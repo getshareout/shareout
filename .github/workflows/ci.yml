@@ -35,11 +35,20 @@ jobs:
           npm run check:boundaries
           npm run check:design-tokens
           npm run check:domains
-          npm run check:customer-names
           npm run check:migrations
           npm run check:ui
           npm run check:access-seams
           npm run check:file-size
+      # The blocklist of customer names is confidential, so it lives in a secret rather
+      # than in the repo, and check:customer-names exits 1 when it is unset rather than
+      # passing vacuously. Secrets are not exposed to fork PRs, so this gate is skipped
+      # there — a contributor cannot leak names they do not have. It always runs on this
+      # repo, which is where the names could actually get committed.
+      - name: Customer names
+        if: env.CUSTOMER_NAMES != ''
+        env:
+          CUSTOMER_NAMES: ${{ secrets.CUSTOMER_NAMES }}
+        run: npm run check:customer-names
       - name: Typecheck
         run: |
           npm run typecheck
