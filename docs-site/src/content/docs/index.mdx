@@ -1,0 +1,51 @@
+---
+title: ShareOut
+description: Self-hosted workspace where agents and people publish live pages on your Cloudflare account.
+template: splash
+hero:
+  tagline: Describe a page — it goes live on your ShareOut instance. Install once on Cloudflare; then talk, build, share.
+  image:
+    file: ../../assets/shareout-mark.png
+  actions:
+    - text: Install ShareOut
+      link: /self-host/overview/
+      icon: right-arrow
+      variant: primary
+    - text: What is ShareOut?
+      link: /everyone/what-is-shareout/
+      icon: open-book
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Your idea, live on *your* instance
+
+ShareOut is **self-hosted only**. Someone deploys it to Cloudflare; then you
+describe a page, it builds it, and you get a link on your domain.
+
+<CardGrid stagger>
+	<Card title="Install first">
+		Clone the repo, `npm run deploy`, open `/setup`. [Install guide](/self-host/overview/).
+	</Card>
+	<Card title="Just describe it">
+		Tell ShareOut what you want — *"a page for my bakery with my menu and a contact form"* — and it builds it. [Make your first page](/everyone/make-your-first-page/).
+	</Card>
+	<Card title="Make it yours">
+		Add photos, change words and colors, drop in a form. Click or ask. [The editor](/everyone/the-editor/).
+	</Card>
+	<Card title="Share with anyone">
+		Every page gets its own link. Whole world, or a few people. [Share it](/everyone/share-it/).
+	</Card>
+</CardGrid>
+
+## New here?
+
+1. [**Install / self-host**](/self-host/overview/) if you do not have an instance yet.
+2. Then [**What is ShareOut?**](/everyone/what-is-shareout/) and
+   [**what you can make**](/everyone/what-you-can-make/).
+
+## Building with code?
+
+REST API and browser SDK — publish pages, store data, run jobs. Start at the
+[**developer intro**](/start/introduction/) or the [**API reference**](/api/).

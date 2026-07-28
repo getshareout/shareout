@@ -1,0 +1,115 @@
+/* ShareOut design system → Starlight theme
+ * Tokens: Design/visual/color.md, Design/visual/typography.md, Design/system/tokens.md
+ * 80% warm neutral · 15% white · 5% blue. Blue = intent, never decoration. */
+
+@import '@fontsource/instrument-sans/400.css';
+@import '@fontsource/instrument-sans/500.css';
+@import '@fontsource/instrument-sans/600.css';
+@import '@fontsource/instrument-sans/700.css';
+@import '@fontsource/source-sans-3/400.css';
+@import '@fontsource/source-sans-3/500.css';
+@import '@fontsource/source-sans-3/600.css';
+@import '@fontsource/jetbrains-mono/400.css';
+
+:root {
+	--font-display: 'Instrument Sans', 'Avenir Next', system-ui, sans-serif;
+	--font-body: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
+
+	--sl-font: var(--font-body);
+	--sl-font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+
+	/* Radius (Design/system/tokens.md) */
+	--sl-border-radius: 12px;
+}
+
+/* Display font for headings + brand */
+:root .sl-markdown-content h1,
+:root .sl-markdown-content h2,
+:root .sl-markdown-content h3,
+.site-title,
+h1, h2, h3 {
+	font-family: var(--font-display);
+	letter-spacing: -0.01em;
+}
+
+/* ── Light theme — warm neutrals ─────────────────────────────── */
+:root[data-theme='light'] {
+	--sl-color-accent-low: #eff6ff;
+	--sl-color-accent: #2563eb;
+	--sl-color-accent-high: #1d4ed8;
+
+	--sl-color-white: #1c1917;        /* "white" = highest-contrast text */
+	--sl-color-gray-1: #292524;
+	--sl-color-gray-2: #44403c;
+	--sl-color-gray-3: #57534e;
+	--sl-color-gray-4: #78716c;
+	--sl-color-gray-5: #a8a29e;
+	--sl-color-gray-6: #e7e5e4;
+	--sl-color-gray-7: #f5f5f4;
+	--sl-color-black: #fafaf9;        /* page canvas */
+
+	--sl-color-text: #1c1917;
+	--sl-color-text-accent: #1d4ed8;
+	--sl-color-bg: #fafaf9;
+	--sl-color-bg-nav: #fafaf9;
+	--sl-color-bg-sidebar: #f5f5f4;
+	--sl-color-bg-inline-code: #f5f5f4;
+	--sl-color-hairline: #e7e5e4;
+	--sl-color-hairline-light: #e7e5e4;
+	--sl-color-hairline-shade: #e7e5e4;
+}
+
+/* ── Dark theme — warm black (Design/visual/color.md) ────────── */
+:root[data-theme='dark'] {
+	--sl-color-accent-low: #15243f;
+	--sl-color-accent: #3b82f6;
+	--sl-color-accent-high: #bfdbfe;
+
+	--sl-color-white: #fafaf9;
+	--sl-color-gray-1: #f5f5f4;
+	--sl-color-gray-2: #d6d3d1;
+	--sl-color-gray-3: #a8a29e;
+	--sl-color-gray-4: #78716c;
+	--sl-color-gray-5: #57534e;
+	--sl-color-gray-6: #44403c;
+	--sl-color-gray-7: #292524;
+	--sl-color-black: #1c1917;
+
+	--sl-color-text: #fafaf9;
+	--sl-color-bg: #1c1917;
+	--sl-color-bg-nav: #1c1917;
+	--sl-color-bg-sidebar: #292524;
+	--sl-color-bg-inline-code: #292524;
+	--sl-color-hairline: #44403c;
+	--sl-color-hairline-light: #44403c;
+	--sl-color-hairline-shade: #292524;
+}
+
+/* Soft, never-dramatic elevation (Design/system/tokens.md) */
+.sl-markdown-content :where(table) {
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+	border-radius: 12px;
+	overflow: hidden;
+}
+
+/* Primary action buttons — warm, rounded, blue used sparingly */
+.sl-markdown-content a.sl-flex,
+a[data-astro-cid] .action.primary,
+.action.primary {
+	border-radius: 12px;
+}
+
+/* Hero CTA tuning on the splash page */
+.hero .actions a.primary {
+	background: #2563eb;
+	border-color: #2563eb;
+	border-radius: 12px;
+}
+.hero .actions a.primary:hover {
+	background: #1d4ed8;
+	border-color: #1d4ed8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	* { scroll-behavior: auto; }
+}

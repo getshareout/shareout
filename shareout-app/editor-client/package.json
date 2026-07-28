@@ -1,0 +1,26 @@
+{
+  "name": "@shareout/editor-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsup && cp dist/index.js dist/editor.js",
+    "dev": "tsup src/index.ts --format esm --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.7",
+    "happy-dom": "^20.0.2",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.7"
+  },
+  "dependencies": {
+    "@shareout/chat-core": "*",
+    "@shareout/design-tokens": "*",
+    "html2canvas": "^1.4.1"
+  }
+}

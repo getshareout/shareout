@@ -1,0 +1,94 @@
+# The slow half of CI: tests, coverage floors, a fresh D1 migration run, the docs
+# build, and the dependency audit. These run on main and nightly rather than on every
+# PR — contributors get the same coverage locally from the pre-push hook
+# (./tooling/scripts/install-hooks.sh), which runs the full suite before anything
+# leaves the machine. Trigger manually from the Actions tab when a PR warrants it.
+name: Full suite
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: full-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: shareout-app
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: npm
+          cache-dependency-path: shareout-app/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Fresh D1 migrations
+        run: npm run db:migrate:fresh
+      - name: Unit tests + coverage floors
+        env:
+          TZ: UTC
+        run: npm run coverage -- --reporter=dot
+      - name: Upload coverage (lcov)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-lcov
+          path: shareout-app/coverage/lcov.info
+          if-no-files-found: ignore
+      - name: Workspace tests (chat-core, sdk, editor)
+        env:
+          TZ: UTC
+        run: |
+          npm test --workspace @shareout/chat-core -- --reporter=dot
+          npm test --workspace @shareout/sdk -- --reporter=dot
+          npm test --workspace @shareout/editor-client -- --reporter=dot
+
+  docs:
+    name: Docs site
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: docs-site
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Build
+        run: npm run build
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: shareout-app
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: npm
+          cache-dependency-path: shareout-app/package-lock.json
+      - name: Install
+        run: npm ci
+      # Production deps only — dev tooling is tracked via Dependabot.
+      - name: Audit (prod, high+)
+        run: npm audit --omit=dev --audit-level=high

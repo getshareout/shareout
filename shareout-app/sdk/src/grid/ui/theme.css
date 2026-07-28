@@ -1,0 +1,121 @@
+/* ShareOut grid theme — maps Tabulator to --so-* tokens.
+   Warm neutrals, ShareOut blue only for selection/focus. No BI-gray chrome.
+   Loaded after tabulator base (import order in index.ts). */
+
+.so-grid-wrap {
+  font-family: var(--so-font-body, system-ui, sans-serif);
+  color: var(--so-color-text, #1a1a1a);
+}
+
+.so-grid-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--so-space-3, 8px) 0;
+}
+
+.so-grid-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font: var(--so-weight-medium, 500) var(--so-text-sm, 0.875rem) var(--so-font-body, system-ui);
+  color: #fff;
+  background: var(--so-color-primary, #2563eb);
+  border: none;
+  border-radius: var(--so-radius-md, 8px);
+  cursor: pointer;
+}
+.so-grid-add:hover { filter: brightness(0.95); }
+
+.so-grid-wrap .tabulator {
+  background: var(--so-color-bg, #fff);
+  border: 1px solid var(--so-color-border, #e5e2dc);
+  border-radius: var(--so-radius-lg, 12px);
+  overflow: hidden;
+  font-size: var(--so-text-base, 0.9375rem);
+}
+
+.so-grid-wrap .tabulator .tabulator-header {
+  background: var(--so-color-surface, #faf8f5);
+  border-bottom: 1px solid var(--so-color-border, #e5e2dc);
+  color: var(--so-color-text-tertiary, #6b6b6b);
+  font-weight: var(--so-weight-medium, 500);
+}
+
+.so-grid-wrap .tabulator .tabulator-col {
+  background: transparent;
+  border-right: none;
+}
+
+.so-grid-wrap .tabulator .tabulator-row {
+  background: var(--so-color-bg, #fff);
+  border-bottom: 1px solid var(--so-color-border, #e5e2dc);
+}
+.so-grid-wrap .tabulator .tabulator-row.tabulator-row-even {
+  background: var(--so-color-bg, #fff);
+}
+.so-grid-wrap .tabulator .tabulator-row:hover {
+  background: var(--so-color-surface, #faf8f5);
+}
+
+.so-grid-wrap .tabulator .tabulator-cell {
+  border-right: none;
+  padding: var(--so-space-3, 10px) var(--so-space-3, 12px);
+  color: var(--so-color-text, #1a1a1a);
+}
+
+.so-grid-wrap .tabulator .tabulator-cell.tabulator-editing {
+  border: 1px solid var(--so-color-primary, #2563eb);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--so-color-primary, #2563eb) 18%, transparent);
+}
+.so-grid-wrap .tabulator .tabulator-cell.tabulator-editing input,
+.so-grid-wrap .tabulator .tabulator-cell.tabulator-editing select {
+  border: none;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+}
+
+.so-grid-wrap .tabulator-row.tabulator-selected {
+  background: color-mix(in srgb, var(--so-color-primary, #2563eb) 8%, #fff);
+}
+
+/* Header: column titles tuned to brand; sort arrows quiet until hover. */
+.so-grid-wrap .tabulator .tabulator-col-title {
+  font-weight: var(--so-weight-medium, 600);
+  font-size: var(--so-text-sm, 0.8125rem);
+  letter-spacing: 0.01em;
+}
+.so-grid-wrap .tabulator .tabulator-col .tabulator-col-sorter .tabulator-arrow {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  border-bottom-color: var(--so-color-text-tertiary, #8a8378) !important;
+  border-top-color: var(--so-color-text-tertiary, #8a8378) !important;
+}
+.so-grid-wrap .tabulator .tabulator-col:hover .tabulator-arrow,
+.so-grid-wrap .tabulator .tabulator-col[aria-sort="ascending"] .tabulator-arrow,
+.so-grid-wrap .tabulator .tabulator-col[aria-sort="descending"] .tabulator-arrow {
+  opacity: 0.6;
+}
+
+/* Frozen "remove" column blends into the row (no default shadow/overlay). */
+.so-grid-wrap .tabulator .tabulator-frozen {
+  background: inherit;
+  box-shadow: none;
+}
+.so-grid-wrap .tabulator .tabulator-col.tabulator-frozen { background: var(--so-color-surface, #faf8f5); }
+.so-grid-wrap .tabulator .so-grid-delcol { padding-right: 4px; }
+
+.so-grid-del {
+  color: var(--so-color-text-tertiary, #8a8378);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: var(--so-text-sm, 0.8125rem);
+  padding: 4px 8px;
+  border-radius: var(--so-radius-sm, 6px);
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+.so-grid-wrap .tabulator-row:hover .so-grid-del { opacity: 1; }
+.so-grid-del:hover { color: var(--so-color-error, #c2410c); background: color-mix(in srgb, var(--so-color-error, #c2410c) 8%, transparent); }

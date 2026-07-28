@@ -1,0 +1,6 @@
+{
+  "name": "shareout-skill",
+  "version": "2.0.1",
+  "updated_at": "2026-06-11T14:07:39-03:00",
+  "description": "Use when the user wants to publish, update, inspect, or manage ShareOut artifacts (HTML, CSV, Markdown, JSON, TXT), including authentication, artifact visibility, collaborators, row-level access policies (per-viewer/multi-tenant data filtering so each customer sees only their own rows), GitHub export, AI chat agents, in-browser Python execution (Pyodide), PWA support, CORS proxy for external APIs, Data Platform integrations (Google Sheets, Google Analytics, Shopify), outbound email (Cloudflare Email Service), scheduled jobs with Slack/Discord/webhook notifications, event-driven automation, and ShareOut deployment URLs."
+}

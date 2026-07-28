@@ -1,0 +1,82 @@
+# Copy to .dev.vars and fill in values (wrangler dev secrets — never commit).
+# `npm run dev` creates this file from this template if it is missing.
+
+# Tell the worker what origin it is actually serving. Unset, it assumes the hosted apex,
+# which makes it generate links to a site you do not control and mis-read localhost as a
+# foreign content domain.
+SHAREOUT_BASE_URL=http://localhost:55162
+
+# Optional — self-host / OSS
+# SETUP_ADMIN_EMAIL=you@example.com
+# ADMIN_ALERTS_DISABLED=1
+
+# Optional — separate marketing site in front of the app. Unset (default): the
+# anonymous apex `/` goes straight to the login page and there is no marketing site.
+# MARKETING_ORIGIN=my-marketing.pages.dev
+
+# Optional — serve your own built docs-site on a hostname this worker owns.
+# Both are required together; unset (default) = no docs proxying.
+# DOCS_HOST=docs.example.com
+# DOCS_ORIGIN=my-docs.pages.dev
+
+# --- Required: session signing ---
+# Signing a session with an empty secret throws an opaque HMAC DataError and every auth
+# route 500s, so this needs a value. `npm run dev` fills it in if left blank.
+# By hand: openssl rand -hex 32
+SESSION_SECRET=
+
+# --- Optional: Google sign-in ---
+# Not needed locally. Use http://localhost:55162/auth/dev?email=you@example.com — it mints
+# a session with no OAuth client at all.
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# --- Optional: publish scripts / API tests ---
+SHAREOUT_API_TOKEN=
+
+# Optional — a SEPARATE domain to serve untrusted artifact bytes from (ADR 30). Leave unset
+# for local dev and for most self-hosts: same-origin serving is the default and works.
+# Do not point it at your own app origin — that is a different domain by definition.
+# ARTIFACT_ORIGIN=https://content.example.com
+
+# --- OAuth integrations (only if testing that connector) ---
+# GITHUB_CLIENT_ID=
+# GITHUB_CLIENT_SECRET=
+# SHOPIFY_CLIENT_ID=
+# SHOPIFY_CLIENT_SECRET=
+# TIENDANUBE_CLIENT_ID=
+# TIENDANUBE_CLIENT_SECRET=
+# SLACK_CLIENT_ID=
+# SLACK_CLIENT_SECRET=
+# SLACK_SIGNING_SECRET=
+
+# --- AI / search (only if testing agent or search features) ---
+# OPENAI_API_KEY=
+# ANTHROPIC_API_KEY=
+# VERCEL_AI_GATEWAY=
+# BRAVE_SEARCH_API_KEY=
+
+# --- R2 S3-compatible signing (admin / artifact uploads) ---
+# R2_ACCESS_KEY_ID=
+# R2_SECRET_ACCESS_KEY=
+# R2_ACCOUNT_ID=
+
+# --- Telegram / alerts (admin only) ---
+# TELEGRAM_BOT_TOKEN=
+# TELEGRAM_ADMIN_BOT_TOKEN=
+# TELEGRAM_WEBHOOK_SECRET=
+# ADMIN_BRIDGE_SECRET=
+# ALERT_TELEGRAM_CHAT_ID=
+
+# --- Turnstile (signup/login widget) ---
+# TURNSTILE_CLOUDFLARE_SITEKEY=
+# TURNSTILE_CLOUDFLARE_SECRETKEY=
+
+# --- Payments (dLocal — only if testing billing) ---
+# DLOCAL_API_KEY=
+# DLOCAL_API_SECRET=
+# DLOCAL_SECRET_KEY=
+
+# --- Email overrides (defaults in wrangler.toml [vars]) ---
+# EMAIL_DEFAULT_FROM=noreply@shareout.site
+# EMAIL_ARTIFACTS_DOMAIN=shareout.site

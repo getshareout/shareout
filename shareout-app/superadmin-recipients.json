@@ -1,0 +1,4 @@
+{
+  "_doc": "Super-admin roster, imported at build time. Keep it EMPTY in a fork: set SETUP_ADMIN_EMAIL (or claim the instance at /setup) so no personal email or Telegram chat id is ever committed. superadmin-recipients.example.json shows the filled shape for local edits.",
+  "recipients": []
+}

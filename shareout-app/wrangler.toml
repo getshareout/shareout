@@ -1,0 +1,142 @@
+# ShareOut — OSS / Deploy-to-Cloudflare template
+# No founder account IDs, routes, or zones. Placeholder D1/KV ids below are filled by
+# `npm run provision:cf` (also runs from `npm run deploy`). Workers Builds does NOT
+# rewrite them — always use deploy command `npm run deploy` with Root = shareout-app.
+name = "shareout"
+main = "src/index.ts"
+compatibility_date = "2025-05-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[dev]
+host = "localhost"
+local_protocol = "http"
+
+[observability]
+enabled = true
+
+  [observability.logs]
+  invocation_logs = true
+  head_sampling_rate = 1
+
+[vars]
+LOG_LEVEL = "info"
+TEAM_METRICS_ENABLED = "0"
+ADMIN_ALERTS_DISABLED = "1"
+# Replace after first deploy with your workers.dev or custom domain origin
+SHAREOUT_BASE_URL = "https://shareout.workers.dev"
+# Optional: hostname of a separate marketing site to put in front of the app.
+# Unset = anonymous `/` goes to the login page (no marketing site ships here).
+# MARKETING_ORIGIN = "my-marketing.pages.dev"
+# Optional: serve your own built docs-site on a hostname this worker owns.
+# DOCS_HOST = "docs.example.com"
+# DOCS_ORIGIN = "my-docs.pages.dev"
+# Same-zone artifacts until you add a CDN domain
+# ARTIFACT_ORIGIN = "https://shareout.workers.dev"
+
+# Optional Email / Queues / AI / Browser / Vectorize — uncomment after core boot.
+# Deploy button stays leaner without them; product degrades (OTP→logs, no queue, keyword search).
+# [[send_email]]
+# name = "EMAIL"
+#
+# [[queues.producers]]
+# queue = "shareout-analytics-views"
+# binding = "VIEWS_QUEUE"
+#
+# [[queues.consumers]]
+# queue = "shareout-analytics-views"
+# max_batch_size = 100
+# max_batch_timeout = 10
+# max_retries = 3
+# dead_letter_queue = "shareout-analytics-views-dlq"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shareout-db"
+# Placeholder — Deploy button / `wrangler d1 create` replaces this
+database_id = "00000000-0000-0000-0000-000000000001"
+
+[[r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "shareout-artifacts"
+
+# [browser]
+# binding = "BROWSER"
+
+[version_metadata]
+binding = "CF_VERSION_METADATA"
+
+# [ai]
+# binding = "AI"
+
+# [[vectorize]]
+# binding = "VECTORIZE"
+# index_name = "shareout-artifacts"
+
+[[kv_namespaces]]
+binding = "SLUGS"
+id = "00000000000000000000000000000001"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "00000000000000000000000000000002"
+
+[[kv_namespaces]]
+binding = "PROXY_CACHE"
+id = "00000000000000000000000000000003"
+
+[[durable_objects.bindings]]
+name = "REALTIME"
+class_name = "RealtimeCoordinator"
+
+[[durable_objects.bindings]]
+name = "COMMENTS"
+class_name = "CommentsCoordinator"
+
+[[durable_objects.bindings]]
+name = "MINIDB"
+class_name = "MiniDB"
+
+[[durable_objects.bindings]]
+name = "CHAT"
+class_name = "ChatDO"
+
+[[durable_objects.bindings]]
+name = "PRESENCE"
+class_name = "PresenceCoordinator"
+
+[[durable_objects.bindings]]
+name = "SHOWTIME"
+class_name = "Showtime"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RealtimeCoordinator"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["CommentsCoordinator"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["MiniDB"]
+
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["ChatDO"]
+
+[[migrations]]
+tag = "v6"
+new_sqlite_classes = ["PresenceCoordinator"]
+
+[[migrations]]
+tag = "v7"
+new_sqlite_classes = ["Showtime"]
+
+# Optional hourly cron — disable on free accounts if undesired
+[triggers]
+crons = ["0 * * * *"]

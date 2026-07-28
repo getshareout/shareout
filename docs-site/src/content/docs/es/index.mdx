@@ -1,0 +1,51 @@
+---
+title: ShareOut
+description: Workspace self-hosted donde agentes y personas publican páginas en vivo en tu cuenta de Cloudflare.
+template: splash
+hero:
+  tagline: Describí una página — queda en vivo en tu instancia ShareOut. Instalá una vez en Cloudflare; después hablá, construí, compartí.
+  image:
+    file: ../../../assets/shareout-mark.png
+  actions:
+    - text: Instalar ShareOut
+      link: /es/self-host/overview/
+      icon: right-arrow
+      variant: primary
+    - text: ¿Qué es ShareOut?
+      link: /es/everyone/what-is-shareout/
+      icon: open-book
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Tu idea, en vivo en *tu* instancia
+
+ShareOut es **solo self-hosted**. Alguien lo despliega en Cloudflare; después
+describís una página, la arma, y tenés un link en tu dominio.
+
+<CardGrid stagger>
+	<Card title="Primero instalá">
+		Cloná el repo, `npm run deploy`, abrí `/setup`. [Guía de install](/es/self-host/overview/).
+	</Card>
+	<Card title="Solo describilo">
+		Decile a ShareOut qué querés — *"una página para mi panadería con el menú y un formulario"* — y la arma. [Hacé tu primera página](/es/everyone/make-your-first-page/).
+	</Card>
+	<Card title="Hacela tuya">
+		Sumá fotos, cambiá textos y colores, agregá un formulario. Clic o pedilo. [El editor](/es/everyone/the-editor/).
+	</Card>
+	<Card title="Compartila">
+		Cada página tiene su link. Al mundo, o a pocas personas. [Compartila](/es/everyone/share-it/).
+	</Card>
+</CardGrid>
+
+## ¿Nuevo acá?
+
+1. [**Install / self-host**](/es/self-host/overview/) si todavía no hay instancia.
+2. Después [**¿Qué es ShareOut?**](/es/everyone/what-is-shareout/) y
+   [**qué podés hacer**](/es/everyone/what-you-can-make/).
+
+## ¿Con código?
+
+API REST y SDK en el browser. Empezá en la [**intro para developers**](/es/start/introduction/)
+o la [**referencia de API**](/es/api/).

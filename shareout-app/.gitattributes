@@ -1,0 +1,7 @@
+# Generated / embedded-bundle files — machine-produced, not hand-authored.
+# Collapse them in code review (architecture_plan §2 principle 2).
+# Regenerated via scripts/embed-*.mjs, scripts/stage-*.mjs, and `npm run build:brand`.
+src/sdk-mobile-serve.ts linguist-generated=true
+src/sdk-charts-serve.ts linguist-generated=true
+public/_bundles/*.js linguist-generated=true
+**/*.generated.ts linguist-generated=true

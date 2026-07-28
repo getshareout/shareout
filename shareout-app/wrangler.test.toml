@@ -1,0 +1,114 @@
+# Miniflare / Vitest pool config for unit tests.
+# Placeholder resource IDs only — not a deploy target. No real zones or account IDs.
+name = "shareout"
+main = "src/index.ts"
+compatibility_date = "2025-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[observability]
+enabled = true
+
+  [observability.logs]
+  invocation_logs = true
+  head_sampling_rate = 1
+
+[vars]
+LOG_LEVEL = "info"
+SIGNUPS_PAUSED = "1"
+# Neutral test origin (not a live product host)
+SHAREOUT_BASE_URL = "https://shareout.test"
+ARTIFACT_ORIGIN = "https://shareout.test"
+EMAIL_DEFAULT_FROM = "noreply@shareout.test"
+EMAIL_ARTIFACTS_DOMAIN = "shareout.test"
+TEAM_METRICS_ENABLED = "0"
+ADMIN_ALERTS_DISABLED = "1"
+
+[[send_email]]
+name = "EMAIL"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shareout-db"
+database_id = "00000000-0000-0000-0000-000000000001"
+
+[[r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "shareout-artifacts"
+
+[browser]
+binding = "BROWSER"
+
+[[kv_namespaces]]
+binding = "SLUGS"
+id = "00000000000000000000000000000001"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "00000000000000000000000000000002"
+
+[[kv_namespaces]]
+binding = "PROXY_CACHE"
+id = "00000000000000000000000000000003"
+
+[[durable_objects.bindings]]
+name = "REALTIME"
+class_name = "RealtimeCoordinator"
+
+[[durable_objects.bindings]]
+name = "COMMENTS"
+class_name = "CommentsCoordinator"
+
+[[durable_objects.bindings]]
+name = "MINIDB"
+class_name = "MiniDB"
+
+[[durable_objects.bindings]]
+name = "CHAT"
+class_name = "ChatDO"
+
+[[durable_objects.bindings]]
+name = "TSML_ENRICHER"
+class_name = "TsmlEnricher"
+
+[[durable_objects.bindings]]
+name = "PRESENCE"
+class_name = "PresenceCoordinator"
+
+[[durable_objects.bindings]]
+name = "SHOWTIME"
+class_name = "Showtime"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RealtimeCoordinator"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["CommentsCoordinator"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["MiniDB"]
+
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["ChatDO"]
+
+[[migrations]]
+tag = "v5"
+new_sqlite_classes = ["TsmlEnricher"]
+
+[[migrations]]
+tag = "v6"
+new_sqlite_classes = ["PresenceCoordinator"]
+
+[[migrations]]
+tag = "v7"
+new_sqlite_classes = ["Showtime"]
+
+[triggers]
+crons = ["0 * * * *"]

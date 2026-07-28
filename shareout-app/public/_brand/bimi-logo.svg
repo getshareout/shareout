@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg version="1.2" baseProfile="tiny-ps" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>ShareOut</title>
+  <rect width="512" height="512" fill="#2563EB"/>
+  <rect x="106" y="106" width="300" height="46" rx="10" fill="#FFFFFF"/>
+  <rect x="106" y="360" width="300" height="46" rx="10" fill="#FFFFFF"/>
+  <rect x="106" y="106" width="46" height="300" rx="10" fill="#FFFFFF"/>
+  <rect x="360" y="106" width="46" height="92" rx="10" fill="#FFFFFF"/>
+  <rect x="360" y="314" width="46" height="92" rx="10" fill="#FFFFFF"/>
+</svg>

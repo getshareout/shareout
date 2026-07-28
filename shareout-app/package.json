@@ -1,0 +1,116 @@
+{
+  "name": "shareout",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ShareOut — open-source artifact publishing on Cloudflare Workers",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/getshareout/shareout.git",
+    "directory": "shareout-app"
+  },
+  "homepage": "https://github.com/getshareout/shareout",
+  "bugs": "https://github.com/getshareout/shareout/issues",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "chat-core",
+    "sdk",
+    "editor-client",
+    "packages/*"
+  ],
+  "scripts": {
+    "predev": "node scripts/dev-vars-bootstrap.mjs",
+    "dev": "wrangler dev --port 55162",
+    "predev:prod": "node scripts/dev-vars-bootstrap.mjs",
+    "dev:prod": "wrangler dev --port 55162 --remote",
+    "provision:cf": "node scripts/provision-cloudflare.mjs",
+    "deploy": "npm run provision:cf && npm run check:destructive && npm run db:migrations:apply && wrangler deploy",
+    "deploy:with-migrations": "npm run deploy",
+    "db:migrations:apply": "wrangler d1 migrations apply DB --remote",
+    "db:migrate": "wrangler d1 migrations apply DB --local",
+    "db:migrate:prod": "npm run db:migrations:apply",
+    "db:migrate:fresh": "bash scripts/fresh-migrate-smoke.sh",
+    "smoke:hello": "bash scripts/hello-publish-smoke.sh",
+    "smoke:data": "bash scripts/data-plane-smoke.sh",
+    "tail": "wrangler tail",
+    "build:editor": "npm run build --prefix editor-client && node scripts/stage-editor-bundle.mjs",
+    "build:chat-core": "node scripts/stage-chat-core-bundle.mjs",
+    "build:sdk": "node scripts/stage-sdk-bundle.mjs",
+    "build:mobile": "node scripts/stage-mobile-sdk-bundle.mjs",
+    "build:grid": "node scripts/stage-grid-bundle.mjs",
+    "build:page-pilot": "node scripts/build-page-pilot.mjs",
+    "build:official-skills": "node scripts/embed-official-skills.mjs",
+    "build:skill": "TZ=UTC node scripts/stage-skill-bundle.mjs",
+    "build:discovery": "node scripts/embed-discovery.mjs",
+    "build:brand": "python3 scripts/generate-brand-assets.py",
+    "sync:skill": "node scripts/sync-skill-to-r2.mjs",
+    "check:boundaries": "node ../tooling/scripts/check-boundaries.mjs",
+    "check:design-tokens": "node ../tooling/scripts/check-design-tokens.mjs",
+    "check:bundles": "node scripts/check-stale-bundles.mjs",
+    "check:bundle-size": "node scripts/check-bundle-size.mjs",
+    "check:inline": "node scripts/check-inline-scripts.mjs",
+    "check:ui": "node scripts/check-ui-conventions.mjs",
+    "check:access-seams": "node scripts/check-access-seams.mjs",
+    "check:migrations": "node scripts/check-migrations.mjs",
+    "check:destructive": "node scripts/check-destructive-migrations.mjs",
+    "check:file-size": "node scripts/check-file-size.mjs",
+    "check:domains": "node scripts/check-domains.mjs",
+    "check:customer-names": "node ../tooling/scripts/check-customer-names.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:agent": "playwright test tests/e2e/agent-private-artifact.spec.ts",
+    "test:e2e:live": "node scripts/run-e2e-live.mjs",
+    "test:e2e:live:flows": "node scripts/run-e2e-live.mjs --flows",
+    "test": "vitest run --maxWorkers=8",
+    "test:watch": "vitest",
+    "test:critical": "vitest run tests/unit/http tests/unit/access tests/unit/auth.test.ts tests/unit/auth tests/unit/publish.test.ts tests/unit/logging.test.ts tests/unit/router/internal-admin.test.ts tests/unit/scheduling-handler.test.ts tests/unit/external-sharing.test.ts tests/unit/artifacts/share.test.ts tests/unit/artifacts/roles.test.ts tests/unit/metric-alerts/routes.test.ts tests/unit/routes.test.ts --maxWorkers=8",
+    "coverage": "vitest run --coverage",
+    "lint": "eslint . --max-warnings 0",
+    "lint:changed": "eslint --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "predeploy": "npm run build:editor && npm run build:chat-core && npm run build:sdk && npm run build:mobile && npm run build:grid && npm run build:official-skills && npm run build:skill && npm run build:discovery"
+  },
+  "dependencies": {
+    "@cloudflare/puppeteer": "^1.1.0",
+    "aws4fetch": "^1.0.20",
+    "fflate": "^0.8.3",
+    "postal-mime": "^2.7.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz",
+    "yjs": "^13.6.31"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.18.8",
+    "@cloudflare/workers-types": "^5.20260724.1",
+    "@eslint/js": "^9.39.2",
+    "@playwright/test": "^1.62.0",
+    "@vitest/coverage-istanbul": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^9.39.2",
+    "happy-dom": "^20.11.1",
+    "page-agent": "^1.12.2",
+    "prettier": "^3.7.4",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.50.0",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.114.0",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "cloudflare": {
+    "bindings": {
+      "SESSION_SECRET": {
+        "description": "Optional here if you use `npm run deploy` (auto-generated). Otherwise: openssl rand -hex 32 | npx wrangler secret put SESSION_SECRET"
+      },
+      "SHAREOUT_BASE_URL": {
+        "description": "Optional here if you use `npm run deploy` (auto-set to workers.dev). Otherwise set to https://shareout.<account>.workers.dev"
+      },
+      "SETUP_ADMIN_EMAIL": {
+        "description": "Optional. Email that becomes the first super-admin on empty roster."
+      }
+    }
+  }
+}

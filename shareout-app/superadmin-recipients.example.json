@@ -1,0 +1,7 @@
+{
+  "_doc": "Copy to superadmin-recipients.json (gitignored in public repos) or seed via SETUP_ADMIN_EMAIL / first-boot admin. Fake placeholders only — never commit real emails or Telegram chat IDs.",
+  "recipients": [
+    { "email": "admin@example.com", "telegramChatId": 100000001 },
+    { "email": "ops@example.com" }
+  ]
+}

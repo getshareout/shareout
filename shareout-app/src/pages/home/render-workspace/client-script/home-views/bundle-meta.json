@@ -1,0 +1,18 @@
+{
+  "byteLen": 155864,
+  "sha256": "dbab4dc159f0f3bb446370e6f3dd83cebf4039b4b2b89eae7018fb17d66b52a9",
+  "sections": [
+    "artifacts-browser",
+    "schedules",
+    "analytics",
+    "datasets",
+    "crew",
+    "library",
+    "connectors",
+    "modals-forms",
+    "admin",
+    "assets",
+    "deliveries",
+    "lens-routing"
+  ]
+}

@@ -1,0 +1,4687 @@
+openapi: 3.1.0
+info:
+  title: ShareOut REST API
+  version: "1.0"
+  summary: Publish, serve, and manage live web artifacts.
+  description: |
+    The ShareOut REST API lets you publish HTML artifacts, manage versions and
+    collaborators, store data and files, and schedule jobs — all over HTTPS.
+
+    **Base URL:** `https://shareout.site`
+
+    All write endpoints require a bearer token. Store yours in
+    `~/.shareout/credentials` as `{ "token": "so_..." }`.
+
+    > Heads up: ShareOut sits behind Cloudflare. Python `requests` can trip a
+    > `1010` block — build your JSON in Python and pipe it to `curl` instead.
+  contact:
+    name: ShareOut
+    url: https://shareout.site
+servers:
+  - url: https://shareout.site
+    description: Production
+security:
+  - bearerAuth: []
+tags:
+  - name: Publish
+    description: Create and update artifacts.
+  - name: Artifacts
+    description: Read, list, and manage artifacts.
+  - name: Search
+    description: Ranked fuzzy search across pages, folders, data, people, schedules, crew, and alerts.
+  - name: Collaborators
+    description: Share editing access and transfer ownership.
+  - name: Access requests
+    description: Viewers request access to private artifacts; owners approve or deny.
+  - name: Support
+    description: Customer support tickets across in-app, email, Slack, and Telegram.
+  - name: Favorites
+    description: Per-user starred artifacts.
+  - name: Data
+    description: Per-artifact JSON and table storage.
+  - name: Blobs
+    description: File storage (images, video, documents).
+  - name: Jobs
+    description: Scheduled and event-driven tasks.
+  - name: Folders
+    description: Organize artifacts into personal folders.
+  - name: Assets
+    description: Per-scope asset library — versioned deliverables, collections, and client download links.
+  - name: External sharing
+    description: Client orgs, external members, folder grants, scoped tokens, read receipts, and client notes (Teams/Enterprise).
+  - name: Metric alerts
+    description: Followable metrics and threshold alert rules.
+  - name: Templates
+    description: Reusable email templates with variables.
+  - name: Account
+    description: Plan tier and upgrades.
+  - name: Auth
+    description: CLI device login and token exchange (no bearer required).
+  - name: Home
+    description: Signed-in home feed, activity visibility, and analytics helpers.
+  - name: Billing
+    description: Workspace subscriptions, trials, and payment methods.
+  - name: Workspaces
+    description: Teams workspaces, members, subdomains, connectors, and data catalog.
+  - name: Catalog
+    description: Optional per-workspace data map — sources, lineage, glossary.
+paths:
+  /v1/publish:
+    post:
+      tags: [Publish]
+      summary: Publish an artifact
+      description: Create a new artifact or push a new version of an existing one.
+      operationId: publishArtifact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishRequest"
+            examples:
+              minimal:
+                summary: Single HTML file
+                value:
+                  name: My App
+                  slug: my-app
+                  entrypoint: index.html
+                  visibility: public
+                  files:
+                    - path: index.html
+                      content: "<!DOCTYPE html><h1>Hello</h1>"
+                      mime: text/html
+                      encoding: utf8
+      responses:
+        "200":
+          description: Published
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/search:
+    get:
+      tags: [Search]
+      summary: Ranked fuzzy search
+      description: >-
+        Typo-tolerant search across pages, folders, datasets, connectors, people,
+        schedules, crew, and alerts. Same engine as the Home Cmd+K palette. Personal
+        tokens may pass `workspace` to scope; workspace Agent tokens (`sot_`) are
+        pinned to their workspace and require `artifacts:read`.
+      operationId: searchWorkspace
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search text. Empty returns recents.
+        - name: groups
+          in: query
+          schema:
+            type: string
+          description: >-
+            Comma subset of artifacts,folders,datasets,connectors,people,schedules,crew,alerts.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 25
+          description: Max results per group.
+        - name: workspace
+          in: query
+          schema:
+            type: string
+          description: Workspace id to scope (personal tokens only).
+      responses:
+        "200":
+          description: Grouped search hits
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  query:
+                    type: string
+                  artifacts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SearchHit"
+                  folders:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SearchHit"
+                  datasets:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SearchHit"
+                  connectors:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SearchHit"
+                  people:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SearchHit"
+                  schedules:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SearchHit"
+                  crew:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SearchHit"
+                  alerts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SearchHit"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/ask:
+    post:
+      tags: [Search]
+      summary: Ask your workspace (single-turn Q&A)
+      description: >-
+        Read-only answer over pages the caller can access. Same access scope as search.
+        Triggered from Home Cmd+K when the query ends with `?`.
+      operationId: askWorkspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question:
+                  type: string
+                workspace:
+                  type: string
+                  description: Workspace id to scope (optional for personal context).
+      responses:
+        "200":
+          description: Answer with page citations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  answer:
+                    type: string
+                  citations:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        artifact_id:
+                          type: string
+                        title:
+                          type: string
+                        url:
+                          type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/metric-watch:
+    get:
+      tags: [Metric alerts]
+      summary: List metric watches on an artifact
+      operationId: listMetricWatches
+      parameters:
+        - name: artifact_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Watches for the artifact
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  watches:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MetricWatch"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Metric alerts]
+      summary: Create a metric watch
+      description: One-click table watch — bell-only anomaly alerts (±threshold_pct vs baseline).
+      operationId: createMetricWatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MetricWatchCreate"
+      responses:
+        "201":
+          description: Watch created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  watch:
+                    $ref: "#/components/schemas/MetricWatch"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/metric-watch/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [Metric alerts]
+      summary: Delete a metric watch
+      operationId: deleteMetricWatch
+      responses:
+        "200":
+          description: Watch removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/artifacts:
+    get:
+      tags: [Artifacts]
+      summary: List artifacts
+      operationId: listArtifacts
+      parameters:
+        - name: favorites
+          in: query
+          description: Return only the current user's favorited artifacts.
+          schema:
+            type: boolean
+        - name: workspace_id
+          in: query
+          description: >-
+            List artifacts that belong to a workspace (not the caller's personal
+            artifacts). Caller must be a workspace member (403 otherwise). Owners/admins
+            see all workspace artifacts; members see non-private artifacts plus any they
+            own or collaborate on.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A list of artifacts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  artifacts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Artifact"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/artifacts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    get:
+      tags: [Artifacts]
+      summary: Get an artifact
+      operationId: getArtifact
+      responses:
+        "200":
+          description: The artifact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artifact"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Artifacts]
+      summary: Update artifact metadata
+      description: >-
+        Update visibility, name, social link-preview fields, or anonymous-access
+        opt-ins. Public visibility requires a paid plan or
+        paid Teams workspace; otherwise visibility is held with code
+        `VISIBILITY_HELD` and a paywall notice.
+      operationId: updateArtifact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                visibility:
+                  $ref: "#/components/schemas/Visibility"
+                allow_anon_write:
+                  type: boolean
+                  description: Let anonymous visitors mutate json/tables/blobs/datasets on public artifacts.
+                allow_anon_email:
+                  type: boolean
+                  description: Let anonymous visitors send contact-form email.
+                allow_anon_agent:
+                  type: boolean
+                  description: Let anonymous visitors use the in-artifact AI chat agent.
+                allow_anon_collab:
+                  type: boolean
+                  description: Let anonymous visitors join realtime collaboration.
+                social_title:
+                  type: [string, "null"]
+                social_description:
+                  type: [string, "null"]
+                social_image_url:
+                  type: [string, "null"]
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artifact"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Artifacts]
+      summary: Delete an artifact (soft delete)
+      description: >-
+        Soft delete with a 30-day recovery window — not an immediate purge. The
+        artifact is hidden from listings and stops serving, and its routing slug is
+        freed for re-publish, but its files, versions, and data store are kept so it
+        can be restored via `POST /v1/artifacts/{id}/restore` until the window
+        elapses (a daily sweep hard-purges it after that). Caller must be the
+        artifact owner, or a workspace owner/admin when the artifact is
+        workspace-owned (`owner_id` is null).
+      operationId: deleteArtifact
+      responses:
+        "200":
+          description: Moved to trash
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  deleted:
+                    type: string
+                    description: Artifact id
+                  deleted_at:
+                    type: string
+                    format: date-time
+                  recoverable_until:
+                    type: string
+                    format: date-time
+                    description: After this time the artifact is permanently purged.
+                  retention_days:
+                    type: integer
+                    example: 30
+                  restore_url:
+                    type: string
+                  message:
+                    type: string
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/artifacts/{id}/export:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    get:
+      tags: [Artifacts]
+      summary: Export artifact as zip
+      description: >-
+        One-click portability — published source files plus json keys and table CSVs.
+        Owner or workspace admin only.
+      operationId: exportArtifact
+      responses:
+        "200":
+          description: Zip bundle
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/artifacts/{id}/present:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    post:
+      tags: [Artifacts]
+      summary: Present this — AI-generate a slides deck
+      description: >-
+        Reads production HTML and publishes a new private slides artifact in the same
+        workspace. Rate-limited per user.
+      operationId: presentArtifact
+      responses:
+        "200":
+          description: New deck artifact
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  artifact_id:
+                    type: string
+                  url:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          description: Rate limit exceeded
+  /v1/artifacts/unused/archive:
+    post:
+      tags: [Artifacts]
+      summary: Archive all unused personal pages
+      description: >-
+        Soft-delete flagged never-viewed pages (janitor). Personal account owner only.
+        Batches of 100 per call.
+      operationId: archiveUnusedPersonalArtifacts
+      responses:
+        "200":
+          description: Archive result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  archived:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/artifacts/{id}/presence:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    get:
+      tags: [Artifacts]
+      summary: Live concurrent viewer count
+      description: >-
+        Best-effort count of viewers with the artifact page open (visible tab).
+        Owner or collaborator only — not shown on the public page.
+      operationId: getArtifactPresence
+      responses:
+        "200":
+          description: Current viewer count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    minimum: 0
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/artifacts/{id}/deliver:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    get:
+      tags: [Artifacts]
+      summary: Deliver channel status
+      description: >-
+        Per-channel connection status for the Home Inspector Deliver section —
+        whether Telegram is linked for the signed-in user, Slack is connected for
+        the artifact workspace (with OAuth `connectUrl` when not), and email is
+        always available.
+      operationId: getArtifactDeliverStatus
+      responses:
+        "200":
+          description: Channel status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  telegram:
+                    type: object
+                    properties:
+                      linked:
+                        type: boolean
+                      connectUrl:
+                        type: string
+                  slack:
+                    type: object
+                    properties:
+                      available:
+                        type: boolean
+                      connected:
+                        type: boolean
+                      connectionName:
+                        type: [string, "null"]
+                      connectUrl:
+                        type: [string, "null"]
+                  email:
+                    type: object
+                    properties:
+                      available:
+                        type: boolean
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Artifacts]
+      summary: Deliver artifact now
+      description: >-
+        One-shot delivery to email, Slack, or Telegram — same destination registry
+        as scheduled jobs (`action` + `config`). Viewers may only deliver to
+        themselves on Slack/Telegram.
+      operationId: deliverArtifactNow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, config]
+              properties:
+                action:
+                  type: string
+                  enum: [email, slack, telegram]
+                config:
+                  type: object
+                  description: Same shape as job `config` for the chosen action.
+      responses:
+        "200":
+          description: Delivery succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  steps:
+                    type: array
+                    items:
+                      type: object
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "502":
+          description: Delivery failed
+  /v1/artifacts/{id}/deliver/slack-channels:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    get:
+      tags: [Artifacts]
+      summary: List Slack channels for Deliver picker
+      description: >-
+        Searchable channel list for the workspace Slack connection — used by Home
+        Inspector Deliver instead of pasting channel IDs.
+      operationId: listArtifactDeliverSlackChannels
+      responses:
+        "200":
+          description: Channels
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  channels:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                  error:
+                    type: string
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/artifacts/deleted:
+    get:
+      tags: [Artifacts]
+      summary: List soft-deleted artifacts (trash)
+      description: >-
+        Soft-deleted artifacts still inside the 30-day recovery window that the
+        caller can restore (their own, plus workspace-owned ones where they are an
+        owner/admin). Each entry includes `deleted_at` and `recoverable_until`.
+      operationId: listDeletedArtifacts
+      responses:
+        "200":
+          description: Trash contents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  artifacts:
+                    type: array
+                    items:
+                      type: object
+                  retention_days:
+                    type: integer
+                    example: 30
+  /v1/artifacts/{id}/restore:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    post:
+      tags: [Artifacts]
+      summary: Restore a soft-deleted artifact
+      description: >-
+        Bring a trashed artifact back. Allocates a fresh routing + display slug
+        (suffixed if the original was reclaimed by a re-publish while it was
+        trashed), recreates the production deployment from the latest version, and
+        returns the artifact detail. Caller must be the owner, or a workspace
+        owner/admin. Only works inside the 30-day window — after that the artifact is
+        permanently purged.
+      operationId: restoreArtifact
+      responses:
+        "200":
+          description: Restored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artifact"
+        "400":
+          description: Artifact is not deleted
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Artifact has no version to restore
+  /v1/artifacts/{id}/files:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    get:
+      tags: [Artifacts]
+      summary: Get artifact files
+      description: Fetch all files for an artifact version. Requires viewer access or higher.
+      operationId: getArtifactFiles
+      parameters:
+        - name: version
+          in: query
+          description: Version number or ID. Defaults to the latest.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Files for the version
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  artifact_id:
+                    type: string
+                  version_id:
+                    type: string
+                  files:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FileEntry"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/artifacts/{id}/collaborators:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    get:
+      tags: [Collaborators]
+      summary: List collaborators
+      operationId: listCollaborators
+      responses:
+        "200":
+          description: Collaborators
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  collaborators:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Collaborator"
+    post:
+      tags: [Collaborators]
+      summary: Add collaborators
+      operationId: addCollaborators
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [emails, role]
+              properties:
+                emails:
+                  type: array
+                  items:
+                    type: string
+                    format: email
+                role:
+                  $ref: "#/components/schemas/Role"
+      responses:
+        "200":
+          description: Added
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/artifacts/{id}/collaborators/{email}:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+      - name: email
+        in: path
+        required: true
+        schema:
+          type: string
+          format: email
+    delete:
+      tags: [Collaborators]
+      summary: Remove a collaborator
+      operationId: removeCollaborator
+      responses:
+        "200":
+          description: Removed
+        "400":
+          description: Cannot remove the artifact owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /v1/artifacts/{id}/transfer-ownership:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    post:
+      tags: [Collaborators]
+      summary: Transfer ownership
+      description: Owner only.
+      operationId: transferOwnership
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: Ownership transferred
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/access-requests:
+    post:
+      tags: [Access requests]
+      summary: Request access to a private page
+      description: >-
+        Signed-in user asks the artifact owner for viewer access (Google Drive style).
+        Requires an email identity. Idempotent while a pending request exists.
+      operationId: createAccessRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug]
+              properties:
+                slug:
+                  type: string
+                  description: Production slug of the private artifact.
+      responses:
+        "200":
+          description: Request created or already pending
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  status:
+                    type: string
+                    enum: [created, pending]
+                  message:
+                    type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/access-requests/incoming:
+    get:
+      tags: [Access requests]
+      summary: List pending access requests for your pages
+      operationId: listIncomingAccessRequests
+      responses:
+        "200":
+          description: Pending requests where you are the artifact owner
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requests:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AccessRequest"
+  /v1/access-requests/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Access requests]
+      summary: Approve or deny an access request
+      description: Owner only. Approving adds the requester as a viewer collaborator.
+      operationId: decideAccessRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [approve, deny]
+      responses:
+        "200":
+          description: Decision recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  action:
+                    type: string
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/support/tickets:
+    get:
+      tags: [Support]
+      summary: List support tickets
+      description: >-
+        `scope=mine` (default) returns the requester's tickets. `scope=workspace&workspace={id}`
+        requires workspace admin/owner. `scope=all` is super-admin only. Optional `status` filter.
+      operationId: listSupportTickets
+      parameters:
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [mine, workspace, all]
+            default: mine
+        - name: workspace
+          in: query
+          schema:
+            type: string
+          description: Required when scope=workspace.
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, pending, resolved, closed]
+      responses:
+        "200":
+          description: Tickets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  tickets:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SupportTicket"
+    post:
+      tags: [Support]
+      summary: Create a support ticket
+      operationId: createSupportTicket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subject, body]
+              properties:
+                subject:
+                  type: string
+                body:
+                  type: string
+                workspaceId:
+                  type: string
+                  nullable: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  ticket:
+                    $ref: "#/components/schemas/SupportTicket"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /v1/support/tickets/{ticketId}:
+    parameters:
+      - name: ticketId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Support]
+      summary: Get ticket and thread
+      operationId: getSupportTicket
+      responses:
+        "200":
+          description: Ticket with messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  ticket:
+                    $ref: "#/components/schemas/SupportTicket"
+                  thread:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SupportMessage"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/support/tickets/{ticketId}/message:
+    parameters:
+      - name: ticketId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Support]
+      summary: Append a message (customer reply re-opens)
+      operationId: appendSupportMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+      responses:
+        "200":
+          description: Message added
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /v1/support/tickets/{ticketId}/reply:
+    parameters:
+      - name: ticketId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Support]
+      summary: Staff approve and send reply on origin channel
+      operationId: replySupportTicket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+      responses:
+        "200":
+          description: Reply delivered
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/support/tickets/{ticketId}/status:
+    parameters:
+      - name: ticketId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Support]
+      summary: Update ticket status (staff)
+      operationId: setSupportTicketStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [open, pending, resolved, closed]
+      responses:
+        "200":
+          description: Status updated
+  /v1/artifacts/{id}/favorite:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    post:
+      tags: [Favorites]
+      summary: Favorite an artifact
+      description: Idempotent. Any logged-in user for public artifacts; viewer+ for private.
+      operationId: addFavorite
+      responses:
+        "200":
+          description: Favorited
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  artifact_id:
+                    type: string
+                  favorited:
+                    type: boolean
+    delete:
+      tags: [Favorites]
+      summary: Unfavorite an artifact
+      description: Idempotent.
+      operationId: removeFavorite
+      responses:
+        "200":
+          description: Unfavorited
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  artifact_id:
+                    type: string
+                  favorited:
+                    type: boolean
+  /v1/data/{artifactId}/json:
+    parameters:
+      - $ref: "#/components/parameters/DataArtifactId"
+    get:
+      tags: [Data]
+      summary: Read the artifact JSON store
+      operationId: getJson
+      responses:
+        "200":
+          description: The stored JSON document
+          content:
+            application/json:
+              schema:
+                type: object
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Data]
+      summary: Replace the artifact JSON store
+      operationId: putJson
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Saved
+  /v1/data/{artifactId}/tables:
+    parameters:
+      - $ref: "#/components/parameters/DataArtifactId"
+    get:
+      tags: [Data]
+      summary: List tables
+      operationId: listTables
+      responses:
+        "200":
+          description: Tables for the artifact
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tables:
+                    type: array
+                    items:
+                      type: string
+  /v1/data/{artifactId}/workspace/_share:
+    parameters:
+      - $ref: "#/components/parameters/DataArtifactId"
+    post:
+      tags: [Data]
+      summary: Share one of this artifact's tables with the workspace (Teams)
+      description: >-
+        Owner-only. Exposes one of this artifact's tables to other artifacts in
+        the same workspace at read or readwrite level. The data stays in this
+        artifact's store; this only records an opt-in grant.
+      operationId: shareWorkspaceTable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [table]
+              properties:
+                table:
+                  type: string
+                  description: Name of this artifact's table to share.
+                as:
+                  type: string
+                  description: Workspace-unique shared name (defaults to the table name).
+                access:
+                  type: string
+                  enum: [read, readwrite]
+                  default: read
+      responses:
+        "200":
+          description: Share created or updated
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/data/{artifactId}/workspace/tables/{sharedName}/query:
+    parameters:
+      - $ref: "#/components/parameters/DataArtifactId"
+      - name: sharedName
+        in: path
+        required: true
+        description: The workspace-shared table name.
+        schema:
+          type: string
+    post:
+      tags: [Data]
+      summary: Query a workspace-shared table (Teams)
+      description: >-
+        Read rows from a table another artifact shared into this workspace. Same
+        query body as the per-artifact table query. Writing (insert/update/delete)
+        is allowed only when the owner shared the table as readwrite.
+      operationId: queryWorkspaceTable
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Matching rows
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/shared-tables:
+    get:
+      tags: [Data]
+      summary: List tables shared into a workspace (Teams)
+      description: Any workspace member can list the shared-table catalog.
+      operationId: listWorkspaceSharedTables
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Shared tables in the workspace
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  viewerRole:
+                    type: string
+                  sharedTables:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        sharedName:
+                          type: string
+                        access:
+                          type: string
+                          enum: [read, readwrite]
+                        ownerArtifactId:
+                          type: string
+                        ownerName:
+                          type: string
+                        sourceTable:
+                          type: string
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/data/{artifactId}/blobs:
+    parameters:
+      - $ref: "#/components/parameters/DataArtifactId"
+    get:
+      tags: [Blobs]
+      summary: List blobs
+      operationId: listBlobs
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Blobs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      blobs:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Blob"
+                      total:
+                        type: integer
+                      hasMore:
+                        type: boolean
+    post:
+      tags: [Blobs]
+      summary: Upload a blob
+      description: "Max 50MB per file, 500MB per artifact, 1000 blobs."
+      operationId: uploadBlob
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                filename:
+                  type: string
+      responses:
+        "200":
+          description: Uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Blob"
+        "413":
+          description: File too large or storage full
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /v1/files/{deliverableId}/content:
+    parameters:
+      - name: deliverableId
+        in: path
+        required: true
+        description: Workspace file id (`dlv_…`)
+        schema:
+          type: string
+    get:
+      tags: [Assets]
+      summary: Stream workspace file content (latest version)
+      description: Cross-artifact file route. Enforces per-file visibility — private files require owner, workspace member, or a sharee grant.
+      operationId: getFileContent
+      responses:
+        "200":
+          description: File bytes
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/jobs:
+    get:
+      tags: [Jobs]
+      summary: List jobs
+      operationId: listJobs
+      parameters:
+        - name: artifact_id
+          in: query
+          description: Filter to a single artifact.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Job"
+    post:
+      tags: [Jobs]
+      summary: Create a job
+      description: Schedule a recurring (cron) or event-driven task.
+      operationId: createJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobCreate"
+            examples:
+              weeklyEmail:
+                summary: Weekly email
+                value:
+                  artifact_id: art_abc123
+                  action: email
+                  trigger_type: cron
+                  schedule: "0 9 * * 1"
+                  config:
+                    recipients: [team@company.com]
+                    subject: Weekly report
+                    includeArtifactLink: true
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /v1/jobs/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Jobs]
+      summary: Get a job
+      operationId: getJob
+      responses:
+        "200":
+          description: The job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Jobs]
+      summary: Update a job
+      description: Enable/pause, change schedule, title, description, or config.
+      operationId: updateJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  maxLength: 200
+                  nullable: true
+                description:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+                schedule:
+                  type: string
+                enabled:
+                  type: boolean
+                config:
+                  type: object
+      responses:
+        "200":
+          description: Updated
+    delete:
+      tags: [Jobs]
+      summary: Delete a job
+      operationId: deleteJob
+      responses:
+        "200":
+          description: Deleted
+  /v1/jobs/{id}/run:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Jobs]
+      summary: Run a job now
+      description: Trigger immediately without affecting the schedule.
+      operationId: runJob
+      responses:
+        "200":
+          description: Executed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  execution:
+                    type: object
+  /v1/folders:
+    get:
+      tags: [Folders]
+      summary: List personal folders
+      operationId: listFolders
+      responses:
+        "200":
+          description: Folders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  folders:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Folder"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Folders]
+      summary: Create a folder
+      operationId: createFolder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                  description: Auto-generated from name if omitted.
+                description:
+                  type: [string, "null"]
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Folder"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/folders/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags: [Folders]
+      summary: Rename or update a folder
+      operationId: updateFolder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                description:
+                  type: [string, "null"]
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Folder"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Folders]
+      summary: Delete a folder
+      description: Artifacts inside the folder become unfiled.
+      operationId: deleteFolder
+      responses:
+        "200":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/artifacts/{id}/folder:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    post:
+      tags: [Folders]
+      summary: Move an artifact into a folder
+      description: "Pass `folder_id: null` to remove the artifact from its folder."
+      operationId: moveArtifactToFolder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [folder_id]
+              properties:
+                folder_id:
+                  type: [string, "null"]
+      responses:
+        "200":
+          description: Moved
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/assets:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Assets]
+      summary: List deliverables and loose files
+      description: >-
+        Returns the scope's asset bucket — deliverables at their latest version,
+        loose uploads, `bucketId`, and `usedBytes`. Personal scope uses
+        `/v1/assets` without a workspace prefix.
+      operationId: listWorkspaceAssets
+      responses:
+        "200":
+          description: Asset library
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetLibrary"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/assets/collections/{collectionId}/share:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: collectionId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Assets]
+      summary: Create a public delivery link
+      description: >-
+        Mint an unguessable `/d/<token>` download page for a collection.
+        Optional `gate` (`none`, `password`, `domain`), `expiresAt`, and gate
+        inputs. Protected deliveries stream bytes through `/d/<token>/file/<blobId>`.
+      operationId: shareAssetCollection
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssetShareRequest"
+      responses:
+        "201":
+          description: Share link created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetShareLink"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/assets/links:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Assets]
+      summary: List sent delivery links
+      operationId: listAssetShareLinks
+      responses:
+        "200":
+          description: Links
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  links:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AssetShareLink"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/assets/links/{linkId}/revoke:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: linkId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Assets]
+      summary: Revoke a delivery link
+      description: Revoked links 404 for both the download page and gated file bytes.
+      operationId: revokeAssetShareLink
+      responses:
+        "200":
+          description: Revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  revoked:
+                    type: boolean
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/sharees:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [External sharing]
+      summary: List client orgs
+      operationId: listSharees
+      responses:
+        "200":
+          description: Client orgs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sharees:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Sharee"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [External sharing]
+      summary: Create a client org
+      operationId: createSharee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShareeCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sharee"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/sharees/{shareeId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: shareeId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [External sharing]
+      summary: Get a client org
+      operationId: getSharee
+      responses:
+        "200":
+          description: Client org
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sharee"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [External sharing]
+      summary: Update a client org
+      operationId: updateSharee
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShareeUpdate"
+      responses:
+        "200":
+          description: Updated
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [External sharing]
+      summary: Delete a client org
+      description: Removes the client, its members, grants, and notes.
+      operationId: deleteSharee
+      responses:
+        "200":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/grants:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [External sharing]
+      summary: List grants
+      operationId: listGrants
+      parameters:
+        - name: subject_id
+          in: query
+          schema:
+            type: string
+        - name: resource_type
+          in: query
+          schema:
+            type: string
+            enum: [folder, artifact, file]
+        - name: resource_id
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Grants
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  grants:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Grant"
+    post:
+      tags: [External sharing]
+      summary: Create a grant
+      operationId: createGrant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GrantCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Grant"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/grants/{grantId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: grantId
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [External sharing]
+      summary: Revoke a grant
+      operationId: deleteGrant
+      responses:
+        "200":
+          description: Revoked
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/share-person:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    post:
+      tags: [External sharing]
+      summary: Share a file or folder with one person by email
+      description: Teams/Enterprise. Admin only. Invites an external user if needed and mints an `external_user` grant. Returns 409 if the email is already an internal member.
+      operationId: shareWithPerson
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, resource_type, resource_id]
+              properties:
+                email:
+                  type: string
+                  format: email
+                resource_type:
+                  type: string
+                  enum: [file, folder]
+                resource_id:
+                  type: string
+                capability:
+                  type: string
+                  enum: [view, comment]
+                  default: view
+      responses:
+        "200":
+          description: Grant created (idempotent re-share)
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Email is already an internal workspace member
+  /v1/workspaces/{workspaceId}/export:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Workspaces]
+      summary: Export all workspace artifacts as zip
+      description: Owner or admin only. Caps at 200 artifacts per zip.
+      operationId: exportWorkspace
+      responses:
+        "200":
+          description: Zip bundle
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/unused/archive:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    post:
+      tags: [Workspaces]
+      summary: Archive all unused workspace pages
+      description: >-
+        Soft-delete flagged never-viewed pages (janitor). Workspace owner or admin.
+        Batches of 100 per call.
+      operationId: archiveUnusedWorkspaceArtifacts
+      responses:
+        "200":
+          description: Archive result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  archived:
+                    type: integer
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/sharee-activity:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [External sharing]
+      summary: List read receipts across all clients
+      operationId: listWorkspaceShareeActivity
+      responses:
+        "200":
+          description: Activity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareeActivityList"
+  /v1/workspaces/{workspaceId}/sharees/{shareeId}/context:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: shareeId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [External sharing]
+      summary: List client note files
+      operationId: listShareeContextFiles
+      responses:
+        "200":
+          description: Note files
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  files:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/sharees/{shareeId}/context/{name}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: shareeId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [External sharing]
+      summary: Read a client note
+      operationId: getShareeContextFile
+      responses:
+        "200":
+          description: Markdown note
+          content:
+            text/markdown:
+              schema:
+                type: string
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [External sharing]
+      summary: Create or replace a client note
+      description: >-
+        Admin only. Raw markdown body or JSON with a content field.
+      operationId: putShareeContextFile
+      requestBody:
+        content:
+          text/markdown:
+            schema:
+              type: string
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+      responses:
+        "200":
+          description: Saved
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    delete:
+      tags: [External sharing]
+      summary: Delete a client note
+      operationId: deleteShareeContextFile
+      responses:
+        "200":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/metric-alerts/definitions:
+    get:
+      tags: [Metric alerts]
+      summary: List metric definitions
+      operationId: listMetricDefinitions
+      parameters:
+        - name: artifact_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Metric definitions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  metrics:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MetricDefinition"
+    put:
+      tags: [Metric alerts]
+      summary: Create or update a metric definition
+      description: "Upserts by `(artifact_id, metric_id)`. Up to 10 metrics per artifact."
+      operationId: upsertMetricDefinition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MetricDefinition"
+      responses:
+        "200":
+          description: Saved
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /v1/metric-alerts/definitions/{artifactId}/{metricId}:
+    parameters:
+      - name: artifactId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: metricId
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [Metric alerts]
+      summary: Delete a metric definition
+      operationId: deleteMetricDefinition
+      responses:
+        "200":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/metric-alerts:
+    get:
+      tags: [Metric alerts]
+      summary: List alert rules
+      description: Manager-aware — managers see every rule on the artifact; viewers see only their own.
+      operationId: listMetricAlerts
+      parameters:
+        - name: artifact_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Alert rules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alerts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MetricAlert"
+    post:
+      tags: [Metric alerts]
+      summary: Create an alert rule
+      operationId: createMetricAlert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MetricAlertCreate"
+            examples:
+              revenueDrop:
+                summary: Slack alert when revenue drops
+                value:
+                  artifact_id: art_abc123
+                  metric_id: revenue
+                  name: Revenue dropped below target
+                  condition: { op: lt, value: 100000 }
+                  schedule: "0 * * * *"
+                  destination:
+                    kind: slack
+                    config: { connection: team, targetType: channel, channelId: C0123456789, mode: message }
+                  message: Revenue is below target.
+                  cooldown_seconds: 86400
+      responses:
+        "200":
+          description: Created
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /v1/metric-alerts/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Metric alerts]
+      summary: Get an alert rule
+      operationId: getMetricAlert
+      responses:
+        "200":
+          description: The rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetricAlert"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Metric alerts]
+      summary: Update an alert rule
+      description: Enable/pause, change schedule, condition, message, or cooldown.
+      operationId: updateMetricAlert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                schedule:
+                  type: string
+                condition:
+                  $ref: "#/components/schemas/MetricCondition"
+                message:
+                  type: string
+                cooldown_seconds:
+                  type: integer
+      responses:
+        "200":
+          description: Updated
+    delete:
+      tags: [Metric alerts]
+      summary: Delete an alert rule
+      operationId: deleteMetricAlert
+      responses:
+        "200":
+          description: Deleted
+  /v1/metric-alerts/{id}/run:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Metric alerts]
+      summary: Evaluate an alert now
+      operationId: runMetricAlert
+      responses:
+        "200":
+          description: Evaluated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  value:
+                    type: number
+                  matched:
+                    type: boolean
+                  delivered:
+                    type: boolean
+  /v1/metric-alerts/{id}/events:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Metric alerts]
+      summary: Recent evaluation history
+      operationId: listMetricAlertEvents
+      responses:
+        "200":
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        value:
+                          type: number
+                        matched:
+                          type: boolean
+                        delivered:
+                          type: boolean
+                        evaluated_at:
+                          type: integer
+  /v1/templates:
+    get:
+      tags: [Templates]
+      summary: List templates
+      operationId: listTemplates
+      parameters:
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [account, artifact, all]
+            default: all
+        - name: artifact_id
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Templates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      templates:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Template"
+    post:
+      tags: [Templates]
+      summary: Create a template
+      operationId: createTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemplateCreate"
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      template:
+                        $ref: "#/components/schemas/Template"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /v1/templates/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Templates]
+      summary: Get a template
+      operationId: getTemplate
+      responses:
+        "200":
+          description: The template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Templates]
+      summary: Update a template
+      operationId: updateTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                subject:
+                  type: string
+                html:
+                  type: string
+                text_body:
+                  type: string
+                variables:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/TemplateVariable"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      tags: [Templates]
+      summary: Delete a template
+      operationId: deleteTemplate
+      responses:
+        "200":
+          description: Deleted
+  /v1/templates/preview:
+    post:
+      tags: [Templates]
+      summary: Preview an inline template
+      description: Render an unsaved template with sample data.
+      operationId: previewInlineTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subject, html]
+              properties:
+                subject:
+                  type: string
+                html:
+                  type: string
+                text_body:
+                  type: string
+                data:
+                  type: object
+      responses:
+        "200":
+          description: Rendered preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplatePreview"
+  /v1/templates/{id}/preview:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Templates]
+      summary: Preview a saved template
+      operationId: previewSavedTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: object
+      responses:
+        "200":
+          description: Rendered preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplatePreview"
+  /v1/auth/device/start:
+    post:
+      tags: [Auth]
+      summary: Start CLI device login
+      description: >
+        RFC-8628-style device authorization for CLI/agents. No auth required.
+        Optional `expected_email` pre-selects the Google account and drives a
+        mismatch warning on approval.
+      operationId: startDeviceLogin
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expected_email:
+                  type: string
+                  format: email
+                  description: Email the user expects to sign in as (e.g. invite address).
+      responses:
+        "201":
+          description: Pending device authorization
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [device_code, user_code, verification_uri, verification_uri_complete, interval, expires_in]
+                properties:
+                  device_code:
+                    type: string
+                    description: Secret held by the CLI for polling.
+                  user_code:
+                    type: string
+                    description: Short code shown in the browser (e.g. XXXX-XXXX).
+                  verification_uri:
+                    type: string
+                    format: uri
+                  verification_uri_complete:
+                    type: string
+                    format: uri
+                  interval:
+                    type: integer
+                    description: Minimum poll interval in seconds.
+                  expires_in:
+                    type: integer
+                    description: Seconds until the code expires.
+  /v1/auth/device/token:
+    post:
+      tags: [Auth]
+      summary: Poll device login for token
+      description: >
+        Poll with the `device_code` secret. Returns pending until the browser
+        OAuth step completes, then delivers the `so_` token exactly once.
+      operationId: pollDeviceLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_code]
+              properties:
+                device_code:
+                  type: string
+      responses:
+        "200":
+          description: Pending or approved
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [status, interval]
+                    properties:
+                      status:
+                        type: string
+                        enum: [pending]
+                      interval:
+                        type: integer
+                  - type: object
+                    required: [status, token, user_id]
+                    properties:
+                      status:
+                        type: string
+                        enum: [approved]
+                      token:
+                        type: string
+                        description: Bearer token (so_…), shown once.
+                      user_id:
+                        type: string
+                      warn:
+                        type: string
+                        description: Present when expected_email did not match signed-in email.
+        "400":
+          description: expired_token, access_denied, or invalid_grant
+  /v1/home/activity-feed:
+    get:
+      tags: [Home]
+      summary: Activity feed (Needs You + Pulse)
+      description: >-
+        Two-surface feed for the signed-in home. Actionable events appear as
+        individual rows; ambient events as aggregated Pulse counts. Filter by
+        `window` (`today`, `7d`, `30d`) and optional `workspace`.
+      operationId: getHomeActivityFeed
+      parameters:
+        - name: workspace
+          in: query
+          schema:
+            type: string
+          description: Workspace id or slug; omit for Personal scope.
+        - name: window
+          in: query
+          schema:
+            type: string
+            enum: [today, 7d, 30d]
+            default: 7d
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 30
+      responses:
+        "200":
+          description: Activity feed payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  needs:
+                    type: array
+                    items:
+                      type: object
+                    description: Actionable events — one row per event requiring action (excludes dismissed/opened items).
+                  seen:
+                    type: array
+                    items:
+                      type: object
+                    description: >-
+                      Dismissed or opened Needs You events still within the selected
+                      window/limit — shown in the notifications panel Seen tab.
+                  pulse:
+                    type: object
+                    description: Aggregated ambient counts per kind over the selected window.
+                  actionItems:
+                    type: array
+                    description: >-
+                      Comments assigned to the signed-in user that are not yet resolved.
+                      Each item is a Comment with `assigneeUserId`, `assigneeEmail`, and
+                      optional `dueAt` set.
+                    items:
+                      type: object
+                  requestedOpen:
+                    type: integer
+                    description: >-
+                      Count of comments the signed-in user assigned to others that are
+                      still open (unresolved).
+  /v1/home/dismiss-event:
+    post:
+      tags: [Home]
+      summary: Dismiss activity notifications
+      description: >-
+        Hide actionable Needs You events for the signed-in user. Used by the
+        notifications panel (single dismiss, mark-all-read, or opening a card).
+      operationId: dismissHomeEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [eventId]
+                  properties:
+                    eventId:
+                      type: string
+                - type: object
+                  required: [eventIds]
+                  properties:
+                    eventIds:
+                      type: array
+                      items:
+                        type: string
+      responses:
+        "200":
+          description: Dismissed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/home/event-visibility:
+    get:
+      tags: [Home]
+      summary: List activity visibility settings
+      operationId: getHomeEventVisibility
+      parameters:
+        - name: workspace
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Per-kind audience map
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kinds:
+                    type: array
+                    items:
+                      type: object
+                  canManage:
+                    type: boolean
+                  scoped:
+                    type: boolean
+    put:
+      tags: [Home]
+      summary: Set activity visibility for one kind
+      operationId: setHomeEventVisibility
+      parameters:
+        - name: workspace
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, audience]
+              properties:
+                kind:
+                  type: string
+                  description: Activity kind (e.g. view, comment, run).
+                audience:
+                  type: string
+                  enum: [self, members, admins, off]
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/home/onboarding:
+    get:
+      tags: [Home]
+      summary: Setup checklist status
+      description: >-
+        Returns the signed-in user's onboarding checklist for a workspace, or
+        `{ "track": null }` when no checklist applies (external sharees, established
+        workspaces, or members who joined more than 14 days ago). Task labels are
+        client-side; the server returns keys, done flags, and action hints.
+      operationId: getHomeOnboarding
+      parameters:
+        - name: workspace
+          in: query
+          schema:
+            type: string
+          description: Workspace id or slug.
+      responses:
+        "200":
+          description: Checklist status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  track:
+                    type: string
+                    nullable: true
+                    enum: [admin, member, null]
+                  tasks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key:
+                          type: string
+                        done:
+                          type: boolean
+                        skippable:
+                          type: boolean
+                  pct:
+                    type: integer
+                    minimum: 0
+                    maximum: 100
+                  eligible:
+                    type: boolean
+                  dismissed:
+                    type: boolean
+                  celebrated:
+                    type: boolean
+  /v1/home/onboarding/dismiss:
+    post:
+      tags: [Home]
+      summary: Dismiss the setup checklist
+      operationId: dismissHomeOnboarding
+      parameters:
+        - name: workspace
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Dismissed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        "400":
+          description: workspace required
+  /v1/home/onboarding/skill-ack:
+    post:
+      tags: [Home]
+      summary: Acknowledge the "Get the skill" onboarding task
+      description: The skill-install task is not server-observable; the client records an explicit ack.
+      operationId: ackHomeOnboardingSkill
+      parameters:
+        - name: workspace
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        "400":
+          description: workspace required
+  /v1/home/onboarding/celebrate:
+    post:
+      tags: [Home]
+      summary: Record the one-shot 100% celebration moment
+      operationId: celebrateHomeOnboarding
+      parameters:
+        - name: workspace
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        "400":
+          description: workspace required
+  /v1/home/agent/brief:
+    get:
+      tags: [Home]
+      summary: Proactive daily AI brief
+      description: >-
+        Short AI-written catch-up shown once per day in the Home agent dock when
+        `ai.web_agent` is enabled. Requires a signed-in session.
+      operationId: getHomeAgentBrief
+      parameters:
+        - name: workspace
+          in: query
+          schema:
+            type: string
+          description: Workspace id or slug; omit for Personal scope.
+      responses:
+        "200":
+          description: Brief text
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  text:
+                    type: string
+        "404":
+          description: Assistant disabled for workspace
+  /v1/home/agent/transcribe:
+    post:
+      tags: [Home]
+      summary: Transcribe voice input for the Home agent
+      description: >-
+        Accepts raw audio bytes (e.g. webm from MediaRecorder). Returns transcribed
+        text for the composer. Requires `ai.web_agent` and a signed-in session.
+      operationId: transcribeHomeAgentAudio
+      parameters:
+        - name: workspace
+          in: query
+          schema:
+            type: string
+          description: Workspace id or slug; omit for Personal scope.
+        - name: seconds
+          in: query
+          schema:
+            type: number
+          description: Clip duration for logging (optional).
+      requestBody:
+        required: true
+        content:
+          audio/webm:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Transcript
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  text:
+                    type: string
+        "422":
+          description: Transcription failed
+  /v1/workspaces:
+    get:
+      tags: [Workspaces]
+      summary: List workspaces
+      operationId: listWorkspaces
+      responses:
+        "200":
+          description: Workspaces the user belongs to
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workspaces:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Workspace"
+    post:
+      tags: [Workspaces]
+      summary: Create a workspace
+      description: Any signed-in user can create a workspace.
+      operationId: createWorkspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+  /v1/workspaces/{workspaceId}/subdomain:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Workspaces]
+      summary: Get subdomain status
+      operationId: getWorkspaceSubdomain
+      responses:
+        "200":
+          description: Subdomain status
+    post:
+      tags: [Workspaces]
+      summary: Enable a custom subdomain
+      description: "Requires workspace admin/owner."
+      operationId: enableWorkspaceSubdomain
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        "200":
+          description: Enabled
+    delete:
+      tags: [Workspaces]
+      summary: Disable the custom subdomain
+      operationId: disableWorkspaceSubdomain
+      responses:
+        "200":
+          description: Disabled
+  /v1/workspaces/{workspaceId}/catalog:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Catalog]
+      summary: Search the data catalog
+      description: >-
+        Returns entries matching filters plus facet counts. Returns enabled false
+        when the catalog is off.
+      operationId: searchWorkspaceCatalog
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: kind
+          in: query
+          schema:
+            type: string
+        - name: domain
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, certified, deprecated]
+        - name: tag
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Search results
+  /v1/workspaces/{workspaceId}/catalog/enable:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    post:
+      tags: [Catalog]
+      summary: Enable or disable the catalog
+      operationId: setWorkspaceCatalogEnabled
+      description: >-
+        Admin+. JSON body with enabled true (default) or enabled false.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                  default: true
+      responses:
+        "200":
+          description: Updated
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/catalog/seed:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    post:
+      tags: [Catalog]
+      summary: Seed catalog from workspace connectors
+      operationId: seedWorkspaceCatalog
+      description: Admin+. Idempotent — never overwrites manually edited entries.
+      responses:
+        "200":
+          description: Seed result
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/catalog/manifest:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Catalog]
+      summary: Catalog adoption manifest
+      operationId: getWorkspaceCatalogManifest
+      responses:
+        "200":
+          description: KPIs, orphans, dangling refs
+  /v1/workspaces/{workspaceId}/catalog/lineage:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Catalog]
+      summary: Full lineage graph
+      operationId: getWorkspaceCatalogLineage
+      responses:
+        "200":
+          description: Nodes and edges
+  /v1/workspaces/{workspaceId}/catalog/entries/{entryId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: entryId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Catalog]
+      summary: Get one catalog entry
+      operationId: getWorkspaceCatalogEntry
+      responses:
+        "200":
+          description: Entry with upstream/downstream neighbors
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/catalog/files:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    put:
+      tags: [Catalog]
+      summary: Upsert a catalog markdown file
+      operationId: upsertWorkspaceCatalogFile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path, content]
+              properties:
+                path:
+                  type: string
+                  example: sources/orders.md
+                content:
+                  type: string
+      responses:
+        "200":
+          description: Saved
+    delete:
+      tags: [Catalog]
+      summary: Delete a catalog file
+      operationId: deleteWorkspaceCatalogFile
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+  /v1/workspaces/{workspaceId}/connections:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Workspaces]
+      summary: List workspace connectors
+      description: "No secrets are returned. Includes `credentialScope` and `hasMyCredentials`."
+      operationId: listWorkspaceConnections
+      responses:
+        "200":
+          description: Connectors
+    post:
+      tags: [Workspaces]
+      summary: Create a workspace connector
+      description: "Admin+. `credentialScope`: `shared` (default) or `per_user`."
+      operationId: createWorkspaceConnection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type]
+              properties:
+                name:
+                  type: string
+                type:
+                  type: string
+                  example: rest_api
+                credentialScope:
+                  type: string
+                  enum: [shared, per_user]
+                  default: shared
+                authType:
+                  type: string
+                config:
+                  type: object
+                credentials:
+                  type: object
+      responses:
+        "200":
+          description: Created
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/connections/test:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    post:
+      tags: [Workspaces]
+      summary: Test connector credentials (no save)
+      description: >-
+        Admin+. Runs the provider's verifyConnection probe on unsaved credentials
+        before creating a connector.
+      operationId: testWorkspaceConnection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, credentials]
+              properties:
+                provider:
+                  type: string
+                  example: google-analytics
+                config:
+                  type: object
+                credentials:
+                  type: object
+      responses:
+        "200":
+          description: Credentials verified
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/connections/{connectionId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: connectionId
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags: [Workspaces]
+      summary: Update a workspace connector
+      description: Admin+. Currently supports toggling `agent_query_enabled` for the workspace assistant.
+      operationId: updateWorkspaceConnection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                agent_query_enabled:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspace/{workspaceId}/agent/chat:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    post:
+      tags: [Workspaces]
+      summary: Workspace assistant chat (SSE)
+      description: >-
+        Stream a workspace-scoped assistant reply. Requires session or bearer token,
+        workspace membership, and the `ai.web_agent` feature flag.
+      operationId: workspaceAgentChat
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+      responses:
+        "200":
+          description: SSE stream (`text/event-stream`)
+        "404":
+          description: Assistant not enabled for this workspace
+        "429":
+          description: Rate limited
+  /v1/workspace/{workspaceId}/agent/confirm:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    post:
+      tags: [Workspaces]
+      summary: Confirm a workspace assistant action
+      operationId: workspaceAgentConfirm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        "200":
+          description: Action executed
+        "410":
+          description: Confirmation token expired
+  /v1/workspaces/{workspaceId}/features:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Workspaces]
+      summary: List workspace feature flags
+      description: Any member may read. Feature flags are read-only to normal users.
+      operationId: getWorkspaceFeatures
+      responses:
+        "200":
+          description: Feature flags
+          content:
+            application/json:
+              schema:
+                type: object
+  /v1/workspaces/{workspaceId}/publish-policy:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Workspaces]
+      summary: Get workspace publish policy
+      operationId: getWorkspacePublishPolicy
+      responses:
+        "200":
+          description: Current policy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  policy:
+                    type: string
+                    enum: [allow, prohibit, require_approval]
+                  approvalsRequired:
+                    type: integer
+    patch:
+      tags: [Workspaces]
+      summary: Set workspace publish policy
+      operationId: setWorkspacePublishPolicy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                policy:
+                  type: string
+                  enum: [allow, prohibit, require_approval]
+                approvals_required:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+      responses:
+        "200":
+          description: Updated
+  /v1/workspaces/{workspaceId}/publish-approvals:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Workspaces]
+      summary: List publish approval requests
+      operationId: listWorkspacePublishApprovals
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            default: pending
+      responses:
+        "200":
+          description: Approval queue
+  /v1/workspaces/{workspaceId}/agent-tokens:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Workspaces]
+      summary: List workspace Agent tokens (service accounts)
+      description: >
+        Lists the workspace's Agent (service-account) tokens — metadata only, plaintext
+        is never recoverable. Owner/admin only.
+      operationId: listAgentTokens
+      responses:
+        "200":
+          description: Token list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  count: { type: integer }
+                  tokens:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        scopes:
+                          type: array
+                          items: { type: string, enum: [artifacts:read, artifacts:publish, data:read, data:write] }
+                        principal_user_id: { type: string }
+                        created_at: { type: string }
+                        last_used_at: { type: string, nullable: true }
+                        expires_at: { type: string, nullable: true }
+                        revoked: { type: boolean }
+        "403":
+          description: Caller is not a workspace owner/admin
+    post:
+      tags: [Workspaces]
+      summary: Mint a workspace Agent token
+      description: >
+        Mints a non-human, workspace-scoped Agent token (prefix `sot_`). Creates a
+        headless service principal and adds it as a first-class workspace member that
+        owns the artifacts it publishes. Plaintext token is returned exactly once.
+        Owner/admin only.
+      operationId: createAgentToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, scopes]
+              properties:
+                name:
+                  type: string
+                  description: Human label, e.g. "CI bot".
+                scopes:
+                  type: array
+                  minItems: 1
+                  items: { type: string, enum: [artifacts:read, artifacts:publish, data:read, data:write] }
+                expires_at:
+                  type: string
+                  nullable: true
+                  description: Optional ISO datetime; omit for no expiry.
+      responses:
+        "201":
+          description: Token minted (plaintext shown once)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  token: { type: string, example: "sot_…" }
+                  shown_once: { type: boolean }
+                  token_id: { type: string }
+                  principal_user_id: { type: string }
+                  scopes:
+                    type: array
+                    items: { type: string }
+        "400":
+          description: Missing name or invalid scopes
+        "403":
+          description: Caller is not a workspace owner/admin
+  /v1/workspaces/{workspaceId}/agent-tokens/{tokenId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: tokenId
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [Workspaces]
+      summary: Revoke a workspace Agent token
+      description: >
+        Soft-revokes the token (sets revoked_at). The Agent principal keeps its
+        artifacts; mint a new token to re-enable it. Owner/admin only.
+      operationId: revokeAgentToken
+      responses:
+        "200":
+          description: Revoked
+        "403":
+          description: Caller is not a workspace owner/admin
+        "404":
+          description: Token not found or already revoked
+  /v1/skills/recommended:
+    get:
+      tags: [Workspaces]
+      summary: List official Recommended by ShareOut skills
+      description: >
+        Curated official skills for the Library strip. Workspace-agnostic —
+        any signed-in user (all plans). Read-only; maintained by ShareOut daily sync.
+      operationId: listRecommendedSkills
+      responses:
+        "200":
+          description: Official skill cards
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [skills]
+                properties:
+                  skills:
+                    type: array
+                    items:
+                      type: object
+                      required: [slug, artifact_id, name, summary, category, tags, uses, url, official]
+                      properties:
+                        slug:
+                          type: string
+                        artifact_id:
+                          type: string
+                        name:
+                          type: string
+                        summary:
+                          type: string
+                        category:
+                          type: string
+                        tags:
+                          type: array
+                          items:
+                            type: string
+                        attribution:
+                          type: string
+                          nullable: true
+                        uses:
+                          type: integer
+                        url:
+                          type: string
+                          format: uri
+                        official:
+                          type: boolean
+                          enum: [true]
+  /v1/workspaces/{workspaceId}/skills:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Workspaces]
+      summary: Browse skill marketplace catalog
+      operationId: listWorkspaceSkills
+      parameters:
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [top, trending, new, installs]
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Skill cards
+  /v1/workspaces/{workspaceId}/skills/categories:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Workspaces]
+      summary: List skill categories
+      operationId: listSkillCategories
+      responses:
+        "200":
+          description: Categories
+  /v1/workspaces/{workspaceId}/skills/installed:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Workspaces]
+      summary: List skills saved by the current user
+      operationId: listInstalledSkills
+      responses:
+        "200":
+          description: Saved skills
+  /v1/skills/{skillId}/markdown:
+    parameters:
+      - name: skillId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Workspaces]
+      summary: Raw SKILL.md for in-Studio viewer
+      operationId: getSkillMarkdown
+      responses:
+        "200":
+          description: Skill markdown body
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  skill_artifact_id:
+                    type: string
+                  name:
+                    type: string
+                  slug:
+                    type: string
+                  markdown:
+                    type: string
+        "404":
+          description: Skill not found or not visible
+  /v1/workspaces/{workspaceId}/agent-skills:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Workspaces]
+      summary: List skills attached to my agent
+      description: Scope is workspace id or `__personal` for personal Home chat. Max 8 per user.
+      operationId: listAgentSkills
+      responses:
+        "200":
+          description: Attached agent skills
+    post:
+      tags: [Workspaces]
+      summary: Attach a skill to my agent
+      operationId: attachAgentSkill
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [skill_artifact_id]
+              properties:
+                skill_artifact_id:
+                  type: string
+      responses:
+        "200":
+          description: Attached
+        "409":
+          description: Limit reached or already attached
+  /v1/workspaces/{workspaceId}/agent-skills/{skillId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: skillId
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [Workspaces]
+      summary: Detach a skill from my agent
+      operationId: detachAgentSkill
+      responses:
+        "200":
+          description: Detached
+  /v1/artifacts/{id}/publish-approval:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    post:
+      tags: [Artifacts]
+      summary: Request publish approval
+      operationId: createPublishApproval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                visibility:
+                  type: string
+                  enum: [public]
+                approver_ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "201":
+          description: Request created
+  /v1/artifacts/{id}/publish-approval/{requestId}/decision:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+      - name: requestId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Artifacts]
+      summary: Approve or reject a publish request
+      operationId: decidePublishApproval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decision:
+                  type: string
+                  enum: [approve, reject]
+      responses:
+        "200":
+          description: Decision recorded
+  /v1/artifacts/{id}/skill/vote:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    post:
+      tags: [Artifacts]
+      summary: Upvote a skill
+      operationId: voteSkill
+      responses:
+        "200":
+          description: Voted
+    delete:
+      tags: [Artifacts]
+      summary: Remove skill upvote
+      operationId: unvoteSkill
+      responses:
+        "200":
+          description: Vote removed
+  /v1/artifacts/{id}/skill/install:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    post:
+      tags: [Artifacts]
+      summary: Save skill to My Skills
+      operationId: installSkill
+      responses:
+        "200":
+          description: Saved
+    delete:
+      tags: [Artifacts]
+      summary: Remove skill from My Skills
+      operationId: uninstallSkill
+      responses:
+        "200":
+          description: Removed
+  /v1/artifacts/{id}/skills:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    get:
+      tags: [Artifacts]
+      summary: List skills attached to an artifact
+      operationId: listAttachedSkills
+      responses:
+        "200":
+          description: Attached skills
+    post:
+      tags: [Artifacts]
+      summary: Attach a skill to an artifact
+      operationId: attachSkill
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                skill_artifact_id:
+                  type: string
+                position:
+                  type: integer
+      responses:
+        "200":
+          description: Attached
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: "ShareOut API token (`so_...`) from ~/.shareout/credentials."
+  parameters:
+    ArtifactId:
+      name: id
+      in: path
+      required: true
+      description: Artifact ID (e.g. `art_abc123`).
+      schema:
+        type: string
+    DataArtifactId:
+      name: artifactId
+      in: path
+      required: true
+      description: Artifact ID (e.g. `art_abc123`).
+      schema:
+        type: string
+    WorkspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      description: Workspace ID or slug.
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Access denied
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Slug taken or version conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Visibility:
+      type: string
+      description: "'unlisted' was retired 2026-07 — still accepted as input and treated as 'public'."
+      enum: [public, workspace, private]
+    Role:
+      type: string
+      enum: [owner, editor, viewer]
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          type: string
+          description: Human-readable message.
+        code:
+          type: string
+          description: Machine-readable error code.
+      required: [success, error, code]
+    SearchHit:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [artifact, folder, dataset, connector, person, schedule, crew, alert]
+        id:
+          type: string
+        title:
+          type: string
+        subtitle:
+          type: string
+        slug:
+          type: string
+        artifactType:
+          type: string
+        views:
+          type: integer
+        owner:
+          type: string
+        thumb:
+          type: string
+        avatar:
+          type: string
+        badge:
+          type: string
+        score:
+          type: number
+    FileEntry:
+      type: object
+      required: [path, content]
+      properties:
+        path:
+          type: string
+        content:
+          type: string
+        mime:
+          type: string
+        encoding:
+          type: string
+          enum: [utf8, base64]
+        size_bytes:
+          type: integer
+    PublishRequest:
+      type: object
+      required: [name, files]
+      properties:
+        name:
+          type: string
+          description: Display name.
+        slug:
+          type: string
+          description: URL slug. Auto-generated if omitted.
+        entrypoint:
+          type: string
+          default: index.html
+        files:
+          type: array
+          items:
+            $ref: "#/components/schemas/FileEntry"
+        visibility:
+          $ref: "#/components/schemas/Visibility"
+        mobile_html:
+          type: string
+        pwa:
+          $ref: "#/components/schemas/PWAConfig"
+        access_policy:
+          type: object
+          description: Row-level access policy for per-viewer data filtering.
+        agent:
+          $ref: "#/components/schemas/AgentConfig"
+    PWAConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        name:
+          type: string
+        short_name:
+          type: string
+          maxLength: 12
+        icon:
+          type: string
+          description: Data URL or absolute URL to a PNG icon.
+    AgentConfig:
+      type: object
+      description: Turns on the visitor chat agent.
+      properties:
+        enabled:
+          type: boolean
+          default: true
+        systemPrompt:
+          type: string
+        model:
+          type: string
+          example: claude-sonnet-4-20250514
+        maxTokens:
+          type: integer
+        temperature:
+          type: number
+        contextJson:
+          type: boolean
+          default: true
+        contextTables:
+          type: array
+          items:
+            type: string
+    PublishResponse:
+      type: object
+      properties:
+        artifact:
+          type: object
+          properties:
+            id:
+              type: string
+        version:
+          type: object
+          properties:
+            id:
+              type: string
+            version_no:
+              type: integer
+        deployment:
+          type: object
+          properties:
+            slug:
+              type: string
+            url:
+              type: string
+              format: uri
+            subdomain_url:
+              type: string
+              format: uri
+              description: >-
+                Preferred share URL for workspace artifacts
+                (https://{workspace}.shareout.site/{slug}/). Omitted for personal artifacts.
+            mobile_url:
+              type: string
+              format: uri
+        editor_readiness:
+          type: object
+          description: >-
+            Advisory HTML editor-readiness profile (HTML artifacts only). Never blocks publishing.
+          properties:
+            manifest:
+              type: string
+              enum: [valid, invalid, missing]
+            outline:
+              type: boolean
+            counts:
+              type: object
+              properties:
+                pages:
+                  type: integer
+                bindings:
+                  type: integer
+                templates:
+                  type: integer
+            summary:
+              type: object
+              properties:
+                errors:
+                  type: integer
+                warnings:
+                  type: integer
+                infos:
+                  type: integer
+            findings:
+              type: array
+              items:
+                type: object
+                properties:
+                  rule:
+                    type: string
+                  level:
+                    type: string
+                  message:
+                    type: string
+                  suggestion:
+                    type: string
+                  disables:
+                    type: string
+        pwa:
+          type: object
+          properties:
+            manifest_url:
+              type: string
+              format: uri
+            installable:
+              type: boolean
+        notice:
+          type: string
+          description: Human-readable message when publish was adjusted (governance, caps, email gate).
+        approval_required:
+          type: object
+          description: Present when workspace policy requires teammate approval before going open.
+          properties:
+            required:
+              type: integer
+              description: Number of approvers the requester must nominate.
+            artifact_id:
+              type: string
+        moderation:
+          type: object
+          properties:
+            status:
+              type: string
+              enum: [approved, pending, blocked]
+            reason:
+              type: string
+            message:
+              type: string
+            requested_visibility:
+              type: string
+              enum: [public, workspace, private]
+    Artifact:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        visibility:
+          $ref: "#/components/schemas/Visibility"
+        moderation_status:
+          type: string
+          enum: [approved, pending, blocked]
+          description: Safety review state for open visibility.
+        allow_anon_write:
+          type: boolean
+        allow_anon_email:
+          type: boolean
+        allow_anon_agent:
+          type: boolean
+        allow_anon_collab:
+          type: boolean
+        url:
+          type: string
+          format: uri
+        thumbnail_url:
+          type: string
+          format: uri
+        is_favorite:
+          type: boolean
+        created_at:
+          type: integer
+    Collaborator:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/Role"
+    AccessRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        artifact_id:
+          type: string
+        artifact_name:
+          type: string
+        artifact_slug:
+          type: string
+        requester_email:
+          type: string
+          format: email
+        requester_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    SupportTicket:
+      type: object
+      properties:
+        id:
+          type: string
+        subject:
+          type: string
+        status:
+          type: string
+          enum: [open, pending, resolved, closed]
+        channel:
+          type: string
+          enum: [ui, skill, email, telegram, slack]
+        workspace_id:
+          type: string
+          nullable: true
+        requester_user_id:
+          type: string
+          nullable: true
+        requester_email:
+          type: string
+          format: email
+          nullable: true
+        priority:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    SupportMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+          enum: [customer, staff, system]
+        body:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    AssetLibrary:
+      type: object
+      properties:
+        deliverables:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetDeliverable"
+        loose:
+          type: array
+          items:
+            $ref: "#/components/schemas/Blob"
+        bucketId:
+          type: string
+        usedBytes:
+          type: integer
+    AssetDeliverable:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        latestVersion:
+          type: integer
+        versionCount:
+          type: integer
+        url:
+          type: string
+          format: uri
+    AssetShareRequest:
+      type: object
+      properties:
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        gate:
+          type: string
+          enum: [none, password, domain]
+          default: none
+        password:
+          type: string
+          description: Required when gate=password.
+        domains:
+          type: array
+          items:
+            type: string
+          description: Required when gate=domain (e.g. acme.com).
+    AssetShareLink:
+      type: object
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+          format: uri
+        collectionName:
+          type: string
+        fileCount:
+          type: integer
+        gate:
+          type: string
+          enum: [none, password, domain]
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        viewCount:
+          type: integer
+        revoked:
+          type: boolean
+        expired:
+          type: boolean
+    Blob:
+      type: object
+      properties:
+        id:
+          type: string
+        filename:
+          type: string
+        mimeType:
+          type: string
+        size:
+          type: integer
+        url:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+    Job:
+      type: object
+      properties:
+        id:
+          type: string
+        artifact_id:
+          type: string
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 1000
+        action:
+          type: string
+          enum: [email, webhook, slack, discord, http_get, materialize, telegram, query_snapshot, sheets_append]
+        trigger_type:
+          type: string
+          enum: [cron, event]
+        schedule:
+          type: string
+          description: Cron expression (cron jobs only).
+        event_type:
+          type: string
+          enum: [artifact.updated, artifact.viewed, comment.added, email.received]
+        config:
+          type: object
+        enabled:
+          type: boolean
+        next_run_at:
+          type: integer
+        last_run_at:
+          type: integer
+        last_status:
+          type: string
+        created_at:
+          type: integer
+    JobCreate:
+      type: object
+      required: [artifact_id, action, config]
+      properties:
+        artifact_id:
+          type: string
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 1000
+        action:
+          type: string
+          enum: [email, webhook, slack, discord, http_get, materialize, telegram, query_snapshot, sheets_append]
+        trigger_type:
+          type: string
+          enum: [cron, event]
+          default: cron
+        schedule:
+          type: string
+          description: Required for cron jobs.
+        event_type:
+          type: string
+          enum: [artifact.updated, artifact.viewed, comment.added, email.received]
+          description: Required for event jobs.
+        config:
+          type: object
+          description: Action-specific configuration.
+        retry_config:
+          type: object
+          properties:
+            maxAttempts:
+              type: integer
+              minimum: 0
+              maximum: 10
+            backoffType:
+              type: string
+              enum: [fixed, linear, exponential]
+            initialDelay:
+              type: integer
+              minimum: 60
+              maximum: 3600
+    Folder:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: [string, "null"]
+        artifact_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+    MetricSource:
+      type: object
+      description: Where a metric value is read from.
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [json_path, table_count, table_aggregate]
+        key:
+          type: string
+          description: "json_path: the sdk.json key to read."
+        path:
+          type: string
+          description: "json_path: e.g. `$.revenue`, `$.totals.mrr`."
+        table:
+          type: string
+        field:
+          type: string
+        fn:
+          type: string
+          enum: [sum, avg, min, max]
+        where:
+          type: object
+          description: Filter using the same operators as sdk.table().query().
+    MetricDefinition:
+      type: object
+      required: [artifact_id, metric_id, label, source]
+      properties:
+        artifact_id:
+          type: string
+        metric_id:
+          type: string
+          description: "Stable key referenced by rules. Letters, digits, `_`, `-`."
+        label:
+          type: string
+        format:
+          type: string
+          description: "Display hint: `currency:USD`, `number`, `percent`."
+        source:
+          $ref: "#/components/schemas/MetricSource"
+    MetricCondition:
+      type: object
+      required: [op, value]
+      properties:
+        op:
+          type: string
+          enum: [gt, gte, lt, lte, eq, neq]
+        value:
+          type: number
+    MetricDestination:
+      type: object
+      required: [kind, config]
+      properties:
+        kind:
+          type: string
+          enum: [slack, email, discord, webhook, http_get, telegram]
+        config:
+          type: object
+          description: Destination config matching the kind (see Jobs config interfaces).
+    MetricAlertCreate:
+      type: object
+      required: [artifact_id, metric_id, name, condition, schedule, destination]
+      properties:
+        artifact_id:
+          type: string
+        metric_id:
+          type: string
+        name:
+          type: string
+        condition:
+          $ref: "#/components/schemas/MetricCondition"
+        schedule:
+          type: string
+          description: 5-field cron expression.
+        destination:
+          $ref: "#/components/schemas/MetricDestination"
+        message:
+          type: string
+        cooldown_seconds:
+          type: integer
+    MetricAlert:
+      allOf:
+        - $ref: "#/components/schemas/MetricAlertCreate"
+        - type: object
+          properties:
+            id:
+              type: string
+            enabled:
+              type: boolean
+            created_at:
+              type: integer
+    MetricWatchCreate:
+      type: object
+      required: [artifact_id, table, kind]
+      properties:
+        artifact_id:
+          type: string
+        table:
+          type: string
+        kind:
+          type: string
+          enum: [count, sum, last]
+        column:
+          type: string
+          description: Required for sum and last.
+        threshold_pct:
+          type: number
+          default: 20
+          description: Alert when value moves ±this percent from baseline.
+    MetricWatch:
+      allOf:
+        - $ref: "#/components/schemas/MetricWatchCreate"
+        - type: object
+          properties:
+            id:
+              type: string
+            workspace_id:
+              type: string
+              nullable: true
+            table_name:
+              type: string
+            metric_kind:
+              type: string
+            column_name:
+              type: string
+            last_value:
+              type: number
+              nullable: true
+            enabled:
+              type: boolean
+            created_at:
+              type: integer
+    TemplateVariable:
+      type: object
+      required: [name, type]
+      properties:
+        name:
+          type: string
+          description: Accessed via `{{data.name}}`.
+        type:
+          type: string
+          enum: [string, number, boolean, date]
+        required:
+          type: boolean
+          default: false
+        default: {}
+        description:
+          type: string
+    TemplateCreate:
+      type: object
+      required: [name, subject, html]
+      properties:
+        name:
+          type: string
+        subject:
+          type: string
+        html:
+          type: string
+        text_body:
+          type: string
+        artifact_id:
+          type: [string, "null"]
+          description: Scope to an artifact; null = account-level.
+        variables:
+          type: array
+          items:
+            $ref: "#/components/schemas/TemplateVariable"
+    Template:
+      type: object
+      properties:
+        id:
+          type: string
+        artifact_id:
+          type: [string, "null"]
+        owner_id:
+          type: string
+        name:
+          type: string
+        subject:
+          type: string
+        html:
+          type: string
+        text_body:
+          type: string
+        is_system:
+          type: boolean
+        created_at:
+          type: integer
+        updated_at:
+          type: integer
+    TemplatePreview:
+      type: object
+      properties:
+        subject:
+          type: string
+        html:
+          type: string
+        text:
+          type: string
+    Workspace:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        role:
+          type: string
+          enum: [owner, admin, member]
+    Sharee:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          description: client, supplier, partner, investor, or any label.
+        member_count:
+          type: integer
+        branding:
+          type: object
+          properties:
+            logo:
+              type: string
+            color:
+              type: string
+    ShareeCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          default: client
+    ShareeUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        properties:
+          type: object
+        branding:
+          type: object
+          properties:
+            logo:
+              type: string
+            color:
+              type: string
+    Grant:
+      type: object
+      properties:
+        id:
+          type: string
+        subject_type:
+          type: string
+          enum: [sharee, external_user]
+        subject_id:
+          type: string
+        resource_type:
+          type: string
+          enum: [folder, artifact, file]
+        resource_id:
+          type: string
+        capability:
+          type: string
+          enum: [view, comment, create, edit]
+    GrantCreate:
+      type: object
+      required: [subject_type, subject_id, resource_type, resource_id, capability]
+      properties:
+        subject_type:
+          type: string
+          enum: [sharee, external_user]
+        subject_id:
+          type: string
+        resource_type:
+          type: string
+          enum: [folder, artifact, file]
+        resource_id:
+          type: string
+        capability:
+          type: string
+          enum: [view, comment, create, edit]
+    ShareeActivityList:
+      type: object
+      properties:
+        activity:
+          type: array
+          items:
+            type: object
+            properties:
+              sharee_id:
+                type: string
+              resource_type:
+                type: string
+              resource_id:
+                type: string
+              user_id:
+                type: string
+              viewed_at:
+                type: string
+                format: date-time
+    WebhookPayload:
+      type: object
+      required: [event, artifact_id, timestamp, data]
+      properties:
+        event:
+          type: string
+          enum:
+            - artifact.published
+            - artifact.updated
+            - artifact.deleted
+            - data.changed
+            - job.executed
+            - job.failed
+        artifact_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        data:
+          type: object
+          description: Event-specific payload.
+webhooks:
+  artifactEvent:
+    post:
+      tags: [Jobs]
+      summary: Outbound artifact webhook
+      description: |
+        ShareOut POSTs this payload to your endpoint for subscribed events.
+        Configure delivery via the Jobs API (`action: webhook`) or artifact settings.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookPayload"
+      responses:
+        "200":
+          description: Acknowledge receipt with any 2xx.

@@ -1,0 +1,20 @@
+# Title: gitleaks config for ShareOut public repo
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Docs, fixtures, generated coverage, and i18n placeholders that look like secrets"
+paths = [
+  '''shareout-app/examples/''',
+  '''shareout-app/src/pages/home/home-i18n/''',
+  '''shareout-app/tests/''',
+  '''shareout-app/coverage/''',
+  '''docs-site/''',
+  '''docs-site/dist/''',
+  '''skills/ShareOutSkill/auth\.md''',
+  '''shareout-app/src/pages/seo\.ts''',
+  '''shareout-app/superadmin-recipients\.example\.json''',
+  # Local-only secrets / build scratch (gitignored; --no-git scans still see them).
+  '''shareout-app/\.dev\.vars$''',
+  '''shareout-app/\.wrangler/''',
+]

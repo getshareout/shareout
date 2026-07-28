@@ -1,0 +1,38 @@
+{
+  "name": "@shareout/sdk",
+  "version": "0.1.0",
+  "description": "ShareOut SDK for artifact data persistence",
+  "main": "dist/shareout-sdk.js",
+  "module": "dist/shareout-sdk.esm.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm,iife --global-name ShareOut --dts --minify && tsup src/charts.ts --format iife --global-name ShareOutCharts --dts --minify -d dist/charts && npm run build:mobile",
+    "build:charts": "tsup src/charts.ts --format iife --global-name ShareOutCharts --dts --minify -d dist/charts",
+    "build:mobile": "tsup src/mobile/index.ts --format iife --minify -d dist/mobile",
+    "build:grid": "tsup --config tsup.grid.config.ts",
+    "dev": "tsup src/index.ts --format iife --global-name ShareOut --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "yjs": "^13.6.31"
+  },
+  "devDependencies": {
+    "@types/tabulator-tables": "^6.3.6",
+    "@vitest/coverage-v8": "^4.1.7",
+    "happy-dom": "^20.9.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.7",
+    "yjs": "^13.6.31"
+  },
+  "dependencies": {
+    "@shareout/chat-core": "*",
+    "tabulator-tables": "^6.5.2"
+  }
+}

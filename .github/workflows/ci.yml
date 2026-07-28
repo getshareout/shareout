@@ -1,0 +1,69 @@
+# PR CI — deliberately small. Static gates, typecheck, the critical-path test subset,
+# and a secret scan; everything here finishes in a couple of minutes. The full test
+# suite runs locally on pre-push (see CONTRIBUTING) and on main/nightly in full.yml.
+# Never deploys.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: shareout-app
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: npm
+          cache-dependency-path: shareout-app/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Static gates
+        run: |
+          npm run check:boundaries
+          npm run check:design-tokens
+          npm run check:domains
+          npm run check:customer-names
+          npm run check:migrations
+          npm run check:ui
+          npm run check:access-seams
+          npm run check:file-size
+      - name: Typecheck
+        run: |
+          npm run typecheck
+          npm run typecheck --workspace @shareout/chat-core
+          npm run typecheck --workspace @shareout/sdk
+          npm run typecheck --workspace @shareout/editor-client
+      # Auth / access / publish / error-contract only — the rest of the suite runs
+      # locally on pre-push and in full.yml.
+      - name: Critical path tests
+        env:
+          TZ: UTC
+        run: npm run test:critical -- --reporter=dot
+      - name: Bundles
+        run: |
+          npm run check:bundles
+          npm run check:bundle-size
+
+  secrets:
+    name: Gitleaks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Secret scan
+        run: ./tooling/scripts/check-secrets.sh

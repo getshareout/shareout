@@ -1,0 +1,46 @@
+.env
+**/.env
+.dev.vars
+**/.dev.vars
+.credentials/
+**/.credentials/
+client_secret*.json
+credentials.json
+**/credentials.json
+account.json
+**/account.json
+*.pem
+*.key
+node_modules/
+**/node_modules/
+.wrangler/
+**/.wrangler/
+*.log
+.DS_Store
+dist/
+**/dist/
+coverage/
+**/coverage/
+coverage-*/
+**/coverage-*/
+playwright-report/
+test-results/
+# Python caches
+__pycache__/
+**/__pycache__/
+*.pyc
+# Build caches
+*.tsbuildinfo
+.turbo/
+.vite/
+.cache/
+**/.cache/
+# Per-machine agent tool caches (Claude Code / Cursor plugin installs)
+.claude/skills/
+.agents/skills/
+
+# Generated knowledge graphs (graphify and friends) — rebuild locally, never commit
+graphify-out/
+
+# Confidential blocklist for check:customer-names
+tooling/customer-names.local

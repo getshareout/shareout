@@ -1,0 +1,12 @@
+{
+  "name": "shareout-monorepo",
+  "private": true,
+  "description": "Root helper so Workers Builds / Deploy button can run from the repo root",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "deploy": "npm --prefix shareout-app ci && npm --prefix shareout-app run deploy",
+    "provision:cf": "npm --prefix shareout-app run provision:cf"
+  }
+}
