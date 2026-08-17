@@ -41,9 +41,6 @@ together, comment, and approve what leaves the team. Data stays live from your
 Sheets, warehouse, and APIs. ShareOut is not the builder — **agents build**;
 ShareOut is where that work lives and gets shared as one link.
 
-<p align="center">
-  <img src="docs/readme/01-home.png" alt="ShareOut home — Resumen with artifact cards, activity, and Ask your space" width="900">
-</p>
 
 ---
 
