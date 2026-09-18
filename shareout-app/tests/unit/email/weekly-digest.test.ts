@@ -15,6 +15,8 @@ import { EMAILS } from '../../../src/email/catalog';
 import type { WorkspaceDigestData } from '../../../src/email/catalog';
 
 const e = env as unknown as Env;
+// The nurture crons are opt-in; these cases exercise the enabled path.
+(e as { NURTURE_EMAILS_ENABLED?: string }).NURTURE_EMAILS_ENABLED = '1';
 const WS = 'wsp_wd';
 const WEEK = '2026-07-06';
 

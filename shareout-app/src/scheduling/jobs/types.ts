@@ -35,6 +35,9 @@ export interface SlackConfig {
   mode?: 'message' | 'snapshot' | 'pdf' | 'both';
   /** Max ms to wait for artifact data to load before capturing image/PDF. */
   waitMs?: number;
+  /** Block Kit blocks for the message body, replacing the mrkdwn section built from
+   *  customMessage. Bot-token delivery only — the webhook path does not use it. */
+  blocks?: unknown[];
 }
 
 export interface DiscordConfig {
@@ -135,14 +138,22 @@ export interface ArtifactTestJobConfig {
   note?: string;
 }
 
-/** Config for the `query_snapshot` action: a generic, deterministic data refresh. */
+/** Config for the `query_snapshot` action: a generic, deterministic data refresh.
+ *
+ *  Query strings and param values may embed date tokens ({{today}}, {{yesterday}},
+ *  {{date:-7d}}) — resolved at delivery time so REST sources, which have no
+ *  equivalent of SQL's CURRENT_DATE(), can express a rolling window. */
 export interface QuerySnapshotConfig {
   connection: string;
+  /** Params applied to every query. Per-query `options.params` override by key. */
   params?: Record<string, unknown>;
   queries: Array<{
     query: string;
     target: { type: 'dataset' | 'table' | 'json'; name: string; path?: string };
     mode?: 'replace' | 'append';
+    /** Per-query params — needed when one job fans out across REST endpoints that
+     *  each take different arguments. */
+    options?: { params?: Record<string, unknown> };
   }>;
 }
 

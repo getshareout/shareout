@@ -2,6 +2,7 @@ import type { Destination, DeliveryStep } from '../types';
 import type { QuerySnapshotConfig } from '../../scheduling/jobs';
 import { runMaterialize } from '../../data/materialize';
 import { queryConnectionAny } from '../../data/connections/warehouse-query';
+import { resolveDateTokens, resolveDateTokensInParams } from '../date-tokens';
 
 // Generic, deterministic data refresh: run a configured list of queries against a
 // workspace connection (REST or a warehouse like BigQuery, on the artifact owner's
@@ -29,16 +30,31 @@ export const querySnapshotDestination: Destination<QuerySnapshotConfig> = {
       const art = await env.DB.prepare('SELECT owner_id FROM artifacts WHERE id = ?')
         .bind(ctx.artifactId).first<{ owner_id: string | null }>();
       const userId = art?.owner_id || ctx.createdBy;
-      const options = config.params ? { params: config.params } : undefined;
+      // One clock for the whole run, so a job spanning UTC midnight can't have its
+      // queries land on two different days.
+      const now = new Date();
 
       for (const q of config.queries) {
         const target = `${q.target.type}:${q.target.name}`;
         const t0 = Date.now();
+        const merged = { ...config.params, ...q.options?.params };
+        const params = resolveDateTokensInParams(
+          Object.keys(merged).length > 0 ? merged : undefined,
+          now,
+        );
         try {
           const res = await runMaterialize(
             env,
             ctx.artifactId,
-            { source: { connection: config.connection, query: q.query, options }, target: q.target, mode: q.mode },
+            {
+              source: {
+                connection: config.connection,
+                query: resolveDateTokens(q.query, now),
+                options: params ? { params } : undefined,
+              },
+              target: q.target,
+              mode: q.mode,
+            },
             (c, query, p) => queryConnectionAny(env, ctx.artifactId, c, query, p, userId)
           );
           steps.push({

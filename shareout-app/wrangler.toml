@@ -27,6 +27,8 @@ enabled = true
 LOG_LEVEL = "info"
 TEAM_METRICS_ENABLED = "0"
 ADMIN_ALERTS_DISABLED = "1"
+# Opt-IN nurture mail. Leave "0" until you explicitly want activation/win-back/digests.
+NURTURE_EMAILS_ENABLED = "0"
 # Replace after first deploy with your workers.dev or custom domain origin
 SHAREOUT_BASE_URL = "https://shareout.workers.dev"
 # Optional: hostname of a separate marketing site to put in front of the app.

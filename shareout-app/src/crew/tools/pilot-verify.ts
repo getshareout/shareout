@@ -3,6 +3,7 @@ import type { CrewTool } from '../types';
 import type { Env } from '../../types';
 import { createAccessToken } from '../../token';
 import { getPlatformOrigin } from '../../config/origins';
+import { logCrewToolFailure, userFacingPilotVerifyToolError } from '../errors';
 
 // Verify runs are short and cheap: cap steps low and wall-clock the whole in-page
 // run so a stuck agent can never burn budget or hold the browser open.
@@ -171,7 +172,13 @@ export const pilotVerifyTool: CrewTool = {
       }
       return { success: outcome.success, data: outcome.data, steps: outcome.steps };
     } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : 'pilot verify failed', data: '' };
+      logCrewToolFailure(env, {
+        tool: 'pilot_verify',
+        ownerId: ctx.principal.ownerId,
+        crewId: ctx.principal.crewId,
+        runId: ctx.principal.runId,
+      }, err);
+      return { success: false, error: userFacingPilotVerifyToolError(err), data: '' };
     } finally {
       if (browser) await browser.close().catch(() => {});
     }

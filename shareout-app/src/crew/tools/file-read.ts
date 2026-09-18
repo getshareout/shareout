@@ -1,4 +1,5 @@
 import type { CrewTool } from '../types';
+import { logCrewToolFailure, userFacingReadFileError } from '../errors';
 import { getOrCreateAssetBucket } from '../../assets/bucket';
 import { summarizeFile } from '../../data/files';
 
@@ -46,8 +47,17 @@ export const fileReadTool: CrewTool = {
     const obj = await env.ARTIFACTS.get(row.r2_key);
     if (!obj) return { error: 'File content missing from storage.' };
     let content: string;
-    try { content = summarizeFile(await obj.arrayBuffer(), row.filename, row.mime_type); }
-    catch (e) { return { error: `Could not read ${row.filename}: ${e instanceof Error ? e.message : 'parse error'}` }; }
+    try {
+      content = summarizeFile(await obj.arrayBuffer(), row.filename, row.mime_type);
+    } catch (e) {
+      logCrewToolFailure(env, {
+        tool: 'file_read',
+        ownerId: ctx.principal.ownerId,
+        crewId: ctx.principal.crewId,
+        runId: ctx.principal.runId,
+      }, e);
+      return { error: userFacingReadFileError(e, row.filename) };
+    }
 
     return { filename: row.filename, mimeType: row.mime_type, summary, tags, content };
   },

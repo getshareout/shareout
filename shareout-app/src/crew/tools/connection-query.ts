@@ -1,4 +1,5 @@
 import { queryConnectionAny } from '../../data/connections/warehouse-query';
+import { logCrewToolFailure, userFacingConnectionToolError } from '../errors';
 import type { CrewTool } from '../types';
 
 export const connectionQueryTool: CrewTool = {
@@ -32,7 +33,13 @@ export const connectionQueryTool: CrewTool = {
       );
       return { connection, data };
     } catch (err) {
-      return { error: err instanceof Error ? err.message : 'connection query failed' };
+      logCrewToolFailure(ctx.data.env, {
+        tool: 'connection_query',
+        ownerId: ctx.principal.ownerId,
+        crewId: ctx.principal.crewId,
+        runId: ctx.principal.runId,
+      }, err);
+      return { error: userFacingConnectionToolError(err, 'The query failed.') };
     }
   },
 };

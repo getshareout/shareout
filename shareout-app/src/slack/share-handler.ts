@@ -2,7 +2,7 @@ import type { Env } from '../types';
 import type { AuthUser } from '../api-auth';
 import { getUserRole } from '../artifacts';
 import { createLogger, logError } from '../logging';
-import { sendArtifactToSlack, userFacingSlackDeliveryError, type SlackDeliveryMode } from './send';
+import { invalidSlackBlocks, sendArtifactToSlack, userFacingSlackDeliveryError, type SlackDeliveryMode } from './send';
 import { jsonWithApiErrors } from '../http/api-error';
 
 function json(data: unknown, status = 200): Response {
@@ -31,6 +31,7 @@ export async function handleShareToSlack(
     slackUserId?: string;
     mode?: string;
     message?: string;
+    blocks?: unknown;
     waitMs?: number;
   };
   try {
@@ -57,6 +58,12 @@ export async function handleShareToSlack(
   if (body.mode && !MODES.includes(body.mode as SlackDeliveryMode)) {
     return json({ error: `mode must be one of: ${MODES.join(', ')}`, code: 'VALIDATION_ERROR' }, 400);
   }
+  if (body.blocks !== undefined) {
+    const problem = invalidSlackBlocks(body.blocks);
+    if (problem) {
+      return json({ error: problem, code: 'VALIDATION_ERROR' }, 400);
+    }
+  }
 
   const logger = createLogger(env, {
     scope: 'slack',
@@ -73,6 +80,7 @@ export async function handleShareToSlack(
       slackUserId: body.slackUserId,
       mode: body.mode as SlackDeliveryMode | undefined,
       message: body.message,
+      blocks: body.blocks as unknown[] | undefined,
       waitMs: typeof body.waitMs === 'number' ? body.waitMs : undefined,
     });
 

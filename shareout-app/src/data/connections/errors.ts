@@ -4,6 +4,8 @@
  * Upstream API failures must not surface as ShareOut 500s — that trips self-health
  * alerts. Query/materialize handlers map upstream status to 424/502/504 instead.
  */
+import type { Env } from '../../types';
+import { createLogger, logError, type LogFields } from '../../logging';
 import { FetchTimeoutError } from '../../fetch-utils';
 
 /** Non-2xx response from the upstream API behind a REST connection. */
@@ -106,6 +108,47 @@ export function mapMaterializeFailure(err: unknown): { code: string; message: st
     return { code: 'MATERIALIZE_ERROR', message, status: 400 };
   }
   return { code: 'MATERIALIZE_ERROR', message: 'Materialize failed', status: 500 };
+}
+
+/** User-actionable connection tool messages safe to show in chat/assistant tool output. */
+function isSafeConnectionToolMessage(msg: string): boolean {
+  if (msg === 'baseUrl not configured') return true;
+  if (msg.startsWith('Provide the SQL string in "query"')) return true;
+  if (msg.startsWith('Server-side query not supported for connection type')) return true;
+  if (msg.startsWith('projectId is required to query this BigQuery connection')) return true;
+  if (msg.startsWith('Server-side SQL query is not yet supported for platform provider')) return true;
+  if (/^Connection "[^"]+" not found$/.test(msg)) return true;
+  return false;
+}
+
+/** Safe user-facing text for chat-agent connection tool failures — never leak upstream bodies or infra errors. */
+export function userFacingConnectionToolError(err: unknown, fallback = 'The query failed.'): string {
+  if (err instanceof FetchTimeoutError) {
+    return userFacingQueryError(err, 'UPSTREAM_TIMEOUT');
+  }
+  if (err instanceof UpstreamHttpError) {
+    const code = err.status >= 400 && err.status < 500 ? 'UPSTREAM_REJECTED' : 'UPSTREAM_ERROR';
+    return userFacingQueryError(err, code, err.status);
+  }
+  if (err instanceof Error) {
+    if (err.message === 'CREDENTIALS_REQUIRED') {
+      return 'Connect your credentials for this connector before querying.';
+    }
+    if (isSafeConnectionToolMessage(err.message)) {
+      return err.message;
+    }
+  }
+  return fallback;
+}
+
+/** Log connection tool failures server-side with workspace/artifact context. */
+export function logConnectionToolFailure(
+  env: Env,
+  fields: LogFields,
+  message: string,
+  err: unknown,
+): void {
+  logError(createLogger(env, fields), message, err);
 }
 
 /** Map a query execution error to HTTP status and error code. */

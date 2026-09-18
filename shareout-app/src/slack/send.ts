@@ -11,6 +11,7 @@ export {
 } from '../chat-platforms/slack/client';
 
 export {
+  invalidSlackBlocks,
   sendArtifactToSlack,
   resolveSlackTokenForArtifact,
   type SlackDeliveryMode,
