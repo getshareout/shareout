@@ -78,13 +78,26 @@ function createKv(title) {
   return m[1];
 }
 
+/** Classify wrangler `r2 bucket create` stdout/stderr. Exported shape mirrored in unit test. */
+function classifyR2Create(out) {
+  if (/Created bucket/i.test(out)) return 'created';
+  // "already exists" variants differ by wrangler version — non-fatal but loud.
+  if (/already exists|Bucket already|403|409/i.test(out) || /exist/i.test(out)) return 'exists';
+  if (!/ERROR|✘/.test(out)) return 'created';
+  return 'error';
+}
+
 function ensureR2(name) {
   const out = run(['r2', 'bucket', 'create', name], { allowFail: true });
-  if (/Created bucket|already exists|403|409|Bucket already/i.test(out) || !/ERROR|✘/.test(out)) {
+  const status = classifyR2Create(out);
+  if (status === 'exists') {
+    console.warn(
+      `provision:cf: WARNING R2 bucket "${name}" already exists — this stack will share that bucket. ` +
+        `Rename bucket_name in wrangler.toml for a fresh stack.`,
+    );
     return;
   }
-  // "already exists" variants differ by wrangler version — treat non-fatal.
-  if (/exist/i.test(out)) return;
+  if (status === 'created') return;
   console.warn(`provision:cf: r2 create warning:\n${out}`);
 }
 
