@@ -126,11 +126,15 @@ describe('workspace connections routes', () => {
   });
 
   it('creates a Snowflake key-pair platform connector', async () => {
+    let insertSql: string | null = null;
     let inserted: unknown[] | null = null;
     const env = makeEnv({
       role: 'admin',
       onRun: (sql, bindings) => {
-        if (sql.includes('INSERT INTO connections')) inserted = bindings;
+        if (sql.includes('INSERT INTO connections')) {
+          insertSql = sql;
+          inserted = bindings;
+        }
       },
     });
     const req = new Request('https://shareout.site/v1/workspaces/wsp_team/connections', {
@@ -147,10 +151,14 @@ describe('workspace connections routes', () => {
     expect(res.status).toBe(201);
     const body = await res.json() as { kind: string; provider: string };
     expect(body).toMatchObject({ kind: 'platform', provider: 'snowflake' });
-    // bindings: id, workspace_id, name, provider, auth_type, config, encrypted, iv, preferred_mode, created_by
+    // bindings: id, workspace_id, name, provider, auth_type, config, encrypted, iv, preferred_mode, created_by, credential_scope
     expect(inserted![3]).toBe('snowflake');
     expect(inserted![4]).toBe('key_pair');
     expect(JSON.stringify(inserted![6])).not.toContain('PRIVATE KEY');
+    expect(inserted!.at(-1)).toBe('shared');
+    // D1 rejects mismatched arity; keep VALUES ? count aligned with .bind(...)
+    const placeholders = (insertSql!.match(/\?/g) || []).length;
+    expect(placeholders).toBe(inserted!.length);
   });
 
   it('schedules a catalog seed after a successful generic connector create', async () => {
