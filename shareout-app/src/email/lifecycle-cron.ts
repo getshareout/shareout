@@ -1,6 +1,7 @@
 import type { Env } from '../types';
 import { dispatchLifecycleEmail } from './gateway';
 import { claimEmailSend } from './email-log';
+import { lifecycleEmailsDisabled, nurtureEmailsEnabled } from './flags';
 import { getPlatformOrigin } from '../config/origins';
 
 // Scheduled lifecycle emails, gated inside the hourly worker cron. Each pass
@@ -122,8 +123,10 @@ async function weeklyDigest(env: Env, weekKey: string): Promise<void> {
  *  daily/weekly passes by UTC hour/day. */
 export async function runLifecycleEmails(env: Env): Promise<void> {
   // Gateway also skips these types when the flag is on; bail early to skip the scans.
-  const v = (env.LIFECYCLE_EMAILS_DISABLED || '').toLowerCase();
-  if (v === '1' || v === 'true' || v === 'yes' || v === 'on') return;
+  if (lifecycleEmailsDisabled(env)) return;
+  // Unsolicited nurture mail (win-back, activation nudges, digests) is opt-IN.
+  // Unset means off, so removing the var can never silently resume the sends.
+  if (!nurtureEmailsEnabled(env)) return;
 
   const now = new Date();
   const hour = now.getUTCHours();

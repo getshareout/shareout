@@ -8,6 +8,7 @@ import { buildCrewDataContext, buildCrewPrincipal, redact } from './principal';
 import { resolveEnabledTools, toProviderTools } from './tool-registry';
 import { createApproval, notifyOwnerPendingApprovals } from './approvals';
 import { getCrewProvider, type CrewProvider, type NeutralTurn, type ProviderTool } from './provider';
+import { logCrewRunFailure, logCrewToolFailure, userFacingCrewRunError, userFacingCrewToolError } from './errors';
 
 // Resolve whether a write tool's call must be deferred for owner approval.
 // 'whenPublic' gates anything not strictly private (public artifacts are shareable).
@@ -258,8 +259,10 @@ export async function executeCrewRun(
       await logEvent('model_start', { tokenInput: turnIn, tokenOutput: turnOut });
 
       if (turnError) {
-        emit({ type: 'error', error: turnError });
-        await logEvent('error', { output: redact(turnError) });
+        logCrewRunFailure(env, { ownerId: crew.owner_id, crewId: crew.id, runId: run.id }, turnError);
+        const safeTurnError = userFacingCrewRunError(turnError);
+        emit({ type: 'error', error: safeTurnError });
+        await logEvent('error', { output: redact(safeTurnError) });
         termination = 'error';
         break;
       }
@@ -316,7 +319,13 @@ export async function executeCrewRun(
                 isError = true;
               }
             } catch (err) {
-              result = { error: err instanceof Error ? err.message : 'tool failed' };
+              logCrewToolFailure(env, {
+                tool: t.name,
+                ownerId: principal.ownerId,
+                crewId: crew.id,
+                runId: run.id,
+              }, err);
+              result = { error: userFacingCrewToolError(err) };
               isError = true;
             }
           }
@@ -382,7 +391,9 @@ export async function executeCrewRun(
       await notifyOwnerPendingApprovals(env, crew.artifact_id, pendingApprovals);
     }
   } catch (err) {
-    emit({ type: 'error', error: err instanceof Error ? err.message : 'run failed' });
+    logCrewRunFailure(env, { ownerId: crew.owner_id, crewId: crew.id, runId: run.id }, err);
+    const safeRunError = userFacingCrewRunError(err);
+    emit({ type: 'error', error: safeRunError });
     await finalize('error', '');
   }
 

@@ -100,6 +100,8 @@ export interface Env {
   ARTIFACT_BADGE?: string;
   /** When truthy (1|true|yes|on), pause ALL lifecycle emails (incl. OTP/invites). Jobs + CrewAI email_send still work. */
   LIFECYCLE_EMAILS_DISABLED?: string;
+  /** Opt-IN for timer-driven nurture mail (win-back, activation, digests). Unset = off. */
+  NURTURE_EMAILS_ENABLED?: string;
   /** When truthy (1|true|yes|on), disable "open" visibility (public). Every artifact stays private; share via email/password/auth. */
   OPEN_VISIBILITY_DISABLED?: string;
   /** Comma-separated workspace slugs exempt from OPEN_VISIBILITY_DISABLED — public showcase/marketing galleries. */

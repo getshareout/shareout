@@ -1,4 +1,5 @@
 import type { Env } from '../types';
+import { lifecycleEmailsDisabled } from './flags';
 import { sendEmail } from '../scheduling/email';
 import { isCategoryAllowed } from './preferences';
 import { isSuppressed } from './suppressions';
@@ -45,13 +46,6 @@ export interface DispatchResult {
   skipped?: SkipReason;
   messageId?: string;
   error?: string;
-}
-
-/** When LIFECYCLE_EMAILS_DISABLED is on, every catalog email is skipped.
- *  Jobs + CrewAI use sendArtifactEmail and are unaffected. */
-function lifecycleEmailsDisabled(env: Env): boolean {
-  const v = (env.LIFECYCLE_EMAILS_DISABLED || '').toLowerCase();
-  return v === '1' || v === 'true' || v === 'yes' || v === 'on';
 }
 
 function defaultFrom(env: Env): string {

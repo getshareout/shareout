@@ -1,6 +1,7 @@
 import type { Env } from '../types';
 import { dispatchLifecycleEmail } from './gateway';
 import { claimEmailSend } from './email-log';
+import { lifecycleEmailsDisabled, nurtureEmailsEnabled } from './flags';
 import { chatComplete, getAIProvider } from '../data/agent/anthropic';
 import { recordAiUsage } from '../data/ai-usage';
 import type { WorkspaceDigestData } from './catalog';
@@ -126,8 +127,8 @@ async function narrate(env: Env, workspaceId: string, d: WorkspaceDigestData): P
 /** Weekly (Monday) entry point. Iterates active workspaces, builds + sends one
  *  digest per workspace to its internal members. Per-workspace failures isolated. */
 export async function runWeeklyWorkspaceDigest(env: Env, weekKey: string): Promise<void> {
-  const v = (env.LIFECYCLE_EMAILS_DISABLED || '').toLowerCase();
-  if (v === '1' || v === 'true' || v === 'yes' || v === 'on') return;
+  if (lifecycleEmailsDisabled(env)) return;
+  if (!nurtureEmailsEnabled(env)) return;
 
   const workspaces = await env.DB.prepare(`
     SELECT w.id AS id, w.name AS name

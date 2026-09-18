@@ -1,5 +1,6 @@
 import type { Env } from '../types';
 import { getBuildConfig, type AIConfig } from '../data/agent/anthropic';
+import { logCrewProviderFailure, userFacingCrewProviderError } from './errors';
 
 // Provider-neutral tool-calling turn. The run loop keeps a neutral transcript;
 // each provider serializes it to its own wire format. Phase 0 ships the
@@ -46,7 +47,10 @@ export class OpenAICompatCrewProvider implements CrewProvider {
   readonly provider: string;
   readonly model: string;
 
-  constructor(private cfg: AIConfig) {
+  constructor(
+    private cfg: AIConfig,
+    private env: Env,
+  ) {
     this.provider = cfg.provider;
     this.model = cfg.model;
   }
@@ -99,19 +103,30 @@ export class OpenAICompatCrewProvider implements CrewProvider {
         }),
       });
     } catch (err) {
-      yield { type: 'error', error: err instanceof Error ? err.message : 'request failed' };
+      logCrewProviderFailure(this.env, { provider: this.provider, model: this.model }, err);
+      yield { type: 'error', error: userFacingCrewProviderError(err) };
       return;
     }
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');
-      yield { type: 'error', error: `AI gateway error ${response.status}: ${text.slice(0, 500)}` };
+      logCrewProviderFailure(
+        this.env,
+        { provider: this.provider, model: this.model, httpStatus: response.status },
+        new Error(`AI gateway HTTP ${response.status}: ${text.slice(0, 2000)}`),
+      );
+      yield { type: 'error', error: userFacingCrewProviderError(undefined, response.status) };
       return;
     }
 
     const reader = response.body?.getReader();
     if (!reader) {
-      yield { type: 'error', error: 'No response body' };
+      logCrewProviderFailure(
+        this.env,
+        { provider: this.provider, model: this.model },
+        new Error('No response body from AI gateway'),
+      );
+      yield { type: 'error', error: userFacingCrewProviderError() };
       return;
     }
 
@@ -191,8 +206,8 @@ export class OpenAICompatCrewProvider implements CrewProvider {
 }
 
 /** Resolve the crew provider: Vercel AI Gateway (strong Claude model), else the default provider. */
-export function getCrewProvider(_env: Env): CrewProvider | null {
-  const cfg = getBuildConfig(_env);
+export function getCrewProvider(env: Env): CrewProvider | null {
+  const cfg = getBuildConfig(env);
   if (!cfg) return null;
-  return new OpenAICompatCrewProvider(cfg);
+  return new OpenAICompatCrewProvider(cfg, env);
 }

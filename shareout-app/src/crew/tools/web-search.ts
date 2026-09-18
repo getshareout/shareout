@@ -1,3 +1,4 @@
+import { logCrewToolFailure, userFacingWebSearchToolError } from '../errors';
 import { getSearchProvider } from '../search';
 import type { CrewTool } from '../types';
 
@@ -16,18 +17,25 @@ export const webSearchTool: CrewTool = {
     required: ['query'],
   },
   async execute(ctx, input) {
+    const env = ctx.data.env;
     const query = typeof input.query === 'string' ? input.query.trim() : '';
     if (!query) return { error: 'Missing required field "query".' };
 
     const cap = ctx.limits.maxResults ?? 8;
     const limit = Math.min(typeof input.limit === 'number' ? input.limit : 5, cap);
 
-    const provider = getSearchProvider(ctx.data.env);
+    const provider = getSearchProvider(env);
     try {
       const results = await provider.search(query, limit);
       return { query, provider: provider.name, count: results.length, results };
     } catch (err) {
-      return { error: err instanceof Error ? err.message : 'web search failed' };
+      logCrewToolFailure(env, {
+        tool: 'web_search',
+        ownerId: ctx.principal.ownerId,
+        crewId: ctx.principal.crewId,
+        runId: ctx.principal.runId,
+      }, err);
+      return { error: userFacingWebSearchToolError(err) };
     }
   },
 };

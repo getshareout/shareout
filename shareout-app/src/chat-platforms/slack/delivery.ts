@@ -13,6 +13,26 @@ import {
 
 export type SlackDeliveryMode = 'message' | 'snapshot' | 'pdf' | 'both';
 
+// Slack caps a message at 50 blocks. A header and a link button are added around the
+// caller's body, so cap the body below 50 rather than letting Slack reject the post.
+const MAX_BODY_BLOCKS = 45;
+
+/** Returns a reason string when `blocks` is unusable, or null when it is fine. */
+export function invalidSlackBlocks(blocks: unknown): string | null {
+  if (!Array.isArray(blocks)) return 'blocks must be an array';
+  if (blocks.length === 0) return 'blocks must not be empty';
+  if (blocks.length > MAX_BODY_BLOCKS) return `blocks must contain at most ${MAX_BODY_BLOCKS} entries`;
+  for (const block of blocks) {
+    if (typeof block !== 'object' || block === null || Array.isArray(block)) {
+      return 'each block must be an object';
+    }
+    if (typeof (block as { type?: unknown }).type !== 'string') {
+      return 'each block must have a string "type"';
+    }
+  }
+  return null;
+}
+
 export interface SlackSendOptions {
   /** connections.name (workspace scope) holding the Slack bot token */
   connection: string;
@@ -22,6 +42,14 @@ export interface SlackSendOptions {
   mode?: SlackDeliveryMode;
   message?: string;
   waitMs?: number;
+  /** Set false to omit the "Open in ShareOut" button and the URL appended to
+   *  snapshot/PDF comments — for briefings that link out to their own system of
+   *  record. Defaults to true. */
+  includeArtifactLink?: boolean;
+  /** Block Kit blocks for the message body, replacing the single mrkdwn section
+   *  built from `message`. The header and the "Open in ShareOut" button are still
+   *  added around them. `message` stays the notification fallback text. */
+  blocks?: unknown[];
 }
 
 export interface SlackResult {
@@ -64,18 +92,27 @@ async function postArtifactMessage(
   channelId: string,
   name: string,
   url: string,
-  message: string
+  message: string,
+  includeLink = true,
+  bodyBlocks?: unknown[],
 ): Promise<SlackResult> {
-  const result = await postSlackMessage(token, channelId, message, [
+  // includeLink=false: briefings whose canonical home is elsewhere. Caller-supplied
+  // body replaces the mrkdwn section, but never the header or the link button.
+  const blocks: unknown[] = [
     { type: 'header', text: { type: 'plain_text', text: name } },
-    { type: 'section', text: { type: 'mrkdwn', text: message } },
-    {
+    ...(bodyBlocks?.length
+      ? bodyBlocks
+      : [{ type: 'section', text: { type: 'mrkdwn', text: message } }]),
+  ];
+  if (includeLink) {
+    blocks.push({
       type: 'actions',
       elements: [
         { type: 'button', text: { type: 'plain_text', text: 'Open in ShareOut' }, url },
       ],
-    },
-  ]);
+    });
+  }
+  const result = await postSlackMessage(token, channelId, message, blocks);
   return result.ok ? { success: true } : { success: false, error: `chat.postMessage failed: ${result.error}` };
 }
 
@@ -136,10 +173,11 @@ export async function sendArtifactToSlack(
 
   const mode = opts.mode || 'message';
   const message = opts.message || `Update from ${meta.name}`;
-  const comment = `${message}\n${meta.url}`;
+  const includeLink = opts.includeArtifactLink !== false;
+  const comment = includeLink ? `${message}\n${meta.url}` : message;
 
   if (mode === 'message') {
-    return postArtifactMessage(resolved.token, channelId, meta.name, meta.url, message);
+    return postArtifactMessage(resolved.token, channelId, meta.name, meta.url, message, includeLink, opts.blocks);
   }
   if (mode === 'snapshot') {
     return uploadSnapshot(env, resolved.token, channelId, artifactId, meta.name, opts.waitMs, comment);
@@ -148,7 +186,7 @@ export async function sendArtifactToSlack(
     return uploadPdf(env, resolved.token, channelId, artifactId, meta.name, opts.waitMs, comment);
   }
 
-  const msg = await postArtifactMessage(resolved.token, channelId, meta.name, meta.url, message);
+  const msg = await postArtifactMessage(resolved.token, channelId, meta.name, meta.url, message, includeLink, opts.blocks);
   if (!msg.success) return msg;
   return uploadSnapshot(env, resolved.token, channelId, artifactId, meta.name, opts.waitMs);
 }

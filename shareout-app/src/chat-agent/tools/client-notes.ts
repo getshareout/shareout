@@ -1,6 +1,7 @@
 import type { AccountTool, ToolContext } from './types';
 import { getInternalWorkspaceRole } from '../../workspaces';
 import { upsertShareeContextFile } from '../../workspace-context';
+import { isKnownShareeContextUpsertError, logAgentToolFailure, userFacingClientNotesError } from '../errors';
 
 // Lets the workspace assistant keep a Client's notes current — the AI half of "admin
 // or AI can edit". Workspace-private (never shared with the client). Direct write
@@ -40,8 +41,26 @@ export const setClientNotesTool: AccountTool = {
     ).bind(wsId, clientRef, clientRef).first<{ id: string; name: string }>();
     if (!sharee) return { error: `No client named "${clientRef}" in this workspace.` };
 
-    const err = await upsertShareeContextFile(ctx.env, wsId, sharee.id, name, content, ctx.userId);
-    if (err) return { error: `Couldn’t save the note (${err}).` };
+    try {
+      const err = await upsertShareeContextFile(ctx.env, wsId, sharee.id, name, content, ctx.userId);
+      if (err) {
+        if (!isKnownShareeContextUpsertError(err)) {
+          logAgentToolFailure(ctx.env, {
+            tool: 'set_client_notes',
+            userId: ctx.userId,
+            platform: ctx.platform,
+          }, new Error(err));
+        }
+        return { error: userFacingClientNotesError(err) };
+      }
+    } catch (e) {
+      logAgentToolFailure(ctx.env, {
+        tool: 'set_client_notes',
+        userId: ctx.userId,
+        platform: ctx.platform,
+      }, e);
+      return { error: userFacingClientNotesError(e) };
+    }
     return { ok: true, client: sharee.name, note: name };
   },
 };

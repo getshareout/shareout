@@ -1,6 +1,6 @@
 import type { Env } from '../../types';
 import type { SlackConfig } from '../../scheduling/jobs';
-import { sendArtifactToSlack } from '../../slack/send';
+import { invalidSlackBlocks, sendArtifactToSlack } from '../../slack/send';
 import type { Destination, DeliveryContext, DeliveryResult } from '../types';
 
 export const slackDestination: Destination<SlackConfig> = {
@@ -9,6 +9,10 @@ export const slackDestination: Destination<SlackConfig> = {
   async validate(_env, _ctx, config) {
     // Bot-token (OAuth app) delivery.
     if (config.connection) {
+      if (config.blocks !== undefined) {
+        const problem = invalidSlackBlocks(config.blocks);
+        if (problem) return problem;
+      }
       if (config.targetType === 'dm') {
         if (!config.slackUserId) return 'slackUserId is required for a Slack DM';
         return null;
@@ -36,6 +40,8 @@ export const slackDestination: Destination<SlackConfig> = {
         mode: config.mode,
         message: config.customMessage,
         waitMs: config.waitMs,
+        includeArtifactLink: config.includeArtifactLink,
+        blocks: config.blocks,
       });
     }
     return deliverViaWebhook(env, ctx, config);

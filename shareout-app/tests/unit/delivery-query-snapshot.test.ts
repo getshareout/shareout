@@ -48,6 +48,47 @@ describe('query_snapshot deliver', () => {
     expect(runMaterializeMock.mock.calls[1][2].target).toEqual({ type: 'json', name: 'digest' });
   });
 
+  it('merges per-query params over job params and resolves date tokens', async () => {
+    const config = {
+      connection: 'mixpanel',
+      params: { project_id: '3212168' },
+      queries: [
+        {
+          query: '/query/segmentation?event=%24ae_first_open&from_date={{date:-6d}}',
+          target: { type: 'json', name: 'digest', path: 'new_users' },
+          options: { params: { unit: 'day', to_date: '{{yesterday}}' } },
+        },
+      ],
+    };
+    const res = await dest.deliver(env, ctx, config as never);
+    expect(res.success).toBe(true);
+
+    const { source } = runMaterializeMock.mock.calls[0][2];
+    // Job-level and per-query params both reach the connection...
+    expect(source.options.params).toMatchObject({ project_id: '3212168', unit: 'day' });
+    // ...and every date token is an absolute day, in the path and in the params.
+    expect(source.query).toMatch(/from_date=\d{4}-\d{2}-\d{2}$/);
+    expect(source.options.params.to_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(JSON.stringify(source)).not.toContain('{{');
+  });
+
+  it('lets a per-query param override the job-level value for the same key', async () => {
+    const config = {
+      connection: 'mixpanel',
+      params: { unit: 'day' },
+      queries: [{ query: '/x', target: { type: 'json', name: 'd' }, options: { params: { unit: 'week' } } }],
+    };
+    await dest.deliver(env, ctx, config as never);
+    expect(runMaterializeMock.mock.calls[0][2].source.options.params).toEqual({ unit: 'week' });
+  });
+
+  it('sends no params when neither job nor query defines any', async () => {
+    const config = { connection: 'c', queries: [{ query: '/x', target: { type: 'json', name: 'd' } }] };
+    await dest.deliver(env, ctx, config as never);
+    expect(runMaterializeMock.mock.calls[0][2].source.options).toBeUndefined();
+  });
+
+
   it('surfaces a query failure as a failed delivery', async () => {
     runMaterializeMock.mockRejectedValueOnce(new Error('BigQuery failed: bad SQL'));
     const res = await dest.deliver(env, ctx, goodConfig as never);
