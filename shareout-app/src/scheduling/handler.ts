@@ -25,8 +25,7 @@ import { checkPublicAutoRollback } from '../public-rollout';
 import { reapStaleApprovals } from '../crew/approvals';
 import { autoCloseIdleTickets } from '../support/store';
 import { runDueMetricAlerts } from '../metric-alerts/rules';
-import { runHealthSweep, sendDailySummary, sendWorkspaceCostDigest, cleanupObservability } from '../observability';
-import { fireAlert } from '../observability/alerts';
+import { cleanupObservability } from '../observability';
 import { cleanupAuditLog } from '../audit';
 import { createLogger } from '../logging';
 import { runStorageSnapshots } from '../storage-snapshots';
@@ -250,13 +249,6 @@ export async function handleScheduledEvent(env: Env, scheduledTime?: number): Pr
   // Evaluate due metric alert rules (Follow Metric Alerts). Per-minute granularity.
   const alertResult = await runDueMetricAlerts(env);
 
-  // Observability: alert on the just-completed hour's threshold breaches on every
-  // run; send a 24h health digest to Telegram once a day at 13:00 UTC.
-  await runHealthSweep(env).catch(() => {});
-  if (hour === 13 && minute === 0) {
-    await sendDailySummary(env).catch(() => {});
-  }
-
   // Stale-data sentinel: flag artifacts whose Sheets source hasn't synced in 7+
   // days. Self-deduped via last_notified_stale_at cooldown, so safe every hour.
   const staleResult = await runStaleDataSweep(env).catch(() => ({ notified: 0 }));
@@ -346,15 +338,12 @@ export async function handleScheduledEvent(env: Env, scheduledTime?: number): Pr
   // pages, prune dead digests, refresh trunk + timeline. Daily 03:00 UTC (quiet slot;
   // cleanup owns 01:00, backups 04:00/05:00). Self-limits (caps in consolidate.ts).
   if (hour === 3 && minute === 0) {
-    const cons = await runKnowledgeConsolidate(env).catch(async (err) => {
-      // Silent failure here means the KB silently stops evolving — alert (deduped) but keep
+    const cons = await runKnowledgeConsolidate(env).catch((err) => {
+      // Silent failure here means the KB silently stops evolving — log it, but keep
       // the cron running by returning null.
-      await fireAlert(
-        env,
-        'knowledge:consolidate:error',
-        `Knowledge consolidate failed: ${err instanceof Error ? err.message : String(err)}`,
-        3600
-      ).catch(() => {});
+      logger.error('knowledge consolidate failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return null;
     });
     if (cons && (cons.workspaces > 0 || cons.pruned > 0)) {
@@ -367,11 +356,6 @@ export async function handleScheduledEvent(env: Env, scheduledTime?: number): Pr
         kn_skipped: cons.skipped,
       });
     }
-  }
-
-  // Per-customer profitability digest: flag workspaces running a net loss. Daily at 14:00 UTC.
-  if (hour === 14 && minute === 0) {
-    await sendWorkspaceCostDigest(env).catch(() => {});
   }
 
   // Scheduled lifecycle emails (activation nudge hourly; win-back + first-view daily;

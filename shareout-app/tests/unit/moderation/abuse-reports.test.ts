@@ -4,14 +4,10 @@ import type { Env } from '../../../src/types';
 
 const setArtifactModeration = vi.fn(async () => ({ ok: true }));
 const setArtifactPaused = vi.fn(async () => undefined);
-const notifyAdmin = vi.fn(async () => true);
 
 vi.mock('../../../src/superadmin/artifacts-admin', () => ({
   setArtifactModeration: (...a: unknown[]) => setArtifactModeration(...a),
   setArtifactPaused: (...a: unknown[]) => setArtifactPaused(...a),
-}));
-vi.mock('../../../src/observability/alerts', () => ({
-  notifyAdmin: (...a: unknown[]) => notifyAdmin(...a),
 }));
 
 import { handleAbuseReport } from '../../../src/moderation/abuse-reports';
@@ -44,7 +40,6 @@ function postReport(category: string, ip: string | null = '203.0.113.9'): Reques
 beforeEach(() => {
   setArtifactModeration.mockClear();
   setArtifactPaused.mockClear();
-  notifyAdmin.mockClear();
 });
 
 describe('handleAbuseReport', () => {
@@ -67,7 +62,6 @@ describe('handleAbuseReport', () => {
     expect(res.status).toBe(200);
     expect(setArtifactPaused).toHaveBeenCalledWith(expect.anything(), 'art_1', true);
     expect(setArtifactModeration).toHaveBeenCalledWith(expect.anything(), 'art_1', 'block', expect.any(String));
-    expect(notifyAdmin).toHaveBeenCalled();
   });
 
   it('does not block a single ordinary report', async () => {

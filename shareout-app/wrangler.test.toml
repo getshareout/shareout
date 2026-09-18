@@ -25,7 +25,6 @@ ARTIFACT_ORIGIN = "https://shareout.test"
 EMAIL_DEFAULT_FROM = "noreply@shareout.test"
 EMAIL_ARTIFACTS_DOMAIN = "shareout.test"
 TEAM_METRICS_ENABLED = "0"
-ADMIN_ALERTS_DISABLED = "1"
 
 [[send_email]]
 name = "EMAIL"

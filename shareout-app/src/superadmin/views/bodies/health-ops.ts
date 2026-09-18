@@ -12,8 +12,7 @@ export function healthBody(
   w24: WindowSummary,
   w1: WindowSummary,
   series: HourRow[],
-  errors: ErrorRow[],
-  alertChats: number[]
+  errors: ErrorRow[]
 ): string {
   const errClass = w24.status5xx + w24.exceptions > 0 ? 'sa-neg' : 'sa-pos';
   const reqChart = barChart(series.map((r) => ({ date: `${r.hour.slice(11)}:00`, value: r.requests })));
@@ -34,10 +33,6 @@ export function healthBody(
     { name: '1–3s', count: sum((r) => r.b_le_3000) },
     { name: '>3s', count: sum((r) => r.b_gt_3000) },
   ];
-
-  const alertStatus = alertChats.length
-    ? `<span class="sa-pos">● Active</span> — alerts go to Telegram chat${alertChats.length === 1 ? '' : 's'} ${alertChats.map((id) => `<code>${id}</code>`).join(', ')}.`
-    : `<span class="sa-neg">● Not linked</span> — add the email to <code>superadmin-recipients.json</code> and link @ShareOutSuperAdminBot in Settings. Or set <code>ALERT_TELEGRAM_CHAT_ID</code>.`;
 
   const errorsTable = errors.length
     ? `<table class="sa-table"><thead><tr><th>When</th><th>Status</th><th>Method</th><th>Path</th><th>Detail</th></tr></thead><tbody>${errors
@@ -70,7 +65,7 @@ export function healthBody(
       ${card('Latency distribution (48h)', distribution(latencyMix))}
     </div>
     <div class="sa-grid-3" style="margin-top:var(--space-4)">
-      ${card('Real-time alerts', `<p class="sa-stat-sub" style="line-height:1.6">${alertStatus}</p><p class="sa-muted" style="font-size:12px;margin-top:8px">Fires on 5xx & unhandled exceptions (repeats muted 5m), an hourly threshold sweep, and a daily 24h digest.</p>`)}
+      ${card('Errors', `<p class="sa-muted" style="font-size:12px">5xx responses and unhandled exceptions are recorded here and in the Worker logs. No out-of-band alerting — this page is the surface.</p>`)}
       ${card('Live logs', `<p class="sa-muted" style="font-size:12px;line-height:1.6">Stream live: <code>wrangler tail shareout --format json</code><br>Or Cloudflare Dashboard → Workers → shareout → Logs.</p>`)}
     </div>
     <div style="margin-top:var(--space-4)">

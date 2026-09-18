@@ -2,25 +2,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../src/types';
 
-const sendMessage = vi.fn(async () => {});
-vi.mock('../../src/telegram/client', () => ({ sendMessage: (...a: unknown[]) => sendMessage(...a) }));
-
 const countExceededMemoryKills = vi.fn(async () => null as number | null);
 vi.mock('../../src/observability/cf-worker-analytics', () => ({ countExceededMemoryKills: (...a: unknown[]) => countExceededMemoryKills(...a) }));
 
 import { recordRequestMetric, getWindowSummary } from '../../src/observability/store';
-import { fireAlert, alertOnError, runHealthSweep, notifyAdmin } from '../../src/observability/alerts';
-import { configuredSuperadminTelegramChatIds, resolveSuperadminTelegramChatIds } from '../../src/superadmin/recipients';
 import { observe, shouldSkipObservability } from '../../src/observability';
-
-// The shipped roster is empty by design (a public repo must not grant super-admin to a
-// baked-in address), so tests that need one mock the roster import.
-const testRoster = vi.hoisted(() => ({
-  default: {
-    recipients: [{ email: 'admin@example.com', telegramChatId: 555000 }, { email: 'ops@example.com' }],
-  },
-}));
-vi.mock('../../superadmin-recipients.json', () => testRoster);
 
 interface DbCall {
   sql: string;
@@ -71,7 +57,6 @@ function makeKv() {
 }
 
 afterEach(() => {
-  sendMessage.mockClear();
 });
 
 describe('recordRequestMetric — bucketing', () => {
@@ -128,143 +113,6 @@ describe('getWindowSummary — math', () => {
   });
 });
 
-describe('resolveSuperadminTelegramChatIds', () => {
-  const rosterIds = configuredSuperadminTelegramChatIds();
-
-  it('honours the explicit override', async () => {
-    const ids = await resolveSuperadminTelegramChatIds({ ALERT_TELEGRAM_CHAT_ID: '424242' } as Env);
-    expect(ids).toEqual([424242]);
-  });
-
-  it('merges roster chat ids with linked superadmin chats and caches them', async () => {
-    const db = makeDb({ all: [{ chat_id: '987654' }, { chat_id: '111222' }] });
-    const kv = makeKv();
-    const env = { DB: db, RATE_LIMIT_KV: kv } as Env;
-    expect(await resolveSuperadminTelegramChatIds(env)).toEqual([...rosterIds, 987654, 111222]);
-    expect((kv as unknown as { _store: Map<string, string> })._store.get('superadmin:telegram_chats:v1')).toBe(
-      JSON.stringify([...rosterIds, 987654, 111222])
-    );
-  });
-
-  it('negative-caches when only roster ids exist and D1 has no links', async () => {
-    const db = makeDb({ all: [] });
-    const kv = makeKv();
-    const env = { DB: db, RATE_LIMIT_KV: kv } as Env;
-    expect(await resolveSuperadminTelegramChatIds(env)).toEqual(rosterIds);
-    expect((kv as unknown as { _store: Map<string, string> })._store.get('superadmin:telegram_chats:v1')).toBe(
-      JSON.stringify(rosterIds)
-    );
-  });
-
-  it('returns the first resolved chat when only one is needed', async () => {
-    const db = makeDb({ all: [{ chat_id: '987654' }, { chat_id: '111222' }] });
-    const env = { DB: db, RATE_LIMIT_KV: makeKv() } as Env;
-    const chatIds = await resolveSuperadminTelegramChatIds(env);
-    expect(chatIds[0] ?? null).toBe(configuredSuperadminTelegramChatIds()[0] ?? 987654);
-  });
-});
-
-describe('fireAlert — throttle', () => {
-  it('sends once per recipient then mutes repeats within the cooldown', async () => {
-    const kv = makeKv();
-    const env = { ALERT_TELEGRAM_CHAT_ID: '111', RATE_LIMIT_KV: kv } as Env;
-    await fireAlert(env, 'k1', 'boom', 300);
-    await fireAlert(env, 'k1', 'boom again', 300);
-    expect(sendMessage).toHaveBeenCalledTimes(1);
-  });
-
-  it('does nothing when no chat resolves', async () => {
-    const env = { ALERT_TELEGRAM_CHAT_ID: 'bad', RATE_LIMIT_KV: makeKv() } as Env;
-    await fireAlert(env, 'k2', 'boom', 300);
-    expect(sendMessage).not.toHaveBeenCalled();
-  });
-});
-
-describe('notifyAdmin', () => {
-  it('sends to every resolved admin chat and reports success', async () => {
-    const env = { ALERT_TELEGRAM_CHAT_ID: '777', RATE_LIMIT_KV: makeKv() } as Env;
-    const ok = await notifyAdmin(env, 'hello admin');
-    expect(ok).toBe(true);
-    expect(sendMessage).toHaveBeenCalledTimes(1);
-    expect(sendMessage.mock.calls[0][1]).toBe(777);
-    expect(String(sendMessage.mock.calls[0][2])).toBe('hello admin');
-  });
-
-  it('returns false (no send) when no admin chat resolves', async () => {
-    const env = { ALERT_TELEGRAM_CHAT_ID: 'bad', RATE_LIMIT_KV: makeKv() } as Env;
-    expect(await notifyAdmin(env, 'hi')).toBe(false);
-    expect(sendMessage).not.toHaveBeenCalled();
-  });
-});
-
-describe('alertOnError', () => {
-  it('formats an HTTP 5xx alert', async () => {
-    const env = { ALERT_TELEGRAM_CHAT_ID: '1', RATE_LIMIT_KV: makeKv() } as Env;
-    await alertOnError(env, { status: 502, outcome: 'http_error', method: 'GET', path: '/home' });
-    expect(sendMessage).toHaveBeenCalledTimes(1);
-    expect(String(sendMessage.mock.calls[0][2])).toContain('HTTP 502');
-  });
-
-  it('formats an exception alert', async () => {
-    const env = { ALERT_TELEGRAM_CHAT_ID: '1', RATE_LIMIT_KV: makeKv() } as Env;
-    await alertOnError(env, { status: 500, outcome: 'exception', path: '/x', message: 'kaboom' });
-    expect(String(sendMessage.mock.calls[0][2])).toContain('kaboom');
-  });
-});
-
-describe('runHealthSweep — thresholds', () => {
-  const kv = () => makeKv();
-
-  beforeEach(() => {
-    countExceededMemoryKills.mockResolvedValue(null);
-  });
-
-  it('alerts on an elevated 5xx rate', async () => {
-    const db = makeDb({ first: { requests: 1000, status_5xx: 30, exceptions: 0, b_le_3000: 0, b_gt_3000: 0 } });
-    await runHealthSweep({ DB: db, ALERT_TELEGRAM_CHAT_ID: '1', RATE_LIMIT_KV: kv() } as Env);
-    expect(sendMessage).toHaveBeenCalledTimes(1);
-    expect(String(sendMessage.mock.calls[0][2])).toContain('5xx');
-  });
-
-  it('stays quiet on a clean hour', async () => {
-    const db = makeDb({ first: { requests: 1000, status_5xx: 0, exceptions: 0, b_le_3000: 0, b_gt_3000: 0 } });
-    await runHealthSweep({ DB: db, ALERT_TELEGRAM_CHAT_ID: '1', RATE_LIMIT_KV: kv() } as Env);
-    expect(sendMessage).not.toHaveBeenCalled();
-  });
-
-  it('ignores low-traffic hours', async () => {
-    const db = makeDb({ first: { requests: 5, status_5xx: 5, exceptions: 5, b_le_3000: 0, b_gt_3000: 0 } });
-    await runHealthSweep({ DB: db, ALERT_TELEGRAM_CHAT_ID: '1', RATE_LIMIT_KV: kv() } as Env);
-    expect(sendMessage).not.toHaveBeenCalled();
-  });
-
-  it('stays quiet on a slow but low-traffic hour (e.g. 9/33)', async () => {
-    const db = makeDb({ first: { requests: 33, status_5xx: 0, exceptions: 0, b_le_3000: 9, b_gt_3000: 0 } });
-    await runHealthSweep({ DB: db, ALERT_TELEGRAM_CHAT_ID: '1', RATE_LIMIT_KV: kv() } as Env);
-    expect(sendMessage).not.toHaveBeenCalled();
-  });
-
-  it('alerts on a genuine high-volume slowdown (e.g. 2153/2226)', async () => {
-    const db = makeDb({ first: { requests: 2226, status_5xx: 0, exceptions: 0, b_le_3000: 2000, b_gt_3000: 153 } });
-    await runHealthSweep({ DB: db, ALERT_TELEGRAM_CHAT_ID: '1', RATE_LIMIT_KV: kv() } as Env);
-    expect(sendMessage).toHaveBeenCalledTimes(1);
-    expect(String(sendMessage.mock.calls[0][2])).toContain('Slow responses');
-  });
-
-  it('alerts when CF Analytics reports exceededMemory kills', async () => {
-    countExceededMemoryKills.mockResolvedValue(2);
-    const db = makeDb({ first: { requests: 1000, status_5xx: 0, exceptions: 0, b_le_3000: 0, b_gt_3000: 0 } });
-    await runHealthSweep({
-      DB: db,
-      ALERT_TELEGRAM_CHAT_ID: '1',
-      RATE_LIMIT_KV: kv(),
-      CF_API_TOKEN: 'tok',
-      CF_ACCOUNT_ID: 'acct',
-    } as Env);
-    expect(sendMessage).toHaveBeenCalledTimes(1);
-    expect(String(sendMessage.mock.calls[0][2])).toContain('memory limit exceeded');
-  });
-});
 
 describe('observe — routing', () => {
   function ctxCapture() {
@@ -275,7 +123,7 @@ describe('observe — routing', () => {
   it('records a 2xx without logging an error or alerting', async () => {
     const db = makeDb() as ReturnType<typeof makeDb>;
     const { ctx, tasks } = ctxCapture();
-    observe({ DB: db, ALERT_TELEGRAM_CHAT_ID: '1', RATE_LIMIT_KV: makeKv() } as Env, ctx, {
+    observe({ DB: db, RATE_LIMIT_KV: makeKv() } as Env, ctx, {
       status: 200,
       durationMs: 12,
       outcome: 'success',
@@ -283,13 +131,12 @@ describe('observe — routing', () => {
     await Promise.all(tasks);
     expect(db._calls.some((c) => c.sql.includes('health_metrics_hourly'))).toBe(true);
     expect(db._calls.some((c) => c.sql.includes('ops_error_log'))).toBe(false);
-    expect(sendMessage).not.toHaveBeenCalled();
   });
 
   it('does not log or alert on a 404', async () => {
     const db = makeDb() as ReturnType<typeof makeDb>;
     const { ctx, tasks } = ctxCapture();
-    observe({ DB: db, ALERT_TELEGRAM_CHAT_ID: '1', RATE_LIMIT_KV: makeKv() } as Env, ctx, {
+    observe({ DB: db, RATE_LIMIT_KV: makeKv() } as Env, ctx, {
       status: 404,
       durationMs: 5,
       outcome: 'http_error',
@@ -297,13 +144,12 @@ describe('observe — routing', () => {
     });
     await Promise.all(tasks);
     expect(db._calls.some((c) => c.sql.includes('ops_error_log'))).toBe(false);
-    expect(sendMessage).not.toHaveBeenCalled();
   });
 
-  it('logs and alerts on a 500', async () => {
+  it('records a 500 to the error log', async () => {
     const db = makeDb() as ReturnType<typeof makeDb>;
     const { ctx, tasks } = ctxCapture();
-    observe({ DB: db, ALERT_TELEGRAM_CHAT_ID: '1', RATE_LIMIT_KV: makeKv() } as Env, ctx, {
+    observe({ DB: db, RATE_LIMIT_KV: makeKv() } as Env, ctx, {
       status: 500,
       durationMs: 33,
       outcome: 'http_error',
@@ -312,13 +158,12 @@ describe('observe — routing', () => {
     });
     await Promise.all(tasks);
     expect(db._calls.some((c) => c.sql.includes('ops_error_log'))).toBe(true);
-    expect(sendMessage).toHaveBeenCalledTimes(1);
   });
 
   it('skips localhost traffic before writing metrics or alerts', async () => {
     const db = makeDb() as ReturnType<typeof makeDb>;
     const { ctx, tasks } = ctxCapture();
-    observe({ DB: db, ALERT_TELEGRAM_CHAT_ID: '1', RATE_LIMIT_KV: makeKv() } as Env, ctx, {
+    observe({ DB: db, RATE_LIMIT_KV: makeKv() } as Env, ctx, {
       status: 500,
       durationMs: 20,
       outcome: 'http_error',
@@ -329,7 +174,6 @@ describe('observe — routing', () => {
     await Promise.all(tasks);
     expect(tasks).toHaveLength(0);
     expect(db._calls).toHaveLength(0);
-    expect(sendMessage).not.toHaveBeenCalled();
   });
 
   it('skips local request flags and the dev login route', async () => {

@@ -9,10 +9,12 @@ vi.mock('../../../src/fetch-utils', () => ({
 }));
 
 const mockFetch = vi.fn();
-const fireAlert = vi.fn();
-vi.mock('../../../src/observability/alerts', () => ({
-  fireAlert: (...args: unknown[]) => (fireAlert(...args), Promise.resolve()),
-}));
+const logWarn = vi.fn();
+const logErr = vi.fn();
+vi.mock('../../../src/logging', async (orig) => {
+  const actual = await orig<typeof import('../../../src/logging')>();
+  return { ...actual, createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: logWarn, error: logErr }) };
+});
 
 import { runPublishSafetyCheck, verdictToStatus } from '../../../src/moderation/check';
 
@@ -28,7 +30,8 @@ function aiResponse(verdict: string, reason = 'ok') {
 
 beforeEach(() => {
   mockFetch.mockReset();
-  fireAlert.mockReset();
+  logWarn.mockReset();
+  logErr.mockReset();
 });
 
 describe('extractSignals', () => {
@@ -99,11 +102,9 @@ describe('runPublishSafetyCheck', () => {
 
     expect(r.status).toBe('approved');
     expect(mockFetch).toHaveBeenCalledTimes(2);
-    expect(fireAlert).toHaveBeenCalledWith(
-      expect.anything(),
-      'ai:provider:failed:vercel-gateway',
-      expect.stringContaining('failed over'),
-      expect.any(Number),
+    expect(logWarn).toHaveBeenCalledWith(
+      'AI provider failed',
+      expect.objectContaining({ provider: 'vercel-gateway', failed_over: true }),
     );
   });
 

@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { runBandwidthAutoPause } from '../../../src/moderation/maintenance';
 import type { Env } from '../../../src/types';
 
-vi.mock('../../../src/observability/alerts', () => ({ notifyAdmin: vi.fn(async () => {}) }));
 
 interface Owner { owner_id: string; est_bytes: number }
 

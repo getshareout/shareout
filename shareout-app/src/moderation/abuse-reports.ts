@@ -8,7 +8,7 @@ import type { Env } from '../types';
 import { generateId } from '../crypto-utils';
 import { checkSlidingWindowRateLimit, getTrustedClientIp } from '../rate-limit';
 import { setArtifactModeration, setArtifactPaused } from '../superadmin/artifacts-admin';
-import { notifyAdmin } from '../observability/alerts';
+import { createLogger } from '../logging';
 import { escapeHtml } from '../serve/utils';
 
 const CATEGORIES = ['phishing', 'malware', 'csam', 'spam', 'copyright', 'other'] as const;
@@ -60,11 +60,11 @@ export async function handleAbuseReport(request: Request, env: Env, artifactId: 
     'INSERT INTO abuse_reports (id, artifact_id, reporter_ip, category, detail, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
   ).bind(generateId('rep'), artifactId, ip, category, detail || null, 'open', new Date().toISOString()).run();
 
-  // CSAM: do not wait for review — pause + block immediately and alert.
+  // CSAM: do not wait for review — pause + block immediately.
   if (category === 'csam') {
     await setArtifactPaused(env, artifactId, true);
     await setArtifactModeration(env, artifactId, 'block', 'CSAM report — auto-blocked pending review');
-    await notifyAdmin(env, `🚨 CSAM report on artifact ${artifactId} — auto-paused + blocked. Review now.`).catch(() => {});
+    createLogger(env, { scope: 'moderation' }).error('CSAM report — artifact auto-paused + blocked', { artifact_id: artifactId });
   } else {
     // Auto-block once enough DISTINCT IPs have reported it.
     const distinct = await env.DB.prepare(
@@ -72,7 +72,7 @@ export async function handleAbuseReport(request: Request, env: Env, artifactId: 
     ).bind(artifactId).first<{ n: number }>();
     if ((distinct?.n ?? 0) >= AUTO_BLOCK_DISTINCT_IPS) {
       await setArtifactModeration(env, artifactId, 'block', `auto-blocked after ${distinct?.n} reports`);
-      await notifyAdmin(env, `⚠️ Artifact ${artifactId} auto-blocked after ${distinct?.n} abuse reports.`).catch(() => {});
+      createLogger(env, { scope: 'moderation' }).warn('artifact auto-blocked after abuse reports', { artifact_id: artifactId, reports: distinct?.n });
     }
   }
 

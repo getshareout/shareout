@@ -8,10 +8,6 @@ vi.mock('../../../src/workspaces', async (orig) => {
   return { ...actual, autoJoinWorkspacesByDomain: vi.fn().mockResolvedValue(undefined) };
 });
 
-vi.mock('../../../src/superadmin/recipients', () => ({
-  notifySuperadmins: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock('../../../src/email/gateway', () => ({
   dispatchLifecycleEmail: vi.fn().mockResolvedValue({ sent: true }),
 }));

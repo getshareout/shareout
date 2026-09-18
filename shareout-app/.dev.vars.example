@@ -8,7 +8,7 @@ SHAREOUT_BASE_URL=http://localhost:55162
 
 # Optional — self-host / OSS
 # SETUP_ADMIN_EMAIL=you@example.com
-# ADMIN_ALERTS_DISABLED=1
+# INSTANCE_ADMIN_EMAILS=you@example.com,ops@example.com
 
 # Optional — separate marketing site in front of the app. Unset (default): the
 # anonymous apex `/` goes straight to the login page and there is no marketing site.
@@ -61,12 +61,10 @@ SHAREOUT_API_TOKEN=
 # R2_SECRET_ACCESS_KEY=
 # R2_ACCOUNT_ID=
 
-# --- Telegram / alerts (admin only) ---
+# --- Telegram (product bot only — there is no super-admin bot) ---
 # TELEGRAM_BOT_TOKEN=
-# TELEGRAM_ADMIN_BOT_TOKEN=
 # TELEGRAM_WEBHOOK_SECRET=
 # ADMIN_BRIDGE_SECRET=
-# ALERT_TELEGRAM_CHAT_ID=
 
 # --- Turnstile (signup/login widget) ---
 # TURNSTILE_CLOUDFLARE_SITEKEY=

@@ -9,7 +9,7 @@ import { extractSignals, outboundHosts } from './extract';
 import { checkHostsReputation } from './url-scanner';
 import { classifyAndPersist } from './check';
 import { setArtifactModeration, setArtifactPaused } from '../superadmin/artifacts-admin';
-import { notifyAdmin } from '../observability/alerts';
+import { createLogger } from '../logging';
 import { setModeration } from '../artifacts/satellites';
 
 interface RescanRow {
@@ -48,7 +48,7 @@ export async function runModerationRescan(env: Env, limit = 20): Promise<{ scann
       if (verdict === 'malicious') {
         await setArtifactModeration(env, row.id, 'block', 'URL reputation flagged on re-scan');
         await setArtifactPaused(env, row.id, true);
-        await notifyAdmin(env, `⚠️ Re-scan blocked artifact ${row.id}: outbound host flagged malicious.`).catch(() => {});
+        createLogger(env, { scope: 'moderation' }).warn('re-scan blocked artifact: outbound host flagged malicious', { artifact_id: row.id });
         blocked++;
       } else {
         // Touch checked_at so the rotation advances even when clean/unknown.

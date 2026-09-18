@@ -11,18 +11,12 @@ vi.mock('../../../src/moderation/url-scanner', () => ({
   checkHostsReputation: async () => 'unknown',
 }));
 vi.mock('../../../src/serve/deployment-cache', () => ({ invalidateDeploymentCacheById: vi.fn(async () => {}) }));
-vi.mock('../../../src/observability/alerts', () => ({
-  fireAlert: vi.fn(async () => {}),
-  notifyAdmin: vi.fn(async () => {}),
-}));
-
 const mockFetch = vi.fn();
 
 import { recheckPendingModeration } from '../../../src/moderation/rescan';
 import { setArtifactModeration } from '../../../src/superadmin/artifacts-admin';
 import { runPublishModeration } from '../../../src/publish/moderation';
 import { contentHash } from '../../../src/moderation/check';
-import { fireAlert } from '../../../src/observability/alerts';
 import { invalidateDeploymentCacheById } from '../../../src/serve/deployment-cache';
 
 const e = env as unknown as Env;
@@ -66,7 +60,6 @@ beforeAll(async () => {
 beforeEach(async () => {
   for (const t of ['artifacts', 'artifact_moderation', 'deployments', 'versions', 'assets']) await e.DB.exec(`DELETE FROM ${t}`);
   mockFetch.mockReset();
-  vi.mocked(fireAlert).mockClear();
   vi.mocked(invalidateDeploymentCacheById).mockClear();
   (e as unknown as { OPENAI_API_KEY: string }).OPENAI_API_KEY = 'sk-test';
 });
@@ -105,7 +98,7 @@ describe('setArtifactModeration approve', () => {
 });
 
 describe('runPublishModeration', () => {
-  it('records the held visibility and fires a super-admin alert on a new hold', async () => {
+  it('records the held visibility on a new hold', async () => {
     mockFetch.mockResolvedValue(aiResponse('suspicious', 'looks off'));
     await e.DB.prepare(
       `INSERT INTO artifacts (id, slug, workspace_id, visibility) VALUES (?,?,?,?)`
@@ -118,7 +111,6 @@ describe('runPublishModeration', () => {
 
     expect(status.status).toBe('pending');
     expect(await row('a4')).toEqual({ moderation_status: 'pending', visibility: 'private', moderation_held_visibility: 'public' });
-    expect(vi.mocked(fireAlert)).toHaveBeenCalledWith(e, 'moderation:held:a4', expect.stringContaining('held for review'), 6 * 3600);
   });
 
   it('republish as private clears the hold so the recheck cannot flip it public', async () => {

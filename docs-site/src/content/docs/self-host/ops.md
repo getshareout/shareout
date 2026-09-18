@@ -104,7 +104,7 @@ Test a restore on a staging worker before you need it.
 
 - Worker logs: `npx wrangler tail`
 - In-product: Admin → Health (when signed in as admin), if enabled on your build
-- Set `ADMIN_ALERTS_DISABLED=1` unless you configure Telegram ops alerts
+- There is no super-admin notification channel — use `/admin?view=health` and Worker logs
 
 ## Security basics (pre-public checklist)
 

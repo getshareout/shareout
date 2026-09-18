@@ -82,8 +82,6 @@ export interface Env {
    * to add an owner — no source edit, no fork.
    */
   INSTANCE_ADMIN_EMAILS?: string;
-  /** When truthy, skip CEO/ops Telegram admin alerts (self-host / empty roster). */
-  ADMIN_ALERTS_DISABLED?: string;
   /** Instance-wide storage cap per workspace/user, in bytes. Unset or 0 = unlimited. */
   STORAGE_QUOTA_BYTES?: string;
   /** Instance-wide single-file cap, in bytes. Unset or 0 = unlimited. */
@@ -168,8 +166,6 @@ export interface Env {
   PROXY_CACHE?: KVNamespace;
   /** Telegram bot token (from BotFather) for the artifact chat bot. */
   TELEGRAM_BOT_TOKEN?: string;
-  /** Telegram bot token for the internal super-admin bot (CEO brief, ops). Falls back to TELEGRAM_BOT_TOKEN. */
-  TELEGRAM_ADMIN_BOT_TOKEN?: string;
   /** Shared Bearer secret for the worker-to-worker admin bridge (/internal/admin/*), called by the headless-email bot. */
   ADMIN_BRIDGE_SECRET?: string;
   /** Shared secret echoed by Telegram in X-Telegram-Bot-Api-Secret-Token to authenticate webhook calls. */
@@ -179,10 +175,6 @@ export interface Env {
   /** Cloudflare account id + API token (Analytics:Read) for infra cost monitoring in the admin portal. Optional. */
   CF_ACCOUNT_ID?: string;
   CF_API_TOKEN?: string;
-  /** Telegram chat id that receives ops/health alerts. When unset, alerts resolve to the superadmin's linked chat from messaging_links. Optional override. */
-  ALERT_TELEGRAM_CHAT_ID?: string;
-  /** Cost threshold (USD, 30d) above which a workspace appears in the daily cost digest. Default 1.0. */
-  COST_ALERT_THRESHOLD_USD?: string;
   /** Browser Rendering binding — headless Chromium for artifact preview screenshots. */
   BROWSER?: Fetcher;
   /** Cloudflare Queue for batched analytics view-event ingest (opt-006). When unset,

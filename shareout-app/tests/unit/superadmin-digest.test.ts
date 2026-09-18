@@ -3,22 +3,13 @@ import { getDailyPlatformDigest, defaultReportDate } from '../../src/superadmin/
 import { investigatePlatformMetrics } from '../../src/superadmin/digest-investigate';
 import { platformMetricsDigestTool } from '../../src/crew/tools/platform-metrics-digest';
 import { platformMetricsInvestigateTool } from '../../src/crew/tools/platform-metrics-investigate';
-
-vi.mock('../../src/observability/alerts', () => ({
-  notifyAdmin: vi.fn().mockResolvedValue(true),
-}));
-
-import { formatBriefTables, buildBriefDashboardHtml } from '../../src/superadmin/brief-visual';
-import { deliverCeoBrief } from '../../src/superadmin/brief-deliver';
-import { adminTelegramNotifyTool } from '../../src/crew/tools/admin-telegram-notify';
-import { notifyAdmin } from '../../src/observability/alerts';
 import { SUPERADMIN_EMAILS } from '../../src/superadmin/recipients';
 
 // The shipped roster is empty by design (a public repo must not grant super-admin to a
 // baked-in address), so tests that need one mock the roster import.
 const testRoster = vi.hoisted(() => ({
   default: {
-    recipients: [{ email: 'admin@example.com', telegramChatId: 555000 }, { email: 'ops@example.com' }],
+    recipients: [{ email: 'admin@example.com' }, { email: 'ops@example.com' }],
   },
 }));
 vi.mock('../../superadmin-recipients.json', () => testRoster);
@@ -109,47 +100,6 @@ describe('investigatePlatformMetrics', () => {
   });
 });
 
-describe('brief visual', () => {
-  it('formats compact tables', async () => {
-    const env = { DB: mockDb('x@y.com') } as never;
-    const digest = await getDailyPlatformDigest(env, '2026-06-17');
-    const text = formatBriefTables(digest);
-    expect(text).toContain('GROWTH');
-    expect(text).toContain('2026-06-17');
-    expect(text).toContain('SPEND (USD)');
-    expect(text).toContain('tokens (LLM)');
-    expect(text).toContain('MTD');
-    expect(text).toContain('TOKENS BY WORKSPACE');
-    expect(text).toContain('Acme');
-    const html = buildBriefDashboardHtml(digest);
-    expect(html).toContain('ShareOut CEO Brief');
-    expect(html).toContain('Daily spend');
-    expect(html).toContain('Tokens by workspace');
-  });
-});
-
-describe('deliverCeoBrief dedup', () => {
-  it('skips duplicate without force', async () => {
-    const kv = new Map<string, string>();
-    const env = {
-      DB: mockDb(SA),
-      RATE_LIMIT_KV: {
-        get: async (k: string) => kv.get(k) ?? null,
-        put: async (k: string, v: string) => {
-          kv.set(k, v);
-        },
-      },
-      ALERT_TELEGRAM_CHAT_ID: '123',
-      TELEGRAM_BOT_TOKEN: 'tok',
-      BROWSER: null,
-    } as never;
-    const digest = await getDailyPlatformDigest(env, '2026-06-17');
-    kv.set('ceo-brief:sent:2026-06-17', '1');
-    const r = await deliverCeoBrief(env, digest, 'notes', {});
-    expect(r.skippedDuplicate).toBe(true);
-  });
-});
-
 describe('crew tools', () => {
   it('digest rejects non-superadmin', async () => {
     const env = { DB: mockDb('user@example.com') };
@@ -163,12 +113,5 @@ describe('crew tools', () => {
       topic: 'errors',
     });
     expect(result).toMatchObject({ topic: 'errors' });
-  });
-
-  it('telegram delivers for superadmin', async () => {
-    vi.mocked(notifyAdmin).mockResolvedValue(true);
-    const env = { DB: mockDb(SA) };
-    const result = await adminTelegramNotifyTool.execute(crewCtx(env), { message: 'CEO brief' });
-    expect(result).toEqual({ delivered: true });
   });
 });

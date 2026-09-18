@@ -23,7 +23,6 @@ const MUST_BE_CLEAN = [
   'artifacts/access-requests.ts',
   'tests/notify.ts',
   'crew/tools/pilot-verify.ts',
-  'observability/alerts.ts',
   'publish/moderation.ts',
   'serve/embed.ts',
   'data/comment-notify.ts',

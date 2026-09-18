@@ -1,7 +1,7 @@
 import type { Env } from '../../types';
 import type { ChatChunk, MessageRole } from './types';
 import { fetchWithTimeout, FetchTimeoutError } from '../../fetch-utils';
-import { fireAlert } from '../../observability/alerts';
+import { createLogger } from '../../logging';
 
 const AI_TIMEOUT_MS = 30000;
 const AI_STREAM_TIMEOUT_MS = 60000;
@@ -70,8 +70,6 @@ export function getAIProvider(env: Env): AIConfig | null {
   return getAIProviderChain(env)[0] ?? null;
 }
 
-const AI_PROVIDER_ALERT_COOLDOWN_SEC = 6 * 60 * 60;
-
 /** Provider-level failures worth failing over from (credits/auth/rate-limit/outage). */
 export function isProviderLevelStatus(status: number): boolean {
   return status === 401 || status === 402 || status === 403 || status === 429 || status >= 500;
@@ -96,15 +94,16 @@ export function isEnvProvider(env: Env, cfg: AIConfig): boolean {
   return getAIProviderChain(env).some(c => c.provider === cfg.provider && c.apiKey === cfg.apiKey);
 }
 
-/** Deduped super-admin alert fired when a provider fails (once per 6h per provider).
- *  Callers must gate on isEnvProvider: a customer's failing BYO key is not our outage,
- *  and letting it fire would also burn the shared dedup key and mask a real one. */
+/** Log a provider failure for the `/admin` health view.
+ *  Callers must gate on isEnvProvider: a customer's failing BYO key is not our outage. */
 export function alertProviderFailure(env: Env, cfg: AIConfig, error: string, failedOver: boolean): void {
   const detail = error.length > 300 ? error.slice(0, 300) + '…' : error;
-  const text = failedOver
-    ? `⚠️ AI provider ${cfg.provider} (${cfg.model}) failed — ${detail}\nTraffic failed over to the next provider. Check its credits/key.`
-    : `🚨 AI provider ${cfg.provider} (${cfg.model}) failed — ${detail}\nNo fallback left; AI requests are failing now. Fix the provider.`;
-  fireAlert(env, `ai:provider:failed:${cfg.provider}`, text, AI_PROVIDER_ALERT_COOLDOWN_SEC).catch(() => {});
+  createLogger(env, { scope: 'ai' })[failedOver ? 'warn' : 'error']('AI provider failed', {
+    provider: cfg.provider,
+    model: cfg.model,
+    failed_over: failedOver,
+    error: detail,
+  });
 }
 
 /** Model id stored in conversation metadata (always OpenAI, matches editor). */
