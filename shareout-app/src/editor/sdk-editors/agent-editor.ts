@@ -1,8 +1,9 @@
 import { dispatchAction } from './dispatch';
 import { jsonResponse } from './response';
 import type { SDKEditorHandler } from './types';
+import { DEFAULT_CLAUDE_MODEL } from '../../data/agent/models';
 
-const DEFAULT_AGENT_MODEL = 'claude-sonnet-4-20250514';
+const DEFAULT_AGENT_MODEL = DEFAULT_CLAUDE_MODEL.id;
 
 const DEFAULT_AGENT_CONFIG = {
   visitor: {

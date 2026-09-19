@@ -20,34 +20,37 @@ Everything else — publishing, data, realtime, sharing, scheduling, delivery �
 without an LLM key. An instance with no AI is a legitimate configuration, not a broken
 one.
 
-## Two providers
+## Three providers
 
-The chain supports exactly two, and it tries them in this order:
+The chain supports three, and by default tries them in this order:
 
 | Order | Secret | What it is |
 |-------|--------|------------|
 | 1 | `VERCEL_AI_GATEWAY` | A Vercel AI Gateway key. Useful when you want routing, budgets or observability in front of the model |
-| 2 | `OPENAI_API_KEY` | An OpenAI API key, called directly |
+| 2 | `ANTHROPIC_API_KEY` | An Anthropic API key, called directly on the native Messages API |
+| 3 | `OPENAI_API_KEY` | An OpenAI API key, called directly |
 
-Set either, or both. With both, the gateway is preferred and OpenAI is the fallback: a
-provider-level failure (`401`, `402`, `403`, `429`, or any `5xx`) fails over to the next
-entry, so a gateway that runs out of credit does not take your crews down.
+Set any of them. With more than one, a provider-level failure (`401`, `402`, `403`, `429`,
+or any `5xx`) fails over to the next entry, so a gateway that runs out of credit does not
+take your assistant or crews down.
 
-The chat model is `gpt-4o`.
+To change the order, set `AI_PROVIDER_ORDER` to a comma-separated list, e.g.
+`anthropic,openai`. Configured providers you leave out still follow, in the default order.
 
-:::note
-There is no `ANTHROPIC_API_KEY` path, despite the module being named `anthropic.ts` for
-historical reasons. Anthropic models are reachable through the Vercel gateway, not
-through a direct key.
-:::
+Models: the assistant, crews and page builds use Claude Sonnet 5 (`claude-sonnet-5`, or
+`anthropic/claude-sonnet-5` on the gateway; override with `BUILD_MODEL`). Lighter chat
+(in-artifact chat, summaries) uses `claude-sonnet-5` on Anthropic and `gpt-4o` on the
+gateway or OpenAI. Model ids live in `src/data/agent/models.ts`.
 
 ## Set it
 
 ```bash
 cd shareout-app
-npx wrangler secret put OPENAI_API_KEY
+npx wrangler secret put ANTHROPIC_API_KEY
 # or
 npx wrangler secret put VERCEL_AI_GATEWAY
+# or
+npx wrangler secret put OPENAI_API_KEY
 ```
 
 Secrets take effect immediately — no redeploy.
@@ -73,7 +76,7 @@ curl -sS -X PUT "$ORIGIN/v1/workspaces/$WORKSPACE_ID/llm" \
   -d '{"provider":"openai","apiKey":"sk-..."}'
 ```
 
-`provider` must be `openai` or `vercel-gateway` — the same two.
+`provider` must be `openai` or `vercel-gateway`; per-workspace Anthropic keys are not supported yet.
 
 This needs **`CREDENTIALS_KEY`** set, because the key is encrypted at rest:
 

@@ -62,7 +62,7 @@ await sdk.crew.define({
     3. notify_send: destination 'slack', message = your text, config = {
          "connection": "team", "channelId": "C0123456789", "mode": "both"
        }.`,
-  model: 'claude-sonnet-4-20250514',
+  model: 'claude-sonnet-5',
   maxIterations: 6,
   tools: {
     read: ['json_get'],

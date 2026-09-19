@@ -82,7 +82,7 @@ Stream live with `sdk.crew.run()` or replay from run history.
    await sdk.crew.define({
      name: 'Weekly reviewer',
      instructions: 'Read sales, flag revenue < 0, write a summary to json key "weekly_review".',
-     model: 'claude-sonnet-4-20250514',
+     model: 'claude-sonnet-5',
      tools: { read: ['table_query'], write: ['json_set'] },
    });
    ```

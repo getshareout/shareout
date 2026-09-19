@@ -54,6 +54,7 @@ SHAREOUT_API_TOKEN=
 # OPENAI_API_KEY=
 # ANTHROPIC_API_KEY=
 # VERCEL_AI_GATEWAY=
+# AI_PROVIDER_ORDER=vercel-gateway,anthropic,openai
 # BRAVE_SEARCH_API_KEY=
 
 # --- R2 S3-compatible signing (admin / artifact uploads) ---

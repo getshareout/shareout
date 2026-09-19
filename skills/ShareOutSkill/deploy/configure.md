@@ -61,9 +61,9 @@ Returns the whole picture — `origin`, `schema`, `auth`, `ai`, `email`, `storag
 {
   "gaps": [
     {
-      "setting": "VERCEL_AI_GATEWAY or OPENAI_API_KEY",
+      "setting": "ANTHROPIC_API_KEY, VERCEL_AI_GATEWAY or OPENAI_API_KEY",
       "disables": "Crew AI, the home assistant, in-artifact chat, editor AI, knowledge distillation, auto-summaries",
-      "fix": "npx wrangler secret put OPENAI_API_KEY (or VERCEL_AI_GATEWAY)"
+      "fix": "npx wrangler secret put ANTHROPIC_API_KEY (or VERCEL_AI_GATEWAY / OPENAI_API_KEY)"
     }
   ]
 }
@@ -84,7 +84,7 @@ The gaps you will actually meet, in the order they hurt:
 |-----|------------------------------------|
 | `D1 schema` | Everything. No tables exist. `npx wrangler d1 migrations apply DB --remote` |
 | `SHAREOUT_BASE_URL` | The skill and API docs hand agents the hosted instance's URLs instead of this one, so published content can land on someone else's server |
-| `VERCEL_AI_GATEWAY` / `OPENAI_API_KEY` | Every AI feature is inert — crews, assistant, in-artifact chat, editor AI, summaries |
+| `ANTHROPIC_API_KEY` / `VERCEL_AI_GATEWAY` / `OPENAI_API_KEY` | Every AI feature is inert — crews, assistant, in-artifact chat, editor AI, summaries |
 | `CREDENTIALS_KEY` | Per-workspace AI keys and stored connector credentials |
 | `EMAIL` binding | Sent mail. One-time codes, invites and digests go to the Worker log. **Password sign-in still works**, which is why an instance is usable without it |
 | `INSTANCE_ADMIN_EMAILS` | A stable owner. Until set, the earliest user is treated as admin |

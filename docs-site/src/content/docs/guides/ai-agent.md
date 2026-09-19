@@ -26,7 +26,7 @@ session. A `403 "Agent not enabled"` means you skipped step 1.
      "agent": {
        "enabled": true,
        "systemPrompt": "You are a data analyst for this dashboard. Answer only from the data provided.",
-       "model": "claude-sonnet-4-20250514",
+       "model": "claude-sonnet-5",
        "contextTables": ["sales"]
      }
    }
@@ -121,7 +121,7 @@ agent. Create a secret (owner only), then call it from the page:
 //   "injectionConfig": { "headerName": "x-api-key" }, "credentials": { "value": "sk-ant-…" } }
 
 const res = await sdk.secrets.post('anthropic', '/v1/messages', {
-  model: 'claude-sonnet-4-20250514',
+  model: 'claude-sonnet-5',
   max_tokens: 1024,
   messages: [{ role: 'user', content: 'Hello!' }],
 });

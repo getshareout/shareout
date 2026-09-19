@@ -44,7 +44,7 @@ button provisions names; replace placeholder IDs after create if needed.
 | `OPEN_VISIBILITY_DISABLED` | var | `1` keeps every artifact private; no public links. |
 | `ADMIN_BRIDGE_SECRET` | secret | **Leave unset** unless you run a private bridge worker. Unset ⇒ `/internal/admin/*` denies all. |
 | Telegram / Slack bot tokens | secret | Only if you use those integrations. |
-| `OPENAI_API_KEY` / `VERCEL_AI_GATEWAY` | secret | **AI is off until one is set** — Crew, assistants, editor AI, knowledge. See [Ops → AI providers](/self-host/ops/#ai-providers). |
+| `ANTHROPIC_API_KEY` / `VERCEL_AI_GATEWAY` / `OPENAI_API_KEY` | secret | **AI is off until one is set** — Crew, assistants, editor AI, knowledge. See [Ops → AI providers](/self-host/ops/#ai-providers). |
 | `CREDENTIALS_KEY` | secret | `openssl rand -hex 32`. Encrypts per-workspace AI keys and connector credentials; those endpoints refuse without it. |
 
 ## Local development

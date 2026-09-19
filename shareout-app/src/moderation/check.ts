@@ -131,7 +131,8 @@ export async function runPublishSafetyCheck(env: Env, html: string): Promise<Saf
   const hash = await contentHash(html);
   const signals = extractSignals(html);
 
-  const chain = getAIProviderChain(env);
+  // The classifier speaks the OpenAI chat format; Anthropic's native API is not in scope here.
+  const chain = getAIProviderChain(env).filter((c) => c.provider !== 'anthropic');
   if (chain.length === 0) {
     // Self-host without an AI key: do not hold every public publish behind
     // "Being reviewed". Heuristic script/host checks below still run when we add

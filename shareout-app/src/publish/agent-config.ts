@@ -6,6 +6,7 @@
  * omitted fields keep their current value (or sensible defaults on first insert).
  */
 import type { AgentPublishConfig, Env } from '../types';
+import { DEFAULT_CLAUDE_MODEL } from '../data/agent/models';
 
 export async function upsertAgentConfig(env: Env, artifactId: string, agent: AgentPublishConfig): Promise<void> {
   const tables = agent.contextTables ? JSON.stringify(agent.contextTables) : null;
@@ -48,7 +49,7 @@ export async function upsertAgentConfig(env: Env, artifactId: string, agent: Age
       artifactId,
       agent.enabled === false ? 0 : 1,
       agent.systemPrompt ?? null,
-      agent.model ?? 'claude-sonnet-4-20250514',
+      agent.model ?? DEFAULT_CLAUDE_MODEL.id,
       agent.maxTokens ?? 4096,
       agent.temperature ?? 0.7,
       agent.contextJson !== false ? 1 : 0,

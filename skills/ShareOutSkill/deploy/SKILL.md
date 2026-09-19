@@ -335,7 +335,7 @@ ones on a fresh instance:
 
 | Gap | Why it matters |
 |-----|----------------|
-| `VERCEL_AI_GATEWAY or OPENAI_API_KEY` | **AI is off until one is set** — Crew, home assistant, in-artifact chat, editor AI, knowledge. It degrades silently, so nothing will tell the user unless you do. |
+| `ANTHROPIC_API_KEY, VERCEL_AI_GATEWAY or OPENAI_API_KEY` | **AI is off until one is set** — Crew, home assistant, in-artifact chat, editor AI, knowledge. It degrades silently, so nothing will tell the user unless you do. |
 | `CREDENTIALS_KEY` | Per-workspace AI keys and connector credentials cannot be stored |
 | `EMAIL binding` | Invites and one-time codes reach the Worker log, not an inbox |
 | `INSTANCE_ADMIN_EMAILS` | No stable owner — the earliest user keeps being treated as admin |

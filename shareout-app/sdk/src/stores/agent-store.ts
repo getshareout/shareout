@@ -13,7 +13,7 @@ import { createPilot, type Pilot } from './pilot-store';
 
 interface AgentConfig {
   systemPrompt?: string;
-  model?: 'claude-sonnet-4-20250514' | 'claude-3-5-haiku-20241022';
+  model?: 'claude-sonnet-5' | 'claude-haiku-4-5-20251001';
   maxTokens?: number;
   temperature?: number;
   context?: {

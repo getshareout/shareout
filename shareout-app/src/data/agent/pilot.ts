@@ -2,7 +2,7 @@ import type { Env } from '../../types';
 import { DATA_ERRORS } from '../../types';
 import type { DataContext } from '../middleware';
 import { errorResponse, corsHeaders } from '../middleware';
-import { getAIProvider, AGENT_CHAT_MODEL, type AIConfig } from './anthropic';
+import { getAIProviderChain, AGENT_CHAT_MODEL, type AIConfig } from './anthropic';
 import { resolveAgentAiConfig, recordAgentUsage } from './ai-config';
 import { getAgentConfig } from './visitor-chat';
 import { checkRateLimit, incrementRateLimit, recordUsage } from './usage';
@@ -384,7 +384,8 @@ export async function handlePilotSpike(request: Request, env: Env, origin: strin
     return pilotError('The execute_javascript tool is not permitted', 400, origin);
   }
 
-  const provider: AIConfig | null = getAIProvider(env);
+  // The pilot forwards OpenAI-format bodies verbatim, so only OpenAI-wire providers qualify.
+  const provider: AIConfig | null = getAIProviderChain(env).find((c) => c.provider !== 'anthropic') ?? null;
   if (!provider) {
     return errorResponse({ ...DATA_ERRORS.INTERNAL_ERROR, message: 'AI provider not configured' }, origin);
   }
