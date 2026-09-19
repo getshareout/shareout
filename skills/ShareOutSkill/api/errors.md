@@ -13,7 +13,7 @@ Standard error codes and their meanings. Response wrapper (`success`/`error`/`co
 | `CONFLICT` | 409 | Version conflict |
 | `RATE_LIMITED` | 429 | Rate limit exceeded |
 | `FEATURE_DISABLED` | 403 | Module not enabled for this workspace — see [features.md](features.md) |
-| `INTERNAL_ERROR` | 500 | Server error. Also returned (with `message: "AI provider not configured"`) when the instance has no platform AI key and the workspace has no BYO key — see [error-recovery below](#error-recovery) |
+| `INTERNAL_ERROR` | 500 | Server error. On visitor chat / pilot / admin-chat routes, also returned (with `message: "AI provider not configured (set VERCEL_AI_GATEWAY, ANTHROPIC_API_KEY or OPENAI_API_KEY)"`) when the instance has no platform AI key and the workspace has no BYO key — see [error-recovery below](#error-recovery) |
 | `CONFIG_ERROR` | 500 | Server is missing required configuration |
 
 ## Artifact Errors
@@ -136,12 +136,18 @@ automated review," not that it's broken or that they need to pay for anything:
 - `MODERATION_HELD` — an automated content-safety check didn't clear instantly. It
   re-checks within the hour and goes public automatically — do not re-publish to "fix" it.
 
-**No AI provider configured** (`INTERNAL_ERROR`, `message: "AI provider not configured"`)
-— this instance has no platform AI key and the workspace has no BYO key
-([team/workspace-connections.md](../team/workspace-connections.md)). This is a
-self-host configuration gap, not something the end user or a retry fixes — tell them to
-ask the instance operator to set a provider key (`VERCEL_AI_GATEWAY` or `OPENAI_API_KEY`)
-or add a workspace BYO key in Admin → AI.
+**No AI provider configured** — this instance has no platform AI key and the workspace
+has no BYO key ([team/workspace-connections.md](../team/workspace-connections.md)). This
+is a self-host configuration gap, not something the end user or a retry fixes. Two
+different surfaces handle it differently:
+- Visitor chat / pilot / admin-chat (raw REST): `INTERNAL_ERROR` (500), `message: "AI
+  provider not configured (set VERCEL_AI_GATEWAY, ANTHROPIC_API_KEY or OPENAI_API_KEY)"`.
+- The Home/workspace assistant ([team/workspace-assistant.md](../team/workspace-assistant.md)):
+  no error at all — it replies in-thread, with an actionable "set this env var" message
+  for admins and "ask your admin" for everyone else.
+
+Either way, tell them to ask the instance operator to set a provider key or add a
+workspace BYO key in Admin → AI — never suggest a billing upgrade.
 
 ## Related
 

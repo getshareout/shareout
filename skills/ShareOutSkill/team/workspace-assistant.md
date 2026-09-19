@@ -19,10 +19,12 @@ OSS**, enable the flag if the dock is missing — do **not** send users to a bil
 page.
 
 When disabled, the Home agent dock is hidden and the API returns `404`. There is no AI
-credit/billing system in this build — every request is allowed. If neither the instance's
-platform AI key nor a workspace BYO key is configured, chat calls fail with **500**
-`INTERNAL_ERROR` (`"AI provider not configured"`) — fix provider keys, don't send users to
-a billing page.
+credit/billing system in this build — every request is allowed. If no AI provider is
+configured (no platform key, no workspace BYO key), the Home agent doesn't error — it
+replies in the chat thread itself: instance admins get an actionable message naming the
+env vars to set (`ANTHROPIC_API_KEY`, `VERCEL_AI_GATEWAY`, or `OPENAI_API_KEY` — e.g.
+`npx wrangler secret put ANTHROPIC_API_KEY`); other members are told to ask their admin.
+Never send anyone to a billing page — there isn't one.
 
 ## What it can do
 
@@ -66,7 +68,7 @@ Files emailed to the workspace inbox (`{slug}@inbox.example.com`) also appear in
 
 ## REST API
 
-All routes require a signed-in session or bearer token and workspace membership. The `ai.web_agent` flag must be enabled. New sessions may return **500** `INTERNAL_ERROR` (`"AI provider not configured"`) if the instance has no AI provider key set up — no billing gate.
+All routes require a signed-in session or bearer token and workspace membership. The `ai.web_agent` flag must be enabled. If no AI provider is configured, the route still responds normally (no error) — the reply text itself explains the gap, differently for admins vs. members (see Availability above). No billing gate.
 
 **Home agent** (personal or workspace Home — includes canvas tools):
 
