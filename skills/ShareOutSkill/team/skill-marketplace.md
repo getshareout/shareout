@@ -8,7 +8,7 @@ Load [SKILL.md](SKILL.md) first.
 
 ## Availability
 
-Requires a **Teams or Enterprise** plan on the workspace owner. Personal workspaces cannot publish skills (`402 TEAMS_PLAN_REQUIRED`).
+No tier requirement — the only rule is that skills must belong to a workspace. A personal (non-workspace) artifact publish with `artifact_type: "skill"` is rejected with `400 SKILL_REQUIRES_WORKSPACE` ("Skills must be published to a workspace").
 
 In the ShareOut app, open a team workspace and select **Skill Market** in the left navigation. Open any skill from **Library** or the marketplace to read it in the in-Studio **skill viewer** (rendered markdown with copy/download).
 

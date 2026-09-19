@@ -18,9 +18,11 @@ Gated by the `ai.web_agent` feature flag (`GET …/features` or Admin → AI). O
 OSS**, enable the flag if the dock is missing — do **not** send users to a billing upgrade
 page.
 
-When disabled, the Home agent dock is hidden and the API returns `404`. When enabled but
-AI credit is exhausted (if metering is configured), new chat sessions may return HTTP **402**
-(`AI_CREDIT_EXHAUSTED`) — on self-host, fix provider keys / credit config rather than selling a plan.
+When disabled, the Home agent dock is hidden and the API returns `404`. There is no AI
+credit/billing system in this build — every request is allowed. If neither the instance's
+platform AI key nor a workspace BYO key is configured, chat calls fail with **500**
+`INTERNAL_ERROR` (`"AI provider not configured"`) — fix provider keys, don't send users to
+a billing page.
 
 ## What it can do
 
@@ -64,7 +66,7 @@ Files emailed to the workspace inbox (`{slug}@inbox.example.com`) also appear in
 
 ## REST API
 
-All routes require a signed-in session or bearer token and workspace membership. The `ai.web_agent` flag must be enabled. New sessions may return **402** `AI_CREDIT_EXHAUSTED` when AI credit is spent (if metering is on).
+All routes require a signed-in session or bearer token and workspace membership. The `ai.web_agent` flag must be enabled. New sessions may return **500** `INTERNAL_ERROR` (`"AI provider not configured"`) if the instance has no AI provider key set up — no billing gate.
 
 **Home agent** (personal or workspace Home — includes canvas tools):
 

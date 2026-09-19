@@ -106,8 +106,8 @@ python3 build_payload.py | curl -sS -X POST "$ORIGIN/v1/publish" \
 
 | Endpoint | Limit |
 |----------|-------|
-| Publish | 60/hour per user |
-| Data API | 1000/min per artifact |
+| Publish | 100/day per user |
+| Data API | No dedicated limiter today — don't rely on a specific number |
 | Email | 50/day per user, 10/day per artifact |
 | CORS Proxy | 100/min per artifact |
 

@@ -112,7 +112,7 @@ A complete, editor-ready, moderation-safe starting point, split per best practic
     const sdk = await ShareOut.create();   // awaited: Bearer token ready
     // ...read/write via SDK only for logic; paint data via data-shareout-binding...
     show('content');
-    await sdk.ready?.();                    // signal first paint complete
+    ShareOut.ready();                       // signal first paint complete (static call)
   } catch (err) {
     console.error(err);
     show('error');                         // graceful fallback, page never blanks

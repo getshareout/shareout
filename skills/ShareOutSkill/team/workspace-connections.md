@@ -213,7 +213,7 @@ Returns `{ "ok": true }` or an error with a provider-specific message. Admin+ on
 | `GET /v1/workspaces/{id}/connections/slack/install?connection={name}` | Slack install (302) |
 | `GET /v1/workspaces/{id}/connections/{connectionId}` | Admin detail (no secret values) |
 
-Query from artifacts via `sdk._internalFetch('/platform/…')` or `sdk.connection(name)` for token-shim providers — see [../sdk/live-data.md](../sdk/live-data.md) and provider docs ([../integrations/facebook-ads.md](../integrations/facebook-ads.md), [../integrations/google-ads.md](../integrations/google-ads.md)).
+Query from artifacts via `sdk.platform` (preferred — see [../sdk/live-data.md](../sdk/live-data.md)) or `sdk.connection(name)` for token-shim providers — see provider docs ([../integrations/facebook-ads.md](../integrations/facebook-ads.md), [../integrations/google-ads.md](../integrations/google-ads.md)).
 
 **`is_private`:** workspace platform connectors default to team-shared execution (`is_private = 0`). Set `is_private = 1` to restrict live queries to the artifact owner only (reserved credentials).
 

@@ -1,6 +1,6 @@
 # Workspace Library
 
-The **Workspace Library** lets a paid account publish private, versioned JavaScript
+The **Workspace Library** lets an account publish private, versioned JavaScript
 modules and import them into artifacts like a CDN library (e.g. plotly) — but scoped to
 the account or workspace. It is the reusable-code counterpart to the
 [Skill Marketplace](skill-marketplace.md) (which shares *prose* for the agent); the
@@ -10,9 +10,10 @@ Load [SKILL.md](SKILL.md) first.
 
 ## Availability
 
-Requires a **Teams or Enterprise** plan to publish (gated on the publisher for personal
-modules, on the workspace owner for workspace modules). Insufficient tier → `402
-TEAMS_PLAN_REQUIRED`. In Home, open the **Library** lens (Workspace and Personal tabs, plus **+ New module**).
+No tier requirement — publishing a module goes through the normal publish path, gated
+on ownership (the publisher for personal modules, the workspace owner/role for workspace
+modules), same as any other artifact publish. In Home, open the **Library** lens
+(Workspace and Personal tabs, plus **+ New module**).
 
 ## Two scopes
 

@@ -57,7 +57,7 @@ await sdk.setVisibility('workspace');
 
 > **Launch note:** where open visibility is disabled (`OPEN_VISIBILITY_DISABLED`), `public` is coerced to `private`; only the "closed" states `private` and `workspace` are selectable.
 
-**Paid visibility gate.** Public visibility requires a **paid plan** or a **paid Teams workspace** — free personal accounts are limited to `private` and `workspace`. Without entitlement, `POST /v1/publish` returns a `notice` and `PATCH /v1/artifacts/{id}` returns `VISIBILITY_HELD` instead of silently downgrading.
+**Visibility is an instance-policy question, not a billing one — there is no paid tier in this build.** When an operator has disabled open visibility instance-wide (`OPEN_VISIBILITY_DISABLED`) and the publisher isn't in the instance's public rollout, `POST /v1/publish` returns a `notice` and `PATCH /v1/artifacts/{id}` returns `VISIBILITY_HELD` instead of silently downgrading.
 
 Transitioning **into** `public` also runs an automated content-safety check. If it isn't cleared instantly, the artifact stays `private` and the response carries a `moderation` object (publish) or `code: "MODERATION_HELD"` + `reason` (PATCH 202) — but it is re-checked automatically within the hour and auto-restored to public once it clears, so tell the user it's "under review, publishing shortly" rather than announcing a live link.
 
@@ -237,7 +237,7 @@ Content-Type: application/json
 
 ## Monitoring & stats
 
-After publish, owners on **Pro or Teams** can track engagement:
+After publish, owners can track engagement — no tier requirement:
 
 | Surface | What it shows |
 | --- | --- |

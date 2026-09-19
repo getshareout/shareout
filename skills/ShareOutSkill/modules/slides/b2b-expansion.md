@@ -14,14 +14,14 @@ B2B buyers (sales enablement, RevOps, marketing) pay for the inverse of anonymou
 
 | Capability | Status | Source |
 |---|---|---|
-| Presentations / slides / versions | ✅ D1-backed | [presentations.ts](../../../shareout-app/src/data/slides/presentations.ts), [versions.ts](../../../shareout-app/src/data/slides/versions.ts) |
-| Publish + visibility (public/private) | ✅ | [publish.ts](../../../shareout-app/src/data/slides/publish.ts) |
-| Presenter state sync (slide, timer, laser, countdown) | ✅ server-side | [presenter.ts](../../../shareout-app/src/data/slides/presenter.ts) |
-| Presenter view UI | ⚠️ basic `window.open` popup | [editor/presentation/index.ts](../../../shareout-app/src/editor/presentation/index.ts) |
-| Realtime transport | ⚠️ `broadcastEvent`, not Y.js CRDT yet | [realtime.ts](../../../shareout-app/src/data/slides/realtime.ts) |
-| **Viewer analytics** | ✅ capture auto-wired in `slides.view()`, owner API + dashboard at `/app/slides/{artifactId}/analytics` | [analytics.ts](../../../shareout-app/src/data/slides/analytics.ts), [pages/slides-analytics.ts](../../../shareout-app/src/pages/slides-analytics.ts), SDK `presentation.analytics()` |
-| **Access control beyond public/private** | ⚠️ tracked & gated links shipped (P1): email/password/domain gate, expiry, view cap | [links.ts](../../../shareout-app/src/data/slides/links.ts), SDK `presentation.links` |
-| **Lead capture / CTAs / notifications** | ⚠️ view-open email shipped (P2): owner emailed when a tracked link is opened, 30-min per-link cooldown | [links.ts](../../../shareout-app/src/data/slides/links.ts) `notifyOwnerOnOpen`, email `slides_deck_opened` |
+| Presentations / slides / versions | ✅ D1-backed | [presentations.ts](../../../../shareout-app/src/data/slides/presentations.ts), [versions.ts](../../../../shareout-app/src/data/slides/versions.ts) |
+| Publish + visibility (public/private) | ✅ | [publish.ts](../../../../shareout-app/src/data/slides/publish.ts) |
+| Presenter state sync (slide, timer, laser, countdown) | ✅ server-side | [presenter.ts](../../../../shareout-app/src/data/slides/presenter.ts) |
+| Presenter view UI | ⚠️ basic `window.open` popup | [editor/presentation/index.ts](../../../../shareout-app/src/editor/presentation/index.ts) |
+| Realtime transport | ⚠️ `broadcastEvent`, not Y.js CRDT yet | [realtime.ts](../../../../shareout-app/src/data/slides/realtime.ts) |
+| **Viewer analytics** | ✅ capture auto-wired in `slides.view()`, owner API + dashboard at `/app/slides/{artifactId}/analytics` | [analytics.ts](../../../../shareout-app/src/data/slides/analytics.ts), [pages/slides-analytics.ts](../../../../shareout-app/src/pages/slides-analytics.ts), SDK `presentation.analytics()` |
+| **Access control beyond public/private** | ⚠️ tracked & gated links shipped (P1): email/password/domain gate, expiry, view cap | [links.ts](../../../../shareout-app/src/data/slides/links.ts), SDK `presentation.links` |
+| **Lead capture / CTAs / notifications** | ⚠️ view-open email shipped (P2): owner emailed when a tracked link is opened, 30-min per-link cooldown | [links.ts](../../../../shareout-app/src/data/slides/links.ts) `notifyOwnerOnOpen`, email `slides_deck_opened` |
 
 ## Roadmap (priority order)
 
@@ -126,4 +126,4 @@ P0 is the keystone — P1 names the analytics, P2 alerts on them, P3 monetizes t
 - **CRDT migration**: this plan deliberately avoids it. The viewer is read-only, so analytics work on the current transport. Revisit only if live collaborative *viewing* is needed.
 - **Pricing/packaging**: which tier gates analytics vs. white-label? (out of scope here)
 - **Schema migrations**: confirm the D1 migration workflow before adding `view_sessions` / `slide_views` / `share_links`.
-- **Presenter view rebuild**: the basic `window.open` popup ([index.ts:336](../../../shareout-app/src/editor/presentation/index.ts#L336)) is below the bar for a paid B2B product and should be rebuilt alongside P0.
+- **Presenter view rebuild**: the basic `window.open` popup ([index.ts:336](../../../../shareout-app/src/editor/presentation/index.ts#L336)) is below the bar for a paid B2B product and should be rebuilt alongside P0.

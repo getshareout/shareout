@@ -61,6 +61,7 @@
     "check:file-size": "node scripts/check-file-size.mjs",
     "check:domains": "node scripts/check-domains.mjs",
     "check:customer-names": "node ../tooling/scripts/check-customer-names.mjs",
+    "check:skill-links": "node ../tooling/scripts/check-skill-links.mjs",
     "test:e2e": "playwright test",
     "test:e2e:agent": "playwright test tests/e2e/agent-private-artifact.spec.ts",
     "test:e2e:live": "node scripts/run-e2e-live.mjs",

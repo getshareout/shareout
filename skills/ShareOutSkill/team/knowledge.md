@@ -7,7 +7,7 @@ Load [SKILL.md](SKILL.md) first.
 ## Overview
 
 - **Opt-in and off by default.** A workspace without Knowledge works exactly as before.
-- **Paid plan required** (Pro, Teams, or Enterprise). Free workspaces see an upgrade prompt; `POST …/knowledge/enable` and `…/backfill` return `403 UPGRADE_REQUIRED` without spending AI credits.
+- **Owner/admin only to turn on.** No tier requirement — `POST …/knowledge/enable` and `…/backfill` are gated on workspace role (owner/admin), returning `403 FORBIDDEN` for members without that role.
 - **Members only.** External sharees get no Knowledge surface.
 - **Your own pages only.** Notes are derived from your workspace's published pages — nothing from other workspaces, and only pages approved by moderation.
 
@@ -101,8 +101,8 @@ All routes require workspace membership. When Knowledge is off, root `GET` retur
 | `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | One note — full markdown body + sources |
 | `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Replace markdown; marks hand-edited |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Delete; `forget=1` stops re-learn |
-| `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | Turn learning on/off (**paid plan** to enable) |
-| `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 recent live pages → `{ queued, kicked }` (**paid plan**) |
+| `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | Turn learning on/off |
+| `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 recent live pages → `{ queued, kicked }` |
 
 ## Related
 

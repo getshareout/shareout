@@ -1,138 +1,44 @@
-# REST API: Webhooks
+# Outbound Webhooks
 
-Webhook payloads for artifact events.
+There is no standalone webhook subscription/event system in this build — no event
+envelope, no `artifact.published`/`data.changed`/`job.*` event types, no
+`X-ShareOut-Signature` HMAC signing, and no multi-step retry schedule. Do not invent
+one; nothing in `shareout-app/src` implements it.
 
-## Webhook Delivery
+The one real outbound webhook is the scheduled-job **`webhook` destination** — see
+[jobs.md § WebhookConfig](jobs.md#webhookconfig) for the full config shape, and
+[jobs.md § Retry Configuration](jobs.md#retry-configuration) for retry (`maxAttempts` /
+`backoffType` / `initialDelay`, per-job, opt-in — default is a single attempt, no retry).
 
-Webhooks are delivered via HTTP POST with JSON body. Configure via [Jobs API](jobs.md) or artifact settings.
+## What it actually sends
 
-## Event Types
-
-| Event | Trigger |
-|-------|---------|
-| `artifact.published` | Artifact version published |
-| `artifact.updated` | Artifact metadata updated |
-| `artifact.deleted` | Artifact deleted |
-| `data.changed` | JSON/table data changed |
-| `job.executed` | Scheduled job ran |
-| `job.failed` | Scheduled job failed |
-
-## Payload Format
-
-```typescript
-interface WebhookPayload {
-  event: string;
-  artifact_id: string;
-  timestamp: string;
-  data: EventData;
-}
-```
-
-## Event Payloads
-
-### artifact.published
+A `POST` (or `GET`/`PUT`/`PATCH`/`DELETE` per `config.method`) to your `url` (HTTPS
+required), on the job's schedule:
 
 ```json
 {
-  "event": "artifact.published",
   "artifact_id": "art_abc123",
-  "timestamp": "2024-01-01T00:00:00Z",
-  "data": {
-    "version_id": "ver_xyz789",
-    "version_no": 5,
-    "slug": "my-app",
-    "url": "$ORIGIN/a/my-app/"
-  }
+  "artifact_name": "My Report",
+  "artifact_url": "$ORIGIN/a/my-report/",
+  "triggered_at": "2026-09-19T09:00:00Z",
+  "data": {}
 }
 ```
 
-### data.changed
+- `data` is only present when `includeArtifactData: true` — up to 50 `sdk.json` keys.
+- `User-Agent: ShareOut-Webhook/1.0`; any `config.headers` you set are merged in.
+- **Unsigned.** There is no `X-ShareOut-Signature` header or HMAC scheme — if you need
+  to verify the caller, put a shared secret in a custom header yourself
+  (`config.headers`) and check for it server-side.
+- Treated as failed (and retried per `retry_config`, if configured) on a non-2xx
+  response or a fetch error; there is no distinction between 4xx and 5xx for retry
+  purposes.
 
-```json
-{
-  "event": "data.changed",
-  "artifact_id": "art_abc123",
-  "timestamp": "2024-01-01T00:00:00Z",
-  "data": {
-    "type": "table",
-    "name": "tasks",
-    "operation": "insert",
-    "count": 1
-  }
-}
-```
-
-### job.executed
-
-```json
-{
-  "event": "job.executed",
-  "artifact_id": "art_abc123",
-  "timestamp": "2024-01-01T09:00:00Z",
-  "data": {
-    "job_id": "job_xyz789",
-    "action": "email",
-    "status": "success",
-    "duration_ms": 1234
-  }
-}
-```
-
-### job.failed
-
-```json
-{
-  "event": "job.failed",
-  "artifact_id": "art_abc123",
-  "timestamp": "2024-01-01T09:00:00Z",
-  "data": {
-    "job_id": "job_xyz789",
-    "action": "email",
-    "error": "Rate limit exceeded",
-    "code": "RATE_LIMITED"
-  }
-}
-```
-
-## Headers
-
-| Header | Description |
-|--------|-------------|
-| `Content-Type` | `application/json` |
-| `X-ShareOut-Event` | Event type |
-| `X-ShareOut-Signature` | HMAC-SHA256 signature |
-| `X-ShareOut-Delivery-Id` | Unique delivery ID |
-
-## Signature Verification
-
-```javascript
-const crypto = require('crypto');
-
-function verifySignature(payload, signature, secret) {
-  const expected = crypto
-    .createHmac('sha256', secret)
-    .update(payload)
-    .digest('hex');
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expected)
-  );
-}
-```
-
-## Retry Policy
-
-| Attempt | Delay |
-|---------|-------|
-| 1 | Immediate |
-| 2 | 1 minute |
-| 3 | 5 minutes |
-| 4 | 30 minutes |
-| 5 | 2 hours |
-
-Webhooks are retried on 5xx errors or timeouts. 4xx errors are not retried.
+Only `email`, `slack`, and `telegram` support an immediate one-shot
+`POST /v1/artifacts/{id}/deliver` (`{ "action": "…", "config": {...} }`) — `webhook` is
+schedule-only, created through the Jobs API.
 
 ## Related
 
-- [Jobs](jobs.md) - Create webhook jobs
+- [Jobs](jobs.md) - Scheduled webhook jobs, retry config, all destination types
 - [Overview](overview.md) - API intro
