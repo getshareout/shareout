@@ -3,9 +3,12 @@
 // phishing / malware / scam / illegal content. It is NOT the whole wall — runtime
 // mutation, obfuscated payloads, and post-publish data changes evade it; reactive
 // takedown (D), anti-Sybil (F), cost ceilings (G) and domain monitoring (H) are
-// the co-equal defenses. Fail-safe: when a *configured* classifier errors/times
-// out, return 'error' → pending (held private). When no AI provider is configured
-// (fresh self-host), approve so first publishes are not stuck on "Being reviewed".
+// the co-equal defenses. When every configured provider is rate-limited, down or
+// slow (429/5xx/timeout), fail OPEN: approve, and leave the content unhashed so the
+// fail-open recheck queue classifies it later (and can still hold it). Any other
+// classifier failure fails safe to 'error' → pending (held private). When no AI
+// provider is configured (fresh self-host), approve so first publishes are not stuck
+// on "Being reviewed".
 
 import { getPlatformHostname } from '../config/origins';
 import type { Env } from '../types';
@@ -20,6 +23,7 @@ import {
 import { invalidateDeploymentCacheById } from '../serve/deployment-cache';
 import { notifyModerationResolved } from './notify';
 import { setModeration } from '../artifacts/satellites';
+import { createLogger } from '../logging';
 
 export type ModerationVerdict = 'clean' | 'suspicious' | 'malicious' | 'error';
 export type ModerationStatus = 'approved' | 'pending' | 'blocked';
@@ -28,10 +32,17 @@ export interface SafetyCheckResult {
   verdict: ModerationVerdict;
   status: ModerationStatus;
   reason: string;
-  contentHash: string;
+  /** NULL for a fail-open approval: the content never earned a verdict. */
+  contentHash: string | null;
 }
 
 const CLASSIFIER_TIMEOUT_MS = 5000;
+// Publishing waits on the classifier, so the whole provider chain shares one short
+// budget there. Background rechecks keep the roomier default.
+export const PUBLISH_CLASSIFIER_BUDGET_MS = 3000;
+const DEFAULT_CLASSIFIER_BUDGET_MS = 2 * CLASSIFIER_TIMEOUT_MS;
+/** Reason prefix of a fail-open approval — with a NULL content_hash, the recheck queue. */
+export const FAIL_OPEN_REASON = 'provider_error_fail_open';
 const MAX_HTML_CHARS = 60_000; // keep the prompt bounded + cheap
 
 // Keep head + tail so end-of-file <script> tags stay visible when the page is large.
@@ -127,7 +138,11 @@ function parseVerdict(content: string): { verdict: ModerationVerdict; reason: st
 }
 
 /** Run the synchronous publish-time safety check on the entrypoint HTML. */
-export async function runPublishSafetyCheck(env: Env, html: string): Promise<SafetyCheckResult> {
+export async function runPublishSafetyCheck(
+  env: Env,
+  html: string,
+  opts: { budgetMs?: number; artifactId?: string } = {},
+): Promise<SafetyCheckResult> {
   const hash = await contentHash(html);
   const signals = extractSignals(html);
 
@@ -160,6 +175,10 @@ export async function runPublishSafetyCheck(env: Env, html: string): Promise<Saf
   let reason = '';
   let lastFailure = 'classifier error';
   let classified = false;
+  // Fail open only when every failure was the provider being busy/down/slow — never
+  // on an auth, billing or bad-request error, which won't fix itself.
+  let transientOnly = true;
+  const deadline = Date.now() + (opts.budgetMs ?? DEFAULT_CLASSIFIER_BUDGET_MS);
 
   // Try each configured provider in order; on a provider-level failure (non-ok or throw)
   // fail over to the next before giving up. Preserves the fail-safe: exhausting the chain
@@ -167,6 +186,8 @@ export async function runPublishSafetyCheck(env: Env, html: string): Promise<Saf
   for (let i = 0; i < chain.length; i++) {
     const provider = chain[i];
     const isLast = i === chain.length - 1;
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
     try {
       const res = await fetchWithTimeout(
         `${provider.baseUrl}/chat/completions`,
@@ -183,10 +204,11 @@ export async function runPublishSafetyCheck(env: Env, html: string): Promise<Saf
             ],
           }),
         },
-        CLASSIFIER_TIMEOUT_MS
+        Math.min(CLASSIFIER_TIMEOUT_MS, remaining)
       );
       if (!res.ok) {
         lastFailure = `classifier http ${res.status}`;
+        if (res.status !== 429 && res.status < 500) transientOnly = false;
         alertProviderFailure(env, provider, lastFailure, !isLast);
         continue;
       }
@@ -207,7 +229,15 @@ export async function runPublishSafetyCheck(env: Env, html: string): Promise<Saf
   }
 
   if (!classified) {
-    return { verdict: 'error', status: 'pending', reason: `${lastFailure} (all providers)`, contentHash: hash };
+    const failure = `${lastFailure} (all providers)`;
+    if (transientOnly) {
+      createLogger(env, { scope: 'moderation', event: 'moderation.fail_open' }).warn(
+        'classifier unavailable; approved without review and queued for recheck',
+        { artifact_id: opts.artifactId, failure },
+      );
+      return { verdict: 'error', status: 'approved', reason: `${FAIL_OPEN_REASON}: ${failure}`, contentHash: null };
+    }
+    return { verdict: 'error', status: 'pending', reason: failure, contentHash: hash };
   }
 
   // Obfuscated inline JS the classifier rated clean is escalated to suspicious:
@@ -254,15 +284,40 @@ export async function classifyAndPersist(env: Env, artifactId: string): Promise<
     return 'approved';
   }
 
-  const check = await runPublishSafetyCheck(env, html);
+  const check = await runPublishSafetyCheck(env, html, { artifactId });
+  const checkedAt = new Date().toISOString();
+  // Fail-open covers content that never got a verdict. It must not release a page the
+  // classifier already held or blocked just because the classifier is down right now.
+  if (check.verdict === 'error' && check.status === 'approved' && prior && prior.moderation_status !== 'approved') {
+    await setModeration(env, artifactId, { checked_at: checkedAt });
+    return prior.moderation_status as ModerationStatus;
+  }
   await setModeration(env, artifactId, {
     status: check.status,
     reason: check.reason,
-    checked_at: new Date().toISOString(),
+    checked_at: checkedAt,
     content_hash: check.contentHash,
   });
   if (check.status === 'approved') await restoreHeldVisibility(env, artifactId);
   return check.status;
+}
+
+/**
+ * Re-classify, and when the verdict no longer approves a page that is live in public,
+ * hold it private with the visibility recorded — the same hold a publish applies. A
+ * fail-open approval went public unreviewed, so its recheck must be able to pull it.
+ */
+export async function recheckAndHold(env: Env, artifactId: string): Promise<ModerationStatus> {
+  const status = await classifyAndPersist(env, artifactId);
+  if (status === 'approved') return status;
+  const res = await env.DB.prepare(
+    `UPDATE artifacts SET visibility = 'private' WHERE id = ? AND visibility = 'public'`
+  ).bind(artifactId).run();
+  if ((res.meta?.changes ?? 0) > 0) {
+    await setModeration(env, artifactId, { held_visibility: 'public' });
+    await invalidateDeploymentCacheById(env, artifactId);
+  }
+  return status;
 }
 
 /**

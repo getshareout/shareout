@@ -86,11 +86,67 @@ describe('runPublishSafetyCheck', () => {
     expect(r.status).toBe('blocked');
   });
 
-  it('fails safe to pending when the classifier errors', async () => {
+  it('fails open on a classifier timeout: approved, unhashed, tagged, logged', async () => {
     mockFetch.mockRejectedValue(new Error('timeout'));
-    const r = await runPublishSafetyCheck(ENV, '<p>x</p>');
-    expect(r.verdict).toBe('error');
+    const r = await runPublishSafetyCheck(ENV, '<p>x</p>', { artifactId: 'art1' });
+    expect(r).toEqual({
+      verdict: 'error',
+      status: 'approved',
+      reason: 'provider_error_fail_open: classifier timeout/error (all providers)',
+      contentHash: null,
+    });
+    expect(logWarn).toHaveBeenCalledWith(
+      'classifier unavailable; approved without review and queued for recheck',
+      { artifact_id: 'art1', failure: 'classifier timeout/error (all providers)' },
+    );
+  });
+
+  it('fails open when every provider is rate-limited or down (429/5xx)', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 503 }).mockResolvedValueOnce({ ok: false, status: 429 });
+    const r = await runPublishSafetyCheck(BOTH_ENV, '<p>x</p>');
+    expect(r.status).toBe('approved');
+    expect(r.reason).toBe('provider_error_fail_open: classifier http 429 (all providers)');
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('holds (fails safe) when any provider failure is not transient', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 429 }).mockResolvedValueOnce({ ok: false, status: 401 });
+    const r = await runPublishSafetyCheck(BOTH_ENV, '<p>x</p>');
     expect(r.status).toBe('pending');
+    expect(r.contentHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('holds on unparseable classifier output (not a provider outage)', async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ choices: [{ message: { content: 'sure!' } }] }) });
+    const r = await runPublishSafetyCheck(ENV, '<p>x</p>');
+    expect(r.status).toBe('pending');
+  });
+
+  it('caps the whole provider chain at the publish budget', async () => {
+    let now = 1_000_000;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    mockFetch.mockImplementationOnce(async () => { now += 3000; throw new Error('timeout'); });
+
+    const r = await runPublishSafetyCheck(BOTH_ENV, '<p>x</p>', { budgetMs: 3000 });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch.mock.calls[0][2]).toBe(3000);
+    expect(r.status).toBe('approved');
+    clock.mockRestore();
+  });
+
+  it('gives the second provider only what is left of the budget', async () => {
+    let now = 1_000_000;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    mockFetch
+      .mockImplementationOnce(async () => { now += 1200; return { ok: false, status: 429 }; })
+      .mockResolvedValueOnce(aiResponse('clean'));
+
+    const r = await runPublishSafetyCheck(BOTH_ENV, '<p>x</p>', { budgetMs: 3000 });
+
+    expect(mockFetch.mock.calls[1][2]).toBe(1800);
+    expect(r.status).toBe('approved');
+    clock.mockRestore();
   });
 
   it('fails over to the next provider on a 402 and returns a clean verdict', async () => {

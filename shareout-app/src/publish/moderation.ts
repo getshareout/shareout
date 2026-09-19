@@ -3,7 +3,7 @@
  * Non-approved verdicts force the artifact private until reviewed.
  */
 import type { Env } from '../types';
-import { runPublishSafetyCheck, contentHash, classifyAndPersist, clearModerationHold, type ModerationStatus } from '../moderation/check';
+import { runPublishSafetyCheck, contentHash, recheckAndHold, clearModerationHold, PUBLISH_CLASSIFIER_BUDGET_MS, type ModerationStatus } from '../moderation/check';
 import { extractSignals, outboundHosts } from '../moderation/extract';
 import { submitHostScan } from '../moderation/url-scanner';
 import { createLogger } from '../logging';
@@ -73,7 +73,7 @@ export async function runPublishModeration(
     moderationStatus = prior.moderation_status as ModerationStatus;
     reason = prior.moderation_reason ?? undefined;
   } else {
-    const check = await runPublishSafetyCheck(env, htmlContent);
+    const check = await runPublishSafetyCheck(env, htmlContent, { budgetMs: PUBLISH_CLASSIFIER_BUDGET_MS, artifactId });
     moderationStatus = check.status;
     reason = check.reason || undefined;
     await setModeration(env, artifactId, {
@@ -92,12 +92,12 @@ export async function runPublishModeration(
       await alertModerationHold(env, artifactId, check.reason, executionCtx);
     }
 
-    // Classifier unavailable/timeout/unparseable held the artifact, not a real
-    // verdict — retry once in the background so a transient failure self-heals.
+    // No real verdict (classifier unavailable/timeout/unparseable): retry once in the
+    // background. A hold self-heals; a fail-open approval can still be pulled private.
     if (check.verdict === 'error' && executionCtx) {
       executionCtx.waitUntil((async () => {
         await new Promise((r) => setTimeout(r, HELD_RETRY_MS));
-        await classifyAndPersist(env, artifactId).catch(() => {});
+        await recheckAndHold(env, artifactId).catch(() => {});
       })());
     }
   }

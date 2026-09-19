@@ -13,7 +13,7 @@ vi.mock('../../../src/moderation/url-scanner', () => ({
 vi.mock('../../../src/serve/deployment-cache', () => ({ invalidateDeploymentCacheById: vi.fn(async () => {}) }));
 const mockFetch = vi.fn();
 
-import { recheckPendingModeration } from '../../../src/moderation/rescan';
+import { recheckPendingModeration, recheckFailOpenModeration } from '../../../src/moderation/rescan';
 import { setArtifactModeration } from '../../../src/superadmin/artifacts-admin';
 import { runPublishModeration } from '../../../src/publish/moderation';
 import { contentHash } from '../../../src/moderation/check';
@@ -50,7 +50,7 @@ function row(id: string) {
 }
 
 beforeAll(async () => {
-  await e.DB.exec(`CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, name TEXT, slug TEXT, workspace_id TEXT, owner_id TEXT, visibility TEXT, paused INTEGER DEFAULT 0)`);
+  await e.DB.exec(`CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, name TEXT, slug TEXT, workspace_id TEXT, owner_id TEXT, visibility TEXT, paused INTEGER DEFAULT 0, deleted_at TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS artifact_moderation (artifact_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'approved', reason TEXT, checked_at TEXT, content_hash TEXT, held_visibility TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS deployments (artifact_id TEXT, channel TEXT, version_id TEXT, slug TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS versions (id TEXT PRIMARY KEY, entrypoint TEXT)`);
@@ -74,7 +74,7 @@ describe('recheckPendingModeration', () => {
     expect(vi.mocked(invalidateDeploymentCacheById)).toHaveBeenCalledWith(e, 'a1');
   });
 
-  it('leaves a hold pending (still private) when the classifier errors', async () => {
+  it('leaves a hold pending (still private) when the classifier errors — fail-open never releases a hold', async () => {
     mockFetch.mockRejectedValue(new Error('timeout'));
     await seedHeld('a2', '<p>x</p>');
     const r = await recheckPendingModeration(e);
@@ -151,5 +151,83 @@ describe('runPublishModeration', () => {
     ).bind('a6', 'blocked', 'public').run();
     await runPublishModeration(e, 'a6', '<p>x</p>', 'private');
     expect((await row('a6'))!.moderation_status).toBe('blocked');
+  });
+});
+
+const RATE_LIMITED = { ok: false, status: 429 };
+
+// A page that went public while the classifier was down: approved, unhashed, tagged.
+async function seedFailOpen(id: string, html: string): Promise<void> {
+  await seedHeld(id, html);
+  await e.DB.prepare(`UPDATE artifacts SET visibility = 'public' WHERE id = ?`).bind(id).run();
+  await e.DB.prepare(
+    `UPDATE artifact_moderation SET status = 'approved', held_visibility = NULL, content_hash = NULL,
+            reason = 'provider_error_fail_open: classifier http 429 (all providers)' WHERE artifact_id = ?`
+  ).bind(id).run();
+}
+
+describe('classifier outage (fail-open)', () => {
+  it('publishes public when every provider is rate-limited, queued for recheck', async () => {
+    mockFetch.mockResolvedValue(RATE_LIMITED);
+    await e.DB.prepare(
+      `INSERT INTO artifacts (id, slug, workspace_id, visibility) VALUES (?,?,?,?)`
+    ).bind('f1', 'f1', 'ws1', 'public').run();
+
+    const status = await runPublishModeration(e, 'f1', '<p>hi</p>', 'public');
+
+    expect(status).toMatchObject({ status: 'approved', forcedPrivate: false });
+    expect(await row('f1')).toEqual({ moderation_status: 'approved', visibility: 'public', moderation_held_visibility: null });
+    const m = await e.DB.prepare('SELECT reason, content_hash FROM artifact_moderation WHERE artifact_id = ?')
+      .bind('f1').first<{ reason: string; content_hash: string | null }>();
+    expect(m).toEqual({ reason: 'provider_error_fail_open: classifier http 429 (all providers)', content_hash: null });
+  });
+
+  it('re-classifies an identical republish instead of reusing the fail-open approval', async () => {
+    await seedFailOpen('f2', '<p>same</p>');
+    mockFetch.mockResolvedValue(aiResponse('suspicious', 'looks off'));
+    const status = await runPublishModeration(e, 'f2', '<p>same</p>', 'public');
+    expect(status.status).toBe('pending');
+    expect(mockFetch).toHaveBeenCalled();
+  });
+
+  it('recheck pulls a fail-open page private when the real verdict is suspicious', async () => {
+    await seedFailOpen('f3', '<p>x</p>');
+    mockFetch.mockResolvedValue(aiResponse('suspicious', 'looks off'));
+
+    const r = await recheckFailOpenModeration(e);
+
+    expect(r).toEqual({ checked: 1, held: 1 });
+    expect(await row('f3')).toEqual({ moderation_status: 'pending', visibility: 'private', moderation_held_visibility: 'public' });
+    expect(vi.mocked(invalidateDeploymentCacheById)).toHaveBeenCalledWith(e, 'f3');
+  });
+
+  it('recheck confirms a clean fail-open page and drops it from the queue', async () => {
+    await seedFailOpen('f4', '<p>ok</p>');
+    mockFetch.mockResolvedValue(aiResponse('clean'));
+
+    expect(await recheckFailOpenModeration(e)).toEqual({ checked: 1, held: 0 });
+    expect(await row('f4')).toEqual({ moderation_status: 'approved', visibility: 'public', moderation_held_visibility: null });
+    expect(await recheckFailOpenModeration(e)).toEqual({ checked: 0, held: 0 });
+  });
+
+  it('keeps a fail-open page live and queued while the outage continues', async () => {
+    await seedFailOpen('f5', '<p>ok</p>');
+    mockFetch.mockResolvedValue(RATE_LIMITED);
+
+    expect(await recheckFailOpenModeration(e)).toEqual({ checked: 1, held: 0 });
+    expect((await row('f5'))!.visibility).toBe('public');
+    expect((await recheckFailOpenModeration(e)).checked).toBe(1);
+  });
+
+  it('drains a burst bigger than the 20/run pending sweep in one run', async () => {
+    for (let i = 0; i < 25; i++) await seedFailOpen(`b${i}`, `<p>${i}</p>`);
+    mockFetch.mockResolvedValue(aiResponse('clean'));
+    expect(await recheckFailOpenModeration(e)).toEqual({ checked: 25, held: 0 });
+  });
+
+  it('skips deleted artifacts', async () => {
+    await seedFailOpen('f6', '<p>ok</p>');
+    await e.DB.prepare(`UPDATE artifacts SET deleted_at = '2026-01-01' WHERE id = ?`).bind('f6').run();
+    expect((await recheckFailOpenModeration(e)).checked).toBe(0);
   });
 });

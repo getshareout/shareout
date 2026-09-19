@@ -19,7 +19,7 @@ import { aggregateDailyStats, cleanupOldEvents } from '../analytics';
 import { cleanupExpiredAdminSessions, cleanupOldRateLimits } from '../api-auth';
 import { cleanupExpiredDeviceCodes } from '../auth/device-auth';
 import { runDueCrewTriggers } from '../crew/triggers';
-import { runModerationRescan, recheckPendingModeration } from '../moderation/rescan';
+import { runModerationRescan, recheckPendingModeration, recheckFailOpenModeration } from '../moderation/rescan';
 import { checkContentDomainReputation, runBandwidthAutoPause } from '../moderation/maintenance';
 import { checkPublicAutoRollback } from '../public-rollout';
 import { reapStaleApprovals } from '../crew/approvals';
@@ -283,6 +283,12 @@ export async function handleScheduledEvent(env: Env, scheduledTime?: number): Pr
   const recheck = await recheckPendingModeration(env).catch(() => ({ checked: 0, approved: 0 }));
   if (recheck.approved > 0) {
     logger.info('moderation recheck finished', { approved: recheck.approved, checked: recheck.checked });
+  }
+  // Fail-open recheck: pages approved unreviewed during a classifier outage get their
+  // real verdict; anything no longer clean is pulled private.
+  const failOpen = await recheckFailOpenModeration(env).catch(() => ({ checked: 0, held: 0 }));
+  if (failOpen.checked > 0) {
+    logger.info('fail-open moderation recheck finished', { checked: failOpen.checked, held: failOpen.held });
   }
 
   // Public-artifacts moderation re-scan (Workstream D3): URL-reputation sweep over
