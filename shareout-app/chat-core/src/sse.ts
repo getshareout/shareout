@@ -1,12 +1,22 @@
 import type { SSEEvent } from './types';
 
+/** A record's payload: its `data:` lines joined (per the SSE spec), or the bare record. */
+function recordData(record: string): string {
+  const data = record
+    .split('\n')
+    .filter((l) => l.startsWith('data:'))
+    .map((l) => l.slice(5).replace(/^ /, ''));
+  return (data.length ? data.join('\n') : record).trim();
+}
+
 /**
  * Read a `text/event-stream` response and yield each decoded `data:` event.
  *
  * This is the loop every ShareOut chat (home, create, editor) used to hand-roll:
  * pull from the reader, decode, split on the SSE record separator (`\n\n`), strip
- * the `data: ` prefix, and JSON-parse. Malformed/blank records are skipped, and a
- * partial record at the tail is held in the buffer until the next chunk completes it.
+ * the `data: ` prefix, and JSON-parse. Blank records are skipped; a malformed record is
+ * logged and skipped so the rest of the stream still renders. A partial record at the
+ * tail is held in the buffer until the next chunk completes it.
  */
 export async function* readSSE(res: Response): AsyncGenerator<SSEEvent> {
   if (!res.body) return;
@@ -22,12 +32,13 @@ export async function* readSSE(res: Response): AsyncGenerator<SSEEvent> {
       while ((idx = buffer.indexOf('\n\n')) >= 0) {
         const record = buffer.slice(0, idx);
         buffer = buffer.slice(idx + 2);
-        const line = record.replace(/^data: /, '').trim();
+        const line = recordData(record);
         if (!line) continue;
         let ev: SSEEvent;
         try {
           ev = JSON.parse(line);
         } catch {
+          console.warn('[chat] dropped malformed SSE event', line.slice(0, 200));
           continue;
         }
         yield ev;
