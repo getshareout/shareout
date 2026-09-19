@@ -1,3 +1,4 @@
+import { createLogger } from '../../logging';
 import { errorResponse, type DataContext } from '../middleware';
 import type { CommentEvent } from './types';
 import { getSession } from './auth';
@@ -43,7 +44,11 @@ export async function broadcastRaw(ctx: DataContext, payload: unknown): Promise<
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }));
-  } catch {
-    // Silently fail if broadcast fails — comments are already persisted.
+  } catch (err) {
+    // Comments are already persisted; broadcast is best-effort for live viewers.
+    createLogger(ctx.env, { scope: 'comments.broadcast' }).warn('comment broadcast failed', {
+      artifact_id: ctx.artifactId,
+      err,
+    });
   }
 }

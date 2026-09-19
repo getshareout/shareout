@@ -11,7 +11,7 @@ import type { TestResult } from './types';
 const SECRET_PATTERNS: { name: string; re: RegExp }[] = [
   { name: 'Stripe-style key', re: /\b[sprk]k_(live|test)_[A-Za-z0-9]{16,}\b/ },
   { name: 'AWS access key id', re: /\bAKIA[0-9A-Z]{16}\b/ },
-  { name: 'Google API key', re: /\bAIza[0-9A-Za-z_\-]{35}\b/ },
+  { name: 'Google API key', re: /\bAIza[0-9A-Za-z_-]{35}\b/ },
   { name: 'GitHub token', re: /\bgh[pousr]_[A-Za-z0-9]{36,}\b/ },
   { name: 'Slack token', re: /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/ },
   { name: 'Private key block', re: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/ },

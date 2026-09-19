@@ -12,7 +12,7 @@ export const STATIC_AUTH_TYPES = ['api_key', 'basic_auth', 'service_account'] as
 export const CREDENTIAL_SCOPES = ['shared', 'per_user'] as const;
 export type CredentialScope = (typeof CREDENTIAL_SCOPES)[number];
 
-const NAME_PATTERN = /^[a-zA-Z0-9_\-]+$/;
+const NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
 /** Standard JSON response helper for connection routes. */
 export function json(data: unknown, status = 200): Response {

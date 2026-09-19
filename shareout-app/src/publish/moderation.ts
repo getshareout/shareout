@@ -97,7 +97,12 @@ export async function runPublishModeration(
     if (check.verdict === 'error' && executionCtx) {
       executionCtx.waitUntil((async () => {
         await new Promise((r) => setTimeout(r, HELD_RETRY_MS));
-        await recheckAndHold(env, artifactId).catch(() => {});
+        await recheckAndHold(env, artifactId).catch((err) => {
+          createLogger(env, { scope: 'moderation' }).warn('publish moderation recheck failed', {
+            artifact_id: artifactId,
+            err,
+          });
+        });
       })());
     }
   }

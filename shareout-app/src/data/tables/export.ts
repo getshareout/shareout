@@ -21,7 +21,7 @@ export async function exportTableCsv(
   const [sortField, sortDirRaw] = sortParam.split(':');
   const sortDir = sortDirRaw === 'desc' ? 'desc' : 'asc';
   const filename = (url.searchParams.get('filename') || `${tableName}.csv`)
-    .replace(/[^\w.\-]/g, '_')
+    .replace(/[^\w.-]/g, '_')
     .slice(0, 120);
 
   const rows: Record<string, unknown>[] = [];

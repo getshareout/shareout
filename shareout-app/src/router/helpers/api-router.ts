@@ -1,4 +1,5 @@
 import type { AuthUser } from '../../api-auth';
+import { simpleApiError } from '../../http/api-error';
 import { createLogger, logError } from '../../logging';
 import type { FetchContext } from '../context';
 import { requireAuthUser, requireToken, requireTokenOrSession } from './auth-guard';
@@ -59,8 +60,9 @@ async function resolveAuth(ctx: FetchContext, auth: ApiAuth): Promise<AuthUser |
   }
 }
 
-function methodNotAllowed(ctx: FetchContext): Response {
-  return ctx.addCORS(jsonError('Method not allowed', 'METHOD_NOT_ALLOWED', 405));
+function methodNotAllowed(ctx: FetchContext, allowed: readonly string[]): Response {
+  const headers = new Headers({ Allow: allowed.join(', ') });
+  return ctx.addCORS(simpleApiError('Method not allowed', 'METHOD_NOT_ALLOWED', 405, { headers }));
 }
 
 function internalError(ctx: FetchContext): Response {
@@ -89,7 +91,10 @@ export function createApiRouter(routes: ApiRoute[]): (ctx: FetchContext) => Prom
     if (matching.length === 0) return null;
 
     const route = matching.find((r) => r.methods.has(method));
-    if (!route) return methodNotAllowed(ctx);
+    if (!route) {
+      const allowed = [...matching[0].methods];
+      return methodNotAllowed(ctx, allowed);
+    }
 
     const authResult = await resolveAuth(ctx, route.auth);
     if (authResult instanceof Response) return authResult;

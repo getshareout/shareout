@@ -1,4 +1,7 @@
+import { apiErrorResponse } from '../http/api-error';
+import { createLogger, logError } from '../logging';
 import type { Env } from '../types';
+import { DATA_ERRORS } from '../types';
 
 // Per-artifact mini-store backend: SQLite inside a Durable Object (ADR 28 / plan §13.5).
 // One DO instance per artifact removes the single-writer bottleneck and shared size
@@ -74,8 +77,10 @@ interface ExecBody extends Statement {
 export class MiniDB implements DurableObject {
   private sql: SqlStorage;
   private storage: DurableObjectStorage;
+  private env: Env;
 
-  constructor(state: DurableObjectState, _env: Env) {
+  constructor(state: DurableObjectState, env: Env) {
+    this.env = env;
     this.sql = state.storage.sql;
     this.storage = state.storage;
     state.blockConcurrencyWhile(async () => {
@@ -112,15 +117,21 @@ export class MiniDB implements DurableObject {
         );
         return Response.json({ results });
       } catch (e) {
-        return Response.json({ error: (e as Error).message }, { status: 500 });
+        return this.internalError(e);
       }
     }
 
     try {
       return Response.json(this.execOne(body));
     } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+      return this.internalError(e);
     }
+  }
+
+  private internalError(err: unknown): Response {
+    const logger = createLogger(this.env, { scope: 'minidb' });
+    logError(logger, 'minidb exec failed', err);
+    return apiErrorResponse(DATA_ERRORS.INTERNAL_ERROR);
   }
 
   private execOne({ sql, bindings = [], mode = 'all' }: Statement) {

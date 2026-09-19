@@ -30,7 +30,8 @@ export function setupKeyboardShortcuts(ctx: EditorContext): void {
       switch (e.key) {
         case 'z':
           e.preventDefault();
-          e.shiftKey ? ctx.redo() : ctx.undo();
+          if (e.shiftKey) ctx.redo();
+          else ctx.undo();
           break;
         case 's':
           e.preventDefault();

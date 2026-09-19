@@ -7,7 +7,7 @@
 
 /**
  * Parse one cron segment (no commas) into an inclusive range + step, or null if
- * malformed / out of bounds. Handles `*`, `a`, `a-b`, `*​/s`, `a/s`, `a-b/s`.
+ * malformed / out of bounds. Handles star, literal, ranges, step (e.g. a-b/s).
  */
 function parseSegment(
   segment: string,

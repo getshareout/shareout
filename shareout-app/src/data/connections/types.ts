@@ -10,7 +10,7 @@ import type { WorkspaceCredentialScope } from './user-credentials';
 /** Default timeout for REST connection tests and queries (ms). */
 export const CONNECTION_TIMEOUT_MS = 15_000;
 
-export const NAME_PATTERN = /^[a-zA-Z0-9_\-]+$/;
+export const NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
 // ponytail: 'postgres' hidden until a server-side engine exists (work/023); existing rows still resolve.
 export const CONNECTION_TYPES = ['rest_api', 'bigquery', 'snowflake'] as const;

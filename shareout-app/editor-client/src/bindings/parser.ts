@@ -257,7 +257,7 @@ export function describeBinding(binding: string | ParsedBinding): string {
     case 'json':
       return `JSON: ${parsed.key}`;
 
-    case 'table':
+    case 'table': {
       if (parsed.operation === 'row') {
         return `${parsed.table}.${parsed.field} (row ${parsed.rowId})`;
       }
@@ -265,6 +265,7 @@ export function describeBinding(binding: string | ParsedBinding): string {
         ? ` where ${Object.entries(parsed.filter).map(([k, v]) => `${k}=${v}`).join(', ')}`
         : '';
       return `${parsed.operation?.toUpperCase()}(${parsed.table}.${parsed.field})${filterDesc}`;
+    }
 
     case 'computed':
       if (parsed.sources && parsed.sources.length > 0) {
@@ -385,7 +386,7 @@ export function formatValue(value: unknown, format: ParsedFormat | null): string
         maximumFractionDigits: format.decimals ?? 0,
       }).format(numValue);
 
-    case 'date':
+    case 'date': {
       const dateValue = value instanceof Date ? value : new Date(String(value));
       if (isNaN(dateValue.getTime())) return String(value);
       switch (format.dateFormat) {
@@ -400,6 +401,7 @@ export function formatValue(value: unknown, format: ParsedFormat | null): string
         default:
           return dateValue.toLocaleDateString(format.locale);
       }
+    }
 
     default:
       return String(value);

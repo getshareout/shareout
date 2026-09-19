@@ -155,7 +155,7 @@ export class RealtimeDoc {
     };
   }
 
-  on(event: 'update' | 'status' | 'sync', handler: Function): void {
+  on(event: 'update' | 'status' | 'sync', handler: (...args: unknown[]) => void): void {
     if (event === 'update') {
       this.ensureDoc();
       this.doc.on('update', handler);
@@ -166,7 +166,7 @@ export class RealtimeDoc {
     }
   }
 
-  off(event: 'update' | 'status' | 'sync', handler: Function): void {
+  off(event: 'update' | 'status' | 'sync', handler: (...args: unknown[]) => void): void {
     if (event === 'update' && this.doc) {
       this.doc.off('update', handler);
     } else if (event === 'status') {

@@ -49,7 +49,8 @@ export async function runEventTriggeredJobs(
     `).bind(logId, job.id, now, result.success ? 'success' : 'failed', duration, result.error || null).run();
     await recordJobSteps(env, logId, job.id, result);
 
-    result.success ? executed++ : failed++;
+    if (result.success) executed++;
+    else failed++;
   }
 
   return { executed, failed };

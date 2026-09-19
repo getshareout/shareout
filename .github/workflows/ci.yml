@@ -30,6 +30,8 @@ jobs:
           cache-dependency-path: shareout-app/package-lock.json
       - name: Install
         run: npm ci
+      - name: Lint
+        run: npx eslint . --quiet
       - name: Static gates
         run: |
           npm run check:boundaries

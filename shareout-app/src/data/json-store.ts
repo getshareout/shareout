@@ -8,7 +8,7 @@ import { bustViewerConfigCache, VIEWER_CONFIG_KEY } from './viewer-config';
 const MAX_KEY_LENGTH = 256;
 const MAX_VALUE_SIZE = 1_000_000;
 const MAX_KEYS_PER_ARTIFACT = 1000;
-const KEY_PATTERN = /^[a-zA-Z0-9_\-\.]+$/;
+const KEY_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 
 export async function handleJsonStore(
   request: Request,

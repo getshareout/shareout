@@ -198,7 +198,7 @@ describe('handleAdminChat', () => {
   });
 
   it('handles unexpected stream failure', async () => {
-    mockStreamChat.mockImplementation(async function* () {
+    mockStreamChat.mockImplementation(async () => {
       throw new Error('D1_ERROR: disk I/O error');
     });
     const ctx = makeCtx(makeEnv(chatDb()));

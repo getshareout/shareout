@@ -5,7 +5,7 @@ import { injectCanvasEditorStyles } from './editor-styles';
 
 const log = createLogger('canvas');
 
-const SDK_SCRIPT = '<script src="/sdk/shareout.js"><\/script>';
+const SDK_SCRIPT = '<script src="/sdk/shareout.js"></script>';
 const EMPTY_HTML = '<html><head></head><body></body></html>';
 const READY_TIMEOUT_MS = 3000;
 

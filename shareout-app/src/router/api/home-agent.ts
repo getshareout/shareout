@@ -22,6 +22,7 @@ import { getCrewProvider } from '../../crew/provider';
 import { getAccountAnalytics } from '../../analytics';
 import { getVisibilityScope } from '../../account-links';
 import { buildClientsContextForWorkspace } from '../../sharees/context';
+import { createLogger } from '../../logging';
 import { knowledgeTrunkForContext } from '../../knowledge-context';
 import { guidanceEntryForContext } from '../../workspace-context';
 import {
@@ -167,7 +168,9 @@ async function handleBrief(ctx: FetchContext, ws: string | null, user: AuthUser)
       if (ev.type === 'text_delta') text += ev.text;
       else if (ev.type === 'message_stop' || ev.type === 'error') break;
     }
-  } catch { /* fall through to whatever we have */ }
+  } catch (err) {
+    createLogger(env, { scope: 'home.agent.brief' }).warn('agent brief stream failed', { err });
+  }
   return jsonResp({ text: text.trim() });
 }
 

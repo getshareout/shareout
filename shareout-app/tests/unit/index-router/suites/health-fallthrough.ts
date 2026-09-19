@@ -68,9 +68,10 @@ describe('index router — health, debug, and fallthrough', () => {
     await expect(response.text()).resolves.toBe('Not Found');
   });
 
-  it('returns 404 for matched path with wrong HTTP method', async () => {
+  it('returns 405 with Allow for matched path with wrong HTTP method', async () => {
     const response = await fetchPath('/v1/publish', { method: 'GET' });
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(405);
+    expect(response.headers.get('Allow')).toBe('POST');
   });
 });
 }

@@ -279,7 +279,7 @@ describe('handleVisitorChat', () => {
   });
 
   it('handles unexpected stream failure', async () => {
-    mockStreamChat.mockImplementation(async function* () {
+    mockStreamChat.mockImplementation(async () => {
       throw new Error('D1_ERROR: no such table');
     });
     const ctx = makeCtx(makeEnv(configDb()));
