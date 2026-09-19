@@ -71,6 +71,7 @@ Standard error codes and their meanings. Response wrapper (`success`/`error`/`co
 | `JOB_NOT_FOUND` | 404 | Job doesn't exist |
 | `INVALID_REQUEST` | 400 | Covers several job-creation failures via a shared message, not a distinct code each: the 5-jobs-per-UTC-day limit (`Job limit reached (5 per user)`, per-user not per-artifact), and over 10 recipients on `email`/`asset_delivery` destinations (`Maximum 10 recipients per email` / `per delivery`) |
 | `INVALID_SCHEDULE` | 400 | Invalid cron expression |
+| `CONNECTION_MISSING` | 400 | Job names a connection (`query_snapshot`, `materialize`, `sheets_append`, Slack bot) that doesn't exist on the artifact or its workspace — check `sdk.connection` / workspace connectors before creating the job, not after |
 
 ## Comments Errors
 
@@ -112,20 +113,31 @@ Standard error codes and their meanings. Response wrapper (`success`/`error`/`co
 
 What to actually do when you hit these, beyond retrying blindly:
 
-**429 rate limited** (`RATE_LIMITED` / `RATE_LIMIT_EXCEEDED`) — the response body doesn't
-restate the limit, only the code (and sometimes `retryAfter` in seconds). Known windows:
-publish 100/day per user ([overview.md](overview.md#rate-limits)), AI chat / scheduled
-jobs are per-user-per-day or per-hour depending on the surface (see the specific doc —
-[jobs.md](jobs.md), [team/workspace-assistant.md](../team/workspace-assistant.md)). Don't
-retry-loop past the limit — batch the work locally (build/validate the full payload
-before making calls) and back off with the `retryAfter` hint when present, or wait for
-the stated window to roll over.
+**429 rate limited** (`RATE_LIMITED` / `RATE_LIMIT_EXCEEDED`) — on publish (`POST
+/v1/publish` and the session `/create` builder — both enforce the same cap), the body
+and headers are actionable: `error` states the limit and reset time in words ("Daily
+publish limit reached (100 per day). It resets at HH:MM UTC, in about N hours."), plus
+`limit` / `remaining` / `reset` (unix seconds) / `retryAfter` (seconds) fields and
+`X-RateLimit-Remaining` / `X-RateLimit-Reset` / `Retry-After` headers. Other surfaces
+(AI chat, scheduled jobs) may only return the code — see the specific doc
+([jobs.md](jobs.md), [team/workspace-assistant.md](../team/workspace-assistant.md)) for
+their windows. Don't retry-loop past the limit — batch the work locally (build/validate
+the full payload before making calls) and back off using `retryAfter`/`Retry-After` when
+present, or wait for the stated reset.
 
 **413 too large** (`FILE_TOO_LARGE` / `STORAGE_LIMIT_EXCEEDED` / `STORAGE_QUOTA_EXCEEDED`)
 — check which cap: per-file (split the upload), per-artifact/per-bucket (delete unused
 data or move heavy media to `sdk.blobs`/asset buckets instead of inline JSON), or the
 instance-wide `STORAGE_QUOTA_BYTES` operator setting (only an operator can raise this —
-don't tell the user to "upgrade," there's no plan to upgrade to).
+don't tell the user to "upgrade," there's no plan to upgrade to; the message itself says
+so: "ask your ShareOut admin to raise STORAGE_QUOTA_BYTES").
+
+**Public artifact limit** — not an error at all: if the instance sets
+`PUBLIC_ARTIFACT_LIMIT` and the account is at the cap, `POST /v1/publish` succeeds
+(`201`) but silently publishes **privately** instead, with a `notice`: "Public artifact
+limit reached (N per account). Published privately. Make another artifact private, or
+ask your ShareOut admin to raise PUBLIC_ARTIFACT_LIMIT." Tell the user their page is
+private, not that the publish failed.
 
 **Visibility held** (`VISIBILITY_HELD` / `MODERATION_HELD`, both `202`) — these are not
 failures, the write succeeded. Tell the user their page is "publishing shortly" / "under
