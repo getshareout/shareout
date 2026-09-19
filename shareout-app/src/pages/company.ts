@@ -227,7 +227,7 @@ export function renderTermsPage(env: Env): Response {
   <p>You may access ShareOut programmatically via API tokens and agent skills. You are responsible for tokens you create and for automated actions they perform. Do not share tokens publicly or use the API in ways that exceed reasonable rate limits or circumvent plan limits.</p>
 
   <h2>Plans, billing &amp; trials</h2>
-  <p>Free, Pro, Teams, and Enterprise plans are described on our <a href="/pricing">pricing page</a>. Paid subscriptions renew automatically each billing period until you cancel. You authorize us and our payment partners to charge your payment method on file. Prices may change with reasonable notice; continued use after a price change constitutes acceptance.</p>
+  <p>Plan tiers, billing, and payment terms depend on how your ShareOut instance is operated. On a self-hosted deployment, your operator sets limits and any paid features. Where ShareOut is offered as a hosted service, subscriptions renew each billing period until you cancel, and you authorize the payment method on file. Prices may change with reasonable notice; continued use after a price change constitutes acceptance.</p>
   <p>Trials and promotional offers, if any, convert to paid plans unless you cancel before the trial ends. Except where required by law, fees are non-refundable. Taxes may apply based on your location.</p>
 
   <h2>ShareOut intellectual property</h2>

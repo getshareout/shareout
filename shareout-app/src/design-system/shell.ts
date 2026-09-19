@@ -7,6 +7,7 @@ import { baseStyles } from './base.css';
 import { componentStylesheet, componentScripts } from './components/index';
 import { googleFontsPreconnect } from './tokens';
 import { brandFaviconHead } from '../brand';
+import { notFoundStyles, renderStreamedPageErrorBody } from '../pages/not-found';
 
 export interface HtmlPageOptions {
   title: string;
@@ -128,6 +129,8 @@ export interface StreamedHtmlPageOptions extends Omit<HtmlPageOptions, 'body' | 
   earlyBody?: string;
   /** Produces the real body + scripts; runs after the head has already been flushed. */
   body: () => Promise<{ body: string; scripts?: string }>;
+  /** Called when `body()` throws — use for structured logging before the branded fallback renders. */
+  onStreamError?: (err: unknown) => void;
 }
 
 /**
@@ -153,8 +156,11 @@ export function renderHtmlPageStreamed(options: StreamedHtmlPageOptions): Respon
 ${scripts ? `<script>${scripts}</script>` : ''}
 </body>
 </html>`));
-    } catch {
-      await writer.write(enc.encode(`<div style="padding:2rem;font-family:system-ui">Something went wrong loading this page. <a href="/home">Reload</a>.</div>
+    } catch (err) {
+      options.onStreamError?.(err);
+      await writer.write(enc.encode(`<style>${notFoundStyles}</style>
+${renderStreamedPageErrorBody()}
+<script>${componentScripts}</script>
 </body>
 </html>`));
     } finally {

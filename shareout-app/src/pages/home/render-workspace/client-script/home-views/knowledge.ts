@@ -95,7 +95,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     var btn = '';
     if (mode === 'off') {
       if (!paid) btn = '<p class="wsx-cat__hint">' + esc(t('knowledge.upsellTitle')) + '</p>'
-        + '<a class="so-c-btn so-c-btn--primary" href="/app/billing?workspace_id=' + encodeURIComponent(window.WSX_WS || '') + '">' + esc(t('knowledge.seePlans')) + '</a>';
+        + '<p class="wsx-cat__hint">' + esc(t('knowledge.askAdmin')) + '</p>';
       else btn = admin
         ? '<button class="so-c-btn so-c-btn--primary" id="knEnable" type="button">' + esc(t('knowledge.turnOn')) + '</button>'
         : '<p class="wsx-cat__hint">' + esc(t('knowledge.askAdmin')) + '</p>';
