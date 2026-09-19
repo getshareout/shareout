@@ -11,6 +11,45 @@ export const workspace_client_home_views_crew_JS = `  // ----- Crew AI — works
         wireBars(host);
       }).catch(function () { host.innerHTML = ''; });
   }
+  // Run now streams the run (SSE) into a step log on the card, so the user sees
+  // each tool call as it happens instead of a button stuck on "Running…".
+  function crewRunLive(b, card, base) {
+    var log = card.querySelector('.wsx-crewlog');
+    if (!log) { log = document.createElement('div'); log.className = 'wsx-crewlog'; log.setAttribute('aria-live', 'polite'); card.insertBefore(log, card.querySelector('.wsx-sched__actions')); }
+    log.innerHTML = ''; var thinking = null, started = false, ended = false;
+    function line(text, cls) { var el = document.createElement('div'); el.className = 'wsx-crewlog__ln' + (cls ? ' ' + cls : ''); el.textContent = text; log.appendChild(el); log.scrollTop = log.scrollHeight; return el; }
+    function onEvent(ev) {
+      if (ev.type === 'run_start') { started = true; line(t('crew.started')); }
+      else if (ev.type === 'reasoning') { if (!thinking) thinking = line(t('crew.thinking')); }
+      else if (ev.type === 'tool_call') { thinking = null; line(t('crew.usingTool').replace('{tool}', ev.tool)); }
+      else if (ev.type === 'tool_result') line(t(ev.is_error ? 'crew.toolFailed' : 'crew.toolDone').replace('{tool}', ev.tool), ev.is_error ? 'is-fail' : '');
+      else if (ev.type === 'finish') line(ev.summary || t('crew.finished'), 'is-ok');
+      else if (ev.type === 'error') line(ev.error || t('crew.couldNotRun'), 'is-fail');
+      else if (ev.type === 'done') {
+        ended = true; var ok = ev.terminationReason === 'goal_met';
+        line(t(ok ? 'crew.doneOk' : 'crew.doneStopped').replace('{n}', ev.iterations || 0).replace('{reason}', String(ev.terminationReason || '').replace(/_/g, ' ')), ok ? 'is-ok' : 'is-fail');
+      }
+    }
+    b.disabled = true; b.textContent = t('crew.running');
+    fetch(base + '/run', { method: 'POST', credentials: 'same-origin', headers: { Accept: 'text/event-stream' } })
+      .then(function (r) {
+        if (!r.ok || !r.body) return r.json().catch(function () { return null; }).then(function (d) { throw new Error((d && d.error) || t('crew.couldNotRun')); });
+        var reader = r.body.getReader(), dec = new TextDecoder(), buf = '';
+        function pump() {
+          return reader.read().then(function (res) {
+            if (res.done) return;
+            buf += dec.decode(res.value, { stream: true });
+            var parts = buf.split('\\n\\n'); buf = parts.pop();
+            parts.forEach(function (chunk) { try { onEvent(JSON.parse(chunk.replace(/^data: ?/, ''))); } catch (e) {} });
+            return pump();
+          });
+        }
+        return pump();
+      })
+      .then(function () { if (!ended) line(t('crew.streamLost'), 'is-fail'); })
+      .catch(function (err) { line(started ? t('crew.streamLost') : (err instanceof TypeError ? t('crew.couldNotRun') : err.message), 'is-fail'); })
+      .then(function () { b.disabled = false; b.textContent = t('crew.runNow'); crewRuns(card.getAttribute('data-crew'), card.querySelector('[data-crew-runs]')); });
+  }
   function loadCrew() {
     var m = document.getElementById('wsxCrewMount'); if (needWs(m)) return;
     m.innerHTML = i18nLoad();
@@ -38,7 +77,7 @@ export const workspace_client_home_views_crew_JS = `  // ----- Crew AI — works
           b.addEventListener('click', function () {
             var card = b.closest('[data-crew]'); var id = card.getAttribute('data-crew'); var act = b.getAttribute('data-crew-act');
             var base = '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/automations/' + encodeURIComponent(id);
-            if (act === 'run') { b.disabled = true; b.textContent = t('crew.running'); fetch(base + '/run', { method: 'POST', credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error('failed'); b.textContent = t('crew.queued'); setTimeout(function () { loaded.crew = 0; loadCrew(); }, 1200); }).catch(function () { b.disabled = false; b.textContent = t('crew.runNow'); showToast(t('crew.couldNotRun'), 'error'); }); }
+            if (act === 'run') crewRunLive(b, card, base);
             else if (act === 'toggle') { var on = card.getAttribute('data-crew-enabled') === '1'; fetch(base, { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: !on }) }).then(function (r) { if (!r.ok) throw new Error('failed'); loaded.crew = 0; loadCrew(); }).catch(function () { showToast(t('crew.couldNotUpdate'), 'error'); }); }
             else if (act === 'del') { if (!window.confirm(t('crew.deleteConfirm'))) return; fetch(base, { method: 'DELETE', credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error('failed'); card.remove(); }).catch(function () { showToast(t('crew.couldNotDelete'), 'error'); }); }
           });

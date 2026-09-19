@@ -4,7 +4,7 @@ import { getInternalWorkspaceRole } from '../../workspaces';
 import { executeJobNow, parseCronSchedule, getNextRunTime, missingJobConnection } from '../../scheduling/jobs';
 import type { ScheduledJob } from '../../scheduling/jobs';
 import { getCrewById, listRuns } from '../../crew/store';
-import { dispatchCrewRun } from '../../crew/triggers';
+import { startCrewRunStream } from '../../crew/triggers';
 import { getRunDetail, listWorkspaceRuns, type RunSurface } from '../../runs/inspector';
 import { jsonWithApiErrors } from '../../http/api-error';
 
@@ -241,11 +241,11 @@ export async function handleRunWorkspaceAutomation(
   const crew = await getCrewById(env, trigger.crew_id);
   if (!crew) return json({ error: 'Crew not found', code: 'NOT_FOUND' }, 404);
 
-  const dispatched = await dispatchCrewRun(env, crew, 'cron', trigger.id);
-  if (!dispatched) {
+  const stream = await startCrewRunStream(env, crew, user.id);
+  if (!stream) {
     return json({ error: 'Could not start run (crew inactive or at concurrency limit)', code: 'NOT_DISPATCHED' }, 409);
   }
-  return json({ success: true });
+  return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } });
 }
 
 export async function handleToggleWorkspaceAutomation(

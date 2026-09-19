@@ -18,7 +18,9 @@ vi.mock('../../../src/crew/store', () => ({
 }));
 
 vi.mock('../../../src/crew/triggers', () => ({
-  dispatchCrewRun: vi.fn().mockResolvedValue(true),
+  startCrewRunStream: vi.fn(async () => new ReadableStream({
+    start(c) { c.enqueue(new TextEncoder().encode('data: {"type":"run_start"}\n\n')); c.close(); },
+  })),
 }));
 
 vi.mock('../../../src/runs/inspector', () => ({
@@ -41,7 +43,7 @@ import {
   handleGetWorkspaceRun,
 } from '../../../src/router/api/workspace-jobs';
 import { executeJobNow } from '../../../src/scheduling/jobs';
-import { dispatchCrewRun } from '../../../src/crew/triggers';
+import { startCrewRunStream } from '../../../src/crew/triggers';
 import { listWorkspaceRuns, getRunDetail } from '../../../src/runs/inspector';
 
 const e = env as unknown as Env;
@@ -146,7 +148,14 @@ describe('workspace automations + runs', () => {
 
     const run = await handleRunWorkspaceAutomation(e, admin, WS, 'trg1');
     expect(run.status).toBe(200);
-    expect(dispatchCrewRun).toHaveBeenCalled();
+    expect(run.headers.get('Content-Type')).toBe('text/event-stream');
+    expect(await run.text()).toContain('run_start');
+    expect(startCrewRunStream).toHaveBeenCalledWith(e, expect.objectContaining({ id: 'crew1' }), 'usr_admin');
+
+    vi.mocked(startCrewRunStream).mockResolvedValueOnce(null);
+    const busy = await handleRunWorkspaceAutomation(e, admin, WS, 'trg1');
+    expect(busy.status).toBe(409);
+    expect((await busy.json() as { code: string }).code).toBe('NOT_DISPATCHED');
 
     expect((await handleToggleWorkspaceAutomation(jsonReq({ enabled: false }), e, admin, WS, 'trg1')).status).toBe(200);
     expect((await handleDeleteWorkspaceAutomation(e, admin, WS, 'trg1')).status).toBe(200);

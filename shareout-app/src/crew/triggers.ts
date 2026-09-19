@@ -3,7 +3,7 @@ import { getNextRunTime } from '../scheduling/jobs';
 import { getCrewById, createRun, reapStaleRuns } from './store';
 import { resolveCrewLimits, countActiveRuns } from './limits';
 import { buildOwnerDataContextForCrew } from './principal';
-import { runCrewToCompletion } from './run-loop';
+import { runCrew, runCrewToCompletion } from './run-loop';
 import { evaluateCondition, validateConditionConfig, clampSeconds, RECHECK_SECONDS } from './condition';
 import type { CrewRow, CrewTriggerRow } from './types';
 
@@ -30,6 +30,23 @@ export async function dispatchCrewRun(
   const run = await createRun(env, crew, '', null, triggerKind);
   await runCrewToCompletion({ env, crew, run, ownerCtx, input: '', triggerId });
   return true;
+}
+
+/**
+ * Manual "Run now" from the workspace UI: same gates as dispatchCrewRun, but the
+ * run streams back as SSE so the user watches each step. Null when the crew is
+ * inactive or the owner is at the concurrency limit.
+ */
+export async function startCrewRunStream(env: Env, crew: CrewRow, initiatedBy: string): Promise<ReadableStream | null> {
+  if (crew.status !== 'active') return null;
+
+  await reapStaleRuns(env).catch(() => 0);
+  const limits = await resolveCrewLimits(env, crew.owner_id);
+  if ((await countActiveRuns(env, crew.owner_id)) >= limits.max_concurrent_runs) return null;
+
+  const ownerCtx = await buildOwnerDataContextForCrew(env, crew);
+  const run = await createRun(env, crew, '', initiatedBy, 'manual');
+  return runCrew({ env, crew, run, ownerCtx, input: '' });
 }
 
 /**

@@ -19,9 +19,9 @@ import lensRoutingTs from '../../../src/pages/home/render-workspace/client-scrip
 import homeViewsBarrel from '../../../src/pages/home/render-workspace/client-script/home-views.ts?raw';
 
 /** Captured at split time — guards against accidental client-script drift.
- *  Re-pinned after comments file-thread UX + invite copy-link on main. */
-const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 555_547;
-const ORIGINAL_WORKSPACE_CLIENT_SHA256 = 'fb9c6172d07747855852f71f073c7b45b157c4481bc962b9a81a0fca9f9f977b';
+ *  Re-pinned after schedules Run now + live crew run log. */
+const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 561_247;
+const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '0479cf46d223d0e268315a2ba4fe93c92f143e57c8492943605a5c30331a5897';
 const HOME_VIEWS_MARKER = '  // ===== rail nav → Home pane views =====';
 
 const SECTION_SOURCES: [string, string][] = [

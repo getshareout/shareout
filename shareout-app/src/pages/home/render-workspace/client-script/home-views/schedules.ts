@@ -30,24 +30,35 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
   function cronHuman(c) {
     if (!c) return t('sched.cronOnSchedule');
     var p = String(c).trim().split(/\\s+/); if (p.length < 5) return c;
-    var H = parseInt(p[1], 10), M = parseInt(p[0], 10);
-    var hhmm = (isNaN(H) || isNaN(M)) ? '' : ((H < 10 ? '0' : '') + H + ':' + (M < 10 ? '0' : '') + M);
-    if (p[2] === '*' && p[3] === '*' && p[4] === '*') return hhmm ? t('sched.cronDailyAt').replace('{time}', hhmm) : t('sched.cronDaily');
-    if (p[2] === '*' && p[4] !== '*') {
-      var day = t(CRON_DAYS[parseInt(p[4], 10)] || '') || p[4];
-      return t('sched.cronWeeklyAt').replace('{day}', day).replace('{time}', hhmm);
+    var num = /^\\d+$/, step = /^\\*\\/(\\d+)$/;
+    var custom = t('sched.cronCustom').replace('{cron}', p.join(' '));
+    if (p[2] !== '*' || p[3] !== '*') {
+      if (p[3] === '*' && num.test(p[2]) && num.test(p[1]) && num.test(p[0]) && p[4] === '*') return t('sched.cronMonthlyAt').replace('{day}', p[2]).replace('{time}', hhmm(p[1], p[0]));
+      return custom;
     }
-    if (p[2] !== '*' && p[3] === '*') return t('sched.cronMonthlyAt').replace('{day}', p[2]).replace('{time}', hhmm);
-    return c;
+    if (p[0] === '*' && p[1] === '*' && p[4] === '*') return t('sched.cronEveryMin');
+    if (step.test(p[0]) && p[1] === '*' && p[4] === '*') return t('sched.cronEveryNMin').replace('{n}', p[0].match(step)[1]);
+    if (!num.test(p[0])) return custom;
+    var mm = (p[0].length < 2 ? '0' : '') + p[0];
+    if (p[1] === '*' && p[4] === '*') return t('sched.cronHourlyAt').replace('{mm}', mm);
+    if (step.test(p[1]) && p[4] === '*') return t('sched.cronEveryNHours').replace('{n}', p[1].match(step)[1]).replace('{mm}', mm);
+    if (!num.test(p[1])) return custom;
+    var time = hhmm(p[1], p[0]);
+    if (p[4] === '*') return t('sched.cronDailyAt').replace('{time}', time);
+    if (p[4] === '1-5') return t('sched.cronWeekdaysAt').replace('{time}', time);
+    if (!/^[0-7](,[0-7])*$/.test(p[4])) return custom;
+    var days = p[4].split(',').map(function (d) { return t(CRON_DAYS[parseInt(d, 10) % 7]); }).join(', ');
+    return t('sched.cronWeeklyAt').replace('{day}', days).replace('{time}', time);
   }
+  function hhmm(h, m) { return (h.length < 2 ? '0' : '') + h + ':' + (m.length < 2 ? '0' : '') + m; }
   function whenAgo(ms) { if (!ms) return ''; try { return timeAgo(ms); } catch (e) { return ''; } }
   // One run-history bar. Clickable (opens the Run Inspector drawer) only inside a
   // Team Space, where the workspace-scoped run-detail endpoint is reachable.
-  function runBar(status, surface, runId) {
+  function runBar(status, surface, runId, note) {
     var c = (status === 'success' || status === 'completed' || status === 'done' || status === 'delivered' || status === 'ok') ? 'ok'
       : (status === 'failed' || status === 'error' || status === 'errored') ? 'fail' : 'pend';
     var click = (window.WSX_WS && runId) ? ' so-runbar is-click" data-run-surface="' + esc(surface) + '" data-run-id="' + esc(runId) : '';
-    return '<span class="wsx-runbar is-' + c + click + '" title="' + esc(status || '') + '"></span>';
+    return '<span class="wsx-runbar is-' + c + click + '" title="' + esc((status || '') + (note ? ' \\u2014 ' + note : '')) + '"></span>';
   }
   function wireBars(host) {
     host.querySelectorAll('[data-run-id]').forEach(function (b) {
@@ -63,7 +74,7 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
         var logs = (d && d.logs) || [];
         if (!logs.length) { host.innerHTML = '<span class="wsx-sched__noruns">' + esc(t('sched.noRuns')) + '</span>'; return; }
         host.innerHTML = logs.slice(0, 24).reverse().map(function (l) {
-          return runBar(l.status, 'job', l.id);
+          return runBar(l.status, 'job', l.id, l.error);
         }).join('');
         wireBars(host);
       }).catch(function () { host.innerHTML = ''; });
@@ -97,11 +108,36 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
             + '<div class="wsx-sched__meta"><span class="wsx-sched__when">' + isvg(SCHED_ICON.clock) + esc(cronHuman(j.schedule)) + '</span>'
             +   (j.last_run_at ? '<span>' + esc(t('sched.lastRun')) + ' ' + esc(whenAgo(j.last_run_at)) + '</span>' : '')
             +   (j.next_run_at ? '<span>' + esc(t('sched.next')) + ' ' + esc(whenAgo(j.next_run_at)) + '</span>' : '') + '</div>'
+            + (st === 'failed' && j.last_error ? '<div class="wsx-runst is-fail" data-last-err>' + esc(j.last_error) + '</div>' : '')
             + '<div class="wsx-runbars" data-runs="' + esc(j.id) + '"><span class="wsx-sched__noruns">' + esc(t('sched.loadingRuns')) + '</span></div>'
+            + '<div class="wsx-sched__actions"><button class="wsx-abtn" data-sched-run type="button">' + esc(t('sched.runNow')) + '</button><span class="wsx-runst" aria-live="polite"></span></div>'
             + '</div>';
         }).join('');
         m.querySelectorAll('[data-runs]').forEach(function (host) { loadJobLogs(host.getAttribute('data-runs'), host); });
+        m.querySelectorAll('[data-sched-run]').forEach(function (b) { b.addEventListener('click', function () { runJobNow(b); }); });
       }).catch(function () { m.innerHTML = i18nError('common.couldNotLoad'); });
+  }
+  function durLabel(ms) { return ms < 1000 ? Math.round(ms) + ' ms' : (ms / 1000).toFixed(1) + ' s'; }
+  // Run now: the request runs the job to completion, so the reply is the real outcome.
+  function runJobNow(b) {
+    var card = b.closest('[data-job]'); var id = card.getAttribute('data-job');
+    var out = card.querySelector('.wsx-sched__actions .wsx-runst'); var badge = card.querySelector('.wsx-sched__badge');
+    var lastErr = card.querySelector('[data-last-err]'); if (lastErr) lastErr.remove();
+    b.disabled = true; b.textContent = t('sched.running'); out.className = 'wsx-runst'; out.textContent = '';
+    fetch('/v1/jobs/' + encodeURIComponent(id) + '/run', { method: 'POST', credentials: 'same-origin' })
+      .then(function (r) { return r.json().catch(function () { return null; }).then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        var ex = res.d && res.d.execution;
+        if (!res.ok || !ex) throw new Error((res.d && res.d.error) || t('sched.couldNotRun'));
+        out.className = 'wsx-runst ' + (ex.success ? 'is-ok' : 'is-fail');
+        out.textContent = ex.success
+          ? t('sched.runOk').replace('{dur}', durLabel(ex.duration_ms || 0))
+          : t('sched.runFailed').replace('{error}', ex.error || t('sched.couldNotRun'));
+        if (badge) { badge.className = 'wsx-sched__badge ' + (ex.success ? 'ok' : 'fail'); badge.textContent = ex.status; }
+        loadJobLogs(id, card.querySelector('[data-runs]'));
+      })
+      .catch(function (err) { out.className = 'wsx-runst is-fail'; out.textContent = err instanceof TypeError ? t('sched.couldNotRun') : err.message; })
+      .then(function () { b.disabled = false; b.textContent = t('sched.runNow'); });
   }
   // Quick-action tiles that kick off a guided chat (Schedules + Alerts empty states).
   function wireNewAuto(root) {
