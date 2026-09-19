@@ -17,10 +17,10 @@ const STYLES = `
 .st-h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.8rem, 4vw, 2.4rem); line-height: 1.15; letter-spacing: -0.03em; color: var(--color-text); margin: 0; }
 .st-lead { font-size: 1.05rem; line-height: 1.6; color: var(--color-text-secondary); margin: 0; }
 .st-banner { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-radius: var(--radius-lg); border: 1px solid var(--color-border); background: var(--color-surface); }
-.st-banner.is-ok { border-color: color-mix(in srgb, var(--color-success, #16a34a) 40%, var(--color-border)); }
-.st-banner.is-degraded { border-color: color-mix(in srgb, #ca8a04 45%, var(--color-border)); }
-.st-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; background: #16a34a; }
-.st-banner.is-degraded .st-dot { background: #ca8a04; }
+.st-banner.is-ok { border-color: color-mix(in srgb, var(--color-success) 40%, var(--color-border)); }
+.st-banner.is-degraded { border-color: color-mix(in srgb, var(--color-warning) 45%, var(--color-border)); }
+.st-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; background: var(--color-success); }
+.st-banner.is-degraded .st-dot { background: var(--color-warning); }
 .st-banner-title { font-weight: 700; font-size: 1.05rem; color: var(--color-text); margin: 0; }
 .st-banner-sub { font-size: 0.92rem; color: var(--color-text-secondary); margin: 2px 0 0; }
 .st-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: var(--space-3); }
@@ -34,8 +34,8 @@ const STYLES = `
 .st-table th, .st-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--color-border); font-variant-numeric: tabular-nums; }
 .st-table th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-secondary); background: var(--color-surface); }
 .st-table tr:last-child td { border-bottom: none; }
-.st-ok { color: #15803d; font-weight: 600; }
-.st-warn { color: #a16207; font-weight: 600; }
+.st-ok { color: var(--color-success); font-weight: 600; }
+.st-warn { color: var(--color-warning); font-weight: 600; }
 .st-foot { font-size: 0.9rem; color: var(--color-text-secondary); margin: 0; line-height: 1.55; }
 .st-foot a { color: var(--color-primary); }
 `;

@@ -8,6 +8,10 @@ export const workspace_client_home_views_clients_JS = `  // ----- Admin — Clie
     if (j && j.code === 'EXTERNAL_SHARING_NOT_ENTITLED') return t('clients.entitled');
     return (j && j.error) || fallback;
   }
+  function clientNetFail(b) {
+    adIdle(b);
+    try { showToast(t('admin.actionFailed'), 'error'); } catch (e) {}
+  }
 
   function adClients() {
     var m = document.getElementById('wsxAdminMount'); if (needWs(m)) return;
@@ -89,7 +93,7 @@ export const workspace_client_home_views_clients_JS = `  // ----- Admin — Clie
           if (res && res.error) { try { alert(clientErr(res, t('clients.couldNotAdd'))); } catch (e) {} adIdle(btn); return; }
           if (res && res.sharee && res.sharee.id) adClientDetail(res.sharee); else adClients();
         })
-        .catch(function () { adIdle(btn); });
+        .catch(function () { clientNetFail(btn); });
     });
     if (onCancel) { var c = document.getElementById('ac_cancel'); if (c) c.addEventListener('click', onCancel); }
   }
@@ -183,14 +187,14 @@ export const workspace_client_home_views_clients_JS = `  // ----- Admin — Clie
         fetch(wsUrl('/sharees/' + encodeURIComponent(sid) + '/members'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: em }) })
           .then(function (r) { return r.json().catch(function () { return {}; }); })
           .then(function (res2) { if (res2 && res2.error) { try { alert(clientErr(res2, t('clients.couldNotInvite'))); } catch (e) {} adIdle(inv); return; } adClientDetail(client); })
-          .catch(function () { adIdle(inv); });
+          .catch(function () { clientNetFail(inv); });
       });
       m.querySelectorAll('[data-cm-rm]').forEach(function (b) {
         b.addEventListener('click', function () {
           if (!window.confirm(t('clients.removeMember').replace('{name}', client.name))) return;
           adBusy(b);
           fetch(wsUrl('/sharees/' + encodeURIComponent(sid) + '/members/' + encodeURIComponent(b.getAttribute('data-cm-rm'))), { method: 'DELETE', credentials: 'same-origin' })
-            .then(function () { adClientDetail(client); }).catch(function () { adIdle(b); });
+            .then(function () { adClientDetail(client); }).catch(function () { clientNetFail(b); });
         });
       });
       var sh = document.getElementById('wsxClShare');
@@ -201,13 +205,13 @@ export const workspace_client_home_views_clients_JS = `  // ----- Admin — Clie
         fetch(wsUrl('/grants'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject_type: 'sharee', subject_id: sid, resource_type: 'folder', resource_id: fid, capability: cap }) })
           .then(function (r) { return r.json().catch(function () { return {}; }); })
           .then(function (res2) { if (res2 && res2.error) { try { alert(clientErr(res2, t('clients.couldNotShare'))); } catch (e) {} adIdle(sh); return; } adClientDetail(client); })
-          .catch(function () { adIdle(sh); });
+          .catch(function () { clientNetFail(sh); });
       });
       m.querySelectorAll('[data-grant-rm]').forEach(function (b) {
         b.addEventListener('click', function () {
           adBusy(b);
           fetch(wsUrl('/grants/' + encodeURIComponent(b.getAttribute('data-grant-rm'))), { method: 'DELETE', credentials: 'same-origin' })
-            .then(function () { adClientDetail(client); }).catch(function () { adIdle(b); });
+            .then(function () { adClientDetail(client); }).catch(function () { clientNetFail(b); });
         });
       });
       var noteNew = document.getElementById('wsxClNoteNew');
@@ -227,7 +231,7 @@ export const workspace_client_home_views_clients_JS = `  // ----- Admin — Clie
           if (!window.confirm(t('clients.deleteNoteConfirm').replace('{name}', name))) return;
           adBusy(b);
           fetch(wsUrl('/sharees/' + encodeURIComponent(sid) + '/context/' + encodeURIComponent(name)), { method: 'DELETE', credentials: 'same-origin' })
-            .then(function () { adClientDetail(client); }).catch(function () { adIdle(b); });
+            .then(function () { adClientDetail(client); }).catch(function () { clientNetFail(b); });
         });
       });
       m.querySelectorAll('[data-cm-tok]').forEach(function (b) {
@@ -262,13 +266,13 @@ export const workspace_client_home_views_clients_JS = `  // ----- Admin — Clie
                   + '<div class="wsx-mt-12"><button class="wsx-abtn" id="wsxTokDone" type="button">' + esc(t('clients.done')) + '</button></div>';
                 document.getElementById('wsxTokDone').addEventListener('click', render);
               } else { try { alert(clientErr(res, t('clients.couldNotCreateToken'))); } catch (e) {} adIdle(btn); render(); }
-            }).catch(function () { render(); });
+            }).catch(function () { clientNetFail(btn); render(); });
         });
         md.body.querySelectorAll('[data-tok-rm]').forEach(function (b) {
           b.addEventListener('click', function () {
             adBusy(b);
             fetch(base + '/' + encodeURIComponent(b.getAttribute('data-tok-rm')), { method: 'DELETE', credentials: 'same-origin' })
-              .then(function () { render(); }).catch(function () { adIdle(b); });
+              .then(function () { render(); }).catch(function () { clientNetFail(b); });
           });
         });
       }).catch(function () { md.body.innerHTML = i18nEmpty('common.couldNotLoad'); });
@@ -295,7 +299,7 @@ export const workspace_client_home_views_clients_JS = `  // ----- Admin — Clie
       fetch(wsUrl('/sharees/' + encodeURIComponent(sid) + '/context/' + encodeURIComponent(nm)), { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: body }) })
         .then(function (r) { return r.json().catch(function () { return {}; }); })
         .then(function (res) { if (res && res.error) { try { alert(res.error); } catch (e) {} adIdle(btn); return; } md.close(); adClientDetail(client); })
-        .catch(function () { md.close(); });
+        .catch(function () { clientNetFail(btn); });
     });
   }
 `;

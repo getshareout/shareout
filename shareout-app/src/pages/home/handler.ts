@@ -25,6 +25,7 @@ import { isFeatureEnabled } from '../../features/flags';
 import { isVisualEditorEnabled } from '../../editor/visual-editor-gate';
 import { CREATE_FEATURE } from '../create-gate';
 import { versionedBundlePath } from '../../bundle-versions';
+import { createLogger, logError } from '../../logging';
 
 /** Head options for the streamed workspace home shell. */
 const HOME_HEAD: Omit<HtmlPageOptions, 'body' | 'scripts'> = {
@@ -49,10 +50,12 @@ export async function handleUserHomePage(
 
   // Stream the shell at first byte, then run the per-view queries and stream the
   // real body in underneath. First paint doesn't block on the catalog/sidebar reads.
+  const homeLogger = createLogger(env, { scope: 'home.stream' });
   return renderHtmlPageStreamed({
     ...HOME_HEAD,
     earlyBody: '',
     body: () => buildHomeBody(request, env, user, filters, hostWs),
+    onStreamError: (err) => logError(homeLogger, 'home render failed', err),
   });
 }
 

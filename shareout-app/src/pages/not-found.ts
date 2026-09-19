@@ -5,7 +5,8 @@ import { renderHtmlPage } from '../design-system/shell';
 import { brandLockupHtml } from '../brand';
 import { escapeHtml } from '../html/utils';
 
-const notFoundStyles = `
+/** Shared branded error/404 layout styles (also used by streamed page fallbacks). */
+export const notFoundStyles = `
 .nf-wrap {
   min-height: 100vh;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -25,6 +26,19 @@ const notFoundStyles = `
 .nf-text code { font-family: var(--font-mono); font-size: 0.9em; color: var(--color-text); }
 .nf-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: center; margin-top: var(--space-2); }
 `;
+
+/** Branded inline body for a streamed page that failed mid-render (head already flushed). */
+export function renderStreamedPageErrorBody(): string {
+  return `<main class="nf-wrap">
+  <div class="nf-brand">${brandLockupHtml({ markSize: 30, href: '/' })}</div>
+  <h1 class="nf-title">Studio didn\u2019t load</h1>
+  <p class="nf-text">We hit a snag loading your workspace \u2014 usually a temporary glitch. Try again, or head back to Home.</p>
+  <div class="nf-actions">
+    <button class="so-c-btn so-c-btn--primary" type="button" onclick="location.reload()">Try again</button>
+    <a class="so-c-btn so-c-btn--secondary" href="/home">Back to Home</a>
+  </div>
+</main>`;
+}
 
 export function renderNotFoundPage(): Response {
   const body = `<main class="nf-wrap">
