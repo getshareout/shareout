@@ -16,6 +16,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
+import { classifyR2Create } from './lib/r2-create-status.mjs';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const tomlPath = join(appDir, 'wrangler.toml');
@@ -80,11 +81,15 @@ function createKv(title) {
 
 function ensureR2(name) {
   const out = run(['r2', 'bucket', 'create', name], { allowFail: true });
-  if (/Created bucket|already exists|403|409|Bucket already/i.test(out) || !/ERROR|✘/.test(out)) {
+  const status = classifyR2Create(out);
+  if (status === 'exists') {
+    console.warn(
+      `provision:cf: WARNING R2 bucket "${name}" already exists — this stack will share that bucket. ` +
+        `Rename bucket_name in wrangler.toml for a fresh stack.`,
+    );
     return;
   }
-  // "already exists" variants differ by wrangler version — treat non-fatal.
-  if (/exist/i.test(out)) return;
+  if (status === 'created') return;
   console.warn(`provision:cf: r2 create warning:\n${out}`);
 }
 
