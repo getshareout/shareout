@@ -58,6 +58,7 @@ beforeAll(async () => {
     `CREATE TABLE IF NOT EXISTS deployments (artifact_id TEXT, channel TEXT, slug TEXT)`,
     `CREATE TABLE IF NOT EXISTS scheduled_jobs (id TEXT PRIMARY KEY, artifact_id TEXT, owner_id TEXT, title TEXT, description TEXT, action TEXT, schedule TEXT, config TEXT, trigger_type TEXT, event_type TEXT, enabled INTEGER, next_run_at TEXT, last_run_at TEXT, last_status TEXT, last_error TEXT, created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))`,
     `CREATE TABLE IF NOT EXISTS job_runs (id TEXT PRIMARY KEY, job_id TEXT, created_at TEXT, status TEXT, duration_ms INTEGER, error TEXT)`,
+    `CREATE TABLE IF NOT EXISTS connections (id TEXT PRIMARY KEY, scope_type TEXT, scope_id TEXT, name TEXT, kind TEXT, provider TEXT)`,
     `CREATE TABLE IF NOT EXISTS crews (id TEXT PRIMARY KEY, name TEXT, status TEXT, model TEXT, instructions TEXT, owner_id TEXT)`,
     `CREATE TABLE IF NOT EXISTS crew_triggers (id TEXT PRIMARY KEY, crew_id TEXT, artifact_id TEXT, kind TEXT, cron TEXT, event_type TEXT, enabled INTEGER, next_run_at TEXT, last_run_at TEXT, created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), updated_at TEXT)`,
   ]) await e.DB.exec(sql);
@@ -65,7 +66,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   for (const t of [
-    'job_runs', 'crew_triggers', 'crews', 'scheduled_jobs', 'deployments',
+    'connections', 'job_runs', 'crew_triggers', 'crews', 'scheduled_jobs', 'deployments',
     'artifacts', 'workspace_members', 'workspaces', 'users',
   ]) await e.DB.exec(`DELETE FROM ${t}`);
 
@@ -117,6 +118,20 @@ describe('workspace schedules', () => {
     expect((await handleDeleteWorkspaceSchedule(e, admin, WS, 'missing')).status).toBe(404);
     expect((await handleDeleteWorkspaceSchedule(e, admin, WS, 'job1')).status).toBe(200);
     expect((await handleRunWorkspaceSchedule(e, admin, WS, 'job1')).status).toBe(404);
+  });
+});
+
+describe('re-enabling a schedule', () => {
+  it('refuses when the job\'s connection is gone, allows once it exists', async () => {
+    await e.DB.exec(`UPDATE scheduled_jobs SET action = 'query_snapshot', enabled = 0, config = '{"connection":"warehouse","queries":[]}' WHERE id = 'job1'`);
+
+    const refused = await handleToggleWorkspaceSchedule(jsonReq({ enabled: true }), e, admin, WS, 'job1');
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toMatchObject({ code: 'CONNECTION_MISSING', error: expect.stringContaining('Connection "warehouse"') });
+    expect((await e.DB.prepare(`SELECT enabled FROM scheduled_jobs WHERE id = 'job1'`).first<{ enabled: number }>())?.enabled).toBe(0);
+
+    await e.DB.exec(`INSERT INTO connections (id, scope_type, scope_id, name, kind, provider) VALUES ('c1', 'workspace', '${WS}', 'warehouse', 'platform', 'bigquery')`);
+    expect((await handleToggleWorkspaceSchedule(jsonReq({ enabled: true }), e, admin, WS, 'job1')).status).toBe(200);
   });
 });
 

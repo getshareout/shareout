@@ -12,7 +12,6 @@ import {
   runJobManually,
   getJobLogs,
   type CreateJobRequest,
-  type JobAction,
   type JobConfig,
 } from './jobs';
 import { aggregateDailyStats, cleanupOldEvents } from '../analytics';
@@ -38,6 +37,7 @@ import { runSummaryBackfill } from '../publish/summary-backfill';
 import { syncOfficialSkills, officialSkillsSynced } from '../official-skills/sync';
 import { runKnowledgeDistill, runKnowledgeConsolidate } from '../knowledge';
 import { simpleApiError } from '../http/api-error';
+import { JOB_ACTIONS, isJobAction } from './jobs/types';
 
 interface AuthenticatedUser {
   id: string;
@@ -65,8 +65,6 @@ function mapCreateJobConstraintError(err: unknown): string | null {
   return cleaned || 'Invalid job configuration';
 }
 
-const VALID_ACTIONS: JobAction[] = ['email', 'webhook', 'slack', 'discord', 'http_get', 'materialize', 'query_snapshot', 'sheets_append', 'artifact_test'];
-
 export async function handleCreateJob(request: Request, env: Env, user: AuthenticatedUser): Promise<Response> {
   let body: CreateJobRequest;
   try {
@@ -79,8 +77,8 @@ export async function handleCreateJob(request: Request, env: Env, user: Authenti
     return errorResponse('artifact_id required', 'INVALID_REQUEST', 400);
   }
 
-  if (!body.action || !VALID_ACTIONS.includes(body.action)) {
-    return errorResponse(`action must be one of: ${VALID_ACTIONS.join(', ')}`, 'INVALID_REQUEST', 400);
+  if (!isJobAction(body.action)) {
+    return errorResponse(`action must be one of: ${JOB_ACTIONS.join(', ')}`, 'INVALID_REQUEST', 400);
   }
 
   const triggerType = body.trigger_type || 'cron';
@@ -240,7 +238,7 @@ export async function handleScheduledEvent(env: Env, scheduledTime?: number): Pr
   const hour = now.getUTCHours();
   const minute = now.getUTCMinutes();
 
-  // Run user scheduled jobs every minute
+  // User scheduled jobs: once per cron tick (hourly — wrangler.toml `crons`).
   const jobResult = await runScheduledJobs(env);
 
   // Dispatch due crew cron triggers (Phase 1). Hourly granularity.

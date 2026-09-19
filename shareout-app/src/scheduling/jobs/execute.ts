@@ -12,6 +12,7 @@ import { getNextRunTime } from './cron';
 import { canManageJob } from './permissions';
 import { calculateBackoffDelay } from './retry';
 import { executeJobAction, recordJobSteps } from './runner';
+import { notifyJobFailed } from './notify';
 import type { DeliveryStep } from '../../delivery/types';
 import type { RetryConfig, RunJobResult, ScheduledJob } from './types';
 
@@ -38,6 +39,15 @@ export async function runScheduledJobs(env: Env): Promise<{ executed: number; fa
       testJobsDeferred++;
       continue;
     }
+    const nextRunAt = job.schedule ? getNextRunTime(job.schedule) : now + 86400;
+    // Claim-and-advance (mirrors crew claimTrigger): move next_run_at off the value
+    // we selected, conditioned on it being unchanged, so an overlapping tick that
+    // saw the same due row can't run the job a second time.
+    const claim = await env.DB.prepare(
+      'UPDATE scheduled_jobs SET next_run_at = ? WHERE id = ? AND next_run_at = ?',
+    ).bind(nextRunAt, job.id, job.next_run_at).run();
+    if (!claim.meta?.changes) continue;
+
     const config = JSON.parse(job.config as unknown as string);
     const startTime = Date.now();
     let result: { success: boolean; error?: string; disable?: boolean };
@@ -59,8 +69,6 @@ export async function runScheduledJobs(env: Env): Promise<{ executed: number; fa
       testJobsRun++;
       testBudgetMs += duration;
     }
-    const nextRunAt = job.schedule ? getNextRunTime(job.schedule) : now + 86400;
-
     let statusStmt;
     if (result.success) {
       statusStmt = env.DB.prepare(`
@@ -109,6 +117,9 @@ export async function runScheduledJobs(env: Env): Promise<{ executed: number; fa
       `).bind(logId, job.id, now, result.success ? 'success' : 'failed', duration, result.error || null),
     ]);
     await recordJobSteps(env, logId, job.id, result);
+    if (!result.success && job.last_status !== 'failed') {
+      await notifyJobFailed(env, job, result.error || 'Unknown error');
+    }
   }
 
   if (testJobsDeferred > 0) {
@@ -152,17 +163,24 @@ export async function executeJobNow(env: Env, job: ScheduledJob): Promise<RunJob
   const now = Math.floor(Date.now() / 1000);
 
   const logId = generateId('log');
-  await env.DB.prepare(`
-    INSERT INTO job_runs (id, job_id, created_at, status, duration_ms, error)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).bind(logId, job.id, now, result.success ? 'success' : 'failed', duration, result.error || null).run();
+  const status = result.success ? 'success' : 'failed';
+  // last_* mirror the cron path so the card reflects a manual run after reload;
+  // next_run_at and retry_count are the schedule's, so they stay untouched.
+  await env.DB.batch([
+    env.DB.prepare(`
+      INSERT INTO job_runs (id, job_id, created_at, status, duration_ms, error)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(logId, job.id, now, status, duration, result.error || null),
+    env.DB.prepare('UPDATE scheduled_jobs SET last_run_at = ?, last_status = ?, last_error = ? WHERE id = ?')
+      .bind(now, status, result.error || null, job.id),
+  ]);
   await recordJobSteps(env, logId, job.id, result);
 
   return {
     success: result.success,
     job_id: job.id,
     execution_id: logId,
-    status: result.success ? 'success' : 'failed',
+    status,
     error: result.error,
     duration_ms: duration,
   };

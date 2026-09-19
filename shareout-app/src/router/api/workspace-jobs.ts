@@ -1,7 +1,7 @@
 import type { Env, WorkspaceRole } from '../../types';
 import type { AuthUser } from '../../api-auth';
 import { getInternalWorkspaceRole } from '../../workspaces';
-import { executeJobNow, parseCronSchedule, getNextRunTime } from '../../scheduling/jobs';
+import { executeJobNow, parseCronSchedule, getNextRunTime, missingJobConnection } from '../../scheduling/jobs';
 import type { ScheduledJob } from '../../scheduling/jobs';
 import { getCrewById, listRuns } from '../../crew/store';
 import { dispatchCrewRun } from '../../crew/triggers';
@@ -130,6 +130,10 @@ export async function handleToggleWorkspaceSchedule(
     body = (await request.json()) as { enabled?: boolean; schedule?: string; title?: string | null; description?: string | null };
   } catch {
     return json({ error: 'Invalid JSON', code: 'INVALID_JSON' }, 400);
+  }
+  if (body.enabled === true) {
+    const connectionError = await missingJobConnection(env, job.artifact_id, JSON.parse(job.config as unknown as string));
+    if (connectionError) return json({ error: connectionError, code: 'CONNECTION_MISSING' }, 400);
   }
   // Cadence edit: validate the cron and recompute the next run (same rules as
   // /v1/jobs updateJob), authorized here by workspace admin instead of ownership.

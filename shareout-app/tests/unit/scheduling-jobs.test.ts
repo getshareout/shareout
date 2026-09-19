@@ -47,6 +47,9 @@ const enableInbound = vi.hoisted(() => vi.fn());
 const disableInbound = vi.hoisted(() => vi.fn());
 vi.mock('../../src/email/inbox-store', () => ({ enableInbound, disableInbound }));
 
+const notifyJobFailed = vi.hoisted(() => vi.fn());
+vi.mock('../../src/scheduling/jobs/notify', () => ({ notifyJobFailed }));
+
 import {
   createArtifactEmail,
   createJob,
@@ -63,12 +66,11 @@ import {
 
 type DbCall =
   | { method: 'first'; result: unknown }
-  | { method: 'run' }
+  | { method: 'run'; changes?: number }
   | { method: 'all'; results: unknown[] };
 
 function dbEnv(calls: DbCall[], overrides: Partial<Env> = {}): Env {
   let idx = 0;
-  const runSpy = vi.fn(async () => ({}));
 
   const db = {
     batch: vi.fn(async (stmts: unknown[]) => stmts.map(() => ({}))),
@@ -80,7 +82,7 @@ function dbEnv(calls: DbCall[], overrides: Partial<Env> = {}): Env {
         }
         return {
           first: vi.fn(async () => (call.method === 'first' ? call.result : null)),
-          run: runSpy,
+          run: vi.fn(async () => ({ meta: { changes: call.method === 'run' ? (call.changes ?? 1) : 0 } })),
           all: vi.fn(async () => ({
             results: call.method === 'all' ? call.results : [],
           })),
@@ -286,6 +288,7 @@ describe('createJob', () => {
     const env = dbEnv([
       { method: 'first', result: { id: artifactId } },
       { method: 'first', result: { count: 0 } },
+      { method: 'first', result: { found: 1 } },
       { method: 'run' },
       { method: 'run' },
       { method: 'first', result: { id: 'job_test1234567890ab', config: '{}' } },
@@ -679,6 +682,7 @@ describe('runScheduledJobs', () => {
   it('executes a successful email job and increments email count', async () => {
     const env = dbEnv([
       { method: 'all', results: [emailJobRow] },
+      { method: 'run' }, // claim
       { method: 'run' },
       { method: 'run' },
       { method: 'run' },
@@ -699,6 +703,7 @@ describe('runScheduledJobs', () => {
     checkEmailRateLimit.mockResolvedValueOnce({ allowed: false });
     const env = dbEnv([
       { method: 'all', results: [emailJobRow] },
+      { method: 'run' }, // claim
       { method: 'run' },
       { method: 'run' },
       { method: 'run' },
@@ -715,6 +720,7 @@ describe('runScheduledJobs', () => {
     sendArtifactEmail.mockResolvedValueOnce({ success: false, error: 'SMTP down' });
     const env = dbEnv([
       { method: 'all', results: [{ ...emailJobRow, retry_count: 0, max_attempts: 2 }] },
+      { method: 'run' }, // claim
       { method: 'run' },
       { method: 'run' },
       { method: 'run' },
@@ -728,6 +734,7 @@ describe('runScheduledJobs', () => {
     sendArtifactEmail.mockResolvedValueOnce({ success: false, error: 'SMTP down' });
     const env = dbEnv([
       { method: 'all', results: [{ ...emailJobRow, retry_count: 1 }] },
+      { method: 'run' }, // claim
       { method: 'run' },
       { method: 'run' },
       { method: 'run' },
@@ -741,6 +748,7 @@ describe('runScheduledJobs', () => {
     sendArtifactEmail.mockRejectedValueOnce(new Error('boom'));
     const env = dbEnv([
       { method: 'all', results: [emailJobRow] },
+      { method: 'run' }, // claim
       { method: 'run' },
       { method: 'run' },
       { method: 'run' },
@@ -755,6 +763,7 @@ describe('runScheduledJobs', () => {
 
     const env = dbEnv([
       { method: 'all', results: [webhookJobRow] },
+      { method: 'run' }, // claim
       { method: 'first', result: artifact },
       { method: 'run' },
       { method: 'run' },
@@ -795,8 +804,10 @@ describe('runScheduledJobs', () => {
     };
     const env = dbEnv([
       { method: 'all', results: [jobWithData] },
+      { method: 'run' }, // claim
       { method: 'first', result: artifact },
       { method: 'all', results: [{ key: 'kpi', value: '{"value":42}' }] },
+      { method: 'run' }, // claim
       { method: 'run' },
       { method: 'run' },
       { method: 'run' },
@@ -816,6 +827,7 @@ describe('runScheduledJobs', () => {
 
     const missingArtifact = dbEnv([
       { method: 'all', results: [webhookJobRow] },
+      { method: 'run' }, // claim
       { method: 'first', result: null },
       { method: 'run' },
       { method: 'run' },
@@ -825,6 +837,7 @@ describe('runScheduledJobs', () => {
 
     const badResponse = dbEnv([
       { method: 'all', results: [webhookJobRow] },
+      { method: 'run' }, // claim
       { method: 'first', result: artifact },
       { method: 'run' },
       { method: 'run' },
@@ -839,6 +852,7 @@ describe('runScheduledJobs', () => {
 
     const env = dbEnv([
       { method: 'all', results: [webhookJobRow] },
+      { method: 'run' }, // claim
       { method: 'first', result: artifact },
       { method: 'run' },
       { method: 'run' },
@@ -846,6 +860,94 @@ describe('runScheduledJobs', () => {
     ]);
 
     expect(await runScheduledJobs(env)).toEqual({ executed: 0, failed: 1 });
+  });
+});
+
+describe('runScheduledJobs claim + failure notice', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-30T09:05:00Z'));
+    getUserRole.mockResolvedValue('owner');
+    notifyJobFailed.mockReset();
+  });
+
+  it('skips a job another tick already claimed (no double fire)', async () => {
+    const env = dbEnv([
+      { method: 'all', results: [emailJobRow] },
+      { method: 'run', changes: 0 },
+    ]);
+    expect(await runScheduledJobs(env)).toEqual({ executed: 0, failed: 0 });
+    expect(sendArtifactEmail).not.toHaveBeenCalled();
+    expect(env.DB.prepare).toHaveBeenCalledWith('UPDATE scheduled_jobs SET next_run_at = ? WHERE id = ? AND next_run_at = ?');
+  });
+
+  it('notifies the owner once when a working job starts failing', async () => {
+    sendArtifactEmail.mockResolvedValue({ success: false, error: 'SMTP down' });
+    const run = (row: typeof emailJobRow) => runScheduledJobs(dbEnv([
+      { method: 'all', results: [row] },
+      { method: 'run' },
+      { method: 'run' },
+      { method: 'run' },
+      { method: 'run' },
+    ]));
+
+    await run({ ...emailJobRow, last_status: 'success' as never });
+    expect(notifyJobFailed).toHaveBeenCalledTimes(1);
+    expect(notifyJobFailed).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: emailJobRow.id }), 'SMTP down');
+
+    await run({ ...emailJobRow, last_status: 'failed' as never });
+    expect(notifyJobFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not notify on success', async () => {
+    await runScheduledJobs(dbEnv([
+      { method: 'all', results: [emailJobRow] },
+      { method: 'run' },
+      { method: 'run' },
+      { method: 'run' },
+      { method: 'run' },
+    ]));
+    expect(notifyJobFailed).not.toHaveBeenCalled();
+  });
+});
+
+describe('connection pre-flight', () => {
+  const snapshot = {
+    connection: 'warehouse',
+    queries: [{ query: 'select 1', target: { type: 'json', name: 'kpi' } }],
+  };
+
+  it('rejects creating a job whose connection does not exist', async () => {
+    getUserRole.mockResolvedValueOnce('owner');
+    const env = dbEnv([
+      { method: 'first', result: { id: artifactId } },
+      { method: 'first', result: { count: 0 } },
+      { method: 'first', result: null },
+    ]);
+    const result = await createJob(env, userId, {
+      artifact_id: artifactId, action: 'query_snapshot', schedule: '0 9 * * *', config: snapshot,
+    });
+    expect(result.error).toBe('Connection "warehouse" isn\'t set up in this workspace. Connect it under Connectors, then try again.');
+  });
+
+  it('rejects re-enabling a job whose connection was removed', async () => {
+    const row = { ...emailJobRow, action: 'query_snapshot', config: JSON.stringify(snapshot) };
+    const env = dbEnv([
+      { method: 'first', result: row },
+      { method: 'first', result: null },
+    ]);
+    expect((await updateJob(env, userId, row.id, { enabled: true })).error).toContain('Connection "warehouse"');
+  });
+
+  it('lets a job enable when its connection exists', async () => {
+    const row = { ...emailJobRow, action: 'query_snapshot', config: JSON.stringify(snapshot) };
+    const env = dbEnv([
+      { method: 'first', result: row },
+      { method: 'first', result: { found: 1 } },
+      { method: 'run' },
+      { method: 'first', result: { ...row, enabled: 1 } },
+    ]);
+    expect((await updateJob(env, userId, row.id, { enabled: true })).error).toBeUndefined();
   });
 });
 

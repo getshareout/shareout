@@ -92,7 +92,7 @@ describe('handleCreateJob', () => {
       env,
       user
     );
-    expect(await jsonBody(badAction)).toMatchObject({ error: 'action must be one of: email, webhook, slack, discord, http_get, materialize, query_snapshot, sheets_append, artifact_test' });
+    expect(await jsonBody(badAction)).toMatchObject({ error: 'action must be one of: email, webhook, slack, discord, http_get, materialize, telegram, query_snapshot, sheets_append, artifact_test, asset_delivery' });
 
     const missingSchedule = await handleCreateJob(
       new Request('https://x', {
@@ -178,6 +178,24 @@ describe('handleCreateJob', () => {
     );
     expect(ok.status).toBe(201);
     expect(await jsonBody(ok)).toEqual({ job });
+  });
+});
+
+describe('handleCreateJob action list', () => {
+  it('accepts every action the job model defines (telegram delivery was rejected before)', async () => {
+    const { JOB_ACTIONS } = await import('../../src/scheduling/jobs/types');
+    for (const action of JOB_ACTIONS) {
+      jobs.createJob.mockResolvedValueOnce({ job: { id: 'job_1' } });
+      const res = await handleCreateJob(
+        new Request('https://x', {
+          method: 'POST',
+          body: JSON.stringify({ artifact_id: 'art_1', action, schedule: '0 9 * * *', config: {} }),
+        }),
+        env,
+        user
+      );
+      expect(res.status, action).toBe(201);
+    }
   });
 });
 
