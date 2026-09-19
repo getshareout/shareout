@@ -8,6 +8,7 @@ import { handleServeGridJS, handleServeGridCSS } from '../grid-serve';
 import { handleServeArtifactUI } from '../ui-serve';
 import { isSupportedSdkMajor } from '../sdk-version';
 import { handleServeLibModule } from '../workspace-library';
+import { isCurrentBundleVersion } from '../bundle-versions';
 
 // Public, origin-independent SDK / static bundles. These resolve identically on the
 // app origin and on each per-artifact content host (<hex>.shareoutcdn.site), so
@@ -49,6 +50,12 @@ export function serveSharedBundle(
 ): Response | Promise<Response> | null {
   if (request.method !== 'GET') return null;
 
+  // `?v=<hash>` naming this deploy's bytes is immutable; any other request is the
+  // short-TTL alias. The edge-cache key keeps the two apart (different headers).
+  const v = new URL(request.url).searchParams.get('v');
+  const pinned = isCurrentBundleVersion(path, v);
+  const cacheKey = pinned ? `${path}?v=${v}` : path;
+
   // Versioned SDK paths (/sdk/v<major>/...) are immutable; the unversioned alias
   // (/sdk/...) floats to the current major for backward compat (ADR 29 / plan §9.4).
   const sdkMatch = path.match(
@@ -59,7 +66,7 @@ export function serveSharedBundle(
     if (major !== null && !isSupportedSdkMajor(major)) {
       return new Response('Unknown SDK version', { status: 404 });
     }
-    const immutable = major !== null;
+    const immutable = major !== null || pinned;
     switch (sdkMatch[2]) {
       case 'shareout.js': {
         // handleServeSDK 403s document/navigate requests. Run that guard BEFORE the
@@ -70,7 +77,7 @@ export function serveSharedBundle(
         if (secFetchDest === 'document' || secFetchMode === 'navigate') {
           return new Response('Forbidden', { status: 403 });
         }
-        return withEdgeCache(path, () => handleServeSDK(request, env, immutable), executionCtx);
+        return withEdgeCache(cacheKey, () => handleServeSDK(request, env, immutable), executionCtx);
       }
       case 'shareout-mobile.js':
         return withEdgeCache(path, () => handleServeMobileSDK(request, env, immutable), executionCtx);
@@ -95,11 +102,11 @@ export function serveSharedBundle(
     return withEdgeCache(path, () => handleServeLibModule(request, env, path).then(r => r ?? new Response('Not found', { status: 404 })), executionCtx);
 
   if (path === '/sdk/editor.js')
-    return withEdgeCache(path, () => handleServeEditor(request, env), executionCtx);
+    return withEdgeCache(cacheKey, () => handleServeEditor(request, env, pinned), executionCtx);
   if (path === '/sdk/comments-agent.js')
-    return withEdgeCache(path, () => handleServeCommentsAgent(request, env), executionCtx);
+    return withEdgeCache(cacheKey, () => handleServeCommentsAgent(request, env, pinned), executionCtx);
   if (path === '/sdk/chat-core.js')
-    return withEdgeCache(path, () => handleServeChatCore(request, env), executionCtx);
+    return withEdgeCache(cacheKey, () => handleServeChatCore(request, env, pinned), executionCtx);
   if (path === '/sdk/page-pilot.js')
     return withEdgeCache(path, () => handleServePagePilot(request, env), executionCtx);
 

@@ -15,7 +15,7 @@ import { canAddPublicArtifact } from '../quota';
 import { buildSubdomainUrl } from '../subdomain';
 import { getWorkspacePublishPolicy, hasApprovedPublish, getArtifactContentHash } from '../publish-approval';
 import { getInternalWorkspaceRole } from '../workspaces/roles';
-import { invalidateDeploymentCache } from '../serve/deployment-cache';
+import { invalidateDeploymentCache, invalidateDeploymentCacheById, routeCacheKeys } from '../serve/deployment-cache';
 import { removeArtifactVector } from '../search/semantic';
 import { getUserRole, requireRole } from './roles';
 import { json } from './json-response';
@@ -447,20 +447,7 @@ export async function handleUpdateArtifact(
   }
   if (hasPresentation) await setPresentation(env, artifactId, presentation);
 
-  if (env.SLUGS) {
-    const deployment = await env.DB.prepare(
-      'SELECT slug FROM deployments WHERE artifact_id = ? AND channel = ?'
-    ).bind(artifactId, 'production').first<{ slug: string }>();
-    if (deployment) {
-      await env.SLUGS.delete(`deploy:${deployment.slug}`).catch(() => {});
-      await env.SLUGS.delete(`art:${deployment.slug}`).catch(() => {});
-      // dataMiddleware caches under artv2: (migration 0080 shape). Bust it too so
-      // anon-access flag changes take effect immediately, not after the 5m TTL.
-      await env.SLUGS.delete(`artv2:${deployment.slug}`).catch(() => {});
-    }
-    await env.SLUGS.delete(`art:${artifactId}`).catch(() => {});
-    await env.SLUGS.delete(`artv2:${artifactId}`).catch(() => {});
-  }
+  await invalidateDeploymentCacheById(env, artifactId);
 
   emitJobEvent(env, artifactId, 'artifact.updated').catch(() => {});
 
@@ -780,6 +767,8 @@ export async function purgeArtifact(
   artifactId: string,
   slug: string
 ): Promise<void> {
+  // Read before the artifact row is deleted below.
+  const routeKeys = await routeCacheKeys(env, artifactId);
   const versions = await env.DB.prepare(
     'SELECT id FROM versions WHERE artifact_id = ?'
   ).bind(artifactId).all<{ id: string }>();
@@ -824,7 +813,5 @@ export async function purgeArtifact(
     await env.ARTIFACTS.delete(`thumbnails/${artifactId}_card.${ext}`).catch(() => {});
   }
 
-  if (env.SLUGS) {
-    await env.SLUGS.delete(`deploy:${slug}`).catch(() => {});
-  }
+  await invalidateDeploymentCache(env, slug, artifactId, routeKeys);
 }

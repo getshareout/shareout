@@ -426,7 +426,8 @@ async function routeArtifactServe(ctx: FetchContext): Promise<Response | null> {
     return routeEditorServe(ctx, slug, assetPath);
   }
 
-  return handleServe(request, env, slug, assetPath, { executionCtx: ctx.executionCtx });
+  const cached = ctx.deployment?.slug === slug ? ctx.deployment.record : undefined;
+  return handleServe(request, env, slug, assetPath, { executionCtx: ctx.executionCtx, cached });
 }
 
 async function routeEditorServe(

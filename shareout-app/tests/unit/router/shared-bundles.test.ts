@@ -27,6 +27,7 @@ vi.mock('../../../src/css-serve', () => ({ handleServeArtifactCSS: mocks.handleS
 vi.mock('../../../src/ui-serve', () => ({ handleServeArtifactUI: mocks.handleServeArtifactUI }));
 
 import { serveSharedBundle } from '../../../src/router/shared-bundles';
+import { versionedBundlePath } from '../../../src/bundle-versions';
 
 const env = {} as Env;
 const sentinel = (name: string) => new Response(name, { status: 200 });
@@ -181,5 +182,34 @@ describe('serveSharedBundle — edge cache (016 Stage A)', () => {
     const css = await serveSharedBundle(get('/sdk/shareout.css'), env, '/sdk/shareout.css');
     expect(await (css as Response).text()).toBe('handleServeArtifactCSS');
     expect(mocks.handleServeArtifactCSS).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('serveSharedBundle — content-hash pinned URLs', () => {
+  it('serves ?v=<current hash> immutable, and an old or missing hash as the short-TTL alias', async () => {
+    const pinned = versionedBundlePath('/sdk/comments-agent.js');
+    expect(pinned).toMatch(/^\/sdk\/comments-agent\.js\?v=[0-9a-f]{12}$/);
+
+    await serveSharedBundle(get(pinned), env, '/sdk/comments-agent.js');
+    await serveSharedBundle(get('/sdk/comments-agent.js?v=000000000000'), env, '/sdk/comments-agent.js');
+    await serveSharedBundle(get('/sdk/comments-agent.js'), env, '/sdk/comments-agent.js');
+
+    expect(mocks.handleServeCommentsAgent.mock.calls.map((c) => c[2])).toEqual([true, false]);
+  });
+
+  it('keeps pinned and alias responses under separate edge-cache keys', async () => {
+    const store = installFakeCache();
+    await serveSharedBundle(get(versionedBundlePath('/sdk/editor.js')), env, '/sdk/editor.js');
+    await serveSharedBundle(get('/sdk/editor.js'), env, '/sdk/editor.js');
+    expect(mocks.handleServeEditor).toHaveBeenCalledTimes(2);
+    expect([...store.keys()].sort()).toEqual([
+      'https://sdk-cache.internal/sdk/editor.js',
+      `https://sdk-cache.internal${versionedBundlePath('/sdk/editor.js')}`,
+    ]);
+  });
+
+  it('pins the floating SDK alias too', async () => {
+    await serveSharedBundle(get(versionedBundlePath('/sdk/shareout.js')), env, '/sdk/shareout.js');
+    expect(mocks.handleServeSDK).toHaveBeenCalledWith(expect.any(Request), env, true);
   });
 });

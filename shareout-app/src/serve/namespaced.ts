@@ -41,27 +41,17 @@ export async function handleServeNamespaced(
   return handleServe(request, env, result.deploy_slug, assetPath, { executionCtx });
 }
 
-async function verifyFolderPath(env: Env, artifactId: string, expectedPath: string): Promise<boolean> {
-  const artifact = await env.DB.prepare(
-    'SELECT folder_id, workspace_id FROM artifacts WHERE id = ?'
-  ).bind(artifactId).first<{ folder_id: string | null; workspace_id: string }>();
+// The artifact's folder ancestry, root first, in one query (was one query per level).
+export async function verifyFolderPath(env: Env, artifactId: string, expectedPath: string): Promise<boolean> {
+  const { results } = await env.DB.prepare(`
+    WITH RECURSIVE chain(slug, parent_id, depth) AS (
+      SELECT f.slug, f.parent_id, 0 FROM artifacts a JOIN folders f ON f.id = a.folder_id WHERE a.id = ?
+      UNION ALL
+      SELECT f.slug, f.parent_id, c.depth + 1 FROM folders f JOIN chain c ON f.id = c.parent_id
+       WHERE c.depth < 64
+    )
+    SELECT slug FROM chain ORDER BY depth DESC
+  `).bind(artifactId).all<{ slug: string }>();
 
-  if (!artifact) return false;
-  if (!artifact.folder_id && !expectedPath) return true;
-  if (!artifact.folder_id && expectedPath) return false;
-
-  const segments: string[] = [];
-  let currentId: string | null = artifact.folder_id;
-
-  while (currentId) {
-    const folder = await env.DB.prepare(
-      'SELECT slug, parent_id FROM folders WHERE id = ?'
-    ).bind(currentId).first<{ slug: string; parent_id: string | null }>();
-
-    if (!folder) break;
-    segments.unshift(folder.slug);
-    currentId = folder.parent_id;
-  }
-
-  return segments.join('/') === expectedPath;
+  return (results || []).map((f) => f.slug).join('/') === expectedPath;
 }

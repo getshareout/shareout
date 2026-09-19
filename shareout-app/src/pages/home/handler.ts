@@ -24,6 +24,7 @@ import { listIncomingAccessRequests } from '../../artifacts/access-requests';
 import { isFeatureEnabled } from '../../features/flags';
 import { isVisualEditorEnabled } from '../../editor/visual-editor-gate';
 import { CREATE_FEATURE } from '../create-gate';
+import { versionedBundlePath } from '../../bundle-versions';
 
 /** Head options for the streamed workspace home shell. */
 const HOME_HEAD: Omit<HtmlPageOptions, 'body' | 'scripts'> = {
@@ -192,7 +193,7 @@ async function buildHomeBody(
   // unread/search/announce). Loaded as a global before the inline hydration script;
   // the dock degrades to its inline fallback if it fails to load.
   return {
-    body: `<style>${WORKSPACE_STYLES}</style><script src="/sdk/chat-core.js"></script>${view.body}`,
+    body: `<style>${WORKSPACE_STYLES}</style><script src="${versionedBundlePath('/sdk/chat-core.js')}"></script>${view.body}`,
     scripts: view.scripts,
   };
 }

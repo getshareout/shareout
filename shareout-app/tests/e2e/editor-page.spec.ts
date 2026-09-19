@@ -15,7 +15,7 @@ test.describe('Editor page shell', () => {
     await expect(page.locator('#studio-rail')).toBeVisible();
     await expect(page.locator('#chat-input')).toBeVisible();
     await expect(page.locator('#btn-publish')).toBeVisible();
-    await expect(page.locator('script[type="module"][src="/sdk/editor.js"]')).toHaveCount(1);
+    await expect(page.locator('script[type="module"][src^="/sdk/editor.js"]')).toHaveCount(1);
     await expect(page.locator('script')).toHaveCount(5);
   });
 

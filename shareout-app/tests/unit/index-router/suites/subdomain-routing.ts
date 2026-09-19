@@ -86,17 +86,20 @@ describe('index router — subdomain routing', () => {
 
   it('serves subdomain artifact paths via handleSubdomainServe', async () => {
     const env = createEnv((sql) => {
+      if (sql.includes('deploy_slug') && sql.includes('d.channel')) {
+        return { deploy_slug: 'deploy-slug', version_id: 'ver_1', entrypoint: 'index.html', has_mobile: 0 };
+      }
       if (sql.includes('FROM workspaces WHERE slug')) {
         return { id: 'ws_1', name: 'Acme', description: null };
       }
-      if (sql.includes('JOIN deployments')) {
-        return { deploy_slug: 'deploy-slug' };
-      }
       return null;
     });
-    const response = await fetchPath('/my-app/index.html', undefined, SUB, env);
+    const response = await fetchPath('/my-app/', undefined, SUB, env);
     expect(await handlerTag(response)).toBe('handleServe');
-    expect(handlers.handleServe).toHaveBeenCalled();
+    // The shorthand's resolved record rides into handleServe (no second `deploy:` read).
+    const [, , slug, , opts] = handlers.handleServe.mock.calls.at(-1)!;
+    expect(slug).toBe('deploy-slug');
+    expect(opts).toMatchObject({ cached: { version_id: 'ver_1', entrypoint: 'index.html' } });
   });
 
   it('falls back to namespaced serve when deploy slug missing', async () => {

@@ -103,9 +103,9 @@ export async function handleFetch(request: Request, env: Env, executionCtx?: Exe
 
   const subCtx = parseSubdomainFromEnv(ctx.hostname, env);
   if (subCtx.isSubdomain && subCtx.workspaceSlug) {
-    const route = await resolveSubdomainRoute(ctx.request, env, subCtx.workspaceSlug, ctx.path);
+    const route = await resolveSubdomainRoute(ctx.request, env, subCtx.workspaceSlug, ctx.path, executionCtx);
     if (route.response) return route.response;
-    if (route.rewritePath) ctx = rewriteContextPath(ctx, route.rewritePath);
+    if (route.rewritePath) ctx = { ...rewriteContextPath(ctx, route.rewritePath), deployment: route.deployment };
     // Otherwise fall through to the shared pipeline unchanged.
   }
 

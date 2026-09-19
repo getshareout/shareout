@@ -12,6 +12,7 @@ execSync('npm run build:chat-core', { stdio: 'inherit' });
 execSync('npm run build:sdk', { stdio: 'inherit' });
 execSync('npm run build:mobile', { stdio: 'inherit' });
 execSync('npm run build:skill', { stdio: 'inherit' });
+execSync('node scripts/stage-comments-agent.mjs && node scripts/stage-bundle-versions.mjs', { stdio: 'inherit' });
 
 try {
   execSync('git diff --exit-code -- public/_bundles/', { stdio: 'inherit' });

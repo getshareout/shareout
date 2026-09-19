@@ -5,6 +5,7 @@ import type { Env } from '../types';
 import type { AuthUser } from '../api-auth';
 import { requireRole } from './roles';
 import { json } from './json-response';
+import { invalidateDeploymentCache } from '../serve/deployment-cache';
 
 export async function handleGetVersions(
   request: Request,
@@ -88,9 +89,7 @@ export async function handleRollback(
     return json({ error: 'No production deployment to roll back', code: 'NOT_DEPLOYED' }, 409);
   }
 
-  if (env.SLUGS) {
-    await env.SLUGS.delete(`deploy:${artifact.slug}`).catch(() => {});
-  }
+  await invalidateDeploymentCache(env, artifact.slug, artifactId);
 
   return json({
     success: true,

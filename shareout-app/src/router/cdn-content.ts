@@ -3,6 +3,7 @@ import { handleServe } from '../serve';
 import { getCdnRegistrable, getPlatformOrigin } from '../config/origins';
 import { CDN_REGISTRABLE } from '../serve/security';
 import { serveSharedBundle } from './shared-bundles';
+import { contentRouteKey, resolveRoutedDeployment } from '../serve/deployment-cache';
 
 // Subdomains that must never resolve to an artifact even though they are valid
 // labels. (Hex-only validation already excludes these, but keep the guard explicit.)
@@ -21,24 +22,6 @@ export function parseCdnLabel(hostname: string, cdnRegistrable: string = CDN_REG
   if (RESERVED_LABELS.has(label)) return null;
   if (!/^[0-9a-f]{16,64}$/.test(label)) return null;
   return label;
-}
-
-async function resolveProductionSlug(env: Env, artifactId: string): Promise<string | null> {
-  const cacheKey = `cdnslug:${artifactId}`;
-  if (env.SLUGS) {
-    try {
-      const cached = await env.SLUGS.get(cacheKey);
-      if (cached) return cached;
-    } catch {}
-  }
-  const row = await env.DB.prepare(
-    "SELECT slug FROM deployments WHERE artifact_id = ? AND channel = 'production'",
-  ).bind(artifactId).first<{ slug: string }>();
-  if (!row?.slug) return null;
-  if (env.SLUGS) {
-    try { await env.SLUGS.put(cacheKey, row.slug, { expirationTtl: 300 }); } catch {}
-  }
-  return row.slug;
 }
 
 const notFound = () => new Response('Not Found', { status: 404 });
@@ -77,8 +60,10 @@ export async function handleCdnContent(request: Request, env: Env, executionCtx?
   }
 
   const artifactId = `art_${label}`;
-  const slug = await resolveProductionSlug(env, artifactId);
-  if (!slug) return notFound();
+  const deployment = await resolveRoutedDeployment(
+    env, contentRouteKey(artifactId), 'd.artifact_id = ?', [artifactId], executionCtx,
+  );
+  if (!deployment) return notFound();
 
   // Optional private capability prefix: /c/<ct>/<assetPath>. The token rides in the
   // path so the artifact's relative subresource requests inherit it without cookies.
@@ -96,7 +81,9 @@ export async function handleCdnContent(request: Request, env: Env, executionCtx?
   rawUrl.searchParams.set('_raw', '');
   const rawReq = new Request(rawUrl.toString(), request);
 
-  const resp = await handleServe(rawReq, env, slug, path, { contentOrigin: true, ct });
+  const resp = await handleServe(rawReq, env, deployment.slug, path, {
+    contentOrigin: true, ct, executionCtx, cached: deployment.record,
+  });
 
   // No cookies belong on the content domain — strip any the serve path may set (the
   // session cookie must never ride onto this origin).

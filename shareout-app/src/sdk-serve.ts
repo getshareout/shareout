@@ -10,7 +10,7 @@ const COMMENTS_AGENT_ASSET = '/_bundles/shareout-comments-agent.js';
 const CHAT_CORE_ASSET = '/_bundles/chat-core.js';
 const PAGE_PILOT_ASSET = '/_bundles/page-pilot.js';
 
-export async function handleServeCommentsAgent(request: Request, env: Env): Promise<Response> {
+export async function handleServeCommentsAgent(request: Request, env: Env, immutable = false): Promise<Response> {
   const asset = await env.ASSETS.fetch(new URL(COMMENTS_AGENT_ASSET, request.url));
   if (!asset.ok) {
     return new Response('Comments agent bundle not found', { status: 404 });
@@ -18,7 +18,7 @@ export async function handleServeCommentsAgent(request: Request, env: Env): Prom
   return new Response(asset.body, {
     headers: {
       'Content-Type': 'application/javascript',
-      'Cache-Control': 'public, max-age=300, must-revalidate',
+      'Cache-Control': immutable ? SDK_IMMUTABLE_CACHE : 'public, max-age=300, must-revalidate',
       'Access-Control-Allow-Origin': '*',
     },
   });
@@ -26,7 +26,7 @@ export async function handleServeCommentsAgent(request: Request, env: Env): Prom
 
 // Shared chat primitives (SSE loop, message view, composer) used by the home and
 // create chats. Built from chat-core/ and staged at public/_bundles/chat-core.js.
-export async function handleServeChatCore(request: Request, env: Env): Promise<Response> {
+export async function handleServeChatCore(request: Request, env: Env, immutable = false): Promise<Response> {
   const asset = await env.ASSETS.fetch(new URL(CHAT_CORE_ASSET, request.url));
   if (!asset.ok) {
     return new Response('Chat core bundle not found', { status: 404 });
@@ -34,7 +34,7 @@ export async function handleServeChatCore(request: Request, env: Env): Promise<R
   return new Response(asset.body, {
     headers: {
       'Content-Type': 'application/javascript',
-      'Cache-Control': 'public, max-age=300, must-revalidate',
+      'Cache-Control': immutable ? SDK_IMMUTABLE_CACHE : 'public, max-age=300, must-revalidate',
       'Access-Control-Allow-Origin': '*',
     },
   });
