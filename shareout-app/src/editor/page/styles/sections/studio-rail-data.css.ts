@@ -258,6 +258,8 @@ export const studioRailDataCss = `
 
 .chat-message-actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   margin-top: 8px;
 }
@@ -288,6 +290,11 @@ export const studioRailDataCss = `
 .chat-action-rejected {
   color: var(--text-secondary);
   background: var(--bg-hover);
+}
+
+.chat-action-warning {
+  color: var(--warning);
+  background: var(--warning-soft);
 }
 
 @keyframes fadeIn {

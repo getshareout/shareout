@@ -58,6 +58,25 @@ export const topbarCss = `
   gap: 6px;
 }
 
+.collab-connection-status {
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  transition: opacity var(--duration-fast), background var(--duration-fast), color var(--duration-fast);
+}
+
+.collab-connection-status[data-state="reconnecting"] {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.collab-connection-status[data-state="offline"] {
+  color: var(--error);
+  background: var(--error-soft);
+}
+
 .toolbar-btn {
   width: 36px;
   height: 36px;

@@ -286,87 +286,36 @@ export function bootEditor(): void {
       log.error('init: fetch error', err);
     }
 
-    try {
-      log.debug('init step: renderCanvas');
-      renderCanvas(ctx.state, ctx.dom);
-    } catch (err) {
-      log.error('renderCanvas failed', err);
-      throw err;
-    }
+    const warned = new Set<string>();
+    const runInitStep = (name: string, fn: () => void) => {
+      try {
+        log.debug(`init step: ${name}`);
+        fn();
+      } catch (err) {
+        log.error(`${name} failed`, err);
+        if (!warned.has(name)) {
+          warned.add(name);
+          showToast(`${name} unavailable — continuing with limited features`, 'warning');
+        }
+      }
+    };
 
-    try {
-      log.debug('init step: renderCollaborators');
-      renderCollaborators(ctx);
-    } catch (err) {
-      log.error('renderCollaborators failed', err);
-      throw err;
-    }
-
-    try {
-      log.debug('init step: initPalette');
-      initPalette(ctx);
-    } catch (err) {
-      log.error('initPalette failed', err);
-      throw err;
-    }
-
-    try {
-      log.debug('init step: bindCanvasEvents');
-      ctx.bindCanvasEvents();
-    } catch (err) {
-      log.error('bindCanvasEvents failed', err);
-      throw err;
-    }
-
-    try {
-      log.debug('init step: setupToolbarEvents');
+    runInitStep('Canvas', () => renderCanvas(ctx.state, ctx.dom));
+    runInitStep('Collaborators', () => renderCollaborators(ctx));
+    runInitStep('Palette', () => initPalette(ctx));
+    runInitStep('Canvas events', () => ctx.bindCanvasEvents());
+    runInitStep('Toolbar', () => {
       setupToolbarEvents(ctx);
       document.querySelector('.toolbar-btn[data-tool="select"]')?.classList.add('active');
-    } catch (err) {
-      log.error('setupToolbarEvents failed', err);
-      throw err;
-    }
-
-    try {
-      log.debug('init step: setupChatEvents');
-      setupChatEvents(ctx);
-    } catch (err) {
-      log.error('setupChatEvents failed', err);
-      throw err;
-    }
-
-    try {
-      log.debug('init step: setupStudioRail');
-      setupStudioRail(ctx);
-    } catch (err) {
-      log.error('setupStudioRail failed', err);
-      throw err;
-    }
-
-    try {
-      log.debug('init step: setupFormatToolbar');
+    });
+    runInitStep('AI agent', () => setupChatEvents(ctx));
+    runInitStep('Studio rail', () => setupStudioRail(ctx));
+    runInitStep('Formatting', () => {
       setupFormatToolbar(ctx);
       setupTopbarAutohide(ctx);
-    } catch (err) {
-      log.error('setupFormatToolbar failed', err);
-      throw err;
-    }
-
-    try {
-      log.debug('init step: setupKeyboardShortcuts');
-      setupKeyboardShortcuts(ctx);
-    } catch (err) {
-      log.error('setupKeyboardShortcuts failed', err);
-      throw err;
-    }
-
-    try {
-      log.debug('init step: connectWebSocket');
-      connectWebSocket(ctx);
-    } catch (err) {
-      log.error('connectWebSocket failed', err);
-      throw err;
-    }
+    });
+    runInitStep('Keyboard shortcuts', () => setupKeyboardShortcuts(ctx));
+    runInitStep('Live collaboration', () => connectWebSocket(ctx));
 
     cleanupDraftLifecycle = setupDraftLifecycle(ctx);
 

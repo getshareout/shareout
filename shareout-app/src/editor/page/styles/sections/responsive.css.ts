@@ -22,6 +22,12 @@ export const responsiveCss = `
     gap: 6px;
   }
 
+  .collab-connection-status {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .artifact-name {
     max-width: 100px;
     font-size: 13px;
@@ -85,6 +91,10 @@ export const responsiveCss = `
 
   .topbar-center {
     gap: 4px;
+  }
+
+  .collab-connection-status {
+    max-width: 120px;
   }
 
   .topbar-right .so-c-btn span {

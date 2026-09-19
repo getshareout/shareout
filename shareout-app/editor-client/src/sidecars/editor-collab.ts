@@ -21,6 +21,14 @@ interface SoftLock {
   expiresAt: number;
 }
 
+type ConnectionState = 'connected' | 'reconnecting' | 'offline';
+
+interface ConnectionStatus {
+  state: ConnectionState;
+  attempt?: number;
+  delayMs?: number;
+}
+
 export class EditorCollab {
   artifactId: string;
   userId: string;
@@ -32,13 +40,16 @@ export class EditorCollab {
   softLocks = new Map<string, SoftLock>();
   userColor: string | null = null;
   reconnectAttempts = 0;
-  maxReconnectAttempts = 5;
   reconnectDelay = 1000;
+  maxReconnectDelay = 30000;
+  reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  shouldReconnect = true;
   handlers: Record<string, CollabHandler> = {
     onPresenceUpdate: () => {},
     onCursorUpdate: () => {},
     onSelectionUpdate: () => {},
     onLockUpdate: () => {},
+    onConnectionStatus: () => {},
   };
 
   constructor(artifactId: string, userId: string, userName: string, userAvatar?: string) {
@@ -59,13 +70,28 @@ export class EditorCollab {
   }
 
   connect(): void {
+    this.shouldReconnect = true;
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${location.host}/v1/artifacts/${this.artifactId}/editor/ws`;
-    this.ws = new WebSocket(wsUrl);
+    try {
+      this.ws = new WebSocket(wsUrl);
+    } catch {
+      this.scheduleReconnect();
+      return;
+    }
     this.ws.binaryType = 'arraybuffer';
 
     this.ws.onopen = () => {
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
       this.reconnectAttempts = 0;
+      this.handlers.onConnectionStatus({ state: 'connected' } as ConnectionStatus);
       this.sendAwareness({
         userId: this.userId,
         userName: this.userName,
@@ -78,7 +104,10 @@ export class EditorCollab {
     };
 
     this.ws.onmessage = (event) => this.handleSocketData(event.data);
-    this.ws.onclose = () => this.scheduleReconnect();
+    this.ws.onclose = () => {
+      this.ws = null;
+      this.scheduleReconnect();
+    };
     this.ws.onerror = () => {};
   }
 
@@ -113,10 +142,22 @@ export class EditorCollab {
   }
 
   scheduleReconnect(): void {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
+    if (!this.shouldReconnect) return;
+
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
     this.reconnectAttempts++;
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-    setTimeout(() => this.connect(), delay);
+    const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), this.maxReconnectDelay);
+    const state: ConnectionState = this.reconnectAttempts >= 3 ? 'offline' : 'reconnecting';
+    this.handlers.onConnectionStatus({
+      state,
+      attempt: this.reconnectAttempts,
+      delayMs: delay,
+    } as ConnectionStatus);
+    this.reconnectTimer = setTimeout(() => this.connect(), delay);
   }
 
   handleMessage(data: string): void {
@@ -276,6 +317,11 @@ export class EditorCollab {
   }
 
   disconnect(): void {
+    this.shouldReconnect = false;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.ws) {
       this.ws.close();
       this.ws = null;
