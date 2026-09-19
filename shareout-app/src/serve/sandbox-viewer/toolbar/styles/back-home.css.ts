@@ -26,7 +26,7 @@ export const backHomeStyles = `    #so-back-zone {
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border: 1px solid rgba(231, 229, 228, 0.6);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
+      box-shadow: var(--shadow-lg);
       color: var(--color-text);
       text-decoration: none;
       font: 500 14px 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;

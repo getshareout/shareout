@@ -31,7 +31,7 @@ export const commentsOverlayStyles = `    #so-comments-overlay {
       background: rgba(255, 255, 255, 0.94);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      box-shadow: -8px 0 40px rgba(0,0,0,0.12);
+      box-shadow: var(--shadow-xl);
       border-left: 1px solid rgba(231, 229, 228, 0.6);
       animation: soSlideIn 0.25s ease-out;
     }
@@ -144,6 +144,22 @@ export const commentsOverlayStyles = `    #so-comments-overlay {
       color: var(--color-text-tertiary);
     }
     .so-cmt-typing.show { display: block; }
+    .so-cmt-conn {
+      display: none;
+      margin: 0 24px 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--color-surface);
+      color: var(--color-text-tertiary);
+      font-size: 12px;
+      font-weight: 600;
+      align-self: flex-start;
+    }
+    .so-cmt-conn.show { display: inline-flex; }
+    .so-cmt-conn.is-error {
+      background: var(--color-error-light);
+      color: var(--color-error);
+    }
     @keyframes soCmtFlash {
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.18); }
@@ -231,7 +247,7 @@ export const commentsOverlayStyles = `    #so-comments-overlay {
       background: var(--color-bg-elevated);
       outline: none;
     }
-    .so-cmt-textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+    .so-cmt-textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-light); }
     .so-cmt-composer-actions {
       display: flex;
       align-items: center;
@@ -271,7 +287,7 @@ export const commentsOverlayStyles = `    #so-comments-overlay {
       background: var(--color-bg-elevated);
       border: 1px solid var(--color-border);
       border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      box-shadow: var(--shadow-xl);
       max-height: 200px;
       overflow-y: auto;
       display: none;
@@ -305,7 +321,7 @@ export const commentsOverlayStyles = `    #so-comments-overlay {
       background: var(--color-primary);
       color: var(--color-text-inverse);
       border: 2px solid var(--color-bg-elevated);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      box-shadow: var(--shadow-md);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -339,7 +355,7 @@ export const commentsOverlayStyles = `    #so-comments-overlay {
     .so-cmt-assignee { font-size: 12px; color: var(--color-text-secondary); margin-top: 6px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .so-cmt-due { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--color-surface); color: var(--color-text-secondary); border: 1px solid var(--color-border); }
     .so-cmt-due.overdue { background: var(--color-error-light); color: var(--color-error); border-color: var(--color-error); }
-    .so-cmt-assign-picker { position: absolute; right: 24px; z-index: 10; min-width: 220px; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); display: none; padding: 8px 0; }
+    .so-cmt-assign-picker { position: absolute; right: 24px; z-index: 10; min-width: 220px; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: 12px; box-shadow: var(--shadow-xl); display: none; padding: 8px 0; }
     .so-cmt-assign-picker.open { display: block; }
     .so-cmt-assign-list { max-height: 180px; overflow-y: auto; }
     .so-cmt-assign-item { display: flex; align-items: center; gap: 8px; padding: 8px 14px; cursor: pointer; font-size: 13px; color: var(--color-text); }
@@ -349,6 +365,32 @@ export const commentsOverlayStyles = `    #so-comments-overlay {
     .so-cmt-assign-due { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-top: 1px solid var(--color-border); font-size: 13px; }
     .so-cmt-assign-due label { display: flex; align-items: center; gap: 6px; flex: 1; color: var(--color-text-secondary); }
     .so-cmt-assign-due input[type=date] { border: 1px solid var(--color-border); border-radius: 6px; padding: 3px 6px; font-size: 12px; background: var(--color-bg-elevated); color: var(--color-text); }
+    .so-cmt-toast {
+      position: absolute;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%) translateY(8px);
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: var(--color-text);
+      color: var(--color-text-inverse);
+      box-shadow: var(--shadow-lg);
+      font-size: 12px;
+      font-weight: 600;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .12s ease, transform .12s ease;
+    }
+    .so-cmt-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .so-cmt-toast.is-error {
+      background: var(--color-error);
+    }
+    .so-cmt-toast.is-success {
+      background: var(--color-success);
+    }
     @keyframes soCmtHighlight { 0%,100% { box-shadow: none; } 30% { box-shadow: 0 0 0 3px var(--color-primary); } }
     .so-cmt-card.so-cmt-highlight { animation: soCmtHighlight 1.8s ease; }
 
