@@ -255,8 +255,8 @@ export function parseEditSuggestions(content: string): EditSuggestion[] {
     const lines = diffContent.split('\n');
 
     let currentFile: string | null = null;
-    let searchLines: string[] = [];
-    let replaceLines: string[] = [];
+    const searchLines: string[] = [];
+    const replaceLines: string[] = [];
 
     for (const line of lines) {
       // Check for file header

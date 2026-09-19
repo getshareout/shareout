@@ -404,7 +404,7 @@ export function getPresentationEditorScript(): string {
               });
 
               showSlide(currentIndex);
-            <\/script>
+            </script>
           </body>
           </html>
         \`);

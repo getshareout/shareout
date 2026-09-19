@@ -18,7 +18,7 @@ const MAX_BLOBS_PER_ARTIFACT = 1000;
 const BUCKET_FILE_SIZE = 500_000_000; // 500MB per file
 const BUCKET_STORAGE = 10_000_000_000; // 10GB per bucket
 const BUCKET_BLOBS = 10_000;
-const FILENAME_PATTERN = /^[a-zA-Z0-9_\-\.\s\(\)\[\]]+$/;
+const FILENAME_PATTERN = /^[a-zA-Z0-9_\-.()[\] ]+$/;
 const MAX_FILENAME_LENGTH = 255;
 
 const ALLOWED_MIME_PREFIXES = ['image/', 'video/', 'audio/'];

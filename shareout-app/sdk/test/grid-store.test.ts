@@ -41,7 +41,7 @@ describe('inferColumns', () => {
 
 function fakeTable(rows: Array<{ id: string; [k: string]: unknown }>) {
   const calls: Record<string, unknown[]> = { updateById: [], insert: [], deleteById: [] };
-  let lastQuery = { skip: 0, limit: 0 };
+  const lastQuery = { skip: 0, limit: 0 };
   const query = {
     skip(n: number) { lastQuery.skip = n; return query; },
     limit(n: number) { lastQuery.limit = n; return query; },

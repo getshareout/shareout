@@ -92,12 +92,13 @@ export async function handleEditor(
       }
       break;
 
-    case 'chat':
+    case 'chat': {
       // AI Chat routes: /editor/chat/{mode}
       const chatPath = parts.slice(1).join('/');
       return handleEditorChat(request, ctx, chatPath);
+    }
 
-    case 'sdk':
+    case 'sdk': {
       // SDK Editor routes: /editor/sdk/{type}/{action}
       const sdkPath = parts.slice(1).join('/');
       const sdkType = parts[1];
@@ -113,6 +114,7 @@ export async function handleEditor(
           name: componentName,
         },
       }, sdkPath);
+    }
 
     case 'source':
       // Source editor (markdown / txt / json / csv): /editor/source/{subAction}

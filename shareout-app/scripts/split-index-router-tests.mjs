@@ -64,7 +64,7 @@ export type HandlerMocks = ReturnType<typeof createHandlerMocks>;
 
 export function createHandlerMocks() {
   return {
-${lines.slice(17, 107).join('\n').replace(/^  handlers = vi\.hoisted\(\(\) => \(\{/, '').replace(/\}\)\);$/, '')}
+${lines.slice(17, 107).join('\n').replace(/^ {2}handlers = vi\.hoisted\(\(\) => \(\{/, '').replace(/\}\)\);$/, '')}
   };
 }
 `;

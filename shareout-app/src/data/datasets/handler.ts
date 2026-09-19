@@ -16,7 +16,7 @@ import { checkStorageQuota, storageQuotaError } from '../../storage-quota';
 const MAX_DATASET_SIZE = 500_000_000; // 500MB — presigned PUT goes direct to R2; the
 // Worker-proxied fallback streams the body (never buffers it), so neither path materializes
 // the whole file in the isolate. Storage is metered + billed per workspace (storage rollup).
-const NAME_PATTERN = /^[a-zA-Z0-9_\-\.]+$/;
+const NAME_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 const ALLOWED_FORMATS = ['json', 'csv'] as const;
 type DatasetFormat = (typeof ALLOWED_FORMATS)[number];
 

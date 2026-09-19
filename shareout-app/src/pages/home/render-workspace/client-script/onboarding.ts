@@ -30,11 +30,11 @@ export const workspace_client_onboarding_JS = `  // ===== onboarding checklist =
   function onbDispatch(action) {
     if (!action) return;
     if (action.kind === 'ask') { if (typeof agentAsk === 'function') agentAsk(t(action.seedKey), true); }
-    else if (action.kind === 'nav') { var b = ws.querySelector('[data-lens=\"' + action.target + '\"]'); if (b) b.click(); }
+    else if (action.kind === 'nav') { var b = ws.querySelector('[data-lens="' + action.target + '"]'); if (b) b.click(); }
     else if (action.kind === 'page') { window.open(action.url, '_blank', 'noopener'); }
     else if (action.kind === 'skill') {
       fetch(ONB_API + '/skill-ack' + onbQs(), { method: 'POST', credentials: 'same-origin' }).then(function () { refreshOnb(false); }).catch(function () {});
-      var lb = ws.querySelector('[data-lens=\"library\"]'); if (lb) lb.click();
+      var lb = ws.querySelector('[data-lens="library"]'); if (lb) lb.click();
     }
   }
 

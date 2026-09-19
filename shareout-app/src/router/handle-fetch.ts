@@ -16,6 +16,7 @@ import { routeInternalAdmin } from './internal-admin';
 import { routeEmail } from '../email/routes';
 import { renderNotFoundPage } from '../pages/not-found';
 import { blockDisabledMarketingPages } from '../marketing-us-gate';
+import { asGetForHead, stripBodyForHead, wrongMethodOnKnownPath } from './method-policy';
 
 // HTML document navigations get the styled 404 page; API/data/asset requests keep
 // the lightweight plain-text body so non-browser clients aren't handed markup.
@@ -87,7 +88,8 @@ function isReservedProductPath(path: string): boolean {
 }
 
 export async function handleFetch(request: Request, env: Env, executionCtx?: ExecutionContext): Promise<Response> {
-  let ctx = createFetchContext(request, env, executionCtx);
+  const effectiveRequest = asGetForHead(request);
+  let ctx = createFetchContext(effectiveRequest, env, executionCtx);
 
   if (env.DOCS_HOST && env.DOCS_ORIGIN && ctx.hostname === env.DOCS_HOST) {
     return proxyDocs(ctx.request, env.DOCS_ORIGIN);
@@ -160,7 +162,7 @@ export async function handleFetch(request: Request, env: Env, executionCtx?: Exe
     return handleCORS(req, env);
   }
 
-  return (
+  const response =
     (await routeAuth(ctx)) ??
     (await routeApi(ctx)) ??
     (await routeServe(ctx)) ??
@@ -175,6 +177,8 @@ export async function handleFetch(request: Request, env: Env, executionCtx?: Exe
               ? Response.redirect(new URL('/auth/login', ctx.url.origin).toString(), 302)
               : null))
       : null) ??
-    notFound(req, path)
-  );
+    wrongMethodOnKnownPath(ctx) ??
+    notFound(req, path);
+
+  return stripBodyForHead(request, response);
 }

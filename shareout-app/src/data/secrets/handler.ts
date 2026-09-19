@@ -13,7 +13,7 @@ import { encryptCredentials, decryptCredentials } from '../connections/credentia
 import { isBlockedDestination, validateAllowedHost } from './blocklist';
 import { matchesAllowedPath, validatePathPatterns } from './path-matcher';
 
-const NAME_PATTERN = /^[a-zA-Z0-9_\-]+$/;
+const NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const INJECTION_TYPES = ['bearer', 'basic', 'header', 'query'] as const;
 type InjectionType = (typeof INJECTION_TYPES)[number];
 

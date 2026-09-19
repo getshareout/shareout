@@ -10,7 +10,7 @@ export async function handleServeText(
   slug: string
 ): Promise<Response> {
   // Try KV cache first for deployment info
-  let cached = await getCachedDeployment(env, slug);
+  const cached = await getCachedDeployment(env, slug);
   let result: ArtifactInfo & { r2_key: string | null; mime: string | null } | null = null;
 
   if (cached) {

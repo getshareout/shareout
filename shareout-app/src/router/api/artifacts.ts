@@ -63,6 +63,7 @@ import { askWorkspace } from '../../search/ask-workspace';
 import { presentArtifact } from '../../present/present-artifact';
 import { handleExportArtifact } from '../../artifacts/export';
 import { setPresentation } from '../../artifacts/satellites';
+import { createLogger } from '../../logging';
 
 export async function routeArtifactApi(ctx: FetchContext): Promise<Response | null> {
   const { request, env, path, url, addCORS } = ctx;
@@ -634,8 +635,12 @@ async function handleArtifactPresence(ctx: FetchContext, artifactId: string): Pr
     const stub = env.PRESENCE.get(env.PRESENCE.idFromName(artifactId));
     const res = await stub.fetch('https://presence/count');
     if (res.ok) count = ((await res.json()) as { count?: number }).count || 0;
-  } catch {
+  } catch (err) {
     // DO unreachable — report zero rather than failing the panel.
+    createLogger(env, { scope: 'presence' }).warn('presence count unavailable', {
+      artifact_id: artifactId,
+      err,
+    });
   }
   return jsonResponse({ count });
 }

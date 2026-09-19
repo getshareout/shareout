@@ -3,7 +3,7 @@ export function loadEditorClass<T>(
   script: string,
   globalName: string,
 ): new (...args: unknown[]) => T {
-  // eslint-disable-next-line no-eval
+   
   eval(script);
   const ctor = (globalThis as Record<string, unknown>)[globalName];
   if (typeof ctor !== 'function') {

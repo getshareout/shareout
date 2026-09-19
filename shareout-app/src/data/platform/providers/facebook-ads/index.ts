@@ -147,7 +147,7 @@ class FacebookAdsProvider extends BaseProvider {
 			};
 		}
 
-		let resolvedPath = endpoint.path.replace('{accountId}', encodeURIComponent(accountId));
+		const resolvedPath = endpoint.path.replace('{accountId}', encodeURIComponent(accountId));
 		let url = `${FACEBOOK_ADS_API_BASE}${resolvedPath}`;
 		if (params.queryParams) {
 			const qs = new URLSearchParams();
