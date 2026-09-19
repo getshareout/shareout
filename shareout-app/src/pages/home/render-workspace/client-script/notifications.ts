@@ -34,16 +34,22 @@ export const workspace_client_notifications_JS = `
     }
 
     function needCard(e, isSeen) {
+      var isAccess = e.kind === 'access';
       var top = e.actor ? esc(e.actor) : esc(e.artifact_name || t('notif.activity'));
       var sum = e.actor ? (esc(e.summary) + ' \\u00B7 ' + esc(e.artifact_name || '')) : esc(e.summary);
-      var href = e.slug ? '/a/' + encodeURIComponent(e.slug) + '/' : '';
+      var href = !isAccess && e.slug ? '/a/' + encodeURIComponent(e.slug) + '/' : '';
       var cls = isSeen ? 'wsx-ncard is-seen' : 'wsx-ncard';
+      if (isAccess) cls += ' wsx-ncard--access';
       var openTag = href ? '<a class="' + cls + '" href="' + href + '"' : '<div class="' + cls + '"';
       var closeTag = href ? '</a>' : '</div>';
       var x = isSeen ? '' : '<button class="wsx-ncard__x" data-dismiss="' + esc(e.id) + '" type="button" title="' + esc(t('notif.dismiss')) + '" aria-label="' + esc(t('notif.dismiss')) + '">\\u00D7</button>';
+      var actions = isAccess && !isSeen
+        ? '<span class="wsx-ncard__act wsx-ncard__act--split"><button class="wsx-abtn wsx-abtn--primary" data-access-approve="' + esc(e.id) + '" type="button">' + esc(t('common.approve')) + '</button><button class="wsx-abtn danger" data-access-deny="' + esc(e.id) + '" type="button">' + esc(t('common.deny')) + '</button></span>'
+        : '';
       return openTag + ' data-eid="' + esc(e.id) + '">'
         + iconChip(e, 'wsx-ncard__ic')
         + '<span class="wsx-ncard__main"><span class="wsx-ncard__top">' + top + '</span><span class="wsx-ncard__sum">' + sum + '</span><span class="wsx-ncard__time">' + timeAgo(e.ts) + '</span></span>'
+        + actions
         + x + closeTag;
     }
 
@@ -222,12 +228,42 @@ export const workspace_client_notifications_JS = `
         })
         .catch(function () { el.disabled = false; el.classList.remove('is-busy'); showToast('Couldn\\u2019t update the comment', 'error'); });
     }
+    function decideAccess(el, action) {
+      var id = el.getAttribute(action === 'approve' ? 'data-access-approve' : 'data-access-deny');
+      if (!id) return;
+      var card = el.closest('.wsx-ncard');
+      if (!card) return;
+      card.querySelectorAll('.wsx-abtn').forEach(function (b) { b.disabled = true; b.classList.add('is-busy'); });
+      fetch('/v1/access-requests/' + encodeURIComponent(id), {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: action }),
+      })
+        .then(function (r) { return r.ok ? r.json().catch(function () { return {}; }) : Promise.reject(); })
+        .then(function () {
+          needs = needs.filter(function (x) { return x.id !== id; });
+          setBadge();
+          if (card) {
+            card.innerHTML = '<div class="wsx-ncard__done">' + esc(action === 'approve' ? t('notif.approved') : t('notif.rejected')) + '</div>';
+            setTimeout(function () { if (card) card.remove(); if (!approvals.length && !actions.length && !needs.length) render(); }, 900);
+          }
+        })
+        .catch(function () {
+          card.querySelectorAll('.wsx-abtn').forEach(function (b) { b.disabled = false; b.classList.remove('is-busy'); });
+          showToast('Couldn\\u2019t update access request', 'error');
+        });
+    }
 
     body.addEventListener('click', function (e) {
       var dn = e.target.closest('[data-done]');
       if (dn) { e.preventDefault(); e.stopPropagation(); resolveAction(dn, true); return; }
       var ro = e.target.closest('[data-reopen]');
       if (ro) { e.preventDefault(); e.stopPropagation(); resolveAction(ro, false); return; }
+      var aa = e.target.closest('[data-access-approve]');
+      if (aa) { e.preventDefault(); e.stopPropagation(); decideAccess(aa, 'approve'); return; }
+      var ad = e.target.closest('[data-access-deny]');
+      if (ad) { e.preventDefault(); e.stopPropagation(); decideAccess(ad, 'deny'); return; }
       var dis = e.target.closest('[data-dismiss]');
       if (dis) { e.preventDefault(); e.stopPropagation(); dismiss(dis.getAttribute('data-dismiss'), dis); return; }
       var ap = e.target.closest('[data-approve]');

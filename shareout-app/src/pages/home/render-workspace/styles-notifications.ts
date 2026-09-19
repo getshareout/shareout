@@ -50,7 +50,7 @@ a.wsx-ncard.is-seen:hover { border-color: var(--color-border-strong); box-shadow
 
 /* ---- notification row card ---- */
 .wsx-ncard { position: relative; display: flex; gap: 11px; padding: 12px 12px 12px 13px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg-elevated); text-decoration: none; color: inherit; transition: border-color var(--duration-fast), box-shadow var(--duration-fast), transform var(--duration-fast); }
-a.wsx-ncard:hover { border-color: var(--color-border-strong); box-shadow: 0 2px 10px rgba(0,0,0,.06); transform: translateY(-1px); }
+a.wsx-ncard:hover { border-color: var(--color-border-strong); box-shadow: var(--shadow-md); transform: translateY(-1px); }
 .wsx-ncard__ic { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: var(--color-surface); color: var(--color-text-secondary); font-size: 15px; overflow: hidden; }
 .wsx-ncard__ic img { width: 100%; height: 100%; object-fit: cover; }
 .wsx-ncard__ic svg { width: 17px; height: 17px; }
@@ -79,6 +79,9 @@ a.wsx-ncard:hover { border-color: var(--color-border-strong); box-shadow: 0 2px 
 .wsx-ncard__act .wsx-abtn { min-height: 30px; }
 .wsx-duechip { font: 600 var(--text-xs) var(--font-body); color: var(--color-text-tertiary); padding: 1px 7px; border-radius: 999px; background: var(--color-surface); white-space: nowrap; }
 .wsx-duechip.is-overdue { color: var(--color-error); background: var(--color-error-light); }
+.wsx-ncard--access { align-items: center; }
+.wsx-ncard__act--split { gap: 6px; }
+.wsx-ncard__act--split .wsx-abtn { min-height: 30px; }
 
 /* ---- empty state ---- */
 .wsx-notif-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 52px 24px; text-align: center; color: var(--color-text-tertiary); }

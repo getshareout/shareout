@@ -409,19 +409,24 @@ async function updateEditorSession(
     userId,
     userName,
     userAvatar || null,
-    getRandomColor(),
+    getSessionColor(userId),
     updates.cursorX ?? null,
     updates.cursorY ?? null,
     updates.selectedElement ?? null
   ).run();
 }
 
-function getRandomColor(): string {
+function getSessionColor(seed: string): string {
+  // Keep collaborator cursors mostly neutral with a single blue accent choice.
   const colors = [
-    '#ef4444', '#f97316', '#eab308', '#22c55e',
-    '#14b8a6', '#3b82f6', '#8b5cf6', '#ec4899',
+    '#a8a29e', // stone-400
+    '#78716c', // stone-500
+    '#57534e', // stone-600
+    '#3b82f6', // blue-500 accent
   ];
-  return colors[Math.floor(Math.random() * colors.length)];
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash << 5) - hash + seed.charCodeAt(i);
+  return colors[Math.abs(hash) % colors.length];
 }
 
 function errorResponse(code: string, message: string, status: number): Response {

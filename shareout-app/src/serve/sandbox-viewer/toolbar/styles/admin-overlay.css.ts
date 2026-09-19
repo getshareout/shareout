@@ -30,7 +30,7 @@ export const adminOverlayStyles = `    #so-admin-overlay {
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       border-radius: 20px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 8px 24px rgba(0,0,0,0.08);
+      box-shadow: var(--shadow-xl);
       border: 1px solid rgba(231, 229, 228, 0.5);
       overflow: hidden;
       animation: slideUp 0.25s ease-out;

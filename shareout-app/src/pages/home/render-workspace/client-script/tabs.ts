@@ -7,6 +7,8 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
   var panes = {};            // key -> { pane, iframe, art }
   var activeKey = 'home';
   var activeArt = null;      // ctx of the active artifact tab, or null on Home
+  var statsCacheAt = {};
+  var STATS_TTL_MS = 30 * 1000;
 
   // Global View/Edit toggle lives in the tab bar; it drives the active artifact pane.
   var tabModeEl = document.getElementById('wsxTabMode');
@@ -113,11 +115,12 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
   function loadAnalytics(id, panel) {
     panel.hidden = false;
     if (!id) { panel.innerHTML = i18nEmpty('tabs.analyticsNeedId'); return; }
-    if (statsCache[id] !== undefined) { paintStats(panel, statsCache[id]); return; }
+    var cachedAt = statsCacheAt[id] || 0;
+    if (statsCache[id] !== undefined && (Date.now() - cachedAt) < STATS_TTL_MS) { paintStats(panel, statsCache[id]); return; }
     panel.innerHTML = i18nEmpty('tabs.loadingAnalytics');
     fetch('/v1/artifacts/' + encodeURIComponent(id) + '/analytics?days=14', { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { statsCache[id] = d; paintStats(panel, d); })
+      .then(function (d) { statsCache[id] = d; statsCacheAt[id] = Date.now(); paintStats(panel, d); })
       .catch(function () { panel.innerHTML = i18nEmpty('tabs.couldNotAnalytics'); });
   }
   function makeArtifactPane(art) {
