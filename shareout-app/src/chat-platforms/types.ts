@@ -78,6 +78,8 @@ export interface ChatReplyPort {
   /** Optional progressive text streaming (web SSE). Bots omit it and render whole messages via sendText. */
   sendTextDelta?(text: string): Promise<void>;
   sendTyping(): Promise<void>;
+  /** Optional "what I'm doing" line while a tool runs (web). Bots fall back to sendTyping. */
+  sendToolProgress?(label: string): Promise<void>;
   sendImage(bytes: ArrayBuffer, filename: string, caption?: string): Promise<boolean>;
   sendFile(bytes: ArrayBuffer, filename: string, mime: string, caption?: string): Promise<boolean>;
   sendArtifactCards(items: ArtifactCardItem[]): Promise<void>;

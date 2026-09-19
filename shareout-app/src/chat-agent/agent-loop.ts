@@ -9,6 +9,9 @@ import { getUserWorkspaceIds } from './access';
 import { botDisabledMessage, botFeatureFlag } from './commands';
 import { SHAREOUT_SKILL_PRIMER } from './skill-primer';
 import { buildAgentSkillsDoc } from '../skill-marketplace';
+import { isPlatformAdmin } from '../superadmin/auth';
+import { logAgentToolFailure, userFacingAgentToolError } from './errors';
+import { toolProgressLabel } from './tool-progress';
 
 /** A turn either ends with a text reply, or with an action awaiting the user's confirm/cancel. */
 export interface TurnResult {
@@ -100,6 +103,33 @@ function systemPrompt(platform: PlatformId, caps: Capabilities, selectedWorkspac
   ].join('\n');
 }
 
+export const NO_PROVIDER_ADMIN_REPLY =
+  'No AI provider is connected to this ShareOut instance yet. Set ANTHROPIC_API_KEY (or VERCEL_AI_GATEWAY / OPENAI_API_KEY) as a Worker secret — e.g. npx wrangler secret put ANTHROPIC_API_KEY — and I’ll be ready.';
+export const NO_PROVIDER_MEMBER_REPLY =
+  'I’m not connected to an AI provider yet. Your ShareOut admin needs to connect one before I can help.';
+
+/** Actionable reply when no AI provider is configured: the fix for admins, a pointer for everyone else. */
+async function noProviderReply(env: Env, userId: string): Promise<string> {
+  let email: string | null = null;
+  try {
+    email = (await env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first<{ email: string | null }>())?.email ?? null;
+  } catch {
+    // No DB / lookup failed — fall back to the member wording.
+  }
+  return (await isPlatformAdmin(env, email, userId)) ? NO_PROVIDER_ADMIN_REPLY : NO_PROVIDER_MEMBER_REPLY;
+}
+
+/** Tell the user a tool is running: a label on web, a fresh typing ping on bots. Never fails the turn. */
+async function announceTool(reply: ChatReplyPort | undefined, name: string, input: Record<string, unknown>): Promise<void> {
+  const label = toolProgressLabel(name, input);
+  if (!reply || !label) return;
+  try {
+    await (reply.sendToolProgress ? reply.sendToolProgress(label) : reply.sendTyping());
+  } catch {
+    // Progress is cosmetic.
+  }
+}
+
 function toProviderTools(tools: AccountTool[]): ProviderTool[] {
   return tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema }));
 }
@@ -121,7 +151,7 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
   }
 
   const provider = getCrewProvider(env);
-  if (!provider) return { reply: "I can’t reach the AI right now. Try again in a bit?" };
+  if (!provider) return { reply: await noProviderReply(env, input.userId) };
 
   const caps = input.capabilities ?? defaultCapabilities(platform);
   const baseTools = selectTools(caps);
@@ -180,6 +210,7 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
       if (!tool) {
         content = JSON.stringify({ error: `unknown tool ${tc.name}` });
       } else {
+        await announceTool(input.reply, tc.name, tc.input);
         try {
           const out = await tool.execute({
             env,
@@ -194,7 +225,8 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
           }
           content = JSON.stringify(out);
         } catch (err) {
-          content = JSON.stringify({ error: err instanceof Error ? err.message : 'tool failed' });
+          logAgentToolFailure(env, { tool: tc.name, userId: input.userId, platform }, err);
+          content = JSON.stringify({ error: userFacingAgentToolError(err) });
         }
       }
       results.push({ id: tc.id, content: truncate(content) });
