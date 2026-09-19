@@ -19,7 +19,6 @@ import {
   getHourlySeries,
   getWindowSummary,
   getRecentErrors,
-  resolveSuperadminTelegramChatIds,
 } from '../../observability';
 import type { RangeDef } from './config';
 import { auditBody, moderationBody, usersBody } from './bodies/admin-lists';
@@ -54,14 +53,13 @@ export async function renderView(env: Env, view: string, range: RangeDef): Promi
       return tokensBody(m, ai);
     }
     case 'health': {
-      const [w24, w1, series, errors, alertChats] = await Promise.all([
+      const [w24, w1, series, errors] = await Promise.all([
         getWindowSummary(env, 24),
         getWindowSummary(env, 1),
         getHourlySeries(env, 48),
         getRecentErrors(env, 50),
-        resolveSuperadminTelegramChatIds(env),
       ]);
-      return healthBody(w24, w1, series, errors, alertChats);
+      return healthBody(w24, w1, series, errors);
     }
     case 'operations':
       return opsBody(await getOpsMetrics(env));

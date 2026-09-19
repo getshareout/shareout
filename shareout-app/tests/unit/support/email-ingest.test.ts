@@ -2,11 +2,6 @@ import { env } from 'cloudflare:test';
 import { beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 
 vi.mock('../../../src/support/triage', () => ({ triageTicket: vi.fn(async () => null) }));
-vi.mock('../../../src/superadmin/recipients', async (orig) => {
-  const actual = await orig<typeof import('../../../src/superadmin/recipients')>();
-  return { ...actual, notifySuperadmins: vi.fn(async () => true) };
-});
-
 import { ingestSupportEmail } from '../../../src/support/email-ingest';
 import { getTicket, getThread } from '../../../src/support/store';
 import type { Env } from '../../../src/types';

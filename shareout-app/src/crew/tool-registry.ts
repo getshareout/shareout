@@ -18,8 +18,6 @@ import { materializeTool } from './tools/materialize';
 import { scheduledJobCreateTool } from './tools/scheduled-job-create';
 import { notifySendTool } from './tools/notify-send';
 import { platformMetricsDigestTool } from './tools/platform-metrics-digest';
-import { adminTelegramNotifyTool } from './tools/admin-telegram-notify';
-import { adminTelegramBriefTool } from './tools/admin-telegram-brief';
 import { platformMetricsInvestigateTool } from './tools/platform-metrics-investigate';
 import { pilotVerifyTool } from './tools/pilot-verify';
 
@@ -52,8 +50,6 @@ export const CREW_TOOLS: Record<string, CrewTool> = {
   // super-admin ops (platform owner crews only)
   [platformMetricsDigestTool.name]: platformMetricsDigestTool,
   [platformMetricsInvestigateTool.name]: platformMetricsInvestigateTool,
-  [adminTelegramBriefTool.name]: adminTelegramBriefTool,
-  [adminTelegramNotifyTool.name]: adminTelegramNotifyTool,
 };
 
 export interface ResolvedGrant {

@@ -56,7 +56,7 @@ import type { Env } from '../../src/types';
 // baked-in address), so tests that need one mock the roster import.
 const testRoster = vi.hoisted(() => ({
   default: {
-    recipients: [{ email: 'admin@example.com', telegramChatId: 555000 }, { email: 'ops@example.com' }],
+    recipients: [{ email: 'admin@example.com' }, { email: 'ops@example.com' }],
   },
 }));
 vi.mock('../../superadmin-recipients.json', () => testRoster);

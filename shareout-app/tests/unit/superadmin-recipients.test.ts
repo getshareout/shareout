@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 // baked-in address), so tests that need one mock the roster import.
 const testRoster = vi.hoisted(() => ({
   default: {
-    recipients: [{ email: 'admin@example.com', telegramChatId: 555000 }, { email: 'ops@example.com' }],
+    recipients: [{ email: 'admin@example.com' }, { email: 'ops@example.com' }],
   },
 }));
 vi.mock('../../superadmin-recipients.json', () => testRoster);
@@ -13,7 +13,6 @@ vi.mock('../../superadmin-recipients.json', () => testRoster);
 import {
   SUPERADMIN_EMAILS,
   SUPERADMIN_RECIPIENTS,
-  configuredSuperadminTelegramChatIds,
   isSuperAdminEmail,
   rosterIsEmpty,
 } from '../../src/superadmin/recipients';
@@ -49,7 +48,9 @@ describe('superadmin roster', () => {
     expect(isSuperAdminEmail('boss@acme.test')).toBe(false);
   });
 
-  it('exposes configured telegram chat ids for admin notifications', () => {
-    expect(configuredSuperadminTelegramChatIds()).toEqual([555000]);
+  it('grants access only — the roster carries no notification channel', () => {
+    for (const r of SUPERADMIN_RECIPIENTS) {
+      expect(Object.keys(r)).toEqual(['email']);
+    }
   });
 });

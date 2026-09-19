@@ -1,7 +1,7 @@
 import type { FetchContext } from '../context';
 import { jsonResponse, jsonError } from '../helpers/json-response';
 import { getTokenOrSessionUser, requireTokenOrSession, isAuthUser } from '../helpers/auth-guard';
-import { isSuperAdminEmail, notifySuperadmins } from '../../superadmin/recipients';
+import { isSuperAdminEmail } from '../../superadmin/recipients';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import {
   createTicket, getTicket, getThread, appendMessage, setStatus, assign,
@@ -69,11 +69,8 @@ export async function routeSupportApi(ctx: FetchContext): Promise<Response | nul
         subject: body.subject,
         body: body.body,
       });
-      // Triage + staff alert run after the response — never block ticket creation.
+      // Triage runs after the response — never block ticket creation.
       ctx.executionCtx?.waitUntil(triageTicket(ctx.env, ticket.id).catch(() => null));
-      ctx.executionCtx?.waitUntil(
-        notifySuperadmins(ctx.env, `🎫 New support ticket: ${ticket.subject}\n${ctx.url.origin}/admin?view=support`).catch(() => false)
-      );
       return cors(jsonResponse({ success: true, ticket }, 201));
     }
 

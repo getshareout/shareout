@@ -6,8 +6,7 @@ import type { Env } from '../types';
 import { runPublishSafetyCheck, contentHash, classifyAndPersist, clearModerationHold, type ModerationStatus } from '../moderation/check';
 import { extractSignals, outboundHosts } from '../moderation/extract';
 import { submitHostScan } from '../moderation/url-scanner';
-import { fireAlert } from '../observability/alerts';
-import { getPlatformOrigin } from '../config/origins';
+import { createLogger } from '../logging';
 import { setModeration } from '../artifacts/satellites';
 
 const HELD_RETRY_MS = 30_000;
@@ -25,14 +24,12 @@ async function alertModerationHold(
          LEFT JOIN deployments dep ON dep.artifact_id = a.id AND dep.channel = 'production'
         WHERE a.id = ?`
     ).bind(artifactId).first<{ slug: string; ws: string | null }>();
-    const base = getPlatformOrigin(env);
-    const text = [
-      '🛑 Artifact held for review',
-      `${meta?.slug || artifactId}${meta?.ws ? ` · ws ${meta.ws}` : ''}`,
-      reason ? `reason: ${reason}` : '',
-      `${base}/admin?view=moderation`,
-    ].filter(Boolean).join('\n');
-    await fireAlert(env, `moderation:held:${artifactId}`, text, 6 * 3600);
+    createLogger(env, { scope: 'moderation' }).warn('artifact held for review', {
+      artifact_id: artifactId,
+      slug: meta?.slug,
+      workspace_id: meta?.ws,
+      reason,
+    });
   })().catch(() => {});
   if (executionCtx) executionCtx.waitUntil(send);
   else await send;

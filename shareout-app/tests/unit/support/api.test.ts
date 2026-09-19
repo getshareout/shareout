@@ -14,7 +14,6 @@ vi.mock('../../../src/superadmin/recipients', async (orig) => {
   return {
     ...actual,
     isSuperAdminEmail: (e: string | null) => !!e && SUPERADMINS.has(e),
-    notifySuperadmins: vi.fn(async () => true),
   };
 });
 

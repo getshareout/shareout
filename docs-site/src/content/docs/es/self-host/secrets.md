@@ -37,7 +37,6 @@ provisiona nombres; reemplazá IDs placeholder después del create si hace falta
 | Nombre | Tipo | Notas |
 |--------|------|--------|
 | `ARTIFACT_ORIGIN` | var | Segundo origen para contenido no confiable; unset = same-zone. |
-| `ADMIN_ALERTS_DISABLED` | var | `1` silencia alertas Telegram/ops (default del template OSS). |
 | `TEAM_METRICS_ENABLED` | var | `0` en self-host (default del template OSS). |
 | `STORAGE_QUOTA_BYTES` / `STORAGE_MAX_FILE_BYTES` | var | Topes de almacenamiento por dueño. Sin setear o `0` = ilimitado, el default. |
 | `DAILY_BANDWIDTH_BYTES_PER_OWNER` | var | Pausa los artifacts públicos de un dueño que supere este egreso diario estimado. Sin setear o `0` = sin tope, el default. |

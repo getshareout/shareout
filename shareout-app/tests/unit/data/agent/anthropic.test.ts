@@ -2,10 +2,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FetchTimeoutError } from '../../../../src/fetch-utils';
 
-const fireAlert = vi.fn();
-vi.mock('../../../../src/observability/alerts', () => ({
-  fireAlert: (...args: unknown[]) => (fireAlert(...args), Promise.resolve()),
-}));
+const logWarn = vi.fn();
+const logErr = vi.fn();
+vi.mock('../../../../src/logging', async (orig) => {
+  const actual = await orig<typeof import('../../../../src/logging')>();
+  return { ...actual, createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: logWarn, error: logErr }) };
+});
 
 import {
   AGENT_CHAT_MODEL,
@@ -20,7 +22,8 @@ import { openAIStreamBody } from './helpers';
 
 afterEach(() => {
   vi.restoreAllMocks();
-  fireAlert.mockReset();
+  logWarn.mockReset();
+  logErr.mockReset();
 });
 
 function openaiEnv(): Env {
@@ -224,11 +227,9 @@ describe('streamChat failover', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('https://api.openai.com/v1/chat/completions');
     expect(chunks).toContainEqual({ type: 'content', content: 'recovered' });
     expect(chunks.at(-1)).toMatchObject({ type: 'done' });
-    expect(fireAlert).toHaveBeenCalledWith(
-      expect.anything(),
-      'ai:provider:failed:vercel-gateway',
-      expect.stringContaining('failed over'),
-      expect.any(Number),
+    expect(logWarn).toHaveBeenCalledWith(
+      'AI provider failed',
+      expect.objectContaining({ provider: 'vercel-gateway', failed_over: true }),
     );
   });
 
@@ -252,20 +253,19 @@ describe('streamChat failover', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1); // no retry after bytes emitted
     expect(chunks).toContainEqual({ type: 'content', content: 'partial' });
     expect(chunks.at(-1)).toMatchObject({ type: 'error' });
-    expect(fireAlert).not.toHaveBeenCalled();
+    expect(logWarn).not.toHaveBeenCalled();
+    expect(logErr).not.toHaveBeenCalled();
   });
 
-  it('alerts that requests are failing when the last provider fails', async () => {
+  it('logs an error when the last provider fails', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('rate limited', { status: 429 }));
 
     const chunks = await collectStream(openaiEnv());
 
     expect(chunks.at(-1)).toMatchObject({ type: 'error', error: expect.stringContaining('429') });
-    expect(fireAlert).toHaveBeenCalledWith(
-      expect.anything(),
-      'ai:provider:failed:openai',
-      expect.stringContaining('No fallback left'),
-      expect.any(Number),
+    expect(logErr).toHaveBeenCalledWith(
+      'AI provider failed',
+      expect.objectContaining({ provider: 'openai', failed_over: false }),
     );
   });
 
@@ -279,7 +279,8 @@ describe('streamChat failover', () => {
     }
 
     expect(chunks.at(-1)).toMatchObject({ type: 'error' });
-    expect(fireAlert).not.toHaveBeenCalled();
+    expect(logWarn).not.toHaveBeenCalled();
+    expect(logErr).not.toHaveBeenCalled();
   });
 });
 

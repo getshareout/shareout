@@ -94,7 +94,7 @@ Probá un restore en un worker de staging antes de necesitarlo.
 
 - Logs del worker: `npx wrangler tail`
 - En producto: Admin → Health (si estás firmado como admin), si tu build lo tiene
-- Seteá `ADMIN_ALERTS_DISABLED=1` salvo que configures alertas Telegram de ops
+- No hay canal de notificación de super-admin — usá `/admin?view=health` y los logs del Worker
 
 ## Seguridad básica (checklist pre-público)
 

@@ -37,7 +37,6 @@ button provisions names; replace placeholder IDs after create if needed.
 | Name | Kind | Notes |
 |------|------|--------|
 | `ARTIFACT_ORIGIN` | var | Second origin for untrusted content; unset = same-zone. |
-| `ADMIN_ALERTS_DISABLED` | var | `1` to silence Telegram/ops alerts (OSS template default). |
 | `TEAM_METRICS_ENABLED` | var | `0` on self-host (OSS template default). |
 | `STORAGE_QUOTA_BYTES` / `STORAGE_MAX_FILE_BYTES` | var | Per-owner storage caps. Unset or `0` = unlimited, the default. |
 | `DAILY_BANDWIDTH_BYTES_PER_OWNER` | var | Auto-pause an owner's public artifacts over this daily estimated egress. Unset or `0` = no cap, the default. |

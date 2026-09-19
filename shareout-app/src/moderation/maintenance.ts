@@ -13,7 +13,7 @@
 
 import type { Env } from './../types';
 import { checkHostsReputation } from './url-scanner';
-import { notifyAdmin } from '../observability/alerts';
+import { createLogger } from '../logging';
 
 const CONTENT_DOMAIN = 'shareoutcdn.site';
 
@@ -21,10 +21,9 @@ export async function checkContentDomainReputation(env: Env): Promise<void> {
   try {
     const verdict = await checkHostsReputation(env, [CONTENT_DOMAIN]);
     if (verdict === 'malicious') {
-      await notifyAdmin(
-        env,
-        `🚨 CONTENT DOMAIN ${CONTENT_DOMAIN} is flagged malicious by URL reputation. This can blocklist ALL artifacts. Investigate + request review immediately.`
-      ).catch(() => {});
+      createLogger(env, { scope: 'moderation' }).error('content domain flagged malicious by URL reputation', {
+        domain: CONTENT_DOMAIN,
+      });
     }
   } catch {
     // best-effort
@@ -76,10 +75,11 @@ export async function runBandwidthAutoPause(env: Env): Promise<{ checked: number
         WHERE owner_id = ? AND visibility = 'public' AND paused = 0`
     ).bind(row.owner_id).run().catch(() => {});
     paused++;
-    await notifyAdmin(
-      env,
-      `⚠️ Auto-paused public artifacts for owner ${row.owner_id}: est. ${(row.est_bytes / 1e9).toFixed(1)} GB served yesterday (cap ${(cap / 1e9).toFixed(1)} GB).`
-    ).catch(() => {});
+    createLogger(env, { scope: 'moderation' }).warn('auto-paused public artifacts over bandwidth cap', {
+      owner_id: row.owner_id,
+      est_gb: Number((row.est_bytes / 1e9).toFixed(1)),
+      cap_gb: Number((cap / 1e9).toFixed(1)),
+    });
   }
   return { checked, paused };
 }

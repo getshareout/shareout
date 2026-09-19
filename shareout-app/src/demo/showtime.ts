@@ -9,8 +9,7 @@
 
 import type { Env } from '../types';
 import { writeDatasetRows } from '../data/datasets/handler';
-import { fireAlert } from '../observability/alerts';
-import { notifySuperadmins } from '../superadmin/recipients';
+import { createLogger } from '../logging';
 import { generateArtifactSummary } from '../publish/auto-summary';
 
 export interface TimelineStep {
@@ -109,10 +108,12 @@ export class Showtime implements DurableObject {
       try {
         await this.runAction(meta, s.action, JSON.parse(s.params));
       } catch (err) {
-        // Demo choreography must not wedge on one failed beat — log to admins, continue.
-        await notifySuperadmins(this.env,
-          `⚠️ Showtime "${meta.scenario}" — acción "${s.action}" falló: ${err instanceof Error ? err.message : String(err)}`
-        ).catch(() => {});
+        // Demo choreography must not wedge on one failed beat — log it, continue.
+        createLogger(this.env, { scope: 'showtime' }).warn('showtime step failed', {
+          scenario: meta.scenario,
+          action: s.action,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
       this.sql.exec('UPDATE steps SET done=1 WHERE idx=?', s.idx);
     }
@@ -126,8 +127,6 @@ export class Showtime implements DurableObject {
   private async runAction(meta: Meta, action: string, params: Record<string, unknown>): Promise<void> {
     switch (action) {
       case 'tick_dataset':   return this.tickDataset(params);
-      case 'fire_alert':     return this.fireAlertAction(params);
-      case 'notify':         return void await notifySuperadmins(this.env, String(params.message ?? ''));
       case 'generate_tldr':  return void await generateArtifactSummary(this.env, String(params.artifactId));
       default:               throw new Error(`unknown action: ${action}`);
     }
@@ -156,11 +155,5 @@ export class Showtime implements DurableObject {
 
     this.sql.exec('INSERT OR REPLACE INTO accum (k, rows) VALUES (?, ?)', k, JSON.stringify(rows));
     await writeDatasetRows(this.env, artifactId, dataset, 'json', rows);
-  }
-
-  private async fireAlertAction(params: Record<string, unknown>): Promise<void> {
-    const message = String(params.message ?? '');
-    await fireAlert(this.env, String(params.key ?? `showtime:${Date.now()}`), message, 0);
-    if (params.notify !== false) await notifySuperadmins(this.env, message).catch(() => {});
   }
 }

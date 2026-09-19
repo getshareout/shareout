@@ -2,7 +2,6 @@ import type { Env } from '../types';
 import { generateId } from '../crypto-utils';
 import { hasWorkspaceSignupAllowlist } from '../workspaces';
 import { signupsPaused, SIGNUPS_PAUSED_MSG } from '../signup-gate';
-import { notifySuperadmins } from '../superadmin/recipients';
 
 export interface GoogleUserInfo {
   id: string;
@@ -52,7 +51,6 @@ export async function upsertUserByEmail(
   await env.DB.prepare(
     `INSERT INTO users (id, email, name, last_login_at) VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
   ).bind(id, email, email.split('@')[0] || 'there').run();
-  void notifySuperadmins(env, `🎉 New signup: ${email}`).catch(() => {});
   return { id, email, isNew: true, firstActivation: true };
 }
 
@@ -114,7 +112,6 @@ export async function upsertUser(env: Env, info: GoogleUserInfo): Promise<{ id: 
     `INSERT INTO users (id, email, name, picture, google_id, last_login_at) VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
   ).bind(id, email, info.name, info.picture, info.id).run();
 
-  void notifySuperadmins(env, `🎉 New signup: ${email}`).catch(() => {});
   return { id, email, isNew: true, firstActivation: true };
 }
 

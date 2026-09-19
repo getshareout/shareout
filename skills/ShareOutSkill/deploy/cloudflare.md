@@ -169,7 +169,6 @@ npx wrangler secret put GOOGLE_CLIENT_SECRET
 # Vars (dashboard or wrangler.toml [vars])
 # SHAREOUT_BASE_URL=https://…
 # SETUP_ADMIN_EMAIL=you@company.com
-# ADMIN_ALERTS_DISABLED=1
 # ARTIFACT_ORIGIN=https://…   # optional
 ```
 

@@ -1,6 +1,5 @@
 import type { Env } from '../types';
 import { recordRequestMetric, recordError, type ErrorEvent } from './store';
-import { alertOnError } from './alerts';
 
 export interface ObserveEvent {
   status: number;
@@ -49,8 +48,8 @@ export function shouldSkipObservability(evt: Pick<ObserveEvent, 'hostname' | 'is
 }
 
 // Fire-and-forget telemetry for one completed request. Always folds the request
-// into its hour bucket; on a server error (5xx / exception) also logs it and
-// raises a throttled Telegram alert. Never blocks or throws into the request.
+// into its hour bucket; on a server error (5xx / exception) also logs it.
+// Never blocks or throws into the request.
 export function observe(env: Env, ctx: ExecutionContext | undefined, evt: ObserveEvent): void {
   if (shouldSkipObservability(evt)) return;
 
@@ -67,7 +66,6 @@ export function observe(env: Env, ctx: ExecutionContext | undefined, evt: Observ
         outcome: evt.outcome === 'exception' ? 'exception' : 'http_error',
       };
       await recordError(env, errEvt).catch(() => {});
-      await alertOnError(env, errEvt).catch(() => {});
     }
   };
 
@@ -85,14 +83,6 @@ export {
   type ErrorRow,
 } from './store';
 export {
-  runHealthSweep,
-  sendDailySummary,
-  sendWorkspaceCostDigest,
-  notifyAdmin,
-} from './alerts';
-export {
-  notifySuperadmins,
-  resolveSuperadminTelegramChatIds,
   SUPERADMIN_RECIPIENTS,
   SUPERADMIN_EMAILS,
 } from '../superadmin/recipients';

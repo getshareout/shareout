@@ -8,7 +8,6 @@
 // per-artifact takedown path (Workstream D).
 
 import type { Env } from './types';
-import { notifyAdmin } from './observability/alerts';
 
 const KILL_KEY = 'public_rollout_killed';
 
@@ -45,7 +44,7 @@ function autoKillThreshold(env: Env): number {
 
 /**
  * Auto-rollback: if abuse reports in the last 24h exceed the threshold, trip the
- * kill switch and alert. Idempotent — does nothing if already killed. Run from the
+ * kill switch. Idempotent — does nothing if already killed. Run from the
  * scheduled handler.
  */
 export async function checkPublicAutoRollback(env: Env): Promise<void> {
@@ -57,9 +56,5 @@ export async function checkPublicAutoRollback(env: Env): Promise<void> {
   const count = row?.n ?? 0;
   if (count >= threshold) {
     await setPublicRolloutKilled(env, true, `auto: ${count} abuse reports in 24h`);
-    await notifyAdmin(
-      env,
-      `🛑 Public-artifacts rollout AUTO-KILLED: ${count} abuse reports in 24h (threshold ${threshold}). New public publishes are blocked. Investigate, then clear the kill switch.`
-    ).catch(() => {});
   }
 }
