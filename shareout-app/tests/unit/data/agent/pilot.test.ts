@@ -12,7 +12,7 @@ const mockCheckSlidingWindowRateLimit = vi.fn();
 const mockFetchWithTimeout = vi.fn();
 
 vi.mock('../../../../src/data/agent/anthropic', () => ({
-  getAIProvider: (...args: unknown[]) => mockGetAIProvider(...args),
+  getAIProviderChain: (...args: unknown[]) => [mockGetAIProvider(...args)].filter(Boolean),
   AGENT_CHAT_MODEL: 'gpt-4o',
 }));
 

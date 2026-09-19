@@ -19,34 +19,38 @@ cómo encenderlas, y qué queda apagado si decidís que no.
 Todo lo demás — publicar, datos, tiempo real, compartir, horarios, entregas — funciona sin
 clave de LLM. Una instancia sin IA es una configuración legítima, no una rota.
 
-## Dos proveedores
+## Tres proveedores
 
-La cadena admite exactamente dos, y los prueba en este orden:
+La cadena admite tres y, por defecto, los prueba en este orden:
 
 | Orden | Secreto | Qué es |
 |-------|---------|--------|
 | 1 | `VERCEL_AI_GATEWAY` | Una clave de Vercel AI Gateway. Útil si querés ruteo, presupuestos u observabilidad delante del modelo |
-| 2 | `OPENAI_API_KEY` | Una clave de OpenAI, llamada directo |
+| 2 | `ANTHROPIC_API_KEY` | Una clave de Anthropic, llamada directo a la Messages API nativa |
+| 3 | `OPENAI_API_KEY` | Una clave de OpenAI, llamada directo |
 
-Poné una, o las dos. Con las dos, el gateway tiene prioridad y OpenAI queda de respaldo:
-una falla a nivel proveedor (`401`, `402`, `403`, `429` o cualquier `5xx`) pasa al
-siguiente, así que un gateway sin crédito no se lleva puestos tus agentes.
+Poné cualquiera. Con más de una, una falla a nivel proveedor (`401`, `402`, `403`, `429`
+o cualquier `5xx`) pasa al siguiente, así que un gateway sin crédito no se lleva puestos
+tu asistente ni tus agentes.
 
-El modelo de chat es `gpt-4o`.
+Para cambiar el orden, definí `AI_PROVIDER_ORDER` como lista separada por comas, p. ej.
+`anthropic,openai`. Los proveedores configurados que no listes siguen después, en el orden
+por defecto.
 
-:::note
-No hay camino por `ANTHROPIC_API_KEY`, aunque el módulo se llame `anthropic.ts` por
-razones históricas. A los modelos de Anthropic se llega por el gateway de Vercel, no con
-una clave directa.
-:::
+Modelos: el asistente, los agentes y la generación de páginas usan Claude Sonnet 5
+(`claude-sonnet-5`, o `anthropic/claude-sonnet-5` en el gateway; se cambia con
+`BUILD_MODEL`). El chat liviano usa `claude-sonnet-5` en Anthropic y `gpt-4o` en el
+gateway u OpenAI. Los ids de modelo viven en `src/data/agent/models.ts`.
 
 ## Configurarlo
 
 ```bash
 cd shareout-app
-npx wrangler secret put OPENAI_API_KEY
+npx wrangler secret put ANTHROPIC_API_KEY
 # o
 npx wrangler secret put VERCEL_AI_GATEWAY
+# o
+npx wrangler secret put OPENAI_API_KEY
 ```
 
 Los secretos tienen efecto inmediato — no hace falta redesplegar.
@@ -72,7 +76,7 @@ curl -sS -X PUT "$ORIGIN/v1/workspaces/$WORKSPACE_ID/llm" \
   -d '{"provider":"openai","apiKey":"sk-..."}'
 ```
 
-`provider` tiene que ser `openai` o `vercel-gateway` — los mismos dos.
+`provider` tiene que ser `openai` o `vercel-gateway`; las claves de Anthropic por espacio todavía no se admiten.
 
 Esto necesita **`CREDENTIALS_KEY`**, porque la clave se guarda cifrada:
 

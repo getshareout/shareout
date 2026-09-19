@@ -22,7 +22,7 @@ At publish time, add an `agent` block to the publish payload:
   "agent": {
     "enabled": true,
     "systemPrompt": "You are a data analyst. Answer only from the data provided.",
-    "model": "claude-sonnet-4-20250514",
+    "model": "claude-sonnet-5",
     "contextJson": true,
     "contextTables": ["sales"]
   }
@@ -38,7 +38,7 @@ Content-Type: application/json
 {
   "visitor_enabled": true,
   "visitor_system_prompt": "You are a helpful assistant.",
-  "visitor_model": "claude-sonnet-4-20250514",
+  "visitor_model": "claude-sonnet-5",
   "visitor_context_tables": ["sales"]
 }
 ```
@@ -68,7 +68,7 @@ widget.setTheme(theme: 'light' | 'dark' | 'auto'): void
 ```typescript
 interface AgentConfig {
   systemPrompt?: string;
-  model?: 'claude-sonnet-4-20250514' | 'claude-3-5-haiku-20241022';
+  model?: 'claude-sonnet-5' | 'claude-haiku-4-5-20251001';
   maxTokens?: number;
   temperature?: number;
   context?: { json?: boolean; tables?: string[]; blobs?: boolean };

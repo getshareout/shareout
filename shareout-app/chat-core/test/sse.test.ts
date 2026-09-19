@@ -30,6 +30,23 @@ describe('readSSE', () => {
     expect(events).toEqual([{ type: 'ok' }]);
   });
 
+  it('logs a malformed record and keeps streaming', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const res = sseResponse(['data: {"type":"a"}\n\n', 'data: {broken\n\n', 'data: {"type":"b"}\n\n']);
+    const events = [];
+    for await (const ev of readSSE(res)) events.push(ev);
+    expect(events).toEqual([{ type: 'a' }, { type: 'b' }]);
+    expect(warn).toHaveBeenCalledWith('[chat] dropped malformed SSE event', '{broken');
+    warn.mockRestore();
+  });
+
+  it('reads the data line of a record that also carries an event: line', async () => {
+    const res = sseResponse(['event: message\ndata: {"type":"ok"}\n\n']);
+    const events = [];
+    for await (const ev of readSSE(res)) events.push(ev);
+    expect(events).toEqual([{ type: 'ok' }]);
+  });
+
   it('yields nothing for a bodyless response', async () => {
     const events = [];
     for await (const ev of readSSE(new Response(null))) events.push(ev);

@@ -22,7 +22,7 @@ Al publicar, incluí un bloque `agent` en el payload:
   "agent": {
     "enabled": true,
     "systemPrompt": "Sos un analista de datos. Respondé solo con los datos provistos.",
-    "model": "claude-sonnet-4-20250514",
+    "model": "claude-sonnet-5",
     "contextJson": true,
     "contextTables": ["sales"]
   }
@@ -38,7 +38,7 @@ Content-Type: application/json
 {
   "visitor_enabled": true,
   "visitor_system_prompt": "Sos un asistente útil.",
-  "visitor_model": "claude-sonnet-4-20250514",
+  "visitor_model": "claude-sonnet-5",
   "visitor_context_tables": ["sales"]
 }
 ```
@@ -68,7 +68,7 @@ widget.setTheme(theme: 'light' | 'dark' | 'auto'): void
 ```typescript
 interface AgentConfig {
   systemPrompt?: string;
-  model?: 'claude-sonnet-4-20250514' | 'claude-3-5-haiku-20241022';
+  model?: 'claude-sonnet-5' | 'claude-haiku-4-5-20251001';
   maxTokens?: number;
   temperature?: number;
   context?: { json?: boolean; tables?: string[]; blobs?: boolean };

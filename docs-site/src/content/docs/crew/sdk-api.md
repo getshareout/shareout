@@ -40,7 +40,7 @@ curl -X POST "https://shareout.site/v1/data/art_abc123/crew/define" \
   -d '{
     "name": "Daily briefing",
     "instructions": "Read digest json and post summary to Slack.",
-    "model": "claude-sonnet-4-20250514",
+    "model": "claude-sonnet-5",
     "maxIterations": 6,
     "tools": { "read": ["json_get"], "write": ["notify_send"] }
   }'
@@ -84,7 +84,7 @@ usage(workspaceId: string): Promise<unknown>
 interface CrewDefineConfig {
   name?: string;
   instructions: string;
-  model?: 'claude-sonnet-4-20250514' | 'claude-3-5-haiku-20241022';
+  model?: 'claude-sonnet-5' | 'claude-haiku-4-5-20251001';
   maxIterations?: number;
   runBudgetMicroUsd?: number;
   tools?: CrewToolGrant;
@@ -144,7 +144,7 @@ const sdk = await ShareOut.create();
 await sdk.crew.define({
   name: 'Data Monitor',
   instructions: 'Check sales for revenue < 0 and summarize.',
-  model: 'claude-sonnet-4-20250514',
+  model: 'claude-sonnet-5',
   tools: { read: ['table_query', 'json_get'] },
 });
 

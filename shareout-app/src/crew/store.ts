@@ -5,14 +5,15 @@ import { CREW_TOOLS } from './tool-registry';
 import { resolveCrewLimits } from './limits';
 import { validateConditionConfig } from './condition';
 import type { CrewRow, CrewRunRow, CrewTriggerRow, ToolLimits } from './types';
+import { CLAUDE_HAIKU, DEFAULT_CLAUDE_MODEL } from '../data/agent/models';
 
 // Event types a crew can subscribe to in Phase 1. Only table.row.inserted is
 // wired for dispatch this phase; others are added as their emit sites gain the
 // crew-event hook.
 const CREW_EVENT_TYPES = new Set(['table.row.inserted']);
 
-const ALLOWED_MODELS = new Set(['claude-sonnet-4-20250514', 'claude-3-5-haiku-20241022']);
-const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
+const ALLOWED_MODELS = new Set<string>([DEFAULT_CLAUDE_MODEL.id, CLAUDE_HAIKU.id]);
+const DEFAULT_MODEL = DEFAULT_CLAUDE_MODEL.id;
 
 export interface DefineCrewBody {
   name?: string;

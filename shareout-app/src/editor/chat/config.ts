@@ -6,9 +6,10 @@
  */
 
 import type { Env } from '../../types';
+import { DEFAULT_CLAUDE_MODEL, OPENAI_CHAT_MODEL } from '../../data/agent/models';
 
-export const ANTHROPIC_MODEL = 'claude-sonnet-4-20250514';
-export const OPENAI_MODEL = 'gpt-4o';
+export const ANTHROPIC_MODEL = DEFAULT_CLAUDE_MODEL.id;
+export const OPENAI_MODEL = OPENAI_CHAT_MODEL;
 export const VERCEL_GATEWAY_URL = 'https://ai-gateway.vercel.sh/v1';
 export const EDITOR_MAX_TOKENS = 8192;
 

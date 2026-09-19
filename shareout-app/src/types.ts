@@ -156,7 +156,9 @@ export interface Env {
   ANTHROPIC_API_KEY?: string;
   OPENAI_API_KEY?: string;
   VERCEL_AI_GATEWAY?: string;
-  /** Gateway model slug for the create-page build agent. Defaults to anthropic/claude-sonnet-4.6. */
+  /** Comma-separated failover order over configured AI providers (`vercel-gateway`, `anthropic`, `openai`). Unlisted configured providers follow in the default order. */
+  AI_PROVIDER_ORDER?: string;
+  /** Model for the build agent and chat agent. Gateway slug (`anthropic/claude-sonnet-5`) or first-party id. Defaults to Claude Sonnet 5. */
   BUILD_MODEL?: string;
   /** Server-side model override for the in-page pilot LLM proxy. Defaults to the provider config model. */
   PILOT_MODEL?: string;

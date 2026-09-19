@@ -18,7 +18,7 @@ Getting a working visitor chat agent takes **two** things — a common mistake i
     "agent": {
       "enabled": true,
       "systemPrompt": "You are a data analyst for this dashboard. Answer only from the data provided.",
-      "model": "claude-sonnet-4-20250514",   // optional
+      "model": "claude-sonnet-5",   // optional
       "contextJson": false,                    // optional: skip sdk.json if you feed live data
       "contextTables": ["sales"]               // optional: auto-include these tables
     }
@@ -62,7 +62,7 @@ Client-side options for the pre-built widget. **For visitor mode, `systemPrompt`
 ```typescript
 sdk.agent.configure({
   systemPrompt?: string,          // widget only; visitor prompt comes from server config
-  model?: 'claude-sonnet-4-20250514' | 'claude-3-5-haiku-20241022',
+  model?: 'claude-sonnet-5' | 'claude-haiku-4-5-20251001',
   maxTokens?: number,             // Max response tokens (default: 4096)
   temperature?: number,           // Creativity 0-1 (default: 0.7)
   context?: {
@@ -247,7 +247,7 @@ Update agent configuration (owner only).
 {
   "visitor_enabled": true,
   "visitor_system_prompt": "You are a helpful assistant.",
-  "visitor_model": "claude-sonnet-4-20250514",
+  "visitor_model": "claude-sonnet-5",
   "visitor_context_json": true,
   "visitor_context_tables": ["tasks", "users"]
 }
@@ -545,7 +545,7 @@ console.log(response.data.choices[0].message.content);
 
 // Anthropic Messages
 const claude = await sdk.secrets.post('anthropic', '/v1/messages', {
-  model: 'claude-sonnet-4-20250514',
+  model: 'claude-sonnet-5',
   max_tokens: 1024,
   messages: [{ role: 'user', content: 'Hello!' }]
 });

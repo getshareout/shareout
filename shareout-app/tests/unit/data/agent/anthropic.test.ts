@@ -14,11 +14,12 @@ import {
   chat,
   getAgentChatModel,
   getAIProviderChain,
+  getBuildConfig,
   resolveFailoverChain,
   streamChat,
 } from '../../../../src/data/agent/anthropic';
 import type { Env } from '../../../../src/types';
-import { openAIStreamBody } from './helpers';
+import { anthropicStreamBody, openAIStreamBody } from './helpers';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -36,6 +37,14 @@ function gatewayEnv(): Env {
 
 function bothEnv(): Env {
   return { VERCEL_AI_GATEWAY: 'gw-test', OPENAI_API_KEY: 'sk-test' } as Env;
+}
+
+function anthropicEnv(): Env {
+  return { ANTHROPIC_API_KEY: 'sk-ant-test' } as Env;
+}
+
+function allEnv(extra: Partial<Env> = {}): Env {
+  return { VERCEL_AI_GATEWAY: 'gw-test', ANTHROPIC_API_KEY: 'sk-ant-test', OPENAI_API_KEY: 'sk-test', ...extra } as Env;
 }
 
 async function collectStream(
@@ -68,7 +77,7 @@ describe('streamChat', () => {
     const chunks = await collectStream({} as Env);
     expect(chunks).toEqual([{
       type: 'error',
-      error: 'AI provider not configured (need VERCEL_AI_GATEWAY or OPENAI_API_KEY)',
+      error: 'AI provider not configured (set VERCEL_AI_GATEWAY, ANTHROPIC_API_KEY or OPENAI_API_KEY)',
     }]);
   });
 
@@ -195,6 +204,87 @@ describe('getAIProviderChain', () => {
   it('is empty when nothing configured', () => {
     expect(getAIProviderChain({} as Env)).toEqual([]);
   });
+
+  it('includes Anthropic between the gateway and OpenAI by default', () => {
+    const chain = getAIProviderChain(allEnv());
+    expect(chain.map((c) => c.provider)).toEqual(['vercel-gateway', 'anthropic', 'openai']);
+    expect(chain[1]).toMatchObject({ baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-5' });
+  });
+
+  it('is just Anthropic when only ANTHROPIC_API_KEY is set', () => {
+    expect(getAIProviderChain(anthropicEnv()).map((c) => c.provider)).toEqual(['anthropic']);
+  });
+
+  it('follows AI_PROVIDER_ORDER, appending unlisted providers and ignoring unknown names', () => {
+    const chain = getAIProviderChain(allEnv({ AI_PROVIDER_ORDER: ' openai, bogus ,anthropic' }));
+    expect(chain.map((c) => c.provider)).toEqual(['openai', 'anthropic', 'vercel-gateway']);
+  });
+
+  it('skips listed providers that have no key', () => {
+    const env = { OPENAI_API_KEY: 'sk-test', AI_PROVIDER_ORDER: 'anthropic,openai' } as Env;
+    expect(getAIProviderChain(env).map((c) => c.provider)).toEqual(['openai']);
+  });
+});
+
+describe('getBuildConfig', () => {
+  it('routes the gateway to Claude Sonnet 5 by default', () => {
+    expect(getBuildConfig(gatewayEnv())?.model).toBe('anthropic/claude-sonnet-5');
+  });
+
+  it('uses Claude Sonnet 5 on the Anthropic API', () => {
+    expect(getBuildConfig(anthropicEnv())).toMatchObject({ provider: 'anthropic', model: 'claude-sonnet-5' });
+  });
+
+  it('ignores a gateway-style BUILD_MODEL on the Anthropic API but honours a first-party id', () => {
+    expect(getBuildConfig({ ...anthropicEnv(), BUILD_MODEL: 'anthropic/claude-opus-5' } as Env)?.model).toBe('claude-sonnet-5');
+    expect(getBuildConfig({ ...anthropicEnv(), BUILD_MODEL: 'claude-opus-5' } as Env)?.model).toBe('claude-opus-5');
+  });
+
+  it('keeps OpenAI-only instances on the default model', () => {
+    expect(getBuildConfig(openaiEnv())?.model).toBe('gpt-4o');
+  });
+});
+
+describe('streamChat on the Anthropic API', () => {
+  it('sends the native Messages request and streams text + usage', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(anthropicStreamBody(['Hel', 'lo'], { input_tokens: 7, output_tokens: 3 }), { status: 200 }),
+    );
+
+    const chunks = await collectStream(anthropicEnv());
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://api.anthropic.com/v1/messages');
+    const headers = init.headers as Record<string, string>;
+    expect(headers['x-api-key']).toBe('sk-ant-test');
+    expect(headers['anthropic-version']).toBe('2023-06-01');
+    expect(headers.Authorization).toBeUndefined();
+    const body = JSON.parse(init.body as string);
+    expect(body).toMatchObject({ model: 'claude-sonnet-5', system: 'system prompt', stream: true, max_tokens: 100 });
+    expect(body.messages).toEqual([{ role: 'user', content: 'Hi' }]);
+    expect(chunks).toEqual([
+      { type: 'content', content: 'Hel' },
+      { type: 'content', content: 'lo' },
+      { type: 'done', usage: { input_tokens: 7, output_tokens: 3 } },
+    ]);
+  });
+
+  it('fails over to the next provider on an overloaded error event before any text', async () => {
+    const overloaded = new ReadableStream({
+      start(c) {
+        c.enqueue(new TextEncoder().encode('event: error\ndata: {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}\n\n'));
+        c.close();
+      },
+    });
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(overloaded, { status: 200 }))
+      .mockResolvedValueOnce(new Response(openAIStreamBody(['ok']), { status: 200 }));
+
+    const chunks = await collectStream({ ANTHROPIC_API_KEY: 'sk-ant-test', OPENAI_API_KEY: 'sk-test' } as Env);
+
+    expect(fetchMock.mock.calls[1][0]).toBe('https://api.openai.com/v1/chat/completions');
+    expect(chunks).toContainEqual({ type: 'content', content: 'ok' });
+  });
 });
 
 describe('resolveFailoverChain', () => {
@@ -305,6 +395,21 @@ describe('chat', () => {
       content: 'Answer',
       usage: { input_tokens: 10, output_tokens: 5 },
     });
+  });
+
+  it('returns text and usage from the Anthropic API', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({
+        content: [{ type: 'text', text: 'Ans' }, { type: 'text', text: 'wer' }],
+        usage: { input_tokens: 4, output_tokens: 2 },
+      }), { status: 200 }),
+    );
+
+    const result = await chat(anthropicEnv(), [{ role: 'user', content: 'Q' }], 'sys', '', 512);
+
+    expect(fetchMock.mock.calls[0][0]).toBe('https://api.anthropic.com/v1/messages');
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string).stream).toBeUndefined();
+    expect(result).toEqual({ content: 'Answer', usage: { input_tokens: 4, output_tokens: 2 } });
   });
 
   it('throws on API error response', async () => {

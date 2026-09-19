@@ -41,6 +41,7 @@ export const WORKSPACE_AGENT_COMPOSER_STYLES = `/* ---- agent dock (inside canva
 /* copy affordance under bot bubbles */
 .wsx-copy { align-self: flex-start; border: 0; background: transparent; color: var(--color-text-tertiary); font: 600 var(--text-xs) var(--font-body); padding: 1px 2px; cursor: pointer; opacity: 0; transition: opacity var(--duration-fast); }
 .wsx-row.bot:hover .wsx-copy { opacity: 1; }
+@media (hover: none) { .wsx-copy { opacity: 1; } }
 .wsx-copy:hover { color: var(--color-primary); }
 /* inline artifact cards */
 .wsx-cards { display: flex; flex-direction: column; gap: 7px; }

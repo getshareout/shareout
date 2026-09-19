@@ -8,7 +8,12 @@ interface ModelPrice {
 
 const PRICES: Record<string, ModelPrice> = {
   'gpt-4o': { inputPerMTok: 2_500_000, outputPerMTok: 10_000_000 },
-  // Claude models used by the Crew runtime (routed via the Vercel AI Gateway).
+  // Claude models (first-party ids and Vercel AI Gateway slugs, prefix stripped).
+  'claude-opus-5': { inputPerMTok: 5_000_000, outputPerMTok: 25_000_000 },
+  'claude-sonnet-5': { inputPerMTok: 2_000_000, outputPerMTok: 10_000_000 },
+  'claude-haiku-4-5-20251001': { inputPerMTok: 1_000_000, outputPerMTok: 5_000_000 },
+  'claude-haiku-4.5': { inputPerMTok: 1_000_000, outputPerMTok: 5_000_000 },
+  // Earlier models, kept so historical usage rows still price correctly.
   'claude-sonnet-4.6': { inputPerMTok: 3_000_000, outputPerMTok: 15_000_000 },
   'claude-sonnet-4-20250514': { inputPerMTok: 3_000_000, outputPerMTok: 15_000_000 },
   'claude-3-5-haiku-20241022': { inputPerMTok: 800_000, outputPerMTok: 4_000_000 },

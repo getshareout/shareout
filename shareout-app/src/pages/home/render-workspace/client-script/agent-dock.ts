@@ -149,10 +149,10 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
     return b;
   }
   function addCopy(col, bubble) {
-    var c = el('button', 'wsx-copy'); c.type = 'button'; c.title = 'Copy'; c.textContent = 'Copy';
+    var c = el('button', 'wsx-copy'); c.type = 'button'; c.title = t('agent.copy'); c.textContent = t('agent.copy');
     c.addEventListener('click', function () {
-      var t = bubble.innerText || bubble.textContent || '';
-      if (navigator.clipboard) navigator.clipboard.writeText(t);
+      var txt = bubble.innerText || bubble.textContent || '';
+      if (navigator.clipboard) navigator.clipboard.writeText(txt);
       c.textContent = t('agent.copied'); setTimeout(function () { c.textContent = t('agent.copy'); }, 1200);
     });
     col.appendChild(c);
@@ -270,14 +270,19 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
   }
 
   function readStream(resp, onEv) {
-    if (CC) { return (async function () { for await (var ev of CC.readSSE(resp)) onEv(ev); })(); }
+    function deliver(ev) { try { onEv(ev); } catch (e) { console.error('[agent] event handler failed', ev && ev.type, e); } }
+    if (CC) { return (async function () { for await (var ev of CC.readSSE(resp)) deliver(ev); })(); }
     var reader = resp.body.getReader(); var dec = new TextDecoder(); var buf = '';
     function pump() {
       return reader.read().then(function (r) {
         if (r.done) return;
         buf += dec.decode(r.value, { stream: true });
         var parts = buf.split('\\n\\n'); buf = parts.pop();
-        parts.forEach(function (p) { var line = p.replace(/^data: /, '').trim(); if (!line) return; try { onEv(JSON.parse(line)); } catch (e) {} });
+        parts.forEach(function (p) {
+          var line = p.replace(/^data: /, '').trim(); if (!line) return;
+          var ev; try { ev = JSON.parse(line); } catch (e) { console.warn('[agent] dropped malformed SSE event', line.slice(0, 200)); return; }
+          deliver(ev);
+        });
         return pump();
       });
     }
@@ -297,7 +302,16 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
     addMsg('user', text);
     var typing = addMsg('bot', '\\u2026'); typing.classList.add('is-typing');
     var removed = false; function killTyping() { if (!removed && typing) { var r = typing.parentNode && typing.parentNode.parentNode; if (r) r.remove(); else typing.remove(); removed = true; lastRole = 'user'; } }
-    var streamEl = null; var streamBuf = '';
+    var streamEl = null; var streamBuf = ''; var stepEl = null;
+    function showStep(label) {
+      if (!label) return;
+      if (!removed) typing.textContent = label;
+      else if (stepEl) stepEl.textContent = label;
+      else { stepEl = addMsg('bot', label); stepEl.classList.add('is-typing'); }
+      if (announcer) announcer.announce(label);
+      scrollEnd();
+    }
+    function clearStep() { if (stepEl) { var r = stepEl.parentNode && stepEl.parentNode.parentNode; if (r) r.remove(); else stepEl.remove(); stepEl = null; } }
     function ensureStream() { killTyping(); if (!streamEl) { streamEl = addMsg('bot', ''); streamEl.classList.add('is-streaming'); } return streamEl; }
     function finalizeStream(finalText) {
       killTyping();
@@ -317,6 +331,8 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
         }
         return readStream(resp, function (ev) {
           if (ev.type === 'typing') return;
+          if (ev.type === 'tool_step') { showStep(ev.label); return; }
+          if (ev.type !== 'thread') clearStep();
           if (ev.type === 'thread') { setThread(ev.id); }
           else if (ev.type === 'delta') { if (ev.text) { ensureStream(); streamBuf += ev.text; streamEl.textContent = streamBuf; scrollEnd(); } }
           else if (ev.type === 'text') { finalizeStream(ev.text); }
@@ -328,7 +344,7 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
         });
       })
       .catch(function (e) { killTyping(); if (e && e.name === 'AbortError') { if (streamBuf) finalizeStream(); else addMsg('bot', 'Stopped.'); } else addMsg('bot', 'Connection dropped.'); })
-      .then(function () { setSending(false); currentAbort = null; });
+      .then(function () { clearStep(); setSending(false); currentAbort = null; });
   }
 
   // ----- thread history drawer -----

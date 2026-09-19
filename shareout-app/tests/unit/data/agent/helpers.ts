@@ -183,3 +183,22 @@ export function openAIStreamBody(chunks: string[], usage?: { prompt_tokens: numb
     },
   });
 }
+
+/** A native Anthropic Messages SSE body: message_start usage, text deltas, message_delta usage. */
+export function anthropicStreamBody(chunks: string[], usage = { input_tokens: 0, output_tokens: 0 }): ReadableStream<Uint8Array> {
+  const events: unknown[] = [
+    { type: 'message_start', message: { usage: { input_tokens: usage.input_tokens, output_tokens: 1 } } },
+    { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+    ...chunks.map((text) => ({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } })),
+    { type: 'content_block_stop', index: 0 },
+    { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: usage.output_tokens } },
+    { type: 'message_stop' },
+  ];
+  const payload = events.map((e) => `event: ${(e as { type: string }).type}\ndata: ${JSON.stringify(e)}\n\n`).join('');
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(payload));
+      controller.close();
+    },
+  });
+}

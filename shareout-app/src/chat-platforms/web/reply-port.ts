@@ -14,6 +14,8 @@ export function agentMediaKey(userId: string, token: string): string {
 export type WebAgentEvent =
   | { type: 'typing' }
   | { type: 'delta'; text: string }
+  /** A tool started running — the client shows the label until the next output. */
+  | { type: 'tool_step'; label: string }
   | { type: 'text'; text: string }
   | { type: 'cards'; items: ArtifactCardItem[] }
   | { type: 'media'; token: string; mime: string; filename: string; caption?: string }
@@ -48,6 +50,9 @@ export function createWebReplyPort(env: Env, userId: string, emit: (ev: WebAgent
     },
     async sendTyping() {
       emit({ type: 'typing' });
+    },
+    async sendToolProgress(label) {
+      emit({ type: 'tool_step', label });
     },
     async sendImage(bytes, filename, caption) {
       return park(bytes, 'image/png', filename, caption);

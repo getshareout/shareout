@@ -45,7 +45,7 @@ describe('buildInstanceConfig', () => {
     const settings = cfg.gaps.map((g) => g.setting);
 
     expect(settings).toContain('SHAREOUT_BASE_URL');
-    expect(settings).toContain('VERCEL_AI_GATEWAY or OPENAI_API_KEY');
+    expect(settings).toContain('ANTHROPIC_API_KEY, VERCEL_AI_GATEWAY or OPENAI_API_KEY');
     expect(settings).toContain('CREDENTIALS_KEY');
     expect(settings).toContain('EMAIL binding');
     expect(settings).toContain('INSTANCE_ADMIN_EMAILS');

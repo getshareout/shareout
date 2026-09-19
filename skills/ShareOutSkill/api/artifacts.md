@@ -102,7 +102,7 @@ When `moderation.status === "pending"`, tell the user their page is **under an a
 |-------|------|-------------|
 | `enabled` | boolean | Turn the agent on/off (default `true` when the block is present) |
 | `systemPrompt` | string | Visitor system prompt |
-| `model` | string | e.g. `claude-sonnet-4-20250514` |
+| `model` | string | e.g. `claude-sonnet-5` |
 | `maxTokens` / `temperature` | number | Generation settings |
 | `contextJson` | boolean | Include `sdk.json` in context (default `true`) |
 | `contextTables` | string[] | Table names to auto-include in context |

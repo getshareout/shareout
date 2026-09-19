@@ -104,9 +104,9 @@ export async function buildInstanceConfig(env: Env): Promise<InstanceConfig> {
   }
   if (providers.length === 0) {
     gaps.push({
-      setting: 'VERCEL_AI_GATEWAY or OPENAI_API_KEY',
+      setting: 'ANTHROPIC_API_KEY, VERCEL_AI_GATEWAY or OPENAI_API_KEY',
       disables: 'Crew AI, the home assistant, in-artifact chat, editor AI, knowledge distillation, auto-summaries',
-      fix: 'npx wrangler secret put OPENAI_API_KEY (or VERCEL_AI_GATEWAY)',
+      fix: 'npx wrangler secret put ANTHROPIC_API_KEY (or VERCEL_AI_GATEWAY / OPENAI_API_KEY)',
     });
   }
   if (!env.CREDENTIALS_KEY) {
