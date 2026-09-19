@@ -86,8 +86,6 @@ export function buildWorkspaceBody(args: RenderArgs): string {
       </div>
       <button class="wsx__create" id="wsxCreateBtn" type="button" data-i18n-title="nav.create" title="Create with AI">${svg(ICON.foryou)}<span data-i18n="nav.create">Create with AI</span></button>
       ${buildNav(args, canManage).map((n, i) => railNav(n, i === 0)).join('')}
-      <div class="wsx__railgroup-title" data-i18n="nav.following">Following</div>
-      <div class="wsx__follows" id="wsxFollows"></div>
       <div class="wsx__railspace"></div>
       <footer class="wsx__railfoot">
         <button class="wsx__footbtn" id="wsxHelpBtn" type="button" data-i18n-aria="help.title" data-i18n-title="help.title" aria-label="Help &amp; support" title="Help &amp; support">${svg('<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/>')}</button>

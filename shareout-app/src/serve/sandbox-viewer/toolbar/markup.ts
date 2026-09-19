@@ -1,4 +1,5 @@
 import { escapeHtml } from '../../utils';
+import { shareModalMarkup } from '../../../components/share-modal';
 import type { ToolbarRenderContext } from '../types';
 
 /** HTML for toolbar buttons, overlays, and comment panel shells. */
@@ -14,6 +15,7 @@ export function renderToolbarMarkup(ctx: ToolbarRenderContext): string {
     hasMetrics,
     baseUrl,
     slug,
+    artifactId,
     loginRedirect,
     userLabel,
     userFirstName,
@@ -90,6 +92,17 @@ export function renderToolbarMarkup(ctx: ToolbarRenderContext): string {
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
         </svg>
         <span id="so-fav-label">${isFav ? 'Favorited' : 'Favorite'}</span>
+      </button>
+      <button class="so-toolbar-btn" id="so-share-btn" onclick='openShare(${JSON.stringify(artifactId)},${JSON.stringify(slug)},${JSON.stringify(slug)},${adminInfo?.canEdit ? 'true' : 'false'})' title="Share this page">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+        </svg>
+        Share
+      </button>
+      <button class="so-toolbar-btn so-live-presence-btn" id="so-live-presence-btn" title="Live viewers">
+        <span class="so-live-presence-dot" aria-hidden="true"></span>
+        <span id="so-live-presence-label">0 viewing now</span>
+        <span class="so-live-presence-avatars" id="so-live-presence-avatars" aria-hidden="true"></span>
       </button>` : ''}${skillsBtn}${loggedIn && !adminInfo ? `
       <button class="so-toolbar-btn" onclick="soOpenSchedule(true)" title="Get this page sent to you on a schedule (email, Telegram, or Slack)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -201,6 +214,7 @@ export function renderToolbarMarkup(ctx: ToolbarRenderContext): string {
         <div class="so-cmt-loading">Loading comments…</div>
       </div>
       <div class="so-cmt-typing" id="so-cmt-typing"></div>
+      <div class="so-cmt-conn" id="so-cmt-conn" aria-live="polite"></div>
       <div class="so-cmt-composer">
         <div class="so-cmt-mentionbox" id="so-cmt-mentionbox"></div>
         ${!loggedIn ? `<input type="text" class="so-cmt-textarea" id="so-cmt-guest-name" placeholder="${commentsIdentityMode === 'named' ? 'Your name (required)' : 'Your name (optional)'}" aria-label="Your name" maxlength="80" style="min-height:0;height:36px;margin-bottom:8px;resize:none">` : ''}
@@ -215,5 +229,5 @@ export function renderToolbarMarkup(ctx: ToolbarRenderContext): string {
         <div class="so-cmt-replying" id="so-cmt-replying" style="margin-top:8px"></div>
       </div>
     </div>
-  </div>` : ''}${skillsOverlay}`;
+  </div>` : ''}${loggedIn ? shareModalMarkup() : ''}${skillsOverlay}`;
 }

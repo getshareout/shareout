@@ -254,4 +254,51 @@ describe('sandbox-viewer modules', () => {
     expect(html).toContain('Live Studio is not enabled for this workspace');
     expect(html).not.toContain('href="https://shareout.site/a/demo/edit"');
   });
+
+  it('wires comments post toasts and connection state messaging in the viewer client script', () => {
+    const html = renderToolbar(buildToolbarContext({
+      loggedIn: true,
+      isFav: false,
+      commentsEnabled: true,
+      commentCount: 0,
+      hasMetrics: false,
+      adminInfo: null,
+      currentUser: { email: 'leo@example.com', name: 'Leo', picture: '' },
+      hideToolbar: false,
+      baseUrl: 'https://shareout.site',
+      slug: 'demo',
+      artifactId: 'art_1',
+      visualEditorEnabled: true,
+      attachedSkills: [],
+    })!);
+
+    expect(html).toContain("cmtToast('Comment posted.', 'success')");
+    expect(html).toContain("cmtToast(err.message === 'auth' ?");
+    expect(html).toContain('Please log in to comment.');
+    expect(html).toContain("post comment. Try again?', 'error')");
+    expect(html).toContain("setConnState('reconnecting')");
+    expect(html).toContain('id="so-cmt-conn"');
+  });
+
+  it('renders live presence UI and polling script on the toolbar chrome', () => {
+    const html = renderToolbar(buildToolbarContext({
+      loggedIn: true,
+      isFav: false,
+      commentsEnabled: false,
+      commentCount: 0,
+      hasMetrics: false,
+      adminInfo: null,
+      currentUser: { email: 'leo@example.com', name: 'Leo', picture: '' },
+      hideToolbar: false,
+      baseUrl: 'https://shareout.site',
+      slug: 'demo',
+      artifactId: 'art_1',
+      visualEditorEnabled: true,
+      attachedSkills: [],
+    })!);
+
+    expect(html).toContain('id="so-live-presence-btn"');
+    expect(html).toContain("fetch('https://shareout.site/v1/artifacts/art_1/presence'");
+    expect(html).toContain("safeCount + ' viewing now'");
+  });
 });

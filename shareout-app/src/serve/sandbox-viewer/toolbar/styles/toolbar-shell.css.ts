@@ -20,7 +20,7 @@ export const toolbarShellStyles = `
     #shareout-admin-toolbar.so-pos-tr { bottom: auto; left: auto; top: 20px; right: 20px; flex-direction: row; }
     #shareout-admin-toolbar.so-pos-tl { bottom: auto; right: auto; top: 20px; left: 20px; flex-direction: row-reverse; }
     #shareout-admin-toolbar.so-dragging { transition: none; user-select: none; }
-    #shareout-admin-toolbar.so-dragging #so-toolbar-trigger { cursor: grabbing; box-shadow: 0 12px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1); }
+    #shareout-admin-toolbar.so-dragging #so-toolbar-trigger { cursor: grabbing; box-shadow: var(--shadow-xl); }
     #so-toolbar-items {
       display: flex;
       align-items: center;
@@ -39,7 +39,7 @@ export const toolbarShellStyles = `
       border-radius: 12px;
       font-size: 14px;
       font-weight: 500;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.04);
+      box-shadow: var(--shadow-md);
       border: 1px solid rgba(231, 229, 228, 0.6);
       cursor: pointer;
       opacity: 0;
@@ -63,7 +63,7 @@ export const toolbarShellStyles = `
     #shareout-admin-toolbar.so-open .so-toolbar-btn.is-disabled { opacity: 0.45; }
     .so-toolbar-btn:hover {
       background: rgba(255, 255, 255, 0.95);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
+      box-shadow: var(--shadow-lg);
       transform: translateY(-1px) !important;
     }
     .so-toolbar-btn svg { color: var(--color-text-secondary); }
@@ -74,16 +74,58 @@ export const toolbarShellStyles = `
       cursor: not-allowed;
       pointer-events: none;
       transform: none !important;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      box-shadow: var(--shadow-sm);
     }
     .so-toolbar-btn.is-disabled svg { color: var(--color-text-tertiary); }
     .so-toolbar-btn.is-disabled:hover {
       background: rgba(255, 255, 255, 0.85);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      box-shadow: var(--shadow-sm);
       transform: none !important;
     }
     .so-fav-btn.active { color: var(--color-text); }
     .so-fav-btn.active svg { color: var(--color-warning); fill: var(--color-warning); }
+    .so-live-presence-btn {
+      gap: 8px;
+      padding-right: 12px;
+      min-width: 168px;
+    }
+    .so-live-presence-btn.is-active .so-live-presence-dot { background: var(--color-success); }
+    .so-live-presence-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--color-text-tertiary);
+      box-shadow: 0 0 0 2px var(--color-bg-elevated);
+      flex-shrink: 0;
+    }
+    .so-live-presence-avatars {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      flex-direction: row-reverse;
+    }
+    .so-live-presence-avatar {
+      width: 20px;
+      height: 20px;
+      margin-left: -6px;
+      border-radius: 999px;
+      border: 1px solid var(--color-bg-elevated);
+      background: var(--color-surface);
+      color: var(--color-text-secondary);
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 20px;
+      text-align: center;
+    }
+    .so-live-presence-avatar.is-you {
+      background: var(--color-primary-light);
+      color: var(--color-primary);
+    }
+    .so-live-presence-more {
+      width: auto;
+      min-width: 20px;
+      padding: 0 4px;
+    }
     .so-avatar-btn { padding-left: 6px !important; }
     .so-avatar {
       width: 22px;
@@ -127,7 +169,7 @@ export const toolbarShellStyles = `
       background: rgba(255, 255, 255, 0.9);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
-      box-shadow: 0 4px 16px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.06);
+      box-shadow: var(--shadow-md);
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -138,7 +180,7 @@ export const toolbarShellStyles = `
     }
     #so-toolbar-trigger:hover {
       background: rgba(255, 255, 255, 1);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.14), 0 2px 6px rgba(0,0,0,0.08);
+      box-shadow: var(--shadow-lg);
     }
     #so-toolbar-trigger .so-trig-icon {
       color: var(--color-text-secondary);

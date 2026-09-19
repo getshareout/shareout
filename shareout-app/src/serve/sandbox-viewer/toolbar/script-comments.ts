@@ -14,6 +14,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
     var cmtWsReconnect = 0;
     var cmtTypingSent = 0;
     var cmtTypingHide = null;
+    var cmtToastHide = null;
     var cmtMyName = 'You';
     var cmtReactState = {};
     var REACT_EMOJIS = ['👍','❤️','✅','🎉','👀'];
@@ -37,6 +38,24 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
     function markRead() {
       setUnread(0);
       fetch(cmtApi + '/_read', { method: 'POST', credentials: 'include' }).catch(function() {});
+    }
+    function cmtToast(message, tone) {
+      var host = document.getElementById('so-comments-overlay');
+      if (!host) return;
+      var el = document.getElementById('so-cmt-toast');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'so-cmt-toast';
+        el.className = 'so-cmt-toast';
+        host.appendChild(el);
+      }
+      el.className = 'so-cmt-toast' + (tone ? ' is-' + tone : '');
+      el.textContent = message;
+      el.classList.add('show');
+      if (cmtToastHide) clearTimeout(cmtToastHide);
+      cmtToastHide = setTimeout(function() {
+        el.classList.remove('show');
+      }, 2200);
     }
 
     window.openComments = function() {
@@ -409,7 +428,10 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
         })
         .then(function(res) {
           var real = res && res.data;
-          if (real && real.id) reconcileOptimistic(tmpId, real, !!replyTo);
+          if (real && real.id) {
+            reconcileOptimistic(tmpId, real, !!replyTo);
+            cmtToast('Comment posted.', 'success');
+          }
           else { removeCardDom(tmpId); cmtRoots = cmtRoots.filter(function(c) { return c.id !== tmpId; }); }
         })
         .catch(function(err) {
@@ -418,7 +440,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
           cmtRoots = cmtRoots.filter(function(c) { return c.id !== tmpId; });
           updatePins(cmtRoots);
           ta.value = content;
-          alert(err.message === 'auth' ? 'Please log in to comment.' : 'Couldn\\'t post comment. Try again?');
+          cmtToast(err.message === 'auth' ? 'Please log in to comment.' : 'Couldn\\'t post comment. Try again?', 'error');
         });
     };
 
@@ -789,11 +811,26 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
         try { cmtWs.send(JSON.stringify({ type: 'typing', name: cmtMyName })); } catch (e) {}
       }
     }
+    function setConnState(state) {
+      var el = document.getElementById('so-cmt-conn');
+      if (!el) return;
+      if (state === 'online') {
+        el.classList.remove('show', 'is-error');
+        el.textContent = '';
+        return;
+      }
+      if (state === 'connecting') el.textContent = 'Connecting…';
+      else if (state === 'reconnecting') el.textContent = 'Reconnecting…';
+      else el.textContent = 'Connection lost. Reopen comments to retry.';
+      el.classList.add('show');
+      el.classList.toggle('is-error', state === 'offline');
+    }
 
     function ensureCmtWs() {
       if (cmtWs && (cmtWs.readyState === 0 || cmtWs.readyState === 1)) return;
+      setConnState(cmtWsReconnect > 0 ? 'reconnecting' : 'connecting');
       try { cmtWs = new WebSocket(cmtWsUrl); } catch (e) { return; }
-      cmtWs.onopen = function() { cmtWsReconnect = 0; };
+      cmtWs.onopen = function() { cmtWsReconnect = 0; setConnState('online'); };
       cmtWs.onmessage = function(e) {
         var data;
         try { data = JSON.parse(e.data); } catch (err) { return; }
@@ -805,11 +842,12 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
       };
       cmtWs.onclose = function() {
         cmtWs = null;
-        if (cmtWsReconnect >= 8) return;
+        if (cmtWsReconnect >= 8) { setConnState('offline'); return; }
         cmtWsReconnect++;
+        setConnState('reconnecting');
         setTimeout(ensureCmtWs, Math.min(1000 * Math.pow(1.5, cmtWsReconnect), 20000));
       };
-      cmtWs.onerror = function() {};
+      cmtWs.onerror = function() { setConnState('reconnecting'); };
     }
 
     // Connect at load so the toolbar badge updates live and pings flash even
