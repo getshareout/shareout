@@ -1,16 +1,10 @@
+// @vitest-environment node
 /**
- * Pins the provision:cf R2 create classifier. The script is a CLI with no exports,
- * so this duplicates classifyR2Create from scripts/provision-cloudflare.mjs — keep
- * them in sync. Existing buckets must be loud: silent reuse shares prod artifacts.
+ * Pins the provision:cf R2 create classifier from the real script module.
+ * Existing buckets must be loud: silent reuse shares prod artifacts.
  */
 import { describe, expect, it } from 'vitest';
-
-function classifyR2Create(out: string): 'created' | 'exists' | 'error' {
-  if (/Created bucket/i.test(out)) return 'created';
-  if (/already exists|Bucket already|403|409/i.test(out) || /exist/i.test(out)) return 'exists';
-  if (!/ERROR|✘/.test(out)) return 'created';
-  return 'error';
-}
+import { classifyR2Create } from '../../scripts/lib/r2-create-status.mjs';
 
 describe('provision:cf R2 create classifier', () => {
   it('treats a fresh create as created', () => {

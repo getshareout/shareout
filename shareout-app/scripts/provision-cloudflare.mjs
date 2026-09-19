@@ -16,6 +16,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
+import { classifyR2Create } from './lib/r2-create-status.mjs';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const tomlPath = join(appDir, 'wrangler.toml');
@@ -76,15 +77,6 @@ function createKv(title) {
   const m = out.match(/id\s*=\s*"([0-9a-f]{32})"/i) || out.match(/\b([0-9a-f]{32})\b/i);
   if (!m) throw new Error(`Could not parse KV id from:\n${out}`);
   return m[1];
-}
-
-/** Classify wrangler `r2 bucket create` stdout/stderr. Exported shape mirrored in unit test. */
-function classifyR2Create(out) {
-  if (/Created bucket/i.test(out)) return 'created';
-  // "already exists" variants differ by wrangler version — non-fatal but loud.
-  if (/already exists|Bucket already|403|409/i.test(out) || /exist/i.test(out)) return 'exists';
-  if (!/ERROR|✘/.test(out)) return 'created';
-  return 'error';
 }
 
 function ensureR2(name) {
