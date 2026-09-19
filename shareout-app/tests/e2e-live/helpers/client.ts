@@ -205,6 +205,10 @@ export class ShareOutClient {
     );
   }
 
+  async getJobLogs(jobId: string) {
+    return this.request<{ logs: Array<{ id: string; status: string; error: string | null }> }>(`/v1/jobs/${jobId}/logs`);
+  }
+
   async deleteJob(jobId: string) {
     return this.request(`/v1/jobs/${jobId}`, { method: 'DELETE' });
   }

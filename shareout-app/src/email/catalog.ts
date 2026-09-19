@@ -62,6 +62,7 @@ export interface ActionItemAssignedData { fromName: string; title: string; snipp
 export interface ActionItemResolvedData { fromName: string; title: string; snippet: string; url: string }
 export interface PublishApprovalData { kind: 'request' | 'approved' | 'declined' }
 export interface CrewApprovalData { count: number }
+export interface JobFailedData { jobName: string; error: string }
 export interface ShareData {
   artifactName: string;
   artifactDescription?: string | null;
@@ -455,6 +456,26 @@ export const EMAILS = {
       };
     },
   } satisfies EmailTemplate<CrewApprovalData>,
+
+  job_failed: {
+    category: 'product',
+    audiences: ['ANY'],
+    trigger: 'notifyJobFailed() — a scheduled job that was working (or never ran) just failed.',
+    build: ({ jobName, error }: JobFailedData, { baseUrl }) => {
+      const next = 'It will try again at its next scheduled time. Open Schedules to fix it or run it now.';
+      return {
+        subject: `Your schedule "${jobName}" failed`,
+        preheader: error,
+        heading: 'A schedule failed',
+        bodyHtml:
+          p(`<strong>${escapeHtml(jobName)}</strong> failed on its last run:`) +
+          p(escapeHtml(error)) +
+          p(next),
+        cta: { label: 'Open Schedules', href: `${baseUrl}/home#l/schedules` },
+        bodyText: `${jobName} failed on its last run:\n\n${error}\n\n${next}`,
+      };
+    },
+  } satisfies EmailTemplate<JobFailedData>,
 
   access_request: {
     category: 'product',

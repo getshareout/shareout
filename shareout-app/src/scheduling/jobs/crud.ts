@@ -10,6 +10,7 @@ import { enableInbound, disableInbound } from '../../email/inbox-store';
 import { DEST_FEATURE, JOB_LIMIT_PER_USER } from './constants';
 import { getNextRunTime, parseCronSchedule } from './cron';
 import { invalidateViewEventJobCache } from './event-cache';
+import { missingJobConnection } from './connection-check';
 import { checkViewerSelfDelivery, canManageJob } from './permissions';
 import {
   JOB_BACKOFF_TYPES,
@@ -105,6 +106,10 @@ export async function createJob(
   );
   if (configError) {
     return { error: configError };
+  }
+  const connectionError = await missingJobConnection(env, request.artifact_id, request.config);
+  if (connectionError) {
+    return { error: connectionError };
   }
 
   const backoffType = request.retry_config?.backoffType ?? 'fixed';
@@ -278,6 +283,13 @@ export async function updateJob(
 
   if (!(await canManageJob(env, job, userId))) {
     return { error: 'Permission denied' };
+  }
+
+  if (updates.enabled === true || updates.config) {
+    const connectionError = await missingJobConnection(
+      env, job.artifact_id, updates.config ?? JSON.parse(job.config as unknown as string),
+    );
+    if (connectionError) return { error: connectionError };
   }
 
   const sets: string[] = [];

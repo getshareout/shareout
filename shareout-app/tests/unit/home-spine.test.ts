@@ -49,9 +49,17 @@ describe('queryNeedsYou — actionable rows only, newest-first', () => {
     const events = await queryNeedsYou(env, user, {}, vis);
     expect(events.map((e) => e.kind)).toEqual(['alert', 'test', 'share', 'access', 'run', 'comment']);
     expect(events.find((e) => e.kind === 'share')!.summary).toBe('shared this with you');
-    expect(events.find((e) => e.kind === 'run')!.summary).toBe('email failed');
+    expect(events.find((e) => e.kind === 'run')!.summary).toBe('email schedule failed');
     expect(events.find((e) => e.kind === 'test')!.summary).toBe('2 tests failed');
     expect(events.find((e) => e.kind === 'access')!.summary).toContain('wants access');
+  });
+
+  it('says which schedule failed and why', async () => {
+    const { env } = mkEnv((sql) => sql.includes('FROM job_runs jl')
+      ? [{ id: 'r2', artifact_id: 'a3', artifact_name: 'A3', slug: 'a3', action: 'query_snapshot', title: 'Morning KPIs', error: 'Connection "warehouse" not found', ts: 200 }]
+      : []);
+    const events = await queryNeedsYou(env, user, {}, vis);
+    expect(events[0].summary).toBe('Morning KPIs failed · Connection "warehouse" not found');
   });
 
   // queryNeedsYou merges every source in JS and sorts with `y.ts - x.ts`. A source that

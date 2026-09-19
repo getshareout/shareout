@@ -7,6 +7,7 @@
  * - `cron.ts` — schedule parsing and next-run computation (UTC)
  * - `retry.ts` — failure backoff delays
  * - `permissions.ts` — viewer self-delivery and manage checks
+ * - `connection-check.ts` — named connection must exist before a job is saved/enabled
  * - `crud.ts` — create, list, update, delete, logs
  * - `runner.ts` — delivery-registry execution and step logging
  * - `execute.ts` — cron tick and manual runs
@@ -40,6 +41,7 @@ export type {
 export { parseCronSchedule, getNextRunTime } from './jobs/cron';
 export { calculateBackoffDelay } from './jobs/retry';
 export { checkViewerSelfDelivery } from './jobs/permissions';
+export { missingJobConnection } from './jobs/connection-check';
 export {
   createJob,
   listJobs,

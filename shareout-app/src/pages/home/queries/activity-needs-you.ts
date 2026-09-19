@@ -266,7 +266,7 @@ export async function queryNeedsYou(
   if (on('run')) {
     push(env.DB.prepare(`
       SELECT jl.id AS id, a.id AS artifact_id, a.name AS artifact_name, a.slug AS slug,
-             sj.action AS action, CAST(jl.created_at AS INTEGER) AS ts
+             sj.action AS action, sj.title AS title, jl.error AS error, CAST(jl.created_at AS INTEGER) AS ts
       FROM job_runs jl
       JOIN scheduled_jobs sj ON sj.id = jl.job_id
       JOIN artifacts a ON a.id = sj.artifact_id
@@ -276,7 +276,8 @@ export async function queryNeedsYou(
     `).bind(...base.joinParams, ...base.whereParams, limit).all(),
       (rows) => rows.map((r) => ({
         kind: 'run', id: r.id, artifact_id: r.artifact_id, artifact_name: r.artifact_name,
-        slug: r.slug, actor: null, actor_picture: null, summary: `${r.action} failed`, ts: r.ts,
+        slug: r.slug, actor: null, actor_picture: null,
+        summary: `${r.title || `${r.action} schedule`} failed${r.error ? ` · ${trim140(r.error)}` : ''}`, ts: r.ts,
       })));
   }
 
