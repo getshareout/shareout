@@ -405,10 +405,21 @@ export function runCrew(opts: CrewRunOpts): ReadableStream {
   const encoder = new TextEncoder();
   return new ReadableStream({
     async start(controller) {
-      const emit = (ev: CrewSseEvent) =>
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(ev)}\n\n`));
+      // A closed tab must not abort the run: the loop keeps going and persists
+      // its events; only the live view is lost.
+      const emit = (ev: CrewSseEvent) => {
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(ev)}\n\n`));
+        } catch {
+          /* client disconnected */
+        }
+      };
       await executeCrewRun(opts, emit);
-      controller.close();
+      try {
+        controller.close();
+      } catch {
+        /* already closed */
+      }
     },
   });
 }

@@ -87,6 +87,12 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 .wsx__view code { font: 600 0.85em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--color-surface); padding: 1px 6px; border-radius: 6px; color: var(--color-text); }
 .wsx-sched__actions { display: flex; gap: 8px; margin-top: 10px; }
 .wsx-sched__actions .wsx-abtn { min-height: 30px; padding: 0 12px; font-size: var(--text-xs); }
+.wsx-sched__actions .wsx-runst { align-self: center; margin: 0; }
+.wsx-runst { font-size: var(--text-xs); color: var(--color-text-secondary); margin: 0 0 10px; overflow-wrap: anywhere; }
+.wsx-runst:empty { display: none; }
+.wsx-runst.is-ok, .wsx-crewlog__ln.is-ok { color: var(--color-success); }
+.wsx-runst.is-fail, .wsx-crewlog__ln.is-fail { color: var(--color-danger, var(--color-error)); }
+.wsx-crewlog { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow: auto; margin-top: 10px; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); font-size: var(--text-xs); color: var(--color-text-secondary); overflow-wrap: anywhere; }
 .wsx-abtn.danger:hover { border-color: var(--color-danger, var(--color-error)); color: var(--color-danger, var(--color-error)); background: color-mix(in srgb, var(--color-danger, var(--color-error)) 10%, transparent); } .wsx-abtn.is-on { border-color: var(--color-success); color: var(--color-success); background: color-mix(in srgb, var(--color-success) 12%, transparent); } .wsx-abtn--primary.is-on { color: var(--color-text-inverse); background: var(--color-success); } .wsx-skill__md { max-height: 52vh; overflow: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-subtle, var(--color-bg-elevated)); padding: 12px 14px; } .wsx-skill__pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: var(--text-xs)/1.6 var(--font-mono, ui-monospace, monospace); color: var(--color-text); } .wsx-skill__foot { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; } .wsx-skill__hint { color: var(--color-text-secondary); font-size: var(--text-xs); } .wsx-skill__btns { display: flex; flex-wrap: wrap; gap: 8px; }
 .wsx-msg--brief { align-self: stretch; max-width: 100%; background: var(--color-primary-light); color: var(--color-text); border: 1px solid color-mix(in srgb, var(--color-primary) 25%, transparent); line-height: 1.55; }
 /* ---- Connectors lens ---- */
