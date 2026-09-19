@@ -101,7 +101,7 @@ direct-from-R2. See [../api/jobs.md](../api/jobs.md) for the job API.
 - Live `query`/`fetch` is **owner-only** (viewers with artifact password cannot proxy credentials).
 - Server-side `query` (and scheduled refresh) supports generic `rest_api` connections
   today; for warehouses use the `rows` push form or platform `_internalFetch` — see [live-data.md](live-data.md).
-- Extract size capped at the dataset per-file limit (Free 25MB · Pro/Teams 500MB) and the workspace storage quota / table limits. Over-cap materialize fails with `FILE_TOO_LARGE` / `STORAGE_QUOTA_EXCEEDED`.
+- Extract size capped at the dataset per-file limit (500MB, flat — no plan tiers) and the instance-wide storage quota / table limits. Over-cap materialize fails with `FILE_TOO_LARGE` / `STORAGE_QUOTA_EXCEEDED`.
 - Connection auth: encrypted at rest; private to the artifact or workspace.
 
 ## Provenance

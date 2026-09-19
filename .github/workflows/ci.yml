@@ -39,6 +39,7 @@ jobs:
           npm run check:ui
           npm run check:access-seams
           npm run check:file-size
+          npm run check:skill-links
       # The blocklist of customer names is confidential, so it lives in a secret rather
       # than in the repo, and check:customer-names exits 1 when it is unset rather than
       # passing vacuously. Secrets are not exposed to fork PRs, so this gate is skipped

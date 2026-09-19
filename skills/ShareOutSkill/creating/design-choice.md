@@ -57,9 +57,9 @@ The tells that scream "auto-generated" (full ban list + pre-ship checklist in [.
 
 When building a specific type, also read its visual guide:
 
-- Dashboards: [../modules/dashboards/design/](../modules/dashboards/design/)
-- Slides: [../modules/slides/design/](../modules/slides/design/)
-- Mobile/PWA: [../modules/mobile/design/](../modules/mobile/design/)
+- Dashboards: [../modules/dashboards/design/README.md](../modules/dashboards/design/README.md)
+- Slides: [../modules/slides/design/README.md](../modules/slides/design/README.md)
+- Mobile/PWA: [../modules/mobile/design/README.md](../modules/mobile/design/README.md)
 
 ## Related
 

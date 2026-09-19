@@ -84,7 +84,7 @@
     },
     {
       "name": "Account",
-      "description": "Plan tier and upgrades."
+      "description": "Account settings and profile."
     },
     {
       "name": "Auth",
@@ -566,7 +566,7 @@
           "Artifacts"
         ],
         "summary": "Update artifact metadata",
-        "description": "Update visibility, name, social link-preview fields, or anonymous-access opt-ins. Public visibility requires a paid plan or paid Teams workspace; otherwise visibility is held with code `VISIBILITY_HELD` and a paywall notice.",
+        "description": "Update visibility, name, social link-preview fields, or anonymous-access opt-ins. Public visibility is an instance-policy question, not a billing one — if the operator disabled open visibility instance-wide and the publisher isn't in the rollout, visibility is held with code `VISIBILITY_HELD`.",
         "operationId": "updateArtifact",
         "requestBody": {
           "required": true,

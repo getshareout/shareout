@@ -34,6 +34,7 @@ npm run check:design-tokens
 npm run check:ui
 npm run check:domains
 npm run check:customer-names
+npm run check:skill-links
 npm run check:migrations
 npm run check:access-seams
 npm run check:file-size

@@ -57,6 +57,5 @@ Each pattern file contains:
 
 ## Related
 
-- [Blocks](../reference/blocks.md) - Original block reference (legacy location)
 - [SDK Overview](../sdk/overview.md) - SDK loading
 - [HTML Spec](../core/html-spec/overview.md) - Compliance requirements

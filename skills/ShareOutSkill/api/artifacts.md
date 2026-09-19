@@ -328,7 +328,7 @@ Common fields:
 
 All `allow_anon_*` flags default to `false`. See [modules/_shared/publishing.md](../modules/_shared/publishing.md#public-artifacts-read-only-by-default).
 
-**Paid visibility gate.** Public visibility requires a paid plan or paid Teams workspace. Free accounts get `notice` on publish or `VISIBILITY_HELD` on PATCH — see [modules/_shared/publishing.md](../modules/_shared/publishing.md).
+**Visibility is an instance-policy question, not a billing one — there is no paid tier in this build.** An operator can disable public links instance-wide (`OPEN_VISIBILITY_DISABLED`); when that's set, publishers outside the instance's public rollout get `notice` on publish or `VISIBILITY_HELD` on PATCH — see [modules/_shared/publishing.md](../modules/_shared/publishing.md).
 
 Transitioning **into** `public` may run an automated content-safety check. If it isn't cleared instantly, PATCH returns `202` with `code: "MODERATION_HELD"`, a `reason`, and the artifact stays `private` — but it is re-checked automatically within the hour and goes public by itself once it clears (no re-publish needed).
 
@@ -425,7 +425,7 @@ Upload a custom thumbnail (max 500KB, webp/png/jpeg). See [SKILL.md § Thumbnail
 
 ## Analytics
 
-View counts and performance for published artifacts. Requires `advanced_analytics` on the account tier (Pro or Teams).
+View counts and performance for published artifacts. Available to the artifact's owner/collaborators — no tier requirement.
 
 ### Account roll-up
 

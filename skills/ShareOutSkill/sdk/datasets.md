@@ -49,15 +49,15 @@ Datasets are written by **materializing** a query or pushing rows — see
 
 | Constraint | Value |
 |------------|-------|
-| Per file (Free) | 25 MB |
-| Per file (Pro / Teams) | 500 MB |
-| Total storage | Free 50 MB · Pro 5 GB · Teams 10 GB/seat |
+| Per file | 500 MB |
+| Total storage | Instance-wide operator setting (`STORAGE_QUOTA_BYTES`), unset by default (unlimited) |
 | Formats | `json`, `csv` |
 
-Per-file and total-storage caps are enforced at upload **and** at `materialize()` — an
-over-cap upload returns `FILE_TOO_LARGE` (413) and an over-quota one returns
-`STORAGE_QUOTA_EXCEEDED` (507). Storage counts uploaded datasets, materialized datasets,
-blobs, and artifact assets across the workspace (personal artifacts count against the owner).
+Flat cap — no per-plan tiers in this build. Per-file and total-storage caps are enforced
+at upload **and** at `materialize()` — an over-cap upload returns `FILE_TOO_LARGE` (413)
+and an over-quota one returns `STORAGE_QUOTA_EXCEEDED` (507). Storage counts uploaded
+datasets, materialized datasets, blobs, and artifact assets across the workspace
+(personal artifacts count against the owner).
 
 > `metadata().rowCount` is computed inline for files up to ~10 MB. For larger files
 > `rowCount` may be `null` (deferred) — use `page().total`, which is always exact, when you

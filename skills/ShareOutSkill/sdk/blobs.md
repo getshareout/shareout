@@ -24,7 +24,7 @@ delete(id: string): Promise<boolean>
 list(options?: { limit?: number; offset?: number }): Promise<BlobListResult>
 
 // Check storage usage
-storage(): Promise<StorageInfo>
+getStorageUsage(): Promise<BlobStorageUsage>
 ```
 
 ## Egress: downloads prefer direct R2; browser uploads go through the Worker
@@ -55,20 +55,33 @@ direct R2 serving isn't configured, so your code works in every environment.
 ## Types
 
 ```typescript
-interface BlobInfo {
+// upload() and list() entries — no contentUrl (fetch get() for that)
+interface BlobUploadResult {
   id: string;
   filename: string;
   mimeType: string;
-  size: number;
-  url: string;
+  sizeBytes: number;
   createdAt: string;
 }
 
-interface StorageInfo {
-  used: number;      // bytes
-  limit: number;     // bytes
+// get() — same fields as above, plus contentUrl
+interface BlobMetadata extends BlobUploadResult {
+  contentUrl?: string;
+}
+
+interface BlobListResult {
+  blobs: BlobMetadata[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+interface BlobStorageUsage {
+  usedBytes: number;
   blobCount: number;
-  blobLimit: number;
+  maxBytes: number;
+  maxBlobs: number;
+  availableBytes: number;
 }
 ```
 
@@ -79,6 +92,9 @@ interface StorageInfo {
 | Per artifact | 500MB |
 | Per file | 50MB |
 | Max blobs | 1000 |
+
+Flat caps — no per-plan tiers in this build. An operator can additionally cap total
+instance storage (`STORAGE_QUOTA_BYTES`, unset = unlimited).
 
 ## Allowed Types
 
@@ -91,14 +107,14 @@ Images, video, audio, PDF, TXT, CSV, Markdown.
 const input = document.querySelector('input[type="file"]');
 const file = input.files[0];
 const blob = await sdk.blobs.upload(file);
-console.log(blob.url); // CDN URL
+console.log(await sdk.blobs.getDownloadUrl(blob.id)); // direct-from-R2 URL
 
 // List uploads
 const { blobs, total } = await sdk.blobs.list({ limit: 20 });
 
 // Get storage
-const { usedBytes, limit } = await sdk.blobs.getStorageUsage();
-console.log(`${usedBytes / 1e6} MB of ${limit / 1e6} MB used`);
+const { usedBytes, maxBytes } = await sdk.blobs.getStorageUsage();
+console.log(`${usedBytes / 1e6} MB of ${maxBytes / 1e6} MB used`);
 
 // Delete
 await sdk.blobs.delete(blob.id);

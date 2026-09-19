@@ -71,7 +71,7 @@ Beyond Brief, the left rail opens full-page lenses inside Home — no separate a
 | Lens | Who | What you do there |
 | --- | --- | --- |
 | **Assets** | Workspace members (personal scope on Personal home) | Upload files, folders, per-file visibility, versions, comments, **Share with a person**, bundle collections, gated `/d/<token>` download links — see [../team/assets.md](../team/assets.md) |
-| **Knowledge** | Workspace members (paid plan to enable) | Opt-in learned library — tree/table browse, Guidance (house rules), nightly consolidator — see [../team/knowledge.md](../team/knowledge.md) |
+| **Knowledge** | Workspace members (owner/admin to enable) | Opt-in learned library — tree/table browse, Guidance (house rules), nightly consolidator — see [../team/knowledge.md](../team/knowledge.md) |
 | **Catalog** | Everyone | Browse the optional [data catalog](../team/catalog.md) — sources, events, lineage, glossary |
 | **Datasets** | Workspace members | Browse and create workspace datasets |
 | **Crew AI** | Owners/admins | Manage crew automations |

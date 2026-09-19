@@ -20,7 +20,7 @@ data-shareout-binding="TYPE:PATH"
 | Table count | `table:name:count:field` | `table:tasks:count:id` |
 | Table filtered | `table:name:count:field:filter` | `table:tasks:count:id:done=true` |
 | Computed | `computed:name` | `computed:completedCount` |
-| Multi-source | `multi:source1+source2` | `multi:json:a+table:b:sum:c` |
+| Multi-source | `multi:op:source1\|source2` (op: `sum`, `diff`, `product`, `ratio`) | `multi:ratio:json:a\|table:orders:sum:amount` |
 
 ## Basic Example
 
@@ -53,8 +53,12 @@ data-shareout-binding="TYPE:PATH"
 | `date:short` | none | 5/29/26 |
 | `date:long` | none | May 29, 2026 |
 | `date:iso` | none | 2026-05-29 |
-| `time` | none | 3:45 PM |
-| `datetime` | none | May 29, 2026 3:45 PM |
+
+`time` and `datetime` are **not honored by the editor today** — the parser only
+recognizes `currency | percent | number | date` and silently falls back to plain text
+(the raw value, unformatted) for anything else. Format a time/datetime value yourself
+(e.g. in a `computed:` binding or client-side) rather than relying on
+`data-shareout-format="time"` / `"datetime"`.
 
 In Live Studio **Inspect** mode, bound elements show a **Format** control (plain text, number, currency, percent, date) that reads and writes `data-shareout-format` — no need to edit the attribute by hand.
 
@@ -131,6 +135,16 @@ Full compliance checklist: [overview.md](overview.md#compliance-checklist). Bind
 - [ ] Binding paths match manifest declarations
 - [ ] Editable bindings have `data-shareout-editable="true"`
 - [ ] Editable bindings have appropriate `data-shareout-validation`
+- [ ] Format is `currency`, `percent`, `number`, or `date` — not `time`/`datetime` (not editor-honored, see above)
+
+**Markers the editor actually parses and renders controls for today:** `json:key`
+(incl. nested paths), `table:name:row:ID:field` (incl. `$id` template form),
+`table:name:sum/count/avg/min/max:field[:filter]`, `computed:name`,
+`data-shareout-editable` + `data-shareout-validation` (`number`/`string`/`email`/`url`/`pattern`
+rules), `data-shareout-display`, and the outline attributes
+(`data-shareout-page`/`-section`/`-tabs`/`-tab`). `multi:` sources parse per the table
+above. When in doubt, publish and read back the advisory `editor_readiness` profile
+(see [pre-ship.md](../../creating/pre-ship.md)) rather than assuming a marker is honored.
 
 ## Related
 
