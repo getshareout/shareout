@@ -35,6 +35,8 @@
     "db:migrate:fresh": "bash scripts/fresh-migrate-smoke.sh",
     "smoke:hello": "bash scripts/hello-publish-smoke.sh",
     "smoke:data": "bash scripts/data-plane-smoke.sh",
+    "seed:investor-demo": "node scripts/seed-investor-demo.mjs",
+    "test:e2e:live:demo": "vitest run --config vitest.e2e-live.config.ts tests/e2e-live/demo-smoke.test.ts",
     "tail": "wrangler tail",
     "build:editor": "npm run build --prefix editor-client && node scripts/stage-editor-bundle.mjs",
     "build:chat-core": "node scripts/stage-chat-core-bundle.mjs",
