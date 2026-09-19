@@ -84,10 +84,15 @@ export const workspace_client_create_ai_JS = `  // ===== Create with AI (in-Stud
     var prog = addMsg('bot', t('create.buildingPage'));
     fetch('/v1/create/generate', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phase: 'build', prompt: prompt }) })
       .then(function (resp) {
-        if (!resp.ok || !resp.body) { prog.textContent = t('create.buildUnavailable'); return; }
+        if (!resp.ok || !resp.body) {
+          return resp.json().catch(function () { return {}; }).then(function (d) {
+            prog.textContent = d && d.error ? t('create.buildFailed') + d.error : t('create.buildUnavailable');
+          });
+        }
         return readStream(resp, function (ev) {
           if (ev.type === 'done') {
-            prog.textContent = t('create.buildDone');
+            var mod = ev.moderation;
+            prog.textContent = t(mod ? (mod.status === 'blocked' ? 'create.buildBlocked' : 'create.buildHeld') : (ev.visibility === 'private' ? 'create.buildPrivate' : 'create.buildDone'));
             if (ev.slug) { openArtifact(ev.slug, '\\u2728 ' + String(prompt).slice(0, 28), ev.artifactId); setComposer('docked'); }
             exitCreate();
           } else if (ev.type === 'error') { prog.textContent = t('create.buildFailed') + (ev.error || 'unknown'); }

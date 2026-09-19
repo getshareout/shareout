@@ -9,13 +9,18 @@ const requireCreateEnabled = vi.hoisted(() => vi.fn());
 const chat = vi.hoisted(() => vi.fn());
 const checkSlidingWindowRateLimit = vi.hoisted(() => vi.fn());
 const publishGeneratedHtml = vi.hoisted(() => vi.fn());
+const streamChat = vi.hoisted(() => vi.fn());
+const extractHtml = vi.hoisted(() => vi.fn());
+const checkRateLimit = vi.hoisted(() => vi.fn());
+const incrementRateLimit = vi.hoisted(() => vi.fn());
+const checkStorageQuota = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../src/auth', () => ({ getSessionUser }));
 vi.mock('../../../src/pages/home/host', () => ({ hostWorkspaceId }));
 vi.mock('../../../src/pages/create-gate', () => ({ requireCreateEnabled }));
 vi.mock('../../../src/data/agent/anthropic', () => ({
   chat,
-  streamChat: vi.fn(),
+  streamChat,
   getAgentChatModel: vi.fn(() => 'model'),
   getBuildConfig: vi.fn(() => ({})),
 }));
@@ -24,6 +29,8 @@ vi.mock('../../../src/rate-limit', () => ({
   getClientIp: vi.fn(() => '1.2.3.4'),
 }));
 vi.mock('../../../src/publish', () => ({ publishGeneratedHtml }));
+vi.mock('../../../src/api-auth', () => ({ checkRateLimit, incrementRateLimit, RATE_LIMIT_MAX: 100 }));
+vi.mock('../../../src/quota', () => ({ checkStorageQuota }));
 vi.mock('../../../src/logging', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
   logError: vi.fn(),
@@ -31,7 +38,7 @@ vi.mock('../../../src/logging', () => ({
 vi.mock('../../../src/data/agent/build-page', () => ({
   BUILD_MAX_TOKENS: 100,
   buildSystemPrompt: vi.fn(),
-  extractHtml: vi.fn(),
+  extractHtml,
   deriveName: vi.fn((p: string) => p.slice(0, 20)),
 }));
 vi.mock('../../../src/pages/themes', () => ({ getPackDirective: vi.fn(() => 'clean') }));
@@ -56,6 +63,11 @@ beforeEach(() => {
   chat.mockReset();
   checkSlidingWindowRateLimit.mockReset().mockResolvedValue({ allowed: true });
   publishGeneratedHtml.mockReset();
+  streamChat.mockReset();
+  extractHtml.mockReset();
+  checkRateLimit.mockReset().mockResolvedValue({ allowed: true, remaining: 99, reset: 0 });
+  incrementRateLimit.mockReset().mockResolvedValue(undefined);
+  checkStorageQuota.mockReset().mockResolvedValue({ allowed: true, used: 0, incoming: 0, max: 0 });
 });
 
 afterEach(() => vi.restoreAllMocks());
@@ -131,5 +143,97 @@ describe('routeCreateApi', () => {
     expect(res?.status).toBe(200);
     expect(await res!.json()).toMatchObject({ ok: true, artifactId: 'art1', slug: 's' });
     expect(publishGeneratedHtml).toHaveBeenCalled();
+  });
+
+  const html = '<!doctype html><html><body><h1>Hi</h1></body></html>';
+  const deployed = { artifact: { id: 'art1' }, deployment: { url: 'https://shareout.site/a/s/', slug: 's' } };
+
+  async function sseEvents(res: Response | null) {
+    const text = await res!.text();
+    return text.split('\n\n').filter(Boolean).map((l) => JSON.parse(l.replace(/^data: /, '')));
+  }
+
+  it('reports a live public publish as public with no moderation hold', async () => {
+    getSessionUser.mockResolvedValue({ id: 'u1', email: 'a@x.com' });
+    publishGeneratedHtml.mockResolvedValue({ ...deployed, visibility: 'public' });
+    const body = await (await post({ phase: 'publish', prompt: 'hi page', html }))!.json();
+    expect(body).toMatchObject({ ok: true, visibility: 'public' });
+    expect(body).not.toHaveProperty('moderation');
+    expect(incrementRateLimit).toHaveBeenCalledWith(env, 'u1', 'publish', 'a@x.com');
+  });
+
+  it('reports a moderation hold instead of claiming the page is live', async () => {
+    getSessionUser.mockResolvedValue({ id: 'u1', email: 'a@x.com' });
+    publishGeneratedHtml.mockResolvedValue({
+      ...deployed,
+      visibility: 'private',
+      moderation: { status: 'pending', reason: 'looks like a login form', message: 'held', forced_private: true },
+    });
+    const body = await (await post({ phase: 'publish', prompt: 'hi page', html }))!.json();
+    expect(body).toMatchObject({ ok: true, visibility: 'private', moderation: { status: 'pending', message: 'held' } });
+  });
+
+  it('carries the moderation hold through the streamed build done event', async () => {
+    getSessionUser.mockResolvedValue({ id: 'u1', email: 'a@x.com' });
+    streamChat.mockImplementation(async function* () { yield { type: 'content', content: html }; });
+    extractHtml.mockReturnValue(html);
+    publishGeneratedHtml.mockResolvedValue({
+      ...deployed,
+      visibility: 'private',
+      moderation: { status: 'pending', message: 'held', forced_private: true },
+    });
+    const events = await sseEvents(await post({ phase: 'build', prompt: 'hi page' }));
+    expect(events.at(-1)).toMatchObject({
+      type: 'done', url: deployed.deployment.url, visibility: 'private', moderation: { status: 'pending' },
+    });
+  });
+
+  it('streams a public done event with no moderation when the page is approved', async () => {
+    getSessionUser.mockResolvedValue({ id: 'u1', email: 'a@x.com' });
+    streamChat.mockImplementation(async function* () { yield { type: 'content', content: html }; });
+    extractHtml.mockReturnValue(html);
+    publishGeneratedHtml.mockResolvedValue({ ...deployed, visibility: 'public' });
+    const done = (await sseEvents(await post({ phase: 'build', prompt: 'hi page' }))).at(-1);
+    expect(done).toMatchObject({ type: 'done', visibility: 'public' });
+    expect(done).not.toHaveProperty('moderation');
+  });
+
+  it('429s build and publish at the daily publish limit, stating the limit and reset', async () => {
+    getSessionUser.mockResolvedValue({ id: 'u1', email: 'a@x.com' });
+    const reset = Math.floor(Date.UTC(2030, 0, 2) / 1000);
+    checkRateLimit.mockResolvedValue({ allowed: false, remaining: 0, reset });
+    for (const req of [{ phase: 'build', prompt: 'x' }, { phase: 'publish', prompt: 'x', html }]) {
+      const res = await post(req);
+      expect(res?.status).toBe(429);
+      const body = await res!.json() as { code: string; error: string; limit: number };
+      expect(body).toMatchObject({ code: 'RATE_LIMIT_EXCEEDED', limit: 100 });
+      expect(body.error).toMatch(/100 per day/);
+      expect(body.error).toMatch(/resets at 00:00 UTC/);
+    }
+    expect(streamChat).not.toHaveBeenCalled();
+    expect(publishGeneratedHtml).not.toHaveBeenCalled();
+  });
+
+  it('413s a publish over the storage quota without publishing', async () => {
+    getSessionUser.mockResolvedValue({ id: 'u1', email: 'a@x.com' });
+    checkStorageQuota.mockResolvedValue({ allowed: false, used: 50_000_000, incoming: 10, max: 50_000_000 });
+    const res = await post({ phase: 'publish', prompt: 'x', html });
+    expect(res?.status).toBe(413);
+    const body = await res!.json() as { code: string; error: string };
+    expect(body.code).toBe('STORAGE_LIMIT_EXCEEDED');
+    expect(body.error).toMatch(/50 MB of 50 MB/);
+    expect(body.error).not.toMatch(/upgrade/i);
+    expect(publishGeneratedHtml).not.toHaveBeenCalled();
+    expect(incrementRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('streams the storage-limit message when a build would exceed the quota', async () => {
+    getSessionUser.mockResolvedValue({ id: 'u1', email: 'a@x.com' });
+    streamChat.mockImplementation(async function* () { yield { type: 'content', content: html }; });
+    extractHtml.mockReturnValue(html);
+    checkStorageQuota.mockResolvedValue({ allowed: false, used: 50_000_000, incoming: 10, max: 50_000_000 });
+    const done = (await sseEvents(await post({ phase: 'build', prompt: 'x' }))).at(-1);
+    expect(done).toMatchObject({ type: 'error', code: 'STORAGE_LIMIT_EXCEEDED' });
+    expect(publishGeneratedHtml).not.toHaveBeenCalled();
   });
 });

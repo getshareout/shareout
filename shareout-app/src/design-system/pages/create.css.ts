@@ -126,6 +126,11 @@ body { overflow: hidden; background: var(--color-bg); color: var(--color-text); 
 .result-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .result-live { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; font: 700 0.72rem var(--font-body); letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-success); }
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-success); animation: pulse 2s infinite; }
+.result-live.is-review { color: var(--color-warning); }
+.result-live.is-blocked { color: var(--color-error); }
+.result-live.is-private { color: var(--color-text-secondary); }
+.result-live.is-review .live-dot, .result-live.is-blocked .live-dot, .result-live.is-private .live-dot { background: currentColor; animation: none; }
+.result-note { margin: 0; font: 500 0.84rem/1.45 var(--font-body); color: var(--color-text-secondary); }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 55%, transparent); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
 .result-url { font: 500 0.84rem var(--font-mono, ui-monospace, SFMono-Regular, monospace); color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .caps { display: flex; flex-wrap: wrap; gap: 6px; }

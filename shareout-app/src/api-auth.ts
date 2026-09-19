@@ -6,7 +6,7 @@ import { isSuperAdminEmail } from './superadmin/auth';
 import { jsonWithApiErrors } from './http/api-error';
 
 const RATE_LIMIT_WINDOW = 60 * 60 * 24; // 24 hours in seconds
-const RATE_LIMIT_MAX = 100; // publishes per day
+export const RATE_LIMIT_MAX = 100; // publishes per day
 
 export type ServiceScope = 'artifacts:read' | 'artifacts:publish' | 'data:read' | 'data:write';
 

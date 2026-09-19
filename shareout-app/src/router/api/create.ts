@@ -9,6 +9,10 @@ import { createLogger, logError } from '../../logging';
 import { requireCreateEnabled } from '../../pages/create-gate';
 import { hostWorkspaceId } from '../../pages/home/host';
 import { jsonWithApiErrors } from '../../http/api-error';
+import { checkRateLimit, incrementRateLimit } from '../../api-auth';
+import { checkStorageQuota } from '../../quota';
+import { rateLimitExceededResponse, storageLimitMessage } from '../../publish/limits';
+import type { PublishResponse } from '../../types';
 
 // The builder runs on a stronger model and produces a full document — give it room.
 // It streams (see chatComplete), so a slow full-page generation isn't bound by a read timeout.
@@ -166,6 +170,13 @@ export async function routeCreateApi(ctx: FetchContext): Promise<Response | null
     return addCORS(json({ ok: false, error: 'Create a free account to save & publish.', code: 'UNAUTHENTICATED' }, 401));
   }
 
+  // Same daily publish cap as POST /v1/publish — checked before generating so a
+  // capped user doesn't wait through a full build to be told no.
+  const rateLimit = await checkRateLimit(env, user.id, 'publish', user.email);
+  if (!rateLimit.allowed) {
+    return addCORS(rateLimitExceededResponse(rateLimit.reset));
+  }
+
   // Publish the exact HTML the visitor already previewed (no regeneration).
   if (body.phase === 'publish' && previousHtml) {
     return addCORS(await handlePublish(env, user, prompt, previousHtml, slug));
@@ -226,21 +237,18 @@ function streamGenerate(opts: {
         const capabilities = detectCapabilities(html);
         if (publish) {
           try {
-            const published = await publishGeneratedHtml(env, publish.user, {
+            const outcome = await publishWithLimits(env, publish.user, {
               name: deriveName(prompt),
               slug: publish.slug,
               html,
             });
-            send({
-              type: 'done',
-              mode: 'build',
-              html,
-              url: published.deployment.url,
-              slug: published.deployment.slug,
-              artifactId: published.artifact.id,
-              capabilities,
-            });
-          } catch {
+            if ('error' in outcome) {
+              send({ type: 'error', error: outcome.error, code: outcome.code });
+            } else {
+              send({ type: 'done', mode: 'build', html, ...publishedFields(outcome), capabilities });
+            }
+          } catch (err) {
+            logError(createLogger(env, { scope: 'create', event: 'publish.failed' }), 'create publish failed', err);
             send({ type: 'error', error: 'Built it, but publishing failed. Try again.' });
           }
         } else {
@@ -275,22 +283,48 @@ async function handlePublish(
   html: string,
   slug: string | undefined
 ): Promise<Response> {
-  let published;
+  let outcome;
   try {
-    published = await publishGeneratedHtml(env, user, { name: deriveName(prompt), slug, html });
+    outcome = await publishWithLimits(env, user, { name: deriveName(prompt), slug, html });
   } catch (err) {
     logError(createLogger(env, { scope: 'create', event: 'publish.failed' }), 'create publish failed', err);
     return json({ ok: false, error: 'Publishing failed. Try again.', code: 'INTERNAL_ERROR' }, 500);
   }
+  if ('error' in outcome) return json({ ok: false, ...outcome }, 413);
   return json({
     ok: true,
     type: 'build',
     html,
+    ...publishedFields(outcome),
+    capabilities: detectCapabilities(html),
+  });
+}
+
+// Same storage cap + daily publish count as POST /v1/publish (see handle-publish.ts).
+async function publishWithLimits(
+  env: Env,
+  user: SessionUser,
+  opts: { name: string; slug?: string; html: string }
+): Promise<PublishResponse | { error: string; code: 'STORAGE_LIMIT_EXCEEDED' }> {
+  const quota = await checkStorageQuota(env, user.id, [{ path: 'index.html', content: opts.html, mime: 'text/html' }]);
+  if (!quota.allowed) return { error: storageLimitMessage(quota), code: 'STORAGE_LIMIT_EXCEEDED' };
+  const published = await publishGeneratedHtml(env, user, opts);
+  await incrementRateLimit(env, user.id, 'publish', user.email);
+  return published;
+}
+
+// What the client needs to render an honest result: a held or private page must not
+// be announced as "Live".
+function publishedFields(published: PublishResponse) {
+  return {
     url: published.deployment.url,
     slug: published.deployment.slug,
     artifactId: published.artifact.id,
-    capabilities: detectCapabilities(html),
-  });
+    visibility: published.visibility ?? 'public',
+    ...(published.moderation
+      ? { moderation: { status: published.moderation.status, message: published.moderation.message } }
+      : {}),
+  };
 }
 
 // Phase 1: route the request to a reply, a confirmation, or a build.
