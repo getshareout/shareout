@@ -18,7 +18,7 @@ function makeEnv(slug: string | null = 'demo'): Env {
     DB: {
       prepare: vi.fn(() => ({
         bind: vi.fn(() => ({
-          first: vi.fn(async () => (slug ? { slug } : null)),
+          first: vi.fn(async () => (slug ? { deploy_slug: slug, version_id: 'ver_1', entrypoint: 'index.html', has_mobile: 0 } : null)),
         })),
       })),
     },
@@ -76,7 +76,30 @@ describe('handleCdnContent', () => {
     expect(new URL((req as Request).url).searchParams.has('_raw')).toBe(true);
     expect(slug).toBe('demo');
     expect(assetPath).toBe('');
-    expect(opts).toMatchObject({ contentOrigin: true, ct: null });
+    expect(opts).toMatchObject({ contentOrigin: true, ct: null, cached: { version_id: 'ver_1' } });
+  });
+
+  it('resolves the artifact in one lookup and reuses the record on the next request', async () => {
+    const store = new Map<string, string>();
+    const env = makeEnv();
+    (env as unknown as { SLUGS: unknown }).SLUGS = {
+      get: vi.fn(async (k: string) => (store.has(k) ? JSON.parse(store.get(k)!) : null)),
+      put: vi.fn(async (k: string, v: string) => void store.set(k, v)),
+    };
+    const waitUntil = vi.fn((p: Promise<unknown>) => p);
+    const ctx = { waitUntil } as unknown as ExecutionContext;
+
+    await handleCdnContent(new Request(`https://${HOST}/`), env, ctx);
+    expect(env.DB.prepare).toHaveBeenCalledTimes(1);
+    expect(waitUntil).toHaveBeenCalledTimes(1); // cache write off the response path
+    await waitUntil.mock.results[0].value;
+    expect(store.has(`cdnslug:art_${LABEL}`)).toBe(true);
+
+    await handleCdnContent(new Request(`https://${HOST}/`), env, ctx);
+    expect(env.DB.prepare).toHaveBeenCalledTimes(1);
+    const [, , slug, , opts] = serveMocks.handleServe.mock.calls[1];
+    expect(slug).toBe('demo');
+    expect(opts).toMatchObject({ contentOrigin: true, executionCtx: ctx, cached: { version_id: 'ver_1' } });
   });
 
   it('extracts the /c/<ct>/ capability token and the asset path', async () => {

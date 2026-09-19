@@ -2,6 +2,7 @@ import { renderHtmlPage } from '../design-system/shell';
 import { createPageStyles } from '../design-system/pages/create.css';
 import { brandLockupHtml } from '../brand';
 import { STARTER_PACKS } from './themes';
+import { versionedBundlePath } from '../bundle-versions';
 
 const arrowSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 6l6 6-6 6"/></svg>`;
 const checkSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>`;
@@ -73,7 +74,7 @@ export function renderCreatePage(
     </div>
   </main>
 </div>
-<script src="/sdk/chat-core.js"></script>`;
+<script src="${versionedBundlePath('/sdk/chat-core.js')}"></script>`;
 
   const clientPacks = STARTER_PACKS.map((p) => ({ id: p.id, name: p.name, blurb: p.blurb, swatch: p.swatch }));
 

@@ -31,6 +31,7 @@ export default defineConfig({
           exclude: [
             'tests/unit/openapi-contract.test.ts',
             'tests/unit/pages/home-views.test.ts',
+            'tests/unit/bundle-versions.test.ts',
             'tests/unit/editor/chat.test.ts',
             'tests/unit/editor/collab.test.ts',
             'tests/unit/editor/dashboard.test.ts',
@@ -45,7 +46,7 @@ export default defineConfig({
         test: {
           name: 'node',
           environment: 'node',
-          include: ['tests/unit/openapi-contract.test.ts', 'tests/unit/pages/home-views.test.ts'],
+          include: ['tests/unit/openapi-contract.test.ts', 'tests/unit/pages/home-views.test.ts', 'tests/unit/bundle-versions.test.ts'],
         },
       },
       {

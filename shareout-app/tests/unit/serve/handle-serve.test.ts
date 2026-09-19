@@ -13,6 +13,7 @@ import {
 import { cacheStore, setupServeTestHooks } from './helpers/hooks';
 import { handleServe } from '../../../src/serve';
 import type { Env } from '../../../src/types';
+import type { CachedDeployment } from '../../../src/serve/types';
 import { createAccessToken } from '../../../src/token';
 import * as auth from '../../../src/auth';
 
@@ -294,6 +295,34 @@ describe('handleServe', () => {
     const { env, slugsStore } = createServeEnv({ cachedDeployment: null });
     await handleServe(serveRequest('app.js'), env, SLUG, 'app.js');
     expect(slugsStore.has(`deploy:${SLUG}`)).toBe(true);
+  });
+
+  it('hands the cache-miss KV write to waitUntil instead of awaiting it', async () => {
+    const { env } = createServeEnv({ cachedDeployment: null });
+    vi.mocked(env.SLUGS!.put).mockImplementation(() => new Promise(() => {})); // never settles
+    const waitUntil = vi.fn();
+    const executionCtx = { waitUntil } as unknown as ExecutionContext;
+
+    const response = await handleServe(serveRequest('app.js'), env, SLUG, 'app.js', { executionCtx });
+    expect(response.status).toBe(200);
+    expect(env.SLUGS!.put).toHaveBeenCalledWith(`deploy:${SLUG}`, expect.any(String), { expirationTtl: 3600 });
+    expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise));
+  });
+
+  it('uses a record the route lookup already resolved without reading deploy: again', async () => {
+    const { entry_asset, mobile_entry_asset, ...info } = {
+      ...defaultDeployment,
+      entry_asset: { r2_key: 'artifacts/demo/index.html', mime: 'text/html', size_bytes: 512 },
+      mobile_entry_asset: null,
+    };
+    const { env } = createServeEnv({ deployment: null });
+
+    const response = await handleServe(serveRequest(''), env, SLUG, '', {
+      cached: { ...info, entry_asset, mobile_entry_asset } as unknown as CachedDeployment,
+    });
+    expect(response.status).toBe(200);
+    expect(await readStreamResponse(response)).toContain('<iframe');
+    expect(env.SLUGS!.get).not.toHaveBeenCalledWith(`deploy:${SLUG}`, 'json');
   });
 
   it('serves mobile entrypoint for mobile user agents', async () => {

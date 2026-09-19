@@ -172,22 +172,6 @@ export function createServeEnv(scenario: ServeScenario = {}) {
               };
             }
 
-            if (sql.includes('SELECT folder_id, workspace_id FROM artifacts')) {
-              return {
-                folder_id: scenario.namespaced?.artifactFolderId ?? null,
-                workspace_id: 'ws_1',
-              };
-            }
-
-            if (sql.includes('SELECT slug, parent_id FROM folders')) {
-              const folderId = bindArgs[0];
-              const chain = scenario.namespaced?.folderChain ?? [];
-              const idx = chain.findIndex((_f, i) => `folder_${i}` === folderId || bindArgs[0] === folderId);
-              if (idx >= 0) return chain[idx];
-              if (chain.length > 0 && folderId === 'folder_leaf') return chain[chain.length - 1];
-              return null;
-            }
-
             if (sql.includes('FROM deployments d') && sql.includes('embed_allowed')) {
               const embed = scenario.embedDeployment;
               if (!embed) return null;
@@ -272,6 +256,10 @@ export function createServeEnv(scenario: ServeScenario = {}) {
             return null;
           }),
           all: vi.fn(async () => {
+            if (sql.includes('WITH RECURSIVE chain')) {
+              const inFolder = scenario.namespaced?.artifactFolderId;
+              return { results: inFolder ? scenario.namespaced?.folderChain ?? [] : [] };
+            }
             if (sql.includes('FROM artifact_json')) {
               if (scenario.throwOnInitialJson) {
                 throw new Error('json unavailable');

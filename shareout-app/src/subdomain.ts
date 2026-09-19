@@ -1,6 +1,7 @@
 import type { Env } from './types';
 import { getPlatformHostname } from './config/origins';
 import { handleWorkspaceLanding } from './pages/workspace';
+import { resolveRoutedDeployment, workspaceRouteKey, type RoutedDeployment } from './serve/deployment-cache';
 
 export interface SubdomainContext {
   isSubdomain: boolean;
@@ -59,6 +60,8 @@ export interface SubdomainRoute {
   response?: Response;
   // Re-dispatch the shared apex pipeline with this rewritten path.
   rewritePath?: string;
+  // The production deployment behind a shorthand rewrite, resolved once.
+  deployment?: RoutedDeployment;
   // Neither set => pass the request through to the shared pipeline unchanged.
 }
 
@@ -89,7 +92,8 @@ export async function resolveSubdomainRoute(
   request: Request,
   env: Env,
   workspaceSlug: string,
-  path: string
+  path: string,
+  executionCtx?: ExecutionContext
 ): Promise<SubdomainRoute> {
   if (
     PASSTHROUGH_PREFIXES.some((p) => path.startsWith(p)) ||
@@ -111,35 +115,18 @@ export async function resolveSubdomainRoute(
   const artifactSlug = parts[0];
   const rest = parts.slice(1).join('/');
 
-  // Read-through KV cache of (workspace-slug, artifact-slug) -> deploy-slug, mirroring
-  // the `cdnslug:` cache (cdn-content.ts). Positives only, 300s TTL: a just-published
-  // artifact isn't masked by a cached negative, and a slug/deploy change self-heals.
-  const cacheKey = `wsslug:${workspaceSlug}/${artifactSlug}`;
-  let deploySlug: string | null = null;
+  // One cached lookup resolves the shorthand to the full deployment record; the
+  // rewritten /a/ request reuses it instead of reading `deploy:` again.
+  const deployment = await resolveRoutedDeployment(
+    env,
+    workspaceRouteKey(workspaceSlug, artifactSlug),
+    'a.workspace_id = (SELECT id FROM workspaces WHERE slug = ?) AND a.display_slug = ?',
+    [workspaceSlug, artifactSlug],
+    executionCtx,
+  );
 
-  if (env.SLUGS) {
-    try { deploySlug = await env.SLUGS.get(cacheKey); } catch {}
-  }
-
-  if (!deploySlug) {
-    const deploy = await env.DB.prepare(`
-      SELECT d.slug as deploy_slug
-      FROM artifacts a
-      JOIN workspaces w ON w.id = a.workspace_id
-      JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
-      WHERE w.slug = ? AND a.display_slug = ?
-    `).bind(workspaceSlug, artifactSlug).first<{ deploy_slug: string }>();
-
-    if (deploy?.deploy_slug) {
-      deploySlug = deploy.deploy_slug;
-      if (env.SLUGS) {
-        try { await env.SLUGS.put(cacheKey, deploySlug, { expirationTtl: 300 }); } catch {}
-      }
-    }
-  }
-
-  if (deploySlug) {
-    return { rewritePath: `/a/${deploySlug}${rest ? `/${rest}` : '/'}` };
+  if (deployment) {
+    return { rewritePath: `/a/${deployment.slug}${rest ? `/${rest}` : '/'}`, deployment };
   }
 
   // No direct artifact match: route through namespaced serve (handles folders and

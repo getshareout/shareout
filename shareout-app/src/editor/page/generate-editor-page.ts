@@ -7,11 +7,12 @@ import { renderEditorShell } from './template/shell';
 import type { EditorPageOptions } from './types';
 import { googleFontsPreconnect } from '../../design-system/tokens';
 import { brandFaviconHead } from '../../brand';
+import { versionedBundlePath } from '../../bundle-versions';
 
 export type { EditorPageOptions } from './types';
 
 /** Bundled editor app (built from editor-client/ via npm run build:editor). */
-export const EDITOR_CLIENT_SCRIPT_URL = '/sdk/editor.js';
+export const EDITOR_CLIENT_SCRIPT_URL = versionedBundlePath('/sdk/editor.js');
 
 /** Build the full editor HTML page served to the browser. */
 export function generateEditorPage(options: EditorPageOptions): string {

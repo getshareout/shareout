@@ -233,16 +233,7 @@ export async function transferArtifactOwnership(
     ).bind(collabId, artifactId, newOwnerEmail, 'owner', actorId).run();
   }
 
-  if (env.SLUGS) {
-    const deployment = await env.DB.prepare(
-      'SELECT slug FROM deployments WHERE artifact_id = ? AND channel = ?'
-    ).bind(artifactId, 'production').first<{ slug: string }>();
-    if (deployment) {
-      await env.SLUGS.delete(`deploy:${deployment.slug}`).catch(() => {});
-      await env.SLUGS.delete(`art:${deployment.slug}`).catch(() => {});
-    }
-    await env.SLUGS.delete(`art:${artifactId}`).catch(() => {});
-  }
+  await invalidateDeploymentCacheById(env, artifactId);
 
   return null;
 }

@@ -1,6 +1,6 @@
 import type { Env } from '../types';
-import type { ArtifactWithAsset } from './types';
-import { getCachedDeployment, cacheDeployment, buildCacheRecord, fetchAssetRow } from './deployment-cache';
+import type { ArtifactWithAsset, CachedDeployment } from './types';
+import { getCachedDeployment, cacheDeployment, buildCacheRecord, fetchAssetRow, DEPLOYMENT_SELECT } from './deployment-cache';
 import { checkAccess } from './access';
 import { normalizeVisibility } from '../visibility-config';
 import { isMobileDevice, notFound, pausedPage, takedownPage, underReviewPage } from './utils';
@@ -14,9 +14,10 @@ import { isCommentsOverlayEnabled } from './comments-config';
 import { injectPerfBeacon } from './perf-beacon';
 import { injectPresenceBeacon } from './presence-beacon';
 import { badgeEnabled, injectBadge } from './badge';
+import { versionedBundlePath } from '../bundle-versions';
 
 function injectCommentsAgent(resp: Response, baseUrl: string): Response {
-  const tag = `<script src="${baseUrl}/sdk/comments-agent.js" defer></script>`;
+  const tag = `<script src="${baseUrl}${versionedBundlePath('/sdk/comments-agent.js')}" defer></script>`;
   let injected = false;
   const append = { element(e: { append: (c: string, o: { html: boolean }) => void }) {
     if (injected) return;
@@ -80,7 +81,9 @@ export async function handleServe(
   // and private bytes are served `no-store` (ADR 30).
   // executionCtx: threaded so the viewers can register per-view analytics writes with
   // waitUntil() instead of firing them detached (which the runtime may cancel).
-  opts: { contentOrigin?: boolean; ct?: string | null; executionCtx?: ExecutionContext } = {},
+  // cached: the deployment record, when a route lookup (subdomain / content domain)
+  // already resolved it this request — skips the `deploy:` read.
+  opts: { contentOrigin?: boolean; ct?: string | null; executionCtx?: ExecutionContext; cached?: CachedDeployment } = {},
 ): Promise<Response> {
   const url = new URL(request.url);
   const isRawRequest = url.searchParams.has('_raw');
@@ -93,7 +96,7 @@ export async function handleServe(
   const forceWeb = versionOverride === 'web';
 
   // Try KV cache first for deployment info (if available)
-  let cached = await getCachedDeployment(env, slug);
+  let cached = opts.cached ?? await getCachedDeployment(env, slug);
   // Legacy cache entries (written before the record was fattened) lack the new
   // immutable fields — treat them as a miss so they get re-fetched and re-cached in
   // the new shape. Drains within one TTL after deploy.
@@ -124,26 +127,8 @@ export async function handleServe(
     }
   } else {
     // Cache miss: full combined query (+ access_policy + manifest_json, immutable per version)
-    result = await env.DB.prepare(`
-      SELECT d.version_id, v.entrypoint, v.mobile_entrypoint, v.artifact_id, v.manifest_json,
-             a.name as artifact_name,
-             a.description, pres_a.social_title, pres_a.social_description, pres_a.social_image_url,
-             pres_a.thumbnail_ext,
-             a.visibility, a.auth_method, a.owner_id, a.workspace_id, a.paused,
-             COALESCE(pres_a.has_mobile, 0) AS has_mobile, pres_a.pwa_config,
-             a.artifact_type, a.type_metadata, a.access_policy,
-             COALESCE(mod_a.status, 'approved') AS moderation_status,
-             mod_a.held_visibility AS moderation_held_visibility,
-             ast.r2_key, ast.mime, ast.size_bytes
-      FROM deployments d
-      JOIN versions v ON v.id = d.version_id
-      JOIN artifacts a ON a.id = v.artifact_id
-      LEFT JOIN artifact_moderation mod_a ON mod_a.artifact_id = a.id
-      LEFT JOIN artifact_presentation pres_a ON pres_a.artifact_id = a.id
-      LEFT JOIN assets ast ON ast.version_id = v.id
-        AND ast.path = COALESCE(?, v.entrypoint)
-      WHERE d.slug = ? AND d.channel = 'production'
-    `).bind(targetPath, slug).first<ArtifactWithAsset>();
+    result = await env.DB.prepare(`${DEPLOYMENT_SELECT} WHERE d.slug = ? AND d.channel = 'production'`)
+      .bind(targetPath, slug).first<ArtifactWithAsset>();
 
     // Cache the deployment info (with entrypoint asset rows) for next time.
     if (result) {
@@ -158,7 +143,7 @@ export async function handleServe(
         ? await fetchAssetRow(env, result.version_id, result.mobile_entrypoint)
         : null;
 
-      await cacheDeployment(env, slug, buildCacheRecord(result, webEntryAsset, mobileEntryAsset));
+      await cacheDeployment(env, slug, buildCacheRecord(result, webEntryAsset, mobileEntryAsset), opts.executionCtx);
     }
   }
 
