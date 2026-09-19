@@ -7,6 +7,7 @@ import { syncHtmlFromCanvas } from '../history/html-sync';
 import { pushUndoImmediate } from '../history/undo-redo';
 import { buildEnrichedContext, getOutlineSummary, getArtifactMetadata } from './context-builder';
 import { markDirty } from '../persistence/draft';
+import { showToast } from '../toast';
 import { clearLassoContext } from '../lasso/lasso';
 import { executeAgentActions, actionLabel, type AgentAction } from '../agent/agent-actions';
 import { extractStreamingReply } from './stream-reply';
@@ -529,18 +530,65 @@ function showAppliedFeedback(ctx: EditorContext, patches: Array<Record<string, u
   });
 }
 
+export interface PatchApplyResult {
+  applied: number;
+  failed: number;
+  notFound: number;
+  appliedPatches: Array<Record<string, unknown>>;
+  failedPatches: Array<Record<string, unknown>>;
+}
+
+export function formatPartialApplyMessage(result: PatchApplyResult, total: number): string {
+  const notFound = result.notFound;
+  if (notFound > 0) {
+    const noun = notFound === 1 ? 'change' : 'changes';
+    const verb = notFound === 1 ? "couldn't" : "couldn't";
+    return `Applied ${result.applied} of ${total} changes — ${notFound} ${noun} ${verb} find ${notFound === 1 ? 'its' : 'their'} target`;
+  }
+  return `Applied ${result.applied} of ${total} changes — ${result.failed} failed`;
+}
+
 async function handleApplyChanges(ctx: EditorContext, aiMsg: HTMLElement) {
   debugGroup('Apply Changes');
 
   const patches = ctx.state.pendingPatches;
   const pendingHtml = ctx.state.pendingHtml;
   const actions = ctx.state.pendingActions as AgentAction[] | null;
+  const actionsEl = aiMsg.querySelector('.chat-message-actions');
 
   if (patches?.length) {
     debugLog('APPLY', `Applying ${patches.length} patches`);
-    pushUndoImmediate(ctx.state);
-    applyPatches(ctx, patches);
-    showAppliedFeedback(ctx, patches);
+    if (aiMsg.dataset.patchApplyStarted !== '1') {
+      pushUndoImmediate(ctx.state);
+      aiMsg.dataset.patchApplyStarted = '1';
+    }
+    const result = applyPatches(ctx, patches);
+    showAppliedFeedback(ctx, result.appliedPatches);
+
+    if (result.failed > 0) {
+      const message = formatPartialApplyMessage(result, patches.length);
+      ctx.state.pendingPatches = result.failedPatches;
+      ctx.state.pendingHtml = null;
+      ctx.state.pendingActions = null;
+      showToast(message, 'warning');
+
+      if (actionsEl) {
+        actionsEl.innerHTML = `
+          <span class="chat-action-result chat-action-warning">${escapeHtml(message)}</span>
+          <button class="so-c-btn so-c-btn--secondary so-c-btn--sm" data-chat-retry>Retry failed</button>
+          <button class="so-c-btn so-c-btn--ghost so-c-btn--sm" data-chat-reject>Reject remaining</button>
+        `;
+        actionsEl
+          .querySelector<HTMLButtonElement>('[data-chat-retry]')
+          ?.addEventListener('click', () => handleApplyChanges(ctx, aiMsg));
+        actionsEl
+          .querySelector<HTMLButtonElement>('[data-chat-reject]')
+          ?.addEventListener('click', () => handleRejectChanges(ctx, aiMsg));
+      }
+
+      debugGroupEnd();
+      return;
+    }
   } else if (pendingHtml) {
     debugLog('APPLY', 'Applying full HTML replacement');
     pushUndoImmediate(ctx.state);
@@ -557,7 +605,6 @@ async function handleApplyChanges(ctx: EditorContext, aiMsg: HTMLElement) {
   }
 
   // Update UI - remove buttons, show confirmation inline
-  const actionsEl = aiMsg.querySelector('.chat-message-actions');
   if (actionsEl) {
     actionsEl.innerHTML = '<span class="chat-action-result chat-action-applied">✓ Applied</span>';
   }
@@ -582,6 +629,7 @@ async function handleApplyChanges(ctx: EditorContext, aiMsg: HTMLElement) {
     }).catch(e => debugError('APPLY', 'Failed to notify server', e));
   }
 
+  delete aiMsg.dataset.patchApplyStarted;
   clearPending(ctx);
   debugGroupEnd();
 }
@@ -605,6 +653,7 @@ function handleRejectChanges(ctx: EditorContext, aiMsg: HTMLElement) {
     setTimeout(() => actionsEl.remove(), 2000);
   }
 
+  delete aiMsg.dataset.patchApplyStarted;
   clearPending(ctx);
 }
 
@@ -629,7 +678,7 @@ export function addChatMessageWithImage(ctx: EditorContext, content: string, ima
   chatView(ctx)?.controller.anchorTop(msg);
 }
 
-export function applyPatches(ctx: EditorContext, patches: Array<Record<string, unknown>>) {
+export function applyPatches(ctx: EditorContext, patches: Array<Record<string, unknown>>): PatchApplyResult {
   debugGroup('Apply Patches');
   debugLog('PATCHES', `Applying ${patches.length} patches`);
 
@@ -646,7 +695,14 @@ export function applyPatches(ctx: EditorContext, patches: Array<Record<string, u
 
   if (!doc) {
     debugError('DOC_CHECK', 'No contentDocument - iframe not loaded');
-    return;
+    debugGroupEnd();
+    return {
+      applied: 0,
+      failed: patches.length,
+      notFound: 0,
+      appliedPatches: [],
+      failedPatches: [...patches],
+    };
   }
 
   const allElements = doc.querySelectorAll('*');
@@ -656,6 +712,9 @@ export function applyPatches(ctx: EditorContext, patches: Array<Record<string, u
 
   let applied = 0;
   let failed = 0;
+  let notFound = 0;
+  const appliedPatches: Array<Record<string, unknown>> = [];
+  const failedPatches: Array<Record<string, unknown>> = [];
 
   patches.forEach((patch, index) => {
     debugLog('PATCH', `[${index + 1}/${patches.length}]`, {
@@ -673,6 +732,7 @@ export function applyPatches(ctx: EditorContext, patches: Array<Record<string, u
     if (!selector || typeof selector !== 'string') {
       debugError('PATCH', `Invalid selector:`, { selector, type: typeof selector });
       failed++;
+      failedPatches.push(patch);
       return;
     }
 
@@ -682,6 +742,7 @@ export function applyPatches(ctx: EditorContext, patches: Array<Record<string, u
     } catch (e) {
       debugError('PATCH', `selector resolution threw for: "${selector}"`, e);
       failed++;
+      failedPatches.push(patch);
       return;
     }
 
@@ -694,6 +755,8 @@ export function applyPatches(ctx: EditorContext, patches: Array<Record<string, u
         bodyText: doc.body?.textContent?.substring(0, 200),
       });
       failed++;
+      notFound++;
+      failedPatches.push(patch);
       return;
     }
 
@@ -729,21 +792,27 @@ export function applyPatches(ctx: EditorContext, patches: Array<Record<string, u
         default:
           debugError('PATCH', `Unknown action: ${patch.action}`);
           failed++;
+          failedPatches.push(patch);
           return;
       }
       applied++;
+      appliedPatches.push(patch);
     } catch (e) {
       debugError('PATCH', `Failed to apply patch`, e);
       failed++;
+      failedPatches.push(patch);
     }
   });
 
-  debugLog('RESULT', `Patches complete`, { applied, failed, total: patches.length });
+  debugLog('RESULT', `Patches complete`, { applied, failed, notFound, total: patches.length });
 
-  // Give freshly inserted/replaced nodes stable ids so later edits, collab
-  // locks and follow-up AI patches can target them reliably.
-  stampEditorIdsOnBlocks(doc);
-  syncHtmlFromCanvas(ctx);
-  markDirty(ctx);
+  if (applied > 0) {
+    // Give freshly inserted/replaced nodes stable ids so later edits, collab
+    // locks and follow-up AI patches can target them reliably.
+    stampEditorIdsOnBlocks(doc);
+    syncHtmlFromCanvas(ctx);
+    markDirty(ctx);
+  }
   debugGroupEnd();
+  return { applied, failed, notFound, appliedPatches, failedPatches };
 }

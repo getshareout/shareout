@@ -3,6 +3,10 @@ import { SDK_DETECTION_PATTERNS } from '../sdk-patterns';
 import { escapeHtml, rgbToHex } from '../utils';
 import { showToast } from '../toast';
 import { getStableSelector, resolveElementBySelector, EDITOR_ID_ATTR } from '../dom/editor-ids';
+import {
+  createCollabConnectionIndicator,
+  type CollabConnectionStatus,
+} from './connection-indicator';
 
 interface CollabPresence {
   userId: string;
@@ -56,6 +60,8 @@ export function renderCollaborators(ctx: EditorContext, presences: CollabPresenc
 
 export function connectWebSocket(ctx: EditorContext) {
   if (!window.EditorCollab) return;
+  const connectionIndicator = createCollabConnectionIndicator();
+  let lastConnectionState: CollabConnectionStatus['state'] = 'connected';
   const instance = new window.EditorCollab(
     ctx.config.artifactId,
     ctx.config.userId ?? '',
@@ -75,6 +81,15 @@ export function connectWebSocket(ctx: EditorContext) {
 
   instance.on('lockUpdate', (raw) => {
     renderLockedElements(ctx, raw as Map<string, CollabLock>);
+  });
+
+  instance.on('connectionStatus', (raw) => {
+    const status = raw as CollabConnectionStatus;
+    connectionIndicator.setStatus(status);
+    if (status.state === 'offline' && lastConnectionState !== 'offline') {
+      showToast('Offline — edits saved locally while we reconnect', 'warning');
+    }
+    lastConnectionState = status.state;
   });
 
   // Remote doc changes arrive as Yjs frames on the socket and apply to ctx.yjsDoc,
