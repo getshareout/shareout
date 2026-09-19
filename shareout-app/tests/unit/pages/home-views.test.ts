@@ -20,8 +20,8 @@ import homeViewsBarrel from '../../../src/pages/home/render-workspace/client-scr
 
 /** Captured at split time — guards against accidental client-script drift.
  *  Re-pinned after schedules Run now + live crew run log. */
-const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 561_247;
-const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '0479cf46d223d0e268315a2ba4fe93c92f143e57c8492943605a5c30331a5897';
+const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 563_609;
+const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '8a2654a6a34a7fc7fc356c40d6b528227c1db90db0258d87adef8d765f63e10f';
 const HOME_VIEWS_MARKER = '  // ===== rail nav → Home pane views =====';
 
 const SECTION_SOURCES: [string, string][] = [
