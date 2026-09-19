@@ -7,7 +7,7 @@
 import type { Env } from '../types';
 import { extractSignals, outboundHosts } from './extract';
 import { checkHostsReputation } from './url-scanner';
-import { classifyAndPersist } from './check';
+import { classifyAndPersist, recheckAndHold, FAIL_OPEN_REASON } from './check';
 import { setArtifactModeration, setArtifactPaused } from '../superadmin/artifacts-admin';
 import { createLogger } from '../logging';
 import { setModeration } from '../artifacts/satellites';
@@ -85,4 +85,36 @@ export async function recheckPendingModeration(env: Env, limit = 20): Promise<{ 
     }
   }
   return { checked, approved };
+}
+
+// Fail-open approvals: pages that went public while every classifier provider was
+// rate-limited or down. Their own queue, apart from the 20/run pending sweep, so a
+// burst drains in a run or two; bounded by wall time rather than a small count. A
+// verdict that no longer approves pulls the page private (recheckAndHold).
+export async function recheckFailOpenModeration(
+  env: Env,
+  limit = 500,
+  budgetMs = 5 * 60_000,
+): Promise<{ checked: number; held: number }> {
+  const rows = await env.DB.prepare(
+    `SELECT m.artifact_id AS id FROM artifact_moderation m
+       JOIN artifacts a ON a.id = m.artifact_id AND a.deleted_at IS NULL
+      WHERE m.status = 'approved' AND m.content_hash IS NULL AND m.reason LIKE ?
+      ORDER BY COALESCE(m.checked_at, '') ASC
+      LIMIT ?`
+  ).bind(`${FAIL_OPEN_REASON}%`, limit).all<{ id: string }>();
+
+  const deadline = Date.now() + budgetMs;
+  let checked = 0;
+  let held = 0;
+  for (const row of rows.results || []) {
+    if (Date.now() > deadline) break;
+    checked++;
+    try {
+      if ((await recheckAndHold(env, row.id)) !== 'approved') held++;
+    } catch {
+      // best-effort per artifact
+    }
+  }
+  return { checked, held };
 }
