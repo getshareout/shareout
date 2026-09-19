@@ -358,7 +358,7 @@ async function createPlatformConnection(
     INSERT INTO connections (
       id, scope_type, scope_id, name, kind, provider, auth_type, config,
       encrypted_credentials, iv, preferred_mode, created_by, credential_scope
-    ) VALUES (?, 'workspace', ?, ?, 'platform', ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, 'workspace', ?, ?, 'platform', ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     id, workspaceId, body.name, body.provider, authType,
     JSON.stringify(body.config || {}), encrypted, iv, preferredMode, userId, credentialScope
