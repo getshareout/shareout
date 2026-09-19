@@ -282,13 +282,22 @@ export function renderCreatePage(
       for (var i = 0; i < d.capabilities.length; i++){ caps += '<span class="cap">' + esc(d.capabilities[i]) + '</span>'; }
       caps += '</div>';
     }
+    // Honest state: a moderation hold or a private publish is not "Live" to anyone else.
+    var mod = d.moderation;
+    var status = mod ? (mod.status === 'blocked' ? 'Blocked' : 'Under review') : (d.visibility === 'private' ? 'Private' : 'Live');
+    var tone = mod ? (mod.status === 'blocked' ? ' is-blocked' : ' is-review') : (d.visibility === 'private' ? ' is-private' : '');
+    var note = mod ? (mod.status === 'blocked'
+      ? 'Automated safety checks blocked this page, so it stays private.'
+      : 'Published. It’s under a quick safety review, so only you can see it for now. It goes public automatically once the review clears.')
+      : (d.visibility === 'private' ? 'Published privately. Public links are turned off on this instance.' : '');
     var card = document.createElement('div');
     card.className = 'result-card';
     card.innerHTML =
-      '<div class="result-top"><span class="result-live"><span class="live-dot"></span>Live</span><span class="result-url">' + esc(host) + '</span></div>' +
+      '<div class="result-top"><span class="result-live' + tone + '"><span class="live-dot"></span>' + status + '</span><span class="result-url">' + esc(host) + '</span></div>' +
+      (note ? '<p class="result-note">' + esc(note) + '</p>' : '') +
       caps +
       '<div class="result-actions">' +
-        '<a class="act primary" href="' + esc(d.url) + '" target="_blank" rel="noopener">Open live ↗</a>' +
+        '<a class="act primary" href="' + esc(d.url) + '" target="_blank" rel="noopener">' + (tone ? 'Open ↗' : 'Open live ↗') + '</a>' +
         '<a class="act" href="' + esc(editUrl) + '" target="_blank" rel="noopener">Open in editor</a>' +
         '<button class="act copy" type="button">Copy link</button>' +
       '</div>';

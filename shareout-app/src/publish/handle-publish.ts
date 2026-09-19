@@ -19,6 +19,7 @@ import { libraryVersionExists } from '../workspace-library';
 import { json } from './http';
 import { resolveAuthMethod, resolveVisibility } from './request-auth';
 import { publishArtifact } from './publish-artifact';
+import { rateLimitExceededResponse, storageLimitExceededResponse, publicLimitNotice } from './limits';
 
 export async function handlePublish(
   request: Request,
@@ -37,23 +38,7 @@ export async function handlePublish(
 
     const rateLimit = await checkRateLimit(env, user.id, 'publish', user.email);
     if (!rateLimit.allowed) {
-      const retryAfter = Math.max(1, rateLimit.reset - Math.floor(Date.now() / 1000));
-      const mins = Math.max(1, Math.ceil(retryAfter / 60));
-      return new Response(JSON.stringify({
-        error: `Publish rate limit reached. Try again in about ${mins} minute${mins === 1 ? '' : 's'}.`,
-        code: 'RATE_LIMIT_EXCEEDED',
-        remaining: 0,
-        reset: rateLimit.reset,
-        retryAfter,
-      }), {
-        status: 429,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-RateLimit-Remaining': '0',
-          'X-RateLimit-Reset': String(rateLimit.reset),
-          'Retry-After': String(retryAfter),
-        },
-      });
+      return rateLimitExceededResponse(rateLimit.reset);
     }
 
     let body: PublishRequest;
@@ -147,7 +132,7 @@ export async function handlePublish(
       const cap = await canAddPublicArtifact(env, user.id);
       if (!cap.allowed) {
         allowOpen = false;
-        publishNotice = `Public artifact limit reached (${cap.max}). Published privately. Upgrade or remove a public artifact.`;
+        publishNotice = publicLimitNotice(cap.max);
       }
     }
 
@@ -170,12 +155,7 @@ export async function handlePublish(
 
     const quota = await checkStorageQuota(env, user.id, body.files);
     if (!quota.allowed) {
-      return json({
-        error: `Storage limit reached (${Math.round(quota.max / 1_000_000)} MB). Delete artifacts or upgrade.`,
-        code: 'STORAGE_LIMIT_EXCEEDED',
-        used: quota.used,
-        max: quota.max,
-      }, 413);
+      return storageLimitExceededResponse(quota);
     }
 
     const artifactType = detectArtifactType(body.files, entrypoint, body.artifact_type);

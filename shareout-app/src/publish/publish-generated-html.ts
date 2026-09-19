@@ -4,6 +4,7 @@
  */
 import type { Env, PublishResponse, FileEntry } from '../types';
 import { generateSlug } from '../validation';
+import { coerceVisibility } from '../visibility-config';
 import { publishArtifact } from './publish-artifact';
 
 export async function publishGeneratedHtml(
@@ -14,7 +15,7 @@ export async function publishGeneratedHtml(
   const slug = opts.slug || generateSlug(opts.name);
   const files: FileEntry[] = [{ path: 'index.html', content: opts.html, mime: 'text/html' }];
 
-  return publishArtifact(env, { id: user.id, email: user.email, username: null }, {
+  const result = await publishArtifact(env, { id: user.id, email: user.email, username: null }, {
     name: opts.name,
     slug,
     entrypoint: 'index.html',
@@ -27,4 +28,8 @@ export async function publishGeneratedHtml(
     folderId: null,
     artifactType: 'html',
   });
+  // Report what actually went live: a moderation hold (or public links being off on
+  // this instance) keeps the page private even though the builder asked for public.
+  result.visibility = result.moderation ? 'private' : coerceVisibility(env, 'public');
+  return result;
 }

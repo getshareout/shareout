@@ -229,12 +229,28 @@ describe('handlePublish auth and validation', () => {
     const response = await handlePublish(publishRequest(validBody()), env);
 
     expect(response.status).toBe(429);
-    await expect(response.json()).resolves.toMatchObject({
+    const body = await response.json() as { error: string };
+    expect(body).toMatchObject({
       code: 'RATE_LIMIT_EXCEEDED',
+      limit: 100,
       remaining: 0,
+      retryAfter: 9.5 * 3600,
     });
+    expect(body.error).toBe('Daily publish limit reached (100 per day). It resets at 00:00 UTC, in about 10 hours.');
     expect(response.headers.get('X-RateLimit-Remaining')).toBe('0');
     expect(response.headers.get('X-RateLimit-Reset')).toBeTruthy();
+    expect(response.headers.get('Retry-After')).toBe(String(9.5 * 3600));
+  });
+
+  it('returns 413 over the storage quota with the limit and how to raise it', async () => {
+    const env = { ...(await makePublishEnv()), STORAGE_QUOTA_BYTES: '10' } as Env;
+    const response = await handlePublish(publishRequest(validBody()), env);
+
+    expect(response.status).toBe(413);
+    const body = await response.json() as { error: string };
+    expect(body).toMatchObject({ code: 'STORAGE_LIMIT_EXCEEDED', max: 10 });
+    expect(body.error).toMatch(/STORAGE_QUOTA_BYTES/);
+    expect(body.error).not.toMatch(/upgrade/i);
   });
 
   it('returns 400 for invalid JSON and validation errors', async () => {
@@ -683,6 +699,21 @@ describe('handlePublish success paths', () => {
         httpMetadata: expect.objectContaining({ contentType: 'image/png' }),
       }),
     );
+  });
+
+  it('publishes a ~2MB single-file HTML page with inline data', async () => {
+    const env = await makePublishEnv();
+    const rows = JSON.stringify(Array.from({ length: 20_000 }, (_, i) => ({ id: i, label: `row-${i}`, value: i * 1.5, note: 'x'.repeat(50) })));
+    const html = `<!doctype html><html><body><script>const DATA = ${rows};</script></body></html>`;
+    expect(html.length).toBeGreaterThan(2_000_000);
+
+    const response = await handlePublish(
+      publishRequest(validBody({ files: [{ path: 'index.html', content: html, mime: 'text/html' }] })),
+      env,
+    );
+
+    expect(response.status).toBe(201);
+    expect(env.ARTIFACTS.put).toHaveBeenCalledWith(expect.stringMatching(/index\.html$/), expect.anything(), expect.anything());
   });
 });
 
