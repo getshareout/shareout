@@ -19,9 +19,9 @@ import lensRoutingTs from '../../../src/pages/home/render-workspace/client-scrip
 import homeViewsBarrel from '../../../src/pages/home/render-workspace/client-script/home-views.ts?raw';
 
 /** Captured at split time — guards against accidental client-script drift.
- *  Re-pinned after frontend-polish clients/knowledge network-toast + billing link removal. */
-const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 563_711;
-const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '3a30b4e784067dac130f3dafd847d2fdb3b64021483e68a9cdc7e30743f5dd15';
+ *  Re-pinned after adding the Assets "Anyone with link" visibility badge. */
+const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 563_933;
+const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '31e0813bb32a9ef8efaf99e71e3dfa317656bcf5e5a3d916233de2d7f88ff05d';
 const HOME_VIEWS_MARKER = '  // ===== rail nav → Home pane views =====';
 
 const SECTION_SOURCES: [string, string][] = [

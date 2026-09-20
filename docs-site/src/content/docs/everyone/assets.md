@@ -35,9 +35,13 @@ Sharing a **folder** with a client (Admin → Sharing) also shares the **files**
 
 ## Visibility
 
-Each file is either **workspace-visible** (default — any member can see and embed it) or **private** (only you, until you share it). Toggle visibility on a file tile. Private files show a small badge.
+Each file is either **link-shareable** (default — anyone who has the file's link can open it) or **private** (only you, until you share it). Toggle visibility on a file tile. Private files show a small badge; link-shareable ones show an "Anyone with link" badge.
 
-- **Workspace-visible** files can be embedded in any page in the workspace via a stable file URL (`/v1/files/dlv_…/content`).
+:::caution[Link-shareable is not membership-gated]
+The link's id is an unguessable random token, but opening it does **not** check that you're signed in or a workspace member — anyone who gets the URL (a leaked link, a screenshot, a shared page's source) can open the file. That's different from a page set to `workspace` visibility, which does check membership. Don't upload anything you'd need real access control on — use **private** plus an explicit grant instead.
+:::
+
+- **Link-shareable** files can be embedded in any page via a stable file URL (`/v1/files/dlv_…/content`).
 - **Private** files are hidden from other members and from anonymous delivery links — share them deliberately via [external sharing](/teams/external-sharing/) or **Share with a person** (below).
 
 ## Versions
