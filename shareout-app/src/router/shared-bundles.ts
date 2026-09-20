@@ -8,6 +8,7 @@ import { handleServeGridJS, handleServeGridCSS } from '../grid-serve';
 import { handleServeArtifactUI } from '../ui-serve';
 import { isSupportedSdkMajor } from '../sdk-version';
 import { handleServeLibModule } from '../workspace-library';
+import { handleServeVendorLib } from '../vendor-cdn';
 import { isCurrentBundleVersion } from '../bundle-versions';
 
 // Public, origin-independent SDK / static bundles. These resolve identically on the
@@ -100,6 +101,13 @@ export function serveSharedBundle(
   // the handler (dispatcher falls through); 404s are non-200 and never cached.
   if (path.startsWith('/lib/'))
     return withEdgeCache(path, () => handleServeLibModule(request, env, path).then(r => r ?? new Response('Not found', { status: 404 })), executionCtx);
+
+  // Vendored public libraries: /vendor/<pkg>@<version>/<file>. Same auth-free,
+  // version-addressed rail as the SDK and Workspace Library — an artifact loads its
+  // chart library from us instead of a third-party CDN, so the bytes are edge-cached
+  // and no extra origin is on the critical path.
+  if (path.startsWith('/vendor/'))
+    return withEdgeCache(path, () => handleServeVendorLib(request, env, path, executionCtx).then(r => r ?? new Response('Not found', { status: 404 })), executionCtx);
 
   if (path === '/sdk/editor.js')
     return withEdgeCache(cacheKey, () => handleServeEditor(request, env, pinned), executionCtx);

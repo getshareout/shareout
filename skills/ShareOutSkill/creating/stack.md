@@ -129,6 +129,7 @@ The quick card. Depth in [../sdk/overview.md](../sdk/overview.md).
 
 ## Charts
 
+- **Load the library from the instance, not a public CDN:** `/vendor/<pkg>@<version>/<file>` (e.g. `/vendor/plotly.js-dist-min@2.35.2/plotly.min.js`). Same bytes, edge-cached, no extra handshake — see [../patterns/performance.md](../patterns/performance.md). Known CDN URLs (`cdn.plot.ly`, `d3js.org`, jsDelivr/unpkg npm paths) are rewritten to it at publish, so an existing artifact gets this for free.
 - **Interactive, view-only artifact:** `<canvas>` charting (e.g. Chart.js) is fine.
 - **Delivered by screenshot** (Slack / PDF / thumbnail / email): use **SVG** charts (Plotly). Server-side capture renders `<canvas>` blank. If unsure whether it'll be screenshotted, default to SVG.
 
@@ -140,7 +141,7 @@ The quick card. Depth in [../sdk/overview.md](../sdk/overview.md).
 
 ## Elevated motion (opt-in)
 
-If the user explicitly wants scroll-driven storytelling or physics-grade motion (a marketing site, a showcase), heavier libraries (GSAP, Lenis) are allowed. Load them from an **allowlisted CDN** (cdnjs, jsDelivr, unpkg) — those hosts pass the sandbox CSP and publish fine on public. Do **not** inline their minified source (a long minified line trips the obfuscation heuristic → held private). Never reach for this by default — bloat and slower first paint.
+If the user explicitly wants scroll-driven storytelling or physics-grade motion (a marketing site, a showcase), heavier libraries (GSAP, Lenis) are allowed. Load them from the instance (`/vendor/gsap@3/dist/gsap.min.js`) or an **allowlisted CDN** (cdnjs, jsDelivr, unpkg) — those hosts pass the sandbox CSP and publish fine on public. Do **not** inline their minified source (a long minified line trips the obfuscation heuristic → held private). Never reach for this by default — bloat and slower first paint.
 
 ## Related
 

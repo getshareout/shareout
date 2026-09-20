@@ -123,17 +123,25 @@ export async function serveSandboxedViewer(
   (async () => {
     try {
       const hasAccessPolicy = !!accessPolicy;
+
+      // The artifact's own seed data and viewer config don't depend on who is looking.
+      // Start them before the session resolves so their round trips overlap with the
+      // cookie lookup instead of queueing behind it.
+      const initialJsonPromise = hasAccessPolicy ? null : fetchInitialJsonData(env, artifactId);
+      const initialTablePromise = hasAccessPolicy ? null : fetchInitialTableData(env, artifactId);
+      const viewerConfigPromise = getViewerConfig(env, artifactId);
+
       const user = await sessionUserPromise;
 
       const [initialJsonData, initialTableData, adminInfo, favInfo, commentsInfo, hasMetrics, viewerConfig, visualEditorEnabled, attachedSkills, profile] = await Promise.all([
-        hasAccessPolicy ? null : fetchInitialJsonData(env, artifactId),
-        hasAccessPolicy ? null : fetchInitialTableData(env, artifactId),
+        initialJsonPromise,
+        initialTablePromise,
         detectAdminStatus(user, env, artifactId, ownerId),
         detectFavoriteState(user, env, artifactId),
         detectCommentsState(user, env, artifactId),
         // Only logged-in viewers can follow a metric, so skip the lookup for anonymous views.
         user ? hasMetricDefinitions(env, artifactId) : false,
-        getViewerConfig(env, artifactId),
+        viewerConfigPromise,
         isVisualEditorEnabled(env, workspaceId, user?.email),
         fetchAttachedSkills(user, env, artifactId),
         // Folded into the batch so the viewer's profile no longer adds a

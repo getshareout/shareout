@@ -71,6 +71,7 @@ tooling/scripts/       ← ci-check, gitleaks, boundary helpers
 |-----|---------|
 | `SHAREOUT_BASE_URL` | Public origin of this instance |
 | `ARTIFACT_ORIGIN` | Optional CDN origin; unset = same-zone |
+| `VENDOR_LIBS_DISABLED` | `1` to stop vendoring JS libraries (`/vendor/*`); artifacts keep their third-party CDN URLs |
 | `SETUP_ADMIN_EMAIL` | Bootstrap admin when roster empty |
 | `STORAGE_QUOTA_BYTES` / `STORAGE_MAX_FILE_BYTES` | Optional storage caps; unset = unlimited |
 | `PUBLIC_ARTIFACT_LIMIT` | Optional per-account public-artifact cap; unset = unlimited |
