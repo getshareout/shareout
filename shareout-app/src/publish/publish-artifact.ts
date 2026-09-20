@@ -42,7 +42,7 @@ export async function publishArtifact(
   // Point the artifact's library <script>/<link> tags at this instance's vendored
   // copies before anything reads or stores the HTML — so the stored bytes, the
   // moderation classifier and the editor all see the rewritten markup.
-  const { files, mobileHtml } = vendorizePublishFiles(env, params.files, params.mobileHtml);
+  const { files, mobileHtml } = await vendorizePublishFiles(env, params.files, params.mobileHtml, workspaceId);
 
   const visibility = coerceVisibility(env, params.visibility, params.allowOpen ?? false);
   const hasMobile = !!mobileHtml;

@@ -14,7 +14,13 @@
  * route can never be used as a general-purpose proxy.
  */
 
-/** npm packages this instance will vendor. Everything else 404s. */
+/**
+ * The packages every instance vendors out of the box. An operator extends this with
+ * `VENDOR_PACKAGES_EXTRA` (or drops the list entirely with `VENDOR_ALLOW_ANY`), and a
+ * workspace admin adds its own through the `vendor_packages` table — see packages.ts.
+ * This set is only the default, never the whole answer; resolve through
+ * `isPackageAllowed` / `resolveAllowedPackages`.
+ */
 export const VENDOR_PACKAGES: ReadonlySet<string> = new Set([
   // charting / dataviz — the reason this exists
   'plotly.js-dist-min',
@@ -68,14 +74,17 @@ export interface VendorRef {
 const VERSION_RE = /^\d+(?:\.\d+){0,2}(?:-[0-9A-Za-z.-]+)?$/;
 const FILE_RE = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*\.(?:js|mjs|css)$/;
 
-/** `/vendor/<pkg>@<version>/<file>` → ref, or null when it is not a servable path. */
+/**
+ * `/vendor/<pkg>@<version>/<file>` → ref, or null when the path is not even the right
+ * shape. Shape only: whether the *package* may be vendored is a per-instance and
+ * per-workspace question, answered by packages.ts.
+ */
 export function parseVendorPath(path: string): VendorRef | null {
   if (!path.startsWith(VENDOR_PREFIX)) return null;
   const rest = path.slice(VENDOR_PREFIX.length);
   const m = rest.match(/^((?:@[^/@]+\/)?[^/@]+)@([^/]+)\/(.+)$/);
   if (!m) return null;
   const [, pkg, version, file] = m;
-  if (!VENDOR_PACKAGES.has(pkg)) return null;
   if (!VERSION_RE.test(version)) return null;
   if (file.includes('..') || !FILE_RE.test(file)) return null;
   return { pkg, version, file };

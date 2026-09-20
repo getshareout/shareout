@@ -34,7 +34,13 @@ storage, and served from the host the viewer is already connected to.
 exactly — `cdn.plot.ly`, `d3js.org`, `cdn.jsdelivr.net/npm/…`, `unpkg.com/…` — to the
 vendored path automatically. Writing `/vendor/…` yourself just skips the translation.
 
-Anything outside the vendored set (`plotly.js*`, `d3`, `chart.js`, `echarts`,
+Need a library that is not in the set? A workspace admin registers it with
+`POST /v1/workspaces/{id}/vendor-packages` (`{"package":"highcharts"}`), and the
+instance operator can add packages instance-wide with `VENDOR_PACKAGES_EXTRA` or lift
+the list entirely with `VENDOR_ALLOW_ANY=1` — see
+[../team/libraries.md](../team/libraries.md).
+
+Anything still outside the vendored set (`plotly.js*`, `d3`, `chart.js`, `echarts`,
 `apexcharts`, `mermaid`, `lodash`, `dayjs`, `date-fns`, `luxon`, `papaparse`, `marked`,
 `dompurify`, `katex`, `highlight.js`, `alpinejs`, `htmx.org`, `preact`, `react`,
 `react-dom`, `vue`, `leaflet`, `three`, `gsap`, `zod`) keeps its CDN URL and the old

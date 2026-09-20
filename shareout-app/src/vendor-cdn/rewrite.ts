@@ -1,5 +1,10 @@
 import { VENDOR_PACKAGES, vendorUrl, type VendorRef } from './registry';
 
+/** Which packages this instance/workspace will vendor — see packages.ts. */
+export type PackageFilter = (pkg: string) => boolean;
+
+const builtInOnly: PackageFilter = pkg => VENDOR_PACKAGES.has(pkg);
+
 /**
  * Publish-time rewrite of third-party CDN URLs to this instance's vendored copies.
  *
@@ -42,7 +47,7 @@ function fromNpmCdn(url: URL, stripNpmPrefix: boolean): VendorRef | null {
   return { pkg: m[1], version: m[2], file: m[3] };
 }
 
-export function mapCdnUrl(raw: string): VendorRef | null {
+export function mapCdnUrl(raw: string, isAllowed: PackageFilter = builtInOnly): VendorRef | null {
   let url: URL;
   try {
     url = new URL(raw.startsWith('//') ? `https:${raw}` : raw);
@@ -66,7 +71,7 @@ export function mapCdnUrl(raw: string): VendorRef | null {
       ref = fromNpmCdn(url, false);
       break;
   }
-  if (!ref || !VENDOR_PACKAGES.has(ref.pkg)) return null;
+  if (!ref || !isAllowed(ref.pkg)) return null;
   // Anything that isn't a plain versioned file (`+esm`, a range, a directory) stays put.
   if (!/^\d/.test(ref.version) || !/\.(?:js|mjs|css)$/.test(ref.file)) return null;
   return ref;
@@ -76,9 +81,13 @@ export function mapCdnUrl(raw: string): VendorRef | null {
 // without rewriting a CDN URL an artifact merely shows as documentation text.
 const QUOTED_URL = /(["'])((?:https?:)?\/\/[^"'\s<>]+)\1/g;
 
-export function rewriteVendorUrls(html: string, baseUrl: string): string {
+export function rewriteVendorUrls(
+  html: string,
+  baseUrl: string,
+  isAllowed: PackageFilter = builtInOnly,
+): string {
   return html.replace(QUOTED_URL, (whole, quote: string, url: string) => {
-    const ref = mapCdnUrl(url);
+    const ref = mapCdnUrl(url, isAllowed);
     return ref ? `${quote}${vendorUrl(ref, baseUrl)}${quote}` : whole;
   });
 }

@@ -1,4 +1,5 @@
 import type { Env } from '../types';
+import { isPackageAllowed } from './packages';
 import {
   parseVendorPath,
   upstreamUrl,
@@ -53,6 +54,7 @@ export async function handleServeVendorLib(
 
   const ref = parseVendorPath(path);
   if (!ref) return new Response('Not Found', { status: 404 });
+  if (!(await isPackageAllowed(env, ref.pkg))) return new Response('Not Found', { status: 404 });
 
   const upstream = upstreamUrl(ref);
   if (!vendorLibsEnabled(env)) return Response.redirect(upstream, 302);

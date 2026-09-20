@@ -484,6 +484,7 @@ themselves.
 | `artifact_tests` | Per-artifact test config: `spec`, `mode`, `baseline_version_id`. |
 | `artifact_test_runs` | One test execution: pass/fail/error counts and full `results`. |
 | `platform_config` | Instance-wide key/value settings. |
+| `vendor_packages` | Extra npm packages a workspace may vendor through `/vendor/<pkg>@<version>/<file>`, on top of the built-in allowlist and `VENDOR_PACKAGES_EXTRA`. |
 
 ---
 

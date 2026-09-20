@@ -6,6 +6,9 @@ import {
   handleServeVendorLib,
   vendorR2Key,
   upstreamUrl,
+  isPackageAllowed,
+  resolveAllowedPackages,
+  isValidPackageName,
 } from '../../src/vendor-cdn';
 import { vendorizePublishFiles } from '../../src/publish/vendorize';
 import type { Env, FileEntry } from '../../src/types';
@@ -25,9 +28,13 @@ describe('parseVendorPath', () => {
     });
   });
 
-  it('refuses anything outside the allowlist', () => {
-    expect(parseVendorPath('/vendor/left-pad@1.0.0/index.js')).toBeNull();
-    expect(parseVendorPath('/vendor/@evil/pkg@1.0.0/index.js')).toBeNull();
+  it('parses the shape without judging the package — that is packages.ts', () => {
+    expect(parseVendorPath('/vendor/left-pad@1.0.0/index.js')).toEqual({
+      pkg: 'left-pad', version: '1.0.0', file: 'index.js',
+    });
+    expect(parseVendorPath('/vendor/@scope/pkg@1.0.0/index.js')).toEqual({
+      pkg: '@scope/pkg', version: '1.0.0', file: 'index.js',
+    });
   });
 
   it('refuses traversal, non-code files and bad versions', () => {
@@ -103,22 +110,45 @@ describe('vendorizePublishFiles', () => {
   };
   const env = { SHAREOUT_BASE_URL: BASE } as unknown as Env;
 
-  it('rewrites html files and the mobile entrypoint', () => {
-    const out = vendorizePublishFiles(env, [html], html.content);
+  it('rewrites html files and the mobile entrypoint', async () => {
+    const out = await vendorizePublishFiles(env, [html], html.content);
     expect(out.files[0].content).toContain(`${BASE}/vendor/plotly.js-dist-min@2.35.2/`);
     expect(out.mobileHtml).toContain(`${BASE}/vendor/`);
   });
 
-  it('leaves non-html and base64 assets alone', () => {
+  it('leaves non-html and base64 assets alone', async () => {
     const css: FileEntry = { path: 'a.css', mime: 'text/css', content: html.content };
-    expect(vendorizePublishFiles(env, [css]).files[0].content).toBe(html.content);
+    expect((await vendorizePublishFiles(env, [css])).files[0].content).toBe(html.content);
     const b64: FileEntry = { ...html, encoding: 'base64' };
-    expect(vendorizePublishFiles(env, [b64]).files[0].content).toBe(html.content);
+    expect((await vendorizePublishFiles(env, [b64])).files[0].content).toBe(html.content);
   });
 
-  it('is a no-op when the instance opts out', () => {
+  it('is a no-op when the instance opts out', async () => {
     const off = { SHAREOUT_BASE_URL: BASE, VENDOR_LIBS_DISABLED: '1' } as unknown as Env;
-    expect(vendorizePublishFiles(off, [html]).files[0].content).toBe(html.content);
+    expect((await vendorizePublishFiles(off, [html])).files[0].content).toBe(html.content);
+  });
+
+  it('rewrites a package the workspace registered', async () => {
+    const withWs = {
+      SHAREOUT_BASE_URL: BASE,
+      DB: { prepare: () => ({ bind: () => ({ all: async () => ({ results: [{ package: 'highcharts' }] }) }) }) },
+    } as unknown as Env;
+    const src: FileEntry = {
+      path: 'index.html', mime: 'text/html',
+      content: `<script src="https://cdn.jsdelivr.net/npm/highcharts@11.4.8/highcharts.js"></script>`,
+    };
+    const out = await vendorizePublishFiles(withWs, [src], undefined, 'wsp_1');
+    expect(out.files[0].content).toContain(`${BASE}/vendor/highcharts@11.4.8/highcharts.js`);
+  });
+
+  it('rewrites anything npm-shaped when the instance allows any package', async () => {
+    const anyEnv = { SHAREOUT_BASE_URL: BASE, VENDOR_ALLOW_ANY: '1' } as unknown as Env;
+    const src: FileEntry = {
+      path: 'index.html', mime: 'text/html',
+      content: `<script src="https://unpkg.com/left-pad@1.3.0/index.js"></script>`,
+    };
+    expect((await vendorizePublishFiles(anyEnv, [src])).files[0].content)
+      .toContain(`${BASE}/vendor/left-pad@1.3.0/index.js`);
   });
 });
 
@@ -162,9 +192,70 @@ describe('handleServeVendorLib', () => {
     expect(res!.headers.get('Location')).toBe(upstreamUrl({ pkg: 'd3', version: '7', file: 'dist/d3.min.js' }));
   });
 
-  it('404s an unknown package and ignores non-vendor paths', async () => {
-    const env = { ARTIFACTS: { get: vi.fn() } } as unknown as Env;
-    expect((await handleServeVendorLib(new Request('https://cdn.test/vendor/left-pad@1.0.0/i.js'), env, '/vendor/left-pad@1.0.0/i.js'))!.status).toBe(404);
+  it('404s a package nobody allowed and ignores non-vendor paths', async () => {
+    const env = {
+      ARTIFACTS: { get: vi.fn() },
+      DB: { prepare: () => ({ all: async () => ({ results: [] }) }) },
+    } as unknown as Env;
+    const unknown = '/vendor/left-pad@1.0.0/i.js';
+    expect((await handleServeVendorLib(new Request(`https://cdn.test${unknown}`), env, unknown))!.status).toBe(404);
+    expect(env.ARTIFACTS.get).not.toHaveBeenCalled();
     expect(await handleServeVendorLib(new Request('https://cdn.test/sdk/shareout.js'), env, '/sdk/shareout.js')).toBeNull();
+  });
+
+  it('serves a package a workspace registered', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('UPSTREAM', { status: 200 })));
+    const path = '/vendor/highcharts@11.4.8/highcharts.js';
+    const env = {
+      ARTIFACTS: { get: vi.fn().mockResolvedValue(null), put: vi.fn().mockResolvedValue(undefined) },
+      DB: { prepare: () => ({ all: async () => ({ results: [{ package: 'highcharts' }] }) }) },
+    } as unknown as Env;
+    const res = await handleServeVendorLib(new Request(`https://cdn.test${path}`), env, path);
+    expect(res!.status).toBe(200);
+  });
+});
+
+describe('package layers', () => {
+  const plain = { DB: { prepare: () => ({ all: async () => ({ results: [] }) }) } } as unknown as Env;
+
+  it('allows a built-in package without touching the database', async () => {
+    const db = { prepare: vi.fn() };
+    expect(await isPackageAllowed({ DB: db } as unknown as Env, 'd3')).toBe(true);
+    expect(db.prepare).not.toHaveBeenCalled();
+  });
+
+  it('allows what the operator listed in VENDOR_PACKAGES_EXTRA', async () => {
+    const env = { ...plain, VENDOR_PACKAGES_EXTRA: ' highcharts , vis-network ' } as unknown as Env;
+    expect(await isPackageAllowed(env, 'highcharts')).toBe(true);
+    expect(await isPackageAllowed(env, 'vis-network')).toBe(true);
+    expect(await isPackageAllowed(env, 'left-pad')).toBe(false);
+  });
+
+  it('allows any valid npm name when the operator opts into allow-any', async () => {
+    const env = { VENDOR_ALLOW_ANY: '1' } as unknown as Env;
+    expect(await isPackageAllowed(env, 'left-pad')).toBe(true);
+    expect(await isPackageAllowed(env, '../etc/passwd')).toBe(false);
+  });
+
+  it('falls back to workspace-registered rows', async () => {
+    const env = {
+      DB: { prepare: () => ({ all: async () => ({ results: [{ package: 'highcharts' }] }) }) },
+    } as unknown as Env;
+    expect(await isPackageAllowed(env, 'highcharts')).toBe(true);
+  });
+
+  it('keeps serving the built-ins when the lookup fails', async () => {
+    const broken = { DB: { prepare: () => { throw new Error('d1 down'); } } } as unknown as Env;
+    expect(await isPackageAllowed(broken, 'd3')).toBe(true);
+    expect(await isPackageAllowed(broken, 'highcharts')).toBe(false);
+    expect([...(await resolveAllowedPackages(broken, 'wsp_1'))]).toContain('d3');
+  });
+
+  it('validates npm package names', () => {
+    expect(isValidPackageName('chart.js')).toBe(true);
+    expect(isValidPackageName('@scope/name')).toBe(true);
+    expect(isValidPackageName('Chart.JS')).toBe(false);
+    expect(isValidPackageName('../evil')).toBe(false);
+    expect(isValidPackageName('')).toBe(false);
   });
 });

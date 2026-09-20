@@ -8,6 +8,7 @@ import {
 } from '../../workspaces';
 import { handleExportWorkspace } from '../../artifacts/export';
 import { routeWorkspaceFolders } from './workspace-folders';
+import { routeWorkspaceVendorPackages } from './workspace-vendor-packages';
 import { routeWorkspaceSharees } from './workspace-sharees-routes';
 import { routeWorkspaceSettings } from './workspace-settings-routes';
 import { routeWorkspaceMembers } from './workspace-members-routes';
@@ -77,6 +78,7 @@ export async function routeWorkspaceApi(ctx: FetchContext): Promise<Response | n
     (await routeWorkspaceSettings(ctx)) ??
     (await routeWorkspaceMembers(ctx)) ??
     (await routeWorkspaceFolders(ctx)) ??
+    (await routeWorkspaceVendorPackages(ctx)) ??
     (await routeWorkspaceOps(ctx)) ??
     (await routeWorkspaceAdminArtifacts(ctx));
 

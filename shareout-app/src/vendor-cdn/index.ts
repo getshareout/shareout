@@ -10,4 +10,12 @@ export {
   type VendorRef,
 } from './registry';
 export { handleServeVendorLib, vendorLibsEnabled } from './serve';
-export { mapCdnUrl, rewriteVendorUrls } from './rewrite';
+export { mapCdnUrl, rewriteVendorUrls, type PackageFilter } from './rewrite';
+export {
+  isPackageAllowed,
+  resolveAllowedPackages,
+  instanceExtraPackages,
+  invalidatePackageCache,
+  isValidPackageName,
+  vendorAllowsAny,
+} from './packages';
