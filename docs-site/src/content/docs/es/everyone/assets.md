@@ -35,9 +35,13 @@ Compartir una **carpeta** con un cliente (Admin → Compartir) también comparte
 
 ## Visibilidad
 
-Cada archivo es **visible para el workspace** (por defecto — cualquier miembro puede verlo e incrustarlo) o **privado** (solo vos, hasta que lo compartas). Cambiá la visibilidad en la tarjeta del archivo. Los privados llevan un badge.
+Cada archivo es **compartible por enlace** (por defecto — cualquiera que tenga el link del archivo puede abrirlo) o **privado** (solo vos, hasta que lo compartas). Cambiá la visibilidad en la tarjeta del archivo. Los privados llevan un badge; los compartibles por enlace muestran un badge "Cualquiera con el enlace".
 
-- Los archivos **visibles para el workspace** se pueden incrustar en cualquier página del workspace con una URL estable (`/v1/files/dlv_…/content`).
+:::caution[Compartible por enlace no verifica membresía]
+El id del link es un token aleatorio no adivinable, pero abrirlo **no** verifica que estés logueado ni que seas miembro del workspace — cualquiera que consiga la URL (un link filtrado, una captura de pantalla, el código fuente de una página compartida) puede abrir el archivo. Es distinto de una página con visibilidad `workspace`, que sí verifica membresía. No subas nada que necesite control de acceso real — usá **privado** más un permiso explícito.
+:::
+
+- Los archivos **compartibles por enlace** se pueden incrustar en cualquier página con una URL estable (`/v1/files/dlv_…/content`).
 - Los archivos **privados** quedan ocultos para otros miembros y para links de entrega anónimos — compartilos a propósito con [compartir externo](/es/teams/external-sharing/) o **Compartir con una persona** (abajo).
 
 ## Versiones

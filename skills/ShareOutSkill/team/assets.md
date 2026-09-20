@@ -32,9 +32,9 @@ Sharing a **folder** with a client (Admin → Sharing) also shares the **files**
 
 ## Visibility
 
-Each file is either **workspace-visible** (default — any member can see and embed it) or **private** (only you, until you share it). Toggle visibility on a file tile. Private files show a small badge.
+Each file is either **link-shareable** (default — anyone who has the file's id/URL can open it) or **private** (only you, until you share it). Toggle visibility on a file tile. Private files show a small badge; link-shareable ones show an "Anyone with link" badge.
 
-- **Workspace-visible** files embed in any page via `/v1/files/dlv_…/content`.
+- **Link-shareable is not membership-gated**, unlike artifact-page `workspace` visibility (which does check membership). The id is an unguessable random token (not enumerable), but ShareOut does **not** check workspace membership before serving the bytes — anyone who obtains the URL (a leaked link, a screenshot, a shared page's source) can open it. Don't upload anything you'd need real access control on; use **private** + an explicit grant instead.
 - **Private** files are hidden from other members and anonymous delivery links — share deliberately via [external-sharing.md](external-sharing.md) or **Share with a person** (below).
 
 ## Versions

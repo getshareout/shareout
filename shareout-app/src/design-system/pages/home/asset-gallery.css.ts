@@ -49,6 +49,7 @@ export const assetGalleryStyles = `/* ── Assets lens ───────�
 .wsx-assets__headr { display: flex; gap: 8px; align-items: center; }
 .wsx-asset-folders { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 var(--space-3); }
 .wsx-asset__ver--lock { background: var(--color-text-secondary); }
+.wsx-asset__ver--link { background: var(--color-text-tertiary); cursor: help; }
 .wsx-deliv { display: flex; flex-direction: column; gap: 8px; }
 .wsx-deliv__row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elevated); }
 .wsx-deliv__main { flex: 1; min-width: 0; }

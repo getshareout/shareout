@@ -44,6 +44,7 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
     var check = assetSelect ? '<button class="wsx-asset__check' + (on ? ' on' : '') + '" data-asset-sel="' + esc(a.id) + '" aria-label="' + esc(t('assets.select')) + '"></button>' : '';
     var ver = a.versionCount > 1 ? '<span class="wsx-asset__ver">v' + a.latestVersion + '</span>' : '';
     var priv = (window.WSX_WS && a.visibility === 'private') ? '<span class="wsx-asset__ver wsx-asset__ver--lock">' + esc(t('assets.private')) + '</span>' : '';
+    var link = (window.WSX_WS && a.visibility !== 'private') ? '<span class="wsx-asset__ver wsx-asset__ver--link" title="' + esc(t('assets.linkVisibleTitle')) + '">' + esc(t('assets.linkVisible')) + '</span>' : '';
     var actions = '';
     if (a.type === 'deliverable') {
       actions += aBtn('ver', t('assets.uploadNewVersion'), ASVG.plus) + aBtn('hist', t('assets.versionHistory'), ASVG.clock) + aBtn('cmt', t('assets.comments'), ASVG.chat) + aBtn('move', t('assets.moveToFolder'), ASVG.folder);
@@ -57,7 +58,7 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
       : '';
     var nameTitle = enr && enr.summary ? enr.summary : a.filename;
     return '<article class="wsx-asset' + (on ? ' is-sel' : '') + '" data-asset-id="' + esc(a.id) + '" data-type="' + a.type + '" data-kind="' + assetKind(a.mimeType) + '">'
-      + check + assetThumb(a) + ver + priv
+      + check + assetThumb(a) + ver + priv + link
       + '<div class="wsx-asset__meta"><span class="wsx-asset__name" title="' + esc(nameTitle) + '">' + esc(a.name) + '</span><span class="wsx-asset__sz">' + adBytes(a.sizeBytes) + (a.versionCount > 1 ? ' \\u00b7 ' + esc(t('assets.versionsCount').replace('{n}', String(a.versionCount))) : '') + '</span>' + tags + '</div>'
       + '<div class="wsx-asset__actions">' + actions + aBtn('copy', t('assets.copyLink'), ASVG.copy)
       +   '<a class="wsx-asset__act" href="' + esc(a.url) + '" download title="' + esc(t('assets.download')) + '" aria-label="' + esc(t('assets.download')) + '">' + isvg(ASVG.dl) + '</a>'

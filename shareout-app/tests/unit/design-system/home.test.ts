@@ -48,11 +48,12 @@ import { iconTooltipsStyles } from '../../../src/design-system/pages/home/icon-t
 import { skillMarketplaceStyles } from '../../../src/design-system/pages/home/skill-marketplace.css';
 import { assetGalleryStyles } from '../../../src/design-system/pages/home/asset-gallery.css';
 
-/** Byte length of the concatenated desktop/shared stylesheet (regression guard). */
-const ORIGINAL_STYLE_BYTE_LENGTH = 147281;
+/** Byte length of the concatenated desktop/shared stylesheet (regression guard).
+ *  Re-pinned after adding the Assets "Anyone with link" visibility badge style. */
+const ORIGINAL_STYLE_BYTE_LENGTH = 147361;
 
 /** SHA-256 of the current concatenated CSS body. */
-const ORIGINAL_STYLE_SHA256 = 'fd549f1f2ba0cd13daf726f8b1b765275e8a1e85964baac6707e45dd799fe981';
+const ORIGINAL_STYLE_SHA256 = '3fa30c9a8f6fcb2e8c06bf44364c2efa48aa7d80d78daf49985b5a02fc4a7b07';
 
 const SECTION_EXPORTS = [
   ['base', baseStyles],
