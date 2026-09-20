@@ -11,6 +11,42 @@ Goal: the artifact shows content — or at least its structure — immediately, 
 
 So you don't build a skeleton yourself. Your job is to make the moment *after* the skeleton fast and correct.
 
+## Libraries load from the instance, not a public CDN
+
+A chart library is the heaviest thing most artifacts load — `plotly.js-dist-min` is
+~1.3 MB brotli — and pulling it from `cdn.plot.ly` puts a third DNS + TLS handshake on
+the critical path, for bytes the instance can never cache.
+
+ShareOut vendors the common libraries itself and serves them immutable + edge-cached:
+
+```html
+<script src="https://<instance>/vendor/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
+<script src="https://<instance>/vendor/d3@7/dist/d3.min.js" defer></script>
+<link rel="stylesheet" href="https://<instance>/vendor/leaflet@1.9.4/dist/leaflet.css">
+```
+
+The path is `/vendor/<npm package>@<version>/<file inside the package>` — the same
+layout jsDelivr uses, so any `cdn.jsdelivr.net/npm/…` URL translates by dropping the
+host and `/npm`. Bytes are fetched once from jsDelivr, frozen in the instance's own
+storage, and served from the host the viewer is already connected to.
+
+**You don't have to remember this.** Publishing rewrites the URL shapes it can map
+exactly — `cdn.plot.ly`, `d3js.org`, `cdn.jsdelivr.net/npm/…`, `unpkg.com/…` — to the
+vendored path automatically. Writing `/vendor/…` yourself just skips the translation.
+
+Need a library that is not in the set? A workspace admin registers it with
+`POST /v1/workspaces/{id}/vendor-packages` (`{"package":"highcharts"}`), and the
+instance operator can add packages instance-wide with `VENDOR_PACKAGES_EXTRA` or lift
+the list entirely with `VENDOR_ALLOW_ANY=1` — see
+[../team/libraries.md](../team/libraries.md).
+
+Anything still outside the vendored set (`plotly.js*`, `d3`, `chart.js`, `echarts`,
+`apexcharts`, `mermaid`, `lodash`, `dayjs`, `date-fns`, `luxon`, `papaparse`, `marked`,
+`dompurify`, `katex`, `highlight.js`, `alpinejs`, `htmx.org`, `preact`, `react`,
+`react-dom`, `vue`, `leaflet`, `three`, `gsap`, `zod`) keeps its CDN URL and the old
+rules apply. A load-bearing chart library should still be **`defer`**-ed or placed at
+the end of `<body>` — a synchronous `<script>` mid-page blocks everything after it.
+
 ## The three speed tiers of content
 
 | Content | Speed | Guidance |
@@ -71,3 +107,4 @@ ShareOut.ready();
 - [ ] Any live `connection.query()` is precomputed via `query_snapshot` / `materialize`, or gated behind a user action
 - [ ] Runtime fetches run in parallel and hydrate per section
 - [ ] `ShareOut.ready()` is called once the page is painted
+- [ ] Library `<script>` tags point at `/vendor/…` (or a CDN shape publish can rewrite) and are `defer`-ed

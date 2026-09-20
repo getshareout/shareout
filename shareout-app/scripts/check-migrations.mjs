@@ -159,7 +159,8 @@ const TABLE_OWNERS = {
   sheets: 'src/data/sheets', skill: 'src/skill-marketplace.ts', slide: 'src/present', slides: 'src/present',
   ticket: 'src/support', tickets: 'src/support', tokens: 'src/api-auth.ts', upload: 'src/data/datasets',
   user: 'src/users', users: 'src/users', versions: 'src/publish', view: 'src/analytics.ts',
-  viewer: 'src/viewers', webhook: 'src/observability', workspace: 'src/workspaces', workspaces: 'src/workspaces',
+  vendor: 'src/vendor-cdn', viewer: 'src/viewers', webhook: 'src/observability', workspace: 'src/workspaces',
+  workspaces: 'src/workspaces',
 };
 
 {

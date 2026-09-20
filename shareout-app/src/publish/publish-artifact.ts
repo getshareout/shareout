@@ -11,6 +11,7 @@ import { recordLibraryVersion, upsertLibraryModuleRow } from '../workspace-libra
 import type { TypeMetadata } from '../types';
 import { upsertAgentConfig } from './agent-config';
 import { storeVersionAssets } from './assets';
+import { vendorizePublishFiles } from './vendorize';
 import { syncCredentials, syncViewers } from './request-auth';
 import {
   assemblePublishResponse,
@@ -33,10 +34,15 @@ export async function publishArtifact(
   executionCtx?: ExecutionContext,
 ): Promise<PublishResponse> {
   const {
-    name, slug, entrypoint, files, authMethod, shareWith, password, credentials,
-    workspaceId, folderId, mobileHtml, mobileEntrypoint, pwa, embed, accessPolicy,
+    name, slug, entrypoint, authMethod, shareWith, password, credentials,
+    workspaceId, folderId, mobileEntrypoint, pwa, embed, accessPolicy,
     agent, artifactType, attachedSkillIds, isExample, library,
   } = params;
+
+  // Point the artifact's library <script>/<link> tags at this instance's vendored
+  // copies before anything reads or stores the HTML — so the stored bytes, the
+  // moderation classifier and the editor all see the rewritten markup.
+  const { files, mobileHtml } = await vendorizePublishFiles(env, params.files, params.mobileHtml, workspaceId);
 
   const visibility = coerceVisibility(env, params.visibility, params.allowOpen ?? false);
   const hasMobile = !!mobileHtml;

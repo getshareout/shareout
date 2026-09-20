@@ -96,6 +96,12 @@ export interface Env {
   DAILY_BANDWIDTH_BYTES_PER_OWNER?: string;
   /** "1" to inject the "Made with ShareOut" badge into public artifacts. Off by default. */
   ARTIFACT_BADGE?: string;
+  /** "1" to stop vendoring JS libraries (/vendor/*): published artifacts keep their third-party CDN URLs. */
+  VENDOR_LIBS_DISABLED?: string;
+  /** Comma-separated npm packages this instance vendors on top of the built-in allowlist. */
+  VENDOR_PACKAGES_EXTRA?: string;
+  /** "1" to vendor ANY npm package instead of an allowlist — /vendor becomes a caching npm proxy for this instance. */
+  VENDOR_ALLOW_ANY?: string;
   /** When truthy (1|true|yes|on), pause ALL lifecycle emails (incl. OTP/invites). Jobs + CrewAI email_send still work. */
   LIFECYCLE_EMAILS_DISABLED?: string;
   /** Opt-IN for timer-driven nurture mail (win-back, activation, digests). Unset = off. */

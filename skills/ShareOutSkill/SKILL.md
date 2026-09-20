@@ -162,6 +162,37 @@ Rules:
 - Prefer `$ORIGIN/sdk/shareout.css` and `.so-` classes. See [modules/ui/overview.md](modules/ui/overview.md).
 - Do not use third-party CDN mirrors of the ShareOut SDK.
 
+### Third-party libraries
+
+Load them from the instance, not a public CDN:
+
+```html
+<script src="$ORIGIN/vendor/plotly.js-dist-min@2.35.2/plotly.min.js" defer></script>
+<script src="$ORIGIN/vendor/d3@7/dist/d3.min.js" defer></script>
+<link rel="stylesheet" href="$ORIGIN/vendor/leaflet@1.9.4/dist/leaflet.css">
+```
+
+`$ORIGIN/vendor/<npm package>@<version>/<file inside the package>` — the same layout
+jsDelivr uses, so any `cdn.jsdelivr.net/npm/…` URL translates by dropping the host and
+`/npm`. The instance fetches the bytes once, stores them and serves them immutable +
+edge-cached, on a host the viewer is already connected to. Publishing rewrites
+`cdn.plot.ly`, `d3js.org`, jsDelivr and unpkg URLs to this automatically, so an existing
+artifact is never broken by writing the CDN URL — writing `/vendor/…` just skips the
+translation.
+
+If the library you need is not vendored yet (`GET $ORIGIN/v1/workspaces/{id}/vendor-packages`
+lists what is), a workspace admin adds it with one call:
+
+```bash
+curl -X POST "$ORIGIN/v1/workspaces/$WS/vendor-packages" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"package":"highcharts"}'
+```
+
+Details and the instance-wide knobs (`VENDOR_PACKAGES_EXTRA`, `VENDOR_ALLOW_ANY`):
+[team/libraries.md](team/libraries.md#public-npm-libraries-vendor) ·
+[patterns/performance.md](patterns/performance.md#libraries-load-from-the-instance-not-a-public-cdn).
+
 ---
 
 ## HTML artifact rules

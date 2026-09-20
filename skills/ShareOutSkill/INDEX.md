@@ -15,6 +15,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Create a new artifact from scratch (build/make a page, dashboard, form, tool) | [creating/overview.md](creating/overview.md) | [creating/stack.md](creating/stack.md), [creating/blueprint.md](creating/blueprint.md) |
 | Build any artifact (spec/reference) | [SKILL.md](SKILL.md) | [core/html-spec/overview.md](core/html-spec/overview.md) |
 | Make an artifact load/render fast (no blank screen) | [patterns/performance.md](patterns/performance.md) | [sdk/overview.md](sdk/overview.md#readiness--loading), [api/jobs.md](api/jobs.md#querysnapshotconfig) |
+| Load a JS library (Plotly, D3, Chart.js…) — or add one the instance does not vendor yet | [patterns/performance.md](patterns/performance.md#libraries-load-from-the-instance-not-a-public-cdn) | [team/libraries.md](team/libraries.md#public-npm-libraries-vendor), [creating/stack.md](creating/stack.md#charts) |
 | Visual editor / live studio | [core/editor.md](core/editor.md) | [core/html-spec/overview.md](core/html-spec/overview.md) |
 | Workspace Home / Inspector / Deliver / Edit-Lite / setup checklist / pro search / notifications | [core/workspace-home.md](core/workspace-home.md) | [core/editor.md](core/editor.md), [team/workspace-assistant.md](team/workspace-assistant.md) |
 | Edit markdown/json/csv/txt in browser | [core/source-editor.md](core/source-editor.md) | [api/artifact-types.md](api/artifact-types.md) |
@@ -239,7 +240,7 @@ ShareOutSkill/
     ├── dashboards.md           # Dashboard patterns
     ├── uploads.md              # File upload patterns
     ├── data-provenance.md      # "Where does this data come from?" drawer + badges
-    └── performance.md          # Instant first paint, no blank screen
+    └── performance.md          # Instant first paint, /vendor libraries, no blank screen
 ```
 
 ## Loading Guidance

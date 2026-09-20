@@ -28,6 +28,20 @@ function parseRange(rangeHeader: string, totalSize: number): { offset: number; l
   return { offset: start, length: end - start + 1 };
 }
 
+// Gated bytes are held in the colo cache for an hour; they are version-addressed, so
+// the only cost of a stale entry is holding bytes nobody asks for any more.
+const PRIVATE_CACHE_TTL = 3600;
+
+function withHeader(resp: Response, value: string): Response {
+  const headers = new Headers(resp.headers);
+  headers.set('Cache-Control', value);
+  return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers });
+}
+
+/** Wire contract for gated bytes: never stored by a browser or a shared CDN cache. */
+const withNoStore = (resp: Response) => withHeader(resp, 'private, no-store');
+const withInternalTtl = (resp: Response) => withHeader(resp, `max-age=${PRIVATE_CACHE_TTL}`);
+
 export function getCacheControl(mime: string): string {
   if (mime.startsWith('image/') || mime.startsWith('video/') || mime.startsWith('audio/') || mime.startsWith('font/')) {
     return 'public, max-age=31536000, immutable';
@@ -72,9 +86,17 @@ export async function serveAsset(
   const variantSuffix =
     (opts.cacheVariant ? `:${opts.cacheVariant}` : '') + (opts.relaxCsp ? ':relax' : '');
 
-  // Edge-cache gate: assets always cacheable by mime, plus opt-in HTML. Private
-  // (noStore) and ranged responses are never cached.
-  const cacheable = !noStore && !rangeHeader && (isCacheableAsset(asset.mime) || cacheHtml);
+  // Edge-cache gate: assets always cacheable by mime, plus opt-in HTML. Ranged
+  // responses are never cached.
+  //
+  // Gated (noStore) bytes are cached too, but only in this colo's Cache API: the key
+  // is an internal URL nothing outside the worker can address, and a hit is only ever
+  // reached after handleServe verified the artifact's capability token. What `noStore`
+  // still guarantees is the wire contract — a private artifact is never stored by a
+  // browser or a shared CDN cache. Without this, every open of a private artifact (so:
+  // every customer dashboard) pays a cross-region R2 read for bytes that are immutable
+  // per r2_key.
+  const cacheable = !rangeHeader && (isCacheableAsset(asset.mime) || cacheHtml);
 
   // Strong validator: r2_key is unique per (version, path), so it changes whenever a
   // new version is published/promoted — cheap revalidation and correct invalidation.
@@ -100,7 +122,7 @@ export async function serveAsset(
   if (cacheable) {
     const cachedResponse = await cache.match(cacheKey);
     if (cachedResponse) {
-      return cachedResponse;
+      return noStore ? withNoStore(cachedResponse) : cachedResponse;
     }
   }
 
@@ -152,8 +174,9 @@ export async function serveAsset(
   if (transform) response = transform(response);
 
   if (cacheable) {
-    const responseToCache = response.clone();
-    cache.put(cacheKey, responseToCache);
+    // The Cache API refuses to store a `no-store` response, so gated bytes go in under
+    // an internal TTL and get their wire header back on the way out (see withNoStore).
+    cache.put(cacheKey, noStore ? withInternalTtl(response.clone()) : response.clone());
   }
 
   return response;

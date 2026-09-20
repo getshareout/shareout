@@ -231,15 +231,41 @@ describe('handleServe', () => {
     expect(cacheStore.has('https://artifact-cache.internal/artifacts/demo/index.html:raw')).toBe(false);
   });
 
-  it('never edge-caches gated (private) raw HTML even though the public variant would (007)', async () => {
+  it('keeps gated (private) raw HTML no-store on the wire while caching it colo-locally (007)', async () => {
+    const { env } = createServeEnv({
+      deployment: { ...defaultDeployment, visibility: 'private' },
+    });
+    const r2 = env.ARTIFACTS!.get as ReturnType<typeof vi.fn>;
+    const ct = await createAccessToken(ARTIFACT_ID, 'content', { SESSION_SECRET: 'session-secret' } as Env, 600);
+
+    const first = await handleServe(serveRequest('?_raw'), env, SLUG, '', { contentOrigin: true, ct });
+    expect(first.status).toBe(200);
+    // The wire contract is unchanged: no browser or shared CDN ever stores this.
+    expect(first.headers.get('Cache-Control')).toBe('private, no-store');
+    // The stored entry must not carry a public directive, so it can never be
+    // revalidated into a shared cache if it ever escaped the internal key.
+    const stored = cacheStore.get('https://artifact-cache.internal/artifacts/demo/index.html:cmt:relax');
+    expect(stored).toBeDefined();
+    expect(stored!.headers.get('Cache-Control')).not.toContain('public');
+    const r2CallsAfterFirst = r2.mock.calls.length;
+
+    // Repeat view (still behind the same verified capability token) skips R2.
+    const second = await handleServe(serveRequest('?_raw'), env, SLUG, '', { contentOrigin: true, ct });
+    expect(second.status).toBe(200);
+    expect(second.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(r2.mock.calls.length).toBe(r2CallsAfterFirst);
+  });
+
+  it('refuses gated bytes without a valid capability token, so the colo cache is unreachable (007)', async () => {
     const { env } = createServeEnv({
       deployment: { ...defaultDeployment, visibility: 'private' },
     });
     const ct = await createAccessToken(ARTIFACT_ID, 'content', { SESSION_SECRET: 'session-secret' } as Env, 600);
-    const response = await handleServe(serveRequest('?_raw'), env, SLUG, '', { contentOrigin: true, ct });
-    expect(response.status).toBe(200);
-    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
-    expect(cacheStore.size).toBe(0);
+    await handleServe(serveRequest('?_raw'), env, SLUG, '', { contentOrigin: true, ct });
+    expect(cacheStore.size).toBeGreaterThan(0);
+
+    const anon = await handleServe(serveRequest('?_raw'), env, SLUG, '', { contentOrigin: true, ct: null });
+    expect(anon.status).toBe(403);
   });
 
   it('uses KV cache on repeat requests and only fetches asset row', async () => {
