@@ -36,6 +36,9 @@ vi.mock('../../../src/features/flags', () => ({
 vi.mock('../../../src/superadmin/auth', () => ({
   isPlatformAdmin: vi.fn(async () => h.admin),
 }));
+vi.mock('../../../src/data/agent/ai-config', () => ({
+  resolveGatewayModel: vi.fn().mockResolvedValue(null),
+}));
 vi.mock('../../../src/logging', async (orig) => {
   const actual = await orig<typeof import('../../../src/logging')>();
   return { ...actual, createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: h.logError }) };

@@ -13,7 +13,8 @@ import type { Env } from '../types';
 import { getPlatformOrigin } from '../config/origins';
 import { googleOAuthConfigured } from '../config/auth-providers';
 import { schemaReady } from '../pages/setup';
-import { getAIProviderChain } from '../data/agent/anthropic';
+import { getAIProviderChain, DEFAULT_GATEWAY_MODEL } from '../data/agent/anthropic';
+import { getInstanceDefaultGatewayModel } from '../data/agent/ai-config';
 import { storageQuotaBytes, storageMaxFileBytes } from '../storage-quota';
 import { envAdminEmails } from './recipients';
 import { badgeEnabled } from '../serve/badge';
@@ -39,6 +40,10 @@ export interface InstanceConfig {
     providers: string[];
     /** Whether workspaces can save their own key (needs CREDENTIALS_KEY). */
     byo_keys: boolean;
+    /** Instance-wide Vercel AI Gateway model. Null ⇒ falls back to DEFAULT_GATEWAY_MODEL,
+     *  unless a workspace sets its own override (workspace_llm_config.gateway_model). */
+    default_gateway_model: string | null;
+    default_gateway_model_fallback: string;
   };
   email: {
     binding: boolean;
@@ -84,6 +89,7 @@ function truthy(value: string | undefined): boolean {
 
 export async function buildInstanceConfig(env: Env): Promise<InstanceConfig> {
   const providers = getAIProviderChain(env).map((c) => c.provider);
+  const defaultGatewayModel = await getInstanceDefaultGatewayModel(env);
   const hasSchema = await schemaReady(env);
   const adminsConfigured = envAdminEmails(env).length > 0;
   const gaps: ConfigGap[] = [];
@@ -139,7 +145,12 @@ export async function buildInstanceConfig(env: Env): Promise<InstanceConfig> {
       google: googleOAuthConfigured(env),
       email_otp_delivery: env.EMAIL ? 'email' : 'worker_log',
     },
-    ai: { providers, byo_keys: Boolean(env.CREDENTIALS_KEY) },
+    ai: {
+      providers,
+      byo_keys: Boolean(env.CREDENTIALS_KEY),
+      default_gateway_model: defaultGatewayModel,
+      default_gateway_model_fallback: DEFAULT_GATEWAY_MODEL,
+    },
     email: {
       binding: Boolean(env.EMAIL),
       default_from: env.EMAIL_DEFAULT_FROM ?? null,

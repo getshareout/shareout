@@ -37,10 +37,12 @@ take your assistant or crews down.
 To change the order, set `AI_PROVIDER_ORDER` to a comma-separated list, e.g.
 `anthropic,openai`. Configured providers you leave out still follow, in the default order.
 
-Models: the assistant, crews and page builds use Claude Sonnet 5 (`claude-sonnet-5`, or
-`anthropic/claude-sonnet-5` on the gateway; override with `BUILD_MODEL`). Lighter chat
-(in-artifact chat, summaries) uses `claude-sonnet-5` on Anthropic and `gpt-4o` on the
-gateway or OpenAI. Model ids live in `src/data/agent/models.ts`.
+Models: on the gateway, the assistant, crews and page builds all use the same model —
+`deepseek/deepseek-v4.1-flash` by default (see [Pick a model](#pick-a-model) to change
+it without touching code — a workspace or instance choice there takes priority). On
+Anthropic direct, everything uses Claude Sonnet 5 (`claude-sonnet-5`); on OpenAI direct,
+`gpt-4o`. `BUILD_MODEL` is a build-agent-only fallback below that. Model ids live in
+`src/data/agent/models.ts`.
 
 ## Set it
 
@@ -89,6 +91,34 @@ the instance key. `CREDENTIALS_KEY` is also what encrypts stored connector crede
 so it is worth setting even if you never use per-workspace AI keys.
 
 A workspace with its own key uses it; everyone else falls back to the instance chain.
+
+## Pick a model
+
+The Vercel AI Gateway model is not hardcoded — pick any model the gateway serves, per
+workspace or instance-wide, from its live catalog rather than a list baked into this repo:
+
+```bash
+# What the gateway offers right now (requires VERCEL_AI_GATEWAY to be set)
+curl -sS "$ORIGIN/v1/ai/gateway-models" -H "Authorization: Bearer $SHAREOUT_TOKEN" | jq '.models'
+
+# Set a workspace's own model (admin of that workspace)
+curl -sS -X PUT "$ORIGIN/v1/workspaces/$WORKSPACE_ID/llm/model" \
+  -H "Authorization: Bearer $SHAREOUT_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"model":"deepseek/deepseek-v4.1-flash"}'
+
+# Set the instance-wide default (superadmin)
+curl -sS -X PUT "$ORIGIN/v1/admin/ai-settings" \
+  -H "Authorization: Bearer $SHAREOUT_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"defaultGatewayModel":"deepseek/deepseek-v4.1-flash"}'
+```
+
+Precedence: a workspace's own model wins, then the instance default, then the hardcoded
+`deepseek/deepseek-v4.1-flash`. `DELETE .../llm/model` (or `defaultGatewayModel: null`)
+clears an override back to the next fallback. Both also have a dropdown — Settings → AI
+in a workspace, and `/admin?view=instance` → **Default AI model** for the instance.
+This only applies to the `vercel-gateway` provider entry; the Anthropic- and
+OpenAI-direct entries keep their own fixed model, since they cannot serve an arbitrary
+gateway catalog id.
 
 ## Cost
 

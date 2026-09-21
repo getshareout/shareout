@@ -21,6 +21,7 @@ import { userRow, artifactRow, renderAdminFragment } from '../../superadmin/page
 import { searchWorkspaces } from '../../superadmin/workspaces-admin';
 import { provisionWorkspace, setWorkspaceMemberRole } from '../../superadmin/workspaces-provision';
 import { buildInstanceConfig } from '../../superadmin/instance-config';
+import { getInstanceDefaultGatewayModel } from '../../data/agent/ai-config';
 import { renderFeatureGrid } from '../../superadmin/features-view';
 import { isKnownFeature } from '../../features/registry';
 import { setGlobalFlag, setWorkspaceFlag, GLOBAL_TARGET } from '../../features/flags';
@@ -79,6 +80,27 @@ export async function routeAdminApi(ctx: FetchContext): Promise<Response | null>
   // unset thing disables. No secrets, only whether each is present.
   if (path === '/v1/admin/instance' && request.method === 'GET') {
     return jsonResponse(await buildInstanceConfig(env));
+  }
+
+  // GET/PUT /v1/admin/ai-settings — instance-wide default Vercel AI Gateway model.
+  // A workspace's own `gateway_model` (workspace-llm.ts) takes priority over this.
+  if (path === '/v1/admin/ai-settings' && request.method === 'GET') {
+    return jsonResponse({ defaultGatewayModel: await getInstanceDefaultGatewayModel(env) });
+  }
+  if (path === '/v1/admin/ai-settings' && request.method === 'PUT') {
+    const body = await request.json<{ defaultGatewayModel?: string | null }>().catch(() => ({}) as { defaultGatewayModel?: string | null });
+    const model = body.defaultGatewayModel;
+    if (model !== null && (!model || typeof model !== 'string' || !model.includes('/'))) {
+      return jsonError('defaultGatewayModel must be a gateway model id or null', 'VALIDATION_ERROR', 400);
+    }
+    await env.DB.prepare(`
+      INSERT INTO instance_ai_settings (id, default_gateway_model, updated_at)
+      VALUES (1, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      ON CONFLICT(id) DO UPDATE SET
+        default_gateway_model = excluded.default_gateway_model,
+        updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+    `).bind(model).run();
+    return jsonResponse({ ok: true, defaultGatewayModel: model });
   }
 
   // POST /v1/admin/workspaces {name, owner_email, slug?, description?}

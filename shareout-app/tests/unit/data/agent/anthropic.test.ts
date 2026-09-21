@@ -67,8 +67,8 @@ describe('getAgentChatModel', () => {
     expect(getAgentChatModel(openaiEnv())).toBe('gpt-4o');
   });
 
-  it('strips openai/ prefix from gateway model', () => {
-    expect(getAgentChatModel(gatewayEnv())).toBe('gpt-4o');
+  it('strips the gateway provider prefix from the model', () => {
+    expect(getAgentChatModel(gatewayEnv())).toBe('deepseek-v4.1-flash');
   });
 });
 
@@ -193,7 +193,13 @@ describe('getAIProviderChain', () => {
   it('orders gateway first, then openai', () => {
     const chain = getAIProviderChain(bothEnv());
     expect(chain.map((c) => c.provider)).toEqual(['vercel-gateway', 'openai']);
-    expect(chain[0].model).toBe('openai/gpt-4o');
+    expect(chain[0].model).toBe('deepseek/deepseek-v4.1-flash');
+    expect(chain[1].model).toBe('gpt-4o');
+  });
+
+  it('honors a gatewayModel override on the vercel-gateway entry only', () => {
+    const chain = getAIProviderChain(bothEnv(), 'anthropic/claude-opus-5');
+    expect(chain[0].model).toBe('anthropic/claude-opus-5');
     expect(chain[1].model).toBe('gpt-4o');
   });
 
@@ -227,8 +233,12 @@ describe('getAIProviderChain', () => {
 });
 
 describe('getBuildConfig', () => {
-  it('routes the gateway to Claude Sonnet 5 by default', () => {
-    expect(getBuildConfig(gatewayEnv())?.model).toBe('anthropic/claude-sonnet-5');
+  it('routes the gateway to the default gateway model', () => {
+    expect(getBuildConfig(gatewayEnv())?.model).toBe('deepseek/deepseek-v4.1-flash');
+  });
+
+  it('honors a gatewayModel override', () => {
+    expect(getBuildConfig(gatewayEnv(), 'anthropic/claude-opus-5')?.model).toBe('anthropic/claude-opus-5');
   });
 
   it('uses Claude Sonnet 5 on the Anthropic API', () => {

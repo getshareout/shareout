@@ -80,6 +80,20 @@ export function instanceBody(cfg: InstanceConfig): string {
     ) + kv('Workspaces can use their own key', yesNo(cfg.ai.byo_keys)),
   );
 
+  // A workspace's own gateway_model (workspace-llm.ts) overrides this default.
+  const aiModel = `
+    <p class="sa-muted" style="margin-bottom:var(--space-3)">
+      Default Vercel AI Gateway model, unless a workspace picks its own.
+      Currently <code>${escapeHtml(cfg.ai.default_gateway_model ?? cfg.ai.default_gateway_model_fallback)}</code>${cfg.ai.default_gateway_model ? '' : ' <span class="sa-muted">(built-in default)</span>'}.
+    </p>
+    <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;align-items:center">
+      <select id="sa-ai-model" class="so-c-select" style="min-width:280px" data-current="${escapeHtml(cfg.ai.default_gateway_model ?? '')}">
+        <option value="">Built-in default (${escapeHtml(cfg.ai.default_gateway_model_fallback)})</option>
+      </select>
+      <button id="sa-ai-model-save" class="so-c-btn so-c-btn--primary so-c-btn--sm" type="button">Save</button>
+      <span id="sa-ai-model-result" class="sa-muted"></span>
+    </div>`;
+
   const email = settingsTable(
     kv('Email binding', yesNo(cfg.email.binding)) +
       kv('Default sender', cfg.email.default_from ? `<code>${escapeHtml(cfg.email.default_from)}</code>` : '—') +
@@ -166,7 +180,8 @@ export function instanceBody(cfg: InstanceConfig): string {
     <div style="margin-top:var(--space-4)">${gapsCard(cfg)}</div>
     ${pair(createWorkspace, appointAdmin)}
     ${pair(card('Identity', identity), card('Sign-in', signIn))}
-    ${pair(card('AI', ai), card('Email', email))}
+    ${pair(card('AI', ai), card('Default AI model', aiModel))}
+    <div style="margin-top:var(--space-4)">${card('Email', email)}</div>
     ${pair(card('Sharing', sharing), card('Storage limits', storage))}
     ${pair(card('Bindings', bindings), card('Instance admins', admins))}`;
 }

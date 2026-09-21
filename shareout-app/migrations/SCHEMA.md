@@ -1,6 +1,6 @@
 # ShareOut database schema
 
-What every one of the **135 tables** is for, grouped the way
+What every one of the **136 tables** is for, grouped the way
 [`0000_init.sql`](0000_init.sql) groups them. Rules for *new* tables live in
 [CONVENTIONS.md](CONVENTIONS.md); this document describes what exists today.
 
@@ -125,7 +125,7 @@ The five paths: **membership** (`workspace_members`), **per-artifact invite**
 | `workspaces` | The tenant. Carries its own policy: `allowed_email_domains`/`allowed_emails` gate joining, `session_max_days` caps session life, `public_publish_policy` + `public_publish_approvals_required` govern publishing, `branding` and `feature_flags` are JSON. |
 | `workspace_members` | Membership and `role` (`owner`/`admin`/`member`). `member_class` separates internal staff from external collaborators. |
 | `workspace_invite_claims` | Pending invites. `code_hash` only; `expires_at` and `claimed_at` make each single-use. `email_status` (`sent`/`failed`/`skipped`/`link_only`) with `email_sent_at` and `email_error` record whether the invite mail actually went out — null on rows minted before that was tracked. |
-| `workspace_llm_config` | Per-workspace AI settings: bring-your-own provider credentials (encrypted), `balance_micro_usd`, `markup_multiplier`, monthly budget. |
+| `workspace_llm_config` | Per-workspace AI settings: bring-your-own provider credentials (encrypted), `balance_micro_usd`, `markup_multiplier`, monthly budget, `gateway_model` override. |
 | `workspace_event_visibility` | Which member audience sees which activity-feed event kind. |
 | `workspace_library` | Workspace- or user-scoped published modules, with `namespace`/`module_name` and install counters. |
 | `workspace_files` | The workspace's virtual filesystem, one row per file. `namespace` is the directory — `context` (markdown fed to agents, where `updated_by_kind` distinguishes human from agent edits), `catalog` (the data catalogue) and `knowledge` (the learned knowledge base). `scope_id` narrows a file to one sharee; `''` means workspace-wide. |
@@ -304,6 +304,7 @@ erDiagram
 | `agent_messages` | Turns, with `suggested_edits` and `applied_at` when a turn proposed a change. |
 | `agent_usage` | Aggregated per-artifact, per-period agent usage. |
 | `agent_usage_events` | Per-call cost ledger: provider, model, tokens, `base_cost_micro_usd` vs `billed_cost_micro_usd`, `byo` flag. |
+| `instance_ai_settings` | Singleton (`id = 1`) instance-wide AI defaults: `default_gateway_model`, the fallback when a workspace has no `gateway_model` override. |
 | `crews` | An autonomous agent: `instructions`, `model`, and hard limits (`max_iterations`, `run_budget_micro_usd`, `max_runtime_ms`). |
 | `crew_runs` | One execution: `status`, `termination_reason`, iterations, tokens, cost. |
 | `crew_run_events` | Ordered trace of a run — tool calls, inputs, outputs, latency. The debugging surface. |

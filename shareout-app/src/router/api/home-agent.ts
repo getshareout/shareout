@@ -19,6 +19,7 @@ import { hostWorkspaceId } from '../../pages/home/host';
 import { queryHomeArtifactCatalog, queryActivityFeed } from '../../pages/home/queries';
 import type { ActionItem } from '../../pages/home/types';
 import { getCrewProvider } from '../../crew/provider';
+import { resolveGatewayModel } from '../../data/agent/ai-config';
 import { getAccountAnalytics } from '../../analytics';
 import { getVisibilityScope } from '../../account-links';
 import { buildClientsContextForWorkspace } from '../../sharees/context';
@@ -132,7 +133,7 @@ async function handleTranscribe(ctx: FetchContext, ws: string | null, user: Auth
  *  dock the first time the user opens the workspace each day. */
 async function handleBrief(ctx: FetchContext, ws: string | null, user: AuthUser): Promise<Response> {
   const { env, url } = ctx;
-  const provider = getCrewProvider(env);
+  const provider = getCrewProvider(env, await resolveGatewayModel(env, ws));
   if (!provider) return jsonResp({ text: '' });
   const todParam = url.searchParams.get('tod');
   const tod = todParam === 'morning' || todParam === 'afternoon' || todParam === 'evening' ? todParam : '';

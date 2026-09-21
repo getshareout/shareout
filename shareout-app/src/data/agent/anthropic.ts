@@ -8,6 +8,8 @@ const AI_TIMEOUT_MS = 30000;
 const AI_STREAM_TIMEOUT_MS = 60000;
 export const AGENT_CHAT_MODEL = OPENAI_CHAT_MODEL;
 const OPENAI_MODEL = AGENT_CHAT_MODEL;
+/** Default Vercel AI Gateway model id, used unless a workspace or the instance picks its own. */
+export const DEFAULT_GATEWAY_MODEL = 'deepseek/deepseek-v4.1-flash';
 const VERCEL_GATEWAY_URL = 'https://ai-gateway.vercel.sh/v1';
 export const ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
 export const ANTHROPIC_VERSION = '2023-06-01';
@@ -26,10 +28,11 @@ export interface AIConfig {
   model: string;
 }
 
-/** Build an AIConfig for a caller-supplied (bring-your-own) provider key. */
-export function buildAIConfig(provider: AIProvider, apiKey: string): AIConfig {
+/** Build an AIConfig for a caller-supplied (bring-your-own) provider key.
+ *  `gatewayModel` overrides the Vercel AI Gateway model id (workspace or instance choice). */
+export function buildAIConfig(provider: AIProvider, apiKey: string, gatewayModel?: string | null): AIConfig {
   if (provider === 'vercel-gateway') {
-    return { provider, apiKey, baseUrl: VERCEL_GATEWAY_URL, model: `openai/${OPENAI_MODEL}` };
+    return { provider, apiKey, baseUrl: VERCEL_GATEWAY_URL, model: gatewayModel || DEFAULT_GATEWAY_MODEL };
   }
   if (provider === 'anthropic') {
     return { provider, apiKey, baseUrl: ANTHROPIC_BASE_URL, model: DEFAULT_CLAUDE_MODEL.id };
@@ -102,20 +105,21 @@ function completionRequest(
 /**
  * Ordered failover candidates from the configured env keys (see providerOrder). When the
  * preferred provider fails with a provider-level error, callers retry against the next
- * entry (see resolveFailoverChain).
+ * entry (see resolveFailoverChain). `gatewayModel` threads a workspace/instance model
+ * choice into the vercel-gateway entry (see ai-config.ts's resolveGatewayModel).
  */
-export function getAIProviderChain(env: Env): AIConfig[] {
+export function getAIProviderChain(env: Env, gatewayModel?: string | null): AIConfig[] {
   const keys: Record<AIProvider, string | undefined> = {
     'vercel-gateway': env.VERCEL_AI_GATEWAY,
     anthropic: env.ANTHROPIC_API_KEY,
     openai: env.OPENAI_API_KEY,
   };
-  return providerOrder(env).flatMap(p => (keys[p] ? [buildAIConfig(p, keys[p]!)] : []));
+  return providerOrder(env).flatMap(p => (keys[p] ? [buildAIConfig(p, keys[p]!, gatewayModel)] : []));
 }
 
 /** Preferred provider (first in the failover chain), or null when none configured. */
-export function getAIProvider(env: Env): AIConfig | null {
-  return getAIProviderChain(env)[0] ?? null;
+export function getAIProvider(env: Env, gatewayModel?: string | null): AIConfig | null {
+  return getAIProviderChain(env, gatewayModel)[0] ?? null;
 }
 
 /** Provider-level failures worth failing over from (credits/auth/rate-limit/outage). */
@@ -154,15 +158,16 @@ export function alertProviderFailure(env: Env, cfg: AIConfig, error: string, fai
   });
 }
 
-/** Model id stored in conversation metadata (provider prefix stripped). */
+/** Model id stored in conversation metadata (gateway provider prefix stripped). */
 export function getAgentChatModel(env: Env): string {
-  return getAIProvider(env)?.model.replace(/^openai\//, '') ?? AGENT_CHAT_MODEL;
+  return getAIProvider(env)?.model.replace(/^[a-z0-9-]+\//, '') ?? AGENT_CHAT_MODEL;
 }
 
-/** Stronger-model variant of a provider config, for the build agent and the chat agent. */
-function withBuildModel(env: Env, cfg: AIConfig): AIConfig {
+/** Build-agent variant of a provider config. Same gateway model as chat by default;
+ *  BUILD_MODEL (legacy secret) can still pin the build agent to a different model. */
+function withBuildModel(env: Env, cfg: AIConfig, gatewayModel?: string | null): AIConfig {
   if (cfg.provider === 'vercel-gateway') {
-    return { ...cfg, model: env.BUILD_MODEL || DEFAULT_CLAUDE_MODEL.gateway };
+    return { ...cfg, model: gatewayModel || env.BUILD_MODEL || DEFAULT_GATEWAY_MODEL };
   }
   if (cfg.provider === 'anthropic') {
     const own = env.BUILD_MODEL && !env.BUILD_MODEL.includes('/') ? env.BUILD_MODEL : '';
@@ -172,17 +177,16 @@ function withBuildModel(env: Env, cfg: AIConfig): AIConfig {
 }
 
 /** Build-model failover chain — same provider order as getAIProviderChain. */
-export function getBuildChain(env: Env): AIConfig[] {
-  return getAIProviderChain(env).map(cfg => withBuildModel(env, cfg));
+export function getBuildChain(env: Env, gatewayModel?: string | null): AIConfig[] {
+  return getAIProviderChain(env, gatewayModel).map(cfg => withBuildModel(env, cfg, gatewayModel));
 }
 
 /**
- * Build-agent provider config — routes the create-page builder to a stronger model
- * (Claude via the Vercel AI Gateway or the Anthropic API) while leaving planner/visitor/admin
- * chat on the default model. OpenAI-only instances keep the default model.
+ * Build-agent provider config — routes the create-page builder to the workspace/instance
+ * gateway model (or BUILD_MODEL / the Anthropic API default when set).
  */
-export function getBuildConfig(env: Env): AIConfig | null {
-  return getBuildChain(env)[0] ?? null;
+export function getBuildConfig(env: Env, gatewayModel?: string | null): AIConfig | null {
+  return getBuildChain(env, gatewayModel)[0] ?? null;
 }
 
 function filterMessages(messages: Array<{ role: MessageRole; content: string }>): ChatMessage[] {

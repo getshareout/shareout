@@ -9,6 +9,7 @@ import type { FetchContext } from '../context';
 import { isAuthUser, requireToken, getTokenOrSessionUser, requireTokenOrSession } from '../helpers/auth-guard';
 import { getSkillWorkspaceContext } from '../../workspace-context';
 import { jsonResponse } from '../helpers/json-response';
+import { fetchGatewayModels } from '../../data/agent/gateway-catalog';
 import { getPlatformOrigin } from '../../config/origins';
 import { schemaReady } from '../../pages/setup';
 
@@ -64,6 +65,22 @@ export async function routeMiscApi(ctx: FetchContext): Promise<Response | null> 
       if (!isAuthUser(user)) return user;
     }
     return handleGlobalProxy(request, env);
+  }
+
+  // GET /v1/ai/gateway-models — live Vercel AI Gateway catalog, for the workspace and
+  // instance model pickers (no hardcoded model list to keep current with new releases).
+  if (path === '/v1/ai/gateway-models' && request.method === 'GET') {
+    const user = await requireTokenOrSession(ctx);
+    if (!isAuthUser(user)) return user;
+    if (!env.VERCEL_AI_GATEWAY) {
+      return addCORS(jsonResponse({ error: 'Vercel AI Gateway not configured on this instance' }, 409));
+    }
+    try {
+      const models = await fetchGatewayModels();
+      return addCORS(jsonResponse({ models }));
+    } catch (err) {
+      return addCORS(jsonResponse({ error: err instanceof Error ? err.message : 'Gateway catalog fetch failed' }, 502));
+    }
   }
 
   if (path === '/health') {

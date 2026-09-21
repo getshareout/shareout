@@ -33,7 +33,12 @@ describe('buildInstanceConfig', () => {
     const cfg = await buildInstanceConfig(makeEnv(CONFIGURED));
     expect(cfg.origin).toBe('https://acme.workers.dev');
     expect(cfg.schema).toBe('ready');
-    expect(cfg.ai).toEqual({ providers: ['openai'], byo_keys: true });
+    expect(cfg.ai).toEqual({
+      providers: ['openai'],
+      byo_keys: true,
+      default_gateway_model: null,
+      default_gateway_model_fallback: 'deepseek/deepseek-v4.1-flash',
+    });
     expect(cfg.auth).toMatchObject({ password: true, google: false, email_otp_delivery: 'email' });
     expect(cfg.gaps).toEqual([]);
   });
