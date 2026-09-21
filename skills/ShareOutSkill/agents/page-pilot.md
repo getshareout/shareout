@@ -163,8 +163,8 @@ Pilot shares the workspace AI balance with visitor chat. Monitor usage via the e
 <html>
 <head>
   <title>Orders Dashboard</title>
-  <link rel="stylesheet" href="$ORIGIN/sdk/shareout.css">
-  <script src="$ORIGIN/sdk/shareout.js"></script>
+  <link rel="stylesheet" href="/sdk/shareout.css">
+  <script src="/sdk/shareout.js"></script>
 </head>
 <body>
   <div class="so-toolbar">

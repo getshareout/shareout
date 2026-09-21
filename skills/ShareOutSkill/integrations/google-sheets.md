@@ -102,7 +102,7 @@ POST /v1/data/{artifactId}/sheets/fetch
   }
 }
 </script>
-<script src="$ORIGIN/sdk/shareout.js"></script>
+<script src="/sdk/shareout.js"></script>
 <script>
   const sdk = new ShareOut();
 

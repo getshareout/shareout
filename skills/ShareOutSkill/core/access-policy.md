@@ -111,8 +111,8 @@ The page queries the table **normally** — no filtering logic needed. The serve
 <!doctype html>
 <html>
 <head>
-  <link rel="stylesheet" href="$ORIGIN/sdk/shareout.css">
-  <script src="$ORIGIN/sdk/shareout.js"></script>
+  <link rel="stylesheet" href="/sdk/shareout.css">
+  <script src="/sdk/shareout.js"></script>
   <script type="shareout/manifest">
   {
     "version": "2.0",

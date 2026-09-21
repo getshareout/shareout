@@ -116,6 +116,8 @@ export interface AssembleResponseInput {
   policyNotice?: string;
   approvalRequired?: number;
   blocking: boolean;
+  /** Non-fatal publish-time repairs/problems worth showing the publisher. */
+  warnings?: string[];
 }
 
 export function assemblePublishResponse(env: Env, input: AssembleResponseInput): PublishResponse {
@@ -150,6 +152,7 @@ export function assemblePublishResponse(env: Env, input: AssembleResponseInput):
       : { status: 'blocked', message: MODERATION_BLOCKED_MESSAGE, forced_private: true };
   }
 
+  if (input.warnings?.length) response.warnings = input.warnings;
   if (input.policyNotice) response.notice = input.policyNotice;
   if (input.approvalRequired !== undefined) {
     response.approval_required = { required: input.approvalRequired, artifact_id: input.artifactId };

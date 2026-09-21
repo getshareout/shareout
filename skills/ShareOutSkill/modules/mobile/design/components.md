@@ -428,10 +428,11 @@ ShareOut.mobile.search({
   onCancel: () => closeSearch(),
 
   // Recent searches
+  // `localStorage` throws SecurityError in the artifact sandbox — persist via sdk.json.
   recentSearches: {
     enabled: true,
     max: 5,
-    storage: 'localStorage'
+    storage: 'sdk.json'
   }
 });
 ```

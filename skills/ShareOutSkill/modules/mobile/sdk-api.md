@@ -8,7 +8,7 @@ Complete API reference for ShareOut mobile features.
 
 ```html
 <!-- Auto-loaded when PWA enabled, or manually include -->
-<script src="$ORIGIN/sdk/shareout-mobile.js"></script>
+<script src="/sdk/shareout-mobile.js"></script>
 ```
 
 ---
@@ -646,7 +646,7 @@ console.log(ShareOut.mobile.version);
 Add `data-auto-init` attribute to auto-initialize:
 
 ```html
-<script src="$ORIGIN/sdk/shareout-mobile.js" data-auto-init></script>
+<script src="/sdk/shareout-mobile.js" data-auto-init></script>
 ```
 
 Equivalent to calling:
@@ -692,7 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <button id="install">Install App</button>
   </div>
 
-  <script src="$ORIGIN/sdk/shareout-mobile.js"></script>
+  <script src="/sdk/shareout-mobile.js"></script>
   <script>
     const { mobile } = ShareOut;
 

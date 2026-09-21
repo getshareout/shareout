@@ -5,7 +5,7 @@ ShareOut SDK for browser artifacts.
 ## Installation
 
 ```html
-<script src="$ORIGIN/sdk/shareout.js"></script>
+<script src="/sdk/shareout.js"></script>
 <script>
 (async () => {
   const sdk = await ShareOut.create();
@@ -15,7 +15,7 @@ ShareOut SDK for browser artifacts.
 
 **Rules:**
 - Load SDK before calling `ShareOut.create()` (or `new ShareOut()` for simple local-only scripts)
-- Use `$ORIGIN/sdk/shareout.js` (not jsdelivr) — or relative `/sdk/shareout.js` inside published artifacts (content host serves the same bundle)
+- Inside published artifacts use the root-relative `/sdk/shareout.js` (never jsdelivr, never `$ORIGIN`): every host an artifact runs on serves the same bundle, so the path cannot break and no placeholder can survive into production
 - **Live workspace data (Mixpanel, BigQuery, REST connections):** read [live-data.md](live-data.md) — two-origin sandbox (`$ORIGIN_HOST` shell + `<hex>.shareoutcdn.site` iframe), no raw `fetch`
 - Debug `ShareOut is not defined` → check script URL and order
 

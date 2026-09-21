@@ -42,10 +42,10 @@ Artifacts serve under the **`/a/{slug}/` prefix**, so **every internal reference
 <!-- index.html -->
 <head>
   <script type="shareout/manifest"> … </script>   <!-- first: declares all data sources -->
-  <link rel="stylesheet" href="$ORIGIN/sdk/shareout.css">  <!-- absolute OK: the SDK origin -->
+  <link rel="stylesheet" href="/sdk/shareout.css">  <!-- ROOT-RELATIVE: this host serves the SDK -->
   <link rel="stylesheet" href="styles.css">         <!-- RELATIVE sibling → /a/{slug}/styles.css -->
-  <script src="$ORIGIN/sdk/shareout-ui.js" defer></script>
-  <script src="$ORIGIN/sdk/shareout.js"></script>
+  <script src="/sdk/shareout-ui.js" defer></script>
+  <script src="/sdk/shareout.js"></script>
   <style> :root { /* customer layer: override --so-* tokens here */ } </style>
 </head>
 <body>

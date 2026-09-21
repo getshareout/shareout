@@ -9,8 +9,8 @@ Renders a live table users can edit in place — backed by a ShareOut **table** 
 ## Quick start
 
 ```html
-<script src="$ORIGIN/sdk/shareout.js"></script>
-<link rel="stylesheet" href="$ORIGIN/sdk/shareout.css">
+<script src="/sdk/shareout.js"></script>
+<link rel="stylesheet" href="/sdk/shareout.css">
 <div id="app"></div>
 <script>
   const sdk = await ShareOut.create();

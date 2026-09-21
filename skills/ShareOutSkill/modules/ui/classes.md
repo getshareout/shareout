@@ -1,6 +1,6 @@
 # ShareOut UI — class reference
 
-All classes are namespaced `so-`. Load `$ORIGIN/sdk/shareout.css` first. See [overview.md](overview.md).
+All classes are namespaced `so-`. Load `/sdk/shareout.css` first. See [overview.md](overview.md).
 
 > **Editor:** `.so-` classes are styling only. For the live editor, also add `data-shareout-page` to page containers and `data-shareout-binding` to any element showing dynamic data — they layer onto the same element. See [overview.md → Works with the live editor](overview.md#works-with-the-live-editor).
 

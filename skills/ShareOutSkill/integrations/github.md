@@ -227,7 +227,7 @@ Errors:
 
 ## SDK Usage
 
-The hosted SDK at `$ORIGIN/sdk/shareout.js` provides the `shareout.github` namespace.
+The SDK at `/sdk/shareout.js` provides the `shareout.github` namespace.
 
 ### shareout.github.authorize(returnUrl?)
 
@@ -302,7 +302,7 @@ console.log(result.filesCommitted); // 3
 <!DOCTYPE html>
 <html>
 <head>
-  <script src="$ORIGIN/sdk/shareout.js"></script>
+  <script src="/sdk/shareout.js"></script>
 </head>
 <body>
   <button id="connect">Connect GitHub</button>

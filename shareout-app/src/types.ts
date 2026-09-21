@@ -441,6 +441,10 @@ export interface PublishResponse {
   /** Human-readable note when the requested visibility was downgraded (e.g. no
    *  verified email, or public-artifact cap reached) — Workstream F. */
   notice?: string;
+  /** Non-fatal problems found (and where possible repaired) in the published bytes,
+   *  e.g. an unsubstituted `$ORIGIN` placeholder in the SDK tags. Publishing
+   *  succeeded; the artifact would otherwise have failed silently in the browser. */
+  warnings?: string[];
   /** True when the published visibility is more private than the caller requested
    *  (email gate, public rollout not enabled, cap reached, external author). Lets an
    *  agent detect the downgrade without parsing `notice` prose. */

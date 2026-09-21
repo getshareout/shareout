@@ -48,9 +48,9 @@ A complete, editor-ready, moderation-safe starting point, split per best practic
   </script>
 
   <!-- 2. Design system + SDK (absolute URLs to $ORIGIN_HOST are correct here) -->
-  <link rel="stylesheet" href="$ORIGIN/sdk/shareout.css">
-  <script src="$ORIGIN/sdk/shareout-ui.js" defer></script>
-  <script src="$ORIGIN/sdk/shareout.js"></script>
+  <link rel="stylesheet" href="/sdk/shareout.css">
+  <script src="/sdk/shareout-ui.js" defer></script>
+  <script src="/sdk/shareout.js"></script>
 
   <!-- 3. Your styles — RELATIVE sibling, served at /a/{slug}/styles.css -->
   <link rel="stylesheet" href="styles.css">

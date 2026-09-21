@@ -395,7 +395,7 @@ Headers included:
 <html>
 <head>
   <title>Help Center</title>
-  <script src="$ORIGIN/sdk/shareout.js"></script>
+  <script src="/sdk/shareout.js"></script>
 </head>
 <body>
   <h1>Help Center</h1>
