@@ -92,7 +92,14 @@ npm run dev   # http://localhost:55162
 
 Login: `/auth/dev?email=<you>&redirect=/home` (localhost only).
 
-Checks: `npm test`, `npm run check:domains`, `npm run typecheck`.
+Checks: `npm run test:affected`, `npm run typecheck`, `npm run check:domains`.
+
+`npm run test:affected` maps your changed files to tests through vitest's module graph
+and runs only those — seconds instead of the ~4m40s full suite. It falls back to the
+full suite when the lockfile or vitest config changed. Whole suite: `npm test`.
+
+Starting a task? `./tooling/scripts/new-worktree.sh <branch>` creates the worktree and
+clones `node_modules` from the primary checkout (copy-on-write, ~4s) instead of `npm ci`.
 
 Rebuild after SDK/editor changes: `npm run build:sdk` / `npm run build:editor`.
 

@@ -2,8 +2,14 @@
 # Fast checks for daily work + git pre-push hooks.
 #
 # This is the local half of the deal struck in .github/workflows/ci.yml: PR CI runs
-# static gates and the critical-path subset only, so THIS script is where the full
-# unit suite actually runs before code leaves the machine. Keep the two in sync.
+# static gates and the critical-path subset only, so THIS script is what stands
+# between a change and main. Keep the two in sync.
+#
+# Tests run as critical-path + whatever the change actually touches (vitest module
+# graph). The full 466-file suite is ~4m40s of which ~34s is assertions, so running
+# all of it on every push bought almost nothing; main and nightly still run it in
+# full.yml. Force it here with SHAREOUT_FULL_TESTS=1.
+#
 # Skips docs-site build, fresh migrate, coverage, and audit (see ci-check.sh).
 set -euo pipefail
 
@@ -39,7 +45,12 @@ npm run check:migrations
 npm run check:access-seams
 npm run check:file-size
 npm run typecheck
-npm test -- --reporter=dot
+if [ "${SHAREOUT_FULL_TESTS:-}" = "1" ]; then
+  npm test -- --reporter=dot
+else
+  npm run test:critical -- --reporter=dot
+  npm run test:affected
+fi
 
 echo "==> Fast CI checks (chat-core workspace)"
 npm run typecheck --workspace @shareout/chat-core
@@ -63,4 +74,4 @@ echo "==> Secret scan (gitleaks)"
 "$REPO_ROOT/tooling/scripts/check-secrets.sh"
 
 echo ""
-echo "✓ Fast checks passed (full suite: ./tooling/scripts/ci-check.sh)"
+echo "✓ Fast checks passed (full suite: SHAREOUT_FULL_TESTS=1 $0)"
