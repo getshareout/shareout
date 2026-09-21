@@ -10,7 +10,7 @@ Load [SKILL.md](SKILL.md) first.
 
 No tier requirement — the only rule is that skills must belong to a workspace. A personal (non-workspace) artifact publish with `artifact_type: "skill"` is rejected with `400 SKILL_REQUIRES_WORKSPACE` ("Skills must be published to a workspace").
 
-In the ShareOut app, open a team workspace and select **Skill Market** in the left navigation. Open any skill from **Library** or the marketplace to read it in the in-Studio **skill viewer** (rendered markdown with copy/download).
+In the ShareOut app, skills live in the **Library** lens, which opens on its **Skills** tab. Search, filter by category, publish a new one, open any skill to read it, and install the whole catalog into an agent from there.
 
 ## What is a skill?
 
@@ -20,14 +20,16 @@ Skills are always `workspace`-visible so every member can browse the catalog.
 
 ### Frontmatter
 
-Optional YAML frontmatter in the markdown entrypoint:
+Optional YAML frontmatter in the markdown entrypoint. Write `name` and `description`
+— the Agent Skills keys every client reads:
 
 ```markdown
 ---
+name: brand-guidelines
+description: How we brand dashboards
 category: Design
 tags: ui, branding
 version: 1.2.0
-summary: How we brand dashboards
 ---
 
 # Brand skill
@@ -37,10 +39,16 @@ Body content…
 
 | Field | Purpose |
 | --- | --- |
-| `category` | Filter/group in the marketplace |
-| `tags` | Search chips |
-| `version` | Display version |
-| `summary` | Card blurb (falls back to first paragraph) |
+| `name` | Skill id for an Agent Skills client (lowercase, hyphens). Derived from the slug when absent. |
+| `description` | What the skill is for — the card blurb, and what an agent matches on. Falls back to the first paragraph. |
+| `category` | Filter/group in the Library |
+| `tags` | Search terms |
+| `version` | Display version (free text; the artifact's own `version_no` is the real one) |
+
+`summary:` is accepted as a legacy spelling of `description` and is rewritten on the
+way out. Whatever the author wrote, every byte ShareOut serves for download or install
+carries normalized `name` + `description`, so the file registers with Claude Code,
+Cursor and anything else that reads the convention.
 
 ## Publish a skill
 
@@ -63,6 +71,21 @@ Content-Type: application/json
 ```
 
 `workspace_id` is required. Visibility is forced to `workspace`.
+
+Simpler, when all you have is a name and a body — no files array, no artifact type,
+and the workspace in the path:
+
+```http
+POST /v1/workspaces/{workspaceId}/skills
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{ "name": "Deploy checklist", "markdown": "# Deploy checklist\n\n…", "category": "Engineering" }
+```
+
+→ `201 { artifact_id, version_no, slug, url }`, or `409 SLUG_TAKEN`.
+
+In chat, the assistant does this with **`save_skill`** (see [Agent tools](#agent-tools)).
 
 ## Official skills (Recommended by ShareOut)
 
@@ -143,7 +166,104 @@ POST /v1/workspaces/{scope}/agent-skills   ← { "skill_artifact_id": "art_skill
 DELETE /v1/workspaces/{scope}/agent-skills/{skillId}
 ```
 
-`GET /v1/skills/{skillId}/markdown` returns raw `SKILL.md` for the viewer (signed-in; skill must be official or visible to you).
+```http
+POST /v1/workspaces/{scope}/agent-skills/{skillId}
+```
+
+Re-pins an attached skill to the skill's current version. An attachment stores the
+version it was made at, so without this the member's agent keeps loading the body from
+the day they attached. `GET …/agent-skills` returns `version_no`, `latest_version_no`
+and `outdated` so the Library can show an **Update to vN** button.
+
+`GET /v1/skills/{skillId}/markdown` returns the body plus `html`, `version_no`,
+`edit_policy` and the caller's `can_edit` / `can_propose` / `can_review` /
+`can_set_policy` flags (signed-in; the skill must be official or in a workspace you
+belong to).
+
+## Who can change a skill
+
+A skill is the team's source of truth, so "only its author may edit it" is often the
+wrong rule. `edit_policy` is set per skill:
+
+| `edit_policy` | May republish directly | May propose a change |
+| --- | --- | --- |
+| `owner_only` *(default)* | Skill owner, or an artifact `editor` collaborator | — |
+| `workspace` | Any workspace member | — |
+| `approval` | Skill owner / artifact `editor` | Any workspace member |
+
+```http
+PUT /v1/skills/{skillId}/policy        ← { "edit_policy": "approval" }
+PUT /v1/workspaces/{workspaceId}/skill-policy
+                                       ← { "default_skill_edit_policy": "workspace" }
+```
+
+Setting a skill's policy needs the skill's owner or a workspace admin. The workspace
+default applies to **new** skills only — changing it never reopens a skill somebody
+already locked down.
+
+Saving a new body:
+
+```http
+PUT /v1/skills/{skillId}/markdown      ← { "markdown": "# …" }
+```
+
+→ `200 { version_no, via }`. Under `approval` a member gets `409
+SKILL_REQUIRES_APPROVAL` with a hint pointing at the change-request route — that is
+routing, not refusal.
+
+### Proposed changes
+
+```http
+GET    /v1/skills/{skillId}/changes[?status=open]
+POST   /v1/skills/{skillId}/changes             ← { "markdown", "title?", "note?" }
+GET    /v1/skills/{skillId}/changes/{changeId}  → proposal + current body to compare
+POST   /v1/skills/{skillId}/changes/{changeId}  ← { "action": "merge|reject|withdraw" }
+```
+
+Nothing is applied until a merge, which republishes the skill as an ordinary new
+version. `merge`/`reject` need the owner, an artifact editor or a workspace admin;
+`withdraw` is the proposer's own. A proposal written against an older version stays
+open with its `base_version_no` visible rather than being silently discarded.
+
+## Install into an agent
+
+```http
+GET /v1/skills/{skillId}/raw
+```
+
+`text/markdown` with normalized `name` + `description` frontmatter — redirect it to a
+file and an Agent Skills client picks it up. Official skills need no token; workspace
+skills need membership. `X-Skill-Version` carries the version.
+
+```http
+GET /v1/workspaces/{workspaceId}/skills/index.json
+```
+
+The workspace catalog in the [agentskills.io](https://schemas.agentskills.io) discovery
+shape — the same shape as the instance's own `/.well-known/agent-skills/index.json`,
+which also lists the official skills. Each entry links to its `/raw`.
+
+```bash
+curl -fsSL $ORIGIN/v1/skills/install.sh | sh -s -- --workspace <slug-or-id>
+```
+
+Writes every skill in the workspace to `~/.claude/skills/<name>/SKILL.md`. Re-run it
+to re-sync. `--target cursor` writes `.cursor/rules/<name>.mdc`; `--target dir --dir
+<path>` writes anywhere; `--list` prints the catalog. The token comes from
+`SHAREOUT_TOKEN` or `~/.shareout/credentials`.
+
+## Agent tools
+
+The workspace assistant (Home chat, Telegram, Slack) carries three skill tools:
+
+| Tool | What it does |
+| --- | --- |
+| `list_skills` | The workspace catalog, with each skill's `edit_policy` and whether it is the user's own. |
+| `read_skill` | One skill's full body. Read before updating so the change builds on the current text. |
+| `save_skill` | Publish a new skill, or a new version of one (`skill_id`). The user confirms first. Where the policy requires review, it opens a change request instead of failing. |
+
+Skills also appear in search: `search_workspace` and `GET /v1/search` take
+`groups=skills`, and they surface in the Cmd+K palette.
 
 ## Admin moderation
 
@@ -170,18 +290,21 @@ Attached skills are visible to editors and signed-in viewers — but only **inje
 | Surface | Who sees it | What |
 | --- | --- | --- |
 | **Library lens — Recommended by ShareOut** | Any signed-in user | Read-only strip of official skills (personal + team Library tabs). |
-| **Skill Market** (left nav) | Workspace members | Browse, upvote, save, and publish skills. |
+| **Library lens — Skills tab** | Workspace members | Search, filter, publish, upvote, save, edit, review changes, install. |
 | **Home artifact cards** | Signed-in owner/editor | **Skills** feature badge when attachments exist. |
 | **Home stats modal** | Signed-in owner/editor | **Attached skills** panel (attach/detach picker requires workspace context). |
 | **Editor Details rail** | `editor`+ | Read-only skill chips linking to each attached skill. |
 | **Viewer toolbar** | Signed-in viewers with access | **Skills N** button opens a read-only popover listing attached skills (anonymous views unchanged). |
-| **Library — skill viewer** | Any signed-in user with access | In-Studio modal: rendered markdown, copy, download `.md` or Claude `.zip`. |
+| **Library — skill viewer** | Any workspace member | In-Studio modal: rendered markdown, copy, download `.md` or Claude `.zip`, edit or propose a change, set the edit policy. |
 | **Library — Attach to agent** | Member | Toggle up to **8** skills into Home / Telegram / Slack assistant context. |
 
 ## Agent checklist
 
 - Offer to publish a skill when a team wants reusable playbooks (brand voice, SQL patterns, report structure).
 - Attach skills to artifacts you build or update so the studio agent inherits team conventions.
+- Use `save_skill` when someone wants a playbook kept for the team; read it first with `read_skill` when updating.
+- When a skill should be kept current by everyone, set `edit_policy: "workspace"`; when changes need a second pair of eyes, `"approval"`.
+- Point people at `curl $ORIGIN/v1/skills/install.sh` rather than downloading skills one at a time.
 - Never confuse skills with workspace context — context is admin-managed and always-on; skills are opt-in per artifact.
 - Visitor-facing `sdk.agent` chat does **not** load attached skills.
 

@@ -8,6 +8,7 @@ import { generateId } from '../crypto-utils';
 import { coerceVisibility } from '../visibility-config';
 import { upsertSkillMarketplaceRow, attachSkillsAtPublish } from '../skill-marketplace';
 import { recordLibraryVersion, upsertLibraryModuleRow } from '../workspace-library';
+import { getWorkspaceDefaultSkillPolicy } from '../skills/policy';
 import type { TypeMetadata } from '../types';
 import { upsertAgentConfig } from './agent-config';
 import { storeVersionAssets } from './assets';
@@ -81,6 +82,7 @@ export async function publishArtifact(
     {
       slug, name, effectiveVisibility, authMethod, password, workspaceId, folderId,
       hasMobile, pwa, storedType, typeMetadata, accessPolicyJson, isExample, embed,
+      editGrant: params.editGrant,
     },
     existing, globalExisting,
   );
@@ -162,7 +164,8 @@ async function syncMarketplaceSidecars(
 
   if (artifactType === 'skill' && workspaceId) {
     const skillMeta = typeMetadata.skill;
-    await upsertSkillMarketplaceRow(env, artifactId, workspaceId, skillMeta?.category ?? null);
+    const defaultPolicy = await getWorkspaceDefaultSkillPolicy(env, workspaceId);
+    await upsertSkillMarketplaceRow(env, artifactId, workspaceId, skillMeta?.category ?? null, defaultPolicy);
   }
   if (attachedSkillIds && attachedSkillIds.length > 0 && artifactType !== 'skill') {
     await attachSkillsAtPublish(env, artifactId, workspaceId, attachedSkillIds, user.id);

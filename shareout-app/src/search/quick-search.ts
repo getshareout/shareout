@@ -22,10 +22,11 @@ export type SearchGroup =
   | 'people'
   | 'schedules'
   | 'crew'
-  | 'alerts';
+  | 'alerts'
+  | 'skills';
 
 export interface SearchHit {
-  kind: 'artifact' | 'folder' | 'dataset' | 'connector' | 'person' | 'schedule' | 'crew' | 'alert';
+  kind: 'artifact' | 'folder' | 'dataset' | 'connector' | 'person' | 'schedule' | 'crew' | 'alert' | 'skill';
   id: string;
   title: string;
   subtitle?: string; // location / provider / owner — the dim second line
@@ -49,6 +50,7 @@ export interface QuickSearchResult {
   schedules: SearchHit[];
   crew: SearchHit[];
   alerts: SearchHit[];
+  skills: SearchHit[];
 }
 
 // ---------- fuzzy scoring (pure) ----------
@@ -317,6 +319,43 @@ function rankSimple(items: SimpleItem[], kind: SearchHit['kind'], q: string, lim
   return scored.slice(0, limit);
 }
 
+/**
+ * Skills were reachable only from the Library's second tab — invisible to Cmd+K,
+ * /v1/search and the search_workspace tool, which is where people actually look for
+ * "the deploy playbook". Matching the summary and tags as well as the name is what
+ * makes a one-line description findable; they live in the artifact's type_metadata.
+ */
+async function rankSkills(env: Env, workspaceId: string, q: string, limit: number): Promise<SearchHit[]> {
+  const res = await env.DB.prepare(
+    `SELECT a.id, a.name, a.display_slug, a.slug, a.type_metadata, sm.category, sm.official
+       FROM skill_marketplace sm JOIN artifacts a ON a.id = sm.artifact_id
+      WHERE sm.workspace_id = ? AND sm.blocked = 0 AND a.deleted_at IS NULL
+      LIMIT 300`
+  ).bind(workspaceId).all<{
+    id: string; name: string; display_slug: string; slug: string;
+    type_metadata: string | null; category: string | null; official: number;
+  }>();
+  return rankSimple(
+    res.results.map((r) => {
+      let summary = '';
+      let tags: string[] = [];
+      try {
+        const meta = r.type_metadata ? JSON.parse(r.type_metadata)?.skill : null;
+        if (typeof meta?.summary === 'string') summary = meta.summary;
+        if (Array.isArray(meta?.tags)) tags = meta.tags.map(String);
+      } catch { /* unparseable metadata just means fewer search terms */ }
+      return {
+        id: r.id,
+        title: r.name,
+        subtitle: [r.category, summary].filter(Boolean).join(' \u00b7 ').slice(0, 120) || undefined,
+        badge: r.official ? 'Official' : undefined,
+        extra: [summary, tags.join(' '), r.display_slug].filter(Boolean).join(' '),
+      };
+    }),
+    'skill', q, limit,
+  );
+}
+
 async function rankPeople(env: Env, workspaceId: string, q: string, limit: number): Promise<SearchHit[]> {
   const res = await env.DB.prepare(
     `SELECT m.user_id, m.role, u.name, u.email, u.picture
@@ -420,7 +459,7 @@ export async function quickSearch(env: Env, userId: string, opts: QuickSearchOpt
   const q = (opts.q || '').trim();
   const limit = opts.limit ?? 8;
   const groups = new Set(
-    opts.groups ?? ['artifacts', 'folders', 'datasets', 'connectors', 'people', 'schedules', 'crew', 'alerts'],
+    opts.groups ?? ['artifacts', 'folders', 'datasets', 'connectors', 'people', 'schedules', 'crew', 'alerts', 'skills'],
   );
   // folders/datasets/connectors/crew/people need a concrete workspace; schedules/alerts
   // also work personally (scoped to the user's own owner ids).
@@ -433,7 +472,7 @@ export async function quickSearch(env: Env, userId: string, opts: QuickSearchOpt
   const withOwner = (g: SearchGroup, run: () => Promise<SearchHit[]>): Promise<SearchHit[]> =>
     groups.has(g) && (wsId || ownerIds.length) ? run() : Promise.resolve([]);
 
-  const [artifacts, folders, datasets, connectors, people, schedules, crew, alerts] = await Promise.all([
+  const [artifacts, folders, datasets, connectors, people, schedules, crew, alerts, skills] = await Promise.all([
     groups.has('artifacts') ? artifactCandidates(env, userId, opts.workspaceId, q).then((rows) => rankArtifacts(rows, q, limit)) : Promise.resolve([]),
     inWs('folders', () => rankFolders(env, wsId!, q, limit)),
     inWs('datasets', () => rankDatasets(env, wsId!, q, limit)),
@@ -442,7 +481,8 @@ export async function quickSearch(env: Env, userId: string, opts: QuickSearchOpt
     withOwner('schedules', () => rankSchedules(env, ownerScope, q, limit)),
     inWs('crew', () => rankCrews(env, wsId!, q, limit)),
     withOwner('alerts', () => rankAlerts(env, ownerScope, q, limit)),
+    inWs('skills', () => rankSkills(env, wsId!, q, limit)),
   ]);
 
-  return { query: q, artifacts, folders, datasets, connectors, people, schedules, crew, alerts };
+  return { query: q, artifacts, folders, datasets, connectors, people, schedules, crew, alerts, skills };
 }

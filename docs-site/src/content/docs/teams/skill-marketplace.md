@@ -5,9 +5,9 @@ description: Per-workspace catalog of reusable markdown skills — publish, rank
 
 import { Aside } from '@astrojs/starlight/components';
 
-The **Skill Marketplace** is a Teams/Enterprise feature: a per-workspace catalog of
+The **Skill Marketplace** is a per-workspace catalog of
 reusable **skills** — markdown playbooks published as artifacts. Members browse,
-upvote, and save skills in the left-nav **Skill Market**, then attach them to
+upvote, and save skills in the **Library** lens, then attach them to
 other artifacts so the **authoring** AI agent reuses them when editing.
 
 <Aside type="note">
@@ -18,12 +18,13 @@ artifact, and inject into the authoring chat only — never the visitor chat.
 
 ## Availability
 
-Requires a **Teams or Enterprise** plan on the workspace owner. Personal
-workspaces cannot publish skills (`402 TEAMS_PLAN_REQUIRED`).
+No plan requirement — the only rule is that a skill belongs to a workspace. A
+personal (non-workspace) publish with `artifact_type: "skill"` is rejected with
+`400 SKILL_REQUIRES_WORKSPACE`.
 
-In the ShareOut app, open a team workspace and select **Skill Market** in the
-left navigation. Open any skill from **Library** or the marketplace to read it in
-the in-Studio **skill viewer** (rendered markdown with copy/download).
+In the ShareOut app, skills live in the **Library** lens, which opens on its
+**Skills** tab: search, filter by category, publish, read, edit, review changes,
+and install the catalog into an agent.
 
 ## Recommended by ShareOut
 
@@ -53,14 +54,16 @@ Skills are always `workspace`-visible so every member can browse the catalog.
 
 ### Frontmatter
 
-Optional YAML frontmatter in the markdown entrypoint:
+Optional YAML frontmatter. Use `name` and `description` — the Agent Skills keys
+every client reads:
 
 ```markdown
 ---
+name: brand-guidelines
+description: How we brand dashboards
 category: Design
 tags: ui, branding
 version: 1.2.0
-summary: How we brand dashboards
 ---
 
 # Brand skill
@@ -70,10 +73,16 @@ Body content…
 
 | Field | Purpose |
 | --- | --- |
-| `category` | Filter/group in the marketplace |
-| `tags` | Search chips |
+| `name` | Skill id for an Agent Skills client. Derived from the slug when absent. |
+| `description` | What the skill is for — the card blurb, and what an agent matches on. |
+| `category` | Filter/group in the Library |
+| `tags` | Search terms |
 | `version` | Display version |
-| `summary` | Card blurb (falls back to first paragraph) |
+
+`summary:` still works as a legacy spelling. Whatever the author wrote, every byte
+ShareOut serves for download or install carries normalized `name` + `description`,
+so the file registers with Claude Code, Cursor and anything else reading the
+convention.
 
 ## Publish a skill
 
@@ -94,6 +103,63 @@ POST /v1/publish
 ```
 
 `workspace_id` is required. Visibility is forced to `workspace`.
+
+Simpler, when all you have is a name and a body:
+
+```http
+POST /v1/workspaces/{workspaceId}/skills
+```
+
+```json
+{ "name": "Deploy checklist", "markdown": "# Deploy checklist\n\n…", "category": "Engineering" }
+```
+
+This is what the Library's **New skill** button and the assistant's `save_skill`
+tool call.
+
+## Who can change a skill
+
+| `edit_policy` | May republish directly | May propose a change |
+| --- | --- | --- |
+| `owner_only` *(default)* | Skill owner, or an artifact `editor` | — |
+| `workspace` | Any workspace member | — |
+| `approval` | Skill owner / artifact `editor` | Any workspace member |
+
+```http
+PUT /v1/skills/{skillId}/policy        ← { "edit_policy": "approval" }
+PUT /v1/workspaces/{workspaceId}/skill-policy
+                                       ← { "default_skill_edit_policy": "workspace" }
+PUT /v1/skills/{skillId}/markdown      ← { "markdown": "# …" }
+```
+
+Setting a policy needs the skill's owner or a workspace admin. The workspace default
+applies to **new** skills only. Under `approval`, saving returns
+`409 SKILL_REQUIRES_APPROVAL` and points at the change-request route:
+
+```http
+GET    /v1/skills/{skillId}/changes
+POST   /v1/skills/{skillId}/changes             ← { "markdown", "title?", "note?" }
+POST   /v1/skills/{skillId}/changes/{changeId}  ← { "action": "merge|reject|withdraw" }
+```
+
+Nothing is applied until a merge, which republishes the skill as a new version.
+
+## Install into an agent
+
+```bash
+curl -fsSL https://shareout.site/v1/skills/install.sh | sh -s -- --workspace <slug-or-id>
+```
+
+Writes every skill in the workspace to `~/.claude/skills/<name>/SKILL.md`. Re-run to
+re-sync. `--target cursor` writes `.cursor/rules/<name>.mdc`; `--list` previews.
+
+```http
+GET /v1/skills/{skillId}/raw                      → text/markdown
+GET /v1/workspaces/{workspaceId}/skills/index.json → agentskills.io discovery shape
+```
+
+The instance's `/.well-known/agent-skills/index.json` lists the official skills with
+no token at all.
 
 ## Browse & rank
 
