@@ -107,12 +107,13 @@ export async function inviteOrAddMember(
   if (isNew || !target.last_login_at) {
     try {
       const inviteCtx = ctx ?? await getInviteContext(env, workspaceId, inviterId);
-      const code = await createInviteClaim(env, workspaceId, target.id, email, inviterId);
+      const claim = await createInviteClaim(env, workspaceId, target.id, email, inviterId);
       await sendInviteEmail(env, {
         email,
         workspaceName: inviteCtx.workspaceName,
         inviterName: inviteCtx.inviterName,
-        claimCode: code,
+        claimCode: claim.code,
+        claimId: claim.id,
       });
       status = 'invited';
     } catch {
