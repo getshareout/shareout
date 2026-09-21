@@ -123,6 +123,7 @@ personal artifacts. An instance owner narrows the surface per workspace under
 
 - **Deploy / domain / Cloudflare** → [deploy/SKILL.md](deploy/SKILL.md)
 - **Build new artifact** → [creating/overview.md](creating/overview.md)
+- **Save / share / install a team skill** → [team/skill-marketplace.md](team/skill-marketplace.md)
 - **Workspace admin** → [team/SKILL.md](team/SKILL.md)
 
 ---

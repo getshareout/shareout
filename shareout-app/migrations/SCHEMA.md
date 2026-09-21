@@ -312,10 +312,14 @@ erDiagram
 | `crew_grants` | Which tools a crew may call, in what `mode`, under what `approval_policy`. |
 | `crew_action_approvals` | A paused tool call waiting on a human decision. |
 | `plan_crew_limits` | Per-tier quota ceilings. Optional — falls back to constants in `src/crew/limits.ts`. |
-| `skill_marketplace` | Published skill listing: counters, `score`, `featured`, `official`, `blocked`. |
+| `skill_marketplace` | Published skill listing: counters, `score`, `featured`, `official`, `blocked`, and `edit_policy` (`owner_only` \| `workspace` \| `approval` — who may change the skill; see `src/skills/policy.ts`). |
+| `skill_change_requests` | A proposed new body for a skill, held until an approver merges it. Carries the markdown inline: it is the only place the proposal exists before the merge republishes the artifact. |
 | `skill_installs` / `skill_votes` / `skill_uses` | Install, upvote and usage records feeding the score. |
 | `artifact_skills` | Skills attached to an artifact, pinned to `skill_version_no`. |
-| `workspace_agent_skills` | Skills attached at workspace level. |
+| `workspace_agent_skills` | Skills a member attached to their own assistant, pinned to `skill_version_no` and re-pinned by `POST /v1/workspaces/{scope}/agent-skills/{skillId}`. |
+
+`workspaces.default_skill_edit_policy` is the policy a newly published skill is born
+with; it never rewrites an existing skill's own `edit_policy`.
 
 ## 08 Scheduled jobs
 

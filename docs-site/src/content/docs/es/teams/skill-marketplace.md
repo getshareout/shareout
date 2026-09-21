@@ -5,11 +5,10 @@ description: Catálogo por workspace de skills markdown reutilizables — public
 
 import { Aside } from '@astrojs/starlight/components';
 
-El **Skill Marketplace** es una función de Teams/Enterprise: un catálogo por
-workspace de **skills** reutilizables — playbooks en markdown publicados como
-artifacts. Los miembros exploran, votan y guardan skills en **Skill Market** en
-la navegación izquierda, y los adjuntan a otros artifacts para que el agente de
-**autoría** los reutilice al editar.
+El **Skill Marketplace** es un catálogo por workspace de **skills**
+reutilizables — playbooks en markdown publicados como artifacts. Los miembros
+exploran, votan y guardan skills en la lente **Library**, y los adjuntan a otros
+artifacts para que el agente de **autoría** los reutilice al editar.
 
 <Aside type="note">
 Los skills son distintos de los [archivos de contexto del workspace](/es/teams/workspaces/#archivos-de-contexto-de-workspace)
@@ -20,12 +19,13 @@ en el chat de visitantes.
 
 ## Disponibilidad
 
-Requiere plan **Teams o Enterprise** del dueño del workspace. Los espacios
-personales no pueden publicar skills (`402 TEAMS_PLAN_REQUIRED`).
+No requiere plan — la única regla es que un skill pertenezca a un workspace. Un
+publish personal (sin workspace) con `artifact_type: "skill"` se rechaza con
+`400 SKILL_REQUIRES_WORKSPACE`.
 
-En la app de ShareOut, abrí un workspace de equipo y elegí **Skill Market** en
-la navegación izquierda. Abrí cualquier skill desde **Library** o el marketplace para
-leerlo en el **visor de skills** dentro del estudio (markdown renderizado con copiar/descargar).
+En la app de ShareOut los skills viven en la lente **Library**, que abre en su
+pestaña **Skills**: buscar, filtrar por categoría, publicar, leer, editar, revisar
+cambios e instalar el catálogo en un agente.
 
 ## Recomendados por ShareOut
 
@@ -55,14 +55,16 @@ exploren el catálogo.
 
 ### Frontmatter
 
-YAML opcional en el entrypoint markdown:
+YAML opcional en el entrypoint markdown. Usá `name` y `description` — las claves
+de Agent Skills que leen todos los clientes:
 
 ```markdown
 ---
+name: brand-guidelines
+description: Cómo brandeamos dashboards
 category: Design
 tags: ui, branding
 version: 1.2.0
-summary: Cómo brandeamos dashboards
 ---
 
 # Brand skill
@@ -72,10 +74,16 @@ Contenido…
 
 | Campo | Uso |
 | --- | --- |
-| `category` | Filtro/grupo en el marketplace |
-| `tags` | Chips de búsqueda |
+| `name` | Id del skill para un cliente Agent Skills. Si falta, se deriva del slug. |
+| `description` | Para qué sirve el skill — el resumen de la tarjeta y lo que matchea un agente. |
+| `category` | Filtro/grupo en la Library |
+| `tags` | Términos de búsqueda |
 | `version` | Versión mostrada |
-| `summary` | Resumen en la tarjeta (si falta, primer párrafo) |
+
+`summary:` sigue funcionando como grafía heredada. Escriba lo que escriba el autor,
+cada byte que ShareOut sirve para descarga o instalación lleva `name` + `description`
+normalizados, así el archivo queda registrado en Claude Code, Cursor y cualquier otro
+cliente que lea la convención.
 
 ## Publicar un skill
 
@@ -96,6 +104,64 @@ POST /v1/publish
 ```
 
 `workspace_id` es obligatorio. La visibilidad se fuerza a `workspace`.
+
+Más simple, cuando solo tenés un nombre y un cuerpo:
+
+```http
+POST /v1/workspaces/{workspaceId}/skills
+```
+
+```json
+{ "name": "Checklist de deploy", "markdown": "# Checklist de deploy\n\n…", "category": "Ingeniería" }
+```
+
+Es lo que llaman el botón **Nueva skill** de la Library y la tool `save_skill` del
+asistente.
+
+## Quién puede modificar una skill
+
+| `edit_policy` | Puede republicar directo | Puede proponer un cambio |
+| --- | --- | --- |
+| `owner_only` *(por defecto)* | El dueño del skill, o un `editor` del artifact | — |
+| `workspace` | Cualquier miembro del espacio | — |
+| `approval` | Dueño / `editor` del artifact | Cualquier miembro del espacio |
+
+```http
+PUT /v1/skills/{skillId}/policy        ← { "edit_policy": "approval" }
+PUT /v1/workspaces/{workspaceId}/skill-policy
+                                       ← { "default_skill_edit_policy": "workspace" }
+PUT /v1/skills/{skillId}/markdown      ← { "markdown": "# …" }
+```
+
+Cambiar la política requiere ser dueño del skill o admin del espacio. El default del
+espacio aplica solo a skills **nuevas**. Con `approval`, guardar devuelve
+`409 SKILL_REQUIRES_APPROVAL` y apunta a la ruta de propuestas:
+
+```http
+GET    /v1/skills/{skillId}/changes
+POST   /v1/skills/{skillId}/changes             ← { "markdown", "title?", "note?" }
+POST   /v1/skills/{skillId}/changes/{changeId}  ← { "action": "merge|reject|withdraw" }
+```
+
+Nada se aplica hasta el merge, que republica la skill como una versión nueva.
+
+## Instalar en un agente
+
+```bash
+curl -fsSL https://shareout.site/v1/skills/install.sh | sh -s -- --workspace <slug-o-id>
+```
+
+Escribe todas las skills del espacio en `~/.claude/skills/<name>/SKILL.md`. Volvé a
+correrlo para re-sincronizar. `--target cursor` escribe `.cursor/rules/<name>.mdc`;
+`--list` previsualiza.
+
+```http
+GET /v1/skills/{skillId}/raw                       → text/markdown
+GET /v1/workspaces/{workspaceId}/skills/index.json → formato de descubrimiento agentskills.io
+```
+
+El `/.well-known/agent-skills/index.json` de la instancia lista las skills oficiales
+sin ningún token.
 
 ## Explorar y rankear
 

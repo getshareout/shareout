@@ -18,6 +18,7 @@ import type { Env } from '../types';
 import { getPlatformHostname, getPlatformOrigin } from '../config/origins';
 import { rewriteSkillOrigin, skillOriginRewriter } from '../skill-origin';
 import { sha256 } from '../crypto-utils';
+import { listOfficialSkillEntries } from '../official-skills/list';
 
 const JSON_CACHE = 'public, max-age=3600';
 
@@ -154,6 +155,12 @@ export async function serveAgentSkillsIndex(env: Env): Promise<Response> {
       ...(rewrite ? {} : { digest: AGENT_SKILL_ARCHIVE_DIGEST }),
     },
   ];
+
+  // The curated official skills are readable by anyone on this instance, so they
+  // belong in the unauthenticated index an agent probes first. Workspace-published
+  // skills do not: they are workspace-visible, and their catalog is the
+  // authenticated /v1/workspaces/{id}/skills/index.json instead.
+  for (const entry of await listOfficialSkillEntries(env, APEX)) skills.push(entry);
 
   return new Response(
     JSON.stringify({ $schema: 'https://schemas.agentskills.io/discovery/0.2.0/schema.json', skills }),

@@ -3527,6 +3527,35 @@ paths:
   /v1/workspaces/{workspaceId}/skills:
     parameters:
       - $ref: "#/components/parameters/WorkspaceId"
+    post:
+      tags: [Workspaces]
+      summary: Publish a new skill from markdown
+      description: >
+        Same publish as `POST /v1/publish` with `artifact_type: "skill"`, in the shape a
+        form or an agent can send. Visibility is forced to `workspace`; the skill starts
+        on the workspace's default edit policy.
+      operationId: createWorkspaceSkill
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, markdown]
+              properties:
+                name:
+                  type: string
+                markdown:
+                  type: string
+                slug:
+                  type: string
+                category:
+                  type: string
+      responses:
+        "201":
+          description: Skill published
+        "409":
+          description: Slug already used in this workspace
     get:
       tags: [Workspaces]
       summary: Browse skill marketplace catalog
@@ -3597,6 +3626,195 @@ paths:
                     type: string
         "404":
           description: Skill not found or not visible
+  /v1/workspaces/{workspaceId}/skills/index.json:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Workspaces]
+      summary: Agent-installable catalog of the workspace's skills
+      description: >
+        The workspace catalog in the agentskills.io discovery shape, so a client that
+        already reads `/.well-known/agent-skills/index.json` needs no new parser. Each
+        entry links to `/v1/skills/{skillId}/raw`.
+      operationId: getWorkspaceSkillsIndex
+      responses:
+        "200":
+          description: Discovery document
+  /v1/workspaces/{workspaceId}/skill-policy:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    put:
+      tags: [Workspaces]
+      summary: Set the default edit policy for new skills
+      description: Workspace owner or admin only. Existing skills keep their own policy.
+      operationId: setWorkspaceSkillPolicy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [default_skill_edit_policy]
+              properties:
+                default_skill_edit_policy:
+                  type: string
+                  enum: [owner_only, workspace, approval]
+      responses:
+        "200":
+          description: Updated
+  /v1/skills/install.sh:
+    get:
+      tags: [Workspaces]
+      summary: Installer script for a workspace's skills
+      description: >
+        POSIX shell script that writes a workspace's skills where an agent looks
+        (`~/.claude/skills`, `.cursor/rules`, or a directory). Public: it carries no
+        data and authenticates with the caller's own token at run time. Re-run it to
+        re-sync.
+      operationId: getSkillInstaller
+      responses:
+        "200":
+          description: Shell script
+          content:
+            text/x-shellscript:
+              schema:
+                type: string
+  /v1/skills/{skillId}/raw:
+    parameters:
+      - name: skillId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Workspaces]
+      summary: The skill as a markdown file
+      description: >
+        `text/markdown` with normalized Agent Skills frontmatter (`name`,
+        `description`), so the bytes register with a client as-is. Official skills are
+        readable without a token; workspace skills need membership.
+      operationId: getSkillRaw
+      responses:
+        "200":
+          description: Skill markdown
+          content:
+            text/markdown:
+              schema:
+                type: string
+        "401":
+          description: Authentication required for a workspace skill
+  /v1/skills/{skillId}/policy:
+    parameters:
+      - name: skillId
+        in: path
+        required: true
+        schema:
+          type: string
+    put:
+      tags: [Workspaces]
+      summary: Set who may change this skill
+      description: Skill owner or workspace admin only.
+      operationId: setSkillEditPolicy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [edit_policy]
+              properties:
+                edit_policy:
+                  type: string
+                  enum: [owner_only, workspace, approval]
+      responses:
+        "200":
+          description: Updated
+  /v1/skills/{skillId}/changes:
+    parameters:
+      - name: skillId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Workspaces]
+      summary: List proposed changes to a skill
+      operationId: listSkillChanges
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, merged, rejected, withdrawn]
+      responses:
+        "200":
+          description: Change requests
+    post:
+      tags: [Workspaces]
+      summary: Propose a change to a skill
+      description: >
+        Any workspace member may propose. Nothing is applied until an approver merges,
+        which republishes the skill as an ordinary new version.
+      operationId: proposeSkillChange
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [markdown]
+              properties:
+                markdown:
+                  type: string
+                title:
+                  type: string
+                note:
+                  type: string
+      responses:
+        "201":
+          description: Change request opened
+  /v1/skills/{skillId}/changes/{changeId}:
+    parameters:
+      - name: skillId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: changeId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Workspaces]
+      summary: Read one proposed change, with the current body to compare against
+      operationId: getSkillChange
+      responses:
+        "200":
+          description: Change request
+    post:
+      tags: [Workspaces]
+      summary: Merge, reject or withdraw a proposed change
+      description: >
+        `merge` and `reject` need the skill's owner, an artifact editor or a workspace
+        admin. `withdraw` is the proposer's own call.
+      operationId: reviewSkillChange
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [merge, reject, withdraw]
+                review_note:
+                  type: string
+      responses:
+        "200":
+          description: Reviewed
   /v1/workspaces/{workspaceId}/agent-skills:
     parameters:
       - $ref: "#/components/parameters/WorkspaceId"

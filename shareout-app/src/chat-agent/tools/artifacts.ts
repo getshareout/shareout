@@ -137,7 +137,7 @@ export const searchWorkspaceTool: AccountTool = {
       query: { type: 'string', description: 'What to look for. Typo/gap tolerant; matches names, tags, and descriptions.' },
       groups: {
         type: 'array',
-        items: { type: 'string', enum: ['artifacts', 'folders', 'datasets', 'connectors', 'people', 'schedules', 'crew', 'alerts'] },
+        items: { type: 'string', enum: ['artifacts', 'folders', 'datasets', 'connectors', 'people', 'schedules', 'crew', 'alerts', 'skills'] },
         description: 'Optional. Which result groups to return. Defaults to all.',
       },
       limit: { type: 'number', description: 'Max results per group (default 8, max 20).' },
@@ -176,6 +176,7 @@ export const searchWorkspaceTool: AccountTool = {
       schedules: strip(result.schedules),
       crew: strip(result.crew),
       alerts: strip(result.alerts),
+      skills: strip(result.skills),
     };
   },
 };

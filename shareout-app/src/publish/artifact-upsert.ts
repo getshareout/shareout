@@ -32,6 +32,13 @@ export interface ArtifactUpsertInput {
   accessPolicyJson: string | null;
   isExample?: boolean;
   embed?: { allowed?: boolean; origins?: string[] };
+  /**
+   * Caller already holds a write grant this module cannot see — a skill whose
+   * `edit_policy` opens it to the workspace, or an approved change request being
+   * merged (src/skills/policy.ts). Only ever set by a path that resolved that
+   * grant itself; the collaborator rule below still applies to everything else.
+   */
+  editGrant?: boolean;
 }
 
 async function assertCanEdit(env: Env, artifactId: string, ownerId: string | null, userId: string): Promise<void> {
@@ -106,7 +113,7 @@ export async function upsertArtifactRecord(
   const passwordHash = input.password ? await hashPassword(input.password) : null;
 
   if (existing) {
-    await assertCanEdit(env, existing.id, existing.owner_id, user.id);
+    if (!input.editGrant) await assertCanEdit(env, existing.id, existing.owner_id, user.id);
     await updateArtifactRow(env, existing.id, input, passwordHash);
     return {
       artifactId: existing.id,
@@ -116,7 +123,7 @@ export async function upsertArtifactRecord(
   }
 
   if (globalExisting) {
-    await assertCanEdit(env, globalExisting.id, globalExisting.owner_id, user.id);
+    if (!input.editGrant) await assertCanEdit(env, globalExisting.id, globalExisting.owner_id, user.id);
     await updateArtifactRow(env, globalExisting.id, input, passwordHash);
     return {
       artifactId: globalExisting.id,

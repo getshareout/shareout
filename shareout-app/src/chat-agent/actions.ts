@@ -13,6 +13,8 @@ import { publishGeneratedHtml } from '../publish';
 
 // A write the bot proposes and the user confirms with a button tap. Kept small
 // and serializable — stored as JSON until the user approves it.
+import { executeSaveSkill } from '../skills/agent-save';
+
 export type PendingAction =
   | { kind: 'alert_pause' | 'alert_resume' | 'alert_delete'; ruleId: string; label: string }
   | { kind: 'job_pause' | 'job_resume' | 'job_delete'; jobId: string; label: string }
@@ -23,7 +25,8 @@ export type PendingAction =
   | { kind: 'data_table_update'; artifactId: string; artifactName: string; table: string; rowId?: string; filter?: Record<string, unknown>; changes: Record<string, unknown> }
   | { kind: 'data_json_set'; artifactId: string; artifactName: string; key: string; value: unknown; exists: boolean }
   | { kind: 'job_create'; artifactId: string; artifactName: string; schedule: string; recipients: string[]; subject: string; includePdf: boolean }
-  | { kind: 'build_artifact'; name: string; prompt: string; source_file_id?: string };
+  | { kind: 'build_artifact'; name: string; prompt: string; source_file_id?: string }
+  | { kind: 'save_skill'; workspaceId: string; name: string; markdown: string; skillArtifactId?: string; category?: string };
 
 // Compact one-line JSON for confirmation prompts (trimmed so a big object can't
 // blow past Telegram's message limit).
@@ -69,6 +72,7 @@ export function describeActionRich(a: PendingAction): ActionCard {
     case 'data_json_set': return { kind: a.kind, title: `Set “${a.key}”`, subject: a.artifactName, detail: a.exists ? 'Replaces the current value.' : undefined, lines: [preview(a.value, 160)] };
     case 'job_create': return { kind: a.kind, title: 'Schedule email', subject: a.artifactName, detail: `cron ${a.schedule}${a.includePdf ? ' · PDF attached' : ''}`, lines: a.recipients };
     case 'build_artifact': return { kind: a.kind, title: 'Build a new page', subject: a.name, detail: a.prompt.length > 280 ? a.prompt.slice(0, 280) + '…' : a.prompt };
+    case 'save_skill': return { kind: a.kind, title: a.skillArtifactId ? 'Update team skill' : 'Save as team skill', subject: a.name, detail: `${a.markdown.length} characters of markdown`, lines: [a.markdown.slice(0, 200) + (a.markdown.length > 200 ? '…' : '')] };
   }
 }
 
@@ -144,6 +148,8 @@ export function describeAction(a: PendingAction): string {
       return `Schedule an email of “${a.artifactName}” (cron \`${a.schedule}\`) to ${a.recipients.join(', ')}${a.includePdf ? ', with a PDF attached' : ''}?`;
     case 'build_artifact':
       return `Build and publish a new page “${a.name}”?\n\n${a.prompt.length > 280 ? a.prompt.slice(0, 280) + '…' : a.prompt}`;
+    case 'save_skill':
+      return `${a.skillArtifactId ? 'Update' : 'Save'} the team skill “${a.name}” in your workspace Library?`;
   }
 }
 
@@ -228,5 +234,7 @@ export async function executeAction(env: Env, userId: string, a: PendingAction):
       const r = await executeBuildArtifact(env, userId, a);
       return r.text;
     }
+    case 'save_skill':
+      return await executeSaveSkill(env, userId, a);
   }
 }

@@ -81,6 +81,12 @@ export interface PublishParams {
   attachedSkillIds?: string[];
   isExample?: boolean;
   library?: LibraryPublishConfig;
+  /**
+   * Skip the owner/collaborator check on an existing artifact because the caller
+   * resolved a write grant this pipeline cannot see — a skill opened to the
+   * workspace, or an approved change request. See src/skills/policy.ts.
+   */
+  editGrant?: boolean;
 }
 
 /** Result of workspace publish-governance checks applied during publish. */

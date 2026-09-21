@@ -192,8 +192,8 @@ export function buildWorkspaceBody(args: RenderArgs): string {
           <div class="wsx__view" data-view="library">
             <h2 class="wsx__viewtitle" data-i18n="view.library">Library</h2>
             <div class="wsx__chips" id="wsxLibTabs">
-              <button class="wsx-chip is-on" data-lib-tab="modules" type="button" data-i18n="lib.modules">Modules</button>
-              <button class="wsx-chip" data-lib-tab="skills" type="button" data-i18n="lib.skills">Skills</button>
+              <button class="wsx-chip is-on" data-lib-tab="skills" type="button" data-i18n="lib.skills">Skills</button>
+              <button class="wsx-chip" data-lib-tab="modules" type="button" data-i18n="lib.modules">Modules</button>
             </div>
             <div id="wsxLibMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>

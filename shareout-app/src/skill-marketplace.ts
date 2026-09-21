@@ -10,6 +10,13 @@ import type { AuthUser } from './api-auth';
 import { requireWorkspaceRole, getInternalWorkspaceRole } from './workspaces/roles';
 import { requireRole } from './artifacts/roles';
 import { json } from './artifacts/json-response';
+import {
+  canReviewSkillChanges,
+  canSetSkillPolicy,
+  loadSkillGovernance,
+  resolveSkillEditGrant,
+} from './skills/policy';
+import { renderSkillHtml } from './skills/render';
 
 const LIST_DEFAULT_LIMIT = 30;
 const LIST_MAX_LIMIT = 100;
@@ -26,20 +33,25 @@ function scoreExpr(): string {
 
 // Upsert the marketplace sidecar when a skill is (re)published. Score starts at 0
 // and is recomputed on the first vote/install/attach event.
+//
+// `editPolicy` applies to the INSERT only: it is the workspace default a new skill is
+// born with. A republish must never reset a policy the owner has since changed, so the
+// conflict branch deliberately leaves the column alone.
 export async function upsertSkillMarketplaceRow(
   env: Env,
   artifactId: string,
   workspaceId: string,
-  category: string | null
+  category: string | null,
+  editPolicy: string = 'owner_only'
 ): Promise<void> {
   await env.DB.prepare(
-    `INSERT INTO skill_marketplace (artifact_id, workspace_id, category, published_at, updated_at)
-       VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    `INSERT INTO skill_marketplace (artifact_id, workspace_id, category, edit_policy, published_at, updated_at)
+       VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now'))
      ON CONFLICT(artifact_id) DO UPDATE SET
        workspace_id = excluded.workspace_id,
        category     = excluded.category,
        updated_at   = strftime('%Y-%m-%dT%H:%M:%fZ','now')`
-  ).bind(artifactId, workspaceId, category).run();
+  ).bind(artifactId, workspaceId, category, editPolicy).run();
 }
 
 async function recomputeScore(env: Env, artifactId: string): Promise<void> {
@@ -124,12 +136,22 @@ export async function handleListSkills(
   ];
   const binds: unknown[] = [workspaceId];
   if (category) { filters.push('sm.category = ?'); binds.push(category); }
-  if (q) { filters.push('(a.name LIKE ? OR a.description LIKE ?)'); binds.push(`%${q}%`, `%${q}%`); }
+  if (q) {
+    // type_metadata carries the skill's summary and tags; searching the raw JSON is
+    // what makes a tag or a one-line summary findable, which name+description alone
+    // never were. Cheap enough at catalog sizes, and the API already caps the page.
+    filters.push('(a.name LIKE ? OR a.description LIKE ? OR a.type_metadata LIKE ? OR sm.category LIKE ?)');
+    binds.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+  }
 
   const rows = await env.DB.prepare(
     `SELECT a.id, a.name, a.slug, a.display_slug, a.description, a.type_metadata,
             sm.category, sm.upvote_count, sm.install_count, sm.attach_count,
-            sm.use_count, sm.score, sm.featured, sm.published_at,
+            sm.use_count, sm.score, sm.featured, sm.published_at, sm.edit_policy,
+            (a.owner_id = ?) AS is_owner,
+            (SELECT MAX(version_no) FROM versions v WHERE v.artifact_id = a.id) AS version_no,
+            (SELECT COUNT(*) FROM skill_change_requests c
+              WHERE c.skill_artifact_id = a.id AND c.status = 'open') AS open_changes,
             EXISTS(SELECT 1 FROM skill_votes v WHERE v.artifact_id = a.id AND v.user_id = ?) AS voted,
             EXISTS(SELECT 1 FROM skill_installs i WHERE i.artifact_id = a.id AND i.user_id = ?) AS installed
        FROM skill_marketplace sm
@@ -137,7 +159,7 @@ export async function handleListSkills(
       WHERE ${filters.join(' AND ')}
       ${orderClause(sort)}
       LIMIT ? OFFSET ?`
-  ).bind(user.id, user.id, ...binds, limit + 1, offset).all();
+  ).bind(user.id, user.id, user.id, ...binds, limit + 1, offset).all();
 
   const list = (rows.results as Array<Record<string, unknown>>).slice(0, limit).map(formatSkillCard);
   const hasMore = (rows.results?.length ?? 0) > limit;
@@ -165,6 +187,10 @@ function formatSkillCard(r: Record<string, unknown>): Record<string, unknown> {
     summary: summary ?? r.description ?? null,
     category: r.category ?? null,
     tags: tags ?? [],
+    version_no: r.version_no ?? 1,
+    edit_policy: r.edit_policy ?? 'owner_only',
+    is_owner: !!r.is_owner,
+    open_changes: Number(r.open_changes ?? 0),
     upvotes: r.upvote_count,
     installs: r.install_count,
     attaches: r.attach_count,
@@ -539,36 +565,70 @@ async function recordSkillUses(env: Env, skillIds: string[], conversationId: str
 
 const AGENT_SKILL_LIMIT = 8;
 
-// A user may use a skill on their agent if it's official, or a skill artifact
-// they can view. Returns a 4xx Response on failure, else the skill row.
+/**
+ * A user may read and attach a skill if it is official, or it belongs to a workspace
+ * they are a member of.
+ *
+ * This used to ask `requireRole(…, 'viewer')`, which resolves *artifact collaborator*
+ * roles — owner, or an explicit per-email row. A teammate is neither, so viewing or
+ * attaching a colleague's skill returned 403 for everyone except its author, which is
+ * the opposite of what a workspace catalog is for. Skills are published at
+ * `visibility: 'workspace'` precisely so every member can use them; membership is the
+ * rule that matches, and it is the same one `listSkills` already browses by.
+ */
 async function assertSkillUsable(env: Env, user: AuthUser, skillId: string): Promise<Response | { row: SkillRow }> {
   const row = await getSkillRow(env, skillId);
   if (!row || row.blocked) return json({ error: 'Skill not found', code: 'NOT_FOUND' }, 404);
   if (!row.official) {
-    const forbidden = await requireRole(env, skillId, user.id, 'viewer');
-    if (forbidden) return forbidden;
+    const member = await getInternalWorkspaceRole(env, row.workspace_id, user.id);
+    if (!member) {
+      const forbidden = await requireRole(env, skillId, user.id, 'viewer');
+      if (forbidden) return forbidden;
+    }
   }
   return { row };
 }
 
-// GET /v1/skills/:skillId/markdown — raw SKILL.md for the in-Studio viewer/download.
+// GET /v1/skills/:skillId/markdown — the body plus everything the viewer needs to
+// decide what to offer: which version this is, who may change it, and how.
 export async function handleGetSkillMarkdown(env: Env, user: AuthUser, skillId: string): Promise<Response> {
   const check = await assertSkillUsable(env, user, skillId);
   if (check instanceof Response) return check;
   const meta = await env.DB.prepare(
-    `SELECT a.name, a.slug, MAX(v.version_no) AS v
+    `SELECT a.name, a.display_slug AS slug, MAX(v.version_no) AS v
        FROM artifacts a JOIN versions v ON v.artifact_id = a.id
       WHERE a.id = ? AND a.deleted_at IS NULL`
   ).bind(skillId).first<{ name: string; slug: string; v: number }>();
   if (!meta || meta.v == null) return json({ error: 'Skill not found', code: 'NOT_FOUND' }, 404);
   const md = await readSkillMarkdown(env, skillId, meta.v);
   if (md == null) return json({ error: 'Skill content unavailable', code: 'NOT_FOUND' }, 404);
-  return json({ skill_artifact_id: skillId, name: meta.name, slug: meta.slug, markdown: md });
+
+  const gov = await loadSkillGovernance(env, skillId);
+  const canEdit = gov ? !!(await resolveSkillEditGrant(env, user.id, gov)) : false;
+  const canReview = gov ? await canReviewSkillChanges(env, user.id, gov) : false;
+  const canPropose = !!gov && !gov.official && !canEdit && gov.editPolicy === 'approval'
+    && !!(await getInternalWorkspaceRole(env, gov.workspaceId, user.id));
+
+  return json({
+    skill_artifact_id: skillId,
+    name: meta.name,
+    slug: meta.slug,
+    markdown: md,
+    html: renderSkillHtml(md),
+    version_no: meta.v,
+    official: !!gov?.official,
+    edit_policy: gov?.editPolicy ?? 'owner_only',
+    can_edit: canEdit,
+    can_propose: canPropose,
+    can_review: canReview,
+    can_set_policy: gov ? await canSetSkillPolicy(env, user.id, gov) : false,
+  });
 }
 
 export async function handleListAgentSkills(env: Env, user: AuthUser, scope: string): Promise<Response> {
   const rows = await env.DB.prepare(
-    `SELECT s.skill_artifact_id, s.skill_version_no, a.name, a.slug, a.type_metadata, sm.official
+    `SELECT s.skill_artifact_id, s.skill_version_no, a.name, a.slug, a.type_metadata, sm.official,
+            (SELECT MAX(version_no) FROM versions v WHERE v.artifact_id = a.id) AS latest_version_no
        FROM workspace_agent_skills s
        JOIN artifacts a ON a.id = s.skill_artifact_id
        LEFT JOIN skill_marketplace sm ON sm.artifact_id = s.skill_artifact_id
@@ -578,9 +638,15 @@ export async function handleListAgentSkills(env: Env, user: AuthUser, scope: str
   const list = (rows.results as Array<Record<string, unknown>>).map(r => {
     let summary: string | undefined;
     try { summary = r.type_metadata ? JSON.parse(String(r.type_metadata))?.skill?.summary : undefined; } catch { /* ignore */ }
+    const pinned = Number(r.skill_version_no ?? 1);
+    const latest = Number(r.latest_version_no ?? pinned);
     return {
       skill_artifact_id: r.skill_artifact_id,
-      version_no: r.skill_version_no,
+      version_no: pinned,
+      latest_version_no: latest,
+      // The attach pinned a version; without this flag a reader had no way to know
+      // their agent was still loading the body from the day they attached it.
+      outdated: latest > pinned,
       name: r.name,
       slug: r.slug,
       summary: summary ?? null,
@@ -588,6 +654,45 @@ export async function handleListAgentSkills(env: Env, user: AuthUser, scope: str
     };
   });
   return json({ skills: list });
+}
+
+/**
+ * POST /v1/workspaces/:scope/agent-skills/:skillId — re-pin an attached skill to the
+ * skill's current version.
+ *
+ * The attach stores `skill_version_no` and nothing ever moved it, so a user's agent
+ * kept injecting the body from the day they attached while the Library showed them
+ * the latest one. `artifact_skills` had this endpoint from the start; this is the
+ * missing half for personal agent skills.
+ */
+export async function handleSyncAgentSkill(
+  env: Env,
+  user: AuthUser,
+  scope: string,
+  skillId: string
+): Promise<Response> {
+  const attached = await env.DB.prepare(
+    'SELECT skill_version_no FROM workspace_agent_skills WHERE workspace_id = ? AND user_id = ? AND skill_artifact_id = ?'
+  ).bind(scope, user.id, skillId).first<{ skill_version_no: number }>();
+  if (!attached) return json({ error: 'Skill is not attached', code: 'NOT_FOUND' }, 404);
+
+  const check = await assertSkillUsable(env, user, skillId);
+  if (check instanceof Response) return check;
+
+  const latest = await env.DB.prepare(
+    'SELECT MAX(version_no) AS v FROM versions WHERE artifact_id = ?'
+  ).bind(skillId).first<{ v: number }>();
+  const versionNo = latest?.v ?? attached.skill_version_no;
+
+  await env.DB.prepare(
+    'UPDATE workspace_agent_skills SET skill_version_no = ? WHERE workspace_id = ? AND user_id = ? AND skill_artifact_id = ?'
+  ).bind(versionNo, scope, user.id, skillId).run();
+
+  return json({
+    skill_artifact_id: skillId,
+    version_no: versionNo,
+    previous_version_no: attached.skill_version_no,
+  });
 }
 
 export async function handleAttachAgentSkill(request: Request, env: Env, user: AuthUser, scope: string): Promise<Response> {

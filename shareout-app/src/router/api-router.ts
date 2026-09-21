@@ -6,6 +6,7 @@ import { routeHomeAgentApi } from './api/home-agent';
 import { routeFolderApi } from './api/folders';
 import { routeAssetApi } from './api/assets';
 import { routeWorkspaceApi } from './api/workspaces';
+import { routeSkillsApi } from './api/skills';
 import { routeWorkspaceAgentApi } from './api/workspace-agent';
 import { routeSchedulingApi } from './api/scheduling';
 import { routeMetricAlertsApi } from './api/metric-alerts';
@@ -39,6 +40,7 @@ export async function routeApi(ctx: FetchContext): Promise<Response | null> {
       (await routeAssetApi(ctx)) ??
       (await routeArtifactApi(ctx)) ??
       (await routeAccessRequestsApi(ctx)) ??
+      (await routeSkillsApi(ctx)) ??
       (await routeWorkspaceAgentApi(ctx)) ??
       (await routeWorkspaceApi(ctx)) ??
       (await routeSchedulingApi(ctx)) ??

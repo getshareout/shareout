@@ -53,6 +53,9 @@ There is no public hosted default — resolve origin or deploy first.
 | Link multiple Google accounts on Home | [auth.md](auth.md#linked-accounts) | [core/workspace-home.md](core/workspace-home.md) |
 | Publish governance (gate public) | [team/publish-governance.md](team/publish-governance.md) | [modules/_shared/publishing.md](modules/_shared/publishing.md), [team/api.md](team/api.md) |
 | Skill marketplace (publish, attach skills) | [team/skill-marketplace.md](team/skill-marketplace.md) | [team/workspace-context.md](team/workspace-context.md), [agents/overview.md](agents/overview.md) |
+| Save a playbook / convention as a reusable team skill | [team/skill-marketplace.md](team/skill-marketplace.md#publish-a-skill) | `POST /v1/workspaces/{id}/skills` |
+| Install a workspace's skills into Claude Code / Cursor | [team/skill-marketplace.md](team/skill-marketplace.md#install-into-an-agent) | `GET /v1/skills/install.sh` |
+| Who may edit a skill / review proposed changes | [team/skill-marketplace.md](team/skill-marketplace.md#who-can-change-a-skill) | `PUT /v1/skills/{id}/policy` |
 | Official Recommended by ShareOut skills | [team/skill-marketplace.md](team/skill-marketplace.md#official-skills-recommended-by-shareout) | `GET /v1/skills/recommended` |
 | Connect Shopify | [integrations/shopify.md](integrations/shopify.md) | [integrations/overview.md](integrations/overview.md) |
 | Each viewer sees only their own data | [core/access-policy.md](core/access-policy.md) | [sdk/table.md](sdk/table.md), [modules/_shared/permissions.md](modules/_shared/permissions.md) |

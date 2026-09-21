@@ -19,9 +19,10 @@ import lensRoutingTs from '../../../src/pages/home/render-workspace/client-scrip
 import homeViewsBarrel from '../../../src/pages/home/render-workspace/client-script/home-views.ts?raw';
 
 /** Captured at split time — guards against accidental client-script drift.
- *  Re-pinned after adding the per-workspace AI Gateway model picker (admin.ts). */
-const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 567_097;
-const ORIGINAL_WORKSPACE_CLIENT_SHA256 = 'c5eb605ded36a269a3784cb54785dd58da049648db18d5283b76395a93a33140';
+ *  Re-pinned after the Library skills overhaul (search/filter, authoring, review
+ *  and install actions in the skills lens). */
+const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 584_493;
+const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '5067814e8c2a6558d85fa1730e431d6a45024fc68e4ea062e27e85d8613414d1';
 const HOME_VIEWS_MARKER = '  // ===== rail nav → Home pane views =====';
 
 const SECTION_SOURCES: [string, string][] = [
