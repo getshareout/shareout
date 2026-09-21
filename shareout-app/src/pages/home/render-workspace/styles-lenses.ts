@@ -125,6 +125,8 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 .wsx-admin__who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .wsx-admin__nm { font: 600 var(--text-sm) var(--font-body); color: var(--color-text); }
 .wsx-admin__sub { font-size: var(--text-xs); color: var(--color-text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wsx-admin__mailok { color: var(--color-success); }
+.wsx-admin__mailbad { color: var(--color-danger, var(--color-error)); }
 .wsx-admin__rolebadge { flex: none; font: 600 var(--text-xs) var(--font-body); padding: 2px 9px; border-radius: 999px; background: var(--color-surface); color: var(--color-text-tertiary); text-transform: capitalize; }
 .wsx-admin__rolebadge.is-owner { background: var(--color-primary-light); color: var(--color-primary); }
 .wsx-admin__rolebadge.is-admin { background: color-mix(in srgb, var(--color-primary) 12%, transparent); color: var(--color-primary); }

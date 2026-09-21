@@ -24,6 +24,7 @@ export async function handleListWorkspaceInvites(env: Env, user: AuthUser, works
   if (forbidden) return forbidden;
   const rows = await env.DB.prepare(`
     SELECT ic.id, ic.email, ic.created_at, ic.expires_at,
+           ic.email_status, ic.email_sent_at, ic.email_error,
            (ic.expires_at < strftime('%Y-%m-%dT%H:%M:%fZ','now')) AS expired,
            inv.email AS invited_by_email, wm.role
     FROM workspace_invite_claims ic
@@ -64,13 +65,14 @@ export async function handleResendWorkspaceInvite(
   const notify = body.notify !== false;
 
   const ws = await env.DB.prepare('SELECT name FROM workspaces WHERE id = ?').bind(workspaceId).first<{ name: string }>();
-  const code = await createInviteClaim(env, workspaceId, inv.user_id, inv.email, user.id);
+  const claim = await createInviteClaim(env, workspaceId, inv.user_id, inv.email, user.id);
   if (notify) {
     await sendInviteEmail(env, {
       email: inv.email,
       workspaceName: ws?.name || 'a workspace',
       inviterName: user.username || user.email || 'A teammate',
-      claimCode: code,
+      claimCode: claim.code,
+      claimId: claim.id,
     });
   }
   await logAudit(env, {
@@ -78,7 +80,7 @@ export async function handleResendWorkspaceInvite(
     action: notify ? 'invite.resend' : 'invite.link', targetType: 'invite', targetId: inviteId,
     detail: { email: inv.email },
   });
-  return json({ ok: true, inviteUrl: `${getPlatformOrigin(env)}/invite/${encodeURIComponent(code)}` });
+  return json({ ok: true, inviteUrl: `${getPlatformOrigin(env)}/invite/${encodeURIComponent(claim.code)}` });
 }
 
 // DELETE /v1/workspaces/{id}/invites/{inviteId} — revoke a pending invite and the pending membership.

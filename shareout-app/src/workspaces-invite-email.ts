@@ -3,6 +3,8 @@ import type { AuthUser } from './api-auth';
 import { generateToken, hashToken } from './api-auth';
 import { generateId } from './crypto-utils';
 import { dispatchLifecycleEmail } from './email/gateway';
+import type { DispatchResult } from './email/gateway';
+import { createLogger } from './logging';
 import { jsonWithApiErrors } from './http/api-error';
 
 const CLAIM_TTL_DAYS = 7;
@@ -24,20 +26,23 @@ async function sha256(input: string): Promise<string> {
     .join('');
 }
 
-// Mint a one-time claim code, store only its hash, and return the plaintext code.
+// Mint a one-time claim code, store only its hash, and return the row id plus the
+// plaintext code. The id is what lets the caller record the email outcome against the
+// exact claim it just minted — a resend inserts a new row, so "latest claim" is not it.
 export async function createInviteClaim(
   env: Env,
   workspaceId: string,
   userId: string,
   email: string,
   invitedBy: string
-): Promise<string> {
+): Promise<{ id: string; code: string }> {
   const code = generateClaimCode();
+  const id = generateId('inv');
   await env.DB.prepare(
-    `INSERT INTO workspace_invite_claims (id, workspace_id, user_id, email, code_hash, invited_by, expires_at)
-     VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now', ?))`
+    `INSERT INTO workspace_invite_claims (id, workspace_id, user_id, email, code_hash, invited_by, expires_at, email_status)
+     VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now', ?), 'link_only')`
   ).bind(
-    generateId('inv'),
+    id,
     workspaceId,
     userId,
     email,
@@ -45,14 +50,21 @@ export async function createInviteClaim(
     invitedBy,
     `+${CLAIM_TTL_DAYS} days`
   ).run();
-  return code;
+  return { id, code };
 }
 
+// Send the invite and write the outcome onto the claim row.
+//
+// The dispatch result used to be discarded here, which made a rejected send
+// indistinguishable from a delivered one: the endpoint answered 200 with
+// status:"invited" either way, nothing was logged, and nothing was stored. An admin
+// staring at a pending invite could not tell whether to resend or to chase spam.
+// Now the row carries the verdict and the Members view shows it.
 export async function sendInviteEmail(
   env: Env,
-  args: { email: string; workspaceName: string; inviterName: string; claimCode: string }
-): Promise<void> {
-  await dispatchLifecycleEmail(env, {
+  args: { email: string; workspaceName: string; inviterName: string; claimCode: string; claimId?: string }
+): Promise<DispatchResult> {
+  const result = await dispatchLifecycleEmail(env, {
     type: 'workspace_invite',
     toEmail: args.email,
     data: {
@@ -62,6 +74,33 @@ export async function sendInviteEmail(
       claimTtlDays: CLAIM_TTL_DAYS,
     },
   });
+
+  if (!result.sent) {
+    createLogger(env, { scope: 'invite' }).warn('invite email not sent', {
+      email: args.email,
+      skipped: result.skipped,
+      error: result.error,
+    });
+  }
+
+  if (args.claimId) await recordInviteEmail(env, args.claimId, result);
+  return result;
+}
+
+// Persist a dispatch verdict. Best-effort: a bookkeeping write must never take down
+// an invite that otherwise succeeded.
+async function recordInviteEmail(env: Env, claimId: string, result: DispatchResult): Promise<void> {
+  const status = result.sent ? 'sent' : result.skipped ? 'skipped' : 'failed';
+  const error = result.sent ? null : result.skipped || result.error || 'unknown';
+  try {
+    await env.DB.prepare(
+      `UPDATE workspace_invite_claims
+          SET email_status = ?, email_sent_at = ?, email_error = ?
+        WHERE id = ?`
+    ).bind(status, result.sent ? new Date().toISOString() : null, error, claimId).run();
+  } catch {
+    // The email already went out (or already failed); losing the note is the lesser evil.
+  }
 }
 
 function json(data: unknown, status = 200): Response {

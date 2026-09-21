@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../src/workspaces-invite-email', () => ({
-  createInviteClaim: vi.fn(async () => 'ABCDE-FGHJK'),
-  sendInviteEmail: vi.fn(async () => {}),
+  createInviteClaim: vi.fn(async () => ({ id: 'inv_1', code: 'ABCDE-FGHJK' })),
+  sendInviteEmail: vi.fn(async () => ({ sent: true })),
 }));
 vi.mock('../../../src/email/gateway', () => ({
   dispatchLifecycleEmail: vi.fn(async () => ({ sent: true })),

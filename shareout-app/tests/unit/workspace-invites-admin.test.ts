@@ -8,8 +8,8 @@ vi.mock('../../src/workspaces', async (orig) => {
   return { ...actual, getWorkspaceRole: wsRoleMock, getInternalWorkspaceRole: wsRoleMock, invalidateWorkspaceRole: vi.fn(async () => {}) };
 });
 vi.mock('../../src/workspaces-invite-email', () => ({
-  createInviteClaim: vi.fn(async () => 'CODE123'),
-  sendInviteEmail: vi.fn(async () => {}),
+  createInviteClaim: vi.fn(async () => ({ id: 'inv_1', code: 'CODE123' })),
+  sendInviteEmail: vi.fn(async () => ({ sent: true })),
 }));
 vi.mock('../../src/audit', () => ({ logAudit: vi.fn(async () => {}) }));
 

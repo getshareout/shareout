@@ -124,7 +124,7 @@ The five paths: **membership** (`workspace_members`), **per-artifact invite**
 |---|---|
 | `workspaces` | The tenant. Carries its own policy: `allowed_email_domains`/`allowed_emails` gate joining, `session_max_days` caps session life, `public_publish_policy` + `public_publish_approvals_required` govern publishing, `branding` and `feature_flags` are JSON. |
 | `workspace_members` | Membership and `role` (`owner`/`admin`/`member`). `member_class` separates internal staff from external collaborators. |
-| `workspace_invite_claims` | Pending invites. `code_hash` only; `expires_at` and `claimed_at` make each single-use. |
+| `workspace_invite_claims` | Pending invites. `code_hash` only; `expires_at` and `claimed_at` make each single-use. `email_status` (`sent`/`failed`/`skipped`/`link_only`) with `email_sent_at` and `email_error` record whether the invite mail actually went out — null on rows minted before that was tracked. |
 | `workspace_llm_config` | Per-workspace AI settings: bring-your-own provider credentials (encrypted), `balance_micro_usd`, `markup_multiplier`, monthly budget. |
 | `workspace_event_visibility` | Which member audience sees which activity-feed event kind. |
 | `workspace_library` | Workspace- or user-scoped published modules, with `namespace`/`module_name` and install counters. |

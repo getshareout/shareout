@@ -19,9 +19,9 @@ import lensRoutingTs from '../../../src/pages/home/render-workspace/client-scrip
 import homeViewsBarrel from '../../../src/pages/home/render-workspace/client-script/home-views.ts?raw';
 
 /** Captured at split time — guards against accidental client-script drift.
- *  Re-pinned after adding the Assets "Anyone with link" visibility badge. */
-const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 563_933;
-const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '31e0813bb32a9ef8efaf99e71e3dfa317656bcf5e5a3d916233de2d7f88ff05d';
+ *  Re-pinned after adding the invite email delivery status to the Members view. */
+const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 564_950;
+const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '76b4caf2f6ebe18fb8dfc6a6ca43538a7882a6c8bcae4180228edfc7b3fe175d';
 const HOME_VIEWS_MARKER = '  // ===== rail nav → Home pane views =====';
 
 const SECTION_SOURCES: [string, string][] = [

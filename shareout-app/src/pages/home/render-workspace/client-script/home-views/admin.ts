@@ -264,12 +264,27 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
         var la = new Date(mem.last_active); if (isNaN(la.getTime())) return true;
         return (Date.now() - la.getTime()) > 2592000000;
       }
+      // Delivery verdict for one pending invite. Stored by sendInviteEmail(); rows minted
+      // before that shipped carry no verdict at all, which is 'unknown' — never a success.
+      function inviteMailSub(iv) {
+        if (iv.email_status === 'sent') {
+          return '<span class="wsx-admin__mailok">' + esc(t('admin.inviteEmailSent').replace('{when}', adRelDate(iv.email_sent_at || iv.created_at))) + '</span>';
+        }
+        if (iv.email_status === 'failed' || iv.email_status === 'skipped') {
+          var why = iv.email_error || t('admin.inviteEmailUnknownReason');
+          return '<span class="wsx-admin__mailbad" title="' + esc(why) + '">'
+            + esc(t(iv.email_status === 'failed' ? 'admin.inviteEmailFailed' : 'admin.inviteEmailSkipped').replace('{why}', why)) + '</span>';
+        }
+        if (iv.email_status === 'link_only') return esc(t('admin.inviteEmailLinkOnly'));
+        return esc(t('admin.inviteEmailUnknown'));
+      }
       var invitesSection = '';
       if (invites.length) {
         invitesSection = '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.pendingInvitesTitle')) + '</div>'
           + '<div class="wsx-admin__list">' + invites.map(function (iv) {
             var expired = iv.expired ? '<span class="wsx-atbl__flag" title="' + esc(t('admin.inviteExpired')) + '">' + esc(t('admin.expired')) + '</span>' : '';
             var invitedSub = t('admin.invitedAt').replace('{when}', adRelDate(iv.created_at)) + (iv.invited_by_email ? ' ' + t('admin.invitedBy').replace('{email}', esc(iv.invited_by_email)) : '');
+            invitedSub += ' \u00B7 ' + inviteMailSub(iv);
             return '<div class="wsx-admin__row" data-inv="' + esc(iv.id) + '"><span class="wsx-cm__av">@</span>'
               + '<div class="wsx-admin__who"><span class="wsx-admin__nm">' + esc(iv.email) + expired + '</span>'
               + '<span class="wsx-admin__sub">' + invitedSub + '</span></div>'
