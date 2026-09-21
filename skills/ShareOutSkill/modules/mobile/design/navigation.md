@@ -483,15 +483,20 @@ ShareOut.mobile.sheet.snapTo('90%');
 
 ### Save/Restore State
 
+Published artifacts run in an opaque-origin sandbox (ADR 30), where
+`localStorage`/`sessionStorage` access throws `SecurityError`. Persist with
+`sdk.json` instead — it survives reloads and follows the viewer across devices.
+
 ```javascript
+const sdk = await ShareOut.create();
+
 // Save navigation state
-const state = ShareOut.mobile.navigation.getState();
-localStorage.setItem('navState', JSON.stringify(state));
+await sdk.json.set('navState', ShareOut.mobile.navigation.getState());
 
 // Restore on app launch
-const savedState = localStorage.getItem('navState');
+const savedState = await sdk.json.get('navState');
 if (savedState) {
-  ShareOut.mobile.navigation.restoreState(JSON.parse(savedState));
+  ShareOut.mobile.navigation.restoreState(savedState);
 }
 ```
 

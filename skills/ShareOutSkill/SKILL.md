@@ -312,5 +312,7 @@ doing workspace administration or workspace-scoped features:
 - No token → First Run (or deploy skill if no instance).
 - Verify artifact ids before update/delete.
 - `ShareOut.create()` + SDK for live artifact data.
+- Never `localStorage`/`sessionStorage` in a published artifact: it runs in an
+  opaque-origin sandbox and both throw `SecurityError`. Use `sdk.json`.
 - Design taste on anything visual.
 - Deploy/install → [deploy/SKILL.md](deploy/SKILL.md); do not improvise Cloudflare setup without [deploy/cloudflare.md](deploy/cloudflare.md).
