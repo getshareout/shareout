@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Local mirror of .github/workflows/ci.yml (worker + docs).
 # Prefer this before opening a PR. Fast subset: ci-check-fast.sh
+#
+# Runs the whole unit suite (~4m40s). Istanbul instrumentation more than doubles that
+# (~10m) and PR CI does not check coverage floors anyway — full.yml does, on main and
+# nightly. So coverage is opt-in here: SHAREOUT_COVERAGE=1 ./tooling/scripts/ci-check.sh
 set -euo pipefail
 
 # Production (Cloudflare Workers) runs in UTC — pin tests so non-UTC contributors
@@ -29,8 +33,11 @@ npm run check:access-seams
 npm run check:file-size
 npm run db:migrate:fresh
 npm run typecheck
-npm run test:critical -- --reporter=dot
-npm run coverage -- --reporter=dot
+if [ "${SHAREOUT_COVERAGE:-}" = "1" ]; then
+  npm run coverage -- --reporter=dot
+else
+  npm test -- --reporter=dot
+fi
 
 echo "==> CI checks (chat-core workspace)"
 npm run typecheck --workspace @shareout/chat-core

@@ -27,6 +27,11 @@ npm run db:migrate
 npm run dev                      # http://localhost:55162
 ```
 
+Working on several branches at once? `./tooling/scripts/new-worktree.sh <branch>` adds a
+worktree off `origin/main` and clones `node_modules` from this checkout rather than
+running `npm ci` again — copy-on-write on APFS, so it takes seconds and almost no disk.
+It falls back to `npm ci` whenever the lockfiles differ.
+
 No secrets to fill in: `npm run dev` creates `.dev.vars` from `.dev.vars.example` and
 generates a local `SESSION_SECRET` if there isn't one. Sessions are signed with that secret,
 and signing with an empty one fails as an opaque HMAC error on every auth route, so it has to
@@ -65,11 +70,13 @@ Prefer the full local mirror of public CI:
 ./tooling/scripts/ci-check.sh
 ```
 
-That runs static gates, fresh D1 migrate, typecheck, **unit tests with coverage floors**,
-workspace tests, bundles, `npm audit --omit=dev --audit-level=high` (runtime deps),
-gitleaks, and the docs-site build.
+That runs static gates, fresh D1 migrate, typecheck, the **full unit suite**, workspace
+tests, bundles, `npm audit --omit=dev --audit-level=high` (runtime deps), gitleaks, and
+the docs-site build. Coverage floors are opt-in — `SHAREOUT_COVERAGE=1` roughly doubles
+the run (~10m) and PR CI does not check them; `full.yml` enforces them on main/nightly.
 
-Faster loop while iterating (skips migrate, coverage, audit, docs):
+Faster loop while iterating (skips migrate, coverage, audit, docs, and runs only the
+tests your change touches):
 
 ```bash
 ./tooling/scripts/ci-check-fast.sh
@@ -77,10 +84,14 @@ Faster loop while iterating (skips migrate, coverage, audit, docs):
 ./tooling/scripts/install-hooks.sh
 ```
 
+Tests there are the critical-path subset plus whatever your diff reaches through
+vitest's module graph. Force the whole suite with `SHAREOUT_FULL_TESTS=1`.
+
 Or the individual worker commands:
 
 ```bash
 cd shareout-app
+npm run test:affected            # only the tests your change reaches
 npm run check:boundaries
 npm run check:domains
 npm run check:migrations
@@ -88,7 +99,8 @@ npm run check:ui
 npm run check:access-seams
 npm run db:migrate:fresh
 npm run typecheck
-TZ=UTC npm run coverage          # enforces vitest coverage thresholds
+TZ=UTC npm test                  # whole unit suite (~4m40s)
+TZ=UTC npm run coverage          # enforces vitest coverage thresholds (~10m)
 ```
 
 Public CI (`.github/workflows/ci.yml`) must be green to merge. It also builds

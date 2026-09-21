@@ -69,6 +69,7 @@
     "test": "vitest run --maxWorkers=8",
     "test:watch": "vitest",
     "test:critical": "vitest run tests/unit/http tests/unit/access tests/unit/auth.test.ts tests/unit/auth tests/unit/publish.test.ts tests/unit/logging.test.ts tests/unit/router/internal-admin.test.ts tests/unit/scheduling-handler.test.ts tests/unit/external-sharing.test.ts tests/unit/artifacts/share.test.ts tests/unit/artifacts/roles.test.ts tests/unit/metric-alerts/routes.test.ts tests/unit/routes.test.ts --maxWorkers=8",
+    "test:affected": "node scripts/test-affected.mjs --reporter=dot",
     "coverage": "vitest run --coverage",
     "lint": "eslint . --max-warnings 0",
     "lint:changed": "eslint --max-warnings 0",
