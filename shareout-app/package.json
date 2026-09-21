@@ -85,6 +85,9 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz",
     "yjs": "^13.6.31"
   },
+  "overrides": {
+    "@puppeteer/browsers": "3.2.2"
+  },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.18.8",
     "@cloudflare/workers-types": "^5.20260724.1",
