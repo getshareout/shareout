@@ -45,6 +45,7 @@ export async function handleGetWorkspaceLlm(
   return json({
     hasByoKey: !!(cfg?.byo_provider),
     byoProvider: cfg?.byo_provider ?? null,
+    gatewayModel: cfg?.gateway_model ?? null,
     monthlyBudgetUsd: cfg?.monthly_budget_micro_usd != null ? microToUsd(cfg.monthly_budget_micro_usd) : null,
     currentMonthSpendUsd: microToUsd(spend?.micro ?? 0),
     period,
@@ -107,6 +108,58 @@ export async function handleDeleteWorkspaceByoKey(
   await env.DB.prepare(`
     UPDATE workspace_llm_config
     SET byo_provider = NULL, byo_encrypted_credentials = NULL, byo_iv = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+    WHERE workspace_id = ?
+  `).bind(workspaceId).run();
+
+  return json({ ok: true });
+}
+
+// PUT /v1/workspaces/{id}/llm/model — set the workspace's Vercel AI Gateway model (admin+)
+export async function handleSetWorkspaceGatewayModel(
+  request: Request,
+  env: Env,
+  user: AuthUser,
+  workspaceId: string
+): Promise<Response> {
+  if (!(await requireAdmin(env, workspaceId, user.id))) {
+    return json({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
+  }
+
+  let body: { model?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'Invalid JSON body', code: 'INVALID_JSON' }, 400);
+  }
+
+  if (!body.model || typeof body.model !== 'string' || !body.model.includes('/')) {
+    return json({ error: 'model must be a gateway model id, e.g. "deepseek/deepseek-v4.1-flash"', code: 'VALIDATION_ERROR' }, 400);
+  }
+
+  await env.DB.prepare(`
+    INSERT INTO workspace_llm_config (workspace_id, gateway_model, updated_at)
+    VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    ON CONFLICT(workspace_id) DO UPDATE SET
+      gateway_model = excluded.gateway_model,
+      updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+  `).bind(workspaceId, body.model).run();
+
+  return json({ ok: true, gatewayModel: body.model });
+}
+
+// DELETE /v1/workspaces/{id}/llm/model — clear the override, falling back to the instance default (admin+)
+export async function handleDeleteWorkspaceGatewayModel(
+  env: Env,
+  user: AuthUser,
+  workspaceId: string
+): Promise<Response> {
+  if (!(await requireAdmin(env, workspaceId, user.id))) {
+    return json({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
+  }
+
+  await env.DB.prepare(`
+    UPDATE workspace_llm_config
+    SET gateway_model = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
     WHERE workspace_id = ?
   `).bind(workspaceId).run();
 

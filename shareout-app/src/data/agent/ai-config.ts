@@ -19,6 +19,7 @@ export interface WorkspaceLlmConfigRow {
   balance_micro_usd: number;
   markup_multiplier: number;
   monthly_budget_micro_usd: number | null;
+  gateway_model: string | null;
 }
 
 export interface AgentAiConfig {
@@ -50,10 +51,35 @@ export async function ensureConfigRow(env: Env, workspaceId: string): Promise<vo
   ).bind(workspaceId).run();
 }
 
+/** Instance-wide default Vercel AI Gateway model, set from the superadmin AI settings panel.
+ *  Fails soft to null (the hardcoded DEFAULT_GATEWAY_MODEL applies) — a missing migration
+ *  should never take every chat/crew request down with it. */
+export async function getInstanceDefaultGatewayModel(env: Env): Promise<string | null> {
+  try {
+    const row = await env.DB.prepare(
+      'SELECT default_gateway_model FROM instance_ai_settings WHERE id = 1'
+    ).bind().first<{ default_gateway_model: string | null }>();
+    return row?.default_gateway_model ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Gateway model to use for a workspace: its own override, else the instance default, else null
+ *  (callers fall back to anthropic.ts's DEFAULT_GATEWAY_MODEL). */
+export async function resolveGatewayModel(env: Env, workspaceId: string | null): Promise<string | null> {
+  if (workspaceId) {
+    const cfg = await getWorkspaceLlmConfig(env, workspaceId);
+    if (cfg?.gateway_model) return cfg.gateway_model;
+  }
+  return getInstanceDefaultGatewayModel(env);
+}
+
 /** Decide which provider key serves this artifact's agent. */
 export async function resolveAgentAiConfig(env: Env, artifactId: string): Promise<AgentAiConfig> {
   const workspaceId = await resolveWorkspaceId(env, artifactId);
-  const platform = getAIProvider(env);
+  const gatewayModel = await resolveGatewayModel(env, workspaceId);
+  const platform = getAIProvider(env, gatewayModel);
 
   if (!workspaceId) return { workspaceId: null, aiConfig: platform, byo: false };
 
@@ -63,7 +89,7 @@ export async function resolveAgentAiConfig(env: Env, artifactId: string): Promis
       const data = await decryptCredentials(cfg.byo_encrypted_credentials, cfg.byo_iv, env.CREDENTIALS_KEY);
       const apiKey = typeof data.api_key === 'string' ? data.api_key : '';
       if (apiKey) {
-        return { workspaceId, aiConfig: buildAIConfig(cfg.byo_provider, apiKey), byo: true };
+        return { workspaceId, aiConfig: buildAIConfig(cfg.byo_provider, apiKey, gatewayModel), byo: true };
       }
     } catch {
       // Decrypt failure — fall through to the platform key.

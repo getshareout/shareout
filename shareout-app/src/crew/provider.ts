@@ -342,9 +342,10 @@ export class FailoverCrewProvider implements CrewProvider {
   }
 }
 
-/** Resolve the crew provider over every configured AI provider, in failover order. */
-export function getCrewProvider(env: Env): CrewProvider | null {
-  const providers = getBuildChain(env).map((cfg) =>
+/** Resolve the crew provider over every configured AI provider, in failover order.
+ *  `gatewayModel` overrides the Vercel AI Gateway model (workspace or instance choice). */
+export function getCrewProvider(env: Env, gatewayModel?: string | null): CrewProvider | null {
+  const providers = getBuildChain(env, gatewayModel).map((cfg) =>
     cfg.provider === 'anthropic' ? new AnthropicCrewProvider(cfg, env) : new OpenAICompatCrewProvider(cfg, env),
   );
   if (providers.length === 0) return null;

@@ -736,6 +736,11 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
       }).join('');
       var modelSection = '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.aiModelsRecent').replace('{n}', String(events.length))) + '</div>'
         + (models.length ? '<div class="wsx-atbl__wrap"><table class="wsx-atbl"><thead><tr><th>' + esc(t('admin.colModel')) + '</th><th>' + esc(t('admin.colRequests')) + '</th><th>' + esc(t('admin.colInput')) + '</th><th>' + esc(t('admin.colOutput')) + '</th><th>' + esc(t('admin.colCost')) + '</th></tr></thead><tbody>' + modelRows + '</tbody></table></div>' : i18nEmpty('admin.noAiUsage')) + '</div>';
+      var modelSection = '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.aiModelTitle')) + '</div>'
+        + '<p class="wsx-lens__intro">' + esc(t('admin.aiModelIntro')) + '</p>'
+        + '<div class="wsx-admin__domain-add"><select class="wsx-admin__role" id="wsxGatewayModel" style="max-width:340px"><option value="">' + esc(t('admin.aiModelInstanceDefault')) + '</option></select>'
+          + '<button class="wsx-abtn" id="wsxGatewayModelSave" type="button">' + esc(t('admin.aiModelSave')) + '</button><span class="wsx-admin__savemsg" id="wsxGatewayModelMsg"></span></div>'
+        + '</div>';
       var byoSection = '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.aiByoTitle')) + '</div>'
         + '<p class="wsx-lens__intro">' + esc(t('admin.aiByoIntro')) + '</p>'
         + (llm.hasByoKey
@@ -745,6 +750,31 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
             + '<button class="wsx-abtn" id="wsxByoSave" type="button">' + esc(t('admin.aiSaveKey')) + '</button><span class="wsx-admin__savemsg" id="wsxByoMsg"></span></div>')
         + '</div>';
       m.innerHTML = '<div class="wsx-admin__cards">' + cards + '</div>' + modelSection + byoSection;
+      var gwSel = document.getElementById('wsxGatewayModel');
+      var gwSave = document.getElementById('wsxGatewayModelSave');
+      var gwMsg = document.getElementById('wsxGatewayModelMsg');
+      if (gwSel && gwSave) {
+        fetch('/v1/ai/gateway-models', { credentials: 'same-origin' })
+          .then(function (r) { return r.ok ? r.json() : { models: [] }; })
+          .then(function (j) {
+            (j.models || []).forEach(function (mm) {
+              var opt = document.createElement('option');
+              opt.value = mm.id; opt.textContent = mm.name + ' (' + mm.id + ')';
+              gwSel.appendChild(opt);
+            });
+            if (llm.gatewayModel) gwSel.value = llm.gatewayModel;
+          })
+          .catch(function () { gwMsg.textContent = t('admin.aiModelLoadError'); });
+        gwSave.addEventListener('click', function () {
+          adBusy(gwSave); gwMsg.textContent = t('common.saving');
+          var val = gwSel.value;
+          var req = val
+            ? fetch(wsUrl('/llm/model'), { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: val }) })
+            : fetch(wsUrl('/llm/model'), { method: 'DELETE', credentials: 'same-origin' });
+          req.then(function (r) { adIdle(gwSave); gwMsg.textContent = r.ok ? t('admin.aiModelSaved') : t('common.failed'); })
+            .catch(function () { adIdle(gwSave); gwMsg.textContent = t('modal.networkError'); });
+        });
+      }
       var bsave = document.getElementById('wsxByoSave');
       if (bsave) bsave.addEventListener('click', function () {
         var msg = document.getElementById('wsxByoMsg'); var key = (document.getElementById('wsxByoKey').value || '').trim();

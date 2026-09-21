@@ -111,6 +111,34 @@ function initContent() {
 let appointWs = null;
 
 function initInstance() {
+  const modelSel = document.getElementById('sa-ai-model');
+  const modelSave = document.getElementById('sa-ai-model-save');
+  if (modelSel && modelSave) {
+    fetch('/v1/ai/gateway-models', { credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.json() : { models: [] }))
+      .then((j) => {
+        (j.models || []).forEach((m) => {
+          const opt = document.createElement('option');
+          opt.value = m.id;
+          opt.textContent = m.name + ' (' + m.id + ')';
+          modelSel.appendChild(opt);
+        });
+        const current = modelSel.getAttribute('data-current');
+        if (current) modelSel.value = current;
+      })
+      .catch(() => { /* catalog needs VERCEL_AI_GATEWAY configured — leave the built-in option only */ });
+    modelSave.onclick = async () => {
+      const out = document.getElementById('sa-ai-model-result');
+      modelSave.disabled = true;
+      out.textContent = 'Saving…';
+      try {
+        await api('PUT', '/v1/admin/ai-settings', { defaultGatewayModel: modelSel.value || null });
+        out.textContent = 'Saved.';
+      } catch (e) { out.textContent = e.message; }
+      modelSave.disabled = false;
+    };
+  }
+
   const createBtn = document.getElementById('sa-ws-create');
   if (createBtn) createBtn.onclick = async () => {
     const name = document.getElementById('sa-ws-name').value.trim();

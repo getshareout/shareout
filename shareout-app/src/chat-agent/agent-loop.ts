@@ -1,5 +1,6 @@
 import type { Env } from '../types';
 import { getCrewProvider, type NeutralTurn, type NeutralToolCall, type ProviderTool } from '../crew/provider';
+import { resolveGatewayModel } from '../data/agent/ai-config';
 import type { ChatReplyPort, PlatformId, WorkspaceSelection } from '../chat-platforms/types';
 import { PERSONAL_SCOPE } from '../chat-platforms/types';
 import { selectTools, defaultCapabilities, type AccountTool, type Capabilities } from './tools/index';
@@ -150,7 +151,8 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
     return { reply: botDisabledMessage(platform) };
   }
 
-  const provider = getCrewProvider(env);
+  const gatewayModel = await resolveGatewayModel(env, flagWs);
+  const provider = getCrewProvider(env, gatewayModel);
   if (!provider) return { reply: await noProviderReply(env, input.userId) };
 
   const caps = input.capabilities ?? defaultCapabilities(platform);

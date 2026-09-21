@@ -1,7 +1,7 @@
 import type { Env } from '../types';
 import type { DataContext } from '../data/middleware';
 import { generateId } from '../crypto-utils';
-import { resolveAgentAiConfig, recordAgentUsage } from '../data/agent/ai-config';
+import { resolveAgentAiConfig, resolveGatewayModel, recordAgentUsage } from '../data/agent/ai-config';
 import { computeBaseCostMicroUsd } from '../data/agent/model-costs';
 import type { CrewRow, CrewRunRow, CrewSseEvent, TerminationReason, RunCaps } from './types';
 import { buildCrewDataContext, buildCrewPrincipal, redact } from './principal';
@@ -174,7 +174,8 @@ export async function executeCrewRun(
   try {
     emit({ type: 'run_start', runId: run.id });
 
-    const provider = opts.provider ?? getCrewProvider(env);
+    const gatewayModel = await resolveGatewayModel(env, crew.workspace_id);
+    const provider = opts.provider ?? getCrewProvider(env, gatewayModel);
     if (!provider) {
       emit({ type: 'error', error: 'AI provider not configured.' });
       await finalize('error', '');
