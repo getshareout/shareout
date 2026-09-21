@@ -11,7 +11,7 @@ Copy-paste form patterns for common use cases.
   "sources": { "json": {} }
 }
 </script>
-<script src="$ORIGIN/sdk/shareout.js"></script>
+<script src="/sdk/shareout.js"></script>
 
 <form id="contact-form">
   <input type="text" name="name" placeholder="Name" required>

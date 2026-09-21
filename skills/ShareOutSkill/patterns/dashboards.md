@@ -75,7 +75,7 @@ threshold (see [../api/metric-alerts.md](../api/metric-alerts.md)). Two steps:
 </script>
 
 <script type="module">
-  import { ShareOut } from '$ORIGIN/sdk/shareout.js';
+  import { ShareOut } from '/sdk/shareout.js';
   const sdk = await ShareOut.create();
   // Persist the headline number the dashboard shows.
   await sdk.json.set('metrics', { revenue: 92420, signups: 1240 });

@@ -3,8 +3,8 @@
 Behavior for interactive components. Load both the stylesheet and the script:
 
 ```html
-<link rel="stylesheet" href="$ORIGIN/sdk/shareout.css">
-<script src="$ORIGIN/sdk/shareout-ui.js" defer></script>
+<link rel="stylesheet" href="/sdk/shareout.css">
+<script src="/sdk/shareout-ui.js" defer></script>
 ```
 
 Everything is on `window.ShareOutUI`. No build step, no dependencies. Tabs and dropdowns (using the markup in [classes.md](classes.md)) auto-initialize on load.

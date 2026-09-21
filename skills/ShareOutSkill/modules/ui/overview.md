@@ -12,9 +12,9 @@ The ShareOut design system, served as a stylesheet + behavior layer. Link it and
 
 ```html
 <head>
-  <link rel="stylesheet" href="$ORIGIN/sdk/shareout.css">
+  <link rel="stylesheet" href="/sdk/shareout.css">
   <!-- only if you need toasts / modals / tabs / dropdowns: -->
-  <script src="$ORIGIN/sdk/shareout-ui.js" defer></script>
+  <script src="/sdk/shareout-ui.js" defer></script>
 </head>
 ```
 
@@ -73,11 +73,11 @@ So an artifact built with the design system must **also** follow the [HTML spec]
   </script>
 
   <!-- 2. Design system: brand styling + behavior -->
-  <link rel="stylesheet" href="$ORIGIN/sdk/shareout.css">
-  <script src="$ORIGIN/sdk/shareout-ui.js" defer></script>
+  <link rel="stylesheet" href="/sdk/shareout.css">
+  <script src="/sdk/shareout-ui.js" defer></script>
 
   <!-- 3. Data SDK -->
-  <script src="$ORIGIN/sdk/shareout.js"></script>
+  <script src="/sdk/shareout.js"></script>
 </head>
 <body>
   <!-- data-shareout-page → editor outline; .so- classes → styling -->

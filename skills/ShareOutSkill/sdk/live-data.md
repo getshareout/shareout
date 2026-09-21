@@ -33,7 +33,7 @@ via `postMessage`.
 
 ```html
 <!-- Absolute URL (always works) or relative /sdk/shareout.js (resolves on content host) -->
-<script src="$ORIGIN/sdk/shareout.js"></script>
+<script src="/sdk/shareout.js"></script>
 <script>
 (async () => {
   const sdk = await ShareOut.create();  // waits for embedded sessionToken in iframe

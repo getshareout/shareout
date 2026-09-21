@@ -214,7 +214,7 @@ const mobileHtml = `
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <script src="$ORIGIN/sdk/shareout-mobile.js"></script>
+  <script src="/sdk/shareout-mobile.js"></script>
 </head>
 <body>
   <main id="content">

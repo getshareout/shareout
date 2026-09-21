@@ -175,7 +175,7 @@ function detectVersion(request) {
 
 ```html
 <!-- Include mobile SDK for features -->
-<script src="$ORIGIN/sdk/shareout-mobile.js"></script>
+<script src="/sdk/shareout-mobile.js"></script>
 
 <script>
   ShareOut.mobile.init({

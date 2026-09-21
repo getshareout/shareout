@@ -12,6 +12,7 @@ import type { TypeMetadata } from '../types';
 import { upsertAgentConfig } from './agent-config';
 import { storeVersionAssets } from './assets';
 import { vendorizePublishFiles } from './vendorize';
+import { stripOriginPlaceholders, placeholderWarnings } from './origin-placeholder';
 import { syncCredentials, syncViewers } from './request-auth';
 import {
   assemblePublishResponse,
@@ -42,7 +43,24 @@ export async function publishArtifact(
   // Point the artifact's library <script>/<link> tags at this instance's vendored
   // copies before anything reads or stores the HTML — so the stored bytes, the
   // moderation classifier and the editor all see the rewritten markup.
-  const { files, mobileHtml } = await vendorizePublishFiles(env, params.files, params.mobileHtml, workspaceId);
+  const { files: vendorized, mobileHtml: vendorizedMobile } = await vendorizePublishFiles(env, params.files, params.mobileHtml, workspaceId);
+
+  // An unsubstituted `$ORIGIN/sdk/...` from the skill docs 404s at view time and
+  // leaves the page with "ShareOut is not defined" — repair it here, before the
+  // bytes are stored, and tell the publisher what we changed.
+  const warnings: string[] = [];
+  const files = vendorized.map(f => {
+    if (f.encoding === 'base64' || !(f.mime === 'text/html' || f.path.endsWith('.html'))) return f;
+    const fix = stripOriginPlaceholders(f.content);
+    warnings.push(...placeholderWarnings(fix));
+    return fix.rewritten > 0 ? { ...f, content: fix.html } : f;
+  });
+  let mobileHtml = vendorizedMobile;
+  if (mobileHtml) {
+    const fix = stripOriginPlaceholders(mobileHtml);
+    warnings.push(...placeholderWarnings(fix));
+    mobileHtml = fix.html;
+  }
 
   const visibility = coerceVisibility(env, params.visibility, params.allowOpen ?? false);
   const hasMobile = !!mobileHtml;
@@ -123,6 +141,7 @@ export async function publishArtifact(
     moderationStatus: moderation.status,
     moderationReason: moderation.reason,
     policyNotice, approvalRequired, blocking,
+    warnings: [...new Set(warnings)],
   });
 }
 

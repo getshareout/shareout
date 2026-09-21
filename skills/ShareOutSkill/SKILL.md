@@ -1,7 +1,7 @@
 ---
 name: "shareout-skill"
-version: "2.52.0"
-updated_at: "2026-07-27T21:30:00Z"
+version: "2.53.0"
+updated_at: "2026-09-21T13:00:00Z"
 description: "Publish, update, inspect, and manage ShareOut artifacts on a self-hosted instance. Use when the user wants to build or publish a web artifact (HTML apps, dashboards, forms, or CSV/Markdown/JSON/TXT), wire SDK data stores, live data, schedules, sharing, analytics, or in-artifact AI. If the user wants to INSTALL or DEPLOY ShareOut on Cloudflare first, load deploy/SKILL.md immediately."
 skill_endpoint: "/v1/skill"
 ---
@@ -49,7 +49,7 @@ the user for their instance URL). Do **not** invent a default host.
 | API | `$ORIGIN/v1/...` |
 | Skill zip | `GET $ORIGIN/v1/skill` |
 | Skill version | `GET $ORIGIN/v1/skill/version` |
-| SDK | `$ORIGIN/sdk/shareout.js` (+ `.css`, `shareout-ui.js`) |
+| SDK | `$ORIGIN/sdk/shareout.js` (+ `.css`, `shareout-ui.js`) — inside artifact HTML write `/sdk/…` |
 | Smoke | `SHAREOUT_ORIGIN=$ORIGIN SHAREOUT_TOKEN=so_… npm run smoke:hello` |
 
 ---
@@ -69,7 +69,7 @@ load [deploy/SKILL.md](deploy/SKILL.md).
 
 ## Version check (against **their** origin)
 
-Frontmatter `version` is this file (`2.52.0`).
+Frontmatter `version` is this file (`2.53.0`).
 
 1. `GET $ORIGIN/v1/skill/version` → `{ "version", "updated_at" }`.
 2. If newer: download `GET $ORIGIN/v1/skill` (zip), replace local skill copy, continue.
@@ -143,9 +143,9 @@ Live external systems: REST, warehouses, Sheets -> sdk.connection / live-data
 
 ```html
 <head>
-  <link rel="stylesheet" href="$ORIGIN/sdk/shareout.css">
-  <script src="$ORIGIN/sdk/shareout-ui.js" defer></script>
-  <script src="$ORIGIN/sdk/shareout.js"></script>
+  <link rel="stylesheet" href="/sdk/shareout.css">
+  <script src="/sdk/shareout-ui.js" defer></script>
+  <script src="/sdk/shareout.js"></script>
 </head>
 <script>
 (async () => {
@@ -156,10 +156,10 @@ Live external systems: REST, warehouses, Sheets -> sdk.connection / live-data
 
 Rules:
 
-- Load `$ORIGIN/sdk/shareout.js` before `ShareOut.create()`.
+- Load `/sdk/shareout.js` before `ShareOut.create()`. Keep it root-relative: the artifact's own host serves the bundle, so there is no placeholder left to substitute and no second origin on the critical path.
 - Prefer `await ShareOut.create()` so the embedded Bearer token is ready.
 - Use SDK methods inside published HTML — not raw `fetch` to `/v1/data/...` from the sandbox. See [sdk/live-data.md](sdk/live-data.md).
-- Prefer `$ORIGIN/sdk/shareout.css` and `.so-` classes. See [modules/ui/overview.md](modules/ui/overview.md).
+- Prefer `/sdk/shareout.css` and `.so-` classes. See [modules/ui/overview.md](modules/ui/overview.md).
 - Do not use third-party CDN mirrors of the ShareOut SDK.
 
 ### Third-party libraries

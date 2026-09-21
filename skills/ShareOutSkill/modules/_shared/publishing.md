@@ -29,7 +29,7 @@ Visitors browse the shell URL; they do not need to know the content URL.
 | Link previews (OG tags) | Shell URL (`/a/` or `/p/`) — crawlers never execute iframe JS |
 | Session cookies | `$ORIGIN_HOST` only — not visible to artifact JS |
 | Your HTML/CSS/JS | Content host iframe |
-| SDK script tags | Works via `$ORIGIN/sdk/…` or relative `/sdk/…` on content host |
+| SDK script tags | Use relative `/sdk/…` — served on the app origin and every content host |
 
 See [sdk/live-data.md](../../sdk/live-data.md) for sandbox auth and data access rules.
 
