@@ -78,12 +78,12 @@
     "predeploy": "npm run build:editor && npm run build:chat-core && npm run build:sdk && npm run build:mobile && npm run build:grid && npm run build:official-skills && npm run build:skill && npm run build:discovery"
   },
   "dependencies": {
-    "@cloudflare/puppeteer": "^1.1.0",
+    "@cloudflare/puppeteer": "^1.4.0",
     "aws4fetch": "^1.0.20",
     "fflate": "^0.8.3",
-    "postal-mime": "^2.7.5",
+    "postal-mime": "^3.0.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz",
-    "yjs": "^13.6.31"
+    "yjs": "^13.6.32"
   },
   "overrides": {
     "@puppeteer/browsers": "3.2.2"
