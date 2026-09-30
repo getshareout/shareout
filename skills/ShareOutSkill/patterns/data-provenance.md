@@ -54,7 +54,7 @@ Every `sources.{connections,json,tables}` entry takes optional provenance fields
 | `query` | The exact SQL / API call / build step that produced the data |
 | `tables` | Underlying warehouse/source tables |
 | `refresh` | Cadence in words (`daily 12:00 UTC`, `manual`, `live`) |
-| `as_of` | Date/time the snapshot reflects |
+| `as_of` | Date/time the snapshot reflects — badges show **stale** once it's >7 days old, so whatever refreshes the data must rewrite it on every run |
 | `replication` | `{ build, publish, credentials, notes }` — how to rebuild from scratch |
 
 All optional, all backward-compatible. Keep `default` too — it powers editor preview.

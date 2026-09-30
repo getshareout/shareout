@@ -61,7 +61,7 @@ fields:
 | `query` | The exact SQL, API call, or build step that produced the data |
 | `tables` | Underlying warehouse or source tables |
 | `refresh` | Cadence in words (`daily 12:00 UTC`, `manual`, `live`) |
-| `as_of` | Date or time the snapshot reflects |
+| `as_of` | Date or time the snapshot reflects — badges show **stale** once it's >7 days old, so whatever refreshes the data must rewrite it on every run |
 | `replication` | `{ build, publish, credentials, notes }` — how to rebuild from scratch |
 
 All fields are optional and backward-compatible. Keep `default` too — it powers
