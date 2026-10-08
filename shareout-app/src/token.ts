@@ -23,13 +23,13 @@ async function getHmacKey(secret: string, usage: 'sign' | 'verify'): Promise<Cry
   );
 }
 
-async function signPayload(payload: string, secret: string): Promise<string> {
+export async function signPayload(payload: string, secret: string): Promise<string> {
   const key = await getHmacKey(secret, 'sign');
   const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
   return btoa(String.fromCharCode(...new Uint8Array(signature)));
 }
 
-async function verifySignature(payload: string, signature: string, secret: string): Promise<boolean> {
+export async function verifySignature(payload: string, signature: string, secret: string): Promise<boolean> {
   const key = await getHmacKey(secret, 'verify');
   const signatureBytes = Uint8Array.from(atob(signature), c => c.charCodeAt(0));
   return crypto.subtle.verify('HMAC', key, signatureBytes, new TextEncoder().encode(payload));

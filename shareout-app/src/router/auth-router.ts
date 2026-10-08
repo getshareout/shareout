@@ -53,6 +53,9 @@ import { getTokenOrSessionUser } from './helpers/auth-guard';
 import { jsonError } from './helpers/json-response';
 import { googleOAuthConfigured } from '../config/auth-providers';
 import { appLoginPage } from '../auth/pages';
+import { handleSsoStart, handleSsoCallback } from '../auth/oidc';
+import { getSsoConfigBySlug, ssoStartPath } from '../auth/sso-config';
+import { parseSubdomainFromEnv } from '../subdomain';
 
 export async function routeAuth(ctx: FetchContext): Promise<Response | null> {
   try {
@@ -229,13 +232,25 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
 
   if (path === '/auth/login' && request.method === 'GET') {
     const redirect = url.searchParams.get('redirect') || '/home';
+    const loginHint = url.searchParams.get('login_hint');
+    const slug = parseSubdomainFromEnv(url.hostname, env).workspaceSlug;
+    const sso = slug ? await getSsoConfigBySlug(env, slug) : null;
     return appLoginPage({
       redirect,
       turnstileSiteKey: env.TURNSTILE_CLOUDFLARE_SITEKEY,
       googleEnabled: googleOAuthConfigured(env),
-      loginHint: url.searchParams.get('login_hint'),
+      loginHint,
       emailConfigured: Boolean(env.EMAIL),
+      sso: sso ? { label: sso.buttonLabel, href: ssoStartPath(sso.workspaceSlug, redirect, loginHint), enforced: sso.enforced } : null,
     });
+  }
+
+  if (path === '/auth/sso' && request.method === 'GET') {
+    return handleSsoStart(request, env);
+  }
+
+  if (path === '/auth/sso/callback' && request.method === 'GET') {
+    return handleSsoCallback(request, env, ctx.executionCtx);
   }
 
   if (path === '/auth/google') {

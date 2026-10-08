@@ -21,6 +21,7 @@ import { userRow, artifactRow, renderAdminFragment } from '../../superadmin/page
 import { searchWorkspaces } from '../../superadmin/workspaces-admin';
 import { provisionWorkspace, setWorkspaceMemberRole } from '../../superadmin/workspaces-provision';
 import { buildInstanceConfig } from '../../superadmin/instance-config';
+import { getWorkspaceSso, putWorkspaceSso, deleteWorkspaceSso } from '../../superadmin/workspace-sso';
 import { getInstanceDefaultGatewayModel } from '../../data/agent/ai-config';
 import { renderFeatureGrid } from '../../superadmin/features-view';
 import { isKnownFeature } from '../../features/registry';
@@ -119,6 +120,24 @@ export async function routeAdminApi(ctx: FetchContext): Promise<Response | null>
   if (wsMemberMatch && request.method === 'POST') {
     const body = await request.json<{ email?: string; role?: string }>().catch(() => ({}));
     const result = await setWorkspaceMemberRole(env, admin, wsMemberMatch[1], body);
+    return jsonResponse(result.body, result.status);
+  }
+
+  // GET|PUT|DELETE /v1/admin/workspaces/{id}/sso — the workspace's OIDC sign-in (Okta, …).
+  // Instance-owner only: the IdP asserts emails on `email_domains`, so letting a workspace
+  // admin set it would let them sign in as anyone on those domains.
+  const wsSsoMatch = path.match(/^\/v1\/admin\/workspaces\/([^/]+)\/sso$/);
+  if (wsSsoMatch && request.method === 'GET') {
+    const result = await getWorkspaceSso(env, wsSsoMatch[1]);
+    return jsonResponse(result.body, result.status);
+  }
+  if (wsSsoMatch && request.method === 'PUT') {
+    const body = await request.json<Record<string, unknown>>().catch(() => ({}));
+    const result = await putWorkspaceSso(env, admin, wsSsoMatch[1], body);
+    return jsonResponse(result.body, result.status);
+  }
+  if (wsSsoMatch && request.method === 'DELETE') {
+    const result = await deleteWorkspaceSso(env, admin, wsSsoMatch[1]);
     return jsonResponse(result.body, result.status);
   }
 

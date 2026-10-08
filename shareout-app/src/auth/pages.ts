@@ -82,10 +82,28 @@ export function appLoginPage(opts: {
   loginHint?: string | null;
   /** EMAIL binding present. Without it, OTP codes only reach the worker log. */
   emailConfigured?: boolean;
+  /** This workspace subdomain signs in through its own IdP; `enforced` hides every other method. */
+  sso?: { label: string; href: string; enforced: boolean } | null;
 }): Response {
   const redirect = opts.redirect && opts.redirect.startsWith('/') ? opts.redirect : '/home';
   const googleEnabled = opts.googleEnabled === true;
   const emailConfigured = opts.emailConfigured !== false;
+  const sso = opts.sso || null;
+
+  if (sso?.enforced) {
+    return renderAuthPage('Sign in - ShareOut', `
+  <div class="card">
+    <div class="icon icon-primary">✦</div>
+    <h1>Sign in</h1>
+    <p>Your organization signs in with single sign-on.</p>
+    <div class="auth-methods">
+    ${ssoButtonHtml(sso)}
+    </div>
+    <div class="footer">
+      Powered by <a href="/" class="footer-brand">${brandMarkImg('footer-mark', 16)}ShareOut</a>
+    </div>
+  </div>`);
+  }
 
   // Password first: it is the one method that works on every instance. A one-time
   // code needs mail delivery, and offering it as the primary route on an instance
@@ -104,6 +122,7 @@ export function appLoginPage(opts: {
     <h1>Sign in</h1>
     <p>Use your email and password${googleEnabled ? ', or Google,' : ''} to continue.</p>
     <div class="auth-methods">
+    ${sso ? ssoButtonHtml(sso) : ''}
     ${googleEnabled ? googleButtonHtml(redirect, opts.loginHint) : ''}
     ${googleEnabled ? '<div class="auth-divider"><span>or</span></div>' : ''}
     ${passwordFormHtml()}
@@ -115,6 +134,10 @@ export function appLoginPage(opts: {
   </div>
   ${passwordLoginScript(redirect)}
   ${emailOtpScript(redirect)}`);
+}
+
+function ssoButtonHtml(sso: { label: string; href: string }): string {
+  return `<a href="${escapeHtml(sso.href)}" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(sso.label)}</a>`;
 }
 
 function passwordFormHtml(): string {
@@ -152,6 +175,7 @@ function passwordLoginScript(redirectAfter: string): string {
       return r.json().then(function (d) { return { ok: r.ok, data: d }; });
     }).then(function (res) {
       if (res.ok && res.data.ok) { window.location.href = ${dest}; return; }
+      if (res.data.redirect_url) { window.location.href = res.data.redirect_url; return; }
       btn.disabled = false;
       status.hidden = false;
       status.className = 'status status--error';
@@ -258,6 +282,10 @@ function emailOtpScript(redirectAfter: string): string {
           body: JSON.stringify({ email: email, turnstileToken: tsEl ? tsEl.value : undefined })
         });
         var data = await readJson(response);
+        if (data.redirect_url) {
+          window.location.href = data.redirect_url;
+          return;
+        }
         if (!response.ok || !data.ok) {
           throw new Error(data.error || "Couldn't send a code. Try again.");
         }

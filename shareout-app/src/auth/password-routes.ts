@@ -15,6 +15,7 @@ import type { FetchContext } from '../router/context';
 import { getSessionUser } from './index';
 import { getTokenOrSessionUser } from '../router/helpers/auth-guard';
 import { createSessionCookieForUser } from './session';
+import { ssoRequiredFor, ssoRequiredBody } from './sso-config';
 import { needsSetup, schemaReady } from '../pages/setup';
 import { checkPasswordLoginLimit, rateLimitResponse } from '../rate-limit';
 import { scheduleSeedStarterKit } from '../starter-kit';
@@ -107,6 +108,9 @@ export async function handlePasswordLogin(ctx: FetchContext): Promise<Response> 
   // One message for every failure — unknown address, no password set, wrong
   // password. Anything more specific is an account-enumeration oracle.
   if (!user) return json({ ok: false, error: 'That email and password do not match.' }, 401);
+
+  const sso = await ssoRequiredFor(ctx.env, user.email);
+  if (sso) return json(ssoRequiredBody(sso, user.email), 403);
 
   if (user.firstActivation) {
     scheduleWorkspaceWelcome(ctx.env, user.id, user.email, ctx.executionCtx);

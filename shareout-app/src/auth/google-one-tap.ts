@@ -7,6 +7,7 @@ import { verifyGoogleIdToken } from './google-id-token';
 import { jsonResponse } from './json-response';
 import { resolveSessionMaxAge } from './session';
 import { upsertUser } from './users';
+import { ssoRequiredFor, ssoRequiredBody } from './sso-config';
 
 /** Sign in with Google One Tap (ID-token flow). */
 export async function handleGoogleOneTap(request: Request, env: Env): Promise<Response> {
@@ -33,6 +34,9 @@ export async function handleGoogleOneTap(request: Request, env: Env): Promise<Re
   if (!claims.email || !emailVerified) {
     return jsonResponse({ error: 'Email not verified' }, 403);
   }
+
+  const sso = await ssoRequiredFor(env, claims.email);
+  if (sso) return jsonResponse(ssoRequiredBody(sso, claims.email), 403);
 
   const user = await upsertUser(env, {
     id: claims.sub,

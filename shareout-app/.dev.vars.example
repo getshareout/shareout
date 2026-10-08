@@ -31,6 +31,10 @@ SESSION_SECRET=
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 
+# --- Optional: workspace SSO (Okta / OIDC) + encrypted connector credentials ---
+# Needed before PUT /v1/admin/workspaces/:id/sso. By hand: openssl rand -hex 32
+# CREDENTIALS_KEY=
+
 # --- Optional: publish scripts / API tests ---
 SHAREOUT_API_TOKEN=
 
