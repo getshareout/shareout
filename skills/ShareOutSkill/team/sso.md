@@ -65,3 +65,11 @@ Addresses on the workspace's domains must use SSO everywhere on the instance: pa
 email code and Google sign-in are refused with code `SSO_REQUIRED`, and the login page
 forwards them to the IdP (`redirect_url`). The workspace subdomain's login page shows
 only the SSO button.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Okta shows its own `400 access_denied` page; ShareOut's callback is never hit | Okta's app sign-on policy denied the user. System Log reads "policy requirements could not be satisfied by the users' current set of available authenticator enrollments" (Catch-all Rule → DENY) | Customer's Okta admin: app → **Sign On** → authentication policy that the users can satisfy, or a rule allowing their enrolled authenticators |
+| Okta says the user is not assigned to the client application | No assignment | App → **Assignments** → assign the people or groups |
+| Save returns `ISSUER_UNREACHABLE` / issuer mismatch | `-admin` console URL used as issuer | Use `https://{org}.okta.com`, without `-admin` |
