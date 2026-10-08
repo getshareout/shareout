@@ -50,11 +50,11 @@ import { isSheetsAuthCallback, isGitHubAuthCallback } from '../oauth-callback';
 import type { FetchContext } from './context';
 import { isLocalRequest } from './helpers/is-local-request';
 import { getTokenOrSessionUser } from './helpers/auth-guard';
-import { jsonError } from './helpers/json-response';
+import { jsonError, jsonResponse } from './helpers/json-response';
 import { googleOAuthConfigured } from '../config/auth-providers';
 import { appLoginPage } from '../auth/pages';
 import { handleSsoStart, handleSsoCallback } from '../auth/oidc';
-import { getSsoConfigBySlug, ssoStartPath } from '../auth/sso-config';
+import { getSsoConfigBySlug, getSsoConfigForEmail, ssoStartPath } from '../auth/sso-config';
 import { parseSubdomainFromEnv } from '../subdomain';
 
 export async function routeAuth(ctx: FetchContext): Promise<Response | null> {
@@ -243,6 +243,16 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
       emailConfigured: Boolean(env.EMAIL),
       sso: sso ? { label: sso.buttonLabel, href: ssoStartPath(sso.workspaceSlug, redirect, loginHint), enforced: sso.enforced } : null,
     });
+  }
+
+  // Email-first sign-in: which SSO (if any) owns this address's domain. Answers per
+  // domain, never per account, so it is not an enumeration oracle.
+  if (path === '/v1/auth/sso/lookup' && request.method === 'GET') {
+    const email = (url.searchParams.get('email') || '').trim().toLowerCase();
+    const sso = email.includes('@') ? await getSsoConfigForEmail(env, email) : null;
+    return addCORS(jsonResponse({
+      sso: sso ? { label: sso.buttonLabel, enforced: sso.enforced, url: ssoStartPath(sso.workspaceSlug, null, email) } : null,
+    }));
   }
 
   if (path === '/auth/sso' && request.method === 'GET') {

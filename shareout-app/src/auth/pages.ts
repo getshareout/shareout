@@ -146,11 +146,12 @@ function passwordFormHtml(): string {
         <label class="field-label" for="password-email">Email address</label>
         <input id="password-email" type="email" name="email" autocomplete="username" placeholder="you@company.com" required>
       </div>
-      <div class="field">
+      <a id="password-sso" class="so-c-btn so-c-btn--primary so-c-btn--block" href="#" hidden></a>
+      <div class="field" id="password-field">
         <label class="field-label" for="password-value">Password</label>
         <input id="password-value" type="password" name="password" autocomplete="current-password" required>
       </div>
-      <button type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">Sign in</button>
+      <button id="password-submit" type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">Sign in</button>
       <div id="password-status" class="status" role="status" aria-live="polite" hidden></div>
     </form>`;
 }
@@ -162,6 +163,38 @@ function passwordLoginScript(redirectAfter: string): string {
   var form = document.getElementById('password-login');
   var status = document.getElementById('password-status');
   if (!form) return;
+
+  // Email first: an address on a workspace's SSO domain gets that IdP's button, and when
+  // the workspace is SSO-only the password field goes away instead of asking for a
+  // password the person does not have.
+  var ssoLink = document.getElementById('password-sso');
+  var pwField = document.getElementById('password-field');
+  var pwSubmit = document.getElementById('password-submit');
+  var lookedUp = '';
+  var timer = null;
+  function showSso(sso) {
+    ssoLink.hidden = !sso;
+    var enforced = !!(sso && sso.enforced);
+    pwField.hidden = enforced;
+    pwSubmit.hidden = enforced;
+    form.password.required = !enforced;
+    if (sso) {
+      ssoLink.textContent = sso.label;
+      ssoLink.href = sso.url + '&redirect=' + encodeURIComponent(${dest});
+    }
+  }
+  function lookup() {
+    var email = form.email.value.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { lookedUp = ''; showSso(null); return; }
+    if (email === lookedUp) return;
+    lookedUp = email;
+    fetch('/v1/auth/sso/lookup?email=' + encodeURIComponent(email))
+      .then(function (r) { return r.ok ? r.json() : { sso: null }; })
+      .then(function (d) { if (lookedUp === email) showSso(d.sso); })
+      .catch(function () { showSso(null); });
+  }
+  form.email.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(lookup, 350); });
+  form.email.addEventListener('change', lookup);
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     var btn = form.querySelector('button[type=submit]');
