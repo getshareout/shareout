@@ -1,6 +1,7 @@
 import type { Env } from '../types';
 import { getBuildChain, isProviderLevelStatus, providerHeaders, type AIConfig } from '../data/agent/anthropic';
 import { logCrewProviderFailure, userFacingCrewProviderError } from './errors';
+import { thinkingOffParams } from '../data/agent/models';
 
 // Provider-neutral tool-calling turn. The run loop keeps a neutral transcript;
 // each provider serializes it to its own wire format: the OpenAI-compatible
@@ -258,7 +259,7 @@ export class AnthropicCrewProvider implements CrewProvider {
       ...(args.tools.length
         ? { tools: args.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema })) }
         : {}),
-      thinking: { type: 'disabled' },
+      ...thinkingOffParams(this.model),
       cache_control: { type: 'ephemeral' },
       stream: true,
     });
