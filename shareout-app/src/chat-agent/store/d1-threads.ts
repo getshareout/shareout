@@ -85,8 +85,8 @@ export class WebThreadStore {
     const cursor = before || '9';
     const rows = await this.env.DB.prepare(
       `SELECT role, content, created_at FROM agent_messages
-        WHERE thread_id = ? AND created_at < ?
-        ORDER BY created_at DESC LIMIT ?`
+        WHERE thread_id = ? AND created_at < ? AND role != 'system'
+        ORDER BY created_at DESC, rowid DESC LIMIT ?`
     ).bind(id, cursor, limit).all<{ role: string; content: string; created_at: string }>();
     return rows.results
       .reverse()

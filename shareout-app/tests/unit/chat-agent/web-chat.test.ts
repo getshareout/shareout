@@ -109,3 +109,19 @@ describe('WebThreadStore', () => {
     expect(msgs?.map((m) => m.content)).toEqual(['a', 'b']); // reversed to chronological
   });
 });
+
+describe('tool notes storage', () => {
+  it('stores notes as system rows, loads them back as notes, and hides them from thread replay', async () => {
+    const { db, calls } = makeDb([{ match: 'SELECT role, content FROM agent_messages', all: { results: [{ role: 'system', content: '- echo' }] } }]);
+    const store = new D1ConversationStore({ DB: db } as Env, 'ws1', 'u1', 'wat_abc');
+
+    await store.appendNotes('- echo');
+    const insert = calls.find((c) => c.sql.includes('INSERT INTO agent_messages'))!;
+    expect(insert.args.slice(1)).toEqual(['wat_abc', 'system', '- echo']);
+    expect(await store.loadHistory(20)).toEqual([{ role: 'notes', content: '- echo' }]);
+
+    const threads = makeDb([{ match: 'FROM agent_threads', first: { 1: 1 } }]);
+    await new WebThreadStore({ DB: threads.db } as Env, 'ws1', 'u1').messages('wat_abc', 50);
+    expect(threads.calls.find((c) => c.sql.includes('FROM agent_messages'))!.sql).toContain("role != 'system'");
+  });
+});

@@ -152,6 +152,7 @@ export class ChatSessionDO implements DurableObject {
     }
 
     await this.store.appendMessage('user', b.text);
+    if (result.toolNotes) await this.store.appendNotes?.(result.toolNotes);
 
     if (result.proposal) {
       const token = generateId('pa');

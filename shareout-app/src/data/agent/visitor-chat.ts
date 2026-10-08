@@ -122,7 +122,7 @@ export async function handleVisitorChat(
     : await VisitorStore.create(ctx.env, ctx.artifactId, body.message);
   const conversationId = store.id;
   const messages: Array<{ role: 'user' | 'assistant'; content: string }> = body.conversationId
-    ? await store.loadHistory()
+    ? (await store.loadHistory()).filter((m): m is { role: 'user' | 'assistant'; content: string } => m.role !== 'notes')
     : [];
 
   // Add user message. If the page supplied per-message `context` (live/external

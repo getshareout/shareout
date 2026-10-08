@@ -5,6 +5,7 @@ const h = vi.hoisted(() => ({
   script: [] as unknown[][],
   nullProvider: false,
   transcripts: [] as unknown[],
+  toolNames: [] as string[][],
   admin: false,
   logError: vi.fn(),
 }));
@@ -16,8 +17,9 @@ vi.mock('../../../src/crew/provider', () => ({
       : {
           provider: 'mock',
           model: 'mock',
-          async *streamTurn(args: { transcript: unknown[] }) {
+          async *streamTurn(args: { transcript: unknown[]; tools: Array<{ name: string }> }) {
             h.transcripts.push(JSON.parse(JSON.stringify(args.transcript)));
+            h.toolNames.push(args.tools.map((t) => t.name));
             const turn = h.script.shift() ?? [];
             for (const ev of turn) yield ev;
           },
@@ -54,6 +56,7 @@ beforeEach(() => {
   h.script = [];
   h.nullProvider = false;
   h.transcripts = [];
+  h.toolNames = [];
   h.admin = false;
   h.logError.mockReset();
 });
@@ -165,5 +168,68 @@ describe('runAgentTurn', () => {
       extraTools: [{ ...throwingTool(new Error('x')), name: 'nope', execute: async () => ({ ok: true }) } as unknown as AccountTool],
     });
     expect(res.reply).toBe('Done');
+  });
+});
+
+const echoTool = {
+  name: 'echo_tool',
+  description: 'echo',
+  input_schema: { type: 'object', properties: {} },
+  execute: async () => ({ ok: true, id: 'art_1' }),
+} as unknown as AccountTool;
+const call = (id: string, name: string, toolInput: Record<string, unknown> = {}) => ({ type: 'tool_use', id, name, input: toolInput });
+
+describe('runAgentTurn tool tree', () => {
+  it('starts with core tools plus open_toolkit, and unlocks a toolkit for the rest of the turn', async () => {
+    h.script = [
+      [call('t1', 'open_toolkit', { toolkits: ['data'] }), stop('tool_use')],
+      [{ type: 'text_delta', text: 'done' }, stop('end_turn')],
+    ];
+
+    await runAgentTurn({} as Env, input('numbers?'));
+
+    expect(h.toolNames[0]).toContain('open_toolkit');
+    expect(h.toolNames[0]).toContain('read_artifact');
+    expect(h.toolNames[0]).not.toContain('run_data_source');
+    expect(h.toolNames[1]).toContain('run_data_source');
+    const result = (h.transcripts[1] as Array<{ role: string; results?: Array<{ content: string }> }>).at(-1)!;
+    expect(JSON.parse(result.results![0].content).tools).toContain('query_connection');
+  });
+});
+
+describe('runAgentTurn memory and budgets', () => {
+  it('returns tool notes and replays them into the next turn', async () => {
+    h.script = [
+      [call('t1', 'echo_tool', { q: 'cpm' }), stop('tool_use')],
+      [{ type: 'text_delta', text: 'Found it' }, stop('end_turn')],
+    ];
+    const res = await runAgentTurn({} as Env, { ...input('find cpm'), extraTools: [echoTool] });
+    expect(res.toolNotes).toContain('echo_tool {"q":"cpm"}');
+    expect(res.toolNotes).toContain('art_1');
+
+    h.transcripts = [];
+    h.script = [[{ type: 'text_delta', text: 'ok' }, stop('end_turn')]];
+    await runAgentTurn({} as Env, {
+      ...input('and now?'),
+      history: [
+        { role: 'user', content: 'find cpm' },
+        { role: 'notes', content: res.toolNotes! },
+        { role: 'assistant', content: 'Found it' },
+      ],
+    });
+    const replayed = (h.transcripts[0] as Array<{ role: string; text?: string }>)[1];
+    expect(replayed.role).toBe('assistant');
+    expect(replayed.text).toContain('Tool notes:');
+    expect(replayed.text).toContain('art_1');
+  });
+
+  it('wraps up with a tool-less answer when it runs out of steps', async () => {
+    h.script = Array.from({ length: 12 }, (_, i) => [call(`t${i}`, 'echo_tool'), stop('tool_use')]);
+    h.script.push([{ type: 'text_delta', text: 'Here is what I found so far.' }, stop('end_turn')]);
+
+    const res = await runAgentTurn({} as Env, { ...input('dig'), extraTools: [echoTool] });
+
+    expect(res.reply).toBe('Here is what I found so far.');
+    expect(h.toolNames.at(-1)).toEqual([]);
   });
 });

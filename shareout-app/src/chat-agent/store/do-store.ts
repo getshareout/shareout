@@ -16,11 +16,15 @@ export class DoConversationStore implements ConversationStore {
       .toArray() as Array<{ role: string; content: string }>;
     return rows
       .reverse()
-      .map((r) => ({ role: r.role === 'assistant' ? 'assistant' : 'user', content: r.content }));
+      .map((r) => ({ role: r.role === 'assistant' || r.role === 'notes' ? r.role : 'user', content: r.content }));
   }
 
   async appendMessage(role: 'user' | 'assistant', content: string): Promise<void> {
     this.sql.exec('INSERT INTO messages (role, content, created_at) VALUES (?, ?, ?)', role, content, Date.now());
+  }
+
+  async appendNotes(content: string): Promise<void> {
+    this.sql.exec('INSERT INTO messages (role, content, created_at) VALUES (?, ?, ?)', 'notes', content, Date.now());
   }
 
   async putPending(token: string, rec: PendingRecord): Promise<void> {
