@@ -10,7 +10,8 @@
  *     "hint"?: string,
  *     "suggestion"?: string,
  *     "param"?: string,
- *     "docs"?: string
+ *     "docs"?: string,
+ *     "redirect_url"?: string
  *   }
  *
  * - `code` is stable for clients; do not overload it with free-form text.
@@ -26,6 +27,8 @@ export interface ApiErrorFields {
   suggestion?: string;
   param?: string;
   docs?: string;
+  /** Where a browser client should go to finish the action (e.g. the workspace's SSO). */
+  redirect_url?: string;
 }
 
 export interface ApiErrorBody {
@@ -37,6 +40,7 @@ export interface ApiErrorBody {
   suggestion?: string;
   param?: string;
   docs?: string;
+  redirect_url?: string;
 }
 
 export interface ApiErrorResponseOptions {
@@ -62,6 +66,7 @@ export function buildApiErrorBody(
   if (fields.suggestion) body.suggestion = fields.suggestion;
   if (fields.param) body.param = fields.param;
   if (fields.docs) body.docs = fields.docs;
+  if (fields.redirect_url) body.redirect_url = fields.redirect_url;
   return body;
 }
 
@@ -129,6 +134,7 @@ export function jsonWithApiErrors(
       suggestion?: string;
       param?: string;
       docs?: string;
+      redirect_url?: string;
     };
     response = apiErrorResponse(
       {
@@ -139,6 +145,7 @@ export function jsonWithApiErrors(
         suggestion: d.suggestion,
         param: d.param,
         docs: d.docs,
+        redirect_url: d.redirect_url,
       },
       { headers: extraHeaders }
     );

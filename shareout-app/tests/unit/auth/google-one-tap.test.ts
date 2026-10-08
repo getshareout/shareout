@@ -7,12 +7,17 @@ const upsertUser = vi.hoisted(() => vi.fn());
 const autoJoinWorkspacesByDomain = vi.hoisted(() => vi.fn());
 const createSessionToken = vi.hoisted(() => vi.fn());
 const resolveSessionMaxAge = vi.hoisted(() => vi.fn());
+const ssoRequiredFor = vi.hoisted(() => vi.fn().mockResolvedValue(null));
 
 vi.mock('../../../src/auth/google-id-token', () => ({ verifyGoogleIdToken }));
 vi.mock('../../../src/auth/users', () => ({ upsertUser }));
 vi.mock('../../../src/workspaces', () => ({ autoJoinWorkspacesByDomain }));
 vi.mock('../../../src/token', () => ({ createSessionToken }));
 vi.mock('../../../src/auth/session', () => ({ resolveSessionMaxAge }));
+vi.mock('../../../src/auth/sso-config', async (orig) => ({
+  ...(await orig<typeof import('../../../src/auth/sso-config')>()),
+  ssoRequiredFor,
+}));
 
 import { handleGoogleOneTap } from '../../../src/auth/google-one-tap';
 
@@ -57,6 +62,18 @@ describe('handleGoogleOneTap', () => {
     const res = await post({ credential: 'tok' });
     expect(res.status).toBe(403);
     expect((await res.json() as { error: string }).error).toMatch(/not verified/i);
+  });
+
+  it('403s and points at SSO when the domain is Okta-only', async () => {
+    verifyGoogleIdToken.mockResolvedValueOnce({
+      sub: 'g1', email: 'u@x.com', email_verified: true,
+      aud: 'client-id', iss: 'https://accounts.google.com', exp: 9e9,
+    });
+    ssoRequiredFor.mockResolvedValueOnce({ workspaceSlug: 'acme', buttonLabel: 'Sign in with Okta' });
+    const res = await post({ credential: 'tok' });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'SSO_REQUIRED', redirect_url: '/auth/sso?workspace=acme&login_hint=u%40x.com' });
+    expect(upsertUser).not.toHaveBeenCalled();
   });
 
   it('mints a session cookie on success', async () => {

@@ -166,6 +166,9 @@ openssl rand -hex 32 | npx wrangler secret put SESSION_SECRET
 npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put GOOGLE_CLIENT_SECRET
 
+# Workspace SSO (Okta / OIDC) — also encrypts connector credentials
+openssl rand -hex 32 | npx wrangler secret put CREDENTIALS_KEY   # then team/sso.md
+
 # Vars (dashboard or wrangler.toml [vars])
 # SHAREOUT_BASE_URL=https://…
 # SETUP_ADMIN_EMAIL=you@company.com

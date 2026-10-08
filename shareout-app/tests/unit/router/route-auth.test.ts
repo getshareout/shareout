@@ -4,6 +4,12 @@ import { createFetchContext } from '../../../src/router/context';
 import { routeAuth } from '../../../src/router/auth-router';
 
 const handleSessionInfo = vi.hoisted(() => vi.fn());
+const getSsoConfigForEmail = vi.hoisted(() => vi.fn());
+
+vi.mock('../../../src/auth/sso-config', async (orig) => ({
+  ...(await orig<typeof import('../../../src/auth/sso-config')>()),
+  getSsoConfigForEmail,
+}));
 
 vi.mock('../../../src/auth-otp', () => ({
   handleEmailOtpStart: vi.fn().mockResolvedValue(new Response('ok')),
@@ -104,5 +110,18 @@ describe('routeAuth', () => {
       path: '/v1/auth/session',
       error_message: 'boom',
     });
+  });
+
+  it('looks up the SSO that owns an email domain for the email-first login form', async () => {
+    getSsoConfigForEmail.mockResolvedValueOnce({ workspaceSlug: 'acme', buttonLabel: 'Sign in with Okta', enforced: true });
+    const res = await routeAuth(ctx('/v1/auth/sso/lookup?email=Ana%40Acme.com'));
+    expect(getSsoConfigForEmail).toHaveBeenCalledWith(env, 'ana@acme.com');
+    expect(await res!.json()).toEqual({
+      sso: { label: 'Sign in with Okta', enforced: true, url: '/auth/sso?workspace=acme&login_hint=ana%40acme.com' },
+    });
+
+    getSsoConfigForEmail.mockResolvedValueOnce(null);
+    expect(await (await routeAuth(ctx('/v1/auth/sso/lookup?email=x%40example.com')))!.json()).toEqual({ sso: null });
+    expect(await (await routeAuth(ctx('/v1/auth/sso/lookup?email=not-an-email')))!.json()).toEqual({ sso: null });
   });
 });
