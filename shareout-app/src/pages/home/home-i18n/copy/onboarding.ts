@@ -65,7 +65,7 @@ export const ONBOARDING_COPY: HomeLocaleCopy = {
     'onb.greet': 'Bienvenido, {name}. Preparemos tu espacio — unos pasos rápidos y quedás en vivo.',
     'onb.greetNoName': 'Bienvenido. Preparemos tu espacio — unos pasos rápidos y quedás en vivo.',
     'onb.hide': 'Ocultar',
-    'onb.progress': '{done} de {total} listo',
+    'onb.progress': '{done} de {total} listos',
     'onb.seed.alert': 'Guiame para configurar una alerta que me avise cuando una métrica cruza un umbral.',
     'onb.seed.firstArtifact': 'Ayudame a crear mi primera página. Preguntame qué debería mostrar y creala.',
     'onb.seed.tryAssistant': 'Dame una cosa que pueda crear con ShareOut ahora mismo y creémosla juntos.',

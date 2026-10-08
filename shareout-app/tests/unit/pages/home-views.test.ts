@@ -19,10 +19,10 @@ import lensRoutingTs from '../../../src/pages/home/render-workspace/client-scrip
 import homeViewsBarrel from '../../../src/pages/home/render-workspace/client-script/home-views.ts?raw';
 
 /** Captured at split time — guards against accidental client-script drift.
- *  Re-pinned after the Library skills overhaul (search/filter, authoring, review
- *  and install actions in the skills lens). */
-const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 584_533;
-const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '42b98264380661b5c1e7de2b2b53f307c26cdeea4e4a8039c07975af5068274e';
+ *  Re-pinned after the Home chat dock revamp (pill + dialog sheet, textarea composer,
+ *  progressive markdown, error rows, thread menu; agent-format/agent-threads split). */
+const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 597_636;
+const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '7e237cde0285cd69dbe51ddb30060d87ae2bff0d4a76e6a0faaf80d288383379';
 const HOME_VIEWS_MARKER = '  // ===== rail nav → Home pane views =====';
 
 const SECTION_SOURCES: [string, string][] = [
