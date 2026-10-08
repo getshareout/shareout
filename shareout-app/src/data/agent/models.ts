@@ -4,7 +4,7 @@
 export const OPENAI_CHAT_MODEL = 'gpt-4o';
 
 export const CLAUDE_OPUS = { id: 'claude-opus-5', gateway: 'anthropic/claude-opus-5' } as const;
-export const CLAUDE_SONNET = { id: 'claude-sonnet-5', gateway: 'anthropic/claude-sonnet-5' } as const;
+export const CLAUDE_SONNET = { id: 'claude-sonnet-5-5', gateway: 'anthropic/claude-sonnet-5.5' } as const;
 export const CLAUDE_HAIKU = { id: 'claude-haiku-4-5-20251001', gateway: 'anthropic/claude-haiku-4.5' } as const;
 
 /** Default Claude model for agents, builds and per-artifact chat. */

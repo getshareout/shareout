@@ -9,7 +9,7 @@ const AI_STREAM_TIMEOUT_MS = 60000;
 export const AGENT_CHAT_MODEL = OPENAI_CHAT_MODEL;
 const OPENAI_MODEL = AGENT_CHAT_MODEL;
 /** Default Vercel AI Gateway model id, used unless a workspace or the instance picks its own. */
-export const DEFAULT_GATEWAY_MODEL = 'deepseek/deepseek-v4.1-flash';
+export const DEFAULT_GATEWAY_MODEL = DEFAULT_CLAUDE_MODEL.gateway;
 const VERCEL_GATEWAY_URL = 'https://ai-gateway.vercel.sh/v1';
 export const ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
 export const ANTHROPIC_VERSION = '2023-06-01';

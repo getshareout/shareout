@@ -38,9 +38,9 @@ To change the order, set `AI_PROVIDER_ORDER` to a comma-separated list, e.g.
 `anthropic,openai`. Configured providers you leave out still follow, in the default order.
 
 Models: on the gateway, the assistant, crews and page builds all use the same model —
-`deepseek/deepseek-v4.1-flash` by default (see [Pick a model](#pick-a-model) to change
+`anthropic/claude-sonnet-5.5` by default (see [Pick a model](#pick-a-model) to change
 it without touching code — a workspace or instance choice there takes priority). On
-Anthropic direct, everything uses Claude Sonnet 5 (`claude-sonnet-5`); on OpenAI direct,
+Anthropic direct, everything uses Claude Sonnet 5.5 (`claude-sonnet-5-5`); on OpenAI direct,
 `gpt-4o`. `BUILD_MODEL` is a build-agent-only fallback below that. Model ids live in
 `src/data/agent/models.ts`.
 
@@ -113,7 +113,7 @@ curl -sS -X PUT "$ORIGIN/v1/admin/ai-settings" \
 ```
 
 Precedence: a workspace's own model wins, then the instance default, then the hardcoded
-`deepseek/deepseek-v4.1-flash`. `DELETE .../llm/model` (or `defaultGatewayModel: null`)
+`anthropic/claude-sonnet-5.5`. `DELETE .../llm/model` (or `defaultGatewayModel: null`)
 clears an override back to the next fallback. Both also have a dropdown — Settings → AI
 in a workspace, and `/admin?view=instance` → **Default AI model** for the instance.
 This only applies to the `vercel-gateway` provider entry; the Anthropic- and

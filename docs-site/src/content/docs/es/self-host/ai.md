@@ -38,9 +38,9 @@ Para cambiar el orden, definí `AI_PROVIDER_ORDER` como lista separada por comas
 por defecto.
 
 Modelos: en el gateway, el asistente, los agentes y la generación de páginas usan el mismo
-modelo — `deepseek/deepseek-v4.1-flash` por defecto (ver [Elegir un modelo](#elegir-un-modelo)
+modelo — `anthropic/claude-sonnet-5.5` por defecto (ver [Elegir un modelo](#elegir-un-modelo)
 para cambiarlo sin tocar código; una elección de workspace o instancia tiene prioridad).
-En Anthropic directo todo usa Claude Sonnet 5 (`claude-sonnet-5`); en OpenAI directo,
+En Anthropic directo todo usa Claude Sonnet 5.5 (`claude-sonnet-5-5`); en OpenAI directo,
 `gpt-4o`. `BUILD_MODEL` sigue siendo un fallback solo para el agente de build, por debajo
 de eso. Los ids de modelo viven en `src/data/agent/models.ts`.
 
@@ -114,7 +114,7 @@ curl -sS -X PUT "$ORIGIN/v1/admin/ai-settings" \
 ```
 
 Prioridad: el modelo propio de un workspace gana, después el default de la instancia,
-después el fijo `deepseek/deepseek-v4.1-flash`. `DELETE .../llm/model` (o
+después el fijo `anthropic/claude-sonnet-5.5`. `DELETE .../llm/model` (o
 `defaultGatewayModel: null`) borra un override y cae al siguiente. Ambos también tienen
 un desplegable — Configuración → IA en un workspace, y `/admin?view=instance` →
 **Modelo de IA por defecto** para la instancia. Esto solo aplica a la entrada del

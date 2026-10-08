@@ -37,7 +37,7 @@ describe('buildInstanceConfig', () => {
       providers: ['openai'],
       byo_keys: true,
       default_gateway_model: null,
-      default_gateway_model_fallback: 'deepseek/deepseek-v4.1-flash',
+      default_gateway_model_fallback: 'anthropic/claude-sonnet-5.5',
     });
     expect(cfg.auth).toMatchObject({ password: true, google: false, email_otp_delivery: 'email' });
     expect(cfg.gaps).toEqual([]);

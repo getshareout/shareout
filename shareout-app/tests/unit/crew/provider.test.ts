@@ -163,7 +163,7 @@ describe('getCrewProvider', () => {
   it('uses the native Anthropic provider when only ANTHROPIC_API_KEY is set', () => {
     const p = getCrewProvider({ ANTHROPIC_API_KEY: 'sk-ant' } as Env);
     expect(p).toBeInstanceOf(AnthropicCrewProvider);
-    expect(p?.model).toBe('claude-sonnet-5');
+    expect(p?.model).toBe('claude-sonnet-5-5');
   });
 
   it('chains every configured provider in AI_PROVIDER_ORDER', () => {
