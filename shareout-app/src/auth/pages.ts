@@ -185,7 +185,7 @@ function passwordLoginScript(redirectAfter: string): string {
   }
   function lookup() {
     var email = form.email.value.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { lookedUp = ''; showSso(null); return; }
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) { lookedUp = ''; showSso(null); return; }
     if (email === lookedUp) return;
     lookedUp = email;
     fetch('/v1/auth/sso/lookup?email=' + encodeURIComponent(email))
