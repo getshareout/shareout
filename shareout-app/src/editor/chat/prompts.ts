@@ -7,6 +7,13 @@
 
 import type { EditorChatRequest } from '../types';
 
+/** Clip document HTML to `max` chars, telling the model when it is not seeing the whole page. */
+export function clipHtml(html: string | undefined, max: number): string {
+  const s = html || '';
+  if (s.length <= max) return s;
+  return `${s.substring(0, max)}\n<!-- TRUNCATED: only the first ${max} of ${s.length} characters are shown; the rest of the document exists but is not visible to you. -->`;
+}
+
 /** Render the artifact manifest as a concise data-model section for the agent. */
 function renderDataModel(manifest: EditorChatRequest['context']['manifest']): string | null {
   if (!manifest) return null;
@@ -67,7 +74,7 @@ Parent: ${context.selection.parentSelector}` : ''}`);
   const htmlMode = context.htmlMode || 'full';
   parts.push(`\nHTML${htmlMode === 'subtree' ? ' (selected area)' : ''}:
 \`\`\`html
-${context.documentHtml?.substring(0, 40000) || ''}
+${clipHtml(context.documentHtml, 40000)}
 \`\`\``);
 
   parts.push(`
@@ -121,7 +128,7 @@ ${context.inlineSelection?.textRange ? `Text range: ${context.inlineSelection.te
 
 Context HTML (surrounding area):
 \`\`\`html
-${context.documentHtml?.substring(0, 20000) || ''}
+${clipHtml(context.documentHtml, 20000)}
 \`\`\`
 
 IMPORTANT: You must respond with valid JSON only. No other text.
@@ -160,7 +167,7 @@ export function buildLassoSystemPrompt(context: EditorChatRequest['context']): s
     parts.push(`\nSELECTION BOUNDS: x:${context.lassoBounds.x}, y:${context.lassoBounds.y}, width:${context.lassoBounds.w}px, height:${context.lassoBounds.h}px`);
   }
 
-  parts.push(`\nFULL DOCUMENT HTML:\n\`\`\`html\n${context.documentHtml?.substring(0, 25000) || ''}\n\`\`\``);
+  parts.push(`\nFULL DOCUMENT HTML:\n\`\`\`html\n${clipHtml(context.documentHtml, 25000)}\n\`\`\``);
 
   parts.push(`
 RESPONSE FORMAT (JSON only):

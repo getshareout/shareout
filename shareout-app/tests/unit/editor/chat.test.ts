@@ -15,6 +15,8 @@ import {
   parseSSEEvents,
   readSSE,
 } from './chat-helpers';
+import { TRUNCATED_RESPONSE_ERROR } from '../../../src/editor/chat/streaming';
+import { DEFAULT_CLAUDE_MODEL } from '../../../src/data/agent/models';
 
 vi.mock('../../../src/crypto-utils', () => ({
   generateId: vi.fn((prefix: string) => `${prefix}_testid000000000001`),
@@ -304,7 +306,7 @@ describe('normal chat', () => {
     });
 
     const events = parseSSEEvents(await readSSE(res));
-    expect(events[0]).toMatchObject({ type: 'error', error: expect.stringContaining('429') });
+    expect(events[0]).toEqual({ type: 'error', error: 'AI service is busy. Try again shortly.' });
   });
 
   it('emits SSE error when API response has no body', async () => {
@@ -316,7 +318,7 @@ describe('normal chat', () => {
     });
 
     const events = parseSSEEvents(await readSSE(res));
-    expect(events[0]).toEqual({ type: 'error', error: 'No response' });
+    expect(events[0]).toEqual({ type: 'error', error: 'AI request failed' });
   });
 
   it('emits stream error when fetch throws', async () => {
@@ -328,7 +330,7 @@ describe('normal chat', () => {
     });
 
     const events = parseSSEEvents(await readSSE(res));
-    expect(events[0]).toEqual({ type: 'error', error: 'Stream failed' });
+    expect(events[0]).toEqual({ type: 'error', error: 'Chat failed' });
   });
 
   it('skips malformed SSE JSON lines', async () => {
@@ -357,10 +359,10 @@ describe('normal chat', () => {
       new Response(editorOpenAIDoneStream(agentReplyExplanation), { status: 200 }),
     );
 
-    await chatRequest(makeCtx(gatewayEnv()), 'normal', {
+    await readSSE(await chatRequest(makeCtx(gatewayEnv()), 'normal', {
       prompt: 'Explain',
       context: { documentHtml: '<body></body>' },
-    });
+    }));
 
     expect(fetch).toHaveBeenCalledWith(
       'https://ai-gateway.vercel.sh/v1/chat/completions',
@@ -489,7 +491,7 @@ describe('lasso chat', () => {
     });
 
     const events = parseSSEEvents(await readSSE(res));
-    expect(events[0]).toMatchObject({ type: 'error', error: expect.stringContaining('500') });
+    expect(events[0]).toEqual({ type: 'error', error: 'AI request failed' });
   });
 
   it('emits error when no AI provider for lasso', async () => {
@@ -591,10 +593,10 @@ describe('AI provider priority', () => {
       new Response(editorOpenAIDoneStream(agentReplyExplanation), { status: 200 }),
     );
 
-    await chatRequest(makeCtx(gatewayEnv()), 'normal', {
+    await readSSE(await chatRequest(makeCtx(gatewayEnv()), 'normal', {
       prompt: 'test',
       context: { documentHtml: '' },
-    });
+    }));
 
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('ai-gateway.vercel.sh'),
@@ -607,14 +609,119 @@ describe('AI provider priority', () => {
       new Response(editorAnthropicDoneStream(agentReplyExplanation), { status: 200 }),
     );
 
-    await chatRequest(makeCtx(anthropicEnv()), 'normal', {
+    await readSSE(await chatRequest(makeCtx(anthropicEnv()), 'normal', {
       prompt: 'test',
       context: { documentHtml: '' },
-    });
+    }));
 
     expect(fetch).toHaveBeenCalledWith(
       'https://api.anthropic.com/v1/messages',
       expect.anything(),
     );
+  });
+});
+
+describe('shared provider path', () => {
+  function sse(events: unknown[]): ReadableStream<Uint8Array> {
+    const encoder = new TextEncoder();
+    return new ReadableStream({
+      start(c) {
+        c.enqueue(encoder.encode(events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('')));
+        c.close();
+      },
+    });
+  }
+
+  it('turns a max-token cutoff into an error event instead of done', async () => {
+    const run = vi.fn(async () => ({ success: true }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(sse([
+      { choices: [{ delta: { content: '{"reply":"half' } }] },
+      { choices: [{ delta: {}, finish_reason: 'length' }] },
+    ]), { status: 200 }));
+
+    const res = await chatRequest(makeCtx(openaiEnv({ run })), 'normal', {
+      prompt: 'Rewrite everything',
+      context: { documentHtml: '<main></main>' },
+    });
+
+    const events = parseSSEEvents(await readSSE(res));
+    expect(events.some((e) => e.type === 'done')).toBe(false);
+    expect(events.at(-1)).toEqual({ type: 'error', error: TRUNCATED_RESPONSE_ERROR });
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('treats an Anthropic max_tokens stop as an error', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(sse([
+      { type: 'content_block_delta', delta: { type: 'text_delta', text: '{"reply":' } },
+      { type: 'message_delta', delta: { stop_reason: 'max_tokens' }, usage: { output_tokens: 8192 } },
+      { type: 'message_stop' },
+    ]), { status: 200 }));
+
+    const res = await chatRequest(makeCtx(anthropicEnv()), 'normal', {
+      prompt: 'Rewrite',
+      context: { documentHtml: '<main></main>' },
+    });
+
+    const events = parseSSEEvents(await readSSE(res));
+    expect(events.filter((e) => e.type === 'done')).toHaveLength(0);
+    expect(events.at(-1)).toEqual({ type: 'error', error: TRUNCATED_RESPONSE_ERROR });
+  });
+
+  it('emits exactly one done event', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(editorOpenAIStopStream(agentReplyExplanation), { status: 200 }),
+    );
+    const res = await chatRequest(makeCtx(openaiEnv()), 'normal', {
+      prompt: 'Explain',
+      context: { documentHtml: '<main></main>' },
+    });
+    const events = parseSSEEvents(await readSSE(res));
+    expect(events.filter((e) => e.type === 'done')).toHaveLength(1);
+  });
+
+  it('fails over to the next provider when the first is down', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('down', { status: 503 }))
+      .mockResolvedValueOnce(new Response(editorAnthropicStopStream(agentReplyExplanation), { status: 200 }));
+
+    const env = { ...gatewayEnv(), OPENAI_API_KEY: undefined } as Env;
+    const res = await chatRequest(makeCtx(env), 'normal', {
+      prompt: 'Explain',
+      context: { documentHtml: '<main></main>' },
+    });
+
+    const done = parseSSEEvents(await readSSE(res)).find((e) => e.type === 'done');
+    expect(done?.response).toMatchObject({ type: 'explanation' });
+    expect(fetchMock.mock.calls[0][0]).toContain('ai-gateway.vercel.sh');
+    expect(fetchMock.mock.calls[1][0]).toBe('https://api.anthropic.com/v1/messages');
+  });
+
+  it('uses the workspace gateway model and defaults to Claude Sonnet 5.5', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(editorOpenAIDoneStream(agentReplyExplanation), { status: 200 }),
+    );
+    await readSSE(await chatRequest(makeCtx(gatewayEnv()), 'normal', {
+      prompt: 'Explain',
+      context: { documentHtml: '' },
+    }));
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).model).toBe(DEFAULT_CLAUDE_MODEL.gateway);
+
+    fetchMock.mockClear();
+    const DB = {
+      prepare: (sql: string) => ({
+        bind: () => ({
+          first: async () => sql.includes('FROM artifacts')
+            ? { workspace_id: 'wsp_1' }
+            : sql.includes('workspace_llm_config') ? { workspace_id: 'wsp_1', gateway_model: 'openai/gpt-5' } : null,
+          all: async () => ({ results: [] }),
+          run: async () => ({ success: true }),
+        }),
+      }),
+    } as unknown as Env['DB'];
+    await readSSE(await chatRequest(makeCtx({ ...gatewayEnv(), DB } as Env), 'normal', {
+      prompt: 'Explain',
+      context: { documentHtml: '' },
+    }));
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).model).toBe('openai/gpt-5');
   });
 });

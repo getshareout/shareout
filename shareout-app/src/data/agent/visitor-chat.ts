@@ -2,7 +2,8 @@ import type { DataContext } from '../middleware';
 import { errorResponse, successResponse } from '../middleware';
 import { DATA_ERRORS } from '../../types';
 import type { AgentConfig, ChatRequest, Conversation, Message } from './types';
-import { streamChat } from './anthropic';
+import { streamChat, type AIConfig } from './anthropic';
+import { CLAUDE_HAIKU, CLAUDE_OPUS, CLAUDE_SONNET } from './models';
 import { buildVisitorContext, buildVisitorSystemPrompt } from './context';
 import { checkRateLimit, incrementRateLimit, recordUsage, recordError } from './usage';
 import { resolveAgentAiConfig, recordAgentUsage } from './ai-config';
@@ -13,6 +14,26 @@ import {
   userFacingAgentChatFailure,
   userFacingAgentStreamError,
 } from './errors';
+
+// Values the config writers filled in when the owner picked nothing. Treated as
+// unset so artifacts that never chose a model keep the workspace/instance default.
+const AUTO_FILLED_VISITOR_MODELS = new Set(['gpt-4o', 'claude-sonnet-4-20250514']);
+const CLAUDE_MODELS = [CLAUDE_OPUS, CLAUDE_SONNET, CLAUDE_HAIKU];
+
+/** Apply the owner's visitor_model to the resolved provider config when it is a model that provider can serve. */
+export function applyVisitorModel(cfg: AIConfig, model: string | null | undefined): AIConfig {
+  const m = model?.trim();
+  if (!m || AUTO_FILLED_VISITOR_MODELS.has(m)) return cfg;
+  let next: string | undefined;
+  if (cfg.provider === 'vercel-gateway') {
+    next = m.includes('/') ? m : CLAUDE_MODELS.find(c => c.id === m)?.gateway;
+  } else if (cfg.provider === 'anthropic') {
+    next = m.startsWith('anthropic/') ? CLAUDE_MODELS.find(c => c.gateway === m)?.id : m.startsWith('claude-') ? m : undefined;
+  } else {
+    next = m.startsWith('openai/') ? m.slice('openai/'.length) : !m.includes('/') && !m.startsWith('claude-') ? m : undefined;
+  }
+  return next ? { ...cfg, model: next } : cfg;
+}
 
 export async function handleVisitorChat(
   request: Request,
@@ -148,7 +169,10 @@ export async function handleVisitorChat(
   // Build context and system prompt
   const visitorContext = await buildVisitorContext(ctx, config);
   const systemPrompt = buildVisitorSystemPrompt(config.visitor_system_prompt, visitorContext);
-  const aiConfig = ai.aiConfig;
+  const aiConfig = applyVisitorModel(ai.aiConfig, config.visitor_model);
+  const temperature = typeof config.visitor_temperature === 'number' && Number.isFinite(config.visitor_temperature)
+    ? config.visitor_temperature
+    : undefined;
   const chatModel = aiConfig.model.replace(/^openai\//, '');
 
   // Stream response
@@ -166,7 +190,8 @@ export async function handleVisitorChat(
           systemPrompt,
           chatModel,
           config.visitor_max_tokens,
-          aiConfig
+          aiConfig,
+          { temperature }
         )) {
           if (chunk.type === 'content' && chunk.content) {
             fullContent += chunk.content;

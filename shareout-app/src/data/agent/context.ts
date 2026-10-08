@@ -297,6 +297,14 @@ export function buildVisitorSystemPrompt(
   return prompt;
 }
 
+export const ADMIN_FILE_CHARS = 20_000;
+export const ADMIN_FILES_TOTAL_CHARS = 60_000;
+export const ADMIN_JSON_CHARS = 20_000;
+
+function capText(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}\n…(truncated: showing ${max} of ${text.length} characters)` : text;
+}
+
 export function buildAdminSystemPrompt(context: AdminContext): string {
   let prompt = `You are an AI assistant helping the owner edit their ShareOut artifact "${context.artifact.name}".
 
@@ -314,14 +322,17 @@ When suggesting code changes:
   prompt += `\n## Artifact Files
 `;
 
+  let filesBudget = ADMIN_FILES_TOTAL_CHARS;
   for (const file of context.files) {
-    prompt += `\n### ${file.path}\n\`\`\`${getLanguageForMime(file.mime)}\n${file.content}\n\`\`\`\n`;
+    const cap = Math.min(ADMIN_FILE_CHARS, filesBudget);
+    filesBudget -= Math.min(file.content.length, cap);
+    prompt += `\n### ${file.path}\n\`\`\`${getLanguageForMime(file.mime)}\n${capText(file.content, cap)}\n\`\`\`\n`;
   }
 
   prompt += '\n' + context.skillDocs;
 
   if (Object.keys(context.json).length > 0) {
-    prompt += '\n\n## Current Data Store\n```json\n' + JSON.stringify(context.json, null, 2) + '\n```';
+    prompt += '\n\n## Current Data Store\n```json\n' + capText(JSON.stringify(context.json, null, 2), ADMIN_JSON_CHARS) + '\n```';
   }
 
   if (context.tables.length > 0) {

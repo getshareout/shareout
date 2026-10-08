@@ -10,7 +10,7 @@ import { handleSourceEditor } from './source/index';
 import { detectComponents } from './detector';
 import { getPlatformOrigin } from '../config/origins';
 import { openVisibilityDisabled } from '../visibility-config';
-import { getAIProvider } from './chat/config';
+import { getAIProvider } from '../data/agent/anthropic';
 
 // Re-export modules for external use
 export * from './visual-editor';

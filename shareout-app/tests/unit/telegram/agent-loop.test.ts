@@ -8,23 +8,28 @@ const h = vi.hoisted(() => ({
   toolNames: [] as string[][],
   admin: false,
   logError: vi.fn(),
+  byo: null as null | { provider: string; model: string; apiKey: string },
+  byoArgs: [] as unknown[],
+  usedProvider: '',
 }));
 
-vi.mock('../../../src/crew/provider', () => ({
-  getCrewProvider: () =>
-    h.nullProvider
-      ? null
-      : {
-          provider: 'mock',
-          model: 'mock',
-          async *streamTurn(args: { transcript: unknown[]; tools: Array<{ name: string }> }) {
-            h.transcripts.push(JSON.parse(JSON.stringify(args.transcript)));
-            h.toolNames.push(args.tools.map((t) => t.name));
-            const turn = h.script.shift() ?? [];
-            for (const ev of turn) yield ev;
-          },
-        },
-}));
+vi.mock('../../../src/crew/provider', () => {
+  const mockProvider = (name: string) => ({
+    provider: name,
+    model: name,
+    async *streamTurn(args: { transcript: unknown[]; tools: Array<{ name: string }> }) {
+      h.usedProvider = name;
+      h.transcripts.push(JSON.parse(JSON.stringify(args.transcript)));
+      h.toolNames.push(args.tools.map((t) => t.name));
+      const turn = h.script.shift() ?? [];
+      for (const ev of turn) yield ev;
+    },
+  });
+  return {
+    getCrewProvider: () => (h.nullProvider ? null : mockProvider('mock')),
+    crewProviderFor: (_env: unknown, cfg: { provider: string }) => mockProvider(`byo:${cfg.provider}`),
+  };
+});
 
 // The bot's feature gate is exercised separately; here treat it as enabled and
 // avoid the workspace lookup so these turns run against an empty Env.
@@ -40,6 +45,7 @@ vi.mock('../../../src/superadmin/auth', () => ({
 }));
 vi.mock('../../../src/data/agent/ai-config', () => ({
   resolveGatewayModel: vi.fn().mockResolvedValue(null),
+  getWorkspaceByoConfig: vi.fn(async (...args: unknown[]) => { h.byoArgs = args; return h.byo; }),
 }));
 vi.mock('../../../src/logging', async (orig) => {
   const actual = await orig<typeof import('../../../src/logging')>();
@@ -59,6 +65,9 @@ beforeEach(() => {
   h.toolNames = [];
   h.admin = false;
   h.logError.mockReset();
+  h.byo = null;
+  h.byoArgs = [];
+  h.usedProvider = '';
 });
 
 function throwingTool(err: Error): AccountTool {
@@ -231,5 +240,29 @@ describe('runAgentTurn memory and budgets', () => {
 
     expect(res.reply).toBe('Here is what I found so far.');
     expect(h.toolNames.at(-1)).toEqual([]);
+  });
+});
+
+describe('runAgentTurn workspace BYO key', () => {
+  it('uses the workspace BYO provider when the workspace has one', async () => {
+    h.byo = { provider: 'anthropic', model: 'claude-sonnet-5-5', apiKey: 'sk-ws' };
+    h.script = [[{ type: 'text_delta', text: 'hi' }, stop('end_turn')]];
+    const res = await runAgentTurn({} as Env, { ...input('hi'), selectedWorkspaceId: 'wsp_1' });
+    expect(res.reply).toBe('hi');
+    expect(h.byoArgs[1]).toBe('wsp_1');
+    expect(h.usedProvider).toBe('byo:anthropic');
+  });
+
+  it('falls back to the platform chain when the workspace has no BYO key', async () => {
+    h.script = [[{ type: 'text_delta', text: 'hi' }, stop('end_turn')]];
+    await runAgentTurn({} as Env, { ...input('hi'), selectedWorkspaceId: 'wsp_1' });
+    expect(h.usedProvider).toBe('mock');
+  });
+
+  it('does not look up a BYO key without a workspace', async () => {
+    h.script = [[{ type: 'text_delta', text: 'hi' }, stop('end_turn')]];
+    await runAgentTurn({} as Env, { ...input('hi'), selectedWorkspaceId: '__personal' });
+    expect(h.byoArgs).toEqual([]);
+    expect(h.usedProvider).toBe('mock');
   });
 });

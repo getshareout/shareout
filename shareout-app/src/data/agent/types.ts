@@ -81,6 +81,8 @@ export interface ChatChunk {
   content?: string;
   usage?: { input_tokens: number; output_tokens: number };
   error?: string;
+  /** Set on `done` when the model stopped at the max-token limit (output cut off). */
+  truncated?: boolean;
 }
 
 export interface AdminChatRequest extends ChatRequest {
