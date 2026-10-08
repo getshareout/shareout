@@ -21,14 +21,23 @@ export class D1ConversationStore implements ConversationStore {
     const rows = await this.env.DB.prepare(
       `SELECT role, content FROM agent_messages
          WHERE thread_id = ?
-         ORDER BY created_at DESC LIMIT ?`
+         ORDER BY created_at DESC, rowid DESC LIMIT ?`
     ).bind(this.threadId, limit).all<{ role: string; content: string }>();
     return rows.results
       .reverse()
-      .map((r) => ({ role: r.role === 'assistant' ? 'assistant' : 'user', content: r.content }));
+      .map((r) => ({ role: r.role === 'assistant' ? 'assistant' : r.role === 'system' ? 'notes' : 'user', content: r.content }));
   }
 
   async appendMessage(role: 'user' | 'assistant', content: string): Promise<void> {
+    await this.insert(role, content);
+  }
+
+  /** Notes live as role='system' rows; thread replay to the UI skips them. */
+  async appendNotes(content: string): Promise<void> {
+    await this.insert('system', content);
+  }
+
+  private async insert(role: 'user' | 'assistant' | 'system', content: string): Promise<void> {
     await this.env.DB.prepare(
       `INSERT INTO agent_messages (id, thread_id, role, content) VALUES (?, ?, ?, ?)`
     ).bind(generateId('wam'), this.threadId, role, content).run();

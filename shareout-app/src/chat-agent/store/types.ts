@@ -18,6 +18,8 @@ export interface PendingRecord {
 export interface ConversationStore {
   loadHistory(limit: number): Promise<ChatMessage[]>;
   appendMessage(role: 'user' | 'assistant', content: string): Promise<void>;
+  /** Save a turn's tool notes (agent memory, never shown to the user). Stores without it just forget them. */
+  appendNotes?(content: string): Promise<void>;
   putPending(token: string, rec: PendingRecord): Promise<void>;
   /** Returns and consumes the pending record, or null if absent/not-permitted. */
   takePending(token: string): Promise<PendingRecord | null>;

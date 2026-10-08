@@ -163,7 +163,7 @@ export class OpenAICompatCrewProvider implements CrewProvider {
       model: this.model,
       max_tokens: args.maxTokens,
       messages: this.toWireMessages(args.system, args.transcript),
-      tools: wireTools,
+      ...(wireTools.length ? { tools: wireTools } : {}),
       stream: true,
       stream_options: { include_usage: true },
     });
@@ -255,7 +255,9 @@ export class AnthropicCrewProvider implements CrewProvider {
       max_tokens: args.maxTokens,
       system: args.system,
       messages: this.toWireMessages(args.transcript),
-      tools: args.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema })),
+      ...(args.tools.length
+        ? { tools: args.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema })) }
+        : {}),
       thinking: { type: 'disabled' },
       cache_control: { type: 'ephemeral' },
       stream: true,

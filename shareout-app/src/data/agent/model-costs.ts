@@ -8,10 +8,12 @@ interface ModelPrice {
 
 const PRICES: Record<string, ModelPrice> = {
   'gpt-4o': { inputPerMTok: 2_500_000, outputPerMTok: 10_000_000 },
-  // Default Vercel AI Gateway model (see anthropic.ts's DEFAULT_GATEWAY_MODEL).
   'deepseek-v4.1-flash': { inputPerMTok: 150_000, outputPerMTok: 600_000 },
   // Claude models (first-party ids and Vercel AI Gateway slugs, prefix stripped).
   'claude-opus-5': { inputPerMTok: 5_000_000, outputPerMTok: 25_000_000 },
+  // Default model (see models.ts's DEFAULT_CLAUDE_MODEL).
+  'claude-sonnet-5-5': { inputPerMTok: 2_000_000, outputPerMTok: 10_000_000 },
+  'claude-sonnet-5.5': { inputPerMTok: 2_000_000, outputPerMTok: 10_000_000 },
   'claude-sonnet-5': { inputPerMTok: 2_000_000, outputPerMTok: 10_000_000 },
   'claude-haiku-4-5-20251001': { inputPerMTok: 1_000_000, outputPerMTok: 5_000_000 },
   'claude-haiku-4.5': { inputPerMTok: 1_000_000, outputPerMTok: 5_000_000 },

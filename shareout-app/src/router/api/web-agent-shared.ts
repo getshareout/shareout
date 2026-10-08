@@ -82,6 +82,7 @@ export function streamAgentChat(env: Env, cfg: ChatTurnConfig): Response {
     });
 
     const summary = result.proposal ? describeAction(result.proposal) : '';
+    if (result.toolNotes) await store.appendNotes(result.toolNotes);
     await store.appendMessage('assistant', [result.reply, summary].filter(Boolean).join('\n\n'));
     send({ type: 'text', text: result.reply });
 

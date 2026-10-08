@@ -68,7 +68,7 @@ describe('getAgentChatModel', () => {
   });
 
   it('strips the gateway provider prefix from the model', () => {
-    expect(getAgentChatModel(gatewayEnv())).toBe('deepseek-v4.1-flash');
+    expect(getAgentChatModel(gatewayEnv())).toBe('claude-sonnet-5.5');
   });
 });
 
@@ -193,7 +193,7 @@ describe('getAIProviderChain', () => {
   it('orders gateway first, then openai', () => {
     const chain = getAIProviderChain(bothEnv());
     expect(chain.map((c) => c.provider)).toEqual(['vercel-gateway', 'openai']);
-    expect(chain[0].model).toBe('deepseek/deepseek-v4.1-flash');
+    expect(chain[0].model).toBe('anthropic/claude-sonnet-5.5');
     expect(chain[1].model).toBe('gpt-4o');
   });
 
@@ -214,7 +214,7 @@ describe('getAIProviderChain', () => {
   it('includes Anthropic between the gateway and OpenAI by default', () => {
     const chain = getAIProviderChain(allEnv());
     expect(chain.map((c) => c.provider)).toEqual(['vercel-gateway', 'anthropic', 'openai']);
-    expect(chain[1]).toMatchObject({ baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-5' });
+    expect(chain[1]).toMatchObject({ baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-5-5' });
   });
 
   it('is just Anthropic when only ANTHROPIC_API_KEY is set', () => {
@@ -234,19 +234,19 @@ describe('getAIProviderChain', () => {
 
 describe('getBuildConfig', () => {
   it('routes the gateway to the default gateway model', () => {
-    expect(getBuildConfig(gatewayEnv())?.model).toBe('deepseek/deepseek-v4.1-flash');
+    expect(getBuildConfig(gatewayEnv())?.model).toBe('anthropic/claude-sonnet-5.5');
   });
 
   it('honors a gatewayModel override', () => {
     expect(getBuildConfig(gatewayEnv(), 'anthropic/claude-opus-5')?.model).toBe('anthropic/claude-opus-5');
   });
 
-  it('uses Claude Sonnet 5 on the Anthropic API', () => {
-    expect(getBuildConfig(anthropicEnv())).toMatchObject({ provider: 'anthropic', model: 'claude-sonnet-5' });
+  it('uses Claude Sonnet 5.5 on the Anthropic API', () => {
+    expect(getBuildConfig(anthropicEnv())).toMatchObject({ provider: 'anthropic', model: 'claude-sonnet-5-5' });
   });
 
   it('ignores a gateway-style BUILD_MODEL on the Anthropic API but honours a first-party id', () => {
-    expect(getBuildConfig({ ...anthropicEnv(), BUILD_MODEL: 'anthropic/claude-opus-5' } as Env)?.model).toBe('claude-sonnet-5');
+    expect(getBuildConfig({ ...anthropicEnv(), BUILD_MODEL: 'anthropic/claude-opus-5' } as Env)?.model).toBe('claude-sonnet-5-5');
     expect(getBuildConfig({ ...anthropicEnv(), BUILD_MODEL: 'claude-opus-5' } as Env)?.model).toBe('claude-opus-5');
   });
 
@@ -270,7 +270,7 @@ describe('streamChat on the Anthropic API', () => {
     expect(headers['anthropic-version']).toBe('2023-06-01');
     expect(headers.Authorization).toBeUndefined();
     const body = JSON.parse(init.body as string);
-    expect(body).toMatchObject({ model: 'claude-sonnet-5', system: 'system prompt', stream: true, max_tokens: 100 });
+    expect(body).toMatchObject({ model: 'claude-sonnet-5-5', system: 'system prompt', stream: true, max_tokens: 100 });
     expect(body.messages).toEqual([{ role: 'user', content: 'Hi' }]);
     expect(chunks).toEqual([
       { type: 'content', content: 'Hel' },
