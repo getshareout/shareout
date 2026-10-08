@@ -41,7 +41,7 @@ export class D1ConversationStore implements ConversationStore {
     if (!this.env.RATE_LIMIT_KV) throw new Error('pending store unavailable');
     await this.env.RATE_LIMIT_KV.put(
       `agent:pending:${token}`,
-      JSON.stringify({ userId: this.userId, wsId: this.scopeKey, action: rec.action }),
+      JSON.stringify({ userId: this.userId, wsId: this.scopeKey, threadId: this.threadId, action: rec.action }),
       { expirationTtl: PENDING_TTL_S }
     );
   }
@@ -50,9 +50,9 @@ export class D1ConversationStore implements ConversationStore {
     if (!this.env.RATE_LIMIT_KV) return null;
     const raw = await this.env.RATE_LIMIT_KV.get(`agent:pending:${token}`);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as { userId: string; wsId: string; action: PendingAction };
+    const parsed = JSON.parse(raw) as { userId: string; wsId: string; threadId?: string; action: PendingAction };
     if (parsed.userId !== this.userId || parsed.wsId !== this.scopeKey) return null;
     await this.env.RATE_LIMIT_KV.delete(`agent:pending:${token}`);
-    return { action: parsed.action };
+    return { action: parsed.action, threadId: parsed.threadId || undefined };
   }
 }

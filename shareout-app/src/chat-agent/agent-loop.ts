@@ -211,6 +211,8 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
       let content: string;
       if (!tool) {
         content = JSON.stringify({ error: `unknown tool ${tc.name}` });
+      } else if ('__invalid_json' in tc.input) {
+        content = JSON.stringify({ error: 'Arguments were not valid JSON. Call the tool again with valid JSON arguments.' });
       } else {
         await announceTool(input.reply, tc.name, tc.input);
         try {

@@ -467,6 +467,7 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
   if (ask) ask.addEventListener('focus', function () { openComposer(); });
   if (dock) dock.addEventListener('submit', function (e) {
     e.preventDefault();
+    if (sending && !createMode) return;
     var v = ask.value.trim();
     var out = v;
     if (attachedFile) {

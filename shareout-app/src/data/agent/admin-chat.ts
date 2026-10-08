@@ -80,10 +80,21 @@ export async function handleAdminChat(
   let messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
 
   if (conversationId) {
+    const owned = await ctx.env.DB.prepare(`
+      SELECT 1 FROM agent_threads
+      WHERE id = ? AND scope_type = 'artifact_admin' AND scope_key = ?
+    `).bind(conversationId, ctx.artifactId).first();
+    if (!owned) {
+      return errorResponse({ ...DATA_ERRORS.NOT_FOUND, message: 'Conversation not found' }, ctx.origin);
+    }
+
     const existingMessages = await ctx.env.DB.prepare(`
-      SELECT role, content FROM agent_messages
-      WHERE thread_id = ?
-      ORDER BY created_at ASC
+      SELECT role, content FROM (
+        SELECT role, content, created_at FROM agent_messages
+        WHERE thread_id = ?
+        ORDER BY created_at DESC
+        LIMIT 30
+      ) ORDER BY created_at ASC
     `).bind(conversationId).all<{ role: string; content: string }>();
 
     messages = existingMessages.results.map((m) => ({
