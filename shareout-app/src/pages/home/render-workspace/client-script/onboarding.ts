@@ -45,8 +45,18 @@ export const workspace_client_onboarding_JS = `  // ===== onboarding checklist =
     if (kickoff && !onbGreeted) {
       onbGreeted = true;
       var nm = (window.WSX_NAME || '').trim();
-      var greet = nm ? t('onb.greet').replace('{name}', nm) : t('onb.greetNoName');
+      var greet = t(s.track === 'member' ? 'onb.greetMember' : 'onb.greet').replace('{name}', nm ? ', ' + nm : '');
       var gcol = makeCol('bot'); var gb = el('div', 'wsx-msg bot'); gb.innerHTML = mdToHtml(greet); gcol.appendChild(gb);
+      // Concrete first builds: one click sends it, so a new account starts by making something.
+      if (s.track !== 'member' && s.pct === 0) {
+        var chips = el('div', 'wsx-chatempty__chips');
+        t('onb.starters').split('|').forEach(function (txt) {
+          var c = el('button', 'wsx-chip'); c.type = 'button'; c.textContent = txt;
+          c.addEventListener('click', function () { if (chips.parentNode) chips.parentNode.removeChild(chips); agentAsk(txt, true); });
+          chips.appendChild(c);
+        });
+        gcol.appendChild(chips);
+      }
     }
     var skipped = onbSkipped();
     var tasks = (s.tasks || []).filter(function (tk) { return skipped.indexOf(tk.key) < 0; });
@@ -139,8 +149,16 @@ export const workspace_client_onboarding_JS = `  // ===== onboarding checklist =
         if (mode === true) { if (!s.eligible) return; }
         else if (mode !== 'force' && !onbCard) { return; }
         renderOnb(s, mode === true || mode === 'force');
+        if (mode === true && s.pct === 0) onbWelcomeOnce();
       })
       .catch(function () { onbBusy = false; });
+  }
+  // The very first visit to a fresh account opens the chat on the welcome, once ever;
+  // every later visit only marks the pill unread.
+  function onbWelcomeOnce() {
+    var k = 'wsx_onb_welcomed_' + SCOPE;
+    try { if (localStorage.getItem(k)) return; localStorage.setItem(k, '1'); } catch (e) { return; }
+    openDock();
   }
   // Agent-triggered surfacing (show_onboarding tool → ui_action). Hoisted, so the dock's
   // ui_action handler can call it even though this fragment loads after agent-dock.

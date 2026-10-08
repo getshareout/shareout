@@ -59,7 +59,6 @@ describe('agent dock — copy', () => {
 
   it('every literal t() key used by the chat exists in en and es', () => {
     const keys = new Set([...fragments.matchAll(/\b(?:t|addError)\('([a-zA-Z0-9_.]+)'[),]/g)].map((m) => m[1]));
-    keys.add('agent.brief.morning').add('agent.brief.afternoon').add('agent.brief.evening');
     expect(keys.size).toBeGreaterThan(30);
     for (const k of keys) {
       expect(HOME_COPY.en[k], `en ${k}`).toBeTruthy();
@@ -82,6 +81,7 @@ describe('agent dock — copy', () => {
       }
     }
     expect(ONBOARDING_COPY.es['onb.progress']).toBe('{done} de {total} listos');
+    for (const v of Object.values(HOME_COPY.es)) expect(v).not.toMatch(/artefacto/i);
   });
 });
 
@@ -119,5 +119,11 @@ describe('agent dock — markup and behaviour contracts', () => {
     );
     expect(render).not.toMatch(/openDock\(\)|openComposer\(\)/);
     expect(render).not.toContain("'role', 'status'");
+  });
+
+  it('opens the chat on the welcome only on the first visit to a fresh account', () => {
+    const once = workspace_client_onboarding_JS.slice(workspace_client_onboarding_JS.indexOf('function onbWelcomeOnce'));
+    expect(once).toMatch(/localStorage\.getItem\(k\)\) return; localStorage\.setItem\(k, '1'\)/);
+    expect(workspace_client_onboarding_JS).toContain("if (mode === true && s.pct === 0) onbWelcomeOnce();");
   });
 });

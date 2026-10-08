@@ -49,7 +49,12 @@ export function createTextStream(t: TextStreamTransport, now: () => number = Dat
     },
 
     async finish(final: string): Promise<void> {
-      if (!final) return;
+      // No final text (e.g. the turn ended in an approval): settle the streamed message
+      // to everything that streamed, not its last throttled snapshot.
+      if (!final) {
+        if (started && !broken && text !== shown) await attempt(() => t.edit(ref, text), false);
+        return;
+      }
       if (!started) {
         await t.send(final);
         return;

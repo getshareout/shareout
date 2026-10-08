@@ -68,7 +68,11 @@ export function streamAgentChat(env: Env, cfg: ChatTurnConfig): Response {
     const store = new D1ConversationStore(env, cfg.scopeKey, cfg.user.id, threadId);
     const reply = createWebReplyPort(env, cfg.user.id, send);
     const [history, snapshot] = await Promise.all([store.loadHistory(HISTORY_LIMIT), cfg.buildSnapshot()]);
-    await store.appendMessage('user', cfg.text);
+    // A retry resends the message a failed turn already saved: keep one copy, and send
+    // it to the model once (as this turn's text, not also as history).
+    const last = history[history.length - 1];
+    if (last?.role === 'user' && last.content === cfg.text) history.pop();
+    else await store.appendMessage('user', cfg.text);
 
     const result = await runAgentTurn(env, {
       platform: 'web',
