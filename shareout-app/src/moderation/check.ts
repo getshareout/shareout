@@ -14,6 +14,7 @@ import { getPlatformHostname } from '../config/origins';
 import type { Env } from '../types';
 import { getAIProviderChain, alertProviderFailure } from '../data/agent/anthropic';
 import { fetchWithTimeout } from '../fetch-utils';
+import { temperatureParams } from '../data/agent/models';
 import { extractSignals } from './extract';
 import {
   ALLOWED_ARTIFACT_SCRIPT_HOSTS,
@@ -196,7 +197,7 @@ export async function runPublishSafetyCheck(
           headers: { Authorization: `Bearer ${provider.apiKey}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             model: provider.model,
-            temperature: 0,
+            ...temperatureParams(provider.model, 0),
             max_tokens: 200,
             messages: [
               { role: 'system', content: systemPrompt(env) },
