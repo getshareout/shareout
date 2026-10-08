@@ -103,14 +103,16 @@ export async function handlePasswordLogin(ctx: FetchContext): Promise<Response> 
   if (!rl.allowed) return rateLimitResponse(rl);
 
   const body = await readBody(ctx);
+  // Before the password check: SSO-only people usually have no ShareOut password, and the
+  // answer depends on the email's domain alone, so it reveals nothing about the account.
+  const sso = await ssoRequiredFor(ctx.env, body.email || '');
+  if (sso) return json(ssoRequiredBody(sso, (body.email || '').trim().toLowerCase()), 403);
+
   const user = await verifyUserPassword(ctx.env, body.email || '', body.password || '');
 
   // One message for every failure — unknown address, no password set, wrong
   // password. Anything more specific is an account-enumeration oracle.
   if (!user) return json({ ok: false, error: 'That email and password do not match.' }, 401);
-
-  const sso = await ssoRequiredFor(ctx.env, user.email);
-  if (sso) return json(ssoRequiredBody(sso, user.email), 403);
 
   if (user.firstActivation) {
     scheduleWorkspaceWelcome(ctx.env, user.id, user.email, ctx.executionCtx);

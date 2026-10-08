@@ -36,6 +36,7 @@ import {
 } from '../../../src/auth/sso-config';
 import { handleSsoStart, handleSsoCallback, resetOidcCaches, verifyIdToken } from '../../../src/auth/oidc';
 import { handleEmailOtpStart, handleEmailOtpVerify } from '../../../src/auth-otp';
+import { handlePasswordLogin } from '../../../src/auth/password-routes';
 import type { FetchContext } from '../../../src/router/context';
 
 const ISSUER = 'https://acme.okta.test/oauth2/default';
@@ -303,6 +304,13 @@ describe('Okta-only enforcement', () => {
     const verify = await handleEmailOtpVerify(otp('/v1/auth/email/verify', { email: 'ana@acme.com', code: '123456' }));
     expect(verify.status).toBe(403);
     expect(verify.headers.get('Set-Cookie')).toBeNull();
+  });
+
+  it('sends an enforced domain to SSO from the password form, even with no ShareOut password', async () => {
+    await upsertSsoConfig(e, 'ws_acme', 'u', { ...acmeInput, enforced: true });
+    const res = await handlePasswordLogin(otp('/v1/auth/password/login', { email: 'Ana@acme.com', password: 'whatever' }));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'SSO_REQUIRED', redirect_url: '/auth/sso?workspace=acme&login_hint=ana%40acme.com' });
   });
 
   it('leaves other domains and non-enforced configs alone', async () => {
