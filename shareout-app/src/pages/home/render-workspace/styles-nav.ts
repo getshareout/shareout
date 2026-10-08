@@ -73,6 +73,10 @@ export const WORKSPACE_NAV_STYLES = `/* ===== account menu: workspace switcher +
   .wsx__railclose { display: grid; place-items: center; margin-left: auto; width: 30px; height: 30px; border: 0; background: transparent; border-radius: var(--radius-sm); color: var(--color-text-tertiary); cursor: pointer; flex: none; }
   .wsx__railclose:hover { background: var(--color-surface); color: var(--color-text); }
   /* rail is an off-canvas drawer here — canvas is full width, so center on the viewport */
-  .wsx__composer[data-state="resting"], .wsx__composer[data-state="sheet"] { left: 50%; }
-  .wsx__composer[data-state="sheet"] { width: 96%; max-height: calc(100vh - 24px); }
+  .wsx__composer[data-state="resting"] { left: 50%; }
+  /* open chat = full screen; follows the visual viewport so the composer stays above the
+     on-screen keyboard (--wsx-vvh/--wsx-vvtop set by agent-dock) and honours safe areas */
+  .wsx__composer[data-state="sheet"] { position: fixed; left: 0; right: 0; top: var(--wsx-vvtop, 0px); bottom: auto; transform: none; width: 100%; height: var(--wsx-vvh, 100dvh); max-height: none; box-sizing: border-box; border-radius: 0; border: 0; padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+  .wsx__composer[data-state="sheet"] .wsx__composer-grip { display: none; }
+  .wsx__composer[data-state="sheet"] .wsx__threads { top: calc(49px + env(safe-area-inset-top, 0px)); }
 }`;

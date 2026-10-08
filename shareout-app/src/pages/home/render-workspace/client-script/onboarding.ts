@@ -5,8 +5,8 @@
  * derived status on window focus / tab return (the only signal that survives an
  * external Telegram/Slack connect flow). Copy is localized via t('onb.*').
  *
- * Runs after agent-dock in the shared IIFE, so makeCol/openDock/agentAsk/scrollEnd/
- * el/esc/t/ws are all in scope.
+ * Runs after agent-dock in the shared IIFE, so makeCol/openDock/agentAsk/scrollToTop/
+ * markUnread/removeRow/el/esc/t/ws are all in scope.
  */
 export const workspace_client_onboarding_JS = `  // ===== onboarding checklist =====
   var ONB_API = '/v1/home/onboarding';
@@ -38,23 +38,26 @@ export const workspace_client_onboarding_JS = `  // ===== onboarding checklist =
     }
   }
 
+  // One neutral card: only the NEXT open step gets the primary button, the rest are
+  // quiet links. Progress changes are announced once (not every focus refetch).
+  var onbLastSpoken = null;
   function renderOnb(s, kickoff) {
     if (kickoff && !onbGreeted) {
       onbGreeted = true;
       var nm = (window.WSX_NAME || '').trim();
       var greet = nm ? t('onb.greet').replace('{name}', nm) : t('onb.greetNoName');
       var gcol = makeCol('bot'); var gb = el('div', 'wsx-msg bot'); gb.innerHTML = mdToHtml(greet); gcol.appendChild(gb);
-      openDock(); scrollEnd(true);
     }
     var skipped = onbSkipped();
     var tasks = (s.tasks || []).filter(function (tk) { return skipped.indexOf(tk.key) < 0; });
     var doneCount = tasks.filter(function (tk) { return tk.done; }).length;
     var full = s.pct >= 100;
+    var isNew = !onbCard;
 
     if (!onbCard) {
       var col = makeCol('bot');
-      onbCard = el('div', 'wsx-onb'); onbCard.setAttribute('role', 'status'); onbCard.setAttribute('aria-live', 'polite');
-      col.appendChild(onbCard); scrollEnd(true);
+      onbCard = el('div', 'wsx-onb');
+      col.appendChild(onbCard);
     }
     onbCard.innerHTML = '';
     onbCard.classList.toggle('is-full', full);
@@ -71,7 +74,7 @@ export const workspace_client_onboarding_JS = `  // ===== onboarding checklist =
       var hide = el('button', 'wsx-onb__hide'); hide.type = 'button'; hide.textContent = t('onb.hide');
       hide.addEventListener('click', function () {
         fetch(ONB_API + '/dismiss' + onbQs(), { method: 'POST', credentials: 'same-origin' }).catch(function () {});
-        var row = onbCard.closest ? onbCard.closest('.wsx-row') : null; if (row) row.remove(); else onbCard.remove(); onbCard = null;
+        removeRow(onbCard.closest ? onbCard.closest('.wsx-row') : null); onbCard = null;
       });
       head.appendChild(hide);
     }
@@ -79,24 +82,29 @@ export const workspace_client_onboarding_JS = `  // ===== onboarding checklist =
 
     if (!full) {
       var list = el('ul', 'wsx-onb__list');
+      var nextKey = null;
+      tasks.forEach(function (tk) { if (!tk.done && nextKey === null) nextKey = tk.key; });
       tasks.forEach(function (tk) {
-        var li = el('li', 'wsx-onb__item' + (tk.done ? ' is-done' : ''));
+        var isNext = tk.key === nextKey;
+        var li = el('li', 'wsx-onb__item' + (tk.done ? ' is-done' : '') + (isNext ? ' is-next' : ''));
         if (tk.done && !onbDone[tk.key]) li.classList.add('is-justdone');
         var chk = el('span', 'wsx-onb__check'); chk.setAttribute('aria-hidden', 'true'); chk.textContent = tk.done ? '\\u2713' : '\\u25CB';
         var body = el('span', 'wsx-onb__body');
         var lab = el('span', 'wsx-onb__label'); lab.textContent = t('onb.task.' + tk.key);
-        var why = el('span', 'wsx-onb__why'); why.textContent = t('onb.why.' + tk.key);
-        body.appendChild(lab); body.appendChild(why);
+        body.appendChild(lab);
+        if (isNext) { var why = el('span', 'wsx-onb__why'); why.textContent = t('onb.why.' + tk.key); body.appendChild(why); }
         li.appendChild(chk); li.appendChild(body);
         if (!tk.done) {
-          var cta = el('button', 'wsx-onb__cta'); cta.type = 'button'; cta.textContent = t('onb.cta.' + tk.key);
+          var acts = el('span', 'wsx-onb__acts');
+          var cta = el('button', isNext ? 'wsx-onb__cta' : 'wsx-onb__link'); cta.type = 'button'; cta.textContent = t('onb.cta.' + tk.key);
           cta.addEventListener('click', function () { onbDispatch(tk.action); });
-          li.appendChild(cta);
+          acts.appendChild(cta);
           if (tk.skippable) {
             var sk = el('button', 'wsx-onb__skipbtn'); sk.type = 'button'; sk.textContent = t('onb.skip');
             sk.addEventListener('click', function () { onbSkip(tk.key); refreshOnb(false); });
-            li.appendChild(sk);
+            acts.appendChild(sk);
           }
+          li.appendChild(acts);
         }
         list.appendChild(li);
       });
@@ -105,16 +113,21 @@ export const workspace_client_onboarding_JS = `  // ===== onboarding checklist =
 
     onbDone = {}; tasks.forEach(function (tk) { if (tk.done) onbDone[tk.key] = 1; });
 
+    var spoken = full ? t('onb.doneTitle') : prog.textContent;
+    if (onbLastSpoken !== null && spoken !== onbLastSpoken && announcer) announcer.announce(spoken);
+    onbLastSpoken = spoken;
+
     if (full && !s.celebrated && !onbCelebrated) {
       onbCelebrated = true;
       onbCard.classList.add('is-celebrate');
-      if (announcer) announcer.announce(t('onb.doneTitle'), { now: true });
       fetch(ONB_API + '/celebrate' + onbQs(), { method: 'POST', credentials: 'same-origin' }).catch(function () {});
     }
-    scrollEnd();
+    // Keep the card's top (title + progress) in view rather than its bottom edge.
+    if (isNew || kickoff) { scrollToTop(onbCard.closest ? onbCard.closest('.wsx-row') : null); markUnread(); }
   }
 
-  // mode: true = kickoff (auto-open only if eligible); 'force' = always render (agent asked);
+  // mode: true = kickoff (renders in the background if eligible — never opens the sheet;
+  // the pill's unread dot points at it); 'force' = always render (agent asked);
   // false = focus refetch (only updates an already-open checklist).
   function refreshOnb(mode) {
     if (onbBusy) return; onbBusy = true;
@@ -133,7 +146,7 @@ export const workspace_client_onboarding_JS = `  // ===== onboarding checklist =
   // ui_action handler can call it even though this fragment loads after agent-dock.
   function onbForce() { openDock(); refreshOnb('force'); }
 
-  // Kickoff: only for a fresh session (no open thread), and only auto-opens if eligible.
+  // Kickoff: only for a fresh session (no open thread), and only renders if eligible.
   // Fires for a workspace home (WSX_WS set) or the personal home (SCOPE === 'personal').
   if (!currentThreadId && (window.WSX_WS || SCOPE === 'personal')) refreshOnb(true);
 

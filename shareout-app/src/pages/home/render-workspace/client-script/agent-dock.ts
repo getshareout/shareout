@@ -1,20 +1,60 @@
-/** Agent chat: composer states (resting/sheet/docked) + SSE chat, threads, inline widgets. */
-export const workspace_client_agent_dock_JS = `  // ===== composer states: resting (pill) · sheet (bottom panel, user-resizable height) =====
+/** Agent chat: composer states (resting pill / sheet dialog) + SSE chat and inline widgets. */
+export const workspace_client_agent_dock_JS = `  // ===== composer states: resting (pill) · sheet (dialog panel, user-resizable height) =====
   var composer = document.getElementById('wsxComposer');
   var scrim = document.getElementById('wsxScrim');
+  var pill = document.getElementById('wsxPill');
+  var pillDot = document.getElementById('wsxPillDot');
+  var ask = document.getElementById('wsxAsk');
   var SHEET_H_LS = 'wsx_sheet_h';
   function sheetMax() { return Math.max(280, window.innerHeight - 36); }
   function applySheetH(px) { var h = Math.min(sheetMax(), Math.max(280, px)); composer.style.setProperty('--wsx-sheet-h', h + 'px'); return h; }
   try { var _sh = parseInt(localStorage.getItem(SHEET_H_LS), 10); if (_sh) applySheetH(_sh); } catch (e) {}
+  function isSheet() { return composer.getAttribute('data-state') === 'sheet'; }
+  // Unread dot on the resting pill: replies that land while the sheet is closed.
+  function markUnread() { if (!isSheet() && pillDot) pillDot.hidden = false; }
+  function markRead() { if (pillDot) pillDot.hidden = true; }
   function setComposer(state) {
     composer.setAttribute('data-state', state);
-    ws.classList.toggle('is-composer-sheet', state === 'sheet');
-    scrim.hidden = state !== 'sheet';
+    var open = state === 'sheet';
+    ws.classList.toggle('is-composer-sheet', open);
+    scrim.hidden = !open;
+    if (open) { composer.setAttribute('role', 'dialog'); composer.setAttribute('aria-modal', 'true'); markRead(); }
+    else { composer.removeAttribute('role'); composer.removeAttribute('aria-modal'); }
   }
-  function openComposer() { if (composer.getAttribute('data-state') === 'resting') setComposer('sheet'); }
-  document.getElementById('wsxComposerMin').addEventListener('click', function () { setComposer('resting'); });
-  scrim.addEventListener('click', function () { setComposer('resting'); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && composer.getAttribute('data-state') === 'sheet') setComposer('resting'); });
+  // Opening from the pill moves focus into the composer; closing returns it to the pill.
+  function openComposer() {
+    if (composer.getAttribute('data-state') !== 'resting') return;
+    setComposer('sheet');
+    if (ask) { try { ask.focus({ preventScroll: true }); } catch (e) { ask.focus(); } }
+  }
+  function closeComposer() {
+    if (!isSheet()) return;
+    setComposer('resting');
+    if (pill) { try { pill.focus({ preventScroll: true }); } catch (e) { pill.focus(); } }
+  }
+  if (pill) pill.addEventListener('click', openComposer);
+  document.getElementById('wsxComposerMin').addEventListener('click', closeComposer);
+  scrim.addEventListener('click', closeComposer);
+  // Escape is scoped: inner controls (search, rename, thread menu) handle it first and
+  // preventDefault; only an unhandled Escape closes the history drawer, then the sheet.
+  function trapTab(e) {
+    var f = Array.prototype.filter.call(composer.querySelectorAll('button, textarea, input:not([type=file]), a[href]'), function (n) { return !n.disabled && n.offsetParent !== null; });
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+  composer.addEventListener('keydown', function (e) {
+    if (!isSheet() || e.defaultPrevented) return;
+    if (e.key === 'Tab') { trapTab(e); return; }
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    if (threadsPanel && !threadsPanel.hidden) { threadsPanel.hidden = true; if (threadsBtn) threadsBtn.focus(); }
+    else closeComposer();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && isSheet() && !e.defaultPrevented && (e.target === document.body || e.target === document.documentElement)) closeComposer();
+  });
 
   // ----- drag the top grip to grow/shrink the chat panel; height persists -----
   var grip = document.getElementById('wsxComposerGrip');
@@ -46,6 +86,13 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
       try { localStorage.setItem(SHEET_H_LS, String(h)); } catch (e) {}
     });
   }
+  // Mobile full-screen sheet: track the visual viewport so the composer stays above the
+  // on-screen keyboard (CSS reads --wsx-vvh / --wsx-vvtop below 720px).
+  if (window.visualViewport) {
+    var vview = window.visualViewport;
+    var syncViewport = function () { composer.style.setProperty('--wsx-vvh', Math.round(vview.height) + 'px'); composer.style.setProperty('--wsx-vvtop', Math.round(vview.offsetTop) + 'px'); };
+    vview.addEventListener('resize', syncViewport); vview.addEventListener('scroll', syncViewport); syncViewport();
+  }
 
   // ===== agent dock (SSE) =====
   var API = '/v1/home/agent';
@@ -60,10 +107,14 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
 
   function el(tag, cls) { var d = document.createElement(tag); if (cls) d.className = cls; return d; }
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-  function nowTime() { try { return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
+  var ICO = function (p, w) { return '<svg viewBox="0 0 24 24" width="' + (w || 18) + '" height="' + (w || 18) + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>'; };
+  var SEND_SVG = ICO('<path d="M4 12h15M13 6l6 6-6 6"/>');
+  var STOP_SVG = ICO('<rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor" stroke="none"/>');
+  var CLIP_SVG = ICO('<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>', 14);
   // Shared reading engine (chat-core global, loaded via <script src="/sdk/chat-core.js">).
-  // When present it owns follow/hold/away + jump + unread + anchoring; if it fails to
-  // load the dock falls back to the inline behaviour below so it degrades, never dies.
+  // When present it owns follow/hold/away + jump + unread + anchoring + the composer; if
+  // it fails to load the dock falls back to the inline behaviour below so it degrades,
+  // never dies. Markdown stays local: chat-core's renderer is inline-only (no lists/code).
   var CC = (typeof window !== 'undefined' && window.ChatCore) || null;
   var scroller = null, unread = null, announcer = null, chatSearch = null;
   var replaying = false;
@@ -74,73 +125,58 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
       onAppendWhileAway: function () {}
     });
     unread = CC.createUnreadTracker(scroller, { onCount: setBadge });
-    announcer = CC.createLiveAnnouncer({ mount: threadWrap });
+    announcer = CC.createLiveAnnouncer({ mount: composer });
   }
   function atBottom() { return threadWrap.scrollHeight - threadWrap.scrollTop - threadWrap.clientHeight < 60; }
   function scrollEnd(force) {
     if (scroller) { if (force) scroller.jumpToLatest(); else scroller.stickToBottom(); return; }
     if (force || atBottom()) threadWrap.scrollTop = threadWrap.scrollHeight;
   }
+  // Scroll so a row's top is visible (cards that would be clipped by a scroll-to-bottom).
+  function scrollToTop(row) {
+    if (!row) return;
+    if (scroller) { scroller.scrollToAnchor(row); return; }
+    threadWrap.scrollTop = Math.max(0, threadWrap.scrollTop + row.getBoundingClientRect().top - threadWrap.getBoundingClientRect().top - 8);
+  }
   function rowOf(b) { return b && b.closest ? b.closest('.wsx-row') : null; }
   function noteBotAppend(b) { if (unread && !replaying) unread.onAppend(rowOf(b)); }
   if (!scroller) threadWrap.addEventListener('scroll', function () { if (scrollDownBtn) scrollDownBtn.hidden = atBottom(); });
   if (scrollDownBtn) scrollDownBtn.addEventListener('click', function () { scrollEnd(true); if (unread) unread.reset(); });
 
-  // ----- safe Markdown: fenced code -> headings/lists/quote/hr -> paragraphs, inline last -----
-  function mdInline(t) {
-    var BT = String.fromCharCode(96);
-    var s = esc(t);
-    s = s.replace(new RegExp(BT + '([^' + BT + ']+)' + BT, 'g'), '<code>$1</code>');
-    s = s.replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>');
-    s = s.replace(/(^|[^*])\\*([^*\\n]+)\\*/g, '$1<em>$2</em>');
-    s = s.replace(/\\[([^\\]]+)\\]\\((https?:\\/\\/[^)\\s]+)\\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-    s = s.replace(/(^|\\s)(https?:\\/\\/[^\\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
-    return s;
-  }
-  function mdToHtml(raw) {
-    var BT = String.fromCharCode(96);
-    var src = String(raw == null ? '' : raw);
-    var blocks = [];
-    var fence = new RegExp(BT + BT + BT + '[^\\n]*\\n([\\s\\S]*?)' + BT + BT + BT, 'g');
-    src = src.replace(fence, function (m, code) { blocks.push(code); return '\\u0000C' + (blocks.length - 1) + '\\u0000'; });
-    var lines = src.split('\\n'); var html = ''; var listType = null;
-    function closeList() { if (listType) { html += '</' + listType + '>'; listType = null; } }
-    for (var i = 0; i < lines.length; i++) {
-      var ln = lines[i];
-      var cm = ln.trim().match(/^\\u0000C(\\d+)\\u0000$/);
-      if (cm) { closeList(); html += '<pre class="wsx-pre"><code>' + esc(blocks[+cm[1]]) + '</code></pre>'; continue; }
-      if (/^\\s*$/.test(ln)) { closeList(); continue; }
-      var h = ln.match(/^(#{1,3})\\s+(.*)$/);
-      if (h) { closeList(); var lvl = h[1].length + 2; html += '<h' + lvl + ' class="wsx-h">' + mdInline(h[2]) + '</h' + lvl + '>'; continue; }
-      if (/^\\s*[-*]\\s+/.test(ln)) { if (listType !== 'ul') { closeList(); html += '<ul class="wsx-ul">'; listType = 'ul'; } html += '<li>' + mdInline(ln.replace(/^\\s*[-*]\\s+/, '')) + '</li>'; continue; }
-      if (/^\\s*\\d+\\.\\s+/.test(ln)) { if (listType !== 'ol') { closeList(); html += '<ol class="wsx-ol">'; listType = 'ol'; } html += '<li>' + mdInline(ln.replace(/^\\s*\\d+\\.\\s+/, '')) + '</li>'; continue; }
-      if (/^\\s*>\\s?/.test(ln)) { closeList(); html += '<blockquote class="wsx-bq">' + mdInline(ln.replace(/^\\s*>\\s?/, '')) + '</blockquote>'; continue; }
-      if (/^\\s*---+\\s*$/.test(ln)) { closeList(); html += '<hr class="wsx-hr">'; continue; }
-      closeList(); html += '<p>' + mdInline(ln) + '</p>';
-    }
-    closeList();
-    return html;
-  }
-
-  // ----- message rows: avatar + meta + bubble, grouped when same role repeats -----
+  // ----- message rows: user = quiet bubble on the right, assistant = full-width text -----
   var lastRole = null;
-  function makeCol(role, ts) {
+  var emptyEl = null;
+  function syncLastRole() {
+    var prev = threadList.lastElementChild;
+    lastRole = prev && prev.classList.contains('wsx-row') ? (prev.classList.contains('user') ? 'user' : 'bot') : null;
+  }
+  function removeRow(row) {
+    if (row && row.parentNode) row.parentNode.removeChild(row);
+    syncLastRole();
+    if (!threadList.children.length) showEmpty();
+  }
+  function makeCol(role) {
+    if (emptyEl) { if (emptyEl.parentNode) emptyEl.parentNode.removeChild(emptyEl); emptyEl = null; }
     var grouped = role === lastRole; lastRole = role;
     var row = el('div', 'wsx-row ' + role + (grouped ? ' grouped' : ''));
-    var av = el('div', 'wsx-av ' + role); av.textContent = role === 'user' ? '\\u25CB' : '\\u25C6';
     var col = el('div', 'wsx-col');
-    if (!grouped) {
-      var meta = el('div', 'wsx-meta');
-      var nm = el('span', 'wsx-meta__name'); nm.textContent = role === 'user' ? 'You' : 'ShareOut';
-      var tm = el('span', 'wsx-meta__time'); tm.textContent = ts || nowTime();
-      meta.appendChild(nm); meta.appendChild(tm); col.appendChild(meta);
-    }
-    row.appendChild(av); row.appendChild(col); threadList.appendChild(row);
+    row.appendChild(col); threadList.appendChild(row);
     return col;
   }
-  function addMsg(role, text, ts) {
-    var col = makeCol(role, ts);
-    var b = el('div', 'wsx-msg ' + role); b.textContent = text; col.appendChild(b);
+  function renderUserBody(b, text) {
+    var parts = splitAttachments(text);
+    if (parts.text) { var p = el('div', 'wsx-msg__text'); p.textContent = parts.text; b.appendChild(p); }
+    parts.files.forEach(function (f) {
+      var chip = el('span', 'wsx-msgfile'); chip.innerHTML = CLIP_SVG;
+      var nm = el('span', 'wsx-msgfile__name'); nm.textContent = f.name; chip.appendChild(nm);
+      b.appendChild(chip);
+    });
+  }
+  function addMsg(role, text) {
+    var col = makeCol(role);
+    var b = el('div', 'wsx-msg ' + role);
+    if (role === 'user') renderUserBody(b, text); else b.textContent = text;
+    col.appendChild(b);
     if (replaying) return b;
     // The reader's own new turn anchors near the top (anchor-and-hold); replies stick
     // to the edge only while following and count as unread when the reader is away.
@@ -148,6 +184,7 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
     else { scrollEnd(); noteBotAppend(b); }
     return b;
   }
+  function addNote(text) { var b = addMsg('bot', text); b.classList.add('is-note'); return b; }
   function addCopy(col, bubble) {
     var c = el('button', 'wsx-copy'); c.type = 'button'; c.title = t('agent.copy'); c.textContent = t('agent.copy');
     c.addEventListener('click', function () {
@@ -157,13 +194,46 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
     });
     col.appendChild(c);
   }
-  function addBot(text, ts) {
-    var col = makeCol('bot', ts);
+  function addBot(text) {
+    var col = makeCol('bot');
     var b = el('div', 'wsx-msg bot'); b.innerHTML = mdToHtml(text); col.appendChild(b);
     addCopy(col, b);
     if (replaying) return b;
     scrollEnd(); noteBotAppend(b); return b;
   }
+  // Failure row: plain-language copy (the raw server text goes to the console) plus a
+  // Retry that resends the last user message when one is given.
+  function addError(key, retryText) {
+    var col = makeCol('bot');
+    var box = el('div', 'wsx-err');
+    var msg = el('span', 'wsx-err__msg'); msg.textContent = t(key); box.appendChild(msg);
+    if (retryText) {
+      var rb = el('button', 'wsx-err__retry'); rb.type = 'button'; rb.textContent = t('common.retry');
+      rb.addEventListener('click', function () { if (sending) return; removeRow(rowOf(box)); send(retryText, { retry: true }); });
+      box.appendChild(rb);
+    }
+    col.appendChild(box);
+    if (!replaying) { scrollEnd(); noteBotAppend(box); markUnread(); }
+    return box;
+  }
+
+  // ----- empty state: a greeting + a few neutral starters (click fills + sends) -----
+  function showEmpty() {
+    if (emptyEl || threadList.children.length) return;
+    emptyEl = el('div', 'wsx-chatempty');
+    var h = el('p', 'wsx-chatempty__title'); h.textContent = t('agent.emptyTitle');
+    var chips = el('div', 'wsx-chatempty__chips');
+    t('agent.suggestions').split('|').forEach(function (s) {
+      var b = el('button', 'wsx-chip'); b.type = 'button'; b.textContent = s;
+      b.addEventListener('click', function () { send(s); });
+      chips.appendChild(b);
+    });
+    emptyEl.appendChild(h); emptyEl.appendChild(chips); threadList.appendChild(emptyEl);
+  }
+  document.addEventListener('shareout:locale', function () {
+    if (emptyEl) { emptyEl.parentNode && emptyEl.parentNode.removeChild(emptyEl); emptyEl = null; showEmpty(); }
+    syncSendBtn();
+  });
 
   // ----- inline widgets -----
   function addCards(items) {
@@ -174,42 +244,46 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
       var card = el('button', 'wsx-card'); card.type = 'button';
       var ic = el('span', 'wsx-card__ic'); ic.textContent = '\\uD83D\\uDCC4';
       var main = el('span', 'wsx-card__main');
-      var top = el('span', 'wsx-card__top'); top.textContent = it.name || 'Untitled';
-      var sub = el('span', 'wsx-card__sub'); sub.textContent = it.artifact_type || 'page';
+      var top = el('span', 'wsx-card__top'); top.textContent = it.name || t('agent.untitled');
+      var sub = el('span', 'wsx-card__sub'); sub.textContent = it.artifact_type || t('agent.page');
       main.appendChild(top); main.appendChild(sub);
-      var go = el('span', 'wsx-card__go'); go.textContent = 'Open \\u2192';
+      var go = el('span', 'wsx-card__go'); go.textContent = t('agent.open');
       card.appendChild(ic); card.appendChild(main); card.appendChild(go);
       card.addEventListener('click', function () { if (typeof openArtifact === 'function') openArtifact(it.slug, it.name, it.id); });
       wrap.appendChild(card);
     });
-    col.appendChild(wrap); scrollEnd();
+    col.appendChild(wrap); scrollEnd(); markUnread();
   }
   function addMedia(ev) {
     var col = makeCol('bot');
     var url = API + '/media/' + encodeURIComponent(ev.token);
     if ((ev.mime || '').indexOf('image/') === 0) {
       var fig = el('figure', 'wsx-media');
-      var img = el('img'); img.src = url; img.alt = ev.caption || ev.filename || 'image'; img.loading = 'lazy';
+      var img = el('img'); img.src = url; img.alt = ev.caption || ev.filename || ''; img.loading = 'lazy';
       img.addEventListener('load', function () { scrollEnd(); });
       fig.appendChild(img);
       if (ev.caption) { var cap = el('figcaption'); cap.textContent = ev.caption; fig.appendChild(cap); }
       col.appendChild(fig);
     } else {
       var a = el('a', 'wsx-file'); a.href = url; a.target = '_blank'; a.rel = 'noopener';
-      a.textContent = '\\uD83D\\uDCCE ' + (ev.filename || 'file');
+      a.innerHTML = CLIP_SVG; var fn = el('span'); fn.textContent = ev.filename || t('agent.file'); a.appendChild(fn);
       col.appendChild(a);
     }
-    scrollEnd();
+    scrollEnd(); markUnread();
   }
 
-  // ----- approval cards (plain + build) -----
+  // ----- approval cards (plain + build): neutral frame, one primary action -----
+  function refreshActiveArtifact() {
+    if (typeof activeArt !== 'undefined' && activeArt && activeArt.iframe && activeArt.slug)
+      activeArt.iframe.src = '/a/' + encodeURIComponent(activeArt.slug) + '/?wsx=1&t=' + Date.now();
+  }
   function buildWidget(col, name) {
     var box = el('div', 'wsx-build');
     var head = el('div', 'wsx-build__head');
     var spin = el('span', 'wsx-build__spin');
-    var ttl = el('span'); ttl.textContent = 'Building \\u201C' + (name || 'page') + '\\u201D\\u2026';
+    var ttl = el('span'); ttl.textContent = t('agent.building').replace('{name}', name || t('agent.page'));
     head.appendChild(spin); head.appendChild(ttl);
-    var step = el('div', 'wsx-build__step'); step.textContent = 'Starting\\u2026';
+    var step = el('div', 'wsx-build__step'); step.textContent = t('agent.buildStarting');
     box.appendChild(head); box.appendChild(step); col.appendChild(box);
     return { box: box, head: head, spin: spin, step: step, ttl: ttl };
   }
@@ -218,30 +292,29 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
     var w = buildWidget(col, name); scrollEnd(true);
     fetch(API + '/confirm', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token }) })
       .then(function (resp) {
-        if (!resp.ok || !resp.body) throw 0;
+        if (!resp.ok || !resp.body) throw new Error('confirm ' + resp.status);
         return readStream(resp, function (ev) {
           if (ev.type === 'build_step') { w.step.textContent = ev.label; scrollEnd(); }
           else if (ev.type === 'build_done') {
-            w.spin.classList.add('is-done'); w.ttl.textContent = ev.name || 'Page built';
+            w.spin.classList.add('is-done'); w.ttl.textContent = ev.name || t('agent.pageBuilt');
             w.step.textContent = ''; w.box.classList.add('is-done');
-            var line = el('div', 'wsx-build__line'); line.innerHTML = mdToHtml(ev.text || 'Done.'); w.box.appendChild(line);
+            var line = el('div', 'wsx-build__line'); line.innerHTML = mdToHtml(ev.text || t('agent.done')); w.box.appendChild(line);
             if (ev.slug) {
-              var open = el('button', 'wsx-build__open'); open.type = 'button'; open.textContent = 'Open page \\u2192';
+              var open = el('button', 'wsx-build__open'); open.type = 'button'; open.textContent = t('agent.openPage');
               open.addEventListener('click', function () { if (typeof openArtifact === 'function') openArtifact(ev.slug, ev.name, ev.artifactId); });
               w.box.appendChild(open);
-              if (typeof activeArt !== 'undefined' && activeArt && activeArt.iframe && activeArt.slug)
-                activeArt.iframe.src = '/a/' + encodeURIComponent(activeArt.slug) + '/?wsx=1&t=' + Date.now();
+              refreshActiveArtifact();
             }
-            scrollEnd();
+            scrollEnd(); markUnread();
           }
         });
       })
-      .catch(function () { w.box.classList.add('is-done'); w.step.textContent = 'That didn\\u2019t go through.'; });
+      .catch(function (e) { console.warn('[agent] build confirm failed', e); w.box.classList.add('is-done', 'is-error'); w.spin.classList.add('is-done'); w.step.textContent = t('agent.err.action'); markUnread(); });
   }
   function addConfirm(prompt, token, card) {
     var col = makeCol('bot');
     var box = el('div', 'wsx-approve' + (card && card.danger ? ' is-danger' : ''));
-    var ttl = el('div', 'wsx-approve__title'); ttl.textContent = (card && card.title) || 'Confirm';
+    var ttl = el('div', 'wsx-approve__title'); ttl.textContent = (card && card.title) || t('agent.confirm');
     box.appendChild(ttl);
     if (card && card.subject) { var sub = el('div', 'wsx-approve__subject'); sub.textContent = card.subject; box.appendChild(sub); }
     if (card && card.detail) { var det = el('div', 'wsx-approve__detail'); det.textContent = card.detail; box.appendChild(det); }
@@ -252,20 +325,26 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
     }
     if (!card) { var p = el('div', 'wsx-approve__detail'); p.textContent = prompt; box.appendChild(p); }
     var row = el('div', 'wsx-approve__row');
-    var ok = el('button', 'wsx-approve__ok'); ok.type = 'button'; ok.textContent = (card && card.kind === 'build_artifact') ? 'Build it' : 'Approve';
-    var no = el('button', 'wsx-approve__no'); no.type = 'button'; no.textContent = 'Cancel';
-    row.appendChild(ok); row.appendChild(no); box.appendChild(row); col.appendChild(box); scrollEnd(true);
-    no.addEventListener('click', function () { box.remove(); addMsg('bot', 'Okay, cancelled.'); });
+    var ok = el('button', 'wsx-approve__ok'); ok.type = 'button'; ok.textContent = (card && card.kind === 'build_artifact') ? t('agent.buildIt') : t('common.approve');
+    var no = el('button', 'wsx-approve__no'); no.type = 'button'; no.textContent = t('agent.cancel');
+    row.appendChild(ok); row.appendChild(no); box.appendChild(row); col.appendChild(box);
+    scrollToTop(rowOf(box)); markUnread();
+    no.addEventListener('click', function () { removeRow(rowOf(box)); addNote(t('agent.cancelled')); });
     ok.addEventListener('click', function () {
       var isBuild = card && card.kind === 'build_artifact';
-      box.remove();
+      removeRow(rowOf(box));
       if (isBuild) { runBuildConfirm(token, card && card.subject); return; }
-      var working = addMsg('bot', 'Working\\u2026'); working.classList.add('is-typing');
+      var working = addMsg('bot', t('agent.working')); working.classList.add('is-typing');
       fetch(API + '/confirm', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token }) })
-        .then(function (r) { return r.json(); })
-        .then(function (j) { var rr = working.parentNode && working.parentNode.parentNode; if (rr) rr.remove(); lastRole = null; addBot(j.text || j.error || 'Done.');
-          if (typeof activeArt !== 'undefined' && activeArt && activeArt.iframe && activeArt.slug) activeArt.iframe.src = '/a/' + encodeURIComponent(activeArt.slug) + '/?wsx=1&t=' + Date.now(); })
-        .catch(function () { addMsg('bot', 'That didn\\u2019t go through.'); });
+        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j || {} }; }); })
+        .then(function (res) {
+          removeRow(rowOf(working));
+          if (res.j.text) addBot(res.j.text);
+          else if (!res.ok || res.j.error) { console.warn('[agent] confirm failed', res.j.error); addError('agent.err.action'); }
+          else addBot(t('agent.done'));
+          markUnread(); refreshActiveArtifact();
+        })
+        .catch(function (e) { console.warn('[agent] confirm failed', e); removeRow(rowOf(working)); addError('agent.err.action'); });
     });
   }
 
@@ -289,20 +368,66 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
     return pump();
   }
 
-  // ----- send a turn (streaming + stop) -----
+  // ----- composer: auto-growing textarea; the send button becomes Stop while streaming -----
   var sending = false; var currentAbort = null;
-  var stopBtn = el('button', 'wsx-stop'); stopBtn.type = 'button'; stopBtn.hidden = true; stopBtn.textContent = '\\u25A0 Stop';
-  composer.appendChild(stopBtn);
-  stopBtn.addEventListener('click', function () { if (currentAbort) currentAbort.abort(); });
-  function setSending(on) { sending = on; stopBtn.hidden = !on; }
+  var dock = document.getElementById('wsxDock');
+  var sendBtn = document.getElementById('wsxSend');
+  var attachedFile = null;
+  function hasDraft() { return !!((ask && ask.value.trim()) || attachedFile); }
+  function syncSendBtn() {
+    if (!sendBtn) return;
+    var stop = sending && !createMode;
+    var mode = stop ? 'stop' : 'send';
+    if (sendBtn.getAttribute('data-mode') !== mode) {
+      sendBtn.setAttribute('data-mode', mode);
+      sendBtn.innerHTML = stop ? STOP_SVG : SEND_SVG;
+    }
+    var label = t(stop ? 'composer.stop' : 'composer.send');
+    sendBtn.setAttribute('aria-label', label); sendBtn.title = label;
+    sendBtn.disabled = !stop && !hasDraft();
+    sendBtn.classList.toggle('is-ready', !stop && hasDraft());
+  }
+  function setSending(on) { sending = on; syncSendBtn(); }
+  function setAsk(v) { if (!ask) return; ask.value = v; ask.dispatchEvent(new Event('input')); }
+  var ASK_MAX_H = 184; // ~8 lines
+  function submitDock() {
+    if (sending && !createMode) return; // blocked: the draft stays in the box
+    var v = ask.value.trim();
+    var out = v;
+    if (attachedFile) {
+      out = (v ? v + '\\n\\n' : '') + attachMarker(attachedFile.name, attachedFile.id);
+      attachedFile = null;
+      renderAttachChip();
+    }
+    if (!out) return;
+    setAsk('');
+    if (createMode) createSend(out); else send(out);
+  }
+  if (ask) {
+    ask.addEventListener('input', syncSendBtn);
+    if (CC && CC.wireComposer) CC.wireComposer({ input: ask, autoResize: true, maxHeight: ASK_MAX_H, clearOnSubmit: false, onSubmit: submitDock });
+    else {
+      ask.addEventListener('input', function () { ask.style.height = 'auto'; ask.style.height = Math.min(ask.scrollHeight, ASK_MAX_H) + 'px'; });
+      ask.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submitDock(); } });
+    }
+  }
+  if (dock) dock.addEventListener('submit', function (e) { e.preventDefault(); submitDock(); });
+  if (sendBtn) sendBtn.addEventListener('click', function () {
+    if (sending && !createMode) { if (currentAbort) currentAbort.abort(); return; }
+    submitDock();
+  });
+  syncSendBtn();
 
-  function send(text) {
+  // ----- send a turn (streaming, progressively formatted) -----
+  function send(text, opts) {
     if (sending || !text) return;
     setSending(true); openComposer();
-    addMsg('user', text);
-    var typing = addMsg('bot', '\\u2026'); typing.classList.add('is-typing');
-    var removed = false; function killTyping() { if (!removed && typing) { var r = typing.parentNode && typing.parentNode.parentNode; if (r) r.remove(); else typing.remove(); removed = true; lastRole = 'user'; } }
-    var streamEl = null; var streamBuf = ''; var stepEl = null;
+    if (!(opts && opts.retry)) addMsg('user', text);
+    // Hold the log's announcements while the turn streams; AT reads the settled reply once.
+    threadList.setAttribute('aria-busy', 'true');
+    var typing = addMsg('bot', t('agent.thinking')); typing.classList.add('is-typing');
+    var removed = false; function killTyping() { if (!removed) { removed = true; removeRow(rowOf(typing)); } }
+    var streamEl = null; var streamBuf = ''; var stepEl = null; var painting = false;
     function showStep(label) {
       if (!label) return;
       if (!removed) typing.textContent = label;
@@ -311,13 +436,17 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
       if (announcer) announcer.announce(label);
       scrollEnd();
     }
-    function clearStep() { if (stepEl) { var r = stepEl.parentNode && stepEl.parentNode.parentNode; if (r) r.remove(); else stepEl.remove(); stepEl = null; } }
+    function clearStep() { if (stepEl) { removeRow(rowOf(stepEl)); stepEl = null; } }
     function ensureStream() { killTyping(); if (!streamEl) { streamEl = addMsg('bot', ''); streamEl.classList.add('is-streaming'); } return streamEl; }
+    // Render Markdown as it streams, at most once per frame.
+    function paint() { painting = false; if (streamEl) { streamEl.innerHTML = mdToHtml(mdStreaming(streamBuf)); scrollEnd(); } }
+    function queuePaint() { if (painting) return; painting = true; (window.requestAnimationFrame || function (f) { return setTimeout(f, 16); })(paint); }
     function finalizeStream(finalText) {
       killTyping();
-      if (streamEl) { streamEl.classList.remove('is-streaming'); streamEl.innerHTML = mdToHtml(streamBuf || finalText || ''); addCopy(streamEl.parentNode, streamEl); streamEl = null; streamBuf = ''; }
-      else if (finalText) { addBot(finalText); }
-      if (announcer) announcer.announce('Reply ready', { now: true });
+      var shown = false;
+      if (streamEl) { streamEl.classList.remove('is-streaming'); streamEl.innerHTML = mdToHtml(streamBuf || finalText || ''); addCopy(streamEl.parentNode, streamEl); streamEl = null; streamBuf = ''; shown = true; }
+      else if (finalText) { addBot(finalText); shown = true; }
+      if (shown) { if (announcer) announcer.announce(t('agent.replyReady'), { now: true }); markUnread(); }
     }
     currentAbort = ('AbortController' in window) ? new AbortController() : null;
     fetch(API + '/chat', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text, threadId: currentThreadId }), signal: currentAbort ? currentAbort.signal : undefined })
@@ -325,8 +454,9 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
         if (!resp.ok || !resp.body) {
           killTyping();
           return resp.json().catch(function () { return null; }).then(function (j) {
-            if (j && j.error && (j.code === 'UPGRADE_REQUIRED' || j.code === 'FEATURE_DISABLED')) addBot(j.error);
-            else addMsg('bot', (j && j.error) || 'The agent is unavailable right now.');
+            if (j && j.error && (j.code === 'UPGRADE_REQUIRED' || j.code === 'FEATURE_DISABLED')) { addBot(j.error); return; }
+            console.warn('[agent] chat request failed', resp.status, j && j.error);
+            addError(resp.status === 429 ? 'agent.err.busy' : 'agent.err.unavailable', text);
           });
         }
         return readStream(resp, function (ev) {
@@ -334,151 +464,41 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
           if (ev.type === 'tool_step') { showStep(ev.label); return; }
           if (ev.type !== 'thread') clearStep();
           if (ev.type === 'thread') { setThread(ev.id); }
-          else if (ev.type === 'delta') { if (ev.text) { ensureStream(); streamBuf += ev.text; streamEl.textContent = streamBuf; scrollEnd(); } }
+          else if (ev.type === 'delta') { if (ev.text) { ensureStream(); streamBuf += ev.text; queuePaint(); } }
           else if (ev.type === 'text') { finalizeStream(ev.text); }
           else if (ev.type === 'cards') { finalizeStream(); addCards(ev.items); }
           else if (ev.type === 'media') { finalizeStream(); addMedia(ev); }
           else if (ev.type === 'ui_action') { finalizeStream(); if (ev.action && ev.action.kind === 'open_artifact' && typeof openArtifact === 'function') openArtifact(ev.action.slug, ev.action.name, ev.action.artifactId); else if (ev.action && ev.action.kind === 'show_onboarding' && typeof onbForce === 'function') onbForce(); }
           else if (ev.type === 'confirm') { finalizeStream(); addConfirm(ev.prompt, ev.token, ev.card); }
-          else if (ev.type === 'error') { finalizeStream(); addMsg('bot', ev.message || 'Something went wrong.'); }
+          else if (ev.type === 'error') { finalizeStream(); console.warn('[agent] stream error', ev.message); addError('agent.err.failed', text); }
         });
       })
-      .catch(function (e) { killTyping(); if (e && e.name === 'AbortError') { if (streamBuf) finalizeStream(); else addMsg('bot', 'Stopped.'); } else addMsg('bot', 'Connection dropped.'); })
-      .then(function () { clearStep(); setSending(false); currentAbort = null; });
-  }
-
-  // ----- thread history drawer -----
-  var threadsPanel = document.getElementById('wsxThreads');
-  var threadsList = document.getElementById('wsxThreadsList');
-  function newChat() {
-    setThread(null); threadList.innerHTML = ''; lastRole = null;
-    if (threadsPanel) threadsPanel.hidden = true;
-    openComposer(); if (ask) ask.focus();
-  }
-  var REPLAY_CAP = 30;
-  function renderMsg(m) {
-    var ts = ''; try { ts = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch (e) {}
-    if (m.role === 'assistant') addBot(m.content, ts); else addMsg('user', m.content, ts);
-  }
-  function replay(messages) {
-    messages = messages || [];
-    threadList.innerHTML = ''; lastRole = null;
-    replaying = true;
-    var start = Math.max(0, messages.length - REPLAY_CAP);
-    if (start > 0) {
-      // Cap the eager render of very long threads; reveal the rest on demand,
-      // preserving the reader's place across the prepend. [12,14]
-      var more = el('button', 'wsx-loadearlier'); more.type = 'button';
-      more.textContent = t(start > 1 ? 'agent.loadEarlierPlural' : 'agent.loadEarlier').replace('{n}', String(start));
-      more.addEventListener('click', function () {
-        function full() { threadList.innerHTML = ''; lastRole = null; replaying = true; messages.forEach(renderMsg); replaying = false; }
-        if (scroller) scroller.preserveOnPrepend(full); else full();
-      });
-      threadList.appendChild(more);
-    }
-    messages.slice(start).forEach(renderMsg);
-    replaying = false;
-    // Reopen at the last user message, not the absolute bottom. [11]
-    var rows = threadList.querySelectorAll('.wsx-row.user');
-    var lastUser = rows.length ? rows[rows.length - 1] : null;
-    if (scroller && lastUser) scroller.scrollToAnchor(lastUser); else scrollEnd(true);
-  }
-  function openThread(id, silent) {
-    setThread(id);
-    fetch(API + '/threads/' + encodeURIComponent(id), { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) { if (!j) { if (!silent) addMsg('bot', t('agent.couldNotLoadChat')); return; } replay(j.messages); if (!silent) { openComposer(); } })
-      .catch(function () {});
-    if (threadsPanel) threadsPanel.hidden = true;
-  }
-  function loadThreads() {
-    if (!threadsList) return;
-    threadsList.innerHTML = i18nLoad();
-    fetch(API + '/threads', { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : { threads: [] }; })
-      .then(function (j) {
-        var ts = (j && j.threads) || [];
-        if (!ts.length) { threadsList.innerHTML = i18nEmpty('agent.noSavedChats'); return; }
-        threadsList.innerHTML = '';
-        ts.forEach(function (th) {
-          var row = el('div', 'wsx-thread' + (th.id === currentThreadId ? ' is-active' : ''));
-          var main = el('button', 'wsx-thread__main'); main.type = 'button';
-          var ti = el('span', 'wsx-thread__title'); ti.textContent = th.title || t('agent.newChat');
-          var pv = el('span', 'wsx-thread__preview'); pv.textContent = th.preview || '';
-          main.appendChild(ti); main.appendChild(pv);
-          main.addEventListener('click', function () { openThread(th.id); });
-          var ren = el('button', 'wsx-thread__act'); ren.type = 'button'; ren.title = t('agent.renameChat'); ren.textContent = '\\u270E';
-          ren.addEventListener('click', function (e) { e.stopPropagation(); var nv = window.prompt(t('agent.renameChat'), th.title || ''); if (nv && nv.trim()) { fetch(API + '/threads/' + encodeURIComponent(th.id) + '/rename', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: nv.trim() }) }).then(function (r) { if (!r.ok) throw new Error('failed'); ti.textContent = nv.trim(); }).catch(function () { showToast('Couldn\\u2019t rename chat', 'error'); }); } });
-          var del = el('button', 'wsx-thread__act'); del.type = 'button'; del.title = t('common.delete'); del.textContent = '\\u00D7';
-          del.addEventListener('click', function (e) { e.stopPropagation(); if (!window.confirm(t('agent.deleteChat'))) return; fetch(API + '/threads/' + encodeURIComponent(th.id), { method: 'DELETE', credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error('failed'); row.remove(); if (th.id === currentThreadId) newChat(); }).catch(function () { showToast('Couldn\\u2019t delete chat', 'error'); }); });
-          row.appendChild(main); row.appendChild(ren); row.appendChild(del);
-          threadsList.appendChild(row);
-        });
+      .catch(function (e) {
+        killTyping();
+        if (e && e.name === 'AbortError') { if (streamBuf) finalizeStream(); addNote(t('agent.stopped')); }
+        else { console.warn('[agent] connection dropped', e); if (streamBuf) finalizeStream(); addError('agent.err.connection', text); }
       })
-      .catch(function () { threadsList.innerHTML = i18nEmpty('agent.couldNotHistory'); });
-  }
-  var threadsBtn = document.getElementById('wsxThreadsBtn');
-  var threadsClose = document.getElementById('wsxThreadsClose');
-  var newChatBtn = document.getElementById('wsxNewChat');
-  if (threadsBtn) threadsBtn.addEventListener('click', function () { openComposer(); if (threadsPanel) { var show = threadsPanel.hidden; threadsPanel.hidden = !show; if (show) loadThreads(); } });
-  if (threadsClose) threadsClose.addEventListener('click', function () { if (threadsPanel) threadsPanel.hidden = true; });
-  if (newChatBtn) newChatBtn.addEventListener('click', newChat);
-
-  // ----- in-thread search (chat-core; only when the global is present) [10] -----
-  var searchBar = document.getElementById('wsxSearch');
-  var searchBtn = document.getElementById('wsxSearchBtn');
-  if (searchBtn && !CC) searchBtn.hidden = true;
-  if (searchBtn && searchBar && CC) {
-    var searchInput = document.getElementById('wsxSearchInput');
-    var searchCount = document.getElementById('wsxSearchCount');
-    chatSearch = CC.createChatSearch(threadList, scroller, {
-      messageSelector: '.wsx-msg',
-      onCount: function (cur, total) { if (searchCount) searchCount.textContent = total ? (cur + '/' + total) : t('agent.noMatches'); }
-    });
-    function runSearch() { chatSearch.search(searchInput ? searchInput.value : ''); }
-    function closeSearch() { if (chatSearch) chatSearch.clear(); searchBar.hidden = true; if (searchCount) searchCount.textContent = ''; }
-    searchBtn.addEventListener('click', function () { var show = searchBar.hidden; searchBar.hidden = !show; if (show && searchInput) { searchInput.focus(); runSearch(); } else closeSearch(); });
-    if (searchInput) searchInput.addEventListener('input', runSearch);
-    if (searchInput) searchInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); e.shiftKey ? chatSearch.prev() : chatSearch.next(); } else if (e.key === 'Escape') { closeSearch(); } });
-    var sNext = document.getElementById('wsxSearchNext'); if (sNext) sNext.addEventListener('click', function () { chatSearch.next(); });
-    var sPrev = document.getElementById('wsxSearchPrev'); if (sPrev) sPrev.addEventListener('click', function () { chatSearch.prev(); });
-    var sClose = document.getElementById('wsxSearchClose'); if (sClose) sClose.addEventListener('click', closeSearch);
+      .then(function () { clearStep(); threadList.removeAttribute('aria-busy'); setSending(false); currentAbort = null; });
   }
 
-  var dock = document.getElementById('wsxDock');
-  var ask = document.getElementById('wsxAsk');
-  var attachedFile = null;
+  // ----- attachments: chip in the composer; a file chip (not the raw marker) in the thread -----
   var attachChip = document.getElementById('wsxAttachChip');
   var attachBtn = document.getElementById('wsxAttach');
   var attachInput = document.getElementById('wsxAttachInput');
   function renderAttachChip() {
+    syncSendBtn();
     if (!attachChip) return;
     if (!attachedFile) { attachChip.hidden = true; attachChip.innerHTML = ''; return; }
     attachChip.hidden = false;
-    attachChip.innerHTML = '<span class="wsx__attachchip__pill"><span class="wsx__attachchip__name">' + esc(attachedFile.name) + '</span><button type="button" class="wsx__attachchip__x" id="wsxAttachClear" aria-label="Remove">&times;</button></span>';
+    attachChip.innerHTML = '<span class="wsx__attachchip__pill">' + CLIP_SVG + '<span class="wsx__attachchip__name">' + esc(attachedFile.name) + '</span><button type="button" class="wsx__attachchip__x" id="wsxAttachClear" aria-label="' + esc(t('agent.removeAttachment')) + '" title="' + esc(t('agent.removeAttachment')) + '">&times;</button></span>';
     var clr = document.getElementById('wsxAttachClear');
-    if (clr) clr.addEventListener('click', function () { attachedFile = null; renderAttachChip(); });
+    if (clr) clr.addEventListener('click', function () { attachedFile = null; renderAttachChip(); if (ask) ask.focus(); });
   }
   function setAttached(blobId, name) {
-    attachedFile = { id: blobId, name: name || 'file' };
-    renderAttachChip();
+    attachedFile = { id: blobId, name: name || t('agent.file') };
     openComposer();
+    renderAttachChip();
   }
-  if (ask) ask.addEventListener('focus', function () { openComposer(); });
-  if (dock) dock.addEventListener('submit', function (e) {
-    e.preventDefault();
-    if (sending && !createMode) return;
-    var v = ask.value.trim();
-    var out = v;
-    if (attachedFile) {
-      out = (v ? v + '\\n\\n' : '') + '[Attached file: ' + attachedFile.name + ' — file id ' + attachedFile.id + ']';
-      attachedFile = null;
-      renderAttachChip();
-    }
-    if (!out) return;
-    ask.value = '';
-    if (createMode) createSend(out); else send(out);
-  });
   if (attachBtn && attachInput) {
     attachBtn.addEventListener('click', function () { if (!attachBtn.classList.contains('is-busy')) attachInput.click(); });
     attachInput.addEventListener('change', function () {
@@ -489,7 +509,7 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
       uploadBlobOnly(f, function (blobId, name) {
         attachBtn.classList.remove('is-busy');
         if (blobId) setAttached(blobId, name);
-        else addMsg('bot', 'Could not attach that file. Try again?');
+        else addError('agent.err.attach');
       });
     });
   }
@@ -497,13 +517,17 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
     var p = new URLSearchParams(location.search);
     var fid = p.get('chat_file');
     if (!fid) return;
-    setAttached(fid, p.get('chat_name') || 'file');
+    setAttached(fid, p.get('chat_name') || '');
     p.delete('chat_file');
     p.delete('chat_name');
     var q = p.toString();
     history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash);
   })();
-  function agentAsk(text, auto) { if (auto) { send(text); } else { ask.value = text; ask.focus(); } }
+  function agentAsk(text, auto) {
+    if (auto) { send(text); return; }
+    openComposer(); setAsk(text); ask.focus();
+    try { ask.setSelectionRange(ask.value.length, ask.value.length); } catch (e) {}
+  }
 
   // ----- voice input: record → POST to /transcribe → drop transcript in the composer -----
   var mic = document.getElementById('wsxMic');
@@ -518,10 +542,10 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
       fetch(API + '/transcribe?seconds=' + Math.round(seconds), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': blob.type || 'audio/webm' }, body: blob })
         .then(function (r) { return r.json().catch(function () { return {}; }); })
         .then(function (d) {
-          if (d && d.text) { ask.value = ask.value ? (ask.value + ' ' + d.text) : d.text; ask.focus(); }
-          else { addMsg('bot', (d && d.error) || 'I couldn’t transcribe that.'); }
+          if (d && d.text) { setAsk(ask.value ? (ask.value + ' ' + d.text) : d.text); ask.focus(); }
+          else { if (d && d.error) console.warn('[agent] transcribe failed', d.error); addError('agent.err.voiceEmpty'); }
         })
-        .catch(function () { addMsg('bot', 'Voice transcription failed. Try again?'); })
+        .catch(function (e) { console.warn('[agent] transcribe failed', e); addError('agent.err.voice'); })
         .then(function () { micBusy = false; setMicState(''); });
     }
     function startRec() {
@@ -537,7 +561,7 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
           rec = null;
         });
         rec.start(); setMicState('recording');
-      }).catch(function () { addMsg('bot', 'I need microphone access to hear you. Check your browser permissions.'); });
+      }).catch(function () { addError('agent.err.mic'); });
     }
     mic.addEventListener('click', function () {
       if (rec && rec.state === 'recording') rec.stop();
@@ -545,24 +569,16 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
     });
   }
 
-  // Restore the last open thread silently (don't pop the composer on load).
-  if (currentThreadId) openThread(currentThreadId, true);
-
-  // ===== proactive daily brief: once per day the assistant greets you with a
-  // short AI summary of what needs you + recent runs/updates, docked on the side =====
+  // ===== proactive daily brief: once per day a short summary of what needs you lands in
+  // the chat — it never opens the sheet; the pill shows an unread dot instead =====
   function timeOfDay() {
     var h = new Date().getHours();
-    if (h < 12) return 'Morning';
-    if (h < 18) return 'Afternoon';
-    return 'Evening';
+    if (h < 12) return 'morning';
+    if (h < 18) return 'afternoon';
+    return 'evening';
   }
+  // Agent-requested surfacing only (e.g. show_onboarding) — never on page load.
   function openDock() { setComposer('sheet'); }
-  function showBrief(text) {
-    var col = makeCol('bot');
-    var b = el('div', 'wsx-msg bot wsx-msg--brief'); b.innerHTML = mdToHtml(text); col.appendChild(b);
-    scrollEnd(true);
-    openDock();
-  }
   (function () {
     if (currentThreadId) return;
     var key = 'wsx_brief_' + SCOPE;
@@ -571,17 +587,17 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
     var tod = timeOfDay();
     var loadCol = makeCol('bot');
     var load = el('div', 'wsx-msg bot wsx-msg--brief is-typing');
-    load.textContent = 'Preparing your ' + tod + ' Brief…';
-    loadCol.appendChild(load); scrollEnd(true); openDock();
-    fetch(API + '/brief?tod=' + tod.toLowerCase(), { credentials: 'same-origin' })
+    load.textContent = t('agent.brief.' + tod);
+    loadCol.appendChild(load);
+    fetch(API + '/brief?tod=' + tod, { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (j) {
         if (j && j.text) {
           try { localStorage.setItem(key, today); } catch (e) {}
-          load.classList.remove('is-typing'); load.innerHTML = mdToHtml(j.text); scrollEnd(true);
-        } else { loadCol.parentNode && loadCol.parentNode.removeChild(loadCol); }
+          load.classList.remove('is-typing'); load.innerHTML = mdToHtml(j.text); scrollToTop(rowOf(load)); markUnread();
+        } else { removeRow(rowOf(load)); }
       })
-      .catch(function () { loadCol.parentNode && loadCol.parentNode.removeChild(loadCol); });
+      .catch(function () { removeRow(rowOf(load)); });
   })();
 
 `;

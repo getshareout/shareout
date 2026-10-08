@@ -39,7 +39,7 @@ export const workspace_client_create_ai_JS = `  // ===== Create with AI (in-Stud
     fetch('/v1/create/generate', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phase: 'plan', prompt: prompt }) })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        typing.remove();
+        removeRow(rowOf(typing));
         if (!d || !d.ok) { addMsg('bot', t('create.planFail')); return; }
         if (d.message) addMsg('bot', d.message);
         if (d.type === 'clarify' && d.questions && d.questions.length) renderClarify(d.questions, prompt);
@@ -47,7 +47,7 @@ export const workspace_client_create_ai_JS = `  // ===== Create with AI (in-Stud
         else if (d.type === 'build') createBuild(prompt);
         if (d.suggestions && d.suggestions.length) renderSuggestions(d.suggestions);
       })
-      .catch(function () { typing.remove(); addMsg('bot', t('create.connDropped')); });
+      .catch(function () { removeRow(rowOf(typing)); addMsg('bot', t('create.connDropped')); });
   }
   function renderClarify(questions, basePrompt) {
     var answers = []; var qi = 0;
@@ -93,7 +93,7 @@ export const workspace_client_create_ai_JS = `  // ===== Create with AI (in-Stud
           if (ev.type === 'done') {
             var mod = ev.moderation;
             prog.textContent = t(mod ? (mod.status === 'blocked' ? 'create.buildBlocked' : 'create.buildHeld') : (ev.visibility === 'private' ? 'create.buildPrivate' : 'create.buildDone'));
-            if (ev.slug) { openArtifact(ev.slug, '\\u2728 ' + String(prompt).slice(0, 28), ev.artifactId); setComposer('docked'); }
+            if (ev.slug) { openArtifact(ev.slug, '\\u2728 ' + String(prompt).slice(0, 28), ev.artifactId); setComposer('resting'); }
             exitCreate();
           } else if (ev.type === 'error') { prog.textContent = t('create.buildFailed') + (ev.error || 'unknown'); }
         });

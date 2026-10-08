@@ -13,7 +13,9 @@ import { workspace_client_inspector_JS } from './inspector';
 import { workspace_client_home_views_JS } from './home-views';
 import { workspace_client_routing_JS } from './routing';
 import { workspace_client_artifact_links_JS } from './artifact-links';
+import { workspace_client_agent_format_JS } from './agent-format';
 import { workspace_client_agent_dock_JS } from './agent-dock';
+import { workspace_client_agent_threads_JS } from './agent-threads';
 import { workspace_client_onboarding_JS } from './onboarding';
 import { workspace_client_create_ai_JS } from './create-ai';
 import { workspace_client_widget_layout_JS } from './widget-layout';
@@ -37,7 +39,9 @@ export const WORKSPACE_CLIENT = [
   workspace_client_home_views_JS,
   workspace_client_routing_JS,
   workspace_client_artifact_links_JS,
+  workspace_client_agent_format_JS,
   workspace_client_agent_dock_JS,
+  workspace_client_agent_threads_JS,
   workspace_client_onboarding_JS,
   workspace_client_create_ai_JS,
   workspace_client_widget_layout_JS,

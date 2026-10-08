@@ -245,40 +245,42 @@ export function buildWorkspaceBody(args: RenderArgs): string {
 
   <div class="wsx__railscrim" id="wsxRailScrim" hidden></div>
   <div class="wsx__scrim" id="wsxScrim" hidden></div>
-  <section class="wsx__composer" id="wsxComposer" data-state="resting">
+  <section class="wsx__composer" id="wsxComposer" data-state="resting" aria-labelledby="wsxComposerTitle">
+    <button type="button" class="wsx__pill" id="wsxPill" aria-haspopup="dialog"><span class="wsx__pill-text" data-i18n="composer.pill">Ask your workspace…</span><span class="wsx__pill-dot" id="wsxPillDot" hidden><span class="wsx-sr" data-i18n="composer.unread">New reply</span></span></button>
     <div class="wsx__composer-grip" id="wsxComposerGrip" title="Drag to resize" aria-hidden="true"></div>
     <header class="wsx__composer-bar">
-      <span class="wsx__composer-title"><span class="wsx__live-dot"></span><span data-i18n="composer.chat">Chat</span></span>
+      <h2 class="wsx__composer-title" id="wsxComposerTitle" data-i18n="composer.chat">Chat</h2>
       <div class="wsx__composer-btns">
+        <button type="button" class="wsx__composer-new" id="wsxNewChat" data-i18n-title="composer.newChat" title="New chat">${svg('<path d="M12 5v14M5 12h14"/>')}<span data-i18n="composer.newChat">New chat</span></button>
         <button type="button" id="wsxSearchBtn" data-i18n-title="composer.search" data-i18n-aria="composer.search" title="Search this chat" aria-label="Search this chat">${svg('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>')}</button>
-        <button type="button" id="wsxThreadsBtn" data-i18n-title="composer.history" data-i18n-aria="composer.history" title="Chat history" aria-label="Chat history">${svg('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/>')}</button>
-        <button type="button" id="wsxNewChat" data-i18n-title="composer.newChat" data-i18n-aria="composer.newChat" title="New chat" aria-label="New chat">${svg('<path d="M12 5v14M5 12h14"/>')}</button>
+        <button type="button" id="wsxThreadsBtn" data-i18n-title="composer.history" data-i18n-aria="composer.history" title="Chat history" aria-label="Chat history" aria-expanded="false" aria-controls="wsxThreads">${svg('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/>')}</button>
         <button type="button" id="wsxComposerMin" data-i18n-title="composer.minimize" data-i18n-aria="composer.minimize" title="Minimize" aria-label="Minimize">${svg('<path d="M6 9l6 6 6-6"/>')}</button>
       </div>
     </header>
     <div class="wsx__threads" id="wsxThreads" hidden>
-      <div class="wsx__threads-head"><span data-i18n="composer.chats">Chats</span><button type="button" id="wsxThreadsClose" data-i18n-aria="composer.closeHistory" aria-label="Close history">${svg('<path d="M18 6L6 18M6 6l12 12"/>')}</button></div>
+      <div class="wsx__threads-head"><span data-i18n="composer.chats">Chats</span><button type="button" id="wsxThreadsClose" data-i18n-aria="composer.closeHistory" data-i18n-title="composer.closeHistory" aria-label="Close history" title="Close history">${svg('<path d="M18 6L6 18M6 6l12 12"/>')}</button></div>
       <div class="wsx__threads-list" id="wsxThreadsList"></div>
     </div>
     <div class="wsx__searchbar" id="wsxSearch" hidden>
       <input class="wsx__searchinput" id="wsxSearchInput" data-i18n-placeholder="composer.findInChat" placeholder="Find in chat…" data-i18n-aria="composer.findInChat" aria-label="Find in chat" autocomplete="off">
-      <span class="wsx__searchcount" id="wsxSearchCount"></span>
+      <span class="wsx__searchcount" id="wsxSearchCount" aria-live="polite"></span>
       <button type="button" id="wsxSearchPrev" data-i18n-title="composer.prevMatch" data-i18n-aria="composer.prevMatch" title="Previous match" aria-label="Previous match">${svg('<path d="M18 15l-6-6-6 6"/>')}</button>
       <button type="button" id="wsxSearchNext" data-i18n-title="composer.nextMatch" data-i18n-aria="composer.nextMatch" title="Next match" aria-label="Next match">${svg('<path d="M6 9l6 6 6-6"/>')}</button>
       <button type="button" id="wsxSearchClose" data-i18n-title="composer.closeSearch" data-i18n-aria="composer.closeSearch" title="Close search" aria-label="Close search">${svg('<path d="M18 6L6 18M6 6l12 12"/>')}</button>
     </div>
-    <div class="wsx__thread" id="wsxThread">
-      <div class="wsx__threadlist" id="wsxThreadList"></div>
-      <button type="button" class="wsx__scrolldown" id="wsxScrollDown" hidden data-i18n-aria="composer.scrollLatest" aria-label="Scroll to latest">${svg('<path d="M12 5v14M5 12l7 7 7-7"/>')}</button>
+    <div class="wsx__threadpane">
+      <div class="wsx__thread" id="wsxThread">
+        <div class="wsx__threadlist" id="wsxThreadList" role="log" aria-live="polite" aria-relevant="additions" data-i18n-aria="composer.messages" aria-label="Messages"></div>
+      </div>
+      <button type="button" class="wsx__scrolldown" id="wsxScrollDown" hidden data-i18n-aria="composer.scrollLatest" data-i18n-title="composer.scrollLatest" aria-label="Scroll to latest" title="Scroll to latest">${svg('<path d="M12 5v14M5 12l7 7 7-7"/>')}</button>
     </div>
     <div class="wsx__attachchip" id="wsxAttachChip" hidden></div>
     <form class="wsx__dockbar" id="wsxDock">
-      ${svg(ICON.foryou)}
-      <input class="wsx__dockinput" id="wsxAsk" data-i18n-placeholder="composer.placeholder" placeholder="Ask your workspace — “show me CPM artifacts”…" data-i18n-aria="composer.ask" aria-label="Ask your workspace" autocomplete="off">
+      <textarea class="wsx__dockinput" id="wsxAsk" rows="1" data-i18n-placeholder="composer.placeholder" placeholder="Ask your workspace — “show me my CPM pages”…" data-i18n-aria="composer.ask" aria-label="Ask your workspace" autocomplete="off" enterkeyhint="send"></textarea>
       <input type="file" id="wsxAttachInput" hidden accept=".xlsx,.xls,.pptx,.csv,.pdf,image/*">
       <button class="wsx__dockattach" id="wsxAttach" type="button" data-i18n-aria="composer.attach" data-i18n-title="composer.attach" aria-label="Attach file" title="Attach file">${svg('<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>')}</button>
       <button class="wsx__dockmic" id="wsxMic" type="button" data-i18n-aria="composer.voice" data-i18n-title="composer.voice" aria-label="Voice message" title="Voice message" hidden>${svg('<path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/>')}</button>
-      <button class="wsx__docksend" type="submit" data-i18n-aria="composer.send" aria-label="Send">${svg('<path d="M4 12h15M13 6l6 6-6 6"/>')}</button>
+      <button class="wsx__docksend" id="wsxSend" type="button" data-mode="send" aria-label="Send" title="Send" disabled>${svg('<path d="M4 12h15M13 6l6 6-6 6"/>')}</button>
     </form>
   </section>
 
