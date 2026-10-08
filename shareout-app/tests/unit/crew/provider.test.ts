@@ -8,6 +8,7 @@ vi.mock('../../../src/logging', async (orig) => {
 
 import {
   AnthropicCrewProvider,
+  OpenAICompatCrewProvider,
   FailoverCrewProvider,
   getCrewProvider,
   type CrewProvider,
@@ -169,5 +170,32 @@ describe('getCrewProvider', () => {
     const p = getCrewProvider({ ANTHROPIC_API_KEY: 'sk-ant', OPENAI_API_KEY: 'sk', AI_PROVIDER_ORDER: 'openai' } as Env);
     expect(p).toBeInstanceOf(FailoverCrewProvider);
     expect(p?.provider).toBe('openai');
+  });
+});
+
+describe('OpenAICompatCrewProvider', () => {
+  const oaCfg = { provider: 'openai' as const, apiKey: 'sk', baseUrl: 'https://gw.example/v1', model: 'x/y' };
+  const chunk = (delta: unknown, finish_reason: string | null = null) => ({ choices: [{ delta, finish_reason }] });
+
+  it('treats emitted tool calls as tool_use even when finish_reason is stop', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(sse([
+      chunk({ tool_calls: [{ index: 0, id: 'c1', function: { name: 'list_artifacts', arguments: '{"q":"x"}' } }] }),
+      chunk({}, 'stop'),
+    ]));
+
+    const events = await collect(new OpenAICompatCrewProvider(oaCfg, env), args);
+
+    expect(events).toContainEqual({ type: 'tool_use', id: 'c1', name: 'list_artifacts', input: { q: 'x' } });
+    expect(events.at(-1)).toMatchObject({ type: 'message_stop', stopReason: 'tool_use' });
+  });
+
+  it('flags malformed tool arguments instead of passing an empty object', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(sse([
+      chunk({ tool_calls: [{ index: 0, id: 'c1', function: { name: 'list_artifacts', arguments: '{"q":' } }] }, 'tool_calls'),
+    ]));
+
+    const events = await collect(new OpenAICompatCrewProvider(oaCfg, env), args);
+
+    expect(events).toContainEqual({ type: 'tool_use', id: 'c1', name: 'list_artifacts', input: { __invalid_json: '{"q":' } });
   });
 });

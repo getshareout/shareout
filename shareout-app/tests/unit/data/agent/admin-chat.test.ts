@@ -113,9 +113,22 @@ describe('handleAdminChat', () => {
         if (sql.includes('FROM assets')) return { results: [] };
         return { results: [] };
       },
+      first: (sql: string, args: unknown[]) =>
+        existingConv && sql.includes('FROM agent_threads') && args[1] === ARTIFACT_ID ? { 1: 1 } : null,
       run: vi.fn(async () => ({ success: true })),
     };
   }
+
+  it('404s a conversation that belongs to a different artifact', async () => {
+    const ctx = makeCtx(makeEnv(chatDb(false)));
+    const res = await handleAdminChat(
+      jsonRequest(`${BASE_URL}/admin/chat`, 'POST', { message: 'hi', conversationId: 'conv_other_artifact' }),
+      ctx,
+    );
+
+    expect(res.status).toBe(404);
+    expect(mockStreamChat).not.toHaveBeenCalled();
+  });
 
   it('rejects non-POST', async () => {
     const ctx = makeCtx(makeEnv());

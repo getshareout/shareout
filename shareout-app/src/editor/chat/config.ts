@@ -24,7 +24,6 @@ export function debugLog(category: string, message: string, data?: unknown): voi
 }
 
 export function debugError(category: string, message: string, error?: unknown): void {
-  if (!DEBUG) return;
   const timestamp = new Date().toISOString();
   console.error(`[EditorChat ${timestamp}] [${category}] ERROR: ${message}`, error);
 }

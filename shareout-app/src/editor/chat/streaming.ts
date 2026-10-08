@@ -79,7 +79,7 @@ async function handleProviderSseEvent(
   state: {
     encoder: TextEncoder;
     controller: ReadableStreamDefaultController<Uint8Array>;
-    content: { text: string };
+    content: { text: string; done?: boolean };
     env: Env;
     artifactId: string;
     userId: string;
@@ -98,7 +98,8 @@ async function handleProviderSseEvent(
       }));
     }
 
-    if (event.type === 'message_stop') {
+    if (event.type === 'message_stop' && !state.content.done) {
+      state.content.done = true;
       debugLog(state.logCategory, 'Anthropic message_stop received');
       await emitDoneEvent(state.encoder, state.controller, {
         env: state.env,
@@ -124,7 +125,8 @@ async function handleProviderSseEvent(
     }));
   }
 
-  if (choices?.[0]?.finish_reason === 'stop') {
+  if (choices?.[0]?.finish_reason === 'stop' && !state.content.done) {
+    state.content.done = true;
     debugLog(state.logCategory, 'OpenAI finish_reason=stop received');
     await emitDoneEvent(state.encoder, state.controller, {
       env: state.env,
@@ -163,7 +165,7 @@ async function pumpUpstreamSse(
 
   const decoder = new TextDecoder();
   let buffer = '';
-  const content = { text: '' };
+  const content: { text: string; done?: boolean } = { text: '' };
   let chunkCount = 0;
   let eventCount = 0;
 
@@ -193,6 +195,8 @@ async function pumpUpstreamSse(
       const data = line.slice(6);
       if (data === '[DONE]') {
         debugLog(options.logCategory, 'Received [DONE] signal');
+        if (content.done) continue;
+        content.done = true;
         await emitDoneEvent(encoder, controller, {
           env: options.env,
           artifactId: options.artifactId,

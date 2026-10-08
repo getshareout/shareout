@@ -6,6 +6,8 @@ export interface PendingRecord {
   action: PendingAction;
   /** Platform message ref to edit after confirm (bots); omitted for web. */
   messageRef?: string | null;
+  /** Web thread the proposal came from, so the confirmed result lands in it. */
+  threadId?: string;
 }
 
 /**

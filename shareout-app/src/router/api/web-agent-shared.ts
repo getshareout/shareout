@@ -68,6 +68,7 @@ export function streamAgentChat(env: Env, cfg: ChatTurnConfig): Response {
     const store = new D1ConversationStore(env, cfg.scopeKey, cfg.user.id, threadId);
     const reply = createWebReplyPort(env, cfg.user.id, send);
     const [history, snapshot] = await Promise.all([store.loadHistory(HISTORY_LIMIT), cfg.buildSnapshot()]);
+    await store.appendMessage('user', cfg.text);
 
     const result = await runAgentTurn(env, {
       platform: 'web',
@@ -80,14 +81,14 @@ export function streamAgentChat(env: Env, cfg: ChatTurnConfig): Response {
       extraTools: cfg.extraTools,
     });
 
-    await store.appendMessage('user', cfg.text);
-    await store.appendMessage('assistant', result.reply);
+    const summary = result.proposal ? describeAction(result.proposal) : '';
+    await store.appendMessage('assistant', [result.reply, summary].filter(Boolean).join('\n\n'));
     send({ type: 'text', text: result.reply });
 
     if (result.proposal && env.RATE_LIMIT_KV) {
       const token = generateId('appr');
       await store.putPending(token, { action: result.proposal });
-      send({ type: 'confirm', prompt: describeAction(result.proposal), token, card: describeActionRich(result.proposal) });
+      send({ type: 'confirm', prompt: summary, token, card: describeActionRich(result.proposal) });
     }
     send({ type: 'done' });
   });
@@ -103,17 +104,22 @@ export async function confirmAgentAction(env: Env, scopeKey: string, user: AuthU
   const store = new D1ConversationStore(env, scopeKey, user.id, '');
   const rec = await store.takePending(token);
   if (!rec) return jsonResp({ error: 'That confirmation expired. Ask again?' }, 410);
+  const remember = (text: string) => rec.threadId
+    ? new D1ConversationStore(env, scopeKey, user.id, rec.threadId).appendMessage('assistant', text)
+    : Promise.resolve();
 
   if (rec.action.kind === 'build_artifact') {
     const action = rec.action;
     return sseResp(async (send) => {
       const r = await executeBuildArtifact(env, user.id, action, (label) => send({ type: 'build_step', label }));
+      await remember(r.url ? `${r.text}\n${r.url}` : r.text);
       send({ type: 'build_done', text: r.text, url: r.url, slug: r.slug, artifactId: r.artifactId, name: r.name });
       send({ type: 'done' });
     });
   }
 
   const resultText = await executeAction(env, user.id, rec.action);
+  await remember(resultText);
   return jsonResp({ ok: true, text: resultText });
 }
 

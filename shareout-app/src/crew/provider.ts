@@ -75,7 +75,7 @@ function parseToolInput(raw: string): Record<string, unknown> {
   try {
     return JSON.parse(raw || '{}');
   } catch {
-    return {};
+    return { __invalid_json: raw.slice(0, 500) };
   }
 }
 
@@ -199,14 +199,16 @@ export class OpenAICompatCrewProvider implements CrewProvider {
       }
     }
 
+    let sawTool = false;
     for (const acc of toolAcc.values()) {
       if (!acc.name) continue;
+      sawTool = true;
       yield { type: 'tool_use', id: acc.id || acc.name, name: acc.name, input: parseToolInput(acc.args) };
     }
 
     yield {
       type: 'message_stop',
-      stopReason: stopReason === 'tool_calls' ? 'tool_use' : 'end_turn',
+      stopReason: stopReason === 'tool_calls' || sawTool ? 'tool_use' : 'end_turn',
       usage: { inputTokens, outputTokens },
     };
   }
