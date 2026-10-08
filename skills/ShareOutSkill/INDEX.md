@@ -87,6 +87,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Internal workspace visibility | [team/SKILL.md](team/SKILL.md#workspace-visibility) | [modules/_shared/permissions.md](modules/_shared/permissions.md) |
 | Workspace membership policy | [team/api.md](team/api.md#workspace-membership-policy) | [team/SKILL.md](team/SKILL.md#workspace-membership-policy) |
 | Workspace subdomain | [team/subdomain.md](team/subdomain.md) | [deploy/cloudflare.md](deploy/cloudflare.md) |
+| Workspace SSO (Okta / OIDC) | [team/sso.md](team/sso.md) | [deploy/cloudflare.md](deploy/cloudflare.md) |
 | Workspace house style/context | [team/workspace-context.md](team/workspace-context.md) | [team/SKILL.md](team/SKILL.md#workspace-context-files) |
 | Workspace connectors (shared / per-user tokens) | [team/workspace-connections.md](team/workspace-connections.md) | [team/api.md](team/api.md#workspace-connections) |
 | Deliver to multiple destinations | [api/destinations.md](api/destinations.md) | [api/jobs.md](api/jobs.md) |
@@ -128,6 +129,7 @@ ShareOutSkill/
 │   ├── SKILL.md                # Workspace entry point (no plan gates on self-host)
 │   ├── INDEX.md                # Workspace intent router
 │   ├── api.md                  # Workspace REST endpoints
+│   ├── sso.md                  # Workspace SSO (Okta / OIDC)
 │   ├── subdomain.md            # Workspace subdomain behavior
 │   ├── workspace-context.md    # Workspace house-style context files
 │   ├── workspace-connections.md  # Shared vs per-user workspace connectors

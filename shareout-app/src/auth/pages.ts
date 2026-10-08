@@ -82,10 +82,28 @@ export function appLoginPage(opts: {
   loginHint?: string | null;
   /** EMAIL binding present. Without it, OTP codes only reach the worker log. */
   emailConfigured?: boolean;
+  /** This workspace subdomain signs in through its own IdP; `enforced` hides every other method. */
+  sso?: { label: string; href: string; enforced: boolean } | null;
 }): Response {
   const redirect = opts.redirect && opts.redirect.startsWith('/') ? opts.redirect : '/home';
   const googleEnabled = opts.googleEnabled === true;
   const emailConfigured = opts.emailConfigured !== false;
+  const sso = opts.sso || null;
+
+  if (sso?.enforced) {
+    return renderAuthPage('Sign in - ShareOut', `
+  <div class="card">
+    <div class="icon icon-primary">✦</div>
+    <h1>Sign in</h1>
+    <p>Your organization signs in with single sign-on.</p>
+    <div class="auth-methods">
+    ${ssoButtonHtml(sso)}
+    </div>
+    <div class="footer">
+      Powered by <a href="/" class="footer-brand">${brandMarkImg('footer-mark', 16)}ShareOut</a>
+    </div>
+  </div>`);
+  }
 
   // Password first: it is the one method that works on every instance. A one-time
   // code needs mail delivery, and offering it as the primary route on an instance
@@ -104,6 +122,7 @@ export function appLoginPage(opts: {
     <h1>Sign in</h1>
     <p>Use your email and password${googleEnabled ? ', or Google,' : ''} to continue.</p>
     <div class="auth-methods">
+    ${sso ? ssoButtonHtml(sso) : ''}
     ${googleEnabled ? googleButtonHtml(redirect, opts.loginHint) : ''}
     ${googleEnabled ? '<div class="auth-divider"><span>or</span></div>' : ''}
     ${passwordFormHtml()}
@@ -117,17 +136,22 @@ export function appLoginPage(opts: {
   ${emailOtpScript(redirect)}`);
 }
 
+function ssoButtonHtml(sso: { label: string; href: string }): string {
+  return `<a href="${escapeHtml(sso.href)}" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(sso.label)}</a>`;
+}
+
 function passwordFormHtml(): string {
   return `<form id="password-login" class="email-code-form" novalidate>
       <div class="field">
         <label class="field-label" for="password-email">Email address</label>
         <input id="password-email" type="email" name="email" autocomplete="username" placeholder="you@company.com" required>
       </div>
-      <div class="field">
+      <a id="password-sso" class="so-c-btn so-c-btn--primary so-c-btn--block" href="#" hidden></a>
+      <div class="field" id="password-field">
         <label class="field-label" for="password-value">Password</label>
         <input id="password-value" type="password" name="password" autocomplete="current-password" required>
       </div>
-      <button type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">Sign in</button>
+      <button id="password-submit" type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">Sign in</button>
       <div id="password-status" class="status" role="status" aria-live="polite" hidden></div>
     </form>`;
 }
@@ -139,6 +163,38 @@ function passwordLoginScript(redirectAfter: string): string {
   var form = document.getElementById('password-login');
   var status = document.getElementById('password-status');
   if (!form) return;
+
+  // Email first: an address on a workspace's SSO domain gets that IdP's button, and when
+  // the workspace is SSO-only the password field goes away instead of asking for a
+  // password the person does not have.
+  var ssoLink = document.getElementById('password-sso');
+  var pwField = document.getElementById('password-field');
+  var pwSubmit = document.getElementById('password-submit');
+  var lookedUp = '';
+  var timer = null;
+  function showSso(sso) {
+    ssoLink.hidden = !sso;
+    var enforced = !!(sso && sso.enforced);
+    pwField.hidden = enforced;
+    pwSubmit.hidden = enforced;
+    form.password.required = !enforced;
+    if (sso) {
+      ssoLink.textContent = sso.label;
+      ssoLink.href = sso.url + '&redirect=' + encodeURIComponent(${dest});
+    }
+  }
+  function lookup() {
+    var email = form.email.value.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { lookedUp = ''; showSso(null); return; }
+    if (email === lookedUp) return;
+    lookedUp = email;
+    fetch('/v1/auth/sso/lookup?email=' + encodeURIComponent(email))
+      .then(function (r) { return r.ok ? r.json() : { sso: null }; })
+      .then(function (d) { if (lookedUp === email) showSso(d.sso); })
+      .catch(function () { showSso(null); });
+  }
+  form.email.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(lookup, 350); });
+  form.email.addEventListener('change', lookup);
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     var btn = form.querySelector('button[type=submit]');
@@ -152,6 +208,7 @@ function passwordLoginScript(redirectAfter: string): string {
       return r.json().then(function (d) { return { ok: r.ok, data: d }; });
     }).then(function (res) {
       if (res.ok && res.data.ok) { window.location.href = ${dest}; return; }
+      if (res.data.redirect_url) { window.location.href = res.data.redirect_url; return; }
       btn.disabled = false;
       status.hidden = false;
       status.className = 'status status--error';
@@ -258,6 +315,10 @@ function emailOtpScript(redirectAfter: string): string {
           body: JSON.stringify({ email: email, turnstileToken: tsEl ? tsEl.value : undefined })
         });
         var data = await readJson(response);
+        if (data.redirect_url) {
+          window.location.href = data.redirect_url;
+          return;
+        }
         if (!response.ok || !data.ok) {
           throw new Error(data.error || "Couldn't send a code. Try again.");
         }

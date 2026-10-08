@@ -8,6 +8,7 @@ import { getPlatformHostname } from '../config/origins';
 import { errorPage, linkSuccessPage } from './pages';
 import { resolveSessionMaxAge } from './session';
 import { linkGoogleToUser, upsertUser } from './users';
+import { ssoRequiredFor, ssoStartPath } from './sso-config';
 import { scheduleSeedStarterKit } from '../starter-kit';
 import { scheduleWelcomeEmail, scheduleWorkspaceWelcome } from '../onboarding/welcome-email';
 import { approveDeviceCode, deviceDonePage } from './device-auth';
@@ -167,6 +168,11 @@ export async function handleGoogleCallback(request: Request, env: Env, execution
         return errorPage(result.error || 'Failed to link account', redirectTo);
       }
       return linkSuccessPage(userInfo.email, redirectTo);
+    }
+
+    const sso = await ssoRequiredFor(env, userInfo.email);
+    if (sso) {
+      return Response.redirect(new URL(ssoStartPath(sso.workspaceSlug, redirectTo, userInfo.email), env.SHAREOUT_BASE_URL).toString(), 302);
     }
 
     const user = await upsertUser(env, userInfo);

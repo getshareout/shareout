@@ -17,10 +17,14 @@ async function hasExplicitArtifactInvite(env: Env, email: string): Promise<boole
   return !!collaborator;
 }
 
-/** Find-or-create a user from an email alone (no Google). */
+/**
+ * Find-or-create a user from an email alone (no Google). `invited` skips the paused-signup
+ * gate for callers that already proved the address is expected (workspace SSO domains).
+ */
 export async function upsertUserByEmail(
   env: Env,
-  emailRaw: string
+  emailRaw: string,
+  opts: { invited?: boolean } = {}
 ): Promise<{ id: string; email: string; isNew: boolean; firstActivation: boolean }> {
   const email = emailRaw.toLowerCase().trim();
   const existing = await env.DB.prepare(
@@ -40,7 +44,8 @@ export async function upsertUserByEmail(
   // Private artifact shares and workspace allowlists are explicit invitations.
   // Let those emails create accounts even while open sign-ups are paused.
   if (
-    signupsPaused(env)
+    !opts.invited
+    && signupsPaused(env)
     && !(await hasExplicitArtifactInvite(env, email))
     && !(await hasWorkspaceSignupAllowlist(env, email))
   ) {

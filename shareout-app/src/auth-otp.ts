@@ -17,6 +17,7 @@ import {
 import { scheduleSeedStarterKit } from './starter-kit';
 import { scheduleWelcomeEmail, scheduleWorkspaceWelcome } from './onboarding/welcome-email';
 import { jsonWithApiErrors } from './http/api-error';
+import { ssoRequiredFor, ssoRequiredBody } from './auth/sso-config';
 
 const OTP_TTL_MS = 10 * 60 * 1000; // codes valid for 10 minutes
 const OTP_RESEND_WINDOW_MS = 30 * 1000; // min gap between sends to one email
@@ -148,6 +149,8 @@ export async function handleEmailOtpStart(ctx: FetchContext): Promise<Response> 
   if (!human) {
     return json({ ok: false, error: 'Bot check failed. Please retry.', code: 'TURNSTILE_FAILED' }, 403);
   }
+  const sso = await ssoRequiredFor(ctx.env, body.email || '');
+  if (sso) return json(ssoRequiredBody(sso, body.email || ''), 403);
   const result = await startEmailOtp(ctx.env, body.email || '');
   return json(result, result.ok ? 200 : 400);
 }
@@ -156,6 +159,8 @@ export async function handleEmailOtpVerify(ctx: FetchContext): Promise<Response>
   const body = await ctx.request.json().catch(() => ({})) as { email?: string; code?: string };
   const rl = await checkEmailOtpVerifyLimit(ctx.env, ctx.request);
   if (!rl.allowed) return rateLimitResponse(rl);
+  const sso = await ssoRequiredFor(ctx.env, body.email || '');
+  if (sso) return json(ssoRequiredBody(sso, body.email || ''), 403);
   const result = await verifyEmailOtp(ctx.env, body.email || '', body.code || '');
   if (!result.ok || !result.user) {
     return json({ ok: false, error: result.error }, 400);
