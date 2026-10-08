@@ -37,6 +37,7 @@ import {
 import { handleSsoStart, handleSsoCallback, resetOidcCaches, verifyIdToken } from '../../../src/auth/oidc';
 import { handleEmailOtpStart, handleEmailOtpVerify } from '../../../src/auth-otp';
 import { handlePasswordLogin } from '../../../src/auth/password-routes';
+import { appLoginPage } from '../../../src/auth/pages';
 import type { FetchContext } from '../../../src/router/context';
 
 const ISSUER = 'https://acme.okta.test/oauth2/default';
@@ -318,5 +319,16 @@ describe('Okta-only enforcement', () => {
     const res = await handleEmailOtpStart(otp('/v1/auth/email/start', { email: 'ana@acme.com' }));
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ ok: true });
+  });
+});
+
+describe('email-first login page', () => {
+  it('ships an email check that accepts addresses containing "s"', async () => {
+    const html = await appLoginPage({ redirect: '/home' }).text();
+    const source = html.match(/if \(!\/(\^\[\^\\s@\][^/]*\$)\/\.test\(email\)\)/)?.[1];
+    expect(source).toBeDefined();
+    const re = new RegExp(source!);
+    expect(re.test('leo@shareout.site')).toBe(true);
+    expect(re.test('not an email')).toBe(false);
   });
 });
