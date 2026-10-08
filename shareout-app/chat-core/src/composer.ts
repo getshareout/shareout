@@ -68,7 +68,8 @@ export function wireComposer(opts: ComposerOptions): void {
     if (submitOnEnter) {
       input.addEventListener('keydown', (e: Event) => {
         const ke = e as KeyboardEvent;
-        if (ke.key === 'Enter' && !ke.shiftKey) {
+        // Enter that confirms an IME composition (CJK, accents) must not send.
+        if (ke.key === 'Enter' && !ke.shiftKey && !ke.isComposing && ke.keyCode !== 229) {
           e.preventDefault();
           submit();
         }

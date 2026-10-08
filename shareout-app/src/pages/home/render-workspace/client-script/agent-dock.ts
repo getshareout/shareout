@@ -584,20 +584,19 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
     var key = 'wsx_brief_' + SCOPE;
     var today = new Date().toISOString().slice(0, 10);
     try { if (localStorage.getItem(key) === today) return; } catch (e) {}
-    var tod = timeOfDay();
-    var loadCol = makeCol('bot');
-    var load = el('div', 'wsx-msg bot wsx-msg--brief is-typing');
-    load.textContent = t('agent.brief.' + tod);
-    loadCol.appendChild(load);
-    fetch(API + '/brief?tod=' + tod, { credentials: 'same-origin' })
+    // No placeholder: the brief appears only when there is something to say (a new,
+    // empty account gets none — the onboarding welcome speaks instead).
+    var lang = typeof window.__SO_HOME_LOCALE === 'function' ? window.__SO_HOME_LOCALE() : 'en';
+    fetch(API + '/brief?tod=' + timeOfDay() + '&lang=' + encodeURIComponent(lang), { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (j) {
-        if (j && j.text) {
-          try { localStorage.setItem(key, today); } catch (e) {}
-          load.classList.remove('is-typing'); load.innerHTML = mdToHtml(j.text); scrollToTop(rowOf(load)); markUnread();
-        } else { removeRow(rowOf(load)); }
+        if (!j || !j.text) return;
+        try { localStorage.setItem(key, today); } catch (e) {}
+        var col = makeCol('bot');
+        var b = el('div', 'wsx-msg bot wsx-msg--brief'); b.innerHTML = mdToHtml(j.text); col.appendChild(b);
+        scrollToTop(rowOf(b)); markUnread();
       })
-      .catch(function () { removeRow(rowOf(load)); });
+      .catch(function () {});
   })();
 
 `;

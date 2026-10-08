@@ -21,8 +21,8 @@ import homeViewsBarrel from '../../../src/pages/home/render-workspace/client-scr
 /** Captured at split time — guards against accidental client-script drift.
  *  Re-pinned after the Home chat dock revamp (pill + dialog sheet, textarea composer,
  *  progressive markdown, error rows, thread menu; agent-format/agent-threads split). */
-const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 597_636;
-const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '7e237cde0285cd69dbe51ddb30060d87ae2bff0d4a76e6a0faaf80d288383379';
+const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 598_726;
+const ORIGINAL_WORKSPACE_CLIENT_SHA256 = 'fa947882b7be2180a986b00935ca8c0a391d220b54418208cdaf4031c0411954';
 const HOME_VIEWS_MARKER = '  // ===== rail nav → Home pane views =====';
 
 const SECTION_SOURCES: [string, string][] = [

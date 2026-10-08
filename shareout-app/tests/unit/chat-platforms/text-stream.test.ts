@@ -68,6 +68,15 @@ describe('createTextStream', () => {
     expect(edit).not.toHaveBeenCalled();
   });
 
+  it('settles a throttled message to the full streamed text when the final reply is empty', async () => {
+    const { stream, edit, send } = setup();
+    await stream.delta('Let me ');
+    await stream.delta('share that.');
+    await stream.finish('');
+    expect(edit).toHaveBeenCalledWith('ref1', 'Let me share that.');
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it('falls back to sending the final text once when the final edit fails', async () => {
     const { stream, send } = setup({ edit: false });
     await stream.delta('partial');

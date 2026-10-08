@@ -15,13 +15,13 @@ import { streamAgentChat, confirmAgentAction } from '../../../src/router/api/web
 const log: string[] = [];
 const inserts: unknown[][] = [];
 
-function makeEnv(): Env {
+function makeEnv(rows: Array<{ role: string; content: string }> = []): Env {
   const kv = new Map<string, string>();
   const DB = {
     prepare: (sql: string) => ({
       bind: (...args: unknown[]) => ({
         first: async () => null,
-        all: async () => ({ results: [] }),
+        all: async () => ({ results: sql.includes('FROM agent_messages') ? [...rows].reverse() : [] }),
         run: async () => {
           if (sql.includes('INSERT INTO agent_messages')) { inserts.push(args); log.push(`insert:${args[2]}`); }
           return { meta: { changes: 1 } };
@@ -54,6 +54,16 @@ describe('streamAgentChat', () => {
     await events(streamAgentChat(env, { scopeKey: 'ws1', user, selectedWorkspaceId: 'ws1', text: 'hola', threadId: 'wat_1', buildSnapshot: async () => '' }));
 
     expect(log).toEqual(['insert:user', 'turn']);
+  });
+
+  it('does not save a retried message twice or replay it to the model as history', async () => {
+    runAgentTurn.mockResolvedValue({ reply: 'ok' });
+    const env = makeEnv([{ role: 'user', content: 'hola' }]);
+
+    await events(streamAgentChat(env, { scopeKey: 'ws1', user, selectedWorkspaceId: 'ws1', text: 'hola', threadId: 'wat_1', buildSnapshot: async () => '' }));
+
+    expect(inserts.filter((a) => a[2] === 'user')).toHaveLength(0);
+    expect(runAgentTurn.mock.calls[0][1].history).toEqual([]);
   });
 
   it('remembers a proposal and its confirmed result in the thread', async () => {

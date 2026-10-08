@@ -3,9 +3,6 @@ import type { HomeLocaleCopy } from '../types';
 /** Agent dock and AI assistant copy. */
 export const AGENT_COPY: HomeLocaleCopy = {
   en: {
-    'agent.brief.morning': 'Preparing your morning brief…',
-    'agent.brief.afternoon': 'Preparing your afternoon brief…',
-    'agent.brief.evening': 'Preparing your evening brief…',
     'agent.buildIt': 'Build page',
     'agent.building': 'Building “{name}”…',
     'agent.buildStarting': 'Starting…',
@@ -52,9 +49,6 @@ export const AGENT_COPY: HomeLocaleCopy = {
     'agent.renameChat': 'Rename chat',
   },
   es: {
-    'agent.brief.morning': 'Preparando tu resumen de la mañana…',
-    'agent.brief.afternoon': 'Preparando tu resumen de la tarde…',
-    'agent.brief.evening': 'Preparando tu resumen de la noche…',
     'agent.buildIt': 'Crear página',
     'agent.building': 'Creando “{name}”…',
     'agent.buildStarting': 'Empezando…',

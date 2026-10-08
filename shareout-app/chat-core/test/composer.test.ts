@@ -30,6 +30,15 @@ describe('wireComposer', () => {
     expect(onSubmit).toHaveBeenCalledWith('x');
   });
 
+  it('ignores Enter while an IME composition is active', () => {
+    const onSubmit = vi.fn();
+    wireComposer({ input, button, onSubmit });
+    input.value = 'にほん';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(input.value).toBe('にほん');
+  });
+
   it('blocks submission when guard returns false', () => {
     const onSubmit = vi.fn();
     wireComposer({ input, button, guard: () => false, onSubmit });
