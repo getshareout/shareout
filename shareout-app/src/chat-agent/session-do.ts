@@ -9,6 +9,8 @@ import { DoConversationStore } from './store/do-store';
 import { checkAiChatLimit } from '../rate-limit';
 import { generateId } from '../crypto-utils';
 import type { WorkspaceSelection } from './access';
+import { PERSONAL_SCOPE } from '../chat-platforms/types';
+import { buildHomeSnapshot } from '../router/api/home-agent';
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS messages (
@@ -76,6 +78,17 @@ function createReplyPort(
   throw new Error(`ChatSessionDO: unsupported platform ${platform}`);
 }
 
+/** The web home's workspace snapshot for a session scoped to one workspace; '' otherwise or on failure. */
+async function workspaceSnapshot(env: Env, userId: string, ws: WorkspaceSelection | undefined): Promise<string> {
+  if (typeof ws !== 'string' || ws === PERSONAL_SCOPE) return '';
+  try {
+    const row = await env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first<{ email: string | null }>();
+    return await buildHomeSnapshot(env, ws, { id: userId, email: row?.email ?? null, username: null });
+  } catch {
+    return '';
+  }
+}
+
 // One Durable Object per messaging session. Serializes turns, dedups retries by
 // update_id, and keeps conversation history + pending approvals in DO SQLite.
 export class ChatSessionDO implements DurableObject {
@@ -134,7 +147,10 @@ export class ChatSessionDO implements DurableObject {
 
     await reply.sendTyping();
 
-    const history = await this.store.loadHistory(HISTORY_LIMIT);
+    const [history, workspaceContext] = await Promise.all([
+      this.store.loadHistory(HISTORY_LIMIT),
+      workspaceSnapshot(this.env, b.userId, b.selectedWorkspaceId),
+    ]);
 
     let result: Awaited<ReturnType<typeof runAgentTurn>>;
     try {
@@ -146,6 +162,7 @@ export class ChatSessionDO implements DurableObject {
         userText: b.text,
         selectedWorkspaceId: b.selectedWorkspaceId,
         history,
+        ...(workspaceContext ? { workspaceContext } : {}),
       });
     } catch {
       result = { reply: 'Hmm, something went wrong on my end. Mind trying again?' };
@@ -155,6 +172,7 @@ export class ChatSessionDO implements DurableObject {
     if (result.toolNotes) await this.store.appendNotes?.(result.toolNotes);
 
     if (result.proposal) {
+      await reply.finishText?.(result.reply);
       const token = generateId('pa');
       const summary = describeAction(result.proposal);
       const messageId = await reply.askConfirmation(summary, token);
@@ -167,7 +185,7 @@ export class ChatSessionDO implements DurableObject {
     }
 
     await this.store.appendMessage('assistant', result.reply);
-    await reply.sendText(result.reply);
+    await (reply.finishText ? reply.finishText(result.reply) : reply.sendText(result.reply));
   }
 
   private async processCallback(b: SessionCallbackBody): Promise<void> {

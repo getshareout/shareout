@@ -75,8 +75,10 @@ export interface LinkOffer {
  */
 export interface ChatReplyPort {
   sendText(text: string): Promise<void>;
-  /** Optional progressive text streaming (web SSE). Bots omit it and render whole messages via sendText. */
+  /** Optional progressive text streaming (web SSE; bots edit one message in place). */
   sendTextDelta?(text: string): Promise<void>;
+  /** Bots that stream: settle the streamed message to the final text, or send it when nothing streamed. */
+  finishText?(text: string): Promise<void>;
   sendTyping(): Promise<void>;
   /** Optional "what I'm doing" line while a tool runs (web). Bots fall back to sendTyping. */
   sendToolProgress?(label: string): Promise<void>;

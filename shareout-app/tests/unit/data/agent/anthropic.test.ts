@@ -445,3 +445,59 @@ describe('chat', () => {
     expect(result.content).toBe('');
   });
 });
+
+describe('streamChat request options', () => {
+  function sseBody(events: unknown[]): ReadableStream<Uint8Array> {
+    const enc = new TextEncoder();
+    return new ReadableStream({
+      start(c) {
+        c.enqueue(enc.encode(events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('')));
+        c.close();
+      },
+    });
+  }
+
+  async function bodyOf(env: Env, opts: Parameters<typeof streamChat>[6], messages: Parameters<typeof streamChat>[1] = [{ role: 'user', content: 'Hi' }]) {
+    vi.restoreAllMocks();
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(openAIStreamBody(['ok'], { prompt_tokens: 1, completion_tokens: 1 }), { status: 200 }),
+    );
+    for await (const _ of streamChat(env, messages, 'sys', '', 100, null, opts)) { /* drain */ }
+    return JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+  }
+
+  it('sends temperature to non-Claude models only', async () => {
+    expect((await bodyOf(openaiEnv(), { temperature: 0.2 })).temperature).toBe(0.2);
+    expect((await bodyOf(gatewayEnv(), { temperature: 0.2 }))).not.toHaveProperty('temperature');
+    expect((await bodyOf(openaiEnv(), {}))).not.toHaveProperty('temperature');
+  });
+
+  it('sends an image block in each provider format', async () => {
+    const image = { mediaType: 'image/png', data: 'AAAA' };
+    const oa = await bodyOf(openaiEnv(), {}, [{ role: 'user', content: 'look', image }]);
+    expect(oa.messages[1].content).toEqual([
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,AAAA' } },
+      { type: 'text', text: 'look' },
+    ]);
+    const an = await bodyOf(anthropicEnv(), {}, [{ role: 'user', content: 'look', image }]);
+    expect(an.messages[0].content[0]).toEqual({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' } });
+  });
+
+  it('flags a max-token stop on the done chunk', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(sseBody([
+      { choices: [{ delta: { content: 'cut' } }] },
+      { choices: [{ delta: {}, finish_reason: 'length' }] },
+    ]), { status: 200 }));
+    const chunks = await collectStream(openaiEnv());
+    expect(chunks.at(-1)).toMatchObject({ type: 'done', truncated: true });
+  });
+
+  it('does not flag a normal stop', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(sseBody([
+      { type: 'content_block_delta', delta: { type: 'text_delta', text: 'ok' } },
+      { type: 'message_delta', delta: { stop_reason: 'end_turn' } },
+    ]), { status: 200 }));
+    const chunks = await collectStream(anthropicEnv());
+    expect(chunks.at(-1)).not.toHaveProperty('truncated');
+  });
+});

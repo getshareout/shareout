@@ -83,8 +83,8 @@ export function editorAnthropicStopStream(fullContent: string): ReadableStream<U
   const encoder = new TextEncoder();
   const half = Math.ceil(fullContent.length / 2);
   const lines = [
-    `data: ${JSON.stringify({ type: 'content_block_delta', delta: { text: fullContent.slice(0, half) } })}\n\n`,
-    `data: ${JSON.stringify({ type: 'content_block_delta', delta: { text: fullContent.slice(half) } })}\n\n`,
+    `data: ${JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: fullContent.slice(0, half) } })}\n\n`,
+    `data: ${JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: fullContent.slice(half) } })}\n\n`,
     'data: {"type":"message_stop"}\n\n',
   ];
   return new ReadableStream({
@@ -99,7 +99,7 @@ export function editorAnthropicStopStream(fullContent: string): ReadableStream<U
 export function editorAnthropicDoneStream(fullContent: string): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   const lines = [
-    `data: ${JSON.stringify({ type: 'content_block_delta', delta: { text: fullContent } })}\n\n`,
+    `data: ${JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: fullContent } })}\n\n`,
     'data: [DONE]\n\n',
   ];
   return new ReadableStream({

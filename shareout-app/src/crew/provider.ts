@@ -347,12 +347,15 @@ export class FailoverCrewProvider implements CrewProvider {
   }
 }
 
+/** A crew provider for one fixed config (e.g. a workspace's BYO key — never failed over to our keys). */
+export function crewProviderFor(env: Env, cfg: AIConfig): CrewProvider {
+  return cfg.provider === 'anthropic' ? new AnthropicCrewProvider(cfg, env) : new OpenAICompatCrewProvider(cfg, env);
+}
+
 /** Resolve the crew provider over every configured AI provider, in failover order.
  *  `gatewayModel` overrides the Vercel AI Gateway model (workspace or instance choice). */
 export function getCrewProvider(env: Env, gatewayModel?: string | null): CrewProvider | null {
-  const providers = getBuildChain(env, gatewayModel).map((cfg) =>
-    cfg.provider === 'anthropic' ? new AnthropicCrewProvider(cfg, env) : new OpenAICompatCrewProvider(cfg, env),
-  );
+  const providers = getBuildChain(env, gatewayModel).map((cfg) => crewProviderFor(env, cfg));
   if (providers.length === 0) return null;
   return providers.length === 1 ? providers[0] : new FailoverCrewProvider(providers);
 }

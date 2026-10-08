@@ -1,16 +1,11 @@
 /**
- * AI provider configuration for the visual editor chat.
+ * Editor chat configuration. Provider selection lives in the shared agent layer
+ * (data/agent/anthropic.ts + ai-config.ts); this module only holds editor limits
+ * and debug logging.
  *
- * Resolution order: Vercel AI Gateway → Anthropic → OpenAI.
  * Set `DEBUG = true` locally to trace prompts, SSE events, and parsed patches.
  */
 
-import type { Env } from '../../types';
-import { DEFAULT_CLAUDE_MODEL, OPENAI_CHAT_MODEL } from '../../data/agent/models';
-
-export const ANTHROPIC_MODEL = DEFAULT_CLAUDE_MODEL.id;
-export const OPENAI_MODEL = OPENAI_CHAT_MODEL;
-export const VERCEL_GATEWAY_URL = 'https://ai-gateway.vercel.sh/v1';
 export const EDITOR_MAX_TOKENS = 8192;
 
 /** EDIT-10 F2: off in prod (was logging full prompts/patches/HTML previews). */
@@ -26,49 +21,4 @@ export function debugLog(category: string, message: string, data?: unknown): voi
 export function debugError(category: string, message: string, error?: unknown): void {
   const timestamp = new Date().toISOString();
   console.error(`[EditorChat ${timestamp}] [${category}] ERROR: ${message}`, error);
-}
-
-export type AIProvider = 'anthropic' | 'openai' | 'vercel-gateway';
-
-export interface AIConfig {
-  provider: AIProvider;
-  apiKey: string;
-  baseUrl: string;
-  model: string;
-}
-
-/** Pick the first configured upstream model API for editor chat. */
-export function getAIProvider(env: Env): AIConfig | null {
-  if (env.VERCEL_AI_GATEWAY) {
-    debugLog('CONFIG', 'Using Vercel AI Gateway', { keyPrefix: env.VERCEL_AI_GATEWAY.slice(0, 8) });
-    return {
-      provider: 'vercel-gateway',
-      apiKey: env.VERCEL_AI_GATEWAY,
-      baseUrl: VERCEL_GATEWAY_URL,
-      model: `openai/${OPENAI_MODEL}`,
-    };
-  }
-
-  if (env.ANTHROPIC_API_KEY) {
-    debugLog('CONFIG', 'Using Anthropic API directly');
-    return {
-      provider: 'anthropic',
-      apiKey: env.ANTHROPIC_API_KEY,
-      baseUrl: 'https://api.anthropic.com/v1',
-      model: ANTHROPIC_MODEL,
-    };
-  }
-
-  if (env.OPENAI_API_KEY) {
-    debugLog('CONFIG', 'Using OpenAI API directly');
-    return {
-      provider: 'openai',
-      apiKey: env.OPENAI_API_KEY,
-      baseUrl: 'https://api.openai.com/v1',
-      model: OPENAI_MODEL,
-    };
-  }
-
-  debugError('CONFIG', 'No AI provider configured - need VERCEL_AI_GATEWAY, ANTHROPIC_API_KEY, or OPENAI_API_KEY');
-  return null;
 }

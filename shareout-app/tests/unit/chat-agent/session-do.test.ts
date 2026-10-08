@@ -4,6 +4,7 @@ import type { Env } from '../../../src/types';
 
 const h = vi.hoisted(() => ({
   runAgentTurn: vi.fn(),
+  buildHomeSnapshot: vi.fn(async () => 'Pages (1 shown):\n- Sales (id: a1)'),
   executeAction: vi.fn(),
   allowed: true,
   port: {
@@ -24,6 +25,7 @@ vi.mock('../../../src/chat-agent/actions', () => ({
   describeAction: (a: { type: string }) => `Do ${a.type}?`,
 }));
 vi.mock('../../../src/chat-platforms/telegram/reply-port', () => ({ createTelegramReplyPort: () => h.port }));
+vi.mock('../../../src/router/api/home-agent', () => ({ buildHomeSnapshot: h.buildHomeSnapshot }));
 vi.mock('../../../src/rate-limit', () => ({ checkAiChatLimit: async () => ({ allowed: h.allowed }) }));
 
 import { ChatSessionDO } from '../../../src/chat-agent/session-do';
@@ -38,10 +40,10 @@ beforeEach(() => {
 });
 
 /** A ChatSessionDO over real DO SQLite storage, with the agent/platform edges mocked. */
-async function withSession<R>(fn: (send: (body: object) => Promise<Response>) => Promise<R>): Promise<R> {
+async function withSession<R>(fn: (send: (body: object) => Promise<Response>) => Promise<R>, sessionEnv = {} as Env): Promise<R> {
   const stub = testEnv.CHAT.get(testEnv.CHAT.newUniqueId());
   return runInDurableObject(stub, async (_instance, state) => {
-    const session = new ChatSessionDO(state, {} as Env);
+    const session = new ChatSessionDO(state, sessionEnv);
     const send = (body: object) =>
       session.fetch(new Request('https://do/turn', { method: 'POST', body: JSON.stringify(body) }));
     return fn(send);
@@ -165,5 +167,56 @@ describe('ChatSessionDO', () => {
     expect(h.port.sendText).toHaveBeenNthCalledWith(1, expect.stringMatching(/went wrong/));
     expect(h.port.sendText).toHaveBeenNthCalledWith(2, 'ok now');
     expect(JSON.stringify(h.port.sendText.mock.calls)).not.toContain('D1 exploded');
+  });
+});
+
+describe('ChatSessionDO workspace snapshot + streaming', () => {
+  const dbEnv = {
+    DB: { prepare: () => ({ bind: () => ({ first: async () => ({ email: 'u1@example.com' }) }) }) },
+  } as unknown as Env;
+
+  it('passes the web home workspace snapshot when a workspace is selected', async () => {
+    h.runAgentTurn.mockResolvedValue({ reply: 'ok' });
+    await withSession((send) => send({ ...turn(70, 'what changed?'), selectedWorkspaceId: 'wsp_1' }), dbEnv);
+    expect(h.buildHomeSnapshot).toHaveBeenCalledWith(dbEnv, 'wsp_1', expect.objectContaining({ id: 'u1', email: 'u1@example.com' }));
+    expect(h.runAgentTurn.mock.calls[0][1].workspaceContext).toContain('Sales (id: a1)');
+  });
+
+  it('sends no snapshot for personal or all-pages scope', async () => {
+    h.runAgentTurn.mockResolvedValue({ reply: 'ok' });
+    h.buildHomeSnapshot.mockClear();
+    await withSession(async (send) => {
+      await send({ ...turn(71, 'hi'), selectedWorkspaceId: '__personal' });
+      await send(turn(72, 'hi'));
+    }, dbEnv);
+    expect(h.buildHomeSnapshot).not.toHaveBeenCalled();
+    expect(h.runAgentTurn.mock.calls[0][1]).not.toHaveProperty('workspaceContext');
+  });
+
+  it('runs the turn without a snapshot when building it fails', async () => {
+    h.runAgentTurn.mockResolvedValue({ reply: 'ok' });
+    h.buildHomeSnapshot.mockRejectedValueOnce(new Error('boom'));
+    await withSession((send) => send({ ...turn(73, 'hi'), selectedWorkspaceId: 'wsp_1' }), dbEnv);
+    expect(h.runAgentTurn.mock.calls[0][1]).not.toHaveProperty('workspaceContext');
+    expect(h.port.sendText).toHaveBeenCalledWith('ok');
+  });
+
+  it('settles a streamed reply through finishText instead of sending it again', async () => {
+    const port = h.port as typeof h.port & { finishText?: ReturnType<typeof vi.fn> };
+    port.finishText = vi.fn(async () => {});
+    try {
+      h.runAgentTurn.mockResolvedValue({ reply: 'final answer' });
+      await withSession((send) => send(turn(74, 'hi')));
+      expect(port.finishText).toHaveBeenCalledWith('final answer');
+      expect(h.port.sendText).not.toHaveBeenCalled();
+
+      port.finishText.mockClear();
+      h.runAgentTurn.mockResolvedValue({ reply: 'Sharing it', proposal: { type: 'share_artifact' } });
+      await withSession((send) => send(turn(75, 'share')));
+      expect(port.finishText).toHaveBeenCalledWith('Sharing it');
+      expect(h.port.askConfirmation).toHaveBeenCalledWith('Do share_artifact?', expect.stringMatching(/^pa/));
+    } finally {
+      delete port.finishText;
+    }
   });
 });

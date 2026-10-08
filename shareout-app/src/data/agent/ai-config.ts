@@ -75,6 +75,24 @@ export async function resolveGatewayModel(env: Env, workspaceId: string | null):
   return getInstanceDefaultGatewayModel(env);
 }
 
+/** The workspace's own (BYO) provider key as an AIConfig, or null when it has none or it can't be decrypted. */
+export async function getWorkspaceByoConfig(
+  env: Env,
+  workspaceId: string,
+  gatewayModel?: string | null
+): Promise<AIConfig | null> {
+  const cfg = await getWorkspaceLlmConfig(env, workspaceId);
+  if (!cfg?.byo_provider || !cfg.byo_encrypted_credentials || !cfg.byo_iv || !env.CREDENTIALS_KEY) return null;
+  try {
+    const data = await decryptCredentials(cfg.byo_encrypted_credentials, cfg.byo_iv, env.CREDENTIALS_KEY);
+    const apiKey = typeof data.api_key === 'string' ? data.api_key : '';
+    return apiKey ? buildAIConfig(cfg.byo_provider, apiKey, gatewayModel) : null;
+  } catch {
+    // Decrypt failure — callers fall back to the platform key.
+    return null;
+  }
+}
+
 /** Decide which provider key serves this artifact's agent. */
 export async function resolveAgentAiConfig(env: Env, artifactId: string): Promise<AgentAiConfig> {
   const workspaceId = await resolveWorkspaceId(env, artifactId);
@@ -83,20 +101,10 @@ export async function resolveAgentAiConfig(env: Env, artifactId: string): Promis
 
   if (!workspaceId) return { workspaceId: null, aiConfig: platform, byo: false };
 
-  const cfg = await getWorkspaceLlmConfig(env, workspaceId);
-  if (cfg?.byo_provider && cfg.byo_encrypted_credentials && cfg.byo_iv && env.CREDENTIALS_KEY) {
-    try {
-      const data = await decryptCredentials(cfg.byo_encrypted_credentials, cfg.byo_iv, env.CREDENTIALS_KEY);
-      const apiKey = typeof data.api_key === 'string' ? data.api_key : '';
-      if (apiKey) {
-        return { workspaceId, aiConfig: buildAIConfig(cfg.byo_provider, apiKey, gatewayModel), byo: true };
-      }
-    } catch {
-      // Decrypt failure — fall through to the platform key.
-    }
-  }
-
-  return { workspaceId, aiConfig: platform, byo: false };
+  const byo = await getWorkspaceByoConfig(env, workspaceId, gatewayModel);
+  return byo
+    ? { workspaceId, aiConfig: byo, byo: true }
+    : { workspaceId, aiConfig: platform, byo: false };
 }
 
 /** Append a per-request usage row so operators can see provider spend. */

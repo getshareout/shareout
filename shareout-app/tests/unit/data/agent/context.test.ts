@@ -1,6 +1,9 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  ADMIN_FILE_CHARS,
+  ADMIN_FILES_TOTAL_CHARS,
+  ADMIN_JSON_CHARS,
   buildAdminContext,
   buildAdminSystemPrompt,
   buildVisitorContext,
@@ -293,5 +296,53 @@ describe('buildAdminSystemPrompt', () => {
 
     expect(prompt).toContain('```javascript');
     expect(prompt).toContain('```markdown');
+  });
+});
+
+describe('buildAdminSystemPrompt size caps', () => {
+  const base = {
+    skillDocs: '## SDK',
+    artifact: { id: 'a1', name: 'Demo', visibility: 'public', currentVersion: 1 },
+    tables: [],
+  };
+
+  it('caps each file and marks it truncated', () => {
+    const big = 'a'.repeat(ADMIN_FILE_CHARS + 500);
+    const prompt = buildAdminSystemPrompt({
+      ...base,
+      json: {},
+      files: [{ path: 'index.html', content: big, mime: 'text/html' }],
+    } as AdminContext);
+    expect(prompt).not.toContain(big);
+    expect(prompt).toContain('a'.repeat(ADMIN_FILE_CHARS));
+    expect(prompt).toContain(`(truncated: showing ${ADMIN_FILE_CHARS} of ${big.length} characters)`);
+  });
+
+  it('caps total inlined file content across files', () => {
+    const files = Array.from({ length: 5 }, (_, i) => ({ path: `f${i}.js`, content: String(i).repeat(ADMIN_FILE_CHARS), mime: 'application/javascript' }));
+    const prompt = buildAdminSystemPrompt({ ...base, json: {}, files } as AdminContext);
+    const inlined = files.reduce((n, f) => n + (prompt.split(f.content[0]).length - 1), 0);
+    expect(inlined).toBeLessThanOrEqual(ADMIN_FILES_TOTAL_CHARS + 200);
+    expect(prompt).toContain('### f4.js');
+    expect(prompt).toContain('(truncated: showing 0 of');
+  });
+
+  it('caps the JSON store dump', () => {
+    const prompt = buildAdminSystemPrompt({
+      ...base,
+      files: [],
+      json: { blob: 'x'.repeat(ADMIN_JSON_CHARS * 2) },
+    } as AdminContext);
+    expect(prompt.length).toBeLessThan(ADMIN_JSON_CHARS + 5_000);
+    expect(prompt).toContain('…(truncated: showing');
+  });
+
+  it('leaves small content untouched', () => {
+    const prompt = buildAdminSystemPrompt({
+      ...base,
+      json: { flag: true },
+      files: [{ path: 'a.css', content: 'body{}', mime: 'text/css' }],
+    } as AdminContext);
+    expect(prompt).not.toContain('truncated');
   });
 });

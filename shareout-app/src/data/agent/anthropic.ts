@@ -2,7 +2,7 @@ import type { Env } from '../../types';
 import type { ChatChunk, MessageRole } from './types';
 import { fetchWithTimeout, FetchTimeoutError } from '../../fetch-utils';
 import { createLogger } from '../../logging';
-import { DEFAULT_CLAUDE_MODEL, OPENAI_CHAT_MODEL, thinkingOffParams } from './models';
+import { DEFAULT_CLAUDE_MODEL, OPENAI_CHAT_MODEL, temperatureParams, thinkingOffParams } from './models';
 
 const AI_TIMEOUT_MS = 30000;
 const AI_STREAM_TIMEOUT_MS = 60000;
@@ -56,9 +56,23 @@ export function providerOrder(env: Env): AIProvider[] {
   return [...new Set([...listed, ...DEFAULT_PROVIDER_ORDER])];
 }
 
+/** Optional inline image (base64, no data: prefix) sent before the message text. */
+export interface ChatImage {
+  mediaType: string;
+  data: string;
+}
+
+type InputMessage = { role: MessageRole; content: string; image?: ChatImage };
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  image?: ChatImage;
+}
+
+export interface StreamChatOptions {
+  /** Sampling temperature; omitted from the request when undefined. */
+  temperature?: number;
 }
 
 interface StreamEvent {
@@ -66,7 +80,7 @@ interface StreamEvent {
   usage?: { prompt_tokens?: number; completion_tokens?: number; input_tokens?: number; output_tokens?: number };
   type?: string;
   message?: { usage?: { input_tokens?: number } };
-  delta?: { type?: string; text?: string };
+  delta?: { type?: string; text?: string; stop_reason?: string };
   error?: { message?: string };
 }
 
@@ -76,8 +90,10 @@ function completionRequest(
   systemPrompt: string,
   messages: ChatMessage[],
   maxTokens: number,
-  stream: boolean
+  stream: boolean,
+  options: StreamChatOptions = {}
 ): { url: string; body: Record<string, unknown> } {
+  const temperature = options.temperature !== undefined ? temperatureParams(cfg.model, options.temperature) : {};
   if (cfg.provider === 'anthropic') {
     return {
       url: `${cfg.baseUrl}/messages`,
@@ -85,8 +101,17 @@ function completionRequest(
         model: cfg.model,
         max_tokens: maxTokens,
         system: systemPrompt,
-        messages,
+        messages: messages.map(m => m.image
+          ? {
+            role: m.role,
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: m.image.mediaType, data: m.image.data } },
+              { type: 'text', text: m.content },
+            ],
+          }
+          : { role: m.role, content: m.content }),
         ...thinkingOffParams(cfg.model),
+        ...temperature,
         ...(stream ? { stream: true } : {}),
       },
     };
@@ -96,7 +121,19 @@ function completionRequest(
     body: {
       model: cfg.model,
       max_tokens: maxTokens,
-      messages: [{ role: 'system', content: systemPrompt }, ...messages],
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages.map(m => m.image
+          ? {
+            role: m.role,
+            content: [
+              { type: 'image_url', image_url: { url: `data:${m.image.mediaType};base64,${m.image.data}` } },
+              { type: 'text', text: m.content },
+            ],
+          }
+          : { role: m.role, content: m.content }),
+      ],
+      ...temperature,
       ...(stream ? { stream: true, stream_options: { include_usage: true } } : {}),
     },
   };
@@ -189,12 +226,13 @@ export function getBuildConfig(env: Env, gatewayModel?: string | null): AIConfig
   return getBuildChain(env, gatewayModel)[0] ?? null;
 }
 
-function filterMessages(messages: Array<{ role: MessageRole; content: string }>): ChatMessage[] {
+function filterMessages(messages: InputMessage[]): ChatMessage[] {
   return messages
     .filter(m => m.role !== 'system')
     .map(m => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,
+      ...(m.image ? { image: m.image } : {}),
     }));
 }
 
@@ -221,11 +259,12 @@ export async function chatComplete(
 
 export async function* streamChat(
   env: Env,
-  messages: Array<{ role: MessageRole; content: string }>,
+  messages: InputMessage[],
   systemPrompt: string,
   _model: string,
   maxTokens: number = 4096,
-  configOverride?: AIConfig | null
+  configOverride?: AIConfig | null,
+  options: StreamChatOptions = {}
 ): AsyncGenerator<ChatChunk> {
   const attempts = resolveFailoverChain(env, configOverride);
   if (attempts.length === 0) {
@@ -242,7 +281,7 @@ export async function* streamChat(
     let failure: { error: string; retryable: boolean } | null = null;
 
     try {
-      const req = completionRequest(cfg, systemPrompt, chatMessages, maxTokens, true);
+      const req = completionRequest(cfg, systemPrompt, chatMessages, maxTokens, true, options);
       const response = await fetchWithTimeout(
         req.url,
         { method: 'POST', headers: providerHeaders(cfg), body: JSON.stringify(req.body) },
@@ -264,6 +303,7 @@ export async function* streamChat(
           let buffer = '';
           let inputTokens = 0;
           let outputTokens = 0;
+          let truncated = false;
 
           try {
             while (true) {
@@ -298,6 +338,10 @@ export async function* streamChat(
                   yield { type: 'content', content };
                 }
 
+                if (event.choices?.[0]?.finish_reason === 'length' || event.delta?.stop_reason === 'max_tokens') {
+                  truncated = true;
+                }
+
                 if (event.message?.usage?.input_tokens !== undefined) inputTokens = event.message.usage.input_tokens;
                 if (event.usage) {
                   inputTokens = event.usage.prompt_tokens ?? inputTokens;
@@ -311,7 +355,11 @@ export async function* streamChat(
           }
 
           if (!failure) {
-            yield { type: 'done', usage: { input_tokens: inputTokens, output_tokens: outputTokens } };
+            yield {
+              type: 'done',
+              usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+              ...(truncated ? { truncated } : {}),
+            };
             return;
           }
         }

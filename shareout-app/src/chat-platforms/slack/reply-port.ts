@@ -3,6 +3,7 @@ import type { ArtifactCardItem, ChatReplyPort } from '../types';
 import { getSlackLink } from './linking';
 import { openDmChannel, postSlackMessage, resolveSlackToken, slackPost, uploadFileToSlack } from './client';
 import { artifactCardBlocks, artifactCardText, confirmationBlocks } from './format';
+import { createTextStream } from '../text-stream';
 
 export interface SlackReplyContext {
   teamId: string;
@@ -26,14 +27,37 @@ async function ensureChannel(token: string, ctx: SlackReplyContext): Promise<str
 
 /** Build a ChatReplyPort backed by Slack Web API for one DM session. */
 export function createSlackReplyPort(env: Env, ctx: SlackReplyContext): ChatReplyPort {
-  return {
-    async sendText(text) {
-      const token = await resolveToken(env, ctx);
-      if (!token) return;
-      const channel = await ensureChannel(token, ctx);
-      if (!channel) return;
-      await postSlackMessage(token, channel, text);
+  async function target(): Promise<{ token: string; channel: string } | null> {
+    const token = await resolveToken(env, ctx);
+    if (!token) return null;
+    const channel = await ensureChannel(token, ctx);
+    return channel ? { token, channel } : null;
+  }
+
+  const sendText = async (text: string) => {
+    const to = await target();
+    if (to) await postSlackMessage(to.token, to.channel, text);
+  };
+
+  const stream = createTextStream({
+    async post(text) {
+      const to = await target();
+      return to ? (await postSlackMessage(to.token, to.channel, text)).ts ?? null : null;
     },
+    async edit(ref, text) {
+      const to = await target();
+      if (!to || typeof ref !== 'string') return false;
+      return (await slackPost(to.token, 'chat.update', { channel: to.channel, ts: ref, text })).ok;
+    },
+    send: sendText,
+  });
+
+  return {
+    sendText,
+
+    sendTextDelta: stream.delta,
+
+    finishText: stream.finish,
 
     async sendTyping() {
       // Slack has no lightweight typing indicator for bot DMs in our scope set.

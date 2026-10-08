@@ -1,10 +1,12 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  applyVisitorModel,
   handleConversations,
   handleVisitorChat,
   handleVisitorConfig,
 } from '../../../../src/data/agent/visitor-chat';
+import type { AIConfig } from '../../../../src/data/agent/anthropic';
 import {
   ARTIFACT_ID,
   BASE_URL,
@@ -261,6 +263,7 @@ describe('handleVisitorChat', () => {
       'gpt-4o',
       defaultAgentConfig.visitor_max_tokens,
       expect.objectContaining({ provider: 'openai', model: 'gpt-4o' }),
+      { temperature: defaultAgentConfig.visitor_temperature },
     );
   });
 
@@ -474,5 +477,49 @@ describe('handleVisitorConfig', () => {
     const res = await handleVisitorConfig(new Request(`${BASE_URL}/config`, { method: 'GET' }), ctx);
     const body = await res.json() as { data: { config: { visitor_context_tables: string[] } } };
     expect(body.data.config.visitor_context_tables).toEqual(['a', 'b']);
+  });
+});
+
+describe('visitor model + temperature settings', () => {
+  const gw: AIConfig = { provider: 'vercel-gateway', apiKey: 'k', baseUrl: 'https://ai-gateway.vercel.sh/v1', model: 'anthropic/claude-sonnet-5.5' };
+  const an: AIConfig = { provider: 'anthropic', apiKey: 'k', baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-5-5' };
+  const oa: AIConfig = { provider: 'openai', apiKey: 'k', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o' };
+
+  it('keeps the default when unset or auto-filled', () => {
+    expect(applyVisitorModel(gw, null)).toBe(gw);
+    expect(applyVisitorModel(gw, '')).toBe(gw);
+    expect(applyVisitorModel(gw, 'gpt-4o')).toBe(gw);
+    expect(applyVisitorModel(an, 'claude-sonnet-4-20250514')).toBe(an);
+  });
+
+  it('honors a model the provider can serve', () => {
+    expect(applyVisitorModel(gw, 'openai/gpt-5').model).toBe('openai/gpt-5');
+    expect(applyVisitorModel(gw, 'claude-opus-5').model).toBe('anthropic/claude-opus-5');
+    expect(applyVisitorModel(an, 'claude-opus-5').model).toBe('claude-opus-5');
+    expect(applyVisitorModel(an, 'anthropic/claude-haiku-4.5').model).toBe('claude-haiku-4-5-20251001');
+    expect(applyVisitorModel(oa, 'openai/gpt-5').model).toBe('gpt-5');
+  });
+
+  it('ignores a model the provider cannot serve', () => {
+    expect(applyVisitorModel(an, 'openai/gpt-5')).toBe(an);
+    expect(applyVisitorModel(oa, 'claude-opus-5')).toBe(oa);
+    expect(applyVisitorModel(gw, 'some-unknown-id')).toBe(gw);
+  });
+
+  it('passes the owner model and temperature to streamChat', async () => {
+    mockResolveAgentAiConfig.mockResolvedValue({ workspaceId: null, aiConfig: gw, byo: false });
+    const ctx = makeCtx(makeEnv(configDb(agentConfigRow({ visitor_model: 'openai/gpt-5', visitor_temperature: 0.3 }))));
+    const res = await handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx);
+    await readSSE(res);
+    const [, , , , , cfg, opts] = mockStreamChat.mock.calls[0];
+    expect(cfg).toMatchObject({ provider: 'vercel-gateway', model: 'openai/gpt-5' });
+    expect(opts).toEqual({ temperature: 0.3 });
+  });
+
+  it('leaves the resolved model alone for an auto-filled visitor_model', async () => {
+    mockResolveAgentAiConfig.mockResolvedValue({ workspaceId: null, aiConfig: gw, byo: false });
+    const ctx = makeCtx(makeEnv(configDb(agentConfigRow({ visitor_model: 'gpt-4o' }))));
+    await readSSE(await handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx));
+    expect(mockStreamChat.mock.calls[0][5]).toBe(gw);
   });
 });

@@ -133,13 +133,14 @@ export async function sendMessageWithButtons(
 }
 
 /** Replace a message's text and drop its inline keyboard — used to resolve an approval prompt. */
-export async function editMessageText(env: Env, chatId: number, messageId: number, text: string): Promise<void> {
-  if (!env.TELEGRAM_BOT_TOKEN) return;
-  await fetch(apiUrl(env, 'editMessageText'), {
+export async function editMessageText(env: Env, chatId: number, messageId: number, text: string): Promise<boolean> {
+  if (!env.TELEGRAM_BOT_TOKEN) return false;
+  const res = await fetch(apiUrl(env, 'editMessageText'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat_id: chatId, message_id: messageId, text: text.slice(0, MAX_MESSAGE_LEN), reply_markup: { inline_keyboard: [] } }),
   });
+  return res.ok;
 }
 
 /** Acknowledge a button tap (clears Telegram's loading spinner). */
@@ -152,4 +153,4 @@ export async function answerCallbackQuery(env: Env, callbackQueryId: string, tex
   });
 }
 
-export { chunkText };
+export { chunkText, MAX_MESSAGE_LEN };
