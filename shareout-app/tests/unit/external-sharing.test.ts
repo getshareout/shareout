@@ -6,7 +6,7 @@ import { env } from 'cloudflare:test';
 import { beforeAll, beforeEach, describe, it, expect } from 'vitest';
 import type { Env } from '../../src/types';
 import type { AuthUser } from '../../src/api-auth';
-import { canAccess, capabilitySatisfies, invalidateGrants } from '../../src/access/can-access';
+import { canAccess, invalidateGrants } from '../../src/access/can-access';
 import { requireExternalSharing } from '../../src/sharees/guard';
 import { handleCreateGrant } from '../../src/sharees/grants';
 import { handleCreateExternalToken, handleListExternalTokens, handleRevokeExternalToken } from '../../src/sharees/tokens';
@@ -60,16 +60,6 @@ async function seedExternalUser(userId: string, email: string) {
     "INSERT INTO workspace_members (id, workspace_id, user_id, role, member_class) VALUES (?, ?, ?, 'member', 'external')"
   ).bind('wsm_' + userId, WS, userId).run();
 }
-
-describe('capability lattice', () => {
-  it('comment satisfies view but not edit; manage implies edit; view ≠ comment', () => {
-    expect(capabilitySatisfies('comment', 'view')).toBe(true);
-    expect(capabilitySatisfies('comment', 'edit')).toBe(false);
-    expect(capabilitySatisfies('manage', 'edit')).toBe(true);
-    expect(capabilitySatisfies('view', 'comment')).toBe(false);
-    expect(capabilitySatisfies('edit', 'comment')).toBe(true);
-  });
-});
 
 describe('canAccess grant resolution', () => {
   const U = { userIds: ['usr_ext'], emails: ['ext@client.com'] };

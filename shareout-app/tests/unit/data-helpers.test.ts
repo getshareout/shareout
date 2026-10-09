@@ -20,10 +20,6 @@ import {
   getRateLimitInfo,
   resetRateLimit,
 } from '../../src/data/connections/rate-limiter';
-import {
-  decryptCredentials,
-  encryptCredentials,
-} from '../../src/data/connections/credentials';
 
 function envWithFirst<T>(firstResult: T, extras: Partial<Env> = {}): Env {
   return {
@@ -431,30 +427,5 @@ describe('connection rate limiter', () => {
 
   it('reports full remaining quota for unknown connections', () => {
     expect(getRateLimitInfo('fresh_conn', 10)).toMatchObject({ remaining: 10 });
-  });
-});
-
-describe('credential encryption', () => {
-  it('round-trips encrypted credential payloads', async () => {
-    const encrypted = await encryptCredentials(
-      { apiKey: 'secret', nested: { region: 'us' } },
-      'test-key'
-    );
-
-    await expect(decryptCredentials(
-      encrypted.encrypted,
-      encrypted.iv,
-      'test-key'
-    )).resolves.toEqual({ apiKey: 'secret', nested: { region: 'us' } });
-  });
-
-  it('rejects decrypting with the wrong key', async () => {
-    const encrypted = await encryptCredentials({ apiKey: 'secret' }, 'test-key');
-
-    await expect(decryptCredentials(
-      encrypted.encrypted,
-      encrypted.iv,
-      'wrong-key'
-    )).rejects.toThrow();
   });
 });

@@ -124,6 +124,9 @@ describe('runKnowledgeDistill', () => {
     expect(index?.kind).toBe('overview');
     expect(index?.body).toContain('retention (1)');
     expect(index?.body).toContain('1 pages learned');
+    // The Knowledge lens localizes the overview by matching these two lines (home-views/knowledge.ts).
+    expect(index?.body).toMatch(/^\d+ pages learned\. Updated \d{4}-\d{2}-\d{2}\.$/m);
+    expect(index?.body).toContain('## Top topics');
   });
 
   it('bootstraps index.md only when absent — leaves an existing (consolidated) trunk untouched', async () => {
