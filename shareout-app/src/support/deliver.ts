@@ -1,12 +1,22 @@
 import type { Env } from '../types';
 import { dispatchLifecycleEmail } from '../email/gateway';
 import { sendMessage as sendTelegram } from '../telegram/client';
+import { getPlatformOrigin } from '../config/origins';
 import { appendMessage, type Ticket } from './store';
 
 export interface DeliverResult {
   delivered: boolean;
   via: Ticket['channel'];
   error?: string;
+}
+
+/** Bell row for a requester who has an account, whatever channel the ticket came in on. */
+async function notifyRequester(env: Env, ticket: Ticket): Promise<void> {
+  if (!ticket.requester_user_id) return;
+  await env.DB.prepare(
+    `INSERT INTO notifications (id, recipient_type, recipient_id, kind, subject_type, subject_id, message)
+     VALUES (?, 'user', ?, 'support_reply', 'ticket', ?, ?)`
+  ).bind(crypto.randomUUID(), ticket.requester_user_id, ticket.id, ticket.subject).run().catch(() => {});
 }
 
 /**
@@ -16,12 +26,21 @@ export interface DeliverResult {
  */
 export async function deliverReply(env: Env, ticket: Ticket, body: string): Promise<DeliverResult> {
   await appendMessage(env, ticket.id, 'staff', body);
+  await notifyRequester(env, ticket);
 
   switch (ticket.channel) {
     case 'ui':
-    case 'skill':
-      // In-app + API requesters read the reply from their ticket thread; nothing to push.
-      return { delivered: true, via: ticket.channel };
+    case 'skill': {
+      // In-app + API requesters answer from their thread; the email tells them a reply is there.
+      if (!ticket.requester_email && !ticket.requester_user_id) return { delivered: false, via: ticket.channel, error: 'no requester' };
+      const res = await dispatchLifecycleEmail(env, {
+        type: 'support_reply',
+        toUserId: ticket.requester_user_id ?? undefined,
+        toEmail: ticket.requester_email ?? undefined,
+        data: { subject: ticket.subject, body, ticketUrl: `${getPlatformOrigin(env)}/home#help`, locale: ticket.locale ?? undefined },
+      });
+      return { delivered: res.sent, via: ticket.channel, error: res.error ?? res.skipped };
+    }
 
     case 'email': {
       if (!ticket.requester_email) return { delivered: false, via: 'email', error: 'no requester email' };
@@ -29,7 +48,7 @@ export async function deliverReply(env: Env, ticket: Ticket, body: string): Prom
         type: 'support_reply',
         toUserId: ticket.requester_user_id ?? undefined,
         toEmail: ticket.requester_email,
-        data: { subject: ticket.subject, body },
+        data: { subject: ticket.subject, body, locale: ticket.locale ?? undefined },
       });
       return { delivered: res.sent, via: 'email', error: res.error };
     }

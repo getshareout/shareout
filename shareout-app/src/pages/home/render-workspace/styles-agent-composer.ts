@@ -206,6 +206,12 @@ export const WORKSPACE_AGENT_COMPOSER_STYLES = `/* ---- agent dock (inside canva
 .wsx__help-mine { margin-top: 14px; }
 .wsx__help-minetitle { font: 600 var(--text-xs) var(--font-body); color: var(--color-text-secondary); margin-bottom: 6px; }
 .wsx__help-mineitem { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; border-top: 1px solid var(--color-border); font: 500 var(--text-sm) var(--font-body); }
+.wsx__help-mineitem[data-help-ticket] { cursor: pointer; }
+.wsx__help-mineitem[data-help-ticket]:hover { color: var(--color-primary); }
+.wsx__help-form[hidden] { display: none; }
+.wsx__help-thread { max-height: 260px; overflow: auto; display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.wsx__help-msg { padding: 8px 10px; border-radius: var(--radius-md); background: var(--color-surface); font: 400 var(--text-sm) var(--font-body); white-space: pre-wrap; }
+.wsx__help-msg--staff { border-left: 2px solid var(--color-primary); }
 .wsx__composer { position: absolute; z-index: 40; display: flex; flex-direction: column; background: var(--glass-bg-strong); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); border: 1px solid var(--color-border); box-shadow: var(--shadow-xl); overflow: hidden; transition: width var(--duration-normal, .22s) var(--ease-out-expo), height var(--duration-normal, .22s) var(--ease-out-expo), max-height var(--duration-normal, .22s) var(--ease-out-expo), border-radius var(--duration-fast); }
 .wsx__composer.is-resizing { transition: none; user-select: none; } /* drag grip resizes the open panel height */
 .wsx__composer[data-state="resting"] { left: calc(50% + (var(--wsx-rail) - var(--wsx-rightcol)) / 2); transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); width: min(680px, 92%); max-height: 60px; border-radius: 999px; box-shadow: var(--shadow-lg); }

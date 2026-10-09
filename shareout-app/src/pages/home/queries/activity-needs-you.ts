@@ -225,6 +225,22 @@ export async function queryNeedsYou(
       })));
   }
 
+  // The team answered a help request you opened. Directed at you; links back to Home,
+  // where the Help panel holds the thread.
+  if (on('support_reply')) {
+    push(env.DB.prepare(`
+      SELECT e.id AS id, e.message AS subject, CAST(strftime('%s', e.created_at) AS INTEGER) AS ts
+      FROM notifications e
+      WHERE e.recipient_type = 'user' AND e.recipient_id IN (${idPh}) AND e.kind = 'support_reply'
+        AND e.created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now', '-30 days')
+      ORDER BY e.created_at DESC LIMIT ?
+    `).bind(...vis.userIds, limit).all(),
+      (rows) => rows.map((r) => ({
+        kind: 'support_reply' as const, id: r.id, artifact_id: null, artifact_name: r.subject,
+        slug: null, actor: null, actor_picture: null, summary: 'support replied to your request', ts: r.ts,
+      })));
+  }
+
   // Failed / errored test runs.
   if (on('test')) {
     push(env.DB.prepare(`

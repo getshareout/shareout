@@ -28,9 +28,9 @@ export interface WorkspaceUrls {
 // the publish response, GET /v1/artifacts/:id, and the PATCH 202 body. Workstream A
 // makes held pages self-heal (hourly re-check + auto-restore), so the copy says so.
 export const MODERATION_PENDING_MESSAGE =
-  'Public pages get an automated safety check at publish. This one is held private for now — it is re-checked automatically within the hour (our team is alerted too) and goes public by itself once it clears.';
+  'Public pages get an automated safety check at publish. This one is held private for now — it is re-checked automatically within the hour and goes public by itself once it clears. If it stays held, open a support ticket from Help & support in the app (or POST /v1/support/tickets).';
 export const MODERATION_BLOCKED_MESSAGE =
-  'Your artifact was blocked by automated safety checks and stays private. Contact support if you believe this is a mistake.';
+  'Your artifact was blocked by automated safety checks and stays private. If you believe this is a mistake, open a support ticket from Help & support in the app (or POST /v1/support/tickets).';
 
 export async function buildWorkspaceUrls(
   env: Env,

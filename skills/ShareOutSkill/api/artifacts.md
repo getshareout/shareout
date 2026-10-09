@@ -72,7 +72,7 @@ Create or update an artifact.
   "moderation": {
     "status": "pending",
     "reason": "unknown domain example.com",
-    "message": "Public pages get an automated safety check at publish. This one is held private for now — it is re-checked automatically within the hour (our team is alerted too) and goes public by itself once it clears.",
+    "message": "Public pages get an automated safety check at publish. This one is held private for now — it is re-checked automatically within the hour and goes public by itself once it clears. If it stays held, open a support ticket from Help & support in the app (or POST /v1/support/tickets).",
     "requested_visibility": "public"
   }
 }

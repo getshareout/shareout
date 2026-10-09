@@ -22,6 +22,7 @@ import { listFilesTool, readFileTool } from './files';
 import { watchMetricTool } from './watch-metric';
 import { presentArtifactTool } from './present-artifact';
 import { listSkillsTool, readSkillTool, saveSkillTool } from './skills';
+import { reportProblemTool } from './report-problem';
 
 import type { PlatformId } from '../../chat-platforms/types';
 
@@ -62,6 +63,7 @@ export const ACCOUNT_TOOLS: AccountTool[] = [
   listSkillsTool,
   readSkillTool,
   saveSkillTool,
+  reportProblemTool,
 ];
 
 // Capability-gated tool groups. A surface opts into each via Capabilities
