@@ -124,8 +124,9 @@ Rules:
 - Invalid domains return `400 INVALID_DOMAIN`.
 - Invalid emails return `400 INVALID_EMAIL`.
 - Inviting an email outside policy returns `403 DOMAIN_NOT_ALLOWED` (bulk invite: per-email `code: "domain_not_allowed"`).
-- Anyone who signs in with an email in `allowed_domains` auto-joins as `member`. Never allow
-  a public mail provider (gmail.com, outlook.com, …) — that lets everyone in.
+- Anyone who signs in with an email in `allowed_domains` auto-joins as `member`, so public
+  mail providers (gmail.com, outlook.com, …) are refused with `400 PUBLIC_EMAIL_DOMAIN` —
+  put individual addresses in `allowed_emails` instead.
 
 ## Subdomain
 

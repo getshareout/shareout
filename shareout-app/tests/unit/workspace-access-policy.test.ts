@@ -130,6 +130,22 @@ describe('handleUpdateWorkspaceAccessPolicy', () => {
     expect((await res.json()).code).toBe('INVALID_DOMAIN');
   });
 
+  // An allowlisted domain auto-joins everyone who signs in with it — gmail.com would open the door to all of Gmail.
+  it('rejects newly added public email-provider domains', async () => {
+    const env = { ...baseEnv, DB: makeDbMock({ first: roleFirst('admin', () => policyRow(null, null)) }) };
+    const res = await handleUpdateWorkspaceAccessPolicy(putRequest({ allowed_domains: ['acme.com', '@Gmail.com'] }), env, admin, workspaceId);
+    expect(res.status).toBe(400);
+    const body = await res.json() as { code: string; error: string };
+    expect(body.code).toBe('PUBLIC_EMAIL_DOMAIN');
+    expect(body.error).toContain('gmail.com');
+  });
+
+  it('keeps a legacy public domain editable when it was already allowed', async () => {
+    const env = { ...baseEnv, DB: makeDbMock({ first: roleFirst('admin', () => policyRow(['outlook.com'], null)) }) };
+    const res = await handleUpdateWorkspaceAccessPolicy(putRequest({ allowed_domains: ['outlook.com', 'acme.com'] }), env, admin, workspaceId);
+    expect(res.status).toBe(200);
+  });
+
   it('rejects invalid emails', async () => {
     const env = { ...baseEnv, DB: makeDbMock({ first: roleFirst('admin', () => policyRow(null, null)) }) };
     const res = await handleUpdateWorkspaceAccessPolicy(putRequest({ allowed_emails: ['nope'] }), env, admin, workspaceId);

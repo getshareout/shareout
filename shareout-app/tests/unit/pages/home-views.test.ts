@@ -23,8 +23,8 @@ import homeViewsBarrel from '../../../src/pages/home/render-workspace/client-scr
  *  Re-pinned after the Home chat dock revamp (pill + dialog sheet, textarea composer,
  *  progressive markdown, error rows, thread menu; agent-format/agent-threads split).
  *  Re-pinned for the Invite people dialog (home-views/invite.ts). */
-const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 608_077;
-const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '0b03b6ea9d61afb0efaac00982ea0d9a5998d92ff583405ecd2c80568ae316a3';
+const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 608_394;
+const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '0cece407aeb360a36aa08a2ff1e7517cf7f8ea9f1225cd9409b02ddccd62a8ad';
 const HOME_VIEWS_MARKER = '  // ===== rail nav → Home pane views =====';
 
 const SECTION_SOURCES: [string, string][] = [

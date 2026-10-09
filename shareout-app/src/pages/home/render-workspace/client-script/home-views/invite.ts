@@ -1,3 +1,5 @@
+import { PUBLIC_EMAIL_DOMAINS } from '../../../../../workspaces/access-policy';
+
 /** "Invite people" dialog + domain auto-join toggle (Admin → Members, overview, onboarding, palette). */
 export const workspace_client_home_views_invite_JS = `  // ===== Invite people =====
   // Mirror of src/workspaces/parse-emails.ts (the shell can't import TS) — keep in step.
@@ -84,8 +86,8 @@ export const workspace_client_home_views_invite_JS = `  // ===== Invite people =
   }
   // Domain auto-join: anyone who signs in with an allowed-domain email joins as a member
   // (workspaces/access-policy.ts autoJoinWorkspacesByDomain). Public mail providers are
-  // never offered — allowing gmail.com would let every Gmail user in.
-  var INV_PUBLIC = ['gmail.com', 'googlemail.com', 'hotmail.com', 'hotmail.com.ar', 'outlook.com', 'outlook.es', 'live.com', 'msn.com', 'yahoo.com', 'yahoo.com.ar', 'icloud.com', 'me.com', 'aol.com', 'proton.me', 'protonmail.com', 'gmx.com'];
+  // never offered (the API refuses them too) — allowing gmail.com would let every Gmail user in.
+  var INV_PUBLIC = ${JSON.stringify(PUBLIC_EMAIL_DOMAINS)};
   function invTeamAccess(mount, members) {
     fetch(wsUrl('/access-policy'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (p) {
       if (!p) return;

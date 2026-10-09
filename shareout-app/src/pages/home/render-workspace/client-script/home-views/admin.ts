@@ -547,15 +547,15 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
       m.querySelectorAll('[data-req-approve]').forEach(function (b) { b.addEventListener('click', function () { decideReq(b.getAttribute('data-req-approve'), 'approve'); }); });
       m.querySelectorAll('[data-req-deny]').forEach(function (b) { b.addEventListener('click', function () { decideReq(b.getAttribute('data-req-deny'), 'deny'); }); });
       var pmsg = document.getElementById('wsxPolicyMsg');
-      function saveDomains() {
+      function saveDomains(prev) {
         fetch(wsUrl('/access-policy'), { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ allowed_domains: domains, allowed_emails: emails }) })
-          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (r) { return r.json().catch(function () { return null; }).then(function (j) { return r.ok ? j : { error: (j && j.error) || t('common.error') }; }); })
           .then(function (j) {
             if (j && !j.error) {
               delete adDataCache['security'];
               pmsg.textContent = t('common.saved'); document.getElementById('wsxDomainList').innerHTML = domainTagsHtml(domains); bindDomainRm();
               setTimeout(function () { pmsg.textContent = ''; }, 1500);
-            } else { pmsg.textContent = (j && j.error) || t('common.error'); }
+            } else { if (prev) domains = prev; pmsg.textContent = (j && j.error) || t('common.error'); }
           }).catch(function () { pmsg.textContent = t('modal.networkError'); });
       }
       function bindDomainRm() {
@@ -568,7 +568,7 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
       bindDomainRm();
       document.getElementById('wsxDomainAdd').addEventListener('click', function () {
         var inp = document.getElementById('wsxDomainInput'); var v = (inp.value || '').trim().toLowerCase().replace(/^@/, '');
-        if (!v || domains.indexOf(v) !== -1) return; domains.push(v); inp.value = ''; saveDomains();
+        if (!v || domains.indexOf(v) !== -1) return; var prev = domains.slice(); domains.push(v); inp.value = ''; saveDomains(prev);
       });
     }, run);
   }
