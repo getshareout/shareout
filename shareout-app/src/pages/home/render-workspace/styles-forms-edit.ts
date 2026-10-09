@@ -30,6 +30,11 @@ export const WORKSPACE_FORMS_EDIT_STYLES = `/* ---- Modal + native create forms 
 .wsx-abtn--primary:hover { background: var(--color-primary-hover); border-color: var(--color-primary-hover); color: var(--color-text-inverse); }
 .wsx-abtn--primary:disabled { opacity: 0.6; cursor: default; }
 .wsx-abtn--block { width: 100%; justify-content: center; }
+.wsx-inv__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.wsx-inv__chips:empty { display: none; }
+.wsx-inv__chip { padding: 3px 9px; border-radius: 999px; background: var(--color-primary-light); color: var(--color-primary); font-size: var(--text-xs); }
+.wsx-inv__chip.is-bad { background: transparent; border: 1px dashed var(--color-danger, var(--color-error)); color: var(--color-danger, var(--color-error)); text-decoration: line-through; }
+.wsx-inv__sum { margin: 0; font: 600 var(--text-sm) var(--font-body); color: var(--color-text); }
 .wsx-admin__planpush .wsx-abtn { margin-top: 10px; }
 .wsx-tests__run { margin-top: 7px; }
 .wsx-mt-12 { margin-top: 12px; }

@@ -88,7 +88,7 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
       var publicSub = publicCount ? t('admin.artifactsPublic') : t('admin.nothingPublic');
       var autoSub = (jobs.length + crews.length) + ' ' + t('admin.automationTotal') + (failingJobs ? ' \\u00B7 ' + failingJobs + ' ' + t('admin.automationFailing') : '');
       var cards = card(t('admin.cardPlan'), esc(plan) + ' <span class="wsx-admin__rolebadge ' + statusCls + '">' + esc(statusLabel) + '</span>', planSub)
-        + card(t('admin.cardMembers'), seatsUsed + (seatsTotal ? ' / ' + seatsTotal : ''), membersSub, seatsTotal ? '<div class="wsx-admin__seatbar"><div class="wsx-admin__seatfill" style="width:' + pct + '%"></div></div>' : '')
+        + card(t('admin.cardMembers'), seatsUsed + (seatsTotal ? ' / ' + seatsTotal : ''), membersSub, (seatsTotal ? '<div class="wsx-admin__seatbar"><div class="wsx-admin__seatfill" style="width:' + pct + '%"></div></div>' : '') + '<button class="wsx-atbl__act" id="wsxOvInvite" type="button">' + esc(t('invite.cta')) + '</button>')
         + card(t('admin.cardArtifacts'), String(alist.length), artsSub)
         + card(t('admin.cardViews'), totalViews.toLocaleString(), viewsSub)
         + card(t('admin.cardPublic'), String(publicCount), publicSub)
@@ -105,6 +105,7 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
           + '</div></div>'
         : '';
       m.innerHTML = '<div class="wsx-admin__cards">' + cards + '</div>' + attnSection;
+      document.getElementById('wsxOvInvite').addEventListener('click', function () { wsxInvite(adReload); });
       m.querySelectorAll('[data-admin-goto]').forEach(function (b) {
         b.addEventListener('click', function () {
           var gotoTab = b.getAttribute('data-admin-goto');
@@ -253,9 +254,7 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
           + '</div><div class="wsx-admin__seatbar" style="width:80px"><div class="wsx-admin__seatfill" style="width:'
           + Math.min(100, Math.round(list.length / seatsTotal * 100)) + '%"></div></div></div>'
         : '';
-      var invite = '<div class="wsx-admin__invite"><input class="wsx-admin__email" id="wsxInviteEmail" type="email" placeholder="' + esc(t('clients.inviteEmail')) + '" autocomplete="off">'
-        + '<select class="wsx-admin__role" id="wsxInviteRoleSel"><option value="member">' + esc(t('admin.roleMember')) + '</option><option value="admin">' + esc(t('admin.roleAdmin')) + '</option></select>'
-        + '<button class="wsx-abtn" id="wsxInviteBtn" type="button"' + (atLimit ? ' disabled title="' + esc(t('admin.seatLimitTitle')) + '"' : '') + '>' + esc(t('clients.invite')) + '</button></div>';
+      var invite = '<div class="wsx-admin__invite"><button class="wsx-abtn wsx-abtn--primary" id="wsxInviteBtn" type="button"' + (atLimit ? ' disabled title="' + esc(t('admin.seatLimitTitle')) + '"' : '') + '>' + esc(t('invite.cta')) + '</button></div>';
       // Inactive = joined >30d ago and no activity in the last 30d (reclaim candidate).
       function memInactive(mem) {
         if (mem.pending) return false;
@@ -334,7 +333,8 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
         var thEl = function (k, lbl) { return '<th class="' + (memSort === k ? 'is-sort' : '') + '" data-msort="' + k + '">' + lbl + (memSort === k ? (memAsc ? ' \\u2191' : ' \\u2193') : '') + '</th>'; };
         var thead = '<thead><tr>' + thEl('name', esc(t('admin.colMember'))) + thEl('role', esc(t('admin.colRole'))) + thEl('joined', esc(t('admin.colJoined'))) + thEl('login', esc(t('admin.colLastLogin'))) + thEl('active', esc(t('admin.colLastActive'))) + thEl('arts', esc(t('admin.colArtifacts'))) + thEl('views', esc(t('widget.colViews'))) + thEl('tokens', esc(t('admin.colAiTokens'))) + thEl('comments', esc(t('admin.colComments'))) + '<th></th></tr></thead>';
         var table = '<div class="wsx-atbl__wrap"><table class="wsx-atbl">' + thead + '<tbody>' + sortedMembers().map(memRow).join('') + '</tbody></table></div>';
-        m.innerHTML = seatUtil + invite + table + invitesSection;
+        m.innerHTML = seatUtil + invite + table + invitesSection + '<div id="wsxInvTeam"></div>';
+        invTeamAccess(document.getElementById('wsxInvTeam'), list);
         bindMembers();
       }
       function bindMembers() {
@@ -345,16 +345,8 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
             renderMembers();
           });
         });
-        var sel = document.getElementById('wsxInviteRoleSel');
         var ib = document.getElementById('wsxInviteBtn');
-        if (ib) ib.addEventListener('click', function () {
-          var em = document.getElementById('wsxInviteEmail'); var v = (em.value || '').trim(); if (!v) return;
-          adBusy(this);
-          fetch(wsUrl('/members'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: v, role: sel.value }) })
-            .then(function (r) { return r.json().catch(function () { return {}; }); })
-            .then(function (j) { if (j && j.error) { try { alert(j.error); } catch (e) {} } adReload(); })
-            .catch(function () { adReload(); });
-        });
+        if (ib) ib.addEventListener('click', function () { wsxInvite(adReload); });
         m.querySelectorAll('[data-inv-resend]').forEach(function (b) {
           b.addEventListener('click', function () {
             b.disabled = true; b.textContent = t('admin.sending');

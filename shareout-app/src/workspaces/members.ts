@@ -3,7 +3,8 @@ import type { AuthUser } from '../api-auth';
 import { json } from './json-response';
 import { invalidateWorkspaceRole, requireWorkspaceRole } from './roles';
 import { invalidateGrants } from '../access/can-access';
-import { getWorkspaceInviteContext, inviteOrAddMember, MAX_BULK_INVITES } from './invite';
+import { getWorkspaceInviteContext, inviteMany, inviteOrAddMember, MAX_BULK_INVITES } from './invite';
+import { parseEmails } from './parse-emails';
 import { logAudit } from '../audit';
 
 export async function handleListWorkspaceMembers(
@@ -90,15 +91,15 @@ export async function handleInviteWorkspaceMembers(
   const forbidden = await requireWorkspaceRole(env, workspaceId, user.id, 'admin');
   if (forbidden) return forbidden;
 
-  let body: { emails?: unknown; role?: WorkspaceRole };
+  let body: { emails?: unknown; role?: WorkspaceRole; message?: unknown };
   try {
     body = await request.json();
   } catch {
     return json({ error: 'Invalid JSON', code: 'INVALID_JSON' }, 400);
   }
 
-  if (!Array.isArray(body.emails)) {
-    return json({ error: 'emails must be an array', code: 'VALIDATION_ERROR' }, 400);
+  if (!Array.isArray(body.emails) && typeof body.emails !== 'string') {
+    return json({ error: 'emails must be an array or a string of addresses', code: 'VALIDATION_ERROR' }, 400);
   }
 
   const role: WorkspaceRole = body.role || 'member';
@@ -106,32 +107,27 @@ export async function handleInviteWorkspaceMembers(
     return json({ error: "Invalid role. Must be 'admin' or 'member'.", code: 'INVALID_ROLE' }, 400);
   }
 
-  const emails = [...new Set(
-    body.emails.map((e) => String(e).trim().toLowerCase()).filter(Boolean)
-  )].slice(0, MAX_BULK_INVITES);
-
-  if (emails.length === 0) {
+  const parsed = parseEmails(body.emails);
+  if (parsed.emails.length + parsed.invalid.length === 0) {
     return json({ error: 'No valid emails provided', code: 'VALIDATION_ERROR' }, 400);
   }
-
-  const ctx = await getWorkspaceInviteContext(env, workspaceId, user.id);
-  // Emails are deduped so invites are independent; run in bounded parallel waves
-  // (caps concurrent invite-email sends) instead of one-at-a-time.
-  const results = [];
-  const WAVE = 10;
-  for (let i = 0; i < emails.length; i += WAVE) {
-    results.push(...await Promise.all(
-      emails.slice(i, i + WAVE).map((email) => inviteOrAddMember(env, workspaceId, user.id, email, role, ctx))
-    ));
+  if (parsed.emails.length > MAX_BULK_INVITES) {
+    return json({
+      error: `Up to ${MAX_BULK_INVITES} emails per request`, code: 'TOO_MANY_EMAILS',
+      hint: `Split the list into batches of ${MAX_BULK_INVITES}.`,
+    }, 400);
   }
+
+  const message = typeof body.message === 'string' ? body.message.trim().slice(0, 500) : undefined;
+  const { results, summary } = await inviteMany(env, workspaceId, user.id, body.emails, role, message || undefined);
 
   await logAudit(env, {
     workspaceId, actorId: user.id, actorEmail: user.email,
     action: 'member.invite_bulk', targetType: 'workspace', targetId: workspaceId,
-    detail: { role, count: emails.length },
+    detail: { role, count: parsed.emails.length, ...summary },
   });
 
-  return json({ results });
+  return json({ results, summary });
 }
 
 export async function handleListWorkspaceMemberMetrics(

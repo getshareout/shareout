@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { WORKSPACE_CLIENT } from '../../../src/pages/home/render-workspace/client-script/index';
 import adminTs from '../../../src/pages/home/render-workspace/client-script/home-views/admin.ts?raw';
+import inviteTs from '../../../src/pages/home/render-workspace/client-script/home-views/invite.ts?raw';
 import clientsTs from '../../../src/pages/home/render-workspace/client-script/home-views/clients.ts?raw';
 import artifactsBrowserTs from '../../../src/pages/home/render-workspace/client-script/home-views/artifacts-browser.ts?raw';
 import cardActionsTs from '../../../src/pages/home/render-workspace/client-script/home-views/card-actions.ts?raw';
@@ -20,9 +21,10 @@ import homeViewsBarrel from '../../../src/pages/home/render-workspace/client-scr
 
 /** Captured at split time — guards against accidental client-script drift.
  *  Re-pinned after the Home chat dock revamp (pill + dialog sheet, textarea composer,
- *  progressive markdown, error rows, thread menu; agent-format/agent-threads split). */
-const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 598_726;
-const ORIGINAL_WORKSPACE_CLIENT_SHA256 = 'fa947882b7be2180a986b00935ca8c0a391d220b54418208cdaf4031c0411954';
+ *  progressive markdown, error rows, thread menu; agent-format/agent-threads split).
+ *  Re-pinned for the Invite people dialog (home-views/invite.ts). */
+const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 608_077;
+const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '0b03b6ea9d61afb0efaac00982ea0d9a5998d92ff583405ecd2c80568ae316a3';
 const HOME_VIEWS_MARKER = '  // ===== rail nav → Home pane views =====';
 
 const SECTION_SOURCES: [string, string][] = [
@@ -36,6 +38,7 @@ const SECTION_SOURCES: [string, string][] = [
   ['connectors', connectorsTs],
   ['modals-forms', modalsFormsTs],
   ['admin', adminTs],
+  ['invite', inviteTs],
   ['clients', clientsTs],
   ['assets', assetsTs],
   ['deliveries', deliveriesTs],
@@ -95,6 +98,7 @@ describe('home views client script', () => {
       'connectors',
       'modals-forms',
       'admin',
+      'invite',
       'clients',
       'assets',
       'deliveries',

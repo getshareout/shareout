@@ -1264,6 +1264,150 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/members/invite:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    post:
+      tags: [Workspaces]
+      summary: Invite people by email (bulk)
+      description: >-
+        Owner or admin only. `emails` is an array or one string of pasted text — commas,
+        semicolons, spaces, newlines, `Name <email>` and spreadsheet columns all work; tokens
+        without `@` are ignored, duplicates collapse. Up to 100 valid addresses per call
+        (`400 TOO_MANY_EMAILS` beyond that — batch). New or not-yet-active people get a
+        7-day join link by email; people with an account are added and notified. Existing
+        members keep their role (change roles with `POST /members`). Re-inviting a pending
+        person retires their older links.
+      operationId: inviteWorkspaceMembers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [emails]
+              properties:
+                emails:
+                  oneOf:
+                    - type: array
+                      items: { type: string }
+                    - type: string
+                  example: "Ana <ana@example.com>, luis@example.com"
+                role:
+                  type: string
+                  enum: [member, admin]
+                  default: member
+                message:
+                  type: string
+                  maxLength: 500
+                  description: Optional personal note passed to the invite email.
+      responses:
+        "200":
+          description: Per-email results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        email: { type: string }
+                        code:
+                          type: string
+                          enum: [invited, added, already_member, invalid_email, domain_not_allowed]
+                        status:
+                          type: string
+                          enum: [invited, added, updated, skipped]
+                          description: Legacy status; prefer `code`.
+                        email_sent:
+                          type: boolean
+                          description: For `invited` — whether the invite email went out.
+                        invite_url:
+                          type: string
+                          description: Join link, present only when the email did not go out. Share it by hand.
+                  summary:
+                    type: object
+                    additionalProperties: { type: integer }
+                    description: Count per `code`.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/invites:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Workspaces]
+      summary: List pending invites
+      description: Owner or admin only. Newest unclaimed invite per person, with `email_status` (`sent`, `failed`, `skipped`, `link_only`), `email_sent_at`, `expired` and `role`.
+      operationId: listWorkspaceInvites
+      responses:
+        "200":
+          description: Pending invites
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/invites/{inviteId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: inviteId
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [Workspaces]
+      summary: Revoke a pending invite
+      description: Owner or admin only. Drops every pending link for that person and their pending membership.
+      operationId: revokeWorkspaceInvite
+      responses:
+        "200":
+          description: Revoked
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/invites/{inviteId}/resend:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: inviteId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [Workspaces]
+      summary: Resend an invite, or mint a shareable link
+      description: >-
+        Owner or admin only. Mints a new join link and returns it as `inviteUrl`. Default
+        (`notify: true`) emails it and expires the person's older links. `notify: false`
+        only returns the link (nothing is emailed, older links keep working) — use it to
+        share the invite in chat.
+      operationId: resendWorkspaceInvite
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notify:
+                  type: boolean
+                  default: true
+      responses:
+        "200":
+          description: New link
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  inviteUrl: { type: string }
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /v1/workspaces/{workspaceId}/shared-tables:
     get:
       tags: [Data]

@@ -43,11 +43,45 @@ Endpoints:
 | `GET` | `/v1/workspaces/{id}/members` | List members. |
 | `POST` | `/v1/workspaces/{id}/members` | Add member; policy-gated. Re-posting an existing member updates their role (`member` or `admin`). |
 | `DELETE` | `/v1/workspaces/{id}/members/{userId}` | Remove member. Also drops their Client (Sharee) links and `external_user` grants in this workspace — the membership edge alone does not gate grant access. |
-| `POST` | `/v1/workspaces/{id}/members/invite` | Invite one or more members. |
+| `POST` | `/v1/workspaces/{id}/members/invite` | Invite many people at once — see [Invite people](#invite-people). Existing members keep their role. |
 | `GET` | `/v1/workspaces/{id}/members/metrics` | Member activity metrics. |
 | `GET` | `/v1/workspaces/{id}/people` | Workspace people picker/list. |
 | `POST` | `/v1/workspaces/{id}/logo` | Upload workspace logo (image). Admin+. |
 | `DELETE` | `/v1/workspaces/{id}/logo` | Remove workspace logo. Admin+. |
+
+### Invite people
+
+Admin/owner only. Pass the addresses however the user gave them: an array, or **one
+string** of pasted text (commas, newlines, `Name <email>`, a spreadsheet column).
+
+```bash
+curl -sS -X POST "$ORIGIN/v1/workspaces/$WS/members/invite" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"emails":"Ana <ana@example.com>, luis@example.com\nbad@","role":"member","message":"Te sumo al equipo"}'
+```
+
+```json
+{
+  "results": [
+    { "email": "bad@", "code": "invalid_email", "status": "skipped" },
+    { "email": "ana@example.com", "code": "invited", "status": "invited", "email_sent": true },
+    { "email": "luis@example.com", "code": "already_member", "status": "updated" }
+  ],
+  "summary": { "invited": 1, "added": 0, "already_member": 1, "invalid_email": 1, "domain_not_allowed": 0 }
+}
+```
+
+- `code`: `invited` (got a 7-day join link) · `added` (had an account; added + notified) ·
+  `already_member` (nothing changed) · `invalid_email` · `domain_not_allowed` (outside the
+  [membership policy](#workspace-membership-policy)).
+- `invite_url` appears only when the invite email did **not** go out (e.g. no email on the
+  instance) — hand that link to the person.
+- Max 100 valid addresses per call (`400 TOO_MANY_EMAILS`); split bigger lists.
+- To change someone's role use `POST /v1/workspaces/{id}/members` `{ "email", "role" }`.
+- Whole company domain instead of a list: set `allowed_domains` in the
+  [membership policy](#workspace-membership-policy) — anyone signing in with that domain
+  joins as a member, and `$ORIGIN/auth/login?redirect=/home?workspace={id}` is a link you
+  can share with the team.
 
 Seat usage: `GET /v1/workspaces/{id}` may include `seats: { used, limit, remaining }`.
 On self-host, `limit` is typically unlimited / unset — do not invent seat paywalls.
@@ -89,7 +123,9 @@ Rules:
 - Send `[]` to clear a list.
 - Invalid domains return `400 INVALID_DOMAIN`.
 - Invalid emails return `400 INVALID_EMAIL`.
-- Inviting an email outside policy returns `403 DOMAIN_NOT_ALLOWED`.
+- Inviting an email outside policy returns `403 DOMAIN_NOT_ALLOWED` (bulk invite: per-email `code: "domain_not_allowed"`).
+- Anyone who signs in with an email in `allowed_domains` auto-joins as `member`. Never allow
+  a public mail provider (gmail.com, outlook.com, …) — that lets everyone in.
 
 ## Subdomain
 
@@ -294,7 +330,7 @@ Unified run detail across crew, scheduled job, and metric-alert surfaces. Admin+
 | --- | --- | --- | --- |
 | `GET` | `/v1/workspaces/{id}/invites` | Admin+ | List unclaimed invites. |
 | `DELETE` | `/v1/workspaces/{id}/invites/{inviteId}` | Admin+ | Revoke pending invite. |
-| `POST` | `/v1/workspaces/{id}/invites/{inviteId}/resend` | Admin+ | Resend invite email. |
+| `POST` | `/v1/workspaces/{id}/invites/{inviteId}/resend` | Admin+ | New join link → `{ ok, inviteUrl }`. Default emails it and expires older links; `{ "notify": false }` only returns the link (copy/paste, older links stay valid). |
 
 ## Workspace Shared Tables
 

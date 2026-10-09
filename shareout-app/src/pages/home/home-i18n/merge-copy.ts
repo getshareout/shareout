@@ -6,6 +6,7 @@ import { ASSETS_COPY } from './copy/assets';
 import { CLIENTS_COPY } from './copy/clients';
 import { COMPOSER_COPY } from './copy/composer';
 import { INSPECTOR_COPY } from './copy/inspector';
+import { INVITE_COPY } from './copy/invite';
 import { LIBRARY_COPY } from './copy/library';
 import { MODALS_COPY } from './copy/modals';
 import { NOTIF_COPY } from './copy/notifications';
@@ -18,6 +19,7 @@ import { WORKSPACE_COPY } from './copy/workspace';
 const COPY_MODULES: HomeLocaleCopy[] = [
   SHELL_COPY,
   ADMIN_COPY,
+  INVITE_COPY,
   CLIENTS_COPY,
   ASSETS_COPY,
   WORKSPACE_COPY,

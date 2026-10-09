@@ -53,6 +53,15 @@ export async function createInviteClaim(
   return { id, code };
 }
 
+// Retire every other unclaimed code for this person in this workspace. A resend means
+// "this is the invite now": the old email's link should say expired, not still work.
+export async function expireOtherInviteClaims(env: Env, workspaceId: string, userId: string, keepId: string): Promise<void> {
+  await env.DB.prepare(
+    `UPDATE workspace_invite_claims SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+      WHERE workspace_id = ? AND user_id = ? AND claimed_at IS NULL AND id != ?`
+  ).bind(workspaceId, userId, keepId).run();
+}
+
 // Send the invite and write the outcome onto the claim row.
 //
 // The dispatch result used to be discarded here, which made a rejected send
@@ -62,7 +71,7 @@ export async function createInviteClaim(
 // Now the row carries the verdict and the Members view shows it.
 export async function sendInviteEmail(
   env: Env,
-  args: { email: string; workspaceName: string; inviterName: string; claimCode: string; claimId?: string }
+  args: { email: string; workspaceName: string; inviterName: string; claimCode: string; claimId?: string; personalMessage?: string }
 ): Promise<DispatchResult> {
   const result = await dispatchLifecycleEmail(env, {
     type: 'workspace_invite',
@@ -72,6 +81,7 @@ export async function sendInviteEmail(
       inviterName: args.inviterName,
       claimCode: args.claimCode,
       claimTtlDays: CLAIM_TTL_DAYS,
+      ...(args.personalMessage ? { personalMessage: args.personalMessage } : {}),
     },
   });
 
