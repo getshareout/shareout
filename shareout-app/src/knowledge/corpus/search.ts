@@ -5,6 +5,7 @@ import type { Env } from '../../types';
 import { getPlatformOrigin } from '../../config/origins';
 import { corpusFor, type ChunkHit, type SourceKind } from './client';
 import { queueKnowledgeSource } from './ingest';
+import { EMBED_DIMENSIONS, estimateTokens, meterKnowledge, PRICING } from './usage';
 
 const EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
 const CANDIDATES = 30;
@@ -96,6 +97,16 @@ export async function searchCorpus(
   if (!store || !q.trim()) return { mode: 'keyword', hits: [] };
 
   const [keyword, semantic] = await Promise.all([store.search(q, CANDIDATES), semanticKeys(env, workspaceId, q)]);
+  const tokens = semantic ? estimateTokens([q.slice(0, 2000)]) : 0;
+  const metered = meterKnowledge(env, workspaceId, 'knowledge_search', {
+    model: semantic ? EMBED_MODEL : 'fts5',
+    units: 1,
+    unitKind: 'queries',
+    costMicroUsd: semantic ? tokens * PRICING.embedTokenMicroUsd + EMBED_DIMENSIONS * PRICING.queriedDimensionMicroUsd : 0,
+    userId,
+  });
+  if (opts.ctx) opts.ctx.waitUntil(metered);
+  else await metered;
   const byKey = new Map(keyword.map((h) => [key(h), h]));
   const missing = (semantic || []).filter((k) => !byKey.has(key(k)));
   if (missing.length) for (const h of await store.chunksByKey(missing)) byKey.set(key(h), h);

@@ -9,6 +9,7 @@ import { parsePptx } from '../../data/files/parse-pptx';
 import { isKnowledgeEnabled } from '../store';
 import { chunkMarkdown } from './chunk';
 import { corpusFor, type SourceKind, type SourceMeta } from './client';
+import { estimateTokens, meterKnowledge, PRICING } from './usage';
 
 const EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
 export const EMBED_BATCH = 50;
@@ -129,10 +130,15 @@ export async function embedStep(env: Env, p: IngestParams, offset: number): Prom
   if (!env.AI || !env.KNOWLEDGE_VECTORS) return 0;
   const rows = await corpusFor(env, p.workspaceId)!.chunkTexts(p.refId, offset, EMBED_BATCH);
   if (!rows.length) return 0;
-  const values = await embed(env, rows.map((r) => r.text.slice(0, 2000)));
+  const texts = rows.map((r) => r.text.slice(0, 2000));
+  const values = await embed(env, texts);
   await env.KNOWLEDGE_VECTORS.upsert(
     rows.map((r, i) => ({ id: vectorId(p.refId, r.ord), values: values[i], namespace: p.workspaceId })),
   );
+  const tokens = estimateTokens(texts);
+  await meterKnowledge(env, p.workspaceId, 'knowledge_embedding', {
+    model: EMBED_MODEL, units: tokens, unitKind: 'tokens', costMicroUsd: tokens * PRICING.embedTokenMicroUsd, source: p.refId,
+  });
   return rows.length;
 }
 
@@ -143,6 +149,11 @@ export async function finishStep(env: Env, p: IngestParams, r: ExtractResult): P
     for (let ord = r.chunkCount; ord < r.previousCount; ord++) stale.push(vectorId(p.refId, ord));
     for (let i = 0; i < stale.length; i += 1000) await env.KNOWLEDGE_VECTORS.deleteByIds(stale.slice(i, i + 1000));
   }
+  // extract + finish, plus one step per embedding batch.
+  const steps = 2 + (r.status === 'chunked' && env.AI && env.KNOWLEDGE_VECTORS ? Math.ceil(r.chunkCount / EMBED_BATCH) : 0);
+  await meterKnowledge(env, p.workspaceId, 'knowledge_ingest', env.KNOWLEDGE_INGEST
+    ? { model: 'workflow', units: steps, unitKind: 'workflow_steps', costMicroUsd: steps * PRICING.workflowStepMicroUsd, source: p.refId }
+    : { model: 'inline', units: 1, unitKind: 'runs', costMicroUsd: 0, source: p.refId });
   if (r.status !== 'chunked') return;
   const store = corpusFor(env, p.workspaceId)!;
   const src = await store.getSource(p.refId);

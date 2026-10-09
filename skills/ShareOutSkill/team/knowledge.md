@@ -120,6 +120,26 @@ GET /v1/workspaces/{workspaceId}/knowledge/sources?limit=50
 
 Returns `counts` by status (`ready`, `processing`, `unsupported`, `failed`), the total `chunks`, and the most recently updated `sources` with their `error` when one couldn't be read. `POST …/knowledge/backfill` also queues every existing page and File not yet learned at its current version — `corpus` is how many started, `corpusRemaining` how many are left (call it again to continue; up to 300 per call).
 
+## What Knowledge costs the workspace
+
+Everything Knowledge does is metered per workspace — embeddings, searches, ingest runs, and the workspace store's own storage and database work:
+
+```http
+GET /v1/workspaces/{workspaceId}/knowledge/usage?days=30
+```
+
+Owner/admin only. Returns `totalCostMicroUsd` and its breakdown:
+
+- `ai[]`: one entry per kind, with `units`, `unitKind`, `events` and `costMicroUsd`:
+  - `knowledge_embedding`: tokens
+  - `knowledge_search`: queries
+  - `knowledge_ingest`: Workflow steps
+- `storage`: bytes, sources, chunks, rows read and rows written.
+- `vectors`: stored vectors and their monthly cost.
+- `pricing`: the unit prices used.
+
+Costs are Cloudflare list prices in micro-USD (1,000,000 = $1) before any account-level free allowance. They are tracking only; nothing is billed.
+
 ## For agents
 
 When Knowledge is on, the [workspace assistant](workspace-assistant.md) can consult it instead of re-reading every page:
@@ -147,6 +167,7 @@ All routes require workspace membership. When Knowledge is off, root `GET` retur
 | `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 recent live pages for notes, and every page and File for search → `{ queued, kicked, corpus, corpusRemaining }` |
 | `GET` | `/v1/workspaces/{id}/knowledge/search?q=&limit=&format=md` | Member+ | Cited passages from Files and pages (hybrid search) |
 | `GET` | `/v1/workspaces/{id}/knowledge/sources?limit=` | Member+ | What has been learned: counts by status + recent sources |
+| `GET` | `/v1/workspaces/{id}/knowledge/usage?days=30` | Admin+ | Metered cost: AI, storage, vectors (micro-USD, tracking only) |
 
 ## Related
 
