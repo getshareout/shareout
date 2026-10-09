@@ -222,4 +222,13 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 .wsx-admin__seat-label { font-size: var(--text-xs); color: var(--color-text-tertiary); }
 .wsx-admin__seat-count { font: 700 var(--text-base) var(--font-body); color: var(--color-text); }
 .wsx-admin__seat-warn { font-size: var(--text-xs); color: var(--color-error); margin-top: 2px; }
+/* ---- connect your agent (/home?view=connect) ---- */
+.wsx-cn { max-width: 680px; }
+.wsx-cn__url { display: flex; gap: 8px; align-items: center; margin: 6px 0 14px; }
+.wsx-cn__url code { flex: 1; min-width: 0; overflow-wrap: anywhere; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-subtle, var(--color-bg-elevated)); font: var(--text-sm)/1.4 var(--font-mono, ui-monospace, monospace); color: var(--color-text); }
+.wsx-cn__steps { margin: 0 0 12px; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; color: var(--color-text); font-size: var(--text-sm); line-height: 1.5; }
+.wsx-cn__key { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--color-border); font-size: var(--text-sm); }
+.wsx-cn__key:first-child { border-top: 0; }
+.wsx-cn__new { margin: 10px 0; }
+.wsx-cn .wsx-skill__pre { padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-subtle, var(--color-bg-elevated)); margin: 8px 0; }
 `;

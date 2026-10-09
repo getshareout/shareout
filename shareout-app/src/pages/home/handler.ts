@@ -5,6 +5,7 @@ import type { Env } from '../../types';
 import { getVisibilityScope, placeholders } from '../../account-links';
 import { openVisibilityDisabled } from '../../visibility-config';
 import { inboxEmailDomain } from '../../scheduling/email';
+import { getPlatformOrigin } from '../../config/origins';
 import { isPlatformAdmin } from '../../superadmin/auth';
 import { getInternalWorkspaceRole } from '../../workspaces';
 import { hostWorkspaceId } from './host';
@@ -187,6 +188,7 @@ async function buildHomeBody(
     wsKnowledgePaid,
     inboxDomain,
     isInstanceAdmin,
+    platformOrigin: getPlatformOrigin(env),
     accessRequests,
     hostname: new URL(request.url).hostname,
     appVersion: env.CF_VERSION_METADATA?.id?.slice(0, 7) || '',

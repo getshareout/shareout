@@ -76,14 +76,33 @@ describe('getOnboardingStatus', () => {
     expect(s?.tasks.find((t) => t.key === 'slack')?.done).toBe(true);
   });
 
-  it('routes a plain member to the 4-task member track', async () => {
+  it('routes a plain member to the 5-task member track, connect-your-agent first', async () => {
     const env = { ...INTEGRATIONS, DB: makeDb({
       member: { role: 'member', created_at: nowIso, member_class: 'internal' },
       signals: NO_SIGNALS,
     }) } as Env;
     const s = await getOnboardingStatus(env, WS, U);
     expect(s?.track).toBe('member');
-    expect(s?.tasks).toHaveLength(4);
+    expect(s?.tasks).toHaveLength(5);
+    expect(s?.tasks[0]).toMatchObject({ key: 'connect_agent', done: false, action: { kind: 'nav', target: 'connect' } });
+  });
+
+  it('marks connect_agent done once the member has a personal key', async () => {
+    const env = { ...INTEGRATIONS, DB: makeDb({
+      member: { role: 'member', created_at: nowIso, member_class: 'internal' },
+      signals: { ...NO_SIGNALS, agentConnected: 1 },
+    }) } as Env;
+    const s = await getOnboardingStatus(env, WS, U);
+    expect(s?.tasks.find((t) => t.key === 'connect_agent')?.done).toBe(true);
+  });
+
+  it('starts the 14-day window when the invite was accepted, not sent', async () => {
+    const env = { ...INTEGRATIONS, DB: makeDb({
+      member: { role: 'member', created_at: oldIso, accepted_at: nowIso, member_class: 'internal' },
+      signals: NO_SIGNALS,
+    }) } as Env;
+    const s = await getOnboardingStatus(env, WS, U);
+    expect(s?.eligible).toBe(true);
   });
 
   it('is not eligible once dismissed', async () => {

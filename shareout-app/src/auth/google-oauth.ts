@@ -176,12 +176,13 @@ export async function handleGoogleCallback(request: Request, env: Env, execution
     }
 
     const user = await upsertUser(env, userInfo);
-    await autoJoinWorkspacesByDomain(env, user.id, user.email);
+    const autoJoined = await autoJoinWorkspacesByDomain(env, user.id, user.email);
     // First-ever activation. A true self-signup gets the personal starter kit + generic
-    // welcome. A pre-created invitee (row existed but never logged in) instead gets a
-    // welcome scoped to the workspace they were invited to — no personal kit.
+    // welcome. A pre-created invitee (row existed but never logged in) or someone the
+    // domain allowlist just added to a workspace instead gets a welcome scoped to that
+    // workspace — no personal kit.
     if (user.firstActivation) {
-      if (user.isNew) {
+      if (user.isNew && !autoJoined) {
         scheduleSeedStarterKit(env, { id: user.id, email: user.email, username: null }, { workspaceId: null, tier: 'personal' }, executionCtx);
         scheduleWelcomeEmail(env, user.email, executionCtx);
       } else {
@@ -200,7 +201,7 @@ export async function handleGoogleCallback(request: Request, env: Env, execution
       const userCode = decodeURIComponent(deviceMatch[1]);
       const result = await approveDeviceCode(env, userCode, user.id, user.email);
       if (!result.ok) return errorPage(result.error, '/');
-      const page = deviceDonePage(user.email, result.warn);
+      const page = deviceDonePage(user.email, result.warn, result.token, request);
       page.headers.set('Set-Cookie', sessionCookie);
       return page;
     }

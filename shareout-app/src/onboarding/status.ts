@@ -13,10 +13,13 @@ interface Membership {
   role: WorkspaceRole;
   created_at: string;
   member_class: string | null;
+  /** When the person accepted their invite — the membership row is written at invite time. */
+  accepted_at: string | null;
 }
 
 interface Signals {
   firstArtifact: boolean;
+  agentConnected: boolean;
   dataSource: boolean;
   slack: boolean;
   alert: boolean;
@@ -47,7 +50,10 @@ export interface OnboardingStatus {
 
 async function getMembership(env: Env, workspaceId: string, userId: string): Promise<Membership | null> {
   return env.DB.prepare(
-    'SELECT role, created_at, member_class FROM workspace_members WHERE workspace_id = ? AND user_id = ?'
+    `SELECT wm.role, wm.created_at, wm.member_class,
+       (SELECT MAX(c.claimed_at) FROM workspace_invite_claims c
+         WHERE c.workspace_id = wm.workspace_id AND c.user_id = wm.user_id) AS accepted_at
+     FROM workspace_members wm WHERE wm.workspace_id = ? AND wm.user_id = ?`
   ).bind(workspaceId, userId).first<Membership>();
 }
 
@@ -56,6 +62,7 @@ async function getSignals(env: Env, workspaceId: string, userId: string, skillAc
   const row = await env.DB.prepare(
     `SELECT
        EXISTS(SELECT 1 FROM artifacts WHERE owner_id=?1 AND is_example=0 AND deleted_at IS NULL) AS firstArtifact,
+       EXISTS(SELECT 1 FROM tokens WHERE principal_type='user' AND principal_id=?1)            AS agentConnected,
        EXISTS(SELECT 1 FROM connections WHERE scope_type='workspace' AND scope_id=?2 AND provider<>'slack') AS dataSource,
        EXISTS(SELECT 1 FROM connections WHERE scope_type='workspace' AND scope_id=?2 AND provider='slack')  AS slack,
        EXISTS(SELECT 1 FROM metric_alert_rules WHERE workspace_id=?2 AND enabled=1)             AS alert,
@@ -67,6 +74,7 @@ async function getSignals(env: Env, workspaceId: string, userId: string, skillAc
   ).bind(userId, workspaceId).first<Record<string, number>>();
   return {
     firstArtifact: !!row?.firstArtifact,
+    agentConnected: !!row?.agentConnected,
     dataSource: !!row?.dataSource,
     slack: !!row?.slack,
     alert: !!row?.alert,
@@ -118,7 +126,8 @@ export async function getOnboardingStatus(
   const track: OnboardingTrack = member.role === 'owner' || member.role === 'admin' ? 'admin' : 'member';
   const state = await getState(env, workspaceId, userId);
   const signals = await getSignals(env, workspaceId, userId, !!state?.skill_ack_at);
-  return buildStatus(track, signals as unknown as Record<string, boolean>, state, member.created_at, env);
+  // The 14-day window starts when they accepted the invite, not when it was sent.
+  return buildStatus(track, signals as unknown as Record<string, boolean>, state, member.accepted_at || member.created_at, env);
 }
 
 interface OnboardingState { skill_ack_at: string | null; dismissed_at: string | null; celebrated_at: string | null }

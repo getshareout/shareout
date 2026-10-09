@@ -107,7 +107,7 @@ describe('verifyEmailOtp', () => {
     const r = await verifyEmailOtp(e, email, code);
     expect(r.ok).toBe(true);
     // Pre-created row with no last_login_at → firstActivation (invitee path).
-    expect(r.user).toEqual({ id: 'usr_ex', email, isNew: false, firstActivation: true });
+    expect(r.user).toEqual({ id: 'usr_ex', email, isNew: false, firstActivation: true, autoJoined: false });
 
     // Code is consumed — second verify fails.
     const again = await verifyEmailOtp(e, email, code);

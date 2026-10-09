@@ -160,19 +160,22 @@ export async function hasWorkspaceSignupAllowlist(env: Env, email: string): Prom
   return false;
 }
 
-/** Auto-join workspaces whose domain allowlist matches the user's email domain on sign-in. */
+/** Auto-join workspaces whose domain allowlist matches the user's email domain on sign-in.
+ *  Returns how many memberships it added, so a first sign-in can welcome the person into
+ *  that workspace instead of seeding a personal starter kit. */
 export async function autoJoinWorkspacesByDomain(
   env: Env,
   userId: string,
   email: string | null
-): Promise<void> {
+): Promise<number> {
   const domain = (email || '').trim().toLowerCase().split('@')[1] || '';
-  if (!domain) return;
+  if (!domain) return 0;
 
   const rows = await env.DB.prepare(
     'SELECT id, allowed_email_domains FROM workspaces WHERE allowed_email_domains IS NOT NULL'
   ).bind().all<{ id: string; allowed_email_domains: string | null }>();
 
+  let joined = 0;
   for (const row of rows.results || []) {
     if (!parseJsonList(row.allowed_email_domains).includes(domain)) continue;
     const existing = await env.DB.prepare(
@@ -183,5 +186,7 @@ export async function autoJoinWorkspacesByDomain(
       "INSERT INTO workspace_members (id, workspace_id, user_id, role) VALUES (?, ?, ?, 'member')"
     ).bind(generateId('wsm'), row.id, userId).run();
     await invalidateWorkspaceRole(env, row.id, userId);
+    joined++;
   }
+  return joined;
 }

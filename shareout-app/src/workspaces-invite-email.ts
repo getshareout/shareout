@@ -201,20 +201,23 @@ export async function notifyInviteAccepted(env: Env, claim: InviteClaim): Promis
   }).catch(() => {});
 }
 
-/** Peek invite metadata without consuming the code — for the unauth join card. */
+/** Peek invite metadata without consuming the code — for the unauth join card. The
+ *  invited email is returned so sign-in can pre-select it (whoever holds the link got it
+ *  at that address). */
 export async function peekInvite(
   env: Env,
   rawCode: string
-): Promise<{ workspaceName: string; inviterName: string } | null> {
+): Promise<{ workspaceName: string; inviterName: string; email: string } | null> {
   const code = (rawCode || '').trim().toUpperCase();
   if (!code) return null;
   const claim = await env.DB.prepare(
-    `SELECT workspace_id, invited_by, claimed_at,
+    `SELECT workspace_id, invited_by, email, claimed_at,
             (expires_at < strftime('%Y-%m-%dT%H:%M:%fZ','now')) AS expired
      FROM workspace_invite_claims WHERE code_hash = ?`
   ).bind(await sha256(code)).first<{
     workspace_id: string;
     invited_by: string | null;
+    email: string;
     claimed_at: string | null;
     expired: number;
   }>();
@@ -231,7 +234,7 @@ export async function peekInvite(
   if (!ws?.name) return null;
   const inviterName =
     inviter?.name || (inviter?.email ? inviter.email.split('@')[0] : 'A teammate');
-  return { workspaceName: ws.name, inviterName };
+  return { workspaceName: ws.name, inviterName, email: claim.email };
 }
 
 /**

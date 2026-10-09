@@ -257,9 +257,15 @@ export async function routeServe(ctx: FetchContext): Promise<Response | null> {
     const sessionUser = await getSessionUser(request, env);
     if (!sessionUser) {
       // Same-origin login so a subdomain visitor returns to the subdomain's /home.
-      return Response.redirect(new URL('/auth/login?redirect=/home', url.origin).toString(), 302);
+      // Keep the query (e.g. ?view=connect) so a deep link survives sign-in.
+      return Response.redirect(new URL('/auth/login?redirect=' + (url.search ? encodeURIComponent('/home' + url.search) : '/home'), url.origin).toString(), 302);
     }
     return handleUserHomePage(request, env, sessionUser);
+  }
+
+  // "Settings → API token" in the docs: personal keys live in the Connect-your-agent view.
+  if (path === '/settings/api-token' || path === '/settings/tokens') {
+    return Response.redirect(new URL('/home?view=connect&tab=code', url.origin).toString(), 302);
   }
 
   // External-sharing spine (work/030) Phase 4: the external member's "shared with me"

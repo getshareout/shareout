@@ -40,11 +40,14 @@ export const ADMIN_TASKS: OnboardingTaskDef[] = [
   { key: 'skill', signal: 'skillAck', action: { kind: 'skill' } },
 ];
 
+// Member track leads with the fastest path to a first page: connect the agent they
+// already use (Claude / ChatGPT) from the Connect view, then publish from it.
 export const MEMBER_TASKS: OnboardingTaskDef[] = [
+  { key: 'connect_agent', signal: 'agentConnected', action: { kind: 'nav', target: 'connect' } },
+  { key: 'first_artifact', signal: 'firstArtifact', action: { kind: 'nav', target: 'connect' } },
   { key: 'explore', signal: 'viewed', action: { kind: 'nav', target: 'artifacts' } },
   { key: 'comment', signal: 'commented', action: { kind: 'nav', target: 'artifacts' } },
   { key: 'telegram', signal: 'telegram', action: { kind: 'page', url: '/settings/telegram?go=1' } },
-  { key: 'skill_publish', signal: 'firstArtifact', action: { kind: 'skill' } },
 ];
 
 // Personal track: a solo user on their own home (no workspace). Every signal is

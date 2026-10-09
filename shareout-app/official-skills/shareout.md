@@ -54,6 +54,10 @@ Save `{ "token", "origin" }` with `chmod 600`.
 
 ## Publish (hello)
 
+Publish into the user's team workspace with `"visibility": "workspace"` so their team
+sees it (replace `wsp_…` with their workspace id; without `workspace_id` it lands in
+their personal space).
+
 Prefer `curl` (some HTTP clients hit Cloudflare 1010):
 
 ```bash
@@ -65,7 +69,8 @@ import json, sys
 json.dump({
   "name": "Hello ShareOut",
   "slug": "hello-shareout",
-  "visibility": "public",
+  "workspace_id": "wsp_…",
+  "visibility": "workspace",
   "files": [{
     "path": "index.html",
     "content": "<!DOCTYPE html><html><body><h1>Hello ShareOut</h1></body></html>",
