@@ -4,7 +4,7 @@
 //
 // Costs are Cloudflare list prices in micro-USD, before account-level free
 // allowances — tracking only, nothing is billed. Checked 2026-10-09:
-//   Workers AI  bge-base-en-v1.5 $0.067 / M input tokens
+//   Workers AI  bge-base-en-v1.5 $0.067 / M input tokens (extraction models: extract.ts)
 //   Vectorize   $0.01 / M queried dimensions, $0.05 / 100M stored dimensions
 //   DO SQLite   $1.00 / M rows written, $0.001 / M rows read, $0.20 / GB-month
 //   Workflows   $0.80 / 100k steps
@@ -26,7 +26,7 @@ export const PRICING = {
 /** Workers AI doesn't return token counts for embeddings; ~4 chars per token. */
 export const estimateTokens = (texts: string[]) => Math.ceil(texts.reduce((n, t) => n + t.length, 0) / 4);
 
-export const KNOWLEDGE_USAGE_KINDS = ['knowledge_embedding', 'knowledge_search', 'knowledge_ingest'] as const;
+export const KNOWLEDGE_USAGE_KINDS = ['knowledge_embedding', 'knowledge_extraction', 'knowledge_search', 'knowledge_ingest'] as const;
 
 type Kind = (typeof KNOWLEDGE_USAGE_KINDS)[number];
 
@@ -85,22 +85,24 @@ export async function knowledgeUsage(
   const ai = rows.map((r) => ({ kind: r.kind, unitKind: r.unit_kind, units: r.units, events: r.events, costMicroUsd: r.cost }));
 
   const s = await store.usage(days);
-  const storageCost =
+  // Round each part, then sum, so the total always equals the breakdown shown.
+  const storageCost = Math.round(
     s.rowsWritten * PRICING.rowWrittenMicroUsd +
     s.rowsRead * PRICING.rowReadMicroUsd +
-    (s.bytes / 1e9) * PRICING.storageGbMonthMicroUsd * (days / 30);
+    (s.bytes / 1e9) * PRICING.storageGbMonthMicroUsd * (days / 30),
+  );
   // One vector per chunk when embeddings are configured.
   const vectors = env.KNOWLEDGE_VECTORS
-    ? { stored: s.chunks, monthlyCostMicroUsd: s.chunks * EMBED_DIMENSIONS * PRICING.storedDimensionMonthMicroUsd }
+    ? { stored: s.chunks, monthlyCostMicroUsd: Math.round(s.chunks * EMBED_DIMENSIONS * PRICING.storedDimensionMonthMicroUsd) }
     : null;
+  const vectorCost = vectors ? Math.round(vectors.monthlyCostMicroUsd * (days / 30)) : 0;
 
-  const total = ai.reduce((n, r) => n + r.costMicroUsd, 0) + storageCost + (vectors ? vectors.monthlyCostMicroUsd * (days / 30) : 0);
   return {
     days,
-    totalCostMicroUsd: Math.round(total),
+    totalCostMicroUsd: ai.reduce((n, r) => n + r.costMicroUsd, 0) + storageCost + vectorCost,
     ai,
-    storage: { ...s, costMicroUsd: Math.round(storageCost) },
-    vectors: vectors && { stored: vectors.stored, monthlyCostMicroUsd: Math.round(vectors.monthlyCostMicroUsd) },
+    storage: { ...s, costMicroUsd: storageCost },
+    vectors,
     pricing: PRICING,
   };
 }

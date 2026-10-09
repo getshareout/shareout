@@ -120,6 +120,40 @@ GET /v1/workspaces/{workspaceId}/knowledge/sources?limit=50
 
 Returns `counts` by status (`ready`, `processing`, `unsupported`, `failed`), the total `chunks`, and the most recently updated `sources` with their `error` when one couldn't be read. `POST …/knowledge/backfill` also queues every existing page and File not yet learned at its current version — `corpus` is how many started, `corpusRemaining` how many are left (call it again to continue; up to 300 per call).
 
+## Explore the knowledge graph (agents)
+
+While learning, Knowledge also reads every passage for the **things the workspace is about**: clients, people, products, projects, campaigns, contracts, and more. It records them as **entities**, how they connect as **relations** (`client_of`, `works_for`, `part_of`…), and concrete values as **facts** (budgets, dates, statuses). Every item keeps the exact quote and source it came from.
+
+- The same thing named differently across files is merged: "Acme Inc.", "ACME" and "Acme, S.A." become one entity.
+- When a file changes, its old evidence is replaced. When it's deleted, its evidence goes away.
+
+The calls, from broad to specific:
+
+```http
+GET /v1/workspaces/{workspaceId}/knowledge/entities?type=Organization&q=acme&limit=20
+```
+
+Returns `types` (each entity type with its count) and `entities`, most-mentioned first. Each entity has `id`, `type`, `name`, `aliases`, `mentions` and up to five `sources`.
+
+```http
+GET /v1/workspaces/{workspaceId}/knowledge/entities/{entityId}?format=md
+```
+
+Returns one entity: its `facts` (each with a `quote` and `source`), its `relations` (`direction` `out`/`in`, plus the `other` entity), and quoted `mentions` with a `cite`. `format=md` gives a compact briefing ready for an LLM prompt.
+
+```http
+GET /v1/workspaces/{workspaceId}/knowledge/graph?focus={entityId}&depth=1&limit=100
+```
+
+Returns `nodes` and `edges` for drawing or walking the graph: the neighbourhood around `focus` (`depth` 1–3), or the workspace's most-mentioned entities when no focus is given.
+
+How to use it:
+
+- **Answering about a client or project:** find it with `entities?q=`, then read `entities/{id}?format=md` and cite the quotes.
+- **Need passages, not structure:** use `search`.
+- **Visibility:** the graph follows the same rule as search. An entity, fact or connection only appears if you can see at least one source behind it.
+- **Gaps:** extraction needs Workers AI on the instance. Without it, Knowledge still searches but the graph stays empty.
+
 ## What Knowledge costs the workspace
 
 Everything Knowledge does is metered per workspace — embeddings, searches, ingest runs, and the workspace store's own storage and database work:
@@ -132,6 +166,7 @@ Owner/admin only. Returns `totalCostMicroUsd` and its breakdown:
 
 - `ai[]`: one entry per kind, with `units`, `unitKind`, `events` and `costMicroUsd`:
   - `knowledge_embedding`: tokens
+  - `knowledge_extraction`: tokens
   - `knowledge_search`: queries
   - `knowledge_ingest`: Workflow steps
 - `storage`: bytes, sources, chunks, rows read and rows written.
@@ -167,6 +202,9 @@ All routes require workspace membership. When Knowledge is off, root `GET` retur
 | `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 recent live pages for notes, and every page and File for search → `{ queued, kicked, corpus, corpusRemaining }` |
 | `GET` | `/v1/workspaces/{id}/knowledge/search?q=&limit=&format=md` | Member+ | Cited passages from Files and pages (hybrid search) |
 | `GET` | `/v1/workspaces/{id}/knowledge/sources?limit=` | Member+ | What has been learned: counts by status + recent sources |
+| `GET` | `/v1/workspaces/{id}/knowledge/entities?type=&q=&limit=` | Member+ | Entities by mentions + `types` with counts |
+| `GET` | `/v1/workspaces/{id}/knowledge/entities/{entityId}?format=md` | Member+ | One entity: facts, relations, quoted mentions |
+| `GET` | `/v1/workspaces/{id}/knowledge/graph?focus=&depth=&limit=` | Member+ | Nodes + edges (neighbourhood or top entities) |
 | `GET` | `/v1/workspaces/{id}/knowledge/usage?days=30` | Admin+ | Metered cost: AI, storage, vectors (micro-USD, tracking only) |
 
 ## Related

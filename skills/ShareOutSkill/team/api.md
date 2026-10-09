@@ -466,6 +466,9 @@ Opt-in learned library. Full guide: [knowledge.md](knowledge.md). On self-host, 
 | `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 pages for notes + every page and File for search → `{ queued, kicked, corpus, corpusRemaining }`. |
 | `GET` | `/v1/workspaces/{id}/knowledge/search?q=&limit=&format=md` | Member+ | Cited passages from Files and pages. |
 | `GET` | `/v1/workspaces/{id}/knowledge/sources?limit=` | Member+ | Learned sources: counts by status + recent list. |
+| `GET` | `/v1/workspaces/{id}/knowledge/entities?type=&q=&limit=` | Member+ | Entities (clients, people, products…) by mentions. |
+| `GET` | `/v1/workspaces/{id}/knowledge/entities/{entityId}?format=md` | Member+ | One entity: facts, relations, quoted mentions. |
+| `GET` | `/v1/workspaces/{id}/knowledge/graph?focus=&depth=&limit=` | Member+ | Knowledge graph nodes + edges. |
 | `GET` | `/v1/workspaces/{id}/knowledge/usage?days=30` | Admin+ | Metered Knowledge cost (AI, storage, vectors), micro-USD, tracking only. |
 
 ## Artifact delivery (one-shot)

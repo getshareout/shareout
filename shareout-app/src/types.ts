@@ -156,6 +156,8 @@ export interface Env {
   KNOWLEDGE_INGEST?: Workflow<import('./knowledge/corpus/ingest').IngestParams>;
   /** Vectorize index over knowledge chunks (namespace = workspace id). Optional: search degrades to keyword. */
   KNOWLEDGE_VECTORS?: VectorizeIndex;
+  /** Workers AI model for knowledge-graph extraction (JSON mode). Defaults to @cf/meta/llama-3.3-70b-instruct-fp8-fast. */
+  KNOWLEDGE_EXTRACT_MODEL?: string;
   /** Workers Static Assets binding — serves build artifacts (editor bundle, etc.)
    *  out of the worker script bundle (plan §19 Phase 4). */
   ASSETS: Fetcher;
