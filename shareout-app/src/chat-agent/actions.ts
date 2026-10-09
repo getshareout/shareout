@@ -89,6 +89,7 @@ export function describeActionRich(a: PendingAction, locale: Locale = 'en'): Act
 }
 
 const ROLE_ES = { viewer: 'lector', editor: 'editor' } as const;
+const ROLE_MEMBER_ES = { member: 'miembro', admin: 'admin' } as const;
 const NO_UNDO_ES = 'No se puede deshacer.';
 
 function describeActionRichEs(a: PendingAction): ActionCard {
@@ -108,6 +109,13 @@ function describeActionRichEs(a: PendingAction): ActionCard {
     case 'job_create': return { kind: a.kind, title: 'Programar mail', subject: a.artifactName, detail: `cron ${a.schedule}${a.includePdf ? ' · con PDF adjunto' : ''}`, lines: a.recipients };
     case 'build_artifact': return { kind: a.kind, title: 'Armar una página nueva', subject: a.name, detail: a.prompt.length > 280 ? a.prompt.slice(0, 280) + '…' : a.prompt };
     case 'save_skill': return { kind: a.kind, title: a.skillArtifactId ? 'Actualizar skill del equipo' : 'Guardar como skill del equipo', subject: a.name, detail: `${a.markdown.length} caracteres de markdown`, lines: [a.markdown.slice(0, 200) + (a.markdown.length > 200 ? '…' : '')] };
+    case 'invite_members': return {
+      kind: a.kind,
+      title: `Invitar a ${a.emails.length} ${a.emails.length === 1 ? 'persona' : 'personas'}`,
+      subject: a.workspaceName,
+      detail: `Como ${ROLE_MEMBER_ES[a.role]}${a.message ? ` · “${a.message}”` : ''}${a.invalid?.length ? ` · se saltean los inválidos: ${a.invalid.join(', ')}` : ''}`,
+      lines: a.emails.length > 8 ? [...a.emails.slice(0, 7), `+${a.emails.length - 7} más`] : a.emails,
+    };
   }
 }
 
@@ -137,6 +145,8 @@ function describeActionEs(a: PendingAction): string {
       return `¿Armo y publico una página nueva, “${a.name}”?\n\n${a.prompt.length > 280 ? a.prompt.slice(0, 280) + '…' : a.prompt}`;
     case 'save_skill':
       return `¿${a.skillArtifactId ? 'Actualizo' : 'Guardo'} la skill del equipo “${a.name}” en la Biblioteca del espacio?`;
+    case 'invite_members':
+      return `¿Invito a ${a.emails.join(', ')} a “${a.workspaceName}” como ${ROLE_MEMBER_ES[a.role]}?`;
   }
 }
 

@@ -180,7 +180,7 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
 
   if (path.startsWith('/v1/me/tokens/') && request.method === 'DELETE') {
     const user = await getTokenOrSessionUser(ctx);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleRevokeMyToken(env, user, decodeURIComponent(path.slice('/v1/me/tokens/'.length))));
   }
 

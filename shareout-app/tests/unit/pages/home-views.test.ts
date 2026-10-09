@@ -21,9 +21,9 @@ import homeViewsBarrel from '../../../src/pages/home/render-workspace/client-scr
 /** Captured at split time — guards against accidental client-script drift.
  *  Re-pinned after the Home chat dock revamp (pill + dialog sheet, textarea composer,
  *  progressive markdown, error rows, thread menu; agent-format/agent-threads split),
- *  then for the Help panel thread view + reply box. */
-const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 602_031;
-const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '87eb518df80d4ea64174dcbf10a8c600cf95256aa61dafb8035286a62846ac2f';
+ *  then for the Help panel thread view, es-AR pass, connect-agent view and invite dialog. */
+const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 620_583;
+const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '80998506108f793ad3675e3d92563afd0e099084b68922d66c91b2987ac53b5d';
 const HOME_VIEWS_MARKER = '  // ===== rail nav → Home pane views =====';
 
 const SECTION_SOURCES: [string, string][] = [
