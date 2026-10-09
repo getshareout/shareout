@@ -5,6 +5,7 @@
 // ("install"), and attached (version-pinned) to other artifacts so the authoring
 // agent reuses them. See CONTEXT.md for the glossary and docs/adr for the decisions.
 
+import { rewriteSkillOrigin } from './skill-origin';
 import type { Env, WorkspaceRole } from './types';
 import type { AuthUser } from './api-auth';
 import { requireWorkspaceRole, getInternalWorkspaceRole } from './workspaces/roles';
@@ -600,10 +601,13 @@ export async function handleGetSkillMarkdown(env: Env, user: AuthUser, skillId: 
       WHERE a.id = ? AND a.deleted_at IS NULL`
   ).bind(skillId).first<{ name: string; slug: string; v: number }>();
   if (!meta || meta.v == null) return json({ error: 'Skill not found', code: 'NOT_FOUND' }, 404);
-  const md = await readSkillMarkdown(env, skillId, meta.v);
-  if (md == null) return json({ error: 'Skill content unavailable', code: 'NOT_FOUND' }, 404);
+  const raw = await readSkillMarkdown(env, skillId, meta.v);
+  if (raw == null) return json({ error: 'Skill content unavailable', code: 'NOT_FOUND' }, 404);
 
   const gov = await loadSkillGovernance(env, skillId);
+  // Official skills are written against $ORIGIN; bake this instance in so a Library
+  // download works without the agent asking where ShareOut lives.
+  const md = gov?.official ? rewriteSkillOrigin(raw, env) : raw;
   const canEdit = gov ? !!(await resolveSkillEditGrant(env, user.id, gov)) : false;
   const canReview = gov ? await canReviewSkillChanges(env, user.id, gov) : false;
   const canPropose = !!gov && !gov.official && !canEdit && gov.editPolicy === 'approval'
