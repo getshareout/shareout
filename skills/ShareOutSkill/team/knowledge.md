@@ -9,7 +9,7 @@ Load [SKILL.md](SKILL.md) first.
 - **Opt-in and off by default.** A workspace without Knowledge works exactly as before.
 - **Owner/admin only to turn on.** No tier requirement — `POST …/knowledge/enable` and `…/backfill` are gated on workspace role (owner/admin), returning `403 FORBIDDEN` for members without that role.
 - **Members only.** External sharees get no Knowledge surface.
-- **Your own pages only.** Notes are derived from your workspace's published pages — nothing from other workspaces, and only pages approved by moderation.
+- **Your own content only.** Notes and search come from your workspace's published pages and Files — nothing from other workspaces, and only pages approved by moderation.
 
 ## Turn it on
 
@@ -78,6 +78,48 @@ The **Knowledge** lens opens in a **tree** view by default — Overview, Topics,
 | `#l/knowledge` | Knowledge list |
 | `#l/knowledge/{path}` | A specific note (e.g. `#l/knowledge/artifacts/art_5d2e74a1.md`) |
 
+## Search what the workspace knows (agents)
+
+Once Knowledge is on, every **File** in the workspace (Assets: PDF, DOCX, XLSX, PPTX, CSV, TXT/MD, images) and every **published page** is read in the background and split into cited passages. Nobody has to do anything — new uploads, new file versions and re-publishes are picked up automatically, and deleted files drop out.
+
+One call returns the passages that answer a question, each with a citation:
+
+```http
+GET /v1/workspaces/{workspaceId}/knowledge/search?q=renewal+date+for+Acme&limit=5
+Authorization: Bearer {token}
+```
+
+```json
+{
+  "query": "renewal date for Acme",
+  "mode": "hybrid",
+  "hits": [
+    {
+      "id": "dlv_8f2c…:3",
+      "text": "The agreement renews on 1 May 2027 unless…",
+      "locator": "Term and renewal",
+      "score": 0.0325,
+      "source": { "kind": "asset", "id": "dlv_8f2c…", "title": "Acme MSA.pdf", "url": null },
+      "cite": "Acme MSA.pdf — Term and renewal"
+    }
+  ]
+}
+```
+
+- Add `&format=md` to get compact markdown (`[1] cite (kind id, url)` + passage) ready to drop into an LLM prompt.
+- **Quote `cite` when you answer** so the reader can find the source. Pages include a `url`; Files are identified by `source.id`.
+- `mode` is `hybrid` (meaning + keywords) when the instance has embeddings configured, else `keyword`.
+- Results only include what the caller may see: another member's private page or File never appears.
+- `409 KNOWLEDGE_DISABLED` means Knowledge is off — the `hint` says how an admin turns it on.
+
+Check coverage — what has been learned and what couldn't be read:
+
+```http
+GET /v1/workspaces/{workspaceId}/knowledge/sources?limit=50
+```
+
+Returns `counts` by status (`ready`, `processing`, `unsupported`, `failed`), the total `chunks`, and the most recently updated `sources` with their `error` when one couldn't be read. `POST …/knowledge/backfill` also queues every existing page and File not yet learned at its current version — `corpus` is how many started, `corpusRemaining` how many are left (call it again to continue; up to 300 per call).
+
 ## For agents
 
 When Knowledge is on, the [workspace assistant](workspace-assistant.md) can consult it instead of re-reading every page:
@@ -102,7 +144,9 @@ All routes require workspace membership. When Knowledge is off, root `GET` retur
 | `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Replace markdown; marks hand-edited |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Delete; `forget=1` stops re-learn |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | Turn learning on/off |
-| `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 recent live pages → `{ queued, kicked }` |
+| `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 recent live pages for notes, and every page and File for search → `{ queued, kicked, corpus, corpusRemaining }` |
+| `GET` | `/v1/workspaces/{id}/knowledge/search?q=&limit=&format=md` | Member+ | Cited passages from Files and pages (hybrid search) |
+| `GET` | `/v1/workspaces/{id}/knowledge/sources?limit=` | Member+ | What has been learned: counts by status + recent sources |
 
 ## Related
 

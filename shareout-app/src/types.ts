@@ -150,6 +150,12 @@ export interface Env {
   PRESENCE: DurableObjectNamespace;
   /** Demo pitch-choreography runner: replays a scenario timeline via alarms (work/044 §6). */
   SHOWTIME: DurableObjectNamespace;
+  /** Per-workspace knowledge corpus (chunks + FTS5) — SQLite-in-DO. Optional: Knowledge search is off without it. */
+  KNOWLEDGE_STORE?: DurableObjectNamespace<import('./knowledge/corpus/store-do').KnowledgeStore>;
+  /** Durable per-source ingest. Optional: ingest runs inline in waitUntil when absent. */
+  KNOWLEDGE_INGEST?: Workflow<import('./knowledge/corpus/ingest').IngestParams>;
+  /** Vectorize index over knowledge chunks (namespace = workspace id). Optional: search degrades to keyword. */
+  KNOWLEDGE_VECTORS?: VectorizeIndex;
   /** Workers Static Assets binding — serves build artifacts (editor bundle, etc.)
    *  out of the worker script bundle (plan §19 Phase 4). */
   ASSETS: Fetcher;

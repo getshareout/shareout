@@ -463,7 +463,9 @@ Opt-in learned library. Full guide: [knowledge.md](knowledge.md). On self-host, 
 | `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Upsert note markdown. |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Delete; `forget=1` stops re-learn. |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | `{ "enabled": true }`. |
-| `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 pages → `{ queued, kicked }`. |
+| `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 pages for notes + every page and File for search → `{ queued, kicked, corpus, corpusRemaining }`. |
+| `GET` | `/v1/workspaces/{id}/knowledge/search?q=&limit=&format=md` | Member+ | Cited passages from Files and pages. |
+| `GET` | `/v1/workspaces/{id}/knowledge/sources?limit=` | Member+ | Learned sources: counts by status + recent list. |
 
 ## Artifact delivery (one-shot)
 

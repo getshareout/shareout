@@ -26,6 +26,7 @@ import { handleBlobs, handleBlobUpload } from '../../data/blobs/handler';
 import { getOrCreateAssetBucket, buildAssetBucketContext, type AssetBucketRow } from '../../assets/bucket';
 import { enrichDeliverable } from '../../assets/enrich';
 import { listFileUsage } from '../../assets/usage';
+import { queueKnowledgeSource } from '../../knowledge/corpus/ingest';
 import {
   createDeliverable, addDeliverableVersion, listDeliverables, listDeliverableVersions, setDeliverableFields,
   createCollection, createShareLink, listShareLinks, revokeShareLink, hashAssetLinkPassword, type LinkGate,
@@ -75,6 +76,12 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
   const method = request.method;
   const json = (body: unknown, status = 200) => addCORS(Response.json(body, { status }));
   const body = async <T>() => (await request.json().catch(() => ({}))) as T;
+  // Workspace Files feed the knowledge corpus; `version` keeps re-queues idempotent.
+  const learn = (refId: string, version: string) => {
+    if (workspaceId) ctx.executionCtx?.waitUntil(
+      queueKnowledgeSource(env, ctx.executionCtx, { workspaceId, kind: 'asset', refId }, version).catch(() => {}),
+    );
+  };
 
   if ((rest === '' || rest === '/') && method === 'GET') {
     return addCORS(await listAssets(request, env, bucket, user.id));
@@ -87,6 +94,7 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
     const name = (b.name || '').trim() || 'Untitled';
     const d = await createDeliverable(env, bucket.id, workspaceId, user.id, name, b.blobId);
     ctx.executionCtx?.waitUntil(enrichDeliverable(env, bucket.id, d.id).catch(() => {}));
+    learn(d.id, b.blobId);
     return json({ id: d.id, name }, 201);
   }
   let dm = sub.match(/^deliverables\/([^/]+)\/version$/);
@@ -95,6 +103,7 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
     if (!b.blobId) return json({ error: 'blobId required' }, 400);
     const v = await addDeliverableVersion(env, bucket.id, dm[1], b.blobId);
     ctx.executionCtx?.waitUntil(enrichDeliverable(env, bucket.id, dm[1]).catch(() => {}));
+    learn(dm[1], b.blobId);
     return json({ deliverableId: dm[1], versionNo: v });
   }
   dm = sub.match(/^deliverables\/([^/]+)\/versions$/);
@@ -118,7 +127,9 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
     return ok ? json({ ok: true }) : json({ error: 'file not found' }, 404);
   }
   if (dm && method === 'DELETE') {
-    return addCORS(await deleteDeliverable(request, env, bucket, dm[1]));
+    const res = await deleteDeliverable(request, env, bucket, dm[1]);
+    if (res.ok) learn(dm[1], `deleted:${Date.now()}`);
+    return addCORS(res);
   }
 
   // ----- collections + sharing -----

@@ -24,7 +24,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Ask a question across workspace pages (⌘K answer mode) | [api/search.md](api/search.md#ask-your-workspace-answer-mode) | [core/workspace-home.md](core/workspace-home.md#pro-search-k) |
 | Store/reuse files (assets), folders, visibility, versioned deliverables, send a client a download link | [team/assets.md](team/assets.md) | [sdk/files.md](sdk/files.md) |
 | Embed a workspace file across pages (`sdk.files.getUrl`) | [sdk/files.md](sdk/files.md) | [team/assets.md](team/assets.md) |
-| Workspace Knowledge / learned library / Guidance | [team/knowledge.md](team/knowledge.md) | [team/workspace-context.md](team/workspace-context.md) |
+| Workspace Knowledge / search Files + pages with citations / learned library / Guidance | [team/knowledge.md](team/knowledge.md) | [team/workspace-context.md](team/workspace-context.md) |
 | Email files to workspace / workspace file inbox / share from phone | [team/assets.md](team/assets.md#add-files-without-opening-assets) | [team/workspace-assistant.md](team/workspace-assistant.md#file-attachments), [team/admin-portal.md](team/admin-portal.md) |
 | Build a page from an uploaded/emailed file (assistant) | [team/workspace-assistant.md](team/workspace-assistant.md#file-attachments) | [team/assets.md](team/assets.md) |
 | Share folders/artifacts OUTSIDE the team (clients, partners, investors) | [team/external-sharing.md](team/external-sharing.md) | [team/SKILL.md](team/SKILL.md), [team/admin-portal.md](team/admin-portal.md) |

@@ -48,6 +48,8 @@ beforeAll(async () => {
     `CREATE TABLE IF NOT EXISTS knowledge_tombstones (workspace_id TEXT NOT NULL, path TEXT NOT NULL, forgotten_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (workspace_id, path))`,
     `CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, name TEXT, slug TEXT, workspace_id TEXT, deleted_at TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))`,
     `CREATE TABLE IF NOT EXISTS deployments (artifact_id TEXT NOT NULL, version_id TEXT, channel TEXT NOT NULL)`,
+    `CREATE TABLE IF NOT EXISTS asset_deliverables (id TEXT PRIMARY KEY, workspace_id TEXT, owner_id TEXT, name TEXT, deleted_at TEXT)`,
+    `CREATE TABLE IF NOT EXISTS blobs (id TEXT PRIMARY KEY, deliverable_id TEXT, version_no INTEGER)`,
   ]) {
     await e.DB.exec(sql);
   }
@@ -121,7 +123,7 @@ describe('knowledge routes', () => {
     }
     const res = await call('POST', '/backfill');
     expect(res?.status).toBe(200);
-    expect(await res!.json()).toEqual({ queued: 2, kicked: true });
+    expect(await res!.json()).toEqual({ queued: 2, kicked: true, corpus: 0, corpusRemaining: 0 });
     const rows = await e.DB.prepare("SELECT COUNT(*) AS n FROM knowledge_ingest WHERE reason = 'backfill'").first<{ n: number }>();
     expect(rows?.n).toBe(2);
   });
@@ -130,7 +132,7 @@ describe('knowledge routes', () => {
     getAIProvider.mockReturnValue(null);
     const res = await call('POST', '/backfill');
     expect(res?.status).toBe(200);
-    expect(await res!.json()).toEqual({ queued: 0, kicked: false });
+    expect(await res!.json()).toEqual({ queued: 0, kicked: false, corpus: 0, corpusRemaining: 0 });
   });
 
   it('status reports counts over a 24h window (older rows excluded)', async () => {
