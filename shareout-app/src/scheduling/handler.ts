@@ -17,6 +17,7 @@ import {
 import { aggregateDailyStats, cleanupOldEvents } from '../analytics';
 import { cleanupExpiredAdminSessions, cleanupOldRateLimits } from '../api-auth';
 import { cleanupExpiredDeviceCodes } from '../auth/device-auth';
+import { cleanupMcpOAuth } from '../mcp';
 import { runDueCrewTriggers } from '../crew/triggers';
 import { runModerationRescan, recheckPendingModeration, recheckFailOpenModeration } from '../moderation/rescan';
 import { checkContentDomainReputation, runBandwidthAutoPause } from '../moderation/maintenance';
@@ -387,6 +388,7 @@ export async function handleScheduledEvent(env: Env, scheduledTime?: number): Pr
       cleanupExpiredAdminSessions(env),
     ]);
     await cleanupExpiredDeviceCodes(env).catch(() => 0);
+    await cleanupMcpOAuth(env).catch(() => undefined);
     const obs = await cleanupObservability(env).catch(() => ({ errors: 0, hours: 0 }));
     const audit = await cleanupAuditLog(env).catch(() => ({ rows: 0 }));
     const approvalsExpired = await reapStaleApprovals(env).catch(() => 0);

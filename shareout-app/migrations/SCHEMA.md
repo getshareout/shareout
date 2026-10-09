@@ -96,6 +96,9 @@ erDiagram
 | `artifact_passwords` | Per-artifact username/password for password-gated artifacts. |
 | `rate_limits` | Every rate limit in the product: one counter per (`principal_type`+`principal_id`, `action`, `window_start`). Principals are users and artifacts; the window string carries its own granularity (ISO day, ISO hour, `YYYY-MM-DD`, or `YYYY-MM-DDTHH:MM`). The ceilings live in code. Pruned nightly. |
 | `onboarding_state` | Per-workspace first-run progress: skill acknowledged, dismissed, celebrated. |
+| `oauth_clients` | *(0008)* AI apps (Claude, ChatGPT…) that registered themselves to connect over MCP (RFC 7591): name, exact `redirect_uris`, optional `client_secret_hash`. See `src/mcp/`. |
+| `oauth_codes` | *(0008)* Authorization codes: hashed, single-use (deleted on redemption), five-minute life, bound to the PKCE `code_challenge` and `redirect_uri`. |
+| `oauth_grants` | *(0008)* One per "person allowed this app": the current hashed refresh token (rotated on every use) and `access_token_id`, the `tokens` row it last minted. Access tokens themselves are ordinary short-lived `so_` rows in `tokens`, named `mcp:<app>`. |
 
 ## 02 Workspaces & access control
 

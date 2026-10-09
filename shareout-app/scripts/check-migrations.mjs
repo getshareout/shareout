@@ -153,7 +153,7 @@ const TABLE_OWNERS = {
   grants: 'src/access', health: 'src/observability', home: 'src/pages/home', job: 'src/scheduling',
   knowledge: 'src/knowledge', library: 'src/skill-marketplace.ts', messaging: 'src/chat-platforms',
   metric: 'src/metric-alerts', notifications: 'src/pages/home', onboarding: 'src/onboarding',
-  ops: 'src/observability', plan: 'src/crew', platform: 'src/config', presentation: 'src/present',
+  oauth: 'src/mcp', ops: 'src/observability', plan: 'src/crew', platform: 'src/config', presentation: 'src/present',
   presentations: 'src/present', rate: 'src/api-auth.ts', scheduled: 'src/scheduling', secret: 'src/data/secrets',
   share: 'src/present', sharee: 'src/sharees', sharees: 'src/sharees', sheet: 'src/data/sheets',
   sheets: 'src/data/sheets', skill: 'src/skill-marketplace.ts', slide: 'src/present', slides: 'src/present',

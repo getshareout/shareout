@@ -40,6 +40,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Presentation/slides | [modules/slides/overview.md](modules/slides/overview.md) | [modules/slides/sdk-api.md](modules/slides/sdk-api.md) |
 | Deck viewer analytics / tracked links / who opened my deck | [modules/slides/analytics.md](modules/slides/analytics.md) | [modules/slides/sdk-api.md](modules/slides/sdk-api.md) |
 | Mobile/PWA app | [modules/mobile/overview.md](modules/mobile/overview.md) | [modules/mobile/pwa.md](modules/mobile/pwa.md) |
+| Connect Claude / ChatGPT (MCP connector, one URL + sign-in) | [integrations/mcp-connector.md](integrations/mcp-connector.md) | [auth.md](auth.md) |
 | Connect Google Sheets | [integrations/google-sheets.md](integrations/google-sheets.md) | [sdk/overview.md](sdk/overview.md) |
 | Connect Google Analytics | [integrations/google-analytics.md](integrations/google-analytics.md) | [patterns/dashboards.md](patterns/dashboards.md) |
 | Connect Google Ads / Facebook Ads (BYO token) | [integrations/google-ads.md](integrations/google-ads.md) | [integrations/facebook-ads.md](integrations/facebook-ads.md), [team/workspace-connections.md](team/workspace-connections.md) |

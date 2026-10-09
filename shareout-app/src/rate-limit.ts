@@ -28,6 +28,12 @@ const RATE_LIMITS = {
   passwordLogin: { limit: 20, windowSeconds: 900 },
   accessRequest: { limit: 30, windowSeconds: 3600 },
   adminBridgeAsk: { limit: 30, windowSeconds: 3600 },
+  // MCP connector OAuth. Registration is per IP but generous: hosted AI apps register
+  // one client per connection from a handful of shared egress IPs. Token calls are
+  // per client (one connection), MCP calls per user.
+  oauthRegister: { limit: 600, windowSeconds: 3600 },
+  oauthToken: { limit: 120, windowSeconds: 3600 },
+  mcp: { limit: 600, windowSeconds: 3600 },
 } as const;
 
 type RateLimitAction = keyof typeof RATE_LIMITS;
