@@ -89,7 +89,25 @@ export interface WorkspaceDigestData {
 }
 export interface UnusedArtifactsReportData { workspaceName: string; count: number; titles: string[]; homeUrl: string }
 export interface SlidesDeckOpenedData { deckName: string; recipientLabel?: string | null; viewerEmail?: string | null; url: string }
-export interface SupportReplyData { subject: string; body: string; ticketUrl?: string | null }
+/** `ticketUrl` set = the requester answers in the app (Help panel), not by replying to the email. */
+export interface SupportReplyData { subject: string; body: string; ticketUrl?: string | null; locale?: 'en' | 'es' }
+
+const SUPPORT_REPLY_COPY = {
+  en: {
+    preheader: 'A reply to your support request.',
+    heading: 'Reply from ShareOut support',
+    cta: 'View your request',
+    replyInApp: 'To answer, open Help & support in ShareOut.',
+    replyByEmail: 'Reply to this email to continue the conversation.',
+  },
+  es: {
+    preheader: 'Te respondimos tu consulta de soporte.',
+    heading: 'Respuesta del soporte de ShareOut',
+    cta: 'Ver tu consulta',
+    replyInApp: 'Para contestar, abrí Ayuda y soporte en ShareOut.',
+    replyByEmail: 'Respondé este email para seguir la conversación.',
+  },
+};
 export interface SupportResolvedData { subject: string }
 export interface AssetDeliveryData { collectionName: string; downloadUrl: string; fileCount: number; senderName?: string | null; expiresAt?: string | null }
 export interface AssetDeliveryOpenedData { collectionName: string; viewerEmail?: string | null }
@@ -169,16 +187,19 @@ export const EMAILS = {
   support_reply: {
     category: 'transactional',
     audiences: ['ANY', 'EXTERNAL'],
-    trigger: 'Staff sends a reply on an email-channel support ticket — deliverReply().',
-    build: ({ subject, body, ticketUrl }: SupportReplyData) => ({
-      subject: `Re: ${subject}`,
-      preheader: 'A reply to your support request.',
-      heading: 'Reply from ShareOut support',
-      bodyHtml: body.split('\n').filter(Boolean).map((line) => p(escapeHtml(line))).join(''),
-      ...(ticketUrl ? { cta: { label: 'View your request', href: ticketUrl } } : {}),
-      footerNote: 'Reply to this email to continue the conversation.',
-      bodyText: body,
-    }),
+    trigger: 'Staff replies on an email, in-app (ui) or API (skill) support ticket — deliverReply().',
+    build: ({ subject, body, ticketUrl, locale }: SupportReplyData) => {
+      const c = SUPPORT_REPLY_COPY[locale === 'es' ? 'es' : 'en'];
+      return {
+        subject: `Re: ${subject}`,
+        preheader: c.preheader,
+        heading: c.heading,
+        bodyHtml: body.split('\n').filter(Boolean).map((line) => p(escapeHtml(line))).join(''),
+        ...(ticketUrl ? { cta: { label: c.cta, href: ticketUrl } } : {}),
+        footerNote: ticketUrl ? c.replyInApp : c.replyByEmail,
+        bodyText: body,
+      };
+    },
   } satisfies EmailTemplate<SupportReplyData>,
 
   support_resolved: {

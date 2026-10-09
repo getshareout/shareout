@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:test';
 import { beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 
-let CURRENT_USER: { id: string; email: string | null } | null = { id: 'usr_req', email: 'req@example.com' };
+let CURRENT_USER: { id: string; email: string | null; service?: { workspaceId: string; scopes: string[] } } | null = { id: 'usr_req', email: 'req@example.com' };
 vi.mock('../../../src/router/helpers/auth-guard', () => ({
   isAuthUser: (r: unknown) => !(r instanceof Response),
   getTokenOrSessionUser: async () => CURRENT_USER,
@@ -48,7 +48,7 @@ function ctx(method: string, path: string, body?: unknown, headers: Record<strin
 }
 
 beforeAll(async () => {
-  await e.DB.exec(`CREATE TABLE IF NOT EXISTS tickets (id TEXT PRIMARY KEY, workspace_id TEXT, requester_user_id TEXT, requester_email TEXT, channel TEXT NOT NULL, channel_ref TEXT, subject TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', priority TEXT, category TEXT, assignee_user_id TEXT, ai_draft TEXT, ai_meta_json TEXT, sla_due INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, last_msg_at INTEGER NOT NULL)`);
+  await e.DB.exec(`CREATE TABLE IF NOT EXISTS tickets (id TEXT PRIMARY KEY, workspace_id TEXT, requester_user_id TEXT, requester_email TEXT, channel TEXT NOT NULL, channel_ref TEXT, subject TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', priority TEXT, category TEXT, assignee_user_id TEXT, ai_draft TEXT, ai_meta_json TEXT, sla_due INTEGER, severity TEXT, request_id TEXT, page_url TEXT, artifact_id TEXT, user_agent TEXT, client TEXT, idempotency_key TEXT, locale TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, last_msg_at INTEGER NOT NULL)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS ticket_messages (id TEXT PRIMARY KEY, ticket_id TEXT NOT NULL, author TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL)`);
 });
 
@@ -79,6 +79,47 @@ describe('create', () => {
   it('token caller is tagged channel=skill', async () => {
     const { ticket } = await createOne({}, { authorization: 'Bearer sot_x' });
     expect(ticket.channel).toBe('skill');
+  });
+
+  it('stores context, defaults client=api for tokens, and tells the caller how to check replies', async () => {
+    const res = await routeSupportApi(ctx('POST', '/v1/support/tickets', {
+      subject: 'Publish fails', body: 'spinner', category: 'bug', severity: 'blocker', client: 'claude',
+      requestId: 'req_9', pageUrl: 'https://x/a/p/', artifactId: 'art_1', locale: 'es',
+    }, { authorization: 'Bearer so_x', 'user-agent': 'agent/1.0' }))!;
+    expect(res!.status).toBe(201);
+    const j = await res!.json() as { ticket: { id: string }; message: string; check_replies: { path: string } };
+    expect(j.message).toContain(j.ticket.id);
+    expect(j.check_replies.path).toBe(`/v1/support/tickets/${j.ticket.id}`);
+    expect(await getTicket(e, j.ticket.id)).toMatchObject({
+      category: 'bug', severity: 'blocker', client: 'claude', request_id: 'req_9', page_url: 'https://x/a/p/',
+      artifact_id: 'art_1', user_agent: 'agent/1.0', locale: 'es',
+    });
+    const plain = await createOne({}, { authorization: 'Bearer so_x' });
+    expect((await getTicket(e, plain.ticket.id))!.client).toBe('api');
+  });
+
+  it('rejects an unknown category/severity/client', async () => {
+    const res = await routeSupportApi(ctx('POST', '/v1/support/tickets', { subject: 's', body: 'b', severity: 'urgent' }))!;
+    expect(res!.status).toBe(400);
+  });
+
+  it('dedupes on idempotencyKey per requester', async () => {
+    const first = await createOne({ idempotencyKey: 'k1' });
+    const again = await routeSupportApi(ctx('POST', '/v1/support/tickets', { subject: 'Help', body: 'broken', idempotencyKey: 'k1' }))!;
+    expect(again!.status).toBe(200);
+    const j = await again!.json() as { deduped: boolean; ticket: { id: string } };
+    expect(j).toMatchObject({ deduped: true, ticket: { id: first.ticket.id } });
+    CURRENT_USER = { id: 'usr_other', email: 'o@example.com' };
+    const other = await createOne({ idempotencyKey: 'k1' });
+    expect(other.ticket.id).not.toBe(first.ticket.id);
+  });
+
+  it('refuses a workspaceId the caller is not a member of', async () => {
+    const res = await routeSupportApi(ctx('POST', '/v1/support/tickets', { subject: 's', body: 'b', workspaceId: 'wsp_x' }))!;
+    expect(res!.status).toBe(403);
+    WS_ROLE = 'member';
+    const ok = await routeSupportApi(ctx('POST', '/v1/support/tickets', { subject: 's', body: 'b', workspaceId: 'wsp_x' }))!;
+    expect(ok!.status).toBe(201);
   });
 
   it('rejects missing fields', async () => {
@@ -116,6 +157,26 @@ describe('list scopes', () => {
     const all = await routeSupportApi(ctx('GET', '/v1/support/tickets?scope=all'))!;
     expect(all!.status).toBe(200);
   });
+
+  it('scope=all filters by status, workspace and since', async () => {
+    SUPERADMINS = new Set(['req@example.com']);
+    const personal = await createOne();
+    WS_ROLE = 'member';
+    await createOne({ workspaceId: 'wsp_1' });
+    const list = async (qs: string) => ((await (await routeSupportApi(ctx('GET', `/v1/support/tickets?scope=all&${qs}`))!)!.json()) as { tickets: { id: string }[] }).tickets;
+    expect((await list('workspace=none')).map((t) => t.id)).toEqual([personal.ticket.id]);
+    expect(await list('status=open')).toHaveLength(2);
+    expect(await list(`since=${new Date(Date.now() + 60_000).toISOString()}`)).toHaveLength(0);
+    const bad = await routeSupportApi(ctx('GET', '/v1/support/tickets?scope=all&since=yesterday'))!;
+    expect(bad!.status).toBe(400);
+  });
+
+  it('a workspace agent token never counts as super-admin', async () => {
+    SUPERADMINS = new Set(['req@example.com']);
+    CURRENT_USER = { id: 'usr_req', email: 'req@example.com', service: { workspaceId: 'wsp_1', scopes: [] } };
+    const res = await routeSupportApi(ctx('GET', '/v1/support/tickets?scope=all'))!;
+    expect(res!.status).toBe(403);
+  });
 });
 
 describe('item access + staff actions', () => {
@@ -142,6 +203,7 @@ describe('item access + staff actions', () => {
   });
 
   it('workspace admin is staff for that workspace ticket; sets status', async () => {
+    WS_ROLE = 'member';
     const { ticket } = await createOne({ workspaceId: 'wsp_1' });
     CURRENT_USER = { id: 'usr_admin', email: 'admin@co.com' };
     WS_ROLE = 'admin';

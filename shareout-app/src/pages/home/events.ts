@@ -13,7 +13,7 @@ import type { Env } from '../../types';
 import type { WorkspaceRole } from '../../types';
 
 export type ActivityKind =
-  | 'comment' | 'reply' | 'mention' | 'share' | 'access' | 'alert' | 'test' | 'file' | 'stale_data' | 'metric_watch' | 'unused_artifacts' | 'moderation'  // actionable
+  | 'comment' | 'reply' | 'mention' | 'share' | 'access' | 'alert' | 'test' | 'file' | 'stale_data' | 'metric_watch' | 'unused_artifacts' | 'moderation' | 'support_reply'  // actionable
   | 'run' | 'publish' | 'create' | 'favorite' | 'view'
   | 'connection' | 'skill' | 'member' | 'agent';                  // ambient
 
@@ -51,6 +51,7 @@ export const EVENT_DEFS: Record<ActivityKind, EventDef> = {
   metric_watch:{ tier: 'actionable', defaultAudience: 'members', label: 'Metric watch',      hint: 'Watched metrics that moved sharply' },
   unused_artifacts:{ tier: 'actionable', defaultAudience: 'admins', label: 'Unused pages',    hint: 'Published pages nobody has opened in 90+ days' },
   moderation:  { tier: 'actionable', defaultAudience: 'self',    label: 'Safety review',     hint: 'When a held page passes review or gets blocked' },
+  support_reply: { tier: 'actionable', defaultAudience: 'self', label: 'Support replies',   hint: 'When the team answers a help request you opened' },
   run:        { tier: 'ambient',    defaultAudience: 'members', label: 'Job & crew runs',   hint: 'Scheduled job and crew executions' },
   publish:    { tier: 'ambient',    defaultAudience: 'members', label: 'Publishes',         hint: 'New versions published' },
   create:     { tier: 'ambient',    defaultAudience: 'members', label: 'New artifacts',     hint: 'Artifacts created' },

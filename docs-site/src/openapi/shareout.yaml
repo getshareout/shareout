@@ -951,7 +951,9 @@ paths:
       summary: List support tickets
       description: >-
         `scope=mine` (default) returns the requester's tickets. `scope=workspace&workspace={id}`
-        requires workspace admin/owner. `scope=all` is super-admin only. Optional `status` filter.
+        requires workspace admin/owner. `scope=all` is instance-admin only (session or personal
+        token; workspace agent tokens are refused) and also filters by `workspace` (`none` =
+        no workspace), `category`, `since` and `limit`. Optional `status` filter.
       operationId: listSupportTickets
       parameters:
         - name: scope
@@ -964,12 +966,30 @@ paths:
           in: query
           schema:
             type: string
-          description: Required when scope=workspace.
+          description: Required when scope=workspace. With scope=all, a workspace id or `none`.
         - name: status
           in: query
           schema:
             type: string
             enum: [open, pending, resolved, closed]
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: scope=all only.
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: scope=all only. Tickets with a message after this ISO timestamp.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 200
+            maximum: 500
+          description: scope=all only.
       responses:
         "200":
           description: Tickets
@@ -1003,7 +1023,34 @@ paths:
                 workspaceId:
                   type: string
                   nullable: true
+                  description: Must be a workspace the caller belongs to (else 403).
+                category:
+                  type: string
+                  enum: [bug, question, access, billing, other]
+                severity:
+                  type: string
+                  enum: [low, normal, high, blocker]
+                client:
+                  type: string
+                  enum: [ui, claude, chatgpt, mcp, api, slack, telegram, email, chat_agent]
+                requestId:
+                  type: string
+                  description: request_id from the error response that led here.
+                pageUrl:
+                  type: string
+                artifactId:
+                  type: string
+                userAgent:
+                  type: string
+                idempotencyKey:
+                  type: string
+                  description: Same key from the same account returns the original ticket (200, deduped=true).
+                locale:
+                  type: string
+                  enum: [en, es]
       responses:
+        "200":
+          description: Duplicate idempotencyKey — the original ticket
         "201":
           description: Created
           content:

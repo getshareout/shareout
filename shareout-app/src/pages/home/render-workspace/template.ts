@@ -288,7 +288,16 @@ export function buildWorkspaceBody(args: RenderArgs): string {
   <section class="wsx__help-panel" id="wsxHelpPanel" hidden data-i18n-aria="help.title" aria-label="Help and support">
     <header class="wsx__help-head"><span data-i18n="help.title">Help &amp; support</span><button type="button" id="wsxHelpClose" data-i18n-aria="help.close" aria-label="Close">${svg('<path d="M18 6L6 18M6 6l12 12"/>')}</button></header>
     <div class="wsx__help-body">
+      <div class="wsx__help-form" id="wsxHelpForm">
       <p class="wsx-lens__intro" data-i18n="help.intro">Hit a bug or have a question? Tell us — we'll reply here and by email.</p>
+      <div class="wsx-field">
+        <select class="wsx-field__in" id="wsxHelpCategory" data-i18n-aria="help.category" aria-label="What is it about?">
+          <option value="bug" data-i18n="help.catBug">Something is broken</option>
+          <option value="question" data-i18n="help.catQuestion">A question</option>
+          <option value="access" data-i18n="help.catAccess">Access or sign-in</option>
+          <option value="other" data-i18n="help.catOther">Something else</option>
+        </select>
+      </div>
       <div class="wsx-field">
         <input class="wsx-field__in" id="wsxHelpSubject" type="text" data-i18n-placeholder="help.subject" placeholder="Short summary">
       </div>
@@ -296,6 +305,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
         <textarea class="wsx-field__in wsx-field__ta" id="wsxHelpBody" data-i18n-placeholder="help.body" placeholder="What happened?"></textarea>
       </div>
       <div class="wsx__help-actions"><button class="wsx-abtn" id="wsxHelpSend" type="button" data-i18n="help.send">Send</button><span class="wsx-admin__savemsg" id="wsxHelpMsg"></span></div>
+      </div>
       <div class="wsx__help-mine" id="wsxHelpMine"></div>
     </div>
   </section>

@@ -4,14 +4,14 @@ import type { Env } from '../../../src/types';
 import {
   createTicket, appendMessage, getTicket, getThread, threadAsChatHistory,
   setStatus, assign, setTriage, listForWorkspace, listAll, listForRequester,
-  findLatestOpenTicketByEmail, autoCloseIdleTickets,
+  findLatestOpenTicketByEmail, autoCloseIdleTickets, findByIdempotencyKey,
 } from '../../../src/support/store';
 
 const e = env as unknown as Env;
 
 beforeAll(async () => {
   await e.DB.exec(
-    `CREATE TABLE IF NOT EXISTS tickets (id TEXT PRIMARY KEY, workspace_id TEXT, requester_user_id TEXT, requester_email TEXT, channel TEXT NOT NULL, channel_ref TEXT, subject TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', priority TEXT, category TEXT, assignee_user_id TEXT, ai_draft TEXT, ai_meta_json TEXT, sla_due INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, last_msg_at INTEGER NOT NULL)`
+    `CREATE TABLE IF NOT EXISTS tickets (id TEXT PRIMARY KEY, workspace_id TEXT, requester_user_id TEXT, requester_email TEXT, channel TEXT NOT NULL, channel_ref TEXT, subject TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', priority TEXT, category TEXT, assignee_user_id TEXT, ai_draft TEXT, ai_meta_json TEXT, sla_due INTEGER, severity TEXT, request_id TEXT, page_url TEXT, artifact_id TEXT, user_agent TEXT, client TEXT, idempotency_key TEXT, locale TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, last_msg_at INTEGER NOT NULL)`
   );
   await e.DB.exec(
     `CREATE TABLE IF NOT EXISTS ticket_messages (id TEXT PRIMARY KEY, ticket_id TEXT NOT NULL, author TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL)`
@@ -84,6 +84,12 @@ describe('status, assign, triage', () => {
     // Draft stored, but no staff/ai message was appended to the thread.
     expect(await getThread(e, t.id)).toHaveLength(1);
   });
+
+  it('keeps the category the reporter chose', async () => {
+    const t = await createTicket(e, { channel: 'ui', subject: 'Q', body: 'hi', category: 'access' });
+    await setTriage(e, t.id, { category: 'bug', priority: 'high', draft: 'd' });
+    expect((await getTicket(e, t.id))!.category).toBe('access');
+  });
 });
 
 describe('listing + scope', () => {
@@ -100,6 +106,28 @@ describe('listing + scope', () => {
     await setStatus(e, a.id, 'closed');
     expect((await listForWorkspace(e, 'wsp_a', { status: 'open' })).length).toBe(0);
     expect((await listAll(e, { status: 'closed' })).map((t) => t.id)).toEqual([a.id]);
+  });
+
+  it('filters the instance-wide list by workspace, category and since', async () => {
+    const a = await createTicket(e, { workspaceId: 'wsp_a', channel: 'ui', subject: 'A', body: 'x', category: 'bug' });
+    const p = await createTicket(e, { workspaceId: null, channel: 'telegram', subject: 'P', body: 'y', category: 'question' });
+    expect((await listAll(e, { workspace: 'none' })).map((t) => t.id)).toEqual([p.id]);
+    expect((await listAll(e, { workspace: 'wsp_a' })).map((t) => t.id)).toEqual([a.id]);
+    expect((await listAll(e, { category: 'question' })).map((t) => t.id)).toEqual([p.id]);
+    expect(await listAll(e, { since: new Date(Date.now() + 60_000).toISOString() })).toHaveLength(0);
+    expect(await listAll(e, { since: new Date(Date.now() - 60_000).toISOString() })).toHaveLength(2);
+  });
+
+  it('stores reporter context and finds a ticket by idempotency key', async () => {
+    const t = await createTicket(e, {
+      requesterUserId: 'usr_1', channel: 'skill', subject: 'S', body: 'b',
+      severity: 'blocker', client: 'claude', requestId: 'req_1', pageUrl: 'https://x/a/p/',
+      artifactId: 'art_1', userAgent: 'UA', idempotencyKey: 'k1', locale: 'es',
+    });
+    const got = (await getTicket(e, t.id))!;
+    expect(got).toMatchObject({ severity: 'blocker', client: 'claude', request_id: 'req_1', page_url: 'https://x/a/p/', artifact_id: 'art_1', user_agent: 'UA', locale: 'es' });
+    expect((await findByIdempotencyKey(e, 'usr_1', 'k1'))?.id).toBe(t.id);
+    expect(await findByIdempotencyKey(e, 'usr_2', 'k1')).toBeNull();
   });
 });
 

@@ -485,7 +485,7 @@ themselves.
 | `abuse_reports` | Viewer-submitted reports, keyed by `reporter_ip` (no account required), with `category` and `status`. |
 | `artifact_publish_approvals` | A request to publish publicly, pinned to a `content_hash` so approval cannot be reused after an edit. |
 | `artifact_publish_approval_voters` | Individual approver decisions, counted against `approvals_required`. |
-| `tickets` | Support ticket: channel, subject, status, priority, `sla_due`, plus AI-drafted reply fields. |
+| `tickets` | Support ticket: channel, subject, status, priority, `sla_due`, plus AI-drafted reply fields. Reporter context: `category`, `severity`, `client`, `request_id`, `page_url`, `artifact_id`, `user_agent`, `locale`; `idempotency_key` is unique per requester. |
 | `ticket_messages` | Ticket conversation. |
 | `artifact_tests` | Per-artifact test config: `spec`, `mode`, `baseline_version_id`. |
 | `artifact_test_runs` | One test execution: pass/fail/error counts and full `results`. |
