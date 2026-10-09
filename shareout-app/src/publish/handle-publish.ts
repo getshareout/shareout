@@ -9,7 +9,7 @@ import { validatePublishRequest, generateSlug, detectArtifactType } from '../val
 import { validateToken, checkRateLimit, incrementRateLimit, hasScope } from '../api-auth';
 import { unauthorizedFor } from '../auth/unauthorized';
 import { SUPPORT_CONTACT } from '../http/api-error';
-import { getInternalWorkspaceRole } from '../workspaces';
+import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { canAccess } from '../access/can-access';
 import { withIdempotency } from '../idempotency';
 import { pingIndexNow } from '../pages/seo';

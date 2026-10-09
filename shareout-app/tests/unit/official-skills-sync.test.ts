@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Stub the publish layer so sync orchestration is tested without D1/R2.
 const publishArtifact = vi.fn(async () => ({ artifact: { id: 'art_new', type: 'markdown' }, version: { id: 'v1', version_no: 1 } }));
-vi.mock('../../src/publish', () => ({ publishArtifact: (...a: unknown[]) => publishArtifact(...a) }));
+vi.mock('../../src/publish/publish-artifact', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  publishArtifact: (...a: unknown[]) => publishArtifact(...a),
+}));
 
 import { syncOfficialSkills, OFFICIAL_SYSTEM_WORKSPACE_ID } from '../../src/official-skills/sync';
 import { OFFICIAL_SKILLS } from '../../src/official-skills/registry';

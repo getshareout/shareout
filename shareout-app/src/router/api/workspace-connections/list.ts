@@ -4,7 +4,7 @@
  */
 import type { Env } from '../../../types';
 import type { AuthUser } from '../../../api-auth';
-import { getInternalWorkspaceRole } from '../../../workspaces';
+import { getInternalWorkspaceRole } from '../../../workspaces/roles';
 import { listProviders } from '../../../data/platform';
 import { json, requireMember } from './shared';
 import type { CredentialScope } from './shared';

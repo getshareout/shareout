@@ -3,7 +3,7 @@
  * Uses brand tokens — no purple gradients or system-only fonts.
  */
 
-import { colors, fonts, radius, shadows, googleFontsPreconnect } from './tokens';
+import { colors, fonts, radius, shadows, googleFontsPreconnect } from '../../packages/design-tokens/src/index';
 
 export { googleFontsPreconnect };
 

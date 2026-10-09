@@ -11,7 +11,10 @@ const ssoRequiredFor = vi.hoisted(() => vi.fn().mockResolvedValue(null));
 
 vi.mock('../../../src/auth/google-id-token', () => ({ verifyGoogleIdToken }));
 vi.mock('../../../src/auth/users', () => ({ upsertUser }));
-vi.mock('../../../src/workspaces', () => ({ autoJoinWorkspacesByDomain }));
+vi.mock('../../../src/workspaces/access-policy', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  autoJoinWorkspacesByDomain,
+}));
 vi.mock('../../../src/token', () => ({ createSessionToken }));
 vi.mock('../../../src/auth/session', () => ({ resolveSessionMaxAge }));
 vi.mock('../../../src/auth/sso-config', async (orig) => ({

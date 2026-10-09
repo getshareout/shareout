@@ -2,7 +2,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { publishMock } = vi.hoisted(() => ({ publishMock: vi.fn() }));
-vi.mock('../../../src/publish', () => ({ publishArtifact: publishMock }));
+vi.mock('../../../src/publish/publish-artifact', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  publishArtifact: publishMock,
+}));
 vi.mock('../../../src/visibility-config', () => ({ coerceVisibility: (_e: unknown, v: string) => v }));
 
 import { handleProvision } from '../../../src/data/provision';

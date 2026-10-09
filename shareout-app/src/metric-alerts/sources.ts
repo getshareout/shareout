@@ -1,6 +1,6 @@
 import type { Env } from '../types';
 import { createMiniDb } from '../data/minidb-client';
-import { filterToSql } from '../data/tables';
+import { filterToSql } from '../data/tables/filter-sql';
 import type { MetricSource } from './types';
 
 export type MetricResult = { value: number } | { error: string };

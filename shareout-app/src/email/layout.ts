@@ -4,7 +4,7 @@
 // action + the logo mark (the 80/15/5 neutral/white/blue ratio), generous spacing,
 // 16px card radius, warm-tinted shadow, one clear action per email. Table-based
 // because divs with max-width don't center in Outlook.
-import { colors, fonts, radius, shadows } from '../design-system/tokens';
+import { colors, fonts, radius, shadows } from '../../packages/design-tokens/src/index';
 import { BRAND } from '../brand';
 import type { Locale } from '../i18n';
 

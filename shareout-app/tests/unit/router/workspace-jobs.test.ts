@@ -4,13 +4,10 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 import type { AuthUser } from '../../../src/api-auth';
 
-vi.mock('../../../src/scheduling/jobs', async (orig) => {
-  const actual = await orig<typeof import('../../../src/scheduling/jobs')>();
-  return {
-    ...actual,
-    executeJobNow: vi.fn().mockResolvedValue({ success: true }),
-  };
-});
+vi.mock('../../../src/scheduling/jobs/execute', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  executeJobNow: vi.fn().mockResolvedValue({ success: true }),
+}));
 
 vi.mock('../../../src/crew/store', () => ({
   getCrewById: vi.fn().mockResolvedValue({ id: 'crew1', status: 'active' }),

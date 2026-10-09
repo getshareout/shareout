@@ -14,7 +14,7 @@ import type { Env } from '../types';
 import type { EmailCategory } from './preferences';
 import type { AudienceSegment } from './audience';
 import { escapeHtml } from './layout';
-import { colors, fonts, radius } from '../design-system/tokens';
+import { colors, fonts, radius } from '../../packages/design-tokens/src/index';
 import type { Locale } from '../i18n';
 
 export type EmailAudienceTag = 'ANY' | 'EXTERNAL' | AudienceSegment;

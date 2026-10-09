@@ -8,7 +8,10 @@ const getSessionUser = vi.hoisted(() => vi.fn());
 const getInternalWorkspaceRole = vi.hoisted(() => vi.fn());
 const getAIProvider = vi.hoisted(() => vi.fn());
 vi.mock('../../../src/api-auth', () => ({ validateToken }));
-vi.mock('../../../src/auth', () => ({ getSessionUser }));
+vi.mock('../../../src/auth/session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getSessionUser,
+}));
 vi.mock('../../../src/workspaces/roles', () => ({ getInternalWorkspaceRole }));
 vi.mock('../../../src/data/agent/anthropic', () => ({ getAIProvider, chatComplete: vi.fn() }));
 

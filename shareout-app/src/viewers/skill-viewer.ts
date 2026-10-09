@@ -1,5 +1,5 @@
 import { generateViewerShell, type ViewerContext } from './viewer-shell';
-import { colors } from '../design-system/tokens';
+import { colors } from '../../packages/design-tokens/src/index';
 import { parseMarkdown, MARKDOWN_VIEWER_STYLES } from './markdown-viewer';
 import { viewerCopy } from './copy';
 

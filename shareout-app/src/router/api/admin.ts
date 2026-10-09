@@ -17,7 +17,8 @@ import {
   setArtifactModeration,
 } from '../../superadmin/artifacts-admin';
 import { listAbuseReports } from '../../moderation/abuse-reports';
-import { userRow, artifactRow, renderAdminFragment } from '../../superadmin/page';
+import { userRow, artifactRow } from '../../superadmin/views/rows';
+import { renderAdminFragment } from '../../superadmin/page';
 import { searchWorkspaces } from '../../superadmin/workspaces-admin';
 import { provisionWorkspace, setWorkspaceMemberRole } from '../../superadmin/workspaces-provision';
 import { buildInstanceConfig } from '../../superadmin/instance-config';

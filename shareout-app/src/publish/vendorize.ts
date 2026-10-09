@@ -7,7 +7,9 @@
  * its URLs rewritten too.
  */
 import type { Env, FileEntry } from '../types';
-import { rewriteVendorUrls, vendorLibsEnabled, vendorAllowsAny, isValidPackageName, resolveAllowedPackages } from '../vendor-cdn';
+import { rewriteVendorUrls } from '../vendor-cdn/rewrite';
+import { vendorLibsEnabled } from '../vendor-cdn/serve';
+import { vendorAllowsAny, isValidPackageName, resolveAllowedPackages } from '../vendor-cdn/packages';
 
 function rewritable(file: FileEntry): boolean {
   return file.encoding !== 'base64' && (file.mime === 'text/html' || file.path.endsWith('.html'));

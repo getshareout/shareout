@@ -1,7 +1,7 @@
 import type { Env } from '../../types';
 import { trackPageView } from '../../analytics';
 import { trackViewerView } from '../../view-tracking';
-import { getSessionUser } from '../../auth';
+import { getSessionUser } from '../../auth/session';
 import { maybeEmitViewEvent } from '../../scheduling/events';
 import { createAccessToken } from '../../token';
 import {
@@ -36,7 +36,7 @@ import { buildToolbarContext } from './toolbar/context';
 import { renderToolbar } from './toolbar';
 import { getViewerConfig } from '../../data/viewer-config';
 import { isVisualEditorEnabled } from '../../editor/visual-editor-gate';
-import { localeForArtifactWorkspace, localeFromAcceptLanguage } from '../../i18n';
+import { localeForArtifactWorkspace, localeFromAcceptLanguage } from '../../i18n/locale';
 
 /**
  * Stream a sandboxed HTML wrapper around an artifact iframe.

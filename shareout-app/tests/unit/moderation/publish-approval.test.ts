@@ -10,7 +10,8 @@ vi.mock('../../../src/moderation/check', () => ({
 vi.mock('../../../src/serve/deployment-cache', () => ({ invalidateDeploymentCacheById: async () => {} }));
 vi.mock('../../../src/scheduling/email', () => ({ sendArtifactEmail: async () => ({ success: true }) }));
 const role = vi.fn(async (userId: string) => (typeof userId === 'string' && userId.startsWith('m') ? 'member' : null));
-vi.mock('../../../src/workspaces', () => ({
+vi.mock('../../../src/workspaces/roles', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getWorkspaceRole: async (_e: unknown, _w: string, userId: string) => role(userId),
   getInternalWorkspaceRole: async (_e: unknown, _w: string, userId: string) => role(userId),
 }));

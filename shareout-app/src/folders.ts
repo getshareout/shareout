@@ -2,7 +2,7 @@ import type { Env, FolderVisibility, Visibility } from './types';
 import { generateId } from './crypto-utils';
 import { normalizeVisibility } from './visibility-config';
 import type { AuthUser } from './api-auth';
-import { getInternalWorkspaceRole } from './workspaces';
+import { getInternalWorkspaceRole } from './workspaces/roles';
 import { jsonWithApiErrors } from './http/api-error';
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;

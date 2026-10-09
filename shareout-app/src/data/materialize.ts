@@ -1,9 +1,9 @@
 import type { Env } from '../types';
 import { writeDatasetRows } from './datasets/handler';
-import { writeTableRows } from './tables';
+import { writeTableRows } from './tables/materialize';
 import { createMiniDb } from './minidb-client';
 import { generateId } from '../crypto-utils';
-import { recordDatasetLineage } from '../catalog';
+import { recordDatasetLineage } from '../catalog/seed-resources';
 
 export type ConnectionQueryFn = (
   connection: string,

@@ -1,23 +1,14 @@
 import type { Env } from '../types';
-import { getUserRole, purgeSoftDeleted } from '../artifacts';
-import {
-  createJob,
-  listJobs,
-  listJobsForArtifact,
-  deleteJob,
-  updateJob,
-  createArtifactEmail,
-  getArtifactEmail,
-  runScheduledJobs,
-  runJobManually,
-  getJobLogs,
-  type CreateJobRequest,
-  type JobConfig,
-} from './jobs';
+import { getUserRole } from '../artifacts/roles';
+import { purgeSoftDeleted } from '../artifacts/crud';
+import { createJob, listJobs, listJobsForArtifact, deleteJob, updateJob, getJobLogs } from './jobs/crud';
+import { createArtifactEmail, getArtifactEmail } from './jobs/artifact-email';
+import { runScheduledJobs, runJobManually } from './jobs/execute';
+import { type CreateJobRequest, type JobConfig } from './jobs/types';
 import { aggregateDailyStats, cleanupOldEvents } from '../analytics';
 import { cleanupExpiredAdminSessions, cleanupOldRateLimits } from '../api-auth';
 import { cleanupExpiredDeviceCodes } from '../auth/device-auth';
-import { cleanupMcpOAuth } from '../mcp';
+import { cleanupMcpOAuth } from '../mcp/oauth';
 import { runDueCrewTriggers } from '../crew/triggers';
 import { runModerationRescan, recheckPendingModeration, recheckFailOpenModeration } from '../moderation/rescan';
 import { checkContentDomainReputation, runBandwidthAutoPause } from '../moderation/maintenance';
@@ -25,7 +16,7 @@ import { checkPublicAutoRollback } from '../public-rollout';
 import { reapStaleApprovals } from '../crew/approvals';
 import { autoCloseIdleTickets } from '../support/store';
 import { runDueMetricAlerts } from '../metric-alerts/rules';
-import { cleanupObservability } from '../observability';
+import { cleanupObservability } from '../observability/store';
 import { cleanupAuditLog } from '../audit';
 import { createLogger } from '../logging';
 import { runStorageSnapshots } from '../storage-snapshots';
@@ -36,7 +27,8 @@ import { runUnusedArtifactSweep } from '../artifacts/unused-sweep';
 import { runMetricWatchSweep } from '../metric-watch/watches';
 import { runSummaryBackfill } from '../publish/summary-backfill';
 import { syncOfficialSkills, officialSkillsSynced } from '../official-skills/sync';
-import { runKnowledgeDistill, runKnowledgeConsolidate } from '../knowledge';
+import { runKnowledgeDistill } from '../knowledge/distill';
+import { runKnowledgeConsolidate } from '../knowledge/consolidate';
 import { simpleApiError } from '../http/api-error';
 import { JOB_ACTIONS, isJobAction } from './jobs/types';
 

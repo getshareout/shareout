@@ -2,8 +2,9 @@
  * Core job execution — routes actions through the delivery registry.
  */
 import type { Env, EmailReceivedPayload } from '../../types';
-import { getUserRole } from '../../artifacts';
-import { getDestination, type DeliveryContext } from '../../delivery/registry';
+import { getUserRole } from '../../artifacts/roles';
+import { getDestination } from '../../delivery/registry';
+import { type DeliveryContext } from '../../delivery/types';
 import type { DeliveryStep } from '../../delivery/types';
 import { isArtifactFeatureEnabled } from '../../features/flags';
 import { generateId } from '../../crypto-utils';

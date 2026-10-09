@@ -6,11 +6,12 @@
 import { getPlatformOrigin } from '../config/origins';
 import type { Env } from '../types';
 import { renderHtmlPage } from '../design-system/shell';
-import { colors, fonts, radius } from '../design-system/tokens';
+import { colors, fonts, radius } from '../../packages/design-tokens/src/index';
 import { resolveShareLink, bumpShareLinkViews, hashAssetLinkPassword, type ResolvedShareLink } from '../assets/deliverables';
 import { escapeHtml } from '../email/layout';
 import { dispatchLifecycleEmail } from '../email/gateway';
-import { localeTag, resolveLocale, type Locale, type LocaleCopy } from '../i18n';
+import { localeTag, resolveLocale, type Locale } from '../i18n/locale';
+import { type LocaleCopy } from '../i18n';
 
 const DL_COPY: LocaleCopy<{
   deliveredWith: string; unavailableTitle: string; unavailableDesc: string; unavailable: string; unavailableSub: string;

@@ -2,7 +2,7 @@
  * Job authorization — viewer self-delivery rules and manage checks.
  */
 import type { Env } from '../../types';
-import { getUserRole } from '../../artifacts';
+import { getUserRole } from '../../artifacts/roles';
 import type {
   EmailConfig,
   JobAction,

@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 
 // Mock createCommentForTool so action-item-create tests don't need a real DB
 const createCommentForToolMock = vi.fn();
-vi.mock('../../../src/data/comments', () => ({
+vi.mock('../../../src/data/comments/tool', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   createCommentForTool: (...args: unknown[]) => createCommentForToolMock(...args),
 }));
 

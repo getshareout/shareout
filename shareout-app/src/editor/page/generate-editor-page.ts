@@ -5,7 +5,7 @@ import { getEditorStyles } from './styles/editor-styles';
 import { renderEditorConfigScript } from './template/config-script';
 import { renderEditorShell } from './template/shell';
 import type { EditorPageOptions } from './types';
-import { googleFontsPreconnect } from '../../design-system/tokens';
+import { googleFontsPreconnect } from '../../../packages/design-tokens/src/index';
 import { brandFaviconHead } from '../../brand';
 import { versionedBundlePath } from '../../bundle-versions';
 

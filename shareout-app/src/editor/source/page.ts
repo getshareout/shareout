@@ -2,8 +2,8 @@
 // (markdown, plain text, JSON, CSV). The visual HTML editor mangles these
 // file types, so each gets a purpose-built editing surface instead.
 
-import { colors, fonts, radius, shadows, googleFontsPreconnect } from '../../design-system/tokens';
-import { componentStylesheet } from '../../design-system/components/index';
+import { colors, fonts, radius, shadows, googleFontsPreconnect } from '../../../packages/design-tokens/src/index';
+import { componentStylesheet } from '../../design-system/components/stylesheet';
 import { brandFaviconHead } from '../../brand';
 
 export type SourceEditableType = 'markdown' | 'txt' | 'json' | 'csv';

@@ -7,7 +7,7 @@
 
 import type { Env } from '../../types';
 import { PlatformEngine } from '../platform';
-import { queryConnectionData } from './handler';
+import { queryConnectionData } from './query';
 import { parseBqRows, parseSnowflakeRows, type WarehouseQueryOptions } from './warehouse-exec';
 
 export type { WarehouseQueryOptions };

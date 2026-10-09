@@ -1,6 +1,6 @@
 import type { Env, WorkspaceRole } from './types';
 import type { AuthUser } from './api-auth';
-import { getInternalWorkspaceRole } from './workspaces';
+import { getInternalWorkspaceRole } from './workspaces/roles';
 import { logAudit } from './audit';
 import { getPlatformHostname } from './config/origins';
 import { jsonWithApiErrors } from './http/api-error';

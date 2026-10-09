@@ -1,6 +1,6 @@
 import type { Env } from '../types';
 import type { AuthUser } from '../api-auth';
-import { getInternalWorkspaceRole, invalidateWorkspaceRole } from '../workspaces';
+import { getInternalWorkspaceRole, invalidateWorkspaceRole } from './roles';
 import { createInviteClaim, expireOtherInviteClaims, sendInviteEmail } from '../workspaces-invite-email';
 import { logAudit } from '../audit';
 import { getPlatformOrigin } from '../config/origins';

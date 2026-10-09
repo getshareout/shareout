@@ -1,7 +1,7 @@
 import type { Env } from '../../types';
 import { createMiniDb, type MiniDb } from '../../data/minidb-client';
 import { extractTextFromHtml } from '../../serve/utils';
-import { buildScopeClause } from '../../data/tables';
+import { buildScopeClause } from '../../data/tables/scope';
 import type { ViewerScope } from '../../data/access-policy';
 import {
   resolveArtifactAccessForUser,

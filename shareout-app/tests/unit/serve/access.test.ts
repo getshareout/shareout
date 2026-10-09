@@ -6,12 +6,19 @@ vi.mock('../../../src/artifacts/access-requests', () => ({
   getPendingAccessRequest: vi.fn(async () => null),
 }));
 
-vi.mock('../../../src/auth', () => ({
+vi.mock('../../../src/auth/session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getSessionUser: vi.fn(async () => ({ id: 'usr_member', email: 'member@example.com' })),
+}));
+vi.mock('../../../src/auth/pages', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   loginPage: () => new Response('login', { status: 401 }),
   accessDeniedPage: () => new Response('denied', { status: 403 }),
   passwordLoginPage: () => new Response('pw', { status: 401 }),
   credentialsLoginPage: () => new Response('cred', { status: 401 }),
+}));
+vi.mock('../../../src/auth/artifact-auth', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   verifyAccessToken: vi.fn(async () => false),
 }));
 

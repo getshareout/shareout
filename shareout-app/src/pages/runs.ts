@@ -1,5 +1,5 @@
 import { renderHtmlPage } from '../design-system/shell';
-import { colors } from '../design-system/tokens';
+import { colors } from '../../packages/design-tokens/src/index';
 import { escapeHtml } from '../html/utils';
 import { RUN_DRAWER_JS } from '../runs/run-drawer-client';
 import type { Env } from '../types';

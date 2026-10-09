@@ -8,7 +8,8 @@ import { buildCrewDataContext, buildCrewPrincipal, redact } from './principal';
 import { resolveEnabledTools, toProviderTools } from './tool-registry';
 import { createApproval, notifyOwnerPendingApprovals } from './approvals';
 import { getCrewProvider, type CrewProvider, type NeutralTurn, type ProviderTool } from './provider';
-import { ES_AR_VOICE, getWorkspaceLocale, type Locale } from '../i18n';
+import { ES_AR_VOICE } from '../i18n/agent-language';
+import { getWorkspaceLocale, type Locale } from '../i18n/locale';
 import { logCrewRunFailure, logCrewToolFailure, userFacingCrewRunError, userFacingCrewToolError } from './errors';
 
 // Resolve whether a write tool's call must be deferred for owner approval.

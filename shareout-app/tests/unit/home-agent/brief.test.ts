@@ -10,7 +10,14 @@ vi.mock('../../../src/router/helpers/auth-guard', () => ({
   isAuthUser: () => true,
 }));
 vi.mock('../../../src/pages/home/host', () => ({ hostWorkspaceId: async () => null }));
-vi.mock('../../../src/pages/home/queries', () => ({ queryActivityFeed: (...a: unknown[]) => feed(...a), queryHomeArtifactCatalog: vi.fn() }));
+vi.mock('../../../src/pages/home/queries/activity-feed', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  queryActivityFeed: (...a: unknown[]) => feed(...a),
+}));
+vi.mock('../../../src/pages/home/queries/artifacts', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  queryHomeArtifactCatalog: vi.fn(),
+}));
 vi.mock('../../../src/account-links', () => ({ getVisibilityScope: async () => ({ userIds: ['u1'] }) }));
 vi.mock('../../../src/analytics', () => ({ getAccountAnalytics: async () => null }));
 vi.mock('../../../src/data/agent/ai-config', () => ({ resolveGatewayModel: async () => 'm' }));

@@ -1,6 +1,6 @@
 import type { Env } from '../../types';
 import type { SlackConfig } from '../../scheduling/jobs';
-import { invalidSlackBlocks, sendArtifactToSlack } from '../../slack/send';
+import { invalidSlackBlocks, sendArtifactToSlack } from '../../chat-platforms/slack/delivery';
 import type { Destination, DeliveryContext, DeliveryResult } from '../types';
 
 export const slackDestination: Destination<SlackConfig> = {

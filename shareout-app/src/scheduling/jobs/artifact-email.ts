@@ -2,7 +2,7 @@
  * Per-artifact inbound email address provisioning.
  */
 import type { Env } from '../../types';
-import { getUserRole } from '../../artifacts';
+import { getUserRole } from '../../artifacts/roles';
 import { artifactEmailAddress, generateEmailPrefix } from '../email';
 
 /** Create or return the artifact's dedicated inbound email address. */

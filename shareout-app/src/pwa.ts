@@ -1,5 +1,5 @@
 import type { Env, PWAConfig } from './types';
-import { colors } from './design-system/tokens';
+import { colors } from '../packages/design-tokens/src/index';
 
 interface PWAManifest {
   id: string;

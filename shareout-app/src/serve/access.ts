@@ -1,7 +1,9 @@
 import type { Env } from '../types';
-import { getSessionUser, loginPage, accessDeniedPage, passwordLoginPage, credentialsLoginPage, verifyAccessToken } from '../auth';
+import { getSessionUser } from '../auth/session';
+import { loginPage, accessDeniedPage, passwordLoginPage, credentialsLoginPage } from '../auth/pages';
+import { verifyAccessToken } from '../auth/artifact-auth';
 import { getVisibilityScope, placeholders } from '../account-links';
-import { getInternalWorkspaceRole } from '../workspaces';
+import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { canAccess } from '../access/can-access';
 import { recordShareeView } from '../sharees/activity';
 import { getPendingAccessRequest } from '../artifacts/access-requests';

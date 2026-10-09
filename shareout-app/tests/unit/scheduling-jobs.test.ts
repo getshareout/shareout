@@ -6,7 +6,10 @@ const checkEmailRateLimit = vi.hoisted(() => vi.fn());
 const sendArtifactEmail = vi.hoisted(() => vi.fn());
 const incrementEmailCount = vi.hoisted(() => vi.fn());
 
-vi.mock('../../src/artifacts', () => ({ getUserRole }));
+vi.mock('../../src/artifacts/roles', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getUserRole,
+}));
 
 // Feature gates are off-topic here and would add DB reads to the strict-sequence
 // mocks below; treat every feature as enabled.

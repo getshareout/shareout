@@ -1,4 +1,4 @@
-import { createCommentForTool } from '../../data/comments';
+import { createCommentForTool } from '../../data/comments/tool';
 import type { CrewTool } from '../types';
 
 export const actionItemCreateTool: CrewTool = {

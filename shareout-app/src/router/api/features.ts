@@ -2,8 +2,8 @@ import type { FetchContext } from '../context';
 import { createApiRouter } from '../helpers/api-router';
 import { jsonError } from '../helpers/json-response';
 import type { AuthUser } from '../../api-auth';
-import { getUserRole } from '../../artifacts';
-import { getInternalWorkspaceRole } from '../../workspaces';
+import { getUserRole } from '../../artifacts/roles';
+import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { buildFeaturesPayload } from '../../features/flags';
 
 /**

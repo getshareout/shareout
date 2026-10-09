@@ -113,21 +113,47 @@ const handlers: HandlerMocks = vi.hoisted(() => ({
   serveEditorPage: vi.fn(() => mockResponse('serveEditorPage')),
 }));
 
-vi.mock('../../../src/publish', () => ({ handlePublish: handlers.handlePublish }));
-vi.mock('../../../src/serve', () => ({
+vi.mock('../../../src/publish/handle-publish', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  handlePublish: handlers.handlePublish,
+}));
+vi.mock('../../../src/serve/handle-serve', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleServe: handlers.handleServe,
+}));
+vi.mock('../../../src/serve/handle-serve-text', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleServeText: handlers.handleServeText,
+}));
+vi.mock('../../../src/serve/namespaced', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleServeNamespaced: handlers.handleServeNamespaced,
+}));
+vi.mock('../../../src/serve/embed', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleServeEmbed: handlers.handleServeEmbed,
 }));
-vi.mock('../../../src/auth', () => ({
+vi.mock('../../../src/auth/google-oauth', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleGoogleLogin: handlers.handleGoogleLogin,
   handleGoogleCallback: handlers.handleGoogleCallback,
+  handleLinkGoogleStart: handlers.handleLinkGoogleStart,
+}));
+vi.mock('../../../src/auth/logout', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleLogout: handlers.handleLogout,
+}));
+vi.mock('../../../src/auth/artifact-auth', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handlePasswordAuth: handlers.handlePasswordAuth,
   handleCredentialsAuth: handlers.handleCredentialsAuth,
-  handleLinkGoogleStart: handlers.handleLinkGoogleStart,
+}));
+vi.mock('../../../src/auth/dev-login', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleDevLogin: handlers.handleDevLogin,
+}));
+vi.mock('../../../src/auth/session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getSessionUser: handlers.getSessionUser,
 }));
 vi.mock('../../../src/api-auth', () => ({
@@ -158,30 +184,50 @@ vi.mock('../../../src/analytics', () => ({
     topReferrers: [],
   }),
 }));
-vi.mock('../../../src/artifacts', () => ({
+vi.mock('../../../src/artifacts/crud', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleListArtifacts: handlers.handleListArtifacts,
   handleGetArtifact: handlers.handleGetArtifact,
   handleUpdateArtifact: handlers.handleUpdateArtifact,
   handleDeleteArtifact: handlers.handleDeleteArtifact,
+}));
+vi.mock('../../../src/artifacts/collaborators', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleGetCollaborators: handlers.handleGetCollaborators,
   handleAddCollaborators: handlers.handleAddCollaborators,
   handleRemoveCollaborator: handlers.handleRemoveCollaborator,
   handleTransferOwnership: handlers.handleTransferOwnership,
+}));
+vi.mock('../../../src/artifacts/versions', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleGetVersions: handlers.handleGetVersions,
   handleRollback: handlers.handleRollback,
+}));
+vi.mock('../../../src/artifacts/files', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleGetArtifactFiles: handlers.handleGetArtifactFiles,
 }));
-vi.mock('../../../src/workspaces', () => ({
+vi.mock('../../../src/workspaces/crud', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleListWorkspaces: handlers.handleListWorkspaces,
   handleCreateWorkspace: handlers.handleCreateWorkspace,
-  handleGetWorkspace: handlers.handleGetWorkspace,
-  handleGetWorkspaceBySlug: handlers.handleGetWorkspaceBySlug,
   handleUpdateWorkspace: handlers.handleUpdateWorkspace,
   handleDeleteWorkspace: handlers.handleDeleteWorkspace,
+}));
+vi.mock('../../../src/workspaces/read', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  handleGetWorkspace: handlers.handleGetWorkspace,
+  handleGetWorkspaceBySlug: handlers.handleGetWorkspaceBySlug,
+}));
+vi.mock('../../../src/workspaces/members', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleListWorkspaceMembers: handlers.handleListWorkspaceMembers,
   handleAddWorkspaceMember: handlers.handleAddWorkspaceMember,
   handleRemoveWorkspaceMember: handlers.handleRemoveWorkspaceMember,
   handleTransferWorkspaceOwnership: handlers.handleTransferWorkspaceOwnership,
+}));
+vi.mock('../../../src/workspaces/branding', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   parseBranding: () => ({ logo_ext: null, accent_color: null, hide_footer: false }),
 }));
 vi.mock('../../../src/folders', () => ({
@@ -194,7 +240,10 @@ vi.mock('../../../src/folders', () => ({
   handleMoveArtifactToFolder: handlers.handleMoveArtifactToFolder,
 }));
 vi.mock('../../../src/data/router', () => ({ handleDataRequest: handlers.handleDataRequest }));
-vi.mock('../../../src/data/sheets/handler', () => ({ handleSheetsOAuthCallback: handlers.handleSheetsOAuthCallback }));
+vi.mock('../../../src/data/sheets/artifact-auth', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  handleSheetsOAuthCallback: handlers.handleSheetsOAuthCallback,
+}));
 vi.mock('../../../src/data/github/handler', () => ({ handleGitHubOAuthCallback: handlers.handleGitHubOAuthCallback }));
 vi.mock('../../../src/skill', () => ({
   handleGetSkill: handlers.handleGetSkill,

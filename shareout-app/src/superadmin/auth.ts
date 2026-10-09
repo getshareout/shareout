@@ -1,5 +1,5 @@
 import type { Env } from '../types';
-import { getSessionUser } from '../auth';
+import { getSessionUser } from '../auth/session';
 import { validateToken } from '../api-auth';
 import { isSuperAdminEmail, rosterIsEmpty, SUPERADMIN_EMAILS } from './recipients';
 

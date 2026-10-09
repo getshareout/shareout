@@ -1,6 +1,6 @@
 import type { Env } from './types';
 import { validateToken, type AuthUser } from './api-auth';
-import { getSessionUser } from './auth';
+import { getSessionUser } from './auth/session';
 
 export async function getAuthUser(request: Request, env: Env): Promise<AuthUser | null> {
   let user = await validateToken(request, env);

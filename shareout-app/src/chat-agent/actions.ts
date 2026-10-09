@@ -1,15 +1,15 @@
 import type { Env } from '../types';
 import { resolveArtifactAccessForUser } from './access';
 import { updateRule, deleteRule } from '../metric-alerts/rules';
-import { updateJob, deleteJob, createJob } from '../scheduling/jobs';
+import { updateJob, deleteJob, createJob } from '../scheduling/jobs/crud';
 import { addCollaboratorEmails } from '../artifacts/collaborators';
 import { runCrewForArtifact } from '../crew/dispatch';
 import { publishEdits } from '../data/agent/headless-edit';
-import { botInsertRows, botUpdateRowById, botUpdateRowsByFilter } from '../data/tables';
+import { botInsertRows, botUpdateRowById, botUpdateRowsByFilter } from '../data/tables/bot';
 import { botSetJson } from '../data/json-store';
 import { buildBotDataContext } from './data-write';
 import { generateArtifactHtml } from '../data/agent/build-page';
-import { publishGeneratedHtml } from '../publish';
+import { publishGeneratedHtml } from '../publish/publish-generated-html';
 import type { Locale } from '../i18n';
 
 // A write the bot proposes and the user confirms with a button tap. Kept small

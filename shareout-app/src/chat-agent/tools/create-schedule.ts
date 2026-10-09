@@ -1,7 +1,7 @@
 import type { AccountTool, ToolContext } from './types';
 import type { PendingAction } from '../actions';
 import { resolveArtifactAccessForUser } from '../access';
-import { parseCronSchedule } from '../../scheduling/jobs';
+import { parseCronSchedule } from '../../scheduling/jobs/cron';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 

@@ -9,7 +9,7 @@ import { renderEmailLayout, renderEmailText } from './layout';
 import { EMAILS, type EmailType, type EmailTemplate } from './catalog';
 import { getPlatformHostname, getPlatformOrigin } from '../config/origins';
 import { buildEmail } from './catalog-es';
-import { localeForRecipient, type Locale } from '../i18n';
+import { localeForRecipient, type Locale } from '../i18n/locale';
 
 // The single chokepoint every lifecycle email flows through. Given a type + data,
 // it looks up the catalog template, enforces audience segmentation + per-category

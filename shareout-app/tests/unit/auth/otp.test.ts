@@ -3,10 +3,10 @@ import { env } from 'cloudflare:test';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 
-vi.mock('../../../src/workspaces', async (orig) => {
-  const actual = await orig<typeof import('../../../src/workspaces')>();
-  return { ...actual, autoJoinWorkspacesByDomain: vi.fn().mockResolvedValue(undefined) };
-});
+vi.mock('../../../src/workspaces/access-policy', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  autoJoinWorkspacesByDomain: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('../../../src/email/gateway', () => ({
   dispatchLifecycleEmail: vi.fn().mockResolvedValue({ sent: true }),

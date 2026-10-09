@@ -1,4 +1,4 @@
-import { updateRowsForTool } from '../../data/tables';
+import { updateRowsForTool } from '../../data/tables/crud';
 import type { CrewTool } from '../types';
 
 export const tableUpdateTool: CrewTool = {

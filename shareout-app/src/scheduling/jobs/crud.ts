@@ -2,7 +2,7 @@
  * Scheduled job CRUD — create, list, update, delete, and execution logs.
  */
 import type { Env } from '../../types';
-import { getUserRole } from '../../artifacts';
+import { getUserRole } from '../../artifacts/roles';
 import { getDestination } from '../../delivery/registry';
 import { isFeatureEnabled } from '../../features/flags';
 import { generateId } from '../../crypto-utils';

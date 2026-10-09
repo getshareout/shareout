@@ -2,7 +2,10 @@
 // and publish_artifact wired to the real publish handler (mocked here at its boundary).
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../src/publish', () => ({ handlePublish: vi.fn() }));
+vi.mock('../../../src/publish/handle-publish', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  handlePublish: vi.fn(),
+}));
 vi.mock('../../../src/chat-agent/access', () => ({ listWorkspacesForUser: vi.fn() }));
 
 import { handleMcp } from '../../../src/mcp/server';

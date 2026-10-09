@@ -6,7 +6,8 @@ import type { Env } from '../../../src/types';
 // artifact in the catalog. Assert the wiring here; the lineage-write logic itself
 // (idempotency, manual-edit preservation) is covered by catalog/seed-resources.test.ts.
 const lineageMock = vi.fn(async () => undefined);
-vi.mock('../../../src/catalog', () => ({
+vi.mock('../../../src/catalog/seed-resources', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   recordDatasetLineage: (...args: unknown[]) => lineageMock(...args),
 }));
 

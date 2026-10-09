@@ -2,7 +2,10 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { Env } from '../../../src/types';
 
-vi.mock('../../../src/workspaces', () => ({ isPublicShowcaseWorkspace: vi.fn() }));
+vi.mock('../../../src/workspaces/roles', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  isPublicShowcaseWorkspace: vi.fn(),
+}));
 
 import { resolveAllowOpen } from '../../../src/access/allow-open';
 import { isPublicShowcaseWorkspace } from '../../../src/workspaces';

@@ -7,17 +7,14 @@ import { openVisibilityDisabled } from '../../visibility-config';
 import { inboxEmailDomain } from '../../scheduling/email';
 import { getPlatformOrigin } from '../../config/origins';
 import { isPlatformAdmin } from '../../superadmin/auth';
-import { getInternalWorkspaceRole } from '../../workspaces';
+import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { hostWorkspaceId } from './host';
 import { parseHomeFilters } from './filters';
-import {
-  queryHomeArtifactCatalog,
-  queryHomeCounts,
-  queryPersonalFolders,
-  queryTeamFolders,
-  queryHomeTags,
-} from './queries';
-import { buildWorkspaceView, WORKSPACE_STYLES } from './render-workspace';
+import { queryHomeArtifactCatalog, queryHomeCounts } from './queries/artifacts';
+import { queryPersonalFolders, queryTeamFolders } from './queries/folders';
+import { queryHomeTags } from './queries/tags';
+import { buildWorkspaceView } from './render-workspace';
+import { WORKSPACE_STYLES } from './render-workspace/styles';
 import { renderHtmlPageStreamed } from '../../design-system/shell';
 import type { HtmlPageOptions } from '../../design-system/shell';
 import { homePageStyles } from '../../design-system/pages/home.css';
@@ -27,7 +24,7 @@ import { isVisualEditorEnabled } from '../../editor/visual-editor-gate';
 import { CREATE_FEATURE } from '../create-gate';
 import { versionedBundlePath } from '../../bundle-versions';
 import { createLogger, logError } from '../../logging';
-import { getWorkspaceLocale, resolveLocale } from '../../i18n';
+import { getWorkspaceLocale, resolveLocale } from '../../i18n/locale';
 
 /** Head options for the streamed workspace home shell. */
 const HOME_HEAD: Omit<HtmlPageOptions, 'body' | 'scripts'> = {

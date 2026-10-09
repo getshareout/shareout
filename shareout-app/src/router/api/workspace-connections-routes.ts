@@ -1,21 +1,8 @@
-import {
-  handleListWorkspaceConnections,
-  handleWorkspaceConnectorsCatalog,
-  handleTestWorkspaceConnection,
-  handleGetWorkspaceConnection,
-  handleListConnectionArtifacts,
-  handleCreateWorkspaceConnection,
-  handleDeleteWorkspaceConnection,
-  handleUpdateWorkspaceConnection,
-  handleGetMyConnectionCredentials,
-  handlePutMyConnectionCredentials,
-  handleDeleteMyConnectionCredentials,
-  handleWorkspaceOAuthUrl,
-  handleWorkspaceOAuthCallback,
-  handleSlackInstall,
-  handleSlackOAuthCallback,
-  handleListSlackChannels,
-} from './workspace-connections';
+import { handleListWorkspaceConnections, handleWorkspaceConnectorsCatalog, handleListConnectionArtifacts } from './workspace-connections/list';
+import { handleTestWorkspaceConnection, handleGetWorkspaceConnection, handleCreateWorkspaceConnection, handleDeleteWorkspaceConnection, handleUpdateWorkspaceConnection } from './workspace-connections/crud';
+import { handleGetMyConnectionCredentials, handlePutMyConnectionCredentials, handleDeleteMyConnectionCredentials } from './workspace-connections/my-credentials';
+import { handleWorkspaceOAuthUrl, handleWorkspaceOAuthCallback } from './workspace-connections/oauth';
+import { handleSlackInstall, handleSlackOAuthCallback, handleListSlackChannels } from './workspace-connections/slack';
 import {
   handleGetWorkspaceLlm,
   handleSetWorkspaceByoKey,

@@ -10,7 +10,8 @@ const owner: AuthUser = { id: 'usr_1', email: 'owner@example.com', username: nul
 const stranger: AuthUser = { id: 'usr_other', email: 'nope@example.com', username: null };
 
 // Mock the workspace role lookup used for admin access.
-vi.mock('../../../src/workspaces', () => ({
+vi.mock('../../../src/workspaces/roles', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getInternalWorkspaceRole: vi.fn(async () => null),
 }));
 import { getInternalWorkspaceRole } from '../../../src/workspaces';

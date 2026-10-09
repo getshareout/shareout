@@ -4,7 +4,7 @@ import { escapeHtml } from '../html/utils';
 import { renderHtmlPage } from '../design-system/shell';
 import { workspacePageStyles } from '../design-system/pages/workspace.css';
 import { workspaceIndexPageStyles } from '../design-system/pages/workspace-index.css';
-import { getSessionUser } from '../auth';
+import { getSessionUser } from '../auth/session';
 import { getLinkedUserIds, placeholders } from '../account-links';
 import { brandLockupHtml } from '../brand';
 import { renderWorkspaceNotFoundPage } from './not-found';

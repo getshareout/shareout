@@ -1,5 +1,5 @@
 import { DATA_ERRORS } from '../../types';
-import { getSessionUser } from '../../auth';
+import { getSessionUser } from '../../auth/session';
 import { createLogger, logError } from '../../logging';
 import { successResponse, errorResponse, type DataContext } from '../middleware';
 import {

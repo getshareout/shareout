@@ -13,7 +13,10 @@ const prefetchMocks = vi.hoisted(() => ({
 
 vi.mock('../../../src/serve/prefetch', () => prefetchMocks);
 vi.mock('../../../src/analytics', () => ({ trackPageView: vi.fn(async () => undefined) }));
-vi.mock('../../../src/auth', () => ({ getSessionUser: vi.fn(async () => null) }));
+vi.mock('../../../src/auth/session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getSessionUser: vi.fn(async () => null),
+}));
 vi.mock('../../../src/view-tracking', () => ({ trackViewerView: vi.fn(async () => undefined) }));
 vi.mock('../../../src/scheduling/events', () => ({ maybeEmitViewEvent: vi.fn(async () => undefined) }));
 

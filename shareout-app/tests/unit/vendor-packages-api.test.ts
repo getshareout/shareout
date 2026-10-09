@@ -3,7 +3,10 @@ import type { Env } from '../../src/types';
 import type { AuthUser } from '../../src/api-auth';
 
 const role = vi.fn();
-vi.mock('../../src/workspaces', () => ({ getInternalWorkspaceRole: role }));
+vi.mock('../../src/workspaces/roles', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getInternalWorkspaceRole: role,
+}));
 
 const {
   handleListVendorPackages,

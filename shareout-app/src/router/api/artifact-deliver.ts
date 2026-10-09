@@ -7,7 +7,7 @@ import { getDestination } from '../../delivery/registry';
 import { executeJobAction } from '../../scheduling/jobs/runner';
 import { checkViewerSelfDelivery } from '../../scheduling/jobs/permissions';
 import type { JobAction, JobConfig } from '../../scheduling/jobs/types';
-import { getUserRole } from '../../artifacts';
+import { getUserRole } from '../../artifacts/roles';
 import { getLinkedChatId } from '../../telegram/linking';
 import { resolveSlackTokenForArtifact } from '../../chat-platforms/slack/delivery';
 import { listSlackChannels } from '../../chat-platforms/slack/client';

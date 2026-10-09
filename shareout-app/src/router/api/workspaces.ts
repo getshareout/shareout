@@ -1,11 +1,5 @@
-import {
-  handleListWorkspaces,
-  handleCreateWorkspace,
-  handleGetWorkspace,
-  handleGetWorkspaceBySlug,
-  handleUpdateWorkspace,
-  handleDeleteWorkspace,
-} from '../../workspaces';
+import { handleListWorkspaces, handleCreateWorkspace, handleUpdateWorkspace, handleDeleteWorkspace } from '../../workspaces/crud';
+import { handleGetWorkspace, handleGetWorkspaceBySlug } from '../../workspaces/read';
 import { handleExportWorkspace } from '../../artifacts/export';
 import { routeWorkspaceFolders } from './workspace-folders';
 import { routeWorkspaceVendorPackages } from './workspace-vendor-packages';

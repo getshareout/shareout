@@ -8,7 +8,8 @@ vi.mock('../../../src/data/platform', () => ({
 }));
 
 const queryConnectionDataMock = vi.fn();
-vi.mock('../../../src/data/connections/handler', () => ({
+vi.mock('../../../src/data/connections/query', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   queryConnectionData: (...args: unknown[]) => queryConnectionDataMock(...args),
 }));
 

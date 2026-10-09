@@ -1,5 +1,5 @@
 import type { Env } from '../types';
-import { handleServe } from '../serve';
+import { handleServe } from '../serve/handle-serve';
 import { getCdnRegistrable, getPlatformOrigin } from '../config/origins';
 import { CDN_REGISTRABLE } from '../serve/security';
 import { serveSharedBundle } from './shared-bundles';

@@ -6,7 +6,10 @@ const serveMocks = vi.hoisted(() => ({
   handleServe: vi.fn(),
 }));
 
-vi.mock('../../../src/serve', () => serveMocks);
+vi.mock('../../../src/serve/handle-serve', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...serveMocks,
+}));
 
 import { handleCdnContent, parseCdnLabel } from '../../../src/router/cdn-content';
 

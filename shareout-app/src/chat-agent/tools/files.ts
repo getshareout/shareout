@@ -1,7 +1,7 @@
 import type { AccountTool, ToolContext } from './types';
 import { getOrCreateAssetBucket, type AssetBucketRow } from '../../assets/bucket';
 import { summarizeFile } from '../../data/files';
-import { PERSONAL_SCOPE } from '../access';
+import { PERSONAL_SCOPE } from '../../chat-platforms/types';
 
 interface FileRow {
   id: string;

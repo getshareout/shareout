@@ -3,7 +3,8 @@ import type { EmbedArtifactInfo } from './types';
 import { SANDBOX_PERMISSIONS, getEmbedCSP, getEmbedSecurityHeaders } from './security';
 import { escapeHtml, notFound, pausedPage } from './utils';
 import { getCacheControl } from './assets';
-import { googleFontsPreconnect, standalonePageStyles } from '../design-system/standalone-page';
+import { googleFontsPreconnect } from '../../packages/design-tokens/src/index';
+import { standalonePageStyles } from '../design-system/standalone-page';
 import { hasCustomViewer, renderViewer } from '../viewers';
 import { getPlatformOrigin } from '../config/origins';
 

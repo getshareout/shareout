@@ -10,9 +10,16 @@ vi.mock('../../../../src/artifacts/access-requests', () => ({
   getPendingAccessRequest: vi.fn(async () => null),
 }));
 
-vi.mock('../../../../src/auth', () => ({
+vi.mock('../../../../src/auth/session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getSessionUser: vi.fn(async () => null),
+}));
+vi.mock('../../../../src/auth/artifact-auth', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   verifyAccessToken: vi.fn(async () => false),
+}));
+vi.mock('../../../../src/auth/pages', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   loginPage: vi.fn((slug: string, name: string) =>
     new Response(`login:${slug}:${name}`, { status: 401, headers: { 'Content-Type': 'text/html' } })
   ),

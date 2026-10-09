@@ -16,7 +16,8 @@ import { CANVAS_TOOLS } from '../../chat-agent/tools/canvas';
 import { checkAiChatLimit } from '../../rate-limit';
 import { transcribeAudioBytes } from '../../data/transcribe';
 import { hostWorkspaceId } from '../../pages/home/host';
-import { queryHomeArtifactCatalog, queryActivityFeed } from '../../pages/home/queries';
+import { queryHomeArtifactCatalog } from '../../pages/home/queries/artifacts';
+import { queryActivityFeed } from '../../pages/home/queries/activity-feed';
 import type { ActionItem } from '../../pages/home/types';
 import { getCrewProvider } from '../../crew/provider';
 import { resolveGatewayModel } from '../../data/agent/ai-config';
@@ -25,7 +26,7 @@ import { getVisibilityScope } from '../../account-links';
 import { buildClientsContextForWorkspace } from '../../sharees/context';
 import { createLogger } from '../../logging';
 import { knowledgeTrunkForContext } from '../../knowledge-context';
-import { ES_AR_VOICE } from '../../i18n';
+import { ES_AR_VOICE } from '../../i18n/agent-language';
 import { guidanceEntryForContext } from '../../workspace-context';
 import {
   jsonResp, streamAgentChat, confirmAgentAction, listAgentThreads,

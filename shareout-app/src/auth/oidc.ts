@@ -11,7 +11,7 @@
  */
 import type { Env } from '../types';
 import { createSessionToken, signPayload, verifySignature } from '../token';
-import { autoJoinWorkspacesByDomain } from '../workspaces';
+import { autoJoinWorkspacesByDomain } from '../workspaces/access-policy';
 import { invalidateWorkspaceRole } from '../workspaces/roles';
 import { generateId } from '../crypto-utils';
 import { getPlatformHostname } from '../config/origins';

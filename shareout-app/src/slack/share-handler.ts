@@ -1,8 +1,9 @@
 import type { Env } from '../types';
 import type { AuthUser } from '../api-auth';
-import { getUserRole } from '../artifacts';
+import { getUserRole } from '../artifacts/roles';
 import { createLogger, logError } from '../logging';
-import { invalidSlackBlocks, sendArtifactToSlack, userFacingSlackDeliveryError, type SlackDeliveryMode } from './send';
+import { invalidSlackBlocks, sendArtifactToSlack, type SlackDeliveryMode } from '../chat-platforms/slack/delivery';
+import { userFacingSlackDeliveryError } from '../chat-platforms/slack/client';
 import { jsonWithApiErrors } from '../http/api-error';
 
 function json(data: unknown, status = 200): Response {

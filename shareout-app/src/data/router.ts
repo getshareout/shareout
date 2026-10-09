@@ -2,7 +2,7 @@ import type { Env } from '../types';
 import { DATA_ERRORS } from '../types';
 import { dataMiddleware, handleCorsOptions, errorResponse, successResponse, setRequestOrigin, type DataContext } from './middleware';
 import { handleJsonStore } from './json-store';
-import { handleTables } from './tables';
+import { handleTables } from './tables/handler';
 import { handleProvision } from './provision';
 import { handleWorkspaceData } from './workspace-shared';
 import { handleDatasets, handleDatasetUpload } from './datasets/handler';

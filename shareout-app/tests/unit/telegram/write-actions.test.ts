@@ -20,12 +20,22 @@ const botSetJson = vi.hoisted(() => vi.fn());
 const buildBotDataContext = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../src/data/agent/headless-edit', () => ({ proposeEdit, publishEdits }));
-vi.mock('../../../src/data/tables', () => ({ botInsertRows, botUpdateRowById, botUpdateRowsByFilter }));
+vi.mock('../../../src/data/tables/bot', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  botInsertRows,
+  botUpdateRowById,
+  botUpdateRowsByFilter,
+}));
 vi.mock('../../../src/data/json-store', () => ({ botSetJson }));
 vi.mock('../../../src/chat-agent/data-write', () => ({ buildBotDataContext }));
 vi.mock('../../../src/chat-agent/access', () => ({ resolveArtifactAccessForUser }));
 vi.mock('../../../src/metric-alerts/rules', () => ({ updateRule, deleteRule, getRule, listRulesForOwner }));
-vi.mock('../../../src/scheduling/jobs', () => ({ updateJob, deleteJob, listJobs }));
+vi.mock('../../../src/scheduling/jobs/crud', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  updateJob,
+  deleteJob,
+  listJobs,
+}));
 vi.mock('../../../src/artifacts/collaborators', () => ({ addCollaboratorEmails }));
 vi.mock('../../../src/crew/store', () => ({ getCrew, createRun: vi.fn(), getRun: vi.fn() }));
 vi.mock('../../../src/crew/limits', () => ({ resolveCrewLimits: vi.fn(), countActiveRuns: vi.fn() }));

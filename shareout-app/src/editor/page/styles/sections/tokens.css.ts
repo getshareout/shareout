@@ -3,7 +3,7 @@
  * @module editor/page/styles/sections/tokens
  */
 
-import { colors, fonts, radius, shadows, animation, layout } from '../../../../design-system/tokens';
+import { colors, fonts, radius, shadows, animation, layout } from '../../../../../packages/design-tokens/src/index';
 
 /** CSS for the tokens section of the visual editor. */
 export const tokensCss = `

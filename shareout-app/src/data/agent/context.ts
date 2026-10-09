@@ -2,7 +2,8 @@ import type { Env } from '../../types';
 import type { DataContext } from '../middleware';
 import type { MiniDb } from '../minidb-client';
 import type { AgentConfig, VisitorContext, AdminContext } from './types';
-import { agentLanguageRule, getWorkspaceLocale } from '../../i18n';
+import { agentLanguageRule } from '../../i18n/agent-language';
+import { getWorkspaceLocale } from '../../i18n/locale';
 
 export async function buildVisitorContext(
   ctx: DataContext,

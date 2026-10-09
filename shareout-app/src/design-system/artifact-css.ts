@@ -7,19 +7,7 @@
  * Component classes are authored here and reference `var(--so-*)`.
  */
 
-import {
-  colors,
-  spacing,
-  radius,
-  shadows,
-  fontSizes,
-  fontWeights,
-  fonts,
-  animation,
-  layout,
-  fontshareDisplayUrl,
-  googleFontsUrl,
-} from './tokens';
+import { colors, spacing, radius, shadows, fontSizes, fontWeights, fonts, animation, layout, fontshareDisplayUrl, googleFontsUrl } from '../../packages/design-tokens/src/index';
 
 const kebab = (s: string) =>
   s.replace(/([a-z0-9])([A-Z])/g, '$1-$2').replace(/_/g, '-').toLowerCase();

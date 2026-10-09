@@ -7,7 +7,7 @@
  *
  * Warm-neutral palette per Design/visual/color.md (80% neutral, blue sparingly).
  */
-import { colors } from '../../design-system/tokens';
+import { colors } from '../../../packages/design-tokens/src/index';
 
 export const LOADING_STYLES = `
     #so-loading {

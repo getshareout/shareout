@@ -4,7 +4,7 @@
 import { zipSync } from 'fflate';
 import type { Env } from '../types';
 import type { AuthUser } from '../api-auth';
-import { getInternalWorkspaceRole } from '../workspaces';
+import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { createMiniDb } from '../data/minidb-client';
 import { json } from './json-response';
 

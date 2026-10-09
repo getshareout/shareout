@@ -3,13 +3,13 @@ import type { FetchContext } from '../context';
 import type { Env } from '../../types';
 import type { AuthUser } from '../../api-auth';
 import { isAuthUser, requireTokenOrSession } from '../helpers/auth-guard';
-import { getInternalWorkspaceRole } from '../../workspaces';
+import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { isFeatureEnabled, webAgentBlockedPayload } from '../../features/flags';
 import { buildClientsContextForWorkspace } from '../../sharees/context';
 import { knowledgeTrunkForContext } from '../../knowledge-context';
 import { guidanceEntryForContext } from '../../workspace-context';
 import { checkAiChatLimit, checkWebAgentWorkspaceLimit } from '../../rate-limit';
-import { queryHomeArtifactCatalog } from '../../pages/home/queries';
+import { queryHomeArtifactCatalog } from '../../pages/home/queries/artifacts';
 import {
   jsonResp, streamAgentChat, confirmAgentAction, listAgentThreads,
   getAgentThreadMessages, renameAgentThread, deleteAgentThread, serveAgentMedia,

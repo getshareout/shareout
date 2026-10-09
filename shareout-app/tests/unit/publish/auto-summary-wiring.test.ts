@@ -13,7 +13,14 @@ vi.mock('../../../src/search/semantic', () => ({ indexArtifactVector: async () =
 vi.mock('../../../src/email/gateway', () => ({ dispatchLifecycleEmail: async () => {} }));
 vi.mock('../../../src/scheduling/events', () => ({ emitJobEvent: async () => {} }));
 vi.mock('../../../src/assets/usage', () => ({ scanFileUsage: async () => {} }));
-vi.mock('../../../src/knowledge', () => ({ isKnowledgeEnabled: async () => false, enqueueIngest: async () => {} }));
+vi.mock('../../../src/knowledge/store', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  isKnowledgeEnabled: async () => false,
+}));
+vi.mock('../../../src/knowledge/ingest', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  enqueueIngest: async () => {},
+}));
 vi.mock('../../../src/tests/block-gate', () => ({
   shouldBlockPublish: async () => false, stageCandidate: async () => {}, runBlockGate: async () => {},
 }));

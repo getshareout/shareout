@@ -1,4 +1,5 @@
-import { queryRowsForTool, listTableNames } from '../../data/tables';
+import { queryRowsForTool } from '../../data/tables/query';
+import { listTableNames } from '../../data/tables/meta';
 import type { CrewTool } from '../types';
 
 export const tableSchemaTool: CrewTool = {

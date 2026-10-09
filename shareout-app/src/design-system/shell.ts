@@ -4,8 +4,8 @@
  */
 
 import { baseStyles } from './base.css';
-import { componentStylesheet, componentScripts } from './components/index';
-import { googleFontsPreconnect } from './tokens';
+import { componentStylesheet, componentScripts } from './components/stylesheet';
+import { googleFontsPreconnect } from '../../packages/design-tokens/src/index';
 import { brandFaviconHead } from '../brand';
 import { notFoundStyles, renderStreamedPageErrorBody } from '../pages/not-found';
 

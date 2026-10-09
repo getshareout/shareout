@@ -7,7 +7,7 @@
 import type { Env } from '../types';
 import type { AuthUser } from '../api-auth';
 import { json } from '../workspaces/json-response';
-import { requireWorkspaceRole } from '../workspaces';
+import { requireWorkspaceRole } from '../workspaces/roles';
 import { generateId } from '../crypto-utils';
 import { inviteOrAddMember } from '../workspaces/invite';
 import { invalidateGrants } from '../access/can-access';

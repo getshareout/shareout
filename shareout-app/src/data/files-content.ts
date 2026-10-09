@@ -8,7 +8,7 @@
 //   workspace → served to anyone with the id (embeddable; the asset bucket is public, so
 //               this matches the raw blob route it replaces). Identity is not resolved.
 import type { Env } from '../types';
-import { getSessionUser } from '../auth';
+import { getSessionUser } from '../auth/session';
 import { getVisibilityScope } from '../account-links';
 import { canAccess } from '../access/can-access';
 import { corsHeaders } from './middleware';

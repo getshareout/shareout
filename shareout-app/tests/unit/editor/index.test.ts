@@ -38,13 +38,10 @@ vi.mock('../../../src/editor/detector', () => ({
   detectComponents: (...args: unknown[]) => mockDetectComponents(...args),
 }));
 
-vi.mock('../../../src/editor/visual-editor', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../src/editor/visual-editor')>();
-  return {
-    ...actual,
-    generateEditorPage: (...args: unknown[]) => mockGenerateEditorPage(...args),
-  };
-});
+vi.mock('../../../src/editor/page/generate-editor-page', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  generateEditorPage: (...args: unknown[]) => mockGenerateEditorPage(...args),
+}));
 
 import { handleEditor, serveEditorPage } from '../../../src/editor/index';
 

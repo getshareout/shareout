@@ -5,7 +5,10 @@ import type { Env } from '../../../src/types';
 const getSessionUser = vi.fn();
 const validateToken = vi.fn();
 
-vi.mock('../../../src/auth', () => ({ getSessionUser: (...a: unknown[]) => getSessionUser(...a) }));
+vi.mock('../../../src/auth/session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getSessionUser: (...a: unknown[]) => getSessionUser(...a),
+}));
 vi.mock('../../../src/api-auth', () => ({ validateToken: (...a: unknown[]) => validateToken(...a) }));
 
 const { requireSuperAdmin } = await import('../../../src/superadmin/auth');

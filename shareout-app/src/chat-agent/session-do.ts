@@ -12,7 +12,8 @@ import { generateId } from '../crypto-utils';
 import type { WorkspaceSelection } from './access';
 import { PERSONAL_SCOPE } from '../chat-platforms/types';
 import { buildHomeSnapshot } from '../router/api/home-agent';
-import { localeForRecipient, t, type Locale } from '../i18n';
+import { localeForRecipient, type Locale } from '../i18n/locale';
+import { t } from '../i18n';
 
 const BOT_COPY = {
   en: {

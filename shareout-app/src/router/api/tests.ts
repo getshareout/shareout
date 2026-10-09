@@ -6,7 +6,7 @@ import type { FetchContext } from '../context';
 import type { Env } from '../../types';
 import { requireAuthUser, requireTokenOrSession, isAuthUser } from '../helpers/auth-guard';
 import { jsonError, jsonResponse } from '../helpers/json-response';
-import { getInternalWorkspaceRole } from '../../workspaces';
+import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { getTestConfig, upsertTestConfig, listRuns, getLatestRun } from '../../tests/config';
 import { runTests } from '../../tests/runner';
 import type { TestMode, TestSpec } from '../../tests/types';

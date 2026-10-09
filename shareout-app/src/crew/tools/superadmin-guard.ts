@@ -1,4 +1,4 @@
-import { isSuperAdminEmail } from '../../superadmin/auth';
+import { isSuperAdminEmail } from '../../superadmin/recipients';
 
 export async function requireSuperAdminOwner(
   env: { DB: D1Database },

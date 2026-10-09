@@ -8,7 +8,7 @@ import { handleServeGridJS, handleServeGridCSS } from '../grid-serve';
 import { handleServeArtifactUI } from '../ui-serve';
 import { isSupportedSdkMajor } from '../sdk-version';
 import { handleServeLibModule } from '../workspace-library';
-import { handleServeVendorLib } from '../vendor-cdn';
+import { handleServeVendorLib } from '../vendor-cdn/serve';
 import { isCurrentBundleVersion } from '../bundle-versions';
 
 // Public, origin-independent SDK / static bundles. These resolve identically on the

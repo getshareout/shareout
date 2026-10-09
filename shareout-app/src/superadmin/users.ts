@@ -1,6 +1,6 @@
 import type { Env } from '../types';
-import { purgeArtifact } from '../artifacts';
-import { isSuperAdminEmail } from './auth';
+import { purgeArtifact } from '../artifacts/crud';
+import { isSuperAdminEmail } from './recipients';
 import { invalidateUserDisabled } from '../auth/session';
 
 export interface UserRow {

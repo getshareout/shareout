@@ -15,11 +15,7 @@ import { getPlatformMetrics, getAiUsageMetrics } from '../metrics';
 import { listModerationQueue } from '../artifacts-admin';
 import { listUsers } from '../users';
 import { renderFeaturesBody } from '../features-view';
-import {
-  getHourlySeries,
-  getWindowSummary,
-  getRecentErrors,
-} from '../../observability';
+import { getHourlySeries, getWindowSummary, getRecentErrors } from '../../observability/store';
 import type { RangeDef } from './config';
 import { auditBody, moderationBody, usersBody } from './bodies/admin-lists';
 import { healthBody, opsBody } from './bodies/health-ops';

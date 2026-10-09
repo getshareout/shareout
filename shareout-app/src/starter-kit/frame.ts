@@ -4,7 +4,7 @@
 // artifact is theirs to edit or delete. Authoring an example = supplying the
 // inner body + script; the frame handles <head>, SDK load, banner, and base CSS.
 
-import { colors, fonts, radius, shadows } from '../design-system/tokens';
+import { colors, fonts, radius, shadows } from '../../packages/design-tokens/src/index';
 
 interface FrameParts {
   /** <title> + banner heading. */

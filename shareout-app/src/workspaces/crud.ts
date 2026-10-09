@@ -6,7 +6,7 @@ import { json } from './json-response';
 import { invalidateWorkspaceRole, requireWorkspaceRole } from './roles';
 import { generateWorkspaceSlug, SLUG_REGEX } from './slug';
 import { handleGetWorkspace } from './read';
-import { scheduleSeedStarterKit } from '../starter-kit';
+import { scheduleSeedStarterKit } from '../starter-kit/schedule';
 
 export async function handleListWorkspaces(
   request: Request,

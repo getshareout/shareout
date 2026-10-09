@@ -4,7 +4,7 @@
 import type { Env, FileEntry } from '../types';
 import type { AuthUser } from '../api-auth';
 import { generateSlug } from '../validation';
-import { getInternalWorkspaceRole } from '../workspaces';
+import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { createLogger, logError } from '../logging';
 import { libraryVersionExists } from '../workspace-library';
 import { json } from './http';

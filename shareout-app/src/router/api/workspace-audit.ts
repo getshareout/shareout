@@ -1,6 +1,6 @@
 import type { Env } from '../../types';
 import type { AuthUser } from '../../api-auth';
-import { requireWorkspaceRole } from '../../workspaces';
+import { requireWorkspaceRole } from '../../workspaces/roles';
 import { listWorkspaceAuditLog } from '../../audit';
 import { jsonWithApiErrors } from '../../http/api-error';
 

@@ -1,6 +1,6 @@
 import type { Env } from '../types';
 import { isFeatureEnabled, featureDisabledResponse } from '../features/flags';
-import { isSuperAdminEmail } from '../superadmin/auth';
+import { isSuperAdminEmail } from '../superadmin/recipients';
 
 export const VISUAL_EDITOR_FEATURE = 'module.visual_editor';
 
