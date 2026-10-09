@@ -1,15 +1,23 @@
+import type { Locale } from '../../../i18n';
+import { TOOLBAR_COPY, js, type ToolbarCopy } from './copy';
+
 /** Auto-extracted client script for the sandbox viewer toolbar. */
-export function renderToolbarScriptCore(): string {
+export function renderToolbarScriptCore(c: ToolbarCopy = TOOLBAR_COPY.en, locale: Locale = 'en'): string {
+  const ago = locale === 'es'
+    ? `      if (seconds < 3600) return 'hace ' + Math.floor(seconds / 60) + ' min';
+      if (seconds < 86400) return 'hace ' + Math.floor(seconds / 3600) + ' h';
+      return 'hace ' + Math.floor(seconds / 86400) + ' d';`
+    : `      if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+      if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+      return Math.floor(seconds / 86400) + 'd ago';`;
   return `
     function escapeHtml(s) {
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
     function timeAgo(date) {
       var seconds = Math.floor((new Date() - date) / 1000);
-      if (seconds < 60) return 'just now';
-      if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
-      if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
-      return Math.floor(seconds / 86400) + 'd ago';
+      if (seconds < 60) return '${js(c.justNow)}';
+${ago}
     }
     window.soToggleToolbar = function() {
       var tb = document.getElementById('shareout-admin-toolbar');

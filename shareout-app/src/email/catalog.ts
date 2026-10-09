@@ -15,12 +15,15 @@ import type { EmailCategory } from './preferences';
 import type { AudienceSegment } from './audience';
 import { escapeHtml } from './layout';
 import { colors, fonts, radius } from '../design-system/tokens';
+import type { Locale } from '../i18n';
 
 export type EmailAudienceTag = 'ANY' | 'EXTERNAL' | AudienceSegment;
 
 export interface EmailContext {
   env: Env;
   baseUrl: string;
+  /** Recipient's language; absent = English. Spanish copy lives in catalog-es.ts. */
+  locale?: Locale;
 }
 
 export interface BuiltEmail {
@@ -47,9 +50,9 @@ export interface EmailTemplate<D = Record<string, unknown>> {
 }
 
 // ── small copy helpers ───────────────────────────────────────────────────────
-const p = (s: string) => `<p style="margin:0 0 14px">${s}</p>`;
+export const p = (s: string) => `<p style="margin:0 0 14px">${s}</p>`;
 
-function codeBlock(code: string): string {
+export function codeBlock(code: string): string {
   return `<div style="font-family:${fonts.mono};font-size:34px;font-weight:700;letter-spacing:8px;color:${colors.text};background:${colors.surface};border:1px solid ${colors.border};border-radius:${radius.sm};padding:18px;text-align:center">${escapeHtml(code)}</div>`;
 }
 
@@ -57,8 +60,8 @@ function codeBlock(code: string): string {
 export interface OtpData { code: string }
 export interface InviteData { workspaceName: string; inviterName: string; claimCode: string; claimTtlDays: number }
 export interface AddedToWorkspaceData { workspaceName: string; inviterName: string }
-export interface CommentData { fromName: string; verb: string; title: string; snippet: string; url: string }
-export interface ActionItemAssignedData { fromName: string; title: string; snippet: string; url: string; dueStr?: string | null }
+export interface CommentData { fromName: string; verb: string; title: string; snippet: string; url: string; reason?: 'mention' | 'reply' }
+export interface ActionItemAssignedData { fromName: string; title: string; snippet: string; url: string; dueStr?: string | null; dueAt?: string | null }
 export interface ActionItemResolvedData { fromName: string; title: string; snippet: string; url: string }
 export interface PublishApprovalData { kind: 'request' | 'approved' | 'declined' }
 export interface CrewApprovalData { count: number }
@@ -98,6 +101,11 @@ export interface InviteAcceptedData { memberName: string; workspaceName: string 
 export interface AccessApprovedData { pageName: string; url: string }
 export interface ModerationApprovedData { pageName: string; url: string }
 export interface AccessDeclinedData { pageName: string }
+
+/** Secondary line under the invite: where to connect an AI assistant once inside. */
+export function inviteConnectNote(label: string, href: string): string {
+  return `<p style="margin:0;color:${colors.textTertiary};font-size:12px;line-height:1.5"><a href="${escapeHtml(href)}" style="color:${colors.textSecondary}">${escapeHtml(label)}</a></p>`;
+}
 
 function shareRoleLine(role: ShareData['role']): string {
   if (role === 'editor') return "You've been added as an editor — open it to start co-editing.";
@@ -207,9 +215,8 @@ export const EMAILS = {
     trigger: 'sendInviteEmail() — workspace owner invites a member.',
     build: ({ workspaceName, inviterName, claimCode, claimTtlDays }: InviteData, { baseUrl }) => {
       const joinUrl = `${baseUrl}/invite/${encodeURIComponent(claimCode)}`;
-      // Agent footnote: humans click the button; Claude users can still claim by code.
-      const agentNote =
-        `<p style="margin:0;color:${colors.textTertiary};font-size:12px;line-height:1.5">Using ShareOut in Claude? Claim with code <span style="font-family:${fonts.mono};color:${colors.textSecondary}">${escapeHtml(claimCode)}</span>.</p>`;
+      const connectUrl = `${baseUrl}/home?view=connect`;
+      const agentNote = inviteConnectNote('After you join, connect Claude or ChatGPT in 2 minutes', connectUrl);
       return {
         subject: `You're invited to ${workspaceName} on ShareOut`,
         preheader: `${inviterName} invited you to ${workspaceName} on ShareOut.`,
@@ -219,7 +226,7 @@ export const EMAILS = {
           agentNote,
         cta: { label: `Join ${workspaceName}`, href: joinUrl },
         footerNote: `This invite is single-use and expires in ${claimTtlDays} days. If you didn't expect it, you can ignore this email.`,
-        bodyText: `${inviterName} invited you to ${workspaceName} on ShareOut.\n\nJoin ${workspaceName}: ${joinUrl}\n\nUsing ShareOut in Claude? Claim with code ${claimCode}.\n\nThis invite is single-use and expires in ${claimTtlDays} days.`,
+        bodyText: `${inviterName} invited you to ${workspaceName} on ShareOut.\n\nJoin ${workspaceName}: ${joinUrl}\n\nAfter you join, connect Claude or ChatGPT in 2 minutes: ${connectUrl}\n\nThis invite is single-use and expires in ${claimTtlDays} days.`,
       };
     },
   } satisfies EmailTemplate<InviteData>,

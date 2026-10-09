@@ -1,5 +1,6 @@
 import type { AdminInfo } from '../types';
 import type { PWAConfig } from '../../types';
+import type { Locale } from '../../i18n';
 
 /** Authenticated viewer profile injected into the sandbox wrapper. */
 export interface ViewerUser {
@@ -31,6 +32,8 @@ export interface ToolbarRenderContext {
   visualEditorEnabled: boolean;
   /** Skills attached to this artifact, shown read-only to any signed-in viewer. Empty for anonymous views. */
   attachedSkills: Array<{ name: string; slug: string }>;
+  /** Language the toolbar speaks: the artifact's workspace locale, else the viewer's browser. */
+  locale: Locale;
 }
 
 /** Result of manifest-aware critical asset resolution. */

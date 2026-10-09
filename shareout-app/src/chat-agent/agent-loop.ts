@@ -15,6 +15,8 @@ import { logAgentToolFailure, userFacingAgentToolError } from './errors';
 import { toolProgressLabel } from './tool-progress';
 import { TOOLKITS, OPEN_TOOLKIT, toolkitOf, openToolkitTool } from './tools/toolkits';
 import { createLogger } from '../logging';
+import { agentLanguageRule, localeForRecipient, t, type Locale } from '../i18n';
+import { agentFallbackReplies } from './replies';
 
 /** A turn either ends with a text reply, or with an action awaiting the user's confirm/cancel. */
 export interface TurnResult {
@@ -46,6 +48,8 @@ export interface TurnInput {
   extraTools?: AccountTool[];
   /** Per-surface powers. Defaults from the platform when omitted. */
   capabilities?: Capabilities;
+  /** Language to speak; resolved from the user + workspace when omitted. */
+  locale?: Locale;
 }
 
 const MAX_ITERATIONS = 12;
@@ -55,9 +59,8 @@ const MAX_TOOL_RESULT_CHARS = 12_000;
 const NOTE_RESULT_CHARS = 300;
 const MAX_NOTES_CHARS = 2_000;
 const WRAP_UP_PROMPT = 'You are out of steps for this turn. Answer now with what you found so far, and say briefly what is still missing. Do not call tools.';
-const GAVE_UP_REPLY = 'I looked into that but couldn’t wrap it up. Try narrowing the question?';
 
-function systemPrompt(platform: PlatformId, caps: Capabilities, selectedWorkspaceId?: WorkspaceSelection, workspaceContext?: string): string {
+function systemPrompt(platform: PlatformId, caps: Capabilities, selectedWorkspaceId: WorkspaceSelection | undefined, workspaceContext: string | undefined, locale: Locale): string {
   const today = new Date().toISOString().slice(0, 10);
   const scopeLine = platform === 'web'
     ? 'Current scope: this workspace. Your page search/list tools and connectors are already filtered to it.'
@@ -90,6 +93,8 @@ function systemPrompt(platform: PlatformId, caps: Capabilities, selectedWorkspac
   return [
     `${channelLine} You speak like a smart friend: warm, brief, clear, no jargon.`,
     '',
+    agentLanguageRule(locale),
+    '',
     scopeLine,
     '',
     'You help the user find, read, and summarize THEIR ShareOut pages (artifacts), and you can run a page’s live data sources to get fresh numbers. Use the tools to look things up — never guess at a page’s contents or its numbers. If you can’t find something or the user lacks access, say so plainly and suggest a next step.',
@@ -121,21 +126,29 @@ export const NO_PROVIDER_ADMIN_REPLY =
   'No AI provider is connected to this ShareOut instance yet. Set ANTHROPIC_API_KEY (or VERCEL_AI_GATEWAY / OPENAI_API_KEY) as a Worker secret — e.g. npx wrangler secret put ANTHROPIC_API_KEY — and I’ll be ready.';
 export const NO_PROVIDER_MEMBER_REPLY =
   'I’m not connected to an AI provider yet. Your ShareOut admin needs to connect one before I can help.';
+const NO_PROVIDER = {
+  en: { admin: NO_PROVIDER_ADMIN_REPLY, member: NO_PROVIDER_MEMBER_REPLY },
+  es: {
+    admin: 'Todavía no hay un proveedor de IA conectado a esta instancia de ShareOut. Cargá ANTHROPIC_API_KEY (o VERCEL_AI_GATEWAY / OPENAI_API_KEY) como secreto del Worker — por ejemplo, npx wrangler secret put ANTHROPIC_API_KEY — y quedo listo.',
+    member: 'Todavía no estoy conectado a un proveedor de IA. Quien administra ShareOut tiene que conectar uno para que te pueda ayudar.',
+  },
+};
 
 /** Actionable reply when no AI provider is configured: the fix for admins, a pointer for everyone else. */
-async function noProviderReply(env: Env, userId: string): Promise<string> {
+async function noProviderReply(env: Env, userId: string, locale: Locale): Promise<string> {
   let email: string | null = null;
   try {
     email = (await env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first<{ email: string | null }>())?.email ?? null;
   } catch {
     // No DB / lookup failed — fall back to the member wording.
   }
-  return (await isPlatformAdmin(env, email, userId)) ? NO_PROVIDER_ADMIN_REPLY : NO_PROVIDER_MEMBER_REPLY;
+  const r = t(locale, NO_PROVIDER);
+  return (await isPlatformAdmin(env, email, userId)) ? r.admin : r.member;
 }
 
 /** Tell the user a tool is running: a label on web, a fresh typing ping on bots. Never fails the turn. */
-async function announceTool(reply: ChatReplyPort | undefined, name: string, input: Record<string, unknown>): Promise<void> {
-  const label = toolProgressLabel(name, input);
+async function announceTool(reply: ChatReplyPort | undefined, name: string, input: Record<string, unknown>, locale: Locale): Promise<void> {
+  const label = toolProgressLabel(name, input, locale);
   if (!reply || !label) return;
   try {
     await (reply.sendToolProgress ? reply.sendToolProgress(label) : reply.sendTyping());
@@ -157,17 +170,20 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
   const flagWs = typeof input.selectedWorkspaceId === 'string' && input.selectedWorkspaceId !== PERSONAL_SCOPE
     ? input.selectedWorkspaceId
     : (await getUserWorkspaceIds(env, input.userId))[0] ?? null;
+  const locale = input.locale
+    ?? await localeForRecipient(env, { userId: input.userId, workspaceId: flagWs }).catch((): Locale => 'en');
+  const replies = agentFallbackReplies(locale);
   if (!(await isFeatureEnabled(env, botFeatureFlag(platform), flagWs))) {
     if (platform === 'web') {
       return { reply: await webAgentBlockedMessage(env, flagWs) };
     }
-    return { reply: botDisabledMessage(platform) };
+    return { reply: botDisabledMessage(platform, locale) };
   }
 
   const gatewayModel = await resolveGatewayModel(env, flagWs);
   const byo = flagWs ? await getWorkspaceByoConfig(env, flagWs, gatewayModel) : null;
   const provider = byo ? crewProviderFor(env, byo) : getCrewProvider(env, gatewayModel);
-  if (!provider) return { reply: await noProviderReply(env, input.userId) };
+  if (!provider) return { reply: await noProviderReply(env, input.userId, locale) };
 
   const caps = input.capabilities ?? defaultCapabilities(platform);
   const baseTools = selectTools(caps);
@@ -188,7 +204,7 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
       ? input.selectedWorkspaceId
       : (flagWs ?? '__personal');
   const agentSkillsDoc = await buildAgentSkillsDoc(env, skillScope, input.userId);
-  const system = systemPrompt(platform, caps, input.selectedWorkspaceId, input.workspaceContext)
+  const system = systemPrompt(platform, caps, input.selectedWorkspaceId, input.workspaceContext, locale)
     + (agentSkillsDoc ? '\n\n' + agentSkillsDoc : '');
 
   const transcript: NeutralTurn[] = [];
@@ -251,7 +267,7 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
   const wrapUp = async (): Promise<TurnResult> => {
     transcript.push({ role: 'user', text: WRAP_UP_PROMPT });
     const r = await callModel([]);
-    return finish({ reply: !r.errored && r.text ? r.text : GAVE_UP_REPLY });
+    return finish({ reply: !r.errored && r.text ? r.text : replies.gaveUp });
   };
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
@@ -259,12 +275,12 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
 
     const { text, toolCalls, stopReason, errored } = await callModel(providerTools());
 
-    if (errored) return finish({ reply: 'Hmm, something went wrong on my end. Mind trying again?' });
+    if (errored) return finish({ reply: replies.errored });
 
     transcript.push({ role: 'assistant', text, toolCalls });
 
     if (stopReason !== 'tool_use' || toolCalls.length === 0) {
-      return finish({ reply: text || 'I didn’t quite get that. Try rephrasing?' });
+      return finish({ reply: text || replies.empty });
     }
 
     const results: Array<{ id: string; content: string }> = [];
@@ -288,7 +304,7 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
         const kit = toolkitOf(tc.name);
         if (kit) openKits.add(kit);
         toolsUsed.push(tc.name);
-        await announceTool(input.reply, tc.name, tc.input);
+        await announceTool(input.reply, tc.name, tc.input, locale);
         try {
           const out = await tool.execute({
             env,

@@ -73,6 +73,7 @@ export async function handleResendWorkspaceInvite(
       inviterName: user.username || user.email || 'A teammate',
       claimCode: claim.code,
       claimId: claim.id,
+      workspaceId,
     });
   }
   await logAudit(env, {

@@ -1,4 +1,32 @@
 import { colors, fonts, radius, shadows } from '../design-system/tokens';
+import type { Locale, LocaleCopy } from '../i18n';
+
+// Values land in HTML and single/double-quoted JS strings: no quotes, backslashes or HTML specials.
+const SHARE_COPY: LocaleCopy<Record<
+  'share' | 'link' | 'copy' | 'sendTo' | 'message' | 'note' | 'access' | 'linkOnly' | 'viewer' | 'editor' |
+  'cancel' | 'send' | 'shareQuoted' | 'canManage' | 'cannotManage' | 'copied' | 'needEmail' | 'sending' |
+  'failed' | 'invite' | 'invites' | 'sent' | 'network', string>> = {
+  en: {
+    share: 'Share', link: 'Link', copy: 'Copy', sendTo: 'Send to (emails, comma-separated)',
+    message: 'Message (optional)', note: 'Add a short note…', access: 'Recipient access',
+    linkOnly: 'Link only', viewer: 'Viewer', editor: 'Editor', cancel: 'Cancel', send: 'Send',
+    shareQuoted: 'Share ',
+    canManage: 'Viewers/Editors are saved as collaborators and can open private artifacts.',
+    cannotManage: 'Only owners/editors can add people. You can still send a link.',
+    copied: 'Link copied!', needEmail: 'Enter at least one email, or use Copy.', sending: 'Sending…',
+    failed: 'Failed to share.', invite: ' invite', invites: ' invites', sent: ' sent', network: 'Network error.',
+  },
+  es: {
+    share: 'Compartir', link: 'Enlace', copy: 'Copiar', sendTo: 'Enviar a (mails separados por comas)',
+    message: 'Mensaje (opcional)', note: 'Sumá una nota corta…', access: 'Qué pueden hacer',
+    linkOnly: 'Solo el enlace', viewer: 'Ver', editor: 'Editar', cancel: 'Cancelar', send: 'Enviar',
+    shareQuoted: 'Compartir ',
+    canManage: 'Quienes puedan ver o editar quedan como colaboradores y pueden abrir páginas privadas.',
+    cannotManage: 'Solo quienes son dueños o editores pueden sumar personas. Igual podés mandar el enlace.',
+    copied: 'Enlace copiado.', needEmail: 'Escribí al menos un mail, o usá Copiar.', sending: 'Enviando…',
+    failed: 'No pudimos compartir. Probá de nuevo.', invite: ' invitación enviada', invites: ' invitaciones enviadas', sent: '', network: 'Error de conexión.',
+  },
+};
 
 /**
  * Self-contained share dialog shared by the home page and the artifact viewer.
@@ -6,7 +34,8 @@ import { colors, fonts, radius, shadows } from '../design-system/tokens';
  * page CSS); `shareModalScript()` returns the JS defining window.openShare /
  * closeShare / submitShare. Both server-rendered surfaces inline these.
  */
-export function shareModalMarkup(): string {
+export function shareModalMarkup(locale: Locale = 'en'): string {
+  const c = SHARE_COPY[locale];
   return `<div id="soShareOverlay" role="dialog" aria-modal="true" aria-labelledby="soShareTitle" style="display:none;position:fixed;inset:0;z-index:1100;align-items:center;justify-content:center;">
   <style>
     #soShareOverlay .so-share-backdrop{position:absolute;inset:0;background:rgba(28,25,23,0.45);}
@@ -42,44 +71,45 @@ export function shareModalMarkup(): string {
   </style>
   <div class="so-share-backdrop" onclick="closeShare()"></div>
   <div class="so-share-panel">
-    <h3 id="soShareTitle">Share</h3>
+    <h3 id="soShareTitle">${c.share}</h3>
     <div class="so-field">
-      <label for="soShareLink">Link</label>
+      <label for="soShareLink">${c.link}</label>
       <div class="so-link-row">
         <input type="text" id="soShareLink" readonly>
-        <button type="button" class="so-btn so-copy" onclick="shareCopyLink()">Copy</button>
+        <button type="button" class="so-btn so-copy" onclick="shareCopyLink()">${c.copy}</button>
       </div>
     </div>
     <div class="so-field">
-      <label for="soShareEmails">Send to (emails, comma-separated)</label>
+      <label for="soShareEmails">${c.sendTo}</label>
       <div class="so-emailwrap">
         <input type="text" id="soShareEmails" placeholder="alex@example.com, sam@example.com" autocomplete="off">
         <div class="so-people" id="soSharePeople"></div>
       </div>
     </div>
     <div class="so-field">
-      <label for="soShareMessage">Message (optional)</label>
-      <textarea id="soShareMessage" placeholder="Add a short note…"></textarea>
+      <label for="soShareMessage">${c.message}</label>
+      <textarea id="soShareMessage" placeholder="${c.note}"></textarea>
     </div>
     <div class="so-field">
-      <label>Recipient access</label>
+      <label>${c.access}</label>
       <div class="so-seg" id="soShareSeg">
-        <label class="so-seg-opt"><input type="radio" name="soShareRole" value="none" checked><span>Link only</span></label>
-        <label class="so-seg-opt" id="soShareOptViewer"><input type="radio" name="soShareRole" value="viewer"><span>Viewer</span></label>
-        <label class="so-seg-opt" id="soShareOptEditor"><input type="radio" name="soShareRole" value="editor"><span>Editor</span></label>
+        <label class="so-seg-opt"><input type="radio" name="soShareRole" value="none" checked><span>${c.linkOnly}</span></label>
+        <label class="so-seg-opt" id="soShareOptViewer"><input type="radio" name="soShareRole" value="viewer"><span>${c.viewer}</span></label>
+        <label class="so-seg-opt" id="soShareOptEditor"><input type="radio" name="soShareRole" value="editor"><span>${c.editor}</span></label>
       </div>
       <div class="so-hint" id="soShareHint"></div>
     </div>
     <div class="so-status" id="soShareStatus"></div>
     <div class="so-actions">
-      <button type="button" class="so-btn so-ghost" onclick="closeShare()">Cancel</button>
-      <button type="button" class="so-btn so-primary" id="soShareSend" onclick="submitShare()">Send</button>
+      <button type="button" class="so-btn so-ghost" onclick="closeShare()">${c.cancel}</button>
+      <button type="button" class="so-btn so-primary" id="soShareSend" onclick="submitShare()">${c.send}</button>
     </div>
   </div>
 </div>`;
 }
 
-export function shareModalScript(opts: { baseUrl: string }): string {
+export function shareModalScript(opts: { baseUrl: string; locale?: Locale }): string {
+  const c = SHARE_COPY[opts.locale ?? 'en'];
   const base = JSON.stringify(opts.baseUrl || '');
   return `(function(){
   var BASE=${base};
@@ -142,33 +172,33 @@ export function shareModalScript(opts: { baseUrl: string }): string {
     current.id=id;
     loadPeople(id,workspaceId);
     var ov=$('soShareOverlay'); if(!ov)return;
-    $('soShareTitle').textContent=name?('Share "'+name+'"'):'Share';
+    $('soShareTitle').textContent=name?('${c.shareQuoted}"'+name+'"'):'${c.share}';
     $('soShareLink').value=BASE+'/a/'+slug+'/';
     $('soShareEmails').value=''; $('soShareMessage').value=''; $('soShareStatus').textContent='';
     var none=ov.querySelector('input[value=none]'); if(none)none.checked=true;
     var vOpt=$('soShareOptViewer'),eOpt=$('soShareOptEditor');
     [vOpt,eOpt].forEach(function(o){if(!o)return;var inp=o.querySelector('input');inp.disabled=!canManage;o.classList.toggle('disabled',!canManage);});
-    $('soShareHint').textContent=canManage?'Viewers/Editors are saved as collaborators and can open private artifacts.':'Only owners/editors can add people. You can still send a link.';
+    $('soShareHint').textContent=canManage?'${c.canManage}':'${c.cannotManage}';
     ov.style.display='flex';
   };
   window.closeShare=function(){var ov=$('soShareOverlay'); if(ov)ov.style.display='none';};
-  window.shareCopyLink=function(){var v=$('soShareLink').value; if(navigator.clipboard){navigator.clipboard.writeText(v);} toast('Link copied!');};
+  window.shareCopyLink=function(){var v=$('soShareLink').value; if(navigator.clipboard){navigator.clipboard.writeText(v);} toast('${c.copied}');};
   window.submitShare=function(){
     if(!current.id)return;
     var emails=$('soShareEmails').value.split(/[,\\s]+/).map(function(e){return e.trim();}).filter(Boolean);
-    if(!emails.length){$('soShareStatus').textContent='Enter at least one email, or use Copy.';return;}
+    if(!emails.length){$('soShareStatus').textContent='${c.needEmail}';return;}
     var roleEl=document.querySelector('input[name=soShareRole]:checked');
     var role=roleEl?roleEl.value:'none';
-    var btn=$('soShareSend'); btn.disabled=true; $('soShareStatus').textContent='Sending…';
+    var btn=$('soShareSend'); btn.disabled=true; $('soShareStatus').textContent='${c.sending}';
     fetch(BASE+'/v1/artifacts/'+current.id+'/share',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({recipients:emails,message:$('soShareMessage').value||undefined,role:role})})
       .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
       .then(function(res){
-        if(!res.ok){$('soShareStatus').textContent=(res.d&&res.d.error)||'Failed to share.';return;}
+        if(!res.ok){$('soShareStatus').textContent=(res.d&&res.d.error)||'${c.failed}';return;}
         var n=(res.d.sent||[]).length;
-        toast(n+' invite'+(n===1?'':'s')+' sent');
+        toast(n+(n===1?'${c.invite}':'${c.invites}')+'${c.sent}');
         window.closeShare();
       })
-      .catch(function(){$('soShareStatus').textContent='Network error.';})
+      .catch(function(){$('soShareStatus').textContent='${c.network}';})
       .finally(function(){btn.disabled=false;});
   };
   var emailInp=$('soShareEmails');

@@ -25,6 +25,7 @@ import { getVisibilityScope } from '../../account-links';
 import { buildClientsContextForWorkspace } from '../../sharees/context';
 import { createLogger } from '../../logging';
 import { knowledgeTrunkForContext } from '../../knowledge-context';
+import { ES_AR_VOICE } from '../../i18n';
 import { guidanceEntryForContext } from '../../workspace-context';
 import {
   jsonResp, streamAgentChat, confirmAgentAction, listAgentThreads,
@@ -160,7 +161,7 @@ async function handleBrief(ctx: FetchContext, ws: string | null, user: AuthUser)
   const name = (row?.name || '').trim().split(/\s+/)[0] || user.username || (user.email ? user.email.split('@')[0] : 'there');
 
   const greet = tod ? `Open with a short good-${tod} greeting using their first name.` : 'Open with a brief hello using their first name.';
-  const language = lang === 'es' ? 'Write in Spanish as spoken in Argentina (use vos), and call pages "páginas".' : 'Write in English.';
+  const language = lang === 'es' ? `Write in ${ES_AR_VOICE}.` : 'Write in English.';
   const system = [
     'You are the ShareOut workspace assistant writing a short proactive brief for the user as they open their workspace.',
     `Write 2–4 sentences, warm and concise, like a smart colleague catching them up. ${greet} ${language}`,

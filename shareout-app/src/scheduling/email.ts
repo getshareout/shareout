@@ -9,6 +9,13 @@ import { captureArtifactReport } from '../screenshots';
 import { generateId } from '../crypto-utils';
 import { suppressedSet } from '../email/suppressions';
 import { getPlatformHostname } from '../config/origins';
+import { isLocale, t } from '../i18n';
+
+// Fallback words around a scheduled delivery, in the page's workspace language.
+const DELIVERY_COPY = {
+  en: { view: 'View', viewPage: 'View artifact', viewButton: 'View Artifact', scheduledFrom: 'Scheduled email from', updateFrom: 'Update from' },
+  es: { view: 'Ver', viewPage: 'Ver la página', viewButton: 'Ver la página', scheduledFrom: 'Envío programado de', updateFrom: 'Novedades de' },
+};
 
 // Attachments use the Workers binding's ambient `EmailAttachment` type
 // (workers-types). We only ever produce `disposition: 'attachment'` (CSV as a raw
@@ -156,10 +163,11 @@ export async function sendArtifactEmail(
   config: EmailConfig
 ): Promise<SendEmailResult> {
   const artifact = await env.DB.prepare(
-    `SELECT a.id, a.name, d.slug AS slug FROM artifacts a
+    `SELECT a.id, a.name, d.slug AS slug, w.locale AS locale FROM artifacts a
      JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
+     LEFT JOIN workspaces w ON w.id = a.workspace_id
      WHERE a.id = ?`
-  ).bind(artifactId).first<{ id: string; name: string; slug: string }>();
+  ).bind(artifactId).first<{ id: string; name: string; slug: string; locale: string | null }>();
 
   if (!artifact) {
     return { success: false, error: 'Artifact not found' };
@@ -175,6 +183,7 @@ export async function sendArtifactEmail(
     : defaultFromEmail(env);
 
   const artifactUrl = `${env.SHAREOUT_BASE_URL}/a/${artifact.slug || artifactId}/`;
+  const copy = t(isLocale(artifact.locale) ? artifact.locale : 'en', DELIVERY_COPY);
 
   let htmlContent = '';
   let textContent = '';
@@ -236,10 +245,10 @@ export async function sendArtifactEmail(
   }
 
   if (config.includeArtifactLink) {
-    const linkHtml = `<p><a href="${artifactUrl}">View ${artifact.name}</a></p>`;
-    const linkText = `\n\nView artifact: ${artifactUrl}`;
+    const linkHtml = `<p><a href="${artifactUrl}">${copy.view} ${artifact.name}</a></p>`;
+    const linkText = `\n\n${copy.viewPage}: ${artifactUrl}`;
     htmlContent = htmlContent ? `${htmlContent}${linkHtml}` : linkHtml;
-    textContent = textContent ? `${textContent}${linkText}` : `View artifact: ${artifactUrl}`;
+    textContent = textContent ? `${textContent}${linkText}` : `${copy.viewPage}: ${artifactUrl}`;
   }
 
   if (config.includeArtifactContent) {
@@ -260,15 +269,15 @@ export async function sendArtifactEmail(
   }
 
   if (!htmlContent && !textContent) {
-    textContent = `Scheduled email from ${artifact.name}\n\n${artifactUrl}`;
-    htmlContent = `<p>Scheduled email from <strong>${artifact.name}</strong></p><p><a href="${artifactUrl}">View Artifact</a></p>`;
+    textContent = `${copy.scheduledFrom} ${artifact.name}\n\n${artifactUrl}`;
+    htmlContent = `<p>${copy.scheduledFrom} <strong>${artifact.name}</strong></p><p><a href="${artifactUrl}">${copy.viewButton}</a></p>`;
   }
 
   return sendEmail(env, {
     from: fromEmail,
     replyTo: config.replyTo || emailRecord?.reply_to || undefined,
     to: config.recipients,
-    subject: subjectContent || `Update from ${artifact.name}`,
+    subject: subjectContent || `${copy.updateFrom} ${artifact.name}`,
     text: textContent || undefined,
     html: htmlContent || undefined,
     attachments: attachments.length ? attachments : undefined,

@@ -90,10 +90,11 @@ function ownerInitials(name: string | null): string {
 function renderOwnerAvatar(a: ArtifactRow): string {
   const isYou = a.user_role === 'owner';
   const label = isYou ? 'You' : (a.owner_name || 'Unknown');
+  const i18n = isYou ? ' data-i18n="cards.you"' : a.owner_name ? '' : ' data-i18n="cards.unknownOwner"';
   const inner = a.owner_picture
     ? `<img src="${escapeHtml(a.owner_picture)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">`
     : escapeHtml(ownerInitials(a.owner_name));
-  return `<span class="card-owner" title="Owner: ${escapeHtml(label)}"><span class="owner-avatar">${inner}</span><span class="owner-name">${escapeHtml(label)}</span></span>`;
+  return `<span class="card-owner" title="${escapeHtml(label)}"><span class="owner-avatar">${inner}</span><span class="owner-name"${i18n}>${escapeHtml(label)}</span></span>`;
 }
 
 function renderVisibilityBadge(a: ArtifactRow): string {
@@ -102,12 +103,13 @@ function renderVisibilityBadge(a: ArtifactRow): string {
   const visClass = isWs ? 'badge-workspace' : 'badge-private';
   const visIcon = isWs ? VIS_PEOPLE_ICON : VIS_LOCK_ICON;
   const id = escapeHtml(a.id);
-  const inner = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${visIcon}</svg>${escapeHtml(visLabel)}`;
+  const inner = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${visIcon}</svg><span data-i18n="${isWs ? 'cards.visWorkspace' : 'inspector.visName.private'}">${escapeHtml(visLabel)}</span>`;
   const canToggle = a.user_role === 'owner' && !!a.workspace_id;
   if (canToggle) {
     const nextVis = isWs ? 'private' : 'workspace';
     const title = isWs ? 'Make private — click to toggle' : 'Share with workspace — click to toggle';
-    return `<button type="button" class="card-badge card-preview-badge vis-toggle ${visClass}" id="badge-${id}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}" onclick="event.stopPropagation();event.preventDefault();toggleVisibility('${id}','${nextVis}')">${inner}</button>`;
+    const titleKey = isWs ? 'cards.makePrivateTip' : 'cards.shareWsTip';
+    return `<button type="button" class="card-badge card-preview-badge vis-toggle ${visClass}" id="badge-${id}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}" data-i18n-title="${titleKey}" data-i18n-aria="${titleKey}" onclick="event.stopPropagation();event.preventDefault();toggleVisibility('${id}','${nextVis}')">${inner}</button>`;
   }
   return `<span class="card-badge card-preview-badge ${visClass}" id="badge-${id}">${inner}</span>`;
 }
@@ -120,11 +122,12 @@ function renderModerationBadge(a: ArtifactRow): string {
   if (!held && !blocked) return '';
   const cls = blocked ? 'badge-blocked' : 'badge-review';
   const label = blocked ? 'Blocked' : 'Under review';
-  return `<span class="card-badge card-preview-badge ${cls}">${escapeHtml(label)}</span>`;
+  return `<span class="card-badge card-preview-badge ${cls}" data-i18n="${blocked ? 'cards.blocked' : 'cards.underReview'}">${escapeHtml(label)}</span>`;
 }
 
 export function renderArtifactCard(a: ArtifactRow, hostname: string, env?: Env): string {
-  const tm = TYPE_META[a.artifact_type] || TYPE_META.html;
+  const typeKey = TYPE_META[a.artifact_type] ? a.artifact_type : 'html';
+  const tm = TYPE_META[typeKey];
   const date = a.updated_at || a.created_at;
   const formattedDate = new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const pageUrl = buildArtifactShareUrl(hostname, a.slug, a.display_slug, undefined, undefined, env);
@@ -136,7 +139,7 @@ export function renderArtifactCard(a: ArtifactRow, hostname: string, env?: Env):
   const features = FEATURE_META.filter(f => (a[f.key] as number) > 0);
   const featuresHtml = features.length ? `
       <div class="card-features">
-        ${features.map(f => `<span class="feature" title="${escapeHtml(f.label)}" aria-label="${escapeHtml(f.label)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${f.svg}</svg></span>`).join('')}
+        ${features.map(f => `<span class="feature" title="${escapeHtml(f.label)}" aria-label="${escapeHtml(f.label)}" data-i18n-title="cards.feat.${f.key}" data-i18n-aria="cards.feat.${f.key}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${f.svg}</svg></span>`).join('')}
       </div>` : '';
 
     return `
@@ -161,38 +164,38 @@ export function renderArtifactCard(a: ArtifactRow, hostname: string, env?: Env):
       data-views="${a.total_views}"
       data-updated="${escapeHtml(a.updated_at || a.created_at)}"
       data-created="${escapeHtml(a.created_at)}">
-      <button type="button" class="card-select" onclick="event.stopPropagation();event.preventDefault();toggleSelect('${escapeHtml(a.id)}')" aria-label="Select" title="Select">
+      <button type="button" class="card-select" onclick="event.stopPropagation();event.preventDefault();toggleSelect('${escapeHtml(a.id)}')" aria-label="Select" title="Select" data-i18n-aria="assets.select" data-i18n-title="assets.select">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </button>
       <div class="card-preview-wrap">
         <a class="card-preview" href="/a/${escapeHtml(a.slug)}/" draggable="false" style="--type-color:${tm.color}">
           <img class="card-preview-img" src="/t/${escapeHtml(a.id)}_card.webp?v=${encodeURIComponent(a.updated_at || a.created_at)}" srcset="/t/${escapeHtml(a.id)}_card.webp?v=${encodeURIComponent(a.updated_at || a.created_at)} 720w, /t/${escapeHtml(a.id)}.webp?v=${encodeURIComponent(a.updated_at || a.created_at)} 2400w" sizes="300px" alt="" loading="lazy" draggable="false" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
           <span class="card-preview-fallback" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${tm.svg}</svg></span>
-          <span class="type-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${tm.svg}</svg>${escapeHtml(tm.label)}</span>
+          <span class="type-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${tm.svg}</svg><span data-i18n="cards.type.${typeKey}">${escapeHtml(tm.label)}</span></span>
         </a>
         ${renderVisibilityBadge(a)}
         ${renderModerationBadge(a)}
       </div>
       <div class="card-actions">
-        <button class="card-action-btn icon-only fav-toggle${a.is_favorite ? ' active' : ''}" onclick="event.stopPropagation();toggleFavorite('${escapeHtml(a.id)}')" title="${a.is_favorite ? 'Remove from favorites' : 'Add to favorites'}" aria-label="${a.is_favorite ? 'Remove from favorites' : 'Add to favorites'}" aria-pressed="${a.is_favorite ? 'true' : 'false'}">
+        <button class="card-action-btn icon-only fav-toggle${a.is_favorite ? ' active' : ''}" onclick="event.stopPropagation();toggleFavorite('${escapeHtml(a.id)}')" title="${a.is_favorite ? 'Remove from favorites' : 'Add to favorites'}" aria-label="${a.is_favorite ? 'Remove from favorites' : 'Add to favorites'}" aria-pressed="${a.is_favorite ? 'true' : 'false'}" data-i18n-title="${a.is_favorite ? 'inspector.favRemove' : 'inspector.favAdd'}" data-i18n-aria="${a.is_favorite ? 'inspector.favRemove' : 'inspector.favAdd'}">
           <svg viewBox="0 0 24 24" fill="${a.is_favorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         </button>
-        <a class="card-action-btn icon-only" href="${escapeHtml(pageUrl)}" target="_blank" rel="noopener" draggable="false" onclick="event.stopPropagation();" title="Open in new tab" aria-label="Open in new tab">
+        <a class="card-action-btn icon-only" href="${escapeHtml(pageUrl)}" target="_blank" rel="noopener" draggable="false" onclick="event.stopPropagation();" title="Open in new tab" aria-label="Open in new tab" data-i18n-title="inspector.act.open" data-i18n-aria="inspector.act.open">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3h7v7"/><path d="M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
         </a>
-        <button class="card-action-btn icon-only" onclick="event.stopPropagation();copyLink('${escapeHtml(pageUrl)}')" title="Copy link" aria-label="Copy link">
+        <button class="card-action-btn icon-only" onclick="event.stopPropagation();copyLink('${escapeHtml(pageUrl)}')" title="Copy link" aria-label="Copy link" data-i18n-title="assets.copyLink" data-i18n-aria="assets.copyLink">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         </button>
         ${a.user_role === 'owner' ? `
-        <a class="card-action-btn icon-only" href="/v1/artifacts/${escapeHtml(a.id)}/export" download onclick="event.stopPropagation();" title="Export (your data is yours)" aria-label="Export">
+        <a class="card-action-btn icon-only" href="/v1/artifacts/${escapeHtml(a.id)}/export" download onclick="event.stopPropagation();" title="Export (your data is yours)" aria-label="Export" data-i18n-title="cards.exportTip" data-i18n-aria="cards.export">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         </a>` : ''}
         ${a.user_role === 'owner' ? `
-        <button class="card-action-btn icon-only" onclick="event.stopPropagation();openFolderPicker(['${escapeHtml(a.id)}'])" title="Move to folder" aria-label="Move to folder">
+        <button class="card-action-btn icon-only" onclick="event.stopPropagation();openFolderPicker(['${escapeHtml(a.id)}'])" title="Move to folder" aria-label="Move to folder" data-i18n-title="assets.moveToFolder" data-i18n-aria="assets.moveToFolder">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
         </button>` : ''}
         ${a.user_role === 'owner' ? `
-        <button class="card-action-btn icon-only danger" onclick="event.stopPropagation();confirmDelete('${escapeHtml(a.id)}')" title="Delete" aria-label="Delete">
+        <button class="card-action-btn icon-only danger" onclick="event.stopPropagation();confirmDelete('${escapeHtml(a.id)}')" title="Delete" aria-label="Delete" data-i18n-title="common.delete" data-i18n-aria="common.delete">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
         </button>` : ''}
       </div>
@@ -205,9 +208,9 @@ export function renderArtifactCard(a: ArtifactRow, hostname: string, env?: Env):
         ${a.description ? `<p class="card-description">${escapeHtml(a.description)}</p>` : ''}
         ${renderOwnerAvatar(a)}
         <div class="card-meta">
-          <span class="card-meta-item" title="Views"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>${fmtCount(a.total_views)}</span>
-          <span class="card-meta-item" title="Unique visitors"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>${fmtCount(a.unique_visitors)}</span>
-          <span class="card-meta-item" title="Last updated"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${formattedDate}</span>
+          <span class="card-meta-item" title="Views" data-i18n-title="tabs.views"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>${fmtCount(a.total_views)}</span>
+          <span class="card-meta-item" title="Unique visitors" data-i18n-title="cards.uniqueVisitors"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>${fmtCount(a.unique_visitors)}</span>
+          <span class="card-meta-item" title="Last updated" data-i18n-title="cards.lastUpdated"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span data-date="${escapeHtml(date)}">${formattedDate}</span></span>
         </div>
         ${tagsHtml}
         ${featuresHtml}
@@ -217,15 +220,16 @@ export function renderArtifactCard(a: ArtifactRow, hostname: string, env?: Env):
 
 /** Compact table row for the workspace Brief's table view (mirrors the card data). */
 export function renderArtifactRow(a: ArtifactRow, _hostname: string): string {
-  const tm = TYPE_META[a.artifact_type] || TYPE_META.html;
+  const typeKey = TYPE_META[a.artifact_type] ? a.artifact_type : 'html';
+  const tm = TYPE_META[typeKey];
   const date = a.updated_at || a.created_at;
   const formattedDate = new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   return `<a class="wsx-tr" href="/a/${escapeHtml(a.slug)}/" data-id="${escapeHtml(a.id)}" data-slug="${escapeHtml(a.slug)}" data-name="${escapeHtml(a.name)}">
     <span class="wsx-tr__icon" style="--type-color:${tm.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${tm.svg}</svg></span>
     <span class="wsx-tr__name">${escapeHtml(a.name)}</span>
-    <span class="wsx-tr__type">${escapeHtml(tm.label)}</span>
+    <span class="wsx-tr__type" data-i18n="cards.type.${typeKey}">${escapeHtml(tm.label)}</span>
     <span class="wsx-tr__views">${fmtCount(a.total_views)}</span>
-    <span class="wsx-tr__date">${formattedDate}</span>
+    <span class="wsx-tr__date" data-date="${escapeHtml(date)}" data-date-y="1">${formattedDate}</span>
   </a>`;
 }
 
@@ -240,10 +244,10 @@ export function renderFolderCard(f: HomeFolder, scope: 'workspace' | 'personal',
   const id = escapeHtml(f.id);
   const actions = canManage ? `
       <div class="wsx-folder-card__actions">
-        <button type="button" class="wsx-folder-card__act" title="Rename folder" aria-label="Rename folder" onclick="event.stopPropagation();renameFolder('${id}',this.closest('.wsx-folder-card').getAttribute('data-folder-name'))">
+        <button type="button" class="wsx-folder-card__act" title="Rename folder" aria-label="Rename folder" data-i18n-title="artifacts.renameFolder" data-i18n-aria="artifacts.renameFolder" onclick="event.stopPropagation();renameFolder('${id}',this.closest('.wsx-folder-card').getAttribute('data-folder-name'))">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
         </button>
-        <button type="button" class="wsx-folder-card__act danger" title="Delete folder" aria-label="Delete folder" onclick="event.stopPropagation();deleteFolder('${id}',this.closest('.wsx-folder-card').getAttribute('data-folder-name'))">
+        <button type="button" class="wsx-folder-card__act danger" title="Delete folder" aria-label="Delete folder" data-i18n-title="artifacts.deleteFolder" data-i18n-aria="artifacts.deleteFolder" onclick="event.stopPropagation();deleteFolder('${id}',this.closest('.wsx-folder-card').getAttribute('data-folder-name'))">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         </button>
       </div>` : '';

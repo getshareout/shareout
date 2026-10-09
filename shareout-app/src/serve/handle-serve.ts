@@ -15,6 +15,7 @@ import { injectPerfBeacon } from './perf-beacon';
 import { injectPresenceBeacon } from './presence-beacon';
 import { badgeEnabled, injectBadge } from './badge';
 import { versionedBundlePath } from '../bundle-versions';
+import { localeForArtifactWorkspace } from '../i18n';
 
 function injectCommentsAgent(resp: Response, baseUrl: string): Response {
   const tag = `<script src="${baseUrl}${versionedBundlePath('/sdk/comments-agent.js')}" defer></script>`;
@@ -154,7 +155,7 @@ export async function handleServe(
   // Paused / blocked pages must not leak the artifact title to strangers. Generic
   // copy only — name was previously embedded in the HTML before the access gate.
   if (result.paused === 1) {
-    return pausedPage();
+    return pausedPage(undefined, await localeForArtifactWorkspace(env, result.workspace_id, request));
   }
 
   // Moderation gate (Workstream B). A blocked artifact shows a takedown page to
@@ -162,7 +163,7 @@ export async function handleServe(
   // publish, so non-owners are already gated by the visibility check below and the
   // owner may still preview their own under-review artifact — no extra gate here.
   if ((result.moderation_status ?? 'approved') === 'blocked') {
-    return takedownPage();
+    return takedownPage(undefined, await localeForArtifactWorkspace(env, result.workspace_id, request));
   }
 
   // Capture mode short-circuit: a signed capture token authorizes the renderer to
@@ -235,7 +236,7 @@ export async function handleServe(
       // truthful "being reviewed" page instead of a login wall they can't clear. The
       // owner passed checkAccess above (accessResult null), so they still see the page.
       if ((result.moderation_status ?? 'approved') === 'pending' && result.moderation_held_visibility) {
-        return underReviewPage();
+        return underReviewPage(undefined, await localeForArtifactWorkspace(env, result.workspace_id, request));
       }
       return accessResult;
     }

@@ -36,6 +36,7 @@ import { buildToolbarContext } from './toolbar/context';
 import { renderToolbar } from './toolbar';
 import { getViewerConfig } from '../../data/viewer-config';
 import { isVisualEditorEnabled } from '../../editor/visual-editor-gate';
+import { localeForArtifactWorkspace, localeFromAcceptLanguage } from '../../i18n';
 
 /**
  * Stream a sandboxed HTML wrapper around an artifact iframe.
@@ -107,8 +108,9 @@ export async function serveSandboxedViewer(
   // per-view prefetch below, so its load starts in parallel with those queries
   // instead of waiting for the slowest of them. In legacy same-origin (dev) mode
   // the preload links still help, so the iframe stays after them (old behavior).
+  const earlyLang = localeFromAcceptLanguage(request.headers.get('Accept-Language')) ?? 'en';
   writer.write(encoder.encode(
-    renderEarlyHead(pageTitle, socialTags, pwaTags, contentHost || undefined, !isOpen),
+    renderEarlyHead(pageTitle, socialTags, pwaTags, contentHost || undefined, !isOpen, earlyLang),
   ));
   if (contentHost) {
     // Bridge hook must land before prefetch so shareout:init can fire as soon as
@@ -133,7 +135,7 @@ export async function serveSandboxedViewer(
 
       const user = await sessionUserPromise;
 
-      const [initialJsonData, initialTableData, adminInfo, favInfo, commentsInfo, hasMetrics, viewerConfig, visualEditorEnabled, attachedSkills, profile] = await Promise.all([
+      const [initialJsonData, initialTableData, adminInfo, favInfo, commentsInfo, hasMetrics, viewerConfig, visualEditorEnabled, attachedSkills, profile, locale] = await Promise.all([
         initialJsonPromise,
         initialTablePromise,
         detectAdminStatus(user, env, artifactId, ownerId),
@@ -151,6 +153,7 @@ export async function serveSandboxedViewer(
               .bind(user.id)
               .first<{ name: string | null; picture: string | null }>()
           : null,
+        localeForArtifactWorkspace(env, workspaceId, request),
       ]);
 
       // Cross-origin (cdn) viewers can't use the parent's preload cache or inlined
@@ -207,6 +210,7 @@ export async function serveSandboxedViewer(
         artifactId,
         visualEditorEnabled,
         attachedSkills,
+        locale,
       });
       const toolbar = toolbarContext ? renderToolbar(toolbarContext) : '';
       const bodyClass = viewerConfig.hide_toolbar
@@ -222,9 +226,9 @@ export async function serveSandboxedViewer(
       // small script since <body> opened before viewerConfig was known. In cdn
       // mode the iframe was already streamed above; in legacy mode it goes here
       // (after the preload links so they still warm the same-origin subresources).
-      const bodyClassScript = bodyClass
+      const bodyClassScript = (bodyClass
         ? `<script>document.body.className=${JSON.stringify(bodyClass)}</script>`
-        : '';
+        : '') + (locale !== earlyLang ? `<script>document.documentElement.lang=${JSON.stringify(locale)}</script>` : '');
 
       const restOfHtml = `${headLinks ? '  ' + headLinks + '\n' : ''}  ${inlinedStyleBlock}${initialDataScript}${mobileSdkScript}${bridgeScript}${bodyClassScript}${contentHost ? '' : '\n  ' + iframeHtml}${toolbar}
   ${renderLoadingHideScript()}

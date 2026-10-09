@@ -12,11 +12,22 @@ export const workspace_client_preamble_JS = `
     (stuck ? console.warn : console.log)('[wsx so-loading] ' + d.reason + ' ' + (d.ms | 0) + 'ms', d);
   });
   var t = window.__SO_HOME_T || function (k) { return k; };
+  function tOr(k, fallback) { var v = t(k); return v === k ? fallback : v; }
   function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
   function i18nEmpty(k) { return '<div class="wsx-empty">' + esc(t(k)) + '</div>'; }
   // Error state (a failed load, not a genuine empty) — carries a Retry that re-runs the
   // active lens loader (wired in lens-routing). Use for catch handlers, not empty data.
   function i18nError(k) { return '<div class="wsx-empty">' + esc(t(k)) + ' <button class="wsx-link" type="button" data-empty-retry>' + esc(t('common.retry')) + '</button></div>'; }
+  // Dates follow the home shell's language, not the browser's.
+  function locTag() { return (window.__SO_HOME_LOCALE && window.__SO_HOME_LOCALE() === 'es') ? 'es-AR' : 'en-US'; }
+  function fmtDay(v, withYear) { var d = new Date(v); if (isNaN(d.getTime())) return ''; var o = { month: 'short', day: 'numeric' }; if (withYear) o.year = 'numeric'; return d.toLocaleDateString(locTag(), o); }
+  // Server-rendered fragments (cards, rows) ship English + data-i18n/data-date hooks.
+  function localizeFragment(root) {
+    if (!root) return;
+    if (typeof window.__SO_APPLY_HOME_I18N === 'function') window.__SO_APPLY_HOME_I18N(root);
+    root.querySelectorAll('[data-date]').forEach(function (el) { var s = fmtDay(el.getAttribute('data-date'), el.getAttribute('data-date-y') === '1'); if (s) el.textContent = s; });
+  }
+  document.addEventListener('shareout:locale', function () { localizeFragment(document); });
   function i18nLoad() { return i18nEmpty('common.loading'); }
   function i18nSpin() { return '<div class="wsx-loading"><span class="wsx-spin"></span>' + esc(t('common.loading')) + '</div>'; }
   var KIND_ICON = { comment: '\\uD83D\\uDCAC', reply: '\\u21A9', share: '\\uD83D\\uDD17', run: '\\u2699', alert: '\\u25B2', view: '\\uD83D\\uDC41', access: '\\uD83D\\uDD11', test: '\\u2713', file: '\\uD83D\\uDCCE', publish: '\\u2191', create: '\\u2728', favorite: '\\u2605', connection: '\\uD83D\\uDD0C', skill: '\\uD83E\\uDDE9', member: '\\uD83D\\uDC64', agent: '\\u2699', metric_watch: '\\uD83D\\uDCC8', unused_artifacts: '\\uD83E\\uDDF9' };

@@ -208,7 +208,7 @@ export async function decideAccessRequest(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const row = await env.DB.prepare(`
     SELECT ar.id, ar.artifact_id, ar.requester_email, ar.requester_name, ar.status,
-           a.name AS artifact_name, a.slug AS artifact_slug, a.owner_id
+           a.name AS artifact_name, a.slug AS artifact_slug, a.owner_id, a.workspace_id
     FROM access_requests ar
     JOIN artifacts a ON a.id = ar.artifact_id
     WHERE ar.id = ?
@@ -221,6 +221,7 @@ export async function decideAccessRequest(
     artifact_name: string;
     artifact_slug: string;
     owner_id: string;
+    workspace_id: string | null;
   }>();
 
   if (!row) return { ok: false, error: 'Request not found.' };
@@ -241,6 +242,7 @@ export async function decideAccessRequest(
     await dispatchLifecycleEmail(env, {
       type: 'access_declined',
       toEmail: row.requester_email,
+      workspaceId: row.workspace_id ?? undefined,
       data: { pageName: row.artifact_name },
     }).catch(() => {});
     return { ok: true };
@@ -253,6 +255,7 @@ export async function decideAccessRequest(
   await dispatchLifecycleEmail(env, {
     type: 'access_approved',
     toEmail: row.requester_email,
+    workspaceId: row.workspace_id ?? undefined,
     data: { pageName: row.artifact_name, url: `${baseUrl}/a/${encodeURIComponent(row.artifact_slug)}/` },
   }).catch(() => {});
 

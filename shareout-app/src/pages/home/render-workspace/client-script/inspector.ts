@@ -71,7 +71,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   function iconBtn(act, title, path, extra) {
     return '<button class="wsx-det__icon ' + (extra || '') + '" data-iact="' + act + '" type="button" data-tip="' + esc(title) + '" aria-label="' + esc(title) + '">' + isvg(path) + '</button>';
   }
-  function fmtDate(s) { if (!s) return '\\u2014'; var ts = Date.parse(s); if (!ts) return '\\u2014'; var d = new Date(ts); return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
+  function fmtDate(s) { if (!s) return '\\u2014'; var ts = Date.parse(s); if (!ts) return '\\u2014'; var d = new Date(ts); return d.toLocaleDateString(locTag(), { year: 'numeric', month: 'short', day: 'numeric' }); }
   function visName(k) { return t('inspector.visName.' + k); }
   function visCaption(k) { return t('inspector.visCaption.' + k); }
   // Open visibility restricts external CDNs (CSP allowlist); nudge private+collaborators to lift it.

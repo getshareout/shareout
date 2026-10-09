@@ -62,11 +62,13 @@ export async function createInviteClaim(
 // Now the row carries the verdict and the Members view shows it.
 export async function sendInviteEmail(
   env: Env,
-  args: { email: string; workspaceName: string; inviterName: string; claimCode: string; claimId?: string }
+  args: { email: string; workspaceName: string; inviterName: string; claimCode: string; claimId?: string; workspaceId?: string }
 ): Promise<DispatchResult> {
   const result = await dispatchLifecycleEmail(env, {
     type: 'workspace_invite',
     toEmail: args.email,
+    // The invite speaks the workspace's language, not whatever the address had before.
+    workspaceId: args.workspaceId,
     data: {
       workspaceName: args.workspaceName,
       inviterName: args.inviterName,
@@ -184,6 +186,7 @@ export async function notifyInviteAccepted(env: Env, claim: InviteClaim): Promis
   await dispatchLifecycleEmail(env, {
     type: 'invite_accepted',
     toUserId: claim.invited_by,
+    workspaceId: claim.workspace_id,
     data: { memberName, workspaceName: ws?.name || 'your workspace' },
   }).catch(() => {});
 }

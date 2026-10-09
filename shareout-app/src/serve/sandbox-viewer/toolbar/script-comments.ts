@@ -1,5 +1,8 @@
+import type { Locale } from '../../../i18n';
+import { TOOLBAR_COPY, js, type ToolbarCopy } from './copy';
+
 /** Auto-extracted client script for the sandbox viewer toolbar. */
-export function renderToolbarScriptComments(baseUrl: string, artifactId: string): string {
+export function renderToolbarScriptComments(baseUrl: string, artifactId: string, c: ToolbarCopy = TOOLBAR_COPY.en, locale: Locale = 'en'): string {
   return `
     var cmtApi = '${baseUrl}/v1/data/${artifactId}/comments';
     var cmtWsUrl = '${baseUrl}'.replace(/^http/, 'ws') + '/v1/data/${artifactId}/comments/ws';
@@ -15,7 +18,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
     var cmtTypingSent = 0;
     var cmtTypingHide = null;
     var cmtToastHide = null;
-    var cmtMyName = 'You';
+    var cmtMyName = '${js(c.you)}';
     var cmtReactState = {};
     var REACT_EMOJIS = ['👍','❤️','✅','🎉','👀'];
     var cmtUnread = 0;
@@ -80,7 +83,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
 
     function loadComments() {
       var list = document.getElementById('so-cmt-list');
-      list.innerHTML = '<div class="so-cmt-loading">Loading comments…</div>';
+      list.innerHTML = '<div class="so-cmt-loading">${js(c.loadingComments)}</div>';
       var resolved = cmtFilter === 'resolved' ? 'true' : 'false';
       fetch(cmtApi + '?parentId=null&resolved=' + resolved, { credentials: 'include' })
         .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
@@ -94,7 +97,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
         })
         .catch(function(err) {
           console.error('Comments error:', err);
-          list.innerHTML = '<div class="so-cmt-empty">Couldn\\'t load comments. Try again?</div>';
+          list.innerHTML = '<div class="so-cmt-empty">${js(c.loadFail)}</div>';
         });
     }
 
@@ -132,8 +135,8 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
       if (c.dueAt) {
         var due = new Date(c.dueAt);
         var overdue = !c.resolved && due < new Date();
-        var dueStr = due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-        dueHtml = ' <span class="so-cmt-due' + (overdue ? ' overdue' : '') + '">Due ' + dueStr + '</span>';
+        var dueStr = due.toLocaleDateString(${locale === 'es' ? "'es-AR'" : 'undefined'}, { month: 'short', day: 'numeric' });
+        dueHtml = ' <span class="so-cmt-due' + (overdue ? ' overdue' : '') + '">${js(c.due)}' + dueStr + '</span>';
       }
       return '<div class="so-cmt-assignee">→ ' + name + dueHtml + '</div>';
     }
@@ -142,24 +145,24 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
       var when = c.createdAt ? timeAgo(new Date(c.createdAt)) : '';
       var isActionItem = !isReply && !c.resolved && (c.assigneeEmail || c.assigneeUserId);
       var html = '<div class="so-cmt-card' + (c.resolved ? ' resolved' : '') + (isActionItem ? ' action-item' : '') + '" data-id="' + c.id + '">';
-      var agentBadge = c.authorType === 'agent' ? ' <span class="so-cmt-agent">🤖 Agent</span>' : '';
+      var agentBadge = c.authorType === 'agent' ? ' <span class="so-cmt-agent">${js(c.agent)}</span>' : '';
       html += '<div class="so-cmt-head">' + avatar(c.authorName) +
         '<div><div class="so-cmt-author">' + escapeHtml(c.authorName) + agentBadge + '</div>' +
-        '<div class="so-cmt-time">' + when + (c.resolved && c.resolvedBy ? ' · resolved' : '') + '</div></div></div>';
+        '<div class="so-cmt-time">' + when + (c.resolved && c.resolvedBy ? '${js(c.resolvedSuffix)}' : '') + '</div></div></div>';
       html += '<div class="so-cmt-body">' + renderMentions(c.content) + '</div>';
       if (!isReply) html += assigneeChipHtml(c);
       html += '<div class="so-cmt-actions">';
-      html += '<button class="so-cmt-action" onclick="startReply(\\'' + c.id + '\\', \\'' + escapeHtml(c.authorName).replace(/'/g, "\\\\'") + '\\')">Reply</button>';
+      html += '<button class="so-cmt-action" onclick="startReply(\\'' + c.id + '\\', \\'' + escapeHtml(c.authorName).replace(/'/g, "\\\\'") + '\\')">${js(c.reply)}</button>';
       if (!isReply) {
         if (cmtLoggedIn) {
           if (c.resolved) {
-            html += '<button class="so-cmt-action resolved" onclick="toggleResolve(\\'' + c.id + '\\', false)">Reopen</button>';
+            html += '<button class="so-cmt-action resolved" onclick="toggleResolve(\\'' + c.id + '\\', false)">${js(c.reopen)}</button>';
           } else {
-            html += '<button class="so-cmt-action" onclick="toggleResolve(\\'' + c.id + '\\', true)">Resolve</button>';
+            html += '<button class="so-cmt-action" onclick="toggleResolve(\\'' + c.id + '\\', true)">${js(c.resolve)}</button>';
           }
-          html += '<button class="so-cmt-action" onclick="openAssignPicker(\\'' + c.id + '\\')">Assign</button>';
+          html += '<button class="so-cmt-action" onclick="openAssignPicker(\\'' + c.id + '\\')">${js(c.assign)}</button>';
         }
-        html += '<button class="so-cmt-action" onclick="toggleReplies(\\'' + c.id + '\\')">Replies</button>';
+        html += '<button class="so-cmt-action" onclick="toggleReplies(\\'' + c.id + '\\')">${js(c.replies)}</button>';
       }
       html += '</div>';
       cmtReactState[c.id] = c.reactions || {};
@@ -177,7 +180,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
         if (!r || !r.count) return;
         html += '<button class="so-cmt-react-chip' + (r.mine ? ' mine' : '') + '" onclick="toggleReaction(\\'' + id + '\\',\\'' + e + '\\')">' + e + ' ' + r.count + '</button>';
       });
-      html += '<button class="so-cmt-react-add" onclick="toggleReactPicker(\\'' + id + '\\')" title="Add reaction">+</button>';
+      html += '<button class="so-cmt-react-add" onclick="toggleReactPicker(\\'' + id + '\\')" title="${js(c.addReaction)}">+</button>';
       html += '<span class="so-cmt-react-picker" id="so-rp-' + id + '">' +
         REACT_EMOJIS.map(function(e) { return '<button class="so-cmt-react-opt" onclick="toggleReaction(\\'' + id + '\\',\\'' + e + '\\')">' + e + '</button>'; }).join('') +
         '</span>';
@@ -210,7 +213,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
         .then(function(r) { if (r.status === 401) throw new Error('auth'); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(function(res) { var d = res.data || {}; cmtReactState[id] = d.reactions || {}; refreshReactionBar(id); })
         .catch(function(err) {
-          if (err.message === 'auth') alert('Please log in to react.');
+          if (err.message === 'auth') alert('${js(c.loginReact)}');
           else console.error('Reaction error:', err);
           loadComments();
         });
@@ -229,7 +232,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
     function renderThreads(roots) {
       var list = document.getElementById('so-cmt-list');
       if (!roots.length) {
-        list.innerHTML = '<div class="so-cmt-empty">' + (cmtFilter === 'resolved' ? 'No resolved comments yet.' : 'No comments yet. Start the conversation!') + '</div>';
+        list.innerHTML = '<div class="so-cmt-empty">' + (cmtFilter === 'resolved' ? '${js(c.noResolved)}' : '${js(c.noComments)}') + '</div>';
         return;
       }
       list.innerHTML = roots.map(function(c) { return commentCardHtml(c, false); }).join('');
@@ -254,20 +257,20 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
       if (!box) return;
       if (box.style.display !== 'none') { box.style.display = 'none'; return; }
       box.style.display = 'flex';
-      box.innerHTML = '<div class="so-cmt-loading" style="padding:12px">Loading…</div>';
+      box.innerHTML = '<div class="so-cmt-loading" style="padding:12px">${js(c.loading)}</div>';
       fetch(cmtApi + '/' + id + '/replies', { credentials: 'include' })
         .then(function(r) { return r.json(); })
         .then(function(res) {
           var replies = (res.data && res.data.replies) || [];
-          box.innerHTML = replies.length ? replies.map(function(c) { return commentCardHtml(c, true); }).join('') : '<div class="so-cmt-time" style="padding:4px">No replies yet</div>';
+          box.innerHTML = replies.length ? replies.map(function(c) { return commentCardHtml(c, true); }).join('') : '<div class="so-cmt-time" style="padding:4px">${js(c.noReplies)}</div>';
         })
-        .catch(function() { box.innerHTML = '<div class="so-cmt-time">Couldn\\'t load replies</div>'; });
+        .catch(function() { box.innerHTML = '<div class="so-cmt-time">${js(c.repliesFail)}</div>'; });
     };
 
     window.startReply = function(id, name) {
       cmtReplyingTo = id;
       var info = document.getElementById('so-cmt-replying');
-      info.innerHTML = 'Replying to ' + escapeHtml(name) + ' <button onclick="cancelReply()">Cancel</button>';
+      info.innerHTML = '${js(c.replyingTo)}' + escapeHtml(name) + ' <button onclick="cancelReply()">${js(c.cancel)}</button>';
       document.getElementById('so-cmt-input').focus();
     };
     window.cancelReply = function() {
@@ -321,11 +324,11 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
           avatar(label) + '<span>' + escapeHtml(label) + '</span></div>';
       }).join('');
       if (c.assigneeEmail || c.assigneeUserId) {
-        listHtml += '<div class="so-cmt-assign-item so-cmt-assign-unassign" onmousedown="pickAssign(event,\\'' + id + '\\',null)">✕ Unassign</div>';
+        listHtml += '<div class="so-cmt-assign-item so-cmt-assign-unassign" onmousedown="pickAssign(event,\\'' + id + '\\',null)">${js(c.unassign)}</div>';
       }
       el.innerHTML = '<div class="so-cmt-assign-list">' + listHtml + '</div>' +
-        '<div class="so-cmt-assign-due"><label>Due date <input type="date" id="so-cmt-due-input" value="' + currentDue + '"></label>' +
-        '<button class="so-cmt-action" onmousedown="pickAssign(event,\\'' + id + '\\',\\'' + escapeHtml(c.assigneeEmail || '') + '\\',true)">Set due</button></div>';
+        '<div class="so-cmt-assign-due"><label>${js(c.dueDate)}<input type="date" id="so-cmt-due-input" value="' + currentDue + '"></label>' +
+        '<button class="so-cmt-action" onmousedown="pickAssign(event,\\'' + id + '\\',\\'' + escapeHtml(c.assigneeEmail || '') + '\\',true)">${js(c.setDue)}</button></div>';
       // Position picker below the card's Assign button
       var actionsEl = card.querySelector('.so-cmt-actions');
       var rect = actionsEl ? actionsEl.getBoundingClientRect() : card.getBoundingClientRect();
@@ -358,7 +361,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
           if (updated && updated.id) applyAssignLive(updated);
         })
         .catch(function(err) {
-          if (err.message === 'auth') alert('Please log in to assign.');
+          if (err.message === 'auth') alert('${js(c.loginAssign)}');
           else console.error('Assign error:', err);
         });
     };
@@ -382,7 +385,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
       var guestNameEl = document.getElementById('so-cmt-guest-name');
       var guestName = guestNameEl ? guestNameEl.value.trim() : '';
       if (!cmtLoggedIn && cmtIdentityMode === 'named' && !guestName) {
-        alert('Please enter your name to comment.');
+        alert('${js(c.enterName)}');
         if (guestNameEl) guestNameEl.focus();
         return;
       }
@@ -399,7 +402,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
 
       // Optimistic: render immediately with a temp id, reconcile on response.
       var tmpId = 'tmp_' + Date.now();
-      var displayName = cmtLoggedIn ? cmtMyName : (guestName || 'Anonymous');
+      var displayName = cmtLoggedIn ? cmtMyName : (guestName || '${js(c.anonymous)}');
       var optimistic = {
         id: tmpId, parentId: replyTo || null, authorName: displayName,
         content: content, createdAt: new Date().toISOString(), resolved: false,
@@ -430,7 +433,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
           var real = res && res.data;
           if (real && real.id) {
             reconcileOptimistic(tmpId, real, !!replyTo);
-            cmtToast('Comment posted.', 'success');
+            cmtToast('${js(c.posted)}', 'success');
           }
           else { removeCardDom(tmpId); cmtRoots = cmtRoots.filter(function(c) { return c.id !== tmpId; }); }
         })
@@ -440,7 +443,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
           cmtRoots = cmtRoots.filter(function(c) { return c.id !== tmpId; });
           updatePins(cmtRoots);
           ta.value = content;
-          cmtToast(err.message === 'auth' ? 'Please log in to comment.' : 'Couldn\\'t post comment. Try again?', 'error');
+          cmtToast(err.message === 'auth' ? '${js(c.loginComment)}' : '${js(c.postFail)}', 'error');
         });
     };
 
@@ -624,11 +627,11 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
       if (on) {
         btn.classList.add('armed');
         btn.classList.remove('placed');
-        if (label) label.textContent = 'Click the page…';
+        if (label) label.textContent = '${js(c.clickPage)}';
         postToIframe({ type: 'shareout:comments:enterPinMode' });
       } else {
         btn.classList.remove('armed');
-        if (label) label.textContent = cmtPendingPosition ? 'Pinned ✓' : 'Pin to page';
+        if (label) label.textContent = cmtPendingPosition ? '${js(c.pinned)}' : '${js(c.pinToPage)}';
         if (cmtPendingPosition) btn.classList.add('placed');
         postToIframe({ type: 'shareout:comments:exitPinMode' });
       }
@@ -641,7 +644,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
       var btn = document.getElementById('so-cmt-pinbtn');
       var label = document.getElementById('so-cmt-pinbtn-label');
       if (btn) { btn.classList.remove('armed', 'placed'); }
-      if (label) label.textContent = 'Pin to page';
+      if (label) label.textContent = '${js(c.pinToPage)}';
     }
 
     function onPinPlaced(position) {
@@ -790,14 +793,14 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
       var el = document.getElementById('so-cmt-presence');
       if (!el) return;
       var others = count - 1;
-      if (others > 0) { el.textContent = others === 1 ? '1 other here' : others + ' others here'; el.classList.add('show'); }
+      if (others > 0) { el.textContent = others === 1 ? '${js(c.oneOther)}' : others + '${js(c.othersHere)}'; el.classList.add('show'); }
       else { el.textContent = ''; el.classList.remove('show'); }
     }
 
     function showTyping(name) {
       var el = document.getElementById('so-cmt-typing');
       if (!el) return;
-      el.textContent = name + ' is typing…';
+      el.textContent = name + '${js(c.isTyping)}';
       el.classList.add('show');
       if (cmtTypingHide) clearTimeout(cmtTypingHide);
       cmtTypingHide = setTimeout(function() { el.classList.remove('show'); el.textContent = ''; }, 3000);
@@ -819,9 +822,9 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string)
         el.textContent = '';
         return;
       }
-      if (state === 'connecting') el.textContent = 'Connecting…';
-      else if (state === 'reconnecting') el.textContent = 'Reconnecting…';
-      else el.textContent = 'Connection lost. Reopen comments to retry.';
+      if (state === 'connecting') el.textContent = '${js(c.connecting)}';
+      else if (state === 'reconnecting') el.textContent = '${js(c.reconnecting)}';
+      else el.textContent = '${js(c.connLost)}';
       el.classList.add('show');
       el.classList.toggle('is-error', state === 'offline');
     }

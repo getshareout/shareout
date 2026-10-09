@@ -1,3 +1,4 @@
+import type { Locale } from '../../i18n';
 export type AgentMode = 'visitor' | 'admin' | 'crew' | 'pilot';
 export type MessageRole = 'user' | 'assistant' | 'system';
 export type EditStatus = 'pending' | 'applied' | 'rejected';
@@ -104,6 +105,8 @@ export interface ApplyEditsRequest {
 }
 
 export interface AdminContext {
+  /** The artifact's workspace language, when it has one. */
+  locale?: Locale;
   files: Array<{ path: string; content: string; mime: string }>;
   skillDocs: string;
   artifact: {
@@ -123,4 +126,6 @@ export interface VisitorContext {
   json: Record<string, unknown>;
   tables: Record<string, unknown[]>;
   blobUrls: string[];
+  /** The artifact's workspace language, when it has one. */
+  locale?: Locale;
 }

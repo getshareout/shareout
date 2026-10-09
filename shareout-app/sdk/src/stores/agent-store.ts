@@ -8,6 +8,30 @@ import {
   type MessageHandle,
 } from '@shareout/chat-core';
 import { ShareOutError } from '../shareout-error';
+import { pageLocale } from '../core/locale';
+
+// Chat widget copy, picked from the page's language when the widget renders.
+const WIDGET_COPY = {
+  en: {
+    chat: 'Chat', closeChat: 'Close chat', jump: 'Jump to latest message', mode: 'Chat mode',
+    placeholder: 'Type a message...', send: 'Send', stop: 'Stop', ask: 'Ask', do: 'Do',
+    replyReady: 'Reply ready', error: 'Error: ', unknown: 'Unknown error', working: 'Working on it…',
+    done: 'Done.', failed: "I couldn't complete that.", noPilot: "This page doesn't have Pilot enabled.",
+    thinking: 'Thinking…', retrying: 'Retrying…', clicking: 'Clicking…', typing: 'Typing…',
+    choosing: 'Choosing an option…', scrolling: 'Scrolling…', waiting: 'Waiting for the page…',
+    needsInput: 'Needs your input…', finishing: 'Finishing…', busy: 'Working…',
+  },
+  es: {
+    chat: 'Chat', closeChat: 'Cerrar el chat', jump: 'Ir al último mensaje', mode: 'Modo del chat',
+    placeholder: 'Escribí un mensaje...', send: 'Enviar', stop: 'Frenar', ask: 'Preguntar', do: 'Hacer',
+    replyReady: 'Respuesta lista', error: 'Error: ', unknown: 'Error desconocido', working: 'Trabajando en eso…',
+    done: 'Listo.', failed: 'No pude terminarlo.', noPilot: 'Esta página no tiene el piloto activado.',
+    thinking: 'Pensando…', retrying: 'Reintentando…', clicking: 'Haciendo clic…', typing: 'Escribiendo…',
+    choosing: 'Eligiendo una opción…', scrolling: 'Desplazando…', waiting: 'Esperando la página…',
+    needsInput: 'Necesito tu respuesta…', finishing: 'Terminando…', busy: 'Trabajando…',
+  },
+};
+type WidgetCopy = typeof WIDGET_COPY.en;
 import type { SdkClient } from '../core/sdk-client';
 import { createPilot, type Pilot } from './pilot-store';
 
@@ -180,6 +204,7 @@ export class AgentStore {
 export class ChatWidget {
   private container: HTMLElement | null = null;
   private shadow: ShadowRoot | null = null;
+  private copy: WidgetCopy = WIDGET_COPY[pageLocale()];
   private messagesEl: HTMLElement | null = null;
   private inputEl: HTMLTextAreaElement | null = null;
   private currentConversationId: string | null = null;
@@ -263,21 +288,22 @@ export class ChatWidget {
 
     const position = this.options.position || 'bottom-right';
     const theme = this.options.theme || 'auto';
+    const c = (this.copy = WIDGET_COPY[pageLocale()]);
 
     this.shadow.innerHTML = `
       <style>${this.getStyles()}</style>
       <div class="shareout-chat ${position} ${this.options.minimized ? 'minimized' : ''}" data-theme="${theme}">
         <div class="chat-header">
-          <span class="title">Chat</span>
-          <button class="minimize-btn" type="button" aria-label="Close chat">×</button>
+          <span class="title">${c.chat}</span>
+          <button class="minimize-btn" type="button" aria-label="${c.closeChat}">×</button>
         </div>
         <div class="chat-messages"></div>
-        <button class="chat-jump" type="button" hidden aria-label="Jump to latest message">↓<span class="chat-jump-count"></span></button>
+        <button class="chat-jump" type="button" hidden aria-label="${c.jump}">↓<span class="chat-jump-count"></span></button>
         <div class="chat-input">
-          <div class="chat-mode" role="group" aria-label="Chat mode" hidden></div>
+          <div class="chat-mode" role="group" aria-label="${c.mode}" hidden></div>
           <div class="chat-compose">
-            <textarea placeholder="${this.options.placeholder || 'Type a message...'}" rows="1"></textarea>
-            <button class="send-btn" type="button">Send</button>
+            <textarea placeholder="${this.options.placeholder || c.placeholder}" rows="1"></textarea>
+            <button class="send-btn" type="button">${c.send}</button>
           </div>
         </div>
       </div>
@@ -320,8 +346,8 @@ export class ChatWidget {
     if (!this.toggleEl) return;
     this.toggleEl.hidden = false;
     this.toggleEl.innerHTML = `
-      <button class="mode-btn" type="button" data-mode="ask" aria-pressed="true">Ask</button>
-      <button class="mode-btn" type="button" data-mode="auto" aria-pressed="false">Do</button>
+      <button class="mode-btn" type="button" data-mode="ask" aria-pressed="true">${this.copy.ask}</button>
+      <button class="mode-btn" type="button" data-mode="auto" aria-pressed="false">${this.copy.do}</button>
     `;
     this.activeMode = 'ask';
     this.toggleEl.querySelectorAll<HTMLButtonElement>('.mode-btn').forEach((btn) => {
@@ -685,16 +711,16 @@ export class ChatWidget {
           else assistantEl.textContent = acc;
         } else if (chunk.type === 'done') {
           if (chunk.conversationId) this.currentConversationId = chunk.conversationId;
-          this.announcer?.announce('Reply ready', { now: true });
+          this.announcer?.announce(this.copy.replyReady, { now: true });
         } else if (chunk.type === 'error') {
-          const err = `Error: ${chunk.error}`;
+          const err = `${this.copy.error}${chunk.error}`;
           if (handle) handle.text(err);
           else assistantEl.textContent = err;
           assistantEl.classList.add('error');
         }
       }
     } catch (e) {
-      const err = `Error: ${e instanceof Error ? e.message : 'Unknown error'}`;
+      const err = `${this.copy.error}${e instanceof Error ? e.message : this.copy.unknown}`;
       if (handle) handle.text(err);
       else assistantEl.textContent = err;
       assistantEl.classList.add('error');
@@ -709,7 +735,7 @@ export class ChatWidget {
 
     const activity = document.createElement('div');
     activity.className = 'message activity';
-    activity.textContent = 'Working on it…';
+    activity.textContent = this.copy.working;
     this.view.add(activity);
     this.view.controller.stickToBottom();
 
@@ -733,7 +759,7 @@ export class ChatWidget {
         onEvent,
       });
       activity.remove();
-      const reply = this.addMessage('assistant', result.data || (result.success ? 'Done.' : "I couldn't complete that."));
+      const reply = this.addMessage('assistant', result.data || (result.success ? this.copy.done : this.copy.failed));
       if (!result.success) reply.classList.add('error');
     } catch (e) {
       activity.remove();
@@ -741,9 +767,9 @@ export class ChatWidget {
         this.pilotAvailable = false;
         this.hideToggle();
         this.activeMode = 'ask';
-        this.addMessage('assistant', "This page doesn't have Pilot enabled.").classList.add('error');
+        this.addMessage('assistant', this.copy.noPilot).classList.add('error');
       } else {
-        this.addMessage('assistant', `Error: ${e instanceof Error ? e.message : 'Unknown error'}`).classList.add('error');
+        this.addMessage('assistant', `${this.copy.error}${e instanceof Error ? e.message : this.copy.unknown}`).classList.add('error');
       }
     } finally {
       this.pendingAsk = null;
@@ -762,15 +788,15 @@ export class ChatWidget {
 
   private activityLabel(e: { kind: string; detail: unknown }): string | null {
     if (e.kind === 'status') {
-      return e.detail === 'running' ? 'Working on it…' : null;
+      return e.detail === 'running' ? this.copy.working : null;
     }
     if (e.kind !== 'activity') return null;
     const a = e.detail as { type?: string; tool?: string };
     switch (a?.type) {
       case 'thinking':
-        return 'Thinking…';
+        return this.copy.thinking;
       case 'retrying':
-        return 'Retrying…';
+        return this.copy.retrying;
       case 'executing':
         return this.toolLabel(a.tool);
       default:
@@ -781,22 +807,22 @@ export class ChatWidget {
   private toolLabel(tool?: string): string {
     switch (tool) {
       case 'click_element_by_index':
-        return 'Clicking…';
+        return this.copy.clicking;
       case 'input_text':
-        return 'Typing…';
+        return this.copy.typing;
       case 'select_dropdown_option':
-        return 'Choosing an option…';
+        return this.copy.choosing;
       case 'scroll':
       case 'scroll_horizontally':
-        return 'Scrolling…';
+        return this.copy.scrolling;
       case 'wait':
-        return 'Waiting for the page…';
+        return this.copy.waiting;
       case 'ask_user':
-        return 'Needs your input…';
+        return this.copy.needsInput;
       case 'done':
-        return 'Finishing…';
+        return this.copy.finishing;
       default:
-        return 'Working…';
+        return this.copy.busy;
     }
   }
 
@@ -805,7 +831,7 @@ export class ChatWidget {
     const sendBtn = this.shadow.querySelector('.send-btn') as HTMLButtonElement | null;
     const awaitingAnswer = running && !!this.pendingAsk;
     if (this.inputEl) this.inputEl.disabled = running && !awaitingAnswer;
-    if (sendBtn) sendBtn.textContent = running && !awaitingAnswer ? 'Stop' : 'Send';
+    if (sendBtn) sendBtn.textContent = running && !awaitingAnswer ? this.copy.stop : this.copy.send;
   }
 
   private addMessage(role: 'user' | 'assistant', content: string): HTMLElement {

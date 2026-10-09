@@ -201,6 +201,7 @@ async function emailOf(env: Env, userId: string): Promise<string | null> {
 }
 
 async function notifyApprovers(env: Env, artifactId: string, approverIds: string[]): Promise<void> {
+  const workspaceId = (await artifactWorkspace(env, artifactId)) ?? undefined;
   for (const id of approverIds) {
     const email = await emailOf(env, id);
     if (!email) continue;
@@ -208,6 +209,7 @@ async function notifyApprovers(env: Env, artifactId: string, approverIds: string
       type: 'publish_approval',
       toUserId: id,
       toEmail: email,
+      workspaceId,
       data: { kind: 'request' },
     }).catch(() => {});
   }
@@ -220,6 +222,7 @@ async function notifyRequester(env: Env, artifactId: string, requesterId: string
     type: 'publish_approval',
     toUserId: requesterId,
     toEmail: email,
+    workspaceId: (await artifactWorkspace(env, artifactId)) ?? undefined,
     data: { kind: outcome === 'approved' ? 'approved' : 'declined' },
   }).catch(() => {});
 }

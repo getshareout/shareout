@@ -1,9 +1,11 @@
+import { TOOLBAR_COPY, js, type ToolbarCopy } from './copy';
+
 /**
  * Lets the viewer drag the floating ShareOut toolbar to any screen corner so it
  * never sits on top of an artifact's own corner widget (chat FABs, etc.).
  * The chosen corner snaps and persists per-artifact in localStorage.
  */
-export function renderToolbarScriptDrag(artifactId: string): string {
+export function renderToolbarScriptDrag(artifactId: string, c: ToolbarCopy = TOOLBAR_COPY.en): string {
   return `
     (function() {
       var KEY = 'so-tbpos:' + ${JSON.stringify(artifactId)};
@@ -22,7 +24,7 @@ export function renderToolbarScriptDrag(artifactId: string): string {
 
       trig.style.cursor = 'grab';
       trig.style.touchAction = 'none';
-      trig.title = trig.title || 'Drag to move';
+      trig.title = trig.title || '${js(c.dragToMove)}';
 
       // Movement past this many px counts as a drag, not a click — large enough
       // that ordinary taps/clicks never get hijacked.

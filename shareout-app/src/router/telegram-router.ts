@@ -22,6 +22,7 @@ import {
 } from '../chat-agent/access';
 import { sendSnapshotTool, sendPdfTool } from '../chat-agent/tools/media';
 import { commandToAgentPrompt } from '../chat-agent/commands';
+import { localeForRecipient, type Locale } from '../i18n';
 import { enqueueAgentTurn, enqueueCallback } from '../chat-platforms/dispatch';
 import { isSuperAdminEmail } from '../superadmin/auth';
 import { getRecentWebhooks } from '../observability/store';
@@ -251,7 +252,8 @@ async function dispatchUpdate(env: Env, update: TelegramUpdate): Promise<void> {
     return;
   }
   if (command) {
-    const prompt = commandToAgentPrompt(command.name, command.args);
+    const locale = await localeForRecipient(env, { userId: userId }).catch((): Locale => 'en');
+    const prompt = commandToAgentPrompt(command.name, command.args, locale);
     if (prompt) {
       await dispatchAgentTurn(env, chatId, userId, prompt, update.update_id);
       return;

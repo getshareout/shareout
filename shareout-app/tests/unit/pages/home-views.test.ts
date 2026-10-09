@@ -20,9 +20,10 @@ import homeViewsBarrel from '../../../src/pages/home/render-workspace/client-scr
 
 /** Captured at split time — guards against accidental client-script drift.
  *  Re-pinned after the Home chat dock revamp (pill + dialog sheet, textarea composer,
- *  progressive markdown, error rows, thread menu; agent-format/agent-threads split). */
-const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 598_726;
-const ORIGINAL_WORKSPACE_CLIENT_SHA256 = 'fa947882b7be2180a986b00935ca8c0a391d220b54418208cdaf4031c0411954';
+ *  progressive markdown, error rows, thread menu; agent-format/agent-threads split), then
+ *  after the es-AR pass (card/edit-lite/event strings via t(), workspace-scoped language toggle). */
+const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 601_210;
+const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '51f6d4d3e61761a542392dbfb1362abe7a3e3617703864806d4237ef73cccb31';
 const HOME_VIEWS_MARKER = '  // ===== rail nav → Home pane views =====';
 
 const SECTION_SOURCES: [string, string][] = [

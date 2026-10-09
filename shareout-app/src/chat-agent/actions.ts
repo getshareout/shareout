@@ -10,6 +10,7 @@ import { botSetJson } from '../data/json-store';
 import { buildBotDataContext } from './data-write';
 import { generateArtifactHtml } from '../data/agent/build-page';
 import { publishGeneratedHtml } from '../publish';
+import type { Locale } from '../i18n';
 
 // A write the bot proposes and the user confirms with a button tap. Kept small
 // and serializable — stored as JSON until the user approves it.
@@ -56,7 +57,8 @@ function kv(obj: Record<string, unknown>, max = 6): string[] {
   return Object.entries(obj).slice(0, max).map(([k, v]) => `${k}: ${preview(v, 80)}`);
 }
 
-export function describeActionRich(a: PendingAction): ActionCard {
+export function describeActionRich(a: PendingAction, locale: Locale = 'en'): ActionCard {
+  if (locale === 'es') return describeActionRichEs(a);
   switch (a.kind) {
     case 'alert_pause': return { kind: a.kind, title: 'Pause alert', subject: a.label };
     case 'alert_resume': return { kind: a.kind, title: 'Resume alert', subject: a.label };
@@ -73,6 +75,58 @@ export function describeActionRich(a: PendingAction): ActionCard {
     case 'job_create': return { kind: a.kind, title: 'Schedule email', subject: a.artifactName, detail: `cron ${a.schedule}${a.includePdf ? ' · PDF attached' : ''}`, lines: a.recipients };
     case 'build_artifact': return { kind: a.kind, title: 'Build a new page', subject: a.name, detail: a.prompt.length > 280 ? a.prompt.slice(0, 280) + '…' : a.prompt };
     case 'save_skill': return { kind: a.kind, title: a.skillArtifactId ? 'Update team skill' : 'Save as team skill', subject: a.name, detail: `${a.markdown.length} characters of markdown`, lines: [a.markdown.slice(0, 200) + (a.markdown.length > 200 ? '…' : '')] };
+  }
+}
+
+const ROLE_ES = { viewer: 'lector', editor: 'editor' } as const;
+const NO_UNDO_ES = 'No se puede deshacer.';
+
+function describeActionRichEs(a: PendingAction): ActionCard {
+  switch (a.kind) {
+    case 'alert_pause': return { kind: a.kind, title: 'Pausar alerta', subject: a.label };
+    case 'alert_resume': return { kind: a.kind, title: 'Reactivar alerta', subject: a.label };
+    case 'alert_delete': return { kind: a.kind, title: 'Borrar alerta', subject: a.label, detail: NO_UNDO_ES, danger: true };
+    case 'job_pause': return { kind: a.kind, title: 'Pausar envío programado', subject: a.label };
+    case 'job_resume': return { kind: a.kind, title: 'Reactivar envío programado', subject: a.label };
+    case 'job_delete': return { kind: a.kind, title: 'Borrar envío programado', subject: a.label, detail: NO_UNDO_ES, danger: true };
+    case 'share': return { kind: a.kind, title: 'Compartir página', subject: a.artifactName, detail: `Como ${ROLE_ES[a.role]}`, lines: a.emails };
+    case 'crew': return { kind: a.kind, title: 'Pedirle al agente', subject: a.artifactName, detail: a.instruction };
+    case 'edit_publish': return { kind: a.kind, title: 'Cambiar y publicar', subject: a.artifactName, detail: a.summary, lines: a.files.length ? [`Archivos: ${a.files.join(', ')}`] : undefined };
+    case 'data_table_insert': return { kind: a.kind, title: `Agregar fila a “${a.table}”`, subject: a.artifactName, lines: kv(a.row) };
+    case 'data_table_update': return { kind: a.kind, title: `Actualizar “${a.table}”`, subject: a.artifactName, detail: a.rowId ? `fila ${a.rowId}` : `filas que coinciden con ${preview(a.filter, 80)}`, lines: kv(a.changes) };
+    case 'data_json_set': return { kind: a.kind, title: `Guardar “${a.key}”`, subject: a.artifactName, detail: a.exists ? 'Reemplaza el valor actual.' : undefined, lines: [preview(a.value, 160)] };
+    case 'job_create': return { kind: a.kind, title: 'Programar mail', subject: a.artifactName, detail: `cron ${a.schedule}${a.includePdf ? ' · con PDF adjunto' : ''}`, lines: a.recipients };
+    case 'build_artifact': return { kind: a.kind, title: 'Armar una página nueva', subject: a.name, detail: a.prompt.length > 280 ? a.prompt.slice(0, 280) + '…' : a.prompt };
+    case 'save_skill': return { kind: a.kind, title: a.skillArtifactId ? 'Actualizar skill del equipo' : 'Guardar como skill del equipo', subject: a.name, detail: `${a.markdown.length} caracteres de markdown`, lines: [a.markdown.slice(0, 200) + (a.markdown.length > 200 ? '…' : '')] };
+  }
+}
+
+function describeActionEs(a: PendingAction): string {
+  switch (a.kind) {
+    case 'alert_pause': return `¿Pauso la alerta “${a.label}”?`;
+    case 'alert_resume': return `¿Reactivo la alerta “${a.label}”?`;
+    case 'alert_delete': return `¿Borro la alerta “${a.label}”? ${NO_UNDO_ES}`;
+    case 'job_pause': return `¿Pauso el envío programado “${a.label}”?`;
+    case 'job_resume': return `¿Reactivo el envío programado “${a.label}”?`;
+    case 'job_delete': return `¿Borro el envío programado “${a.label}”? ${NO_UNDO_ES}`;
+    case 'share': return `¿Comparto “${a.artifactName}” con ${a.emails.join(', ')} como ${ROLE_ES[a.role]}?`;
+    case 'crew': return `¿Le pido al agente de “${a.artifactName}” que haga esto: ${a.instruction}?`;
+    case 'edit_publish':
+      return `${a.summary}\n\n¿Aplico esto en “${a.artifactName}” y lo publico?${a.files.length ? `\n\nArchivos: ${a.files.join(', ')}` : ''}`;
+    case 'data_table_insert':
+      return `¿Agrego esta fila a “${a.table}” en “${a.artifactName}”?\n\n${preview(a.row)}`;
+    case 'data_table_update': {
+      const target = a.rowId ? `la fila ${a.rowId}` : `las filas que coinciden con ${preview(a.filter)}`;
+      return `¿Actualizo ${target} de “${a.table}” en “${a.artifactName}” con esto?\n\n${preview(a.changes)}`;
+    }
+    case 'data_json_set':
+      return `¿Guardo “${a.key}” en “${a.artifactName}” con este valor?\n\n${preview(a.value)}${a.exists ? '\n\nReemplaza el valor actual.' : ''}`;
+    case 'job_create':
+      return `¿Programo un mail de “${a.artifactName}” (cron \`${a.schedule}\`) para ${a.recipients.join(', ')}${a.includePdf ? ', con un PDF adjunto' : ''}?`;
+    case 'build_artifact':
+      return `¿Armo y publico una página nueva, “${a.name}”?\n\n${a.prompt.length > 280 ? a.prompt.slice(0, 280) + '…' : a.prompt}`;
+    case 'save_skill':
+      return `¿${a.skillArtifactId ? 'Actualizo' : 'Guardo'} la skill del equipo “${a.name}” en la Biblioteca del espacio?`;
   }
 }
 
@@ -124,7 +178,8 @@ export async function executeBuildArtifact(
 }
 
 /** The human-readable confirmation prompt shown above the ✅/❌ buttons. */
-export function describeAction(a: PendingAction): string {
+export function describeAction(a: PendingAction, locale: Locale = 'en'): string {
+  if (locale === 'es') return describeActionEs(a);
   switch (a.kind) {
     case 'alert_pause': return `Pause the alert “${a.label}”?`;
     case 'alert_resume': return `Resume the alert “${a.label}”?`;

@@ -8,6 +8,7 @@ import { buildCrewDataContext, buildCrewPrincipal, redact } from './principal';
 import { resolveEnabledTools, toProviderTools } from './tool-registry';
 import { createApproval, notifyOwnerPendingApprovals } from './approvals';
 import { getCrewProvider, type CrewProvider, type NeutralTurn, type ProviderTool } from './provider';
+import { ES_AR_VOICE, getWorkspaceLocale, type Locale } from '../i18n';
 import { logCrewRunFailure, logCrewToolFailure, userFacingCrewRunError, userFacingCrewToolError } from './errors';
 
 // Resolve whether a write tool's call must be deferred for owner approval.
@@ -49,7 +50,7 @@ const NEXT_RUN_MAX_HOURS = 720;
 // of the iteration/budget allotment on a stuck loop.
 const MAX_NO_PROGRESS_ITERS = 3;
 
-function buildSystemPrompt(crew: CrewRow): string {
+function buildSystemPrompt(crew: CrewRow, locale: Locale | null): string {
   return [
     crew.instructions || 'You are a helpful assistant operating inside a ShareOut app.',
     '',
@@ -65,6 +66,9 @@ function buildSystemPrompt(crew: CrewRow): string {
       'report date. Do NOT use json_get/table_query as the source — name the warehouse connection and SQL ' +
       'that produced the data, or omit source (the platform resolves it from query_snapshot jobs). ' +
       'Never confuse the Slack delivery connection with the data source.',
+    ...(locale === 'es'
+      ? ['', `LANGUAGE: This workspace speaks Spanish. Write everything meant for people (summaries, messages, emails) in ${ES_AR_VOICE}, in plain words with no anglicisms.`]
+      : []),
   ].join('\n');
 }
 
@@ -190,7 +194,8 @@ export async function executeCrewRun(
     const grantByName = new Map(grants.map((g) => [g.tool.name, g]));
     const tools: ProviderTool[] = [...toProviderTools(grants.map((g) => g.tool)), FINISH_TOOL];
 
-    const system = buildSystemPrompt(crew);
+    const locale = await getWorkspaceLocale(env, crew.workspace_id).catch(() => null);
+    const system = buildSystemPrompt(crew, locale);
     const transcript: NeutralTurn[] = [{ role: 'user', text: input || crew.instructions || 'Begin.' }];
 
     let termination: TerminationReason = 'max_iterations';
