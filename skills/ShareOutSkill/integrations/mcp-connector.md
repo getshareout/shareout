@@ -35,6 +35,10 @@ your ShareOut account"). Allow, and the app is connected.
 | `invite_members` | Owners/admins: invite `emails` (list or comma/newline text) as `member`/`admin`; per-email result + join link |
 | `list_members` | People in a workspace + pending invites (admins) |
 | `resend_invite` / `revoke_invite` | Admins: resend or cancel a pending invite by `email` |
+| `knowledge_search` | Cited passages from the workspace's learned Files and pages (`query`, optional `workspace_id`, `limit`) |
+| `knowledge_entity` | One company, person or project by `name` (or entity id): its connections, sources and quoted mentions |
+| `knowledge_facts` | Facts about `about` (amounts, dates, statuses), each with the quoted sentence and its source; optional `filter` |
+| `knowledge_status` | Whether Knowledge is on, what's learned / processing / unreadable, and how many entities it knows |
 | `get_help` | Short how-to and links |
 | `report_problem` | Opens a support ticket for the ShareOut team |
 | `search` / `fetch` | Read-only, ChatGPT deep-research shape |
@@ -47,6 +51,12 @@ Rules the tools follow:
   existing one is `update_artifact`.
 - **Plain results** — each result says the link, who can see it, and any notice
   (visibility downgraded, under review, approval needed) to relay to the person.
+- **Knowledge answers cite their sources** — the `knowledge_*` tools tell the model to answer
+  in the person's language, only from what they return, naming the page or File (and link)
+  behind each fact. They are read-only, workspace-scoped by the signed-in account, run the
+  same `/v1/workspaces/{id}/knowledge/*` routes (so a source someone can't open never shows
+  up), and searches are metered to the workspace like any other. When Knowledge is off they
+  say so instead of failing. See [team/knowledge.md](../team/knowledge.md).
 - **Same rules as the API** — the tools run the same handlers as `POST /v1/publish`,
   `GET /v1/artifacts`, `/v1/workspaces/{id}/members/invite`, so quotas, moderation,
   workspace publish policy and roles all apply.

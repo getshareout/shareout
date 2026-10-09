@@ -186,6 +186,17 @@ When Knowledge is on, the [workspace assistant](workspace-assistant.md) can cons
 
 Both tools work only inside a workspace (not Personal home), and return `{ "enabled": false }` when Knowledge is off.
 
+Claude, ChatGPT and Claude Code connected through the [MCP connector](../integrations/mcp-connector.md) get the cited corpus and the graph directly:
+
+| MCP tool | Same as |
+| --- | --- |
+| `knowledge_search` | `GET …/knowledge/search` — numbered passages, each with its source title and link |
+| `knowledge_entity` | `GET …/knowledge/entities?q=` + `…/entities/{id}` — one entity, its neighbours, sources and quotes |
+| `knowledge_facts` | facts from `…/entities/{id}`, each with the quoted evidence; optional `filter` |
+| `knowledge_status` | `GET …/knowledge/sources` + entity counts — what's learned, processing or unreadable |
+
+Pass `workspace_id` when the person has several workspaces (the tool asks otherwise).
+
 ## REST API
 
 All routes require workspace membership. When Knowledge is off, root `GET` returns `{ "enabled": false }` and per-note routes return `404`.
