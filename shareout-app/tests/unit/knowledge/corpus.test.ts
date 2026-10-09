@@ -17,6 +17,7 @@ import { searchCorpus } from '../../../src/knowledge/corpus/search';
 import { routeKnowledgeApi } from '../../../src/router/api/knowledge';
 import { createFetchContext } from '../../../src/router/context';
 import { setKnowledgeEnabled } from '../../../src/knowledge';
+import { softDeleteArtifact } from '../../../src/artifacts/crud';
 
 const e = env as unknown as Env;
 let n = 0;
@@ -54,6 +55,18 @@ async function putFile(ws: string, id: string, text: string, opts: { owner?: str
   await e.DB.prepare('INSERT INTO blobs (id, filename, mime_type, r2_key, size_bytes, deliverable_id, version_no) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .bind(blobId, opts.filename ?? `${id}.md`, opts.mime ?? 'text/markdown', key, text.length, id, version).run();
   await queueKnowledgeSource(e, undefined, { workspaceId: ws, kind: 'asset', refId: id }, blobId);
+}
+
+async function putPage(ws: string, id: string, html: string) {
+  const ver = `ver_${id}`;
+  await e.ARTIFACTS.put(`test/${id}.html`, html);
+  await e.DB.batch([
+    e.DB.prepare("INSERT INTO artifacts (id, name, slug, owner_id, visibility, workspace_id) VALUES (?, ?, ?, 'u1', 'public', ?)").bind(id, id, id, ws),
+    e.DB.prepare("INSERT INTO deployments (artifact_id, version_id, channel) VALUES (?, ?, 'production')").bind(id, ver),
+    e.DB.prepare("INSERT INTO versions (id, entrypoint) VALUES (?, 'index.html')").bind(ver),
+    e.DB.prepare("INSERT INTO assets (version_id, path, r2_key, mime) VALUES (?, 'index.html', ?, 'text/html')").bind(ver, `test/${id}.html`),
+  ]);
+  await queueKnowledgeSource(e, undefined, { workspaceId: ws, kind: 'page', refId: id }, ver);
 }
 
 describe('chunkMarkdown', () => {
@@ -126,6 +139,16 @@ describe('corpus ingest + search', () => {
     await queueKnowledgeSource(e, undefined, { workspaceId: ws, kind: 'asset', refId: 'dlv_d' }, 'deleted');
     expect(await corpusFor(e, ws)!.getSource('dlv_d')).toBeNull();
     expect((await searchCorpus(e, ws, 'u1', 'churn')).hits).toHaveLength(0);
+  });
+
+  it('forgets a page when it is deleted', async () => {
+    const ws = nextWs();
+    await setKnowledgeEnabled(e, ws, true);
+    await putPage(ws, 'art_del', '<html><body><p>Fleet uptime was 97 percent.</p></body></html>');
+    expect(await corpusFor(e, ws)!.getSource('art_del')).not.toBeNull();
+    await softDeleteArtifact(e, 'art_del', 'art_del');
+    expect(await corpusFor(e, ws)!.getSource('art_del')).toBeNull();
+    expect((await searchCorpus(e, ws, 'u1', 'fleet uptime')).hits).toHaveLength(0);
   });
 
   it('marks unreadable files unsupported instead of failing', async () => {
@@ -211,5 +234,22 @@ describe('POST /knowledge/backfill (corpus)', () => {
       e, execCtx,
     ));
     expect(await res!.json()).toMatchObject({ corpus: 1, corpusRemaining: 0 });
+  });
+
+  it('forgets stored sources that no longer exist', async () => {
+    const ws = nextWs();
+    await setKnowledgeEnabled(e, ws, true);
+    await putPage(ws, 'art_gone', '<html><body><p>Removed before this fix shipped.</p></body></html>');
+    await e.DB.prepare('DELETE FROM artifacts WHERE id = ?').bind('art_gone').run();
+    getInternalWorkspaceRole.mockResolvedValue('admin');
+    const pending: Promise<unknown>[] = [];
+    const waitCtx = { waitUntil: (p: Promise<unknown>) => pending.push(p), passThroughOnException() {} } as unknown as ExecutionContext;
+    const res = await routeKnowledgeApi(createFetchContext(
+      new Request(`https://shareout.site/v1/workspaces/${ws}/knowledge/backfill`, { method: 'POST', headers: { Cookie: 'shareout_session=x' } }),
+      e, waitCtx,
+    ));
+    expect(await res!.json()).toMatchObject({ corpus: 1, corpusRemaining: 0 });
+    await Promise.allSettled(pending);
+    expect(await corpusFor(e, ws)!.getSource('art_gone')).toBeNull();
   });
 });
