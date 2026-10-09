@@ -17,6 +17,7 @@ import { routeEmail } from '../email/routes';
 import { renderNotFoundPage } from '../pages/not-found';
 import { blockDisabledMarketingPages } from '../marketing-us-gate';
 import { asGetForHead, stripBodyForHead, wrongMethodOnKnownPath } from './method-policy';
+import { routeMcp } from '../mcp';
 
 // HTML document navigations get the styled 404 page; API/data/asset requests keep
 // the lightweight plain-text body so non-browser clients aren't handed markup.
@@ -78,7 +79,7 @@ const RESERVED_PREFIXES = [
   '/internal/', '/telegram/', '/slack/', '/report/', '/debug', '/health',
   '/app', '/home', '/create', '/teams', '/settings/', '/workspace', '/share-target',
   '/manifest.webmanifest', '/sw.js',
-  '/a/', '/@', '/p/', '/embed/', '/t/', '/wl/',
+  '/a/', '/@', '/p/', '/embed/', '/t/', '/wl/', '/mcp', '/oauth/',
 ];
 
 function isReservedProductPath(path: string): boolean {
@@ -112,6 +113,13 @@ export async function handleFetch(request: Request, env: Env, executionCtx?: Exe
   }
 
   const { request: req, path } = ctx;
+
+  // Remote MCP connector + its OAuth server. Apex only: the resource URL people paste
+  // is `{origin}/mcp`, and the consent step needs the apex session.
+  if (!subCtx.isSubdomain) {
+    const mcp = await routeMcp(ctx);
+    if (mcp) return mcp;
+  }
 
   // Worker-to-worker admin bridge (shared Bearer secret). Before auth/app pipeline.
   if (path.startsWith('/internal/admin/')) {
