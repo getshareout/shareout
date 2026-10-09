@@ -62,7 +62,7 @@ async function backfill(ctx: FetchContext, workspaceId: string): Promise<number>
 }
 
 // Queue every live page and File into the corpus that isn't already learned at its
-// current version. Capped per call (each start is a subrequest); `remaining` says how
+// current version, and every stored source that no longer exists (ingest forgets it). Capped per call (each start is a subrequest); `remaining` says how
 // many are left for the next call.
 const CORPUS_BACKFILL_MAX = 300;
 
@@ -89,6 +89,10 @@ async function backfillCorpus(ctx: FetchContext, workspaceId: string): Promise<{
       // A failed version gets a fresh instance id so it actually re-runs.
       todo.push({ kind, id: r.id, version: k?.status === 'failed' ? `${r.version}:retry:${Date.now()}` : r.version });
     }
+  }
+  const live = new Set([...pages, ...files].map((r) => r.id));
+  for (const [id, k] of Object.entries(known)) {
+    if (!live.has(id)) todo.push({ kind: k.kind, id, version: `gone:${Date.now()}` });
   }
   const batch = todo.slice(0, CORPUS_BACKFILL_MAX);
   for (const t of batch) {

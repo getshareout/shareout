@@ -221,6 +221,12 @@ export async function queueKnowledgeSource(
   return true;
 }
 
+/** A page was deleted, purged or restored: re-check it, so a page that's gone is forgotten. */
+export function relearnPage(env: Env, workspaceId: string | null, refId: string, version: string): Promise<boolean> {
+  if (!workspaceId) return Promise.resolve(false);
+  return queueKnowledgeSource(env, undefined, { workspaceId, kind: 'page', refId }, version).catch(() => false);
+}
+
 /** Start ingest for a source the caller already gated. `checkExisting` looks the
  *  instance up first; skip it when the caller knows the version is new. */
 export async function startIngest(

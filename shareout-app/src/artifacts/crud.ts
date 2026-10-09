@@ -17,6 +17,7 @@ import { getWorkspacePublishPolicy, hasApprovedPublish, getArtifactContentHash }
 import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { invalidateDeploymentCache, invalidateDeploymentCacheById, routeCacheKeys } from '../serve/deployment-cache';
 import { removeArtifactVector } from '../search/semantic';
+import { relearnPage } from '../knowledge/corpus/ingest';
 import { getUserRole, requireRole } from './roles';
 import { json } from './json-response';
 import type { ArtifactDetail, ArtifactSummary } from './types';
@@ -553,6 +554,9 @@ export async function softDeleteArtifact(
   ).bind(artifactId).run();
   await invalidateDeploymentCache(env, slug, artifactId);
   await removeArtifactVector(env, artifactId).catch(() => {});
+  const ws = await env.DB.prepare('SELECT workspace_id FROM artifacts WHERE id = ?')
+    .bind(artifactId).first<{ workspace_id: string | null }>();
+  await relearnPage(env, ws?.workspace_id ?? null, artifactId, `deleted:${deletedAt}`);
   return deletedAt;
 }
 
@@ -653,6 +657,7 @@ export async function handleRestoreArtifact(
   `).bind(generateId('dep'), artifactId, latest.id, routingSlug).run();
 
   await invalidateDeploymentCache(env, routingSlug, artifactId);
+  await relearnPage(env, artifact.workspace_id, artifactId, `restored:${Date.now()}:${latest.id}`);
 
   return handleGetArtifact(request, env, user, artifactId);
 }
@@ -805,6 +810,7 @@ export async function purgeArtifact(
   const wsRow = await env.DB.prepare('SELECT workspace_id FROM artifacts WHERE id = ?')
     .bind(artifactId).first<{ workspace_id: string | null }>();
   await purgeInbox(env, artifactId, wsRow?.workspace_id ?? '').catch(() => {});
+  await relearnPage(env, wsRow?.workspace_id ?? null, artifactId, `purged:${Date.now()}`);
 
   await env.DB.prepare('DELETE FROM artifacts WHERE id = ?').bind(artifactId).run();
 

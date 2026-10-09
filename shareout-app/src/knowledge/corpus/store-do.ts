@@ -191,11 +191,11 @@ export class KnowledgeStore extends DurableObject<Env> {
   }
 
   /** refId → version/status for every source, so a backfill can skip what's current. */
-  versions(): Record<string, { version: string; status: SourceStatus }> {
+  versions(): Record<string, { kind: SourceKind; version: string; status: SourceStatus }> {
     return this.metered(() => {
-      const out: Record<string, { version: string; status: SourceStatus }> = {};
-      for (const r of this.q('SELECT ref_id, version, status FROM sources').toArray()) {
-        out[r.ref_id as string] = { version: r.version as string, status: r.status as SourceStatus };
+      const out: Record<string, { kind: SourceKind; version: string; status: SourceStatus }> = {};
+      for (const r of this.q('SELECT ref_id, kind, version, status FROM sources').toArray()) {
+        out[r.ref_id as string] = { kind: r.kind as SourceKind, version: r.version as string, status: r.status as SourceStatus };
       }
       return out;
     });
