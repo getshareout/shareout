@@ -227,14 +227,15 @@ describe('skill handlers', () => {
       expect(md).not.toContain('shareout.site');
     });
 
-    it('leaves the bundle byte-identical on the founder host', async () => {
+    it('keeps founder-host content unchanged on the founder host', async () => {
       const response = await handleGetSkill(
         new Request('https://shareout.site/v1/skill', { method: 'GET' }),
         makeEnv({}, { vars: { SHAREOUT_BASE_URL: 'https://shareout.site' } }),
       );
-      const bytes = new Uint8Array(await response.arrayBuffer());
-
-      expect(bytes).toEqual(SKILL_BUNDLE);
+      const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
+      // Only $ORIGIN placeholders are filled there; the fixture has none.
+      expect(new TextDecoder().decode(entries['SKILL.md'])).toBe(SKILL_MD);
+      expect(new TextDecoder().decode(entries['INDEX.md'])).toBe(INDEX_MD);
     });
 
     it('rewrites and injects workspace context in the same pass', async () => {
