@@ -10,6 +10,7 @@ import { isKnowledgeEnabled } from '../store';
 import { chunkMarkdown } from './chunk';
 import { corpusFor, type SourceKind, type SourceMeta } from './client';
 import { estimateTokens, meterKnowledge, PRICING } from './usage';
+import { EXTRACT_BATCH, extractBatch } from './extract';
 
 const EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
 export const EMBED_BATCH = 50;
@@ -142,6 +143,26 @@ export async function embedStep(env: Env, p: IngestParams, offset: number): Prom
   return rows.length;
 }
 
+const KNOWN_ENTITIES = 60;
+
+/** Extract entities/relations/facts from one batch of chunks into the graph. */
+export async function graphStep(env: Env, p: IngestParams, offset: number): Promise<number> {
+  if (!env.AI) return 0;
+  const store = corpusFor(env, p.workspaceId)!;
+  const chunks = await store.chunkTexts(p.refId, offset, EXTRACT_BATCH);
+  if (!chunks.length) return 0;
+  const known = await store.knownEntities(KNOWN_ENTITIES);
+  const x = await extractBatch(env, p.workspaceId, p.refId, chunks, known);
+  const r = await store.applyExtraction(p.refId, x);
+  return r.entities + r.relations + r.facts;
+}
+
+/** Workflow steps one ingest takes: extract + finish, plus graph and embedding batches. */
+export function ingestSteps(env: Env, chunkCount: number): number {
+  if (!chunkCount) return 2;
+  return 2 + (env.AI ? Math.ceil(chunkCount / EXTRACT_BATCH) : 0) + (env.AI && env.KNOWLEDGE_VECTORS ? Math.ceil(chunkCount / EMBED_BATCH) : 0);
+}
+
 /** Drop vectors past the new end (a shorter new version), then mark the source ready. */
 export async function finishStep(env: Env, p: IngestParams, r: ExtractResult): Promise<void> {
   if (env.KNOWLEDGE_VECTORS && r.previousCount > r.chunkCount) {
@@ -149,8 +170,7 @@ export async function finishStep(env: Env, p: IngestParams, r: ExtractResult): P
     for (let ord = r.chunkCount; ord < r.previousCount; ord++) stale.push(vectorId(p.refId, ord));
     for (let i = 0; i < stale.length; i += 1000) await env.KNOWLEDGE_VECTORS.deleteByIds(stale.slice(i, i + 1000));
   }
-  // extract + finish, plus one step per embedding batch.
-  const steps = 2 + (r.status === 'chunked' && env.AI && env.KNOWLEDGE_VECTORS ? Math.ceil(r.chunkCount / EMBED_BATCH) : 0);
+  const steps = ingestSteps(env, r.status === 'chunked' ? r.chunkCount : 0);
   await meterKnowledge(env, p.workspaceId, 'knowledge_ingest', env.KNOWLEDGE_INGEST
     ? { model: 'workflow', units: steps, unitKind: 'workflow_steps', costMicroUsd: steps * PRICING.workflowStepMicroUsd, source: p.refId }
     : { model: 'inline', units: 1, unitKind: 'runs', costMicroUsd: 0, source: p.refId });
@@ -173,6 +193,10 @@ export async function ingestInline(env: Env, p: IngestParams): Promise<void> {
   try {
     const r = await extractStep(env, p);
     if (r.status === 'chunked') {
+      for (let offset = 0; offset < r.chunkCount; offset += EXTRACT_BATCH) {
+        // The graph is best-effort: a failed batch never blocks search.
+        await graphStep(env, p, offset).catch(() => 0);
+      }
       for (let offset = 0; offset < r.chunkCount; offset += EMBED_BATCH) await embedStep(env, p, offset);
     }
     await finishStep(env, p, r);

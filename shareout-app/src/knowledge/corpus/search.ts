@@ -3,7 +3,7 @@
 // for access). Every hit carries a citation an agent can quote.
 import type { Env } from '../../types';
 import { getPlatformOrigin } from '../../config/origins';
-import { corpusFor, type ChunkHit, type SourceKind } from './client';
+import { corpusFor, type SourceKind } from './client';
 import { queueKnowledgeSource } from './ingest';
 import { EMBED_DIMENSIONS, estimateTokens, meterKnowledge, PRICING } from './usage';
 
@@ -43,11 +43,11 @@ async function semanticKeys(env: Env, workspaceId: string, q: string): Promise<{
   }
 }
 
-interface Visible { title: string; url: string | null }
+export interface Visible { title: string; url: string | null }
 
 /** Which sources this member may see right now: the source still exists in the workspace
  *  and is not someone else's private page/file. */
-async function visibleSources(env: Env, workspaceId: string, userId: string, hits: ChunkHit[]) {
+export async function visibleSources(env: Env, workspaceId: string, userId: string, hits: { refId: string; kind: SourceKind }[]) {
   const visible = new Map<string, Visible>();
   const gone = new Map<string, SourceKind>();
   const ids = (kind: SourceKind) => [...new Set(hits.filter((h) => h.kind === kind).map((h) => h.refId))];

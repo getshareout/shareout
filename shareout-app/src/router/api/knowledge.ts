@@ -21,6 +21,7 @@ import { corpusFor } from '../../knowledge/corpus/client';
 import { startIngest } from '../../knowledge/corpus/ingest';
 import { searchCorpus, searchResultMarkdown } from '../../knowledge/corpus/search';
 import { knowledgeUsage } from '../../knowledge/corpus/usage';
+import { entityMarkdown, listVisibleEntities, visibleEntity, visibleGraph } from '../../knowledge/corpus/graph';
 
 const PREFIX_RE = /^\/v1\/workspaces\/([^/]+)\/knowledge(?:\/(.*))?$/;
 const BACKFILL_LIMIT = 200;
@@ -209,7 +210,8 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
   }
 
   // GET /search?q=&limit=&format=md — cited passages from the workspace's Files and pages.
-  if (sub === 'search' || sub === 'sources' || sub === 'usage') {
+  const corpusRoute = ['search', 'sources', 'usage', 'graph', 'entities'].includes(sub) || sub.startsWith('entities/');
+  if (corpusRoute) {
     if (method !== 'GET') return cors(jsonError('Method not allowed', 'METHOD_NOT_ALLOWED', 405));
     if (!(await isKnowledgeEnabled(ctx.env, workspaceId))) {
       return cors(apiErrorResponse({
@@ -221,12 +223,41 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
     }
     const store = corpusFor(ctx.env, workspaceId);
     if (!store) return cors(jsonError('Knowledge search is not configured on this instance', 'NOT_CONFIGURED', 501));
+    const num = (k: string, d: number, max: number) => Math.min(Math.max(Number(url.searchParams.get(k)) || d, 1), max);
 
     // GET /usage?days=30 — what Knowledge cost this workspace (owner/admin).
     if (sub === 'usage') {
       if (!canManage) return cors(jsonError('Forbidden', 'FORBIDDEN', 403));
-      const days = Math.min(Math.max(Number(url.searchParams.get('days')) || 30, 1), 365);
+      const days = num('days', 30, 365);
       return cors(jsonResponse(await knowledgeUsage(ctx.env, workspaceId, store, days)));
+    }
+
+    // GET /entities?type=&q=&limit= — the things the workspace is about, most-mentioned first.
+    if (sub === 'entities') {
+      return cors(jsonResponse(await listVisibleEntities(ctx.env, store, workspaceId, auth.id, {
+        type: url.searchParams.get('type') || undefined,
+        q: url.searchParams.get('q') || undefined,
+        limit: num('limit', 50, 100),
+      })));
+    }
+
+    // GET /entities/{id}[?format=md] — one entity: facts, connections and quoted evidence.
+    if (sub.startsWith('entities/')) {
+      const found = await visibleEntity(ctx.env, store, workspaceId, auth.id, decodeURIComponent(sub.slice('entities/'.length)));
+      if (!found) return cors(jsonError('Entity not found', 'NOT_FOUND', 404));
+      if (url.searchParams.get('format') === 'md') {
+        return cors(new Response(entityMarkdown(found), { headers: { 'Content-Type': 'text/markdown; charset=utf-8' } }));
+      }
+      return cors(jsonResponse(found));
+    }
+
+    // GET /graph?focus=&depth=&limit= — nodes + edges, around an entity or the whole workspace.
+    if (sub === 'graph') {
+      return cors(jsonResponse(await visibleGraph(ctx.env, store, workspaceId, auth.id, {
+        focus: url.searchParams.get('focus') || undefined,
+        depth: num('depth', 1, 3),
+        limit: num('limit', 100, 300),
+      })));
     }
 
     if (sub === 'sources') {

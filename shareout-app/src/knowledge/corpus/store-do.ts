@@ -5,6 +5,8 @@ import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../../types';
 import type { Chunk } from './chunk';
 import type { ChunkHit, SourceKind, SourceMeta, SourceRow, SourceStatus } from './client';
+import type { Extraction } from './extract';
+import * as graphSql from './graph-store';
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS sources (
@@ -52,7 +54,7 @@ export class KnowledgeStore extends DurableObject<Env> {
     super(state, env);
     this.sql = state.storage.sql;
     state.blockConcurrencyWhile(async () => {
-      for (const stmt of SCHEMA) this.sql.exec(stmt);
+      for (const stmt of [...SCHEMA, ...graphSql.GRAPH_SCHEMA]) this.sql.exec(stmt);
     });
   }
 
@@ -111,6 +113,7 @@ export class KnowledgeStore extends DurableObject<Env> {
     return this.metered(() => {
       return this.ctx.storage.transactionSync(() => {
         const previousCount = this.deleteChunks(meta.refId);
+        graphSql.clearSourceGraph(this.q.bind(this), meta.refId);
         for (const c of chunks) {
           const id = this.q(
             'INSERT INTO chunks (ref_id, ord, locator, title, text) VALUES (?, ?, ?, ?, ?) RETURNING id',
@@ -129,6 +132,7 @@ export class KnowledgeStore extends DurableObject<Env> {
     return this.metered(() => {
       return this.ctx.storage.transactionSync(() => {
         const previousCount = this.deleteChunks(refId);
+        graphSql.clearSourceGraph(this.q.bind(this), refId);
         this.q('DELETE FROM sources WHERE ref_id = ?', refId);
         return { previousCount };
       });
@@ -195,6 +199,28 @@ export class KnowledgeStore extends DurableObject<Env> {
       }
       return out;
     });
+  }
+
+  // ----- knowledge graph (graph-store.ts) -----
+
+  knownEntities(limit: number) {
+    return this.metered(() => graphSql.knownEntities(this.q.bind(this), limit));
+  }
+
+  applyExtraction(refId: string, x: Extraction) {
+    return this.metered(() => this.ctx.storage.transactionSync(() => graphSql.applyExtraction(this.q.bind(this), refId, x)));
+  }
+
+  listEntities(opts: { type?: string; q?: string; limit: number }) {
+    return this.metered(() => ({ types: graphSql.entityTypes(this.q.bind(this)), entities: graphSql.listEntities(this.q.bind(this), opts) }));
+  }
+
+  getEntity(id: string) {
+    return this.metered(() => graphSql.getEntity(this.q.bind(this), id));
+  }
+
+  graph(opts: { focus?: string; depth: number; limit: number }) {
+    return this.metered(() => graphSql.graph(this.q.bind(this), opts));
   }
 
   /** This store's SQLite work over the last `days` days, plus its current size. */
