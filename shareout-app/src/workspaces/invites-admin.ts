@@ -1,7 +1,7 @@
 import type { Env } from '../types';
 import type { AuthUser } from '../api-auth';
 import { getInternalWorkspaceRole, invalidateWorkspaceRole } from '../workspaces';
-import { createInviteClaim, sendInviteEmail } from '../workspaces-invite-email';
+import { createInviteClaim, expireOtherInviteClaims, sendInviteEmail } from '../workspaces-invite-email';
 import { logAudit } from '../audit';
 import { getPlatformOrigin } from '../config/origins';
 import { jsonWithApiErrors } from '../http/api-error';
@@ -49,8 +49,8 @@ export async function handleListWorkspaceInvites(env: Env, user: AuthUser, works
 // Returning the join URL is what makes a no-email instance invitable.
 //
 // `notify: false` mints a link without mailing anyone, so "copy link" does not spam the
-// invitee. Minting never invalidates earlier claims — createInviteClaim inserts a row,
-// and every unclaimed row stays redeemable until it expires.
+// invitee, and leaves earlier codes alone (the emailed link keeps working). A real resend
+// (notify, the default) expires every older code: the newest email is the invite now.
 export async function handleResendWorkspaceInvite(
   request: Request, env: Env, user: AuthUser, workspaceId: string, inviteId: string
 ): Promise<Response> {
@@ -67,6 +67,7 @@ export async function handleResendWorkspaceInvite(
   const ws = await env.DB.prepare('SELECT name FROM workspaces WHERE id = ?').bind(workspaceId).first<{ name: string }>();
   const claim = await createInviteClaim(env, workspaceId, inv.user_id, inv.email, user.id);
   if (notify) {
+    await expireOtherInviteClaims(env, workspaceId, inv.user_id, claim.id);
     await sendInviteEmail(env, {
       email: inv.email,
       workspaceName: ws?.name || 'a workspace',

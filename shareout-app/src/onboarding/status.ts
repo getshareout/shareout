@@ -26,6 +26,7 @@ interface Signals {
   skillAck: boolean;
   assistant: boolean;
   shared: boolean;
+  teammates: boolean;
 }
 
 export interface OnboardingTaskView {
@@ -61,7 +62,8 @@ async function getSignals(env: Env, workspaceId: string, userId: string, skillAc
        EXISTS(SELECT 1 FROM messaging_links WHERE platform='telegram' AND user_id=?1)           AS telegram,
        EXISTS(SELECT 1 FROM user_recent_views WHERE user_id=?1)                                 AS viewed,
        (EXISTS(SELECT 1 FROM artifact_comments WHERE author_id=?1)
-         OR EXISTS(SELECT 1 FROM comment_reactions WHERE user_id=?1))                           AS commented`
+         OR EXISTS(SELECT 1 FROM comment_reactions WHERE user_id=?1))                           AS commented,
+       EXISTS(SELECT 1 FROM workspace_members WHERE workspace_id=?2 AND user_id<>?1 AND member_class='internal') AS teammates`
   ).bind(userId, workspaceId).first<Record<string, number>>();
   return {
     firstArtifact: !!row?.firstArtifact,
@@ -71,6 +73,7 @@ async function getSignals(env: Env, workspaceId: string, userId: string, skillAc
     telegram: !!row?.telegram,
     viewed: !!row?.viewed,
     commented: !!row?.commented,
+    teammates: !!row?.teammates,
     skillAck,
     assistant: false, // workspace tracks don't use these two
     shared: false,

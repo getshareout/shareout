@@ -8,6 +8,7 @@
  *   nav   → switch to a home lens (target)
  *   page  → open a same-origin connect page in a new tab (url)
  *   skill → ack "got the skill" + open the skill library
+ *   invite → open the "Invite people" dialog
  */
 import type { Env } from '../types';
 
@@ -17,7 +18,8 @@ export type OnboardingAction =
   | { kind: 'ask'; seedKey: string }
   | { kind: 'nav'; target: string }
   | { kind: 'page'; url: string }
-  | { kind: 'skill' };
+  | { kind: 'skill' }
+  | { kind: 'invite' };
 
 export interface OnboardingTaskDef {
   key: string;
@@ -31,6 +33,7 @@ export interface OnboardingTaskDef {
 export const ADMIN_TASKS: OnboardingTaskDef[] = [
   { key: 'first_artifact', signal: 'firstArtifact', action: { kind: 'ask', seedKey: 'onb.seed.firstArtifact' } },
   { key: 'data_source', signal: 'dataSource', action: { kind: 'nav', target: 'connectors' } },
+  { key: 'invite_team', signal: 'teammates', action: { kind: 'invite' }, skippable: true },
   { key: 'telegram', signal: 'telegram', action: { kind: 'page', url: '/settings/telegram?go=1' } },
   { key: 'slack', signal: 'slack', action: { kind: 'page', url: '/settings/slack' }, skippable: true },
   { key: 'alert', signal: 'alert', action: { kind: 'ask', seedKey: 'onb.seed.alert' } },

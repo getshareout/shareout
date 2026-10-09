@@ -42,6 +42,7 @@ export const workspace_client_command_palette_JS = `
     function buildActions() {
       var acts = [];
       if (document.getElementById('wsxCreateBtn')) acts.push({ label: t('palette.newPage') || 'New page with AI', run: function () { var b = document.getElementById('wsxCreateBtn'); if (b) b.click(); } });
+      if (window.WSX_ADMIN && window.WSX_WS) acts.push({ label: t('invite.cta'), run: function () { closePalette(); wsxInvite(); } });
       var rail = document.querySelectorAll('[data-lens]');
       rail.forEach(function (el) {
         var key = el.getAttribute('data-lens'); if (!key) return;

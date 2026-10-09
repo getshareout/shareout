@@ -12,9 +12,10 @@ function makeDb(rows: {
   user?: Row;
 }): Env['DB'] {
   function resolve(sql: string): Row {
+    // Signals first: its teammates EXISTS also reads workspace_members.
+    if (sql.includes('AS firstArtifact')) return rows.signals ?? {};
     if (sql.includes('FROM workspace_members')) return rows.member ?? null;
     if (sql.includes('FROM onboarding_state')) return rows.state ?? null;
-    if (sql.includes('AS firstArtifact')) return rows.signals ?? {};
     if (sql.includes('FROM users')) return rows.user ?? null;
     return null;
   }
@@ -52,14 +53,14 @@ describe('getOnboardingStatus', () => {
     expect(await getOnboardingStatus(env, WS, U)).toBeNull();
   });
 
-  it('gives a fresh admin the 6-task admin track at 0% and eligible', async () => {
+  it('gives a fresh admin the 7-task admin track (invite_team is skippable) at 0% and eligible', async () => {
     const env = { ...INTEGRATIONS, DB: makeDb({
       member: { role: 'owner', created_at: nowIso, member_class: 'internal' },
       signals: NO_SIGNALS,
     }) } as Env;
     const s = await getOnboardingStatus(env, WS, U);
     expect(s?.track).toBe('admin');
-    expect(s?.tasks).toHaveLength(6);
+    expect(s?.tasks).toHaveLength(7);
     expect(s?.pct).toBe(0);
     expect(s?.eligible).toBe(true);
     expect(s?.celebrated).toBe(false);

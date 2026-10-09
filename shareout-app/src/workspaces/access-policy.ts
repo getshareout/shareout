@@ -7,6 +7,17 @@ import { logAudit } from '../audit';
 
 export const DOMAIN_REGEX = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
 
+/**
+ * Public mail providers. An allowlisted domain auto-joins everyone who signs in with it,
+ * so allowing one of these would let any of its users into the workspace.
+ */
+export const PUBLIC_EMAIL_DOMAINS = [
+  'gmail.com', 'googlemail.com', 'hotmail.com', 'hotmail.com.ar', 'hotmail.es', 'outlook.com', 'outlook.es',
+  'live.com', 'live.com.ar', 'msn.com', 'yahoo.com', 'yahoo.com.ar', 'yahoo.es', 'ymail.com', 'icloud.com',
+  'me.com', 'mac.com', 'aol.com', 'proton.me', 'protonmail.com', 'pm.me', 'gmx.com', 'gmx.net', 'mail.com',
+  'zoho.com', 'yandex.com', 'qq.com', '163.com',
+];
+
 export function normalizeDomain(raw: string): string {
   return raw.trim().toLowerCase().replace(/^@/, '');
 }
@@ -89,6 +100,15 @@ export async function handleUpdateWorkspaceAccessPolicy(
     const invalid = domains.find((d) => !DOMAIN_REGEX.test(d));
     if (invalid) {
       return json({ error: `Invalid domain: ${invalid}`, code: 'INVALID_DOMAIN' }, 400);
+    }
+    // Only newly added ones: a legacy row that already holds one stays editable.
+    const publicDomain = domains.find((d) => PUBLIC_EMAIL_DOMAINS.includes(d) && !current.allowed_domains.includes(d));
+    if (publicDomain) {
+      return json({
+        error: `${publicDomain} is a public email provider — allowing it would let anyone with an address there join`,
+        code: 'PUBLIC_EMAIL_DOMAIN',
+        hint: 'Allow your company domain, or add individual addresses to allowed_emails.',
+      }, 400);
     }
   }
 

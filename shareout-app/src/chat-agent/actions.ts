@@ -15,6 +15,8 @@ import type { Locale } from '../i18n';
 // A write the bot proposes and the user confirms with a button tap. Kept small
 // and serializable — stored as JSON until the user approves it.
 import { executeSaveSkill } from '../skills/agent-save';
+import { inviteMany, MAX_BULK_INVITES } from '../workspaces/invite';
+import { isWorkspaceAdmin } from './tools/members';
 
 export type PendingAction =
   | { kind: 'alert_pause' | 'alert_resume' | 'alert_delete'; ruleId: string; label: string }
@@ -27,7 +29,8 @@ export type PendingAction =
   | { kind: 'data_json_set'; artifactId: string; artifactName: string; key: string; value: unknown; exists: boolean }
   | { kind: 'job_create'; artifactId: string; artifactName: string; schedule: string; recipients: string[]; subject: string; includePdf: boolean }
   | { kind: 'build_artifact'; name: string; prompt: string; source_file_id?: string }
-  | { kind: 'save_skill'; workspaceId: string; name: string; markdown: string; skillArtifactId?: string; category?: string };
+  | { kind: 'save_skill'; workspaceId: string; name: string; markdown: string; skillArtifactId?: string; category?: string }
+  | { kind: 'invite_members'; workspaceId: string; workspaceName: string; emails: string[]; role: 'member' | 'admin'; message?: string; invalid?: string[] };
 
 // Compact one-line JSON for confirmation prompts (trimmed so a big object can't
 // blow past Telegram's message limit).
@@ -75,6 +78,13 @@ export function describeActionRich(a: PendingAction, locale: Locale = 'en'): Act
     case 'job_create': return { kind: a.kind, title: 'Schedule email', subject: a.artifactName, detail: `cron ${a.schedule}${a.includePdf ? ' · PDF attached' : ''}`, lines: a.recipients };
     case 'build_artifact': return { kind: a.kind, title: 'Build a new page', subject: a.name, detail: a.prompt.length > 280 ? a.prompt.slice(0, 280) + '…' : a.prompt };
     case 'save_skill': return { kind: a.kind, title: a.skillArtifactId ? 'Update team skill' : 'Save as team skill', subject: a.name, detail: `${a.markdown.length} characters of markdown`, lines: [a.markdown.slice(0, 200) + (a.markdown.length > 200 ? '…' : '')] };
+    case 'invite_members': return {
+      kind: a.kind,
+      title: `Invite ${a.emails.length} ${a.emails.length === 1 ? 'person' : 'people'}`,
+      subject: a.workspaceName,
+      detail: `As ${a.role}${a.message ? ` · “${a.message}”` : ''}${a.invalid?.length ? ` · skipping invalid: ${a.invalid.join(', ')}` : ''}`,
+      lines: a.emails.length > 8 ? [...a.emails.slice(0, 7), `+${a.emails.length - 7} more`] : a.emails,
+    };
   }
 }
 
@@ -205,6 +215,8 @@ export function describeAction(a: PendingAction, locale: Locale = 'en'): string 
       return `Build and publish a new page “${a.name}”?\n\n${a.prompt.length > 280 ? a.prompt.slice(0, 280) + '…' : a.prompt}`;
     case 'save_skill':
       return `${a.skillArtifactId ? 'Update' : 'Save'} the team skill “${a.name}” in your workspace Library?`;
+    case 'invite_members':
+      return `Invite ${a.emails.join(', ')} to “${a.workspaceName}” as ${a.role}?`;
   }
 }
 
@@ -291,5 +303,26 @@ export async function executeAction(env: Env, userId: string, a: PendingAction):
     }
     case 'save_skill':
       return await executeSaveSkill(env, userId, a);
+    case 'invite_members':
+      return await executeInviteMembers(env, userId, a);
   }
+}
+
+async function executeInviteMembers(env: Env, userId: string, a: Extract<PendingAction, { kind: 'invite_members' }>): Promise<string> {
+  if (!(await isWorkspaceAdmin(env, a.workspaceId, userId))) return 'Only workspace owners and admins can invite people.';
+  const lines: string[] = [];
+  for (let i = 0; i < a.emails.length; i += MAX_BULK_INVITES) {
+    const { results } = await inviteMany(env, a.workspaceId, userId, a.emails.slice(i, i + MAX_BULK_INVITES), a.role, a.message);
+    for (const r of results) {
+      const what = {
+        invited: r.email_sent === false ? `invited — email not sent, share this link: ${r.invite_url ?? '(see Admin → Members)'}` : 'invited',
+        added: 'added (already had an account)',
+        already_member: 'already a member',
+        invalid_email: 'not a valid email',
+        domain_not_allowed: 'domain not allowed in this workspace',
+      }[r.code];
+      lines.push(`${r.email}: ${what}`);
+    }
+  }
+  return `Done.\n${lines.join('\n')}`;
 }
