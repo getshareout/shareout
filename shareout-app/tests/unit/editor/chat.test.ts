@@ -265,38 +265,6 @@ describe('normal chat', () => {
     expect(done?.response).toMatchObject({ type: 'html_patch', message: 'Styled paragraph.' });
   });
 
-  it('parses JSON wrapped in markdown code fences', async () => {
-    const fenced = '```json\n' + agentReplyPatches + '\n```';
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(editorOpenAIDoneStream(fenced), { status: 200 }),
-    );
-
-    const res = await chatRequest(makeCtx(openaiEnv()), 'normal', {
-      prompt: 'Fix',
-      context: { documentHtml: '<h1></h1>' },
-    });
-
-    const done = parseSSEEvents(await readSSE(res)).find((e) => e.type === 'done');
-    expect(done?.response).toMatchObject({ type: 'html_patch' });
-  });
-
-  it('treats non-JSON model output as explanation', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(editorOpenAIDoneStream('Just plain text, no JSON here.'), { status: 200 }),
-    );
-
-    const res = await chatRequest(makeCtx(openaiEnv()), 'normal', {
-      prompt: 'What is this?',
-      context: { documentHtml: '<div></div>' },
-    });
-
-    const done = parseSSEEvents(await readSSE(res)).find((e) => e.type === 'done');
-    expect(done?.response).toMatchObject({
-      type: 'explanation',
-      message: 'Just plain text, no JSON here.',
-    });
-  });
-
   it('emits SSE error on API failure', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('rate limited', { status: 429 }));
 

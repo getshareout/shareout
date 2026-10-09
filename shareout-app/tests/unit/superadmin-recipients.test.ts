@@ -28,6 +28,7 @@ describe('superadmin roster', () => {
     expect(isSuperAdminEmail('admin@example.com')).toBe(true);
     expect(isSuperAdminEmail('ADMIN@example.com')).toBe(true);
     expect(isSuperAdminEmail('random@example.com')).toBe(false);
+    expect(isSuperAdminEmail(null)).toBe(false);
   });
 
   it('accepts SETUP_ADMIN_EMAIL as the bootstrap super-admin', () => {

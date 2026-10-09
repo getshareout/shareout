@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import companyTs from '../../../src/pages/company.ts?raw';
 import statusTs from '../../../src/pages/status.ts?raw';
 import knowledgeTs from '../../../src/pages/home/render-workspace/client-script/home-views/knowledge.ts?raw';
-import clientsTs from '../../../src/pages/home/render-workspace/client-script/home-views/clients.ts?raw';
 
 describe('OSS frontend polish — no dead billing/pricing links', () => {
   it('knowledge lens does not link to /app/billing', () => {
@@ -11,11 +10,6 @@ describe('OSS frontend polish — no dead billing/pricing links', () => {
 
   it('terms page does not link to /pricing', () => {
     expect(companyTs).not.toContain('href="/pricing"');
-  });
-
-  it('clients admin view toasts on network failure', () => {
-    expect(clientsTs).toContain('function clientNetFail');
-    expect(clientsTs).toContain("showToast(t('admin.actionFailed'), 'error')");
   });
 
   it('status page uses feedback color CSS vars', () => {

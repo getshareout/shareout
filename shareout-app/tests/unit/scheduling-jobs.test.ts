@@ -63,6 +63,7 @@ import {
   runScheduledJobs,
   updateJob,
 } from '../../src/scheduling/jobs';
+import { calculateBackoffDelay } from '../../src/scheduling/jobs/retry';
 
 type DbCall =
   | { method: 'first'; result: unknown }
@@ -1020,5 +1021,14 @@ describe('hasEnabledViewEventJob', () => {
     await invalidateViewEventJobCache({ PROXY_CACHE: kv } as unknown as Env, 'art_1');
     expect(kv.delete).toHaveBeenCalledWith('evtjobs:view:art_1');
     expect(kv.store.has('evtjobs:view:art_1')).toBe(false);
+  });
+});
+
+describe('calculateBackoffDelay', () => {
+  it('scales by strategy', () => {
+    const base = { maxAttempts: 3, initialDelay: 100, backoffType: 'fixed' as const };
+    expect(calculateBackoffDelay(base, 0)).toBe(100);
+    expect(calculateBackoffDelay({ ...base, backoffType: 'linear' }, 1)).toBe(200);
+    expect(calculateBackoffDelay({ ...base, backoffType: 'exponential' }, 2)).toBe(400);
   });
 });

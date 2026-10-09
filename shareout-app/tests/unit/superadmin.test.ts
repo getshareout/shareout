@@ -43,11 +43,9 @@ import {
 } from '../../src/superadmin/insights';
 import { searchArtifacts, deleteArtifactAdmin } from '../../src/superadmin/artifacts-admin';
 import { handleSuperAdminPage } from '../../src/superadmin/page';
-import { isSuperAdminEmail } from '../../src/superadmin/auth';
 import { SUPERADMIN_EMAILS } from '../../src/superadmin/recipients';
 
 const SA = SUPERADMIN_EMAILS[0]!;
-const SA_ALT = SUPERADMIN_EMAILS[1] ?? SUPERADMIN_EMAILS[0]!;
 import { routeAdminApi } from '../../src/router/api/admin';
 import { createFetchContext } from '../../src/router/context';
 import type { Env } from '../../src/types';
@@ -116,18 +114,6 @@ function stubDashboard() {
 }
 
 afterEach(() => vi.clearAllMocks());
-
-describe('isSuperAdminEmail', () => {
-  it('accepts allowlisted emails case-insensitively', () => {
-    expect(isSuperAdminEmail(SA)).toBe(true);
-    expect(isSuperAdminEmail(SA.toUpperCase())).toBe(true);
-    expect(isSuperAdminEmail(SA_ALT)).toBe(true);
-  });
-  it('rejects everyone else', () => {
-    expect(isSuperAdminEmail('someone@else.com')).toBe(false);
-    expect(isSuperAdminEmail(null)).toBe(false);
-  });
-});
 
 describe('handleSuperAdminPage', () => {
   it('gates anonymous visitors with 403', async () => {
