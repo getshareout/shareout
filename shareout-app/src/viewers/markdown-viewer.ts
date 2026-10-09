@@ -1,4 +1,5 @@
 import { generateViewerShell, type ViewerContext } from './viewer-shell';
+import { viewerCopy } from './copy';
 
 function escapeHtml(str: string): string {
   return str
@@ -15,7 +16,7 @@ export function renderMarkdownViewer(ctx: ViewerContext): string {
 
   const tocHtml = metadata?.toc?.length ? `
     <nav class="toc">
-      <h3 class="toc-title">Contents</h3>
+      <h3 class="toc-title">${viewerCopy(ctx.locale).contents}</h3>
       <ul class="toc-list">
         ${metadata.toc.map(item => `
           <li class="toc-item toc-level-${item.level}">

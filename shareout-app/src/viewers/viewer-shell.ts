@@ -5,6 +5,8 @@ import { cssVariables } from '../design-system/base.css';
 import { componentStylesheet } from '../design-system/components/index';
 import { renderSocialMetaTags, type SocialPreview } from '../serve/social-meta';
 import { shareModalMarkup, shareModalScript } from '../components/share-modal';
+import type { Locale } from '../i18n';
+import { viewerCopy, type ViewerCopy } from './copy';
 
 export interface ViewerContext {
   slug: string;
@@ -17,6 +19,8 @@ export interface ViewerContext {
   artifactId: string;
   loggedIn: boolean;
   isFavorite: boolean;
+  /** Artifact's workspace language, else the viewer's browser. Defaults to English. */
+  locale?: Locale;
   canManage?: boolean;
   socialPreview?: SocialPreview;
   // Skill Marketplace: metrics + per-user state for the skill viewer chrome.
@@ -40,18 +44,18 @@ export interface ViewerContext {
   };
 }
 
-const TYPE_LABELS: Record<ArtifactType, string> = {
+const typeLabels = (c: ViewerCopy): Record<ArtifactType, string> => ({
   html: 'HTML',
   csv: 'CSV',
-  txt: 'Text',
+  txt: c.typeText,
   markdown: 'Markdown',
   json: 'JSON',
   pdf: 'PDF',
-  image: 'Image',
-  video: 'Video',
-  skill: 'Skill',
-  library: 'Library',
-};
+  image: c.typeImage,
+  video: c.typeVideo,
+  skill: c.typeSkill,
+  library: c.typeLibrary,
+});
 
 const TYPE_ICONS: Record<ArtifactType, string> = {
   html: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 4 2 14 6 4 6-4 2-14"/><path d="m8 8h8l-2 10-2 2-2-2-2-10z"/></svg>',
@@ -81,29 +85,30 @@ export function generateViewerShell(
   extraHead?: string,
   extraStyles?: string
 ): string {
-  const typeLabel = TYPE_LABELS[ctx.artifactType];
+  const c = viewerCopy(ctx.locale);
+  const typeLabel = typeLabels(c)[ctx.artifactType];
   const typeIcon = TYPE_ICONS[ctx.artifactType];
 
   const adminToolbar = ctx.isAdmin ? `
     <div class="admin-toolbar">
-      <a href="/home" class="admin-btn" title="Back to all your artifacts">
+      <a href="/home" class="admin-btn" title="${c.backAllYours}">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>
         </svg>
-        All artifacts
+        ${c.allArtifacts}
       </a>
       <a href="${ctx.baseUrl}/a/${ctx.slug}/edit" class="admin-btn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
         </svg>
-        Edit
+        ${c.edit}
       </a>
       <a href="${ctx.baseUrl}/a/${ctx.slug}/admin" class="admin-btn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/>
         </svg>
-        Stats
+        ${c.stats}
       </a>
     </div>` : '';
 
@@ -111,7 +116,7 @@ export function generateViewerShell(
   const socialTags = ctx.socialPreview ? renderSocialMetaTags(ctx.socialPreview) : '';
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${ctx.locale ?? 'en'}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -238,7 +243,7 @@ export function generateViewerShell(
 <body>
   <div class="viewer-container">
     <header class="viewer-header">${ctx.loggedIn ? `
-      <a href="/home" class="so-c-btn so-c-btn--ghost so-c-btn--icon so-c-btn--sm" title="Back to all artifacts" aria-label="Back to all artifacts">
+      <a href="/home" class="so-c-btn so-c-btn--ghost so-c-btn--icon so-c-btn--sm" title="${c.backAll}" aria-label="${c.backAll}">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
       </a>` : ''}
       <div class="artifact-info">
@@ -246,15 +251,15 @@ export function generateViewerShell(
         <span class="type-badge">${typeIcon} ${typeLabel}</span>
       </div>
       <div class="header-actions">${ctx.loggedIn ? `
-        <button class="so-c-btn so-c-btn--ghost so-c-btn--sm fav-btn${ctx.isFavorite ? ' active' : ''}" id="so-fav-btn" onclick="soToggleFav()" title="${ctx.isFavorite ? 'Remove from favorites' : 'Add to favorites'}" aria-pressed="${ctx.isFavorite ? 'true' : 'false'}">
+        <button class="so-c-btn so-c-btn--ghost so-c-btn--sm fav-btn${ctx.isFavorite ? ' active' : ''}" id="so-fav-btn" onclick="soToggleFav()" title="${ctx.isFavorite ? c.favRemove : c.favAdd}" aria-pressed="${ctx.isFavorite ? 'true' : 'false'}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="${ctx.isFavorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
           </svg>
-          <span id="so-fav-label">${ctx.isFavorite ? 'Favorited' : 'Favorite'}</span>
+          <span id="so-fav-label">${ctx.isFavorite ? c.favorited : c.favorite}</span>
         </button>
-        <button class="so-c-btn so-c-btn--secondary so-c-btn--sm" id="so-share-btn" onclick="openShare('${ctx.artifactId}','${ctx.slug}',${escapeHtml(JSON.stringify(ctx.artifactName))},${ctx.canManage ?? ctx.isAdmin})" title="Share">
+        <button class="so-c-btn so-c-btn--secondary so-c-btn--sm" id="so-share-btn" onclick="openShare('${ctx.artifactId}','${ctx.slug}',${escapeHtml(JSON.stringify(ctx.artifactName))},${ctx.canManage ?? ctx.isAdmin})" title="${c.share}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-          Share
+          ${c.share}
         </button>` : ''}
         <a href="${ctx.baseUrl}/a/${ctx.slug}/${ctx.content.includes('\n') ? escapeHtml(ctx.artifactName) + getExtension(ctx.artifactType) : 'download'}" download="${escapeHtml(ctx.artifactName)}${getExtension(ctx.artifactType)}" class="so-c-btn so-c-btn--secondary so-c-btn--sm">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -262,7 +267,7 @@ export function generateViewerShell(
             <polyline points="7 10 12 15 17 10"/>
             <line x1="12" y1="15" x2="12" y2="3"/>
           </svg>
-          Download
+          ${c.download}
         </a>
       </div>
     </header>
@@ -270,10 +275,10 @@ export function generateViewerShell(
       ${bodyContent}
     </main>
   </div>
-  ${ctx.loggedIn ? shareModalMarkup() : ''}
+  ${ctx.loggedIn ? shareModalMarkup(ctx.locale) : ''}
   ${adminToolbar}${ctx.loggedIn ? `
   <script>
-    ${shareModalScript({ baseUrl: ctx.baseUrl })}
+    ${shareModalScript({ baseUrl: ctx.baseUrl, locale: ctx.locale })}
     window.soToggleFav = function() {
       var btn = document.getElementById('so-fav-btn');
       if (!btn) return;
@@ -284,10 +289,10 @@ export function generateViewerShell(
         .then(function() {
           on = !on;
           btn.classList.toggle('active', on);
-          btn.title = on ? 'Remove from favorites' : 'Add to favorites';
+          btn.title = on ? '${c.favRemove}' : '${c.favAdd}';
           btn.setAttribute('aria-pressed', on ? 'true' : 'false');
           var svg = btn.querySelector('svg'); if (svg) svg.setAttribute('fill', on ? 'currentColor' : 'none');
-          var lbl = document.getElementById('so-fav-label'); if (lbl) lbl.textContent = on ? 'Favorited' : 'Favorite';
+          var lbl = document.getElementById('so-fav-label'); if (lbl) lbl.textContent = on ? '${c.favorited}' : '${c.favorite}';
         })
         .catch(function(err) { console.error('Favorite error:', err); })
         .finally(function() { btn.disabled = false; });

@@ -1,18 +1,22 @@
 import { HOME_COPY } from './merge-copy';
+import type { HomeLocale } from './types';
 
 /**
  * Inline client bootstrap for workspace home i18n.
  *
- * Embeds the full copy table, detects locale (localStorage → navigator),
+ * Embeds the full copy table, picks the locale (server-resolved person/workspace
+ * language → localStorage → navigator),
  * exposes `window.__SO_HOME_T` and friends, and applies `data-i18n*` attributes.
  */
-export function getHomeI18nScript(): string {
+export function getHomeI18nScript(serverLocale: HomeLocale | null = null): string {
   const copyJson = JSON.stringify(HOME_COPY).replace(/</g, '\\u003c');
   return `(function(){
   var COPY = ${copyJson};
   var STORAGE_KEY = 'shareout_lang';
+  var SERVER_LOCALE = ${JSON.stringify(serverLocale)};
 
   function detectLocale(){
+    if (SERVER_LOCALE) return SERVER_LOCALE;
     try {
       var saved = localStorage.getItem(STORAGE_KEY);
       if (saved === 'en' || saved === 'es') return saved;
@@ -28,24 +32,27 @@ export function getHomeI18nScript(): string {
     return bag[key] || COPY.en[key] || key;
   }
 
-  function applyHomeI18n(){
-    document.documentElement.lang = locale;
-    document.title = t('meta.title');
-    document.querySelectorAll('[data-i18n]').forEach(function(el){
+  function applyHomeI18n(root){
+    var r = root || document;
+    if (!root) {
+      document.documentElement.lang = locale;
+      document.title = t('meta.title');
+    }
+    r.querySelectorAll('[data-i18n]').forEach(function(el){
       var key = el.getAttribute('data-i18n');
       if (!key) return;
       if (el.getAttribute('data-i18n-html') === 'true') el.innerHTML = t(key);
       else el.textContent = t(key);
     });
-    document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el){
+    r.querySelectorAll('[data-i18n-placeholder]').forEach(function(el){
       var key = el.getAttribute('data-i18n-placeholder');
       if (key) el.setAttribute('placeholder', t(key));
     });
-    document.querySelectorAll('[data-i18n-aria]').forEach(function(el){
+    r.querySelectorAll('[data-i18n-aria]').forEach(function(el){
       var key = el.getAttribute('data-i18n-aria');
       if (key) el.setAttribute('aria-label', t(key));
     });
-    document.querySelectorAll('[data-i18n-title]').forEach(function(el){
+    r.querySelectorAll('[data-i18n-title]').forEach(function(el){
       var key = el.getAttribute('data-i18n-title');
       if (key) el.setAttribute('title', t(key));
     });
@@ -56,8 +63,10 @@ export function getHomeI18nScript(): string {
     });
   }
 
-  function setHomeLocale(next){
+  function setHomeLocale(next, scope){
     if (next !== 'en' && next !== 'es') return;
+    var url = scope === 'workspace' && window.WSX_WS ? '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/locale' : scope === 'me' ? '/v1/me/locale' : '';
+    if (url) fetch(url, { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locale: next }) }).catch(function(){});
     locale = next;
     try { localStorage.setItem(STORAGE_KEY, locale); } catch (e) {}
     applyHomeI18n();
@@ -68,7 +77,7 @@ export function getHomeI18nScript(): string {
     (root || document).querySelectorAll('.home-lang-btn').forEach(function(btn){
       if (btn.__soLangWired) return;
       btn.__soLangWired = true;
-      btn.addEventListener('click', function(){ setHomeLocale(btn.getAttribute('data-lang')); });
+      btn.addEventListener('click', function(){ setHomeLocale(btn.getAttribute('data-lang'), btn.getAttribute('data-scope') || 'me'); });
     });
   }
 

@@ -1,6 +1,7 @@
 import type { ArtifactType, TypeMetadata } from '../types';
 import type { ViewerContext } from './viewer-shell';
 import type { SocialPreview } from '../serve/social-meta';
+import type { Locale } from '../i18n';
 import { renderTxtViewer } from './txt-viewer';
 import { renderJsonViewer } from './json-viewer';
 import { renderMarkdownViewer } from './markdown-viewer';
@@ -43,6 +44,7 @@ export function renderViewer(
   socialPreview?: SocialPreview,
   skillMetrics?: ViewerContext['skillMetrics'],
   libraryMetrics?: ViewerContext['libraryMetrics'],
+  locale?: Locale,
 ): string | null {
   const renderer = getViewer(type);
   if (!renderer) return null;
@@ -61,6 +63,7 @@ export function renderViewer(
     socialPreview,
     skillMetrics,
     libraryMetrics,
+    locale,
   };
 
   return renderer(ctx);

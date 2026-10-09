@@ -4,6 +4,7 @@ import { createTelegramReplyPort } from '../chat-platforms/telegram/reply-port';
 import { createSlackReplyPort } from '../chat-platforms/slack/reply-port';
 import { parseSlackSessionKey } from '../chat-platforms/slack/linking';
 import { runAgentTurn } from './agent-loop';
+import { agentFallbackReplies } from './replies';
 import { executeAction, describeAction } from './actions';
 import { DoConversationStore } from './store/do-store';
 import { checkAiChatLimit } from '../rate-limit';
@@ -11,6 +12,31 @@ import { generateId } from '../crypto-utils';
 import type { WorkspaceSelection } from './access';
 import { PERSONAL_SCOPE } from '../chat-platforms/types';
 import { buildHomeSnapshot } from '../router/api/home-agent';
+import { localeForRecipient, t, type Locale } from '../i18n';
+
+const BOT_COPY = {
+  en: {
+    tooFast: 'You’re going a bit fast for me — give it a minute and try again.',
+    expired: 'That request expired.',
+    cancelled: '❌ Cancelled.',
+    working: 'Working on it…',
+    confirmed: '✅ Confirmed.',
+    failed: 'Something went wrong running that. Try again?',
+  },
+  es: {
+    tooFast: 'Vas un poco rápido para mí. Esperá un minuto y probá de nuevo.',
+    expired: 'Ese pedido venció.',
+    cancelled: '❌ Cancelado.',
+    working: 'Estoy en eso…',
+    confirmed: '✅ Confirmado.',
+    failed: 'Algo falló al hacerlo. ¿Probás de nuevo?',
+  },
+};
+
+function botLocale(env: Env, userId: string, selected?: WorkspaceSelection): Promise<Locale> {
+  const workspaceId = typeof selected === 'string' && selected !== PERSONAL_SCOPE ? selected : null;
+  return localeForRecipient(env, { userId, workspaceId }).catch((): Locale => 'en');
+}
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS messages (
@@ -139,9 +165,10 @@ export class ChatSessionDO implements DurableObject {
 
     const reply = createReplyPort(this.env, b.platform, b.nativeChatId, b.slackChannelId);
 
+    const locale = await botLocale(this.env, b.userId, b.selectedWorkspaceId);
     const rl = await checkAiChatLimit(this.env, b.userId);
     if (!rl.allowed) {
-      await reply.sendText('You’re going a bit fast for me — give it a minute and try again.');
+      await reply.sendText(t(locale, BOT_COPY).tooFast);
       return;
     }
 
@@ -162,10 +189,11 @@ export class ChatSessionDO implements DurableObject {
         userText: b.text,
         selectedWorkspaceId: b.selectedWorkspaceId,
         history,
+        locale,
         ...(workspaceContext ? { workspaceContext } : {}),
       });
     } catch {
-      result = { reply: 'Hmm, something went wrong on my end. Mind trying again?' };
+      result = { reply: agentFallbackReplies(locale).errored };
     }
 
     await this.store.appendMessage('user', b.text);
@@ -174,7 +202,7 @@ export class ChatSessionDO implements DurableObject {
     if (result.proposal) {
       await reply.finishText?.(result.reply);
       const token = generateId('pa');
-      const summary = describeAction(result.proposal);
+      const summary = describeAction(result.proposal, locale);
       const messageId = await reply.askConfirmation(summary, token);
       await this.store.putPending(token, {
         action: result.proposal,
@@ -196,29 +224,30 @@ export class ChatSessionDO implements DurableObject {
       return;
     }
 
+    const copy = t(await botLocale(this.env, b.userId), BOT_COPY);
     const [decision, token] = (b.data || '').split(':');
     const rec = await this.store.takePending(token || '');
 
     if (!rec) {
-      await reply.answerCallback?.(b.callbackId, 'That request expired.');
+      await reply.answerCallback?.(b.callbackId, copy.expired);
       return;
     }
     const messageRef = rec.messageRef ?? b.messageId;
 
     if (decision !== 'ok') {
-      await reply.editConfirmation?.(messageRef, '❌ Cancelled.');
+      await reply.editConfirmation?.(messageRef, copy.cancelled);
       await reply.answerCallback?.(b.callbackId);
       return;
     }
 
-    await reply.answerCallback?.(b.callbackId, 'Working on it…');
-    await reply.editConfirmation?.(messageRef, '✅ Confirmed.');
+    await reply.answerCallback?.(b.callbackId, copy.working);
+    await reply.editConfirmation?.(messageRef, copy.confirmed);
 
     let resultText: string;
     try {
       resultText = await executeAction(this.env, b.userId, rec.action);
     } catch {
-      resultText = 'Something went wrong running that. Try again?';
+      resultText = copy.failed;
     }
     await this.store.appendMessage('assistant', resultText);
     await reply.sendText(resultText);

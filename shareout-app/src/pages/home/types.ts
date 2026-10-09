@@ -98,6 +98,8 @@ export interface RenderArgs {
   /** Viewer administers the instance itself → Settings links to the admin portal. */
   isInstanceAdmin: boolean;
   hostname: string;
+  /** Server-resolved language (person's choice → workspace's); null = let the browser decide. */
+  locale: 'en' | 'es' | null;
   /** Short current-release id (Cloudflare deployment version) for the rail footer; '' when unavailable. */
   appVersion: string;
   visualEditorOffWorkspaces: string[];

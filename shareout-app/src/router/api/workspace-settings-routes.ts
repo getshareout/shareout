@@ -29,6 +29,7 @@ import { handleListRecommendedSkills } from '../../official-skills/list';
 import { handleListWorkspaceLibraries } from '../../workspace-library';
 import { handleGetWorkspaceAudit } from './workspace-audit';
 import { handleGetWorkspaceSessionPolicy, handleSetWorkspaceSessionPolicy } from './workspace-session-policy';
+import { handleGetWorkspaceLocale, handleSetWorkspaceLocale, handleSetMyLocale } from './workspace-locale';
 import type { FetchContext } from '../context';
 import { isAuthUser, requireTokenOrSession } from '../helpers/auth-guard';
 
@@ -117,6 +118,23 @@ export async function routeWorkspaceSettings(ctx: FetchContext): Promise<Respons
     if (request.method === 'PUT' || request.method === 'PATCH') {
       return addCORS(await handleSetWorkspaceSessionPolicy(request, env, user, workspaceId));
     }
+  }
+
+  const workspaceLocaleMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/locale$/);
+  if (workspaceLocaleMatch) {
+    const [, workspaceId] = workspaceLocaleMatch;
+    const user = await requireTokenOrSession(ctx);
+    if (!isAuthUser(user)) return user;
+    if (request.method === 'GET') return addCORS(await handleGetWorkspaceLocale(env, user, workspaceId));
+    if (request.method === 'PUT' || request.method === 'PATCH') {
+      return addCORS(await handleSetWorkspaceLocale(request, env, user, workspaceId));
+    }
+  }
+
+  if (path === '/v1/me/locale' && (request.method === 'PUT' || request.method === 'PATCH')) {
+    const user = await requireTokenOrSession(ctx);
+    if (!isAuthUser(user)) return user;
+    return addCORS(await handleSetMyLocale(request, env, user));
   }
 
   const wsContextFileMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/context\/([^/]+)$/);

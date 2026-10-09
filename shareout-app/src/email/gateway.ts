@@ -8,6 +8,8 @@ import { unsubscribeUrl } from './unsubscribe-token';
 import { renderEmailLayout, renderEmailText } from './layout';
 import { EMAILS, type EmailType, type EmailTemplate } from './catalog';
 import { getPlatformHostname, getPlatformOrigin } from '../config/origins';
+import { buildEmail } from './catalog-es';
+import { localeForRecipient, type Locale } from '../i18n';
 
 // The single chokepoint every lifecycle email flows through. Given a type + data,
 // it looks up the catalog template, enforces audience segmentation + per-category
@@ -31,6 +33,10 @@ export interface DispatchInput<D = Record<string, unknown>> {
   data?: D;
   replyTo?: string;
   from?: string;
+  /** Workspace the email is about — its language is the default for the recipient. */
+  workspaceId?: string;
+  /** Force a language (skips the recipient lookup). */
+  locale?: Locale;
 }
 
 export type SkipReason =
@@ -61,6 +67,17 @@ async function emailForUser(env: Env, userId: string): Promise<string | null> {
     .bind(userId)
     .first<{ email: string | null }>();
   return row?.email ? row.email.toLowerCase().trim() : null;
+}
+
+// A bare address may still belong to an account (e.g. a sign-in code or a welcome),
+// so look the person up before falling back to the workspace's language.
+async function recipientLocale(env: Env, userId: string | null, email: string, workspaceId?: string): Promise<Locale> {
+  try {
+    const id = userId ?? (await env.DB.prepare('SELECT id FROM users WHERE lower(email) = ?').bind(email).first<{ id: string }>())?.id;
+    return await localeForRecipient(env, { userId: id, workspaceId });
+  } catch {
+    return 'en';
+  }
 }
 
 export async function dispatchLifecycleEmail(env: Env, input: DispatchInput): Promise<DispatchResult> {
@@ -99,7 +116,8 @@ export async function dispatchLifecycleEmail(env: Env, input: DispatchInput): Pr
   if (!tmpl.build) return { sent: false, skipped: 'no_template', error: `No builder for email type "${input.type}"` };
 
   const baseUrl = getPlatformOrigin(env);
-  const built = tmpl.build(input.data ?? {}, { env, baseUrl });
+  const locale = input.locale ?? (await recipientLocale(env, userId, email, input.workspaceId));
+  const built = buildEmail(input.type, input.data ?? {}, { env, baseUrl, locale })!;
 
   const managePreferencesUrl = tmpl.category !== 'transactional' ? `${baseUrl}/v1/email/center` : undefined;
   const html = renderEmailLayout({
@@ -110,6 +128,7 @@ export async function dispatchLifecycleEmail(env: Env, input: DispatchInput): Pr
     cta: built.cta,
     footerNote: built.footerNote,
     managePreferencesUrl,
+    locale,
   });
   const text =
     built.text ??

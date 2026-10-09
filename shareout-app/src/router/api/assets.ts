@@ -167,6 +167,7 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
     await dispatchLifecycleEmail(env, {
       type: 'asset_delivery',
       toEmail: b.to,
+      workspaceId: workspaceId ?? undefined,
       data: { collectionName: col?.name || 'Files', downloadUrl: link.url, fileCount: count?.n || 0, senderName: user.email || '', expiresAt: b.expiresAt || null },
     }).catch(() => {});
     return json({ url: link.url, sent: true });

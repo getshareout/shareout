@@ -85,7 +85,7 @@ erDiagram
 
 | Table | Holds |
 |---|---|
-| `users` | The account. `tier` drives quota lookups, `disabled` soft-bans, `is_service` marks non-human accounts, `identity_id` links merged identities, `last_janitor_at` tracks background cleanup. |
+| `users` | The account. `tier` drives quota lookups, `disabled` soft-bans, `is_service` marks non-human accounts, `identity_id` links merged identities, `last_janitor_at` tracks background cleanup. `locale` (`en`/`es`) is the person's own language; NULL follows the workspace. |
 | `user_passwords` | PBKDF2 digest, `salt`, and the `iterations` used, stored per row so the cost can be raised later without invalidating existing credentials. Deliberately **not** columns on `users`, so no ordinary `SELECT` on `users` carries a password hash. It is the credential a fresh instance can issue with no EMAIL binding and no OAuth client. |
 | `user_profiles` | Optional public profile: freeform `profile_md` and a `follows` list. |
 | `tokens` | Every bearer token. `principal_type` is `user` (a personal `so_` token) or `workspace` (a `sot_` agent token); `user_id` is always the identity it authenticates as. Only `token_hash` is stored — the plaintext is shown once at creation. `scopes` is NULL for personal tokens, a csv for workspace ones, and `subject_external_user_id` lets a token act on behalf of an external user. Revocable via `revoked_at`. |
@@ -122,7 +122,7 @@ The five paths: **membership** (`workspace_members`), **per-artifact invite**
 
 | Table | Holds |
 |---|---|
-| `workspaces` | The tenant. Carries its own policy: `allowed_email_domains`/`allowed_emails` gate joining, `session_max_days` caps session life, `public_publish_policy` + `public_publish_approvals_required` govern publishing, `branding` and `feature_flags` are JSON. |
+| `workspaces` | The tenant. Carries its own policy: `allowed_email_domains`/`allowed_emails` gate joining, `session_max_days` caps session life, `public_publish_policy` + `public_publish_approvals_required` govern publishing, `branding` and `feature_flags` are JSON. `locale` (`en`/`es`) is the language emails, the agent, the home shell and shared pages speak to its people. |
 | `workspace_members` | Membership and `role` (`owner`/`admin`/`member`). `member_class` separates internal staff from external collaborators. |
 | `workspace_invite_claims` | Pending invites. `code_hash` only; `expires_at` and `claimed_at` make each single-use. `email_status` (`sent`/`failed`/`skipped`/`link_only`) with `email_sent_at` and `email_error` record whether the invite mail actually went out — null on rows minted before that was tracked. |
 | `workspace_llm_config` | Per-workspace AI settings: bring-your-own provider credentials (encrypted), `balance_micro_usd`, `markup_multiplier`, monthly budget, `gateway_model` override. |

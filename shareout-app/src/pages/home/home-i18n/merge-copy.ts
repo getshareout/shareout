@@ -11,6 +11,7 @@ import { MODALS_COPY } from './copy/modals';
 import { NOTIF_COPY } from './copy/notifications';
 import { ONBOARDING_COPY } from './copy/onboarding';
 import { SHELL_COPY } from './copy/shell';
+import { STUDIO_COPY } from './copy/studio';
 import { TIME_COPY } from './copy/time';
 import { WORKSPACE_COPY } from './copy/workspace';
 
@@ -30,6 +31,7 @@ const COPY_MODULES: HomeLocaleCopy[] = [
   NOTIF_COPY,
   AGENT_COPY,
   TIME_COPY,
+  STUDIO_COPY,
 ];
 
 function mergeLocale(locale: HomeLocale): Record<string, string> {

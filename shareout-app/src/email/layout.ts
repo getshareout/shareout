@@ -6,6 +6,7 @@
 // because divs with max-width don't center in Outlook.
 import { colors, fonts, radius, shadows } from '../design-system/tokens';
 import { BRAND } from '../brand';
+import type { Locale } from '../i18n';
 
 /** Centralized HTML escaper — replaces the per-file copies in share-email.ts,
  *  workspaces-invite-email.ts, comment-notify.ts, and data/email/handler.ts. */
@@ -35,7 +36,14 @@ export interface EmailLayoutInput {
   managePreferencesUrl?: string;
   /** Absolute base URL for the logo asset (defaults to production). */
   baseUrl?: string;
+  /** Recipient's language for the shell's own words; absent = English. */
+  locale?: Locale;
 }
+
+const SHELL_COPY = {
+  en: { sentBy: 'Sent by ShareOut', manage: 'Manage email preferences' },
+  es: { sentBy: 'Enviado por ShareOut', manage: 'Elegí qué mails recibís' },
+} as const;
 
 const DEFAULT_BASE = 'https://shareout.site';
 
@@ -47,6 +55,8 @@ function logoUrl(baseUrl: string): string {
 export function renderEmailLayout(input: EmailLayoutInput): string {
   const { preheader, heading, bodyHtml, cta, footerNote, managePreferencesUrl } = input;
   const baseUrl = input.baseUrl || DEFAULT_BASE;
+  const locale = input.locale ?? 'en';
+  const copy = SHELL_COPY[locale];
 
   const preheaderHtml = preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;opacity:0;color:transparent;height:0;width:0;font-size:1px;line-height:1px">${escapeHtml(preheader)}</div>`
@@ -60,7 +70,7 @@ export function renderEmailLayout(input: EmailLayoutInput): string {
     : '';
 
   const manageLink = managePreferencesUrl
-    ? ` · <a href="${escapeHtml(managePreferencesUrl)}" style="color:${colors.textTertiary};text-decoration:underline">Manage email preferences</a>`
+    ? ` · <a href="${escapeHtml(managePreferencesUrl)}" style="color:${colors.textTertiary};text-decoration:underline">${copy.manage}</a>`
     : '';
 
   const footerNoteHtml = footerNote
@@ -68,7 +78,7 @@ export function renderEmailLayout(input: EmailLayoutInput): string {
     : '';
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${locale}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -97,7 +107,7 @@ export function renderEmailLayout(input: EmailLayoutInput): string {
         <!-- footer -->
         <tr><td style="padding:28px 32px 28px">
           <div style="border-top:1px solid ${colors.border};padding-top:18px">
-            <p style="margin:0;font-size:12px;line-height:1.5;color:${colors.textTertiary}">Sent by ShareOut${manageLink}</p>
+            <p style="margin:0;font-size:12px;line-height:1.5;color:${colors.textTertiary}">${copy.sentBy}${manageLink}</p>
             ${footerNoteHtml}
           </div>
         </td></tr>

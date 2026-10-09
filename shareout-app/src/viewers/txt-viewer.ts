@@ -1,4 +1,5 @@
 import { generateViewerShell, type ViewerContext } from './viewer-shell';
+import { viewerCopy } from './copy';
 
 function escapeHtml(str: string): string {
   return str
@@ -20,10 +21,12 @@ export function renderTxtViewer(ctx: ViewerContext): string {
   }).join('');
 
   const metadata = ctx.typeMetadata.txt;
+  const c = viewerCopy(ctx.locale);
+  const tag = ctx.locale === 'es' ? 'es-AR' : undefined;
   const statsHtml = metadata ? `
     <div class="stats">
-      <span>${lineCount.toLocaleString()} lines</span>
-      <span>${metadata.charCount.toLocaleString()} characters</span>
+      <span>${lineCount.toLocaleString(tag)} ${c.lines}</span>
+      <span>${metadata.charCount.toLocaleString(tag)} ${c.characters}</span>
     </div>
   ` : '';
 

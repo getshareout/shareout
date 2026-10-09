@@ -26,6 +26,7 @@ import { isVisualEditorEnabled } from '../../editor/visual-editor-gate';
 import { CREATE_FEATURE } from '../create-gate';
 import { versionedBundlePath } from '../../bundle-versions';
 import { createLogger, logError } from '../../logging';
+import { getWorkspaceLocale, resolveLocale } from '../../i18n';
 
 /** Head options for the streamed workspace home shell. */
 const HOME_HEAD: Omit<HtmlPageOptions, 'body' | 'scripts'> = {
@@ -93,10 +94,11 @@ async function buildHomeBody(
     workspaces,
     accessRequests,
     createEnabled,
+    wsLocale,
   ] = await Promise.all([
     env.DB.prepare(
-      'SELECT name, picture FROM users WHERE id = ?'
-    ).bind(user.id).first<{ name: string | null; picture: string | null }>(),
+      'SELECT name, picture, locale FROM users WHERE id = ?'
+    ).bind(user.id).first<{ name: string | null; picture: string | null; locale: string | null }>(),
     queryHomeArtifactCatalog(env, user, catalogWs, vis),
     queryHomeCounts(env, user, hostWs, vis),
     createContextWs ? queryTeamFolders(env, user, createContextWs, vis) : Promise.resolve([]),
@@ -128,6 +130,7 @@ async function buildHomeBody(
     // Folded into this batch (was a serial await after it) — only needs the
     // create context, known before the queries run.
     isFeatureEnabled(env, CREATE_FEATURE, createContextWs),
+    getWorkspaceLocale(env, createContextWs),
   ]);
 
   const { allCount, favCount, sharedCount } = counts;
@@ -189,6 +192,7 @@ async function buildHomeBody(
     appVersion: env.CF_VERSION_METADATA?.id?.slice(0, 7) || '',
     visualEditorOffWorkspaces,
     createEnabled,
+    locale: (userInfo?.locale || wsLocale) ? resolveLocale({ user: userInfo?.locale, workspace: wsLocale }) : null,
   };
 
   const view = buildWorkspaceView(renderArgs);

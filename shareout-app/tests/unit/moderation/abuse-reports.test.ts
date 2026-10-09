@@ -13,14 +13,14 @@ vi.mock('../../../src/superadmin/artifacts-admin', () => ({
 import { handleAbuseReport } from '../../../src/moderation/abuse-reports';
 
 // DB mock: artifact exists; distinct-IP COUNT is configurable.
-function makeEnv(distinctCount = 1): Env {
+function makeEnv(distinctCount = 1, locale: string | null = null): Env {
   return {
     DB: {
       prepare: (sql: string) => ({
         bind: () => ({
           first: async () => {
             if (sql.includes('COUNT(DISTINCT reporter_ip)')) return { n: distinctCount };
-            if (sql.includes('FROM artifacts WHERE id')) return { id: 'art_1' };
+            if (sql.includes('FROM artifacts a')) return { id: 'art_1', locale };
             return null;
           },
           run: async () => ({ success: true }),
@@ -50,6 +50,14 @@ describe('handleAbuseReport', () => {
     expect(html).toContain('Report this page');
     expect(html).toContain('action="/report/art_1"');
     expect(html).toContain('csam');
+  });
+
+  it('renders the form in Spanish when the artifact workspace speaks Spanish', async () => {
+    const res = await handleAbuseReport(new Request('https://shareout.site/report/art_1'), makeEnv(1, 'es'), 'art_1');
+    const html = await res.text();
+    expect(html).toContain('<html lang="es">');
+    expect(html).toContain('Denunciar esta página');
+    expect(html).toContain('<option value="csam">');
   });
 
   it('fails closed when the client IP cannot be verified', async () => {

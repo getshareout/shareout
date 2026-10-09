@@ -10,10 +10,40 @@ import { checkSlidingWindowRateLimit, getTrustedClientIp } from '../rate-limit';
 import { setArtifactModeration, setArtifactPaused } from '../superadmin/artifacts-admin';
 import { createLogger } from '../logging';
 import { escapeHtml } from '../serve/utils';
+import { resolveLocale, type Locale, type LocaleCopy } from '../i18n';
 
 const CATEGORIES = ['phishing', 'malware', 'csam', 'spam', 'copyright', 'other'] as const;
 type Category = (typeof CATEGORIES)[number];
 const AUTO_BLOCK_DISTINCT_IPS = 3;
+
+const REPORT_COPY: LocaleCopy<{
+  title: string; heading: string; intro: string; reason: string; details: string; submit: string;
+  thanksTitle: string; thanksHeading: string; thanksBody: string; categories: Record<Category, string>;
+}> = {
+  en: {
+    title: 'Report content', heading: 'Report this page', intro: "Tell us what's wrong. Reports are reviewed by ShareOut.",
+    reason: 'Reason', details: 'Details (optional)', submit: 'Submit report',
+    thanksTitle: 'Thanks', thanksHeading: 'Thank you', thanksBody: 'Your report was submitted and will be reviewed.',
+    categories: { phishing: 'phishing', malware: 'malware', csam: 'csam', spam: 'spam', copyright: 'copyright', other: 'other' },
+  },
+  es: {
+    title: 'Denunciar contenido', heading: 'Denunciar esta página', intro: 'Contanos qué pasa. ShareOut revisa cada denuncia.',
+    reason: 'Motivo', details: 'Detalles (opcional)', submit: 'Enviar denuncia',
+    thanksTitle: 'Gracias', thanksHeading: 'Gracias', thanksBody: 'Recibimos tu denuncia y la vamos a revisar.',
+    categories: {
+      phishing: 'Engaño para robar datos (phishing)', malware: 'Software malicioso', csam: 'Abuso sexual infantil',
+      spam: 'Spam', copyright: 'Derechos de autor', other: 'Otro',
+    },
+  },
+};
+
+/** The artifact's workspace language, else the visitor's browser. */
+async function reportLocale(env: Env, request: Request, artifactId: string): Promise<{ exists: boolean; locale: Locale }> {
+  const row = await env.DB.prepare(
+    'SELECT a.id, w.locale FROM artifacts a LEFT JOIN workspaces w ON w.id = a.workspace_id WHERE a.id = ?'
+  ).bind(artifactId).first<{ id: string; locale: string | null }>();
+  return { exists: !!row, locale: resolveLocale({ workspace: row?.locale, acceptLanguage: request.headers.get('Accept-Language') }) };
+}
 
 export interface AbuseReportRow {
   id: string;
@@ -39,7 +69,7 @@ export async function listAbuseReports(env: Env, limit = 100): Promise<Array<Abu
 
 /** Public route handler for /report/:artifactId (GET form, POST submit). */
 export async function handleAbuseReport(request: Request, env: Env, artifactId: string): Promise<Response> {
-  if (request.method === 'GET') return reportForm(artifactId);
+  if (request.method === 'GET') return reportForm(artifactId, (await reportLocale(env, request, artifactId)).locale);
   if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
 
   // Anonymous + per-IP rate limit (strict cf-connecting-ip, fail closed).
@@ -53,8 +83,8 @@ export async function handleAbuseReport(request: Request, env: Env, artifactId: 
   const detail = String(form?.get('detail') || '').slice(0, 2000);
   if (!CATEGORIES.includes(category)) return new Response('Invalid category', { status: 400 });
 
-  const artifact = await env.DB.prepare('SELECT id FROM artifacts WHERE id = ?').bind(artifactId).first();
-  if (!artifact) return new Response('Not found', { status: 404 });
+  const { exists, locale } = await reportLocale(env, request, artifactId);
+  if (!exists) return new Response('Not found', { status: 404 });
 
   await env.DB.prepare(
     'INSERT INTO abuse_reports (id, artifact_id, reporter_ip, category, detail, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
@@ -76,29 +106,31 @@ export async function handleAbuseReport(request: Request, env: Env, artifactId: 
     }
   }
 
-  return new Response(reportThanksHtml(), { status: 200, headers: { 'Content-Type': 'text/html' } });
+  return new Response(reportThanksHtml(locale), { status: 200, headers: { 'Content-Type': 'text/html' } });
 }
 
-function reportForm(artifactId: string): Response {
-  const options = CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join('');
-  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>Report content</title>
+function reportForm(artifactId: string, locale: Locale = 'en'): Response {
+  const t = REPORT_COPY[locale];
+  const options = CATEGORIES.map((c) => `<option value="${c}">${t.categories[c]}</option>`).join('');
+  const html = `<!DOCTYPE html><html lang="${locale}"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>${t.title}</title>
 <style>body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;max-width:480px;margin:8vh auto;padding:0 20px;color:#1a1a2e}
 h1{font-size:1.3rem}label{display:block;margin:14px 0 4px;font-weight:600}select,textarea{width:100%;padding:8px;border:1px solid #ccc;border-radius:8px;font:inherit}
 button{margin-top:16px;padding:10px 18px;border:0;border-radius:9999px;background:#1a1a2e;color:#fff;font:inherit;cursor:pointer}</style>
 </head><body>
-<h1>Report this page</h1>
-<p>Tell us what's wrong. Reports are reviewed by ShareOut.</p>
+<h1>${t.heading}</h1>
+<p>${t.intro}</p>
 <form method="POST" action="/report/${escapeHtml(artifactId)}">
-<label for="category">Reason</label><select id="category" name="category">${options}</select>
-<label for="detail">Details (optional)</label><textarea id="detail" name="detail" rows="4" maxlength="2000"></textarea>
-<button type="submit">Submit report</button>
+<label for="category">${t.reason}</label><select id="category" name="category">${options}</select>
+<label for="detail">${t.details}</label><textarea id="detail" name="detail" rows="4" maxlength="2000"></textarea>
+<button type="submit">${t.submit}</button>
 </form></body></html>`;
   return new Response(html, { status: 200, headers: { 'Content-Type': 'text/html', 'X-Robots-Tag': 'noindex' } });
 }
 
-function reportThanksHtml(): string {
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Thanks</title>
+function reportThanksHtml(locale: Locale): string {
+  const t = REPORT_COPY[locale];
+  return `<!DOCTYPE html><html lang="${locale}"><head><meta charset="UTF-8"><title>${t.thanksTitle}</title>
 <style>body{font:16px/1.5 -apple-system,sans-serif;max-width:480px;margin:12vh auto;padding:0 20px;text-align:center;color:#1a1a2e}</style>
-</head><body><h1>Thank you</h1><p>Your report was submitted and will be reviewed.</p></body></html>`;
+</head><body><h1>${t.thanksHeading}</h1><p>${t.thanksBody}</p></body></html>`;
 }

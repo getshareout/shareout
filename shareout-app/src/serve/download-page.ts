@@ -10,6 +10,45 @@ import { colors, fonts, radius } from '../design-system/tokens';
 import { resolveShareLink, bumpShareLinkViews, hashAssetLinkPassword, type ResolvedShareLink } from '../assets/deliverables';
 import { escapeHtml } from '../email/layout';
 import { dispatchLifecycleEmail } from '../email/gateway';
+import { localeTag, resolveLocale, type Locale, type LocaleCopy } from '../i18n';
+
+const DL_COPY: LocaleCopy<{
+  deliveredWith: string; unavailableTitle: string; unavailableDesc: string; unavailable: string; unavailableSub: string;
+  password: string; emailPh: string; passwordPrompt: string; emailPrompt: string; protectedTitle: string;
+  protectedDesc: string; protected: string; continue: string; download: string; availableUntil: string;
+  file: string; files: string; forYou: string; empty: string;
+  badPassword: string; badEmail: string; badDomain: string;
+}> = {
+  en: {
+    deliveredWith: 'Delivered with', unavailableTitle: 'Link unavailable — ShareOut', unavailableDesc: 'This download link is no longer available.',
+    unavailable: 'Link unavailable', unavailableSub: 'This download link has expired or been removed.',
+    password: 'Password', emailPh: 'you@company.com', passwordPrompt: 'This delivery is password protected.',
+    emailPrompt: 'Enter your email to access this delivery.', protectedTitle: 'Protected delivery — ShareOut',
+    protectedDesc: 'This delivery is protected.', protected: 'Protected delivery', continue: 'Continue', download: 'Download',
+    availableUntil: 'Available until ', file: 'file ready to download.', files: 'files ready to download.', forYou: 'Files for you',
+    empty: 'No files in this delivery.', badPassword: 'Incorrect password.', badEmail: 'Enter a valid email.',
+    badDomain: 'That email domain is not permitted for this delivery.',
+  },
+  es: {
+    deliveredWith: 'Enviado con', unavailableTitle: 'Enlace no disponible — ShareOut', unavailableDesc: 'Este enlace de descarga ya no está disponible.',
+    unavailable: 'Enlace no disponible', unavailableSub: 'Este enlace de descarga venció o lo dieron de baja.',
+    password: 'Contraseña', emailPh: 'vos@empresa.com', passwordPrompt: 'Este envío tiene contraseña.',
+    emailPrompt: 'Escribí tu mail para ver este envío.', protectedTitle: 'Envío protegido — ShareOut',
+    protectedDesc: 'Este envío está protegido.', protected: 'Envío protegido', continue: 'Continuar', download: 'Descargar',
+    availableUntil: 'Disponible hasta el ', file: 'archivo listo para descargar.', files: 'archivos listos para descargar.', forYou: 'Archivos para vos',
+    empty: 'Este envío no tiene archivos.', badPassword: 'La contraseña no es correcta.', badEmail: 'Escribí un mail válido.',
+    badDomain: 'Ese dominio de mail no tiene acceso a este envío.',
+  },
+};
+
+/** The delivery's workspace language, else the visitor's browser. */
+async function deliveryLocale(env: Env, request: Request, bucketId: string | null): Promise<Locale> {
+  const row = bucketId
+    ? await env.DB.prepare('SELECT w.locale FROM artifacts a JOIN workspaces w ON w.id = a.workspace_id WHERE a.id = ?')
+      .bind(bucketId).first<{ locale: string }>().catch(() => null)
+    : null;
+  return resolveLocale({ workspace: row?.locale, acceptLanguage: request.headers.get('Accept-Language') });
+}
 
 function fmtBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -68,49 +107,54 @@ function readCookie(request: Request, name: string): string | null {
  * unconditionally, so a self-hoster sending a file to a client advertised
  * someone else's product on the way out. Point it at the instance that served it.
  */
-function deliveredFooter(env: Env): string {
+function deliveredFooter(env: Env, locale: Locale): string {
   const origin = getPlatformOrigin(env);
-  return `<p class="dl-foot">Delivered with <a href="${origin}">ShareOut</a></p>`;
+  return `<p class="dl-foot">${DL_COPY[locale].deliveredWith} <a href="${origin}">ShareOut</a></p>`;
 }
 
-function renderUnavailable(env: Env): Response {
+function renderUnavailable(env: Env, locale: Locale): Response {
+  const c = DL_COPY[locale];
   return renderHtmlPage({
-    title: 'Link unavailable — ShareOut',
-    description: 'This download link is no longer available.',
+    title: c.unavailableTitle,
+    description: c.unavailableDesc,
     pageStyles: pageStyles(),
+    lang: locale,
     status: 404,
-    body: `<div class="dl-wrap"><div class="dl-card"><div class="dl-empty"><h1 class="dl-title">Link unavailable</h1><p class="dl-sub">This download link has expired or been removed.</p></div></div>${deliveredFooter(env)}</div>`,
+    body: `<div class="dl-wrap"><div class="dl-card"><div class="dl-empty"><h1 class="dl-title">${c.unavailable}</h1><p class="dl-sub">${c.unavailableSub}</p></div></div>${deliveredFooter(env, locale)}</div>`,
   });
 }
 
-function renderGate(env: Env, token: string, gate: 'password' | 'domain', error: string | null, status = 200): Response {
+function renderGate(env: Env, token: string, gate: 'password' | 'domain', error: string | null, locale: Locale, status = 200): Response {
+  const c = DL_COPY[locale];
   const field = gate === 'password'
-    ? '<input type="password" name="password" placeholder="Password" autofocus required>'
-    : '<input type="email" name="email" placeholder="you@company.com" autofocus required>';
-  const prompt = gate === 'password' ? 'This delivery is password protected.' : 'Enter your email to access this delivery.';
+    ? `<input type="password" name="password" placeholder="${c.password}" autofocus required>`
+    : `<input type="email" name="email" placeholder="${c.emailPh}" autofocus required>`;
+  const prompt = gate === 'password' ? c.passwordPrompt : c.emailPrompt;
   return renderHtmlPage({
-    title: 'Protected delivery — ShareOut',
-    description: 'This delivery is protected.',
+    title: c.protectedTitle,
+    description: c.protectedDesc,
     pageStyles: pageStyles(),
+    lang: locale,
     status,
     body: `
       <div class="dl-wrap">
         <div class="dl-card">
           <form class="dl-gate" method="POST" action="/d/${escapeHtml(token)}">
             <span class="dl-gate__ic">${lockIcon}</span>
-            <h1 class="dl-title">Protected delivery</h1>
+            <h1 class="dl-title">${c.protected}</h1>
             <p class="dl-sub">${prompt}</p>
             ${error ? `<p class="dl-gate__err">${escapeHtml(error)}</p>` : ''}
             ${field}
-            <button class="dl-btn dl-btn--block" type="submit">Continue</button>
+            <button class="dl-btn dl-btn--block" type="submit">${c.continue}</button>
           </form>
         </div>
-        ${deliveredFooter(env)}
+        ${deliveredFooter(env, locale)}
       </div>`,
   });
 }
 
-async function renderFiles(env: Env, token: string, data: ResolvedShareLink, setCookie: string | null, viewerEmail: string | null = null): Promise<Response> {
+async function renderFiles(env: Env, token: string, data: ResolvedShareLink, setCookie: string | null, locale: Locale, viewerEmail: string | null = null): Promise<Response> {
+  const c = DL_COPY[locale];
   // First open → tell the sender ("Acme opened your delivery"). Dedupe on the
   // 0→1 view transition so a refresh doesn't re-notify.
   if (data.viewCount === 0 && data.createdBy) {
@@ -129,27 +173,28 @@ async function renderFiles(env: Env, token: string, data: ResolvedShareLink, set
         <div class="dl-name" title="${escapeHtml(f.filename)}">${escapeHtml(f.deliverableName || f.filename)}</div>
         <div class="dl-sz">${escapeHtml(f.filename)} · ${fmtBytes(f.sizeBytes)}${f.version > 1 ? ` · v${f.version}` : ''}</div>
       </span>
-      <a class="dl-btn" href="/d/${escapeHtml(token)}/file/${escapeHtml(f.blobId)}" download>${dlIcon}<span>Download</span></a>
+      <a class="dl-btn" href="/d/${escapeHtml(token)}/file/${escapeHtml(f.blobId)}" download>${dlIcon}<span>${c.download}</span></a>
     </li>`).join('');
   const exp = data.expiresAt
-    ? `<p class="dl-sub">Available until ${escapeHtml(new Date(data.expiresAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }))}.</p>`
+    ? `<p class="dl-sub">${c.availableUntil}${escapeHtml(new Date(data.expiresAt).toLocaleDateString(localeTag(locale), { month: 'long', day: 'numeric', year: 'numeric' }))}.</p>`
     : '';
   const resp = renderHtmlPage({
     title: `${data.collectionName} — ShareOut`,
-    description: `${n} ${n === 1 ? 'file' : 'files'} ready to download.`,
+    description: `${n} ${n === 1 ? c.file : c.files}`,
     pageStyles: pageStyles(),
+    lang: locale,
     body: `
       <div class="dl-wrap">
         <div class="dl-card">
           <div class="dl-head">
-            <p class="dl-eyebrow">Files for you</p>
+            <p class="dl-eyebrow">${c.forYou}</p>
             <h1 class="dl-title">${escapeHtml(data.collectionName)}</h1>
-            <p class="dl-sub">${n} ${n === 1 ? 'file' : 'files'} ready to download.</p>
+            <p class="dl-sub">${n} ${n === 1 ? c.file : c.files}</p>
             ${exp}
           </div>
-          <ul class="dl-list">${rows || '<div class="dl-empty">No files in this delivery.</div>'}</ul>
+          <ul class="dl-list">${rows || `<div class="dl-empty">${c.empty}</div>`}</ul>
         </div>
-        ${deliveredFooter(env)}
+        ${deliveredFooter(env, locale)}
       </div>`,
   });
   return withCookie(resp, setCookie);
@@ -199,8 +244,9 @@ export async function handleDeliveryFile(token: string, blobId: string, env: Env
 
 export async function handleDownloadPage(token: string, env: Env, request: Request): Promise<Response> {
   const data = await resolveShareLink(env, token);
-  if (!data) return renderUnavailable(env);
-  if (data.gate === 'none') return renderFiles(env, token, data, null);
+  const locale = await deliveryLocale(env, request, data?.bucketId ?? null);
+  if (!data) return renderUnavailable(env, locale);
+  if (data.gate === 'none') return renderFiles(env, token, data, null, locale);
 
   const cookieName = `so_dl_${token}`;
   const secure = (env.SHAREOUT_BASE_URL || '').startsWith('https') ? ' Secure;' : '';
@@ -213,7 +259,7 @@ export async function handleDownloadPage(token: string, env: Env, request: Reque
   // Already cleared this gate on a prior visit?
   if (gateCleared(request, token, data)) {
     const known = data.gate === 'domain' ? readCookie(request, cookieName) : null;
-    return renderFiles(env, token, data, null, known);
+    return renderFiles(env, token, data, null, locale, known);
   }
 
   if (request.method === 'POST') {
@@ -221,15 +267,15 @@ export async function handleDownloadPage(token: string, env: Env, request: Reque
     if (data.gate === 'password') {
       const pw = String(form?.get('password') || '');
       if (pw && (await hashAssetLinkPassword(pw)) === data.gateValue) {
-        return renderFiles(env, token, data, setCookie(data.gateValue || ''));
+        return renderFiles(env, token, data, setCookie(data.gateValue || ''), locale);
       }
-      return renderGate(env, token, 'password', 'Incorrect password.', 401);
+      return renderGate(env, token, 'password', DL_COPY[locale].badPassword, locale, 401);
     }
     const email = String(form?.get('email') || '').trim().toLowerCase();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return renderGate(env, token, 'domain', 'Enter a valid email.', 401);
-    if (!domainOk(email)) return renderGate(env, token, 'domain', 'That email domain is not permitted for this delivery.', 403);
-    return renderFiles(env, token, data, setCookie(email), email);
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return renderGate(env, token, 'domain', DL_COPY[locale].badEmail, locale, 401);
+    if (!domainOk(email)) return renderGate(env, token, 'domain', DL_COPY[locale].badDomain, locale, 403);
+    return renderFiles(env, token, data, setCookie(email), locale, email);
   }
 
-  return renderGate(env, token, data.gate, null);
+  return renderGate(env, token, data.gate, null, locale);
 }

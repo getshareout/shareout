@@ -103,6 +103,15 @@ describe('private artifact privacy', () => {
     }
   });
 
+  it('paused / under-review / takedown pages speak Spanish for a Spanish workspace', async () => {
+    const paused = await pausedPage(undefined, 'es').text();
+    expect(paused).toContain('<html lang="es">');
+    expect(paused).toContain('Esta página está en pausa');
+    expect(await underReviewPage(undefined, 'es').text()).toContain('Estamos revisando esta página');
+    expect(await takedownPage(undefined, 'es').text()).toContain('Esta página no está disponible');
+    expect(await pausedPage().text()).toContain('This content is paused');
+  });
+
   it('closed sandbox head sets noindex and omits social tags', () => {
     const head = renderEarlyHead(
       'Secret Board Report',

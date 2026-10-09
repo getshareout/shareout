@@ -95,6 +95,7 @@ export async function inviteOrAddMember(
       await dispatchLifecycleEmail(env, {
         type: 'member_joined',
         toUserId: ws.owner_id,
+        workspaceId,
         data: { memberName, workspaceName: ws.name },
       }).catch(() => {});
     }
@@ -114,6 +115,7 @@ export async function inviteOrAddMember(
         inviterName: inviteCtx.inviterName,
         claimCode: claim.code,
         claimId: claim.id,
+        workspaceId,
       });
       status = 'invited';
     } catch {
@@ -126,6 +128,7 @@ export async function inviteOrAddMember(
         type: 'added_to_workspace',
         toUserId: target.id,
         toEmail: email,
+        workspaceId,
         data: { workspaceName: inviteCtx.workspaceName, inviterName: inviteCtx.inviterName },
       }).catch(() => {});
     } catch {
