@@ -196,7 +196,7 @@ See [../team/workspace-assistant.md](../team/workspace-assistant.md#setup-checkl
 
 ## Localization
 
-The Home studio shell (rails, lenses, Admin, chat composer, onboarding copy) ships in **English and Spanish** — strings follow the browser locale (`en` / `es`). Artifact content and agent replies are not auto-translated.
+The Home studio shell (rails, lenses, Admin, chat composer, onboarding copy) ships in **English and Spanish** — strings follow the browser locale (`en` / `es`). Artifact content is not auto-translated. Any agent talking to the user — including you — answers in the language the user writes in (Spanish for Argentina uses *vos*); see [../SKILL.md § Talk to the user](../SKILL.md#talk-to-the-user).
 
 ## Account menu
 

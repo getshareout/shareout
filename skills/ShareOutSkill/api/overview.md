@@ -73,9 +73,13 @@ interface DataResponse<T> {
 {
   "success": false,
   "error": "Resource not found",
-  "code": "NOT_FOUND"
+  "code": "NOT_FOUND",
+  "request_id": "8a1f2c3d4e5f6a7b"
 }
 ```
+
+Optional fields: `hint` (what to do next), `docs`, `param`, `reason`, and on 5xx `support`.
+Full envelope and recovery steps: [errors.md](errors.md).
 
 ## Common Error Codes
 

@@ -92,8 +92,10 @@ paths:
                       mime: text/html
                       encoding: utf8
       responses:
-        "200":
-          description: Published
+        "201":
+          description: >-
+            Published. Check `visibility` — when it is more private than asked,
+            `visibility_downgraded` is true and `notice` says why; tell the user.
           content:
             application/json:
               schema:
@@ -102,8 +104,20 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
+        "413":
+          description: Storage limit reached (`STORAGE_LIMIT_EXCEEDED`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/search:
     get:
       tags: [Search]
@@ -361,9 +375,9 @@ paths:
       summary: Update artifact metadata
       description: >-
         Update visibility, name, social link-preview fields, or anonymous-access
-        opt-ins. Public visibility requires a paid plan or
-        paid Teams workspace; otherwise visibility is held with code
-        `VISIBILITY_HELD` and a paywall notice.
+        opt-ins. When instance policy holds public visibility the write still
+        succeeds with 202 `VISIBILITY_HELD` (or `MODERATION_HELD` while an automated
+        safety check runs) and the page stays private for now.
       operationId: updateArtifact
       requestBody:
         required: true
@@ -2472,6 +2486,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TemplatePreview"
+  /v1/auth/profile:
+    get:
+      tags: [Auth]
+      summary: Who am I
+      description: >-
+        The account this API key belongs to. Call it first to check the key works;
+        a 401 here means reconnect (see the error `hint`).
+      operationId: getProfile
+      responses:
+        "200":
+          description: The signed-in account
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  email:
+                    type: [string, "null"]
+                  username:
+                    type: [string, "null"]
+                  name:
+                    type: [string, "null"]
+                  metadata:
+                    type: object
+                  created_at:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /v1/auth/device/start:
     post:
       tags: [Auth]
@@ -2568,7 +2612,14 @@ paths:
                         type: string
                         description: Present when expected_email did not match signed-in email.
         "400":
-          description: expired_token, access_denied, or invalid_grant
+          description: >-
+            `error` is the RFC 8628 value (`expired_token`, `access_denied`,
+            `invalid_grant`, `invalid_request`); `code` and `hint` say what happened
+            and what to do next (usually: start a new login).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /v1/home/activity-feed:
     get:
       tags: [Home]
@@ -4030,6 +4081,22 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
+    RateLimited:
+      description: >-
+        Rate limit reached (`RATE_LIMIT_EXCEEDED` on publish / account creation / AI
+        routes, `RATE_LIMITED` on the data plane). Wait for `Retry-After` / `reset`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InternalError:
+      description: >-
+        Unexpected server failure. Retry once; if it fails again, file a ticket with
+        `POST /v1/support/tickets` quoting `request_id`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
   schemas:
     Visibility:
       type: string
@@ -4050,6 +4117,38 @@ components:
         code:
           type: string
           description: Machine-readable error code.
+        request_id:
+          type: string
+          description: Correlation id (also the `X-Request-Id` header). Quote it in support tickets.
+        reason:
+          type: string
+          description: >-
+            Finer cause under `code`. For `UNAUTHORIZED`: missing, invalid, revoked or expired.
+        hint:
+          type: string
+          description: What to do next, in plain words.
+        suggestion:
+          type: string
+        param:
+          type: string
+          description: The request field at fault.
+        docs:
+          type: string
+          description: Doc page for this error.
+        redirect_url:
+          type: string
+        support:
+          type: object
+          description: Present on 5xx — how to reach a human.
+          properties:
+            how:
+              type: string
+              example: POST /v1/support/tickets
+            include:
+              type: array
+              items:
+                type: string
+              example: [request_id]
       required: [success, error, code]
     SearchHit:
       type: object
@@ -4241,9 +4340,21 @@ components:
               format: uri
             installable:
               type: boolean
+        visibility:
+          $ref: "#/components/schemas/Visibility"
+        visibility_downgraded:
+          type: boolean
+          description: >-
+            True when the page came out more private than requested (instance
+            policy, account without a verified email, public-artifact cap, or a
+            moderation hold). A publish with no `visibility` counts as asking for public.
+        requested_visibility:
+          type: string
+          enum: [public]
+          description: Present with `visibility_downgraded`.
         notice:
           type: string
-          description: Human-readable message when publish was adjusted (governance, caps, email gate).
+          description: Human-readable reason the publish was adjusted (governance, caps, email gate, instance policy).
         approval_required:
           type: object
           description: Present when workspace policy requires teammate approval before going open.

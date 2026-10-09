@@ -118,3 +118,7 @@ If there is no `$ORIGIN` yet:
 - No token → First Run above (or deploy skill if no instance).
 - Prefer documented endpoints; do not invent request shapes.
 - Self-host: no paid plan gates; roles + features only.
+- Talk to the user in their language (Argentina: *vos*), without jargon ("page", not
+  "artifact"), end with the link, and never paste a token into chat.
+- Stuck? Follow the error's `hint`; after 2 failed attempts or any 5xx, file
+  `POST $ORIGIN/v1/support/tickets` with the `request_id` and tell the user the team was notified.

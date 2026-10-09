@@ -1,8 +1,8 @@
 import type { AuthUser } from '../../api-auth';
 import { validateToken } from '../../api-auth';
+import { unauthorizedFor } from '../../auth/unauthorized';
 import { getAuthUser } from '../../auth-user';
 import { getSessionUser } from '../../auth';
-import { unauthorized } from '../../cors';
 import type { FetchContext } from '../context';
 
 export function isAuthUser(result: AuthUser | Response): result is AuthUser {
@@ -11,13 +11,13 @@ export function isAuthUser(result: AuthUser | Response): result is AuthUser {
 
 export async function requireToken(ctx: FetchContext): Promise<AuthUser | Response> {
   const user = await validateToken(ctx.request, ctx.env);
-  if (!user) return ctx.addCORS(unauthorized());
+  if (!user) return ctx.addCORS(await unauthorizedFor(ctx.request, ctx.env));
   return user;
 }
 
 export async function requireAuthUser(ctx: FetchContext): Promise<AuthUser | Response> {
   const user = await getAuthUser(ctx.request, ctx.env);
-  if (!user) return ctx.addCORS(unauthorized());
+  if (!user) return ctx.addCORS(await unauthorizedFor(ctx.request, ctx.env));
   return user;
 }
 
@@ -34,6 +34,6 @@ export async function getTokenOrSessionUser(ctx: FetchContext): Promise<AuthUser
 
 export async function requireTokenOrSession(ctx: FetchContext): Promise<AuthUser | Response> {
   const user = await getTokenOrSessionUser(ctx);
-  if (!user) return ctx.addCORS(unauthorized());
+  if (!user) return ctx.addCORS(await unauthorizedFor(ctx.request, ctx.env));
   return user;
 }

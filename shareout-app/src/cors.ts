@@ -1,5 +1,6 @@
 import type { Env } from './types';
 import { getPlatformHostname, getPlatformOrigin } from './config/origins';
+import { apiErrorResponse } from './http/api-error';
 
 const ALLOWED_ORIGINS = [
   'https://shareout.site',
@@ -105,9 +106,26 @@ export function addCORSHeaders(response: Response, request: Request, env?: Env):
   return newResponse;
 }
 
-export function unauthorized(): Response {
-  return new Response(JSON.stringify({ error: 'Unauthorized', code: 'UNAUTHORIZED' }), {
+export type UnauthorizedReason = 'missing' | 'invalid' | 'revoked' | 'expired';
+
+const UNAUTHORIZED_MESSAGES: Record<UnauthorizedReason, string> = {
+  missing: 'Unauthorized: this request carries no API key.',
+  invalid: 'Unauthorized: this API key is not recognized on this instance.',
+  revoked: 'Unauthorized: this API key was revoked.',
+  expired: 'Unauthorized: this API key has expired.',
+};
+
+/**
+ * 401 envelope. With a `reason` (see `unauthorizedFor` in api-auth) it says why and
+ * how to get a working key, so an agent can tell its user what to do instead of looping.
+ */
+export function unauthorized(reason?: UnauthorizedReason, origin = ''): Response {
+  return apiErrorResponse({
+    code: 'UNAUTHORIZED',
     status: 401,
-    headers: { 'Content-Type': 'application/json' },
+    message: reason ? UNAUTHORIZED_MESSAGES[reason] : 'Unauthorized',
+    reason,
+    hint: `Get a key: have the user open ${origin}/home?view=connect and connect their agent (or copy an API token), or run device login (POST ${origin}/v1/auth/device/start). Then send Authorization: Bearer <key>.`,
+    docs: `${origin}/v1/skill/auth.md`,
   });
 }

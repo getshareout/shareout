@@ -18,21 +18,21 @@ export async function handleGoogleOneTap(request: Request, env: Env): Promise<Re
     const body = await request.json<{ credential?: string }>();
     credential = body.credential || '';
   } catch {
-    return jsonResponse({ error: 'Invalid body' }, 400);
+    return jsonResponse({ error: 'Invalid body', code: 'INVALID_JSON', hint: 'Send JSON: { "credential": "<Google ID token>" }.' }, 400);
   }
-  if (!credential) return jsonResponse({ error: 'Missing credential' }, 400);
+  if (!credential) return jsonResponse({ error: 'Missing credential', code: 'MISSING_PARAM', param: 'credential' }, 400);
 
   let claims;
   try {
     claims = await verifyGoogleIdToken(credential, env.GOOGLE_CLIENT_ID || "");
   } catch (err: any) {
     console.error('One Tap verification failed:', err?.message || err);
-    return jsonResponse({ error: 'Invalid credential' }, 401);
+    return jsonResponse({ error: 'Invalid credential', code: 'INVALID_CREDENTIAL', hint: 'The Google sign-in token was rejected or expired. Sign in with Google again.' }, 401);
   }
 
   const emailVerified = claims.email_verified === true || claims.email_verified === 'true';
   if (!claims.email || !emailVerified) {
-    return jsonResponse({ error: 'Email not verified' }, 403);
+    return jsonResponse({ error: 'Email not verified', code: 'EMAIL_NOT_VERIFIED', hint: 'Google has not verified this email address. Verify it with Google, or sign in with a different account.' }, 403);
   }
 
   const sso = await ssoRequiredFor(env, claims.email);

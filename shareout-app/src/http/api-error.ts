@@ -11,13 +11,20 @@
  *     "suggestion"?: string,
  *     "param"?: string,
  *     "docs"?: string,
- *     "redirect_url"?: string
+ *     "redirect_url"?: string,
+ *     "reason"?: string,
+ *     "support"?: { "how": string, "include": string[] }
  *   }
  *
  * - `code` is stable for clients; do not overload it with free-form text.
  * - Never put stack traces or secret values in `error` / `hint`.
  * - Prefer this helper over ad-hoc `Response.json({ error: ... })`.
+ * - `request_id` (and, on 5xx, `support`) is stamped onto every JSON error body by
+ *   {@link withErrorContext} at the top-level fetch seam — handlers don't thread it.
  */
+
+/** How an agent reaches a human when it is stuck: file a ticket quoting the request_id. */
+export const SUPPORT_CONTACT = { how: 'POST /v1/support/tickets', include: ['request_id'] };
 
 export interface ApiErrorFields {
   code: string;
@@ -29,6 +36,9 @@ export interface ApiErrorFields {
   docs?: string;
   /** Where a browser client should go to finish the action (e.g. the workspace's SSO). */
   redirect_url?: string;
+  /** Finer-grained cause under a stable `code` (e.g. UNAUTHORIZED → missing | expired). */
+  reason?: string;
+  support?: typeof SUPPORT_CONTACT;
 }
 
 export interface ApiErrorBody {
@@ -41,6 +51,8 @@ export interface ApiErrorBody {
   param?: string;
   docs?: string;
   redirect_url?: string;
+  reason?: string;
+  support?: typeof SUPPORT_CONTACT;
 }
 
 export interface ApiErrorResponseOptions {
@@ -67,6 +79,8 @@ export function buildApiErrorBody(
   if (fields.param) body.param = fields.param;
   if (fields.docs) body.docs = fields.docs;
   if (fields.redirect_url) body.redirect_url = fields.redirect_url;
+  if (fields.reason) body.reason = fields.reason;
+  if (fields.support) body.support = fields.support;
   return body;
 }
 
@@ -135,6 +149,7 @@ export function jsonWithApiErrors(
       param?: string;
       docs?: string;
       redirect_url?: string;
+      reason?: string;
     };
     response = apiErrorResponse(
       {
@@ -146,6 +161,7 @@ export function jsonWithApiErrors(
         param: d.param,
         docs: d.docs,
         redirect_url: d.redirect_url,
+        reason: d.reason,
       },
       { headers: extraHeaders }
     );
@@ -155,4 +171,32 @@ export function jsonWithApiErrors(
     response = new Response(JSON.stringify(data), { status, headers });
   }
   return response;
+}
+
+/**
+ * Stamp `request_id` — and, on 5xx, {@link SUPPORT_CONTACT} — into a JSON error body
+ * that lacks them, so every error an agent sees carries the id a support ticket needs.
+ * Non-JSON, non-error and oversized bodies pass through untouched.
+ */
+export async function withErrorContext(response: Response, requestId: string): Promise<Response> {
+  if (response.status < 400 || !response.body) return response;
+  if (!(response.headers.get('Content-Type') || '').includes('application/json')) return response;
+  if (Number(response.headers.get('Content-Length') || 0) > 64 * 1024) return response;
+
+  const text = await response.text();
+  const init = { status: response.status, statusText: response.statusText, headers: new Headers(response.headers) };
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return new Response(text, init);
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body) || !('error' in body || 'code' in body)) {
+    return new Response(text, init);
+  }
+  const b = body as Record<string, unknown>;
+  b.request_id ??= requestId;
+  if (response.status >= 500) b.support ??= SUPPORT_CONTACT;
+  init.headers.delete('Content-Length');
+  return new Response(JSON.stringify(b), init);
 }

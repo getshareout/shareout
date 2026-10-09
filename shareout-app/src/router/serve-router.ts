@@ -14,6 +14,7 @@ import {
   serveAgentSkillsIndex,
   serveIntegrationsJson,
   serveOpenApiJson,
+  serveOpenApiAgentJson,
 } from '../pages/integrations-discovery';
 import { handleUserHomePage } from '../pages/home';
 import { handleSharedPortal } from '../sharees/portal-page';
@@ -108,6 +109,7 @@ export async function routeServe(ctx: FetchContext): Promise<Response | null> {
     if (path === '/robots.txt') return serveRobots(env);
     if (path === '/.well-known/integrations.json') return serveIntegrationsJson(env);
     if (path === '/openapi.json') return serveOpenApiJson(env);
+    if (path === '/openapi.agent.json') return serveOpenApiAgentJson(env);
     if (path === '/.well-known/agent-skills/index.json') return serveAgentSkillsIndex(env);
     if (path === '/.well-known/agent-skills/shareout/SKILL.md') return serveAgentSkillMd(env);
   }

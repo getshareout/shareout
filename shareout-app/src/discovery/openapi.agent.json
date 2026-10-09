@@ -1,0 +1,1366 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ShareOut API (agent essentials)",
+    "version": "1.0",
+    "summary": "Publish, serve, and manage live web artifacts.",
+    "description": "The small set of ShareOut calls an AI agent needs to publish pages for a person: check the key, list workspaces, publish, find and update pages, and ask the ShareOut team for help. Errors carry `code`, `hint` and `request_id`; on a 5xx or when stuck, create a support ticket quoting the request_id. Full spec: /openapi.json.",
+    "contact": {
+      "name": "ShareOut",
+      "url": "https://shareout.site"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://shareout.site",
+      "description": "Production"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/v1/auth/profile": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Who am I",
+        "description": "The account this API key belongs to. Call it first to check the key works; a 401 here means reconnect (see the error `hint`).",
+        "operationId": "getProfile",
+        "responses": {
+          "200": {
+            "description": "The signed-in account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "username": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "metadata": {
+                      "type": "object"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/workspaces": {
+      "get": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "List workspaces",
+        "operationId": "listWorkspaces",
+        "responses": {
+          "200": {
+            "description": "Workspaces the user belongs to",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "workspaces": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Workspace"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/publish": {
+      "post": {
+        "tags": [
+          "Publish"
+        ],
+        "summary": "Publish an artifact",
+        "description": "Create a new artifact or push a new version of an existing one.",
+        "operationId": "publishArtifact",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishRequest"
+              },
+              "examples": {
+                "minimal": {
+                  "summary": "Single HTML file",
+                  "value": {
+                    "name": "My App",
+                    "slug": "my-app",
+                    "entrypoint": "index.html",
+                    "visibility": "public",
+                    "files": [
+                      {
+                        "path": "index.html",
+                        "content": "<!DOCTYPE html><h1>Hello</h1>",
+                        "mime": "text/html",
+                        "encoding": "utf8"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Published. Check `visibility` — when it is more private than asked, `visibility_downgraded` is true and `notice` says why; tell the user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "description": "Storage limit reached (`STORAGE_LIMIT_EXCEEDED`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/artifacts": {
+      "get": {
+        "tags": [
+          "Artifacts"
+        ],
+        "summary": "List artifacts",
+        "operationId": "listArtifacts",
+        "parameters": [
+          {
+            "name": "favorites",
+            "in": "query",
+            "description": "Return only the current user's favorited artifacts.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "description": "List artifacts that belong to a workspace (not the caller's personal artifacts). Caller must be a workspace member (403 otherwise). Owners/admins see all workspace artifacts; members see non-private artifacts plus any they own or collaborate on.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of artifacts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Artifact"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/artifacts/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ArtifactId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Artifacts"
+        ],
+        "summary": "Get an artifact",
+        "operationId": "getArtifact",
+        "responses": {
+          "200": {
+            "description": "The artifact",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Artifact"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Artifacts"
+        ],
+        "summary": "Update artifact metadata",
+        "description": "Update visibility, name, social link-preview fields, or anonymous-access opt-ins. When instance policy holds public visibility the write still succeeds with 202 `VISIBILITY_HELD` (or `MODERATION_HELD` while an automated safety check runs) and the page stays private for now.",
+        "operationId": "updateArtifact",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "visibility": {
+                    "$ref": "#/components/schemas/Visibility"
+                  },
+                  "allow_anon_write": {
+                    "type": "boolean",
+                    "description": "Let anonymous visitors mutate json/tables/blobs/datasets on public artifacts."
+                  },
+                  "allow_anon_email": {
+                    "type": "boolean",
+                    "description": "Let anonymous visitors send contact-form email."
+                  },
+                  "allow_anon_agent": {
+                    "type": "boolean",
+                    "description": "Let anonymous visitors use the in-artifact AI chat agent."
+                  },
+                  "allow_anon_collab": {
+                    "type": "boolean",
+                    "description": "Let anonymous visitors join realtime collaboration."
+                  },
+                  "social_title": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "social_description": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "social_image_url": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Artifact"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/search": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Ranked fuzzy search",
+        "description": "Typo-tolerant search across pages, folders, datasets, connectors, people, schedules, crew, and alerts. Same engine as the Home Cmd+K palette. Personal tokens may pass `workspace` to scope; workspace Agent tokens (`sot_`) are pinned to their workspace and require `artifacts:read`.",
+        "operationId": "searchWorkspace",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search text. Empty returns recents."
+          },
+          {
+            "name": "groups",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma subset of artifacts,folders,datasets,connectors,people,schedules,crew,alerts."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "maximum": 25
+            },
+            "description": "Max results per group."
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Workspace id to scope (personal tokens only)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Grouped search hits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "query": {
+                      "type": "string"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SearchHit"
+                      }
+                    },
+                    "folders": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SearchHit"
+                      }
+                    },
+                    "datasets": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SearchHit"
+                      }
+                    },
+                    "connectors": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SearchHit"
+                      }
+                    },
+                    "people": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SearchHit"
+                      }
+                    },
+                    "schedules": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SearchHit"
+                      }
+                    },
+                    "crew": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SearchHit"
+                      }
+                    },
+                    "alerts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SearchHit"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/support/tickets": {
+      "post": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "Create a support ticket",
+        "operationId": "createSupportTicket",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "subject",
+                  "body"
+                ],
+                "properties": {
+                  "subject": {
+                    "type": "string"
+                  },
+                  "body": {
+                    "type": "string"
+                  },
+                  "workspaceId": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "ticket": {
+                      "$ref": "#/components/schemas/SupportTicket"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "List support tickets",
+        "description": "`scope=mine` (default) returns the requester's tickets. `scope=workspace&workspace={id}` requires workspace admin/owner. `scope=all` is super-admin only. Optional `status` filter.",
+        "operationId": "listSupportTickets",
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mine",
+                "workspace",
+                "all"
+              ],
+              "default": "mine"
+            }
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required when scope=workspace."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "pending",
+                "resolved",
+                "closed"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tickets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "tickets": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SupportTicket"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/support/tickets/{ticketId}": {
+      "parameters": [
+        {
+          "name": "ticketId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "Get ticket and thread",
+        "operationId": "getSupportTicket",
+        "responses": {
+          "200": {
+            "description": "Ticket with messages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "ticket": {
+                      "$ref": "#/components/schemas/SupportTicket"
+                    },
+                    "thread": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SupportMessage"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/support/tickets/{ticketId}/message": {
+      "parameters": [
+        {
+          "name": "ticketId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "Append a message (customer reply re-opens)",
+        "operationId": "appendSupportMessage",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "body"
+                ],
+                "properties": {
+                  "body": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Message added"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "ShareOut API token (`so_...`) from ~/.shareout/credentials."
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Authentication required",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Invalid request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Access denied",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Slug taken or version conflict",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "Rate limit reached (`RATE_LIMIT_EXCEEDED` on publish / account creation / AI routes, `RATE_LIMITED` on the data plane). Wait for `Retry-After` / `reset`.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Unexpected server failure. Retry once; if it fails again, file a ticket with `POST /v1/support/tickets` quoting `request_id`.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Workspace": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "member"
+            ]
+          }
+        }
+      },
+      "PublishRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "files"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Display name."
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL slug. Auto-generated if omitted."
+          },
+          "entrypoint": {
+            "type": "string",
+            "default": "index.html"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileEntry"
+            }
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility"
+          },
+          "mobile_html": {
+            "type": "string"
+          },
+          "pwa": {
+            "$ref": "#/components/schemas/PWAConfig"
+          },
+          "access_policy": {
+            "type": "object",
+            "description": "Row-level access policy for per-viewer data filtering."
+          },
+          "agent": {
+            "$ref": "#/components/schemas/AgentConfig"
+          }
+        }
+      },
+      "PublishResponse": {
+        "type": "object",
+        "properties": {
+          "artifact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            }
+          },
+          "version": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "version_no": {
+                "type": "integer"
+              }
+            }
+          },
+          "deployment": {
+            "type": "object",
+            "properties": {
+              "slug": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "subdomain_url": {
+                "type": "string",
+                "format": "uri",
+                "description": "Preferred share URL for workspace artifacts (https://{workspace}.shareout.site/{slug}/). Omitted for personal artifacts."
+              },
+              "mobile_url": {
+                "type": "string",
+                "format": "uri"
+              }
+            }
+          },
+          "editor_readiness": {
+            "type": "object",
+            "description": "Advisory HTML editor-readiness profile (HTML artifacts only). Never blocks publishing.",
+            "properties": {
+              "manifest": {
+                "type": "string",
+                "enum": [
+                  "valid",
+                  "invalid",
+                  "missing"
+                ]
+              },
+              "outline": {
+                "type": "boolean"
+              },
+              "counts": {
+                "type": "object",
+                "properties": {
+                  "pages": {
+                    "type": "integer"
+                  },
+                  "bindings": {
+                    "type": "integer"
+                  },
+                  "templates": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "summary": {
+                "type": "object",
+                "properties": {
+                  "errors": {
+                    "type": "integer"
+                  },
+                  "warnings": {
+                    "type": "integer"
+                  },
+                  "infos": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "findings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "rule": {
+                      "type": "string"
+                    },
+                    "level": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "suggestion": {
+                      "type": "string"
+                    },
+                    "disables": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "pwa": {
+            "type": "object",
+            "properties": {
+              "manifest_url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "installable": {
+                "type": "boolean"
+              }
+            }
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility"
+          },
+          "visibility_downgraded": {
+            "type": "boolean",
+            "description": "True when the page came out more private than requested (instance policy, account without a verified email, public-artifact cap, or a moderation hold). A publish with no `visibility` counts as asking for public."
+          },
+          "requested_visibility": {
+            "type": "string",
+            "enum": [
+              "public"
+            ],
+            "description": "Present with `visibility_downgraded`."
+          },
+          "notice": {
+            "type": "string",
+            "description": "Human-readable reason the publish was adjusted (governance, caps, email gate, instance policy)."
+          },
+          "approval_required": {
+            "type": "object",
+            "description": "Present when workspace policy requires teammate approval before going open.",
+            "properties": {
+              "required": {
+                "type": "integer",
+                "description": "Number of approvers the requester must nominate."
+              },
+              "artifact_id": {
+                "type": "string"
+              }
+            }
+          },
+          "moderation": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "approved",
+                  "pending",
+                  "blocked"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "requested_visibility": {
+                "type": "string",
+                "enum": [
+                  "public",
+                  "workspace",
+                  "private"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": false
+          },
+          "error": {
+            "type": "string",
+            "description": "Human-readable message."
+          },
+          "code": {
+            "type": "string",
+            "description": "Machine-readable error code."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Correlation id (also the `X-Request-Id` header). Quote it in support tickets."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Finer cause under `code`. For `UNAUTHORIZED`: missing, invalid, revoked or expired."
+          },
+          "hint": {
+            "type": "string",
+            "description": "What to do next, in plain words."
+          },
+          "suggestion": {
+            "type": "string"
+          },
+          "param": {
+            "type": "string",
+            "description": "The request field at fault."
+          },
+          "docs": {
+            "type": "string",
+            "description": "Doc page for this error."
+          },
+          "redirect_url": {
+            "type": "string"
+          },
+          "support": {
+            "type": "object",
+            "description": "Present on 5xx — how to reach a human.",
+            "properties": {
+              "how": {
+                "type": "string",
+                "example": "POST /v1/support/tickets"
+              },
+              "include": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "example": [
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "success",
+          "error",
+          "code"
+        ]
+      },
+      "Artifact": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility"
+          },
+          "moderation_status": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "pending",
+              "blocked"
+            ],
+            "description": "Safety review state for open visibility."
+          },
+          "allow_anon_write": {
+            "type": "boolean"
+          },
+          "allow_anon_email": {
+            "type": "boolean"
+          },
+          "allow_anon_agent": {
+            "type": "boolean"
+          },
+          "allow_anon_collab": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "thumbnail_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "is_favorite": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "integer"
+          }
+        }
+      },
+      "Visibility": {
+        "type": "string",
+        "description": "'unlisted' was retired 2026-07 — still accepted as input and treated as 'public'.",
+        "enum": [
+          "public",
+          "workspace",
+          "private"
+        ]
+      },
+      "SearchHit": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "artifact",
+              "folder",
+              "dataset",
+              "connector",
+              "person",
+              "schedule",
+              "crew",
+              "alert"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "subtitle": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "artifactType": {
+            "type": "string"
+          },
+          "views": {
+            "type": "integer"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "thumb": {
+            "type": "string"
+          },
+          "avatar": {
+            "type": "string"
+          },
+          "badge": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          }
+        }
+      },
+      "SupportTicket": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "pending",
+              "resolved",
+              "closed"
+            ]
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "ui",
+              "skill",
+              "email",
+              "telegram",
+              "slack"
+            ]
+          },
+          "workspace_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "requester_user_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "requester_email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "priority": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SupportMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "staff",
+              "system"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FileEntry": {
+        "type": "object",
+        "required": [
+          "path",
+          "content"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "encoding": {
+            "type": "string",
+            "enum": [
+              "utf8",
+              "base64"
+            ]
+          },
+          "size_bytes": {
+            "type": "integer"
+          }
+        }
+      },
+      "PWAConfig": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "short_name": {
+            "type": "string",
+            "maxLength": 12
+          },
+          "icon": {
+            "type": "string",
+            "description": "Data URL or absolute URL to a PNG icon."
+          }
+        }
+      },
+      "AgentConfig": {
+        "type": "object",
+        "description": "Turns on the visitor chat agent.",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "systemPrompt": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string",
+            "example": "claude-sonnet-5"
+          },
+          "maxTokens": {
+            "type": "integer"
+          },
+          "temperature": {
+            "type": "number"
+          },
+          "contextJson": {
+            "type": "boolean",
+            "default": true
+          },
+          "contextTables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "ArtifactId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Artifact ID (e.g. `art_abc123`).",
+        "schema": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
