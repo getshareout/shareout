@@ -58,7 +58,7 @@ export function codeBlock(code: string): string {
 
 // ── data shapes per email ────────────────────────────────────────────────────
 export interface OtpData { code: string }
-export interface InviteData { workspaceName: string; inviterName: string; claimCode: string; claimTtlDays: number }
+export interface InviteData { workspaceName: string; inviterName: string; claimCode: string; claimTtlDays: number; personalMessage?: string | null }
 export interface AddedToWorkspaceData { workspaceName: string; inviterName: string }
 export interface CommentData { fromName: string; verb: string; title: string; snippet: string; url: string; reason?: 'mention' | 'reply' }
 export interface ActionItemAssignedData { fromName: string; title: string; snippet: string; url: string; dueStr?: string | null; dueAt?: string | null }
@@ -105,6 +105,17 @@ export interface AccessDeclinedData { pageName: string }
 /** Secondary line under the invite: where to connect an AI assistant once inside. */
 export function inviteConnectNote(label: string, href: string): string {
   return `<p style="margin:0;color:${colors.textTertiary};font-size:12px;line-height:1.5"><a href="${escapeHtml(href)}" style="color:${colors.textSecondary}">${escapeHtml(label)}</a></p>`;
+}
+
+/** The inviter's own words, quoted under the intro. Empty → nothing. */
+export function invitePersonalNote(lead: string, message: string | null | undefined): { html: string; text: string } {
+  const msg = (message || '').trim();
+  if (!msg) return { html: '', text: '' };
+  return {
+    html: p(escapeHtml(lead)) +
+      `<blockquote style="margin:0 0 14px;padding:10px 14px;border-left:3px solid ${colors.border};color:${colors.text};white-space:pre-line">${escapeHtml(msg)}</blockquote>`,
+    text: `${lead}\n"${msg}"\n\n`,
+  };
 }
 
 function shareRoleLine(role: ShareData['role']): string {
@@ -213,20 +224,22 @@ export const EMAILS = {
     category: 'transactional',
     audiences: ['EXTERNAL', 'ANY'],
     trigger: 'sendInviteEmail() — workspace owner invites a member.',
-    build: ({ workspaceName, inviterName, claimCode, claimTtlDays }: InviteData, { baseUrl }) => {
+    build: ({ workspaceName, inviterName, claimCode, claimTtlDays, personalMessage }: InviteData, { baseUrl }) => {
       const joinUrl = `${baseUrl}/invite/${encodeURIComponent(claimCode)}`;
       const connectUrl = `${baseUrl}/home?view=connect`;
       const agentNote = inviteConnectNote('After you join, connect Claude or ChatGPT in 2 minutes', connectUrl);
+      const note = invitePersonalNote(`${inviterName} added a note:`, personalMessage);
       return {
         subject: `You're invited to ${workspaceName} on ShareOut`,
         preheader: `${inviterName} invited you to ${workspaceName} on ShareOut.`,
         heading: `Join ${workspaceName}`,
         bodyHtml:
           p(`${escapeHtml(inviterName)} invited you to <strong>${escapeHtml(workspaceName)}</strong> on ShareOut — a place to build and publish pages with real data. Open it and you're in.`) +
+          note.html +
           agentNote,
         cta: { label: `Join ${workspaceName}`, href: joinUrl },
         footerNote: `This invite is single-use and expires in ${claimTtlDays} days. If you didn't expect it, you can ignore this email.`,
-        bodyText: `${inviterName} invited you to ${workspaceName} on ShareOut.\n\nJoin ${workspaceName}: ${joinUrl}\n\nAfter you join, connect Claude or ChatGPT in 2 minutes: ${connectUrl}\n\nThis invite is single-use and expires in ${claimTtlDays} days.`,
+        bodyText: `${inviterName} invited you to ${workspaceName} on ShareOut.\n\n${note.text}Join ${workspaceName}: ${joinUrl}\n\nAfter you join, connect Claude or ChatGPT in 2 minutes: ${connectUrl}\n\nThis invite is single-use and expires in ${claimTtlDays} days.`,
       };
     },
   } satisfies EmailTemplate<InviteData>,

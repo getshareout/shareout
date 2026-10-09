@@ -176,3 +176,24 @@ describe('catalog: Spanish (es-AR)', () => {
     }
   });
 });
+
+describe('workspace_invite personal message', () => {
+  const base = { workspaceName: 'Acme', inviterName: 'Leo', claimCode: 'C', claimTtlDays: 7 };
+  const c = { env: {} as never, baseUrl: 'https://example.com' };
+
+  it('quotes the inviter’s note, escaped, in both languages', () => {
+    const en = buildEmail('workspace_invite', { ...base, personalMessage: 'Hi <b>team</b>' }, c)!;
+    expect(en.bodyHtml).toContain('Leo added a note:');
+    expect(en.bodyHtml).toContain('<blockquote');
+    expect(en.bodyHtml).toContain('Hi &lt;b&gt;team&lt;/b&gt;');
+    expect(en.bodyText).toContain('"Hi <b>team</b>"');
+    const es = buildEmail('workspace_invite', { ...base, personalMessage: 'Hola' }, { ...c, locale: 'es' })!;
+    expect(es.bodyHtml).toContain('Leo te dejó un mensaje:');
+  });
+
+  it('omits the block when the note is empty', () => {
+    const b = buildEmail('workspace_invite', { ...base, personalMessage: '  ' }, c)!;
+    expect(b.bodyHtml).not.toContain('<blockquote');
+    expect(b.bodyHtml).not.toContain('added a note');
+  });
+});

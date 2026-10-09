@@ -1,7 +1,7 @@
 // Spanish (rioplatense, voseo) copy for the member-facing lifecycle emails. Same
 // data shapes as catalog.ts; a type with no entry here falls back to English.
 // Voice: a friend from the team — warm, short, no jargon. "Página", never "artefacto".
-import { EMAILS, p, codeBlock, inviteConnectNote } from './catalog';
+import { EMAILS, p, codeBlock, inviteConnectNote, invitePersonalNote } from './catalog';
 import type {
   BuiltEmail,
   EmailContext,
@@ -59,19 +59,21 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
       'ShareOut convierte una idea en una página en vivo, con datos reales, para compartir. Te dejamos algunos ejemplos en tu inicio para que arranques; cada uno muestra una función y es tuyo para editar o borrar. Empezá por la primera de la lista: te muestra cómo publicar la tuya.',
   }),
 
-  workspace_invite: ({ workspaceName, inviterName, claimCode, claimTtlDays }: InviteData, { baseUrl }) => {
+  workspace_invite: ({ workspaceName, inviterName, claimCode, claimTtlDays, personalMessage }: InviteData, { baseUrl }) => {
     const joinUrl = `${baseUrl}/invite/${encodeURIComponent(claimCode)}`;
     const connectUrl = `${baseUrl}/home?view=connect`;
+    const note = invitePersonalNote(`${inviterName} te dejó un mensaje:`, personalMessage);
     return {
       subject: `Te invitaron a ${workspaceName} en ShareOut`,
       preheader: `${inviterName} te invitó a ${workspaceName} en ShareOut.`,
       heading: `Sumate a ${workspaceName}`,
       bodyHtml:
         p(`${escapeHtml(inviterName)} te invitó a <strong>${escapeHtml(workspaceName)}</strong> en ShareOut, un lugar para armar y publicar páginas con datos reales. Abrí la invitación y ya estás adentro.`) +
+        note.html +
         inviteConnectNote('Después de entrar, conectá Claude o ChatGPT en 2 minutos', connectUrl),
       cta: { label: `Entrar a ${workspaceName}`, href: joinUrl },
       footerNote: `La invitación se usa una sola vez y vence en ${claimTtlDays} días. Si no la esperabas, podés ignorar este mail.`,
-      bodyText: `${inviterName} te invitó a ${workspaceName} en ShareOut.\n\nEntrar a ${workspaceName}: ${joinUrl}\n\nDespués de entrar, conectá Claude o ChatGPT en 2 minutos: ${connectUrl}\n\nLa invitación se usa una sola vez y vence en ${claimTtlDays} días.`,
+      bodyText: `${inviterName} te invitó a ${workspaceName} en ShareOut.\n\n${note.text}Entrar a ${workspaceName}: ${joinUrl}\n\nDespués de entrar, conectá Claude o ChatGPT en 2 minutos: ${connectUrl}\n\nLa invitación se usa una sola vez y vence en ${claimTtlDays} días.`,
     };
   },
 
