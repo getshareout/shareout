@@ -1,4 +1,7 @@
-import { handleServe, handleServeText, handleServeNamespaced, handleServeEmbed } from '../serve';
+import { handleServe } from '../serve/handle-serve';
+import { handleServeText } from '../serve/handle-serve-text';
+import { handleServeNamespaced } from '../serve/namespaced';
+import { handleServeEmbed } from '../serve/embed';
 import { canViewClosedArtifact } from '../serve/access';
 import { handleDownloadPage, handleDeliveryFile } from '../serve/download-page';
 import type { ArtifactInfo } from '../serve/types';
@@ -16,7 +19,7 @@ import {
   serveOpenApiJson,
   serveOpenApiAgentJson,
 } from '../pages/integrations-discovery';
-import { handleUserHomePage } from '../pages/home';
+import { handleUserHomePage } from '../pages/home/handler';
 import { handleSharedPortal } from '../sharees/portal-page';
 import { handleInviteAcceptPage, handleInviteJoinPage } from '../workspaces/invite-accept-page';
 import { renderTelegramConnectPage, telegramDeepLinkRedirect } from '../pages/telegram-connect';
@@ -28,7 +31,7 @@ import { needsSetup, renderSetupPage } from '../pages/setup';
 import { renderStatusPage } from '../pages/status';
 import { renderWorkspaceIndexPage } from '../pages/workspace';
 import { renderWorkspaceUsagePage } from '../pages/workspace-usage';
-import { getSessionUser } from '../auth';
+import { getSessionUser } from '../auth/session';
 import { parseSubdomainFromEnv } from '../subdomain';
 import type { FetchContext } from './context';
 import { getTokenOrSessionUser } from './helpers/auth-guard';

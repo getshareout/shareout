@@ -1,6 +1,6 @@
 import type { Env } from '../types';
 import { createSessionToken } from '../token';
-import { autoJoinWorkspacesByDomain } from '../workspaces';
+import { autoJoinWorkspacesByDomain } from '../workspaces/access-policy';
 import { buildSessionCookie } from './cookies';
 import { getPlatformHostname } from '../config/origins';
 import { verifyGoogleIdToken } from './google-id-token';

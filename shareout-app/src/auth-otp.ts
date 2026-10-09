@@ -2,9 +2,10 @@ import type { Env } from './types';
 import type { FetchContext } from './router/context';
 import { generateId, sha256 } from './crypto-utils';
 import { dispatchLifecycleEmail } from './email/gateway';
-import { createSessionCookieForUser, upsertUserByEmail, getSessionUser } from './auth';
+import { createSessionCookieForUser, getSessionUser } from './auth/session';
+import { upsertUserByEmail } from './auth/users';
 import { SIGNUPS_PAUSED_MSG } from './signup-gate';
-import { autoJoinWorkspacesByDomain } from './workspaces';
+import { autoJoinWorkspacesByDomain } from './workspaces/access-policy';
 import { linkIdentity, getLinkedAccounts, unlinkIdentity } from './account-links';
 import { getTokenOrSessionUser } from './router/helpers/auth-guard';
 import { verifyTurnstile } from './turnstile';
@@ -14,7 +15,7 @@ import {
   getClientIp,
   rateLimitResponse,
 } from './rate-limit';
-import { scheduleSeedStarterKit } from './starter-kit';
+import { scheduleSeedStarterKit } from './starter-kit/schedule';
 import { scheduleWelcomeEmail, scheduleWorkspaceWelcome } from './onboarding/welcome-email';
 import { jsonWithApiErrors } from './http/api-error';
 import { ssoRequiredFor, ssoRequiredBody } from './auth/sso-config';

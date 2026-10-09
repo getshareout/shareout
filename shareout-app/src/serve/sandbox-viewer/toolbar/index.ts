@@ -1,7 +1,7 @@
 import { TOOLBAR_STYLES } from './styles/index';
 import { renderToolbarMarkup } from './markup';
 import { renderToolbarScript } from './script';
-import { componentStylesheet, componentScripts } from '../../../design-system/components/index';
+import { componentStylesheet, componentScripts } from '../../../design-system/components/stylesheet';
 import type { ToolbarRenderContext } from '../types';
 
 /**

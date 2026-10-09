@@ -1,13 +1,8 @@
-import {
-  handleGoogleLogin,
-  handleGoogleCallback,
-  handleGoogleOneTap,
-  handleLogout,
-  handlePasswordAuth,
-  handleCredentialsAuth,
-  handleLinkGoogleStart,
-  handleDevLogin,
-} from '../auth';
+import { handleGoogleLogin, handleGoogleCallback, handleLinkGoogleStart } from '../auth/google-oauth';
+import { handleGoogleOneTap } from '../auth/google-one-tap';
+import { handleLogout } from '../auth/logout';
+import { handlePasswordAuth, handleCredentialsAuth } from '../auth/artifact-auth';
+import { handleDevLogin } from '../auth/dev-login';
 import {
   handleCreateAccount,
   handleLinkEmail,
@@ -42,8 +37,8 @@ import { handleClaimInvite } from '../workspaces-invite-email';
 import { handleDeviceStart, handleDevicePoll, handleDevicePage, handleDeviceDone } from '../auth/device-auth';
 import { handleListMyTokens, handleCreateMyToken, handleRevokeMyToken } from '../api-me-tokens';
 import { handleListMyLibraries } from '../workspace-library';
-import { handleCreateLibraryModule } from '../publish';
-import { handleSheetsOAuthCallback } from '../data/sheets/handler';
+import { handleCreateLibraryModule } from '../publish/library-module';
+import { handleSheetsOAuthCallback } from '../data/sheets/artifact-auth';
 import { handleGitHubOAuthCallback } from '../data/github/handler';
 import { createLogger, logError } from '../logging';
 import { isSheetsAuthCallback, isGitHubAuthCallback } from '../oauth-callback';

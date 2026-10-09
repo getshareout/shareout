@@ -8,7 +8,7 @@ import type { Env } from './types';
 import type { AuthUser } from './api-auth';
 import { generateId } from './crypto-utils';
 import { contentHash, classifyAndPersist } from './moderation/check';
-import { getInternalWorkspaceRole } from './workspaces';
+import { getInternalWorkspaceRole } from './workspaces/roles';
 import { invalidateDeploymentCacheById } from './serve/deployment-cache';
 import { dispatchLifecycleEmail } from './email/gateway';
 import { normalizeVisibility } from './visibility-config';

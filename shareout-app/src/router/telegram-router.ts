@@ -22,9 +22,9 @@ import {
 } from '../chat-agent/access';
 import { sendSnapshotTool, sendPdfTool } from '../chat-agent/tools/media';
 import { commandToAgentPrompt } from '../chat-agent/commands';
-import { localeForRecipient, type Locale } from '../i18n';
+import { localeForRecipient, type Locale } from '../i18n/locale';
 import { enqueueAgentTurn, enqueueCallback } from '../chat-platforms/dispatch';
-import { isSuperAdminEmail } from '../superadmin/auth';
+import { isSuperAdminEmail } from '../superadmin/recipients';
 import { getRecentWebhooks } from '../observability/store';
 import { openTicket } from '../support/intake';
 import { getPlatformHostname, getPlatformOrigin } from '../config/origins';

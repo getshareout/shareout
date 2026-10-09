@@ -1,6 +1,6 @@
 import type { Env } from '../../types';
 import type { AuthUser } from '../../api-auth';
-import { getInternalWorkspaceRole } from '../../workspaces';
+import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { encryptCredentials } from '../../data/connections/credentials';
 import { getWorkspaceLlmConfig } from '../../data/agent/ai-config';
 import { jsonWithApiErrors } from '../../http/api-error';

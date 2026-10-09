@@ -10,17 +10,12 @@ import type { Env } from '../../types';
 import type { AuthUser } from '../../api-auth';
 import type { FetchContext } from '../context';
 import { isAuthUser, requireTokenOrSession } from '../helpers/auth-guard';
-import { getInternalWorkspaceRole } from '../../workspaces';
+import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { generateId } from '../../crypto-utils';
 import { apiErrorResponse, simpleApiError } from '../../http/api-error';
-import {
-  VENDOR_PACKAGES,
-  instanceExtraPackages,
-  invalidatePackageCache,
-  isValidPackageName,
-  vendorAllowsAny,
-  vendorLibsEnabled,
-} from '../../vendor-cdn';
+import { VENDOR_PACKAGES } from '../../vendor-cdn/registry';
+import { instanceExtraPackages, invalidatePackageCache, isValidPackageName, vendorAllowsAny } from '../../vendor-cdn/packages';
+import { vendorLibsEnabled } from '../../vendor-cdn/serve';
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });

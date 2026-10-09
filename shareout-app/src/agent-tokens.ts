@@ -2,7 +2,7 @@ import type { Env } from './types';
 import type { AuthUser, ServiceScope } from './api-auth';
 import { generateServiceToken, hashToken, SERVICE_SCOPES } from './api-auth';
 import { generateId } from './crypto-utils';
-import { getInternalWorkspaceRole, invalidateWorkspaceRole } from './workspaces';
+import { getInternalWorkspaceRole, invalidateWorkspaceRole } from './workspaces/roles';
 import { logAudit } from './audit';
 import { jsonWithApiErrors } from './http/api-error';
 

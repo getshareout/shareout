@@ -1,4 +1,4 @@
-import { getInternalWorkspaceRole } from '../../workspaces';
+import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { logAudit } from '../../audit';
 import { setArtifactPaused, setArtifactVisibility } from '../../superadmin/artifacts-admin';
 import { transferArtifactOwnership } from '../../artifacts/collaborators';

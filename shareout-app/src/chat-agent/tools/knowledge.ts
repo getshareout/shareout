@@ -1,12 +1,8 @@
 import type { AccountTool, ToolContext } from './types';
 import type { Env } from '../../types';
 import { PERSONAL_SCOPE } from '../../chat-platforms/types';
-import {
-  isKnowledgeEnabled,
-  loadKnowledge,
-  NODE_KINDS,
-  type KnowledgeNode,
-} from '../../knowledge';
+import { isKnowledgeEnabled, loadKnowledge } from '../../knowledge/store';
+import { NODE_KINDS, type KnowledgeNode } from '../../knowledge/types';
 
 const MAX_RESULTS = 20;
 const SEMANTIC_TOPK = 15;

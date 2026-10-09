@@ -1,6 +1,6 @@
 import type { Env } from '../types';
 import { generateId } from '../crypto-utils';
-import { hasWorkspaceSignupAllowlist } from '../workspaces';
+import { hasWorkspaceSignupAllowlist } from '../workspaces/access-policy';
 import { signupsPaused, SIGNUPS_PAUSED_MSG } from '../signup-gate';
 
 export interface GoogleUserInfo {

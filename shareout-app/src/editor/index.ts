@@ -1,7 +1,7 @@
 // ShareOut Visual Editor - Main Router
 
 import type { Env } from '../types';
-import { generateEditorPage } from './visual-editor';
+import { generateEditorPage } from './page/generate-editor-page';
 import { handleDraft, handlePublish, handleHistory, handleUpload } from './draft';
 import { handleEditorWebSocket } from './collab/index';
 import { handleEditorChat } from './chat/index';

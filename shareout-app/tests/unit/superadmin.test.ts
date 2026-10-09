@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../src/auth', () => ({
+vi.mock('../../src/auth/session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getSessionUser: vi.fn(),
 }));
 

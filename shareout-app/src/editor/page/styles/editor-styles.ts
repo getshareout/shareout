@@ -27,7 +27,7 @@ import { artifactDetailsEnhancedCss } from './sections/artifact-details-enhanced
 import { validationPanelCss } from './sections/validation-panel.css';
 import { shortcutsHelpCss } from './sections/shortcuts-help.css';
 import { approvalPickerCss } from './sections/approval-picker.css';
-import { componentStylesheet } from '../../../design-system/components/index';
+import { componentStylesheet } from '../../../design-system/components/stylesheet';
 
 /**
  * Returns the complete CSS bundle injected into the visual editor page.

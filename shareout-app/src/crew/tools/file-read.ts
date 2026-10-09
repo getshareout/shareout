@@ -1,5 +1,6 @@
 import type { CrewTool } from '../types';
-import { logCrewToolFailure, userFacingReadFileError } from '../errors';
+import { logCrewToolFailure } from '../errors';
+import { userFacingReadFileError } from '../../chat-agent/errors';
 import { getOrCreateAssetBucket } from '../../assets/bucket';
 import { summarizeFile } from '../../data/files';
 

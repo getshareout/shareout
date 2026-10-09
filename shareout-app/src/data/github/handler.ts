@@ -1,7 +1,8 @@
 import type { Env } from '../../types';
 import { DATA_ERRORS } from '../../types';
-import { googleFontsPreconnect, standalonePageStyles } from '../../design-system/standalone-page';
-import { colors } from '../../design-system/tokens';
+import { googleFontsPreconnect } from '../../../packages/design-tokens/src/index';
+import { standalonePageStyles } from '../../design-system/standalone-page';
+import { colors } from '../../../packages/design-tokens/src/index';
 import { createLogger, logError } from '../../logging';
 import {
   successResponse,

@@ -12,13 +12,13 @@
  *     Changing an existing one requires the current password.
  */
 import type { FetchContext } from '../router/context';
-import { getSessionUser } from './index';
+import { getSessionUser } from './session';
 import { getTokenOrSessionUser } from '../router/helpers/auth-guard';
 import { createSessionCookieForUser } from './session';
 import { ssoRequiredFor, ssoRequiredBody } from './sso-config';
 import { needsSetup, schemaReady } from '../pages/setup';
 import { checkPasswordLoginLimit, rateLimitResponse } from '../rate-limit';
-import { scheduleSeedStarterKit } from '../starter-kit';
+import { scheduleSeedStarterKit } from '../starter-kit/schedule';
 import { scheduleWelcomeEmail, scheduleWorkspaceWelcome } from '../onboarding/welcome-email';
 import { generateId } from '../crypto-utils';
 import {

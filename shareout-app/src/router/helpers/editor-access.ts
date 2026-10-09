@@ -5,7 +5,7 @@ import { jsonError } from './json-response';
 import { getVisibilityScope } from '../../account-links';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { canAccess } from '../../access/can-access';
-import { isSuperAdminEmail } from '../../superadmin/auth';
+import { isSuperAdminEmail } from '../../superadmin/recipients';
 
 export type ArtifactRole = 'owner' | 'editor' | 'viewer';
 

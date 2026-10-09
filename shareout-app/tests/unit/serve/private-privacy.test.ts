@@ -14,13 +14,12 @@ import {
 } from './helpers/env';
 import { setupServeTestHooks } from './helpers/hooks';
 import { handleServe } from '../../../src/serve';
-import {
-  loginPage,
-  accessDeniedPage,
-  passwordLoginPage,
-} from '../../../src/auth/pages';
 import { pausedPage, underReviewPage, takedownPage, NOINDEX_ROBOTS } from '../../../src/serve/utils';
 import { renderEarlyHead } from '../../../src/serve/sandbox-viewer/early-head';
+
+// helpers/mocks stubs the gate pages for handleServe; these tests check the real renderers.
+const { loginPage, accessDeniedPage, passwordLoginPage } =
+  await vi.importActual<typeof import('../../../src/auth/pages')>('../../../src/auth/pages');
 
 setupServeTestHooks();
 

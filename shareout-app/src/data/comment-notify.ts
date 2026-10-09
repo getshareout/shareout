@@ -4,7 +4,8 @@ import { dispatchLifecycleEmail } from '../email/gateway';
 import { getLinkedChatId } from '../telegram/linking';
 import { sendMessage } from '../telegram/client';
 import { getPlatformOrigin } from '../config/origins';
-import { localeForRecipient, localeTag, t, type Locale } from '../i18n';
+import { localeForRecipient, localeTag, type Locale } from '../i18n/locale';
+import { t } from '../i18n';
 
 export interface NotifyComment {
   id: string;

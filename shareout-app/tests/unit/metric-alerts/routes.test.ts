@@ -5,7 +5,10 @@ import type { Env } from '../../../src/types';
 const validateToken = vi.hoisted(() => vi.fn());
 const getSessionUser = vi.hoisted(() => vi.fn());
 vi.mock('../../../src/api-auth', () => ({ validateToken }));
-vi.mock('../../../src/auth', () => ({ getSessionUser }));
+vi.mock('../../../src/auth/session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getSessionUser,
+}));
 
 // Rules/definitions services — we only assert routing/auth here.
 const listRulesForOwner = vi.hoisted(() => vi.fn());

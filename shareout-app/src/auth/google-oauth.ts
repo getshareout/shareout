@@ -1,6 +1,6 @@
 import type { Env } from '../types';
 import { createSessionToken } from '../token';
-import { autoJoinWorkspacesByDomain } from '../workspaces';
+import { autoJoinWorkspacesByDomain } from '../workspaces/access-policy';
 import { linkIdentity } from '../account-links';
 import { COOKIE_NAME } from './constants';
 import { cookieDomainAttr, isShareoutOrigin } from './cookies';
@@ -9,7 +9,7 @@ import { errorPage, linkSuccessPage } from './pages';
 import { resolveSessionMaxAge } from './session';
 import { linkGoogleToUser, upsertUser } from './users';
 import { ssoRequiredFor, ssoStartPath } from './sso-config';
-import { scheduleSeedStarterKit } from '../starter-kit';
+import { scheduleSeedStarterKit } from '../starter-kit/schedule';
 import { scheduleWelcomeEmail, scheduleWorkspaceWelcome } from '../onboarding/welcome-email';
 import { approveDeviceCode, deviceDonePage } from './device-auth';
 

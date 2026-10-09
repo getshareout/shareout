@@ -1,7 +1,7 @@
 import type { FetchContext } from '../router/context';
 import type { Env } from '../types';
-import { getSessionUser } from '../auth';
-import { colors, fonts, radius } from '../design-system/tokens';
+import { getSessionUser } from '../auth/session';
+import { colors, fonts, radius } from '../../packages/design-tokens/src/index';
 import { addSuppression, removeSuppression } from './suppressions';
 import { verifyUnsubscribeToken } from './unsubscribe-token';
 import { getPreferences, setPreference, type EmailCategory } from './preferences';

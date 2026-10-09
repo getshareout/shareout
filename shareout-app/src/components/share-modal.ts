@@ -1,4 +1,4 @@
-import { colors, fonts, radius, shadows } from '../design-system/tokens';
+import { colors, fonts, radius, shadows } from '../../packages/design-tokens/src/index';
 import type { Locale, LocaleCopy } from '../i18n';
 
 // Values land in HTML and single/double-quoted JS strings: no quotes, backslashes or HTML specials.

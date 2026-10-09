@@ -1,7 +1,7 @@
 import type { Env } from '../types';
 import type { FetchContext } from './context';
 import { commandToAgentPrompt } from '../chat-agent/commands';
-import { localeForRecipient, type Locale } from '../i18n';
+import { localeForRecipient, type Locale } from '../i18n/locale';
 import { enqueueAgentTurn, enqueueCallback } from '../chat-platforms/dispatch';
 import { createSlackReplyPort } from '../chat-platforms/slack/reply-port';
 import {

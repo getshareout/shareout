@@ -2,7 +2,7 @@
  * Static metadata for artifact types, feature badges, and connector tiles.
  */
 import type { ArtifactRow } from './types';
-import { colors } from '../../design-system/tokens';
+import { colors } from '../../../packages/design-tokens/src/index';
 
 export const TYPE_GROUPS: Record<string, string[]> = {
   apps: ['html'],

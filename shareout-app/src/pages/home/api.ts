@@ -8,26 +8,12 @@ import { getAccountAnalytics } from '../../analytics';
 import { hostWorkspaceId } from './host';
 import { renderFolderReadme } from './folder-readme';
 import { parseHomeFilters } from './filters';
-import {
-  queryHomeArtifacts,
-  queryHomeArtifactCatalog,
-  queryHomeCounts,
-  queryHomeTags,
-  queryPersonalFolders,
-  queryTeamFolders,
-  queryFoldersInParent,
-  queryFolderPath,
-  queryFolderReadme,
-  queryRecentActivity,
-  queryRecentComments,
-  queryActivityFeed,
-  queryForYou,
-  queryRecentlyViewed,
-  queryArtifactComments,
-  addArtifactComment,
-  recordRecentView,
-  dismissHomeEvents,
-} from './queries';
+import { queryHomeArtifacts, queryHomeArtifactCatalog, queryHomeCounts, queryForYou, queryRecentlyViewed, recordRecentView } from './queries/artifacts';
+import { queryHomeTags } from './queries/tags';
+import { queryPersonalFolders, queryTeamFolders, queryFoldersInParent, queryFolderPath, queryFolderReadme } from './queries/folders';
+import { queryRecentActivity, queryRecentComments } from './queries/activity-panels';
+import { queryActivityFeed, dismissHomeEvents } from './queries/activity-feed';
+import { queryArtifactComments, addArtifactComment } from './queries/comments';
 import {
   ALL_KINDS, EVENT_DEFS, isAudience, resolveWorkspaceAudiences, setWorkspaceEventAudience,
   type ActivityKind,

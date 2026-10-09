@@ -1,11 +1,7 @@
 import type { Env } from '../types';
 import { placeholders } from '../account-links';
-import {
-  getBotVisibilityScope,
-  listWorkspacesForUser,
-  TELEGRAM_PERSONAL_WORKSPACE,
-  type WorkspaceSelection,
-} from '../chat-agent/access';
+import { getBotVisibilityScope, listWorkspacesForUser, TELEGRAM_PERSONAL_WORKSPACE } from '../chat-agent/access';
+import { type WorkspaceSelection } from '../chat-platforms/types';
 
 /**
  * Shared "pro search" service — one ranked, fuzzy, multi-group search behind every

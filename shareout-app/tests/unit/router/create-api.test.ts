@@ -15,7 +15,10 @@ const checkRateLimit = vi.hoisted(() => vi.fn());
 const incrementRateLimit = vi.hoisted(() => vi.fn());
 const checkStorageQuota = vi.hoisted(() => vi.fn());
 
-vi.mock('../../../src/auth', () => ({ getSessionUser }));
+vi.mock('../../../src/auth/session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getSessionUser,
+}));
 vi.mock('../../../src/pages/home/host', () => ({ hostWorkspaceId }));
 vi.mock('../../../src/pages/create-gate', () => ({ requireCreateEnabled }));
 vi.mock('../../../src/data/agent/anthropic', () => ({
@@ -28,7 +31,10 @@ vi.mock('../../../src/rate-limit', () => ({
   checkSlidingWindowRateLimit,
   getClientIp: vi.fn(() => '1.2.3.4'),
 }));
-vi.mock('../../../src/publish', () => ({ publishGeneratedHtml }));
+vi.mock('../../../src/publish/publish-generated-html', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  publishGeneratedHtml,
+}));
 vi.mock('../../../src/api-auth', () => ({ checkRateLimit, incrementRateLimit, RATE_LIMIT_MAX: 100 }));
 vi.mock('../../../src/quota', () => ({ checkStorageQuota }));
 vi.mock('../../../src/logging', () => ({

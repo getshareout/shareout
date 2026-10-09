@@ -2,7 +2,7 @@ import type { AuthUser } from '../../api-auth';
 import { validateToken } from '../../api-auth';
 import { unauthorizedFor } from '../../auth/unauthorized';
 import { getAuthUser } from '../../auth-user';
-import { getSessionUser } from '../../auth';
+import { getSessionUser } from '../../auth/session';
 import type { FetchContext } from '../context';
 
 export function isAuthUser(result: AuthUser | Response): result is AuthUser {

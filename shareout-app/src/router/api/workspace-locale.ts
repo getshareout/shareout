@@ -1,9 +1,9 @@
 import type { Env } from '../../types';
 import type { AuthUser } from '../../api-auth';
-import { requireWorkspaceRole } from '../../workspaces';
+import { requireWorkspaceRole } from '../../workspaces/roles';
 import { logAudit } from '../../audit';
 import { jsonWithApiErrors as json } from '../../http/api-error';
-import { isLocale } from '../../i18n';
+import { isLocale } from '../../i18n/locale';
 
 // The language a workspace speaks to its people (emails, agent, home, shared pages),
 // and a person's own override of it. Admins set the workspace; anyone sets their own.

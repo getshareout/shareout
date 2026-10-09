@@ -1,6 +1,6 @@
 import type { Env } from '../types';
-import { getUserRole } from '../artifacts';
-import { getInternalWorkspaceRole } from '../workspaces';
+import { getUserRole } from '../artifacts/roles';
+import { getInternalWorkspaceRole } from '../workspaces/roles';
 
 export interface ArtifactRef {
   id: string;

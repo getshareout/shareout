@@ -1,5 +1,7 @@
 import type { Env } from './types';
-import { INDEX_PATH, isKnowledgeEnabled, getKnowledgeFile, parseNode } from './knowledge';
+import { INDEX_PATH } from './knowledge/types';
+import { isKnowledgeEnabled, getKnowledgeFile } from './knowledge/store';
+import { parseNode } from './knowledge/parse';
 
 const DEFAULT_MAX_CHARS = 1500;
 

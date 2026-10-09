@@ -3,19 +3,11 @@ import { jsonResponse, jsonError } from '../helpers/json-response';
 import { apiErrorResponse } from '../../http/api-error';
 import { requireTokenOrSession, isAuthUser } from '../helpers/auth-guard';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
-import {
-  isKnowledgeEnabled,
-  setKnowledgeEnabled,
-  listKnowledgeFiles,
-  upsertKnowledgeFile,
-  deleteKnowledgeFile,
-  enqueueIngest,
-  parseKnowledge,
-  runKnowledgeDistill,
-  NODE_KINDS,
-  type KnowledgeNode,
-  type StoredKnowledgeFile,
-} from '../../knowledge';
+import { isKnowledgeEnabled, setKnowledgeEnabled, listKnowledgeFiles, upsertKnowledgeFile, deleteKnowledgeFile, type StoredKnowledgeFile } from '../../knowledge/store';
+import { enqueueIngest } from '../../knowledge/ingest';
+import { parseKnowledge } from '../../knowledge/parse';
+import { runKnowledgeDistill } from '../../knowledge/distill';
+import { NODE_KINDS, type KnowledgeNode } from '../../knowledge/types';
 import { getAIProvider } from '../../data/agent/anthropic';
 import { corpusFor } from '../../knowledge/corpus/client';
 import { startIngest } from '../../knowledge/corpus/ingest';

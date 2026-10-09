@@ -8,8 +8,9 @@
  */
 import type { Env } from '../types';
 import { hashToken } from '../api-auth';
-import { handlePublish } from '../publish';
-import { handleListArtifacts, handleGetArtifact, handleGetArtifactFiles } from '../artifacts';
+import { handlePublish } from '../publish/handle-publish';
+import { handleListArtifacts, handleGetArtifact } from '../artifacts/crud';
+import { handleGetArtifactFiles } from '../artifacts/files';
 import { requireRole } from '../artifacts/roles';
 import { listWorkspacesForUser, type BotWorkspace } from '../chat-agent/access';
 import { quickSearch } from '../search/quick-search';

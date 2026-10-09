@@ -1,5 +1,6 @@
 import { queryConnectionAny } from '../../data/connections/warehouse-query';
-import { logCrewToolFailure, userFacingConnectionToolError } from '../errors';
+import { logCrewToolFailure } from '../errors';
+import { userFacingConnectionToolError } from '../../data/connections/errors';
 import type { CrewTool } from '../types';
 
 export const connectionQueryTool: CrewTool = {

@@ -1,6 +1,6 @@
 import type { Env } from '../types';
 import { generateId } from '../crypto-utils';
-import { getUserRole } from '../artifacts';
+import { getUserRole } from '../artifacts/roles';
 import {
   type TemplateVariable,
   type TemplateVariablesSchema,

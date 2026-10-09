@@ -1,5 +1,5 @@
 import type { PWAConfig } from '../../types';
-import { colors } from '../../design-system/tokens';
+import { colors } from '../../../packages/design-tokens/src/index';
 import { escapeHtml } from '../utils';
 import type { ParsedPwaConfig } from './types';
 

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { handleListSlackChannels } from '../../../src/router/api/workspace-connections';
-import * as slackSend from '../../../src/slack/send';
+import * as slackSend from '../../../src/chat-platforms/slack/client';
 import type { Env } from '../../../src/types';
 import type { AuthUser } from '../../../src/api-auth';
 

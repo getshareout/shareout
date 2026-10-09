@@ -10,10 +10,11 @@ vi.mock('../../src/router/helpers/auth-guard', async (orig) => {
 });
 // work/030 sweep: code now calls getInternalWorkspaceRole; alias both to one mock fn.
 const wsRoleMock = vi.hoisted(() => vi.fn());
-vi.mock('../../src/workspaces', async (orig) => {
-  const actual = await orig<typeof import('../../src/workspaces')>();
-  return { ...actual, getWorkspaceRole: wsRoleMock, getInternalWorkspaceRole: wsRoleMock };
-});
+vi.mock('../../src/workspaces/roles', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getWorkspaceRole: wsRoleMock,
+  getInternalWorkspaceRole: wsRoleMock,
+}));
 vi.mock('../../src/superadmin/artifacts-admin', () => ({
   setArtifactPaused: vi.fn(async () => {}),
   setArtifactVisibility: vi.fn(async () => ({ ok: true })),

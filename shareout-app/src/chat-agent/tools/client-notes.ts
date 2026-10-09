@@ -1,5 +1,5 @@
 import type { AccountTool, ToolContext } from './types';
-import { getInternalWorkspaceRole } from '../../workspaces';
+import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { upsertShareeContextFile } from '../../workspace-context';
 import { isKnownShareeContextUpsertError, logAgentToolFailure, userFacingClientNotesError } from '../errors';
 

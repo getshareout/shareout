@@ -15,7 +15,7 @@ import { WebThreadStore } from '../../chat-agent/store/d1-threads';
 import { createWebReplyPort, agentMediaKey, type WebAgentEvent } from '../../chat-platforms/web/reply-port';
 import { generateId } from '../../crypto-utils';
 import { jsonWithApiErrors } from '../../http/api-error';
-import { localeForRecipient, type Locale } from '../../i18n';
+import { localeForRecipient, type Locale } from '../../i18n/locale';
 import { PERSONAL_SCOPE } from '../../chat-platforms/types';
 
 const HISTORY_LIMIT = 20;

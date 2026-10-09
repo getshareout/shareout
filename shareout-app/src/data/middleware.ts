@@ -6,7 +6,7 @@ import {
   extractTokenFromCookie,
 } from '../token';
 import { validateToken, type ServiceScope } from '../api-auth';
-import { getInternalWorkspaceRole } from '../workspaces';
+import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { canAccess } from '../access/can-access';
 import { normalizeVisibility } from '../visibility-config';
 import { apiErrorResponse } from '../http/api-error';

@@ -8,7 +8,7 @@ import { generateId } from '../../../crypto-utils';
 import { logAudit } from '../../../audit';
 import { encryptCredentials, decryptCredentials } from '../../../data/connections/credentials';
 import { getProvider, hasProvider, listProviders } from '../../../data/platform';
-import { seedCatalogForConnection } from '../../../catalog';
+import { seedCatalogForConnection } from '../../../catalog/seed-resources';
 import { buildProbeCredentials, summarizeCredentials } from './credentials';
 import {
   GENERIC_TYPES,

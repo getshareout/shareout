@@ -6,7 +6,10 @@ import { createFetchContext } from '../../../src/router/context';
 const validateToken = vi.hoisted(() => vi.fn());
 const getSessionUser = vi.hoisted(() => vi.fn());
 vi.mock('../../../src/api-auth', () => ({ validateToken }));
-vi.mock('../../../src/auth', () => ({ getSessionUser }));
+vi.mock('../../../src/auth/session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getSessionUser,
+}));
 
 const env = {} as Env;
 

@@ -8,7 +8,7 @@
  * below and the new class-based helpers.
  */
 
-import { colors, fonts, spacing, radius, shadows, animation, layout } from './tokens';
+import { colors, fonts, spacing, radius, shadows, animation, layout } from '../../packages/design-tokens/src/index';
 
 export * from './components/index';
 

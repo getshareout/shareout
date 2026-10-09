@@ -3,7 +3,7 @@
 // granted (direct or via a folder subtree), branded by their Sharee org. This is the
 // external user's home — the surface that turns a one-off share into a relationship.
 import type { Env } from '../types';
-import { getSessionUser } from '../auth';
+import { getSessionUser } from '../auth/session';
 import { getVisibilityScope } from '../account-links';
 import { renderHtmlPage } from '../design-system/shell';
 import { escapeHtml } from '../html/utils';

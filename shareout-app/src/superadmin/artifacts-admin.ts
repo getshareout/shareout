@@ -1,5 +1,5 @@
 import type { Env, Visibility } from '../types';
-import { purgeArtifact } from '../artifacts';
+import { purgeArtifact } from '../artifacts/crud';
 import { clearModerationHold, restoreHeldVisibility } from '../moderation/check';
 import { notifyModerationResolved } from '../moderation/notify';
 import { invalidateDeploymentCacheById } from '../serve/deployment-cache';

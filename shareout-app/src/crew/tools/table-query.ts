@@ -1,4 +1,5 @@
-import { queryRowsForTool, type QueryBody } from '../../data/tables';
+import { queryRowsForTool } from '../../data/tables/query';
+import { type QueryBody } from '../../data/tables/types';
 import type { CrewTool } from '../types';
 
 export const tableQueryTool: CrewTool = {

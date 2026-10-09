@@ -6,7 +6,8 @@ vi.mock('../../src/api-auth', () => ({
   validateAdminSession: vi.fn(),
 }));
 
-vi.mock('../../src/auth', () => ({
+vi.mock('../../src/auth/session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getSessionUser: vi.fn(),
 }));
 

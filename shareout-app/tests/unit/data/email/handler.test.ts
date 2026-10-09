@@ -7,7 +7,8 @@ import type { Env } from '../../../../src/types';
 const ARTIFACT_ID = 'art_email';
 const ORIGIN = 'https://app.example.com';
 
-vi.mock('../../../../src/scheduling/jobs', () => ({
+vi.mock('../../../../src/scheduling/jobs/artifact-email', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getArtifactEmail: vi.fn(),
 }));
 

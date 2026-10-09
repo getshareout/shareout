@@ -25,7 +25,7 @@ import type {
   AssetDeliveryData,
 } from './catalog';
 import { escapeHtml } from './layout';
-import { colors } from '../design-system/tokens';
+import { colors } from '../../packages/design-tokens/src/index';
 
 const quote = (title: string, snippet: string) =>
   `<p style="margin:0 0 14px">En <strong>${escapeHtml(title)}</strong>:</p>` +

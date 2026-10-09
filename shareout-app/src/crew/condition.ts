@@ -1,5 +1,6 @@
 import type { DataContext } from '../data/middleware';
-import { filterToSql, buildScopeClause } from '../data/tables';
+import { filterToSql } from '../data/tables/filter-sql';
+import { buildScopeClause } from '../data/tables/scope';
 
 // A condition trigger's predicate: count rows in a table matching a filter and
 // compare. Cheap (one COUNT), owner-scoped, no external calls. Optional — a

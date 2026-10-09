@@ -3,11 +3,11 @@
  */
 import { escapeHtml } from '../../../html/utils';
 import { brandLockupHtml } from '../../../brand';
-import { parseBranding } from '../../../workspaces';
+import { parseBranding } from '../../../workspaces/branding';
 import type { RenderArgs } from '../types';
 import { ICON } from './constants';
 import { railNav, svg, widget, viewSeg, GRIP_SVG } from './helpers';
-import { homeLangSwitchHtml } from '../home-i18n';
+import { homeLangSwitchHtml } from '../home-i18n/lang-switch';
 import type { NavItem } from './constants';
 
 /** True when the viewer can open workspace admin surfaces. */

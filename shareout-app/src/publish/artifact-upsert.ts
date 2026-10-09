@@ -4,7 +4,7 @@
  */
 import type { ArtifactType, AuthMethod, Env, PWAConfig, TypeMetadata, Visibility } from '../types';
 import type { AuthUser } from '../api-auth';
-import { getUserRole } from '../artifacts';
+import { getUserRole } from '../artifacts/roles';
 import { generateId } from '../crypto-utils';
 import { hashPassword } from './request-auth';
 import { allocateRoutingSlug } from './routing-slug';

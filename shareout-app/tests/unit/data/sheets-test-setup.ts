@@ -22,7 +22,8 @@ vi.mock('../../../src/crypto-utils', () => ({
   generateId: vi.fn((prefix: string) => `${prefix}_id${++idSeq}`),
 }));
 
-vi.mock('../../../src/auth', () => ({
+vi.mock('../../../src/auth/session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getSessionUser: vi.fn(),
 }));
 

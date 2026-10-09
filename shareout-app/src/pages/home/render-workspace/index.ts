@@ -5,7 +5,7 @@
  * Styles, HTML template, and client hydration are split across submodules.
  */
 import type { RenderArgs } from '../types';
-import { getHomeI18nScript } from '../home-i18n';
+import { getHomeI18nScript } from '../home-i18n/runtime';
 import { WORKSPACE_CLIENT } from './client-script';
 import { buildWorkspaceBody, canManageWorkspace } from './template';
 

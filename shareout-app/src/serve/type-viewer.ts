@@ -4,14 +4,14 @@ import { trackViewerView } from '../view-tracking';
 import { hasCustomViewer, renderViewer } from '../viewers';
 import { loadSkillViewerMetrics } from '../skill-marketplace';
 import { loadLibraryViewerMetrics } from '../workspace-library';
-import { getSessionUser } from '../auth';
+import { getSessionUser } from '../auth/session';
 import type { ArtifactInfo } from './types';
 import { detectAdminStatus, detectFavoriteState } from './prefetch';
 import { getSecurityHeaders } from './security';
 import { notFound, runBackground, NOINDEX_ROBOTS } from './utils';
 import type { SocialPreview } from './social-meta';
 import { normalizeVisibility } from '../visibility-config';
-import { localeForArtifactWorkspace } from '../i18n';
+import { localeForArtifactWorkspace } from '../i18n/locale';
 
 export async function serveTypeViewer(
   request: Request,

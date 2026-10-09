@@ -39,8 +39,33 @@ const teamMetrics = vi.hoisted(() => ({
   writeTeamDashboardSnapshots: vi.fn(async () => []),
 }));
 
-vi.mock('../../src/scheduling/jobs', () => jobs);
-vi.mock('../../src/artifacts', () => ({ getUserRole, purgeSoftDeleted }));
+vi.mock('../../src/scheduling/jobs/crud', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  createJob: jobs.createJob,
+  listJobs: jobs.listJobs,
+  listJobsForArtifact: jobs.listJobsForArtifact,
+  deleteJob: jobs.deleteJob,
+  updateJob: jobs.updateJob,
+  getJobLogs: jobs.getJobLogs,
+}));
+vi.mock('../../src/scheduling/jobs/artifact-email', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  createArtifactEmail: jobs.createArtifactEmail,
+  getArtifactEmail: jobs.getArtifactEmail,
+}));
+vi.mock('../../src/scheduling/jobs/execute', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  runScheduledJobs: jobs.runScheduledJobs,
+  runJobManually: jobs.runJobManually,
+}));
+vi.mock('../../src/artifacts/roles', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getUserRole,
+}));
+vi.mock('../../src/artifacts/crud', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  purgeSoftDeleted,
+}));
 vi.mock('../../src/analytics', () => analytics);
 vi.mock('../../src/api-auth', () => apiAuth);
 vi.mock('../../src/crew/triggers', () => crewTriggers);

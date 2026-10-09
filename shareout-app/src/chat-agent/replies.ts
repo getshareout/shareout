@@ -1,4 +1,5 @@
-import { t, type Locale } from '../i18n';
+import { t } from '../i18n';
+import { type Locale } from '../i18n/locale';
 
 const REPLIES = {
   en: {

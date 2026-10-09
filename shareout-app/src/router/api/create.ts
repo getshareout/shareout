@@ -1,9 +1,9 @@
 import type { FetchContext } from '../context';
-import { getSessionUser } from '../../auth';
+import { getSessionUser } from '../../auth/session';
 import { chat, streamChat, getAgentChatModel, getBuildConfig } from '../../data/agent/anthropic';
 import { BUILD_MAX_TOKENS, buildSystemPrompt, extractHtml, deriveName } from '../../data/agent/build-page';
 import { getPackDirective } from '../../pages/themes';
-import { publishGeneratedHtml } from '../../publish';
+import { publishGeneratedHtml } from '../../publish/publish-generated-html';
 import { checkSlidingWindowRateLimit, getClientIp } from '../../rate-limit';
 import { createLogger, logError } from '../../logging';
 import { requireCreateEnabled } from '../../pages/create-gate';

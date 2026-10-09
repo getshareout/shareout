@@ -3,10 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // work/030 sweep: code now calls getInternalWorkspaceRole; alias both exports to one
 // mock fn so vi.mocked(getWorkspaceRole).mockResolvedValue(...) drives the real path.
 const wsRoleMock = vi.hoisted(() => vi.fn());
-vi.mock('../../src/workspaces', async (orig) => {
-  const actual = await orig<typeof import('../../src/workspaces')>();
-  return { ...actual, getWorkspaceRole: wsRoleMock, getInternalWorkspaceRole: wsRoleMock, invalidateWorkspaceRole: vi.fn(async () => {}) };
-});
+vi.mock('../../src/workspaces/roles', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getWorkspaceRole: wsRoleMock,
+  getInternalWorkspaceRole: wsRoleMock,
+  invalidateWorkspaceRole: vi.fn(async () => {}),
+}));
 vi.mock('../../src/workspaces-invite-email', () => ({
   createInviteClaim: vi.fn(async () => ({ id: 'inv_1', code: 'CODE123' })),
   sendInviteEmail: vi.fn(async () => ({ sent: true })),

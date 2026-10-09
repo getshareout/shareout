@@ -5,7 +5,10 @@ import type { Env } from '../../src/types';
 const validateToken = vi.hoisted(() => vi.fn());
 const getSessionUser = vi.hoisted(() => vi.fn());
 vi.mock('../../src/api-auth', () => ({ validateToken }));
-vi.mock('../../src/auth', () => ({ getSessionUser }));
+vi.mock('../../src/auth/session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getSessionUser,
+}));
 
 // Job + template handlers — we only assert routing/auth here.
 const handleCreateJob = vi.hoisted(() => vi.fn());

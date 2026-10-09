@@ -7,7 +7,7 @@ import {
   incrementEmailCount,
   type EmailConfig,
 } from '../../scheduling/email';
-import { getArtifactEmail } from '../../scheduling/jobs';
+import { getArtifactEmail } from '../../scheduling/jobs/artifact-email';
 import { checkSlidingWindowRateLimit, getTrustedClientIp } from '../../rate-limit';
 
 const MAX_SUBJECT_LEN = 200;

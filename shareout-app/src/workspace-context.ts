@@ -1,7 +1,7 @@
 import type { Env } from './types';
 import type { AuthUser } from './api-auth';
 import { generateId } from './crypto-utils';
-import { requireWorkspaceRole } from './workspaces';
+import { requireWorkspaceRole } from './workspaces/roles';
 import { json } from './artifacts/json-response';
 import { knowledgeTrunkForContext } from './knowledge-context';
 

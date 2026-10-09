@@ -1,7 +1,7 @@
 import type { Env } from '../types';
 import { generateId } from '../crypto-utils';
 import { createSessionToken } from '../token';
-import { autoJoinWorkspacesByDomain } from '../workspaces';
+import { autoJoinWorkspacesByDomain } from '../workspaces/access-policy';
 import { COOKIE_NAME } from './constants';
 import { cookieDomainAttr, cookieSecureAttr, isLocalhost } from './cookies';
 import { getPlatformHostname } from '../config/origins';

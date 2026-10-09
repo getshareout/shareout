@@ -1,4 +1,5 @@
-import { googleFontsPreconnect, standalonePageStyles } from '../../design-system/standalone-page';
+import { googleFontsPreconnect } from '../../../packages/design-tokens/src/index';
+import { standalonePageStyles } from '../../design-system/standalone-page';
 
 export function renderCallbackPage(
   success: boolean,

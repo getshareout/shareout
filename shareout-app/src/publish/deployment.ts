@@ -16,7 +16,8 @@ import { shouldBlockPublish, stageCandidate, runBlockGate } from '../tests/block
 import type { ModerationStatus } from '../moderation/check';
 import type { ReadinessProfile } from '../../shared/editor-readiness/model';
 import { maybeRunMonitorTests } from './monitor-tests';
-import { isKnowledgeEnabled, enqueueIngest } from '../knowledge';
+import { isKnowledgeEnabled } from '../knowledge/store';
+import { enqueueIngest } from '../knowledge/ingest';
 import { queueKnowledgeSource } from '../knowledge/corpus/ingest';
 
 export interface WorkspaceUrls {

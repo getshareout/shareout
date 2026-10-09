@@ -3,7 +3,7 @@
  * name validation, and workspace role guards.
  */
 import type { Env } from '../../../types';
-import { getInternalWorkspaceRole } from '../../../workspaces';
+import { getInternalWorkspaceRole } from '../../../workspaces/roles';
 import { jsonWithApiErrors } from '../../../http/api-error';
 
 // ponytail: 'postgres' hidden until a server-side engine exists (work/023); existing rows still resolve.

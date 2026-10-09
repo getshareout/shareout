@@ -6,11 +6,17 @@ const validateToken = vi.hoisted(() => vi.fn());
 const getSessionUser = vi.hoisted(() => vi.fn());
 const hasScope = vi.hoisted(() => vi.fn());
 vi.mock('../../src/api-auth', () => ({ validateToken, hasScope }));
-vi.mock('../../src/auth', () => ({ getSessionUser }));
+vi.mock('../../src/auth/session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getSessionUser,
+}));
 
 // Membership gate + the answer engine — assert routing/auth only.
 const getInternalWorkspaceRole = vi.hoisted(() => vi.fn());
-vi.mock('../../src/workspaces', () => ({ getInternalWorkspaceRole }));
+vi.mock('../../src/workspaces/roles', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getInternalWorkspaceRole,
+}));
 const askWorkspace = vi.hoisted(() => vi.fn());
 vi.mock('../../src/search/ask-workspace', () => ({ askWorkspace }));
 

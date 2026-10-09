@@ -8,7 +8,7 @@
  * it renders both inside the home shell and on the standalone /app/runs page).
  * Included by the workspace client bundle and by renderRunsPage.
  */
-import { colors } from '../design-system/tokens';
+import { colors } from '../../packages/design-tokens/src/index';
 
 export const RUN_DRAWER_JS = `(function(){
   if (window.SO_openRunDrawer) return;

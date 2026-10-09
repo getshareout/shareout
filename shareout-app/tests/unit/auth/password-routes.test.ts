@@ -8,11 +8,14 @@ const { getTokenOrSessionUser } = vi.hoisted(() => ({ getTokenOrSessionUser: vi.
 
 vi.mock('../../../src/pages/setup', () => ({ needsSetup, schemaReady }));
 vi.mock('../../../src/router/helpers/auth-guard', () => ({ getTokenOrSessionUser }));
-vi.mock('../../../src/auth/index', () => ({ getSessionUser: vi.fn() }));
+vi.mock('../../../src/auth/session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getSessionUser: vi.fn(),
+}));
 vi.mock('../../../src/auth/session', () => ({
   createSessionCookieForUser: vi.fn(async () => 'shareout_session=abc; Path=/'),
 }));
-vi.mock('../../../src/starter-kit', () => ({ scheduleSeedStarterKit: vi.fn() }));
+vi.mock('../../../src/starter-kit/schedule', () => ({ scheduleSeedStarterKit: vi.fn() }));
 vi.mock('../../../src/onboarding/welcome-email', () => ({
   scheduleWelcomeEmail: vi.fn(),
   scheduleWorkspaceWelcome: vi.fn(),

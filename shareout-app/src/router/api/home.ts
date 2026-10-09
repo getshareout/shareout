@@ -1,5 +1,5 @@
-import { handleHomeBrowserApi, handleHomeQuickSearchApi, handleHomeCatalogApi, handleHomeCountsApi, handleHomeActivityApi, handleHomeCommentActivityApi, handleHomeAnalyticsApi, handleHomeActivityFeedApi, handleHomeForYouApi, handleHomeProfileGetApi, handleHomeProfileSetApi, handleHomeFollowApi, handleHomeRecentApi, handleHomeRecordViewApi, handleHomeDismissEventApi, handleHomeCommentsApi, handleHomeCommentPostApi } from '../../pages/home';
-import { handleHomeEventVisibilityGetApi, handleHomeEventVisibilitySetApi } from '../../pages/home';
+import { handleHomeBrowserApi, handleHomeQuickSearchApi, handleHomeCatalogApi, handleHomeCountsApi, handleHomeActivityApi, handleHomeCommentActivityApi, handleHomeAnalyticsApi, handleHomeActivityFeedApi, handleHomeForYouApi, handleHomeProfileGetApi, handleHomeProfileSetApi, handleHomeFollowApi, handleHomeRecentApi, handleHomeRecordViewApi, handleHomeDismissEventApi, handleHomeCommentsApi, handleHomeCommentPostApi } from '../../pages/home/api';
+import { handleHomeEventVisibilityGetApi, handleHomeEventVisibilitySetApi } from '../../pages/home/api';
 import { handleOnboardingGetApi, handleOnboardingDismissApi, handleOnboardingSkillAckApi, handleOnboardingCelebrateApi } from '../../onboarding/api';
 import type { FetchContext } from '../context';
 import { isAuthUser, requireAuthUser } from '../helpers/auth-guard';

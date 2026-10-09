@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const roleMock = vi.hoisted(() => vi.fn());
-vi.mock('../../../../src/workspaces', () => ({ getInternalWorkspaceRole: roleMock }));
+vi.mock('../../../../src/workspaces/roles', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getInternalWorkspaceRole: roleMock,
+}));
 
 import {
   handleSetWorkspaceGatewayModel,

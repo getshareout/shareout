@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { handleShareToSlack } from '../../../src/slack/share-handler';
-import * as artifacts from '../../../src/artifacts';
-import * as slackSend from '../../../src/slack/send';
+import * as artifacts from '../../../src/artifacts/roles';
+import * as slackSend from '../../../src/chat-platforms/slack/delivery';
 import type { Env } from '../../../src/types';
 import type { AuthUser } from '../../../src/api-auth';
 

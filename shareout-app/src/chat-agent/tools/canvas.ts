@@ -7,7 +7,7 @@
  */
 import type { AccountTool } from './types';
 import { listArtifactsForUser } from './artifacts';
-import { recordRecentView } from '../../pages/home/queries';
+import { recordRecentView } from '../../pages/home/queries/artifacts';
 import { semanticSearchArtifacts } from '../../search/semantic';
 
 /** Show matching pages in the user's main canvas (renders cards there). */

@@ -1,6 +1,6 @@
 import { DATA_ERRORS } from '../../types';
 import { generateId } from '../../crypto-utils';
-import { getSessionUser } from '../../auth';
+import { getSessionUser } from '../../auth/session';
 import { createLogger, logError } from '../../logging';
 import { successResponse, errorResponse, type DataContext } from '../middleware';
 import { getValidAccessToken } from './google-auth';

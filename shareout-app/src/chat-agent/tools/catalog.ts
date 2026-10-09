@@ -1,12 +1,9 @@
 import type { AccountTool, ToolContext } from './types';
 import { PERSONAL_SCOPE } from '../../chat-platforms/types';
-import {
-  isCatalogEnabled,
-  loadCatalog,
-  searchEntries,
-  traverseLineage,
-  type CatalogEntry,
-} from '../../catalog';
+import { isCatalogEnabled, loadCatalog } from '../../catalog/store';
+import { searchEntries } from '../../catalog/search';
+import { traverseLineage } from '../../catalog/lineage';
+import { type CatalogEntry } from '../../catalog/types';
 
 const MAX_RESULTS = 50;
 

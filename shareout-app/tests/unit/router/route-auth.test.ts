@@ -21,14 +21,27 @@ vi.mock('../../../src/auth-otp', () => ({
   handleUnlinkAccount: vi.fn().mockResolvedValue(new Response('ok')),
 }));
 
-vi.mock('../../../src/auth', () => ({
+vi.mock('../../../src/auth/google-oauth', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleGoogleLogin: vi.fn().mockResolvedValue(new Response('ok')),
   handleGoogleCallback: vi.fn().mockResolvedValue(new Response('ok')),
+  handleLinkGoogleStart: vi.fn().mockResolvedValue(new Response('ok')),
+}));
+vi.mock('../../../src/auth/google-one-tap', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleGoogleOneTap: vi.fn().mockResolvedValue(new Response('ok')),
+}));
+vi.mock('../../../src/auth/logout', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleLogout: vi.fn().mockResolvedValue(new Response('ok')),
+}));
+vi.mock('../../../src/auth/artifact-auth', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handlePasswordAuth: vi.fn().mockResolvedValue(new Response('ok')),
   handleCredentialsAuth: vi.fn().mockResolvedValue(new Response('ok')),
-  handleLinkGoogleStart: vi.fn().mockResolvedValue(new Response('ok')),
+}));
+vi.mock('../../../src/auth/dev-login', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleDevLogin: vi.fn().mockResolvedValue(new Response('ok')),
 }));
 
@@ -54,11 +67,13 @@ vi.mock('../../../src/workspace-library', () => ({
   handleListMyLibraries: vi.fn().mockResolvedValue(new Response('ok')),
 }));
 
-vi.mock('../../../src/publish', () => ({
+vi.mock('../../../src/publish/library-module', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleCreateLibraryModule: vi.fn().mockResolvedValue(new Response('ok')),
 }));
 
-vi.mock('../../../src/data/sheets/handler', () => ({
+vi.mock('../../../src/data/sheets/artifact-auth', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   handleSheetsOAuthCallback: vi.fn().mockResolvedValue(new Response('ok')),
 }));
 

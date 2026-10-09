@@ -10,7 +10,8 @@ import { checkSlidingWindowRateLimit, getTrustedClientIp } from '../rate-limit';
 import { setArtifactModeration, setArtifactPaused } from '../superadmin/artifacts-admin';
 import { createLogger } from '../logging';
 import { escapeHtml } from '../serve/utils';
-import { resolveLocale, type Locale, type LocaleCopy } from '../i18n';
+import { resolveLocale, type Locale } from '../i18n/locale';
+import { type LocaleCopy } from '../i18n';
 
 const CATEGORIES = ['phishing', 'malware', 'csam', 'spam', 'copyright', 'other'] as const;
 type Category = (typeof CATEGORIES)[number];

@@ -5,7 +5,7 @@
 // on first run. Never throws into the caller — a bad skill is skipped, not fatal.
 import type { Env } from '../types';
 import type { AuthUser } from '../api-auth';
-import { publishArtifact } from '../publish';
+import { publishArtifact } from '../publish/publish-artifact';
 import { OFFICIAL_SKILLS } from './registry';
 import { OFFICIAL_SKILL_CONTENT } from './content.generated';
 

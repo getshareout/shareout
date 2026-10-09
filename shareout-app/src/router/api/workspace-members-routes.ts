@@ -1,12 +1,4 @@
-import {
-  handleListWorkspaceMembers,
-  handleAddWorkspaceMember,
-  handleRemoveWorkspaceMember,
-  handleTransferWorkspaceOwnership,
-  handleInviteWorkspaceMembers,
-  handleListWorkspaceMemberMetrics,
-  handleListWorkspacePeople,
-} from '../../workspaces';
+import { handleListWorkspaceMembers, handleAddWorkspaceMember, handleRemoveWorkspaceMember, handleTransferWorkspaceOwnership, handleInviteWorkspaceMembers, handleListWorkspaceMemberMetrics, handleListWorkspacePeople } from '../../workspaces/members';
 import { handleRevokeMemberTokens, handleCreateMemberToken } from '../../workspaces-tokens';
 import { handleListAgentTokens, handleCreateAgentToken, handleRevokeAgentToken } from '../../agent-tokens';
 import { handleListWorkspaceInvites, handleResendWorkspaceInvite, handleRevokeWorkspaceInvite } from '../../workspaces/invites-admin';

@@ -10,7 +10,8 @@ import type { Env } from '../../src/types';
 // work/030 sweep: access code calls getInternalWorkspaceRole; alias it to the same
 // mock fn so the existing mockResolvedValue(...) calls drive both.
 const wsRoleMock = vi.hoisted(() => vi.fn());
-vi.mock('../../src/workspaces', () => ({
+vi.mock('../../src/workspaces/roles', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getWorkspaceRole: wsRoleMock,
   getInternalWorkspaceRole: wsRoleMock,
 }));

@@ -2,7 +2,7 @@ import type { Env } from '../../types';
 import type { AccountTool } from './types';
 import type { PendingAction } from '../actions';
 import { listRulesForOwner, getRule } from '../../metric-alerts/rules';
-import { listJobs } from '../../scheduling/jobs';
+import { listJobs } from '../../scheduling/jobs/crud';
 import { resolveArtifactAccessForUser } from '../access';
 import { getCrew } from '../../crew/store';
 import { proposeEdit } from '../../data/agent/headless-edit';

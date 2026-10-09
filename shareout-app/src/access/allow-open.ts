@@ -8,7 +8,7 @@
 // When false, coerceVisibility downgrades public to private.
 
 import type { Env } from '../types';
-import { isPublicShowcaseWorkspace } from '../workspaces';
+import { isPublicShowcaseWorkspace } from '../workspaces/roles';
 import { openVisibilityDisabled, isUserInPublicRollout } from '../visibility-config';
 
 export const OPEN_VISIBILITY_PAYWALL_MESSAGE =

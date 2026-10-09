@@ -11,7 +11,7 @@
 //         files?: FileEntry[],                       // raw files, OR
 //         fromArtifact?: string, replace?: {k:v} }   // clone+stamp a template
 import type { DataContext } from './middleware';
-import { publishArtifact } from '../publish';
+import { publishArtifact } from '../publish/publish-artifact';
 import { coerceVisibility } from '../visibility-config';
 import { json } from '../artifacts/json-response';
 import { generateSlug } from '../validation';

@@ -3,7 +3,7 @@
  * CSS custom properties and reset styles
  */
 
-import { colors, fonts, spacing, radius, shadows, animation, layout } from './tokens';
+import { colors, fonts, spacing, radius, shadows, animation, layout } from '../../packages/design-tokens/src/index';
 
 // =============================================================================
 // CSS CUSTOM PROPERTIES

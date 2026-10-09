@@ -19,7 +19,8 @@ import type { AuthUser } from '../../../../src/api-auth';
 // (called with the right ids, doesn't block/break create) without exercising the
 // real provider-listing logic — that's covered by catalog/seed-resources.test.ts.
 const catalogSeedMock = vi.fn(async () => ({ seeded: 0, skipped: 0, provider: null }));
-vi.mock('../../../../src/catalog', () => ({
+vi.mock('../../../../src/catalog/seed-resources', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   seedCatalogForConnection: (...args: unknown[]) => catalogSeedMock(...args),
 }));
 

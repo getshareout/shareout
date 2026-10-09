@@ -15,7 +15,7 @@ import { injectPerfBeacon } from './perf-beacon';
 import { injectPresenceBeacon } from './presence-beacon';
 import { badgeEnabled, injectBadge } from './badge';
 import { versionedBundlePath } from '../bundle-versions';
-import { localeForArtifactWorkspace } from '../i18n';
+import { localeForArtifactWorkspace } from '../i18n/locale';
 
 function injectCommentsAgent(resp: Response, baseUrl: string): Response {
   const tag = `<script src="${baseUrl}${versionedBundlePath('/sdk/comments-agent.js')}" defer></script>`;

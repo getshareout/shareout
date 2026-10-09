@@ -1,6 +1,7 @@
 import type { PlatformId } from '../chat-platforms/types';
 import { getPlatform } from '../chat-platforms/registry';
-import { t, type Locale } from '../i18n';
+import { t } from '../i18n';
+import { type Locale } from '../i18n/locale';
 
 const PROMPTS = {
   en: {

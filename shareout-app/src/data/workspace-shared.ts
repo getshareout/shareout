@@ -2,7 +2,7 @@ import { generateId } from '../crypto-utils';
 import { DATA_ERRORS } from '../types';
 import { successResponse, errorResponse, verifyOwner, type DataContext } from './middleware';
 import { createMiniDb } from './minidb-client';
-import { handleTables } from './tables';
+import { handleTables } from './tables/handler';
 
 // Workspace shared tables (ADR 28 + 0067). A table stays owned by, and stored in,
 // the originating artifact's mini-store. This tier exposes tables that the owner has

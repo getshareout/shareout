@@ -1,7 +1,7 @@
 import type { Env } from '../types';
 import { escapeHtml } from '../html/utils';
 import { renderHtmlPage } from '../design-system/shell';
-import { getInternalWorkspaceRole } from '../workspaces';
+import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { getWorkspaceStorageLive } from '../storage-snapshots';
 
 const usageStyles = `

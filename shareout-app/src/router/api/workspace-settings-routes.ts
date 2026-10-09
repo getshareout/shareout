@@ -1,12 +1,6 @@
-import {
-  handleGetWorkspaceAccessPolicy,
-  handleUpdateWorkspaceAccessPolicy,
-  handleGetWorkspaceBranding,
-  handleUpdateWorkspaceBranding,
-  handleUploadWorkspaceLogo,
-  handleDeleteWorkspaceLogo,
-  getInternalWorkspaceRole,
-} from '../../workspaces';
+import { handleGetWorkspaceAccessPolicy, handleUpdateWorkspaceAccessPolicy } from '../../workspaces/access-policy';
+import { handleGetWorkspaceBranding, handleUpdateWorkspaceBranding, handleUploadWorkspaceLogo, handleDeleteWorkspaceLogo } from '../../workspaces/branding';
+import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { buildFeaturesPayload } from '../../features/flags';
 import { handleGetPublishPolicy, handleSetPublishPolicy, handleListPublishApprovals } from '../../publish-approval';
 import {

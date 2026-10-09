@@ -1,8 +1,8 @@
 import type { Env } from './types';
 import { generateId } from './crypto-utils';
 import { signupsPaused, SIGNUPS_PAUSED_MSG } from './signup-gate';
-import { scheduleSeedStarterKit } from './starter-kit';
-import { isSuperAdminEmail } from './superadmin/auth';
+import { scheduleSeedStarterKit } from './starter-kit/schedule';
+import { isSuperAdminEmail } from './superadmin/recipients';
 import { jsonWithApiErrors } from './http/api-error';
 
 const RATE_LIMIT_WINDOW = 60 * 60 * 24; // 24 hours in seconds

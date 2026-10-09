@@ -1,5 +1,5 @@
 import type { Env } from '../types';
-import { getNextRunTime } from '../scheduling/jobs';
+import { getNextRunTime } from '../scheduling/jobs/cron';
 import { getCrewById, createRun, reapStaleRuns } from './store';
 import { resolveCrewLimits, countActiveRuns } from './limits';
 import { buildOwnerDataContextForCrew } from './principal';

@@ -2,19 +2,12 @@ import type { FetchContext } from '../context';
 import { jsonResponse, jsonError } from '../helpers/json-response';
 import { requireTokenOrSession, isAuthUser } from '../helpers/auth-guard';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
-import {
-  isCatalogEnabled,
-  setCatalogEnabled,
-  loadCatalog,
-  upsertCatalogFile,
-  deleteCatalogFile,
-  searchEntries,
-  buildFacets,
-  buildManifest,
-  buildLineage,
-  seedConnectorsAsSources,
-  type CatalogEntry,
-} from '../../catalog';
+import { isCatalogEnabled, setCatalogEnabled, loadCatalog, upsertCatalogFile, deleteCatalogFile } from '../../catalog/store';
+import { searchEntries, buildFacets } from '../../catalog/search';
+import { buildManifest } from '../../catalog/manifest';
+import { buildLineage } from '../../catalog/lineage';
+import { seedConnectorsAsSources } from '../../catalog/seed';
+import { type CatalogEntry } from '../../catalog/types';
 
 const PREFIX_RE = /^\/v1\/workspaces\/([^/]+)\/catalog(?:\/(.*))?$/;
 

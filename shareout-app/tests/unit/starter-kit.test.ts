@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Stub the publish layer so seeding logic is tested without touching D1/R2.
 const publishArtifact = vi.fn(async () => ({ id: 'art_x', slug: 's', url: 'u' }));
-vi.mock('../../src/publish', () => ({ publishArtifact: (...a: unknown[]) => publishArtifact(...a) }));
+vi.mock('../../src/publish/publish-artifact', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  publishArtifact: (...a: unknown[]) => publishArtifact(...a),
+}));
 
 import { PERSONAL_KIT, TEAM_KIT, seedStarterKit } from '../../src/starter-kit';
 import type { Env } from '../../src/types';

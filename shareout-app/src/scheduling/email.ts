@@ -1,15 +1,12 @@
 import type { Env } from '../types';
-import {
-  getTemplateForArtifact,
-  renderTemplate,
-  buildTemplateContext,
-  applyDefaults,
-} from './templates';
+import { getTemplateForArtifact } from './templates';
+import { renderTemplate, buildTemplateContext, applyDefaults } from './template-renderer';
 import { captureArtifactReport } from '../screenshots';
 import { generateId } from '../crypto-utils';
 import { suppressedSet } from '../email/suppressions';
 import { getPlatformHostname } from '../config/origins';
-import { isLocale, t } from '../i18n';
+import { isLocale } from '../i18n/locale';
+import { t } from '../i18n';
 
 // Fallback words around a scheduled delivery, in the page's workspace language.
 const DELIVERY_COPY = {

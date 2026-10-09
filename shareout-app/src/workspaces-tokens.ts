@@ -2,7 +2,7 @@ import type { Env } from './types';
 import type { AuthUser } from './api-auth';
 import { generateToken, hashToken } from './api-auth';
 import { generateId } from './crypto-utils';
-import { getInternalWorkspaceRole } from './workspaces';
+import { getInternalWorkspaceRole } from './workspaces/roles';
 import { jsonWithApiErrors } from './http/api-error';
 
 function json(data: unknown, status = 200): Response {

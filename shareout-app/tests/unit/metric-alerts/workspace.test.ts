@@ -5,7 +5,11 @@ import type { AuthUser } from '../../../src/api-auth';
 const getWorkspaceRole = vi.hoisted(() => vi.fn());
 const getRuleById = vi.hoisted(() => vi.fn());
 const evaluateAndDeliver = vi.hoisted(() => vi.fn());
-vi.mock('../../../src/workspaces', () => ({ getWorkspaceRole, getInternalWorkspaceRole: getWorkspaceRole }));
+vi.mock('../../../src/workspaces/roles', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getWorkspaceRole,
+  getInternalWorkspaceRole: getWorkspaceRole,
+}));
 vi.mock('../../../src/metric-alerts/rules', () => ({ getRuleById, evaluateAndDeliver, fetchHistories: vi.fn(async () => ({})) }));
 
 import {

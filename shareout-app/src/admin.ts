@@ -1,6 +1,6 @@
 import type { Env } from './types';
 import { validateAdminSession } from './api-auth';
-import { getSessionUser } from './auth';
+import { getSessionUser } from './auth/session';
 import { getAnalytics, type AnalyticsSummary } from './analytics';
 import { renderHtmlPage } from './design-system/shell';
 import { adminPageStyles } from './design-system/pages/admin.css';

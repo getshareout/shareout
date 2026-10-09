@@ -6,7 +6,7 @@ import type { Env } from '../../../types';
 import type { AuthUser } from '../../../api-auth';
 import { createLogger, logError } from '../../../logging';
 import { getProvider } from '../../../data/platform';
-import { resolveSlackToken, listSlackChannels, isSlackAuthError } from '../../../slack/send';
+import { resolveSlackToken, listSlackChannels, isSlackAuthError } from '../../../chat-platforms/slack/client';
 import { renderWorkspaceConnectionCallbackPage } from './callback-page';
 import { oauthDenialMessage, userFacingWorkspaceOAuthError } from './errors';
 import { json, requireAdmin, requireMember, validateName } from './shared';

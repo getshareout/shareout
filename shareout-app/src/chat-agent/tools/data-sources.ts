@@ -1,5 +1,5 @@
 import type { Env } from '../../types';
-import { queryConnectionData } from '../../data/connections/handler';
+import { queryConnectionData } from '../../data/connections/query';
 import { listConnections } from '../../data/platform/core/credentials';
 import { resolveArtifactAccessForUser } from '../access';
 import type { AccountTool } from './types';

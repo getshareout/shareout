@@ -3,7 +3,8 @@ import { crewProviderFor, getCrewProvider, type NeutralTurn, type NeutralToolCal
 import { getWorkspaceByoConfig, resolveGatewayModel } from '../data/agent/ai-config';
 import type { ChatReplyPort, PlatformId, WorkspaceSelection } from '../chat-platforms/types';
 import { PERSONAL_SCOPE } from '../chat-platforms/types';
-import { selectTools, defaultCapabilities, type AccountTool, type Capabilities } from './tools/index';
+import { selectTools, defaultCapabilities, type Capabilities } from './tools/index';
+import { type AccountTool } from './tools/types';
 import type { PendingAction } from './actions';
 import { isFeatureEnabled, webAgentBlockedMessage } from '../features/flags';
 import { getUserWorkspaceIds } from './access';
@@ -15,7 +16,9 @@ import { logAgentToolFailure, userFacingAgentToolError } from './errors';
 import { toolProgressLabel } from './tool-progress';
 import { TOOLKITS, OPEN_TOOLKIT, toolkitOf, openToolkitTool } from './tools/toolkits';
 import { createLogger } from '../logging';
-import { agentLanguageRule, localeForRecipient, t, type Locale } from '../i18n';
+import { agentLanguageRule } from '../i18n/agent-language';
+import { localeForRecipient, type Locale } from '../i18n/locale';
+import { t } from '../i18n';
 import { agentFallbackReplies } from './replies';
 
 /** A turn either ends with a text reply, or with an action awaiting the user's confirm/cancel. */

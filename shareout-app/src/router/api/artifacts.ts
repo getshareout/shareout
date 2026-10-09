@@ -1,28 +1,13 @@
-import { handlePublish } from '../../publish';
+import { handlePublish } from '../../publish/handle-publish';
 import { getAnalytics } from '../../analytics';
 import { handleEditor } from '../../editor/index';
-import {
-  handleListArtifacts,
-  handleGetArtifact,
-  handleUpdateArtifact,
-  handleDeleteArtifact,
-  handleListDeletedArtifacts,
-  handleRestoreArtifact,
-  handleRestoreAllDeleted,
-  handleGetCollaborators,
-  handleAddCollaborators,
-  handleRemoveCollaborator,
-  handleShareArtifact,
-  handleTransferOwnership,
-  handleGetVersions,
-  handleRollback,
-  handleGetArtifactFiles,
-  handleAddFavorite,
-  handleRemoveFavorite,
-  handleGetTags,
-  handleAddTag,
-  handleRemoveTag,
-} from '../../artifacts';
+import { handleListArtifacts, handleGetArtifact, handleUpdateArtifact, handleDeleteArtifact, handleListDeletedArtifacts, handleRestoreArtifact, handleRestoreAllDeleted } from '../../artifacts/crud';
+import { handleGetCollaborators, handleAddCollaborators, handleRemoveCollaborator, handleTransferOwnership } from '../../artifacts/collaborators';
+import { handleShareArtifact } from '../../artifacts/share';
+import { handleGetVersions, handleRollback } from '../../artifacts/versions';
+import { handleGetArtifactFiles } from '../../artifacts/files';
+import { handleAddFavorite, handleRemoveFavorite } from '../../artifacts/favorites';
+import { handleGetTags, handleAddTag, handleRemoveTag } from '../../artifacts/tags';
 import {
   handleCreateArtifactEmail,
   handleGetArtifactEmail,
@@ -46,7 +31,7 @@ import {
   handleUnpinLibrary,
   handleListArtifactLibraries,
 } from '../../workspace-library';
-import { getInternalWorkspaceRole } from '../../workspaces';
+import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { canAccess } from '../../access/can-access';
 import type { Env } from '../../types';
 import type { AuthUser } from '../../api-auth';

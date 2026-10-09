@@ -5,7 +5,10 @@ import type { Env } from '../../../src/types';
 import { createFetchContext } from '../../../src/router/context';
 
 const getSessionUser = vi.hoisted(() => vi.fn());
-vi.mock('../../../src/auth', () => ({ getSessionUser }));
+vi.mock('../../../src/auth/session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getSessionUser,
+}));
 
 import { routeEmail } from '../../../src/email/routes';
 import { createUnsubscribeToken } from '../../../src/email/unsubscribe-token';
