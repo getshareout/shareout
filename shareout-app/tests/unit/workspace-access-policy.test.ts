@@ -271,7 +271,7 @@ describe('autoJoinWorkspacesByDomain', () => {
         run,
       }),
     };
-    await autoJoinWorkspacesByDomain(env, 'usr_new', 'someone@acme.example');
+    expect(await autoJoinWorkspacesByDomain(env, 'usr_new', 'someone@acme.example')).toBe(1);
     const inserts = run.mock.calls.filter((c) => String(c[0]).includes('INSERT INTO workspace_members'));
     expect(inserts).toHaveLength(1);
     expect(inserts[0][2]).toBe('wsp_match'); // workspace_id binding
@@ -288,7 +288,7 @@ describe('autoJoinWorkspacesByDomain', () => {
         run,
       }),
     };
-    await autoJoinWorkspacesByDomain(env, 'usr_existing', 'someone@acme.example');
+    expect(await autoJoinWorkspacesByDomain(env, 'usr_existing', 'someone@acme.example')).toBe(0);
     expect(run.mock.calls.filter((c) => String(c[0]).includes('INSERT'))).toHaveLength(0);
   });
 

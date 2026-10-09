@@ -39,7 +39,7 @@ import {
 } from '../auth-otp';
 import { handleClaimInvite } from '../workspaces-invite-email';
 import { handleDeviceStart, handleDevicePoll, handleDevicePage, handleDeviceDone } from '../auth/device-auth';
-import { handleListMyTokens, handleCreateMyToken } from '../api-me-tokens';
+import { handleListMyTokens, handleCreateMyToken, handleRevokeMyToken } from '../api-me-tokens';
 import { handleListMyLibraries } from '../workspace-library';
 import { handleCreateLibraryModule } from '../publish';
 import { handleSheetsOAuthCallback } from '../data/sheets/handler';
@@ -53,6 +53,7 @@ import { getTokenOrSessionUser } from './helpers/auth-guard';
 import { jsonError, jsonResponse } from './helpers/json-response';
 import { googleOAuthConfigured } from '../config/auth-providers';
 import { appLoginPage } from '../auth/pages';
+import { pageLocale } from '../i18n/accept-language';
 import { handleSsoStart, handleSsoCallback } from '../auth/oidc';
 import { getSsoConfigBySlug, getSsoConfigForEmail, ssoStartPath } from '../auth/sso-config';
 import { parseSubdomainFromEnv } from '../subdomain';
@@ -177,6 +178,12 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
     return addCORS(await handleCreateMyToken(request, env, user));
   }
 
+  if (path.startsWith('/v1/me/tokens/') && request.method === 'DELETE') {
+    const user = await getTokenOrSessionUser(ctx);
+    if (!user) return addCORS(unauthorized());
+    return addCORS(await handleRevokeMyToken(env, user, decodeURIComponent(path.slice('/v1/me/tokens/'.length))));
+  }
+
   // Personal Workspace Library catalog ("my modules").
   if (path === '/v1/me/libraries' && request.method === 'GET') {
     const user = await getTokenOrSessionUser(ctx);
@@ -242,6 +249,7 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
       loginHint,
       emailConfigured: Boolean(env.EMAIL),
       sso: sso ? { label: sso.buttonLabel, href: ssoStartPath(sso.workspaceSlug, redirect, loginHint), enforced: sso.enforced } : null,
+      locale: pageLocale(request),
     });
   }
 

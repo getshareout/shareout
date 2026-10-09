@@ -18,6 +18,6 @@ export function buildWorkspaceView(args: RenderArgs): { body: string; scripts: s
   const canManage = canManageWorkspace(args);
   const firstName = (args.userInfo?.name || '').trim().split(/\s+/)[0] || '';
   const body = buildWorkspaceBody(args);
-  const scripts = `${getHomeI18nScript()}\nwindow.WSX_WS=${JSON.stringify(wsParam)};window.WSX_SLUG=${JSON.stringify(wsSlug)};window.WSX_ADMIN=${canManage ? 'true' : 'false'};window.WSX_NAME=${JSON.stringify(firstName)};window.WSX_KNOWLEDGE_PAID=${args.wsKnowledgePaid ? 'true' : 'false'};window.WSX_INBOX_DOMAIN=${JSON.stringify(args.inboxDomain || '')};window.WSX_INSTANCE_ADMIN=${args.isInstanceAdmin ? 'true' : 'false'};\n${WORKSPACE_CLIENT}`;
+  const scripts = `${getHomeI18nScript()}\nwindow.WSX_WS=${JSON.stringify(wsParam)};window.WSX_SLUG=${JSON.stringify(wsSlug)};window.WSX_ADMIN=${canManage ? 'true' : 'false'};window.WSX_NAME=${JSON.stringify(firstName)};window.WSX_KNOWLEDGE_PAID=${args.wsKnowledgePaid ? 'true' : 'false'};window.WSX_INBOX_DOMAIN=${JSON.stringify(args.inboxDomain || '')};window.WSX_INSTANCE_ADMIN=${args.isInstanceAdmin ? 'true' : 'false'};window.WSX_ORIGIN=${JSON.stringify(args.platformOrigin || '')};\n${WORKSPACE_CLIENT}`;
   return { body, scripts };
 }

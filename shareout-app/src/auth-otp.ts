@@ -98,7 +98,7 @@ export async function startEmailOtp(env: Env, emailRaw: string): Promise<StartRe
 interface VerifyResult {
   ok: boolean;
   error?: string;
-  user?: { id: string; email: string; isNew: boolean; firstActivation: boolean };
+  user?: { id: string; email: string; isNew: boolean; firstActivation: boolean; autoJoined?: boolean };
 }
 
 export async function verifyEmailOtp(env: Env, emailRaw: string, codeRaw: string): Promise<VerifyResult> {
@@ -130,8 +130,8 @@ export async function verifyEmailOtp(env: Env, emailRaw: string, codeRaw: string
     if (e?.message === SIGNUPS_PAUSED_MSG) return { ok: false, error: SIGNUPS_PAUSED_MSG };
     throw e;
   }
-  await autoJoinWorkspacesByDomain(env, user.id, user.email);
-  return { ok: true, user };
+  const joined = await autoJoinWorkspacesByDomain(env, user.id, user.email);
+  return { ok: true, user: { ...user, autoJoined: !!joined } };
 }
 
 function json(data: unknown, status = 200, headers: Record<string, string> = {}): Response {
@@ -166,9 +166,9 @@ export async function handleEmailOtpVerify(ctx: FetchContext): Promise<Response>
     return json({ ok: false, error: result.error }, 400);
   }
   // First-ever activation (parity with Google OAuth). Self-signup gets personal kit;
-  // pre-created invitee gets a workspace-scoped welcome instead.
+  // pre-created invitee (or a domain auto-join) gets a workspace-scoped welcome instead.
   if (result.user.firstActivation) {
-    if (result.user.isNew) {
+    if (result.user.isNew && !result.user.autoJoined) {
       scheduleSeedStarterKit(ctx.env, { id: result.user.id, email: result.user.email, username: null }, { workspaceId: null, tier: 'personal' }, ctx.executionCtx);
       scheduleWelcomeEmail(ctx.env, result.user.email, ctx.executionCtx);
     } else {

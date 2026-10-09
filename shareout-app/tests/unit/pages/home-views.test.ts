@@ -12,6 +12,7 @@ import datasetsTs from '../../../src/pages/home/render-workspace/client-script/h
 import crewTs from '../../../src/pages/home/render-workspace/client-script/home-views/crew.ts?raw';
 import libraryTs from '../../../src/pages/home/render-workspace/client-script/home-views/library.ts?raw';
 import connectorsTs from '../../../src/pages/home/render-workspace/client-script/home-views/connectors.ts?raw';
+import connectTs from '../../../src/pages/home/render-workspace/client-script/home-views/connect.ts?raw';
 import modalsFormsTs from '../../../src/pages/home/render-workspace/client-script/home-views/modals-forms.ts?raw';
 import assetsTs from '../../../src/pages/home/render-workspace/client-script/home-views/assets.ts?raw';
 import deliveriesTs from '../../../src/pages/home/render-workspace/client-script/home-views/deliveries.ts?raw';
@@ -20,9 +21,10 @@ import homeViewsBarrel from '../../../src/pages/home/render-workspace/client-scr
 
 /** Captured at split time — guards against accidental client-script drift.
  *  Re-pinned after the Home chat dock revamp (pill + dialog sheet, textarea composer,
- *  progressive markdown, error rows, thread menu; agent-format/agent-threads split). */
-const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 598_726;
-const ORIGINAL_WORKSPACE_CLIENT_SHA256 = 'fa947882b7be2180a986b00935ca8c0a391d220b54418208cdaf4031c0411954';
+ *  progressive markdown, error rows, thread menu; agent-format/agent-threads split) and
+ *  the Connect-your-agent view (connect.ts, ?view= deep link). */
+const ORIGINAL_WORKSPACE_CLIENT_LENGTH = 605_126;
+const ORIGINAL_WORKSPACE_CLIENT_SHA256 = '0f1775d6c8249b92a6d2fbd19a5784d5e87755c5362dec428139c104d3e4b307';
 const HOME_VIEWS_MARKER = '  // ===== rail nav → Home pane views =====';
 
 const SECTION_SOURCES: [string, string][] = [
@@ -34,6 +36,7 @@ const SECTION_SOURCES: [string, string][] = [
   ['crew', crewTs],
   ['library', libraryTs],
   ['connectors', connectorsTs],
+  ['connect', connectTs],
   ['modals-forms', modalsFormsTs],
   ['admin', adminTs],
   ['clients', clientsTs],
@@ -77,6 +80,14 @@ describe('home views client script', () => {
     expect(modalsFormsTs).toContain('ev.data.message');
   });
 
+  it('wires the Connect-your-agent view: query deep link, personal keys, MCP URL', () => {
+    expect(WORKSPACE_CLIENT).toContain("key === 'connect') loadConnect()");
+    expect(WORKSPACE_CLIENT).toContain("qp.get('view')");
+    expect(connectTs).toContain("'/v1/me/tokens'");
+    expect(connectTs).toContain("+ '/mcp'");
+    expect(() => new Function(WORKSPACE_CLIENT)).not.toThrow();
+  });
+
   it('preserves the full workspace client bundle byte-for-byte', async () => {
     expect(WORKSPACE_CLIENT.length).toBe(ORIGINAL_WORKSPACE_CLIENT_LENGTH);
     expect(await sha256(WORKSPACE_CLIENT)).toBe(ORIGINAL_WORKSPACE_CLIENT_SHA256);
@@ -93,6 +104,7 @@ describe('home views client script', () => {
       'crew',
       'library',
       'connectors',
+      'connect',
       'modals-forms',
       'admin',
       'clients',

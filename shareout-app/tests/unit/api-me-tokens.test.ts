@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { handleListMyTokens, handleCreateMyToken } from '../../src/api-me-tokens';
+import { handleListMyTokens, handleCreateMyToken, handleRevokeMyToken } from '../../src/api-me-tokens';
 import type { AuthUser } from '../../src/api-auth';
 import type { Env } from '../../src/types';
 
@@ -107,5 +107,21 @@ describe('handleCreateMyToken', () => {
     const body = await res.json() as { ok: boolean; token: string };
     expect(body.ok).toBe(true);
     expect(body.token).toMatch(/^so_/);
+  });
+});
+
+describe('handleRevokeMyToken', () => {
+  it('deletes only a token owned by the caller', async () => {
+    let bound: unknown[] = [];
+    const env = { DB: makeDbMock({ run: (_sql, ...args) => { bound = args; return { success: true, meta: { changes: 1 } }; } }) } as unknown as Env;
+    const res = await handleRevokeMyToken(env, user, 'tok_9');
+    expect(res.status).toBe(200);
+    expect(bound).toEqual(['tok_9', 'usr_1']);
+  });
+
+  it('404s when the token is not the caller\'s', async () => {
+    const env = { DB: makeDbMock() } as unknown as Env;
+    const res = await handleRevokeMyToken(env, user, 'tok_other');
+    expect(res.status).toBe(404);
   });
 });

@@ -23,11 +23,14 @@ This file is the **use** skill (build & publish).
 
 ## 0) Instance origin — resolve before any API call
 
-ShareOut is **self-hosted only**. There is no public hosted API. Every example URL
-in this tree uses **`$ORIGIN`** (scheme + host, no trailing slash) and
-**`$ORIGIN_HOST`** (hostname only).
+ShareOut is **self-hosted only**. There is no public hosted API. Example URLs in this
+tree are written against the instance origin (scheme + host, no trailing slash) and
+its hostname.
 
-**Resolve origin (first match wins) — required before any API call:**
+**Downloaded from an instance?** (`GET …/v1/skill`, a Library download, or the
+well-known SKILL.md.) Then the instance already filled itself in: the origin in this
+file is **$ORIGIN**. Use it — do not ask the user. If that still reads as a literal
+placeholder (this file came from a repo checkout), resolve it — first match wins:
 
 1. `~/.shareout/credentials` → `"origin"` field  
 2. Env `SHAREOUT_ORIGIN` or `SHAREOUT_BASE_URL`  
@@ -282,6 +285,18 @@ python3 build_payload.py | curl -sS -X POST "$ORIGIN/v1/publish" \
   --data-binary @-
 ```
 
+Minimal payload — publish into the user's team workspace so their team sees it
+(omit `workspace_id` and it lands in their personal space instead):
+
+```json
+{
+  "name": "Hello ShareOut",
+  "workspace_id": "wsp_…",
+  "visibility": "workspace",
+  "files": [{ "path": "index.html", "content": "<!DOCTYPE html><h1>Hello</h1>", "mime": "text/html", "encoding": "utf8" }]
+}
+```
+
 Full API: [api/overview.md](api/overview.md).
 
 ---
@@ -308,7 +323,7 @@ doing workspace administration or workspace-scoped features:
 
 ## Non-negotiable rules
 
-- Resolve `$ORIGIN` before authenticated calls; keep it in credentials.
+- Know the instance origin before authenticated calls (see §0); keep it in credentials.
 - Prefer documented endpoints; do not invent request shapes.
 - No token → First Run (or deploy skill if no instance).
 - Verify artifact ids before update/delete.

@@ -39,3 +39,12 @@ export async function handleCreateMyToken(request: Request, env: Env, user: Auth
   // Plaintext is returned exactly once and never stored.
   return json({ ok: true, token, shown_once: true });
 }
+
+// Self-serve: revokes one of the signed-in user's own tokens. Scoped by principal so a
+// user can never delete someone else's token by guessing its id.
+export async function handleRevokeMyToken(env: Env, user: AuthUser, tokenId: string): Promise<Response> {
+  const res = await env.DB.prepare("DELETE FROM tokens WHERE id = ? AND principal_type = 'user' AND principal_id = ?")
+    .bind(tokenId, user.id).run();
+  if (!res.meta?.changes) return json({ ok: false, error: 'Token not found', code: 'NOT_FOUND' }, 404);
+  return json({ ok: true });
+}

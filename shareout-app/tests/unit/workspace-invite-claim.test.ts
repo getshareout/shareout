@@ -197,7 +197,7 @@ describe('peekInvite', () => {
       DB: makeDbMock({
         first: (sql) => {
           if (sql.includes('FROM workspace_invite_claims')) {
-            return { workspace_id: 'wsp_x', invited_by: 'usr_boss', claimed_at: null, expired: 0 };
+            return { workspace_id: 'wsp_x', invited_by: 'usr_boss', email: 'new@acme.com', claimed_at: null, expired: 0 };
           }
           if (sql.includes('FROM workspaces')) return { name: 'Acme Co' };
           if (sql.includes('FROM users')) return { name: 'Boss', email: 'boss@acme.com' };
@@ -208,6 +208,35 @@ describe('peekInvite', () => {
     await expect(peekInvite(env, 'GOOD1-GOOD2')).resolves.toEqual({
       workspaceName: 'Acme Co',
       inviterName: 'Boss',
+      email: 'new@acme.com',
     });
+  });
+});
+
+describe('invite join page', () => {
+  it('names the invited email and sends sign-in with login_hint, in Spanish for es browsers', async () => {
+    const { handleInviteJoinPage } = await import('../../src/workspaces/invite-accept-page');
+    const env = {
+      ...baseEnv,
+      DB: makeDbMock({
+        first: (sql) => {
+          if (sql.includes('FROM workspace_invite_claims')) {
+            return { workspace_id: 'wsp_x', invited_by: 'usr_boss', email: 'new@acme.com', claimed_at: null, expired: 0 };
+          }
+          if (sql.includes('FROM workspaces')) return { name: 'Acme Co' };
+          if (sql.includes('FROM users')) return { name: 'Boss', email: 'boss@acme.com' };
+          return null;
+        },
+      }),
+    };
+    const res = await handleInviteJoinPage(
+      new Request('https://x/invite/GOOD1-GOOD2', { headers: { 'Accept-Language': 'es-AR' } }),
+      env,
+      'GOOD1-GOOD2',
+    );
+    const html = await res.text();
+    expect(html).toContain('Te invitaron como <strong>new@acme.com</strong>');
+    expect(html).toContain('login_hint=new%40acme.com');
+    expect(html).toContain('Sumate a Acme Co');
   });
 });

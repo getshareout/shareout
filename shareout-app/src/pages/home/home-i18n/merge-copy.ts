@@ -5,6 +5,7 @@ import { AGENT_COPY } from './copy/agent';
 import { ASSETS_COPY } from './copy/assets';
 import { CLIENTS_COPY } from './copy/clients';
 import { COMPOSER_COPY } from './copy/composer';
+import { CONNECT_COPY } from './copy/connect';
 import { INSPECTOR_COPY } from './copy/inspector';
 import { LIBRARY_COPY } from './copy/library';
 import { MODALS_COPY } from './copy/modals';
@@ -22,6 +23,7 @@ const COPY_MODULES: HomeLocaleCopy[] = [
   ASSETS_COPY,
   WORKSPACE_COPY,
   LIBRARY_COPY,
+  CONNECT_COPY,
   COMPOSER_COPY,
   ACCOUNT_COPY,
   INSPECTOR_COPY,

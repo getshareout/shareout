@@ -13,6 +13,7 @@ export const workspace_client_home_views_lensRouting_JS = `  var lenses = ws.que
     else if (key === 'crew' && !loaded.crew) { loaded.crew = 1; loadCrew(); }
     else if (key === 'library' && !loaded.library) { loaded.library = 1; loadLibrary(); }
     else if (key === 'connectors' && !loaded.connectors) { loaded.connectors = 1; loadConnectors(); }
+    else if (key === 'connect') loadConnect();
     else if (key === 'catalog' && !loaded.catalog) { loaded.catalog = 1; loadCatalog(); }
     else if (key === 'knowledge' && !loaded.knowledge) { loaded.knowledge = 1; loadKnowledge(); }
     else if (key === 'admin' && !loaded.admin) { loaded.admin = 1; loadAdmin(); }

@@ -6,16 +6,30 @@ import type { Env } from '../../src/types';
 const env = (vars: Record<string, string> = {}) => vars as unknown as Env;
 
 describe('skillOriginRewriter', () => {
-  it('is a no-op on the founder host so served bytes and digests stay stable', () => {
-    expect(skillOriginRewriter(env({ SHAREOUT_BASE_URL: 'https://shareout.site' }))).toBeNull();
+  it('leaves founder-host literals alone on the founder host', () => {
+    const rw = skillOriginRewriter(env({ SHAREOUT_BASE_URL: 'https://shareout.site' }))!;
+    expect(rw('POST https://shareout.site/v1/publish')).toBe('POST https://shareout.site/v1/publish');
   });
 
-  it('is a no-op when SHAREOUT_BASE_URL is unset (the hosted default)', () => {
-    expect(skillOriginRewriter(env())).toBeNull();
+  it('still fills $ORIGIN placeholders on the founder host', () => {
+    expect(skillOriginRewriter(env())!('GET $ORIGIN/v1/skill')).toBe('GET https://shareout.site/v1/skill');
   });
 
   it('rewrites once SHAREOUT_BASE_URL names a different instance', () => {
     expect(skillOriginRewriter(env({ SHAREOUT_BASE_URL: 'https://acme.workers.dev' }))).not.toBeNull();
+  });
+});
+
+describe('$ORIGIN placeholders', () => {
+  const self = env({ SHAREOUT_BASE_URL: 'https://shareout.acme.com' });
+
+  it('bakes the instance origin and host in so agents never have to ask', () => {
+    expect(rewriteSkillOrigin('curl "$ORIGIN/v1/publish"', self)).toBe('curl "https://shareout.acme.com/v1/publish"');
+    expect(rewriteSkillOrigin('host: $ORIGIN_HOST', self)).toBe('host: shareout.acme.com');
+  });
+
+  it('leaves other $ORIGIN_* names alone', () => {
+    expect(rewriteSkillOrigin('$ORIGIN_FOO', self)).toBe('$ORIGIN_FOO');
   });
 });
 
