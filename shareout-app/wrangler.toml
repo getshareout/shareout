@@ -78,6 +78,18 @@ binding = "CF_VERSION_METADATA"
 # binding = "VECTORIZE"
 # index_name = "shareout-artifacts"
 
+# Knowledge search over Files and pages. Create with:
+#   wrangler vectorize create shareout-knowledge --dimensions=768 --metric=cosine
+# [[vectorize]]
+# binding = "KNOWLEDGE_VECTORS"
+# index_name = "shareout-knowledge"
+
+# Durable per-file knowledge ingest (without it, ingest runs inline after the request).
+[[workflows]]
+name = "shareout-knowledge-ingest"
+binding = "KNOWLEDGE_INGEST"
+class_name = "KnowledgeIngestWorkflow"
+
 [[kv_namespaces]]
 binding = "SLUGS"
 id = "00000000000000000000000000000001"
@@ -114,6 +126,10 @@ class_name = "PresenceCoordinator"
 name = "SHOWTIME"
 class_name = "Showtime"
 
+[[durable_objects.bindings]]
+name = "KNOWLEDGE_STORE"
+class_name = "KnowledgeStore"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["RealtimeCoordinator"]
@@ -137,6 +153,10 @@ new_sqlite_classes = ["PresenceCoordinator"]
 [[migrations]]
 tag = "v7"
 new_sqlite_classes = ["Showtime"]
+
+[[migrations]]
+tag = "v8"
+new_sqlite_classes = ["KnowledgeStore"]
 
 # Optional hourly cron — disable on free accounts if undesired
 [triggers]

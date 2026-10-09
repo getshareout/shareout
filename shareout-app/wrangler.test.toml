@@ -81,6 +81,10 @@ class_name = "PresenceCoordinator"
 name = "SHOWTIME"
 class_name = "Showtime"
 
+[[durable_objects.bindings]]
+name = "KNOWLEDGE_STORE"
+class_name = "KnowledgeStore"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["RealtimeCoordinator"]
@@ -108,6 +112,10 @@ new_sqlite_classes = ["PresenceCoordinator"]
 [[migrations]]
 tag = "v7"
 new_sqlite_classes = ["Showtime"]
+
+[[migrations]]
+tag = "v8"
+new_sqlite_classes = ["KnowledgeStore"]
 
 [triggers]
 crons = ["0 * * * *"]

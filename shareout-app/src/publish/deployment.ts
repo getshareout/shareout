@@ -17,6 +17,7 @@ import type { ModerationStatus } from '../moderation/check';
 import type { ReadinessProfile } from '../../shared/editor-readiness/model';
 import { maybeRunMonitorTests } from './monitor-tests';
 import { isKnowledgeEnabled, enqueueIngest } from '../knowledge';
+import { queueKnowledgeSource } from '../knowledge/corpus/ingest';
 
 export interface WorkspaceUrls {
   namespacedUrl?: string;
@@ -226,6 +227,14 @@ export function schedulePostPublishTasks(
             : undefined,
         )
         .catch(() => {}),
+    );
+    executionCtx.waitUntil(
+      queueKnowledgeSource(
+        env,
+        executionCtx,
+        { workspaceId: wsId, kind: 'page', refId: opts.artifactId },
+        opts.versionId ?? `${Date.now()}`,
+      ).catch(() => {}),
     );
   }
 
