@@ -396,9 +396,10 @@ const reportProblem: ToolDef = {
     const ticket = await openTicket(ctx.env, {
       requesterUserId: ctx.user.id,
       requesterEmail: ctx.user.email,
-      // 'skill' until the ticket channel list grows an MCP entry; channelRef says which.
       channel: 'skill',
       channelRef: `mcp:${app}`.slice(0, 120),
+      client: 'mcp',
+      artifactId: artifactId ?? null,
       subject: summary,
       body: [details, artifactId ? `Page: ${artifactId}` : '', `Reported from: ${app} (MCP connector)`].filter(Boolean).join('\n\n'),
     });
