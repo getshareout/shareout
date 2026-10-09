@@ -1,20 +1,74 @@
 # REST API: Error Codes
 
-Standard error codes and their meanings. Response wrapper (`success`/`error`/`code`) is in [overview.md](overview.md#error-response).
+Standard error codes and their meanings. Stuck after reading the error? See
+[SKILL.md § If you get stuck](../SKILL.md#if-you-get-stuck).
+
+## Envelope
+
+Every JSON error has the same shape:
+
+```json
+{
+  "success": false,
+  "error": "Unauthorized: this API key has expired.",
+  "code": "UNAUTHORIZED",
+  "reason": "expired",
+  "hint": "Get a key: have the user open $ORIGIN/home?view=connect …",
+  "docs": "$ORIGIN/v1/skill/auth.md",
+  "request_id": "8a1f2c3d4e5f6a7b"
+}
+```
+
+| Field | Always? | Meaning |
+|-------|---------|---------|
+| `success` | yes | `false` |
+| `error` | yes | Human-readable message (device login keeps the RFC 8628 value here — see [Auth errors](#auth-errors)) |
+| `code` | yes | Stable machine code — branch on this, never on `error` text |
+| `request_id` | yes | Correlation id, same as the `X-Request-Id` header. Quote it in any support ticket |
+| `hint` | often | What to do next, in plain words |
+| `docs` | sometimes | Doc page for this error |
+| `param` | sometimes | The request field at fault |
+| `reason` | sometimes | Finer cause under `code` (e.g. `UNAUTHORIZED` → `missing` / `invalid` / `revoked` / `expired`) |
+| `support` | on 5xx | `{ "how": "POST /v1/support/tickets", "include": ["request_id"] }` — how to reach a human |
+
+On a 5xx, or when the same error repeats after following its `hint`, file a ticket
+([support.md](support.md)) with what the user wanted, what you tried, the `code`, the
+`request_id` and any `artifact_id`, then tell the user the team was notified.
 
 ## General Errors
 
 | Code | Status | Description |
 |------|--------|-------------|
-| `UNAUTHORIZED` | 401 | Authentication required |
-| `FORBIDDEN` | 403 | Access denied |
+| `UNAUTHORIZED` | 401 | No usable API key. `reason`: `missing` (no `Authorization: Bearer`), `invalid` (unknown key), `revoked`, or `expired`. `hint` says how to get a new one: the user opens `$ORIGIN/home?view=connect`, or run device login — [auth.md](../auth.md) |
+| `FORBIDDEN` | 403 | Access denied — the key works but this person can't touch that workspace/page. Retrying won't help; a workspace admin has to invite them |
+| `INSUFFICIENT_SCOPE` | 403 | A workspace Agent token (`sot_`) lacks the scope for this call (e.g. `artifacts:publish`) |
 | `NOT_FOUND` | 404 | Resource not found |
 | `INVALID_REQUEST` | 400 | Bad request format |
 | `CONFLICT` | 409 | Version conflict |
-| `RATE_LIMITED` | 429 | Rate limit exceeded |
+| `RATE_LIMIT_EXCEEDED` | 429 | Rate limit on publish, account creation, and in-artifact AI (visitor chat / pilot). Body has `reset` / `retryAfter`; header `Retry-After` |
+| `RATE_LIMITED` | 429 | Rate limit on the data plane (`/v1/data/…`), the CORS proxy, live connections, and share invites |
 | `FEATURE_DISABLED` | 403 | Module not enabled for this workspace — see [features.md](features.md) |
-| `INTERNAL_ERROR` | 500 | Server error. On visitor chat / pilot / admin-chat routes, also returned (with `message: "AI provider not configured (set VERCEL_AI_GATEWAY, ANTHROPIC_API_KEY or OPENAI_API_KEY)"`) when the instance has no platform AI key and the workspace has no BYO key — see [error-recovery below](#error-recovery) |
+| `INTERNAL_ERROR` | 500 | Unexpected server failure — body carries `request_id`, a `hint` and `support`. Retry once, then file a support ticket. On visitor chat / pilot / admin-chat routes, also returned (with `message: "AI provider not configured (set VERCEL_AI_GATEWAY, ANTHROPIC_API_KEY or OPENAI_API_KEY)"`) when the instance has no platform AI key and the workspace has no BYO key — see [error-recovery below](#error-recovery) |
 | `CONFIG_ERROR` | 500 | Server is missing required configuration |
+
+## Auth Errors
+
+| Code | Status | Description |
+|------|--------|-------------|
+| `SIGNUPS_PAUSED` | 403 | `POST /v1/auth/create-account` is closed on this instance. Existing/invited users sign in with device login instead; everyone else needs an invite |
+| `INVALID_CREDENTIAL` | 401 | Google One Tap token rejected or expired — sign in again |
+| `EMAIL_NOT_VERIFIED` | 403 | Google hasn't verified that email |
+| `SSO_REQUIRED` | 403 | The email's workspace enforces SSO — follow `redirect_url` |
+
+Device login (`POST /v1/auth/device/token`) keeps the RFC 8628 token in `error` so
+device-flow clients keep working, and adds `code` + `hint`:
+
+| `error` | `code` | Meaning / next step |
+|---------|--------|---------------------|
+| `invalid_request` | `INVALID_REQUEST` | Body must be `{ "device_code": "…" }` |
+| `invalid_grant` | `DEVICE_CODE_UNKNOWN` | Unknown or already-used code (the token is handed out once) — start a new login |
+| `expired_token` | `DEVICE_CODE_EXPIRED` | The user didn't finish within 10 minutes — start a new login and send the new link |
+| `access_denied` | `DEVICE_LOGIN_DENIED` | The user declined in the browser — ask, then start again |
 
 ## Artifact Errors
 
@@ -113,7 +167,12 @@ Standard error codes and their meanings. Response wrapper (`success`/`error`/`co
 
 What to actually do when you hit these, beyond retrying blindly:
 
-**429 rate limited** (`RATE_LIMITED` / `RATE_LIMIT_EXCEEDED`) — on publish (`POST
+**401 unauthorized** — read `reason`. `missing`: you forgot the header or have no key yet.
+`invalid` / `revoked` / `expired`: the saved key is dead — don't retry it. Get a new one
+(user opens `$ORIGIN/home?view=connect`, or device login — [auth.md](../auth.md)), save it,
+retry once. Tell the user you need them to reconnect; never ask them to paste a key into chat.
+
+**429 rate limited** (`RATE_LIMIT_EXCEEDED` on publish / account creation / AI, `RATE_LIMITED` on the data plane) — on publish (`POST
 /v1/publish` and the session `/create` builder — both enforce the same cap), the body
 and headers are actionable: `error` states the limit and reset time in words ("Daily
 publish limit reached (100 per day). It resets at HH:MM UTC, in about N hours."), plus
@@ -131,6 +190,15 @@ data or move heavy media to `sdk.blobs`/asset buckets instead of inline JSON), o
 instance-wide `STORAGE_QUOTA_BYTES` operator setting (only an operator can raise this —
 don't tell the user to "upgrade," there's no plan to upgrade to; the message itself says
 so: "ask your ShareOut admin to raise STORAGE_QUOTA_BYTES").
+
+**Published, but private** (`visibility_downgraded: true` on a `201` from `POST
+/v1/publish`) — the publish worked, the page is just not public. It happens when the
+instance turned public links off (`OPEN_VISIBILITY_DISABLED`, `notice` says so), when the
+account has no verified email (anonymous `create-account` accounts **always** publish
+privately until an email is linked), when the public-artifact cap is reached, or during a
+moderation hold. A publish that sends no `visibility` counts as asking for public, so it is
+reported the same way (`requested_visibility: "public"`). Tell the user it's private and
+why — never announce the link as public, and don't re-publish to "fix" it.
 
 **Public artifact limit** — not an error at all: if the instance sets
 `PUBLIC_ARTIFACT_LIMIT` and the account is at the cap, `POST /v1/publish` succeeds

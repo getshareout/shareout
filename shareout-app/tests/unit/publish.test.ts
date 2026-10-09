@@ -212,13 +212,14 @@ describe('handlePublish auth and validation', () => {
       env,
     );
     expect(noAuth.status).toBe(401);
-    await expect(noAuth.json()).resolves.toMatchObject({ code: 'UNAUTHORIZED' });
+    await expect(noAuth.json()).resolves.toMatchObject({ code: 'UNAUTHORIZED', reason: 'missing' });
 
     const badToken = await handlePublish(
       publishRequest(validBody(), { headers: { Authorization: 'Bearer not_so_token' } }),
       env,
     );
     expect(badToken.status).toBe(401);
+    await expect(badToken.json()).resolves.toMatchObject({ code: 'UNAUTHORIZED', reason: 'invalid' });
   });
 
   it('returns 429 when publish rate limit is exceeded', async () => {
@@ -880,6 +881,18 @@ describe('handlePublish auth visibility and collaborators', () => {
       env,
     );
     await expect(res.json()).resolves.toMatchObject({ notice: OPEN_VISIBILITY_PAYWALL_MESSAGE });
+  });
+
+  it('reports the downgrade when a bare publish (no visibility) hits the closed gate', async () => {
+    const env = await makePublishEnv();
+    env.OPEN_VISIBILITY_DISABLED = '1';
+    const res = await handlePublish(publishRequest(validBody({ slug: 'bare-blocked' })), env);
+    await expect(res.json()).resolves.toMatchObject({
+      visibility: 'private',
+      visibility_downgraded: true,
+      requested_visibility: 'public',
+      notice: OPEN_VISIBILITY_PAYWALL_MESSAGE,
+    });
   });
 });
 

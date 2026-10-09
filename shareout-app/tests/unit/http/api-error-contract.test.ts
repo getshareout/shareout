@@ -8,7 +8,9 @@ import {
   apiErrorResponse,
   buildApiErrorBody,
   simpleApiError,
+  SUPPORT_CONTACT,
 } from '../../../src/http/api-error';
+import { unauthorized } from '../../../src/cors';
 import { errorJson, invalidParam } from '../../../src/data/errors';
 import { errorResponse } from '../../../src/data/middleware';
 import { DATA_ERRORS, type Env } from '../../../src/types';
@@ -118,6 +120,34 @@ describe('api error envelope contract', () => {
     expect(JSON.stringify(body)).not.toContain('D1_ERROR');
     expect(JSON.stringify(body)).not.toContain('credentials');
     expect(body.request_id).toBeTruthy();
+    expect(body.support).toEqual(SUPPORT_CONTACT);
     spy.mockRestore();
+  });
+
+  it('stamps request_id on every JSON error, and support on 5xx, at the fetch seam', async () => {
+    const env = { LOG_LEVEL: 'error' } as Env;
+    const run = (res: Response) =>
+      withRequestLogging(new Request('https://shareout.test/x', { headers: { 'cf-ray': 'ray-1' } }), env, undefined, async () => res);
+
+    const notFound = await run(simpleApiError('Missing', 'NOT_FOUND', 404));
+    expect(await notFound.json()).toEqual({ success: false, error: 'Missing', code: 'NOT_FOUND', request_id: 'ray-1' });
+
+    const adHoc = await run(Response.json({ error: 'boom' }, { status: 502 }));
+    expect(await adHoc.json()).toEqual({ error: 'boom', request_id: 'ray-1', support: SUPPORT_CONTACT });
+
+    const ok = await run(Response.json({ error: 'not an error status' }));
+    expect(await ok.json()).toEqual({ error: 'not an error status' });
+
+    const text = await run(new Response('Not Found', { status: 404 }));
+    expect(await text.text()).toBe('Not Found');
+  });
+
+  it('unauthorized() says why and how to get a key', async () => {
+    const res = unauthorized('expired', 'https://so.example');
+    expect(res.status).toBe(401);
+    const body = (await res.json()) as Record<string, string>;
+    expect(body).toMatchObject({ success: false, code: 'UNAUTHORIZED', reason: 'expired' });
+    expect(body.hint).toContain('https://so.example/home?view=connect');
+    expect(body.docs).toBe('https://so.example/v1/skill/auth.md');
   });
 });

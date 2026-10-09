@@ -1,7 +1,7 @@
 ---
 name: "shareout-skill"
-version: "2.53.0"
-updated_at: "2026-09-21T13:00:00Z"
+version: "2.54.0"
+updated_at: "2026-10-09T12:00:00Z"
 description: "Publish, update, inspect, and manage ShareOut artifacts on a self-hosted instance. Use when the user wants to build or publish a web artifact (HTML apps, dashboards, forms, or CSV/Markdown/JSON/TXT), wire SDK data stores, live data, schedules, sharing, analytics, or in-artifact AI. If the user wants to INSTALL or DEPLOY ShareOut on Cloudflare first, load deploy/SKILL.md immediately."
 skill_endpoint: "/v1/skill"
 ---
@@ -18,6 +18,28 @@ Do not treat `getshareout/shareout-skill` as a second place to edit — that rep
 
 This file is the **use** skill (build & publish).  
 **Install / deploy** a new instance? → stop and load **[deploy/SKILL.md](deploy/SKILL.md)** first.
+
+---
+
+## Talk to the user
+
+The person you are helping is usually not technical. Every message you send them:
+
+- **Reply in their language.** If they write in Spanish, answer in natural Spanish — and in
+  Argentina use *vos* ("¿Querés que la publique?", not "¿Quiere usted…?"). Same for any
+  other language: match theirs, never switch to English on your own.
+- **No jargon.** Say "page" / "página", "link", "private" / "privada", "only you can see it"
+  — not artifact, deploy, endpoint, slug, token, visibility, 401. Technical words are for
+  your own reasoning, not their screen.
+- **Always end with the link** when you published or changed something — the full URL, on
+  its own line, and say who can open it (anyone / your team / only you).
+- **Never paste a token, API key or `device_code` back into the chat**, and never ask them
+  to paste one unless there is no other way. Keys go in `~/.shareout/credentials` or the
+  connector, not in conversation.
+- **Tell the truth about the result.** If the response has `visibility_downgraded: true`,
+  the page is private — say so and why (the `notice`), never announce it as public.
+
+If something goes wrong, see [If you get stuck](#if-you-get-stuck) — don't make them debug it.
 
 ---
 
@@ -69,7 +91,7 @@ load [deploy/SKILL.md](deploy/SKILL.md).
 
 ## Version check (against **their** origin)
 
-Frontmatter `version` is this file (`2.53.0`).
+Frontmatter `version` is this file (`2.54.0`).
 
 1. `GET $ORIGIN/v1/skill/version` → `{ "version", "updated_at" }`.
 2. If newer: download `GET $ORIGIN/v1/skill` (zip), replace local skill copy, continue.
@@ -306,6 +328,40 @@ doing workspace administration or workspace-scoped features:
 
 ---
 
+## If you get stuck
+
+Every error body carries `code`, usually a `hint` (what to do next), sometimes `docs`, and
+always a `request_id`. Read them before retrying — never retry the same call blindly.
+Codes and fields: [api/errors.md](api/errors.md).
+
+| You see | Do this | Tell the user (in their language) |
+|---------|---------|-----------------------------------|
+| `401 UNAUTHORIZED` (`reason`: missing / invalid / revoked / expired) | Get a fresh key: the user opens `$ORIGIN/home?view=connect` (connector or API token), or run device login ([auth.md](auth.md)). Retry once. | "I need you to reconnect me to ShareOut — open this link and come back." |
+| `403 FORBIDDEN` / `INSUFFICIENT_SCOPE` | Don't retry. The key or the person lacks access to that workspace/page. | "You don't have access to that space yet — ask its admin to invite you." |
+| `429 RATE_LIMIT_EXCEEDED` / `RATE_LIMITED` | Wait until `Retry-After` / `reset`; batch work instead of looping. | "ShareOut asks me to wait until HH:MM before publishing again." |
+| `201` with `visibility_downgraded: true` | It published, but private. Don't re-publish to "fix" it. | "It's published, but only you can see it for now, because …" (the `notice`) |
+| `moderation` in the publish result, or `202 MODERATION_HELD` | Under automatic review; it goes public by itself when it clears. Don't re-publish. | "It's published and under a quick automatic review; it'll open to everyone on its own." |
+| `SIGNUPS_PAUSED` | Use device login if they already have an account; otherwise they need an invite. | "This ShareOut only lets invited people in — ask whoever runs it for an invite." |
+| Any `5xx`, or the same error twice after following its `hint` | Stop and file a ticket (below). | "Something broke on ShareOut's side. I've told the team (ticket #…)." |
+
+**Ask a human — don't loop silently.** After **2 failed attempts** at the same step, or on
+**any 5xx**, create a support ticket ([api/support.md](api/support.md)):
+
+```bash
+curl -sS -X POST "$ORIGIN/v1/support/tickets" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"subject":"Publish fails with INTERNAL_ERROR",
+       "body":"User wanted: publish their sales dashboard.\nTried: POST /v1/publish twice.\nError: 500 INTERNAL_ERROR\nrequest_id: 8a1f…\nartifact_id: art_… (if any)"}'
+```
+
+Put in `body`: what the user wanted, what you tried, the error `code`, the `request_id`, and
+the `artifact_id` if there is one. Then tell the user, in their language, that the ShareOut
+team was notified and give them the ticket id — and stop retrying. Using the ShareOut
+connector (`$ORIGIN/mcp`) instead of the REST API? Call its `report_problem` tool with the
+same details.
+
+---
+
 ## Non-negotiable rules
 
 - Resolve `$ORIGIN` before authenticated calls; keep it in credentials.
@@ -316,4 +372,6 @@ doing workspace administration or workspace-scoped features:
 - Never `localStorage`/`sessionStorage` in a published artifact: it runs in an
   opaque-origin sandbox and both throw `SecurityError`. Use `sdk.json`.
 - Design taste on anything visual.
+- Speak the user's language, plainly, and end with the link ([Talk to the user](#talk-to-the-user)).
+- Never loop on an error: follow its `hint`, then file a support ticket ([If you get stuck](#if-you-get-stuck)).
 - Deploy/install → [deploy/SKILL.md](deploy/SKILL.md); do not improvise Cloudflare setup without [deploy/cloudflare.md](deploy/cloudflare.md).

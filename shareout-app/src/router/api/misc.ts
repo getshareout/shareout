@@ -73,13 +73,13 @@ export async function routeMiscApi(ctx: FetchContext): Promise<Response | null> 
     const user = await requireTokenOrSession(ctx);
     if (!isAuthUser(user)) return user;
     if (!env.VERCEL_AI_GATEWAY) {
-      return addCORS(jsonResponse({ error: 'Vercel AI Gateway not configured on this instance' }, 409));
+      return addCORS(jsonResponse({ error: 'Vercel AI Gateway not configured on this instance', code: 'GATEWAY_NOT_CONFIGURED', hint: 'Ask the instance operator to set VERCEL_AI_GATEWAY, or pick a model from a configured provider.' }, 409));
     }
     try {
       const models = await fetchGatewayModels();
       return addCORS(jsonResponse({ models }));
     } catch (err) {
-      return addCORS(jsonResponse({ error: err instanceof Error ? err.message : 'Gateway catalog fetch failed' }, 502));
+      return addCORS(jsonResponse({ error: err instanceof Error ? err.message : 'Gateway catalog fetch failed', code: 'UPSTREAM_ERROR', hint: 'The AI Gateway model catalog did not answer. Retry in a minute.' }, 502));
     }
   }
 

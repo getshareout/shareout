@@ -9,7 +9,7 @@ import {
 } from './logging';
 import { observe } from './observability';
 import { isLocalRequest } from './router/helpers/is-local-request';
-import { apiErrorResponse } from './http/api-error';
+import { apiErrorResponse, SUPPORT_CONTACT, withErrorContext } from './http/api-error';
 
 type FetchHandler = (request: Request, env: Env) => Promise<Response>;
 
@@ -93,11 +93,12 @@ export async function withRequestLogging(
       country,
     });
 
-    const headers = new Headers(response.headers);
+    const annotated = await withErrorContext(response, requestId);
+    const headers = new Headers(annotated.headers);
     headers.set('X-Request-Id', requestId);
-    return new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
+    return new Response(annotated.body, {
+      status: annotated.status,
+      statusText: annotated.statusText,
       headers,
     });
   } catch (err) {
@@ -128,6 +129,8 @@ export async function withRequestLogging(
         code: 'INTERNAL_ERROR',
         message: 'Internal server error',
         status: 500,
+        hint: 'Unexpected server failure. Retry once; if it fails again, file a support ticket quoting this request_id.',
+        support: SUPPORT_CONTACT,
       },
       { requestId }
     );

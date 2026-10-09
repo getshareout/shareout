@@ -16,6 +16,7 @@ import {
   validateToken,
   handleCreateAdminSession,
 } from '../api-auth';
+import { unauthorizedFor } from '../auth/unauthorized';
 import {
   checkAccountCreation,
   rateLimitResponse,
@@ -44,7 +45,6 @@ import { handleListMyLibraries } from '../workspace-library';
 import { handleCreateLibraryModule } from '../publish';
 import { handleSheetsOAuthCallback } from '../data/sheets/handler';
 import { handleGitHubOAuthCallback } from '../data/github/handler';
-import { unauthorized } from '../cors';
 import { createLogger, logError } from '../logging';
 import { isSheetsAuthCallback, isGitHubAuthCallback } from '../oauth-callback';
 import type { FetchContext } from './context';
@@ -106,7 +106,7 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
 
   if (path === '/v1/invites/claim' && request.method === 'POST') {
     const user = await getTokenOrSessionUser(ctx);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleClaimInvite(request, env, user));
   }
 
@@ -132,31 +132,31 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
 
   if (path === '/v1/auth/link-email' && request.method === 'POST') {
     const user = await validateToken(request, env);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleLinkEmail(request, env, user));
   }
 
   if (path === '/v1/auth/profile' && request.method === 'GET') {
     const user = await validateToken(request, env);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleGetProfile(request, env, user));
   }
 
   if (path === '/v1/auth/profile' && (request.method === 'PUT' || request.method === 'PATCH')) {
     const user = await validateToken(request, env);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleUpdateProfile(request, env, user));
   }
 
   if (path === '/v1/auth/admin-session' && request.method === 'POST') {
     const user = await validateToken(request, env);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleCreateAdminSession(request, env, user));
   }
 
   if (path === '/v1/auth/link-google' && request.method === 'GET') {
     const user = await getTokenOrSessionUser(ctx);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     const redirectTo = url.searchParams.get('redirect') || '/home';
     return handleLinkGoogleStart(user.id, redirectTo, env, 'identity');
   }
@@ -167,20 +167,20 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
 
   if (path === '/v1/me/tokens' && request.method === 'GET') {
     const user = await getTokenOrSessionUser(ctx);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleListMyTokens(env, user));
   }
 
   if (path === '/v1/me/tokens' && request.method === 'POST') {
     const user = await getTokenOrSessionUser(ctx);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleCreateMyToken(request, env, user));
   }
 
   // Personal Workspace Library catalog ("my modules").
   if (path === '/v1/me/libraries' && request.method === 'GET') {
     const user = await getTokenOrSessionUser(ctx);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleListMyLibraries(env, user));
   }
 
@@ -188,7 +188,7 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
   // both scopes via the body (scope + workspace_id).
   if (path === '/v1/me/libraries' && request.method === 'POST') {
     const user = await getTokenOrSessionUser(ctx);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleCreateLibraryModule(env, user, request));
   }
 

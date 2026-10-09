@@ -175,7 +175,10 @@ describe('handleDevicePoll', () => {
     rows[0].expires_at = new Date(Date.now() - 1000).toISOString();
     const res = await handleDevicePoll(req({ device_code: start.device_code }), env);
     expect(res.status).toBe(400);
-    expect((await res.json() as any).error).toBe('expired_token');
+    const body = await res.json() as any;
+    expect(body.error).toBe('expired_token');
+    expect(body.code).toBe('DEVICE_CODE_EXPIRED');
+    expect(body.hint).toMatch(/device\/start/);
     expect(rows).toHaveLength(0);
   });
 });

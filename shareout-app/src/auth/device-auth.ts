@@ -84,6 +84,31 @@ export async function handleDeviceStart(request: Request, env: Env): Promise<Res
   }, 201);
 }
 
+// `error` stays the RFC 8628 token device-flow clients branch on; `code` + `hint` say
+// in plain words what happened and what to do next.
+const DEVICE_ERRORS = {
+  invalid_request: {
+    code: 'INVALID_REQUEST',
+    hint: 'Send JSON { "device_code": "…" } — the device_code returned by POST /v1/auth/device/start.',
+  },
+  invalid_grant: {
+    code: 'DEVICE_CODE_UNKNOWN',
+    hint: 'This login code is unknown or was already used (a token is handed out only once). Start a new login with POST /v1/auth/device/start.',
+  },
+  expired_token: {
+    code: 'DEVICE_CODE_EXPIRED',
+    hint: 'The user did not finish signing in within 10 minutes. Start a new login with POST /v1/auth/device/start and send them the new link.',
+  },
+  access_denied: {
+    code: 'DEVICE_LOGIN_DENIED',
+    hint: 'The user declined this sign-in in the browser. Ask whether they want to try again, then start a new login with POST /v1/auth/device/start.',
+  },
+} as const;
+
+function deviceError(error: keyof typeof DEVICE_ERRORS) {
+  return { error, ...DEVICE_ERRORS[error] };
+}
+
 // POST /v1/auth/device/token — CLI polls with { device_code }. No auth required
 // (the device_code is the secret). Returns the token exactly once, then consumes the row.
 export async function handleDevicePoll(request: Request, env: Env): Promise<Response> {
@@ -92,25 +117,25 @@ export async function handleDevicePoll(request: Request, env: Env): Promise<Resp
     const body = (await request.json()) as { device_code?: string };
     deviceCode = body?.device_code;
   } catch {
-    return json({ error: 'invalid_request' }, 400);
+    return json(deviceError('invalid_request'), 400);
   }
-  if (!deviceCode) return json({ error: 'invalid_request' }, 400);
+  if (!deviceCode) return json(deviceError('invalid_request'), 400);
 
   const row = await env.DB.prepare(
     `SELECT id, status, user_id, token, warn, expires_at FROM device_auth WHERE device_code = ?`
   ).bind(deviceCode).first<DeviceRow>();
 
-  if (!row) return json({ error: 'invalid_grant' }, 400);
+  if (!row) return json(deviceError('invalid_grant'), 400);
 
   const now = new Date().toISOString();
   if (row.expires_at < now) {
     await env.DB.prepare('DELETE FROM device_auth WHERE id = ?').bind(row.id).run();
-    return json({ error: 'expired_token' }, 400);
+    return json(deviceError('expired_token'), 400);
   }
 
   if (row.status === 'denied') {
     await env.DB.prepare('DELETE FROM device_auth WHERE id = ?').bind(row.id).run();
-    return json({ error: 'access_denied' }, 400);
+    return json(deviceError('access_denied'), 400);
   }
 
   if (row.status !== 'approved' || !row.token) {
