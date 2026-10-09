@@ -22,6 +22,7 @@ function buildNav(args: RenderArgs, canManage: boolean): NavItem[] {
   const items: NavItem[] = [
     { key: 'brief', label: 'Brief', i18n: 'nav.brief', icon: 'brief', kind: 'view' },
     { key: 'artifacts', label: 'All Artifacts', i18n: 'nav.artifacts', icon: 'browse', kind: 'view' },
+    { key: 'connect', label: 'Connect your agent', i18n: 'nav.connect', icon: 'link', kind: 'view' },
     { key: 'schedules', label: 'My Schedules', i18n: 'nav.schedules', icon: 'recent', kind: 'view' },
     { key: 'alerts', label: 'My Alerts', i18n: 'nav.alerts', icon: 'alert', kind: 'view' },
     { key: 'analytics', label: 'Analytics', i18n: 'nav.analytics', icon: 'chart', kind: 'view' },
@@ -197,6 +198,16 @@ export function buildWorkspaceBody(args: RenderArgs): string {
             </div>
             <div id="wsxLibMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
+          <div class="wsx__view" data-view="connect">
+            <h2 class="wsx__viewtitle" data-i18n="view.connect">Connect your agent</h2>
+            <p class="wsx-lens__intro" data-i18n="intro.connect">Use the AI you already use — Claude or ChatGPT — to make pages here. Pick yours and follow the steps.</p>
+            <div class="wsx__chips" id="wsxCnTabs">
+              <button class="wsx-chip is-on" data-cn-tab="claude" type="button" data-i18n="connect.tabClaude">Claude</button>
+              <button class="wsx-chip" data-cn-tab="chatgpt" type="button" data-i18n="connect.tabChatgpt">ChatGPT</button>
+              <button class="wsx-chip" data-cn-tab="code" type="button" data-i18n="connect.tabCode">Claude Code · advanced</button>
+            </div>
+            <div id="wsxCnMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
+          </div>
           <div class="wsx__view" data-view="connectors">
             <h2 class="wsx__viewtitle" data-i18n="view.connectors">Connectors</h2>
             <p class="wsx-lens__intro" data-i18n="intro.connectors">Data sources your workspace can query by name — bring your own credentials once, then use them from any page.</p>
@@ -288,7 +299,16 @@ export function buildWorkspaceBody(args: RenderArgs): string {
   <section class="wsx__help-panel" id="wsxHelpPanel" hidden data-i18n-aria="help.title" aria-label="Help and support">
     <header class="wsx__help-head"><span data-i18n="help.title">Help &amp; support</span><button type="button" id="wsxHelpClose" data-i18n-aria="help.close" aria-label="Close">${svg('<path d="M18 6L6 18M6 6l12 12"/>')}</button></header>
     <div class="wsx__help-body">
+      <div class="wsx__help-form" id="wsxHelpForm">
       <p class="wsx-lens__intro" data-i18n="help.intro">Hit a bug or have a question? Tell us — we'll reply here and by email.</p>
+      <div class="wsx-field">
+        <select class="wsx-field__in" id="wsxHelpCategory" data-i18n-aria="help.category" aria-label="What is it about?">
+          <option value="bug" data-i18n="help.catBug">Something is broken</option>
+          <option value="question" data-i18n="help.catQuestion">A question</option>
+          <option value="access" data-i18n="help.catAccess">Access or sign-in</option>
+          <option value="other" data-i18n="help.catOther">Something else</option>
+        </select>
+      </div>
       <div class="wsx-field">
         <input class="wsx-field__in" id="wsxHelpSubject" type="text" data-i18n-placeholder="help.subject" placeholder="Short summary">
       </div>
@@ -296,6 +316,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
         <textarea class="wsx-field__in wsx-field__ta" id="wsxHelpBody" data-i18n-placeholder="help.body" placeholder="What happened?"></textarea>
       </div>
       <div class="wsx__help-actions"><button class="wsx-abtn" id="wsxHelpSend" type="button" data-i18n="help.send">Send</button><span class="wsx-admin__savemsg" id="wsxHelpMsg"></span></div>
+      </div>
       <div class="wsx__help-mine" id="wsxHelpMine"></div>
     </div>
   </section>
@@ -332,6 +353,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
       <p class="wsx__accsub" data-i18n="account.linkedDesc">Link your other emails to see all their workspaces from one login.</p>
       <div class="wsx__linked" id="wsxLinked"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
       <div class="wsx__accactions">
+        <a class="wsx-accbtn" href="/home?view=connect&amp;tab=code" data-cn-open="code">${svg('<circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 19 4M18 5l2 2M15 8l2 2"/>')}<span data-i18n="account.apiToken">API token</span></a>
         <a class="wsx-accbtn" href="/settings/telegram?go=1" target="_blank" rel="noopener">${svg('<path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>')}<span data-i18n="account.telegram">Connect Telegram</span></a>
         <a class="wsx-accbtn" href="/v1/auth/link-google?redirect=%2Fhome%3Fnext%3D1">${svg('<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>')}<span data-i18n="account.linkGoogle">Link Google account</span></a>
         <a class="wsx-accbtn wsx-accbtn--out" href="/auth/logout">${svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>')}<span data-i18n="account.signOut">Sign out</span></a>

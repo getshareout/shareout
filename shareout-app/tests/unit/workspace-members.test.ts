@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../src/workspaces-invite-email', () => ({
   createInviteClaim: vi.fn(async () => ({ id: 'inv_1', code: 'ABCDE-FGHJK' })),
   sendInviteEmail: vi.fn(async () => ({ sent: true })),
+  expireOtherInviteClaims: vi.fn(async () => {}),
 }));
 
 import {
@@ -63,15 +64,69 @@ describe('handleInviteWorkspaceMembers', () => {
     expect(res.status).toBe(403);
   });
 
-  it('returns 400 when emails is not an array', async () => {
+  it('returns 400 when emails is neither an array nor a string', async () => {
     const env = { ...baseEnv, DB: makeDbMock({ first: roleFirst('admin') }) };
     const res = await handleInviteWorkspaceMembers(
       new Request('https://x/v1/workspaces/w/members/invite', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emails: 'a@b.com' }),
+        body: JSON.stringify({ emails: 42 }),
       }), env, user, workspaceId);
     expect(res.status).toBe(400);
     expect((await jsonBody(res)).code).toBe('VALIDATION_ERROR');
+  });
+
+  it('parses a pasted string and reports codes, including invalid tokens', async () => {
+    const env = { ...baseEnv, DB: makeDbMock({ first: roleFirst('admin'), all: () => ({ results: [] }) }) };
+    const res = await handleInviteWorkspaceMembers(
+      new Request('https://x/v1/workspaces/w/members/invite', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emails: 'Ana <ana@example.com>, bob@example.com\nnope@', message: 'hola' }),
+      }), env, user, workspaceId);
+    expect(res.status).toBe(200);
+    const body = await jsonBody(res);
+    const results = body.results as Array<{ email: string; code: string }>;
+    expect(results.map((r) => [r.email, r.code])).toEqual([
+      ['nope@', 'invalid_email'],
+      ['ana@example.com', 'invited'],
+      ['bob@example.com', 'invited'],
+    ]);
+    expect(body.summary).toMatchObject({ invited: 2, invalid_email: 1 });
+    expect(vi.mocked(sendInviteEmail).mock.calls[0][1]).toMatchObject({ personalMessage: 'hola' });
+  });
+
+  it('rejects more than 100 valid emails with a batching hint', async () => {
+    const env = { ...baseEnv, DB: makeDbMock({ first: roleFirst('admin') }) };
+    const emails = Array.from({ length: 101 }, (_, i) => `p${i}@example.com`);
+    const res = await handleInviteWorkspaceMembers(
+      new Request('https://x/v1/workspaces/w/members/invite', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emails }),
+      }), env, user, workspaceId);
+    expect(res.status).toBe(400);
+    expect((await jsonBody(res)).code).toBe('TOO_MANY_EMAILS');
+  });
+
+  it('does not change an existing active member\'s role on bulk invite', async () => {
+    const runs: string[] = [];
+    const env = {
+      ...baseEnv,
+      DB: makeDbMock({
+        first: roleFirst('admin', (sql) => {
+          if (sql.includes('FROM users WHERE email')) return { id: 'usr_9', last_login_at: '2026-01-01' };
+          if (sql.includes('SELECT id, role, member_class FROM workspace_members')) return { id: 'wsm_9', role: 'admin', member_class: 'internal' };
+          return null;
+        }),
+        run: (sql) => { runs.push(sql); return { success: true }; },
+      }),
+    };
+    const res = await handleInviteWorkspaceMembers(
+      new Request('https://x/v1/workspaces/w/members/invite', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emails: ['boss@example.com'], role: 'member' }),
+      }), env, user, workspaceId);
+    const results = (await jsonBody(res)).results as Array<{ code: string }>;
+    expect(results[0].code).toBe('already_member');
+    expect(runs.some((s) => s.includes('UPDATE workspace_members SET role'))).toBe(false);
   });
 
   it('invites new users and reports per-email results', async () => {
@@ -121,6 +176,7 @@ describe('handleInviteWorkspaceMembers', () => {
     const blocked = results.find((r) => r.email === 'no@blocked.com');
     expect(blocked?.status).toBe('skipped');
     expect(blocked?.reason).toBe('domain_not_allowed');
+    expect((blocked as { code?: string })?.code).toBe('domain_not_allowed');
   });
 });
 

@@ -81,8 +81,8 @@ export const workspace_client_inspector_activity_JS = `
           var kinds = (d && d.kinds) || [];
           var rows = kinds.map(function (k) {
             var opts = AUD.map(function (a) { return '<option value="' + a[0] + '"' + (a[0] === k.audience ? ' selected' : '') + '>' + a[1] + '</option>'; }).join('');
-            return '<div class="wsx__evrow"><span class="wsx__evtier">' + esc(k.tier) + '</span>'
-              + '<span><b>' + esc(k.label) + '</b><small>' + esc(k.hint) + '</small></span>'
+            return '<div class="wsx__evrow"><span class="wsx__evtier">' + esc(tOr('evt.tier.' + k.tier, k.tier)) + '</span>'
+              + '<span><b>' + esc(tOr('evt.' + k.kind, k.label)) + '</b><small>' + esc(tOr('evt.' + k.kind + '.hint', k.hint)) + '</small></span>'
               + '<select data-kind="' + esc(k.kind) + '"' + (d.canManage ? '' : ' disabled') + '>' + opts + '</select></div>';
           }).join('');
           var em = panel.querySelector('.wsx-empty'); if (em) em.outerHTML = rows;

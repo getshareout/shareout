@@ -19,6 +19,9 @@ export function renderEarlyHead(
   // Closed (private/workspace) pages must not be indexed even when a logged-in
   // viewer (or a cached session) receives the real document.
   noindex = false,
+  // The viewer's best-known language at first byte (Accept-Language); the toolbar
+  // chunk corrects it once the workspace's language is known.
+  lang = 'en',
 ): string {
   const preconnect = preconnectHost
     ? `<link rel="preconnect" href="https://${preconnectHost}">\n  `
@@ -31,7 +34,7 @@ export function renderEarlyHead(
     : '';
   const metaSocial = noindex ? '' : socialTags;
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${lang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">

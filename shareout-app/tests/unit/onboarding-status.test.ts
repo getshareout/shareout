@@ -12,9 +12,10 @@ function makeDb(rows: {
   user?: Row;
 }): Env['DB'] {
   function resolve(sql: string): Row {
+    // Signals first: its teammates EXISTS also reads workspace_members.
+    if (sql.includes('AS firstArtifact')) return rows.signals ?? {};
     if (sql.includes('FROM workspace_members')) return rows.member ?? null;
     if (sql.includes('FROM onboarding_state')) return rows.state ?? null;
-    if (sql.includes('AS firstArtifact')) return rows.signals ?? {};
     if (sql.includes('FROM users')) return rows.user ?? null;
     return null;
   }
@@ -52,14 +53,14 @@ describe('getOnboardingStatus', () => {
     expect(await getOnboardingStatus(env, WS, U)).toBeNull();
   });
 
-  it('gives a fresh admin the 6-task admin track at 0% and eligible', async () => {
+  it('gives a fresh admin the 7-task admin track (invite_team is skippable) at 0% and eligible', async () => {
     const env = { ...INTEGRATIONS, DB: makeDb({
       member: { role: 'owner', created_at: nowIso, member_class: 'internal' },
       signals: NO_SIGNALS,
     }) } as Env;
     const s = await getOnboardingStatus(env, WS, U);
     expect(s?.track).toBe('admin');
-    expect(s?.tasks).toHaveLength(6);
+    expect(s?.tasks).toHaveLength(7);
     expect(s?.pct).toBe(0);
     expect(s?.eligible).toBe(true);
     expect(s?.celebrated).toBe(false);
@@ -75,14 +76,33 @@ describe('getOnboardingStatus', () => {
     expect(s?.tasks.find((t) => t.key === 'slack')?.done).toBe(true);
   });
 
-  it('routes a plain member to the 4-task member track', async () => {
+  it('routes a plain member to the 5-task member track, connect-your-agent first', async () => {
     const env = { ...INTEGRATIONS, DB: makeDb({
       member: { role: 'member', created_at: nowIso, member_class: 'internal' },
       signals: NO_SIGNALS,
     }) } as Env;
     const s = await getOnboardingStatus(env, WS, U);
     expect(s?.track).toBe('member');
-    expect(s?.tasks).toHaveLength(4);
+    expect(s?.tasks).toHaveLength(5);
+    expect(s?.tasks[0]).toMatchObject({ key: 'connect_agent', done: false, action: { kind: 'nav', target: 'connect' } });
+  });
+
+  it('marks connect_agent done once the member has a personal key', async () => {
+    const env = { ...INTEGRATIONS, DB: makeDb({
+      member: { role: 'member', created_at: nowIso, member_class: 'internal' },
+      signals: { ...NO_SIGNALS, agentConnected: 1 },
+    }) } as Env;
+    const s = await getOnboardingStatus(env, WS, U);
+    expect(s?.tasks.find((t) => t.key === 'connect_agent')?.done).toBe(true);
+  });
+
+  it('starts the 14-day window when the invite was accepted, not sent', async () => {
+    const env = { ...INTEGRATIONS, DB: makeDb({
+      member: { role: 'member', created_at: oldIso, accepted_at: nowIso, member_class: 'internal' },
+      signals: NO_SIGNALS,
+    }) } as Env;
+    const s = await getOnboardingStatus(env, WS, U);
+    expect(s?.eligible).toBe(true);
   });
 
   it('is not eligible once dismissed', async () => {

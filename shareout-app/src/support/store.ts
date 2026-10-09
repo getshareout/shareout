@@ -6,6 +6,13 @@ export type TicketChannel = 'ui' | 'skill' | 'slack' | 'telegram' | 'email';
 export type TicketStatus = 'open' | 'pending' | 'resolved' | 'closed';
 export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type MessageAuthor = 'customer' | 'staff' | 'ai';
+export const TICKET_CATEGORIES = ['bug', 'question', 'access', 'billing', 'other'] as const;
+export const TICKET_SEVERITIES = ['low', 'normal', 'high', 'blocker'] as const;
+export const TICKET_CLIENTS = ['ui', 'claude', 'chatgpt', 'mcp', 'api', 'slack', 'telegram', 'email', 'chat_agent'] as const;
+export type TicketCategory = (typeof TICKET_CATEGORIES)[number];
+export type TicketSeverity = (typeof TICKET_SEVERITIES)[number];
+export type TicketClient = (typeof TICKET_CLIENTS)[number];
+export type TicketLocale = 'en' | 'es';
 
 export interface Ticket {
   id: string;
@@ -22,6 +29,14 @@ export interface Ticket {
   ai_draft: string | null;
   ai_meta_json: string | null;
   sla_due: number | null;
+  severity: TicketSeverity | null;
+  request_id: string | null;
+  page_url: string | null;
+  artifact_id: string | null;
+  user_agent: string | null;
+  client: TicketClient | null;
+  idempotency_key: string | null;
+  locale: TicketLocale | null;
   created_at: string;
   updated_at: string;
   last_msg_at: string;
@@ -43,6 +58,15 @@ export interface CreateTicketInput {
   channelRef?: string | null;
   subject: string;
   body: string;
+  category?: TicketCategory | null;
+  severity?: TicketSeverity | null;
+  requestId?: string | null;
+  pageUrl?: string | null;
+  artifactId?: string | null;
+  userAgent?: string | null;
+  client?: TicketClient | null;
+  idempotencyKey?: string | null;
+  locale?: TicketLocale | null;
 }
 
 /** Open a new ticket and seed it with the customer's first message. */
@@ -51,8 +75,9 @@ export async function createTicket(env: Env, input: CreateTicketInput): Promise<
   const id = generateId('tkt');
   await env.DB.prepare(
     `INSERT INTO tickets (id, workspace_id, requester_user_id, requester_email, channel, channel_ref,
-       subject, status, created_at, updated_at, last_msg_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)`
+       subject, status, category, severity, request_id, page_url, artifact_id, user_agent, client,
+       idempotency_key, locale, created_at, updated_at, last_msg_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     id,
     input.workspaceId ?? null,
@@ -61,6 +86,15 @@ export async function createTicket(env: Env, input: CreateTicketInput): Promise<
     input.channel,
     input.channelRef ?? null,
     input.subject,
+    input.category ?? null,
+    input.severity ?? null,
+    input.requestId ?? null,
+    input.pageUrl ?? null,
+    input.artifactId ?? null,
+    input.userAgent ?? null,
+    input.client ?? null,
+    input.idempotencyKey ?? null,
+    input.locale ?? null,
     now, now, now,
   ).run();
   await appendMessage(env, id, 'customer', input.body);
@@ -84,6 +118,11 @@ export async function appendMessage(env: Env, ticketId: string, author: MessageA
 
 export async function getTicket(env: Env, ticketId: string): Promise<Ticket | null> {
   return await env.DB.prepare(`SELECT * FROM tickets WHERE id = ?`).bind(ticketId).first<Ticket>();
+}
+
+export async function findByIdempotencyKey(env: Env, requesterUserId: string, key: string): Promise<Ticket | null> {
+  return await env.DB.prepare(`SELECT * FROM tickets WHERE requester_user_id = ? AND idempotency_key = ?`)
+    .bind(requesterUserId, key).first<Ticket>();
 }
 
 export async function getThread(env: Env, ticketId: string): Promise<TicketMessage[]> {
@@ -117,11 +156,12 @@ export interface Triage {
   draft: string;
 }
 
-/** Store triage output on the ticket. Draft is never auto-sent — staff approve it. */
+/** Store triage output on the ticket. Draft is never auto-sent — staff approve it.
+ *  A category the reporter chose is kept; triage only fills an empty one. */
 export async function setTriage(env: Env, ticketId: string, t: Triage): Promise<void> {
   const now = new Date().toISOString();
   await env.DB.prepare(
-    `UPDATE tickets SET category = ?, priority = ?, ai_draft = ?, ai_meta_json = ?, updated_at = ? WHERE id = ?`
+    `UPDATE tickets SET category = COALESCE(category, ?), priority = ?, ai_draft = ?, ai_meta_json = ?, updated_at = ? WHERE id = ?`
   ).bind(t.category, t.priority, t.draft, JSON.stringify(t), now, ticketId).run();
 }
 
@@ -139,6 +179,14 @@ export interface ListFilter {
   limit?: number;
 }
 
+export interface AllFilter extends ListFilter {
+  /** A workspace id, or 'none' for tickets with no workspace. */
+  workspace?: string;
+  category?: string;
+  /** ISO timestamp: only tickets with a message after it. */
+  since?: string;
+}
+
 /** Tickets for one workspace (personal scope = workspace_id IS NULL). */
 export async function listForWorkspace(env: Env, workspaceId: string | null, filter: ListFilter = {}): Promise<Ticket[]> {
   const wsClause = workspaceId === null ? 'workspace_id IS NULL' : 'workspace_id = ?';
@@ -152,12 +200,17 @@ export async function listForWorkspace(env: Env, workspaceId: string | null, fil
 }
 
 /** All tickets across every workspace — super-admin only. */
-export async function listAll(env: Env, filter: ListFilter = {}): Promise<Ticket[]> {
-  const statusClause = filter.status ? 'WHERE status = ?' : '';
-  const statusBind = filter.status ? [filter.status] : [];
+export async function listAll(env: Env, filter: AllFilter = {}): Promise<Ticket[]> {
+  const where: string[] = [];
+  const binds: unknown[] = [];
+  if (filter.status) { where.push('status = ?'); binds.push(filter.status); }
+  if (filter.workspace === 'none') where.push('workspace_id IS NULL');
+  else if (filter.workspace) { where.push('workspace_id = ?'); binds.push(filter.workspace); }
+  if (filter.category) { where.push('category = ?'); binds.push(filter.category); }
+  if (filter.since) { where.push('last_msg_at > ?'); binds.push(filter.since); }
   const rows = await env.DB.prepare(
-    `SELECT * FROM tickets ${statusClause} ORDER BY last_msg_at DESC LIMIT ?`
-  ).bind(...statusBind, filter.limit ?? 200).all<Ticket>();
+    `SELECT * FROM tickets ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY last_msg_at DESC LIMIT ?`
+  ).bind(...binds, filter.limit ?? 200).all<Ticket>();
   return rows.results;
 }
 

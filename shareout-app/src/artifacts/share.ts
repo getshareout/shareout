@@ -19,7 +19,7 @@ export async function handleShareArtifact(
   artifactId: string
 ): Promise<Response> {
   const artifact = await env.DB.prepare(
-    `SELECT a.id, a.name, a.description, a.slug, a.display_slug, a.auth_method, d.slug AS prod_slug, w.slug AS workspace_slug
+    `SELECT a.id, a.name, a.description, a.slug, a.display_slug, a.auth_method, d.slug AS prod_slug, w.slug AS workspace_slug, a.workspace_id
      FROM artifacts a
      LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
      LEFT JOIN workspaces w ON w.id = a.workspace_id
@@ -33,6 +33,7 @@ export async function handleShareArtifact(
     auth_method: string;
     prod_slug: string | null;
     workspace_slug: string | null;
+    workspace_id: string | null;
   }>();
 
   if (!artifact) {
@@ -127,6 +128,7 @@ export async function handleShareArtifact(
     const result = await dispatchLifecycleEmail(env, {
       type: 'artifact_share',
       toEmail: recipient,
+      workspaceId: artifact.workspace_id ?? undefined,
       replyTo: sender?.email || undefined,
       data: shareData,
     });

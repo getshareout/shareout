@@ -1,18 +1,21 @@
 /**
  * Client-side formatting and aggregation utilities for dashboard widgets.
  * Exposed via `sdk.dashboards.helpers` — pure functions with no network or doc state.
+ * Formats follow the page's language (see pageLocaleTag).
  */
+import { pageLocaleTag } from '../../core/locale';
+
 export class DashboardHelpers {
   formatNumber(value: number, options?: Intl.NumberFormatOptions): string {
-    return new Intl.NumberFormat('en-US', options).format(value);
+    return new Intl.NumberFormat(pageLocaleTag(), options).format(value);
   }
 
   formatCurrency(value: number, currency = 'USD'): string {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
+    return new Intl.NumberFormat(pageLocaleTag(), { style: 'currency', currency }).format(value);
   }
 
   formatPercent(value: number, decimals = 1): string {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat(pageLocaleTag(), {
       style: 'percent',
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
@@ -21,7 +24,7 @@ export class DashboardHelpers {
 
   formatDate(date: Date | string, _format?: string): string {
     const d = typeof date === 'string' ? new Date(date) : date;
-    return d.toLocaleDateString('en-US', {
+    return d.toLocaleDateString(pageLocaleTag(), {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

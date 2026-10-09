@@ -84,7 +84,7 @@
     },
     {
       "name": "Account",
-      "description": "Account settings and profile."
+      "description": "Plan tier and upgrades."
     },
     {
       "name": "Auth",
@@ -146,8 +146,8 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Published",
+          "201": {
+            "description": "Published. Check `visibility` — when it is more private than asked, `visibility_downgraded` is true and `notice` says why; tell the user.",
             "content": {
               "application/json": {
                 "schema": {
@@ -162,8 +162,27 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "409": {
             "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "description": "Storage limit reached (`STORAGE_LIMIT_EXCEEDED`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -566,7 +585,7 @@
           "Artifacts"
         ],
         "summary": "Update artifact metadata",
-        "description": "Update visibility, name, social link-preview fields, or anonymous-access opt-ins. Public visibility is an instance-policy question, not a billing one — if the operator disabled open visibility instance-wide and the publisher isn't in the rollout, visibility is held with code `VISIBILITY_HELD`.",
+        "description": "Update visibility, name, social link-preview fields, or anonymous-access opt-ins. When instance policy holds public visibility the write still succeeds with 202 `VISIBILITY_HELD` (or `MODERATION_HELD` while an automated safety check runs) and the page stays private for now.",
         "operationId": "updateArtifact",
         "requestBody": {
           "required": true,
@@ -1482,7 +1501,7 @@
           "Support"
         ],
         "summary": "List support tickets",
-        "description": "`scope=mine` (default) returns the requester's tickets. `scope=workspace&workspace={id}` requires workspace admin/owner. `scope=all` is super-admin only. Optional `status` filter.",
+        "description": "`scope=mine` (default) returns the requester's tickets. `scope=workspace&workspace={id}` requires workspace admin/owner. `scope=all` is instance-admin only (session or personal token; workspace agent tokens are refused) and also filters by `workspace` (`none` = no workspace), `category`, `since` and `limit`. Optional `status` filter.",
         "operationId": "listSupportTickets",
         "parameters": [
           {
@@ -1504,7 +1523,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Required when scope=workspace."
+            "description": "Required when scope=workspace. With scope=all, a workspace id or `none`."
           },
           {
             "name": "status",
@@ -1518,6 +1537,33 @@
                 "closed"
               ]
             }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "scope=all only."
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "scope=all only. Tickets with a message after this ISO timestamp."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 200,
+              "maximum": 500
+            },
+            "description": "scope=all only."
           }
         ],
         "responses": {
@@ -1569,7 +1615,65 @@
                   },
                   "workspaceId": {
                     "type": "string",
-                    "nullable": true
+                    "nullable": true,
+                    "description": "Must be a workspace the caller belongs to (else 403)."
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "bug",
+                      "question",
+                      "access",
+                      "billing",
+                      "other"
+                    ]
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "normal",
+                      "high",
+                      "blocker"
+                    ]
+                  },
+                  "client": {
+                    "type": "string",
+                    "enum": [
+                      "ui",
+                      "claude",
+                      "chatgpt",
+                      "mcp",
+                      "api",
+                      "slack",
+                      "telegram",
+                      "email",
+                      "chat_agent"
+                    ]
+                  },
+                  "requestId": {
+                    "type": "string",
+                    "description": "request_id from the error response that led here."
+                  },
+                  "pageUrl": {
+                    "type": "string"
+                  },
+                  "artifactId": {
+                    "type": "string"
+                  },
+                  "userAgent": {
+                    "type": "string"
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "description": "Same key from the same account returns the original ticket (200, deduped=true)."
+                  },
+                  "locale": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "es"
+                    ]
                   }
                 }
               }
@@ -1577,6 +1681,9 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Duplicate idempotencyKey — the original ticket"
+          },
           "201": {
             "description": "Created",
             "content": {
@@ -2033,6 +2140,251 @@
         "responses": {
           "200": {
             "description": "Matching rows"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/members/invite": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Invite people by email (bulk)",
+        "description": "Owner or admin only. `emails` is an array or one string of pasted text — commas, semicolons, spaces, newlines, `Name <email>` and spreadsheet columns all work; tokens without `@` are ignored, duplicates collapse. Up to 100 valid addresses per call (`400 TOO_MANY_EMAILS` beyond that — batch). New or not-yet-active people get a 7-day join link by email; people with an account are added and notified. Existing members keep their role (change roles with `POST /members`). Re-inviting a pending person retires their older links.",
+        "operationId": "inviteWorkspaceMembers",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "emails"
+                ],
+                "properties": {
+                  "emails": {
+                    "oneOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ],
+                    "example": "Ana <ana@example.com>, luis@example.com"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "member",
+                      "admin"
+                    ],
+                    "default": "member"
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "Optional personal note passed to the invite email."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Per-email results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "email": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string",
+                            "enum": [
+                              "invited",
+                              "added",
+                              "already_member",
+                              "invalid_email",
+                              "domain_not_allowed"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "invited",
+                              "added",
+                              "updated",
+                              "skipped"
+                            ],
+                            "description": "Legacy status; prefer `code`."
+                          },
+                          "email_sent": {
+                            "type": "boolean",
+                            "description": "For `invited` — whether the invite email went out."
+                          },
+                          "invite_url": {
+                            "type": "string",
+                            "description": "Join link, present only when the email did not go out. Share it by hand."
+                          }
+                        }
+                      }
+                    },
+                    "summary": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      },
+                      "description": "Count per `code`."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/invites": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "List pending invites",
+        "description": "Owner or admin only. Newest unclaimed invite per person, with `email_status` (`sent`, `failed`, `skipped`, `link_only`), `email_sent_at`, `expired` and `role`.",
+        "operationId": "listWorkspaceInvites",
+        "responses": {
+          "200": {
+            "description": "Pending invites"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/invites/{inviteId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        },
+        {
+          "name": "inviteId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "delete": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Revoke a pending invite",
+        "description": "Owner or admin only. Drops every pending link for that person and their pending membership.",
+        "operationId": "revokeWorkspaceInvite",
+        "responses": {
+          "200": {
+            "description": "Revoked"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/invites/{inviteId}/resend": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        },
+        {
+          "name": "inviteId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Resend an invite, or mint a shareable link",
+        "description": "Owner or admin only. Mints a new join link and returns it as `inviteUrl`. Default (`notify: true`) emails it and expires the person's older links. `notify: false` only returns the link (nothing is emailed, older links keep working) — use it to share the invite in chat.",
+        "operationId": "resendWorkspaceInvite",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "notify": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New link",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "inviteUrl": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
@@ -4091,6 +4443,60 @@
         }
       }
     },
+    "/v1/auth/profile": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Who am I",
+        "description": "The account this API key belongs to. Call it first to check the key works; a 401 here means reconnect (see the error `hint`).",
+        "operationId": "getProfile",
+        "responses": {
+          "200": {
+            "description": "The signed-in account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "username": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "metadata": {
+                      "type": "object"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
     "/v1/auth/device/start": {
       "post": {
         "tags": [
@@ -4249,7 +4655,14 @@
             }
           },
           "400": {
-            "description": "expired_token, access_denied, or invalid_grant"
+            "description": "`error` is the RFC 8628 value (`expired_token`, `access_denied`, `invalid_grant`, `invalid_request`); `code` and `hint` say what happened and what to do next (usually: start a new login).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -5894,6 +6307,50 @@
           "$ref": "#/components/parameters/WorkspaceId"
         }
       ],
+      "post": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Publish a new skill from markdown",
+        "description": "Same publish as `POST /v1/publish` with `artifact_type: \"skill\"`, in the shape a form or an agent can send. Visibility is forced to `workspace`; the skill starts on the workspace's default edit policy.\n",
+        "operationId": "createWorkspaceSkill",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "markdown"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "markdown": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Skill published"
+          },
+          "409": {
+            "description": "Slug already used in this workspace"
+          }
+        }
+      },
       "get": {
         "tags": [
           "Workspaces"
@@ -6018,6 +6475,321 @@
           },
           "404": {
             "description": "Skill not found or not visible"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/skills/index.json": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Agent-installable catalog of the workspace's skills",
+        "description": "The workspace catalog in the agentskills.io discovery shape, so a client that already reads `/.well-known/agent-skills/index.json` needs no new parser. Each entry links to `/v1/skills/{skillId}/raw`.\n",
+        "operationId": "getWorkspaceSkillsIndex",
+        "responses": {
+          "200": {
+            "description": "Discovery document"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/skill-policy": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "put": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Set the default edit policy for new skills",
+        "description": "Workspace owner or admin only. Existing skills keep their own policy.",
+        "operationId": "setWorkspaceSkillPolicy",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "default_skill_edit_policy"
+                ],
+                "properties": {
+                  "default_skill_edit_policy": {
+                    "type": "string",
+                    "enum": [
+                      "owner_only",
+                      "workspace",
+                      "approval"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated"
+          }
+        }
+      }
+    },
+    "/v1/skills/install.sh": {
+      "get": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Installer script for a workspace's skills",
+        "description": "POSIX shell script that writes a workspace's skills where an agent looks (`~/.claude/skills`, `.cursor/rules`, or a directory). Public: it carries no data and authenticates with the caller's own token at run time. Re-run it to re-sync.\n",
+        "operationId": "getSkillInstaller",
+        "responses": {
+          "200": {
+            "description": "Shell script",
+            "content": {
+              "text/x-shellscript": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/skills/{skillId}/raw": {
+      "parameters": [
+        {
+          "name": "skillId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "The skill as a markdown file",
+        "description": "`text/markdown` with normalized Agent Skills frontmatter (`name`, `description`), so the bytes register with a client as-is. Official skills are readable without a token; workspace skills need membership.\n",
+        "operationId": "getSkillRaw",
+        "responses": {
+          "200": {
+            "description": "Skill markdown",
+            "content": {
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required for a workspace skill"
+          }
+        }
+      }
+    },
+    "/v1/skills/{skillId}/policy": {
+      "parameters": [
+        {
+          "name": "skillId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "put": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Set who may change this skill",
+        "description": "Skill owner or workspace admin only.",
+        "operationId": "setSkillEditPolicy",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "edit_policy"
+                ],
+                "properties": {
+                  "edit_policy": {
+                    "type": "string",
+                    "enum": [
+                      "owner_only",
+                      "workspace",
+                      "approval"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated"
+          }
+        }
+      }
+    },
+    "/v1/skills/{skillId}/changes": {
+      "parameters": [
+        {
+          "name": "skillId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "List proposed changes to a skill",
+        "operationId": "listSkillChanges",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "merged",
+                "rejected",
+                "withdrawn"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Change requests"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Propose a change to a skill",
+        "description": "Any workspace member may propose. Nothing is applied until an approver merges, which republishes the skill as an ordinary new version.\n",
+        "operationId": "proposeSkillChange",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "markdown"
+                ],
+                "properties": {
+                  "markdown": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Change request opened"
+          }
+        }
+      }
+    },
+    "/v1/skills/{skillId}/changes/{changeId}": {
+      "parameters": [
+        {
+          "name": "skillId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "changeId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Read one proposed change, with the current body to compare against",
+        "operationId": "getSkillChange",
+        "responses": {
+          "200": {
+            "description": "Change request"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Merge, reject or withdraw a proposed change",
+        "description": "`merge` and `reject` need the skill's owner, an artifact editor or a workspace admin. `withdraw` is the proposer's own call.\n",
+        "operationId": "reviewSkillChange",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "action"
+                ],
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "merge",
+                      "reject",
+                      "withdraw"
+                    ]
+                  },
+                  "review_note": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reviewed"
           }
         }
       }
@@ -6390,6 +7162,26 @@
             }
           }
         }
+      },
+      "RateLimited": {
+        "description": "Rate limit reached (`RATE_LIMIT_EXCEEDED` on publish / account creation / AI routes, `RATE_LIMITED` on the data plane). Wait for `Retry-After` / `reset`.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Unexpected server failure. Retry once; if it fails again, file a ticket with `POST /v1/support/tickets` quoting `request_id`.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
       }
     },
     "schemas": {
@@ -6424,6 +7216,51 @@
           "code": {
             "type": "string",
             "description": "Machine-readable error code."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Correlation id (also the `X-Request-Id` header). Quote it in support tickets."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Finer cause under `code`. For `UNAUTHORIZED`: missing, invalid, revoked or expired."
+          },
+          "hint": {
+            "type": "string",
+            "description": "What to do next, in plain words."
+          },
+          "suggestion": {
+            "type": "string"
+          },
+          "param": {
+            "type": "string",
+            "description": "The request field at fault."
+          },
+          "docs": {
+            "type": "string",
+            "description": "Doc page for this error."
+          },
+          "redirect_url": {
+            "type": "string"
+          },
+          "support": {
+            "type": "object",
+            "description": "Present on 5xx — how to reach a human.",
+            "properties": {
+              "how": {
+                "type": "string",
+                "example": "POST /v1/support/tickets"
+              },
+              "include": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "example": [
+                  "request_id"
+                ]
+              }
+            }
           }
         },
         "required": [
@@ -6729,9 +7566,23 @@
               }
             }
           },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility"
+          },
+          "visibility_downgraded": {
+            "type": "boolean",
+            "description": "True when the page came out more private than requested (instance policy, account without a verified email, public-artifact cap, or a moderation hold). A publish with no `visibility` counts as asking for public."
+          },
+          "requested_visibility": {
+            "type": "string",
+            "enum": [
+              "public"
+            ],
+            "description": "Present with `visibility_downgraded`."
+          },
           "notice": {
             "type": "string",
-            "description": "Human-readable message when publish was adjusted (governance, caps, email gate)."
+            "description": "Human-readable reason the publish was adjusted (governance, caps, email gate, instance policy)."
           },
           "approval_required": {
             "type": "object",

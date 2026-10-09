@@ -86,6 +86,7 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
         ? '<div class="wsx-tbl">' + TBL_HEAD + (d.rowsHtml || '') + '</div>'
         : '<div class="artifacts-grid">' + (d.cardsHtml || '') + '</div>');
     el.innerHTML = head + body;
+    localizeFragment(el);
   }
   function syncViewSeg(id) {
     var seg = document.querySelector('[data-viewseg-for="' + id + '"]'); if (!seg) return;

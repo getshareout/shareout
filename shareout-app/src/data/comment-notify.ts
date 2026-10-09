@@ -4,6 +4,7 @@ import { dispatchLifecycleEmail } from '../email/gateway';
 import { getLinkedChatId } from '../telegram/linking';
 import { sendMessage } from '../telegram/client';
 import { getPlatformOrigin } from '../config/origins';
+import { localeForRecipient, localeTag, t, type Locale } from '../i18n';
 
 export interface NotifyComment {
   id: string;
@@ -25,16 +26,36 @@ interface Recipient {
 
 const SNIPPET_MAX = 280;
 
-async function artifactMeta(ctx: DataContext): Promise<{ title: string; url: string }> {
+async function artifactMeta(ctx: DataContext): Promise<{ title: string; url: string; workspaceId?: string }> {
   const art = await ctx.env.DB.prepare(
-    `SELECT a.name AS name, d.slug AS slug FROM artifacts a
+    `SELECT a.name AS name, d.slug AS slug, a.workspace_id AS workspace_id FROM artifacts a
      LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
      WHERE a.id = ?`
-  ).bind(ctx.artifactId).first<{ name: string | null; slug: string | null }>();
+  ).bind(ctx.artifactId).first<{ name: string | null; slug: string | null; workspace_id: string | null }>();
   const title = art?.name?.trim() || 'an artifact';
   const base = getPlatformOrigin(ctx.env);
   const url = art?.slug ? `${base}/a/${art.slug}/` : base;
-  return { title, url };
+  return { title, url, workspaceId: art?.workspace_id ?? undefined };
+}
+
+// Telegram twins of the emails, in the recipient's language.
+const TG = {
+  en: {
+    assigned: (from: string, title: string, due: string | null) => `${from} assigned you an action item on "${title}"${due ? ` (due ${due})` : ''}`,
+    mention: (from: string, title: string) => `${from} mentioned you in a comment on "${title}"`,
+    reply: (from: string, title: string) => `${from} replied to your comment on "${title}"`,
+    resolved: (from: string, title: string) => `${from} marked your action item done on "${title}"`,
+  },
+  es: {
+    assigned: (from: string, title: string, due: string | null) => `${from} te asignó una tarea en "${title}"${due ? ` (para el ${due})` : ''}`,
+    mention: (from: string, title: string) => `${from} te mencionó en un comentario en "${title}"`,
+    reply: (from: string, title: string) => `${from} respondió tu comentario en "${title}"`,
+    resolved: (from: string, title: string) => `${from} terminó la tarea que asignaste en "${title}"`,
+  },
+};
+
+function dueLabel(dueAt: string | null | undefined, locale: Locale): string | null {
+  return dueAt ? new Date(dueAt).toLocaleDateString(localeTag(locale), { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }) : null;
 }
 
 function snippetOf(content: string): string {
@@ -109,10 +130,11 @@ export async function notifyCommentTargets(ctx: DataContext, comment: NotifyComm
 
   if (!byEmail.size) return;
 
-  const { title, url } = await artifactMeta(ctx);
+  const { title, url, workspaceId } = await artifactMeta(ctx);
   const snippet = snippetOf(comment.content);
   const fromName = comment.authorName || 'Someone';
-  const dueStr = comment.dueAt ? new Date(comment.dueAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }) : null;
+  const dueStr = dueLabel(comment.dueAt, 'en');
+  const dueAt = comment.dueAt ?? null;
 
   const tasks: Promise<unknown>[] = [];
   for (const r of byEmail.values()) {
@@ -122,7 +144,8 @@ export async function notifyCommentTargets(ctx: DataContext, comment: NotifyComm
           type: 'action_item_assigned',
           toUserId: r.userId ?? undefined,
           toEmail: r.email,
-          data: { fromName, title, snippet, url, dueStr },
+          workspaceId,
+          data: { fromName, title, snippet, url, dueStr, dueAt },
         }).catch(() => undefined),
       );
       if (r.userId) {
@@ -130,7 +153,8 @@ export async function notifyCommentTargets(ctx: DataContext, comment: NotifyComm
         tasks.push((async () => {
           const chatId = await getLinkedChatId(ctx.env, userId);
           if (chatId != null) {
-            await sendMessage(ctx.env, chatId, `${fromName} assigned you an action item on "${title}"${dueStr ? ` (due ${dueStr})` : ''}:\n\n"${snippet}"\n\n${url}`);
+            const locale = await localeForRecipient(ctx.env, { userId, workspaceId });
+            await sendMessage(ctx.env, chatId, `${t(locale, TG).assigned(fromName, title, dueLabel(dueAt, locale))}:\n\n"${snippet}"\n\n${url}`);
           }
         })().catch(() => undefined));
       }
@@ -144,7 +168,8 @@ export async function notifyCommentTargets(ctx: DataContext, comment: NotifyComm
         type: 'comment_notify',
         toUserId: r.userId ?? undefined,
         toEmail: r.email,
-        data: { fromName, verb, title, snippet, url },
+        workspaceId,
+        data: { fromName, verb, title, snippet, url, reason: r.reason === 'mention' ? 'mention' : 'reply' },
       }).catch(() => undefined),
     );
 
@@ -153,7 +178,9 @@ export async function notifyCommentTargets(ctx: DataContext, comment: NotifyComm
       tasks.push((async () => {
         const chatId = await getLinkedChatId(ctx.env, userId);
         if (chatId != null) {
-          await sendMessage(ctx.env, chatId, `${fromName} ${verb} on "${title}":\n\n"${snippet}"\n\n${url}`);
+          const locale = await localeForRecipient(ctx.env, { userId, workspaceId });
+          const line = r.reason === 'mention' ? t(locale, TG).mention(fromName, title) : t(locale, TG).reply(fromName, title);
+          await sendMessage(ctx.env, chatId, `${line}:\n\n"${snippet}"\n\n${url}`);
         }
       })().catch(() => undefined));
     }
@@ -171,7 +198,7 @@ export async function notifyActionItemResolved(
   resolverName: string,
   content: string,
 ): Promise<void> {
-  const { title, url } = await artifactMeta(ctx);
+  const { title, url, workspaceId } = await artifactMeta(ctx);
   const snippet = snippetOf(content);
   const fromName = resolverName || 'Someone';
 
@@ -180,6 +207,7 @@ export async function notifyActionItemResolved(
       type: 'action_item_resolved',
       toUserId: requester.userId ?? undefined,
       toEmail: requester.email,
+      workspaceId,
       data: { fromName, title, snippet, url },
     }).catch(() => undefined),
   ];
@@ -189,7 +217,8 @@ export async function notifyActionItemResolved(
     tasks.push((async () => {
       const chatId = await getLinkedChatId(ctx.env, userId);
       if (chatId != null) {
-        await sendMessage(ctx.env, chatId, `${fromName} marked your action item done on "${title}":\n\n"${snippet}"\n\n${url}`);
+        const locale = await localeForRecipient(ctx.env, { userId, workspaceId });
+        await sendMessage(ctx.env, chatId, `${t(locale, TG).resolved(fromName, title)}:\n\n"${snippet}"\n\n${url}`);
       }
     })().catch(() => undefined));
   }

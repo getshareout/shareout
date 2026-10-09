@@ -130,6 +130,22 @@ describe('handleUpdateWorkspaceAccessPolicy', () => {
     expect((await res.json()).code).toBe('INVALID_DOMAIN');
   });
 
+  // An allowlisted domain auto-joins everyone who signs in with it — gmail.com would open the door to all of Gmail.
+  it('rejects newly added public email-provider domains', async () => {
+    const env = { ...baseEnv, DB: makeDbMock({ first: roleFirst('admin', () => policyRow(null, null)) }) };
+    const res = await handleUpdateWorkspaceAccessPolicy(putRequest({ allowed_domains: ['acme.com', '@Gmail.com'] }), env, admin, workspaceId);
+    expect(res.status).toBe(400);
+    const body = await res.json() as { code: string; error: string };
+    expect(body.code).toBe('PUBLIC_EMAIL_DOMAIN');
+    expect(body.error).toContain('gmail.com');
+  });
+
+  it('keeps a legacy public domain editable when it was already allowed', async () => {
+    const env = { ...baseEnv, DB: makeDbMock({ first: roleFirst('admin', () => policyRow(['outlook.com'], null)) }) };
+    const res = await handleUpdateWorkspaceAccessPolicy(putRequest({ allowed_domains: ['outlook.com', 'acme.com'] }), env, admin, workspaceId);
+    expect(res.status).toBe(200);
+  });
+
   it('rejects invalid emails', async () => {
     const env = { ...baseEnv, DB: makeDbMock({ first: roleFirst('admin', () => policyRow(null, null)) }) };
     const res = await handleUpdateWorkspaceAccessPolicy(putRequest({ allowed_emails: ['nope'] }), env, admin, workspaceId);
@@ -271,7 +287,7 @@ describe('autoJoinWorkspacesByDomain', () => {
         run,
       }),
     };
-    await autoJoinWorkspacesByDomain(env, 'usr_new', 'someone@acme.example');
+    expect(await autoJoinWorkspacesByDomain(env, 'usr_new', 'someone@acme.example')).toBe(1);
     const inserts = run.mock.calls.filter((c) => String(c[0]).includes('INSERT INTO workspace_members'));
     expect(inserts).toHaveLength(1);
     expect(inserts[0][2]).toBe('wsp_match'); // workspace_id binding
@@ -288,7 +304,7 @@ describe('autoJoinWorkspacesByDomain', () => {
         run,
       }),
     };
-    await autoJoinWorkspacesByDomain(env, 'usr_existing', 'someone@acme.example');
+    expect(await autoJoinWorkspacesByDomain(env, 'usr_existing', 'someone@acme.example')).toBe(0);
     expect(run.mock.calls.filter((c) => String(c[0]).includes('INSERT'))).toHaveLength(0);
   });
 

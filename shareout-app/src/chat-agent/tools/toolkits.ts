@@ -26,6 +26,10 @@ export const TOOLKITS: Record<string, { summary: string; tools: string[] }> = {
     summary: 'read and save skills (reusable instructions) in the Library',
     tools: ['list_skills', 'read_skill', 'save_skill'],
   },
+  people: {
+    summary: 'see who is in the workspace and invite people by email (admins)',
+    tools: ['list_members', 'invite_members'],
+  },
 };
 
 export const OPEN_TOOLKIT = 'open_toolkit';

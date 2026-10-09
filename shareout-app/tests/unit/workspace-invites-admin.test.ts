@@ -10,6 +10,7 @@ vi.mock('../../src/workspaces', async (orig) => {
 vi.mock('../../src/workspaces-invite-email', () => ({
   createInviteClaim: vi.fn(async () => ({ id: 'inv_1', code: 'CODE123' })),
   sendInviteEmail: vi.fn(async () => ({ sent: true })),
+  expireOtherInviteClaims: vi.fn(async () => {}),
 }));
 vi.mock('../../src/audit', () => ({ logAudit: vi.fn(async () => {}) }));
 
@@ -19,7 +20,7 @@ import {
   handleRevokeWorkspaceInvite,
 } from '../../src/workspaces/invites-admin';
 import { getWorkspaceRole } from '../../src/workspaces';
-import { createInviteClaim, sendInviteEmail } from '../../src/workspaces-invite-email';
+import { createInviteClaim, expireOtherInviteClaims, sendInviteEmail } from '../../src/workspaces-invite-email';
 import type { Env } from '../../src/types';
 import type { AuthUser } from '../../src/api-auth';
 
@@ -62,6 +63,8 @@ describe('workspace invites admin', () => {
     expect(res.status).toBe(200);
     expect(createInviteClaim).toHaveBeenCalledWith(env, wsId, 'usr_2', 'p@e.com', 'usr_1');
     expect(sendInviteEmail).toHaveBeenCalled();
+    // A resend retires older codes so only the newest email's link works.
+    expect(expireOtherInviteClaims).toHaveBeenCalledWith(env, wsId, 'usr_2', 'inv_1');
   });
 
   // The claim code is hashed at rest, so an instance with no EMAIL binding had no way to
@@ -80,6 +83,7 @@ describe('workspace invites admin', () => {
     expect(res.status).toBe(200);
     expect(createInviteClaim).toHaveBeenCalled();
     expect(sendInviteEmail).not.toHaveBeenCalled();
+    expect(expireOtherInviteClaims).not.toHaveBeenCalled();
     expect((await res.json<{ inviteUrl: string }>()).inviteUrl).toBe('https://acme.example/invite/CODE123');
   });
 

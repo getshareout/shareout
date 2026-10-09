@@ -89,6 +89,17 @@ describe('routeServe — GEO discovery files', () => {
     expect(openapiBody.openapi).toBe('3.1.0');
     expect(openapiBody.info.title).toContain('ShareOut');
 
+    const agentSpec = await routeServe(ctxFor('shareout.site', '/openapi.agent.json'));
+    expect(agentSpec?.status).toBe(200);
+    const agentBody = JSON.parse(await agentSpec!.text());
+    const ops = Object.values(agentBody.paths as Record<string, Record<string, unknown>>)
+      .flatMap((item) => Object.keys(item).filter((k) => k !== 'parameters'));
+    expect(ops.length).toBeGreaterThan(5);
+    expect(ops.length).toBeLessThanOrEqual(15);
+    expect(agentBody.paths['/v1/publish'].post).toBeTruthy();
+    expect(agentBody.paths['/v1/support/tickets'].post).toBeTruthy();
+    expect(agentBody.components.securitySchemes.bearerAuth.scheme).toBe('bearer');
+
     const skillsIndex = await routeServe(ctxFor('shareout.site', '/.well-known/agent-skills/index.json'));
     expect(skillsIndex?.status).toBe(200);
     const skillsBody = JSON.parse(await skillsIndex!.text());

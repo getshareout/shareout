@@ -7,6 +7,17 @@ import { logAudit } from '../audit';
 
 export const DOMAIN_REGEX = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
 
+/**
+ * Public mail providers. An allowlisted domain auto-joins everyone who signs in with it,
+ * so allowing one of these would let any of its users into the workspace.
+ */
+export const PUBLIC_EMAIL_DOMAINS = [
+  'gmail.com', 'googlemail.com', 'hotmail.com', 'hotmail.com.ar', 'hotmail.es', 'outlook.com', 'outlook.es',
+  'live.com', 'live.com.ar', 'msn.com', 'yahoo.com', 'yahoo.com.ar', 'yahoo.es', 'ymail.com', 'icloud.com',
+  'me.com', 'mac.com', 'aol.com', 'proton.me', 'protonmail.com', 'pm.me', 'gmx.com', 'gmx.net', 'mail.com',
+  'zoho.com', 'yandex.com', 'qq.com', '163.com',
+];
+
 export function normalizeDomain(raw: string): string {
   return raw.trim().toLowerCase().replace(/^@/, '');
 }
@@ -90,6 +101,15 @@ export async function handleUpdateWorkspaceAccessPolicy(
     if (invalid) {
       return json({ error: `Invalid domain: ${invalid}`, code: 'INVALID_DOMAIN' }, 400);
     }
+    // Only newly added ones: a legacy row that already holds one stays editable.
+    const publicDomain = domains.find((d) => PUBLIC_EMAIL_DOMAINS.includes(d) && !current.allowed_domains.includes(d));
+    if (publicDomain) {
+      return json({
+        error: `${publicDomain} is a public email provider — allowing it would let anyone with an address there join`,
+        code: 'PUBLIC_EMAIL_DOMAIN',
+        hint: 'Allow your company domain, or add individual addresses to allowed_emails.',
+      }, 400);
+    }
   }
 
   let emails = current.allowed_emails;
@@ -140,19 +160,22 @@ export async function hasWorkspaceSignupAllowlist(env: Env, email: string): Prom
   return false;
 }
 
-/** Auto-join workspaces whose domain allowlist matches the user's email domain on sign-in. */
+/** Auto-join workspaces whose domain allowlist matches the user's email domain on sign-in.
+ *  Returns how many memberships it added, so a first sign-in can welcome the person into
+ *  that workspace instead of seeding a personal starter kit. */
 export async function autoJoinWorkspacesByDomain(
   env: Env,
   userId: string,
   email: string | null
-): Promise<void> {
+): Promise<number> {
   const domain = (email || '').trim().toLowerCase().split('@')[1] || '';
-  if (!domain) return;
+  if (!domain) return 0;
 
   const rows = await env.DB.prepare(
     'SELECT id, allowed_email_domains FROM workspaces WHERE allowed_email_domains IS NOT NULL'
   ).bind().all<{ id: string; allowed_email_domains: string | null }>();
 
+  let joined = 0;
   for (const row of rows.results || []) {
     if (!parseJsonList(row.allowed_email_domains).includes(domain)) continue;
     const existing = await env.DB.prepare(
@@ -163,5 +186,7 @@ export async function autoJoinWorkspacesByDomain(
       "INSERT INTO workspace_members (id, workspace_id, user_id, role) VALUES (?, ?, ?, 'member')"
     ).bind(generateId('wsm'), row.id, userId).run();
     await invalidateWorkspaceRole(env, row.id, userId);
+    joined++;
   }
+  return joined;
 }

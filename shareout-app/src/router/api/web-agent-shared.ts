@@ -15,6 +15,8 @@ import { WebThreadStore } from '../../chat-agent/store/d1-threads';
 import { createWebReplyPort, agentMediaKey, type WebAgentEvent } from '../../chat-platforms/web/reply-port';
 import { generateId } from '../../crypto-utils';
 import { jsonWithApiErrors } from '../../http/api-error';
+import { localeForRecipient, type Locale } from '../../i18n';
+import { PERSONAL_SCOPE } from '../../chat-platforms/types';
 
 const HISTORY_LIMIT = 20;
 const THREAD_PAGE = 50;
@@ -74,7 +76,10 @@ export function streamAgentChat(env: Env, cfg: ChatTurnConfig): Response {
     if (last?.role === 'user' && last.content === cfg.text) history.pop();
     else await store.appendMessage('user', cfg.text);
 
+    const ws = typeof cfg.selectedWorkspaceId === 'string' && cfg.selectedWorkspaceId !== PERSONAL_SCOPE ? cfg.selectedWorkspaceId : null;
+    const locale = await localeForRecipient(env, { userId: cfg.user.id, workspaceId: ws }).catch((): Locale => 'en');
     const result = await runAgentTurn(env, {
+      locale,
       platform: 'web',
       userId: cfg.user.id,
       selectedWorkspaceId: cfg.selectedWorkspaceId,
@@ -85,7 +90,7 @@ export function streamAgentChat(env: Env, cfg: ChatTurnConfig): Response {
       extraTools: cfg.extraTools,
     });
 
-    const summary = result.proposal ? describeAction(result.proposal) : '';
+    const summary = result.proposal ? describeAction(result.proposal, locale) : '';
     if (result.toolNotes) await store.appendNotes(result.toolNotes);
     await store.appendMessage('assistant', [result.reply, summary].filter(Boolean).join('\n\n'));
     send({ type: 'text', text: result.reply });
@@ -93,7 +98,7 @@ export function streamAgentChat(env: Env, cfg: ChatTurnConfig): Response {
     if (result.proposal && env.RATE_LIMIT_KV) {
       const token = generateId('appr');
       await store.putPending(token, { action: result.proposal });
-      send({ type: 'confirm', prompt: summary, token, card: describeActionRich(result.proposal) });
+      send({ type: 'confirm', prompt: summary, token, card: describeActionRich(result.proposal, locale) });
     }
     send({ type: 'done' });
   });

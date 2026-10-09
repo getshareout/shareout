@@ -229,6 +229,38 @@ describe('sandbox-viewer modules', () => {
     expect(html).toContain("method: 'DELETE'");
   });
 
+  it('renders the toolbar in Spanish (voseo) for a Spanish workspace, and only that copy', () => {
+    const es = renderToolbar(buildToolbarContext({
+      loggedIn: true,
+      isFav: false,
+      commentsEnabled: true,
+      commentCount: 0,
+      hasMetrics: true,
+      adminInfo: { role: 'owner' } as never,
+      currentUser: { email: 'o@example.com', name: 'Owner', picture: '' },
+      hideToolbar: false,
+      baseUrl: 'https://shareout.site',
+      slug: 'demo',
+      artifactId: 'art_1',
+      visualEditorEnabled: true,
+      attachedSkills: [],
+      locale: 'es',
+    })!);
+    expect(es).toContain('Todas las páginas');
+    expect(es).toContain('Escribí un comentario…');
+    expect(es).toContain('No pudimos cargar los comentarios');
+    expect(es).toContain('Compartir');
+    expect(es).not.toContain('All artifacts');
+    expect(es).not.toContain('Add a comment');
+    expect(es).not.toContain("Couldn\\'t load comments");
+    expect(es).not.toContain('Follow a metric');
+  });
+
+  it('opens the early head with the given language', () => {
+    expect(renderEarlyHead('x', '', '', undefined, false, 'es')).toContain('<html lang="es">');
+    expect(renderEarlyHead('x', '', '', undefined, false)).toContain('<html lang="en">');
+  });
+
   it('toolbar styles hide chrome on mobile unless opted in', () => {
     const html = renderToolbar(followCtx(false));
     expect(html).toContain('body.so-hide-toolbar-mobile #shareout-admin-toolbar');

@@ -97,7 +97,11 @@ export interface RenderArgs {
   inboxDomain: string;
   /** Viewer administers the instance itself → Settings links to the admin portal. */
   isInstanceAdmin: boolean;
+  /** Public origin of this instance — the Connect view's MCP / skill URLs point here. */
+  platformOrigin?: string;
   hostname: string;
+  /** Server-resolved language (person's choice → workspace's); null = let the browser decide. */
+  locale: 'en' | 'es' | null;
   /** Short current-release id (Cloudflare deployment version) for the rail footer; '' when unavailable. */
   appVersion: string;
   visualEditorOffWorkspaces: string[];

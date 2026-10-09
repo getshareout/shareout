@@ -48,5 +48,14 @@ export const workspace_client_routing_JS = `  // ===== deep-link routing (hash) 
   window.addEventListener('popstate', function () { applyHash(); });
   window.addEventListener('hashchange', function () { if (location.hash === routeLastHash) return; applyHash(); });
   if (location.hash) applyHash();
+  else {
+    // Query deep link (/home?view=connect&tab=code) — what emails and docs link to.
+    var qp = new URLSearchParams(location.search), qv = qp.get('view') || '', qt = qp.get('tab') || '';
+    var qb = /^[a-z]+$/.test(qv) ? ws.querySelector('[data-lens="' + qv + '"]') : null;
+    if (qb) {
+      if (qv === 'connect' && /^(claude|chatgpt|code)$/.test(qt)) cnTab = qt;
+      qb.click();
+    }
+  }
 
 `;

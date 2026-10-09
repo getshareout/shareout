@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DashboardHelpers } from '../src/stores/dashboards/helpers';
 
 describe('DashboardHelpers', () => {
@@ -37,5 +37,16 @@ describe('DashboardHelpers', () => {
     expect(result).toHaveLength(2);
     const east = result.find(r => (r as Record<string, unknown>).region === 'East');
     expect(east).toMatchObject({ revenue_sum: 300, revenue_count: 2 });
+  });
+});
+
+describe('DashboardHelpers locale', () => {
+  it('formats in the page language from <html lang>', () => {
+    vi.stubGlobal('document', { documentElement: { lang: 'es-AR' } });
+    try {
+      expect(new DashboardHelpers().formatNumber(1234.5)).toMatch(/,5$/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

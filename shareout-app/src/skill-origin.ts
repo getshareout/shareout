@@ -7,9 +7,11 @@
  * `{ORIGIN}/v1/skill` is told to `POST https://shareout.site/v1/publish`, so the
  * user's content lands on someone else's server.
  *
- * Every skill response goes through here. When the instance *is* the founder host
- * (or `SHAREOUT_BASE_URL` is unset and falls back to it) the rewrite is a no-op and
- * the bytes are unchanged — the well-known SKILL.md digest stays stable.
+ * Every skill response goes through here. It also bakes this instance's origin into
+ * the `$ORIGIN` / `$ORIGIN_HOST` placeholders the skill tree is written with, so an
+ * agent that downloaded the skill from an instance already knows where it lives and
+ * never has to ask the user. That part applies on every instance, the founder host
+ * included; the founder-literal rewrite below is skipped there.
  */
 import type { Env } from './types';
 import { getPlatformHostname, getPlatformOrigin } from './config/origins';
@@ -28,19 +30,23 @@ function artifactHostname(env: Env, platformHost: string): string {
   }
 }
 
+// `$ORIGIN_HOST` first: `$ORIGIN` is its prefix.
+const PLACEHOLDER = /\$ORIGIN_HOST\b|\$ORIGIN\b/g;
+
 /**
- * A text transform for skill content, or `null` when this instance is the founder
- * host and nothing needs rewriting. Callers use `null` to skip the work entirely —
- * on the hosted instance that keeps `/v1/skill` a straight R2 passthrough.
+ * A text transform for skill content. Kept nullable for callers that skip work when
+ * nothing needs rewriting, but every instance now has placeholders to fill.
  */
 export function skillOriginRewriter(env: Env): ((text: string) => string) | null {
   const origin = getPlatformOrigin(env);
   const host = getPlatformHostname(env);
+  const fillPlaceholders = (text: string): string =>
+    text.replace(PLACEHOLDER, (m) => (m === '$ORIGIN_HOST' ? host : origin));
 
   // The app origin is what decides this: if it is the founder host, this *is* the
   // hosted instance and every literal in the skill is already correct. (Its
   // ARTIFACT_ORIGIN is shareoutcdn.site, so the sandbox mentions are right too.)
-  if (origin === FOUNDER_ORIGIN && host === FOUNDER_HOST) return null;
+  if (origin === FOUNDER_ORIGIN && host === FOUNDER_HOST) return fillPlaceholders;
 
   const cdnHost = artifactHostname(env, host);
 
@@ -56,10 +62,10 @@ export function skillOriginRewriter(env: Env): ((text: string) => string) | null
     [FOUNDER_HOST]: host,
   };
 
-  return (text: string): string => text.replace(pattern, (m) => replacements[m]);
+  return (text: string): string => fillPlaceholders(text.replace(pattern, (m) => replacements[m]));
 }
 
-/** Convenience for a single string; no-ops on the founder host. */
+/** Convenience for a single string. */
 export function rewriteSkillOrigin(text: string, env: Env): string {
   const rewrite = skillOriginRewriter(env);
   return rewrite ? rewrite(text) : text;

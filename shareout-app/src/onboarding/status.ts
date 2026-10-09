@@ -13,10 +13,13 @@ interface Membership {
   role: WorkspaceRole;
   created_at: string;
   member_class: string | null;
+  /** When the person accepted their invite — the membership row is written at invite time. */
+  accepted_at: string | null;
 }
 
 interface Signals {
   firstArtifact: boolean;
+  agentConnected: boolean;
   dataSource: boolean;
   slack: boolean;
   alert: boolean;
@@ -26,6 +29,7 @@ interface Signals {
   skillAck: boolean;
   assistant: boolean;
   shared: boolean;
+  teammates: boolean;
 }
 
 export interface OnboardingTaskView {
@@ -46,7 +50,10 @@ export interface OnboardingStatus {
 
 async function getMembership(env: Env, workspaceId: string, userId: string): Promise<Membership | null> {
   return env.DB.prepare(
-    'SELECT role, created_at, member_class FROM workspace_members WHERE workspace_id = ? AND user_id = ?'
+    `SELECT wm.role, wm.created_at, wm.member_class,
+       (SELECT MAX(c.claimed_at) FROM workspace_invite_claims c
+         WHERE c.workspace_id = wm.workspace_id AND c.user_id = wm.user_id) AS accepted_at
+     FROM workspace_members wm WHERE wm.workspace_id = ? AND wm.user_id = ?`
   ).bind(workspaceId, userId).first<Membership>();
 }
 
@@ -55,22 +62,26 @@ async function getSignals(env: Env, workspaceId: string, userId: string, skillAc
   const row = await env.DB.prepare(
     `SELECT
        EXISTS(SELECT 1 FROM artifacts WHERE owner_id=?1 AND is_example=0 AND deleted_at IS NULL) AS firstArtifact,
+       EXISTS(SELECT 1 FROM tokens WHERE principal_type='user' AND principal_id=?1)            AS agentConnected,
        EXISTS(SELECT 1 FROM connections WHERE scope_type='workspace' AND scope_id=?2 AND provider<>'slack') AS dataSource,
        EXISTS(SELECT 1 FROM connections WHERE scope_type='workspace' AND scope_id=?2 AND provider='slack')  AS slack,
        EXISTS(SELECT 1 FROM metric_alert_rules WHERE workspace_id=?2 AND enabled=1)             AS alert,
        EXISTS(SELECT 1 FROM messaging_links WHERE platform='telegram' AND user_id=?1)           AS telegram,
        EXISTS(SELECT 1 FROM user_recent_views WHERE user_id=?1)                                 AS viewed,
        (EXISTS(SELECT 1 FROM artifact_comments WHERE author_id=?1)
-         OR EXISTS(SELECT 1 FROM comment_reactions WHERE user_id=?1))                           AS commented`
+         OR EXISTS(SELECT 1 FROM comment_reactions WHERE user_id=?1))                           AS commented,
+       EXISTS(SELECT 1 FROM workspace_members WHERE workspace_id=?2 AND user_id<>?1 AND member_class='internal') AS teammates`
   ).bind(userId, workspaceId).first<Record<string, number>>();
   return {
     firstArtifact: !!row?.firstArtifact,
+    agentConnected: !!row?.agentConnected,
     dataSource: !!row?.dataSource,
     slack: !!row?.slack,
     alert: !!row?.alert,
     telegram: !!row?.telegram,
     viewed: !!row?.viewed,
     commented: !!row?.commented,
+    teammates: !!row?.teammates,
     skillAck,
     assistant: false, // workspace tracks don't use these two
     shared: false,
@@ -115,7 +126,8 @@ export async function getOnboardingStatus(
   const track: OnboardingTrack = member.role === 'owner' || member.role === 'admin' ? 'admin' : 'member';
   const state = await getState(env, workspaceId, userId);
   const signals = await getSignals(env, workspaceId, userId, !!state?.skill_ack_at);
-  return buildStatus(track, signals as unknown as Record<string, boolean>, state, member.created_at, env);
+  // The 14-day window starts when they accepted the invite, not when it was sent.
+  return buildStatus(track, signals as unknown as Record<string, boolean>, state, member.accepted_at || member.created_at, env);
 }
 
 interface OnboardingState { skill_ack_at: string | null; dismissed_at: string | null; celebrated_at: string | null }

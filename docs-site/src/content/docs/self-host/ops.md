@@ -61,6 +61,28 @@ curl -sS "$ORIGIN/v1/admin/instance" -H "Cookie: $ADMIN_SESSION" | jq .gaps
 No secrets are returned — only whether each is present. An empty `gaps` array is the
 signal that the instance is fully configured.
 
+### Answer support requests
+
+Every help request — the in-app **Help & support** panel, the Home assistant, the API,
+Telegram, Slack, `support@` email — lands in one queue at `/admin?view=support`. Nothing
+is pushed to you; you (or your agents) read the queue. Open a ticket to see its context
+(category, severity, page, request id, browser), the thread and an AI-drafted reply, then
+answer and set its status. The reply reaches the requester on the channel they used, by
+email for in-app and API requests, and in their notification bell.
+
+An agent can work the same queue with a personal API token created by an instance admin:
+
+```bash
+curl -sS "$ORIGIN/v1/support/tickets?scope=all&status=open&since=2026-10-09T00:00:00Z" \
+  -H "Authorization: Bearer $SHAREOUT_ADMIN_TOKEN"
+
+curl -sS -X POST "$ORIGIN/v1/support/tickets/$TICKET_ID/reply" \
+  -H "Authorization: Bearer $SHAREOUT_ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"body":"Fixed on our side — try again."}'
+```
+
+Full reference: the skill's `api/support.md` (section *Triage as super-admin*).
+
 ### AI providers
 
 AI is **off until you supply a key**. Every AI surface degrades quietly rather than

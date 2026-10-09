@@ -15,12 +15,15 @@ import type { EmailCategory } from './preferences';
 import type { AudienceSegment } from './audience';
 import { escapeHtml } from './layout';
 import { colors, fonts, radius } from '../design-system/tokens';
+import type { Locale } from '../i18n';
 
 export type EmailAudienceTag = 'ANY' | 'EXTERNAL' | AudienceSegment;
 
 export interface EmailContext {
   env: Env;
   baseUrl: string;
+  /** Recipient's language; absent = English. Spanish copy lives in catalog-es.ts. */
+  locale?: Locale;
 }
 
 export interface BuiltEmail {
@@ -47,18 +50,18 @@ export interface EmailTemplate<D = Record<string, unknown>> {
 }
 
 // ── small copy helpers ───────────────────────────────────────────────────────
-const p = (s: string) => `<p style="margin:0 0 14px">${s}</p>`;
+export const p = (s: string) => `<p style="margin:0 0 14px">${s}</p>`;
 
-function codeBlock(code: string): string {
+export function codeBlock(code: string): string {
   return `<div style="font-family:${fonts.mono};font-size:34px;font-weight:700;letter-spacing:8px;color:${colors.text};background:${colors.surface};border:1px solid ${colors.border};border-radius:${radius.sm};padding:18px;text-align:center">${escapeHtml(code)}</div>`;
 }
 
 // ── data shapes per email ────────────────────────────────────────────────────
 export interface OtpData { code: string }
-export interface InviteData { workspaceName: string; inviterName: string; claimCode: string; claimTtlDays: number }
+export interface InviteData { workspaceName: string; inviterName: string; claimCode: string; claimTtlDays: number; personalMessage?: string | null }
 export interface AddedToWorkspaceData { workspaceName: string; inviterName: string }
-export interface CommentData { fromName: string; verb: string; title: string; snippet: string; url: string }
-export interface ActionItemAssignedData { fromName: string; title: string; snippet: string; url: string; dueStr?: string | null }
+export interface CommentData { fromName: string; verb: string; title: string; snippet: string; url: string; reason?: 'mention' | 'reply' }
+export interface ActionItemAssignedData { fromName: string; title: string; snippet: string; url: string; dueStr?: string | null; dueAt?: string | null }
 export interface ActionItemResolvedData { fromName: string; title: string; snippet: string; url: string }
 export interface PublishApprovalData { kind: 'request' | 'approved' | 'declined' }
 export interface CrewApprovalData { count: number }
@@ -89,7 +92,25 @@ export interface WorkspaceDigestData {
 }
 export interface UnusedArtifactsReportData { workspaceName: string; count: number; titles: string[]; homeUrl: string }
 export interface SlidesDeckOpenedData { deckName: string; recipientLabel?: string | null; viewerEmail?: string | null; url: string }
-export interface SupportReplyData { subject: string; body: string; ticketUrl?: string | null }
+/** `ticketUrl` set = the requester answers in the app (Help panel), not by replying to the email. */
+export interface SupportReplyData { subject: string; body: string; ticketUrl?: string | null; locale?: 'en' | 'es' }
+
+const SUPPORT_REPLY_COPY = {
+  en: {
+    preheader: 'A reply to your support request.',
+    heading: 'Reply from ShareOut support',
+    cta: 'View your request',
+    replyInApp: 'To answer, open Help & support in ShareOut.',
+    replyByEmail: 'Reply to this email to continue the conversation.',
+  },
+  es: {
+    preheader: 'Te respondimos tu consulta de soporte.',
+    heading: 'Respuesta del soporte de ShareOut',
+    cta: 'Ver tu consulta',
+    replyInApp: 'Para contestar, abrí Ayuda y soporte en ShareOut.',
+    replyByEmail: 'Respondé este email para seguir la conversación.',
+  },
+};
 export interface SupportResolvedData { subject: string }
 export interface AssetDeliveryData { collectionName: string; downloadUrl: string; fileCount: number; senderName?: string | null; expiresAt?: string | null }
 export interface AssetDeliveryOpenedData { collectionName: string; viewerEmail?: string | null }
@@ -98,6 +119,22 @@ export interface InviteAcceptedData { memberName: string; workspaceName: string 
 export interface AccessApprovedData { pageName: string; url: string }
 export interface ModerationApprovedData { pageName: string; url: string }
 export interface AccessDeclinedData { pageName: string }
+
+/** Secondary line under the invite: where to connect an AI assistant once inside. */
+export function inviteConnectNote(label: string, href: string): string {
+  return `<p style="margin:0;color:${colors.textTertiary};font-size:12px;line-height:1.5"><a href="${escapeHtml(href)}" style="color:${colors.textSecondary}">${escapeHtml(label)}</a></p>`;
+}
+
+/** The inviter's own words, quoted under the intro. Empty → nothing. */
+export function invitePersonalNote(lead: string, message: string | null | undefined): { html: string; text: string } {
+  const msg = (message || '').trim();
+  if (!msg) return { html: '', text: '' };
+  return {
+    html: p(escapeHtml(lead)) +
+      `<blockquote style="margin:0 0 14px;padding:10px 14px;border-left:3px solid ${colors.border};color:${colors.text};white-space:pre-line">${escapeHtml(msg)}</blockquote>`,
+    text: `${lead}\n"${msg}"\n\n`,
+  };
+}
 
 function shareRoleLine(role: ShareData['role']): string {
   if (role === 'editor') return "You've been added as an editor — open it to start co-editing.";
@@ -169,16 +206,19 @@ export const EMAILS = {
   support_reply: {
     category: 'transactional',
     audiences: ['ANY', 'EXTERNAL'],
-    trigger: 'Staff sends a reply on an email-channel support ticket — deliverReply().',
-    build: ({ subject, body, ticketUrl }: SupportReplyData) => ({
-      subject: `Re: ${subject}`,
-      preheader: 'A reply to your support request.',
-      heading: 'Reply from ShareOut support',
-      bodyHtml: body.split('\n').filter(Boolean).map((line) => p(escapeHtml(line))).join(''),
-      ...(ticketUrl ? { cta: { label: 'View your request', href: ticketUrl } } : {}),
-      footerNote: 'Reply to this email to continue the conversation.',
-      bodyText: body,
-    }),
+    trigger: 'Staff replies on an email, in-app (ui) or API (skill) support ticket — deliverReply().',
+    build: ({ subject, body, ticketUrl, locale }: SupportReplyData) => {
+      const c = SUPPORT_REPLY_COPY[locale === 'es' ? 'es' : 'en'];
+      return {
+        subject: `Re: ${subject}`,
+        preheader: c.preheader,
+        heading: c.heading,
+        bodyHtml: body.split('\n').filter(Boolean).map((line) => p(escapeHtml(line))).join(''),
+        ...(ticketUrl ? { cta: { label: c.cta, href: ticketUrl } } : {}),
+        footerNote: ticketUrl ? c.replyInApp : c.replyByEmail,
+        bodyText: body,
+      };
+    },
   } satisfies EmailTemplate<SupportReplyData>,
 
   support_resolved: {
@@ -205,21 +245,22 @@ export const EMAILS = {
     category: 'transactional',
     audiences: ['EXTERNAL', 'ANY'],
     trigger: 'sendInviteEmail() — workspace owner invites a member.',
-    build: ({ workspaceName, inviterName, claimCode, claimTtlDays }: InviteData, { baseUrl }) => {
+    build: ({ workspaceName, inviterName, claimCode, claimTtlDays, personalMessage }: InviteData, { baseUrl }) => {
       const joinUrl = `${baseUrl}/invite/${encodeURIComponent(claimCode)}`;
-      // Agent footnote: humans click the button; Claude users can still claim by code.
-      const agentNote =
-        `<p style="margin:0;color:${colors.textTertiary};font-size:12px;line-height:1.5">Using ShareOut in Claude? Claim with code <span style="font-family:${fonts.mono};color:${colors.textSecondary}">${escapeHtml(claimCode)}</span>.</p>`;
+      const connectUrl = `${baseUrl}/home?view=connect`;
+      const agentNote = inviteConnectNote('After you join, connect Claude or ChatGPT in 2 minutes', connectUrl);
+      const note = invitePersonalNote(`${inviterName} added a note:`, personalMessage);
       return {
         subject: `You're invited to ${workspaceName} on ShareOut`,
         preheader: `${inviterName} invited you to ${workspaceName} on ShareOut.`,
         heading: `Join ${workspaceName}`,
         bodyHtml:
           p(`${escapeHtml(inviterName)} invited you to <strong>${escapeHtml(workspaceName)}</strong> on ShareOut — a place to build and publish pages with real data. Open it and you're in.`) +
+          note.html +
           agentNote,
         cta: { label: `Join ${workspaceName}`, href: joinUrl },
         footerNote: `This invite is single-use and expires in ${claimTtlDays} days. If you didn't expect it, you can ignore this email.`,
-        bodyText: `${inviterName} invited you to ${workspaceName} on ShareOut.\n\nJoin ${workspaceName}: ${joinUrl}\n\nUsing ShareOut in Claude? Claim with code ${claimCode}.\n\nThis invite is single-use and expires in ${claimTtlDays} days.`,
+        bodyText: `${inviterName} invited you to ${workspaceName} on ShareOut.\n\n${note.text}Join ${workspaceName}: ${joinUrl}\n\nAfter you join, connect Claude or ChatGPT in 2 minutes: ${connectUrl}\n\nThis invite is single-use and expires in ${claimTtlDays} days.`,
       };
     },
   } satisfies EmailTemplate<InviteData>,

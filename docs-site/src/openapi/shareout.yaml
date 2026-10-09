@@ -92,8 +92,10 @@ paths:
                       mime: text/html
                       encoding: utf8
       responses:
-        "200":
-          description: Published
+        "201":
+          description: >-
+            Published. Check `visibility` — when it is more private than asked,
+            `visibility_downgraded` is true and `notice` says why; tell the user.
           content:
             application/json:
               schema:
@@ -102,8 +104,20 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
+        "413":
+          description: Storage limit reached (`STORAGE_LIMIT_EXCEEDED`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/search:
     get:
       tags: [Search]
@@ -361,9 +375,9 @@ paths:
       summary: Update artifact metadata
       description: >-
         Update visibility, name, social link-preview fields, or anonymous-access
-        opt-ins. Public visibility requires a paid plan or
-        paid Teams workspace; otherwise visibility is held with code
-        `VISIBILITY_HELD` and a paywall notice.
+        opt-ins. When instance policy holds public visibility the write still
+        succeeds with 202 `VISIBILITY_HELD` (or `MODERATION_HELD` while an automated
+        safety check runs) and the page stays private for now.
       operationId: updateArtifact
       requestBody:
         required: true
@@ -937,7 +951,9 @@ paths:
       summary: List support tickets
       description: >-
         `scope=mine` (default) returns the requester's tickets. `scope=workspace&workspace={id}`
-        requires workspace admin/owner. `scope=all` is super-admin only. Optional `status` filter.
+        requires workspace admin/owner. `scope=all` is instance-admin only (session or personal
+        token; workspace agent tokens are refused) and also filters by `workspace` (`none` =
+        no workspace), `category`, `since` and `limit`. Optional `status` filter.
       operationId: listSupportTickets
       parameters:
         - name: scope
@@ -950,12 +966,30 @@ paths:
           in: query
           schema:
             type: string
-          description: Required when scope=workspace.
+          description: Required when scope=workspace. With scope=all, a workspace id or `none`.
         - name: status
           in: query
           schema:
             type: string
             enum: [open, pending, resolved, closed]
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: scope=all only.
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: scope=all only. Tickets with a message after this ISO timestamp.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 200
+            maximum: 500
+          description: scope=all only.
       responses:
         "200":
           description: Tickets
@@ -989,7 +1023,34 @@ paths:
                 workspaceId:
                   type: string
                   nullable: true
+                  description: Must be a workspace the caller belongs to (else 403).
+                category:
+                  type: string
+                  enum: [bug, question, access, billing, other]
+                severity:
+                  type: string
+                  enum: [low, normal, high, blocker]
+                client:
+                  type: string
+                  enum: [ui, claude, chatgpt, mcp, api, slack, telegram, email, chat_agent]
+                requestId:
+                  type: string
+                  description: request_id from the error response that led here.
+                pageUrl:
+                  type: string
+                artifactId:
+                  type: string
+                userAgent:
+                  type: string
+                idempotencyKey:
+                  type: string
+                  description: Same key from the same account returns the original ticket (200, deduped=true).
+                locale:
+                  type: string
+                  enum: [en, es]
       responses:
+        "200":
+          description: Duplicate idempotencyKey — the original ticket
         "201":
           description: Created
           content:
@@ -1260,6 +1321,150 @@ paths:
       responses:
         "200":
           description: Matching rows
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/members/invite:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    post:
+      tags: [Workspaces]
+      summary: Invite people by email (bulk)
+      description: >-
+        Owner or admin only. `emails` is an array or one string of pasted text — commas,
+        semicolons, spaces, newlines, `Name <email>` and spreadsheet columns all work; tokens
+        without `@` are ignored, duplicates collapse. Up to 100 valid addresses per call
+        (`400 TOO_MANY_EMAILS` beyond that — batch). New or not-yet-active people get a
+        7-day join link by email; people with an account are added and notified. Existing
+        members keep their role (change roles with `POST /members`). Re-inviting a pending
+        person retires their older links.
+      operationId: inviteWorkspaceMembers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [emails]
+              properties:
+                emails:
+                  oneOf:
+                    - type: array
+                      items: { type: string }
+                    - type: string
+                  example: "Ana <ana@example.com>, luis@example.com"
+                role:
+                  type: string
+                  enum: [member, admin]
+                  default: member
+                message:
+                  type: string
+                  maxLength: 500
+                  description: Optional personal note passed to the invite email.
+      responses:
+        "200":
+          description: Per-email results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        email: { type: string }
+                        code:
+                          type: string
+                          enum: [invited, added, already_member, invalid_email, domain_not_allowed]
+                        status:
+                          type: string
+                          enum: [invited, added, updated, skipped]
+                          description: Legacy status; prefer `code`.
+                        email_sent:
+                          type: boolean
+                          description: For `invited` — whether the invite email went out.
+                        invite_url:
+                          type: string
+                          description: Join link, present only when the email did not go out. Share it by hand.
+                  summary:
+                    type: object
+                    additionalProperties: { type: integer }
+                    description: Count per `code`.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/invites:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Workspaces]
+      summary: List pending invites
+      description: Owner or admin only. Newest unclaimed invite per person, with `email_status` (`sent`, `failed`, `skipped`, `link_only`), `email_sent_at`, `expired` and `role`.
+      operationId: listWorkspaceInvites
+      responses:
+        "200":
+          description: Pending invites
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/invites/{inviteId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: inviteId
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [Workspaces]
+      summary: Revoke a pending invite
+      description: Owner or admin only. Drops every pending link for that person and their pending membership.
+      operationId: revokeWorkspaceInvite
+      responses:
+        "200":
+          description: Revoked
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/invites/{inviteId}/resend:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: inviteId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [Workspaces]
+      summary: Resend an invite, or mint a shareable link
+      description: >-
+        Owner or admin only. Mints a new join link and returns it as `inviteUrl`. Default
+        (`notify: true`) emails it and expires the person's older links. `notify: false`
+        only returns the link (nothing is emailed, older links keep working) — use it to
+        share the invite in chat.
+      operationId: resendWorkspaceInvite
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notify:
+                  type: boolean
+                  default: true
+      responses:
+        "200":
+          description: New link
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  inviteUrl: { type: string }
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -2472,6 +2677,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TemplatePreview"
+  /v1/auth/profile:
+    get:
+      tags: [Auth]
+      summary: Who am I
+      description: >-
+        The account this API key belongs to. Call it first to check the key works;
+        a 401 here means reconnect (see the error `hint`).
+      operationId: getProfile
+      responses:
+        "200":
+          description: The signed-in account
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  email:
+                    type: [string, "null"]
+                  username:
+                    type: [string, "null"]
+                  name:
+                    type: [string, "null"]
+                  metadata:
+                    type: object
+                  created_at:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /v1/auth/device/start:
     post:
       tags: [Auth]
@@ -2568,7 +2803,14 @@ paths:
                         type: string
                         description: Present when expected_email did not match signed-in email.
         "400":
-          description: expired_token, access_denied, or invalid_grant
+          description: >-
+            `error` is the RFC 8628 value (`expired_token`, `access_denied`,
+            `invalid_grant`, `invalid_request`); `code` and `hint` say what happened
+            and what to do next (usually: start a new login).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /v1/home/activity-feed:
     get:
       tags: [Home]
@@ -4030,6 +4272,22 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
+    RateLimited:
+      description: >-
+        Rate limit reached (`RATE_LIMIT_EXCEEDED` on publish / account creation / AI
+        routes, `RATE_LIMITED` on the data plane). Wait for `Retry-After` / `reset`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InternalError:
+      description: >-
+        Unexpected server failure. Retry once; if it fails again, file a ticket with
+        `POST /v1/support/tickets` quoting `request_id`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
   schemas:
     Visibility:
       type: string
@@ -4050,6 +4308,38 @@ components:
         code:
           type: string
           description: Machine-readable error code.
+        request_id:
+          type: string
+          description: Correlation id (also the `X-Request-Id` header). Quote it in support tickets.
+        reason:
+          type: string
+          description: >-
+            Finer cause under `code`. For `UNAUTHORIZED`: missing, invalid, revoked or expired.
+        hint:
+          type: string
+          description: What to do next, in plain words.
+        suggestion:
+          type: string
+        param:
+          type: string
+          description: The request field at fault.
+        docs:
+          type: string
+          description: Doc page for this error.
+        redirect_url:
+          type: string
+        support:
+          type: object
+          description: Present on 5xx — how to reach a human.
+          properties:
+            how:
+              type: string
+              example: POST /v1/support/tickets
+            include:
+              type: array
+              items:
+                type: string
+              example: [request_id]
       required: [success, error, code]
     SearchHit:
       type: object
@@ -4241,9 +4531,21 @@ components:
               format: uri
             installable:
               type: boolean
+        visibility:
+          $ref: "#/components/schemas/Visibility"
+        visibility_downgraded:
+          type: boolean
+          description: >-
+            True when the page came out more private than requested (instance
+            policy, account without a verified email, public-artifact cap, or a
+            moderation hold). A publish with no `visibility` counts as asking for public.
+        requested_visibility:
+          type: string
+          enum: [public]
+          description: Present with `visibility_downgraded`.
         notice:
           type: string
-          description: Human-readable message when publish was adjusted (governance, caps, email gate).
+          description: Human-readable reason the publish was adjusted (governance, caps, email gate, instance policy).
         approval_required:
           type: object
           description: Present when workspace policy requires teammate approval before going open.

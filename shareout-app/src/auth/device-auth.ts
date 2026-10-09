@@ -84,6 +84,31 @@ export async function handleDeviceStart(request: Request, env: Env): Promise<Res
   }, 201);
 }
 
+// `error` stays the RFC 8628 token device-flow clients branch on; `code` + `hint` say
+// in plain words what happened and what to do next.
+const DEVICE_ERRORS = {
+  invalid_request: {
+    code: 'INVALID_REQUEST',
+    hint: 'Send JSON { "device_code": "…" } — the device_code returned by POST /v1/auth/device/start.',
+  },
+  invalid_grant: {
+    code: 'DEVICE_CODE_UNKNOWN',
+    hint: 'This login code is unknown or was already used (a token is handed out only once). Start a new login with POST /v1/auth/device/start.',
+  },
+  expired_token: {
+    code: 'DEVICE_CODE_EXPIRED',
+    hint: 'The user did not finish signing in within 10 minutes. Start a new login with POST /v1/auth/device/start and send them the new link.',
+  },
+  access_denied: {
+    code: 'DEVICE_LOGIN_DENIED',
+    hint: 'The user declined this sign-in in the browser. Ask whether they want to try again, then start a new login with POST /v1/auth/device/start.',
+  },
+} as const;
+
+function deviceError(error: keyof typeof DEVICE_ERRORS) {
+  return { error, ...DEVICE_ERRORS[error] };
+}
+
 // POST /v1/auth/device/token — CLI polls with { device_code }. No auth required
 // (the device_code is the secret). Returns the token exactly once, then consumes the row.
 export async function handleDevicePoll(request: Request, env: Env): Promise<Response> {
@@ -92,25 +117,25 @@ export async function handleDevicePoll(request: Request, env: Env): Promise<Resp
     const body = (await request.json()) as { device_code?: string };
     deviceCode = body?.device_code;
   } catch {
-    return json({ error: 'invalid_request' }, 400);
+    return json(deviceError('invalid_request'), 400);
   }
-  if (!deviceCode) return json({ error: 'invalid_request' }, 400);
+  if (!deviceCode) return json(deviceError('invalid_request'), 400);
 
   const row = await env.DB.prepare(
     `SELECT id, status, user_id, token, warn, expires_at FROM device_auth WHERE device_code = ?`
   ).bind(deviceCode).first<DeviceRow>();
 
-  if (!row) return json({ error: 'invalid_grant' }, 400);
+  if (!row) return json(deviceError('invalid_grant'), 400);
 
   const now = new Date().toISOString();
   if (row.expires_at < now) {
     await env.DB.prepare('DELETE FROM device_auth WHERE id = ?').bind(row.id).run();
-    return json({ error: 'expired_token' }, 400);
+    return json(deviceError('expired_token'), 400);
   }
 
   if (row.status === 'denied') {
     await env.DB.prepare('DELETE FROM device_auth WHERE id = ?').bind(row.id).run();
-    return json({ error: 'access_denied' }, 400);
+    return json(deviceError('access_denied'), 400);
   }
 
   if (row.status !== 'approved' || !row.token) {
@@ -174,7 +199,7 @@ export async function handleDevicePage(request: Request, env: Env): Promise<Resp
     if (session) {
       const result = await approveDeviceCode(env, code, session.id, session.email);
       if (!result.ok) return errorPage(result.error, '/');
-      return deviceDonePage(session.email, result.warn);
+      return deviceDonePage(session.email, result.warn, result.token, request);
     }
   }
 
@@ -187,7 +212,7 @@ export async function handleDevicePage(request: Request, env: Env): Promise<Resp
     loginHint = row?.expected_email ?? null;
   }
 
-  return devicePage(code, loginHint);
+  return devicePage(code, loginHint, pageLocale(request));
 }
 
 /** OTP/Google redirect target — same approve path as /auth/device?code= when sessioned. */
@@ -205,32 +230,71 @@ export async function cleanupExpiredDeviceCodes(env: Env): Promise<number> {
 import { renderHtmlPage } from '../design-system/shell';
 import { authPageStyles } from '../design-system/pages/auth.css';
 import { escapeHtml } from '../html/utils';
+import { pageLocale, type PageLocale } from '../i18n/accept-language';
 
-function devicePage(code: string, loginHint?: string | null): Response {
+// Most people reaching these pages come from a chat app (Claude / ChatGPT), not a
+// terminal — so the copy names both and never says "CLI".
+const DEVICE_COPY = {
+  en: {
+    title: 'Connect your agent - ShareOut',
+    heading: 'Connect your agent',
+    body: 'An app — like Claude, ChatGPT or a terminal — wants to use ShareOut as you. Sign in to approve it.',
+    codeIs: 'Code',
+    enterCode: 'Enter the code your app showed you',
+    continue: 'Continue',
+    approve: 'Sign in to approve',
+    doneTitle: 'Connected - ShareOut',
+    doneHeading: 'Done — you’re connected',
+    doneBody: 'Connected as {email}. Go back to Claude, ChatGPT or your terminal — you can keep going.',
+    tokenIntro: 'If your app asks for a key, paste this one. It’s shown only once.',
+    copy: 'Copy',
+    copied: 'Copied',
+  },
+  es: {
+    title: 'Conectá tu agente - ShareOut',
+    heading: 'Conectá tu agente',
+    body: 'Una app — como Claude, ChatGPT o una terminal — quiere usar ShareOut con tu cuenta. Iniciá sesión para aprobarla.',
+    codeIs: 'Código',
+    enterCode: 'Escribí el código que te mostró la app',
+    continue: 'Continuar',
+    approve: 'Iniciar sesión para aprobar',
+    doneTitle: 'Conectado - ShareOut',
+    doneHeading: 'Listo, ya estás conectado',
+    doneBody: 'Conectado como {email}. Volvé a Claude, ChatGPT o tu terminal: ya podés seguir.',
+    tokenIntro: 'Si la app te pide una clave, pegá esta. Se muestra una sola vez.',
+    copy: 'Copiar',
+    copied: 'Copiado',
+  },
+};
+
+function devicePage(code: string, loginHint: string | null | undefined, lang: PageLocale): Response {
+  const c = DEVICE_COPY[lang];
   // After sign-in, land back on /auth/device?code= so handleDevicePage can approve
   // (email OTP and Google both work). login_hint only helps Google account pick.
   const hintParam = loginHint ? `&login_hint=${encodeURIComponent(loginHint)}` : '';
-  const signInHref = `/auth/login?redirect=${encodeURIComponent(`/auth/device?code=${code}`)}${hintParam}`;
+  const signInHref = `/auth/login?redirect=${encodeURIComponent(`/auth/device?code=${code}`)}${hintParam}&lang=${lang}`;
   const codeField = code
-    ? `<p class="auth-help">Login code <span class="email">${escapeHtml(code)}</span></p>`
+    ? `<p class="auth-help">${escapeHtml(c.codeIs)} <span class="email">${escapeHtml(code)}</span></p>`
     : `<form method="GET" action="/auth/device" class="email-code-form" novalidate>
+         <input type="hidden" name="lang" value="${lang}">
          <div class="field">
-           <label class="field-label" for="device-code">Enter the code from your terminal</label>
+           <label class="field-label" for="device-code">${escapeHtml(c.enterCode)}</label>
            <input id="device-code" type="text" name="code" autocomplete="one-time-code" placeholder="XXXX-XXXX" required>
          </div>
-         <button type="submit" class="so-c-btn so-c-btn--secondary so-c-btn--block">Continue</button>
+         <button type="submit" class="so-c-btn so-c-btn--secondary so-c-btn--block">${escapeHtml(c.continue)}</button>
        </form>`;
   const continueButton = code
-    ? `<a href="${escapeHtml(signInHref)}" class="so-c-btn so-c-btn--primary so-c-btn--block">Sign in to approve</a>`
+    ? `<a href="${escapeHtml(signInHref)}" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(c.approve)}</a>`
     : '';
   return renderHtmlPage({
-    title: 'Authorize CLI login - ShareOut',
+    title: c.title,
+    lang,
     pageStyles: authPageStyles,
     body: `
     <div class="card">
       <div class="icon icon-primary">🔑</div>
-      <h1>Authorize CLI login</h1>
-      <p>A command-line tool is asking to sign in as you. Sign in to approve it.</p>
+      <h1>${escapeHtml(c.heading)}</h1>
+      <p>${escapeHtml(c.body)}</p>
       ${codeField}
       ${continueButton}
       <div class="footer">Powered by <a href="/">ShareOut</a></div>
@@ -238,20 +302,44 @@ function devicePage(code: string, loginHint?: string | null): Response {
   });
 }
 
-export function deviceDonePage(email: string, warn: string | null): Response {
+/**
+ * Success page after approving a device login. Shows the freshly minted token for
+ * copy-paste — the fallback for an agent that cannot poll (skills/ShareOutSkill/auth.md).
+ */
+export function deviceDonePage(email: string, warn: string | null, token: string, request: Request): Response {
+  const lang = pageLocale(request);
+  const c = DEVICE_COPY[lang];
   const warnHtml = warn
     ? `<p class="auth-help auth-help--warning">${escapeHtml(warn)}</p>`
     : '';
+  const copied = JSON.stringify(c.copied);
   return renderHtmlPage({
-    title: 'Signed in - ShareOut',
+    title: c.doneTitle,
+    lang,
     pageStyles: authPageStyles,
+    cacheControl: 'no-store',
     body: `
     <div class="card">
       <div class="icon icon-success">✓</div>
-      <h1>You're signed in</h1>
-      <p>Authorized as <span class="email">${escapeHtml(email)}</span>. Return to your terminal — it should pick up automatically.</p>
+      <h1>${escapeHtml(c.doneHeading)}</h1>
+      <p>${escapeHtml(c.doneBody).replace('{email}', `<span class="email">${escapeHtml(email)}</span>`)}</p>
       ${warnHtml}
+      <p class="auth-help">${escapeHtml(c.tokenIntro)}</p>
+      <div class="field"><input id="device-token" type="text" readonly value="${escapeHtml(token)}" aria-label="API token"></div>
+      <button id="device-token-copy" type="button" class="so-c-btn so-c-btn--secondary so-c-btn--block">${escapeHtml(c.copy)}</button>
       <div class="footer">Powered by <a href="/">ShareOut</a></div>
-    </div>`,
+    </div>
+    <script>
+    (function () {
+      var b = document.getElementById('device-token-copy'), i = document.getElementById('device-token');
+      if (!b || !i) return;
+      b.addEventListener('click', function () {
+        i.select();
+        var done = function () { b.textContent = ${copied}; };
+        if (navigator.clipboard) navigator.clipboard.writeText(i.value).then(done, function () { try { document.execCommand('copy'); done(); } catch (e) {} });
+        else { try { document.execCommand('copy'); done(); } catch (e) {} }
+      });
+    }());
+    </script>`,
   });
 }

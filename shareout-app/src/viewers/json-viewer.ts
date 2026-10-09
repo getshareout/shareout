@@ -1,4 +1,5 @@
 import { generateViewerShell, type ViewerContext } from './viewer-shell';
+import { viewerCopy, VIEWER_COPY, type ViewerCopy } from './copy';
 
 function escapeHtml(str: string): string {
   return str
@@ -20,11 +21,12 @@ export function renderJsonViewer(ctx: ViewerContext): string {
   }
 
   const metadata = ctx.typeMetadata.json;
+  const c = viewerCopy(ctx.locale);
   const statsHtml = metadata ? `
     <div class="stats">
-      <span>Type: ${metadata.schema}</span>
-      ${metadata.itemCount !== undefined ? `<span>${metadata.itemCount.toLocaleString()} items</span>` : ''}
-      ${metadata.rootKeys?.length ? `<span>${metadata.rootKeys.length} keys</span>` : ''}
+      <span>${c.type}${metadata.schema}</span>
+      ${metadata.itemCount !== undefined ? `<span>${metadata.itemCount.toLocaleString(ctx.locale === 'es' ? 'es-AR' : undefined)} ${c.items}</span>` : ''}
+      ${metadata.rootKeys?.length ? `<span>${metadata.rootKeys.length} ${c.keys}</span>` : ''}
     </div>
   ` : '';
 
@@ -33,19 +35,19 @@ export function renderJsonViewer(ctx: ViewerContext): string {
   if (parseError) {
     bodyContent = `
       <div class="json-viewer">
-        <div class="error">Invalid JSON content</div>
+        <div class="error">${c.invalidJson}</div>
         <pre class="raw-content">${escapeHtml(ctx.content)}</pre>
       </div>
     `;
   } else {
-    const treeHtml = renderJsonTree(parsed, '', 0);
+    const treeHtml = renderJsonTree(parsed, '', 0, c);
     bodyContent = `
       <div class="json-viewer">
         ${statsHtml}
         <div class="toolbar">
-          <button class="tool-btn" onclick="expandAll()">Expand All</button>
-          <button class="tool-btn" onclick="collapseAll()">Collapse All</button>
-          <button class="tool-btn" onclick="copyPath()">Copy Path</button>
+          <button class="tool-btn" onclick="expandAll()">${c.expandAll}</button>
+          <button class="tool-btn" onclick="collapseAll()">${c.collapseAll}</button>
+          <button class="tool-btn" onclick="copyPath()">${c.copyPath}</button>
         </div>
         <div class="content-wrapper">
           <div class="tree" id="json-tree">${treeHtml}</div>
@@ -190,7 +192,7 @@ export function renderJsonViewer(ctx: ViewerContext): string {
     }
     function showPath(path) {
       currentPath = path;
-      document.getElementById('path-display').textContent = path || 'Click a value to see its path';
+      document.getElementById('path-display').textContent = path || '${c.clickValue}';
     }
     function copyPath() {
       if (currentPath) {
@@ -206,7 +208,7 @@ export function renderJsonViewer(ctx: ViewerContext): string {
   return generateViewerShell(ctx, bodyContent, extraHead, extraStyles);
 }
 
-function renderJsonTree(value: unknown, path: string, depth: number): string {
+function renderJsonTree(value: unknown, path: string, depth: number, c: ViewerCopy = VIEWER_COPY.en): string {
   if (value === null) {
     return `<span class="value null" onclick="showPath('${path}')">null</span>`;
   }
@@ -232,13 +234,13 @@ function renderJsonTree(value: unknown, path: string, depth: number): string {
 
     const items = value.map((item, i) => {
       const itemPath = `${path}[${i}]`;
-      return `<div class="item">${renderJsonTree(item, itemPath, depth + 1)},</div>`;
+      return `<div class="item">${renderJsonTree(item, itemPath, depth + 1, c)},</div>`;
     }).join('');
 
     return `<div class="node ${depth === 0 ? 'node-root' : ''}">
       <span class="toggle" onclick="toggle(this)"></span>
       <span class="bracket">[</span>
-      <span class="count">${value.length} items</span>
+      <span class="count">${value.length} ${c.items}</span>
       <div class="children">${items}</div>
       <span class="bracket">]</span>
     </div>`;
@@ -253,13 +255,13 @@ function renderJsonTree(value: unknown, path: string, depth: number): string {
     const entries = keys.map(key => {
       const keyPath = path ? `${path}.${key}` : key;
       const val = (value as Record<string, unknown>)[key];
-      return `<div class="entry"><span class="key">"${escapeHtml(key)}"</span>: ${renderJsonTree(val, keyPath, depth + 1)},</div>`;
+      return `<div class="entry"><span class="key">"${escapeHtml(key)}"</span>: ${renderJsonTree(val, keyPath, depth + 1, c)},</div>`;
     }).join('');
 
     return `<div class="node ${depth === 0 ? 'node-root' : ''}">
       <span class="toggle" onclick="toggle(this)"></span>
       <span class="bracket">{</span>
-      <span class="count">${keys.length} keys</span>
+      <span class="count">${keys.length} ${c.keys}</span>
       <div class="children">${entries}</div>
       <span class="bracket">}</span>
     </div>`;

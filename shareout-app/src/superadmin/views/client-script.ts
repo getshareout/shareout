@@ -105,7 +105,65 @@ function initContent() {
   liveSearch('sa-art-search', 'sa-artifacts', 'sa-art-count', '/v1/admin/artifacts', 'artifacts');
   initFeatures();
   initInstance();
+  initSupport();
 }
+
+// ---- Support view: filter the queue, open a thread, reply, set status ----
+function initSupport() {
+  const ids = ['sa-sup-status', 'sa-sup-category', 'sa-sup-ws'];
+  const sels = ids.map((id) => document.getElementById(id));
+  if (!sels[0]) return;
+  const apply = () => {
+    const [st, cat, ws] = sels.map((s) => s.value);
+    document.querySelectorAll('[data-sup-row]').forEach((r) => {
+      r.hidden = (st && r.dataset.status !== st) || (cat && r.dataset.category !== cat) || (ws && r.dataset.ws !== ws);
+    });
+  };
+  sels.forEach((s) => { s.onchange = apply; });
+}
+
+window.saTicket = async (id) => {
+  let data;
+  try { data = await api('GET', '/v1/support/tickets/' + encodeURIComponent(id)); } catch (e) { alert(e.message); return; }
+  const t = data.ticket;
+  const ctxRows = [
+    ['Ticket', t.id], ['Requester', t.requester_email], ['Channel', t.channel], ['Client', t.client],
+    ['Workspace', t.workspace_id || 'none'], ['Category', t.category], ['Severity', t.severity], ['Priority', t.priority],
+    ['Page', t.page_url], ['Artifact', t.artifact_id], ['Request id', t.request_id], ['User agent', t.user_agent],
+    ['Language', t.locale], ['Opened', t.created_at],
+  ].filter((r) => r[1]).map((r) => '<tr><td class="sa-muted">' + esc(r[0]) + '</td><td style="word-break:break-all">' + esc(r[1]) + '</td></tr>').join('');
+  const thread = (data.thread || []).map((m) =>
+    '<div style="margin:0 0 10px"><div class="sa-muted">' + esc(m.author) + ' · ' + esc(m.created_at) + '</div><div style="white-space:pre-wrap">' + esc(m.body) + '</div></div>'
+  ).join('');
+  const statuses = ['open', 'pending', 'resolved', 'closed'].map((s) => '<option value="' + s + '"' + (s === t.status ? ' selected' : '') + '>' + s + '</option>').join('');
+  openModal(t.subject,
+    '<table class="sa-table">' + ctxRows + '</table>' +
+    '<div style="margin-top:14px;max-height:280px;overflow:auto">' + thread + '</div>' +
+    (t.ai_draft ? '<p style="margin-top:12px"><button type="button" class="so-c-btn so-c-btn--secondary so-c-btn--sm" id="sa-sup-draft">Use AI draft</button></p>' : '') +
+    '<textarea id="sa-sup-reply" class="so-c-textarea" rows="5" style="width:100%;margin-top:12px" placeholder="Reply to the requester"></textarea>' +
+    '<p style="margin-top:10px">Status <select id="sa-sup-set" class="so-c-select">' + statuses + '</select> <span id="sa-sup-out" class="sa-muted"></span></p>',
+    'Send reply',
+    async () => {
+      const body = document.getElementById('sa-sup-reply').value.trim();
+      if (!body) { alert('Write a reply first.'); return; }
+      try {
+        const r = await api('POST', '/v1/support/tickets/' + encodeURIComponent(id) + '/reply', { body });
+        const d = r.delivery || {};
+        document.getElementById('sa-sup-out').textContent = d.delivered ? 'Sent via ' + d.via + '.' : 'Saved to the thread; delivery via ' + d.via + ' failed: ' + (d.error || 'unknown');
+        document.getElementById('sa-sup-reply').value = '';
+        viewCache.delete(key(curView, curRange));
+      } catch (e) { alert(e.message); }
+    });
+  const draft = document.getElementById('sa-sup-draft');
+  if (draft) draft.onclick = () => { document.getElementById('sa-sup-reply').value = t.ai_draft; };
+  document.getElementById('sa-sup-set').onchange = async (e) => {
+    try {
+      await api('POST', '/v1/support/tickets/' + encodeURIComponent(id) + '/status', { status: e.target.value });
+      document.getElementById('sa-sup-out').textContent = 'Status set to ' + e.target.value + '.';
+      viewCache.delete(key(curView, curRange));
+    } catch (err) { alert(err.message); }
+  };
+};
 
 // ---- Instance view: provision a workspace, appoint a role ----
 let appointWs = null;

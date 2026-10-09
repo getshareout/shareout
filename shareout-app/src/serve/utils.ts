@@ -1,4 +1,5 @@
 import { googleFontsPreconnect, standalonePageStyles } from '../design-system/standalone-page';
+import type { Locale, LocaleCopy } from '../i18n';
 
 // Mobile device detection regex
 const MOBILE_UA_REGEX = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i;
@@ -89,14 +90,40 @@ export function notFound(): Response {
   });
 }
 
-export function pausedPage(_artifactName?: string): Response {
-  const html = `<!DOCTYPE html>
-<html lang="en">
+type StatusPageKind = 'paused' | 'takedown' | 'review';
+
+const STATUS_PAGE_COPY: LocaleCopy<Record<StatusPageKind, { title: string; heading: string; body: string }>> = {
+  en: {
+    paused: { title: 'Paused', heading: 'This content is paused', body: 'This content is temporarily unavailable.' },
+    takedown: { title: 'Unavailable', heading: 'This page is unavailable', body: 'This page was removed by ShareOut safety review.' },
+    review: {
+      title: 'Being reviewed',
+      heading: 'This page is being reviewed',
+      body: 'This page is going through an automated safety review. It usually clears within the hour — check back soon.',
+    },
+  },
+  es: {
+    paused: { title: 'En pausa', heading: 'Esta página está en pausa', body: 'Por ahora no está disponible.' },
+    takedown: { title: 'No disponible', heading: 'Esta página no está disponible', body: 'La revisión de seguridad de ShareOut la dio de baja.' },
+    review: {
+      title: 'En revisión',
+      heading: 'Estamos revisando esta página',
+      body: 'Está pasando por una revisión de seguridad automática. Suele resolverse en menos de una hora, volvé a entrar en un rato.',
+    },
+  },
+};
+
+const STATUS_PAGE_ICONS: Record<StatusPageKind, string> = { paused: '⏸️', takedown: '🚫', review: '🔍' };
+
+function statusPage(kind: StatusPageKind, locale: Locale): string {
+  const c = STATUS_PAGE_COPY[locale][kind];
+  return `<!DOCTYPE html>
+<html lang="${locale}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="${NOINDEX_ROBOTS}">
-  <title>Paused</title>
+  <title>${c.title}</title>
   ${googleFontsPreconnect}
   <style>
     ${standalonePageStyles}
@@ -105,14 +132,16 @@ export function pausedPage(_artifactName?: string): Response {
 </head>
 <body>
   <div class="card">
-    <div class="icon">⏸️</div>
-    <h1>This content is paused</h1>
-    <p>This content is temporarily unavailable.</p>
+    <div class="icon">${STATUS_PAGE_ICONS[kind]}</div>
+    <h1>${c.heading}</h1>
+    <p>${c.body}</p>
   </div>
 </body>
 </html>`;
+}
 
-  return new Response(html, {
+export function pausedPage(_artifactName?: string, locale: Locale = 'en'): Response {
+  return new Response(statusPage('paused', locale), {
     status: 503,
     headers: { 'Content-Type': 'text/html', 'X-Robots-Tag': NOINDEX_ROBOTS },
   });
@@ -120,30 +149,8 @@ export function pausedPage(_artifactName?: string): Response {
 
 /** Shown when an artifact was blocked by safety review (Workstream B). Distinct
  *  copy from pausedPage so a takedown reads as a takedown, not a temporary pause. */
-export function takedownPage(_artifactName?: string): Response {
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="robots" content="${NOINDEX_ROBOTS}">
-  <title>Unavailable</title>
-  ${googleFontsPreconnect}
-  <style>
-    ${standalonePageStyles}
-    .icon { font-size: 3rem; margin-bottom: 1rem; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="icon">🚫</div>
-    <h1>This page is unavailable</h1>
-    <p>This page was removed by ShareOut safety review.</p>
-  </div>
-</body>
-</html>`;
-
-  return new Response(html, {
+export function takedownPage(_artifactName?: string, locale: Locale = 'en'): Response {
+  return new Response(statusPage('takedown', locale), {
     status: 451,
     headers: { 'Content-Type': 'text/html', 'X-Robots-Tag': NOINDEX_ROBOTS },
   });
@@ -154,30 +161,8 @@ export function takedownPage(_artifactName?: string): Response {
  *  owner still sees the real page — this replaces the misleading login wall for
  *  everyone else. 503 + Retry-After mirrors pausedPage's "temporarily unavailable"
  *  semantics; the hold self-heals within the hour (see MODERATION_PENDING_MESSAGE). */
-export function underReviewPage(_artifactName?: string): Response {
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="robots" content="${NOINDEX_ROBOTS}">
-  <title>Being reviewed</title>
-  ${googleFontsPreconnect}
-  <style>
-    ${standalonePageStyles}
-    .icon { font-size: 3rem; margin-bottom: 1rem; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="icon">🔍</div>
-    <h1>This page is being reviewed</h1>
-    <p>This page is going through an automated safety review. It usually clears within the hour — check back soon.</p>
-  </div>
-</body>
-</html>`;
-
-  return new Response(html, {
+export function underReviewPage(_artifactName?: string, locale: Locale = 'en'): Response {
+  return new Response(statusPage('review', locale), {
     status: 503,
     headers: { 'Content-Type': 'text/html', 'Retry-After': '3600', 'X-Robots-Tag': NOINDEX_ROBOTS },
   });

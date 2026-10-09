@@ -7,6 +7,7 @@
 // fixed — the project documentation is a shared resource, not per-instance.
 
 import openapiSpec from '../discovery/openapi.spec.json';
+import openapiAgentSpec from '../discovery/openapi.agent.json';
 import {
   AGENT_SKILL_ARCHIVE_DIGEST,
   AGENT_SKILL_DESCRIPTION,
@@ -123,6 +124,12 @@ export function serveIntegrationsJson(env: Env): Response {
 export function serveOpenApiJson(env: Env): Response {
   // The spec's `servers` entry is where a generated client will send requests.
   const spec = JSON.parse(rewriteSkillOrigin(JSON.stringify(openapiSpec), env));
+  return new Response(JSON.stringify(spec), { headers: JSON_HEADERS });
+}
+
+/** Trimmed "agent essentials" spec (~a dozen operations) — sized for ChatGPT Custom GPT Actions. */
+export function serveOpenApiAgentJson(env: Env): Response {
+  const spec = JSON.parse(rewriteSkillOrigin(JSON.stringify(openapiAgentSpec), env));
   return new Response(JSON.stringify(spec), { headers: JSON_HEADERS });
 }
 

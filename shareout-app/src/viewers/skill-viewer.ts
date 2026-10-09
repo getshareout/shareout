@@ -1,6 +1,7 @@
 import { generateViewerShell, type ViewerContext } from './viewer-shell';
 import { colors } from '../design-system/tokens';
 import { parseMarkdown, MARKDOWN_VIEWER_STYLES } from './markdown-viewer';
+import { viewerCopy } from './copy';
 
 function escapeHtml(str: string): string {
   return str
@@ -17,6 +18,7 @@ function escapeHtml(str: string): string {
 export function renderSkillViewer(ctx: ViewerContext): string {
   const meta = ctx.typeMetadata.skill;
   const m = ctx.skillMetrics;
+  const c = viewerCopy(ctx.locale);
   const html = parseMarkdown(ctx.content);
 
   const chips = [
@@ -28,16 +30,16 @@ export function renderSkillViewer(ctx: ViewerContext): string {
   const canAct = !!m?.canAct;
   const metricsBar = m ? `
     <div class="sk-metrics">
-      <button class="sk-btn sk-vote${m.voted ? ' active' : ''}" id="sk-vote"${canAct ? '' : ' disabled'} onclick="skVote()" title="Upvote">
+      <button class="sk-btn sk-vote${m.voted ? ' active' : ''}" id="sk-vote"${canAct ? '' : ' disabled'} onclick="skVote()" title="${c.upvote}">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="${m.voted ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
         <span id="sk-vote-n">${m.upvotes}</span>
       </button>
-      <button class="sk-btn sk-install${m.installed ? ' active' : ''}" id="sk-install"${canAct ? '' : ' disabled'} onclick="skInstall()" title="${m.installed ? 'Saved to My Skills' : 'Save to My Skills'}">
+      <button class="sk-btn sk-install${m.installed ? ' active' : ''}" id="sk-install"${canAct ? '' : ' disabled'} onclick="skInstall()" title="${m.installed ? c.savedToMine : c.saveToMine}">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="${m.installed ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-        <span id="sk-install-label">${m.installed ? 'Saved' : 'Save'}</span>
+        <span id="sk-install-label">${m.installed ? c.saved : c.save}</span>
       </button>
-      <span class="sk-stat" title="Attached to artifacts">⚲ ${m.attaches}</span>
-      <span class="sk-stat" title="Uses by agents">↻ ${m.uses}</span>
+      <span class="sk-stat" title="${c.attachedTo}">⚲ ${m.attaches}</span>
+      <span class="sk-stat" title="${c.usesByAgents}">↻ ${m.uses}</span>
     </div>` : '';
 
   const bodyContent = `
@@ -104,7 +106,7 @@ export function renderSkillViewer(ctx: ViewerContext): string {
         .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
         .then(function(){ b.classList.toggle('active', !on);
           var svg = b.querySelector('svg'); if (svg) svg.setAttribute('fill', !on ? 'currentColor' : 'none');
-          var lbl = document.getElementById('sk-install-label'); if (lbl) lbl.textContent = !on ? 'Saved' : 'Save'; })
+          var lbl = document.getElementById('sk-install-label'); if (lbl) lbl.textContent = !on ? '${c.saved}' : '${c.save}'; })
         .catch(function(){}).finally(function(){ b.disabled = false; });
     }
   </script>` : undefined;

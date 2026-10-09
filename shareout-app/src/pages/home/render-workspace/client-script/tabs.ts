@@ -75,7 +75,7 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
     if (s < 3600) return Math.floor(s / 60) + 'm';
     if (s < 86400) return Math.floor(s / 3600) + 'h';
     if (s < 2592000) return Math.floor(s / 86400) + 'd';
-    return new Date(at).toLocaleDateString();
+    return new Date(at).toLocaleDateString(locTag());
   }
   function viewersHtml(viewers) {
     if (!viewers || !viewers.length) return '';

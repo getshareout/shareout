@@ -8,7 +8,7 @@ export const workspace_client_home_views_deliveries_JS = `  // ----- sent delive
       var st = delivStatus(l);
       var filesLbl = l.fileCount === 1 ? t('deliveries.files') : t('deliveries.filesPlural');
       var opensLbl = l.viewCount === 1 ? t('deliveries.opens') : t('deliveries.opensPlural');
-      var meta = l.fileCount + ' ' + filesLbl + ' \\u00b7 ' + delivGate(l.gate) + ' \\u00b7 ' + l.viewCount + ' ' + opensLbl + (l.expiresAt ? ' \\u00b7 ' + t('deliveries.until') + ' ' + esc(new Date(l.expiresAt).toLocaleDateString()) : '');
+      var meta = l.fileCount + ' ' + filesLbl + ' \\u00b7 ' + delivGate(l.gate) + ' \\u00b7 ' + l.viewCount + ' ' + opensLbl + (l.expiresAt ? ' \\u00b7 ' + t('deliveries.until') + ' ' + esc(new Date(l.expiresAt).toLocaleDateString(locTag())) : '');
       return '<div class="wsx-deliv__row" data-link="' + esc(l.id) + '">'
         + '<div class="wsx-deliv__main"><div class="wsx-deliv__name">' + esc(l.collectionName) + '</div><div class="wsx-deliv__meta">' + meta + '</div></div>'
         + '<span class="wsx-deliv__st ' + st[1] + '">' + esc(st[0]) + '</span>'

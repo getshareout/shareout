@@ -1,6 +1,7 @@
 import { escapeHtml } from '../../utils';
 import type { AdminInfo } from '../../types';
 import type { ToolbarRenderContext, ViewerUser } from '../types';
+import type { Locale } from '../../../i18n';
 
 interface BuildToolbarContextInput {
   loggedIn: boolean;
@@ -17,6 +18,7 @@ interface BuildToolbarContextInput {
   artifactId: string;
   visualEditorEnabled: boolean;
   attachedSkills: Array<{ name: string; slug: string }>;
+  locale?: Locale;
 }
 
 /** Derive display fields and visibility flags for toolbar rendering. */
@@ -36,6 +38,7 @@ export function buildToolbarContext(input: BuildToolbarContextInput): ToolbarRen
     artifactId,
     visualEditorEnabled,
     attachedSkills,
+    locale = 'en',
   } = input;
 
   if (hideToolbar) return null;
@@ -76,5 +79,6 @@ export function buildToolbarContext(input: BuildToolbarContextInput): ToolbarRen
     avatarInner,
     visualEditorEnabled,
     attachedSkills,
+    locale,
   };
 }

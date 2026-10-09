@@ -1,5 +1,6 @@
 import { ShareOutError } from '../shareout-error';
 import type { SdkClient } from '../core/sdk-client';
+import { pageLocale } from '../core/locale';
 
 /**
  * `so.agent.pilot` — an in-page GUI agent (vendored page-agent, MIT) that reads
@@ -52,6 +53,9 @@ interface PilotAgent extends EventTarget {
   stop(): Promise<void>;
   dispose(): void;
 }
+
+const SPANISH_REPLIES =
+  'Write every message to the user in Spanish as spoken in Argentina: use vos, plain words, no anglicisms.';
 
 interface PilotAgentConfig {
   model: string;
@@ -203,7 +207,11 @@ export class PilotStore {
       language: 'en-US',
       maxSteps,
       stepDelay: 0.3,
-      instructions: opts.instructions ? { system: opts.instructions } : undefined,
+      // page-agent ships only en-US/zh-CN UI copy; steer the model's replies instead.
+      instructions: (() => {
+        const system = [opts.instructions, pageLocale() === 'es' ? SPANISH_REPLIES : ''].filter(Boolean).join('\n\n');
+        return system ? { system } : undefined;
+      })(),
       customFetch: (url: RequestInfo | URL, init?: RequestInit) => {
         const headers = new Headers(init?.headers);
         headers.set('x-pilot-task', taskId);

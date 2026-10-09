@@ -1,4 +1,5 @@
 import { generateViewerShell, type ViewerContext } from './viewer-shell';
+import { viewerCopy } from './copy';
 
 function escapeHtml(str: string): string {
   return str
@@ -12,12 +13,14 @@ function escapeHtml(str: string): string {
 export function renderCsvViewer(ctx: ViewerContext): string {
   const metadata = ctx.typeMetadata.csv;
   const { headers, rows } = parseCsv(ctx.content, metadata?.delimiter || ',');
+  const c = viewerCopy(ctx.locale);
+  const num = (n: number) => n.toLocaleString(ctx.locale === 'es' ? 'es-AR' : undefined);
 
   const statsHtml = metadata ? `
     <div class="stats">
-      <span>${metadata.rowCount.toLocaleString()} rows</span>
-      <span>${metadata.columns.length} columns</span>
-      <span>Delimiter: ${metadata.delimiter === '\t' ? 'TAB' : metadata.delimiter === ',' ? 'Comma' : metadata.delimiter}</span>
+      <span>${num(metadata.rowCount)} ${c.rows}</span>
+      <span>${metadata.columns.length} ${c.columns}</span>
+      <span>${c.delimiter}${metadata.delimiter === '\t' ? 'TAB' : metadata.delimiter === ',' ? c.comma : metadata.delimiter}</span>
     </div>
   ` : '';
 
@@ -43,7 +46,7 @@ export function renderCsvViewer(ctx: ViewerContext): string {
 
   const truncatedWarning = rows.length > 1000 ? `
     <div class="truncated-warning">
-      Showing first 1,000 of ${rows.length.toLocaleString()} rows. Download the file to see all data.
+      ${c.showingFirst}${num(rows.length)}${c.downloadAll}
     </div>
   ` : '';
 
@@ -51,7 +54,7 @@ export function renderCsvViewer(ctx: ViewerContext): string {
     <div class="csv-viewer">
       ${statsHtml}
       <div class="toolbar">
-        <input type="text" class="search-input" placeholder="Filter rows..." oninput="filterRows(this.value)">
+        <input type="text" class="search-input" placeholder="${c.filterRows}" oninput="filterRows(this.value)">
       </div>
       <div class="table-wrapper">
         <table class="data-table" id="data-table">
@@ -64,7 +67,7 @@ export function renderCsvViewer(ctx: ViewerContext): string {
         </table>
       </div>
       ${truncatedWarning}
-      <div class="row-count" id="row-count">${rows.length.toLocaleString()} rows</div>
+      <div class="row-count" id="row-count">${num(rows.length)} ${c.rows}</div>
     </div>
   `;
 
@@ -254,7 +257,7 @@ export function renderCsvViewer(ctx: ViewerContext): string {
         }
       });
 
-      document.getElementById('row-count').textContent = visible.toLocaleString() + ' of ${rows.length.toLocaleString()} rows';
+      document.getElementById('row-count').textContent = visible.toLocaleString(${ctx.locale === 'es' ? "'es-AR'" : ''}) + '${c.of}${num(rows.length)} ${c.rows}';
     }
   </script>
   `;

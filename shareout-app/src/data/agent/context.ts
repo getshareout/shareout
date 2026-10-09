@@ -2,6 +2,7 @@ import type { Env } from '../../types';
 import type { DataContext } from '../middleware';
 import type { MiniDb } from '../minidb-client';
 import type { AgentConfig, VisitorContext, AdminContext } from './types';
+import { agentLanguageRule, getWorkspaceLocale } from '../../i18n';
 
 export async function buildVisitorContext(
   ctx: DataContext,
@@ -57,6 +58,8 @@ export async function buildVisitorContext(
     );
   }
 
+  const locale = await getWorkspaceLocale(env, ctx.workspaceId).catch(() => null);
+  if (locale) context.locale = locale;
   return context;
 }
 
@@ -149,7 +152,9 @@ export async function buildAdminContext(
 
   const tables = tableRows.results.map((r) => r.name);
 
+  const locale = await getWorkspaceLocale(env, ctx.workspaceId).catch(() => null);
   return {
+    ...(locale ? { locale } : {}),
     files,
     skillDocs,
     artifact: {
@@ -279,6 +284,8 @@ export function buildVisitorSystemPrompt(
   // trust it, so live-data dashboards work without the owner hand-writing this rule.
   prompt += '\n\nIf a user message contains a "Live page data" JSON block, it is the current state of the app the user is viewing — treat it as authoritative, answer from it, and never ask the user to paste data that is already provided there.';
 
+  prompt += '\n\n' + agentLanguageRule(context.locale);
+
   if (Object.keys(context.json).length > 0) {
     prompt += '\n\n## Available Data\n```json\n' + JSON.stringify(context.json, null, 2) + '\n```';
   }
@@ -314,6 +321,8 @@ When suggesting code changes:
 3. Explain what the change does
 4. Mark changes clearly with \`\`\`diff blocks
 `;
+
+  prompt += `\n${agentLanguageRule(context.locale)}\n`;
 
   if (context.folderGuide) {
     prompt += `\nThis artifact lives in a folder with a guide. Follow its conventions for anything you build or change here:\n\n## Folder guide\n${context.folderGuide}\n`;

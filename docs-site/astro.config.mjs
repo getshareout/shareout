@@ -109,6 +109,7 @@ export default defineConfig({
 					translations: { es: '🔌 Conectá tus herramientas' },
 					items: [
 						{ label: 'Connect your tools', slug: 'everyone/connect', translations: { es: 'Conectá tus herramientas' } },
+						{ label: 'Connect Claude or ChatGPT', slug: 'everyone/connect-ai-apps', translations: { es: 'Conectar Claude o ChatGPT' } },
 						{ label: 'Google Sheets', slug: 'everyone/google-sheets', translations: { es: 'Google Sheets' } },
 						{ label: 'Your store & other tools', slug: 'everyone/more-connections', translations: { es: 'Tu tienda y otras herramientas' } },
 					],

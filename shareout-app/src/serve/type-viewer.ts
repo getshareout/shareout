@@ -11,6 +11,7 @@ import { getSecurityHeaders } from './security';
 import { notFound, runBackground, NOINDEX_ROBOTS } from './utils';
 import type { SocialPreview } from './social-meta';
 import { normalizeVisibility } from '../visibility-config';
+import { localeForArtifactWorkspace } from '../i18n';
 
 export async function serveTypeViewer(
   request: Request,
@@ -43,9 +44,10 @@ export async function serveTypeViewer(
 
   // Resolve the session once, then check admin + favorite state.
   const sessionUser = await getSessionUser(request, env);
-  const [adminInfo, favInfo] = await Promise.all([
+  const [adminInfo, favInfo, locale] = await Promise.all([
     detectAdminStatus(sessionUser, env, artifact.artifact_id, artifact.owner_id),
     detectFavoriteState(sessionUser, env, artifact.artifact_id),
+    localeForArtifactWorkspace(env, artifact.workspace_id, request),
   ]);
   const isAdmin = !!adminInfo;
 
@@ -79,6 +81,7 @@ export async function serveTypeViewer(
     socialPreview,
     skillMetrics,
     libraryMetrics,
+    locale,
   );
 
   if (!html) {

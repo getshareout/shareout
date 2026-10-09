@@ -83,7 +83,9 @@ describe('worker routes', () => {
 
     expect(response.status).toBe(401);
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
-    expect(body).toEqual({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
+    expect(body).toMatchObject({ success: false, code: 'UNAUTHORIZED', reason: 'missing' });
+    expect(body).toHaveProperty('request_id');
+    expect(body).toHaveProperty('hint');
   });
 
   it('redirects Google login to the configured OAuth client', async () => {

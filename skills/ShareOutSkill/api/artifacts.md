@@ -72,13 +72,26 @@ Create or update an artifact.
   "moderation": {
     "status": "pending",
     "reason": "unknown domain example.com",
-    "message": "Public pages get an automated safety check at publish. This one is held private for now — it is re-checked automatically within the hour (our team is alerted too) and goes public by itself once it clears.",
+    "message": "Public pages get an automated safety check at publish. This one is held private for now — it is re-checked automatically within the hour and goes public by itself once it clears. If it stays held, open a support ticket from Help & support in the app (or POST /v1/support/tickets).",
     "requested_visibility": "public"
   }
 }
 ```
 
 When `moderation.status === "pending"`, tell the user their page is **under an automated safety review** — it usually clears within the hour and **goes public automatically**, no action needed. Do **not** present the URL as live/public yet; share it as "publishing shortly" or offer the private link. When `status === "blocked"`, the page stays private and needs support. Absent means the page published at the requested visibility.
+
+**Visibility downgrade** (`visibility`, `visibility_downgraded`, `requested_visibility`, `notice`): the response always carries the page's real `visibility`. When it came out more private than asked, `visibility_downgraded` is `true`, `requested_visibility` is `"public"`, and `notice` says why in plain words. Causes besides a moderation hold: the instance turned public links off (`OPEN_VISIBILITY_DISABLED`), the account has **no verified email** (anonymous `create-account` accounts always publish privately until an email is linked), or the public-artifact cap is reached. A publish with **no** `visibility` (and no `private` / `password` / `share_with`) asks for public, so it is reported the same way:
+
+```json
+{
+  "visibility": "private",
+  "visibility_downgraded": true,
+  "requested_visibility": "public",
+  "notice": "Public links are turned off on this instance (OPEN_VISIBILITY_DISABLED)."
+}
+```
+
+Tell the user the page is private and why; don't call the link public and don't re-publish to "fix" it.
 
 **Editor-readiness** (`editor_readiness`, HTML artifacts only): an **advisory** profile of how much the visual editor can do with this artifact, computed from the same rules the editor runs in the browser. It **never blocks publishing** — the artifact is live regardless. The more structural markers it carries (manifest, `data-shareout-page`, declared bindings, templates), the more the editor can offer (outline navigation, inline editing, add/remove items). Each finding's `disables` says which editor feature that gap costs. Surface a short summary to the user after publishing (e.g. "Published ✅ — editor-ready, 1 advisory warning"), so they know what they'd gain by adding the missing markers, but don't treat it as an error. Absent for non-HTML artifacts. See [core/html-spec/overview.md](../core/html-spec/overview.md).
 
@@ -90,7 +103,7 @@ When `moderation.status === "pending"`, tell the user their page is **under an a
 | `slug` | string | No | Human-facing slug (auto-generated from `name` if omitted). Unique **per workspace** (or per owner for personal artifacts). Drives subdomain/namespaced URLs and publish dedup. |
 | `entrypoint` | string | No | Default: `index.html` |
 | `files` | FileEntry[] | Yes | Files to publish |
-| `visibility` | string | No | `private` (default; owner + explicitly shared), `workspace` (all members of the artifact's workspace), `public` (anyone on the internet with the link; discoverable). (`unlisted` is a retired legacy alias, still accepted and treated as `public`.) |
+| `visibility` | string | No | Omitted → `public` when the instance and account allow it, otherwise `private` with `visibility_downgraded` (see above). `private` (owner + explicitly shared), `workspace` (all members of the artifact's workspace), `public` (anyone on the internet with the link; discoverable). (`unlisted` is a retired legacy alias, still accepted and treated as `public`.) |
 | `mobile_html` | string | No | Mobile-specific HTML |
 | `pwa` | PWAConfig | No | PWA configuration |
 | `access_policy` | object | No | Row-level access policy (per-viewer data filtering) |

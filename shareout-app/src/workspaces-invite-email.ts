@@ -53,6 +53,15 @@ export async function createInviteClaim(
   return { id, code };
 }
 
+// Retire every other unclaimed code for this person in this workspace. A resend means
+// "this is the invite now": the old email's link should say expired, not still work.
+export async function expireOtherInviteClaims(env: Env, workspaceId: string, userId: string, keepId: string): Promise<void> {
+  await env.DB.prepare(
+    `UPDATE workspace_invite_claims SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+      WHERE workspace_id = ? AND user_id = ? AND claimed_at IS NULL AND id != ?`
+  ).bind(workspaceId, userId, keepId).run();
+}
+
 // Send the invite and write the outcome onto the claim row.
 //
 // The dispatch result used to be discarded here, which made a rejected send
@@ -62,16 +71,19 @@ export async function createInviteClaim(
 // Now the row carries the verdict and the Members view shows it.
 export async function sendInviteEmail(
   env: Env,
-  args: { email: string; workspaceName: string; inviterName: string; claimCode: string; claimId?: string }
+  args: { email: string; workspaceName: string; inviterName: string; claimCode: string; claimId?: string; workspaceId?: string; personalMessage?: string }
 ): Promise<DispatchResult> {
   const result = await dispatchLifecycleEmail(env, {
     type: 'workspace_invite',
     toEmail: args.email,
+    // The invite speaks the workspace's language, not whatever the address had before.
+    workspaceId: args.workspaceId,
     data: {
       workspaceName: args.workspaceName,
       inviterName: args.inviterName,
       claimCode: args.claimCode,
       claimTtlDays: CLAIM_TTL_DAYS,
+      ...(args.personalMessage ? { personalMessage: args.personalMessage } : {}),
     },
   });
 
@@ -184,24 +196,28 @@ export async function notifyInviteAccepted(env: Env, claim: InviteClaim): Promis
   await dispatchLifecycleEmail(env, {
     type: 'invite_accepted',
     toUserId: claim.invited_by,
+    workspaceId: claim.workspace_id,
     data: { memberName, workspaceName: ws?.name || 'your workspace' },
   }).catch(() => {});
 }
 
-/** Peek invite metadata without consuming the code — for the unauth join card. */
+/** Peek invite metadata without consuming the code — for the unauth join card. The
+ *  invited email is returned so sign-in can pre-select it (whoever holds the link got it
+ *  at that address). */
 export async function peekInvite(
   env: Env,
   rawCode: string
-): Promise<{ workspaceName: string; inviterName: string } | null> {
+): Promise<{ workspaceName: string; inviterName: string; email: string } | null> {
   const code = (rawCode || '').trim().toUpperCase();
   if (!code) return null;
   const claim = await env.DB.prepare(
-    `SELECT workspace_id, invited_by, claimed_at,
+    `SELECT workspace_id, invited_by, email, claimed_at,
             (expires_at < strftime('%Y-%m-%dT%H:%M:%fZ','now')) AS expired
      FROM workspace_invite_claims WHERE code_hash = ?`
   ).bind(await sha256(code)).first<{
     workspace_id: string;
     invited_by: string | null;
+    email: string;
     claimed_at: string | null;
     expired: number;
   }>();
@@ -218,7 +234,7 @@ export async function peekInvite(
   if (!ws?.name) return null;
   const inviterName =
     inviter?.name || (inviter?.email ? inviter.email.split('@')[0] : 'A teammate');
-  return { workspaceName: ws.name, inviterName };
+  return { workspaceName: ws.name, inviterName, email: claim.email };
 }
 
 /**

@@ -16,6 +16,7 @@ import {
   validateToken,
   handleCreateAdminSession,
 } from '../api-auth';
+import { unauthorizedFor } from '../auth/unauthorized';
 import {
   checkAccountCreation,
   rateLimitResponse,
@@ -39,12 +40,11 @@ import {
 } from '../auth-otp';
 import { handleClaimInvite } from '../workspaces-invite-email';
 import { handleDeviceStart, handleDevicePoll, handleDevicePage, handleDeviceDone } from '../auth/device-auth';
-import { handleListMyTokens, handleCreateMyToken } from '../api-me-tokens';
+import { handleListMyTokens, handleCreateMyToken, handleRevokeMyToken } from '../api-me-tokens';
 import { handleListMyLibraries } from '../workspace-library';
 import { handleCreateLibraryModule } from '../publish';
 import { handleSheetsOAuthCallback } from '../data/sheets/handler';
 import { handleGitHubOAuthCallback } from '../data/github/handler';
-import { unauthorized } from '../cors';
 import { createLogger, logError } from '../logging';
 import { isSheetsAuthCallback, isGitHubAuthCallback } from '../oauth-callback';
 import type { FetchContext } from './context';
@@ -53,6 +53,7 @@ import { getTokenOrSessionUser } from './helpers/auth-guard';
 import { jsonError, jsonResponse } from './helpers/json-response';
 import { googleOAuthConfigured } from '../config/auth-providers';
 import { appLoginPage } from '../auth/pages';
+import { pageLocale } from '../i18n/accept-language';
 import { handleSsoStart, handleSsoCallback } from '../auth/oidc';
 import { getSsoConfigBySlug, getSsoConfigForEmail, ssoStartPath } from '../auth/sso-config';
 import { parseSubdomainFromEnv } from '../subdomain';
@@ -106,7 +107,7 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
 
   if (path === '/v1/invites/claim' && request.method === 'POST') {
     const user = await getTokenOrSessionUser(ctx);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleClaimInvite(request, env, user));
   }
 
@@ -132,31 +133,31 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
 
   if (path === '/v1/auth/link-email' && request.method === 'POST') {
     const user = await validateToken(request, env);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleLinkEmail(request, env, user));
   }
 
   if (path === '/v1/auth/profile' && request.method === 'GET') {
     const user = await validateToken(request, env);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleGetProfile(request, env, user));
   }
 
   if (path === '/v1/auth/profile' && (request.method === 'PUT' || request.method === 'PATCH')) {
     const user = await validateToken(request, env);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleUpdateProfile(request, env, user));
   }
 
   if (path === '/v1/auth/admin-session' && request.method === 'POST') {
     const user = await validateToken(request, env);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleCreateAdminSession(request, env, user));
   }
 
   if (path === '/v1/auth/link-google' && request.method === 'GET') {
     const user = await getTokenOrSessionUser(ctx);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     const redirectTo = url.searchParams.get('redirect') || '/home';
     return handleLinkGoogleStart(user.id, redirectTo, env, 'identity');
   }
@@ -167,20 +168,26 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
 
   if (path === '/v1/me/tokens' && request.method === 'GET') {
     const user = await getTokenOrSessionUser(ctx);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleListMyTokens(env, user));
   }
 
   if (path === '/v1/me/tokens' && request.method === 'POST') {
     const user = await getTokenOrSessionUser(ctx);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleCreateMyToken(request, env, user));
+  }
+
+  if (path.startsWith('/v1/me/tokens/') && request.method === 'DELETE') {
+    const user = await getTokenOrSessionUser(ctx);
+    if (!user) return addCORS(await unauthorizedFor(request, env));
+    return addCORS(await handleRevokeMyToken(env, user, decodeURIComponent(path.slice('/v1/me/tokens/'.length))));
   }
 
   // Personal Workspace Library catalog ("my modules").
   if (path === '/v1/me/libraries' && request.method === 'GET') {
     const user = await getTokenOrSessionUser(ctx);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleListMyLibraries(env, user));
   }
 
@@ -188,7 +195,7 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
   // both scopes via the body (scope + workspace_id).
   if (path === '/v1/me/libraries' && request.method === 'POST') {
     const user = await getTokenOrSessionUser(ctx);
-    if (!user) return addCORS(unauthorized());
+    if (!user) return addCORS(await unauthorizedFor(request, env));
     return addCORS(await handleCreateLibraryModule(env, user, request));
   }
 
@@ -242,6 +249,7 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
       loginHint,
       emailConfigured: Boolean(env.EMAIL),
       sso: sso ? { label: sso.buttonLabel, href: ssoStartPath(sso.workspaceSlug, redirect, loginHint), enforced: sso.enforced } : null,
+      locale: pageLocale(request),
     });
   }
 

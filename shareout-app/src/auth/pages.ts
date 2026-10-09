@@ -4,12 +4,82 @@ import { brandMarkImg } from '../brand';
 import { escapeHtml } from '../html/utils';
 import { NOINDEX_ROBOTS } from '../serve/utils';
 import { turnstileWidgetHtml } from '../turnstile';
+import type { PageLocale } from '../i18n/accept-language';
+
+// Sign-in copy, en + rioplatense es. Strings dropped into scripts go through JSON.stringify.
+const SIGN_IN_COPY = {
+  en: {
+    pageTitle: 'Sign in - ShareOut',
+    signIn: 'Sign in',
+    ssoOnly: 'Your organization signs in with single sign-on.',
+    intro: 'Use your email and password to continue.',
+    introGoogle: 'Use your email and password, or Google, to continue.',
+    or: 'or',
+    codeInstead: 'Email me a one-time code instead',
+    noEmailBinding: 'This instance has no email binding configured, so the code is written to the Worker log rather than sent.',
+    emailLabel: 'Email address',
+    passwordLabel: 'Password',
+    google: 'Sign in with Google',
+    sendCode: 'Send code',
+    sentTo: 'We sent a 6-digit code to',
+    codeLabel: 'One-time code',
+    continue: 'Continue',
+    otherEmail: 'Use another email',
+    enterEmail: 'Enter your email address.',
+    sending: 'Sending...',
+    couldNotSend: "Couldn't send a code. Try again.",
+    checkEmail: 'Check your email for the code.',
+    enterCode: 'Enter the 6-digit code from your email.',
+    checking: 'Checking...',
+    badCode: "That code didn't work. Try again.",
+    signedIn: 'Signed in…',
+    signInFailed: 'Sign in failed.',
+    networkError: 'Network error — try again.',
+    inviteTitle: 'Join your team',
+    invitedAs: 'You were invited as <strong>{email}</strong>. We’ll email a one-time code to that address — no password needed.',
+    inviteGoogleNote: 'With Google, pick the {email} account. Another account won’t see the invite.',
+  },
+  es: {
+    pageTitle: 'Iniciar sesión - ShareOut',
+    signIn: 'Iniciá sesión',
+    ssoOnly: 'Tu organización inicia sesión con inicio de sesión único (SSO).',
+    intro: 'Usá tu email y contraseña para seguir.',
+    introGoogle: 'Usá tu email y contraseña, o Google, para seguir.',
+    or: 'o',
+    codeInstead: 'Mandame un código por email',
+    noEmailBinding: 'Esta instancia no tiene email configurado: el código se escribe en el log del Worker en vez de enviarse.',
+    emailLabel: 'Email',
+    passwordLabel: 'Contraseña',
+    google: 'Entrar con Google',
+    sendCode: 'Mandar código',
+    sentTo: 'Te mandamos un código de 6 dígitos a',
+    codeLabel: 'Código',
+    continue: 'Continuar',
+    otherEmail: 'Usar otro email',
+    enterEmail: 'Escribí tu email.',
+    sending: 'Enviando...',
+    couldNotSend: 'No pudimos mandar el código. Probá de nuevo.',
+    checkEmail: 'Revisá tu email: ahí está el código.',
+    enterCode: 'Escribí el código de 6 dígitos que te llegó por email.',
+    checking: 'Verificando...',
+    badCode: 'Ese código no funcionó. Probá de nuevo.',
+    signedIn: 'Listo, entrando…',
+    signInFailed: 'No pudimos iniciar sesión.',
+    networkError: 'Error de conexión. Probá de nuevo.',
+    inviteTitle: 'Sumate a tu equipo',
+    invitedAs: 'Te invitaron como <strong>{email}</strong>. Te mandamos un código a esa dirección: no necesitás contraseña.',
+    inviteGoogleNote: 'Si usás Google, elegí la cuenta {email}. Con otra cuenta no vas a ver la invitación.',
+  },
+};
+type SignInCopy = (typeof SIGN_IN_COPY)['en'];
+const EN = SIGN_IN_COPY.en;
 
 /** Auth/access gates for private content: never index, never emit OG of the page or artifact. */
-function renderAuthPage(title: string, body: string, status = 200, opts?: { noindex?: boolean }): Response {
+function renderAuthPage(title: string, body: string, status = 200, opts?: { noindex?: boolean; lang?: PageLocale }): Response {
   const noindex = opts?.noindex !== false;
   return renderHtmlPage({
     title,
+    lang: opts?.lang,
     pageStyles: authPageStyles,
     body,
     status,
@@ -84,25 +154,53 @@ export function appLoginPage(opts: {
   emailConfigured?: boolean;
   /** This workspace subdomain signs in through its own IdP; `enforced` hides every other method. */
   sso?: { label: string; href: string; enforced: boolean } | null;
+  locale?: PageLocale;
 }): Response {
   const redirect = opts.redirect && opts.redirect.startsWith('/') ? opts.redirect : '/home';
   const googleEnabled = opts.googleEnabled === true;
   const emailConfigured = opts.emailConfigured !== false;
   const sso = opts.sso || null;
+  const lang = opts.locale || 'en';
+  const c = SIGN_IN_COPY[lang];
+  const footer = `<div class="footer">
+      Powered by <a href="/" class="footer-brand">${brandMarkImg('footer-mark', 16)}ShareOut</a>
+    </div>`;
 
   if (sso?.enforced) {
-    return renderAuthPage('Sign in - ShareOut', `
+    return renderAuthPage(c.pageTitle, `
   <div class="card">
     <div class="icon icon-primary">✦</div>
-    <h1>Sign in</h1>
-    <p>Your organization signs in with single sign-on.</p>
+    <h1>${escapeHtml(c.signIn)}</h1>
+    <p>${escapeHtml(c.ssoOnly)}</p>
     <div class="auth-methods">
     ${ssoButtonHtml(sso)}
     </div>
-    <div class="footer">
-      Powered by <a href="/" class="footer-brand">${brandMarkImg('footer-mark', 16)}ShareOut</a>
+    ${footer}
+  </div>`, 200, { lang });
+  }
+
+  // Invite mode: the invitee has no password yet. Lead with a one-time code to the
+  // invited address (and Google pre-selected on it); never show a password form.
+  if (redirect.startsWith('/invite/')) {
+    const hint = opts.loginHint || '';
+    const intro = hint ? c.invitedAs.replace('{email}', escapeHtml(hint)) : '';
+    const googleNote = hint ? `<p class="auth-help">${escapeHtml(c.inviteGoogleNote.replace('{email}', hint))}</p>` : '';
+    return renderAuthPage(c.pageTitle, `
+  <div class="card">
+    <div class="icon icon-primary">✦</div>
+    <h1>${escapeHtml(c.inviteTitle)}</h1>
+    ${intro ? `<p>${intro}</p>` : ''}
+    <div class="auth-methods">
+    ${sso ? ssoButtonHtml(sso) : ''}
+    ${emailConfigured ? '' : `<p class="auth-help">${escapeHtml(c.noEmailBinding)}</p>`}
+    ${emailOtpFormsHtml(opts.turnstileSiteKey, c, hint)}
+    <div id="email-code-status" class="status" role="status" aria-live="polite" hidden></div>
+    ${googleEnabled ? `<div class="auth-divider"><span>${escapeHtml(c.or)}</span></div>` : ''}
+    ${googleEnabled ? googleButtonHtml(redirect, hint, c) + googleNote : ''}
     </div>
-  </div>`);
+    ${footer}
+  </div>
+  ${emailOtpScript(redirect, c)}`, 200, { lang });
   }
 
   // Password first: it is the one method that works on every instance. A one-time
@@ -110,54 +208,53 @@ export function appLoginPage(opts: {
   // with no EMAIL binding sends people to a code that only appears in a log.
   const otpSection = `
     <details class="auth-alt"${emailConfigured ? ' open' : ''}>
-      <summary>Email me a one-time code instead</summary>
-      ${emailConfigured ? '' : '<p class="auth-help">This instance has no email binding configured, so the code is written to the Worker log rather than sent.</p>'}
-      ${emailOtpFormsHtml(opts.turnstileSiteKey)}
+      <summary>${escapeHtml(c.codeInstead)}</summary>
+      ${emailConfigured ? '' : `<p class="auth-help">${escapeHtml(c.noEmailBinding)}</p>`}
+      ${emailOtpFormsHtml(opts.turnstileSiteKey, c)}
       <div id="email-code-status" class="status" role="status" aria-live="polite" hidden></div>
     </details>`;
 
-  return renderAuthPage('Sign in - ShareOut', `
+  return renderAuthPage(c.pageTitle, `
   <div class="card">
     <div class="icon icon-primary">✦</div>
-    <h1>Sign in</h1>
-    <p>Use your email and password${googleEnabled ? ', or Google,' : ''} to continue.</p>
+    <h1>${escapeHtml(c.signIn)}</h1>
+    <p>${escapeHtml(googleEnabled ? c.introGoogle : c.intro)}</p>
     <div class="auth-methods">
     ${sso ? ssoButtonHtml(sso) : ''}
-    ${googleEnabled ? googleButtonHtml(redirect, opts.loginHint) : ''}
-    ${googleEnabled ? '<div class="auth-divider"><span>or</span></div>' : ''}
-    ${passwordFormHtml()}
+    ${googleEnabled ? googleButtonHtml(redirect, opts.loginHint, c) : ''}
+    ${googleEnabled ? `<div class="auth-divider"><span>${escapeHtml(c.or)}</span></div>` : ''}
+    ${passwordFormHtml(c)}
     ${otpSection}
     </div>
-    <div class="footer">
-      Powered by <a href="/" class="footer-brand">${brandMarkImg('footer-mark', 16)}ShareOut</a>
-    </div>
+    ${footer}
   </div>
-  ${passwordLoginScript(redirect)}
-  ${emailOtpScript(redirect)}`);
+  ${passwordLoginScript(redirect, c)}
+  ${emailOtpScript(redirect, c)}`, 200, { lang });
 }
 
 function ssoButtonHtml(sso: { label: string; href: string }): string {
   return `<a href="${escapeHtml(sso.href)}" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(sso.label)}</a>`;
 }
 
-function passwordFormHtml(): string {
+function passwordFormHtml(c: SignInCopy = EN): string {
   return `<form id="password-login" class="email-code-form" novalidate>
       <div class="field">
-        <label class="field-label" for="password-email">Email address</label>
+        <label class="field-label" for="password-email">${escapeHtml(c.emailLabel)}</label>
         <input id="password-email" type="email" name="email" autocomplete="username" placeholder="you@company.com" required>
       </div>
       <a id="password-sso" class="so-c-btn so-c-btn--primary so-c-btn--block" href="#" hidden></a>
       <div class="field" id="password-field">
-        <label class="field-label" for="password-value">Password</label>
+        <label class="field-label" for="password-value">${escapeHtml(c.passwordLabel)}</label>
         <input id="password-value" type="password" name="password" autocomplete="current-password" required>
       </div>
-      <button id="password-submit" type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">Sign in</button>
+      <button id="password-submit" type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(c.signIn)}</button>
       <div id="password-status" class="status" role="status" aria-live="polite" hidden></div>
     </form>`;
 }
 
-function passwordLoginScript(redirectAfter: string): string {
+function passwordLoginScript(redirectAfter: string, c: SignInCopy = EN): string {
   const dest = JSON.stringify(redirectAfter);
+  const msg = (s: string) => JSON.stringify(s).replace(/</g, '\\u003c');
   return `<script>
 (function () {
   var form = document.getElementById('password-login');
@@ -212,19 +309,19 @@ function passwordLoginScript(redirectAfter: string): string {
       btn.disabled = false;
       status.hidden = false;
       status.className = 'status status--error';
-      status.textContent = res.data.error || 'Sign in failed.';
+      status.textContent = res.data.error || ${msg(c.signInFailed)};
     }).catch(function () {
       btn.disabled = false;
       status.hidden = false;
       status.className = 'status status--error';
-      status.textContent = 'Network error — try again.';
+      status.textContent = ${msg(c.networkError)};
     });
   });
 })();
 </script>`;
 }
 
-function googleButtonHtml(redirect: string, loginHint?: string | null): string {
+function googleButtonHtml(redirect: string, loginHint?: string | null, c: SignInCopy = EN): string {
   const hint = loginHint ? `&login_hint=${encodeURIComponent(loginHint)}` : '';
   return `<a href="/auth/google?redirect=${encodeURIComponent(redirect)}${hint}" class="btn btn-google">
       <svg viewBox="0 0 24 24">
@@ -233,34 +330,37 @@ function googleButtonHtml(redirect: string, loginHint?: string | null): string {
         <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
         <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
       </svg>
-      Sign in with Google
+      ${escapeHtml(c.google)}
     </a>`;
 }
 
-function emailOtpFormsHtml(turnstileSiteKey?: string): string {
+function emailOtpFormsHtml(turnstileSiteKey?: string, c: SignInCopy = EN, prefill = ''): string {
+  const value = prefill ? ` value="${escapeHtml(prefill)}"` : '';
   return `<form id="email-code-start" class="email-code-form" novalidate>
       <div class="field">
-        <label class="field-label" for="email-code-email">Email address</label>
-        <input id="email-code-email" type="email" name="email" autocomplete="email" placeholder="you@company.com" required>
+        <label class="field-label" for="email-code-email">${escapeHtml(c.emailLabel)}</label>
+        <input id="email-code-email" type="email" name="email" autocomplete="email" placeholder="you@company.com"${value} required>
       </div>
       ${turnstileWidgetHtml(turnstileSiteKey)}
-      <button id="email-code-send" type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">Send code</button>
+      <button id="email-code-send" type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(c.sendCode)}</button>
     </form>
     <form id="email-code-verify" class="email-code-form" hidden novalidate>
-      <p class="auth-help">We sent a 6-digit code to <span id="email-code-target" class="email"></span>.</p>
+      <p class="auth-help">${escapeHtml(c.sentTo)} <span id="email-code-target" class="email"></span>.</p>
       <div class="field">
-        <label class="field-label" for="email-code-code">One-time code</label>
+        <label class="field-label" for="email-code-code">${escapeHtml(c.codeLabel)}</label>
         <input id="email-code-code" type="text" name="code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="123456" required>
       </div>
-      <button id="email-code-continue" type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">Continue</button>
-      <button id="email-code-change" type="button" class="so-c-btn so-c-btn--secondary so-c-btn--block">Use another email</button>
+      <button id="email-code-continue" type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(c.continue)}</button>
+      <button id="email-code-change" type="button" class="so-c-btn so-c-btn--secondary so-c-btn--block">${escapeHtml(c.otherEmail)}</button>
     </form>`;
 }
 
-function emailOtpScript(redirectAfter: string): string {
+function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
   const dest = JSON.stringify(redirectAfter);
+  const L = JSON.stringify(c).replace(/</g, '\\u003c');
   return `<script>
   (function () {
+    var L = ${L};
     var startForm = document.getElementById('email-code-start');
     var verifyForm = document.getElementById('email-code-verify');
     var emailInput = document.getElementById('email-code-email');
@@ -300,12 +400,12 @@ function emailOtpScript(redirectAfter: string): string {
       event.preventDefault();
       var email = emailInput.value.trim().toLowerCase();
       if (!email) {
-        setStatus('Enter your email address.', 'error');
+        setStatus(L.enterEmail, 'error');
         emailInput.focus();
         return;
       }
 
-      setBusy(sendButton, true, 'Sending...');
+      setBusy(sendButton, true, L.sending);
       setStatus('', '');
       try {
         var tsEl = startForm.querySelector('[name="cf-turnstile-response"]');
@@ -320,19 +420,19 @@ function emailOtpScript(redirectAfter: string): string {
           return;
         }
         if (!response.ok || !data.ok) {
-          throw new Error(data.error || "Couldn't send a code. Try again.");
+          throw new Error(data.error || L.couldNotSend);
         }
 
         pendingEmail = email;
         target.textContent = email;
         startForm.hidden = true;
         verifyForm.hidden = false;
-        setStatus('Check your email for the code.', 'success');
+        setStatus(L.checkEmail, 'success');
         codeInput.focus();
       } catch (err) {
-        setStatus(err && err.message ? err.message : "Couldn't send a code. Try again.", 'error');
+        setStatus(err && err.message ? err.message : L.couldNotSend, 'error');
       } finally {
-        setBusy(sendButton, false, 'Send code');
+        setBusy(sendButton, false, L.sendCode);
       }
     });
 
@@ -340,12 +440,12 @@ function emailOtpScript(redirectAfter: string): string {
       event.preventDefault();
       var code = codeInput.value.trim();
       if (!/^[0-9]{6}$/.test(code)) {
-        setStatus('Enter the 6-digit code from your email.', 'error');
+        setStatus(L.enterCode, 'error');
         codeInput.focus();
         return;
       }
 
-      setBusy(continueButton, true, 'Checking...');
+      setBusy(continueButton, true, L.checking);
       setStatus('', '');
       try {
         var response = await fetch('/v1/auth/email/verify', {
@@ -356,14 +456,14 @@ function emailOtpScript(redirectAfter: string): string {
         });
         var data = await readJson(response);
         if (!response.ok || !data.ok) {
-          throw new Error(data.error || "That code didn't work. Try again.");
+          throw new Error(data.error || L.badCode);
         }
 
-        setStatus('Signed in…', 'success');
+        setStatus(L.signedIn, 'success');
         window.location.href = redirectAfter || '/home';
       } catch (err) {
-        setStatus(err && err.message ? err.message : "That code didn't work. Try again.", 'error');
-        setBusy(continueButton, false, 'Continue');
+        setStatus(err && err.message ? err.message : L.badCode, 'error');
+        setBusy(continueButton, false, L.continue);
       }
     });
 

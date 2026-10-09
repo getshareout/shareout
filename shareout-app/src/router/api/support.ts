@@ -1,12 +1,14 @@
 import type { FetchContext } from '../context';
 import { jsonResponse, jsonError } from '../helpers/json-response';
-import { getTokenOrSessionUser, requireTokenOrSession, isAuthUser } from '../helpers/auth-guard';
-import { isSuperAdminEmail } from '../../superadmin/recipients';
+import { requireTokenOrSession, isAuthUser } from '../helpers/auth-guard';
+import type { AuthUser } from '../../api-auth';
+import { isPlatformAdmin } from '../../superadmin/auth';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import {
   createTicket, getTicket, getThread, appendMessage, setStatus, assign,
-  listForWorkspace, listAll, listForRequester,
-  type Ticket, type TicketStatus,
+  listForWorkspace, listAll, listForRequester, findByIdempotencyKey,
+  TICKET_CATEGORIES, TICKET_SEVERITIES, TICKET_CLIENTS,
+  type Ticket, type TicketStatus, type TicketCategory, type TicketSeverity, type TicketClient,
 } from '../../support/store';
 import { triageTicket } from '../../support/triage';
 import { deliverReply } from '../../support/deliver';
@@ -24,12 +26,60 @@ function secretOk(provided: string | null, expected: string | undefined): boolea
 
 const STATUSES: TicketStatus[] = ['open', 'pending', 'resolved', 'closed'];
 
-/** Staff = a ShareOut super-admin, or an owner/admin of the ticket's workspace. */
-async function isStaffFor(ctx: FetchContext, ticket: Ticket, user: { id: string; email: string | null }): Promise<boolean> {
-  if (isSuperAdminEmail(user.email)) return true;
+/** Instance admin, by session or personal token. Workspace agent (sot_) tokens never count. */
+async function isSuperAdmin(ctx: FetchContext, user: AuthUser): Promise<boolean> {
+  return !user.service && await isPlatformAdmin(ctx.env, user.email, user.id);
+}
+
+/** Staff = an instance admin, or an owner/admin of the ticket's workspace. */
+async function isStaffFor(ctx: FetchContext, ticket: Ticket, user: AuthUser): Promise<boolean> {
+  if (await isSuperAdmin(ctx, user)) return true;
   if (!ticket.workspace_id) return false;
   const role = await getInternalWorkspaceRole(ctx.env, ticket.workspace_id, user.id);
   return role === 'owner' || role === 'admin';
+}
+
+interface CreateBody {
+  subject?: string;
+  body?: string;
+  workspaceId?: string | null;
+  category?: TicketCategory;
+  severity?: TicketSeverity;
+  client?: TicketClient;
+  requestId?: string;
+  pageUrl?: string;
+  artifactId?: string;
+  userAgent?: string;
+  idempotencyKey?: string;
+  locale?: string;
+}
+
+function invalidEnum(b: CreateBody): string | null {
+  const checks: [string, unknown, readonly string[]][] = [
+    ['category', b.category, TICKET_CATEGORIES],
+    ['severity', b.severity, TICKET_SEVERITIES],
+    ['client', b.client, TICKET_CLIENTS],
+  ];
+  for (const [name, value, allowed] of checks) {
+    if (value != null && !allowed.includes(value as string)) return `${name} must be one of: ${allowed.join(', ')}`;
+  }
+  return null;
+}
+
+function clip(v: unknown, max: number): string | null {
+  return typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null;
+}
+
+function created(ticket: Ticket, deduped: boolean) {
+  const check = `/v1/support/tickets/${ticket.id}`;
+  return {
+    success: true,
+    deduped,
+    ticket,
+    message: `Your report is in the support queue as ${ticket.id}. The team replies on the ticket thread`
+      + ' (Help & support in the app) and by email — nothing else to do now.',
+    check_replies: { method: 'GET', path: check, hint: 'Staff messages appear in `thread` with author "staff"; status turns "pending" once answered.' },
+  };
 }
 
 export async function routeSupportApi(ctx: FetchContext): Promise<Response | null> {
@@ -57,36 +107,68 @@ export async function routeSupportApi(ctx: FetchContext): Promise<Response | nul
     if (!isAuthUser(auth)) return auth;
 
     if (method === 'POST') {
-      const body = await request.json().catch(() => null) as { subject?: string; body?: string; workspaceId?: string | null } | null;
+      const body = await request.json().catch(() => null) as CreateBody | null;
       if (!body?.subject || !body?.body) return cors(jsonError('subject and body are required', 'BAD_REQUEST', 400));
+      const bad = invalidEnum(body);
+      if (bad) return cors(jsonError(bad, 'BAD_REQUEST', 400));
+      const workspaceId = body.workspaceId || null;
+      if (workspaceId && auth.service?.workspaceId !== workspaceId
+        && !(await getInternalWorkspaceRole(ctx.env, workspaceId, auth.id))) {
+        return cors(jsonError('You are not a member of that workspace. Omit workspaceId to file a personal ticket.', 'FORBIDDEN', 403));
+      }
+      const idempotencyKey = clip(body.idempotencyKey, 200);
+      if (idempotencyKey) {
+        const existing = await findByIdempotencyKey(ctx.env, auth.id, idempotencyKey);
+        if (existing) return cors(jsonResponse(created(existing, true)));
+      }
       // Token caller → programmatic (skill); session caller → in-app UI.
       const viaToken = !!request.headers.get('authorization');
       const ticket = await createTicket(ctx.env, {
-        workspaceId: body.workspaceId ?? null,
+        workspaceId,
         requesterUserId: auth.id,
         requesterEmail: auth.email,
         channel: viaToken ? 'skill' : 'ui',
-        subject: body.subject,
+        subject: body.subject.slice(0, 300),
         body: body.body,
+        category: body.category ?? null,
+        severity: body.severity ?? null,
+        client: body.client ?? (viaToken ? 'api' : 'ui'),
+        requestId: clip(body.requestId, 200),
+        pageUrl: clip(body.pageUrl, 2000),
+        artifactId: clip(body.artifactId, 200),
+        userAgent: clip(body.userAgent ?? request.headers.get('user-agent'), 500),
+        idempotencyKey,
+        locale: body.locale === 'es' || body.locale === 'en' ? body.locale : null,
       });
       // Triage runs after the response — never block ticket creation.
       ctx.executionCtx?.waitUntil(triageTicket(ctx.env, ticket.id).catch(() => null));
-      return cors(jsonResponse({ success: true, ticket }, 201));
+      return cors(jsonResponse(created(ticket, false), 201));
     }
 
     if (method === 'GET') {
       const scope = ctx.url.searchParams.get('scope') ?? 'mine';
-      const status = ctx.url.searchParams.get('status') as TicketStatus | null;
+      const q = ctx.url.searchParams;
+      const status = q.get('status') as TicketStatus | null;
       const filter = status && STATUSES.includes(status) ? { status } : {};
       if (scope === 'all') {
-        if (!isSuperAdminEmail(auth.email)) return cors(jsonError('Forbidden', 'FORBIDDEN', 403));
-        return cors(jsonResponse({ success: true, tickets: await listAll(ctx.env, filter) }));
+        if (!(await isSuperAdmin(ctx, auth))) return cors(jsonError('Forbidden', 'FORBIDDEN', 403));
+        const since = q.get('since');
+        if (since && Number.isNaN(Date.parse(since))) return cors(jsonError('since must be an ISO timestamp', 'BAD_REQUEST', 400));
+        const limit = Math.min(Math.max(Number(q.get('limit')) || 200, 1), 500);
+        const tickets = await listAll(ctx.env, {
+          ...filter,
+          workspace: q.get('workspace') || undefined,
+          category: q.get('category') || undefined,
+          since: since ? new Date(since).toISOString() : undefined,
+          limit,
+        });
+        return cors(jsonResponse({ success: true, tickets }));
       }
       if (scope === 'workspace') {
         const ws = ctx.url.searchParams.get('workspace');
         if (!ws) return cors(jsonError('workspace required', 'BAD_REQUEST', 400));
         const role = await getInternalWorkspaceRole(ctx.env, ws, auth.id);
-        if (!isSuperAdminEmail(auth.email) && role !== 'owner' && role !== 'admin') {
+        if (role !== 'owner' && role !== 'admin' && !(await isSuperAdmin(ctx, auth))) {
           return cors(jsonError('Forbidden', 'FORBIDDEN', 403));
         }
         return cors(jsonResponse({ success: true, tickets: await listForWorkspace(ctx.env, ws, filter) }));

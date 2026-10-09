@@ -7,6 +7,8 @@
 import type { Env, PublishRequest } from '../types';
 import { validatePublishRequest, generateSlug, detectArtifactType } from '../validation';
 import { validateToken, checkRateLimit, incrementRateLimit, hasScope } from '../api-auth';
+import { unauthorizedFor } from '../auth/unauthorized';
+import { SUPPORT_CONTACT } from '../http/api-error';
 import { getInternalWorkspaceRole } from '../workspaces';
 import { canAccess } from '../access/can-access';
 import { withIdempotency } from '../idempotency';
@@ -28,12 +30,16 @@ export async function handlePublish(
 ): Promise<Response> {
   return withIdempotency(request, env, async () => {
     const user = await validateToken(request, env);
-    if (!user) {
-      return json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, 401);
-    }
+    if (!user) return unauthorizedFor(request, env);
+    const docs = `${new URL(request.url).origin}/v1/skill/api/artifacts.md`;
 
     if (!hasScope(user, 'artifacts:publish')) {
-      return json({ error: 'Token missing artifacts:publish scope', code: 'INSUFFICIENT_SCOPE' }, 403);
+      return json({
+        error: 'Token missing artifacts:publish scope',
+        code: 'INSUFFICIENT_SCOPE',
+        hint: 'This workspace Agent token cannot publish. Ask a workspace admin for a token with artifacts:publish, or use a personal key.',
+        docs,
+      }, 403);
     }
 
     const rateLimit = await checkRateLimit(env, user.id, 'publish', user.email);
@@ -45,7 +51,7 @@ export async function handlePublish(
     try {
       body = await request.json();
     } catch {
-      return json({ error: 'Invalid JSON', code: 'INVALID_JSON' }, 400);
+      return json({ error: 'Invalid JSON', code: 'INVALID_JSON', hint: 'Send the publish payload as a JSON object with Content-Type: application/json.', docs }, 400);
     }
 
     const validationError = validatePublishRequest(body);
@@ -75,7 +81,12 @@ export async function handlePublish(
           !body.artifact_type /* standard artifacts only */ &&
           await canAccess(env, identity, 'folder', folderId, 'create');
         if (!canAuthor) {
-          return json({ error: 'Workspace not found or access denied', code: 'FORBIDDEN' }, 403);
+          return json({
+            error: 'Workspace not found or access denied',
+            code: 'FORBIDDEN',
+            hint: 'Check workspace_id with GET /v1/workspaces. If it is right, the user must be invited to that workspace by its admin, or publish without workspace_id (personal).',
+            docs,
+          }, 403);
         }
         externalAuthor = true;
       }
@@ -116,11 +127,16 @@ export async function handlePublish(
     const wantedOpen = body.visibility === 'public' || !body.visibility;
     let publishNotice: string | undefined;
 
-    // Explicit public request the launch gate will downgrade to private — tell the
-    // user, whatever the reason it's closed (global kill OR this user not yet in the
-    // public rollout). A bare request (no visibility) defaults to public and is fine
-    // to publish privately without a notice.
-    if (!allowOpen && body.visibility === 'public') {
+    // What the caller is effectively asking for: a bare request (no visibility, no
+    // private/password/share_with) defaults to public, so a downgrade of it is just as
+    // real and must be reported the same way.
+    const requestedVisibility = body.visibility
+      ?? (resolveVisibility(body, env, true) === 'public' ? 'public' : undefined);
+
+    // Public request the launch gate will downgrade to private — tell the user,
+    // whatever the reason it's closed (global kill OR this user not yet in the public
+    // rollout).
+    if (!allowOpen && requestedVisibility === 'public') {
       publishNotice = OPEN_VISIBILITY_PAYWALL_MESSAGE;
     }
 
@@ -206,12 +222,12 @@ export async function handlePublish(
       // `visibility` was resolved, so report the EFFECTIVE visibility, not the request.
       const effectiveVisibility = result.moderation ? 'private' : visibility;
       result.visibility = effectiveVisibility;
-      if (body.visibility === 'public' && effectiveVisibility !== body.visibility) {
+      if (requestedVisibility === 'public' && effectiveVisibility !== requestedVisibility) {
         result.visibility_downgraded = true;
-        result.requested_visibility = body.visibility;
+        result.requested_visibility = requestedVisibility;
         // The moderation object already carries the richer "under review" story —
         // don't also stamp a generic downgrade notice over it.
-        if (!result.notice && !result.moderation) result.notice = `Published as ${effectiveVisibility} instead of ${body.visibility}.`;
+        if (!result.notice && !result.moderation) result.notice = `Published as ${effectiveVisibility} instead of ${requestedVisibility}.`;
       }
 
       const response = json(result, 201);
@@ -223,7 +239,15 @@ export async function handlePublish(
         return json({ error: 'You do not own this artifact', code: 'FORBIDDEN' }, 403);
       }
       logError(createLogger(env, { scope: 'publish', event: 'publish.failed' }), 'publish failed', err);
-      return json({ error: 'Internal server error', code: 'INTERNAL_ERROR' }, 500);
+      return json({
+        success: false,
+        error: 'Internal server error',
+        code: 'INTERNAL_ERROR',
+        hint: 'Unexpected publish failure. Retry once with the same payload; if it fails again, file a support ticket quoting the request_id.',
+        docs,
+        support: SUPPORT_CONTACT,
+      }, 500);
     }
   });
 }
+

@@ -1,6 +1,7 @@
 import type { Env } from '../types';
 import type { FetchContext } from './context';
 import { commandToAgentPrompt } from '../chat-agent/commands';
+import { localeForRecipient, type Locale } from '../i18n';
 import { enqueueAgentTurn, enqueueCallback } from '../chat-platforms/dispatch';
 import { createSlackReplyPort } from '../chat-platforms/slack/reply-port';
 import {
@@ -242,7 +243,8 @@ async function dispatchSlackText(env: Env, inbound: SlackInbound): Promise<void>
   }
 
   if (command) {
-    const prompt = commandToAgentPrompt(command.name, command.args);
+    const locale = await localeForRecipient(env, { userId: linkedUserId }).catch((): Locale => 'en');
+    const prompt = commandToAgentPrompt(command.name, command.args, locale);
     if (prompt) {
       await dispatchAgent(env, {
         teamId,

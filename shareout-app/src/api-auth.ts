@@ -95,10 +95,11 @@ export async function handleCreateAccount(
   executionCtx?: ExecutionContext
 ): Promise<Response> {
   if (signupsPaused(env)) {
-    return new Response(JSON.stringify({ error: SIGNUPS_PAUSED_MSG }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonWithApiErrors({
+      error: SIGNUPS_PAUSED_MSG,
+      code: 'SIGNUPS_PAUSED',
+      hint: 'This instance is not creating new anonymous accounts. If the user already has an account (or was invited), sign in with device login: POST /v1/auth/device/start. Otherwise ask the instance admin for an invite.',
+    }, 403);
   }
 
   const userId = generateId('usr');
