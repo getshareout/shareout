@@ -23,8 +23,19 @@ export const emailDestination: Destination<EmailConfig> = {
     const rateLimit = await checkEmailRateLimit(env, ctx.createdBy, ctx.artifactId);
     if (!rateLimit.allowed) return { success: false, error: 'Email rate limit exceeded' };
 
+    const started = Date.now();
     const result = await sendArtifactEmail(env, ctx.artifactId, config);
     if (result.success) await incrementEmailCount(env, ctx.createdBy, ctx.artifactId);
-    return result;
+    return {
+      ...result,
+      steps: [{
+        step: 'deliver',
+        status: result.success ? 'success' : 'failed',
+        durationMs: Date.now() - started,
+        detail: result.success
+          ? { recipients: config.recipients.length, messageId: result.messageId }
+          : { error: result.error },
+      }],
+    };
   },
 };
