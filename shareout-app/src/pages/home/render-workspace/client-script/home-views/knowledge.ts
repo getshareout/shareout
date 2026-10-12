@@ -14,6 +14,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     path = path || '';
     if (!knReady) { knPendingPath = path; return; }
     var m = knMount(); if (!m) return;
+    if (path.indexOf('map/') === 0) { knState.view = 'map'; kmState.focus = path.slice(4); knCurrentPath = path; knRenderShell(m); return; }
     knCurrentPath = (path && knState.byPath[path]) ? path : '';
     knRenderShell(m);
   }
@@ -48,7 +49,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     var m = knMount(); if (needWs(m)) return;
     knStopPoll();
     m.innerHTML = i18nLoad();
-    if (!knState.view) { var v = ''; try { v = localStorage.getItem('wsx_kn_view') || ''; } catch (e) {} knState.view = v === 'table' ? 'table' : 'tree'; }
+    if (!knState.view) { var v = ''; try { v = localStorage.getItem('wsx_kn_view') || ''; } catch (e) {} knState.view = (v === 'table' || v === 'map') ? v : 'tree'; }
     var base = knBase();
     fetch(base, { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
@@ -68,7 +69,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
           var gfiles = (ctx && ctx.files) || [];
           knState.guidance = gfiles.map(function (f) { return { path: 'guidance/' + f.name, kind: 'guidance', name: f.name, title: f.name, is_entry: !!f.is_entry, size: f.size, updated_at: f.updated_at }; });
           var admin = !!window.WSX_ADMIN;
-          if (!nodes.length && !knState.guidance.length && !admin) { knReady = false; knRenderOnboard(m, 'empty'); return; }
+          var finish = function () {
           knState.nodes = nodes;
           knState.byPath = {};
           nodes.forEach(function (n) { knState.byPath[n.path] = n; });
@@ -79,9 +80,21 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
             knState._cinit = true;
           }
           knReady = true;
-          if (knPendingPath) { knCurrentPath = knState.byPath[knPendingPath] ? knPendingPath : ''; knPendingPath = ''; }
-          else if (knCurrentPath && !knState.byPath[knCurrentPath]) knCurrentPath = '';
+          if (knPendingPath && knPendingPath.indexOf('map/') === 0) { knState.view = 'map'; kmState.focus = knPendingPath.slice(4); knCurrentPath = knPendingPath; knPendingPath = ''; }
+          else if (knPendingPath) { knCurrentPath = knState.byPath[knPendingPath] ? knPendingPath : ''; knPendingPath = ''; }
+          else if (knCurrentPath && knCurrentPath.indexOf('map/') !== 0 && !knState.byPath[knCurrentPath]) knCurrentPath = '';
           knRenderShell(m);
+          };
+          if (nodes.length || knState.guidance.length || admin) { finish(); return; }
+          // The tree distills on the hourly cron, the graph learns right away: a member whose
+          // workspace already has entities gets the Map, not the empty state.
+          fetch(base + '/entities?limit=1', { credentials: 'same-origin' })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (d) {
+              if (d && d.entities && d.entities.length) { knState.view = 'map'; finish(); }
+              else { knReady = false; knRenderOnboard(m, 'empty'); }
+            })
+            .catch(function () { knReady = false; knRenderOnboard(m, 'empty'); });
         });
       })
       .catch(function () { m.innerHTML = i18nError('knowledge.couldNotLoad'); });
@@ -169,7 +182,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     var tiles = [
       [n('artifact-digest').toLocaleString(), t('knowledge.kpiPages')],
       [n('topic').toLocaleString(), t('knowledge.kpiTopics')],
-      [n('entity').toLocaleString(), t('knowledge.kpiEntities')],
+      [Math.max(n('entity'), typeof kmEntityTotal === 'function' ? kmEntityTotal() : 0).toLocaleString(), t('knowledge.kpiEntities')],
       [knState.lastUpdated ? adRelDate(knState.lastUpdated) : '\\u2014', t('knowledge.kpiUpdated'), t('knowledge.tipUpdated')]
     ];
     return '<div class="wsx-an__cards wsx-cat__kpis">' + tiles.map(function (tile) {
@@ -181,6 +194,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     return '<div class="wsx__modetog wsx-kn2__viewtog">'
       + '<button class="' + (knState.view === 'tree' ? 'is-on' : '') + '" data-kn-view="tree" type="button">' + esc(t('knowledge.viewTree')) + '</button>'
       + '<button class="' + (knState.view === 'table' ? 'is-on' : '') + '" data-kn-view="table" type="button">' + esc(t('knowledge.viewTable')) + '</button>'
+      + '<button class="' + (knState.view === 'map' ? 'is-on' : '') + '" data-kn-view="map" type="button">' + esc(t('knowledge.viewMap')) + '</button>'
       + '</div>';
   }
   function knHowBtn() {
@@ -423,6 +437,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
           : '')
       + '<div class="wsx-kn2__ctlright">' + trainBtn + knHowBtn() + knToggle() + '</div>'
       + '</div>' + prog + '</div>';
+    if (knState.view === 'map') { kmRender(m, top); return; }
     if (knState.view === 'table') {
       m.innerHTML = top + knTableBody();
       knBindShell(m); knBindTable(m); knApplyFilter();
@@ -452,6 +467,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     m.querySelectorAll('[data-kn-view]').forEach(function (b) {
       b.addEventListener('click', function () {
         var v = b.getAttribute('data-kn-view'); if (v === knState.view) return;
+        kmOnViewSwitch(knState.view, v);
         knState.view = v; try { localStorage.setItem('wsx_kn_view', v); } catch (e) {}
         knRenderShell(m);
       });

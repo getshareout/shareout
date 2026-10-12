@@ -2,8 +2,9 @@
  *  stays under the per-module line cap. Uses the shared .wsx design tokens. */
 import { WORKSPACE_ONBOARDING_STYLES } from './styles-onboarding';
 import { WORKSPACE_KNOWLEDGE_STYLES } from './styles-knowledge';
+import { WORKSPACE_KNOWLEDGE_MAP_STYLES } from './styles-knowledge-map';
 
-export const WORKSPACE_CATALOG_STYLES = WORKSPACE_ONBOARDING_STYLES + WORKSPACE_KNOWLEDGE_STYLES + `
+export const WORKSPACE_CATALOG_STYLES = WORKSPACE_ONBOARDING_STYLES + WORKSPACE_KNOWLEDGE_STYLES + WORKSPACE_KNOWLEDGE_MAP_STYLES + `
 /* ---- Catalog lens ---- */
 .wsx-cat__onboard { text-align: center; padding: 40px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .wsx-cat__onboard p { margin: 0; color: var(--color-text); }

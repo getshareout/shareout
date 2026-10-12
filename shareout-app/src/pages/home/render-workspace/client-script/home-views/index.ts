@@ -13,6 +13,7 @@ import { workspace_client_home_views_connectors_JS } from './connectors';
 import { workspace_client_home_views_connect_JS } from './connect';
 import { workspace_client_home_views_catalog_JS } from './catalog';
 import { workspace_client_home_views_knowledge_JS } from './knowledge';
+import { workspace_client_home_views_knowledgeMap_JS } from './knowledge-map';
 import { workspace_client_home_views_modalsForms_JS } from './modals-forms';
 import { workspace_client_home_views_admin_JS } from './admin';
 import { workspace_client_home_views_invite_JS } from './invite';
@@ -34,6 +35,7 @@ export const workspace_client_home_views_JS = [
   workspace_client_home_views_connect_JS,
   workspace_client_home_views_catalog_JS,
   workspace_client_home_views_knowledge_JS,
+  workspace_client_home_views_knowledgeMap_JS,
   workspace_client_home_views_modalsForms_JS,
   workspace_client_home_views_admin_JS,
   workspace_client_home_views_invite_JS,
