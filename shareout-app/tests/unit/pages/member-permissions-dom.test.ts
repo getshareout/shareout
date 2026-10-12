@@ -6,7 +6,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { workspace_client_inspector_JS as inspectorJs } from '../../../src/pages/home/render-workspace/client-script/inspector';
 import { workspace_client_home_views_connectors_JS as connectorsJs } from '../../../src/pages/home/render-workspace/client-script/home-views/connectors';
-import { workspace_client_home_views_assets_JS as assetsJs } from '../../../src/pages/home/render-workspace/client-script/home-views/assets';
 
 type Fn = (...a: unknown[]) => unknown;
 let fetchImpl: Fn = () => new Promise(() => {});
@@ -127,15 +126,5 @@ describe('Data sources — Connect is admin-only', () => {
     document.body.innerHTML = connCard({ ...provider, connections: [{ id: 'c1', name: 'Ventas' }] }, true) as string;
     expect(document.querySelector('[data-conn-add]')).not.toBeNull();
     expect(document.querySelector('[data-conn-del]')).not.toBeNull();
-  });
-});
-
-describe('Files — Delete follows canDelete', () => {
-  const file = { id: 'dlv_1', type: 'deliverable', name: 'Logo', filename: 'logo.png', mimeType: 'image/png', url: '/f', versionCount: 1, visibility: 'workspace' };
-
-  it.each([[false, 0], [true, 1]])('canDelete=%s → %i delete buttons', (canDelete, n) => {
-    const { assetTile } = load(assetsJs, ['assetTile']);
-    document.body.innerHTML = assetTile({ ...file, canDelete }) as string;
-    expect(document.querySelectorAll('[data-asset-act="del"]').length).toBe(n);
   });
 });

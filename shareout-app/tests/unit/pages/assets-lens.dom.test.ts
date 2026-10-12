@@ -40,9 +40,9 @@ function load(ws: string | null): Lens {
 }
 
 const json = (d: unknown) => new Response(JSON.stringify(d), { headers: { 'Content-Type': 'application/json' } });
-const dlv = (id: string, visibility: string, mimeType = 'application/pdf') => ({
+const dlv = (id: string, visibility: string, mimeType = 'application/pdf', canDelete = true) => ({
   id, name: `Plano ${id}`, visibility, blobId: `b_${id}`, filename: `${id}.pdf`, mimeType, sizeBytes: 10,
-  url: `/v1/files/${id}/content?v=1`, versionCount: 1, latestVersion: 1, folderId: null, usageCount: 0,
+  url: `/v1/files/${id}/content?v=1`, versionCount: 1, latestVersion: 1, folderId: null, usageCount: 0, canDelete,
 });
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
@@ -71,6 +71,14 @@ describe('Recursos lens', () => {
     const labels = [...modal.querySelectorAll('.wsx-asset-pv__acts a, .wsx-asset-pv__acts button')].map((b) => b.textContent!.trim());
     for (const l of ['Descargar', 'Copiar enlace', 'Compartir', 'Mover', 'Eliminar']) expect(labels).toContain(l);
     expect((modal.querySelector('#pv_vis') as HTMLSelectElement).value).toBe('team');
+  });
+
+  it('the preview offers Eliminar only when the server says canDelete', () => {
+    const lens = load('wsp_1');
+    lens.setState({ deliverables: [dlv('t', 'team', 'application/pdf', false)], loose: [] });
+    lens.renderAssets();
+    document.querySelector<HTMLElement>('.wsx-asset')!.click();
+    expect(document.querySelector('[data-pv-act="del"]')).toBeNull();
   });
 
   it('changing visibility in the preview PATCHes the file', async () => {
