@@ -1,5 +1,6 @@
 import { generateViewerShell, type ViewerContext } from './viewer-shell';
 import { parseMarkdown, MARKDOWN_VIEWER_STYLES } from './markdown-viewer';
+import { viewerCopy } from './copy';
 
 function escapeHtml(str: string): string {
   return str
@@ -10,8 +11,9 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
-// Library viewer: the README plus a module-install panel — version chips, exported
-// symbols, and copy-paste import snippets (plain <script>, ESM, and so.lib).
+// Library viewer: the README first, then a collapsed "For developers" panel with the
+// exported symbols and copy-paste import snippets (plain <script>, ESM, and so.lib),
+// so a non-technical member reading the module isn't greeted by code.
 export function renderLibraryViewer(ctx: ViewerContext): string {
   const meta = ctx.typeMetadata.library;
   const m = ctx.libraryMetrics;
@@ -22,11 +24,12 @@ export function renderLibraryViewer(ctx: ViewerContext): string {
   const absUrl = importPath ? `${ctx.baseUrl}${importPath}` : '';
   const named = exportsList.length ? `{ ${exportsList.join(', ')} }` : '* as mod';
 
+  const c = viewerCopy(ctx.locale);
   const chips = [
     m?.version ? `<span class="lib-chip lib-ver">v${escapeHtml(m.version)}</span>` : '',
     m?.scope ? `<span class="lib-chip">${m.scope === 'personal' ? 'personal' : 'workspace'}</span>` : '',
-    ...exportsList.map(e => `<span class="lib-chip lib-export">${escapeHtml(e)}</span>`),
   ].join('');
+  const exportChips = exportsList.map(e => `<span class="lib-chip lib-export">${escapeHtml(e)}</span>`).join('');
 
   const snippets = importPath ? `
     <div class="lib-snippets">
@@ -55,10 +58,14 @@ export function renderLibraryViewer(ctx: ViewerContext): string {
       <div class="lib-head">
         <h1 class="lib-title">${escapeHtml(m?.moduleName || ctx.artifactName)}</h1>
         ${chips ? `<div class="lib-chips">${chips}</div>` : ''}
-        ${snippets}
-        ${allVersions}
       </div>
       <article class="content">${html}</article>
+      <details class="lib-dev">
+        <summary>${escapeHtml(c.forDevelopers)}</summary>
+        ${exportChips ? `<div class="lib-chips">${exportChips}</div>` : ''}
+        ${snippets}
+        ${allVersions}
+      </details>
     </div>
   `;
 
@@ -71,6 +78,13 @@ export function renderLibraryViewer(ctx: ViewerContext): string {
     }
     .lib-title { font: 700 24px var(--font-display); margin: 0 0 12px; }
     .lib-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+    .lib-head .lib-chips { margin-bottom: 0; }
+    .lib-dev {
+      margin-top: 20px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px 24px;
+    }
+    .lib-dev summary { cursor: pointer; font-weight: 600; color: var(--text-muted); }
+    .lib-dev[open] summary { margin-bottom: 16px; }
     .lib-chip {
       font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: 999px;
       background: var(--code-bg); color: var(--text-muted);

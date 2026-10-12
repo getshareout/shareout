@@ -45,7 +45,7 @@ export const workspace_client_home_views_deliveries_JS = `  // ----- sent delive
     var btn = document.getElementById('wsxAssetUpload'); var inp = document.getElementById('wsxAssetFile');
     if (btn && inp) {
       btn.addEventListener('click', function () { inp.click(); });
-      inp.addEventListener('change', function () { var files = Array.prototype.slice.call(inp.files || []); inp.value = ''; uploadAssets(files); });
+      inp.addEventListener('change', function () { var files = Array.prototype.slice.call(inp.files || []); inp.value = ''; askUploadVisibility(files); });
     }
     ws.querySelectorAll('[data-asset-filter]').forEach(function (c) {
       c.addEventListener('click', function () {

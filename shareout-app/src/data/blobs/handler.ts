@@ -458,7 +458,7 @@ async function getBlobContent(ctx: DataContext, id: string): Promise<Response> {
   // through the
   // identity-checked /v1/files/:id/content route (byte-level deny, work/042 P3).
   // ponytail: blunt 403 here is correct precisely because this route can't authenticate.
-  if (blob.deliverable_visibility === 'private') {
+  if (blob.deliverable_visibility === 'private' || blob.deliverable_visibility === 'team') {
     return errorResponse({
       ...DATA_ERRORS.FORBIDDEN,
       message: 'This file is private.',

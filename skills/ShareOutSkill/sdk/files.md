@@ -34,10 +34,11 @@ document.querySelector('#logo').src = logoUrl;
 
 | File visibility | Who can fetch the URL |
 | --- | --- |
-| `workspace` (default) | Anyone — embeddable in pages and delivery links |
-| `private` | Owner, workspace members (read), or sharees with a file/folder grant |
+| `workspace` (personal-library default) | Anyone — embeddable in pages and delivery links |
+| `team` (workspace upload default) | Signed-in internal workspace members, the owner, or sharees with a direct file grant |
+| `private` | Owner, or sharees with a direct file grant |
 
-Private files return **403** on the file content route for everyone else. The older per-bucket blob URL also refuses private file bytes — always use `sdk.files.getUrl()` for workspace files.
+`team` and `private` files return **403** on the file content route for everyone else — including a published artifact's anonymous viewers, so set a file to `workspace` before embedding it. The older per-bucket blob URL also refuses private file bytes — always use `sdk.files.getUrl()` for workspace files.
 
 ## Related
 

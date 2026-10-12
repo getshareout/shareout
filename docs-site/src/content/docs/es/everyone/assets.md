@@ -29,32 +29,38 @@ El **inbox de una página** (`tu-pagina@inbox.YOUR_DOMAIN`) captura mail *dentro
 
 ## Organizar en carpetas
 
-Usá la **barra de carpetas** arriba en Assets para agrupar archivos — entregables de clientes, assets de marca, material en bruto, lo que te sirva. **New folder** crea una carpeta en el mismo árbol compartido que usan tus páginas; **Move** en una tarjeta mete el archivo adentro.
+Usá la **barra de carpetas** arriba en Assets para agrupar archivos — entregables de clientes, assets de marca, material en bruto, lo que te sirva. **New folder** crea una carpeta en el mismo árbol compartido que usan tus páginas; hacé clic en un archivo y elegí **Mover** para meterlo adentro.
 
 Compartir una **carpeta** con un cliente (Admin → Compartir) también comparte los **archivos** que hay dentro — carpetas y páginas comparten un solo árbol.
 
 ## Visibilidad
 
-Cada archivo es **compartible por enlace** (por defecto — cualquiera que tenga el link del archivo puede abrirlo) o **privado** (solo vos, hasta que lo compartas). Cambiá la visibilidad en la tarjeta del archivo. Los privados llevan un badge; los compartibles por enlace muestran un badge "Cualquiera con el enlace".
+Cada archivo del espacio tiene una de tres opciones, que se ve como badge en su tarjeta:
 
-:::caution[Compartible por enlace no verifica membresía]
+- **Solo el equipo** (por defecto al subir) — lo abren los miembros del espacio con sesión iniciada; nadie más.
+- **Solo vos** — oculto para el resto de los miembros hasta que lo compartas.
+- **Cualquiera con el enlace** — sin iniciar sesión. Elegilo para mostrar el archivo dentro de un artefacto o mandarlo fuera del equipo.
+
+Al subir, ShareOut te pregunta quién puede ver los archivos (viene marcado Solo el equipo). Para cambiarlo después, hacé clic en el archivo y elegí otra opción en **Quién lo puede ver**. Los archivos subidos antes de este cambio mantienen la opción que tenían.
+
+:::caution[Cualquiera con el enlace no verifica membresía]
 El id del link es un token aleatorio no adivinable, pero abrirlo **no** verifica que estés logueado ni que seas miembro del workspace — cualquiera que consiga la URL (un link filtrado, una captura de pantalla, el código fuente de una página compartida) puede abrir el archivo. Es distinto de una página con visibilidad `workspace`, que sí verifica membresía. No subas nada que necesite control de acceso real — usá **privado** más un permiso explícito.
 :::
 
-- Los archivos **compartibles por enlace** se pueden incrustar en cualquier página con una URL estable (`/v1/files/dlv_…/content`).
-- Los archivos **privados** quedan ocultos para otros miembros y para links de entrega anónimos — compartilos a propósito con [compartir externo](/es/teams/external-sharing/) o **Compartir con una persona** (abajo).
+- Los archivos con **Cualquiera con el enlace** se pueden incrustar en cualquier página con una URL estable (`/v1/files/dlv_…/content`). Los de **Solo el equipo** y **Solo vos** necesitan a alguien con sesión iniciada, así que no cargan dentro de un artefacto publicado.
+- Los archivos **Solo vos** quedan ocultos para otros miembros y para links de entrega anónimos — compartilos a propósito con [compartir externo](/es/teams/external-sharing/) o **Compartir con una persona** (abajo).
 
 ## Versiones
 
-¿Reenviás el tercer corte de un video? Abrí el **＋** de un deliverable y subí el archivo nuevo — pasa a ser **v2**, **v3**, y así. La tarjeta siempre muestra la última versión con un badge `v3`; el ícono del reloj muestra todo el historial para recuperar una versión anterior.
+¿Reenviás el tercer corte de un video? Hacé clic en el archivo, elegí **Subir nueva versión** y elegí el archivo nuevo — pasa a ser **v2**, **v3**, y así. La tarjeta siempre muestra la última versión con un badge `v3`; **Historial de versiones** muestra todas para recuperar una anterior.
 
 ## Comentar un archivo
 
-Abrí el control de **comentarios** (ícono de chat) en una tarjeta para dejar un hilo en ese archivo.
+Hacé clic en un archivo y elegí **Comentarios** para dejar un hilo en ese archivo.
 
 - Mismo almacenamiento y notificaciones que los comentarios de páginas, pero **acotado solo a ese archivo**.
-- Los miembros pueden comentar archivos **visibles para el workspace** (y siempre los que son de su autoría).
-- Archivos **privados**: solo el dueño (y a quienes se los compartió) ven el hilo.
+- Los miembros pueden comentar archivos **Solo el equipo** y **Cualquiera con el enlace** (y siempre los que son de su autoría).
+- Archivos **Solo vos**: solo el dueño (y a quienes se los compartió) ven el hilo.
 - Sharees externos necesitan grant **comment** para publicar; **view** alcanza para leer.
 - Los hilos también aparecen en el portal **`/shared`** del destinatario.
 

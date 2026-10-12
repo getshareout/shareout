@@ -316,6 +316,14 @@ describe('Phase 5 — file grants + portal files (work/042)', () => {
     expect(ids).toEqual(['dW']);   // dP (private) excluded from the folder subtree
   });
 
+  it('a folder grant does not reach a team-only file (portal list or canAccess)', async () => {
+    await e.DB.exec(`INSERT INTO asset_deliverables (id, bucket_artifact_id, workspace_id, owner_id, name, folder_id, visibility) VALUES ('dT','bk','${WS}','usr_owner','Plano','F1','team')`);
+    await e.DB.exec(`INSERT INTO blobs (id, artifact_id, deliverable_id, version_no, filename, mime_type, size_bytes) VALUES ('bT','bk','dT',1,'plano.pdf','application/pdf',30)`);
+    await grant('Gfo', 'sharee', 'Sp', 'folder', 'F1');
+    expect((await listGrantedFiles(e, U)).map(f => f.id)).toEqual(['dW']);
+    expect(await canAccess(e, U, 'file', 'dT', 'view')).toBe(false);
+  });
+
   it('listGrantedFiles: a direct grant surfaces even a private file, with its content path', async () => {
     await grant('Gp', 'external_user', 'usr_ext', 'file', 'dP');
     const files = await listGrantedFiles(e, U);

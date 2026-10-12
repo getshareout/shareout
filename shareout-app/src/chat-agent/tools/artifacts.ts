@@ -71,7 +71,7 @@ export async function listArtifactsForUser(
     FROM artifacts a
     LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
     LEFT JOIN collaborators c ON c.artifact_id = a.id AND c.email IN (${emailPh})
-    WHERE a.deleted_at IS NULL AND (${scopeClause})${searchClause}
+    WHERE a.deleted_at IS NULL AND a.id NOT IN (SELECT artifact_id FROM asset_buckets) AND (${scopeClause})${searchClause}
     ORDER BY COALESCE(d.updated_at, a.created_at) DESC
     LIMIT ?`;
 

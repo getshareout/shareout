@@ -116,12 +116,12 @@ export const workspace_client_home_views_library_JS = `  // ----- Library — ma
       libAttached = {}; libSkillMap = {};
       attached.forEach(function (s) { libAttached[s.skill_artifact_id] = s; });
       skState.rec.concat(skState.items).forEach(function (k) { var id = k.artifact_id || k.id; if (id) libSkillMap[id] = k; });
-      var h = '';
+      // The workspace's own skills lead; ShareOut's official catalog follows.
+      var h = window.WSX_WS ? skToolbar() + '<div id="skList"></div>' : '';
       if (skState.rec.length) {
         h += '<p class="wsx-lens__intro">' + esc(t('library.recommendedSub')) + '</p>';
         h += '<div id="skRec">' + skState.rec.map(libRecommendedCard).join('') + '</div>';
       }
-      if (window.WSX_WS) h += skToolbar() + '<div id="skList"></div>';
       m.innerHTML = h || i18nEmpty('library.noSkills');
       var rec = document.getElementById('skRec'); if (rec) skBindCards(rec);
       var s = document.getElementById('skSearch');
