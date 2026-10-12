@@ -14,8 +14,9 @@ GET /v1/features?artifact_id=<id>
 ```
 
 Auth: ShareOut API token or session. With `artifact_id`/`workspace_id` you get
-that workspace's effective flags (you must have access); with no param you get
-the personal/global defaults.
+that workspace's effective flags (you must have access). With no param on a
+workspace subdomain (`<slug>.<host>`) you get that workspace's flags if you are a
+member; otherwise the personal/global defaults.
 
 Response:
 
