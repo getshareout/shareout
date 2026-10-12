@@ -81,7 +81,14 @@ export async function getWorkspaceByoConfig(
   workspaceId: string,
   gatewayModel?: string | null
 ): Promise<AIConfig | null> {
-  const cfg = await getWorkspaceLlmConfig(env, workspaceId);
+  return byoConfigFromRow(env, await getWorkspaceLlmConfig(env, workspaceId), gatewayModel);
+}
+
+async function byoConfigFromRow(
+  env: Env,
+  cfg: WorkspaceLlmConfigRow | null,
+  gatewayModel?: string | null
+): Promise<AIConfig | null> {
   if (!cfg?.byo_provider || !cfg.byo_encrypted_credentials || !cfg.byo_iv || !env.CREDENTIALS_KEY) return null;
   try {
     const data = await decryptCredentials(cfg.byo_encrypted_credentials, cfg.byo_iv, env.CREDENTIALS_KEY);
@@ -91,6 +98,20 @@ export async function getWorkspaceByoConfig(
     // Decrypt failure — callers fall back to the platform key.
     return null;
   }
+}
+
+/** resolveGatewayModel + getWorkspaceByoConfig in one round trip: the workspace row and
+ *  the instance default are read concurrently, and the row is read once. */
+export async function resolveWorkspaceAi(
+  env: Env,
+  workspaceId: string | null
+): Promise<{ gatewayModel: string | null; byo: AIConfig | null }> {
+  const [cfg, instanceModel] = await Promise.all([
+    workspaceId ? getWorkspaceLlmConfig(env, workspaceId) : null,
+    getInstanceDefaultGatewayModel(env),
+  ]);
+  const gatewayModel = cfg?.gateway_model || instanceModel;
+  return { gatewayModel, byo: workspaceId ? await byoConfigFromRow(env, cfg, gatewayModel) : null };
 }
 
 /** Decide which provider key serves this artifact's agent. */

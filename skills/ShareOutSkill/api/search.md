@@ -98,7 +98,7 @@ Response:
 }
 ```
 
-The engine runs **one focused agent turn** over a small candidate set from the same ranked search pool (`quickSearch`, up to 8 pages). Citations only ever point at artifacts the caller can already open. Runs on the workspace's own provider key like other assistant turns.
+The engine runs **one focused agent turn** over a small candidate set from the same ranked search pool (`quickSearch`, up to 8 pages). Citations are the pages the answer drew on — candidates it marks `[n]`, pages it read, and any page it found that the answer names — and only ever point at artifacts the caller can already open. Each turn is logged in the workspace AI usage ledger (`kind: ask_workspace`). Runs on the workspace's own provider key like other assistant turns.
 
 **When to use which:**
 - **`GET /v1/search`** — jump to a known name, browse recents, or list connectors/people/schedules.

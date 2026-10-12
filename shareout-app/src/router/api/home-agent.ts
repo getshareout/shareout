@@ -58,18 +58,17 @@ export function actionItemsBlock(items: ActionItem[]): string {
  *  prompt. Untrusted data. */
 export async function buildHomeSnapshot(env: Env, ws: string | null, user: AuthUser): Promise<string> {
   const u = { id: user.id, email: user.email };
-  const [cat, feed, wsRow] = await Promise.all([
+  const [cat, feed, wsRow, clientNotes, trunk, guidance] = await Promise.all([
     queryHomeArtifactCatalog(env, u, ws)
       .catch(() => ({ artifacts: [] as { id: string; name: string }[], total: 0, truncated: false })),
     queryActivityFeed(env, u, { workspaceId: ws }).catch(() => null),
     ws ? env.DB.prepare('SELECT slug FROM workspaces WHERE id = ?').bind(ws).first<{ slug: string }>() : null,
+    ws ? buildClientsContextForWorkspace(env, ws).catch(() => '') : '',
+    ws ? knowledgeTrunkForContext(env, ws) : '',
+    ws ? guidanceEntryForContext(env, ws) : '',
   ]);
   const pages = cat.artifacts.slice(0, 15).map((a) => `- ${a.name} (id: ${a.id})`).join('\n');
   const actions = feed ? actionItemsBlock(feed.actionItems) : '';
-  const clientNotes = ws ? await buildClientsContextForWorkspace(env, ws).catch(() => '') : '';
-  const [trunk, guidance] = ws
-    ? await Promise.all([knowledgeTrunkForContext(env, ws), guidanceEntryForContext(env, ws)])
-    : ['', ''];
   const inboxLine = wsRow?.slug
     ? `Members can email files to ${inboxAddress(wsRow.slug, env)}; they appear in list_files.`
     : '';

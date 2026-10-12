@@ -59,25 +59,31 @@ export interface ChatTurnConfig {
  *  shared agent loop and persists both messages under that thread. */
 export function streamAgentChat(env: Env, cfg: ChatTurnConfig): Response {
   return sseResp(async (send) => {
-    const threads = new WebThreadStore(env, cfg.scopeKey, cfg.user.id);
-    let threadId = cfg.threadId;
-    if (!threadId) {
-      const t = await threads.create(cfg.text);
-      threadId = t.id;
-      send({ type: 'thread', id: t.id, title: t.title });
-    }
+    const started = Date.now();
+    const ws = typeof cfg.selectedWorkspaceId === 'string' && cfg.selectedWorkspaceId !== PERSONAL_SCOPE ? cfg.selectedWorkspaceId : null;
+    // Thread, history, snapshot and locale don't depend on each other: read them together.
+    // A brand-new thread has no history to load.
+    const [threadId, history, snapshot, locale] = await Promise.all([
+      cfg.threadId
+        ? cfg.threadId
+        : new WebThreadStore(env, cfg.scopeKey, cfg.user.id).create(cfg.text).then((t) => {
+          send({ type: 'thread', id: t.id, title: t.title });
+          return t.id;
+        }),
+      cfg.threadId ? new D1ConversationStore(env, cfg.scopeKey, cfg.user.id, cfg.threadId).loadHistory(HISTORY_LIMIT) : [],
+      cfg.buildSnapshot(),
+      localeForRecipient(env, { userId: cfg.user.id, workspaceId: ws }).catch((): Locale => 'en'),
+    ]);
+    const contextAt = Date.now();
 
     const store = new D1ConversationStore(env, cfg.scopeKey, cfg.user.id, threadId);
     const reply = createWebReplyPort(env, cfg.user.id, send);
-    const [history, snapshot] = await Promise.all([store.loadHistory(HISTORY_LIMIT), cfg.buildSnapshot()]);
     // A retry resends the message a failed turn already saved: keep one copy, and send
     // it to the model once (as this turn's text, not also as history).
     const last = history[history.length - 1];
     if (last?.role === 'user' && last.content === cfg.text) history.pop();
     else await store.appendMessage('user', cfg.text);
 
-    const ws = typeof cfg.selectedWorkspaceId === 'string' && cfg.selectedWorkspaceId !== PERSONAL_SCOPE ? cfg.selectedWorkspaceId : null;
-    const locale = await localeForRecipient(env, { userId: cfg.user.id, workspaceId: ws }).catch((): Locale => 'en');
     const result = await runAgentTurn(env, {
       locale,
       platform: 'web',
@@ -88,6 +94,7 @@ export function streamAgentChat(env: Env, cfg: ChatTurnConfig): Response {
       reply,
       workspaceContext: snapshot,
       extraTools: cfg.extraTools,
+      timing: { context_ms: contextAt - started, save_ms: Date.now() - contextAt },
     });
 
     const summary = result.proposal ? describeAction(result.proposal, locale) : '';
