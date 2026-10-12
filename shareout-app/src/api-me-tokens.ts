@@ -20,11 +20,14 @@ export async function handleListMyTokens(env: Env, user: AuthUser): Promise<Resp
 // the user's existing tokens first, so they end with exactly one.
 export async function handleCreateMyToken(request: Request, env: Env, user: AuthUser): Promise<Response> {
   let regenerate = false;
-  try {
-    const body = (await request.json()) as { regenerate?: boolean };
-    regenerate = body?.regenerate === true;
-  } catch {
-    // empty body → plain generate
+  const raw = await request.text();
+  if (raw.trim()) {
+    try {
+      const body = JSON.parse(raw) as { regenerate?: boolean };
+      regenerate = body?.regenerate === true;
+    } catch {
+      return json({ ok: false, error: 'Request body is not valid JSON', code: 'INVALID_JSON' }, 400);
+    }
   }
 
   if (regenerate) {

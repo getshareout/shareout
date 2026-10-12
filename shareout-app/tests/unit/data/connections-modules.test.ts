@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { FetchTimeoutError } from '../../../src/fetch-utils';
 import {
   UpstreamHttpError,
@@ -10,6 +10,7 @@ import {
 } from '../../../src/data/connections/errors';
 import { validateName } from '../../../src/data/connections/crud';
 import {
+  executeRestApiQuery,
   redactUrl,
   staticHeaders,
   validateRestBaseUrl,
@@ -78,6 +79,29 @@ describe('connections/rest-query', () => {
     expect(validateRestBaseUrl('https://10.0.0.5/api')).toMatch(/Blocked/);
     expect(validateRestBaseUrl('https://api.example.com/v1')).toBeNull();
     expect(validateRestBaseUrl('not-a-url')).toMatch(/absolute/);
+  });
+
+  it('re-validates redirects and drops credentials on cross-origin hops', async () => {
+    const blocked = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(null, { status: 302, headers: { Location: 'http://127.0.0.1/admin' } }),
+    );
+    await expect(executeRestApiQuery(
+      { baseUrl: 'https://api.example.com' }, { apiKey: 'k' }, 'api_key', '/x',
+    )).rejects.toThrow(/Blocked/);
+    expect(blocked).toHaveBeenCalledTimes(1);
+    blocked.mockRestore();
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(null, { status: 302, headers: { Location: 'https://other.example.net/y' } }))
+      .mockResolvedValueOnce(new Response('{"ok":true}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    await expect(executeRestApiQuery(
+      { baseUrl: 'https://api.example.com', headers: { 'X-Api-Key': 'static' } }, { apiKey: 'k' }, 'api_key', '/x',
+    )).resolves.toEqual({ ok: true });
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer k');
+    const hop = new Headers(fetchMock.mock.calls[1][1]?.headers);
+    expect(hop.get('Authorization')).toBeNull();
+    expect(hop.get('X-Api-Key')).toBeNull();
+    fetchMock.mockRestore();
   });
 });
 
