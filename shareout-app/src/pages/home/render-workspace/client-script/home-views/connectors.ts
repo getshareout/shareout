@@ -15,24 +15,29 @@ export const workspace_client_home_views_connectors_JS = `  // ----- Connectors 
         var html = '';
         connCats().forEach(function (pair) {
           var ps = byCat[pair[0]]; if (!ps || !ps.length) return;
-          html += '<div class="wsx-conn__cat">' + esc(t(pair[1])) + '</div><div class="wsx-conn__grid">' + ps.map(connCard).join('') + '</div>';
+          html += '<div class="wsx-conn__cat">' + esc(t(pair[1])) + '</div><div class="wsx-conn__grid">' + ps.map(function (p) { return connCard(p, !!d.canManage); }).join('') + '</div>';
         });
         m.innerHTML = html;
+        if (!d.canManage) return;
         wireConn(m);
       }).catch(function () { m.innerHTML = i18nError('common.couldNotLoad'); });
   }
-  function connCard(p) {
+  // Adding/removing workspace connections is an owner/admin action (server: canManage);
+  // members see what is connected and who to ask.
+  function connCard(p, canManage) {
     var conns = p.connections || [];
     var ico = '<span class="wsx-conn__ic" style="color:' + esc(p.color || 'var(--color-primary)') + '">' + isvg(p.iconSvg || SCHED_ICON.db) + '</span>';
     var insts = conns.map(function (c) {
       return '<div class="wsx-conn__inst" data-conn="' + esc(c.id) + '"><span class="wsx-conn__instname">' + esc(c.name) + '</span>'
-        + '<label class="wsx-conn__ai" title="' + esc(t('connectors.aiTitle')) + '"><input type="checkbox" data-conn-ai="' + esc(c.id) + '"' + (c.agentQueryEnabled ? ' checked' : '') + '> ' + esc(t('connectors.ai')) + '</label>'
-        + '<button class="wsx-conn__del" data-conn-del="' + esc(c.id) + '" title="' + esc(t('connectors.remove')) + '" type="button">\\u00D7</button></div>';
+        + '<label class="wsx-conn__ai" title="' + esc(t('connectors.aiTitle')) + '"><input type="checkbox" data-conn-ai="' + esc(c.id) + '"' + (c.agentQueryEnabled ? ' checked' : '') + (canManage ? '' : ' disabled') + '> ' + esc(t('connectors.ai')) + '</label>'
+        + (canManage ? '<button class="wsx-conn__del" data-conn-del="' + esc(c.id) + '" title="' + esc(t('connectors.remove')) + '" type="button">\\u00D7</button>' : '') + '</div>';
     }).join('');
     return '<div class="wsx-conn__card">'
       + '<div class="wsx-conn__top">' + ico + '<div class="wsx-conn__meta"><div class="wsx-conn__name">' + esc(p.label || p.id) + (conns.length ? ' <span class="wsx-conn__on">' + esc(t('connectors.connected')) + '</span>' : '') + '</div><div class="wsx-conn__tag">' + esc(p.tagline || '') + '</div></div></div>'
       + (insts ? '<div class="wsx-conn__insts">' + insts + '</div>' : '')
-      + '<button class="wsx-abtn wsx-conn__add" data-conn-add="' + esc(p.id) + '" type="button">' + esc(conns.length ? t('connectors.addAnother') : t('connectors.connect')) + '</button>'
+      + (canManage
+        ? '<button class="wsx-abtn wsx-conn__add" data-conn-add="' + esc(p.id) + '" type="button">' + esc(conns.length ? t('connectors.addAnother') : t('connectors.connect')) + '</button>'
+        : (conns.length ? '' : '<div class="wsx-conn__tag">' + esc(t('connectors.askAdmin').replace('{name}', p.label || p.id)) + '</div>'))
       + '</div>';
   }
   function wireConn(root) {

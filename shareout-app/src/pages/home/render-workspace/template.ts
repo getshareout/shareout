@@ -351,8 +351,8 @@ export function buildWorkspaceBody(args: RenderArgs): string {
       <div class="wsx__accactions">
         <a class="wsx-accbtn" href="/home?view=connect" data-cn-open="claude">${svg(ICON.link)}<span data-i18n="nav.connect">Connect your agent</span></a>
         <a class="wsx-accbtn" href="/home?view=analytics" data-acc-lens="analytics">${svg(ICON.chart)}<span data-i18n="nav.analytics">Analytics</span></a>
-        <a class="wsx-accbtn" href="/home?view=connect&amp;tab=code" data-cn-open="code">${svg('<circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 19 4M18 5l2 2M15 8l2 2"/>')}<span data-i18n="account.apiToken">API token</span></a>
-        <a class="wsx-accbtn" href="/settings/telegram?go=1" target="_blank" rel="noopener">${svg('<path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>')}<span data-i18n="account.telegram">Connect Telegram</span></a>
+${!(args.workspaceId || args.workspace) || canManage ? `        <a class="wsx-accbtn" href="/home?view=connect&amp;tab=code" data-cn-open="code">${svg('<circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 19 4M18 5l2 2M15 8l2 2"/>')}<span data-i18n="account.apiToken">API token</span></a>
+` : ''}        <a class="wsx-accbtn" href="/settings/telegram?go=1" target="_blank" rel="noopener">${svg('<path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>')}<span data-i18n="account.telegram">Connect Telegram</span></a>
         <a class="wsx-accbtn" href="/v1/auth/link-google?redirect=%2Fhome%3Fnext%3D1">${svg('<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>')}<span data-i18n="account.linkGoogle">Link Google account</span></a>
         <a class="wsx-accbtn wsx-accbtn--out" href="/auth/logout">${svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>')}<span data-i18n="account.signOut">Sign out</span></a>
       </div>
