@@ -71,6 +71,12 @@ async function serveCaptureView(
   }).transform(resp);
 }
 
+function isViewerDownloadPath(path: string, entrypoint: string): boolean {
+  if (path === 'download') return true;
+  const ext = (p: string) => (p.match(/\.[^./]+$/)?.[0] ?? '').toLowerCase();
+  return !path.includes('/') && ext(path) !== '' && ext(path) === ext(entrypoint);
+}
+
 export async function handleServe(
   request: Request,
   env: Env,
@@ -266,6 +272,21 @@ export async function handleServe(
 
   const baseUrl = env.SHAREOUT_BASE_URL.replace(/\/$/, '');
   const socialPreview = resolveArtifactSocialPreview(result, baseUrl, slug);
+
+  // The typed viewers' Download link targets /a/{slug}/download or /a/{slug}/{name}{ext}
+  // (no such asset): serve the source file as an attachment.
+  if (!asset && assetPath && hasCustomViewer(result.artifact_type || 'html') &&
+      isViewerDownloadPath(assetPath, result.entrypoint)) {
+    const source = await fetchAssetRow(env, result.version_id, result.entrypoint);
+    if (source) {
+      const resp = await serveAsset(request, env, source, slug, true, { noStore, relaxCsp: !isOpen });
+      const out = new Response(resp.body, resp);
+      let filename = result.entrypoint.split('/').pop()!;
+      if (assetPath !== 'download') { try { filename = decodeURIComponent(assetPath); } catch { /* keep entrypoint name */ } }
+      out.headers.set('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+      return out;
+    }
+  }
 
   if (asset) {
     // Check for type-specific viewer (CSV, Markdown, JSON, TXT)
