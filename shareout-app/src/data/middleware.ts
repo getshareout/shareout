@@ -55,6 +55,8 @@ export interface DataContext {
   canWrite?: boolean;
   // Realtime/Y.js collab capability: owner, OR anon-collab explicitly opted in.
   canWriteCollab?: boolean;
+  // Agent token holding data:read but not data:write: refused on every mutation.
+  readOnlyToken?: boolean;
   // Artifact Tests (Phase 2 Unit B): true when this request is part of a sandboxed
   // test run (the renderer carries an `owner_test` session token). Reads resolve as
   // the owner so the artifact loads, but the data router blocks ALL mutating methods
@@ -215,7 +217,8 @@ export async function dataMiddleware(
   }
   // Agent token without data:write reads but never mutates — reuses the router's
   // existing canWrite gate, same as a sandboxed test run.
-  if (authResult.serviceScopes && !authResult.serviceScopes.includes('data:write')) {
+  const readOnlyToken = !!authResult.serviceScopes && !authResult.serviceScopes.includes('data:write');
+  if (readOnlyToken) {
     canWrite = false;
     canWriteCollab = false;
   }
@@ -242,6 +245,7 @@ export async function dataMiddleware(
     isArtifactOwner,
     canWrite,
     canWriteCollab,
+    readOnlyToken,
     testRun,
   };
 }

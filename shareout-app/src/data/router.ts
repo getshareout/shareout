@@ -57,14 +57,20 @@ export const ANON_WRITE_GATED_TIERS = new Set(['json', 'tables', 'blobs', 'datas
 // Pure read-only-default decision (Workstream A), enumerable in tests. `canWrite`
 // is undefined only for trusted internal contexts, which never reach the HTTP
 // router, so treat undefined as deny here.
-export function shouldBlockAnonWrite(tier: string, method: string, canWrite: boolean | undefined): boolean {
-  return ANON_WRITE_GATED_TIERS.has(tier) && MUTATING_METHODS.has(method.toUpperCase()) && canWrite !== true;
+export function shouldBlockAnonWrite(tier: string, method: string, canWrite: boolean | undefined, subPath = ''): boolean {
+  return ANON_WRITE_GATED_TIERS.has(tier) && MUTATING_METHODS.has(method.toUpperCase()) && canWrite !== true
+    && !isReadOnlyPost(tier, method, subPath);
+}
+
+// POST endpoints that only read (table query/count/distinct): a filter body, no mutation.
+export function isReadOnlyPost(tier: string, method: string, subPath: string): boolean {
+  return tier === 'tables' && method.toUpperCase() === 'POST' && /^\/[^/]+\/(query|count|distinct)\/?$/.test(subPath);
 }
 
 // Read-only-default gate: block anonymous mutations to the artifact's private
 // stores unless the owner opted in. Returns an error Response to send, or null.
-function anonWriteDenied(tier: string, method: string, ctx: DataContext, origin: string | null): Response | null {
-  if (shouldBlockAnonWrite(tier, method, ctx.canWrite)) {
+function anonWriteDenied(tier: string, method: string, ctx: DataContext, origin: string | null, subPath: string): Response | null {
+  if (shouldBlockAnonWrite(tier, method, ctx.canWrite, subPath)) {
     return errorResponse({
       ...DATA_ERRORS.FORBIDDEN,
       message: 'This public artifact is read-only for anonymous visitors.',
@@ -135,7 +141,7 @@ async function handleBatch(
 
         // Read-only-default gate applies per sub-request, not per batch envelope:
         // a batch can't be used to smuggle anonymous writes past the gate.
-        const denied = anonWriteDenied(tier, method, ctx, ctx.origin);
+        const denied = anonWriteDenied(tier, method, ctx, ctx.origin, subPath);
         if (denied) {
           const body = await denied.json() as { error?: string; code?: string };
           return { path: req.path, success: false, error: body.error, code: body.code };
@@ -297,8 +303,17 @@ async function handleDataRequestInner(
   // Read-only-default gate (Workstream A): anonymous viewers of a public artifact
   // cannot mutate its private stores unless the owner opted in. Owner/authenticated
   // writes (ctx.canWrite === true) pass through unchanged.
-  const writeDenied = anonWriteDenied(tier, request.method, ctx, origin);
+  const writeDenied = anonWriteDenied(tier, request.method, ctx, origin, subPath);
   if (writeDenied) return writeDenied;
+
+  // A read-only agent token (data:read without data:write) never mutates — comments
+  // included, even though anonymous comments are allowed by design.
+  if (tier === 'comments' && ctx.readOnlyToken && MUTATING_METHODS.has(request.method.toUpperCase())) {
+    return errorResponse({
+      ...DATA_ERRORS.FORBIDDEN,
+      message: 'This token is read-only (data:read). Writing comments requires data:write.',
+    }, origin);
+  }
 
   // Realtime/Y.js collab proxies straight to a Durable Object, bypassing any
   // per-store auth. Default-deny anonymous collab on public artifacts: the
