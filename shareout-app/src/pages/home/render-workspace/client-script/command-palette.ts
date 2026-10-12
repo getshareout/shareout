@@ -19,7 +19,8 @@ export const workspace_client_command_palette_JS = `
       schedule: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
       crew: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M8 2h8"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/></svg>',
       alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
-      action: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>'
+      action: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>',
+      ask: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>'
     };
     var EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
 
@@ -97,8 +98,8 @@ export const workspace_client_command_palette_JS = `
     }
     function askRowHtml(idx, q) {
       return '<button type="button" class="wsx-cmdk__item wsx-cmdk__item--ask" role="option" data-pi="' + idx + '">' +
-        '<span class="wsx-cmdk__tile wsx-cmdk__tile--ask">' + SEARCH_ICONS.action + '</span>' +
-        '<span class="wsx-cmdk__txt"><span class="wsx-cmdk__ttl">' + esc(t('palette.askAction') || 'Ask your workspace') + '</span><span class="wsx-cmdk__sub">' + esc(q) + '</span></span></button>';
+        '<span class="wsx-cmdk__tile wsx-cmdk__tile--ask">' + SEARCH_ICONS.ask + '</span>' +
+        '<span class="wsx-cmdk__txt"><span class="wsx-cmdk__ttl">' + esc((t('palette.askQuery') || 'Ask AI: \u201c{q}\u201d').replace('{q}', q)) + '</span></span></button>';
     }
 
     // ---- shared fetch with in-memory cache + prefetch ----
@@ -182,11 +183,12 @@ export const workspace_client_command_palette_JS = `
       }
       function renderAsk() {
         if (!q) return;
-        html += '<div class="wsx-cmdk__gtitle">' + esc(t('palette.ask') || 'Ask') + '</div>';
+        html += '<div class="wsx-cmdk__gtitle">' + esc(t('palette.ask') || 'Ask AI') + '</div>';
         var idx = palItems.push({ ask: q }) - 1;
         html += askRowHtml(idx, q);
       }
-      if (/\\?\\s*$/.test(q)) { renderAsk(); renderActions(); } else { renderActions(); renderAsk(); }
+      // Real matches first (Enter opens the top one); AI is an explicit opt-in, always last.
+      if (!q) renderActions();
       if (data) {
         pushGroup(q ? (t('palette.pages') || 'Pages') : (t('palette.recent') || 'Recent'), data.artifacts, 'artifact');
         pushGroup(t('palette.folders') || 'Folders', data.folders, 'folder');
@@ -197,6 +199,7 @@ export const workspace_client_command_palette_JS = `
         pushGroup(t('palette.crew') || 'Crew', data.crew, 'crew');
         pushGroup(t('palette.alerts') || 'Alerts', data.alerts, 'alert');
       }
+      if (q) { renderActions(); renderAsk(); }
       function pushGroup(title, rows, kind) {
         group(title, rows, function (h) { h.kind = kind; var idx = palItems.push({ hit: h }) - 1; html += hitRowHtml(idx, h); });
       }

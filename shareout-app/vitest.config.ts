@@ -29,6 +29,7 @@ export default defineConfig({
           name: 'workers',
           include: ['tests/unit/**/*.test.ts'],
           exclude: [
+            'tests/unit/**/*.dom.test.ts',
             'tests/unit/openapi-contract.test.ts',
             'tests/unit/pages/home-views.test.ts',
             'tests/unit/bundle-versions.test.ts',
@@ -62,6 +63,7 @@ export default defineConfig({
         test: {
           name: 'happy-dom',
           include: [
+            'tests/unit/**/*.dom.test.ts',
             'tests/unit/editor/chat.test.ts',
             'tests/unit/editor/collab.test.ts',
             'tests/unit/editor/dashboard.test.ts',
