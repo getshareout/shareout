@@ -7,7 +7,7 @@ import { handleInviteWorkspaceMembers, handleListWorkspaceMembers } from '../wor
 import { handleListWorkspaceInvites, handleResendWorkspaceInvite, handleRevokeWorkspaceInvite } from '../workspaces/invites-admin';
 import { MAX_BULK_INVITES } from '../workspaces/invite';
 import {
-  ON_FAILURE, errorText, fail, ok, readJson, resolveWorkspace, str, workspaceChoiceText,
+  NOT_MEMBER, ON_FAILURE, errorText, fail, ok, readJson, resolveWorkspace, str, workspaceChoiceText,
   type Args, type ToolContext, type ToolDef, type ToolResult,
 } from './tool-kit';
 import type { BotWorkspace } from '../chat-agent/access';
@@ -32,7 +32,7 @@ function call(ctx: ToolContext, path: string, method = 'GET', body?: unknown): R
 /** Resolves the workspace or returns the result to send back instead. */
 async function pickWorkspace(ctx: ToolContext, args: Args, action: string): Promise<BotWorkspace | ToolResult> {
   const resolved = await resolveWorkspace(ctx, str(args.workspace_id, 100));
-  if (resolved.notMember) return fail('The person is not a member of that workspace. Call list_workspaces to see the right ids.');
+  if (resolved.notMember) return fail(NOT_MEMBER);
   if (resolved.choices) return ok(workspaceChoiceText(action, resolved.choices), { needs_workspace: true, workspaces: resolved.choices });
   if (!resolved.workspace) return fail('The person has no workspace yet, so there is nobody to invite to. They can create one in ShareOut.');
   return resolved.workspace;
