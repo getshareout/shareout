@@ -133,7 +133,15 @@ describe('api error envelope contract', () => {
     expect(await notFound.json()).toEqual({ success: false, error: 'Missing', code: 'NOT_FOUND', request_id: 'ray-1' });
 
     const adHoc = await run(Response.json({ error: 'boom' }, { status: 502 }));
-    expect(await adHoc.json()).toEqual({ error: 'boom', request_id: 'ray-1', support: SUPPORT_CONTACT });
+    expect(await adHoc.json()).toEqual({ success: false, error: 'boom', code: 'INTERNAL_ERROR', request_id: 'ray-1', support: SUPPORT_CONTACT });
+
+    const noSuccess = await run(Response.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 }));
+    expect(await noSuccess.json()).toEqual({ success: false, error: 'Forbidden', code: 'FORBIDDEN', request_id: 'ray-1' });
+
+    for (const [status, code] of [[400, 'INVALID_REQUEST'], [403, 'FORBIDDEN'], [404, 'NOT_FOUND'], [429, 'RATE_LIMITED']] as const) {
+      const bare = await run(Response.json({ error: 'nope', extra: 1 }, { status }));
+      expect(await bare.json()).toEqual({ success: false, error: 'nope', code, extra: 1, request_id: 'ray-1' });
+    }
 
     const ok = await run(Response.json({ error: 'not an error status' }));
     expect(await ok.json()).toEqual({ error: 'not an error status' });

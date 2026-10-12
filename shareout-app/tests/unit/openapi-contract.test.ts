@@ -41,11 +41,11 @@ function openApiPathToUrl(path: string): string {
     .replace(/\{email\}/g, 'user%40example.com');
 }
 
-/** Worker-level miss: plain-text 404 from handleFetch, not a handler JSON body. */
+/** Worker-level miss: handleFetch's ROUTE_NOT_FOUND (plain text off /v1), not a handler body. */
 async function isUnrouted404(response: Response): Promise<boolean> {
   if (response.status !== 404) return false;
   const text = await response.text();
-  return text === 'Not Found';
+  return text === 'Not Found' || text.includes('"ROUTE_NOT_FOUND"');
 }
 
 const env = {
