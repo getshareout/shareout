@@ -20,9 +20,11 @@ export async function handleListMyTokens(env: Env, user: AuthUser): Promise<Resp
 // the user's existing tokens first, so they end with exactly one.
 export async function handleCreateMyToken(request: Request, env: Env, user: AuthUser): Promise<Response> {
   let regenerate = false;
+  let name = 'self-serve';
   try {
-    const body = (await request.json()) as { regenerate?: boolean };
+    const body = (await request.json()) as { regenerate?: boolean; name?: unknown };
     regenerate = body?.regenerate === true;
+    if (typeof body?.name === 'string' && body.name.trim()) name = body.name.trim().slice(0, 100);
   } catch {
     // empty body → plain generate
   }
@@ -34,7 +36,7 @@ export async function handleCreateMyToken(request: Request, env: Env, user: Auth
   const token = generateToken();
   const tokenHash = await hashToken(token);
   await env.DB.prepare("INSERT INTO tokens (id, principal_type, principal_id, user_id, token_hash, name) VALUES (?, 'user', ?, ?, ?, ?)")
-    .bind(generateId('tok'), user.id, user.id, tokenHash, 'self-serve').run();
+    .bind(generateId('tok'), user.id, user.id, tokenHash, name).run();
 
   // Plaintext is returned exactly once and never stored.
   return json({ ok: true, token, shown_once: true });
