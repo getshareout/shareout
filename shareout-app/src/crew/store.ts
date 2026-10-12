@@ -5,7 +5,7 @@ import { CREW_TOOLS } from './tool-registry';
 import { resolveCrewLimits } from './limits';
 import { validateConditionConfig } from './condition';
 import type { CrewRow, CrewRunRow, CrewTriggerRow, ToolLimits } from './types';
-import { CLAUDE_HAIKU, DEFAULT_CLAUDE_MODEL } from '../data/agent/models';
+import { CLAUDE_HAIKU, DEFAULT_CLAUDE_MODEL, claudeModelById } from '../data/agent/models';
 
 // Event types a crew can subscribe to in Phase 1. Only table.row.inserted is
 // wired for dispatch this phase; others are added as their emit sites gain the
@@ -51,7 +51,8 @@ export async function defineCrew(
     .first<{ owner_id: string | null }>();
   const ownerId = ownerRow?.owner_id ?? '';
 
-  const model = body.model && ALLOWED_MODELS.has(body.model) ? body.model : DEFAULT_MODEL;
+  const chosen = claudeModelById(body.model)?.id;
+  const model = chosen && ALLOWED_MODELS.has(chosen) ? chosen : DEFAULT_MODEL;
   const existing = await getCrew(env, artifactId);
   const crewId = existing?.id ?? generateId('crew');
 

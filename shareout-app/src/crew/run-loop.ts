@@ -3,6 +3,7 @@ import type { DataContext } from '../data/middleware';
 import { generateId } from '../crypto-utils';
 import { resolveAgentAiConfig, resolveGatewayModel, recordAgentUsage } from '../data/agent/ai-config';
 import { computeBaseCostMicroUsd } from '../data/agent/model-costs';
+import { claudeModelById, DEFAULT_CLAUDE_MODEL } from '../data/agent/models';
 import type { CrewRow, CrewRunRow, CrewSseEvent, TerminationReason, RunCaps } from './types';
 import { buildCrewDataContext, buildCrewPrincipal, redact } from './principal';
 import { resolveEnabledTools, toProviderTools } from './tool-registry';
@@ -50,6 +51,13 @@ const NEXT_RUN_MAX_HOURS = 720;
 // ungranted/unknown tool) before we cut the run short rather than burn the rest
 // of the iteration/budget allotment on a stuck loop.
 const MAX_NO_PROGRESS_ITERS = 3;
+
+/** The model a crew's owner chose. The default model is not a choice — those crews
+ *  follow the workspace/instance gateway model like every other agent. */
+export function crewPinnedModel(model: string | null | undefined) {
+  const m = claudeModelById(model);
+  return m && m.id !== DEFAULT_CLAUDE_MODEL.id ? m : null;
+}
 
 function buildSystemPrompt(crew: CrewRow, locale: Locale | null): string {
   return [
@@ -179,8 +187,9 @@ export async function executeCrewRun(
   try {
     emit({ type: 'run_start', runId: run.id });
 
-    const gatewayModel = await resolveGatewayModel(env, crew.workspace_id);
-    const provider = opts.provider ?? getCrewProvider(env, gatewayModel);
+    const pinned = crewPinnedModel(crew.model);
+    const gatewayModel = pinned ? pinned.gateway : await resolveGatewayModel(env, crew.workspace_id);
+    const provider = opts.provider ?? getCrewProvider(env, gatewayModel, pinned?.id);
     if (!provider) {
       emit({ type: 'error', error: 'AI provider not configured.' });
       await finalize('error', '');
