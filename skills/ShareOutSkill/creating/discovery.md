@@ -1,6 +1,6 @@
 # Discovery — the intake before you build
 
-Ask these before generating. They take seconds and prevent the expensive failure: building the wrong thing beautifully. Expands [../SKILL.md](../SKILL.md#first-questions) — don't re-ask what the user already told you, and on a trivial ask infer instead (see [overview.md](overview.md#adaptive-depth)).
+Ask these before generating. They take seconds and prevent the expensive failure: building the wrong thing beautifully. Expands [../SKILL.md](../SKILL.md#first-questions-product-work) — don't re-ask what the user already told you, and on a trivial ask infer instead (see [overview.md](overview.md#adaptive-depth)).
 
 Ask in plain language, batched — not a rigid interrogation. The goal is to fill the decision record in [overview.md](overview.md#decision-record).
 
@@ -78,5 +78,5 @@ Reflect the decision record back in one block (see [overview.md](overview.md#dec
 
 - [overview.md](overview.md) — the full flow
 - [design-choice.md](design-choice.md) — choosing the design language
-- [../SKILL.md](../SKILL.md#first-questions) — the short first-questions list
+- [../SKILL.md](../SKILL.md#first-questions-product-work) — the short first-questions list
 - [../sdk/overview.md](../sdk/overview.md) — SDK store reference
