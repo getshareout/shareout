@@ -7993,27 +7993,16 @@
             "type": "boolean"
           },
           "next_run_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true,
-            "description": "ISO 8601; null for event-triggered jobs."
+            "type": "integer"
           },
           "last_run_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": "integer"
           },
           "last_status": {
             "type": "string"
           },
           "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": "integer"
           }
         }
       },
