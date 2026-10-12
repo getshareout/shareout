@@ -83,6 +83,25 @@
         ],
         "summary": "List workspaces",
         "operationId": "listWorkspaces",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Workspaces the user belongs to",
@@ -96,6 +115,15 @@
                       "items": {
                         "$ref": "#/components/schemas/Workspace"
                       }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "type": "integer"
                     }
                   }
                 }
@@ -207,6 +235,31 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "Set `true` to include an exact `total` (extra query).",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -222,6 +275,19 @@
                       "items": {
                         "$ref": "#/components/schemas/Artifact"
                       }
+                    },
+                    "has_more": {
+                      "type": "boolean"
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Only with `count=true`."
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "type": "integer"
                     }
                   }
                 }
@@ -1209,14 +1275,45 @@
             "format": "uri"
           },
           "thumbnail_url": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uri"
+          },
+          "workspace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "artifact_type": {
+            "type": "string"
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "current_version": {
+            "type": "integer",
+            "description": "version_no live on the production deployment (reflects rollback)."
+          },
+          "user_role": {
+            "type": "string",
+            "description": "Caller's role (list endpoint only)."
           },
           "is_favorite": {
             "type": "boolean"
           },
           "created_at": {
-            "type": "integer"
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
