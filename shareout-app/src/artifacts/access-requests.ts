@@ -66,6 +66,7 @@ export async function getPendingAccessRequest(
 export async function listIncomingAccessRequests(
   env: Env,
   ownerUserId: string,
+  workspaceId?: string | null,
 ): Promise<IncomingAccessRequest[]> {
   // Owner's own artifacts, plus every artifact in a workspace they administer —
   // otherwise a request against a departed member's page sits in a queue nobody
@@ -81,9 +82,10 @@ export async function listIncomingAccessRequests(
               SELECT workspace_id FROM workspace_members
                WHERE user_id = ?1 AND member_class = 'internal' AND role IN ('owner','admin')
             ) )
+      ${workspaceId ? 'AND a.workspace_id = ?2' : ''}
     ORDER BY ar.created_at DESC
     LIMIT 20
-  `).bind(ownerUserId).all<IncomingAccessRequest>();
+  `).bind(...(workspaceId ? [ownerUserId, workspaceId] : [ownerUserId])).all<IncomingAccessRequest>();
   return rows.results ?? [];
 }
 
@@ -333,8 +335,9 @@ export async function handleCreateAccessRequest(
 export async function handleListIncomingAccessRequests(
   env: Env,
   user: AuthUser,
+  workspaceId?: string | null,
 ): Promise<Response> {
-  const requests = await listIncomingAccessRequests(env, user.id);
+  const requests = await listIncomingAccessRequests(env, user.id, workspaceId);
   return json({ requests });
 }
 

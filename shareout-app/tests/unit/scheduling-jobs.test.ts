@@ -475,6 +475,12 @@ describe('listJobs', () => {
     await listJobs(env, userId, artifactId);
     expect(env.DB.prepare).toHaveBeenCalledWith(expect.stringContaining('artifact_id = ?'));
   });
+
+  it('filters by workspace when requested', async () => {
+    const env = dbEnv([{ method: 'all', results: [] }]);
+    await listJobs(env, userId, undefined, 'wsp_1');
+    expect(env.DB.prepare).toHaveBeenCalledWith(expect.stringContaining('a.workspace_id = ?'));
+  });
 });
 
 describe('deleteJob', () => {

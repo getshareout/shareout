@@ -233,7 +233,11 @@ describe('handleListJobs and handleGetJob', () => {
 
     jobs.listJobs.mockResolvedValueOnce([]);
     await handleListJobs(new Request('https://x'), env, user);
-    expect(jobs.listJobs).toHaveBeenLastCalledWith(env, 'user_1');
+    expect(jobs.listJobs).toHaveBeenLastCalledWith(env, 'user_1', undefined, undefined);
+
+    jobs.listJobs.mockResolvedValueOnce([]);
+    await handleListJobs(new Request('https://x?workspace_id=wsp_1'), env, user);
+    expect(jobs.listJobs).toHaveBeenLastCalledWith(env, 'user_1', undefined, 'wsp_1');
   });
 
   it('returns 404 when job is missing', async () => {

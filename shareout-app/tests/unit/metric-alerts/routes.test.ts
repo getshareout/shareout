@@ -88,7 +88,7 @@ describe('metric-alerts route auth', () => {
     const res = await get('/v1/metric-alerts', { Cookie: 'shareout_session=x' });
     expect(res?.status).toBe(200);
     expect(await res!.json()).toEqual({ alerts: [{ id: 'alert_1' }] });
-    expect(listRulesForOwner).toHaveBeenCalledWith(env, 'user_1');
+    expect(listRulesForOwner).toHaveBeenCalledWith(env, 'user_1', undefined);
   });
 
   it('401s when neither token nor session is present', async () => {

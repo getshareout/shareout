@@ -108,12 +108,14 @@ export async function handleCreateJob(request: Request, env: Env, user: Authenti
 export async function handleListJobs(request: Request, env: Env, user: AuthenticatedUser): Promise<Response> {
   const url = new URL(request.url);
   const artifactId = url.searchParams.get('artifact_id') || undefined;
+  const workspaceId = url.searchParams.get('workspace_id') || undefined;
 
   // Scoped to an artifact: owners/editors see every schedule on it (incl.
-  // viewer DM subscriptions). Unscoped: the user's own schedules across artifacts.
+  // viewer DM subscriptions). Unscoped: the user's own schedules across artifacts,
+  // optionally narrowed to one workspace.
   const jobs = artifactId
     ? await listJobsForArtifact(env, artifactId, user.id)
-    : await listJobs(env, user.id);
+    : await listJobs(env, user.id, undefined, workspaceId);
 
   return jsonResponse({ jobs });
 }

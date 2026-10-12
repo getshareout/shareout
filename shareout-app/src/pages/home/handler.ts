@@ -124,7 +124,7 @@ async function buildHomeBody(
       artifact_count: number;
       role_rank: number;
     }>(),
-    listIncomingAccessRequests(env, user.id),
+    listIncomingAccessRequests(env, user.id, createContextWs),
     // Folded into this batch (was a serial await after it) — only needs the
     // create context, known before the queries run.
     isFeatureEnabled(env, CREATE_FEATURE, createContextWs),

@@ -281,6 +281,15 @@ describe('listRulesForOwner', () => {
     expect(rules).toHaveLength(1);
     expect(rules[0].owner_id).toBe('user_1');
   });
+
+  it('narrows to one workspace, or to personal pages', async () => {
+    const { db } = routedDb([]);
+    const { listRulesForOwner } = await import('../../../src/metric-alerts/rules');
+    await listRulesForOwner({ DB: db } as unknown as Env, 'user_1', 'wsp_1');
+    expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('artifact_id IN (SELECT id FROM artifacts WHERE workspace_id = ?)'));
+    await listRulesForOwner({ DB: db } as unknown as Env, 'user_1', null);
+    expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('workspace_id IS NULL'));
+  });
 });
 
 describe('runDueMetricAlerts', () => {

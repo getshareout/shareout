@@ -81,7 +81,7 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
   }
   function loadSchedules() {
     var m = document.getElementById('wsxSchedMount'); m.innerHTML = i18nLoad();
-    fetch('/v1/jobs', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
+    fetch('/v1/jobs' + (window.WSX_WS ? '?workspace_id=' + encodeURIComponent(window.WSX_WS) : ''), { credentials: 'same-origin' }).then(function (r) { return r.json(); })
       .then(function (d) {
         var jobs = (d && (d.jobs || d.items)) || [];
         if (!jobs.length) {
@@ -147,7 +147,7 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
   }
   function loadAlerts() {
     var m = document.getElementById('wsxAlertMount'); m.innerHTML = i18nLoad();
-    fetch('/v1/metric-alerts', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
+    fetch('/v1/metric-alerts' + (window.WSX_WS ? '?workspace_id=' + encodeURIComponent(window.WSX_WS) : ''), { credentials: 'same-origin' }).then(function (r) { return r.json(); })
       .then(function (d) {
         var al = (d && d.alerts) || [];
         if (!al.length) {

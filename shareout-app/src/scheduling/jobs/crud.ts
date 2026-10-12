@@ -174,13 +174,21 @@ export async function createJob(
   return { job: job ? { ...job, config: JSON.parse(job.config as unknown as string) } : undefined };
 }
 
-export async function listJobs(env: Env, userId: string, artifactId?: string): Promise<ScheduledJob[]> {
+/** workspaceId: undefined = every workspace, null = personal pages only. */
+export async function listJobs(env: Env, userId: string, artifactId?: string, workspaceId?: string | null): Promise<ScheduledJob[]> {
   let query = "SELECT sj.*, a.name AS artifact_name, COALESCE(d.slug, a.slug) AS artifact_slug FROM scheduled_jobs sj LEFT JOIN artifacts a ON a.id = sj.artifact_id LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production' WHERE sj.owner_id = ?";
   const params: string[] = [userId];
 
   if (artifactId) {
     query += ' AND sj.artifact_id = ?';
     params.push(artifactId);
+  }
+
+  if (workspaceId === null) {
+    query += ' AND a.workspace_id IS NULL';
+  } else if (workspaceId) {
+    query += ' AND a.workspace_id = ?';
+    params.push(workspaceId);
   }
 
   query += ' ORDER BY sj.created_at DESC';
