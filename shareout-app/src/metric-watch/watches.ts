@@ -165,6 +165,9 @@ export async function createWatch(
   const v = validateSpec(input);
   if (!v.ok) return { error: v.error };
 
+  const probe = await evaluateMetric(env, artifactId, artifact.workspace_id ?? '', { type: 'table_count', table: v.spec.table });
+  if (probe.error) return { error: probe.error };
+
   const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM metric_watches WHERE artifact_id = ?')
     .bind(artifactId).first<{ n: number }>();
   if ((count?.n || 0) >= MAX_WATCHES_PER_ARTIFACT) {

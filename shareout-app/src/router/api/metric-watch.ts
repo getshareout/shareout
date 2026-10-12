@@ -4,12 +4,12 @@ import { createWatch, listWatches, deleteWatch } from '../../metric-watch/watche
 import { jsonWithApiErrors } from '../../http/api-error';
 
 function json(data: unknown, status = 200): Response {
-  return Response.json(data, { status });
+  return jsonWithApiErrors(data, status);
 }
 
 function errorJson(error: string): Response {
   const status = /not found/i.test(error) ? 404 : /permission|denied/i.test(error) ? 403 : 400;
-  return json({ error }, status);
+  return json({ error, code: status === 404 ? 'NOT_FOUND' : status === 403 ? 'FORBIDDEN' : 'INVALID_REQUEST' }, status);
 }
 
 /**
@@ -30,7 +30,7 @@ export async function routeMetricWatchApi(ctx: FetchContext): Promise<Response |
 
     if (request.method === 'GET') {
       const artifactId = url.searchParams.get('artifact_id');
-      if (!artifactId) return addCORS(json({ error: 'artifact_id query param required' }, 400));
+      if (!artifactId) return addCORS(json({ error: 'artifact_id query param required', code: 'VALIDATION_ERROR', param: 'artifact_id' }, 400));
       const result = await listWatches(env, user.id, artifactId);
       return addCORS(result.error ? errorJson(result.error) : json({ watches: result.watches }));
     }
@@ -41,8 +41,10 @@ export async function routeMetricWatchApi(ctx: FetchContext): Promise<Response |
       } catch {
         return addCORS(json({ error: 'Invalid JSON', code: 'INVALID_JSON' }, 400));
       }
-      const artifactId = body.artifact_id as string;
-      if (!artifactId) return addCORS(json({ error: 'artifact_id required' }, 400));
+      const artifactId = body?.artifact_id;
+      if (typeof artifactId !== 'string' || !artifactId) {
+        return addCORS(json({ error: 'artifact_id required', code: 'VALIDATION_ERROR', param: 'artifact_id' }, 400));
+      }
       const result = await createWatch(env, user.id, artifactId, body);
       return addCORS(result.error ? errorJson(result.error) : json({ watch: result.watch }, 201));
     }
