@@ -36,6 +36,9 @@ export default tseslint.config(
       ],
       'no-empty': ['warn', { allowEmptyCatch: true }],
       'prefer-const': 'warn',
+      // New in eslint 10's recommended set; existing backlog, tighten later.
+      'no-useless-assignment': 'warn',
+      'preserve-caught-error': 'warn',
     },
   },
   {

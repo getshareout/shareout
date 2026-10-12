@@ -40,6 +40,7 @@ function ctxFor(body: unknown, env: Partial<Env> = {}, db: DbPlan = {}): FetchCo
     body: JSON.stringify(body),
   });
   const fullEnv = {
+    SESSION_SECRET: 'test-session-secret',
     ...env,
     DB: {
       prepare: (sql: string) => ({
