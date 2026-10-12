@@ -3,6 +3,8 @@ import type { Env } from '../types';
 import { hostWorkspaceId } from '../pages/home/host';
 import { getOnboardingStatus, getPersonalOnboardingStatus, PERSONAL_WS } from './status';
 import { markDismissed, markSkillAck, markCelebrated } from './state';
+import { getInternalWorkspaceRole } from '../workspaces/roles';
+import { jsonError } from '../router/helpers/json-response';
 
 type AuthUser = { id: string; email: string | null };
 
@@ -12,11 +14,15 @@ async function resolveWorkspace(request: Request, env: Env): Promise<string | nu
   return new URL(request.url).searchParams.get('workspace')?.trim() || null;
 }
 
-// No workspace context (apex /home) = the personal checklist. State rows key on the
-// PERSONAL_WS sentinel so the shared onboarding_state table needs no schema change.
-async function resolveScope(request: Request, env: Env): Promise<string> {
-  return (await resolveWorkspace(request, env)) ?? PERSONAL_WS;
+// No workspace context (apex /home) = the personal checklist (PERSONAL_WS). A
+// workspace scope must be one the caller belongs to; null means refuse.
+async function resolveScope(request: Request, env: Env, userId: string): Promise<string | null> {
+  const workspaceId = await resolveWorkspace(request, env);
+  if (!workspaceId) return PERSONAL_WS;
+  return (await getInternalWorkspaceRole(env, workspaceId, userId)) ? workspaceId : null;
 }
+
+const forbidden = () => jsonError('Not a member of this workspace', 'FORBIDDEN', 403);
 
 /** GET /v1/home/onboarding — full checklist status, or { track: null } when no surface. */
 export async function handleOnboardingGetApi(request: Request, env: Env, user: AuthUser): Promise<Response> {
@@ -29,18 +35,24 @@ export async function handleOnboardingGetApi(request: Request, env: Env, user: A
 
 /** POST /v1/home/onboarding/dismiss */
 export async function handleOnboardingDismissApi(request: Request, env: Env, user: AuthUser): Promise<Response> {
-  await markDismissed(env, await resolveScope(request, env), user.id);
+  const scope = await resolveScope(request, env, user.id);
+  if (!scope) return forbidden();
+  await markDismissed(env, scope, user.id);
   return Response.json({ ok: true });
 }
 
 /** POST /v1/home/onboarding/skill-ack — the "Get the skill" task is not server-observable. */
 export async function handleOnboardingSkillAckApi(request: Request, env: Env, user: AuthUser): Promise<Response> {
-  await markSkillAck(env, await resolveScope(request, env), user.id);
+  const scope = await resolveScope(request, env, user.id);
+  if (!scope) return forbidden();
+  await markSkillAck(env, scope, user.id);
   return Response.json({ ok: true });
 }
 
 /** POST /v1/home/onboarding/celebrate — fired once by the client when it shows the 100% moment. */
 export async function handleOnboardingCelebrateApi(request: Request, env: Env, user: AuthUser): Promise<Response> {
-  await markCelebrated(env, await resolveScope(request, env), user.id);
+  const scope = await resolveScope(request, env, user.id);
+  if (!scope) return forbidden();
+  await markCelebrated(env, scope, user.id);
   return Response.json({ ok: true });
 }

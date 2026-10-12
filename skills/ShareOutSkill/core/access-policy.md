@@ -133,8 +133,8 @@ The page queries the table **normally** — no filtering logic needed. The serve
   <div data-shareout-page="main">
     <table class="so-table"><tbody data-shareout-binding="rows"></tbody></table>
   </div>
-  <script>
-    const sdk = new ShareOut();
+  <script type="module">
+    const sdk = await ShareOut.create();
     // No client-side tenant filter — the server enforces it. We just query all.
     const rows = await sdk.table('sales').find().sort({ month: -1 }).toArray();
     // `rows` already contains ONLY the signed-in viewer's company rows.

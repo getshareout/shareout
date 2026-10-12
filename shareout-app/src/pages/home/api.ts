@@ -24,6 +24,7 @@ import { isFeatureEnabled } from '../../features/flags';
 import { CREATE_FEATURE } from '../create-gate';
 import { renderArtifactCard, renderArtifactRow, renderHomeEmptyState, renderRecentActivity, renderRecentComments, renderFolderCard } from './render-cards';
 import { buildResultLabel } from './utils';
+import { jsonWithApiErrors } from '../../http/api-error';
 import { getUserProfile, setUserProfile, addFollow, removeFollow, type Follow, type FollowKind } from '../../users/user-profile';
 
 /**
@@ -38,7 +39,7 @@ async function resolveWorkspace(
   const ws = (await hostWorkspaceId(request, env)) || new URL(request.url).searchParams.get('workspace')?.trim() || null;
   if (!ws) return null;
   if (await isLinkedWorkspaceMember(env, await getVisibilityScope(env, user), ws)) return ws;
-  return Response.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
+  return jsonWithApiErrors({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
 }
 
 const PULSE_WINDOWS: PulseWindow[] = ['today', '7d', '30d'];
@@ -86,12 +87,12 @@ export async function handleHomeEventVisibilitySetApi(
 ): Promise<Response> {
   const workspaceId = await resolveWorkspace(request, env, user);
   if (workspaceId instanceof Response) return workspaceId;
-  if (!workspaceId) return Response.json({ error: 'workspace required' }, { status: 400 });
+  if (!workspaceId) return jsonWithApiErrors({ error: 'workspace required', code: 'VALIDATION_ERROR', param: 'workspace' }, 400);
   const role = await getInternalWorkspaceRole(env, workspaceId, user.id);
-  if (role !== 'owner' && role !== 'admin') return Response.json({ error: 'Forbidden' }, { status: 403 });
-  const body = await request.json().catch(() => ({})) as { kind?: unknown; audience?: unknown };
+  if (role !== 'owner' && role !== 'admin') return jsonWithApiErrors({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
+  const body = ((await request.json().catch(() => null)) ?? {}) as { kind?: unknown; audience?: unknown };
   if (typeof body.kind !== 'string' || !(body.kind in EVENT_DEFS) || !isAudience(body.audience)) {
-    return Response.json({ error: 'invalid kind/audience' }, { status: 400 });
+    return jsonWithApiErrors({ error: 'invalid kind/audience', code: 'VALIDATION_ERROR', param: typeof body.kind === 'string' && body.kind in EVENT_DEFS ? 'audience' : 'kind' }, 400);
   }
   await setWorkspaceEventAudience(env, workspaceId, body.kind as ActivityKind, body.audience, user.id);
   return Response.json({ ok: true });
@@ -191,11 +192,11 @@ export async function handleHomeDismissEventApi(
   env: Env,
   user: { id: string; email: string | null },
 ): Promise<Response> {
-  const body = await request.json().catch(() => ({})) as { eventIds?: unknown; eventId?: unknown };
+  const body = ((await request.json().catch(() => null)) ?? {}) as { eventIds?: unknown; eventId?: unknown };
   const ids = Array.isArray(body.eventIds)
     ? (body.eventIds.filter((x) => typeof x === 'string') as string[])
     : (typeof body.eventId === 'string' ? [body.eventId] : []);
-  if (!ids.length) return Response.json({ error: 'eventIds required' }, { status: 400 });
+  if (!ids.length) return jsonWithApiErrors({ error: 'eventIds required', code: 'VALIDATION_ERROR', param: 'eventIds' }, 400);
   await dismissHomeEvents(env, user.id, ids);
   return Response.json({ ok: true });
 }

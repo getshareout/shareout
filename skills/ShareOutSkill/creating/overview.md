@@ -41,7 +41,7 @@ When the user signals speed ("quick", "rough", "just"), collapse to the trivial 
 
 ## Why this beats freestyling
 
-- **Bindings over imperative DOM.** The skeleton wires data through `data-shareout-binding` / manifest sources — ShareOut's own declarative layer — instead of hand-rolled `getElementById` + SDK calls, which is the top source of runtime errors. See [stack.md](stack.md#js-reactivity-bindings-first).
+- **Bindings over imperative DOM.** The skeleton declares data with `data-shareout-binding` / manifest sources and paints it with one `paintBindings(sdk)` helper, instead of hand-rolled `getElementById` + SDK calls per element, which is the top source of runtime errors. Bindings are editor metadata — nothing renders them unless you call the helper. See [stack.md](stack.md#js-reactivity-bindings-first).
 - **Design system over invented CSS.** Starting from `shareout.css` + `.so-` classes means brand fonts, a warm palette, and harmonized spacing for free — the default look is "designed," not "auto-generated." See [design-choice.md](design-choice.md).
 - **Every state shipped.** The skeleton stubs loading / empty / error / success so the happy-path-only trap is closed before you start.
 

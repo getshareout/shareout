@@ -1,7 +1,7 @@
 ---
 name: "shareout-skill"
-version: "2.55.0"
-updated_at: "2026-10-12T12:00:00Z"
+version: "2.56.0"
+updated_at: "2026-10-12T19:00:00Z"
 description: "Publish, update, inspect, and manage ShareOut artifacts on a self-hosted instance. Use when the user wants to build or publish a web artifact (HTML apps, dashboards, forms, or CSV/Markdown/JSON/TXT), wire SDK data stores, live data, schedules, sharing, analytics, or in-artifact AI. If the user wants to INSTALL or DEPLOY ShareOut on Cloudflare first, load deploy/SKILL.md immediately."
 skill_endpoint: "/v1/skill"
 ---
@@ -12,7 +12,7 @@ ShareOut is the workspace where AI work lives: publish HTML (and CSV/MD/JSON/TXT
 with persistent data, collab, connectors, and automation — on **your** instance.
 
 **Source of truth:** this tree lives in the product repo at
-`getshareout/shareout` → `skills/ShareOutSkill/` (see [../README.md](../README.md)).
+`getshareout/shareout` → `skills/ShareOutSkill/` (see `README.md` at the repo root).
 Do not treat `getshareout/shareout-skill` as a second place to edit — that repo is a
 **mirror / install surface**. Runtime copy for agents: `GET $ORIGIN/v1/skill`.
 
@@ -94,7 +94,7 @@ load [deploy/SKILL.md](deploy/SKILL.md).
 
 ## Version check (against **their** origin)
 
-Frontmatter `version` is this file (`2.55.0`).
+Frontmatter `version` is this file (`2.56.0`).
 
 1. `GET $ORIGIN/v1/skill/version` → `{ "version", "updated_at" }`.
 2. If newer: download `GET $ORIGIN/v1/skill` (zip), replace local skill copy, continue.

@@ -75,8 +75,8 @@ export async function handleCreateFolder(
     return json({ error: 'Invalid JSON', code: 'INVALID_JSON' }, 400);
   }
 
-  if (!body.name?.trim()) {
-    return json({ error: 'name is required', code: 'VALIDATION_ERROR' }, 400);
+  if (typeof body?.name !== 'string' || !body.name.trim()) {
+    return json({ error: 'name is required', code: 'VALIDATION_ERROR', param: 'name' }, 400);
   }
 
   const slug = body.slug || generateFolderSlug(body.name);

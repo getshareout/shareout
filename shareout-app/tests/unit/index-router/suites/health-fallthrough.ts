@@ -65,7 +65,7 @@ describe('index router — health, debug, and fallthrough', () => {
     // under a reserved product namespace keep the worker's own 404.
     const response = await fetchPath('/v1/totally-unknown-route');
     expect(response.status).toBe(404);
-    await expect(response.text()).resolves.toBe('Not Found');
+    await expect(response.json()).resolves.toMatchObject({ success: false, code: 'ROUTE_NOT_FOUND' });
   });
 
   it('returns 405 with Allow for matched path with wrong HTTP method', async () => {

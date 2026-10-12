@@ -1,5 +1,7 @@
 # Presenter Mode
 
+> **Not available — design spec only.** The `sdk.dashboards.*` module has no backend: `/v1/data/{artifactId}/dashboards` returns 404 on every deployment. Do not build on it. For a dashboard with data, use [`sdk.table`](../../sdk/table.md) / [`sdk.json`](../../sdk/json.md) and the patterns in [patterns/dashboards.md](../../patterns/dashboards.md).
+
 Dashboard presentation system with widget focus, auto-cycling, timer, and pointer sync.
 
 ## Overview

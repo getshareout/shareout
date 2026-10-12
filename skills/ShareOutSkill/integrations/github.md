@@ -234,7 +234,7 @@ The SDK at `/sdk/shareout.js` provides the `shareout.github` namespace.
 Opens a popup for GitHub OAuth. Returns a promise that resolves to `true` on success or `false` on failure.
 
 ```javascript
-const sdk = new ShareOut();
+const sdk = await ShareOut.create();
 const connected = await sdk.github.authorize();
 if (connected) {
   console.log('GitHub connected!');
@@ -309,8 +309,8 @@ console.log(result.filesCommitted); // 3
   <button id="export" disabled>Export to GitHub</button>
   <div id="status"></div>
 
-  <script>
-    const sdk = new ShareOut();
+  <script type="module">
+    const sdk = await ShareOut.create();
     const connectBtn = document.getElementById('connect');
     const exportBtn = document.getElementById('export');
     const status = document.getElementById('status');

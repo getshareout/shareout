@@ -16,6 +16,7 @@ function makeEnv(rows: {
         bind(..._args: unknown[]) {
           return {
             async first() {
+              if (rows.artifact?.deleted_at && sql.includes('FROM artifacts') && sql.includes('deleted_at IS NULL')) return null;
               if (sql.includes('FROM artifacts a') && sql.includes('JOIN deployments')) {
                 return rows.artifact ?? null;
               }
@@ -82,5 +83,15 @@ describe('editor access', () => {
     const env = makeEnv({ artifact: otherArtifact, collab: { role: 'viewer' } });
     const res = await resolveArtifactEditorAccess(env, 'art_1', user);
     expect(res.ok).toBe(false);
+  });
+
+  it('returns 404 for a trashed artifact, even to its owner', async () => {
+    const env = makeEnv({ artifact: { ...otherArtifact, owner_id: user.id, deleted_at: '2026-10-12T00:00:00Z' } });
+    const byId = await resolveArtifactEditorAccess(env, 'art_1', user);
+    expect(byId.ok).toBe(false);
+    if (!byId.ok) expect(byId.response.status).toBe(404);
+    const bySlug = await resolveSlugEditorAccess(env, 'weekly-report', user);
+    expect(bySlug.ok).toBe(false);
+    if (!bySlug.ok) expect(bySlug.response.status).toBe(404);
   });
 });

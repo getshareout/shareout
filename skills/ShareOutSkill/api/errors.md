@@ -43,6 +43,7 @@ On a 5xx, or when the same error repeats after following its `hint`, file a tick
 | `FORBIDDEN` | 403 | Access denied — the key works but this person can't touch that workspace/page. Retrying won't help; a workspace admin has to invite them |
 | `INSUFFICIENT_SCOPE` | 403 | A workspace Agent token (`sot_`) lacks the scope for this call (e.g. `artifacts:publish`) |
 | `NOT_FOUND` | 404 | Resource not found |
+| `ROUTE_NOT_FOUND` | 404 | No such `/v1` endpoint for that method and path (typo, wrong method, or trailing slash) — check the path in the docs |
 | `INVALID_REQUEST` | 400 | Bad request format |
 | `CONFLICT` | 409 | Version conflict |
 | `RATE_LIMIT_EXCEEDED` | 429 | Rate limit on publish, account creation, and in-artifact AI (visitor chat / pilot). Body has `reset` / `retryAfter`; header `Retry-After` |

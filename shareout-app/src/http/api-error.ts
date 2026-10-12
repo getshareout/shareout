@@ -173,10 +173,20 @@ export function jsonWithApiErrors(
   return response;
 }
 
+const STATUS_CODES: Record<number, string> = {
+  401: 'UNAUTHORIZED',
+  403: 'FORBIDDEN',
+  404: 'NOT_FOUND',
+  405: 'METHOD_NOT_ALLOWED',
+  409: 'CONFLICT',
+  429: 'RATE_LIMITED',
+};
+
 /**
  * Stamp `request_id` — and, on 5xx, {@link SUPPORT_CONTACT} — into a JSON error body
  * that lacks them, so every error an agent sees carries the id a support ticket needs.
- * Non-JSON, non-error and oversized bodies pass through untouched.
+ * Ad-hoc `{ error }` bodies also get the envelope's `success: false` and a `code`
+ * derived from the status. Non-JSON, non-error and oversized bodies pass through untouched.
  */
 export async function withErrorContext(response: Response, requestId: string): Promise<Response> {
   if (response.status < 400 || !response.body) return response;
@@ -195,6 +205,8 @@ export async function withErrorContext(response: Response, requestId: string): P
     return new Response(text, init);
   }
   const b = body as Record<string, unknown>;
+  b.success ??= false;
+  b.code ??= STATUS_CODES[response.status] ?? (response.status >= 500 ? 'INTERNAL_ERROR' : 'INVALID_REQUEST');
   b.request_id ??= requestId;
   if (response.status >= 500) b.support ??= SUPPORT_CONTACT;
   init.headers.delete('Content-Length');

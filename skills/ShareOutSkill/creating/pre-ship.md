@@ -45,7 +45,7 @@ Run this before every publish. If a box can't be honestly ticked, it's not done.
 
 - [ ] Init is `await ShareOut.create()`, wrapped in try/catch.
 - [ ] Every store used (`json` keys, `table()` names, `connection()` names) is **declared in the manifest** with `default` sample data for editor preview.
-- [ ] Dynamic data is painted via **`data-shareout-binding` / templates**, not imperative `getElementById` + `innerHTML`.
+- [ ] Dynamic data is declared with **`data-shareout-binding` / templates** and painted by `paintBindings(sdk)` (bindings render nothing on their own — a viewer would see the placeholders), not imperative `getElementById` + `innerHTML`.
 - [ ] No raw `fetch` to `/v1/data/...` — SDK methods only.
 - [ ] Charts are **SVG (Plotly)** if the artifact is delivered by screenshot (Slack/PDF/thumbnail/email); `<canvas>` only for view-only interactive. See [stack.md](stack.md#charts).
 

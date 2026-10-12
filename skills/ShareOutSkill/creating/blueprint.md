@@ -99,7 +99,7 @@ A complete, editor-ready, moderation-safe starting point, split per best practic
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
 ```
 
-**`app.js`** — guarded SDK init + behavior:
+**`app.js`** — guarded SDK init + behavior. Paste `paintBindings()` from [../core/html-spec/bindings.md](../core/html-spec/bindings.md#rendering-for-viewers) at the top of this file:
 
 ```js
 (async () => {
@@ -110,7 +110,8 @@ A complete, editor-ready, moderation-safe starting point, split per best practic
   };
   try {
     const sdk = await ShareOut.create();   // awaited: Bearer token ready
-    // ...read/write via SDK only for logic; paint data via data-shareout-binding...
+    window.sdk = sdk;                       // inline handlers below reuse it
+    await paintBindings(sdk);               // bindings render nothing on their own
     show('content');
     ShareOut.ready();                       // signal first paint complete (static call)
   } catch (err) {
@@ -124,10 +125,10 @@ Why each piece matters: relative links keep it working under `/a/{slug}/` after 
 
 ## Archetype: dashboard / report
 
-For daily monitoring and deliverables. Data via bindings and the chart attribute — not imperative DOM. Declare the table (and any connection) in the manifest with `default` rows.
+For daily monitoring and deliverables. Data via bindings (painted by `paintBindings`) and the chart attribute (drawn with Plotly — see [../core/html-spec/templates.md](../core/html-spec/templates.md#charts)). Declare the table (and any connection) in the manifest with `default` rows.
 
 ```html
-<!-- KPI row: aggregate bindings, no JS -->
+<!-- KPI row: aggregate bindings, filled by paintBindings(sdk) -->
 <div class="so-grid so-grid-3">
   <div class="so-kpi"><span class="so-kpi-label">Orders</span>
     <span class="so-kpi-value" data-shareout-binding="table:orders:count:id">0</span></div>
@@ -139,17 +140,17 @@ For daily monitoring and deliverables. Data via bindings and the chart attribute
           data-shareout-format="currency">$0</span></div>
 </div>
 
-<!-- Chart: declarative. Use SVG (Plotly) if this is delivered by screenshot -->
+<!-- Chart: declared for the editor; draw it with Plotly (SVG survives screenshots) -->
 <div data-shareout-chart='{"type":"line","title":"Revenue trend"}'
      data-shareout-chart-data="table:orders"
      data-shareout-chart-x="date" data-shareout-chart-y="amount"></div>
 ```
 
-Avoid the three-equal-cards trap — vary the layout. Deeper patterns: [../patterns/dashboards.md](../patterns/dashboards.md), [../modules/dashboards/overview.md](../modules/dashboards/overview.md). Chart/screenshot rule: [stack.md](stack.md#charts).
+Avoid the three-equal-cards trap — vary the layout. Deeper patterns: [../patterns/dashboards.md](../patterns/dashboards.md). Chart/screenshot rule: [stack.md](stack.md#charts).
 
 ## Archetype: form / collection
 
-For internal tools and viewer submissions. Writes go to `sdk.table()`; the list re-renders via a template binding, not innerHTML.
+For internal tools and viewer submissions. Writes go to `sdk.table()`; the list re-renders by re-running `paintBindings(sdk)` over the template, not innerHTML.
 
 ```html
 <form id="entry" class="so-stack">
@@ -160,7 +161,7 @@ For internal tools and viewer submissions. Writes go to `sdk.table()`; the list 
   <button class="so-btn so-btn-primary" type="submit">Add</button>
 </form>
 
-<!-- Submissions render declaratively from the table -->
+<!-- Submissions: template expanded by paintBindings(sdk) -->
 <ul data-shareout-template="rows" data-shareout-template-source="table:entries">
   <li data-shareout-template-item>
     <span data-shareout-binding="table:entries:row:$id:name"></span>
@@ -172,6 +173,7 @@ For internal tools and viewer submissions. Writes go to `sdk.table()`; the list 
     e.preventDefault();
     try {
       await sdk.table('entries').insert({ name: e.target.name.value });
+      await paintBindings(sdk);
       e.target.reset();
       ShareOutUI.toast('Added');
     } catch (err) { ShareOutUI.toast('Could not save', { type: 'error' }); }

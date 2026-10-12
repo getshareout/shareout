@@ -46,41 +46,41 @@ export async function investigatePlatformMetrics(
     case 'marketing_funnel': {
       const [byEvent, byMode, byCountry, sessions, chips, teamsEvents, priorViews] = await Promise.all([
         env.DB.prepare(
-          `SELECT event, COUNT(*) AS count FROM funnel_events WHERE date(ts) = ? GROUP BY event ORDER BY count DESC`
+          `SELECT event, COUNT(*) AS count FROM funnel_events WHERE date(created_at) = ? GROUP BY event ORDER BY count DESC`
         )
           .bind(date)
           .all<{ event: string; count: number }>(),
         env.DB.prepare(
           `SELECT COALESCE(mode, '(none)') AS mode, event, COUNT(*) AS count
-           FROM funnel_events WHERE date(ts) = ? GROUP BY mode, event ORDER BY count DESC`
+           FROM funnel_events WHERE date(created_at) = ? GROUP BY mode, event ORDER BY count DESC`
         )
           .bind(date)
           .all<{ mode: string; event: string; count: number }>(),
         env.DB.prepare(
           `SELECT COALESCE(country, 'XX') AS country, COUNT(*) AS count
-           FROM funnel_events WHERE date(ts) = ? AND event = 'view' GROUP BY country ORDER BY count DESC LIMIT ?`
+           FROM funnel_events WHERE date(created_at) = ? AND event = 'view' GROUP BY country ORDER BY count DESC LIMIT ?`
         )
           .bind(date, limit)
           .all<{ country: string; count: number }>(),
         env.DB.prepare(
-          `SELECT COUNT(DISTINCT sid) AS sessions FROM funnel_events WHERE date(ts) = ? AND sid IS NOT NULL`
+          `SELECT COUNT(DISTINCT sid) AS sessions FROM funnel_events WHERE date(created_at) = ? AND sid IS NOT NULL`
         )
           .bind(date)
           .first<{ sessions: number }>(),
         env.DB.prepare(
           `SELECT label, COUNT(*) AS count FROM funnel_events
-           WHERE date(ts) = ? AND event = 'chip' AND label IS NOT NULL GROUP BY label ORDER BY count DESC LIMIT ?`
+           WHERE date(created_at) = ? AND event = 'chip' AND label IS NOT NULL GROUP BY label ORDER BY count DESC LIMIT ?`
         )
           .bind(date, limit)
           .all<{ label: string; count: number }>(),
         env.DB.prepare(
           `SELECT event, COUNT(*) AS count FROM funnel_events
-           WHERE date(ts) = ? AND event LIKE 'teams_%' GROUP BY event ORDER BY count DESC`
+           WHERE date(created_at) = ? AND event LIKE 'teams_%' GROUP BY event ORDER BY count DESC`
         )
           .bind(date)
           .all<{ event: string; count: number }>(),
         env.DB.prepare(
-          `SELECT COUNT(*) AS views FROM funnel_events WHERE date(ts) = ? AND event = 'view'`
+          `SELECT COUNT(*) AS views FROM funnel_events WHERE date(created_at) = ? AND event = 'view'`
         )
           .bind(priorDate)
           .first<{ views: number }>(),
@@ -200,8 +200,8 @@ export async function investigatePlatformMetrics(
 
     case 'errors': {
       const rows = await env.DB.prepare(
-        `SELECT ts, status, outcome, method, route, path, substr(message, 1, 300) AS message
-         FROM ops_error_log WHERE date(ts) = ? ORDER BY ts DESC LIMIT ?`
+        `SELECT created_at AS ts, status, outcome, method, route, path, substr(message, 1, 300) AS message
+         FROM ops_error_log WHERE date(created_at) = ? ORDER BY created_at DESC LIMIT ?`
       )
         .bind(date, limit)
         .all<Record<string, unknown>>();

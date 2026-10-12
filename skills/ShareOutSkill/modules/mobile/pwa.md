@@ -23,35 +23,38 @@ Progressive Web Apps make web content feel like native apps:
 
 ### Enable PWA on Publish
 
-```javascript
-const sdk = new ShareOut();
+PWA is a field on the normal publish call — there is no `sdk.publish()`; publish over REST
+([api/artifacts.md](../../api/artifacts.md#post-v1publish)):
 
-await sdk.publish({
-  slug: 'my-app',
-  title: 'My App',
-  html: appHtml,
+```http
+POST /v1/publish
+Authorization: Bearer so_xxx
+Content-Type: application/json
 
-  // Enable PWA
-  pwa: {
-    enabled: true,
-    name: 'My App',
-    short_name: 'MyApp',
-    icon: iconBase64,  // 512x512 PNG, base64 encoded
-    theme_color: '#3b82f6',
-    background_color: '#ffffff'
+{
+  "name": "My App",
+  "slug": "my-app",
+  "entrypoint": "index.html",
+  "files": [{ "path": "index.html", "content": "<!DOCTYPE html>...", "mime": "text/html", "encoding": "utf8" }],
+  "pwa": {
+    "enabled": true,
+    "name": "My App",
+    "short_name": "MyApp",
+    "icon": "data:image/png;base64,...",
+    "theme_color": "#3b82f6",
+    "background_color": "#ffffff"
   }
-});
+}
 ```
 
 ### What ShareOut Generates
 
-When `pwa.enabled: true`, ShareOut automatically:
+When `pwa.enabled: true`, ShareOut:
 
-1. **Creates manifest.json** at `/a/{slug}/manifest.json`
-2. **Generates icons** at multiple sizes (192, 512)
-3. **Registers service worker** for offline caching
-4. **Adds meta tags** to HTML for iOS/Android
-5. **Shows install prompt** to eligible users
+1. **Serves manifest.json** at `/a/{slug}/manifest.json` (`start_url` defaults to and `scope` is `$ORIGIN/a/{slug}/`, the canonical routing URL — not the workspace subdomain URL)
+2. **Serves your icon** at `/a/{slug}/_pwa/icon-{size}.png` (see [Icon Requirements](#icon-requirements))
+3. **Serves a service worker** at `/a/{slug}/sw.js` for offline caching
+4. **Adds meta tags** to the HTML for iOS/Android
 
 ---
 
@@ -59,47 +62,30 @@ When `pwa.enabled: true`, ShareOut automatically:
 
 ### Full PWA Options
 
+These are all the fields the server reads; anything else is ignored.
+
 ```javascript
 pwa: {
   // Required
   enabled: true,
-  name: 'My Application',      // Full app name (max 45 chars)
-  short_name: 'MyApp',         // Homescreen name (max 12 chars)
-  icon: iconBase64,            // 512x512 PNG
+  name: 'My Application',      // Full app name
+  short_name: 'MyApp',         // Homescreen name (keep ≤ 12 chars)
+  icon: iconBase64,            // 512x512 PNG, base64 (data: URL prefix optional)
 
-  // Optional - Appearance
+  // Optional
+  description: 'What the app does',
   theme_color: '#3b82f6',      // Browser chrome color
   background_color: '#ffffff', // Splash screen background
-  display: 'standalone',       // standalone, fullscreen, minimal-ui
-
-  // Optional - Behavior
-  start_url: '/',              // Where app opens (default: /)
-  scope: '/',                  // Navigation scope
-  orientation: 'any',          // any, portrait, landscape
-
-  // Optional - Icons
-  icons: {
-    favicon: favicon16Base64,  // 16x16 for browser tab
-    apple_touch: icon180Base64 // 180x180 for iOS
-  },
+  display: 'standalone',       // standalone | fullscreen | minimal-ui | browser
+  orientation: 'any',          // any | portrait | landscape
+  start_url: '/a/my-app/',     // Where the app opens (default: the artifact URL)
 
   // Optional - Offline
   offline: {
     enabled: true,
-    strategy: 'cache-first',   // cache-first, network-first
+    strategy: 'cache-first',   // cache-first | network-first
     cacheName: 'my-app-v1',
-    assets: [                  // Additional assets to cache
-      '/fonts/inter.woff2',
-      '/images/logo.png'
-    ]
-  },
-
-  // Optional - Install Prompt
-  installPrompt: {
-    enabled: true,
-    delay: 5000,               // ms before showing (0 = immediate)
-    text: 'Install this app for a better experience',
-    buttonText: 'Install'
+    assets: ['styles.css', 'assets/logo.png']  // Additional assets to cache
   }
 }
 ```
@@ -117,48 +103,11 @@ pwa: {
 
 ## Icon Requirements
 
-### Required Icon
-
-```javascript
-// Minimum: 512x512 PNG
-pwa: {
-  icon: await readFileAsBase64('icon-512.png')
-}
-```
-
-### ShareOut Auto-Generates
-
-From your 512x512 icon, ShareOut creates:
-
-| Size | Purpose |
-|------|---------|
-| 512×512 | Splash screen, high-res |
-| 384×384 | Android install |
-| 192×192 | Android homescreen |
-| 180×180 | iOS homescreen |
-| 152×152 | iPad |
-| 144×144 | Android legacy |
-| 128×128 | Chrome Web Store |
-| 96×96 | Windows taskbar |
-| 72×72 | Android low-res |
-| 48×48 | Android mini |
-| 32×32 | Favicon |
-| 16×16 | Favicon |
-
-### Custom Icons
-
-```javascript
-pwa: {
-  icon: mainIcon512,
-
-  // Override specific sizes
-  icons: {
-    favicon: favicon32,
-    apple_touch: appleIcon180,
-    maskable: maskableIcon512  // Safe zone icon for Android
-  }
-}
-```
+Provide **one** square 512×512 PNG as `pwa.icon`. ShareOut does **not** resize it: the manifest
+lists sizes 512, 384, 192, 152, 144, 128, 96 and 72 (plus 512/192 as `maskable`), and every
+`/a/{slug}/_pwa/icon-{size}.png` path returns that same 512×512 file — browsers and launchers
+scale it down. Design the icon so it still reads at small sizes, and keep important content in
+the maskable safe zone below. There is no per-size override.
 
 ### Maskable Icons
 
@@ -239,27 +188,8 @@ pwa: {
 
 ### Automatic Prompt
 
-```javascript
-pwa: {
-  installPrompt: {
-    enabled: true,
-    delay: 5000  // Show after 5 seconds
-  }
-}
-```
-
-```
-┌─────────────────────────────────────────┐
-│ ┌─────────────────────────────────────┐ │
-│ │ 📱 Add My App to Home Screen       │ │
-│ │                                     │ │
-│ │ Install for quick access and       │ │
-│ │ offline use.                        │ │
-│ │                                     │ │
-│ │ [Not Now]           [Install]       │ │
-│ └─────────────────────────────────────┘ │
-└─────────────────────────────────────────┘
-```
+There is no `installPrompt` config: the browser decides when to offer installation once the
+manifest and service worker are valid. To control the timing, use a custom button (below).
 
 ### Custom Install Button
 

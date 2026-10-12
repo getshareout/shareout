@@ -134,7 +134,7 @@ Content-Type: application/json
 
 Clear the assignment by passing `"assignee": null` (also clears `dueAt`).
 
-**Auth:** session required. Permitted callers: comment author, artifact owner, or current assignee.
+**Auth:** signed-in user (session cookie or Bearer API token). Permitted callers: comment author, artifact owner, or current assignee.
 
 **Errors:** `400 ASSIGNEE_NOT_FOUND` — email is not a workspace member or collaborator.
 

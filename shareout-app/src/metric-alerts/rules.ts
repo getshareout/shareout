@@ -101,6 +101,7 @@ export async function createRule(
   const cond = validateCondition(req.condition);
   if (!cond.ok) return { error: cond.error };
 
+  if (typeof req.metric_id !== 'string' || !req.metric_id) return { error: 'metric_id is required' };
   const def = await getDefinition(env, req.artifact_id, req.metric_id);
   if (!def) return { error: `Metric "${req.metric_id}" is not defined on this artifact` };
 

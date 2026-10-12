@@ -64,7 +64,15 @@
     },
     {
       "name": "Folders",
-      "description": "Organize artifacts into personal folders."
+      "description": "Organize artifacts into personal and Team Space folders."
+    },
+    {
+      "name": "Knowledge",
+      "description": "Per-workspace learned knowledge — notes, search, entities."
+    },
+    {
+      "name": "Tokens",
+      "description": "Self-serve personal API tokens."
     },
     {
       "name": "Assets",
@@ -84,7 +92,7 @@
     },
     {
       "name": "Account",
-      "description": "Plan tier and upgrades."
+      "description": "Plan tier, upgrades, and feature introspection."
     },
     {
       "name": "Auth",
@@ -522,6 +530,31 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "Set `true` to include an exact `total` (extra query).",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -537,6 +570,19 @@
                       "items": {
                         "$ref": "#/components/schemas/Artifact"
                       }
+                    },
+                    "has_more": {
+                      "type": "boolean"
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Only with `count=true`."
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "type": "integer"
                     }
                   }
                 }
@@ -2480,7 +2526,8 @@
             "in": "query",
             "schema": {
               "type": "integer",
-              "default": 50
+              "default": 100,
+              "maximum": 1000
             }
           },
           {
@@ -2494,7 +2541,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Blobs",
+            "description": "Blobs, newest first",
             "content": {
               "application/json": {
                 "schema": {
@@ -2515,8 +2562,11 @@
                         "total": {
                           "type": "integer"
                         },
-                        "hasMore": {
-                          "type": "boolean"
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
                         }
                       }
                     }
@@ -2526,30 +2576,42 @@
             }
           }
         }
-      },
+      }
+    },
+    "/v1/data/{artifactId}/blobs/upload": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DataArtifactId"
+        }
+      ],
       "post": {
         "tags": [
           "Blobs"
         ],
-        "summary": "Upload a blob",
-        "description": "Max 50MB per file, 500MB per artifact, 1000 blobs.",
-        "operationId": "uploadBlob",
+        "summary": "Request an upload URL",
+        "description": "Step 1 of an upload. Returns an `uploadUrl`; PUT the raw file bytes to it within 15 minutes. When `direct` is true (presigned storage URL, non-browser callers only), POST `confirmUrl` afterwards to record the blob; when false the PUT itself records it and returns the Blob (201). Limits: 50MB per file, 500MB and 1000 blobs per artifact.",
+        "operationId": "requestBlobUpload",
         "requestBody": {
           "required": true,
           "content": {
-            "multipart/form-data": {
+            "application/json": {
               "schema": {
                 "type": "object",
                 "required": [
-                  "file"
+                  "filename",
+                  "mimeType"
                 ],
                 "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  },
                   "filename": {
                     "type": "string"
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "description": "image/*, video/*, audio/*, application/pdf, text/plain, text/csv, text/markdown."
+                  },
+                  "size": {
+                    "type": "integer",
+                    "description": "Bytes. Optional, enables early quota checks."
                   }
                 }
               }
@@ -2557,8 +2619,90 @@
           }
         },
         "responses": {
+          "201": {
+            "description": "Upload URL issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "uploadUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "confirmUrl": {
+                          "type": "string",
+                          "description": "Present only when `direct` is true."
+                        },
+                        "tokenId": {
+                          "type": "string"
+                        },
+                        "direct": {
+                          "type": "boolean"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "maxSize": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "413": {
+            "description": "File too large or storage full",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/data/{artifactId}/blobs/{tokenId}/confirm": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DataArtifactId"
+        },
+        {
+          "name": "tokenId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "Blobs"
+        ],
+        "summary": "Confirm a direct upload",
+        "description": "Records the blob after a `direct` PUT. Idempotent.",
+        "operationId": "confirmBlobUpload",
+        "responses": {
           "200": {
-            "description": "Uploaded",
+            "description": "Already confirmed"
+          },
+          "201": {
+            "description": "Blob recorded",
             "content": {
               "application/json": {
                 "schema": {
@@ -2575,15 +2719,233 @@
               }
             }
           },
-          "413": {
-            "description": "File too large or storage full",
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/data/{artifactId}/blobs/storage": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DataArtifactId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Blobs"
+        ],
+        "summary": "Storage usage",
+        "operationId": "getBlobStorage",
+        "responses": {
+          "200": {
+            "description": "Usage for this artifact",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "usedBytes": {
+                          "type": "integer"
+                        },
+                        "blobCount": {
+                          "type": "integer"
+                        },
+                        "maxBytes": {
+                          "type": "integer"
+                        },
+                        "maxBlobs": {
+                          "type": "integer"
+                        },
+                        "availableBytes": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/v1/data/{artifactId}/blobs/{blobId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DataArtifactId"
+        },
+        {
+          "name": "blobId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Blobs"
+        ],
+        "summary": "Get blob metadata",
+        "operationId": "getBlob",
+        "responses": {
+          "200": {
+            "description": "Blob metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/Blob"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "contentUrl": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Blobs"
+        ],
+        "summary": "Delete a blob",
+        "operationId": "deleteBlob",
+        "responses": {
+          "200": {
+            "description": "Deleted (`data.deleted` is true)"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/data/{artifactId}/blobs/{blobId}/content": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DataArtifactId"
+        },
+        {
+          "name": "blobId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Blobs"
+        ],
+        "summary": "Download blob bytes",
+        "description": "Media types render inline; everything else downloads as an attachment.",
+        "operationId": "getBlobContent",
+        "responses": {
+          "200": {
+            "description": "File bytes",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/data/{artifactId}/blobs/{blobId}/download-url": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DataArtifactId"
+        },
+        {
+          "name": "blobId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Blobs"
+        ],
+        "summary": "Get a download URL",
+        "description": "A short-lived presigned URL when configured (`direct`, `expiresIn` 300s), else the content route.",
+        "operationId": "getBlobDownloadUrl",
+        "responses": {
+          "200": {
+            "description": "Download URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        },
+                        "direct": {
+                          "type": "boolean"
+                        },
+                        "expiresIn": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -3044,6 +3406,1409 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/folders": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Folders"
+        ],
+        "summary": "List Team Space folders",
+        "description": "Top-level folders by default; `parent_id` lists one level below it, `all=1` returns every depth. Any member.",
+        "operationId": "listWorkspaceFolders",
+        "parameters": [
+          {
+            "name": "parent_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "all",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Folders (unpaginated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "folders": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Folder"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Folders"
+        ],
+        "summary": "Create a Team Space folder",
+        "description": "Owner/admin only (members get 403 ADMIN_REQUIRED).",
+        "operationId": "createWorkspaceFolder",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string",
+                    "description": "Auto-generated from name if omitted."
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "parent_id": {
+                    "type": "string"
+                  },
+                  "readme": {
+                    "type": "string",
+                    "description": "Markdown folder guide."
+                  },
+                  "visibility": {
+                    "type": "string",
+                    "enum": [
+                      "inherit",
+                      "public",
+                      "workspace",
+                      "private"
+                    ],
+                    "default": "inherit"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Folder"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "parent_id not found (PARENT_NOT_FOUND)"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/folders/by-path/{path}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        },
+        {
+          "name": "path",
+          "in": "path",
+          "required": true,
+          "description": "Slash-separated folder slugs, e.g. `clients/acme`.",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Folders"
+        ],
+        "summary": "Get a Team Space folder by slug path",
+        "operationId": "getWorkspaceFolderByPath",
+        "responses": {
+          "200": {
+            "description": "The folder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Folder"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/folders/{folderId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        },
+        {
+          "name": "folderId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Folders"
+        ],
+        "summary": "Get a Team Space folder",
+        "operationId": "getWorkspaceFolder",
+        "responses": {
+          "200": {
+            "description": "The folder, with `path`, `readme` and `effective_visibility`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Folder"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Folders"
+        ],
+        "summary": "Update a Team Space folder",
+        "description": "Also accepts PUT. Any member.",
+        "operationId": "updateWorkspaceFolder",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "readme": {
+                    "type": "string"
+                  },
+                  "visibility": {
+                    "type": "string",
+                    "enum": [
+                      "inherit",
+                      "public",
+                      "workspace",
+                      "private"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated folder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Folder"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Folders"
+        ],
+        "summary": "Delete a Team Space folder",
+        "description": "Owner/admin only. Artifacts become unfiled and subfolders move to the top level.",
+        "operationId": "deleteWorkspaceFolder",
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "deleted": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/artifacts/{artifactId}/move": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        },
+        {
+          "name": "artifactId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "Folders"
+        ],
+        "summary": "Move a workspace artifact into a Team Space folder",
+        "description": "Pass `folder_id: null` to unfile it.",
+        "operationId": "moveWorkspaceArtifact",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "folder_id"
+                ],
+                "properties": {
+                  "folder_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Moved"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/knowledge": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Knowledge settings and counts",
+        "description": "Returns `{enabled:false, ...}` when Knowledge is off. Any member.",
+        "operationId": "getKnowledge",
+        "responses": {
+          "200": {
+            "description": "Settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    },
+                    "lastUpdated": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/knowledge/enable": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Turn Knowledge on or off",
+        "description": "Owner/admin. Body `{ \"enabled\": false }` turns it off; anything else turns it on.",
+        "operationId": "enableKnowledge",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New state (`{ enabled }`)"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/knowledge/status": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Learning progress (last 24h)",
+        "operationId": "getKnowledgeStatus",
+        "responses": {
+          "200": {
+            "description": "Progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "queued": {
+                      "type": "integer"
+                    },
+                    "processed": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "running": {
+                      "type": "boolean"
+                    },
+                    "lastProcessedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/knowledge/backfill": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Queue existing pages and Files for learning",
+        "description": "Owner/admin.",
+        "operationId": "backfillKnowledge",
+        "responses": {
+          "200": {
+            "description": "Queued counts (`queued`, `kicked`, `corpus`, `corpusRemaining`)"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/knowledge/tree": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "All knowledge notes grouped by kind (no bodies)",
+        "operationId": "getKnowledgeTree",
+        "responses": {
+          "200": {
+            "description": "`{ enabled, groups, count, issues }`"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/knowledge/files/{path}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        },
+        {
+          "name": "path",
+          "in": "path",
+          "required": true,
+          "description": "Note path ending in `.md` (may contain slashes).",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Read one knowledge note",
+        "operationId": "getKnowledgeFile",
+        "responses": {
+          "200": {
+            "description": "`{ enabled, node }` with body and sources"
+          },
+          "404": {
+            "description": "Not found, or Knowledge is off"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Write a knowledge note",
+        "description": "Any member. Send the markdown (with frontmatter `kind`, `id`, `title`) as `text/markdown`, or JSON `{ \"content\": \"...\" }`. Human edits win over learned ones.",
+        "operationId": "putKnowledgeFile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "text/markdown": {
+              "schema": {
+                "type": "string"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved (`{ ok, source: \"manual\" }`)"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Delete a knowledge note",
+        "description": "Owner/admin. `forget=1` also stops it being re-learned.",
+        "operationId": "deleteKnowledgeFile",
+        "parameters": [
+          {
+            "name": "forget",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted (`{ ok, forgotten }`)"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/knowledge/search": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Search the workspace's Files and pages",
+        "description": "Cited passages. 409 KNOWLEDGE_DISABLED when off; 501 when the instance has no search index.",
+        "operationId": "searchKnowledge",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "`md` returns text/markdown.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "md"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`{ query, ... }` results"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "description": "Knowledge is off (KNOWLEDGE_DISABLED)"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/knowledge/entities": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "List entities the workspace is about",
+        "operationId": "listKnowledgeEntities",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entities, most-mentioned first"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/knowledge/entities/{entityId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        },
+        {
+          "name": "entityId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "One entity with facts, connections and evidence",
+        "operationId": "getKnowledgeEntity",
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "md"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The entity"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/knowledge/graph": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Entity graph (nodes + edges)",
+        "operationId": "getKnowledgeGraph",
+        "parameters": [
+          {
+            "name": "focus",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "maximum": 3
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "maximum": 300
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Graph"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/knowledge/sources": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Indexed sources",
+        "operationId": "listKnowledgeSources",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sources"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/knowledge/usage": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Knowledge cost for this workspace",
+        "description": "Owner/admin.",
+        "operationId": "getKnowledgeUsage",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 30,
+              "maximum": 365
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usage"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/context": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "List workspace guidance (context) files",
+        "description": "Any member. Markdown house rules an agent reads when working in the workspace.",
+        "operationId": "listWorkspaceContext",
+        "responses": {
+          "200": {
+            "description": "Files (unpaginated, max 100)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entry": {
+                      "type": "string",
+                      "description": "File an agent reads first (default `index.md`)."
+                    },
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "size": {
+                            "type": "integer"
+                          },
+                          "is_entry": {
+                            "type": "boolean"
+                          },
+                          "updated_by": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "updated_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Set the entry file",
+        "description": "Owner/admin. Also accepts PATCH. `null` or empty resets to `index.md`.",
+        "operationId": "setWorkspaceContextEntry",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "entry": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`{ entry }`"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/context/{name}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        },
+        {
+          "name": "name",
+          "in": "path",
+          "required": true,
+          "description": "Lowercase file name ending in `.md` (max 64 chars).",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Read a guidance file",
+        "operationId": "getWorkspaceContextFile",
+        "responses": {
+          "200": {
+            "description": "The markdown",
+            "content": {
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Create or replace a guidance file",
+        "description": "Owner/admin. Also accepts POST. Raw markdown body or JSON `{ \"content\": \"...\" }`; max 64KB, 100 files.",
+        "operationId": "putWorkspaceContextFile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "text/markdown": {
+              "schema": {
+                "type": "string"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`{ name, size, updated: true }`"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Delete a guidance file",
+        "description": "Owner/admin.",
+        "operationId": "deleteWorkspaceContextFile",
+        "responses": {
+          "200": {
+            "description": "`{ name, deleted: true }`"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/audit": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Workspace audit log",
+        "description": "Owner/admin. Newest first. No offset/cursor — only the most recent `limit` entries.",
+        "operationId": "getWorkspaceAudit",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "minimum": 1,
+              "maximum": 500
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "ts": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "actor_id": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "actor_email": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "action": {
+                            "type": "string"
+                          },
+                          "target_type": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "target_id": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "detail": {
+                            "description": "Parsed JSON detail, or null."
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/me/tokens": {
+      "get": {
+        "tags": [
+          "Tokens"
+        ],
+        "summary": "List my API tokens",
+        "description": "Metadata only — a token's plaintext is never recoverable.",
+        "operationId": "listMyTokens",
+        "responses": {
+          "200": {
+            "description": "Tokens (unpaginated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "tokens": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "last_used_at": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Tokens"
+        ],
+        "summary": "Create an API token",
+        "description": "Mints a personal token, returned once. Body optional; `{ \"regenerate\": true }` first revokes all of the caller's existing tokens.",
+        "operationId": "createMyToken",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "regenerate": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "token": {
+                      "type": "string"
+                    },
+                    "shown_once": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/me/tokens/{tokenId}": {
+      "parameters": [
+        {
+          "name": "tokenId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "delete": {
+        "tags": [
+          "Tokens"
+        ],
+        "summary": "Revoke one of my API tokens",
+        "operationId": "revokeMyToken",
+        "responses": {
+          "200": {
+            "description": "Revoked (`{ ok: true }`)"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/features": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Which features are enabled",
+        "description": "Feature introspection for agents. Scope: `artifact_id` (caller needs access) → that artifact's workspace; else `workspace_id` (caller must be a member); else the host workspace on a workspace subdomain, else personal scope.",
+        "operationId": "getFeatures",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "artifact_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Effective flags",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scope": {
+                      "type": "object",
+                      "properties": {
+                        "workspace_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "features": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "boolean"
+                      }
+                    },
+                    "disabled": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "catalog": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         }
       }
@@ -5229,6 +6994,25 @@
         ],
         "summary": "List workspaces",
         "operationId": "listWorkspaces",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Workspaces the user belongs to",
@@ -5242,6 +7026,15 @@
                       "items": {
                         "$ref": "#/components/schemas/Workspace"
                       }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "type": "integer"
                     }
                   }
                 }
@@ -6384,11 +8177,52 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 30,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque `next_cursor` from the previous page.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Skill cards"
+            "description": "Skill cards",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "skills": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "sort": {
+                      "type": "string"
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -7667,14 +9501,45 @@
             "format": "uri"
           },
           "thumbnail_url": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uri"
+          },
+          "workspace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "artifact_type": {
+            "type": "string"
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "current_version": {
+            "type": "integer",
+            "description": "version_no live on the production deployment (reflects rollback)."
+          },
+          "user_role": {
+            "type": "string",
+            "description": "Caller's role (list endpoint only)."
           },
           "is_favorite": {
             "type": "boolean"
           },
           "created_at": {
-            "type": "integer"
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -7922,12 +9787,8 @@
           "mimeType": {
             "type": "string"
           },
-          "size": {
+          "sizeBytes": {
             "type": "integer"
-          },
-          "url": {
-            "type": "string",
-            "format": "uri"
           },
           "createdAt": {
             "type": "string",
@@ -8121,6 +9982,42 @@
           },
           "artifact_count": {
             "type": "integer"
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Team Space folders only."
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "inherit",
+              "public",
+              "workspace",
+              "private"
+            ],
+            "description": "Team Space folders only."
+          },
+          "subfolder_count": {
+            "type": "integer",
+            "description": "Team Space folders only."
+          },
+          "path": {
+            "type": "string",
+            "description": "Slug path; single-folder Team Space responses only."
+          },
+          "readme": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Single-folder Team Space responses only."
+          },
+          "effective_visibility": {
+            "type": "string",
+            "description": "Single-folder Team Space responses only."
           },
           "created_at": {
             "type": "string",

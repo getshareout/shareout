@@ -51,6 +51,7 @@ describe('validatePublishRequest', () => {
 
   it('rejects an unknown visibility instead of publishing it', () => {
     expect(validatePublishRequest(validRequest({ visibility: 'bogus' as never }))?.details).toContain('visibility must be one of: public, workspace, private');
+    expect(validatePublishRequest(validRequest({ visibility: 'bogus' as never }))?.param).toBe('visibility');
     for (const visibility of ['public', 'workspace', 'private', 'unlisted'] as never[]) {
       expect(validatePublishRequest(validRequest({ visibility }))).toBeNull();
     }

@@ -133,6 +133,11 @@ export async function getOnboardingStatus(
 interface OnboardingState { skill_ack_at: string | null; dismissed_at: string | null; celebrated_at: string | null }
 
 async function getState(env: Env, workspaceId: string, userId: string): Promise<OnboardingState | null> {
+  if (workspaceId === PERSONAL_WS) {
+    return env.DB.prepare(
+      'SELECT skill_ack_at, dismissed_at, celebrated_at FROM onboarding_personal_state WHERE user_id = ?'
+    ).bind(userId).first<OnboardingState>();
+  }
   return env.DB.prepare(
     'SELECT skill_ack_at, dismissed_at, celebrated_at FROM onboarding_state WHERE workspace_id = ? AND user_id = ?'
   ).bind(workspaceId, userId).first<OnboardingState>();

@@ -743,4 +743,19 @@ describe('handleServe', () => {
     expect(html).toContain('<iframe');
     expect(html).not.toContain('shareout-admin-toolbar');
   });
+  it('serves a typed artifact source as an attachment at the viewer Download link', async () => {
+    const mdAsset = { r2_key: 'artifacts/demo/doc.md', mime: 'text/markdown', size_bytes: 7 };
+    const { env } = createServeEnv({
+      deployment: { ...defaultDeployment, entrypoint: 'doc.md', has_mobile: 0, artifact_type: 'markdown', ...mdAsset } as typeof defaultDeployment,
+      assets: { 'doc.md': mdAsset },
+      r2: { 'artifacts/demo/doc.md': { body: '# Hola\n' } },
+    });
+    const named = await handleServe(serveRequest('Glosario%20INCRO.md'), env, SLUG, 'Glosario%20INCRO.md');
+    expect(named.status).toBe(200);
+    expect(named.headers.get('Content-Disposition')).toBe("attachment; filename*=UTF-8''Glosario%20INCRO.md");
+    expect(await named.text()).toBe('# Hola\n');
+    const plain = await handleServe(serveRequest('download'), env, SLUG, 'download');
+    expect(plain.headers.get('Content-Disposition')).toBe("attachment; filename*=UTF-8''doc.md");
+    expect((await handleServe(serveRequest('other.png'), env, SLUG, 'other.png')).status).toBe(404);
+  });
 });

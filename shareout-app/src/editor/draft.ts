@@ -1,6 +1,7 @@
 // ShareOut Visual Editor - Draft Management
 
 import { getPlatformOrigin } from '../config/origins';
+import type { Env } from '../types';
 import type { EditorContext } from './index';
 import { generateId, sha256 } from '../crypto-utils';
 import { invalidateDeploymentCache } from '../serve/deployment-cache';
@@ -66,6 +67,32 @@ async function getDraft(ctx: EditorContext): Promise<Response> {
   }
 }
 
+/** 409 when the client's base is stale: the stored draft changed since, or (no draft
+ *  row — discarded or published elsewhere) the live version is newer than the base. */
+async function draftConflict(
+  env: Env,
+  artifactId: string,
+  userId: string,
+  base: string,
+): Promise<Response | null> {
+  const current = await env.DB.prepare(`
+    SELECT updated_at FROM artifact_drafts WHERE artifact_id = ? AND user_id = ?
+  `).bind(artifactId, userId).first<{ updated_at: string }>();
+  let newer: string | null = current && current.updated_at !== base ? current.updated_at : null;
+  if (!current) {
+    const live = await env.DB.prepare(`
+      SELECT updated_at FROM deployments WHERE artifact_id = ? AND channel = 'production'
+    `).bind(artifactId).first<{ updated_at: string | null }>();
+    if (live?.updated_at && Date.parse(live.updated_at) > Date.parse(base)) newer = live.updated_at;
+  }
+  if (!newer) return null;
+  return new Response(JSON.stringify({
+    success: false,
+    code: 'DRAFT_CONFLICT',
+    currentUpdatedAt: newer,
+  }), { status: 409, headers: { 'Content-Type': 'application/json' } });
+}
+
 async function saveDraft(request: Request, ctx: EditorContext): Promise<Response> {
   const { artifactId, userId, env } = ctx;
 
@@ -84,16 +111,8 @@ async function saveDraft(request: Request, ctx: EditorContext): Promise<Response
     // write if the stored draft still matches. Otherwise another tab / device / the AI agent
     // saved since, and an unconditional UPSERT would silently clobber that work.
     if (body.baseUpdatedAt) {
-      const current = await env.DB.prepare(`
-        SELECT updated_at FROM artifact_drafts WHERE artifact_id = ? AND user_id = ?
-      `).bind(artifactId, userId).first<{ updated_at: string }>();
-      if (current && current.updated_at !== body.baseUpdatedAt) {
-        return new Response(JSON.stringify({
-          success: false,
-          code: 'DRAFT_CONFLICT',
-          currentUpdatedAt: current.updated_at,
-        }), { status: 409, headers: { 'Content-Type': 'application/json' } });
-      }
+      const conflict = await draftConflict(env, artifactId, userId, body.baseUpdatedAt);
+      if (conflict) return conflict;
     }
 
     const draftId = `draft_${generateId('draft').slice(6)}`;
@@ -174,16 +193,8 @@ export async function handlePublish(
     // body.html live. If another tab/device/agent saved since the client loaded, refuse
     // rather than clobber the newer draft and publish stale HTML. `force` omits the base.
     if (body.baseUpdatedAt) {
-      const current = await env.DB.prepare(`
-        SELECT updated_at FROM artifact_drafts WHERE artifact_id = ? AND user_id = ?
-      `).bind(artifactId, userId).first<{ updated_at: string }>();
-      if (current && current.updated_at !== body.baseUpdatedAt) {
-        return new Response(JSON.stringify({
-          success: false,
-          code: 'DRAFT_CONFLICT',
-          currentUpdatedAt: current.updated_at,
-        }), { status: 409, headers: { 'Content-Type': 'application/json' } });
-      }
+      const conflict = await draftConflict(env, artifactId, userId, body.baseUpdatedAt);
+      if (conflict) return conflict;
     }
 
     // Get artifact info. The routing slug (deployments.slug) drives canonical

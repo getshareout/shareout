@@ -127,7 +127,7 @@ Useful for: assigned sections, review workflows, protected content.
 ### Create a Presentation
 
 ```javascript
-const sdk = new ShareOut();
+const sdk = await ShareOut.create();
 
 const result = await sdk.slides.create({
   title: 'Q4 Review',

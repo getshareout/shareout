@@ -36,6 +36,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   resolveAlertRole.mockResolvedValue('manager');
   getArtifactRef.mockImplementation(async (_env: Env, id: string) => ({ id, workspace_id: null }));
+  evaluateMetric.mockResolvedValue({ value: 0 });
 });
 
 /** ISO instant `deltaSec` from now — the TEXT format the schema stores. */
@@ -70,6 +71,15 @@ describe('createWatch (auth)', () => {
     const res = await createWatch(e, 'stranger', 'art_1', { table: 'orders', kind: 'count' });
     expect(res.error).toMatch(/permission denied/i);
     expect(res.watch).toBeUndefined();
+  });
+
+  it('rejects a watch on a table the artifact does not have', async () => {
+    await e.DB.prepare(`INSERT INTO artifacts (id, name) VALUES ('art_1', 'Dash')`).run();
+    evaluateMetric.mockResolvedValue({ error: 'Table "nope_tbl" not found' });
+    const res = await createWatch(e, 'user_1', 'art_1', { table: 'nope_tbl', kind: 'count' });
+    expect(res.error).toBe('Table "nope_tbl" not found');
+    const n = await e.DB.prepare('SELECT COUNT(*) AS n FROM metric_watches').first<{ n: number }>();
+    expect(n?.n).toBe(0);
   });
 
   it('creates a watch for a member and is idempotent on the same metric', async () => {

@@ -15,7 +15,7 @@ function makeDb(rows: {
     // Signals first: its teammates EXISTS also reads workspace_members.
     if (sql.includes('AS firstArtifact')) return rows.signals ?? {};
     if (sql.includes('FROM workspace_members')) return rows.member ?? null;
-    if (sql.includes('FROM onboarding_state')) return rows.state ?? null;
+    if (sql.includes('FROM onboarding_state') || sql.includes('FROM onboarding_personal_state')) return rows.state ?? null;
     if (sql.includes('FROM users')) return rows.user ?? null;
     return null;
   }

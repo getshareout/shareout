@@ -12,7 +12,7 @@ import { broadcastEvent } from '../../../data/comments/broadcast';
 import { isAssetBucketArtifactId, userCanAccessFileComment } from '../../../data/comments/file-comments';
 import { MAX_CONTENT_LENGTH } from '../../../data/comments/types';
 import { generateId } from '../../../crypto-utils';
-import type { DataContext } from '../../../data/middleware';
+import { canViewArtifact, type DataContext } from '../../../data/middleware';
 
 export interface InspectorComment {
   id: string;
@@ -29,11 +29,13 @@ export interface InspectorComment {
   context_id?: string | null;
 }
 
-/** Confirm the user owns or collaborates on the artifact (Inspector comment scope). */
+/** Confirm the user can view the artifact (owner/collaborator across linked accounts,
+ *  or the closed-artifact viewer rule used by the data API). */
 async function userCanAccessArtifact(
   env: Env,
   vis: VisibilityScope,
   artifactId: string,
+  user: { id: string; email: string | null },
 ): Promise<boolean> {
   const idPh = placeholders(vis.userIds.length);
   const emailPh = placeholders(vis.emails.length);
@@ -43,7 +45,11 @@ async function userCanAccessArtifact(
     WHERE a.id = ? AND a.deleted_at IS NULL AND (a.owner_id IN (${idPh}) OR c.email IN (${emailPh}))
     LIMIT 1
   `).bind(...vis.emails, artifactId, ...vis.userIds, ...vis.emails).first();
-  return !!access;
+  if (access) return true;
+  const artifact = await env.DB.prepare(
+    'SELECT id, visibility, workspace_id, owner_id FROM artifacts WHERE id = ? AND deleted_at IS NULL'
+  ).bind(artifactId).first<{ id: string; visibility: string; workspace_id: string | null; owner_id: string | null }>();
+  return !!artifact && canViewArtifact(env, artifact, user.id, user.email);
 }
 
 /**
@@ -62,7 +68,7 @@ export async function queryArtifactComments(
   visArg?: VisibilityScope,
 ): Promise<InspectorComment[]> {
   const vis = visArg ?? await getVisibilityScope(env, user);
-  if (!(await userCanAccessArtifact(env, vis, artifactId))) return [];
+  if (!(await userCanAccessArtifact(env, vis, artifactId, user))) return [];
   const lim = Math.min(Math.max(limit, 1), 500);
   const rows = await env.DB.prepare(`
     SELECT id, parent_id, author_id, author_name, author_type, content, created_at, resolved, position, mentions, context_id
@@ -120,7 +126,7 @@ export async function addArtifactComment(
   if (!text) return null;
   if (text.length > MAX_CONTENT_LENGTH) return null;
   const vis = visArg ?? await getVisibilityScope(env, user);
-  if (!(await userCanAccessArtifact(env, vis, artifactId))) return null;
+  if (!(await userCanAccessArtifact(env, vis, artifactId, user))) return null;
 
   if (await isAssetBucketArtifactId(env, artifactId)) {
     if (!user.email) return null;

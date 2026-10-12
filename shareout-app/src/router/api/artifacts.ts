@@ -88,6 +88,9 @@ export async function routeArtifactApi(ctx: FetchContext): Promise<Response | nu
   if (path === '/v1/search' && request.method === 'GET') {
     const user = await requireTokenOrSession(ctx);
     if (!isAuthUser(user)) return user;
+    if (!url.searchParams.has('q')) {
+      return addCORS(jsonResponse({ error: 'q is required (send q= for recents)', code: 'VALIDATION_ERROR', param: 'q' }, 400));
+    }
     const q = url.searchParams.get('q')?.trim() || '';
     const limit = Math.min(Number(url.searchParams.get('limit')) || 10, 25);
     const workspaceId = user.service?.workspaceId || url.searchParams.get('workspace')?.trim() || undefined;

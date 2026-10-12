@@ -42,3 +42,34 @@ describe('reactions with a Bearer token', () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe('action items, _people and the comments socket with a Bearer token', () => {
+  const auth = { Authorization: 'Bearer so_test' };
+  const db = () => createCommentsDb({
+    comments: [{
+      id: ROOT_COMMENT, artifact_id: ARTIFACT_ID, context_id: null, parent_id: null,
+      author_id: 'usr_tok', author_name: 'Tok', content: 'hi',
+      created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z',
+    }],
+  });
+
+  it('authenticates assign and _people with the token', async () => {
+    const assign = await handleComments(
+      commentsRequest(`/${ROOT_COMMENT}/assign`, { method: 'PATCH', headers: auth, body: JSON.stringify({ assignee: null }) }),
+      ctxFromDb(db()), `/${ROOT_COMMENT}/assign`,
+    );
+    expect(assign.status).not.toBe(401);
+    const people = await handleComments(commentsRequest('/_people', { headers: auth }), ctxFromDb(db()), '/_people');
+    expect(people.status).not.toBe(401);
+  });
+
+  it('opens the comments socket on a private artifact with the token', async () => {
+    const bundle = db();
+    const fetchMock = vi.fn().mockResolvedValue(new Response('upgraded', { status: 200 }));
+    bundle.commentsDo.get.mockReturnValue({ fetch: fetchMock });
+    const req = new Request(`https://example.com/v1/data/${ARTIFACT_ID}/comments/ws`, { headers: { ...auth, Upgrade: 'websocket' } });
+    const res = await handleComments(req, ctxFromDb(bundle, { visibility: 'private' }), '/ws');
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalled();
+  });
+});
