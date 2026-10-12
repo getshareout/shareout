@@ -9,7 +9,7 @@
 import type { Env } from '../types';
 import { hashToken } from '../api-auth';
 import { handlePublish } from '../publish/handle-publish';
-import { handleListArtifacts, handleGetArtifact } from '../artifacts/crud';
+import { handleListArtifacts, handleGetArtifact, handleUpdateArtifact } from '../artifacts/crud';
 import { handleGetArtifactFiles } from '../artifacts/files';
 import { requireRole } from '../artifacts/roles';
 import { listWorkspacesForUser, type BotWorkspace } from '../chat-agent/access';
@@ -18,7 +18,7 @@ import { openTicket } from '../support/intake';
 import { generateSlug } from '../validation';
 import { createLogger, logError } from '../logging';
 import {
-  ON_FAILURE, errorText, fail, getRequest, ok, readJson, resolveWorkspace, str, workspaceChoiceText,
+  NOT_MEMBER, ON_FAILURE, errorText, fail, getRequest, invalid, ok, readJson, resolveWorkspace, str, validateArgs, workspaceChoiceText,
   type Args, type ToolContext, type ToolDef, type ToolResult,
 } from './tool-kit';
 import { MEMBER_TOOLS } from './member-tools';
@@ -131,6 +131,19 @@ function describePublish(
   });
 }
 
+/** A folder of the workspace, named by id or by name. */
+async function resolveFolder(ctx: ToolContext, workspaceId: string | null, folder: string): Promise<{ id?: string; error?: string }> {
+  if (!workspaceId) return { error: 'Folders belong to a workspace; this page is in the personal space, so it cannot go in a folder.' };
+  const { results } = await ctx.env.DB.prepare(
+    'SELECT id, name FROM folders WHERE workspace_id = ? AND (id = ? OR name = ? COLLATE NOCASE) LIMIT 6'
+  ).bind(workspaceId, folder, folder).all<{ id: string; name: string }>();
+  const exact = results.find((f) => f.id === folder);
+  if (exact) return { id: exact.id };
+  if (results.length === 1) return { id: results[0].id };
+  if (!results.length) return { error: `There is no folder "${folder}" in that workspace. Ask the person for the exact folder name.` };
+  return { error: `Several folders are called "${folder}"; call again with one of these ids as folder: ${results.map((f) => f.id).join(', ')}.` };
+}
+
 async function mainFileText(ctx: ToolContext, artifactId: string): Promise<string | null> {
   const res = await handleGetArtifactFiles(getRequest(ctx, `/v1/artifacts/${artifactId}/files`), ctx.env, ctx.user, artifactId);
   if (!res.ok) return null;
@@ -173,11 +186,11 @@ const listWorkspaces: ToolDef = {
 const listArtifacts: ToolDef = {
   name: 'list_artifacts',
   title: 'List pages',
-  description: 'Lists or searches the pages the person can see on ShareOut, newest first, with links. Optional workspace_id narrows to one workspace; search finds pages by name.',
+  description: 'Lists or searches the person\'s pages on ShareOut, newest first, with links. Without workspace_id it covers every workspace they belong to plus their personal space (no need to ask which one); workspace_id (id or slug) narrows to one workspace. search finds pages by name.',
   inputSchema: {
     type: 'object',
     properties: {
-      workspace_id: { type: 'string', description: 'Only pages in this workspace.' },
+      workspace_id: { type: 'string', description: 'Only pages in this workspace (id or slug). Omit to cover all of them.' },
       search: { type: 'string', description: 'Words to look for in page names.' },
       limit: { type: 'integer', minimum: 1, maximum: 50, default: 20 },
     },
@@ -185,7 +198,10 @@ const listArtifacts: ToolDef = {
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   async run(ctx, args) {
-    const workspaceId = str(args.workspace_id, 100);
+    const requested = str(args.workspace_id, 100);
+    const resolved = requested ? await resolveWorkspace(ctx, requested) : null;
+    if (resolved?.notMember) return fail(NOT_MEMBER);
+    const workspaceId = resolved?.workspace?.id ?? null;
     const search = str(args.search, 200);
     const limit = Math.min(Math.max(Number(args.limit) || 20, 1), 50);
 
@@ -247,6 +263,7 @@ const publishArtifact: ToolDef = {
     'content is a complete, self-contained HTML document (inline CSS/JS) or Markdown text.',
     'workspace_id: needed when the person has more than one workspace — ask them which one.',
     'visibility: "workspace" (default: everyone in the workspace), "private" (only them) or "public" (anyone with the link).',
+    'folder: optional, a folder of that workspace (its name or id) to file the page in.',
     'Afterwards give the person the link in their language, in plain words, and pass on any notice in the result.',
     ON_FAILURE,
   ].join(' '),
@@ -258,6 +275,7 @@ const publishArtifact: ToolDef = {
       format: { type: 'string', enum: ['html', 'markdown'], description: 'Defaults to a guess from the content.' },
       workspace_id: { type: 'string' },
       visibility: { type: 'string', enum: ['workspace', 'private', 'public'] },
+      folder: { type: 'string', description: 'Folder to file the page in: its name or id. Omit to leave it unfiled.' },
     },
     required: ['title', 'content'],
     additionalProperties: false,
@@ -269,15 +287,18 @@ const publishArtifact: ToolDef = {
     if (!title || !content.trim()) return fail('A title and the page content are both needed.');
 
     const resolved = await resolveWorkspace(ctx, str(args.workspace_id, 100));
-    if (resolved.notMember) return fail('The person is not a member of that workspace. Call list_workspaces to see the right ids.');
+    if (resolved.notMember) return fail(NOT_MEMBER);
     if (resolved.choices) {
       return ok(workspaceChoiceText('publish_artifact', resolved.choices), { needs_workspace: true, workspaces: resolved.choices });
     }
     const workspace = resolved.workspace;
 
-    const wanted = args.visibility === 'public' || args.visibility === 'private' || args.visibility === 'workspace' ? args.visibility : 'workspace';
+    const wanted = (args.visibility as string | undefined) ?? 'workspace';
     const visibility = wanted === 'workspace' && !workspace ? 'private' : wanted;
     const format = detectFormat(content, args.format);
+    const folderName = str(args.folder, 200);
+    const folder = folderName ? await resolveFolder(ctx, workspace?.id ?? null, folderName) : null;
+    if (folder?.error) return invalid(folder.error);
 
     const { status, body } = await runPublish(ctx, {
       name: title,
@@ -285,6 +306,7 @@ const publishArtifact: ToolDef = {
       ...fileFor(content, format),
       workspace_id: workspace?.id,
       visibility,
+      ...(folder?.id ? { folder_id: folder.id } : {}),
     });
     if (status >= 400) return fail(`The page was not published: ${errorText(body, status)}`, { status, code: body.code });
     return describePublish('Published', title, body, workspace);
@@ -296,6 +318,7 @@ const updateArtifact: ToolDef = {
   title: 'Update a page',
   description: [
     'Replaces the content of a page the person already has (keeps its link and who can see it) and saves it as a new version.',
+    'title renames the page; folder moves it into a folder of its workspace (name or id).',
     'Send the whole new page, not a fragment. Find the artifact_id with list_artifacts; get_artifact with include_content gives the current source.',
     'Afterwards give the person the link.',
     ON_FAILURE,
@@ -307,6 +330,7 @@ const updateArtifact: ToolDef = {
       content: { type: 'string', description: 'The full new page: an HTML document or Markdown.' },
       title: { type: 'string', description: 'New name, if it should change.' },
       format: { type: 'string', enum: ['html', 'markdown'] },
+      folder: { type: 'string', description: 'Folder to move the page into: its name or id.' },
     },
     required: ['artifact_id', 'content'],
     additionalProperties: false,
@@ -338,16 +362,31 @@ const updateArtifact: ToolDef = {
       if (clash) return fail('This page can only be updated in ShareOut itself.');
     }
 
-    const title = str(args.title, 120) ?? row.name;
+    const newTitle = str(args.title, 120);
+    const folderName = str(args.folder, 200);
+    const folder = folderName ? await resolveFolder(ctx, row.workspace_id, folderName) : null;
+    if (folder?.error) return invalid(folder.error);
     const format = detectFormat(content, args.format ?? (row.artifact_type === 'markdown' ? 'markdown' : 'html'));
     const { status, body } = await runPublish(ctx, {
-      name: title,
+      name: row.name,
       slug: row.display_slug,
       ...fileFor(content, format),
       workspace_id: row.workspace_id ?? undefined,
       visibility: row.visibility,
+      ...(folder?.id ? { folder_id: folder.id } : {}),
     });
     if (status >= 400) return fail(`The page was not updated: ${errorText(body, status)}`, { status, code: body.code });
+    // Publishing keeps the stored name; a rename goes through the same PATCH the REST API uses.
+    let title = row.name;
+    if (newTitle && newTitle !== row.name) {
+      const res = await handleUpdateArtifact(new Request(`${ctx.origin}/v1/artifacts/${id}`, {
+        method: 'PATCH',
+        headers: { Authorization: ctx.authorization, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newTitle }),
+      }), ctx.env, ctx.user, id);
+      if (res.ok) title = newTitle;
+      else body.warnings = [...(Array.isArray(body.warnings) ? body.warnings : []), `The content was saved, but the name could not be changed: ${errorText(await readJson(res), res.status)}`];
+    }
     const workspace = row.workspace_id
       ? (await listWorkspacesForUser(ctx.env, ctx.user.id)).find((w) => w.id === row.workspace_id) ?? null
       : null;
@@ -424,12 +463,23 @@ async function clientName(ctx: ToolContext): Promise<string> {
 const search: ToolDef = {
   name: 'search',
   title: 'Search pages',
-  description: 'Searches the person\'s ShareOut pages by name. Returns ids to pass to fetch.',
-  inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'], additionalProperties: false },
+  description: 'Searches the person\'s ShareOut pages by name, across all their workspaces unless workspace_id (id or slug) narrows it to one. Returns ids to pass to fetch.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string' },
+      workspace_id: { type: 'string', description: 'Only pages in this workspace (id or slug). Omit to search all of them.' },
+    },
+    required: ['query'],
+    additionalProperties: false,
+  },
   annotations: { readOnlyHint: true, openWorldHint: false },
   async run(ctx, args) {
     const q = str(args.query, 200) ?? '';
-    const result = await quickSearch(ctx.env, ctx.user.id, { q, groups: ['artifacts'], limit: 10 });
+    const requested = str(args.workspace_id, 100);
+    const resolved = requested ? await resolveWorkspace(ctx, requested) : null;
+    if (resolved?.notMember) return fail(NOT_MEMBER);
+    const result = await quickSearch(ctx.env, ctx.user.id, { q, workspaceId: resolved?.workspace?.id, groups: ['artifacts'], limit: 10 });
     const results = result.artifacts.map((h) => ({ id: h.id, title: h.title, url: artifactUrl(ctx.origin, h.slug ?? h.id) }));
     return ok(JSON.stringify({ results }), { results });
   },
@@ -475,6 +525,8 @@ export function listTools() {
 export async function callTool(ctx: ToolContext, name: string, args: Args): Promise<ToolResult | null> {
   const tool = TOOLS.find((t) => t.name === name);
   if (!tool) return null;
+  const problem = validateArgs(tool.inputSchema, args ?? {});
+  if (problem) return invalid(`Nothing was done: ${problem}`);
   try {
     return await tool.run(ctx, args ?? {});
   } catch (err) {

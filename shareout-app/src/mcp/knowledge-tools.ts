@@ -10,7 +10,7 @@ import { visibleSources } from '../knowledge/corpus/search';
 import type { SourceKind } from '../knowledge/corpus/client';
 import type { BotWorkspace } from '../chat-agent/access';
 import {
-  ON_FAILURE, errorText, fail, ok, readJson, resolveWorkspace, str, workspaceChoiceText,
+  NOT_MEMBER, ON_FAILURE, errorText, fail, ok, readJson, resolveWorkspace, str, workspaceChoiceText,
   type Args, type ToolContext, type ToolDef, type ToolResult,
 } from './tool-kit';
 
@@ -44,13 +44,13 @@ function notAnswered(w: BotWorkspace, status: number, body: Record<string, unkno
     return ok(`Knowledge is turned off for "${w.name}", so there is nothing to look in yet. A workspace owner or admin can turn it on in ShareOut, in the Knowledge section.`, { enabled: false, workspace_id: w.id });
   }
   if (body.code === 'NOT_CONFIGURED') return ok('Knowledge is not available on this ShareOut instance.', { enabled: false, configured: false });
-  if (status === 403) return fail('The person is not a member of that workspace. Call list_workspaces to see the right ids.');
+  if (status === 403) return fail(NOT_MEMBER);
   return fail(`Could not read the workspace's knowledge: ${errorText(body, status)}`, { status, code: body.code });
 }
 
 async function pickWorkspace(ctx: ToolContext, args: Args, action: string): Promise<BotWorkspace | ToolResult> {
   const resolved = await resolveWorkspace(ctx, str(args.workspace_id, 100));
-  if (resolved.notMember) return fail('The person is not a member of that workspace. Call list_workspaces to see the right ids.');
+  if (resolved.notMember) return fail(NOT_MEMBER);
   if (resolved.choices) return ok(workspaceChoiceText(action, resolved.choices), { needs_workspace: true, workspaces: resolved.choices });
   if (!resolved.workspace) return ok('Knowledge lives in a workspace, and the person has none yet.', { enabled: false });
   return resolved.workspace;

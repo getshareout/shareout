@@ -43,6 +43,38 @@ export function fail(text: string, structured?: Record<string, unknown>): ToolRe
   return { ...ok(`${text}\n${ON_FAILURE}`, structured), isError: true };
 }
 
+export function invalid(text: string): ToolResult {
+  return { ...ok(text), isError: true };
+}
+
+export const NOT_MEMBER = 'The person is not a member of that workspace. Call list_workspaces to see the right ids.';
+
+type PropSchema = { type?: string | string[]; enum?: unknown[]; minimum?: number; maximum?: number };
+
+/** Checks arguments against a tool's inputSchema (required, type, enum, range). Returns what is wrong, or null. */
+export function validateArgs(schema: Record<string, unknown>, args: Args): string | null {
+  const props = (schema.properties ?? {}) as Record<string, PropSchema>;
+  for (const key of (schema.required ?? []) as string[]) {
+    if (args[key] === undefined || args[key] === null) return `${key} is required.`;
+  }
+  for (const [key, value] of Object.entries(args)) {
+    const p = props[key];
+    if (!p || value === undefined || value === null) continue;
+    const typeOk = p.type === 'string' ? typeof value === 'string'
+      : p.type === 'integer' ? Number.isInteger(value)
+      : p.type === 'number' ? typeof value === 'number' && Number.isFinite(value)
+      : p.type === 'boolean' ? typeof value === 'boolean'
+      : p.type === 'array' ? Array.isArray(value)
+      : true;
+    if (!typeOk) return `${key} must be ${p.type === 'integer' ? 'an' : 'a'} ${p.type}.`;
+    if (p.enum && !p.enum.includes(value)) return `${key} must be one of: ${p.enum.map((v) => JSON.stringify(v)).join(', ')}.`;
+    if (typeof value === 'number' && ((p.minimum !== undefined && value < p.minimum) || (p.maximum !== undefined && value > p.maximum))) {
+      return `${key} must be between ${p.minimum ?? '-∞'} and ${p.maximum ?? '∞'}.`;
+    }
+  }
+  return null;
+}
+
 export function str(v: unknown, max = 500): string | null {
   return typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null;
 }
