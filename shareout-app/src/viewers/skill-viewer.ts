@@ -1,4 +1,4 @@
-import { generateViewerShell, type ViewerContext } from './viewer-shell';
+import { generateViewerShell, scriptOpen, type ViewerContext } from './viewer-shell';
 import { colors } from '../../packages/design-tokens/src/index';
 import { parseMarkdown, MARKDOWN_VIEWER_STYLES } from './markdown-viewer';
 import { viewerCopy } from './copy';
@@ -30,11 +30,11 @@ export function renderSkillViewer(ctx: ViewerContext): string {
   const canAct = !!m?.canAct;
   const metricsBar = m ? `
     <div class="sk-metrics">
-      <button class="sk-btn sk-vote${m.voted ? ' active' : ''}" id="sk-vote"${canAct ? '' : ' disabled'} onclick="skVote()" title="${c.upvote}">
+      <button class="sk-btn sk-vote${m.voted ? ' active' : ''}" id="sk-vote"${canAct ? '' : ' disabled'} title="${c.upvote}">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="${m.voted ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
         <span id="sk-vote-n">${m.upvotes}</span>
       </button>
-      <button class="sk-btn sk-install${m.installed ? ' active' : ''}" id="sk-install"${canAct ? '' : ' disabled'} onclick="skInstall()" title="${m.installed ? c.savedToMine : c.saveToMine}">
+      <button class="sk-btn sk-install${m.installed ? ' active' : ''}" id="sk-install"${canAct ? '' : ' disabled'} title="${m.installed ? c.savedToMine : c.saveToMine}">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="${m.installed ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
         <span id="sk-install-label">${m.installed ? c.saved : c.save}</span>
       </button>
@@ -87,7 +87,7 @@ export function renderSkillViewer(ctx: ViewerContext): string {
     .content { background: var(--surface); padding: 32px; border-radius: 12px; border: 1px solid var(--border); }
   `;
 
-  const extraHead = m && m.canAct ? `<script>
+  const extraHead = m && m.canAct ? `${scriptOpen(ctx)}
     var SK_ID = ${JSON.stringify(ctx.artifactId)};
     var SK_BASE = ${JSON.stringify(ctx.baseUrl)};
     function skVote() {
@@ -109,6 +109,10 @@ export function renderSkillViewer(ctx: ViewerContext): string {
           var lbl = document.getElementById('sk-install-label'); if (lbl) lbl.textContent = !on ? '${c.saved}' : '${c.save}'; })
         .catch(function(){}).finally(function(){ b.disabled = false; });
     }
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('sk-vote').addEventListener('click', skVote);
+      document.getElementById('sk-install').addEventListener('click', skInstall);
+    });
   </script>` : undefined;
 
   return generateViewerShell(ctx, bodyContent, extraHead, extraStyles);

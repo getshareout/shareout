@@ -10,6 +10,7 @@ import { renderSkillViewer } from './skill-viewer';
 import { renderLibraryViewer } from './library-viewer';
 
 export type { ViewerContext } from './viewer-shell';
+export { viewerScriptCsp } from './viewer-shell';
 
 type ViewerRenderer = (ctx: ViewerContext) => string;
 
@@ -45,6 +46,7 @@ export function renderViewer(
   skillMetrics?: ViewerContext['skillMetrics'],
   libraryMetrics?: ViewerContext['libraryMetrics'],
   locale?: Locale,
+  nonce?: string,
 ): string | null {
   const renderer = getViewer(type);
   if (!renderer) return null;
@@ -64,6 +66,7 @@ export function renderViewer(
     skillMetrics,
     libraryMetrics,
     locale,
+    nonce,
   };
 
   return renderer(ctx);
