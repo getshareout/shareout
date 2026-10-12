@@ -14,10 +14,11 @@ const TIMEOUT_MS = 5000;
 // key is configured (so forms render normally pre-provisioning). Place the div
 // INSIDE the <form>; Cloudflare injects a hidden `cf-turnstile-response` input the
 // client reads and posts as `turnstileToken`. data-action enables Spin telemetry.
-export function turnstileWidgetHtml(siteKey?: string): string {
+export function turnstileWidgetHtml(siteKey?: string, lang?: 'en' | 'es'): string {
   if (!siteKey) return '';
+  const language = lang ? ` data-language="${lang}"` : '';
   return `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<div class="cf-turnstile" data-sitekey="${siteKey}" data-action="turnstile-spin-v1" style="margin:8px 0"></div>`;
+<div class="cf-turnstile" data-sitekey="${siteKey}" data-action="turnstile-spin-v1"${language} style="margin:8px 0"></div>`;
 }
 
 interface SiteverifyResponse {

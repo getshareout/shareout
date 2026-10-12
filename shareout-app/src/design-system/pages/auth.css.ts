@@ -53,6 +53,14 @@ body {
   color: var(--color-error);
 }
 
+.auth-logo {
+  display: block;
+  max-width: 160px;
+  max-height: 56px;
+  margin: 0 auto 1rem;
+  object-fit: contain;
+}
+
 /* Typography */
 h1 {
   font-family: var(--font-display);
