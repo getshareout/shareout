@@ -48,7 +48,7 @@ interface EmailStatus {
 ## Examples
 
 ```javascript
-const sdk = new ShareOut();
+const sdk = await ShareOut.create();
 
 // Check availability
 const { enabled, ownerEmailConfigured, from } = await sdk.email.status();
@@ -75,8 +75,8 @@ await sdk.email.notifyOwner({
   <button type="submit">Send</button>
 </form>
 
-<script>
-  const sdk = new ShareOut();
+<script type="module">
+  const sdk = await ShareOut.create();
 
   document.getElementById('contact-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -222,7 +222,7 @@ Templates support mustache-style `{{variable}}` interpolation:
 ### Template Examples
 
 ```javascript
-const sdk = new ShareOut();
+const sdk = await ShareOut.create();
 
 // Create account-level template
 const template = await sdk.templates.create({

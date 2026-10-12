@@ -19,9 +19,10 @@ Copy-paste form patterns for common use cases.
   <textarea name="message" placeholder="Message" required></textarea>
   <button type="submit">Send</button>
 </form>
+<p id="contact-status" role="status"></p>
 
-<script>
-  const sdk = new ShareOut();
+<script type="module">
+  const sdk = await ShareOut.create();
   document.getElementById('contact-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = new FormData(e.target);
@@ -29,7 +30,7 @@ Copy-paste form patterns for common use cases.
       subject: `Contact from ${form.get('name')}`,
       body: `Email: ${form.get('email')}\n\n${form.get('message')}`
     });
-    alert('Message sent!');
+    document.getElementById('contact-status').textContent = 'Message sent.';
     e.target.reset();
   });
 </script>
@@ -58,18 +59,19 @@ Copy-paste form patterns for common use cases.
 </script>
 
 <form id="survey">
-  <input type="text" name="name" data-shareout-binding="form:name">
-  <input type="email" name="email" data-shareout-binding="form:email">
-  <select name="response" data-shareout-binding="form:response">
+  <input type="text" name="name">
+  <input type="email" name="email">
+  <select name="response">
     <option value="">Select...</option>
     <option value="yes">Yes</option>
     <option value="no">No</option>
   </select>
   <button type="submit">Submit</button>
 </form>
+<p id="survey-status" role="status"></p>
 
-<script>
-  const sdk = new ShareOut();
+<script type="module">
+  const sdk = await ShareOut.create();
   const submissions = sdk.table('submissions');
 
   document.getElementById('survey').addEventListener('submit', async (e) => {
@@ -82,7 +84,8 @@ Copy-paste form patterns for common use cases.
       response: form.get('response'),
       createdAt: new Date().toISOString()
     });
-    alert('Submitted!');
+    document.getElementById('survey-status').textContent = 'Submitted.';
+    e.target.reset();
   });
 </script>
 ```

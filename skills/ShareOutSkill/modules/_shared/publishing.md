@@ -203,7 +203,7 @@ Authorization: Bearer {token}
 Content-Type: image/webp
 ```
 
-Serve at `GET /t/{artifact_id}.webp` (also used as preview image). See [SKILL.md § Thumbnails](../../SKILL.md#thumbnails).
+Serve at `GET /t/{artifact_id}.webp` (also used as preview image). API: [PUT /v1/artifacts/{id}/thumbnail](../../api/artifacts.md#put-v1artifactsidthumbnail).
 
 ### Option 4: Override via API
 
@@ -251,6 +251,6 @@ API: `GET /v1/home/analytics?range=` and `GET /v1/artifacts/{id}/analytics`. See
 
 - [Permissions](permissions.md) - Who can publish
 - [Versions](versions.md) - Publish creates version
-- [SKILL.md § Thumbnails](../../SKILL.md#thumbnails) - Upload and serve thumbnails
+- [API: thumbnail upload](../../api/artifacts.md#put-v1artifactsidthumbnail) - Upload and serve thumbnails
 - [api/artifacts.md](../../api/artifacts.md) - REST fields and screenshot endpoint
 - [team/publish-governance.md](../../team/publish-governance.md) - Teams member approval before open visibility

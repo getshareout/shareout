@@ -30,20 +30,20 @@ Copy-paste patterns for displaying tabular data.
     <tr data-template="row">
       <td data-shareout-binding="field:name"></td>
       <td data-shareout-binding="field:status"></td>
-      <td><button onclick="deleteItem(this)">Delete</button></td>
+      <td><button data-action="delete">Delete</button></td>
     </tr>
   </tbody>
 </table>
 
-<script>
-  const sdk = new ShareOut();
+<script type="module">
+  const sdk = await ShareOut.create();
   const items = sdk.table('items');
 
-  async function deleteItem(btn) {
-    const row = btn.closest('tr');
-    const id = row.dataset.id;
-    await items.delete(id);
-  }
+  document.querySelector('tbody').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-action="delete"]');
+    if (!btn) return;
+    await items.delete(btn.closest('tr').dataset.id);
+  });
 </script>
 ```
 

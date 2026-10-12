@@ -401,8 +401,8 @@ Headers included:
   <h1>Help Center</h1>
   <div id="support-chat"></div>
 
-  <script>
-    const sdk = new ShareOut();
+  <script type="module">
+    const sdk = await ShareOut.create();
 
     sdk.agent.configure({
       systemPrompt: `You are a support assistant for Acme Corp.
@@ -424,8 +424,8 @@ Headers included:
 ### Data Explorer Assistant
 
 ```html
-<script>
-  const sdk = new ShareOut();
+<script type="module">
+  const sdk = await ShareOut.create();
 
   sdk.agent.configure({
     systemPrompt: 'Help users explore and understand their data.',
@@ -534,7 +534,7 @@ POST /v1/data/{artifactId}/secrets
 2. **Call via secrets proxy** from your artifact:
 
 ```javascript
-const sdk = new ShareOut();
+const sdk = await ShareOut.create();
 
 // OpenAI Chat
 const response = await sdk.secrets.post('openai', '/v1/chat/completions', {

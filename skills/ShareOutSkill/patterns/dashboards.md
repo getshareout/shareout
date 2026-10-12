@@ -113,8 +113,8 @@ For table-backed dashboards, owners can add a **metric watch** (Inspector **Watc
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-  const sdk = new ShareOut();
+<script type="module">
+  const sdk = await ShareOut.create();
 
   async function refreshData() {
     const data = await fetchFromAPI();
@@ -151,15 +151,15 @@ For table-backed dashboards, owners can add a **metric watch** (Inspector **Watc
 </script>
 
 <div id="connect-section" style="display:none">
-  <button onclick="connectSheets()">Connect Google Sheets</button>
+  <button id="connect-sheets">Connect Google Sheets</button>
 </div>
 
 <div id="dashboard" style="display:none">
   <table data-shareout-binding="json:sheetsData"></table>
 </div>
 
-<script>
-  const sdk = new ShareOut();
+<script type="module">
+  const sdk = await ShareOut.create();
 
   async function init() {
     if (await sdk.sheets.isConnected()) {
@@ -173,6 +173,7 @@ For table-backed dashboards, owners can add a **metric watch** (Inspector **Watc
     await sdk.sheets.authorize();
     loadData();
   }
+  document.getElementById('connect-sheets').addEventListener('click', connectSheets);
 
   async function loadData() {
     const { data } = await sdk.sheets.fetch({
@@ -193,5 +194,5 @@ For table-backed dashboards, owners can add a **metric watch** (Inspector **Watc
 
 - [Overview](overview.md) - All patterns
 - [SDK: Live data](../sdk/live-data.md) - Mixpanel, BigQuery, REST connections in artifacts
-- [Modules: Dashboards](../modules/dashboards/overview.md) - Dashboard module
+- [Modules: Dashboards](../modules/dashboards/overview.md) - unshipped design spec (no backend; build with `sdk.table`/`sdk.json` as above)
 - [Google Sheets](../integrations/google-sheets.md) - Sheets integration

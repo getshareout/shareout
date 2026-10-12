@@ -1,10 +1,12 @@
 # Publishing
 
-Dual-artifact system: Editor mode for creating, Published mode for sharing.
+One artifact, two modes: Editor mode for creating, Published mode for sharing.
 
 ## Architecture
 
-Every presentation has two URLs:
+A presentation is stored **inside its host artifact** (the artifact whose page calls
+`sdk.slides.create()`); no separate artifacts are created. It has two URLs, both on the
+host artifact's slug:
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -26,7 +28,7 @@ Every presentation has two URLs:
 
 ## Creating a Presentation
 
-Both artifacts created automatically:
+Both URLs are returned by `create`:
 
 ```javascript
 const result = await sdk.slides.create({
@@ -45,8 +47,8 @@ interface CreateResult {
   id: string;                    // Presentation ID
   editorUrl: string;             // $ORIGIN_HOST/a/{slug}
   publishedUrl: string;          // $ORIGIN_HOST/p/{slug}
-  editorArtifactId: string;      // Editor artifact ID
-  publishedArtifactId: string;   // Published artifact ID
+  editorArtifactId: string;      // Host artifact ID
+  publishedArtifactId: string;   // Host artifact ID (same artifact serves /p/{slug})
 }
 ```
 

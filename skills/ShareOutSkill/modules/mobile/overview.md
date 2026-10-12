@@ -46,31 +46,23 @@ Transform HTML artifacts into native-feeling mobile experiences with PWA support
 
 ### Dual-Mode Publishing
 
-Publish both web and mobile versions in a single call:
+Publish both web and mobile versions in a single `POST /v1/publish` (there is no `sdk.publish()`;
+full field list in [publishing.md](publishing.md#publish-api)):
 
-```javascript
-const sdk = new ShareOut();
-
-await sdk.publish({
-  slug: 'my-app',
-  title: 'My App',
-
-  // Web version (desktop/tablet)
-  html: webHtml,
-
-  // Mobile-specific version (NEW)
-  mobile_html: mobileHtml,
-
-  // PWA configuration (NEW)
-  pwa: {
-    enabled: true,
-    name: 'My App',
-    short_name: 'MyApp',
-    icon: iconBase64,        // 512x512 PNG
-    theme_color: '#3b82f6',
-    background_color: '#ffffff'
+```json
+{
+  "name": "My App",
+  "slug": "my-app",
+  "files": [{ "path": "index.html", "content": "<!DOCTYPE html>..." }],
+  "mobile_html": "<!DOCTYPE html>...",
+  "pwa": {
+    "enabled": true,
+    "name": "My App",
+    "short_name": "MyApp",
+    "icon": "data:image/png;base64,...",
+    "theme_color": "#3b82f6"
   }
-});
+}
 ```
 
 ### Automatic Device Detection
@@ -205,11 +197,9 @@ ShareOut.mobile.haptic('error');   // Error pattern
 
 ### Create a Mobile App
 
-```javascript
-const sdk = new ShareOut();
+Mobile-optimized HTML with bottom navigation (`mobile.html`):
 
-// Mobile-optimized HTML with bottom navigation
-const mobileHtml = `
+```html
 <!DOCTYPE html>
 <html>
 <head>
@@ -239,22 +229,9 @@ const mobileHtml = `
   </script>
 </body>
 </html>
-`;
-
-await sdk.publish({
-  slug: 'my-mobile-app',
-  title: 'My Mobile App',
-  html: webHtml,
-  mobile_html: mobileHtml,
-  pwa: {
-    enabled: true,
-    name: 'My Mobile App',
-    short_name: 'MyApp',
-    icon: iconBase64,
-    theme_color: '#1e40af'
-  }
-});
 ```
+
+Publish it as `mobile_html` next to your web `files`, with `pwa.enabled: true` — see [publishing.md](publishing.md#publish-api).
 
 ### Test PWA Installation
 
@@ -312,7 +289,7 @@ Mobile features integrate with existing SDK:
 
 | SDK Feature | Mobile Integration |
 |------------|---------------------|
-| `sdk.publish()` | `mobile_html` + `pwa` options |
+| `POST /v1/publish` | `mobile_html` + `pwa` fields |
 | `sdk.blobs` | Icon storage for PWA |
 | `sdk.realtime()` | Works in PWA mode |
 | Analytics | Tracks mobile vs web views |

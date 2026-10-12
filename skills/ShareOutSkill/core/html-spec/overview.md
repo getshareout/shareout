@@ -64,8 +64,10 @@ Before generating any ShareOut artifact, verify ALL of these:
 
 ### Bindings
 - [ ] ALL dynamic content uses `data-shareout-binding` attributes
-- [ ] NO DOM updates via JS without corresponding binding attributes
+- [ ] Every JS DOM update targets an element carrying the matching binding attribute
 - [ ] ALL repeating content uses `data-shareout-template`
+- [ ] Bound elements are actually painted for viewers — bindings are editor metadata and
+      render nothing on their own; use `paintBindings()` from [bindings.md](bindings.md#rendering-for-viewers)
 
 ### Actions
 - [ ] ALL interactive elements have `data-shareout-action` or `data-shareout-link`

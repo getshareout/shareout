@@ -15,7 +15,7 @@ This skill is for **install / deploy / configure**. After the instance is up, sw
 the product skill ([../SKILL.md](../SKILL.md)) and set `origin` to their worker URL.
 
 **Where this file lives:** only in `getshareout/shareout` under `skills/ShareOutSkill/deploy/`.
-That monorepo path is the source of truth ([../../README.md](../../README.md)). The
+That monorepo path is the source of truth (`README.md` at the repo root). The
 standalone `getshareout/shareout-skill` repo is a mirror for agents that only install
 the skill — still edit deploy docs here, then mirror on release.
 
@@ -420,12 +420,12 @@ Do these only if the user asked — order of value:
 |------|--------|---------|
 | Company domain | Custom domain on Worker + update `SHAREOUT_BASE_URL` | [cloudflare.md](cloudflare.md#custom-domain) |
 | Workspace subdomains | Wildcard DNS `*.company.com` → Worker | [cloudflare.md](cloudflare.md#workspace-subdomains) |
-| Google login | `GOOGLE_CLIENT_ID` / `SECRET`; callback `$ORIGIN/auth/callback` | [secrets](../../../docs-site/src/content/docs/self-host/secrets.md) |
+| Google login | `GOOGLE_CLIENT_ID` / `SECRET`; callback `$ORIGIN/auth/callback` | secrets (`docs-site/src/content/docs/self-host/secrets.md` in the `getshareout/shareout` repo) |
 | Emailed one-time codes | Email binding / Email Routing | skill **cloudflare-email-service** |
 | Split artifact CDN | Second host + `ARTIFACT_ORIGIN` | optional hardening |
 | Docs site | Deploy `docs-site/` separately; set `DOCS_HOST` + `DOCS_ORIGIN` | optional |
 
-Full ops: [Self-host overview](../../../docs-site/src/content/docs/self-host/overview.md).
+Full ops: Self-host overview (`docs-site/src/content/docs/self-host/overview.md` in the `getshareout/shareout` repo).
 
 ---
 

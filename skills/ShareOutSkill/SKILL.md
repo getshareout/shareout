@@ -12,7 +12,7 @@ ShareOut is the workspace where AI work lives: publish HTML (and CSV/MD/JSON/TXT
 with persistent data, collab, connectors, and automation — on **your** instance.
 
 **Source of truth:** this tree lives in the product repo at
-`getshareout/shareout` → `skills/ShareOutSkill/` (see [../README.md](../README.md)).
+`getshareout/shareout` → `skills/ShareOutSkill/` (see `README.md` at the repo root).
 Do not treat `getshareout/shareout-skill` as a second place to edit — that repo is a
 **mirror / install surface**. Runtime copy for agents: `GET $ORIGIN/v1/skill`.
 

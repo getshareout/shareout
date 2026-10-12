@@ -26,7 +26,7 @@ GET $ORIGIN/v1/data/{artifactId}/proxy?url=<encoded-url>
 ## Usage
 
 ```javascript
-const sdk = new ShareOut();
+const sdk = await ShareOut.create();
 const proxyUrl = `$ORIGIN/v1/data/${sdk.artifactId}/proxy`;
 const apiUrl = 'https://api.weather.gov/points/39.7456,-104.9910';
 

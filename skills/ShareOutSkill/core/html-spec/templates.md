@@ -2,6 +2,10 @@
 
 Templates handle repeating content. Charts visualize data. Realtime regions sync collaboratively.
 
+> Like bindings, these attributes are **editor metadata** — no runtime expands templates or
+> draws charts for viewers. Expand templates with the `paintBindings()` helper in
+> [bindings.md](bindings.md#rendering-for-viewers); draw charts yourself (see [Charts](#charts)).
+
 ## Templates
 
 ### Basic Template
@@ -64,6 +68,17 @@ Templates handle repeating content. Charts visualize data. Realtime regions sync
 ```
 
 ## Charts
+
+`data-shareout-chart*` declares the chart for the editor's chart panel only. Draw it yourself
+with a chart library loaded from the instance (`/vendor/plotly.js-dist-min@2.35.2/plotly.min.js`
+— SVG, survives screenshots), feeding it rows from `sdk.table(name).find().exec()`:
+
+```js
+const rows = await sdk.table('sales').find().exec();
+Plotly.newPlot(document.querySelector('[data-shareout-chart]'),
+  [{ type: 'scatter', x: rows.map(r => r.date), y: rows.map(r => r.revenue) }],
+  { title: 'Revenue Trend' }, { responsive: true, displayModeBar: false });
+```
 
 ### Basic Chart
 

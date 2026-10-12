@@ -143,7 +143,7 @@ Up to **10 metrics per artifact**.
 | `destination` | object | yes | `{ kind, config }`. `kind`: `slack`\|`email`\|`discord`\|`webhook`\|`http_get`\|`telegram`. `config` is the matching destination config (see [api/jobs.md](jobs.md#config-interfaces)). |
 | `message` | string | no | Author note appended to the alert. |
 | `cooldown_seconds` | number | no | Min seconds between deliveries once matched. Default `86400` (1 day), clamped to 60s–30d. |
-| `on_trigger` | object | no | Optional follow-up when the alert fires and delivers (manager only). See [Crew investigation](#crew-investigation-on-trigger). |
+| `on_trigger` | object | no | Optional follow-up when the alert fires and delivers (manager only). See [Crew investigation](#crew-investigation-on_trigger). |
 
 The default message is built automatically (metric label, current value,
 threshold); `message` adds context on top of it.

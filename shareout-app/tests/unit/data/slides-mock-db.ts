@@ -44,6 +44,7 @@ export interface SlidesStore {
   notes: StoredNote[];
   versions: StoredVersion[];
   states: StoredPresenterState[];
+  artifacts: { id: string; slug: string }[];
 }
 
 const DEFAULT_FONTS = JSON.stringify({ heading: 'Inter', body: 'Inter', mono: 'JetBrains Mono' });
@@ -102,6 +103,10 @@ function slideJoinMatch(
 }
 
 function handleFirst(sql: string, args: unknown[], store: SlidesStore): unknown {
+  if (sql.includes('SELECT slug FROM artifacts WHERE id = ?')) {
+    return store.artifacts.find((a) => a.id === args[0]) ?? null;
+  }
+
   if (sql.includes('SELECT id FROM presentations WHERE artifact_id = ? AND id = ?')) {
     const [artifactId, presId] = args as [string, string];
     const pres = store.presentations.find((p) => p.artifact_id === artifactId && p.id === presId);
@@ -225,6 +230,15 @@ function handleFirst(sql: string, args: unknown[], store: SlidesStore): unknown 
 }
 
 function handleAll(sql: string, args: unknown[], store: SlidesStore): { results: unknown[] } {
+  if (sql.includes('SELECT presentation_id, COUNT(*) AS cnt FROM slides')) {
+    const ids = new Set(store.presentations.filter((p) => p.artifact_id === args[0]).map((p) => p.id));
+    const counts = new Map<string, number>();
+    for (const s of store.slides) {
+      if (ids.has(s.presentation_id)) counts.set(s.presentation_id, (counts.get(s.presentation_id) ?? 0) + 1);
+    }
+    return { results: [...counts].map(([presentation_id, cnt]) => ({ presentation_id, cnt })) };
+  }
+
   if (sql.includes('SELECT * FROM presentations WHERE artifact_id = ? ORDER BY updated_at DESC')) {
     const artifactId = args[0] as string;
     return {
@@ -672,6 +686,7 @@ export function createSlidesDb(initial?: Partial<SlidesStore>) {
     notes: [...(initial?.notes ?? [])],
     versions: [...(initial?.versions ?? [])],
     states: [...(initial?.states ?? [])],
+    artifacts: [...(initial?.artifacts ?? [{ id: 'art_test', slug: 'demo-deck-slug' }])],
   };
 
   type BoundStmt = {

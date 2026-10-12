@@ -97,12 +97,14 @@ Folded from premium frontend practice, kept dependency-free:
 
 ## JS reactivity (bindings-first)
 
-This is the single biggest bug-killer. ShareOut already ships a validated declarative reactive layer — use it instead of hand-wiring the DOM.
+This is the single biggest bug-killer. Declare data on the DOM with ShareOut's binding attributes and paint it with one shared helper, instead of hand-wiring element by element.
+
+**Bindings don't render themselves.** `data-shareout-binding` / `-template` / `-chart` are editor metadata (data panel, Inspect, Format control, `editor_readiness`). Neither the served SDK nor the editor paints them, so a page that only declares bindings shows its placeholders (`$0`, empty lists) to every viewer. Paint them with the `paintBindings(sdk)` helper from [../core/html-spec/bindings.md](../core/html-spec/bindings.md#rendering-for-viewers) — call it after init and after each write.
 
 **Decision tree:**
 
-1. **Declarative bindings first.** Bind data to the DOM with `data-shareout-binding`, repeating content with `data-shareout-template`, charts with `data-shareout-chart`, and declare every source in the manifest. The runtime keeps them in sync. See [../core/html-spec/bindings.md](../core/html-spec/bindings.md) and [../core/html-spec/templates.md](../core/html-spec/templates.md).
-2. **Vanilla JS for glue only** — event handlers, calling SDK writes, branching. Not for re-rendering data into the DOM.
+1. **Declarative bindings first.** Mark data on the DOM with `data-shareout-binding`, repeating content with `data-shareout-template`, charts with `data-shareout-chart`, and declare every source in the manifest. Paint them with `paintBindings(sdk)` (re-run after writes); draw charts with Plotly from the bound rows. See [../core/html-spec/bindings.md](../core/html-spec/bindings.md) and [../core/html-spec/templates.md](../core/html-spec/templates.md).
+2. **Vanilla JS for glue** — event handlers, calling SDK writes, branching, then `paintBindings(sdk)`. Not for one-off `getElementById` painting of unannotated elements.
 3. **Alpine.js for genuinely complex interactive state** (multi-step wizards, heavy client-side filtering/derived UI). Load it from an **allowlisted CDN**: `<script src="https://cdn.jsdelivr.net/npm/alpinejs@3" defer></script>` (jsDelivr, unpkg, cdnjs all pass the sandbox CSP and publish fine on public). Do **not** paste Alpine's minified source inline — a single long minified line trips the publish-time obfuscation heuristic and can hold the artifact private.
 
 The anti-pattern that causes most "SDK errors":
@@ -112,7 +114,7 @@ The anti-pattern that causes most "SDK errors":
 <span id="rev"></span>
 <script>document.getElementById('rev').textContent = await sdk.json.get('metrics.revenue')</script>
 
-<!-- RIGHT: declarative, editor-aware, auto-synced -->
+<!-- RIGHT: declared for the editor, painted by paintBindings(sdk) for viewers -->
 <span data-shareout-binding="json:metrics.revenue" data-shareout-format="currency">$0</span>
 ```
 
@@ -121,7 +123,7 @@ The anti-pattern that causes most "SDK errors":
 The quick card. Depth in [../sdk/overview.md](../sdk/overview.md).
 
 - **Init with `await ShareOut.create()`**, not `new ShareOut()` — the awaited form readies the embedded Bearer token.
-- **Prefer bindings over imperative reads.** Reach for `sdk.json.get` / `sdk.table().exec()` only for logic, not for painting data onto the page.
+- **Prefer bindings over ad-hoc reads.** Paint bound elements through `paintBindings(sdk)`; reach for `sdk.json.get` / `sdk.table().exec()` directly for logic, `computed:` values and charts.
 - **Declare every store in the manifest** before you use it — `sdk.json` keys, `sdk.table()` names, `sdk.connection()` names. An undeclared store is a common runtime failure and breaks editor preview. Manifest rules: [../core/html-spec/manifest.md](../core/html-spec/manifest.md).
 - **Editor / preview mode does no network.** The visual editor resolves all reads (including connector queries) from `sources.*.default`. Give every source `default` sample data so a data-gated artifact still renders and stays editable.
 - **Wrap data calls in try/catch** with a graceful fallback into the error state — never let a rejected promise blank the page.

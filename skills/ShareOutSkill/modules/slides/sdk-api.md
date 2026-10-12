@@ -44,10 +44,15 @@ interface CreateResult {
   id: string;
   editorUrl: string;              // $ORIGIN_HOST/a/{slug}
   publishedUrl: string;           // $ORIGIN_HOST/p/{slug}
-  editorArtifactId: string;
-  publishedArtifactId: string;
+  editorArtifactId: string;       // host artifact id (the presentation lives inside it)
+  publishedArtifactId: string;    // same host artifact id — /p/{slug} serves it in view mode
 }
 ```
+
+REST equivalent (owner Bearer token): `POST /v1/data/{artifactId}/slides` with the same body
+returns `{ success, data: { ...presentation, editorUrl, publishedUrl, editorArtifactId,
+publishedArtifactId } }`. `GET /v1/data/{artifactId}/slides` lists them,
+`GET /v1/data/{artifactId}/slides/{presId}` returns one with its `slides`.
 
 **Example:**
 
