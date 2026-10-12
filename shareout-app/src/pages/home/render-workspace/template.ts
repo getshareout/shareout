@@ -110,7 +110,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
         <button class="wsx__tabdevice" id="wsxTabDevice" type="button" hidden aria-pressed="false" data-i18n-title="tabs.mobilePreview" data-i18n-aria="tabs.mobilePreview" title="Toggle mobile preview" aria-label="Toggle mobile preview">${svg('<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>')}</button>
         <button class="wsx__tabdevice" id="wsxTabFull" type="button" hidden data-i18n-title="tabs.fullScreen" data-i18n-aria="tabs.fullScreen" title="Full screen" aria-label="View full screen">${svg('<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>')}</button>
         <button class="wsx__notifbtn" id="wsxNotifBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="wsxNotifPanel" data-i18n-title="notif.title" data-i18n-aria="notif.title" title="Notifications" aria-label="Notifications">${svg('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>')}<span class="wsx__notifbadge" id="wsxNotifBadge" hidden>0</span></button>
-        <button class="wsx__acct wsx__acct--mob" id="wsxAcctBtnMob" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="wsxAccPanel" title="Account">${avatar}<span class="wsx__acctname">${escapeHtml(name)}</span></button>
+        <button class="wsx__acct wsx__acct--mob" id="wsxAcctBtnMob" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="wsxAccPanel" data-i18n-title="nav.account" title="Account">${avatar}<span class="wsx__acctname">${escapeHtml(name)}</span></button>
       </div>
       <div class="wsx__panes" id="wsxPanes">
         <div class="wsx__pane is-active" data-pane="home" id="wsxHomePane">
@@ -254,7 +254,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
     </main>
 
     <aside class="wsx__activity">
-      <button class="wsx__acthandle" id="wsxActHandle" type="button" aria-label="Drag to resize panel" title="Drag to resize"></button>
+      <button class="wsx__acthandle" id="wsxActHandle" type="button" data-i18n-aria="widget.resize" data-i18n-title="widget.resize" aria-label="Drag to resize panel" title="Drag to resize"></button>
       <div class="wsx__rtabs" id="wsxRtabs"></div>
       <div class="wsx__rbody" id="wsxRbody"></div>
     </aside>
@@ -264,7 +264,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
   <div class="wsx__scrim" id="wsxScrim" hidden></div>
   <section class="wsx__composer" id="wsxComposer" data-state="resting" aria-labelledby="wsxComposerTitle">
     <button type="button" class="wsx__pill" id="wsxPill" aria-haspopup="dialog"><span class="wsx__pill-text" data-i18n="composer.pill">Ask your workspace…</span><span class="wsx__pill-dot" id="wsxPillDot" hidden><span class="wsx-sr" data-i18n="composer.unread">New reply</span></span></button>
-    <div class="wsx__composer-grip" id="wsxComposerGrip" title="Drag to resize" aria-hidden="true"></div>
+    <div class="wsx__composer-grip" id="wsxComposerGrip" data-i18n-title="widget.resize" title="Drag to resize" aria-hidden="true"></div>
     <header class="wsx__composer-bar">
       <h2 class="wsx__composer-title" id="wsxComposerTitle" data-i18n="composer.chat">Chat</h2>
       <div class="wsx__composer-btns">

@@ -4,7 +4,7 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
   function evRow(g, dismissable) {
     var e = g.e || g; var count = g.count || 1; var ids = g.ids ? g.ids.join(',') : e.id; var ts = g.ts || e.ts;
     var ic = e.actor_picture ? '<img src="' + esc(e.actor_picture) + '" alt="">' : (KIND_ICON[e.kind] || '\\u2022');
-    var top = e.actor ? esc(e.actor) : esc(e.artifact_name || (e.kind === 'unused_artifacts' ? 'Workspace cleanup' : ''));
+    var top = e.actor ? esc(e.actor) : esc(e.artifact_name || (e.kind === 'unused_artifacts' ? t('evt.cleanup') : ''));
     var sum = e.actor ? (esc(e.summary) + ' \\u00B7 ' + esc(e.artifact_name)) : esc(e.summary);
     if (count > 1) sum += ' \\u00B7 ' + count + '\\u00D7';
     var x = dismissable ? '<button class="wsx-ev__x" data-eids="' + esc(ids) + '" type="button" title="' + esc(t('inspector.dismiss')) + '" aria-label="' + esc(t('inspector.dismiss')) + '">\\u00D7</button>' : '';
@@ -12,7 +12,7 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
     // only. Personal card (no workspaceId, personal home so no WSX_WS): always the owner.
     var janOk = e.kind === 'unused_artifacts' && ((window.WSX_ADMIN && e.workspaceId) || (!window.WSX_WS && !e.workspaceId));
     var act = janOk
-      ? '<button type="button" class="so-c-btn so-c-btn--secondary so-c-btn--sm" data-unused-archive="' + esc(e.workspaceId || '') + '" data-unused-n="' + (e.count || 0) + '">Archive all</button>'
+      ? '<button type="button" class="so-c-btn so-c-btn--secondary so-c-btn--sm" data-unused-archive="' + esc(e.workspaceId || '') + '" data-unused-n="' + (e.count || 0) + '">' + esc(t('evt.archiveAll')) + '</button>'
       : '';
     // Workspace-level cards (unused pages, files) carry no artifact slug — route them to /home.
     var href = e.slug ? '/a/' + encodeURIComponent(e.slug) + '/' : '/home';
@@ -63,13 +63,13 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
     var b = e.target.closest('[data-unused-archive]'); if (!b) return;
     e.preventDefault(); e.stopPropagation();
     var wid = b.getAttribute('data-unused-archive'); var n = b.getAttribute('data-unused-n') || '0';
-    if (!window.confirm('Move ' + n + ' unopened page' + (n === '1' ? '' : 's') + ' to trash? Recoverable for 30 days.')) return;
-    b.disabled = true; b.textContent = 'Archiving\\u2026';
+    if (!window.confirm(n === '1' ? t('evt.archiveConfirmOne') : t('evt.archiveConfirm').replace('{n}', n))) return;
+    b.disabled = true; b.textContent = t('evt.archiving');
     var url = wid ? '/v1/workspaces/' + encodeURIComponent(wid) + '/unused/archive' : '/v1/artifacts/unused/archive';
     fetch(url, { method: 'POST', credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function () { loadFeed(); })
-      .catch(function () { b.disabled = false; b.textContent = 'Archive all'; });
+      .catch(function () { b.disabled = false; b.textContent = t('evt.archiveAll'); });
   });
 
   // ===== artifact widgets: tile (cards) <-> table (rows), per-widget + persisted =====

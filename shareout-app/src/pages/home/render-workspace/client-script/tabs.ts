@@ -52,17 +52,17 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
   // the parent can drive contentEditable text edits and round-trip them cleanly.
   var ART_PANE_HTML =
     '<div class="wsx__stagebar2">'
-    + '<button class="wsx__ubtn js-undo" type="button" title="Undo" hidden>' + isvg('<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/>') + '</button>'
-    + '<button class="wsx__ubtn js-redo" type="button" title="Redo" hidden>' + isvg('<path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h1"/>') + '</button>'
-    + '<button class="wsx__ubtn js-mobile" type="button" title="Mobile preview" hidden>' + isvg('<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>') + '</button>'
+    + '<button class="wsx__ubtn js-undo" type="button" title="' + esc(t('tabs.undo')) + '" hidden>' + isvg('<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/>') + '</button>'
+    + '<button class="wsx__ubtn js-redo" type="button" title="' + esc(t('tabs.redo')) + '" hidden>' + isvg('<path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h1"/>') + '</button>'
+    + '<button class="wsx__ubtn js-mobile" type="button" title="' + esc(t('tabs.mobilePreview')) + '" hidden>' + isvg('<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>') + '</button>'
     + '<span class="wsx__savestat js-savestat"></span>'
     + '<span class="wsx__editspacer"></span>'
     + '<button class="wsx__discard js-discard" type="button" hidden>' + esc(t('tabs.discard')) + '</button>'
     + '<button class="wsx__publish js-publish" type="button" hidden>' + esc(t('tabs.publish')) + '</button>'
     + '<a class="wsx__fulledit js-fulledit" target="_blank" rel="noopener" hidden title="' + esc(t('tabs.editLiteHint')) + '">' + esc(t('tabs.openFullEditor')) + '</a>'
     + '</div>'
-    + '<iframe class="wsx__stageframe" title="Artifact" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>'
-    + '<iframe class="wsx__editframe" title="Edit" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>';
+    + '<iframe class="wsx__stageframe" title="' + esc(t('tabs.frameArtifact')) + '" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>'
+    + '<iframe class="wsx__editframe" title="' + esc(t('tabs.edit')) + '" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>';
 
   function spark(daily) {
     if (!daily || !daily.length) return '';
@@ -176,7 +176,7 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
     if (rec.histTimer) clearTimeout(rec.histTimer);
     rec.srcDoc.body.innerHTML = rec.history[rec.histIdx] || '';
     rec.pendingSel = null;
-    rec.dirty = true; renderTabs(); setSaveStatus(rec, 'Editing\\u2026');
+    rec.dirty = true; renderTabs(); setSaveStatus(rec, t('edit.editing'));
     if (rec.saveTimer) clearTimeout(rec.saveTimer);
     rec.saveTimer = setTimeout(function () { autosaveDraft(rec); }, 1200);
     renderLive(rec); updateUndoButtons(rec);

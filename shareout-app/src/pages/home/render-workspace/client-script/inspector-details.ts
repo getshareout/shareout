@@ -98,7 +98,7 @@ export const workspace_client_inspector_details_JS = `  // ===== Inspector Detai
     if (metaCache[id]) metaCache[id].is_favorite = on ? 0 : 1;
     fetch('/v1/artifacts/' + encodeURIComponent(id) + '/favorite', { method: on ? 'DELETE' : 'POST', credentials: 'same-origin' })
       .then(function (r) { if (!r.ok) throw new Error('failed'); })
-      .catch(function () { btn.classList.toggle('is-on', on); if (metaCache[id]) metaCache[id].is_favorite = on ? 1 : 0; try { wsxToast('Couldn\\u2019t update favorite', true); } catch (e) {} });
+      .catch(function () { btn.classList.toggle('is-on', on); if (metaCache[id]) metaCache[id].is_favorite = on ? 1 : 0; try { wsxToast(t('cards.favFailed'), true); } catch (e) {} });
   }
   function trashArtifact(art) {
     if (!window.confirm(t('inspector.trashConfirm').replace('{name}', art.name || 'this page'))) return;

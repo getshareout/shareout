@@ -21,7 +21,7 @@ const SHARE_COPY: LocaleCopy<Record<
     message: 'Mensaje (opcional)', note: 'Sumá una nota corta…', access: 'Qué pueden hacer',
     linkOnly: 'Solo el enlace', viewer: 'Ver', editor: 'Editar', cancel: 'Cancelar', send: 'Enviar',
     shareQuoted: 'Compartir ',
-    canManage: 'Quienes puedan ver o editar quedan como colaboradores y pueden abrir páginas privadas.',
+    canManage: 'Quienes puedan ver o editar quedan como colaboradores y pueden abrir artefactos privados.',
     cannotManage: 'Solo quienes son dueños o editores pueden sumar personas. Igual podés mandar el enlace.',
     copied: 'Enlace copiado.', needEmail: 'Escribí al menos un mail, o usá Copiar.', sending: 'Enviando…',
     failed: 'No pudimos compartir. Probá de nuevo.', invite: ' invitación enviada', invites: ' invitaciones enviadas', sent: '', network: 'Error de conexión.',

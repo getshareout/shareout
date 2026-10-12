@@ -33,8 +33,8 @@ export const workspace_client_artifact_links_JS = `  // ===== dismiss a "Needs y
     mount.innerHTML = items.map(function (it) {
       return '<a class="wsx-ev" data-open="' + esc(it.slug) + '" data-name="' + esc(it.name) + '" data-id="' + esc(it.id) + '" href="#">'
         + '<span class="wsx-ev__ic">\\uD83D\\uDCC4</span>'
-        + '<span class="wsx-ev__main"><span class="wsx-ev__top">' + esc(it.name) + '</span><span class="wsx-ev__sum">' + esc(it.artifact_type || 'page') + '</span></span>'
-        + '<span class="wsx-ev__time">Open</span></a>';
+        + '<span class="wsx-ev__main"><span class="wsx-ev__top">' + esc(it.name) + '</span><span class="wsx-ev__sum">' + esc(it.artifact_type || t('agent.page')) + '</span></span>'
+        + '<span class="wsx-ev__time">' + esc(t('inspector.openLabel')) + '</span></a>';
     }).join('');
     mount.querySelectorAll('[data-open]').forEach(function (a) {
       a.addEventListener('click', function (e) { e.preventDefault(); openArtifact(a.getAttribute('data-open'), a.getAttribute('data-name'), a.getAttribute('data-id')); });

@@ -246,7 +246,7 @@ describe('sandbox-viewer modules', () => {
       attachedSkills: [],
       locale: 'es',
     })!);
-    expect(es).toContain('Todas las páginas');
+    expect(es).toContain('Todos los artefactos');
     expect(es).toContain('Escribí un comentario…');
     expect(es).toContain('No pudimos cargar los comentarios');
     expect(es).toContain('Compartir');

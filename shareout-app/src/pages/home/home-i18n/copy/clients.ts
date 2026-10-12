@@ -129,7 +129,7 @@ export const CLIENTS_COPY: HomeLocaleCopy = {
     'clients.notesTitle': 'Notas sobre este cliente',
     'clients.nothingShared': 'Todavía no compartiste nada. Compartí una carpeta para que {name} la vea.',
     'clients.open': 'Abrir',
-    'clients.openedArtifact': 'abrió una página',
+    'clients.openedArtifact': 'abrió un artefacto',
     'clients.people': 'Personas',
     'clients.recentActivity': 'Actividad reciente',
     'clients.removeMember': '¿Quitar a esta persona de {name}?',

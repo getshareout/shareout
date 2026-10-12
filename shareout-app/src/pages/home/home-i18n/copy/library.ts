@@ -132,7 +132,7 @@ export const LIBRARY_COPY: HomeLocaleCopy = {
     'library.imports': 'importaciones',
     'library.newModule': 'Nuevo módulo',
     'library.newModuleSub': 'Funciones JS puras que importás con so.lib',
-    'library.noModules': 'Todavía no hay módulos — publicá JS reutilizable que cualquier página importe con so.lib(nombre).',
+    'library.noModules': 'Todavía no hay módulos — publicá JS reutilizable que cualquier artefacto importe con so.lib(nombre).',
     'library.noSkills': 'Todavía no hay skills en el catálogo.',
     'library.official': 'Oficial',
     'library.recommendedSub': 'Recomendadas por ShareOut — skills oficiales, siempre actualizadas.',

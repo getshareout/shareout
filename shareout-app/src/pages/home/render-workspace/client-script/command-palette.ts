@@ -235,7 +235,7 @@ export const workspace_client_command_palette_JS = `
         '<div class="wsx-cmdk__ask-answer">' + esc(ans).replace(/\\n/g, '<br>') + '</div>';
       if (cites.length) {
         h += '<div class="wsx-cmdk__ask-cites"><div class="wsx-cmdk__ask-citehd">' + esc(t('palette.askSources') || 'Sources') + '</div>';
-        cites.forEach(function (c, i) { h += '<button type="button" class="wsx-cmdk__cite" data-ci="' + i + '"><span class="wsx-cmdk__cite-n">' + (i + 1) + '</span><span class="wsx-cmdk__cite-t">' + esc(c.title || 'Untitled') + '</span></button>'; });
+        cites.forEach(function (c, i) { h += '<button type="button" class="wsx-cmdk__cite" data-ci="' + i + '"><span class="wsx-cmdk__cite-n">' + (i + 1) + '</span><span class="wsx-cmdk__cite-t">' + esc(c.title || t('agent.untitled')) + '</span></button>'; });
         h += '</div>';
       }
       h += '</div>';

@@ -23,7 +23,7 @@ export const workspace_client_inspector_activity_JS = `
     if (e.kind === 'view') detail = g.count > 1 ? 'viewed ' + g.count + ' times' : feedText(e.summary);
     else { detail = feedText(e.summary); if (e.actor) detail += ' \\u00B7 ' + esc(e.artifact_name); if (g.count > 1) detail += ' \\u00B7 ' + g.count + '\\u00D7'; }
     var dot = e.actor_picture ? '<img class="wsx-tl__av" src="' + esc(e.actor_picture) + '" alt="">' : '<span class="wsx-tl__dot k-' + esc(e.kind) + '"></span>';
-    var x = '<button class="wsx-tl__x" data-eids="' + esc(g.ids.join(',')) + '" type="button" title="Dismiss" aria-label="Dismiss">\\u00D7</button>';
+    var x = '<button class="wsx-tl__x" data-eids="' + esc(g.ids.join(',')) + '" type="button" title="' + esc(t('inspector.dismiss')) + '" aria-label="' + esc(t('inspector.dismiss')) + '">\\u00D7</button>';
     return '<a class="wsx-tl" data-kind="' + esc(e.kind) + '" data-name="' + esc(e.artifact_name) + '" data-id="' + esc(e.artifact_id) + '" href="/a/' + encodeURIComponent(e.slug) + '/">'
       + '<span class="wsx-tl__rail">' + dot + '</span>'
       + '<span class="wsx-tl__main"><span class="wsx-tl__top">' + title + '</span><span class="wsx-tl__sum">' + detail + '</span></span>'
