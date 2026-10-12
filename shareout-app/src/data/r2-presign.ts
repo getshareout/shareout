@@ -1,11 +1,14 @@
 import { AwsClient } from 'aws4fetch';
 import type { Env } from '../types';
 
-const DEFAULT_BUCKET = 'shareout-artifacts';
-
-/** True when R2 S3-API credentials are configured for presigned direct transfers. */
+/**
+ * True when R2 S3-API credentials AND the bucket name are configured for presigned
+ * direct transfers. R2_BUCKET must name the same bucket as the ARTIFACTS binding —
+ * the binding doesn't expose its name, and guessing one sent direct uploads to a
+ * different bucket than confirm/content read from.
+ */
 export function isPresignConfigured(env: Env): boolean {
-  return !!(env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_ACCOUNT_ID);
+  return !!(env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_ACCOUNT_ID && env.R2_BUCKET);
 }
 
 function client(env: Env): AwsClient {
@@ -18,9 +21,8 @@ function client(env: Env): AwsClient {
 }
 
 function objectUrl(env: Env, key: string, ttlSeconds: number): string {
-  const bucket = env.R2_BUCKET || DEFAULT_BUCKET;
   const encodedKey = key.split('/').map(encodeURIComponent).join('/');
-  return `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${bucket}/${encodedKey}?X-Amz-Expires=${ttlSeconds}`;
+  return `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${env.R2_BUCKET}/${encodedKey}?X-Amz-Expires=${ttlSeconds}`;
 }
 
 async function presign(env: Env, key: string, method: 'GET' | 'PUT', ttlSeconds: number): Promise<string | null> {

@@ -41,17 +41,27 @@ GET    /v1/data/{artifactId}/blobs/storage            # Storage info
 Browser callers (request carries an `Origin` header) get `direct: false` and an
 `uploadUrl` that proxies through the Worker instead
 (`/v1/data/{artifactId}/blobs/_upload/{tokenId}`) — R2 doesn't accept CORS PUTs from
-a sandboxed artifact's opaque origin.
+a sandboxed artifact's opaque origin. Server callers also get `direct: false` when the
+instance has no R2 S3 credentials / `R2_BUCKET` configured. Always branch on `direct`,
+never on whether you sent an `Origin`.
 
 ## PUT {uploadUrl} (2. Upload bytes)
 
 `PUT` the raw file body (no multipart wrapper) to the `uploadUrl` from step 1. The
 token expires in 15 minutes.
 
+- `direct: true` — the PUT goes straight to R2 and returns R2's empty `200`. Call
+  `confirm` (step 3) to create the blob.
+- `direct: false` — the PUT goes to the Worker, which stores the bytes **and** finalizes
+  the blob in one step: it returns `201` with the blob (`id`, `filename`, `mimeType`,
+  `sizeBytes`, `createdAt`). `confirm` is not needed (calling it is harmless — see below).
+
 ## POST /blobs/{tokenId}/confirm (3. Confirm)
 
 No body. Persists the blob row from the token + the real uploaded size. Returns
-`UPLOAD_INCOMPLETE` (400) if nothing was PUT to `uploadUrl` yet.
+`UPLOAD_INCOMPLETE` (400) if nothing was PUT to `uploadUrl` yet. Idempotent: confirming a
+token that is already finalized (repeat confirm, or a `direct: false` upload) returns
+`200` with the existing blob instead of an error. Status is `201` when this call created it.
 
 **Response:**
 ```json
@@ -62,11 +72,12 @@ No body. Persists the blob row from the token + the real uploaded size. Returns
     "filename": "image.png",
     "mimeType": "image/png",
     "sizeBytes": 12345,
-    "createdAt": "2026-09-19T12:00:00Z",
-    "contentUrl": "/v1/data/art_xxx/blobs/blob_abc123/content"
+    "createdAt": "2026-09-19T12:00:00Z"
   }
 }
 ```
+
+Bytes are always readable at `GET /v1/data/{artifactId}/blobs/{id}/content`.
 
 ## GET /blobs (List)
 
@@ -89,8 +100,8 @@ No body. Persists the blob row from the token + the real uploaded size. Returns
 
 ## GET /blobs/{id} (Metadata)
 
-**Response:** same shape as the confirm response above — `id`, `filename`, `mimeType`,
-`sizeBytes`, `createdAt`, `contentUrl`.
+**Response:** same shape as the confirm response above plus `contentUrl`
+(`/v1/data/{artifactId}/blobs/{id}/content`).
 
 ## GET /blobs/{id}/download-url
 
@@ -105,6 +116,9 @@ No body. Persists the blob row from the token + the real uploaded size. Returns
   }
 }
 ```
+
+`direct: true` is a 5-minute presigned R2 URL; `direct: false` (no R2 S3 credentials on
+the instance) returns the Worker `.../content` URL with `expiresIn: null`.
 
 ## GET /blobs/storage
 
@@ -147,7 +161,7 @@ No body. Persists the blob row from the token + the real uploaded size. Returns
 | `BLOB_LIMIT_EXCEEDED` | 400 | Max 1000 blobs per artifact (10,000 for asset-library buckets) |
 | `INVALID_TYPE` | 400 | MIME type not allowed |
 | `BLOB_NOT_FOUND` | 404 | Blob doesn't exist |
-| `UPLOAD_TOKEN_INVALID` / `UPLOAD_TOKEN_EXPIRED` | 400 | The upload token from step 1 is unknown, already used, or its 15-minute window passed — request a new one |
+| `UPLOAD_TOKEN_INVALID` / `UPLOAD_TOKEN_EXPIRED` | 400 | The upload token from step 1 is unknown, or its 15-minute window passed — request a new one (an already-finalized token confirms idempotently) |
 | `UPLOAD_INCOMPLETE` | 400 | `confirm` was called before the file was PUT to `uploadUrl` |
 
 Blob uploads are bounded by **three** caps, all enforced on upload/confirm: per-file (50MB),

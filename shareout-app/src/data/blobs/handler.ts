@@ -624,10 +624,26 @@ async function requestUpload(request: Request, ctx: DataContext): Promise<Respon
 async function confirmBlobUpload(ctx: DataContext, tokenId: string): Promise<Response> {
   const token = await ctx.env.DB.prepare(`
     SELECT * FROM upload_tokens
-    WHERE id = ? AND kind = 'blob' AND artifact_id = ? AND used_at IS NULL
+    WHERE id = ? AND kind = 'blob' AND artifact_id = ?
   `).bind(tokenId, ctx.artifactId).first<UploadTokenRow>();
 
-  if (!token) {
+  // Idempotent: the proxied PUT (or an earlier confirm) already finalized this token.
+  if (token?.used_at) {
+    const done = await ctx.env.DB.prepare(`
+      SELECT id, filename, mime_type, size_bytes, created_at FROM blobs WHERE artifact_id = ? AND r2_key = ?
+    `).bind(ctx.artifactId, token.r2_key).first<BlobRow>();
+    if (done) {
+      return successResponse({
+        id: done.id,
+        filename: done.filename,
+        mimeType: done.mime_type,
+        sizeBytes: done.size_bytes,
+        createdAt: done.created_at,
+      }, 200, ctx.origin);
+    }
+  }
+
+  if (!token || token.used_at) {
     return errorResponse({
       ...DATA_ERRORS.UPLOAD_TOKEN_INVALID,
       hint: `Token "${tokenId}" is invalid, expired, or already used.`,
