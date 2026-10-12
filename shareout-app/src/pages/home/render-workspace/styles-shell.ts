@@ -28,6 +28,7 @@ export const WORKSPACE_SHELL_STYLES = `.wsx { position: relative; height: 100vh;
 .wsx-lens:hover { background: var(--color-surface); color: var(--color-text); }
 .wsx-lens.is-active { background: var(--color-primary-light); color: var(--color-primary); }
 .wsx-lens svg, .wsx__create svg { flex: none; }
+.wsx__raildiv { height: 1px; margin: var(--space-2) 12px; background: var(--color-border); flex: none; }
 .wsx__railgroup-title { font: 600 var(--text-xs) var(--font-body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-tertiary); padding: var(--space-3) 12px var(--space-1); white-space: nowrap; }
 .wsx__follows:empty::after { content: 'Nothing followed yet'; font-size: var(--text-xs); color: var(--color-text-tertiary); padding: 0 12px; white-space: nowrap; }
 .wsx__railspace { flex: 1; min-height: 8px; } .wsx__railfoot { display: flex; align-items: center; gap: 4px; margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--color-border); }

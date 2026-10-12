@@ -100,14 +100,14 @@ function describeActionRichEs(a: PendingAction): ActionCard {
     case 'job_pause': return { kind: a.kind, title: 'Pausar envío programado', subject: a.label };
     case 'job_resume': return { kind: a.kind, title: 'Reactivar envío programado', subject: a.label };
     case 'job_delete': return { kind: a.kind, title: 'Borrar envío programado', subject: a.label, detail: NO_UNDO_ES, danger: true };
-    case 'share': return { kind: a.kind, title: 'Compartir página', subject: a.artifactName, detail: `Como ${ROLE_ES[a.role]}`, lines: a.emails };
+    case 'share': return { kind: a.kind, title: 'Compartir artefacto', subject: a.artifactName, detail: `Como ${ROLE_ES[a.role]}`, lines: a.emails };
     case 'crew': return { kind: a.kind, title: 'Pedirle al agente', subject: a.artifactName, detail: a.instruction };
     case 'edit_publish': return { kind: a.kind, title: 'Cambiar y publicar', subject: a.artifactName, detail: a.summary, lines: a.files.length ? [`Archivos: ${a.files.join(', ')}`] : undefined };
     case 'data_table_insert': return { kind: a.kind, title: `Agregar fila a “${a.table}”`, subject: a.artifactName, lines: kv(a.row) };
     case 'data_table_update': return { kind: a.kind, title: `Actualizar “${a.table}”`, subject: a.artifactName, detail: a.rowId ? `fila ${a.rowId}` : `filas que coinciden con ${preview(a.filter, 80)}`, lines: kv(a.changes) };
     case 'data_json_set': return { kind: a.kind, title: `Guardar “${a.key}”`, subject: a.artifactName, detail: a.exists ? 'Reemplaza el valor actual.' : undefined, lines: [preview(a.value, 160)] };
     case 'job_create': return { kind: a.kind, title: 'Programar mail', subject: a.artifactName, detail: `cron ${a.schedule}${a.includePdf ? ' · con PDF adjunto' : ''}`, lines: a.recipients };
-    case 'build_artifact': return { kind: a.kind, title: 'Armar una página nueva', subject: a.name, detail: a.prompt.length > 280 ? a.prompt.slice(0, 280) + '…' : a.prompt };
+    case 'build_artifact': return { kind: a.kind, title: 'Armar un artefacto nuevo', subject: a.name, detail: a.prompt.length > 280 ? a.prompt.slice(0, 280) + '…' : a.prompt };
     case 'save_skill': return { kind: a.kind, title: a.skillArtifactId ? 'Actualizar skill del equipo' : 'Guardar como skill del equipo', subject: a.name, detail: `${a.markdown.length} caracteres de markdown`, lines: [a.markdown.slice(0, 200) + (a.markdown.length > 200 ? '…' : '')] };
     case 'invite_members': return {
       kind: a.kind,
@@ -142,7 +142,7 @@ function describeActionEs(a: PendingAction): string {
     case 'job_create':
       return `¿Programo un mail de “${a.artifactName}” (cron \`${a.schedule}\`) para ${a.recipients.join(', ')}${a.includePdf ? ', con un PDF adjunto' : ''}?`;
     case 'build_artifact':
-      return `¿Armo y publico una página nueva, “${a.name}”?\n\n${a.prompt.length > 280 ? a.prompt.slice(0, 280) + '…' : a.prompt}`;
+      return `¿Armo y publico un artefacto nuevo, “${a.name}”?\n\n${a.prompt.length > 280 ? a.prompt.slice(0, 280) + '…' : a.prompt}`;
     case 'save_skill':
       return `¿${a.skillArtifactId ? 'Actualizo' : 'Guardo'} la skill del equipo “${a.name}” en la Biblioteca del espacio?`;
     case 'invite_members':

@@ -8,7 +8,7 @@ export const svg = (path: string) =>
   `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
 
 export function railNav(n: NavItem, active: boolean): string {
-  const titleAttr = n.i18n ? ` data-i18n-title="${n.i18n}" title="${n.label}"` : ` title="${n.label}"`;
+  const titleAttr = n.i18n ? ` data-tip-rail data-i18n-tip="${n.i18n}" data-tip="${n.label}"` : ` data-tip-rail data-tip="${n.label}"`;
   const spanI18n = n.i18n ? ` data-i18n="${n.i18n}"` : '';
   if (n.kind === 'link') {
     return `<a class="wsx-lens" href="${escapeHtml(n.href || '#')}"${titleAttr}>${svg(ICON[n.icon])}<span${spanI18n}>${n.label}</span></a>`;

@@ -3,6 +3,9 @@ import type { HomeLocaleCopy } from '../types';
 /** Notifications bell + panel (approvals, activity that needs you). */
 export const NOTIF_COPY: HomeLocaleCopy = {
   en: {
+    'notif.accessFailed': 'Couldn’t update access request',
+    'notif.commentFailed': 'Couldn’t update the comment',
+    'notif.decisionFailed': 'Couldn’t submit your decision',
     'notif.title': 'Notifications',
     'notif.approvals': 'Needs your approval',
     'notif.recent': 'Recent',
@@ -33,6 +36,9 @@ export const NOTIF_COPY: HomeLocaleCopy = {
     'notif.seenEmptySub': "Notifications you've opened or dismissed show up here.",
   },
   es: {
+    'notif.accessFailed': 'No se pudo actualizar la solicitud de acceso',
+    'notif.commentFailed': 'No se pudo actualizar el comentario',
+    'notif.decisionFailed': 'No se pudo enviar tu decisión',
     'notif.title': 'Notificaciones',
     'notif.approvals': 'Necesita tu aprobación',
     'notif.recent': 'Recientes',

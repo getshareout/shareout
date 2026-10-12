@@ -34,4 +34,5 @@ export const ICON = {
 };
 
 /** Rail navigation. `view` items switch the canvas Home pane; `link` items navigate. */
+export interface NavGroup { title?: string; i18n?: string; items: NavItem[]; }
 export interface NavItem { key: string; label: string; i18n?: string; icon: keyof typeof ICON; kind: 'view' | 'link'; href?: string; }

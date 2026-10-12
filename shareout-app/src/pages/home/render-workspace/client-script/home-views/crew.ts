@@ -57,7 +57,7 @@ export const workspace_client_home_views_crew_JS = `  // ----- Crew AI — works
       .then(function (d) {
         var a = (d && d.automations) || [];
         if (!a.length) {
-          m.innerHTML = '<div class="wsx-qa-grid wsx-qa-grid--lens"><button class="wsx-qa" data-newauto="Set up a crew for one of my pages that runs on a schedule and " type="button"><span class="wsx-qa__ic">' + isvg('<circle cx="9" cy="7" r="3"/><path d="M2 21v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"/><circle cx="18" cy="8" r="2.5"/>') + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('crew.emptyChat')) + '</span><span class="wsx-qa__s">' + esc(t('crew.emptyChatSub')) + '</span></span></button></div>';
+          m.innerHTML = '<div class="wsx-qa-grid wsx-qa-grid--lens"><button class="wsx-qa" data-newauto="' + esc(t('crew.prefillChat')) + '" type="button"><span class="wsx-qa__ic">' + isvg('<circle cx="9" cy="7" r="3"/><path d="M2 21v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"/><circle cx="18" cy="8" r="2.5"/>') + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('crew.emptyChat')) + '</span><span class="wsx-qa__s">' + esc(t('crew.emptyChatSub')) + '</span></span></button></div>';
           wireNewAuto(m); return;
         }
         m.innerHTML = runsLink() + a.map(function (c) {

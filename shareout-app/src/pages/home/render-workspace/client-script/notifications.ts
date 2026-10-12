@@ -203,13 +203,13 @@ export const workspace_client_notifications_JS = `
           } else {
             el.classList.remove('is-busy');
             if (acts) acts.querySelectorAll('.wsx-abtn').forEach(function (b) { b.disabled = false; });
-            showToast('Couldn\\u2019t submit your decision', 'error');
+            showToast(t('notif.decisionFailed'), 'error');
           }
         })
         .catch(function () {
           el.classList.remove('is-busy');
           if (acts) acts.querySelectorAll('.wsx-abtn').forEach(function (b) { b.disabled = false; });
-          showToast('Couldn\\u2019t submit your decision', 'error');
+          showToast(t('notif.decisionFailed'), 'error');
         });
     }
 
@@ -226,7 +226,7 @@ export const workspace_client_notifications_JS = `
           setBadge();
           if (!approvals.length && !actions.length && !needs.length) render();
         })
-        .catch(function () { el.disabled = false; el.classList.remove('is-busy'); showToast('Couldn\\u2019t update the comment', 'error'); });
+        .catch(function () { el.disabled = false; el.classList.remove('is-busy'); showToast(t('notif.commentFailed'), 'error'); });
     }
     function decideAccess(el, action) {
       var id = el.getAttribute(action === 'approve' ? 'data-access-approve' : 'data-access-deny');
@@ -251,7 +251,7 @@ export const workspace_client_notifications_JS = `
         })
         .catch(function () {
           card.querySelectorAll('.wsx-abtn').forEach(function (b) { b.disabled = false; b.classList.remove('is-busy'); });
-          showToast('Couldn\\u2019t update access request', 'error');
+          showToast(t('notif.accessFailed'), 'error');
         });
     }
 

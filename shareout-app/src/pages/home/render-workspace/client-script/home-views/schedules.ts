@@ -86,8 +86,8 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
         var jobs = (d && (d.jobs || d.items)) || [];
         if (!jobs.length) {
           m.innerHTML = '<div class="wsx-qa-grid wsx-qa-grid--lens">'
-            + '<button class="wsx-qa" data-newauto="Schedule a recurring send of one of my pages \\u2014 " type="button"><span class="wsx-qa__ic">' + isvg(SCHED_ICON.clock) + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('sched.emptyChat')) + '</span><span class="wsx-qa__s">' + esc(t('sched.emptyChatSub')) + '</span></span></button>'
-            + '<button class="wsx-qa" data-newauto="Walk me through creating a schedule step by step: pick a page, a destination (Slack/Email/Telegram) and a time." type="button"><span class="wsx-qa__ic">' + isvg(SCHED_ICON.check) + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('sched.emptyStep')) + '</span><span class="wsx-qa__s">' + esc(t('sched.emptyStepSub')) + '</span></span></button>'
+            + '<button class="wsx-qa" data-newauto="' + esc(t('sched.prefillChat')) + '" type="button"><span class="wsx-qa__ic">' + isvg(SCHED_ICON.clock) + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('sched.emptyChat')) + '</span><span class="wsx-qa__s">' + esc(t('sched.emptyChatSub')) + '</span></span></button>'
+            + '<button class="wsx-qa" data-newauto="' + esc(t('sched.prefillStep')) + '" type="button"><span class="wsx-qa__ic">' + isvg(SCHED_ICON.check) + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('sched.emptyStep')) + '</span><span class="wsx-qa__s">' + esc(t('sched.emptyStepSub')) + '</span></span></button>'
             + '</div>';
           wireNewAuto(m); return;
         }
@@ -153,8 +153,8 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
         if (!al.length) {
           m.innerHTML = '<p class="wsx-lens__intro">' + esc(t('alerts.intro')) + '</p>'
             + '<div class="wsx-qa-grid wsx-qa-grid--lens">'
-            + '<button class="wsx-qa" data-newauto="Set up an alert that pings me when " type="button"><span class="wsx-qa__ic">' + isvg('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>') + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('alerts.emptyChat')) + '</span><span class="wsx-qa__s">' + esc(t('alerts.emptyChatSub')) + '</span></span></button>'
-            + '<button class="wsx-qa" data-newauto="Walk me through creating a metric alert step by step: pick a page, a metric, a condition (above/below a threshold) and how often to check." type="button"><span class="wsx-qa__ic">' + isvg('<path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/>') + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('alerts.emptyStep')) + '</span><span class="wsx-qa__s">' + esc(t('alerts.emptyStepSub')) + '</span></span></button>'
+            + '<button class="wsx-qa" data-newauto="' + esc(t('alerts.prefillChat')) + '" type="button"><span class="wsx-qa__ic">' + isvg('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>') + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('alerts.emptyChat')) + '</span><span class="wsx-qa__s">' + esc(t('alerts.emptyChatSub')) + '</span></span></button>'
+            + '<button class="wsx-qa" data-newauto="' + esc(t('alerts.prefillStep')) + '" type="button"><span class="wsx-qa__ic">' + isvg('<path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/>') + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('alerts.emptyStep')) + '</span><span class="wsx-qa__s">' + esc(t('alerts.emptyStepSub')) + '</span></span></button>'
             + '</div>';
           wireNewAuto(m); return;
         }

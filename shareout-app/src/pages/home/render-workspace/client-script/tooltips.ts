@@ -4,12 +4,15 @@ export const workspace_client_tooltips_JS = `  // ===== tooltip for [data-tip] (
     var tip = null, tEl = null;
     function show(el) {
       var txt = el.getAttribute('data-tip'); if (!txt) return;
+      var rail = el.hasAttribute('data-tip-rail');
+      if (rail && !el.closest('.wsx.is-rail-collapsed')) return;
       if (!tip) { tip = document.createElement('div'); tip.className = 'wsx-tip'; document.body.appendChild(tip); }
       tip.textContent = txt; tip.style.display = 'block'; tEl = el;
       var r = el.getBoundingClientRect();
       var tw = tip.offsetWidth, th = tip.offsetHeight;
       var left = Math.min(window.innerWidth - tw - 8, Math.max(8, r.left + r.width / 2 - tw / 2));
       var top = r.top - th - 8; if (top < 8) top = r.bottom + 8;
+      if (rail) { left = r.right + 10; top = r.top + r.height / 2 - th / 2; }
       tip.style.left = left + 'px'; tip.style.top = top + 'px';
       tip.classList.add('is-show');
     }

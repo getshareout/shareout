@@ -629,7 +629,7 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
         : '';
       m.innerHTML = instanceSection + inboxSection + '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title" data-i18n="settings.language">Language</div>'
         + '<p class="wsx-lens__intro" data-i18n="settings.languageIntro">Choose the language for menus, labels, and messages in your workspace home.</p>'
-        + '<div class="wsx-home-lang" role="group" aria-label="Language">'
+        + '<div class="wsx-home-lang" role="group" aria-label="Language" data-i18n-aria="settings.language">'
         + '<button class="home-lang-btn" type="button" data-scope="workspace" data-lang="en" aria-selected="true" title="English" data-i18n-title="settings.languageEn">\\uD83C\\uDDFA\\uD83C\\uDDF8 EN</button>'
         + '<button class="home-lang-btn" type="button" data-scope="workspace" data-lang="es" aria-selected="false" title="Espa\\u00f1ol" data-i18n-title="settings.languageEs">\\uD83C\\uDDE6\\uD83C\\uDDF7 ES</button>'
         + '</div></div>' + pubSection + brdSection + featSection;

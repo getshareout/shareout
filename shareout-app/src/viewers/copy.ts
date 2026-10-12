@@ -50,11 +50,11 @@ const en = {
 export type ViewerCopy = typeof en;
 
 const es: ViewerCopy = {
-  backAllYours: 'Volver a todas tus páginas',
-  allArtifacts: 'Todas las páginas',
+  backAllYours: 'Volver a todos tus artefactos',
+  allArtifacts: 'Todos los artefactos',
   edit: 'Editar',
   stats: 'Estadísticas',
-  backAll: 'Volver a todas las páginas',
+  backAll: 'Volver a todos los artefactos',
   favRemove: 'Quitar de favoritos',
   favAdd: 'Agregar a favoritos',
   favorited: 'En favoritos',
@@ -90,7 +90,7 @@ const es: ViewerCopy = {
   saveToMine: 'Guardar en Mis habilidades',
   saved: 'Guardada',
   save: 'Guardar',
-  attachedTo: 'Sumada a páginas',
+  attachedTo: 'Sumada a artefactos',
   usesByAgents: 'Usos de agentes',
 };
 

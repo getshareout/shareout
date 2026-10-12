@@ -1,6 +1,6 @@
 /** Create with AI flow. */
 export const workspace_client_create_ai_JS = `  // ===== Create with AI (in-Studio; reuses /v1/create/generate) =====
-  var SOURCES = ['Google Sheets', 'Google Analytics', 'Shopify', 'Snowflake', 'A CSV upload'];
+  var SOURCES = ['Google Sheets', 'Google Analytics', 'Shopify', 'Snowflake', t('create.sourceCsv')];
   var createMode = false;
   function renderCreatePanels() {
     var idEl = document.getElementById('wsxIdeas');

@@ -113,7 +113,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     if (meta && meta.moderation) {
       var mod = meta.moderation;
       var modTint = mod.status === 'blocked' ? 'var(--color-error)' : 'var(--color-warning)';
-      var modLabel = mod.status === 'blocked' ? 'Blocked by review' : 'Under review';
+      var modLabel = mod.status === 'blocked' ? t('inspector.modBlocked') : t('cards.underReview');
       h += '<div class="wsx-det__modnote" style="margin:8px 0 4px;padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.45;background:color-mix(in srgb,' + modTint + ' 12%,transparent);color:var(--color-text-secondary);border:1px solid color-mix(in srgb,' + modTint + ' 30%,transparent)">'
         + '<strong style="color:' + modTint + '">' + esc(modLabel) + '</strong>'
         + (mod.reason ? ' \\u00B7 ' + esc(mod.reason) : '')
@@ -168,7 +168,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
         patchArtifact(art.id, { name: v }, function (j) {
           if (j) return; // roll back an unsaved rename instead of showing false success
           name = prevName; art.name = prevName; if (metaCache[art.id]) metaCache[art.id].name = prevName; if (panes[art.key]) panes[art.key].art.name = prevName; setTabLabel(art.key, prevName); nameEl.textContent = prevName;
-          try { wsxToast('Couldn\\u2019t save name', true); } catch (e) {}
+          try { wsxToast(t('inspector.saveNameFailed'), true); } catch (e) {}
         });
       });
       enterSaves(nameEl);
@@ -180,7 +180,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
         patchArtifact(art.id, { description: v }, function (j) {
           if (j) return;
           desc = prevDesc; if (metaCache[art.id]) metaCache[art.id].description = prevDesc; descEl.textContent = prevDesc;
-          try { wsxToast('Couldn\\u2019t save description', true); } catch (e) {}
+          try { wsxToast(t('inspector.saveDescFailed'), true); } catch (e) {}
         });
       });
       enterSaves(descEl);
@@ -216,7 +216,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
           if (next === prev) return;
           applyVis(next); // optimistic
           patchArtifact(art.id, { visibility: next }, function (j) {
-            if (!j) { applyVis(prev); try { wsxToast('Couldn\\u2019t change visibility', true); } catch (e) {} return; } // failed — roll back
+            if (!j) { applyVis(prev); try { wsxToast(t('cards.visFailed'), true); } catch (e) {} return; } // failed — roll back
             var applied = j.visibility || next;
             if (j.message) { try { wsxToast(j.message, true); } catch (e) {} }
             if (applied !== next) applyVis(applied); // server overrode (moderation)
@@ -375,7 +375,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
           var em = b.getAttribute('data-rm');
           fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/collaborators/' + encodeURIComponent(em), { method: 'DELETE', credentials: 'same-origin' })
             .then(function (r) { if (!r.ok) throw new Error('failed'); list = list.filter(function (c) { return c.email !== em; }); metaCache[art.id] = undefined; paint(); })
-            .catch(function () { try { wsxToast('Couldn\\u2019t remove collaborator', true); } catch (e) {} });
+            .catch(function () { try { wsxToast(t('inspector.removeCollabFailed'), true); } catch (e) {} });
         });
       });
       box.querySelectorAll('[data-role]').forEach(function (b) {
@@ -433,11 +433,11 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       box.innerHTML = h;
       box.querySelectorAll('[data-rmtag]').forEach(function (b) {
         b.addEventListener('click', function () {
-          var t = b.getAttribute('data-rmtag'), idx = tags.indexOf(t);
-          tags = tags.filter(function (x) { return x !== t; }); sync(); paint(); // optimistic
-          fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/tags/' + encodeURIComponent(t), { method: 'DELETE', credentials: 'same-origin' })
+          var tag = b.getAttribute('data-rmtag'), idx = tags.indexOf(tag);
+          tags = tags.filter(function (x) { return x !== tag; }); sync(); paint(); // optimistic
+          fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/tags/' + encodeURIComponent(tag), { method: 'DELETE', credentials: 'same-origin' })
             .then(function (r) { if (!r.ok) throw 0; })
-            .catch(function () { if (tags.indexOf(t) < 0) tags.splice(idx < 0 ? tags.length : idx, 0, t); sync(); paint(); try { wsxToast('Couldn\\u2019t remove tag', true); } catch (e) {} }); // roll back
+            .catch(function () { if (tags.indexOf(tag) < 0) tags.splice(idx < 0 ? tags.length : idx, 0, tag); sync(); paint(); try { wsxToast(t('inspector.removeTagFailed'), true); } catch (e) {} }); // roll back
         });
       });
       var add = box.querySelector('#wsxTagAdd');
@@ -445,11 +445,11 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
         var inp = document.createElement('input'); inp.className = 'wsx-det__addin'; inp.placeholder = t('inspector.tagPlaceholder');
         add.replaceWith(inp); inp.focus();
         function commit() {
-          var t = inp.value.trim().replace(/^#/, ''); if (!t) { paint(); return; }
-          var added = tags.indexOf(t) < 0; if (added) tags.push(t); sync(); paint(); // optimistic
-          fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/tags', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: t }) })
+          var tag = inp.value.trim().replace(/^#/, ''); if (!tag) { paint(); return; }
+          var added = tags.indexOf(tag) < 0; if (added) tags.push(tag); sync(); paint(); // optimistic
+          fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/tags', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: tag }) })
             .then(function (r) { if (!r.ok) throw 0; })
-            .catch(function () { if (added) tags = tags.filter(function (x) { return x !== t; }); sync(); paint(); try { wsxToast('Couldn\\u2019t add tag', true); } catch (e) {} }); // roll back
+            .catch(function () { if (added) tags = tags.filter(function (x) { return x !== tag; }); sync(); paint(); try { wsxToast(t('inspector.addTagFailed'), true); } catch (e) {} }); // roll back
         }
         inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
         inp.addEventListener('blur', commit);
@@ -489,7 +489,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       var url = wsId ? '/v1/workspaces/' + encodeURIComponent(wsId) + '/artifacts/' + encodeURIComponent(art.id) + '/move' : '/v1/artifacts/' + encodeURIComponent(art.id) + '/folder';
       fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folder_id: fid || null }) })
         .then(function (r) { if (!r.ok) throw 0; })
-        .catch(function () { meta.folder_id = prev; if (metaCache[art.id]) metaCache[art.id].folder_id = prev; paint(folders); try { wsxToast('Couldn\\u2019t move page', true); } catch (e) {} }); // roll back
+        .catch(function () { meta.folder_id = prev; if (metaCache[art.id]) metaCache[art.id].folder_id = prev; paint(folders); try { wsxToast(t('inspector.movePageFailed'), true); } catch (e) {} }); // roll back
     }
     function paint(folders) {
       var cur = meta.folder_id || '';
@@ -544,8 +544,8 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       var b = e.currentTarget; b.disabled = true; b.textContent = t('inspector.running');
       fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/tests/run', { method: 'POST', credentials: 'same-origin' })
         .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (j) { if (j && j.run) paintTests(art, box, { config: cfg, latest: j.run }); else { b.disabled = false; b.textContent = t('inspector.runTestsNow'); try { wsxToast('Couldn\\u2019t start test run', true); } catch (e) {} } })
-        .catch(function () { b.disabled = false; b.textContent = t('inspector.runTestsNow'); try { wsxToast('Couldn\\u2019t start test run', true); } catch (e) {} });
+        .then(function (j) { if (j && j.run) paintTests(art, box, { config: cfg, latest: j.run }); else { b.disabled = false; b.textContent = t('inspector.runTestsNow'); try { wsxToast(t('inspector.testRunFailed'), true); } catch (e) {} } })
+        .catch(function () { b.disabled = false; b.textContent = t('inspector.runTestsNow'); try { wsxToast(t('inspector.testRunFailed'), true); } catch (e) {} });
     });
   }
 
@@ -566,8 +566,8 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   // self-describing [[a:slug|Label]] / [[s:id|Label]] tokens, and #tags.
   function cmBody(text) {
     return esc(text)
-      .replace(/\\[\\[a:([^|\\]]+)\\|([^\\]]+)\\]\\]/g, function (_m, slug, label) { return '<a class="wsx-cm__ent is-artifact" href="/a/' + slug + '/" data-name="' + label + '" title="Open ' + label + '">' + ART_SVG + '<span>' + label + '</span></a>'; })
-      .replace(/\\[\\[s:([^|\\]]+)\\|([^\\]]+)\\]\\]/g, function (_m, _id, label) { return '<span class="wsx-cm__ent is-source" title="Data source">' + SRC_SVG + '<span>' + label + '</span></span>'; })
+      .replace(/\\[\\[a:([^|\\]]+)\\|([^\\]]+)\\]\\]/g, function (_m, slug, label) { return '<a class="wsx-cm__ent is-artifact" href="/a/' + slug + '/" data-name="' + label + '" title="' + esc(t('inspector.openLabel')) + ' ' + label + '">' + ART_SVG + '<span>' + label + '</span></a>'; })
+      .replace(/\\[\\[s:([^|\\]]+)\\|([^\\]]+)\\]\\]/g, function (_m, _id, label) { return '<span class="wsx-cm__ent is-source" title="' + esc(t('inspector.dataSource')) + '">' + SRC_SVG + '<span>' + label + '</span></span>'; })
       .replace(/@([A-Za-z0-9._-]+)/g, '<span class="wsx-cm__ent is-user">@$1</span>')
       .replace(/#([A-Za-z0-9_-]+)/g, '<span class="wsx-cm__ent is-tag">#$1</span>');
   }
@@ -769,10 +769,10 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   // ----- Automate (per-artifact schedules + alerts) -----
   function autoJobRow(j) {
     var st = j.last_status || ''; var cls = st === 'success' ? ' ok' : st === 'failed' ? ' fail' : '';
-    return '<div class="wsx-row"><div class="wsx-row__main"><div class="wsx-row__title">' + esc(j.title || j.action || 'Job') + '</div><div class="wsx-row__sub">' + esc(j.schedule || '') + (j.action ? ' \\u00B7 ' + esc(j.action) : '') + '</div></div>' + (st ? '<span class="wsx-row__badge' + cls + '">' + esc(st) + '</span>' : '') + '</div>';
+    return '<div class="wsx-row"><div class="wsx-row__main"><div class="wsx-row__title">' + esc(j.title || j.action || t('admin.jobDefault')) + '</div><div class="wsx-row__sub">' + esc(j.schedule || '') + (j.action ? ' \\u00B7 ' + esc(j.action) : '') + '</div></div>' + (st ? '<span class="wsx-row__badge' + cls + '">' + esc(st) + '</span>' : '') + '</div>';
   }
   function autoAlertRow(a) {
-    return '<div class="wsx-row"><div class="wsx-row__main"><div class="wsx-row__title">' + esc(a.name || a.metric_id || 'Alert') + '</div><div class="wsx-row__sub">' + esc(a.schedule || '') + '</div></div>' + (a.enabled ? '<span class="wsx-row__badge ok">on</span>' : '<span class="wsx-row__badge">off</span>') + '</div>';
+    return '<div class="wsx-row"><div class="wsx-row__main"><div class="wsx-row__title">' + esc(a.name || a.metric_id || t('inspector.alertDefault')) + '</div><div class="wsx-row__sub">' + esc(a.schedule || '') + '</div></div>' + (a.enabled ? '<span class="wsx-row__badge ok">' + esc(t('admin.on')) + '</span>' : '<span class="wsx-row__badge">' + esc(t('admin.off')) + '</span>') + '</div>';
   }
   function renderAutomate(art) {
     if (autoCache[art.id] !== undefined) { paintAutomate(art, autoCache[art.id]); return; }
@@ -806,11 +806,11 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     rbodyEl.innerHTML = h;
     rbodyEl.querySelectorAll('[data-aauto]').forEach(function (b) {
       b.addEventListener('click', function () {
-        var n = art.name || 'this page'; var k = b.getAttribute('data-aauto');
-        if (k === 'schedule') agentAsk('Schedule a weekly send of "' + n + '" \\u2014 ');
-        else if (k === 'alert') agentAsk('Set an alert on "' + n + '" when ');
-        else if (k === 'crew') agentAsk('Set up a crew for "' + n + '" that ');
-        else agentAsk('For "' + n + '": ');
+        var n = art.name || t('inspector.thisPage'); var k = b.getAttribute('data-aauto');
+        if (k === 'schedule') agentAsk(t('inspector.askSchedule').replace('{name}', n));
+        else if (k === 'alert') agentAsk(t('inspector.askAlert').replace('{name}', n));
+        else if (k === 'crew') agentAsk(t('inspector.askCrew').replace('{name}', n));
+        else agentAsk(t('inspector.askCustom').replace('{name}', n));
       });
     });
   }

@@ -72,16 +72,16 @@ describe('agent dock — copy', () => {
     }
   });
 
-  it('chat copy speaks es-AR (vos) and says "páginas", not "artefactos"', () => {
+  it('chat copy speaks es-AR (vos) and says "artefactos", not "páginas"', () => {
     for (const mod of [COMPOSER_COPY, AGENT_COPY, ONBOARDING_COPY]) {
       expect(Object.keys(mod.es).sort()).toEqual(Object.keys(mod.en).sort());
       for (const v of Object.values(mod.es)) {
         expect(v).not.toMatch(/\b(tú|tienes|quieres|puedes|muéstrame|Cuéntame|Pregunta a|Describe lo|Intenta)\b/);
-        expect(v).not.toMatch(/artefacto/i);
+        expect(v).not.toMatch(/\bp[aá]ginas?\b/i);
       }
     }
     expect(ONBOARDING_COPY.es['onb.progress']).toBe('{done} de {total} listos');
-    for (const v of Object.values(HOME_COPY.es)) expect(v).not.toMatch(/artefacto/i);
+    for (const v of Object.values(HOME_COPY.es)) expect(v).not.toMatch(/\bp[aá]ginas?\b/i);
   });
 });
 

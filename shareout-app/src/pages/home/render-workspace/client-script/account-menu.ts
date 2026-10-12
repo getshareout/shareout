@@ -47,8 +47,8 @@ export const workspace_client_account_menu_JS = `
       if (!window.confirm(t('account.unlinkConfirm'))) return;
       fetch('/v1/auth/linked-accounts/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin' })
         .then(function (r) { return r.json(); })
-        .then(function (d) { if (d && d.ok) loadLinked(); else showToast('Couldn\\u2019t unlink account', 'error'); })
-        .catch(function () { showToast('Couldn\\u2019t unlink account', 'error'); });
+        .then(function (d) { if (d && d.ok) loadLinked(); else showToast(t('account.unlinkFailed'), 'error'); })
+        .catch(function () { showToast(t('account.unlinkFailed'), 'error'); });
     }
 
     // Switch space: subdomain-based in prod; degrades to apex Personal on localhost.
@@ -105,14 +105,14 @@ export const workspace_client_account_menu_JS = `
       fetch('/v1/artifacts/' + encodeURIComponent(b.getAttribute('data-restore')) + '/restore', { method: 'POST', credentials: 'same-origin' })
         .then(function (r) { if (!r.ok) throw new Error('failed'); return r.json(); })
         .then(function () { var row = b.closest('.wsx-trash-item'); if (row) row.remove(); })
-        .catch(function () { b.disabled = false; b.textContent = t('trash.restore'); showToast('Couldn\\u2019t restore', 'error'); });
+        .catch(function () { b.disabled = false; b.textContent = t('trash.restore'); showToast(t('trash.restoreFailed'), 'error'); });
     }
     function restoreAll(n) {
       if (!window.confirm(t('trash.restoreAllConfirm').replace('{n}', String(n)))) return;
       fetch('/v1/artifacts/deleted/restore-all', { method: 'POST', credentials: 'same-origin' })
         .then(function (r) { if (!r.ok) throw new Error('failed'); return r.json(); })
         .then(function () { loadTrash(); })
-        .catch(function () { showToast('Couldn\\u2019t restore', 'error'); });
+        .catch(function () { showToast(t('trash.restoreFailed'), 'error'); });
     }
   })();
 

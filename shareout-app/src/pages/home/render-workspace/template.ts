@@ -8,7 +8,7 @@ import type { RenderArgs } from '../types';
 import { ICON } from './constants';
 import { railNav, svg, widget, viewSeg, GRIP_SVG } from './helpers';
 import { homeLangSwitchHtml } from '../home-i18n/lang-switch';
-import type { NavItem } from './constants';
+import type { NavItem, NavGroup } from './constants';
 
 /** True when the viewer can open workspace admin surfaces. */
 export function canManageWorkspace(args: RenderArgs): boolean {
@@ -16,26 +16,32 @@ export function canManageWorkspace(args: RenderArgs): boolean {
 }
 
 /** Rail nav, scoped to context: workspace-only lenses appear only inside a workspace.
- *  Uses the same effective workspace the client hydrates with (workspaceId or ?workspace). */
-function buildNav(args: RenderArgs, canManage: boolean): NavItem[] {
+ *  Uses the same effective workspace the client hydrates with (workspaceId or ?workspace).
+ *  Grouped into titled sections; empty groups are dropped. A group with no title renders a divider. */
+function buildNav(args: RenderArgs, canManage: boolean): NavGroup[] {
   const ws = !!(args.workspaceId || args.workspace);
-  const items: NavItem[] = [
-    { key: 'brief', label: 'Brief', i18n: 'nav.brief', icon: 'brief', kind: 'view' },
-    { key: 'artifacts', label: 'All Artifacts', i18n: 'nav.artifacts', icon: 'browse', kind: 'view' },
-    { key: 'connect', label: 'Connect your agent', i18n: 'nav.connect', icon: 'link', kind: 'view' },
-    { key: 'schedules', label: 'My Schedules', i18n: 'nav.schedules', icon: 'recent', kind: 'view' },
-    { key: 'alerts', label: 'My Alerts', i18n: 'nav.alerts', icon: 'alert', kind: 'view' },
-    { key: 'analytics', label: 'Analytics', i18n: 'nav.analytics', icon: 'chart', kind: 'view' },
+  const v = (key: string, label: string, icon: NavItem['icon']): NavItem => ({ key, label, i18n: `nav.${key}`, icon, kind: 'view' });
+  const groups: NavGroup[] = [
+    { items: [v('brief', 'Home', 'brief'), v('artifacts', 'Artifacts', 'browse')] },
+    { title: 'Library', i18n: 'nav.group.library', items: [v('assets', 'Assets', 'assets'), v('library', 'AI skills', 'library')] },
+    { title: 'Automation', i18n: 'nav.group.automation', items: [v('schedules', 'Scheduled', 'recent'), v('alerts', 'Alerts', 'alert'), ...(ws && canManage ? [v('crew', 'AI tasks', 'crew')] : [])] },
+    { title: 'Data', i18n: 'nav.group.data', items: ws ? [v('connectors', 'Data sources', 'plug'), v('datasets', 'Tables', 'datasets')] : [] },
+    { title: 'Context', i18n: 'nav.group.context', items: ws ? [v('knowledge', 'Knowledge', 'knowledge'), v('catalog', 'Catalog', 'catalog')] : [] },
+    { items: ws && canManage ? [v('admin', 'Admin', 'admin')] : [] },
   ];
-  if (ws) items.push({ key: 'datasets', label: 'Datasets', i18n: 'nav.datasets', icon: 'datasets', kind: 'view' });
-  if (ws) items.push({ key: 'catalog', label: 'Catalog', i18n: 'nav.catalog', icon: 'catalog', kind: 'view' });
-  if (ws) items.push({ key: 'knowledge', label: 'Knowledge', i18n: 'nav.knowledge', icon: 'knowledge', kind: 'view' });
-  if (ws && canManage) items.push({ key: 'crew', label: 'Crew AI', i18n: 'nav.crew', icon: 'crew', kind: 'view' });
-  items.push({ key: 'library', label: 'Library', i18n: 'nav.library', icon: 'library', kind: 'view' });
-  items.push({ key: 'assets', label: 'Assets', i18n: 'nav.assets', icon: 'assets', kind: 'view' });
-  if (ws) items.push({ key: 'connectors', label: 'Connectors', i18n: 'nav.connectors', icon: 'plug', kind: 'view' });
-  if (ws && canManage) items.push({ key: 'admin', label: 'Admin', i18n: 'nav.admin', icon: 'admin', kind: 'view' });
-  return items;
+  return groups.filter(g => g.items.length);
+}
+
+/** Lenses kept out of the rail but still reachable (account menu, ⌘K, onboarding, ?view=). */
+const HIDDEN_LENSES = ['connect', 'analytics'];
+
+function railHtml(groups: NavGroup[]): string {
+  return groups.map((g, gi) => {
+    const head = gi === 0 ? '' : g.title
+      ? `<div class="wsx__railgroup-title" data-i18n="${g.i18n}">${g.title}</div>`
+      : '<div class="wsx__raildiv"></div>';
+    return head + g.items.map(n => railNav(n, n.key === 'brief')).join('');
+  }).join('') + HIDDEN_LENSES.map(k => `<button class="wsx-lens" data-lens="${k}" type="button" hidden><span data-i18n="nav.${k}"></span></button>`).join('');
 }
 
 /** Builds the static workspace DOM inserted into the page body. */
@@ -85,12 +91,12 @@ export function buildWorkspaceBody(args: RenderArgs): string {
         <button class="wsx__collapse" id="wsxCollapse" type="button" data-i18n-title="nav.collapse" data-i18n-aria="nav.collapse" title="Collapse" aria-label="Collapse sidebar">${svg('<path d="M15 6l-6 6 6 6"/>')}</button>
         <button class="wsx__railclose" id="wsxRailClose" type="button" data-i18n-aria="nav.closeMenu" aria-label="Close menu">${svg('<path d="M6 6l12 12M18 6L6 18"/>')}</button>
       </div>
-      <button class="wsx__create" id="wsxCreateBtn" type="button" data-i18n-title="nav.create" title="Create with AI">${svg(ICON.foryou)}<span data-i18n="nav.create">Create with AI</span></button>
-      ${buildNav(args, canManage).map((n, i) => railNav(n, i === 0)).join('')}
+      <button class="wsx__create" id="wsxCreateBtn" type="button" data-tip-rail data-i18n-tip="nav.create" data-tip="Create with AI">${svg(ICON.foryou)}<span data-i18n="nav.create">Create with AI</span></button>
+      ${railHtml(buildNav(args, canManage))}
       <div class="wsx__railspace"></div>
       <footer class="wsx__railfoot">
-        <button class="wsx__footbtn" id="wsxHelpBtn" type="button" data-i18n-aria="help.title" data-i18n-title="help.title" aria-label="Help &amp; support" title="Help &amp; support">${svg('<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/>')}</button>
-        <a class="wsx__footbtn" href="https://docs.shareout.site" target="_blank" rel="noopener" data-i18n-aria="foot.docs" data-i18n-title="foot.docs" aria-label="Documentation" title="Documentation">${svg('<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>')}</a>
+        <button class="wsx__footbtn" id="wsxHelpBtn" type="button" data-i18n-aria="help.title" data-i18n-tip="help.title" aria-label="Help &amp; support" data-tip="Help &amp; support">${svg('<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/>')}</button>
+        <a class="wsx__footbtn" href="https://docs.shareout.site" target="_blank" rel="noopener" data-i18n-aria="foot.docs" data-i18n-tip="foot.docs" aria-label="Documentation" data-tip="Documentation">${svg('<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>')}</a>
         ${args.appVersion ? `<span class="wsx__footver" title="Release ${escapeHtml(args.appVersion)}">v${escapeHtml(args.appVersion)}</span>` : ''}
       </footer>
     </aside>
@@ -104,7 +110,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
         <button class="wsx__tabdevice" id="wsxTabDevice" type="button" hidden aria-pressed="false" data-i18n-title="tabs.mobilePreview" data-i18n-aria="tabs.mobilePreview" title="Toggle mobile preview" aria-label="Toggle mobile preview">${svg('<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>')}</button>
         <button class="wsx__tabdevice" id="wsxTabFull" type="button" hidden data-i18n-title="tabs.fullScreen" data-i18n-aria="tabs.fullScreen" title="Full screen" aria-label="View full screen">${svg('<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>')}</button>
         <button class="wsx__notifbtn" id="wsxNotifBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="wsxNotifPanel" data-i18n-title="notif.title" data-i18n-aria="notif.title" title="Notifications" aria-label="Notifications">${svg('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>')}<span class="wsx__notifbadge" id="wsxNotifBadge" hidden>0</span></button>
-        <button class="wsx__acct wsx__acct--mob" id="wsxAcctBtnMob" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="wsxAccPanel" title="Account">${avatar}<span class="wsx__acctname">${escapeHtml(name)}</span></button>
+        <button class="wsx__acct wsx__acct--mob" id="wsxAcctBtnMob" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="wsxAccPanel" data-i18n-title="nav.account" title="Account">${avatar}<span class="wsx__acctname">${escapeHtml(name)}</span></button>
       </div>
       <div class="wsx__panes" id="wsxPanes">
         <div class="wsx__pane is-active" data-pane="home" id="wsxHomePane">
@@ -248,7 +254,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
     </main>
 
     <aside class="wsx__activity">
-      <button class="wsx__acthandle" id="wsxActHandle" type="button" aria-label="Drag to resize panel" title="Drag to resize"></button>
+      <button class="wsx__acthandle" id="wsxActHandle" type="button" data-i18n-aria="widget.resize" data-i18n-title="widget.resize" aria-label="Drag to resize panel" title="Drag to resize"></button>
       <div class="wsx__rtabs" id="wsxRtabs"></div>
       <div class="wsx__rbody" id="wsxRbody"></div>
     </aside>
@@ -258,7 +264,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
   <div class="wsx__scrim" id="wsxScrim" hidden></div>
   <section class="wsx__composer" id="wsxComposer" data-state="resting" aria-labelledby="wsxComposerTitle">
     <button type="button" class="wsx__pill" id="wsxPill" aria-haspopup="dialog"><span class="wsx__pill-text" data-i18n="composer.pill">Ask your workspace…</span><span class="wsx__pill-dot" id="wsxPillDot" hidden><span class="wsx-sr" data-i18n="composer.unread">New reply</span></span></button>
-    <div class="wsx__composer-grip" id="wsxComposerGrip" title="Drag to resize" aria-hidden="true"></div>
+    <div class="wsx__composer-grip" id="wsxComposerGrip" data-i18n-title="widget.resize" title="Drag to resize" aria-hidden="true"></div>
     <header class="wsx__composer-bar">
       <h2 class="wsx__composer-title" id="wsxComposerTitle" data-i18n="composer.chat">Chat</h2>
       <div class="wsx__composer-btns">
@@ -353,6 +359,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
       <p class="wsx__accsub" data-i18n="account.linkedDesc">Link your other emails to see all their workspaces from one login.</p>
       <div class="wsx__linked" id="wsxLinked"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
       <div class="wsx__accactions">
+        <a class="wsx-accbtn" href="/home?view=connect" data-cn-open="claude">${svg(ICON.link)}<span data-i18n="nav.connect">Connect your agent</span></a>
         <a class="wsx-accbtn" href="/home?view=connect&amp;tab=code" data-cn-open="code">${svg('<circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 19 4M18 5l2 2M15 8l2 2"/>')}<span data-i18n="account.apiToken">API token</span></a>
         <a class="wsx-accbtn" href="/settings/telegram?go=1" target="_blank" rel="noopener">${svg('<path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>')}<span data-i18n="account.telegram">Connect Telegram</span></a>
         <a class="wsx-accbtn" href="/v1/auth/link-google?redirect=%2Fhome%3Fnext%3D1">${svg('<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>')}<span data-i18n="account.linkGoogle">Link Google account</span></a>
