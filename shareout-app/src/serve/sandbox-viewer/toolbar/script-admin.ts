@@ -130,7 +130,7 @@ export function renderToolbarScriptAdmin(baseUrl: string, slug: string, artifact
       html += '</div>';
 
       html += '<div class="so-stats-section"><div class="so-stats-section-title">URL</div>';
-      html += '<div class="so-url-box"><span class="so-url-text">' + escapeHtml(data.url) + '</span><button class="so-url-copy" onclick="copyUrl(\\''+escapeHtml(data.url)+'\\')">Copy</button></div>';
+      html += '<div class="so-url-box"><span class="so-url-text">' + escapeHtml(data.url) + '</span><button class="so-url-copy" data-url="'+escapeHtml(data.url)+'" onclick="copyUrl(this.dataset.url)">Copy</button></div>';
       html += '</div>';
 
       html += '<div class="so-stats-section"><div class="so-stats-section-title">Viewer</div>';
@@ -154,7 +154,7 @@ export function renderToolbarScriptAdmin(baseUrl: string, slug: string, artifact
         if (data.embed_origins && data.embed_origins.length > 0) {
           html += '<div class="so-prop-row"><span class="so-prop-label">Allowed Origins</span><span class="so-prop-value">' + data.embed_origins.length + ' domains</span></div>';
         }
-        html += '<div class="so-url-box"><span class="so-url-text">' + escapeHtml(data.embed_url) + '</span><button class="so-url-copy" onclick="copyUrl(\\''+escapeHtml(data.embed_url)+'\\')">Copy</button></div>';
+        html += '<div class="so-url-box"><span class="so-url-text">' + escapeHtml(data.embed_url) + '</span><button class="so-url-copy" data-url="'+escapeHtml(data.embed_url)+'" onclick="copyUrl(this.dataset.url)">Copy</button></div>';
         html += '</div>';
       }
 

@@ -12,7 +12,7 @@ export function renderToolbarScriptCore(c: ToolbarCopy = TOOLBAR_COPY.en, locale
       return Math.floor(seconds / 86400) + 'd ago';`;
   return `
     function escapeHtml(s) {
-      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     }
     function timeAgo(date) {
       var seconds = Math.floor((new Date() - date) / 1000);

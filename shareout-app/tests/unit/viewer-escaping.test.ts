@@ -4,6 +4,9 @@ import { parseMarkdown } from '../../src/viewers/markdown-viewer';
 import { renderViewer } from '../../src/viewers';
 import { serveTypeViewer } from '../../src/serve/type-viewer';
 import type { ArtifactType, Env } from '../../src/types';
+import { renderToolbarScriptCore } from '../../src/serve/sandbox-viewer/toolbar/script-core';
+import { renderToolbarScriptComments } from '../../src/serve/sandbox-viewer/toolbar/script-comments';
+import { renderToolbarScriptAdmin } from '../../src/serve/sandbox-viewer/toolbar/script-admin';
 
 // Real (unescaped) tags in the output, with <script> bodies removed.
 function tagsOf(html: string): string[] {
@@ -140,5 +143,23 @@ describe('serveTypeViewer CSP', () => {
     expect(nonce).toBeTruthy();
     expect(csp).toContain("object-src 'none'");
     expect(csp).not.toContain('unsafe-inline');
+  });
+});
+
+describe('sandbox-viewer toolbar escaping', () => {
+  const scripts = [
+    renderToolbarScriptCore(),
+    renderToolbarScriptComments('https://shareout.test', 'art_1'),
+    renderToolbarScriptAdmin('https://shareout.test', 'slug', 'art_1'),
+  ].join('\n');
+
+  it('client escapeHtml also escapes quotes', () => {
+    const fn = /function escapeHtml\(s\) \{([\s\S]*?)\}/.exec(scripts)![1];
+    expect(fn).toContain('&quot;');
+    expect(fn).toContain('&#39;');
+  });
+
+  it('never splices escaped user strings into inline-handler JS', () => {
+    expect(scripts).not.toMatch(/on[a-z]+="[^"]*\\'' *\+ *escapeHtml\(/);
   });
 });

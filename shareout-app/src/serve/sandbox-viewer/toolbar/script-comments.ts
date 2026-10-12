@@ -152,7 +152,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
       html += '<div class="so-cmt-body">' + renderMentions(c.content) + '</div>';
       if (!isReply) html += assigneeChipHtml(c);
       html += '<div class="so-cmt-actions">';
-      html += '<button class="so-cmt-action" onclick="startReply(\\'' + c.id + '\\', \\'' + escapeHtml(c.authorName).replace(/'/g, "\\\\'") + '\\')">${js(c.reply)}</button>';
+      html += '<button class="so-cmt-action" data-name="' + escapeHtml(c.authorName) + '" onclick="startReply(\\'' + c.id + '\\', this.dataset.name)">${js(c.reply)}</button>';
       if (!isReply) {
         if (cmtLoggedIn) {
           if (c.resolved) {
@@ -320,7 +320,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
       var listHtml = people.map(function(p) {
         var label = p.name || p.email;
         var isAssigned = c.assigneeEmail && c.assigneeEmail === p.email;
-        return '<div class="so-cmt-assign-item' + (isAssigned ? ' active' : '') + '" onmousedown="pickAssign(event,\\'' + id + '\\',\\'' + escapeHtml(p.email) + '\\')">' +
+        return '<div class="so-cmt-assign-item' + (isAssigned ? ' active' : '') + '" data-email="' + escapeHtml(p.email) + '" onmousedown="pickAssign(event,\\'' + id + '\\',this.dataset.email)">' +
           avatar(label) + '<span>' + escapeHtml(label) + '</span></div>';
       }).join('');
       if (c.assigneeEmail || c.assigneeUserId) {
@@ -328,7 +328,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
       }
       el.innerHTML = '<div class="so-cmt-assign-list">' + listHtml + '</div>' +
         '<div class="so-cmt-assign-due"><label>${js(c.dueDate)}<input type="date" id="so-cmt-due-input" value="' + currentDue + '"></label>' +
-        '<button class="so-cmt-action" onmousedown="pickAssign(event,\\'' + id + '\\',\\'' + escapeHtml(c.assigneeEmail || '') + '\\',true)">${js(c.setDue)}</button></div>';
+        '<button class="so-cmt-action" data-email="' + escapeHtml(c.assigneeEmail || '') + '" onmousedown="pickAssign(event,\\'' + id + '\\',this.dataset.email,true)">${js(c.setDue)}</button></div>';
       // Position picker below the card's Assign button
       var actionsEl = card.querySelector('.so-cmt-actions');
       var rect = actionsEl ? actionsEl.getBoundingClientRect() : card.getBoundingClientRect();
