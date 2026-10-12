@@ -7,6 +7,7 @@ import {
   type DataContext,
 } from '../middleware';
 import { Errors } from '../errors';
+import { invalidIntParam } from '../../http/query-params';
 import { presignGet, presignPut } from '../r2-presign';
 import { serveCachedR2Bytes } from '../r2-cache';
 import { checkStorageQuota, storageQuotaError } from '../../storage-quota';
@@ -381,6 +382,8 @@ async function getOrCreateStorage(ctx: DataContext): Promise<StorageRow> {
 
 async function listBlobs(request: Request, ctx: DataContext): Promise<Response> {
   const url = new URL(request.url);
+  const badParam = invalidIntParam(url, 'limit', 'offset');
+  if (badParam) return errorResponse(Errors.validation(badParam, `${badParam} must be a non-negative integer`), ctx.origin);
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '100', 10), 1000);
   const offset = parseInt(url.searchParams.get('offset') || '0', 10);
 

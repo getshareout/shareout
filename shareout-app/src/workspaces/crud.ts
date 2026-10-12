@@ -3,6 +3,7 @@ import { generateId } from '../crypto-utils';
 import { getLinkedUserIds, placeholders } from '../account-links';
 import type { AuthUser } from '../api-auth';
 import { json } from './json-response';
+import { invalidIntParam } from '../http/query-params';
 import { invalidateWorkspaceRole, requireWorkspaceRole } from './roles';
 import { generateWorkspaceSlug, SLUG_REGEX } from './slug';
 import { handleGetWorkspace } from './read';
@@ -14,6 +15,8 @@ export async function handleListWorkspaces(
   user: AuthUser
 ): Promise<Response> {
   const url = new URL(request.url);
+  const badParam = invalidIntParam(url, 'limit', 'offset');
+  if (badParam) return json({ error: `${badParam} must be a non-negative integer`, code: 'VALIDATION_ERROR', param: badParam }, 400);
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
   const offset = parseInt(url.searchParams.get('offset') || '0');
 
@@ -113,8 +116,8 @@ export async function handleCreateWorkspace(
     return json({ error: 'Invalid JSON', code: 'INVALID_JSON' }, 400);
   }
 
-  if (!body.name?.trim()) {
-    return json({ error: 'name is required', code: 'VALIDATION_ERROR' }, 400);
+  if (typeof body?.name !== 'string' || !body.name.trim()) {
+    return json({ error: 'name is required', code: 'VALIDATION_ERROR', param: 'name' }, 400);
   }
 
   const slug = body.slug || generateWorkspaceSlug(body.name);

@@ -20,6 +20,7 @@ import { removeArtifactVector } from '../search/semantic';
 import { relearnPage } from '../knowledge/corpus/ingest';
 import { getUserRole, requireRole } from './roles';
 import { json } from './json-response';
+import { invalidIntParam } from '../http/query-params';
 import type { ArtifactDetail, ArtifactSummary } from './types';
 import { setPresentation, type PresentationFields } from './satellites';
 import { parseTagList, replaceTags } from './tags';
@@ -34,6 +35,8 @@ export async function handleListArtifacts(
   user: AuthUser
 ): Promise<Response> {
   const url = new URL(request.url);
+  const badParam = invalidIntParam(url, 'limit', 'offset');
+  if (badParam) return json({ error: `${badParam} must be a non-negative integer`, code: 'VALIDATION_ERROR', param: badParam }, 400);
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
   const offset = parseInt(url.searchParams.get('offset') || '0');
   const favoritesOnly = url.searchParams.get('favorites') === 'true';
