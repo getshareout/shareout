@@ -53,7 +53,7 @@ react(id: string, emoji: string): Promise<ReactionResult>
 
 List, reply and single-comment responses include a `reactions` summary scoped to
 the viewer: `{ "👍": { count: 2, mine: true } }`. Reaction changes broadcast over
-the real-time channel as a `comment:reaction` event.
+the real-time channel as a `comment:reaction` event. Over REST, `POST /v1/data/{id}/comments/{commentId}/reactions {"emoji":"👍"}` accepts a session cookie or a Bearer API token (the token's user is the reactor; a token user is also the comment author on create).
 
 ## Query Builder
 

@@ -1,5 +1,6 @@
 import { errorResponse, type DataContext } from '../middleware';
 import { verifySessionToken, extractTokenFromCookie } from '../../token';
+import { validateToken } from '../../api-auth';
 import type { CommentsConfig } from './types';
 
 export interface CommentSession {
@@ -8,16 +9,20 @@ export interface CommentSession {
   name?: string;
 }
 
-/** Resolve the signed-in user from the shareout_session cookie, if any. */
+/** Resolve the signed-in user from a Bearer API token or the shareout_session cookie, if any. */
 export async function getSession(
   request: Request,
   ctx: DataContext,
 ): Promise<CommentSession | null> {
-  const cookies = request.headers.get('Cookie');
-  const token = extractTokenFromCookie(cookies, /shareout_session=([^;]+)/);
-  if (!token) return null;
-
-  const payload = await verifySessionToken(token, ctx.env);
+  const apiUser = await validateToken(request, ctx.env);
+  let payload: { userId: string; email: string } | null = null;
+  if (apiUser) {
+    payload = { userId: apiUser.id, email: apiUser.email ?? apiUser.username ?? apiUser.id };
+  } else {
+    const token = extractTokenFromCookie(request.headers.get('Cookie'), /shareout_session=([^;]+)/);
+    if (!token) return null;
+    payload = await verifySessionToken(token, ctx.env);
+  }
   if (!payload) return null;
 
   let name = payload.email;
