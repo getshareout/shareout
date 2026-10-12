@@ -1,5 +1,6 @@
 import { errorResponse, successResponse, verifyOwner, type DataContext } from '../middleware';
 import { normalizeVisibility } from '../../visibility-config';
+import { hostArtifactLinks } from './presentations';
 
 export async function handlePublishRoutes(
   request: Request,
@@ -18,11 +19,8 @@ export async function handlePublishRoutes(
       return errorResponse({ code: 'PRESENTATION_NOT_FOUND', message: 'Presentation not found', status: 404 });
     }
 
-    return successResponse({
-      visibility: pres.visibility,
-      publishedArtifactId: pres.published_artifact_id,
-      publishedUrl: `${ctx.env.SHAREOUT_BASE_URL}/p/${ctx.artifact.name}`,
-    });
+    const { publishedUrl, publishedArtifactId } = await hostArtifactLinks(ctx, pres.published_artifact_id);
+    return successResponse({ visibility: pres.visibility, publishedArtifactId, publishedUrl });
   }
 
   if (action === 'visibility') {

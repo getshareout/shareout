@@ -1,6 +1,7 @@
 import { errorResponse, successResponse, verifyOwner, type DataContext } from '../middleware';
 import { generateId, sha256 } from '../../crypto-utils';
 import { dispatchLifecycleEmail } from '../../email/gateway';
+import { hostArtifactLinks } from './presentations';
 
 // Slides B2B P1 — tracked & gated share links.
 // Owner CRUD for links + a public access endpoint that validates the gate,
@@ -93,9 +94,10 @@ async function createLink(request: Request, ctx: DataContext, presId: string): P
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
   ).bind(id, presId, ctx.artifactId, body.recipientLabel ?? null, gate, gateValue, body.expiresAt ?? null, maxViews, ctx.artifact.owner_id ?? null, now).run();
 
+  const { publishedUrl } = await hostArtifactLinks(ctx, null);
   return successResponse({
     id,
-    url: `${ctx.env.SHAREOUT_BASE_URL}/p/${ctx.artifact.name}?l=${id}`,
+    url: `${publishedUrl}?l=${id}`,
     recipientLabel: body.recipientLabel ?? null,
     gate, expiresAt: body.expiresAt ?? null, maxViews,
   }, 201, ctx.origin);
@@ -111,9 +113,10 @@ async function listLinks(request: Request, ctx: DataContext, presId: string): Pr
      FROM share_links l WHERE l.presentation_id = ? ORDER BY l.created_at DESC`
   ).bind(presId).all<ShareLinkRow & { views: number }>();
 
+  const { publishedUrl } = await hostArtifactLinks(ctx, null);
   const links = rows.results.map((l) => ({
     id: l.id,
-    url: `${ctx.env.SHAREOUT_BASE_URL}/p/${ctx.artifact.name}?l=${l.id}`,
+    url: `${publishedUrl}?l=${l.id}`,
     recipientLabel: l.recipient_label,
     gate: l.gate,
     expiresAt: l.expires_at,
@@ -254,7 +257,7 @@ async function notifyOwnerOnOpen(
       deckName: pres?.title || ctx.artifact.name,
       recipientLabel,
       viewerEmail,
-      url: `${ctx.env.SHAREOUT_BASE_URL}/a/${ctx.artifact.name}`,
+      url: (await hostArtifactLinks(ctx, null)).editorUrl,
     },
   });
 }

@@ -35,8 +35,10 @@ beforeAll(async () => {
       recipient_label TEXT, gate TEXT NOT NULL DEFAULT 'none', gate_value TEXT,
       expires_at TEXT, max_views INTEGER, created_by TEXT, created_at TEXT NOT NULL, revoked INTEGER NOT NULL DEFAULT 0)`,
     `CREATE TABLE IF NOT EXISTS presentations (id TEXT PRIMARY KEY, title TEXT)`,
+    `CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, slug TEXT NOT NULL)`,
   ];
   for (const s of stmts) await e.DB.prepare(s).run();
+  await e.DB.prepare(`INSERT OR IGNORE INTO artifacts (id, slug) VALUES (?, 'q3-deck')`).bind(ARTIFACT_ID).run();
   await e.DB.prepare(`INSERT OR IGNORE INTO presentations (id, title) VALUES (?, 'Q3 Proposal')`).bind(PRES_ID).run();
 });
 
@@ -92,7 +94,7 @@ describe('slides tracked links — owner CRUD', () => {
     mockVerifyOwner.mockResolvedValue(true);
     const { json } = await call('GET', []);
     expect(json.data.links).toHaveLength(1);
-    expect(json.data.links[0].url).toContain(`?l=${id}`);
+    expect(json.data.links[0].url).toBe(`https://shareout.site/p/q3-deck?l=${id}`);
     expect(json.data.links[0].recipientLabel).toBe('Acme Corp');
     expect(json.data.links[0].views).toBe(0);
   });

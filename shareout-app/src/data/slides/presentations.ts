@@ -6,14 +6,41 @@ import type { DbPresentation, DbSlide } from './db';
 import { mapPresentation, mapSlide } from './db';
 import { getSession } from './auth';
 
-export async function listPresentations(ctx: DataContext): Promise<Response> {
-  const result = await ctx.env.DB.prepare(
-    `SELECT * FROM presentations WHERE artifact_id = ? ORDER BY updated_at DESC`
-  )
+// A presentation lives inside its host artifact, so both URLs and both ids point at it.
+export async function hostArtifactLinks(ctx: DataContext, publishedArtifactId: string | null) {
+  const row = await ctx.env.DB.prepare(`SELECT slug FROM artifacts WHERE id = ?`)
     .bind(ctx.artifactId)
-    .all<DbPresentation>();
+    .first<{ slug: string }>();
+  const slug = row?.slug ?? ctx.artifactId;
+  return {
+    editorUrl: `${ctx.env.SHAREOUT_BASE_URL}/a/${slug}`,
+    publishedUrl: `${ctx.env.SHAREOUT_BASE_URL}/p/${slug}`,
+    editorArtifactId: ctx.artifactId,
+    publishedArtifactId: publishedArtifactId ?? ctx.artifactId,
+  };
+}
 
-  const presentations = result.results.map(mapPresentation);
+export async function listPresentations(ctx: DataContext): Promise<Response> {
+  const [result, counts] = await Promise.all([
+    ctx.env.DB.prepare(`SELECT * FROM presentations WHERE artifact_id = ? ORDER BY updated_at DESC`)
+      .bind(ctx.artifactId)
+      .all<DbPresentation>(),
+    ctx.env.DB.prepare(
+      `SELECT presentation_id, COUNT(*) AS cnt FROM slides
+       WHERE presentation_id IN (SELECT id FROM presentations WHERE artifact_id = ?) GROUP BY presentation_id`
+    )
+      .bind(ctx.artifactId)
+      .all<{ presentation_id: string; cnt: number }>(),
+  ]);
+
+  const slideCounts = new Map(counts.results.map((r) => [r.presentation_id, r.cnt]));
+  const links = await hostArtifactLinks(ctx, null);
+  const presentations = result.results.map((row) => ({
+    ...mapPresentation(row),
+    ...links,
+    publishedArtifactId: row.published_artifact_id ?? ctx.artifactId,
+    slideCount: slideCounts.get(row.id) ?? 0,
+  }));
   return successResponse({ presentations, count: presentations.length });
 }
 
@@ -82,8 +109,7 @@ export async function createPresentation(request: Request, ctx: DataContext): Pr
   return successResponse(
     {
       ...mapPresentation(pres!),
-      editorUrl: `${ctx.env.SHAREOUT_BASE_URL}/a/${ctx.artifact.name}`,
-      publishedUrl: `${ctx.env.SHAREOUT_BASE_URL}/p/${ctx.artifact.name}`,
+      ...(await hostArtifactLinks(ctx, pres!.published_artifact_id)),
     },
     201
   );
@@ -107,8 +133,7 @@ export async function getPresentation(ctx: DataContext, presId: string): Promise
   return successResponse({
     ...mapPresentation(pres),
     slides,
-    editorUrl: `${ctx.env.SHAREOUT_BASE_URL}/a/${ctx.artifact.name}`,
-    publishedUrl: `${ctx.env.SHAREOUT_BASE_URL}/p/${ctx.artifact.name}`,
+    ...(await hostArtifactLinks(ctx, pres.published_artifact_id)),
   });
 }
 
