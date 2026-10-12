@@ -21,6 +21,10 @@ export const workspace_client_home_views_connectors_JS = `  // ----- Connectors 
         wireConn(m);
       }).catch(function () { m.innerHTML = i18nError('common.couldNotLoad'); });
   }
+  function connTag(p) {
+    var k = 'conn.tag.' + p.id, v = t(k);
+    return v === k ? (p.tagline || '') : v;
+  }
   function connCard(p) {
     var conns = p.connections || [];
     var ico = '<span class="wsx-conn__ic" style="color:' + esc(p.color || 'var(--color-primary)') + '">' + isvg(p.iconSvg || SCHED_ICON.db) + '</span>';
@@ -30,7 +34,7 @@ export const workspace_client_home_views_connectors_JS = `  // ----- Connectors 
         + '<button class="wsx-conn__del" data-conn-del="' + esc(c.id) + '" title="' + esc(t('connectors.remove')) + '" type="button">\\u00D7</button></div>';
     }).join('');
     return '<div class="wsx-conn__card">'
-      + '<div class="wsx-conn__top">' + ico + '<div class="wsx-conn__meta"><div class="wsx-conn__name">' + esc(p.label || p.id) + (conns.length ? ' <span class="wsx-conn__on">' + esc(t('connectors.connected')) + '</span>' : '') + '</div><div class="wsx-conn__tag">' + esc(p.tagline || '') + '</div></div></div>'
+      + '<div class="wsx-conn__top">' + ico + '<div class="wsx-conn__meta"><div class="wsx-conn__name">' + esc(p.label || p.id) + (conns.length ? ' <span class="wsx-conn__on">' + esc(t('connectors.connected')) + '</span>' : '') + '</div><div class="wsx-conn__tag">' + esc(connTag(p)) + '</div></div></div>'
       + (insts ? '<div class="wsx-conn__insts">' + insts + '</div>' : '')
       + '<button class="wsx-abtn wsx-conn__add" data-conn-add="' + esc(p.id) + '" type="button">' + esc(conns.length ? t('connectors.addAnother') : t('connectors.connect')) + '</button>'
       + '</div>';

@@ -12,6 +12,7 @@ import { contentHash } from '../moderation/check';
 import { parseModelJson } from '../assets/enrich';
 import { recordAiUsage } from '../data/ai-usage';
 import { setPresentation } from '../artifacts/satellites';
+import { localeForContent, summaryLanguageRule, type Locale } from '../i18n';
 
 const MAX_HTML_CHARS = 20_000; // keep the prompt bounded + cheap
 const MODEL_LABEL = 'artifact-summary';
@@ -22,6 +23,10 @@ Given its HTML, respond with STRICT JSON only:
 - summary: 1-2 sentences, <= 300 characters, plain language, what the page IS and shows.
 - tags: 3-6 short lowercase keywords (topic, purpose, data type). No # prefix.
 No prose outside the JSON.`;
+
+export function summarySystemPrompt(locale: Locale): string {
+  return `${SYSTEM}\n${summaryLanguageRule(locale)}`;
+}
 
 interface Row {
   workspace_id: string | null;
@@ -53,7 +58,8 @@ export async function generateArtifactSummary(env: Env, artifactId: string): Pro
 
   let out: string;
   try {
-    out = await chatComplete(env, [{ role: 'user', content: html }], SYSTEM, 200);
+    const locale = await localeForContent(env, row.workspace_id, row.owner_id).catch((): Locale => 'en');
+    out = await chatComplete(env, [{ role: 'user', content: html }], summarySystemPrompt(locale), 200);
   } catch {
     return; // silent — hash not written, so an unchanged re-publish retries later
   }

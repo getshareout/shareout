@@ -9,8 +9,10 @@ import type { PageLocale } from '../i18n/accept-language';
 // Sign-in copy, en + rioplatense es. Strings dropped into scripts go through JSON.stringify.
 const SIGN_IN_COPY = {
   en: {
+    lang: 'en' as PageLocale,
     pageTitle: 'Sign in - ShareOut',
     signIn: 'Sign in',
+    signInTo: 'Sign in to {name}',
     ssoOnly: 'Your organization signs in with single sign-on.',
     intro: 'Use your email and password to continue.',
     introGoogle: 'Use your email and password, or Google, to continue.',
@@ -40,8 +42,10 @@ const SIGN_IN_COPY = {
     inviteGoogleNote: 'With Google, pick the {email} account. Another account won’t see the invite.',
   },
   es: {
+    lang: 'es' as PageLocale,
     pageTitle: 'Iniciar sesión - ShareOut',
     signIn: 'Iniciá sesión',
+    signInTo: 'Iniciá sesión en {name}',
     ssoOnly: 'Tu organización inicia sesión con inicio de sesión único (SSO).',
     intro: 'Usá tu email y contraseña para seguir.',
     introGoogle: 'Usá tu email y contraseña, o Google, para seguir.',
@@ -155,6 +159,8 @@ export function appLoginPage(opts: {
   /** This workspace subdomain signs in through its own IdP; `enforced` hides every other method. */
   sso?: { label: string; href: string; enforced: boolean } | null;
   locale?: PageLocale;
+  /** Workspace subdomain: its name, logo and accent color on the card. */
+  brand?: { name: string; logoUrl: string | null; accent: string | null } | null;
 }): Response {
   const redirect = opts.redirect && opts.redirect.startsWith('/') ? opts.redirect : '/home';
   const googleEnabled = opts.googleEnabled === true;
@@ -162,15 +168,24 @@ export function appLoginPage(opts: {
   const sso = opts.sso || null;
   const lang = opts.locale || 'en';
   const c = SIGN_IN_COPY[lang];
+  const brand = opts.brand || null;
+  const accent = brand?.accent ? escapeHtml(brand.accent) : '';
+  const card = accent
+    ? `<div class="card" style="--color-primary:${accent};--color-primary-hover:${accent};--color-primary-light:color-mix(in srgb, ${accent} 12%, transparent)">`
+    : '<div class="card">';
+  const mark = brand?.logoUrl
+    ? `<img class="auth-logo" src="${escapeHtml(brand.logoUrl)}" alt="${escapeHtml(brand.name)}">`
+    : '<div class="icon icon-primary">✦</div>';
+  const signInTitle = brand ? c.signInTo.replace('{name}', brand.name) : c.signIn;
   const footer = `<div class="footer">
       Powered by <a href="/" class="footer-brand">${brandMarkImg('footer-mark', 16)}ShareOut</a>
     </div>`;
 
   if (sso?.enforced) {
     return renderAuthPage(c.pageTitle, `
-  <div class="card">
-    <div class="icon icon-primary">✦</div>
-    <h1>${escapeHtml(c.signIn)}</h1>
+  ${card}
+    ${mark}
+    <h1>${escapeHtml(signInTitle)}</h1>
     <p>${escapeHtml(c.ssoOnly)}</p>
     <div class="auth-methods">
     ${ssoButtonHtml(sso)}
@@ -186,8 +201,8 @@ export function appLoginPage(opts: {
     const intro = hint ? c.invitedAs.replace('{email}', escapeHtml(hint)) : '';
     const googleNote = hint ? `<p class="auth-help">${escapeHtml(c.inviteGoogleNote.replace('{email}', hint))}</p>` : '';
     return renderAuthPage(c.pageTitle, `
-  <div class="card">
-    <div class="icon icon-primary">✦</div>
+  ${card}
+    ${mark}
     <h1>${escapeHtml(c.inviteTitle)}</h1>
     ${intro ? `<p>${intro}</p>` : ''}
     <div class="auth-methods">
@@ -215,9 +230,9 @@ export function appLoginPage(opts: {
     </details>`;
 
   return renderAuthPage(c.pageTitle, `
-  <div class="card">
-    <div class="icon icon-primary">✦</div>
-    <h1>${escapeHtml(c.signIn)}</h1>
+  ${card}
+    ${mark}
+    <h1>${escapeHtml(signInTitle)}</h1>
     <p>${escapeHtml(googleEnabled ? c.introGoogle : c.intro)}</p>
     <div class="auth-methods">
     ${sso ? ssoButtonHtml(sso) : ''}
@@ -341,7 +356,7 @@ function emailOtpFormsHtml(turnstileSiteKey?: string, c: SignInCopy = EN, prefil
         <label class="field-label" for="email-code-email">${escapeHtml(c.emailLabel)}</label>
         <input id="email-code-email" type="email" name="email" autocomplete="email" placeholder="you@company.com"${value} required>
       </div>
-      ${turnstileWidgetHtml(turnstileSiteKey)}
+      ${turnstileWidgetHtml(turnstileSiteKey, c.lang)}
       <button id="email-code-send" type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(c.sendCode)}</button>
     </form>
     <form id="email-code-verify" class="email-code-form" hidden novalidate>

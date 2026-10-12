@@ -9,3 +9,10 @@ export function agentLanguageRule(locale: Locale | null | undefined): string {
     ? `Reply in the language the user writes in; when unsure, use Spanish — this workspace speaks it. When you write Spanish, write ${ES_AR_VOICE} (artifacts are "artefactos"), in plain words with no anglicisms.`
     : 'Reply in the language the user writes in.';
 }
+
+/** Language rule for AI-written summaries/tags people read in the workspace. */
+export function summaryLanguageRule(locale: Locale | null | undefined): string {
+  return locale === 'es'
+    ? `Write the summary and tags in ${ES_AR_VOICE}, in plain words with no anglicisms.`
+    : 'Write the summary and tags in English.';
+}

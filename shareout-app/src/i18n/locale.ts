@@ -82,3 +82,13 @@ export async function localeForRecipient(
     .first<{ user_locale: string | null; ws_locale: string | null; member_locale: string | null }>();
   return resolveLocale({ user: row?.user_locale, workspace: row?.ws_locale ?? row?.member_locale });
 }
+
+/** Language for AI text about a piece of content: its workspace's, else (personal) its owner's. */
+export async function localeForContent(
+  env: Env,
+  workspaceId: string | null | undefined,
+  ownerId: string | null | undefined,
+): Promise<Locale> {
+  if (workspaceId) return (await getWorkspaceLocale(env, workspaceId)) ?? 'en';
+  return ownerId ? localeForRecipient(env, { userId: ownerId }) : 'en';
+}
