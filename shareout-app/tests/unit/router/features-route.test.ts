@@ -75,4 +75,12 @@ describe('routeFeaturesApi (createApiRouter)', () => {
     expect(res?.status).toBe(200);
     expect(buildFeaturesPayload).toHaveBeenCalledWith(env, null);
   });
+
+  it('accepts ?workspace= as an alias of ?workspace_id=', async () => {
+    validateToken.mockResolvedValue({ id: 'user_1', email: 'me@example.com' });
+    getInternalWorkspaceRole.mockResolvedValue('owner');
+    const res = await request('/v1/features?workspace=wsp_x', 'GET', { Authorization: 'Bearer so_x' });
+    expect(res?.status).toBe(200);
+    expect(buildFeaturesPayload).toHaveBeenCalledWith(env, 'wsp_x');
+  });
 });
