@@ -96,6 +96,9 @@ export async function routeMetricAlertsApi(ctx: FetchContext): Promise<Response 
     if (request.method === 'POST') {
       const bodyOrError = await parseJsonBody(request);
       if (bodyOrError instanceof Response) return addCORS(bodyOrError);
+      if (typeof bodyOrError?.artifact_id !== 'string' || !bodyOrError.artifact_id) {
+        return addCORS(json({ error: 'artifact_id is required', code: 'VALIDATION_ERROR', param: 'artifact_id' }, 400));
+      }
       const result = await createRule(env, user.id, bodyOrError as unknown as CreateRuleRequest);
       return addCORS(result.error ? errorJson(result.error) : json({ alert: result.rule }, 201));
     }
