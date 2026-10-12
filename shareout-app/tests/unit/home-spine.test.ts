@@ -412,13 +412,18 @@ describe('buildWorkspaceView — Phase 1 shell SSR', () => {
     expect(scripts).toContain('WSX_ADMIN');
   });
 
-  it('Create with AI runs in-Studio: create view + planner/build via /v1/create/generate', () => {
+  it('Create with AI runs in the chat: no create view, planner/build via /v1/create/generate', () => {
     const { body, scripts } = buildWorkspaceView(args);
-    expect(body).toContain('data-view="create"');   // create canvas view
+    expect(body).not.toContain('data-view="create"'); // no separate create screen
     expect(body).toContain('id="wsxCreateBtn"');     // rail Create button (no nav-away)
     expect(body).not.toContain("location.href='/create'");
     expect(scripts).toContain('/v1/create/generate'); // reuses the create endpoints
     expect(scripts).toContain('renderClarify');       // one-by-one questions
+  });
+
+  it('hides Create with AI when ai.create is off for the workspace', () => {
+    const { body } = buildWorkspaceView({ ...args, createEnabled: false });
+    expect(body).not.toContain('id="wsxCreateBtn"');
   });
 });
 

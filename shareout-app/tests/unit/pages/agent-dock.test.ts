@@ -30,6 +30,14 @@ describe('agent dock — text helpers', () => {
     expect(html).toContain('<ul class="wsx-ul"><li>one</li><li>two</li></ul>');
   });
 
+  it('renders GFM tables (escaped cells, inline markdown kept)', () => {
+    const html = fmt.mdToHtml('Resumen:\n| Artefacto | Tipo |\n|---|---|\n| **Q3** | <b>html</b> |\n| CRM | csv |\nFin');
+    expect(html).toContain('<table class="wsx-table"><thead><tr><th>Artefacto</th><th>Tipo</th></tr></thead>');
+    expect(html).toContain('<tr><td><strong>Q3</strong></td><td>&lt;b&gt;html&lt;/b&gt;</td></tr><tr><td>CRM</td><td>csv</td></tr></tbody></table>');
+    expect(html).toContain('<p>Fin</p>');
+    expect(fmt.mdToHtml('| a | b |')).toBe('<p>| a | b |</p>');
+  });
+
   it('closes a dangling code fence while streaming so code renders as code', () => {
     const partial = `Here:\n${FENCE}js\nconst a = 1;`;
     expect(fmt.mdToHtml(partial)).not.toContain('<pre');

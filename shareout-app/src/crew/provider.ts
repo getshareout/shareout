@@ -1,7 +1,7 @@
 import type { Env } from '../types';
 import { getBuildChain, isProviderLevelStatus, providerHeaders, type AIConfig } from '../data/agent/anthropic';
 import { logCrewProviderFailure, userFacingCrewProviderError } from './errors';
-import { thinkingOffParams } from '../data/agent/models';
+import { gatewayReasoningParams, thinkingOffParams } from '../data/agent/models';
 
 // Provider-neutral tool-calling turn. The run loop keeps a neutral transcript;
 // each provider serializes it to its own wire format: the OpenAI-compatible
@@ -165,6 +165,7 @@ export class OpenAICompatCrewProvider implements CrewProvider {
       max_tokens: args.maxTokens,
       messages: this.toWireMessages(args.system, args.transcript),
       ...(wireTools.length ? { tools: wireTools } : {}),
+      ...(this.provider === 'vercel-gateway' ? gatewayReasoningParams(this.model) : {}),
       stream: true,
       stream_options: { include_usage: true },
     });

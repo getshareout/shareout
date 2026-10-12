@@ -1,28 +1,14 @@
 /** Create with AI flow. */
 export const workspace_client_create_ai_JS = `  // ===== Create with AI (in-Studio; reuses /v1/create/generate) =====
-  var SOURCES = ['Google Sheets', 'Google Analytics', 'Shopify', 'Snowflake', t('create.sourceCsv')];
   var createMode = false;
-  function renderCreatePanels() {
-    var idEl = document.getElementById('wsxIdeas');
-    if (idEl) {
-      var ideas = t('create.ideas').split('|');
-      idEl.innerHTML = ideas.map(function (x) { return '<button class="wsx-chip" data-idea="' + esc(x) + '" type="button">' + esc(x) + '</button>'; }).join('');
-      idEl.querySelectorAll('[data-idea]').forEach(function (b) { b.addEventListener('click', function () { createSend(b.getAttribute('data-idea')); }); });
-    }
-    var scEl = document.getElementById('wsxSources');
-    if (scEl) {
-      scEl.innerHTML = SOURCES.map(function (x) { return '<button class="wsx-chip" data-source="' + esc(x) + '" type="button">' + esc(x) + '</button>'; }).join('');
-      scEl.querySelectorAll('[data-source]').forEach(function (b) { b.addEventListener('click', function () { createSend(t('create.sourcePrompt').replace('{source}', b.getAttribute('data-source'))); }); });
-    }
-  }
+  // Create with AI lives entirely in the chat: open the composer in create mode with idea chips.
   function enterCreate() {
     createMode = true;
-    lenses.forEach(function (x) { x.classList.remove('is-active'); });
-    activateTab('home'); show('create'); renderCreatePanels();
     ws.classList.add('is-create');
     ask.placeholder = t('create.placeholder');
     threadList.innerHTML = ''; openComposer('sheet');
     addMsg('bot', t('create.greeting'));
+    renderSuggestions(t('create.ideas').split('|'));
     ask.focus();
   }
   function exitCreate() {

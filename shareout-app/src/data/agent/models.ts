@@ -19,6 +19,13 @@ export function thinkingOffParams(model: string): { thinking?: { type: string } 
   return { thinking: { type: 'disabled' } };
 }
 
+/** The Vercel AI Gateway counterpart of thinkingOffParams on its OpenAI-compatible
+ *  endpoint: with no `reasoning` field Claude 5.x thinks at its default effort on every
+ *  turn. They can't turn thinking off there, so ask for the lowest effort. */
+export function gatewayReasoningParams(model: string): { reasoning?: { effort: string } } {
+  return /claude-(sonnet|opus)-5/.test(model) ? { reasoning: { effort: 'low' } } : {};
+}
+
 /** Current Claude models reject a non-default temperature; send it only to other models. */
 export function temperatureParams(model: string, temperature: number): { temperature?: number } {
   return /claude/.test(model) ? {} : { temperature };

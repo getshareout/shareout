@@ -91,7 +91,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
         <button class="wsx__collapse" id="wsxCollapse" type="button" data-i18n-title="nav.collapse" data-i18n-aria="nav.collapse" title="Collapse" aria-label="Collapse sidebar">${svg('<path d="M15 6l-6 6 6 6"/>')}</button>
         <button class="wsx__railclose" id="wsxRailClose" type="button" data-i18n-aria="nav.closeMenu" aria-label="Close menu">${svg('<path d="M6 6l12 12M18 6L6 18"/>')}</button>
       </div>
-      <button class="wsx__create" id="wsxCreateBtn" type="button" data-tip-rail data-i18n-tip="nav.create" data-tip="Create with AI">${svg(ICON.foryou)}<span data-i18n="nav.create">Create with AI</span></button>
+      ${args.createEnabled ? `<button class="wsx__create" id="wsxCreateBtn" type="button" data-tip-rail data-i18n-tip="nav.create" data-tip="Create with AI">${svg(ICON.foryou)}<span data-i18n="nav.create">Create with AI</span></button>` : ''}
       ${railHtml(buildNav(args, canManage))}
       <div class="wsx__railspace"></div>
       <footer class="wsx__railfoot">
@@ -237,16 +237,6 @@ export function buildWorkspaceBody(args: RenderArgs): string {
           <div class="wsx__view" data-view="agent">
             <h2 class="wsx__viewtitle" id="wsxAgentTitle" data-i18n="view.results">Results</h2>
             <div id="wsxAgentMount"></div>
-          </div>
-          <div class="wsx__view" data-view="create">
-            <div class="wsx__chero">
-              <h2 class="wsx__viewtitle" data-i18n="view.create">Create with AI</h2>
-              <p class="wsx__csub" data-i18n="create.subtitle">Describe what you want — I’ll ask a couple quick questions, then build it live. Talk to me in the bar below.</p>
-            </div>
-            <div class="wsx__ccols">
-              <section class="wsx-cpanel"><div class="wsx-panel-title" data-i18n="create.ideas">Ideas to start</div><div class="wsx__chips" id="wsxIdeas"></div></section>
-              <section class="wsx-cpanel"><div class="wsx-panel-title" data-i18n="create.bringData">Bring your data</div><div class="wsx__chips" id="wsxSources"></div></section>
-            </div>
           </div>
         </div>
       </div>
