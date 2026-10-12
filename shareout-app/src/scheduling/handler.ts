@@ -4,7 +4,7 @@ import { purgeSoftDeleted } from '../artifacts/crud';
 import { createJob, listJobs, listJobsForArtifact, deleteJob, updateJob, getJobLogs } from './jobs/crud';
 import { createArtifactEmail, getArtifactEmail } from './jobs/artifact-email';
 import { runScheduledJobs, runJobManually } from './jobs/execute';
-import { type CreateJobRequest, type JobConfig } from './jobs/types';
+import { type CreateJobRequest, type JobConfig, type JobLog, type ScheduledJob } from './jobs/types';
 import { aggregateDailyStats, cleanupOldEvents } from '../analytics';
 import { cleanupExpiredAdminSessions, cleanupOldRateLimits } from '../api-auth';
 import { cleanupExpiredDeviceCodes } from '../auth/device-auth';
@@ -46,6 +46,30 @@ function jsonResponse(data: unknown, status = 200): Response {
 
 function errorResponse(error: string, code: string, status: number): Response {
   return simpleApiError(error, code, status);
+}
+
+/** scheduled_jobs/job_runs keep unix-seconds timestamps; the API speaks ISO 8601. */
+function isoTime(v: unknown): string | null {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'number' || /^\d+(\.\d+)?$/.test(String(v))) return new Date(Number(v) * 1000).toISOString();
+  return String(v);
+}
+
+/** One response shape for create/get/list/patch: ISO timestamps, boolean enabled,
+ *  next_run_at only for cron jobs (event jobs have no schedule). */
+export function toApiJob(job: ScheduledJob & { updated_at?: unknown }) {
+  return {
+    ...job,
+    enabled: Boolean(job.enabled),
+    next_run_at: job.trigger_type === 'event' ? null : isoTime(job.next_run_at),
+    last_run_at: isoTime(job.last_run_at),
+    created_at: isoTime(job.created_at),
+    updated_at: isoTime(job.updated_at),
+  };
+}
+
+function toApiLog(log: JobLog) {
+  return { ...log, created_at: isoTime(log.created_at) };
 }
 
 function mapCreateJobConstraintError(err: unknown): string | null {
@@ -102,7 +126,7 @@ export async function handleCreateJob(request: Request, env: Env, user: Authenti
     return errorResponse(result.error, 'INVALID_REQUEST', 400);
   }
 
-  return jsonResponse({ job: result.job }, 201);
+  return jsonResponse({ job: result.job && toApiJob(result.job) }, 201);
 }
 
 export async function handleListJobs(request: Request, env: Env, user: AuthenticatedUser): Promise<Response> {
@@ -117,7 +141,7 @@ export async function handleListJobs(request: Request, env: Env, user: Authentic
     ? await listJobsForArtifact(env, artifactId, user.id)
     : await listJobs(env, user.id, undefined, workspaceId);
 
-  return jsonResponse({ jobs });
+  return jsonResponse({ jobs: jobs.map(toApiJob) });
 }
 
 export async function handleGetJobLogs(env: Env, user: AuthenticatedUser, jobId: string): Promise<Response> {
@@ -126,7 +150,7 @@ export async function handleGetJobLogs(env: Env, user: AuthenticatedUser, jobId:
     const status = result.error === 'Job not found' ? 404 : 403;
     return errorResponse(result.error, result.error === 'Job not found' ? 'NOT_FOUND' : 'FORBIDDEN', status);
   }
-  return jsonResponse({ logs: result.logs });
+  return jsonResponse({ logs: (result.logs || []).map(toApiLog) });
 }
 
 export async function handleGetJob(env: Env, user: AuthenticatedUser, jobId: string): Promise<Response> {
@@ -137,7 +161,7 @@ export async function handleGetJob(env: Env, user: AuthenticatedUser, jobId: str
     return errorResponse('Job not found', 'NOT_FOUND', 404);
   }
 
-  return jsonResponse({ job });
+  return jsonResponse({ job: toApiJob(job) });
 }
 
 export async function handleUpdateJob(
@@ -160,7 +184,7 @@ export async function handleUpdateJob(
     return errorResponse(result.error, result.error === 'Job not found' ? 'NOT_FOUND' : 'INVALID_REQUEST', status);
   }
 
-  return jsonResponse({ job: result.job });
+  return jsonResponse({ job: result.job && toApiJob(result.job) });
 }
 
 export async function handleDeleteJob(env: Env, user: AuthenticatedUser, jobId: string): Promise<Response> {

@@ -78,6 +78,7 @@ import {
   handleDeleteJob,
   handleGetArtifactEmail,
   handleGetJob,
+  handleGetJobLogs,
   handleListJobs,
   handleScheduledEvent,
   handleUpdateJob,
@@ -202,7 +203,7 @@ describe('handleCreateJob', () => {
       user
     );
     expect(ok.status).toBe(201);
-    expect(await jsonBody(ok)).toEqual({ job });
+    expect(await jsonBody(ok)).toMatchObject({ job });
   });
 });
 
@@ -229,7 +230,7 @@ describe('handleListJobs and handleGetJob', () => {
     jobs.listJobsForArtifact.mockResolvedValueOnce([{ id: 'job_1' }]);
     const filtered = await handleListJobs(new Request('https://x?artifact_id=art_1'), env, user);
     expect(jobs.listJobsForArtifact).toHaveBeenCalledWith(env, 'art_1', 'user_1');
-    expect(await jsonBody(filtered)).toEqual({ jobs: [{ id: 'job_1' }] });
+    expect(await jsonBody(filtered)).toMatchObject({ jobs: [{ id: 'job_1' }] });
 
     jobs.listJobs.mockResolvedValueOnce([]);
     await handleListJobs(new Request('https://x'), env, user);
@@ -250,7 +251,7 @@ describe('handleListJobs and handleGetJob', () => {
   it('returns a job when found', async () => {
     jobs.listJobs.mockResolvedValueOnce([{ id: 'job_1' }, { id: 'job_2' }]);
     const response = await handleGetJob(env, user, 'job_2');
-    expect(await jsonBody(response)).toEqual({ job: { id: 'job_2' } });
+    expect(await jsonBody(response)).toMatchObject({ job: { id: 'job_2' } });
   });
 });
 
@@ -293,7 +294,47 @@ describe('handleUpdateJob', () => {
       user,
       'job_1'
     );
-    expect(await jsonBody(ok)).toEqual({ job: { id: 'job_1', enabled: false } });
+    expect(await jsonBody(ok)).toMatchObject({ job: { id: 'job_1', enabled: false } });
+  });
+});
+
+describe('job response shape', () => {
+  const raw = {
+    id: 'job_1', trigger_type: 'cron', enabled: 1, schedule: '0 9 * * *',
+    next_run_at: '1791909450.0', last_run_at: 1791823040, created_at: '2026-10-12T16:37:20.000Z', updated_at: null,
+  };
+  const iso = (s: number) => new Date(s * 1000).toISOString();
+
+  it('normalizes timestamps to ISO and enabled to boolean on create/get/list/patch', async () => {
+    jobs.createJob.mockResolvedValueOnce({ job: raw });
+    jobs.listJobs.mockResolvedValueOnce([raw]).mockResolvedValueOnce([raw]);
+    jobs.updateJob.mockResolvedValueOnce({ job: { ...raw, enabled: 0 } });
+    const expected = { enabled: true, next_run_at: iso(1791909450), last_run_at: iso(1791823040), created_at: raw.created_at, updated_at: null };
+
+    const created = await jsonBody(await handleCreateJob(new Request('https://x', {
+      method: 'POST',
+      body: JSON.stringify({ artifact_id: 'art_1', action: 'webhook', schedule: '0 9 * * *', config: { url: 'https://h.example.com' } }),
+    }), env, user)) as { job: unknown };
+    const got = await jsonBody(await handleGetJob(env, user, 'job_1')) as { job: unknown };
+    const listed = await jsonBody(await handleListJobs(new Request('https://x'), env, user)) as { jobs: unknown[] };
+    const patched = await jsonBody(await handleUpdateJob(new Request('https://x', { method: 'PATCH', body: '{"enabled":false}' }), env, user, 'job_1')) as { job: unknown };
+
+    expect(created.job).toMatchObject(expected);
+    expect(got.job).toMatchObject(expected);
+    expect(listed.jobs[0]).toMatchObject(expected);
+    expect(patched.job).toMatchObject({ ...expected, enabled: false });
+  });
+
+  it('reports no next_run_at for event-triggered jobs', async () => {
+    jobs.listJobs.mockResolvedValueOnce([{ ...raw, trigger_type: 'event', schedule: '' }]);
+    const body = await jsonBody(await handleGetJob(env, user, 'job_1')) as { job: { next_run_at: unknown } };
+    expect(body.job.next_run_at).toBeNull();
+  });
+
+  it('serves job logs with ISO created_at', async () => {
+    jobs.getJobLogs.mockResolvedValueOnce({ logs: [{ id: 'jr_1', created_at: '1791823040', status: 'success', duration_ms: 5, error: null }] });
+    const body = await jsonBody(await handleGetJobLogs(env, user, 'job_1')) as { logs: Array<{ created_at: string }> };
+    expect(body.logs[0].created_at).toBe(iso(1791823040));
   });
 });
 

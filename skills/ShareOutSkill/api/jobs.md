@@ -103,6 +103,10 @@ A job's creator **or** the artifact owner may pause/delete/run it.
 
 > **Always set `title` and `description`** when creating a schedule. They appear in the user's **My schedules** view and the workspace **Admin → Schedules** tab. `PATCH /v1/jobs/{id}` accepts `title` / `description` too (send `null` to clear).
 
+### Job object
+
+`POST /v1/jobs` (201), `GET /v1/jobs`, `GET /v1/jobs/{id}` and `PATCH /v1/jobs/{id}` all return the same shape: `enabled` is a boolean; `next_run_at`, `last_run_at`, `created_at`, `updated_at` are ISO 8601 strings (or `null`). Event-triggered jobs have `schedule: ""` and `next_run_at: null`. `GET /v1/jobs/{id}/logs` entries also carry an ISO `created_at`.
+
 ### Retry Configuration
 
 ```typescript
