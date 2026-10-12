@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { generateSlug, shortHash, validatePublishRequest } from '../../src/validation';
+import { generateSlug, resolveEntrypoint, shortHash, validatePublishRequest } from '../../src/validation';
+import { jsonWithApiErrors } from '../../src/http/api-error';
 import type { PublishRequest, PWAConfig } from '../../src/types';
 
 describe('shortHash', () => {
@@ -85,6 +86,34 @@ describe('validatePublishRequest', () => {
       'invalid path "../secret.txt": must be relative, no traversal',
       'entrypoint "missing.html" not found in files',
     ]));
+  });
+
+  it('names the offending field in param and surfaces the message', async () => {
+    const error = validatePublishRequest(validRequest({ slug: 'Bad Slug' }));
+    expect(error).toMatchObject({ code: 'VALIDATION_ERROR', param: 'slug' });
+    expect(error?.error).toContain('slug must be lowercase');
+
+    const multi = validatePublishRequest({ name: '', files: [] });
+    expect(multi?.param).toBe('name');
+    expect(multi?.hint).toContain('files array is required');
+
+    const body = await jsonWithApiErrors(error, 400).json() as Record<string, unknown>;
+    expect(body).toMatchObject({ code: 'VALIDATION_ERROR', param: 'slug' });
+    expect(body.error).toContain('slug must be lowercase');
+  });
+
+  it('defaults the entrypoint to a lone non-HTML file', () => {
+    const csv = { name: 'sales', files: [{ path: 'data.csv', content: 'a,b\n1,2', mime: 'text/csv' }] };
+    expect(validatePublishRequest(csv)).toBeNull();
+    expect(resolveEntrypoint(csv)).toBe('data.csv');
+    expect(resolveEntrypoint({ files: [{ path: 'index.html', content: '', mime: 'text/html' }, { path: 'a.css', content: '', mime: 'text/css' }] })).toBe('index.html');
+    expect(resolveEntrypoint({ entrypoint: 'x.md', files: [] })).toBe('x.md');
+
+    const two = validatePublishRequest({ name: 'n', files: [
+      { path: 'a.md', content: '#', mime: 'text/markdown' },
+      { path: 'b.md', content: '#', mime: 'text/markdown' },
+    ] });
+    expect(two).toMatchObject({ param: 'entrypoint' });
   });
 
   it('allows empty file content when the mime type is valid', () => {

@@ -91,7 +91,7 @@ already has enabled against the live version (no extra config to author). The wo
 cron is **hourly**, so schedules are hourly-granular.
 
 ```bash
-curl -X POST $ORIGIN/v1/artifacts/$ID/jobs \
+curl -X POST $ORIGIN/v1/jobs \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"artifact_id":"'$ID'","action":"artifact_test","trigger_type":"cron","schedule":"0 * * * *","config":{}}'
 ```

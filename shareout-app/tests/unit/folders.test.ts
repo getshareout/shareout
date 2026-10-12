@@ -295,7 +295,7 @@ describe('handleCreateFolder', () => {
       user,
       workspaceId,
     );
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(201);
     const body = await jsonBody(response);
     expect(body.path).toBe('docs');
     expect(body.effective_visibility).toBe('public');

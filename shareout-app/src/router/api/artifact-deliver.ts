@@ -111,5 +111,6 @@ export async function handleDeliverNow(
 
   const result = await executeJobAction(env, action, artifactId, user.id, config, 'manual');
   if (!result.success) return jsonError(result.error || 'Delivery failed', 'DELIVERY_FAILED', 502);
-  return jsonResponse({ success: true, steps: result.steps || [] });
+  const steps = result.steps?.length ? result.steps : [{ step: 'deliver', status: 'success' as const }];
+  return jsonResponse({ success: true, steps });
 }

@@ -473,6 +473,8 @@ export interface PublishResponse {
 export interface ApiError {
   error: string;
   code: string;
+  param?: string;
+  hint?: string;
   details?: string[];
 }
 

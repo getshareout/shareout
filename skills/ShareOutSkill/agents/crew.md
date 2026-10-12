@@ -86,6 +86,60 @@ Post a comment on the artifact. Requires comments enabled and owner/editor ident
 
 Create or list **action items** — comments assigned to a workspace member or collaborator with an optional due date. The assignee is notified by email and Telegram. See [../sdk/comments.md](../sdk/comments.md#action-items).
 
+## REST API
+
+All routes live under the artifact's data API and are **artifact-owner only** (owner's
+`Authorization: Bearer so_…` token or session; others get `403`). Responses use the data
+envelope `{ "success": true, "data": … }`. One crew per artifact.
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/v1/data/{id}/crew` | `{ crew, grants[] }`; `404` if none defined |
+| POST | `/v1/data/{id}/crew/define` | Create or replace the crew (upsert). Body below. Grants are rewritten from `tools` |
+| POST | `/v1/data/{id}/crew/run` | `{ "input": "…" }` (optional). Streams **SSE** events: `run_start`, `reasoning`, `tool_call`, `tool_result`, `finish`, `error`, `done`. `429 CONCURRENCY_LIMIT` when too many runs are active |
+| GET | `/v1/data/{id}/crew/runs` | Last 20 runs |
+| GET | `/v1/data/{id}/crew/runs/{runId}` | `{ run, events[] }` |
+| GET | `/v1/data/{id}/crew/runs/{runId}/stream` | Replays a run's stored events as SSE |
+| GET / POST | `/v1/data/{id}/crew/triggers` | List / create a trigger |
+| PATCH / DELETE | `/v1/data/{id}/crew/triggers/{triggerId}` | Update (`enabled`, `cron`, `eventType`) / delete |
+| GET | `/v1/data/{id}/crew/approvals?status=pending` | Pending write-tool approvals |
+| POST | `/v1/data/{id}/crew/approvals/{approvalId}/approve` \| `/reject` | Approve (executes the tool) or reject |
+
+```jsonc
+// POST /v1/data/{id}/crew/define
+{
+  "name": "Daily narrator",
+  "instructions": "Read json key `snapshot`, write a 3-line summary to `summary`, then notify Slack.",
+  "model": "<optional; unsupported values fall back to the default>",
+  "maxIterations": 8,                 // clamped to the plan cap
+  "runBudgetMicroUsd": 200000,        // optional
+  "tools": {
+    "read":  ["json_get", "table_query", "connection_query"],
+    "write": ["json_set", "notify_send"],
+    "approval": { "json_set": "never" },   // never | always | whenPublic
+    "limits": { "connection_query": { "maxRows": 500, "maxCalls": 5 } }   // maxRows/maxCalls/maxBytes/maxResults
+  }
+}
+```
+
+Tool names — read: `table_query`, `table_schema`, `json_get`, `file_list`, `file_read`,
+`web_search`, `connection_query`, `action_item_list`. Write: `json_set`, `table_insert`,
+`table_update`, `comment_create`, `action_item_create`, `email_send`, `materialize_query`,
+`scheduled_job_create`, `notify_send`, `pilot_verify`. Unknown names, or a name listed under
+the wrong mode, are ignored silently — check `grants` in `GET /crew` after defining.
+
+Triggers (`POST /crew/triggers`):
+
+```jsonc
+{ "kind": "cron", "cron": "0 9 * * 1-5" }                     // hourly-granular worker cron
+{ "kind": "event", "eventType": "table.row.inserted" }          // only supported event
+{ "kind": "condition", "condition": {                           // checked hourly
+    "predicate": { "table": "orders", "where": { "status": "late" }, "op": "gt", "value": 5 },
+    "cooldownSeconds": 86400 } }
+```
+
+There is no crew catalog/template endpoint; define each crew per artifact.
+
 ## Permissions & limits
 
 - Crew tools run with **owner** identity (`principal.ownerId`) for data writes and warehouse queries.

@@ -22,6 +22,7 @@ import { getUserRole, requireRole } from './roles';
 import { json } from './json-response';
 import type { ArtifactDetail, ArtifactSummary } from './types';
 import { setPresentation, type PresentationFields } from './satellites';
+import { parseTagList, replaceTags } from './tags';
 
 // Soft-deleted artifacts are recoverable for this many days, then a daily cron
 // sweep (purgeSoftDeleted) runs the real hard purge.
@@ -72,7 +73,7 @@ export async function handleListArtifacts(
     SELECT DISTINCT
       a.id, a.name, a.slug, a.visibility, a.paused, a.created_at, a.artifact_type,
       d.updated_at,
-      (SELECT MAX(version_no) FROM versions WHERE artifact_id = a.id) as current_version,
+      COALESCE((SELECT version_no FROM versions WHERE id = d.version_id), (SELECT MAX(version_no) FROM versions WHERE artifact_id = a.id)) as current_version,
       CASE WHEN a.owner_id = ? THEN 'owner' ELSE c.role END as user_role,
       CASE WHEN f.artifact_id IS NOT NULL THEN 1 ELSE 0 END as is_favorite
     FROM artifacts a
@@ -154,7 +155,8 @@ export async function handleGetArtifact(
       mod_a.reason AS moderation_reason, mod_a.checked_at AS moderation_checked_at,
       d.updated_at, d.slug as deploy_slug,
       w.slug as workspace_slug,
-      (SELECT MAX(version_no) FROM versions WHERE artifact_id = a.id) as current_version,
+      COALESCE((SELECT version_no FROM versions WHERE id = d.version_id), (SELECT MAX(version_no) FROM versions WHERE artifact_id = a.id)) as current_version,
+      (SELECT MAX(version_no) FROM versions WHERE artifact_id = a.id) as latest_version,
       (SELECT COUNT(*) FROM favorites WHERE artifact_id = a.id AND user_id = ?) as is_favorite
     FROM artifacts a
     LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
@@ -184,6 +186,7 @@ export async function handleGetArtifact(
     workspace_slug: string | null;
     artifact_type: string;
     current_version: number;
+    latest_version: number | null;
     embed_allowed: number;
     embed_origins: string | null;
     is_favorite: number;
@@ -232,6 +235,7 @@ export async function handleGetArtifact(
     created_at: artifact.created_at,
     updated_at: artifact.updated_at,
     current_version: artifact.current_version || 1,
+    latest_version: artifact.latest_version || artifact.current_version || 1,
     description: artifact.description,
     social_title: artifact.social_title,
     social_description: artifact.social_description,
@@ -307,12 +311,16 @@ export async function handleUpdateArtifact(
     allow_anon_email?: boolean;
     allow_anon_agent?: boolean;
     allow_anon_collab?: boolean;
+    tags?: unknown;
   };
   try {
     body = await request.json();
   } catch {
     return json({ error: 'Invalid JSON', code: 'INVALID_JSON' }, 400);
   }
+
+  const tags = body.tags === undefined ? undefined : parseTagList(body.tags);
+  if (typeof tags === 'string') return json({ error: tags, code: 'VALIDATION_ERROR', param: 'tags' }, 400);
 
   const updates: string[] = [];
   const values: (string | number | null)[] = [];
@@ -436,7 +444,7 @@ export async function handleUpdateArtifact(
   }
 
   const hasPresentation = Object.keys(presentation).length > 0;
-  if (updates.length === 0 && !hasPresentation) {
+  if (updates.length === 0 && !hasPresentation && !tags) {
     return json({ error: 'No fields to update', code: 'NO_UPDATES' }, 400);
   }
 
@@ -447,6 +455,7 @@ export async function handleUpdateArtifact(
     ).bind(...values).run();
   }
   if (hasPresentation) await setPresentation(env, artifactId, presentation);
+  if (tags) await replaceTags(env, artifactId, tags);
 
   await invalidateDeploymentCacheById(env, artifactId);
 

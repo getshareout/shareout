@@ -21,12 +21,19 @@ destination; email is another; more can be added without changing callers.
 
 All config shapes are documented in [jobs.md](jobs.md).
 
+> **There is no standalone destinations resource** (no `/v1/destinations` CRUD). A
+> destination is not saved on its own — its config travels inline in each job
+> (`POST /v1/jobs`), one-shot deliver call, or crew tool input. Slack/Telegram
+> credentials come from the workspace Slack connection or the user's linked Telegram
+> chat; check what's available for an artifact with `GET /v1/artifacts/{id}/deliver`
+> (and `GET /v1/artifacts/{id}/deliver/slack-channels` for a channel picker).
+
 ## How delivery is triggered
 
 | Path | Use |
 |------|-----|
 | `POST /v1/jobs` (`action: <kind>`) | Recurring (cron) or event-driven delivery |
-| `POST /v1/artifacts/{id}/deliver` | One-shot delivery (email, Slack, or Telegram) from Home Inspector or API |
+| `POST /v1/artifacts/{id}/deliver` | One-shot delivery (email, Slack, or Telegram) from Home Inspector or API. Body `{"action":"email","config":{…}}`; returns `{success:true, steps:[{step:"deliver",status,detail}]}` (email `detail` has `recipients` + `messageId`), `400 VALIDATION_ERROR` for bad config, `502 DELIVERY_FAILED` when the send fails |
 | `POST /v1/artifacts/{id}/share/slack` | Legacy one-shot Slack delivery (channel or DM) |
 | Crew `notify_send` tool | One-shot delivery from an AI workflow |
 | Crew `scheduled_job_create` tool | Recurring delivery created by an AI workflow |

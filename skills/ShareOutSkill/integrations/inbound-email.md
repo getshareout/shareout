@@ -3,7 +3,7 @@
 Give an artifact its own email address. Mail sent (or forwarded) to it is parsed,
 stored, and fires an `email.received` trigger — so inbound mail becomes an action.
 
-**Use case:** forward an invoice ("expensas") to `expensas@inbox.example.com` →
+**Use case:** forward an invoice ("expensas") to `expensas@inbox.shareout.site` →
 extract the amount → store a row + send a reminder. The sender keeps using Gmail/
 Outlook normally; the inbox is ShareOut-owned, so there's no OAuth and no mailbox
 access required.
@@ -12,7 +12,7 @@ access required.
 
 ```
 sender / a Gmail forward rule
-        │  → expensas@inbox.example.com
+        │  → expensas@inbox.shareout.site
         ▼
 Cloudflare Email Routing  →  Worker email() handler
         │  parse + store in the artifact's inbox + fire email.received
@@ -20,8 +20,11 @@ Cloudflare Email Routing  →  Worker email() handler
 event-triggered jobs run (webhook, telegram, slack, email, crew, …)
 ```
 
-- **Address:** `<prefix>@inbox.example.com`, where `<prefix>` is auto-generated
-  from the artifact slug. Plus-addressing works: `expensas+enero@inbox.example.com`
+- **Address:** `<prefix>@inbox.<instance-host>`, where `<prefix>` is auto-generated
+  from the artifact slug. The inbox domain is instance-specific: `inbox.` + the
+  instance hostname (on shareout.site: `expensas@inbox.shareout.site`), or the
+  operator's `EMAIL_INBOX_DOMAIN` override. Don't guess it — read `status.address`
+  from `sdk.inbox.enable()`. Plus-addressing works: `expensas+enero@inbox.shareout.site`
   delivers to the same inbox with `tag = "enero"`.
 - **Opt-in:** receiving is OFF until enabled. It turns on automatically when you
   create the first `email.received` trigger, or explicitly via `sdk.inbox.enable()`.
@@ -34,7 +37,7 @@ const so = await ShareOut.create();
 
 // Turn the inbox on (owner/editor). Optionally restrict who can send.
 const status = await so.inbox.enable({ allowlist: ['@edificio.com'] });
-console.log(status.address); // "expensas@inbox.example.com"
+console.log(status.address); // "expensas@inbox.shareout.site"
 
 // List / read received mail
 const messages = await so.inbox.list({ limit: 20 });
@@ -51,8 +54,9 @@ Create an event-triggered job with `event_type: "email.received"`. The inbound
 message is passed to the destination so templates can interpolate it:
 
 ```json
-POST /v1/data/{artifactId}/scheduling/jobs
+POST /v1/jobs
 {
+  "artifact_id": "{artifactId}",
   "action": "telegram",
   "trigger_type": "event",
   "event_type": "email.received",
@@ -86,6 +90,6 @@ POST /v1/data/{artifactId}/scheduling/jobs
   trigger once.
 - Deleting the artifact deletes its inbox and all stored messages/attachments.
 
-> Inbound (`inbox.example.com`) is separate from outbound sending
+> Inbound (`inbox.<instance-host>`) is separate from outbound sending
 > (`<prefix>@$ORIGIN_HOST`, see [overview.md](overview.md) and the email SDK). The
 > two share the artifact's prefix but are independent systems on different domains.
