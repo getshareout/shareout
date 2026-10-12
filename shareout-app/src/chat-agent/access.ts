@@ -78,7 +78,7 @@ export async function resolveArtifactAccessForUser(
   userId: string
 ): Promise<ArtifactAccess | null> {
   const art = await env.DB.prepare(
-    'SELECT owner_id, workspace_id, visibility, access_policy FROM artifacts WHERE id = ?'
+    'SELECT owner_id, workspace_id, visibility, access_policy FROM artifacts WHERE id = ? AND deleted_at IS NULL'
   ).bind(artifactId).first<ArtifactRow>();
   if (!art) return null;
 
@@ -146,7 +146,7 @@ export async function listWorkspacesForUser(env: Env, userId: string): Promise<B
   const res = await env.DB.prepare(`
     SELECT w.id, w.name, w.slug,
            MAX(CASE wm.role WHEN 'owner' THEN 3 WHEN 'admin' THEN 2 ELSE 1 END) AS role_rank,
-           (SELECT COUNT(*) FROM artifacts a WHERE a.workspace_id = w.id) AS artifact_count
+           (SELECT COUNT(*) FROM artifacts a WHERE a.workspace_id = w.id AND a.deleted_at IS NULL) AS artifact_count
       FROM workspaces w
       JOIN workspace_members wm ON wm.workspace_id = w.id
      WHERE wm.user_id IN (${idPh})

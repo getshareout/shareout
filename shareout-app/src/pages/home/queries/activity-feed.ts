@@ -143,10 +143,10 @@ export async function queryPulse(
     `AND f.user_id IN (${idPh})`, [...vis.userIds]);
   // view — self by default → own slice = views on the viewer's own artifacts.
   artifactSource('view', 'analytics_events ae JOIN artifacts a ON a.id = ae.artifact_id',
-    `ae.timestamp`, `AND ae.event_type = 'view'`,
+    `CAST(strftime('%s', ae.created_at) AS INTEGER)`, `AND ae.event_type = 'view'`,
     (n) => `+${n} view${n === 1 ? '' : 's'}`);
   // connection — data sources wired up (platform OAuth connectors tracked separately).
-  artifactSource('connection', 'connections cn JOIN artifacts a ON a.id = cn.artifact_id',
+  artifactSource('connection', "connections cn JOIN artifacts a ON a.id = cn.scope_id AND cn.scope_type = 'artifact'",
     `CAST(strftime('%s', cn.created_at) AS INTEGER)`, '',
     (n) => n === 1 ? 'connected a data source' : `${n} data sources connected`);
   // skill — skills attached to a target artifact.
@@ -155,7 +155,7 @@ export async function queryPulse(
     (n) => n === 1 ? 'skill attached' : `${n} skills attached`);
   // run — SUCCESSFUL job/crew runs (failures are in Needs You).
   artifactSource('run', 'job_runs jl JOIN scheduled_jobs sj ON sj.id = jl.job_id JOIN artifacts a ON a.id = sj.artifact_id',
-    `jl.created_at`, `AND jl.status = 'success'`,
+    `CAST(strftime('%s', jl.created_at) AS INTEGER)`, `AND jl.status = 'success'`,
     (n) => `${n} run${n === 1 ? '' : 's'} succeeded`);
 
   // Workspace-level (no artifact): member joins + AI assistant activity. Workspace scope only.

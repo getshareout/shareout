@@ -10,6 +10,7 @@ import { botSetJson } from '../data/json-store';
 import { buildBotDataContext } from './data-write';
 import { generateArtifactHtml } from '../data/agent/build-page';
 import { publishGeneratedHtml } from '../publish/publish-generated-html';
+import { getInternalWorkspaceRole } from '../workspaces/roles';
 import type { Locale } from '../i18n';
 
 // A write the bot proposes and the user confirms with a button tap. Kept small
@@ -28,7 +29,7 @@ export type PendingAction =
   | { kind: 'data_table_update'; artifactId: string; artifactName: string; table: string; rowId?: string; filter?: Record<string, unknown>; changes: Record<string, unknown> }
   | { kind: 'data_json_set'; artifactId: string; artifactName: string; key: string; value: unknown; exists: boolean }
   | { kind: 'job_create'; artifactId: string; artifactName: string; schedule: string; recipients: string[]; subject: string; includePdf: boolean }
-  | { kind: 'build_artifact'; name: string; prompt: string; source_file_id?: string }
+  | { kind: 'build_artifact'; name: string; prompt: string; source_file_id?: string; workspace_id?: string }
   | { kind: 'save_skill'; workspaceId: string; name: string; markdown: string; skillArtifactId?: string; category?: string }
   | { kind: 'invite_members'; workspaceId: string; workspaceName: string; emails: string[]; role: 'member' | 'admin'; message?: string; invalid?: string[] };
 
@@ -179,7 +180,8 @@ export async function executeBuildArtifact(
   if (!html || html.length < 40) return { text: 'I couldn’t build that one — try rephrasing what you want.', name: a.name };
   onProgress?.('Publishing it live…');
   try {
-    const published = await publishGeneratedHtml(env, { id: userId, email: u.email }, { name: a.name, html });
+    const workspaceId = a.workspace_id && await getInternalWorkspaceRole(env, a.workspace_id, userId) ? a.workspace_id : null;
+    const published = await publishGeneratedHtml(env, { id: userId, email: u.email }, { name: a.name, html, workspaceId, visibility: 'private' });
     if (a.source_file_id) {
       await env.DB.prepare(
         'INSERT INTO blob_artifact_links (blob_id, artifact_id, created_at) VALUES (?, ?, ?)'

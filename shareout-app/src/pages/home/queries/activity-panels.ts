@@ -15,12 +15,12 @@ export async function queryRecentActivity(
   const binds: unknown[] = [user.email, user.id, user.email];
   if (workspaceId) binds.push(workspaceId);
   const rows = await env.DB.prepare(`
-    SELECT a.name as artifact_name, a.slug, ae.event_type, ae.timestamp, ae.country
+    SELECT a.name as artifact_name, a.slug, ae.event_type, ae.created_at AS timestamp, ae.country
     FROM analytics_events ae
     JOIN artifacts a ON a.id = ae.artifact_id
     LEFT JOIN collaborators c ON c.artifact_id = a.id AND c.email = ?
     WHERE a.deleted_at IS NULL AND (a.owner_id = ? OR c.email = ?) AND ae.event_type = 'view'${wsFilter}
-    ORDER BY ae.timestamp DESC
+    ORDER BY ae.created_at DESC
     LIMIT 6
   `).bind(...binds).all<RecentActivityRow>();
   return rows.results || [];

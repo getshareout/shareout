@@ -5,13 +5,14 @@ import type { AuthUser } from '../../api-auth';
 import { getUserRole } from '../../artifacts/roles';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { buildFeaturesPayload } from '../../features/flags';
+import { hostWorkspaceId } from '../../pages/home/host';
 
 /**
  * Agent-facing feature introspection. Lets the skill/agent discover what is
  * enabled before attempting to use a module, and lets it recover from a
  * FEATURE_DISABLED rejection by re-checking what IS available.
  *
- * GET /v1/features            -> personal scope (global defaults)
+ * GET /v1/features            -> the host's workspace on a workspace subdomain (if a member), else personal scope
  * GET /v1/features?workspace_id=...  -> that workspace (caller must be a member)
  * GET /v1/features?artifact_id=...   -> the artifact's workspace (caller must have access)
  */
@@ -43,6 +44,9 @@ const routeFeatures = createApiRouter([
             return jsonError('Not a member of this workspace', 'FORBIDDEN', 403);
           }
           workspaceId = wid;
+        } else {
+          const hostWs = await hostWorkspaceId(ctx.request, env);
+          if (hostWs && await getInternalWorkspaceRole(env, hostWs, authUser.id)) workspaceId = hostWs;
         }
       }
 

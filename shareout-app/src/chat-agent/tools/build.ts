@@ -1,6 +1,7 @@
 import type { AccountTool } from './types';
 import { deriveName } from '../../data/agent/build-page';
 import type { PendingAction } from '../actions';
+import { PERSONAL_SCOPE } from '../../chat-platforms/types';
 
 // Build & publish a brand-new ShareOut page from a natural-language spec. The
 // heavy generation (strong model) runs only after the user confirms — at propose
@@ -27,16 +28,18 @@ export const createArtifactTool: AccountTool = {
     },
     required: ['prompt'],
   },
-  async execute(_ctx, input): Promise<{ __propose: PendingAction }> {
+  async execute(ctx, input): Promise<{ __propose: PendingAction }> {
     const prompt = String(input.prompt || '').trim();
     const name = (typeof input.name === 'string' && input.name.trim()) || deriveName(prompt);
     const sourceFileId = typeof input.source_file_id === 'string' ? input.source_file_id.trim() : '';
+    const ws = ctx.selectedWorkspaceId;
     return {
       __propose: {
         kind: 'build_artifact',
         name,
         prompt,
         ...(sourceFileId ? { source_file_id: sourceFileId } : {}),
+        ...(ws && ws !== PERSONAL_SCOPE ? { workspace_id: ws } : {}),
       },
     };
   },
