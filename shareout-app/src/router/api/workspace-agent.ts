@@ -76,7 +76,7 @@ async function handleChat(ctx: FetchContext, wsId: string, user: AuthUser): Prom
     text,
     threadId: typeof body.threadId === 'string' ? body.threadId : undefined,
     buildSnapshot: () => buildWorkspaceSnapshot(env, wsId, user),
-    timing: { limits_ms: Date.now() - limitsAt },
+    timing: { pre_ms: limitsAt - (ctx.startedAt ?? limitsAt), limits_ms: Date.now() - limitsAt },
   });
 }
 

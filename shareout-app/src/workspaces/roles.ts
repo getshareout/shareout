@@ -1,6 +1,7 @@
 import type { Env, WorkspaceRole } from '../types';
 import { publicShowcaseSlugs, isShowcaseSlug } from '../visibility-config';
 import { json } from './json-response';
+import { deferWork, kvCacheGet } from '../kv-cache';
 
 const ROLE_HIERARCHY: Record<WorkspaceRole, number> = { owner: 3, admin: 2, member: 1 };
 
@@ -41,7 +42,7 @@ export async function getWorkspaceRole(
 
   if (env.SLUGS) {
     try {
-      const cached = await env.SLUGS.get(cacheKey);
+      const cached = await kvCacheGet(env.SLUGS, cacheKey);
       if (cached) return cached === WSROLE_NONE ? null : (cached as WorkspaceRole);
     } catch { /* fail-open to D1 */ }
   }
@@ -51,9 +52,8 @@ export async function getWorkspaceRole(
   ).bind(workspaceId, userId).first<{ role: WorkspaceRole }>();
   const role = member?.role ?? null;
 
-  if (env.SLUGS) {
-    try { await env.SLUGS.put(cacheKey, role ?? WSROLE_NONE, { expirationTtl: WSROLE_TTL }); } catch { /* best-effort */ }
-  }
+  const slugs = env.SLUGS;
+  if (slugs) deferWork(() => slugs.put(cacheKey, role ?? WSROLE_NONE, { expirationTtl: WSROLE_TTL }));
   return role;
 }
 
@@ -70,7 +70,7 @@ export async function getInternalWorkspaceRole(
 
   if (env.SLUGS) {
     try {
-      const cached = await env.SLUGS.get(cacheKey);
+      const cached = await kvCacheGet(env.SLUGS, cacheKey);
       if (cached) return cached === WSROLE_NONE ? null : (cached as WorkspaceRole);
     } catch { /* fail-open to D1 */ }
   }
@@ -80,9 +80,8 @@ export async function getInternalWorkspaceRole(
   ).bind(workspaceId, userId).first<{ role: WorkspaceRole }>();
   const role = member?.role ?? null;
 
-  if (env.SLUGS) {
-    try { await env.SLUGS.put(cacheKey, role ?? WSROLE_NONE, { expirationTtl: WSROLE_TTL }); } catch { /* best-effort */ }
-  }
+  const slugs = env.SLUGS;
+  if (slugs) deferWork(() => slugs.put(cacheKey, role ?? WSROLE_NONE, { expirationTtl: WSROLE_TTL }));
   return role;
 }
 

@@ -1,5 +1,6 @@
 import type { Env } from '../types';
 import { FEATURES, featureDefault, isKnownFeature } from './registry';
+import { deferWork, kvCacheGet } from '../kv-cache';
 
 function featureLabel(key: string): string {
   return FEATURES.find((f) => f.key === key)?.label ?? key;
@@ -33,7 +34,7 @@ function parseOverrides(raw: string | null | undefined): Record<string, boolean>
 async function loadGlobalOverrides(env: Env): Promise<Record<string, boolean>> {
   if (env.SLUGS) {
     try {
-      const cached = await env.SLUGS.get(GLOBAL_KEY);
+      const cached = await kvCacheGet(env.SLUGS, GLOBAL_KEY);
       if (cached !== null) return parseOverrides(cached);
     } catch {}
   }
@@ -43,9 +44,8 @@ async function loadGlobalOverrides(env: Env): Promise<Record<string, boolean>> {
       .bind('feature_defaults').first<{ value: string }>();
     raw = row?.value ?? null;
   } catch {}
-  if (env.SLUGS) {
-    try { await env.SLUGS.put(GLOBAL_KEY, raw ?? '{}', { expirationTtl: FLAG_TTL }); } catch {}
-  }
+  const slugs = env.SLUGS;
+  if (slugs) deferWork(() => slugs.put(GLOBAL_KEY, raw ?? '{}', { expirationTtl: FLAG_TTL }));
   return parseOverrides(raw);
 }
 
@@ -53,7 +53,7 @@ async function loadWorkspaceOverrides(env: Env, workspaceId: string): Promise<Re
   const key = wsKey(workspaceId);
   if (env.SLUGS) {
     try {
-      const cached = await env.SLUGS.get(key);
+      const cached = await kvCacheGet(env.SLUGS, key);
       if (cached !== null) return parseOverrides(cached);
     } catch {}
   }
@@ -63,9 +63,8 @@ async function loadWorkspaceOverrides(env: Env, workspaceId: string): Promise<Re
       .bind(workspaceId).first<{ feature_flags: string | null }>();
     raw = row?.feature_flags ?? null;
   } catch {}
-  if (env.SLUGS) {
-    try { await env.SLUGS.put(key, raw ?? '{}', { expirationTtl: FLAG_TTL }); } catch {}
-  }
+  const slugs = env.SLUGS;
+  if (slugs) deferWork(() => slugs.put(key, raw ?? '{}', { expirationTtl: FLAG_TTL }));
   return parseOverrides(raw);
 }
 

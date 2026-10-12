@@ -13,6 +13,8 @@ export interface FetchContext {
   executionCtx?: ExecutionContext;
   /** Deployment already resolved by the subdomain shorthand rewrite, if any. */
   deployment?: RoutedDeployment;
+  /** Date.now() when the worker started handling this request (for phase timings). */
+  startedAt?: number;
 }
 
 export function createFetchContext(request: Request, env: Env, executionCtx?: ExecutionContext): FetchContext {
@@ -25,5 +27,6 @@ export function createFetchContext(request: Request, env: Env, executionCtx?: Ex
     hostname: url.hostname,
     addCORS: (response) => addCORSHeaders(response, request, env),
     executionCtx,
+    startedAt: Date.now(),
   };
 }

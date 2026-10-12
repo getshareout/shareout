@@ -102,7 +102,7 @@ async function handleChat(ctx: FetchContext, ws: string | null, user: AuthUser):
     threadId: typeof body.threadId === 'string' ? body.threadId : undefined,
     buildSnapshot: () => buildHomeSnapshot(env, ws, user),
     extraTools: CANVAS_TOOLS,
-    timing: { limits_ms: Date.now() - limitsAt },
+    timing: { pre_ms: limitsAt - (ctx.startedAt ?? limitsAt), limits_ms: Date.now() - limitsAt },
   });
 }
 

@@ -15,6 +15,9 @@ import type { AuthUser } from '../../src/api-auth';
 import type { Env } from '../../src/types';
 import { SUPERADMIN_EMAILS } from '../../src/superadmin/recipients';
 
+// The last-used write runs after auth returns; let it finish before asserting on it.
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 // The shipped roster is empty by design (a public repo must not grant super-admin to a
 // baked-in address), so tests that need one mock the roster import.
 const testRoster = vi.hoisted(() => ({
@@ -160,6 +163,7 @@ describe('validateToken', () => {
     const env = makeValidEnv({ run, tokenHash, kv });
 
     await validateToken(bearer(token), env);
+    await settle();
 
     expect(get).toHaveBeenCalledWith(`tokused:${tokenHash}`);
     expect(run).toHaveBeenCalledTimes(1);
@@ -174,6 +178,7 @@ describe('validateToken', () => {
     const env = makeValidEnv({ run, tokenHash, kv });
 
     await expect(validateToken(bearer(token), env)).resolves.toMatchObject({ id: 'usr_1' });
+    await settle();
 
     expect(run).not.toHaveBeenCalled();
     expect(put).not.toHaveBeenCalled();
@@ -187,6 +192,7 @@ describe('validateToken', () => {
     const env = makeValidEnv({ run, tokenHash, kv });
 
     await expect(validateToken(bearer(token), env)).resolves.toMatchObject({ id: 'usr_1' });
+    await settle();
     expect(run).toHaveBeenCalledTimes(1);
   });
 
@@ -217,6 +223,7 @@ describe('validateToken', () => {
       validateToken(req, env),
     ]);
 
+    await settle();
     expect(a).toEqual(b);
     expect(b).toEqual(c);
     expect(run).toHaveBeenCalledTimes(1);
