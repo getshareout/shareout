@@ -1,3 +1,5 @@
+import { generateId } from '../../../crypto-utils';
+import { createMiniDb } from '../../minidb-client';
 import type { CacheEntry, Env } from '../types';
 
 function createHash(input: string): string {
@@ -36,6 +38,10 @@ export class PlatformCache {
 		config?: Partial<CacheConfig>
 	) {
 		this.config = { ...DEFAULT_CONFIG, ...config };
+	}
+
+	private miniDb() {
+		return createMiniDb(this.env, this.artifactId, '');
 	}
 
 	static generateCacheKey(
@@ -167,7 +173,7 @@ export class PlatformCache {
 	private async getFromPersisted<T>(key: string): Promise<CacheEntry<T> | null> {
 		try {
 			if (this.config.persistedType === 'artifact_json') {
-				const row = await this.env.DB.prepare(`
+				const row = await this.miniDb().prepare(`
 					SELECT value FROM artifact_json
 					WHERE artifact_id = ? AND key = ?
 				`)
@@ -189,15 +195,18 @@ export class PlatformCache {
 	private async writeToPersisted<T>(key: string, entry: CacheEntry<T>): Promise<void> {
 		try {
 			if (this.config.persistedType === 'artifact_json') {
-				await this.env.DB.prepare(`
-					INSERT INTO artifact_json (artifact_id, key, value, updated_at)
-					VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-					ON CONFLICT(artifact_id, key) DO UPDATE SET value = excluded.value, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+				const value = JSON.stringify(entry);
+				await this.miniDb().prepare(`
+					INSERT INTO artifact_json (id, artifact_id, key, value, size_bytes, updated_at)
+					VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+					ON CONFLICT(artifact_id, key) DO UPDATE SET value = excluded.value, size_bytes = excluded.size_bytes, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
 				`)
 					.bind(
+						generateId('jsn'),
 						this.artifactId,
 						`${this.config.persistedPrefix}:${key}`,
-						JSON.stringify(entry)
+						value,
+						new TextEncoder().encode(value).length
 					)
 					.run();
 			} else {
@@ -220,7 +229,7 @@ export class PlatformCache {
 		try {
 			if (options.key) {
 				if (this.config.persistedType === 'artifact_json') {
-					const result = await this.env.DB.prepare(`
+					const result = await this.miniDb().prepare(`
 						DELETE FROM artifact_json
 						WHERE artifact_id = ? AND key = ?
 					`)
@@ -241,7 +250,7 @@ export class PlatformCache {
 					: `${this.config.persistedPrefix}:${options.provider}:%`;
 
 				if (this.config.persistedType === 'artifact_json') {
-					const result = await this.env.DB.prepare(`
+					const result = await this.miniDb().prepare(`
 						DELETE FROM artifact_json
 						WHERE artifact_id = ? AND key LIKE ?
 					`)
