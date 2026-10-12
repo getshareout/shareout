@@ -56,6 +56,10 @@ export function getHomeI18nScript(serverLocale: HomeLocale | null = null): strin
       var key = el.getAttribute('data-i18n-title');
       if (key) el.setAttribute('title', t(key));
     });
+    r.querySelectorAll('[data-i18n-tip]').forEach(function(el){
+      var key = el.getAttribute('data-i18n-tip');
+      if (key) el.setAttribute('data-tip', t(key));
+    });
     document.querySelectorAll('.home-lang-btn').forEach(function(btn){
       var lang = btn.getAttribute('data-lang');
       btn.setAttribute('aria-selected', lang === locale ? 'true' : 'false');
