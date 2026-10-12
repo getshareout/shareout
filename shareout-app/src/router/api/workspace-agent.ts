@@ -62,9 +62,11 @@ async function handleChat(ctx: FetchContext, wsId: string, user: AuthUser): Prom
   if (!text) return jsonResp({ error: 'Empty message' }, 400);
 
   const retryMin = (r: { reset: number }) => Math.max(1, Math.ceil((r.reset - Math.floor(Date.now() / 1000)) / 60));
-  const perUser = await checkAiChatLimit(env, user.id);
+  const limitsAt = Date.now();
+  const defer = ctx.executionCtx ? (p: Promise<unknown>) => ctx.executionCtx!.waitUntil(p) : undefined;
+  const perUser = await checkAiChatLimit(env, user.id, defer);
   if (!perUser.allowed) return jsonResp({ error: `You’re sending messages too fast — try again in about ${retryMin(perUser)} min.` }, 429);
-  const perWs = await checkWebAgentWorkspaceLimit(env, wsId);
+  const perWs = await checkWebAgentWorkspaceLimit(env, wsId, defer);
   if (!perWs.allowed) return jsonResp({ error: `This workspace has hit its assistant limit — try again in about ${retryMin(perWs)} min.` }, 429);
 
   return streamAgentChat(env, {
@@ -74,6 +76,7 @@ async function handleChat(ctx: FetchContext, wsId: string, user: AuthUser): Prom
     text,
     threadId: typeof body.threadId === 'string' ? body.threadId : undefined,
     buildSnapshot: () => buildWorkspaceSnapshot(env, wsId, user),
+    timing: { limits_ms: Date.now() - limitsAt },
   });
 }
 

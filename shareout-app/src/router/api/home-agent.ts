@@ -89,7 +89,8 @@ async function handleChat(ctx: FetchContext, ws: string | null, user: AuthUser):
   const text = typeof body.text === 'string' ? body.text.trim() : '';
   if (!text) return jsonResp({ error: 'Empty message' }, 400);
 
-  const perUser = await checkAiChatLimit(env, user.id);
+  const limitsAt = Date.now();
+  const perUser = await checkAiChatLimit(env, user.id, ctx.executionCtx ? (p) => ctx.executionCtx!.waitUntil(p) : undefined);
   if (!perUser.allowed) return jsonResp({ error: `You’re sending messages too fast — try again in about ${Math.max(1, Math.ceil((perUser.reset - Math.floor(Date.now() / 1000)) / 60))} min.` }, 429);
 
   const selectedWorkspaceId: WorkspaceSelection = ws || PERSONAL_SCOPE;
@@ -101,6 +102,7 @@ async function handleChat(ctx: FetchContext, ws: string | null, user: AuthUser):
     threadId: typeof body.threadId === 'string' ? body.threadId : undefined,
     buildSnapshot: () => buildHomeSnapshot(env, ws, user),
     extraTools: CANVAS_TOOLS,
+    timing: { limits_ms: Date.now() - limitsAt },
   });
 }
 
