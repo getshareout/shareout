@@ -321,6 +321,10 @@ async function checkDataAuth(
           };
         }
         const owns = apiUser.id === artifact.owner_id;
+        if (!owns && artifact.visibility === 'private' &&
+            !(await closedArtifactViewer(env, artifact, apiUser.id, apiUser.email ?? null))) {
+          return { authorized: false, needsAuth: false, viewer: { email: null, isOwner: false } };
+        }
         return {
           authorized: true,
           needsAuth: false,
@@ -345,6 +349,10 @@ async function checkDataAuth(
         };
       }
       const owns = apiUser.id === artifact.owner_id;
+      if (!owns && (artifact.visibility === 'private' || artifact.visibility === 'workspace')) {
+        return (await closedArtifactViewer(env, artifact, apiUser.id, apiUser.email ?? null))
+          ?? { authorized: false, needsAuth: false, viewer: { email: null, isOwner: false } };
+      }
       return {
         authorized: true,
         needsAuth: false,
@@ -424,16 +432,27 @@ async function verifyGoogleSession(
     };
   }
 
+  return (await closedArtifactViewer(env, artifact, payload.userId, payload.email)) ?? deny;
+}
+
+/** A signed-in non-owner's access to a closed (private/workspace) artifact: collaborator,
+ *  internal member of a workspace-visible artifact, or a view grant. Null = no access. */
+async function closedArtifactViewer(
+  env: Env,
+  artifact: { id: string; visibility: string; workspace_id: string | null },
+  userId: string,
+  email: string | null,
+): Promise<DataAuthResult | null> {
   const collaborator = await env.DB.prepare(
     'SELECT role FROM collaborators WHERE artifact_id = ? AND email = ?'
-  ).bind(artifact.id, payload.email).first<{ role: string }>();
+  ).bind(artifact.id, email).first<{ role: string }>();
   if (collaborator) {
     // Owner/editor bypass the row-level policy; viewers are filtered.
     const isOwner = collaborator.role === 'owner' || collaborator.role === 'editor';
     return {
       authorized: true,
       needsAuth: false,
-      viewer: { email: payload.email, isOwner },
+      viewer: { email, isOwner },
       isArtifactOwner: collaborator.role === 'owner',
     };
   }
@@ -443,11 +462,11 @@ async function verifyGoogleSession(
   // getInternalWorkspaceRole (not the raw getWorkspaceRole) so an external's
   // membership edge never satisfies this — externals must hold an explicit grant.
   if (artifact.visibility === 'workspace' && artifact.workspace_id) {
-    if (await getInternalWorkspaceRole(env, artifact.workspace_id, payload.userId)) {
+    if (await getInternalWorkspaceRole(env, artifact.workspace_id, userId)) {
       return {
         authorized: true,
         needsAuth: false,
-        viewer: { email: payload.email, isOwner: false },
+        viewer: { email, isOwner: false },
         isArtifactOwner: false,
       };
     }
@@ -456,17 +475,17 @@ async function verifyGoogleSession(
   // External-sharing spine (work/030): an external user with a view grant on this
   // artifact (directly or via an ancestor folder) reads it as a filtered viewer,
   // regardless of visibility. Additive — only reached after the checks above fail.
-  const emails = payload.email ? [payload.email] : [];
-  if (await canAccess(env, { userIds: [payload.userId], emails }, 'artifact', artifact.id, 'view')) {
+  const emails = email ? [email] : [];
+  if (await canAccess(env, { userIds: [userId], emails }, 'artifact', artifact.id, 'view')) {
     return {
       authorized: true,
       needsAuth: false,
-      viewer: { email: payload.email, isOwner: false },
+      viewer: { email, isOwner: false },
       isArtifactOwner: false,
     };
   }
 
-  return deny;
+  return null;
 }
 
 /** Resolve the authenticated requester to a user id (API token, artifact access
