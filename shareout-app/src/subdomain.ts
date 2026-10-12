@@ -86,7 +86,8 @@ const PASSTHROUGH_PREFIXES = [
 // optional `home` artifact and is resolved through the shorthand branch below.
 // `/create` is the AI build flow — it must behave as on the apex, not be treated
 // as an artifact slug (which would 404 the sidebar's "Create with AI" button).
-const PASSTHROUGH_EXACT = ['/home', '/create', '/create/'];
+// `/admin` is the instance admin portal, linked from workspace Admin.
+const PASSTHROUGH_EXACT = ['/home', '/create', '/create/', '/admin', '/admin/'];
 
 export async function resolveSubdomainRoute(
   request: Request,

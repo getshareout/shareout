@@ -104,6 +104,13 @@ describe('resolveSubdomainRoute shorthand cache', () => {
     expect(db.prepare).not.toHaveBeenCalled();
   });
 
+  it('passes /admin through so the instance portal link works on a subdomain', async () => {
+    const db = makeDb(false);
+    const env = { DB: db, SLUGS: makeSlugs() } as unknown as Env;
+    expect(await resolveSubdomainRoute(req(), env, WS, '/admin')).toEqual({});
+    expect(db.prepare).not.toHaveBeenCalled();
+  });
+
   it('does not cache a negative result and falls through to the namespaced rewrite', async () => {
     const db = makeDb(false);
     const slugs = makeSlugs();

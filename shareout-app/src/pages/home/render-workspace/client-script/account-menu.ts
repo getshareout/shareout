@@ -22,6 +22,13 @@ export const workspace_client_account_menu_JS = `
     btn.addEventListener('click', function (e) { e.stopPropagation(); if (menu.hidden) open(); else close(); });
     if (closeBtn) closeBtn.addEventListener('click', close);
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !menu.hidden) close(); });
+    menu.querySelectorAll('[data-acc-lens]').forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        var lb = document.querySelector('[data-lens="' + a.getAttribute('data-acc-lens') + '"]');
+        if (!lb) return;
+        e.preventDefault(); close(); lb.click();
+      });
+    });
 
     function loadLinked() {
       var list = document.getElementById('wsxLinked');
