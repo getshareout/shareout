@@ -601,8 +601,8 @@ paths:
       description: >-
         Per-channel connection status for the Home Inspector Deliver section —
         whether Telegram is linked for the signed-in user, Slack is connected for
-        the artifact workspace (with OAuth `connectUrl` when not), and email is
-        always available.
+        the artifact workspace (with OAuth `connectUrl` when not), email is
+        always available (with the caller's own address), and the caller's role.
       operationId: getArtifactDeliverStatus
       responses:
         "200":
@@ -635,6 +635,15 @@ paths:
                     properties:
                       available:
                         type: boolean
+                      address:
+                        type: [string, "null"]
+                        description: The signed-in user's own email — the default recipient.
+                  role:
+                    type: string
+                    enum: [owner, editor, viewer]
+                    description: >-
+                      Caller's role on the artifact. Viewers may only schedule or
+                      deliver to themselves (own email, own Telegram, Slack DM).
         "403":
           $ref: "#/components/responses/Forbidden"
     post:
@@ -1878,14 +1887,26 @@ paths:
                     subject: Weekly report
                     includeArtifactLink: true
       responses:
-        "200":
+        "201":
           description: Created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Job"
+                type: object
+                properties:
+                  job:
+                    $ref: "#/components/schemas/Job"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "403":
+          description: >-
+            No access to the artifact, or a viewer scheduling delivery to someone
+            other than themselves (viewers may only send to their own email,
+            their own Telegram, or a Slack DM to themselves).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /v1/jobs/{id}:
     parameters:
       - name: id

@@ -141,6 +141,19 @@ describe('handleCreateJob', () => {
     expect(await jsonBody(missingConfig)).toMatchObject({ error: 'config required' });
   });
 
+  it('403s permission refusals from createJob (viewer sending to someone else, no access)', async () => {
+    const req = () => new Request('https://x', {
+      method: 'POST',
+      body: JSON.stringify({ artifact_id: 'art_1', action: 'email', schedule: '0 9 * * 1', config: { recipients: ['boss@example.com'] } }),
+    });
+    jobs.createJob.mockResolvedValueOnce({ error: 'Viewers can only schedule email delivery to their own account address' });
+    const viewer = await handleCreateJob(req(), env, user);
+    expect(viewer.status).toBe(403);
+    expect(await jsonBody(viewer)).toMatchObject({ code: 'FORBIDDEN' });
+    jobs.createJob.mockResolvedValueOnce({ error: 'Permission denied: no access to this artifact' });
+    expect((await handleCreateJob(req(), env, user)).status).toBe(403);
+  });
+
   it('returns createJob errors and success payloads', async () => {
     jobs.createJob.mockResolvedValueOnce({ error: 'Invalid cron' });
     const failed = await handleCreateJob(

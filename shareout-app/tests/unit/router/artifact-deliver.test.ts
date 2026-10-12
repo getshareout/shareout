@@ -160,12 +160,21 @@ describe('handleDeliverStatus / channels', () => {
     const body = await res.json() as {
       telegram: { linked: boolean };
       slack: { connected: boolean; connectUrl: string | null };
-      email: { available: boolean };
+      email: { available: boolean; address: string | null };
+      role: string;
     };
     expect(body.telegram.linked).toBe(false);
     expect(body.slack.connected).toBe(false);
     expect(body.slack.connectUrl).toMatch(/connections\/slack\/install/);
     expect(body.email.available).toBe(true);
+    expect(body.email.address).toBe('owner@x.com');
+    expect(body.role).toBe('owner');
+  });
+
+  it('tells a viewer their role so the UI can lock recipients to themselves', async () => {
+    const body = await (await handleDeliverStatus(new Request('https://x'), e, viewer, 'art1')).json() as { role: string; email: { address: string } };
+    expect(body.role).toBe('viewer');
+    expect(body.email.address).toBe('viewer@x.com');
   });
 
   it('returns empty channels when Slack is not connected', async () => {

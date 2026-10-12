@@ -808,10 +808,10 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   // ----- Automate (per-artifact schedules + alerts) -----
   function autoJobRow(j) {
     var st = j.last_status || ''; var cls = st === 'success' ? ' ok' : st === 'failed' ? ' fail' : '';
-    return '<div class="wsx-row"><div class="wsx-row__main"><div class="wsx-row__title">' + esc(j.title || j.action || t('admin.jobDefault')) + '</div><div class="wsx-row__sub">' + esc(j.schedule || '') + (j.action ? ' \\u00B7 ' + esc(j.action) : '') + '</div></div>' + (st ? '<span class="wsx-row__badge' + cls + '">' + esc(st) + '</span>' : '') + '</div>';
+    return '<div class="wsx-row"><div class="wsx-row__main"><div class="wsx-row__title">' + esc(j.title || j.action || t('admin.jobDefault')) + '</div><div class="wsx-row__sub">' + esc(cronHuman(j.schedule)) + (j.action ? ' \\u00B7 ' + esc(j.action) : '') + '</div></div>' + (st ? '<span class="wsx-row__badge' + cls + '">' + esc(st) + '</span>' : '') + '</div>';
   }
   function autoAlertRow(a) {
-    return '<div class="wsx-row"><div class="wsx-row__main"><div class="wsx-row__title">' + esc(a.name || a.metric_id || t('inspector.alertDefault')) + '</div><div class="wsx-row__sub">' + esc(a.schedule || '') + '</div></div>' + (a.enabled ? '<span class="wsx-row__badge ok">' + esc(t('admin.on')) + '</span>' : '<span class="wsx-row__badge">' + esc(t('admin.off')) + '</span>') + '</div>';
+    return '<div class="wsx-row"><div class="wsx-row__main"><div class="wsx-row__title">' + esc(a.name || a.metric_id || t('inspector.alertDefault')) + '</div><div class="wsx-row__sub">' + esc(a.schedule ? cronHuman(a.schedule) : '') + '</div></div>' + (a.enabled ? '<span class="wsx-row__badge ok">' + esc(t('admin.on')) + '</span>' : '<span class="wsx-row__badge">' + esc(t('admin.off')) + '</span>') + '</div>';
   }
   function renderAutomate(art) {
     if (autoCache[art.id] !== undefined) { paintAutomate(art, autoCache[art.id]); return; }
@@ -846,8 +846,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     rbodyEl.querySelectorAll('[data-aauto]').forEach(function (b) {
       b.addEventListener('click', function () {
         var n = art.name || t('inspector.thisPage'); var k = b.getAttribute('data-aauto');
-        if (k === 'schedule') agentAsk(t('inspector.askSchedule').replace('{name}', n));
-        else if (k === 'alert') agentAsk(t('inspector.askAlert').replace('{name}', n));
+        if (k === 'schedule' || k === 'alert') openAutoForm(k, { id: art.id, name: n }, function () { delete autoCache[art.id]; });
         else if (k === 'crew') agentAsk(t('inspector.askCrew').replace('{name}', n));
         else agentAsk(t('inspector.askCustom').replace('{name}', n));
       });

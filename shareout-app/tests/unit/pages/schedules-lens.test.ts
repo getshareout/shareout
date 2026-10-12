@@ -8,13 +8,14 @@ import { workspace_client_home_views_crew_JS as crewJs } from '../../../src/page
 import { WORKSPACE_COPY } from '../../../src/pages/home/home-i18n/copy/workspace';
 
 type Lens = {
-  cronHuman: (c: string) => string;
+  cronHuman: (c: string, tz?: string) => string;
   runJobNow: (b: HTMLButtonElement) => void;
   crewRunLive: (b: HTMLButtonElement, card: HTMLElement, base: string) => void;
 };
 
 const copy = WORKSPACE_COPY.en as Record<string, string>;
 let fetchMock: ReturnType<typeof vi.fn>;
+let locale = 'en-US';
 
 function loadLens(): Lens {
   const win = globalThis.window as unknown as Record<string, unknown>;
@@ -28,6 +29,7 @@ function loadLens(): Lens {
       if (prop === 't') return (k: string) => copy[k] ?? k;
       if (prop === 'esc') return (s: unknown) => (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
       if (prop === 'fetch') return (...a: unknown[]) => fetchMock(...a);
+      if (prop === 'locTag') return () => locale;
       if (prop in globalThis) return (globalThis as Record<string, unknown>)[prop];
       return () => '';
     },
@@ -42,18 +44,39 @@ const json = (d: unknown, status = 200) => new Response(JSON.stringify(d), { sta
 describe('cronHuman', () => {
   const { cronHuman } = loadLens();
   it.each([
-    ['0 9 * * *', 'Daily · 09:00 UTC'],
-    ['30 14 * * 1', 'Weekly · Mon 14:30 UTC'],
-    ['0 9 * * 1,3', 'Weekly · Mon, Wed 09:00 UTC'],
-    ['0 9 * * 1-5', 'Weekdays · 09:00 UTC'],
-    ['0 8 1 * *', 'Monthly · day 1 08:00 UTC'],
+    ['0 9 * * *', 'Daily · 09:00 AM (UTC)'],
+    ['30 14 * * 1', 'Weekly · Mon 02:30 PM (UTC)'],
+    ['0 9 * * 1,3', 'Weekly · Mon, Wed 09:00 AM (UTC)'],
+    ['0 9 * * 1-5', 'Weekdays · 09:00 AM (UTC)'],
+    ['0 8 1 * *', 'Monthly · day 1 08:00 AM (UTC)'],
     ['0 * * * *', 'Hourly · at :00'],
     ['15 */6 * * *', 'Every 6 hours · at :15'],
     ['*/15 * * * *', 'Every 15 min'],
     ['* * * * *', 'Every minute'],
     ['0 0 1 1 *', 'Custom · 0 0 1 1 * UTC'],
-  ])('%s → %s', (cron, label) => {
-    expect(cronHuman(cron)).toBe(label);
+  ])('%s in UTC → %s', (cron, label) => {
+    expect(cronHuman(cron, 'UTC')).toBe(label);
+  });
+
+  // Stored UTC → the viewer's own clock, moving the day when it crosses midnight.
+  it.each([
+    ['0 12 * * 1', 'America/Buenos_Aires', 'Weekly · Mon 09:00 AM (Buenos Aires)'],
+    ['30 1 * * 2-6', 'America/Buenos_Aires', 'Weekdays · 10:30 PM (Buenos Aires)'],
+    ['0 1 * * 0', 'America/Buenos_Aires', 'Weekly · Sat 10:00 PM (Buenos Aires)'],
+    ['0 23 * * 0-4', 'Asia/Tokyo', 'Weekdays · 08:00 AM (Tokyo)'],
+    ['0 23 * * 0', 'Asia/Tokyo', 'Weekly · Mon 08:00 AM (Tokyo)'],
+    ['0 2 1 * *', 'America/Buenos_Aires', 'Custom · 0 2 1 * * UTC'],
+    ['0 2 15 * *', 'America/Buenos_Aires', 'Monthly · day 14 11:00 PM (Buenos Aires)'],
+    ['30 3 * * *', 'Asia/Kolkata', 'Daily · 09:00 AM (Kolkata)'],
+    ['0 * * * *', 'Asia/Kolkata', 'Hourly · at :30'],
+  ])('%s in %s → %s', (cron, tz, label) => {
+    expect(cronHuman(cron, tz)).toBe(label);
+  });
+
+  it('uses es-AR clock formatting in Spanish', () => {
+    locale = 'es-AR';
+    try { expect(cronHuman('0 12 * * *', 'America/Buenos_Aires')).toBe('Daily · 09:00 (Buenos Aires)'); }
+    finally { locale = 'en-US'; }
   });
 });
 
