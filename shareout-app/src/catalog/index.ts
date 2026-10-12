@@ -27,6 +27,7 @@ export {
 } from './seed';
 export {
   seedCatalogForConnection,
+  removeCatalogForConnection,
   recordDatasetLineage,
   type DatasetSeedResult,
 } from './seed-resources';

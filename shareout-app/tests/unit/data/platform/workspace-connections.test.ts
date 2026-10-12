@@ -19,9 +19,11 @@ import type { AuthUser } from '../../../../src/api-auth';
 // (called with the right ids, doesn't block/break create) without exercising the
 // real provider-listing logic — that's covered by catalog/seed-resources.test.ts.
 const catalogSeedMock = vi.fn(async () => ({ seeded: 0, skipped: 0, provider: null }));
+const catalogRemoveMock = vi.fn(async () => undefined);
 vi.mock('../../../../src/catalog/seed-resources', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   seedCatalogForConnection: (...args: unknown[]) => catalogSeedMock(...args),
+  removeCatalogForConnection: (...args: unknown[]) => catalogRemoveMock(...args),
 }));
 
 const CREDENTIALS_KEY = 'test-credentials-key-32bytes!!';
@@ -56,7 +58,7 @@ function makeEnv(h: DbHandlers): Env {
         if (sql.includes('FROM workspace_members')) {
           return h.role !== undefined ? (h.role === null ? null : { role: h.role }) : { role: 'member' };
         }
-        if (sql.includes("SELECT id FROM connections")) {
+        if (sql.includes("SELECT id FROM connections") || sql.includes("SELECT id, name FROM connections")) {
           // create-time conflict check vs delete-time existence check
           return sql.includes('AND name = ?') ? (h.existingConnection ?? null) : (h.existingDeleteTarget ?? null);
         }
@@ -270,11 +272,12 @@ describe('workspace connections routes', () => {
   });
 
   it('deletes a shared connector', async () => {
-    const env = makeEnv({ role: 'admin', existingDeleteTarget: { id: 'conn_1' } });
+    const env = makeEnv({ role: 'admin', existingDeleteTarget: { id: 'conn_1', name: 'my_api' } });
     const res = await handleDeleteWorkspaceConnection(env, USER, WORKSPACE_ID, 'conn_1');
     expect(res.status).toBe(200);
     const body = await res.json() as { deleted: boolean };
     expect(body.deleted).toBe(true);
+    expect(catalogRemoveMock).toHaveBeenCalledWith(env, WORKSPACE_ID, 'my_api');
   });
 
   it('404s when deleting a missing connector', async () => {

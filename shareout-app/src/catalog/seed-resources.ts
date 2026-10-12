@@ -2,7 +2,7 @@ import type { Env } from '../types';
 import { PlatformEngine } from '../data/platform';
 import { parseSnowflakeRows } from '../data/connections/warehouse-exec';
 import { upsertCatalogFile, listCatalogFiles } from './store';
-import { seedConnectorsAsSources, slugifyName } from './seed';
+import { buildConnectorEntry, slugifyName } from './seed';
 
 // Bounded per connect-time seed run: number of tables/sheets enumerated and written
 // as catalog dataset entries. Keeps a first connect to a workspace with thousands of
@@ -15,6 +15,7 @@ const MAX_BQ_DATASETS = 20;
 interface ConnectionRow {
   id: string;
   name: string;
+  kind: string;
   provider: string;
   config: string | null;
 }
@@ -163,12 +164,12 @@ Auto-seeded from **${conn.name}** (${conn.provider}). Agents can enrich this ent
 }
 
 /**
- * Seed the workspace catalog from one just-created connection: the connector's own
- * `source` entry (via seedConnectorsAsSources) plus one `dataset` entry per
+ * Seed the workspace catalog from one just-created connection: that connector's own
+ * `source` entry (only this one — not every workspace connector) plus one `dataset` entry per
  * table/sheet the provider cheaply exposes (name only, capped, no data reads).
  * Idempotent — re-running upserts the same paths, never duplicates. Never clobbers
  * a human-edited entry (source === 'manual' at the file level — the same rule
- * seedConnectorsAsSources already uses for source entries).
+ * seedConnectorsAsSources uses for source entries).
  *
  * Never throws: catalog seeding is best-effort and must never fail a connection
  * create, so every failure mode (bad creds, unsupported provider, D1 error) resolves
@@ -180,19 +181,22 @@ export async function seedCatalogForConnection(
   connectionId: string
 ): Promise<DatasetSeedResult> {
   try {
-    await seedConnectorsAsSources(env, workspaceId);
-
     const conn = await env.DB.prepare(
-      "SELECT id, name, provider, config FROM connections WHERE scope_type = 'workspace' AND scope_id = ? AND id = ?"
+      "SELECT id, name, kind, provider, config FROM connections WHERE scope_type = 'workspace' AND scope_id = ? AND id = ?"
     )
       .bind(workspaceId, connectionId)
       .first<ConnectionRow>();
     if (!conn) return { seeded: 0, skipped: 0, provider: null };
 
+    const existing = new Map((await listCatalogFiles(env, workspaceId)).map((f) => [f.path, f.source]));
+    const source = buildConnectorEntry(conn);
+    if (existing.get(source.path) !== 'manual') {
+      await upsertCatalogFile(env, workspaceId, { ...source, source: 'seed:connector' });
+    }
+
     const resources = await listResources(env, workspaceId, conn);
     if (!resources.length) return { seeded: 0, skipped: 0, provider: conn.provider };
 
-    const existing = new Map((await listCatalogFiles(env, workspaceId)).map((f) => [f.path, f.source]));
     const connSlug = slugifyName(conn.name);
     let seeded = 0;
     let skipped = 0;
@@ -252,5 +256,22 @@ Auto-linked from **${connectionName}**, materialized into artifact \`${artifactI
     await upsertCatalogFile(env, workspaceId, { path, content, source: 'seed:provenance' });
   } catch {
     // Lineage is best-effort — never fail the materialize that triggered it.
+  }
+}
+
+/**
+ * Drop the auto-seeded catalog entries of a deleted connection: its `source` entry and
+ * the `dataset` entries seeded from its tables. Human-edited entries and dataset
+ * provenance records are kept. Never throws — must not fail the connection delete.
+ */
+export async function removeCatalogForConnection(env: Env, workspaceId: string, connectionName: string): Promise<void> {
+  try {
+    const slug = slugifyName(connectionName);
+    await env.DB.prepare(
+      `DELETE FROM workspace_files WHERE workspace_id = ? AND namespace = 'catalog' AND source = 'seed:connector'
+         AND (path = ? OR path LIKE ?)`
+    ).bind(workspaceId, `sources/${slug}.md`, `datasets/${slug}/%`).run();
+  } catch {
+    // Best-effort cleanup.
   }
 }
