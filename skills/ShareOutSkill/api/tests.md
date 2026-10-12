@@ -45,7 +45,8 @@ and easy to generate. Phase 1 uses read-only contract assertions:
 ```
 
 `store` is `table:<name>` or `json:<key>`. `expect` supports `columns`, `minRows`,
-`maxRows` (tables) and `schema` (json: a field→type map of `string|number|boolean|object|array|null`).
+`maxRows` (tables) and `schema` (json: a field→type map of `string|number|boolean|object|array|null`). A `columns`
+check passes when each column appears in at least one of the table's 50 most recent rows.
 
 Smoke + policy run automatically with no spec. The spec only adds contract checks.
 

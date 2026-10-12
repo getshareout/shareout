@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlatformCache } from '../../../../src/data/platform/core/cache';
 import type { CacheEntry } from '../../../../src/data/platform/types';
 import type { Env } from '../../../../src/types';
+import { miniDbBinding } from '../../helpers/minidb-mock';
 
 const env = { DB: { prepare: vi.fn() }, ARTIFACTS: { get: vi.fn(), put: vi.fn(), delete: vi.fn() } } as unknown as Env;
+(env as unknown as { MINIDB: unknown }).MINIDB = miniDbBinding(() => env.DB as never);
 
 function mockDb(
   handlers: {
@@ -355,13 +357,15 @@ describe('PlatformCache persisted layer (artifact_json)', () => {
     const run = vi.fn().mockResolvedValue({ meta: { changes: 1 } });
     prepare = vi.fn(() => ({
       bind: (...bindings: unknown[]) => {
-        expect(bindings[0]).toBe('art_1');
-        expect(bindings[1]).toBe('platform_cache:write-key');
-        expect(JSON.parse(String(bindings[2]))).toMatchObject({
+        expect(bindings[0]).toMatch(/^jsn_/);
+        expect(bindings[1]).toBe('art_1');
+        expect(bindings[2]).toBe('platform_cache:write-key');
+        expect(JSON.parse(String(bindings[3]))).toMatchObject({
           data: { saved: true },
           provider: 'shopify',
           endpoint: 'orders.list',
         });
+        expect(bindings[4]).toBe(String(bindings[3]).length);
         return { run };
       },
     }));

@@ -223,7 +223,7 @@ interface WebhookConfig {
   url: string;                    // HTTPS only
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';  // Default: POST
   headers?: Record<string, string>;
-  includeArtifactData?: boolean;  // Include data_json in payload
+  includeArtifactData?: boolean;  // Include up to 50 sdk.json keys as `data`
 }
 ```
 

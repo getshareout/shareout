@@ -1,3 +1,4 @@
+import { createMiniDb } from '../../data/minidb-client';
 import type { WebhookConfig } from '../../scheduling/jobs';
 import type { Destination } from '../types';
 
@@ -16,10 +17,10 @@ export const webhookDestination: Destination<WebhookConfig> = {
 
   async deliver(env, ctx, config) {
     const artifact = await env.DB.prepare(
-      `SELECT a.id, a.name, d.slug AS slug FROM artifacts a
+      `SELECT a.id, a.name, a.workspace_id, d.slug AS slug FROM artifacts a
        JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
        WHERE a.id = ?`
-    ).bind(ctx.artifactId).first<{ id: string; name: string; slug: string }>();
+    ).bind(ctx.artifactId).first<{ id: string; name: string; workspace_id: string | null; slug: string }>();
 
     if (!artifact) return { success: false, error: 'Artifact not found' };
 
@@ -34,8 +35,8 @@ export const webhookDestination: Destination<WebhookConfig> = {
     };
 
     if (config.includeArtifactData && hasBody) {
-      const jsonData = await env.DB.prepare(
-        'SELECT key, value FROM data_json WHERE artifact_id = ? LIMIT 50'
+      const jsonData = await createMiniDb(env, artifact.id, artifact.workspace_id ?? '').prepare(
+        'SELECT key, value FROM artifact_json WHERE artifact_id = ? LIMIT 50'
       ).bind(ctx.artifactId).all<{ key: string; value: string }>();
       payload.data = Object.fromEntries(
         (jsonData.results || []).map(r => [r.key, JSON.parse(r.value)])

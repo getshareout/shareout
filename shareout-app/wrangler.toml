@@ -61,6 +61,8 @@ database_name = "shareout-db"
 # Placeholder — Deploy button / `wrangler d1 create` replaces this
 database_id = "00000000-0000-0000-0000-000000000001"
 
+# Optional presigned direct-to-R2 transfers: set the R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY /
+# R2_ACCOUNT_ID secrets AND an R2_BUCKET var equal to this bucket_name (no default is guessed).
 [[r2_buckets]]
 binding = "ARTIFACTS"
 bucket_name = "shareout-artifacts"

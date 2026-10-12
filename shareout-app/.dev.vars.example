@@ -65,6 +65,7 @@ SHAREOUT_API_TOKEN=
 # R2_ACCESS_KEY_ID=
 # R2_SECRET_ACCESS_KEY=
 # R2_ACCOUNT_ID=
+# R2_BUCKET=            # MUST equal the ARTIFACTS bucket_name in wrangler.toml; presigned direct transfers stay off without it
 
 # --- Telegram (product bot only — there is no super-admin bot) ---
 # TELEGRAM_BOT_TOKEN=

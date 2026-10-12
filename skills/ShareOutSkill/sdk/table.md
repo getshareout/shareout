@@ -8,6 +8,12 @@ Structured records with filtering, sorting, pagination. Access via `sdk.table(na
 
 > **Share a table across artifacts (Teams):** to let *another artifact* in the same workspace read/write this table (one page collects, another displays), use `sdk.workspace.table(name)` — see [team/workspace-tables.md](../team/workspace-tables.md).
 
+## Table Names
+
+Letter first, then letters, digits, or `_` only — max 64 chars (`/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/`).
+No hyphens or spaces: `e2e-orders` → `400 INVALID_TABLE_NAME`; use `e2e_orders`. The same rule
+applies to workspace shared-table names. Tables are created on first insert.
+
 ## Table Methods
 
 ```typescript
@@ -76,6 +82,26 @@ type FilterOperator<T> = {
   $endsWith?: string;
 };
 ```
+
+Any other `$`-key (or a nested object that isn't an operator map) is rejected with
+`400 VALIDATION_ERROR` and `param: "filter.<field>.<op>"` — it is never silently ignored.
+`$in` / `$nin` must be arrays.
+
+## REST (server / CLI callers)
+
+```http
+POST   /v1/data/{artifactId}/tables/{name}            # insert: one row object, or {"rows":[...]} for bulk
+POST   /v1/data/{artifactId}/tables/{name}/query      # {"filter","sort","limit","skip","select"}
+POST   /v1/data/{artifactId}/tables/{name}/count      # {"filter"}
+POST   /v1/data/{artifactId}/tables/{name}/distinct   # {"field","filter"}
+PATCH  /v1/data/{artifactId}/tables/{name}            # {"filter","changes"}
+DELETE /v1/data/{artifactId}/tables/{name}            # {"filter"} — rows only
+DELETE /v1/data/{artifactId}/tables/{name}?confirm=true   # drop the table
+GET|PATCH|DELETE /v1/data/{artifactId}/tables/{name}/{rowId}
+```
+
+Bulk insert is `{"rows": [{...}, {...}]}` (what `insertMany` sends). A top-level JSON array
+is rejected with `400 VALIDATION_ERROR` (`param: "body"`) rather than stored as one row.
 
 ## Examples
 

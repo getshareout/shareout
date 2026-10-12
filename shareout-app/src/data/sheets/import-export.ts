@@ -161,19 +161,19 @@ export async function importFromSheet(
     const headers = rows[0].map(h => sanitizeColumnName(h));
     const dataRows = rows.slice(1);
 
-    let table = await ctx.env.DB.prepare(
+    let table = await ctx.db.prepare(
       'SELECT id FROM artifact_tables WHERE artifact_id = ? AND name = ?'
     ).bind(ctx.artifactId, conn.target_table).first<{ id: string }>();
 
     if (!table) {
       const tableId = generateId('tbl');
-      await ctx.env.DB.prepare(
+      await ctx.db.prepare(
         'INSERT INTO artifact_tables (id, artifact_id, name) VALUES (?, ?, ?)'
       ).bind(tableId, ctx.artifactId, conn.target_table).run();
       table = { id: tableId };
     }
 
-    await ctx.env.DB.prepare(
+    await ctx.db.prepare(
       'DELETE FROM artifact_rows WHERE table_id = ?'
     ).bind(table.id).run();
 
@@ -193,14 +193,14 @@ export async function importFromSheet(
         }
       });
 
-      await ctx.env.DB.prepare(
+      await ctx.db.prepare(
         'INSERT INTO artifact_rows (id, table_id, data) VALUES (?, ?, ?)'
       ).bind(rowData.id, table.id, JSON.stringify(rowData)).run();
 
       importedCount++;
     }
 
-    await ctx.env.DB.prepare(
+    await ctx.db.prepare(
       `UPDATE artifact_tables SET row_count = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`
     ).bind(importedCount, table.id).run();
 
@@ -246,7 +246,7 @@ export async function exportToSheet(
   const logId = await startSyncLog(ctx, conn.id, 'export');
 
   try {
-    const table = await ctx.env.DB.prepare(
+    const table = await ctx.db.prepare(
       'SELECT id FROM artifact_tables WHERE artifact_id = ? AND name = ?'
     ).bind(ctx.artifactId, conn.target_table).first<{ id: string }>();
 
@@ -255,7 +255,7 @@ export async function exportToSheet(
       return successResponse({ exported: 0, message: 'Table not found' });
     }
 
-    const result = await ctx.env.DB.prepare(
+    const result = await ctx.db.prepare(
       'SELECT data FROM artifact_rows WHERE table_id = ? ORDER BY created_at'
     ).bind(table.id).all<{ data: string }>();
 
