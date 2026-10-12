@@ -15,6 +15,7 @@ export interface ArtifactSummary {
   paused: boolean;
   created_at: string;
   updated_at: string | null;
+  /** version_no live on the production deployment (reflects rollback). */
   current_version: number;
   user_role?: CollaboratorRole;
   artifact_type: ArtifactType;
@@ -23,6 +24,8 @@ export interface ArtifactSummary {
 
 /** Full artifact metadata returned by GET `/v1/artifacts/:id`. */
 export interface ArtifactDetail extends ArtifactSummary {
+  /** Highest published version_no; differs from current_version after a rollback. */
+  latest_version: number;
   workspace_id: string | null;
   description: string | null;
   social_title: string | null;

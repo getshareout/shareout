@@ -207,5 +207,44 @@ describe('handleUpdateArtifact', () => {
       code: 'MODERATION_HELD',
     });
   });
-});
 
+  it('replaces tags via PATCH (tags alone is a valid update)', async () => {
+    const db = makeDbMock({ first: ownerRoleFirst, all: () => ({ results: [] }), run: () => ({ success: true }) });
+    const batch = vi.fn(async () => []);
+    const env = { ...baseEnv, SLUGS: makeSlugsMock(), DB: Object.assign(db, { batch }) };
+
+    const response = await handleUpdateArtifact(
+      new Request('https://shareout.example.com/v1/artifacts/art_1', {
+        method: 'PATCH',
+        body: JSON.stringify({ tags: [' e2e ', 'Q2', 'e2e'] }),
+      }),
+      env,
+      user,
+      'art_1',
+    );
+
+    expect(response.status).toBe(200);
+    expect(batch).toHaveBeenCalledTimes(1);
+    const prepare = vi.mocked(db.prepare);
+    const sqls = prepare.mock.calls.map(c => c[0] as string);
+    expect(sqls.some(q => q.includes('DELETE FROM artifact_tags'))).toBe(true);
+    const insertIdx = sqls.findIndex(q => q.includes('INSERT OR IGNORE INTO artifact_tags'));
+    const bindArgs = vi.mocked(prepare.mock.results[insertIdx].value.bind).mock.calls;
+    expect(bindArgs.map(a => a[2])).toEqual(['e2e', 'Q2']);
+  });
+
+  it('rejects a non-array tags value with param', async () => {
+    const env = { ...baseEnv, DB: makeDbMock({ first: ownerRoleFirst }) };
+    const response = await handleUpdateArtifact(
+      new Request('https://shareout.example.com/v1/artifacts/art_1', {
+        method: 'PATCH',
+        body: JSON.stringify({ tags: 'e2e' }),
+      }),
+      env,
+      user,
+      'art_1',
+    );
+    expect(response.status).toBe(400);
+    expect(await jsonBody(response)).toMatchObject({ code: 'VALIDATION_ERROR', param: 'tags' });
+  });
+});

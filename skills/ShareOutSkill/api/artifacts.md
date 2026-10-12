@@ -193,6 +193,14 @@ Fetch all files for an artifact version.
 }
 ```
 
+## Versions & rollback
+
+`GET /v1/artifacts/{id}/versions` lists published versions (`id`, `version_no`, `entrypoint`, `created_at`, newest first).
+
+`POST /v1/artifacts/{id}/rollback` with `{"version_no": 1}` (or `{"version_id": "ver_…"}`) re-points the production deployment at that version — no new version is created. Editor or owner. Returns `{success, deployed_version, version_id}`; `404 VERSION_NOT_FOUND`, `409 NOT_DEPLOYED`.
+
+On `GET /v1/artifacts/{id}`, `current_version` is the version **live in production** (so it reflects a rollback) and `latest_version` is the highest published `version_no`. The next publish becomes `latest_version + 1` and goes live.
+
 ## Collaborator API
 
 Every route below accepts the artifact's own roles (owner / editor / viewer as noted)
@@ -332,6 +340,7 @@ Common fields:
 | `name` | string | Display name |
 | `description` | string | Short description |
 | `visibility` | string | `private`, `workspace`, `public` |
+| `tags` | string[] | Replaces the artifact's tag set (max 12, ≤32 chars each; `[]` clears). Single-tag edits: `POST /v1/artifacts/{id}/tags {"label"}` / `DELETE /v1/artifacts/{id}/tags/{label}` |
 | `access_policy` | object | Row-level access policy — see [core/access-policy.md](../core/access-policy.md) |
 | `social_title` / `social_description` / `social_image_url` | string \| null | Link preview overrides |
 | `allow_anon_write` | boolean | Let anonymous visitors mutate json/tables/blobs/datasets on public artifacts |
