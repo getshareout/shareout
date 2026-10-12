@@ -4,6 +4,7 @@ import { signupsPaused, SIGNUPS_PAUSED_MSG } from './signup-gate';
 import { scheduleSeedStarterKit } from './starter-kit/schedule';
 import { isSuperAdminEmail } from './superadmin/recipients';
 import { jsonWithApiErrors } from './http/api-error';
+import { deferWork } from './kv-cache';
 
 const RATE_LIMIT_WINDOW = 60 * 60 * 24; // 24 hours in seconds
 export const RATE_LIMIT_MAX = 100; // publishes per day
@@ -204,7 +205,7 @@ async function resolveToken(request: Request, env: Env): Promise<AuthUser | null
 
   if (!result) return null;
 
-  await touchLastUsed(env, tokenHash);
+  deferWork(() => touchLastUsed(env, tokenHash));
 
   return { id: result.user_id, email: result.email, username: result.username };
 }
@@ -233,7 +234,7 @@ async function resolveServiceToken(token: string, env: Env): Promise<AuthUser | 
 
   if (!row) return null;
 
-  await touchLastUsed(env, tokenHash, 'sottokused');
+  deferWork(() => touchLastUsed(env, tokenHash, 'sottokused'));
 
   const scopes = row.scopes
     .split(',')
