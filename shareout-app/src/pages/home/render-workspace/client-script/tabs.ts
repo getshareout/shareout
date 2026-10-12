@@ -36,7 +36,7 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
   function syncTabMode() {
     if (!tabModeEl) return;
     var rec = panes[activeKey];
-    tabModeEl.hidden = !rec;
+    tabModeEl.hidden = !rec || rec.art.canEdit === false;
     if (rec) tabModeEl.querySelectorAll('[data-mode]').forEach(function (b) { b.classList.toggle('is-on', b.getAttribute('data-mode') === rec.mode); });
     if (tabDeviceEl) {
       tabDeviceEl.hidden = !rec;
