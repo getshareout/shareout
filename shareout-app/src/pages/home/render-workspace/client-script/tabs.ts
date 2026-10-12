@@ -61,7 +61,7 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
     + '<button class="wsx__publish js-publish" type="button" hidden>' + esc(t('tabs.publish')) + '</button>'
     + '<a class="wsx__fulledit js-fulledit" target="_blank" rel="noopener" hidden title="' + esc(t('tabs.editLiteHint')) + '">' + esc(t('tabs.openFullEditor')) + '</a>'
     + '</div>'
-    + '<iframe class="wsx__stageframe" title="' + esc(t('tabs.frameArtifact')) + '" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>'
+    + '<iframe class="wsx__stageframe" title="' + esc(t('tabs.frameArtifact')) + '" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-downloads"></iframe>'
     + '<iframe class="wsx__editframe" title="' + esc(t('tabs.edit')) + '" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>';
 
   function spark(daily) {
