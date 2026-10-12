@@ -1,22 +1,12 @@
 /** Step-by-step (no AI) forms: schedule a send (POST /v1/jobs) and create a metric alert (POST /v1/metric-alerts). */
 export const workspace_client_home_views_autoForms_JS = `  // ----- Step-by-step forms, no AI: schedule a send / create a metric alert -----
-  // Minutes the zone is ahead of UTC at a given instant (Buenos Aires = -180).
-  function afOffset(tz, at) {
-    try {
-      var p = {};
-      new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' })
-        .formatToParts(at).forEach(function (x) { p[x.type] = x.value; });
-      var local = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute);
-      return Math.round((local - (at.getTime() - at.getTime() % 60000)) / 60000);
-    } catch (e) { return 0; }
-  }
   // Local time + zone → the UTC cron the scheduler runs on. A time that crosses
   // midnight in UTC moves the weekday (or day of month) with it.
   function afCron(freq, time, day, tz, at) {
     if (freq === 'hourly') return { cron: '0 * * * *' };
     var hm = String(time || '').split(':'); var h = parseInt(hm[0], 10), mi = parseInt(hm[1], 10);
     if (isNaN(h) || isNaN(mi)) return { err: 'autof.errTime' };
-    var m = h * 60 + mi - afOffset(tz, at || new Date());
+    var m = h * 60 + mi - tzOffset(tz, at || new Date());
     var shift = m < 0 ? -1 : m >= 1440 ? 1 : 0; m = (m + 1440) % 1440;
     var base = (m % 60) + ' ' + Math.floor(m / 60);
     if (freq === 'daily') return { cron: base + ' * * *' };
@@ -28,7 +18,7 @@ export const workspace_client_home_views_autoForms_JS = `  // ----- Step-by-step
   function afOpt(v, label, sel) { return '<option value="' + esc(v) + '"' + (sel ? ' selected' : '') + '>' + esc(label) + '</option>'; }
   function afSel(label, id, opts) { return '<label class="wsx-field" data-af="' + id + '"><span class="wsx-field__lbl">' + esc(label) + '</span><select class="wsx-field__in" id="' + id + '">' + opts + '</select></label>'; }
   function afTzOptions() {
-    var cur = 'UTC'; try { cur = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) {}
+    var cur = viewerTz();
     var all = []; try { all = Intl.supportedValuesOf('timeZone').slice(); } catch (e) {}
     if (all.indexOf(cur) < 0) all.unshift(cur); if (all.indexOf('UTC') < 0) all.push('UTC');
     return all.map(function (z) { return afOpt(z, z.replace(/_/g, ' '), z === cur); }).join('');

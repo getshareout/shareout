@@ -27,28 +27,68 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
     return '<span class="wsx-sched__chip ' + (cls || '') + '">' + ico + '<span>' + esc(label) + '</span></span>';
   }
   var CRON_DAYS = ['sched.daySun', 'sched.dayMon', 'sched.dayTue', 'sched.dayWed', 'sched.dayThu', 'sched.dayFri', 'sched.daySat'];
-  function cronHuman(c) {
+  // Minutes the zone is ahead of UTC at a given instant (Buenos Aires = -180).
+  function tzOffset(tz, at) {
+    try {
+      var p = {};
+      new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' })
+        .formatToParts(at).forEach(function (x) { p[x.type] = x.value; });
+      var local = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute);
+      return Math.round((local - (at.getTime() - at.getTime() % 60000)) / 60000);
+    } catch (e) { return 0; }
+  }
+  function viewerTz() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) { return 'UTC'; } }
+  function tzLabel(tz) { return /^(Etc\\/)?UTC$/.test(tz) ? 'UTC' : String(tz).split('/').pop().replace(/_/g, ' '); }
+  function clockLabel(h, m, tz) {
+    var loc = (typeof locTag === 'function' && locTag()) || 'en-US', s;
+    try { s = new Date(Date.UTC(2000, 0, 1, h, m)).toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hourCycle: /^es/.test(loc) ? 'h23' : undefined }); } catch (e) { s = hhmm(String(h), String(m)); }
+    return s + ' (' + tzLabel(tz) + ')';
+  }
+  // Weekday field ("1", "1,3", "1-5", "0-4") → sorted day numbers 0–6, or null.
+  function dowSet(f) {
+    var out = [];
+    var ok = String(f).split(',').every(function (seg) {
+      var r = /^([0-7])(?:-([0-7]))?$/.exec(seg); if (!r) return false;
+      for (var d = +r[1]; d <= +(r[2] || r[1]); d++) if (out.indexOf(d % 7) < 0) out.push(d % 7);
+      return true;
+    });
+    return ok && out.length ? out : null;
+  }
+  // Schedules are stored as UTC cron; show them in the viewer's time zone, moving the
+  // weekday / day of month when the conversion crosses midnight.
+  function cronHuman(c, tz) {
     if (!c) return t('sched.cronOnSchedule');
     var p = String(c).trim().split(/\\s+/); if (p.length < 5) return c;
     var num = /^\\d+$/, step = /^\\*\\/(\\d+)$/;
     var custom = t('sched.cronCustom').replace('{cron}', p.join(' '));
+    tz = tz || viewerTz();
+    var off = tzOffset(tz, new Date());
+    function mm(m) { var v = (((+m + off) % 60) + 60) % 60; return (v < 10 ? '0' : '') + v; }
+    function local(h, m) {
+      var x = +h * 60 + +m + off; var shift = x < 0 ? -1 : x >= 1440 ? 1 : 0; x = ((x % 1440) + 1440) % 1440;
+      return { shift: shift, time: clockLabel(Math.floor(x / 60), x % 60, tz) };
+    }
     if (p[2] !== '*' || p[3] !== '*') {
-      if (p[3] === '*' && num.test(p[2]) && num.test(p[1]) && num.test(p[0]) && p[4] === '*') return t('sched.cronMonthlyAt').replace('{day}', p[2]).replace('{time}', hhmm(p[1], p[0]));
+      if (p[3] === '*' && num.test(p[2]) && num.test(p[1]) && num.test(p[0]) && p[4] === '*') {
+        var lm = local(p[1], p[0]); var day = +p[2] + lm.shift;
+        if (day < 1 || day > 31) return custom;
+        return t('sched.cronMonthlyAt').replace('{day}', String(day)).replace('{time}', lm.time);
+      }
       return custom;
     }
     if (p[0] === '*' && p[1] === '*' && p[4] === '*') return t('sched.cronEveryMin');
     if (step.test(p[0]) && p[1] === '*' && p[4] === '*') return t('sched.cronEveryNMin').replace('{n}', p[0].match(step)[1]);
     if (!num.test(p[0])) return custom;
-    var mm = (p[0].length < 2 ? '0' : '') + p[0];
-    if (p[1] === '*' && p[4] === '*') return t('sched.cronHourlyAt').replace('{mm}', mm);
-    if (step.test(p[1]) && p[4] === '*') return t('sched.cronEveryNHours').replace('{n}', p[1].match(step)[1]).replace('{mm}', mm);
+    if (p[1] === '*' && p[4] === '*') return t('sched.cronHourlyAt').replace('{mm}', mm(p[0]));
+    if (step.test(p[1]) && p[4] === '*') return t('sched.cronEveryNHours').replace('{n}', p[1].match(step)[1]).replace('{mm}', mm(p[0]));
     if (!num.test(p[1])) return custom;
-    var time = hhmm(p[1], p[0]);
-    if (p[4] === '*') return t('sched.cronDailyAt').replace('{time}', time);
-    if (p[4] === '1-5') return t('sched.cronWeekdaysAt').replace('{time}', time);
-    if (!/^[0-7](,[0-7])*$/.test(p[4])) return custom;
-    var days = p[4].split(',').map(function (d) { return t(CRON_DAYS[parseInt(d, 10) % 7]); }).join(', ');
-    return t('sched.cronWeeklyAt').replace('{day}', days).replace('{time}', time);
+    var lt = local(p[1], p[0]);
+    if (p[4] === '*') return t('sched.cronDailyAt').replace('{time}', lt.time);
+    var set = dowSet(p[4]); if (!set) return custom;
+    set = set.map(function (d) { return (d + lt.shift + 7) % 7; }).sort(function (a, b) { return ((a + 6) % 7) - ((b + 6) % 7); });
+    if (set.join(',') === '1,2,3,4,5') return t('sched.cronWeekdaysAt').replace('{time}', lt.time);
+    var days = set.map(function (d) { return t(CRON_DAYS[d]); }).join(', ');
+    return t('sched.cronWeeklyAt').replace('{day}', days).replace('{time}', lt.time);
   }
   function hhmm(h, m) { return (h.length < 2 ? '0' : '') + h + ':' + (m.length < 2 ? '0' : '') + m; }
   function whenAgo(ms) { if (!ms) return ''; try { return timeAgo(typeof ms === 'string' && isNaN(ms) ? Date.parse(ms) : ms); } catch (e) { return ''; } }

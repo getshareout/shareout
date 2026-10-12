@@ -3080,12 +3080,17 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "Created",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Job"
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "$ref": "#/components/schemas/Job"
+                    }
+                  }
                 }
               }
             }
