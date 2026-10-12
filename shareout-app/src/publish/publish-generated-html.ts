@@ -2,7 +2,7 @@
  * Session-authenticated single-page HTML publish (/create build flow).
  * Skips token/rate-limit gating — caller already authenticated by cookie.
  */
-import type { Env, PublishResponse, FileEntry } from '../types';
+import type { Env, PublishResponse, FileEntry, Visibility } from '../types';
 import { generateSlug } from '../validation';
 import { coerceVisibility } from '../visibility-config';
 import { publishArtifact } from './publish-artifact';
@@ -10,9 +10,10 @@ import { publishArtifact } from './publish-artifact';
 export async function publishGeneratedHtml(
   env: Env,
   user: { id: string; email: string },
-  opts: { name: string; slug?: string; html: string },
+  opts: { name: string; slug?: string; html: string; workspaceId?: string | null; visibility?: Visibility },
 ): Promise<PublishResponse> {
   const slug = opts.slug || generateSlug(opts.name);
+  const visibility = opts.visibility ?? 'public';
   const files: FileEntry[] = [{ path: 'index.html', content: opts.html, mime: 'text/html' }];
 
   const result = await publishArtifact(env, { id: user.id, email: user.email, username: null }, {
@@ -20,16 +21,16 @@ export async function publishGeneratedHtml(
     slug,
     entrypoint: 'index.html',
     files,
-    visibility: 'public',
+    visibility,
     authMethod: 'google',
     shareWith: [],
     credentials: [],
-    workspaceId: null,
+    workspaceId: opts.workspaceId ?? null,
     folderId: null,
     artifactType: 'html',
   });
   // Report what actually went live: a moderation hold (or public links being off on
   // this instance) keeps the page private even though the builder asked for public.
-  result.visibility = result.moderation ? 'private' : coerceVisibility(env, 'public');
+  result.visibility = result.moderation ? 'private' : coerceVisibility(env, visibility);
   return result;
 }

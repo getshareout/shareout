@@ -44,7 +44,7 @@ Never send anyone to a billing page — there isn't one.
 | **Knowledge** | **`knowledge_search`** / **`knowledge_get`** — when Knowledge is enabled, search and read distilled workspace notes instead of re-reading every page |
 | **Build from a file** | Pass `source_file_id` on confirmed **build artifact** after `read_file` — spreadsheets, decks, and CSVs become live pages |
 | Canvas actions (Home only) | Home agent adds tools to search and open artifacts in the workspace canvas |
-| Streaming builds | Confirming a **build artifact** action streams progress steps, then returns the new page URL |
+| Streaming builds | Confirming a **build artifact** action streams progress steps, then returns the new page URL. The page is published **private**, in the workspace the chat is scoped to (personal on personal Home) |
 
 Destructive or write actions always go through a **confirmation** step. The assistant cannot mutate data stores, publish artifacts without confirmation, or run non-`SELECT` SQL.
 
