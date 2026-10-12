@@ -90,32 +90,41 @@ const MAX_TOTAL_SIZE = 500 * 1024 * 1024; // 500MB total
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
 const SEMVER_REGEX = /^\d+\.\d+\.\d+([-+].+)?$/;
 
+/** Entrypoint used when the publish body omits one: index.html when present, else a lone file. */
+export function resolveEntrypoint(req: Pick<PublishRequest, 'entrypoint' | 'files'>): string {
+  if (req.entrypoint) return req.entrypoint;
+  const files = Array.isArray(req.files) ? req.files : [];
+  if (files.length === 1 && files[0]?.path && files[0].path !== 'index.html') return files[0].path;
+  return 'index.html';
+}
+
 export function validatePublishRequest(req: PublishRequest): ApiError | null {
   const errors: string[] = [];
+  let param: string | undefined;
+  const fail = (field: string, msg: string) => { param ??= field; errors.push(msg); };
 
   if (!req.name?.trim()) {
-    errors.push('name is required');
+    fail('name', 'name is required');
   }
 
   if (req.slug && !SLUG_REGEX.test(req.slug)) {
-    errors.push('slug must be lowercase alphanumeric with hyphens, cannot start/end with hyphen');
+    fail('slug', 'slug must be lowercase alphanumeric with hyphens, cannot start/end with hyphen');
   }
 
   if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
-    errors.push('files array is required and must not be empty');
+    fail('files', 'files array is required and must not be empty');
   }
 
-  const entrypoint = req.entrypoint || 'index.html';
+  const entrypoint = resolveEntrypoint(req);
   const paths = new Set<string>();
   let totalSize = 0;
 
   for (const file of req.files || []) {
-    const fileErrors = validateFile(file);
-    errors.push(...fileErrors);
+    for (const msg of validateFile(file)) fail('files', msg);
 
     if (file.path) {
       if (paths.has(file.path)) {
-        errors.push(`duplicate path: ${file.path}`);
+        fail('files', `duplicate path: ${file.path}`);
       }
       paths.add(file.path);
     }
@@ -129,32 +138,37 @@ export function validatePublishRequest(req: PublishRequest): ApiError | null {
   }
 
   if (!paths.has(entrypoint)) {
-    errors.push(`entrypoint "${entrypoint}" not found in files`);
+    fail('entrypoint', `entrypoint "${entrypoint}" not found in files`);
   }
 
   if (totalSize > MAX_TOTAL_SIZE) {
-    errors.push(`total size ${(totalSize / 1024 / 1024).toFixed(1)}MB exceeds limit of ${MAX_TOTAL_SIZE / 1024 / 1024}MB`);
+    fail('files', `total size ${(totalSize / 1024 / 1024).toFixed(1)}MB exceeds limit of ${MAX_TOTAL_SIZE / 1024 / 1024}MB`);
   }
 
   if (req.pwa) {
-    const pwaErrors = validatePWAConfig(req.pwa);
-    errors.push(...pwaErrors);
+    for (const msg of validatePWAConfig(req.pwa)) fail('pwa', msg);
   }
 
   // Workspace Library: require a semver and a present main JS file (the served module).
   if (req.artifact_type === 'library') {
     const lib = req.library;
     if (!lib?.version || !SEMVER_REGEX.test(lib.version)) {
-      errors.push('library.version is required and must be semver (e.g. 1.0.0)');
+      fail('library.version', 'library.version is required and must be semver (e.g. 1.0.0)');
     }
     const main = lib?.main || 'index.js';
     if (!paths.has(main)) {
-      errors.push(`library main "${main}" not found in files`);
+      fail('library.main', `library main "${main}" not found in files`);
     }
   }
 
   if (errors.length > 0) {
-    return { error: 'Validation failed', code: 'VALIDATION_ERROR', details: errors };
+    return {
+      error: `Validation failed: ${errors[0]}`,
+      code: 'VALIDATION_ERROR',
+      param,
+      ...(errors.length > 1 ? { hint: errors.join('; ') } : {}),
+      details: errors,
+    };
   }
 
   return null;
