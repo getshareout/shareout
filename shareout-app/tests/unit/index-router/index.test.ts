@@ -120,6 +120,7 @@ vi.mock('../../../src/publish/handle-publish', async (importOriginal) => ({
 vi.mock('../../../src/serve/handle-serve', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   handleServe: handlers.handleServe,
+  gateArtifactSideAsset: vi.fn(async () => ({ isOpen: true })),
 }));
 vi.mock('../../../src/serve/handle-serve-text', async (importOriginal) => ({
   ...(await importOriginal<object>()),

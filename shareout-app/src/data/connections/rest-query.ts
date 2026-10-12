@@ -6,7 +6,7 @@
  * Destinations are checked against the same SSRF blocklist as the secrets proxy.
  */
 import { fetchWithTimeout } from '../../fetch-utils';
-import { isBlockedDestination } from '../secrets/blocklist';
+import { fetchCheckingRedirects, isBlockedDestination } from '../secrets/blocklist';
 import { UpstreamHttpError } from './errors';
 import { CONNECTION_TIMEOUT_MS } from './types';
 
@@ -99,7 +99,10 @@ export async function executeRestApiQuery(
     headers['Authorization'] = `Basic ${auth}`;
   }
 
-  const response = await fetchWithTimeout(url, { method, headers, body }, CONNECTION_TIMEOUT_MS);
+  const response = await fetchCheckingRedirects(url, { method, headers, body }, () => null, {
+    stripCredentialsCrossOrigin: true,
+    fetcher: (u, init) => fetchWithTimeout(u, init, CONNECTION_TIMEOUT_MS),
+  });
 
   if (!response.ok) {
     const errBody = (await response.text().catch(() => '')).slice(0, 500);

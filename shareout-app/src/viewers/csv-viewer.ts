@@ -1,4 +1,4 @@
-import { generateViewerShell, type ViewerContext } from './viewer-shell';
+import { generateViewerShell, scriptOpen, type ViewerContext } from './viewer-shell';
 import { viewerCopy } from './copy';
 
 function escapeHtml(str: string): string {
@@ -27,7 +27,7 @@ export function renderCsvViewer(ctx: ViewerContext): string {
   const headerCells = headers.map((h, i) => {
     const type = metadata?.columns[i]?.type || 'string';
     const typeIcon = type === 'number' ? '#' : type === 'date' ? '📅' : type === 'boolean' ? '✓' : 'Aa';
-    return `<th data-col="${i}" onclick="sortBy(${i})">
+    return `<th data-col="${i}">
       <span class="header-content">
         <span class="header-text">${escapeHtml(h)}</span>
         <span class="type-hint" title="${type}">${typeIcon}</span>
@@ -54,7 +54,7 @@ export function renderCsvViewer(ctx: ViewerContext): string {
     <div class="csv-viewer">
       ${statsHtml}
       <div class="toolbar">
-        <input type="text" class="search-input" placeholder="${c.filterRows}" oninput="filterRows(this.value)">
+        <input type="text" class="search-input" placeholder="${c.filterRows}">
       </div>
       <div class="table-wrapper">
         <table class="data-table" id="data-table">
@@ -202,7 +202,7 @@ export function renderCsvViewer(ctx: ViewerContext): string {
   `;
 
   const extraHead = `
-  <script>
+  ${scriptOpen(ctx)}
     let sortCol = -1;
     let sortDir = 'asc';
     const allRows = Array.from(document.querySelectorAll('#table-body tr'));
@@ -259,6 +259,10 @@ export function renderCsvViewer(ctx: ViewerContext): string {
 
       document.getElementById('row-count').textContent = visible.toLocaleString(${ctx.locale === 'es' ? "'es-AR'" : ''}) + '${c.of}${num(rows.length)} ${c.rows}';
     }
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('th[data-col]').forEach(th => th.addEventListener('click', () => sortBy(Number(th.dataset.col))));
+      document.querySelector('.search-input').addEventListener('input', e => filterRows(e.target.value));
+    });
   </script>
   `;
 

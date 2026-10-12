@@ -182,16 +182,42 @@ export const MARKDOWN_VIEWER_STYLES = `
     }
   `;
 
+const SAFE_URL_SCHEMES = new Set(['http', 'https', 'mailto']);
+
+function unescapeHtml(str: string): string {
+  return str
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+// Allow http(s)/mailto and scheme-less (relative, /path, #anchor, ?query) URLs only.
+// Browsers drop ASCII whitespace/control chars when parsing a scheme, so strip them first.
+export function isSafeMarkdownUrl(escapedUrl: string): boolean {
+  // eslint-disable-next-line no-control-regex
+  const url = unescapeHtml(escapedUrl).replace(/[\x00-\x20\x7f]/g, '').toLowerCase();
+  const scheme = /^([a-z][a-z0-9+.-]*):/.exec(url);
+  return !scheme || SAFE_URL_SCHEMES.has(scheme[1]);
+}
+
 export function parseMarkdown(md: string): string {
-  let html = md;
+  // eslint-disable-next-line no-control-regex
+  let html = md.replace(/\u0000/g, '');
 
   // Remove frontmatter
   html = html.replace(/^---\n[\s\S]*?\n---\n?/, '');
 
-  // Code blocks (before other processing)
+  // Code blocks (before other processing) — stashed so inline formatting can't touch them
+  const codeBlocks: string[] = [];
   html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-    return `<pre><code class="language-${lang}">${escapeHtml(code.trim())}</code></pre>`;
+    codeBlocks.push(`<pre><code class="language-${lang}">${escapeHtml(code.trim())}</code></pre>`);
+    return `\u0000${codeBlocks.length - 1}\u0000`;
   });
+
+  // Everything else is text: escape it before any markdown is turned into tags
+  html = escapeHtml(html);
 
   // Inline code
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -199,8 +225,8 @@ export function parseMarkdown(md: string): string {
   // Headers with anchors
   html = html.replace(/^(#{1,6})\s+(.+)$/gm, (_, hashes, text) => {
     const level = hashes.length;
-    const anchor = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    return `<h${level} id="${anchor}">${escapeHtml(text)}</h${level}>`;
+    const anchor = unescapeHtml(text).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    return `<h${level} id="${anchor}">${text}</h${level}>`;
   });
 
   // Bold and italic
@@ -214,17 +240,19 @@ export function parseMarkdown(md: string): string {
   // Strikethrough
   html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
 
-  // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  // Images (before links, so ![alt](src) isn't consumed as a link)
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) =>
+    isSafeMarkdownUrl(src) ? `<img src="${src}" alt="${alt}">` : alt);
 
-  // Images
-  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+  // Links
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, href) =>
+    isSafeMarkdownUrl(href) ? `<a href="${href}">${text}</a>` : text);
 
   // Horizontal rules
   html = html.replace(/^(?:---|\*\*\*|___)$/gm, '<hr>');
 
   // Blockquotes
-  html = html.replace(/^>\s?(.*)$/gm, '<blockquote>$1</blockquote>');
+  html = html.replace(/^&gt;\s?(.*)$/gm, '<blockquote>$1</blockquote>');
   html = html.replace(/<\/blockquote>\n<blockquote>/g, '\n');
 
   // Task lists
@@ -255,6 +283,9 @@ export function parseMarkdown(md: string): string {
 
   // Clean up empty paragraphs
   html = html.replace(/<p>\s*<\/p>/g, '');
+
+  // eslint-disable-next-line no-control-regex
+  html = html.replace(/\u0000(\d+)\u0000/g, (_, i) => codeBlocks[Number(i)]);
 
   // Clean up nested elements
   html = html.replace(/<p>(<(?:ul|ol|blockquote|pre|table|h[1-6]))/g, '$1');

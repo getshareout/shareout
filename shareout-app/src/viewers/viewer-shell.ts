@@ -23,6 +23,8 @@ export interface ViewerContext {
   locale?: Locale;
   canManage?: boolean;
   socialPreview?: SocialPreview;
+  /** CSP nonce for the viewer's own inline scripts (see viewerScriptCsp). */
+  nonce?: string;
   // Skill Marketplace: metrics + per-user state for the skill viewer chrome.
   skillMetrics?: {
     upvotes: number;
@@ -77,6 +79,16 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+// Viewers render user content on the platform origin, so only the viewer's own
+// nonce-tagged scripts may run; inline event handlers are not allowed.
+export function viewerScriptCsp(nonce: string): string {
+  return `script-src 'nonce-${nonce}' https://static.cloudflareinsights.com; object-src 'none'; base-uri 'none'`;
+}
+
+export function scriptOpen(ctx: ViewerContext): string {
+  return ctx.nonce ? `<script nonce="${ctx.nonce}">` : '<script>';
 }
 
 export function generateViewerShell(
@@ -251,13 +263,13 @@ export function generateViewerShell(
         <span class="type-badge">${typeIcon} ${typeLabel}</span>
       </div>
       <div class="header-actions">${ctx.loggedIn ? `
-        <button class="so-c-btn so-c-btn--ghost so-c-btn--sm fav-btn${ctx.isFavorite ? ' active' : ''}" id="so-fav-btn" onclick="soToggleFav()" title="${ctx.isFavorite ? c.favRemove : c.favAdd}" aria-pressed="${ctx.isFavorite ? 'true' : 'false'}">
+        <button class="so-c-btn so-c-btn--ghost so-c-btn--sm fav-btn${ctx.isFavorite ? ' active' : ''}" id="so-fav-btn" title="${ctx.isFavorite ? c.favRemove : c.favAdd}" aria-pressed="${ctx.isFavorite ? 'true' : 'false'}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="${ctx.isFavorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
           </svg>
           <span id="so-fav-label">${ctx.isFavorite ? c.favorited : c.favorite}</span>
         </button>
-        <button class="so-c-btn so-c-btn--secondary so-c-btn--sm" id="so-share-btn" onclick="openShare('${ctx.artifactId}','${ctx.slug}',${escapeHtml(JSON.stringify(ctx.artifactName))},${ctx.canManage ?? ctx.isAdmin})" title="${c.share}">
+        <button class="so-c-btn so-c-btn--secondary so-c-btn--sm" id="so-share-btn" title="${c.share}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
           ${c.share}
         </button>` : ''}
@@ -277,7 +289,7 @@ export function generateViewerShell(
   </div>
   ${ctx.loggedIn ? shareModalMarkup(ctx.locale) : ''}
   ${adminToolbar}${ctx.loggedIn ? `
-  <script>
+  ${scriptOpen(ctx)}
     ${shareModalScript({ baseUrl: ctx.baseUrl, locale: ctx.locale })}
     window.soToggleFav = function() {
       var btn = document.getElementById('so-fav-btn');
@@ -297,9 +309,17 @@ export function generateViewerShell(
         .catch(function(err) { console.error('Favorite error:', err); })
         .finally(function() { btn.disabled = false; });
     };
+    document.getElementById('so-fav-btn').addEventListener('click', window.soToggleFav);
+    document.getElementById('so-share-btn').addEventListener('click', function() {
+      openShare(${jsonForScript(ctx.artifactId)}, ${jsonForScript(ctx.slug)}, ${jsonForScript(ctx.artifactName)}, ${!!(ctx.canManage ?? ctx.isAdmin)});
+    });
   </script>` : ''}
 </body>
 </html>`;
+}
+
+function jsonForScript(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
 function getExtension(type: ArtifactType): string {

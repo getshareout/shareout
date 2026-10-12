@@ -108,6 +108,28 @@ describe('handleCreateMyToken', () => {
     expect(body.ok).toBe(true);
     expect(body.token).toMatch(/^so_/);
   });
+
+  it('rejects a malformed JSON body with 400 and mints nothing', async () => {
+    let inserted = false;
+    const env = {
+      DB: makeDbMock({
+        run: (sql) => {
+          if (sql.startsWith('INSERT')) inserted = true;
+          return { success: true, meta: { changes: 1 } };
+        },
+      }),
+    } as unknown as Env;
+    const res = await handleCreateMyToken(
+      new Request('https://x/v1/me/tokens', { method: 'POST', body: '{bad' }),
+      env,
+      user,
+    );
+    const body = await res.json() as { ok: boolean; code: string; token?: string };
+    expect(res.status).toBe(400);
+    expect(body.code).toBe('INVALID_JSON');
+    expect(body.token).toBeUndefined();
+    expect(inserted).toBe(false);
+  });
 });
 
 describe('handleRevokeMyToken', () => {

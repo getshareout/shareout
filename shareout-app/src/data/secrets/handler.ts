@@ -10,7 +10,8 @@ import {
 } from '../middleware';
 import { Errors } from '../errors';
 import { encryptCredentials, decryptCredentials } from '../connections/credentials';
-import { isBlockedDestination, validateAllowedHost } from './blocklist';
+import { BlockedRedirectError, fetchCheckingRedirects, isBlockedDestination, validateAllowedHost } from './blocklist';
+import { isOwnHost } from '../../config/origins';
 import { matchesAllowedPath, validatePathPatterns } from './path-matcher';
 
 const NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
@@ -572,7 +573,7 @@ async function executeProxy(request: Request, ctx: DataContext, secretName: stri
   }
 
   const allowedPaths: string[] = JSON.parse(secret.allowed_paths);
-  if (!matchesAllowedPath(path, allowedPaths)) {
+  if (hasPathTraversal(path) || !matchesAllowedPath(path, allowedPaths)) {
     await logAudit(ctx, secretName, method, '', path, null, 'Path not allowed');
     return errorResponse({
       ...DATA_ERRORS.PATH_NOT_ALLOWED,
@@ -606,6 +607,21 @@ async function executeProxy(request: Request, ctx: DataContext, secretName: stri
   }
 
   const parsedUrl = new URL(targetUrl);
+  if (isOwnHost(ctx.env, parsedUrl.hostname, [new URL(request.url).hostname])) {
+    await logAudit(ctx, secretName, method, parsedUrl.hostname, path, null, 'Blocked destination');
+    return errorResponse({
+      ...DATA_ERRORS.BLOCKED_DESTINATION,
+      hint: `Host "${parsedUrl.hostname}" is served by this instance.`,
+    }, ctx.origin);
+  }
+  if (!matchesAllowedPath(parsedUrl.pathname, allowedPaths)) {
+    await logAudit(ctx, secretName, method, parsedUrl.hostname, path, null, 'Path not allowed');
+    return errorResponse({
+      ...DATA_ERRORS.PATH_NOT_ALLOWED,
+      hint: `Path "${path}" is not in the secret's allowedPaths.`,
+      suggestion: `Allowed patterns: ${allowedPaths.join(', ')}. Update the secret to allow this path.`,
+    }, ctx.origin);
+  }
   if (!validateAllowedHost(parsedUrl.hostname, allowedHosts)) {
     await logAudit(ctx, secretName, method, parsedUrl.hostname, path, null, 'Host not in allowed list');
     return errorResponse({
@@ -643,6 +659,7 @@ async function executeProxy(request: Request, ctx: DataContext, secretName: stri
     }
   }
 
+  const fetchUrl = new URL(targetUrl);
   if (credentials) {
     const injectionConfig = secret.injection_config ? JSON.parse(secret.injection_config) : {};
 
@@ -666,8 +683,7 @@ async function executeProxy(request: Request, ctx: DataContext, secretName: stri
       }
       case 'query': {
         const paramName = injectionConfig.queryParam || 'api_key';
-        const url = new URL(targetUrl);
-        url.searchParams.set(paramName, credentials.value as string);
+        fetchUrl.searchParams.set(paramName, credentials.value as string);
         break;
       }
     }
@@ -678,11 +694,17 @@ async function executeProxy(request: Request, ctx: DataContext, secretName: stri
   let errorMsg: string | null = null;
 
   try {
-    const response = await fetch(targetUrl, {
+    const response = await fetchCheckingRedirects(fetchUrl.toString(), {
       method: method.toUpperCase(),
       headers: outboundHeaders,
       body: requestBody ? JSON.stringify(requestBody) : undefined,
-    });
+    }, (next) => {
+      if (next.origin !== parsedUrl.origin && secret.injection_type === 'query') return 'cross-origin redirect';
+      if (isOwnHost(ctx.env, next.hostname, [new URL(request.url).hostname])) return `host ${next.hostname} is served by this instance`;
+      if (!validateAllowedHost(next.hostname, allowedHosts)) return `host ${next.hostname} not in allowedHosts`;
+      if (!matchesAllowedPath(next.pathname, allowedPaths)) return `path ${next.pathname} not in allowedPaths`;
+      return null;
+    }, { stripCredentialsCrossOrigin: true });
 
     statusCode = response.status;
     const executionTimeMs = Date.now() - start;
@@ -722,6 +744,10 @@ async function executeProxy(request: Request, ctx: DataContext, secretName: stri
 
     await logAudit(ctx, secretName, method, parsedUrl.hostname, path, statusCode, errorMsg, executionTimeMs);
 
+    if (err instanceof BlockedRedirectError) {
+      return errorResponse({ ...DATA_ERRORS.BLOCKED_DESTINATION, hint: err.message }, ctx.origin);
+    }
+
     if (err instanceof Error && err.name === 'AbortError') {
       return errorResponse({
         ...DATA_ERRORS.PROXY_ERROR,
@@ -735,6 +761,12 @@ async function executeProxy(request: Request, ctx: DataContext, secretName: stri
       ctx.origin
     );
   }
+}
+
+function hasPathTraversal(path: string): boolean {
+  if (path.includes('\\')) return true;
+  const decoded = path.split(/[?#]/)[0].replace(/%2e/gi, '.').replace(/%2f|%5c/gi, '/');
+  return decoded.split('/').some((seg) => seg === '.' || seg === '..');
 }
 
 function buildTargetUrl(host: string, path: string, query?: Record<string, string>): string {

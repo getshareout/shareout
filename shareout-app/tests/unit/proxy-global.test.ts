@@ -88,6 +88,41 @@ describe('handleGlobalProxy', () => {
     }
   });
 
+  it('refuses redirects to blocked or own-instance destinations', async () => {
+    const { env } = createGlobalEnv();
+    for (const location of ['http://127.0.0.1/', 'http://169.254.169.254/latest', 'https://acme.shareout.site/v1/features']) {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response(null, { status: 302, headers: { Location: location } }),
+      );
+      const response = await handleGlobalProxy(new Request(
+        'https://shareout.site/proxy?url=' + encodeURIComponent('https://redirector.example.com/x'),
+      ), env);
+      expect(response.status, location).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ code: 'BLOCKED_DESTINATION' });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      fetchMock.mockRestore();
+    }
+
+    const loop = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      new Response(null, { status: 302, headers: { Location: 'https://redirector.example.com/again' } }));
+    const tooMany = await handleGlobalProxy(new Request(
+      'https://shareout.site/proxy?url=' + encodeURIComponent('https://redirector.example.com/loop'),
+    ), env);
+    expect(tooMany.status).toBe(403);
+    expect(loop.mock.calls.length).toBeLessThanOrEqual(6);
+  });
+
+  it('refuses this instance\'s own hosts up front', async () => {
+    const { env } = createGlobalEnv();
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const response = await handleGlobalProxy(new Request(
+      'https://shareout.site/proxy?url=' + encodeURIComponent('https://shareout.site/health'),
+    ), env);
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: 'BLOCKED_DESTINATION' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('returns 429 when global rate limit is exceeded', async () => {
     const { env, store } = createGlobalEnv();
     const ip = '203.0.113.10';
