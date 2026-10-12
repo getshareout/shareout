@@ -136,6 +136,10 @@ export function validatePublishRequest(req: PublishRequest): ApiError | null {
     errors.push(`total size ${(totalSize / 1024 / 1024).toFixed(1)}MB exceeds limit of ${MAX_TOTAL_SIZE / 1024 / 1024}MB`);
   }
 
+  if (req.visibility && !['public', 'workspace', 'private', 'unlisted'].includes(req.visibility as string)) {
+    errors.push('visibility must be one of: public, workspace, private');
+  }
+
   if (req.pwa) {
     const pwaErrors = validatePWAConfig(req.pwa);
     errors.push(...pwaErrors);

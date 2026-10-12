@@ -48,6 +48,13 @@ describe('validatePublishRequest', () => {
     expect(validatePublishRequest(validRequest())).toBeNull();
   });
 
+  it('rejects an unknown visibility instead of publishing it', () => {
+    expect(validatePublishRequest(validRequest({ visibility: 'bogus' as never }))?.details).toContain('visibility must be one of: public, workspace, private');
+    for (const visibility of ['public', 'workspace', 'private', 'unlisted'] as never[]) {
+      expect(validatePublishRequest(validRequest({ visibility }))).toBeNull();
+    }
+  });
+
   it('requires a name and at least one file', () => {
     const error = validatePublishRequest({ name: ' ', files: [] });
 
