@@ -38,6 +38,14 @@ describe('tables/filter-sql', () => {
     expect(params).toEqual(['open']);
   });
 
+  it('binds booleans as 1/0 (how SQLite stores JSON true/false)', () => {
+    expect(filterToSql({ done: true }).params).toEqual([1]);
+    expect(filterToSql({ done: { $eq: false } }).params).toEqual([0]);
+    expect(filterToSql({ done: { $ne: true } }).params).toEqual([1]);
+    expect(filterToSql({ done: { $in: [true, false] } }).params).toEqual([1, 0]);
+    expect(filterToSql({ done: { $nin: [true] } }).params).toEqual([1]);
+  });
+
   it('compiles operator objects', () => {
     const { sql, params } = filterToSql({ score: { $gte: 10, $lt: 100 } });
     expect(sql).toContain('>= ?');

@@ -5,6 +5,9 @@ import { escapeField } from './validation';
  * Compile a Mongo-style filter into SQLite json_extract conditions.
  * Used by queries, counts, distinct, bulk updates/deletes, and metric alerts.
  */
+// SQLite stores JSON booleans as 1/0, so a bound JS boolean must be compared as such.
+const bindValue = (v: unknown): unknown => (typeof v === 'boolean' ? (v ? 1 : 0) : v);
+
 export function filterToSql(filter: Filter): { sql: string; params: unknown[] } {
   const conditions: string[] = [];
   const params: unknown[] = [];
@@ -20,40 +23,40 @@ export function filterToSql(filter: Filter): { sql: string; params: unknown[] } 
         switch (op) {
           case '$eq':
             conditions.push(`json_extract(data, '$.${escapedField}') = ?`);
-            params.push(opVal);
+            params.push(bindValue(opVal));
             break;
           case '$ne':
             conditions.push(`json_extract(data, '$.${escapedField}') != ?`);
-            params.push(opVal);
+            params.push(bindValue(opVal));
             break;
           case '$gt':
             conditions.push(`json_extract(data, '$.${escapedField}') > ?`);
-            params.push(opVal);
+            params.push(bindValue(opVal));
             break;
           case '$gte':
             conditions.push(`json_extract(data, '$.${escapedField}') >= ?`);
-            params.push(opVal);
+            params.push(bindValue(opVal));
             break;
           case '$lt':
             conditions.push(`json_extract(data, '$.${escapedField}') < ?`);
-            params.push(opVal);
+            params.push(bindValue(opVal));
             break;
           case '$lte':
             conditions.push(`json_extract(data, '$.${escapedField}') <= ?`);
-            params.push(opVal);
+            params.push(bindValue(opVal));
             break;
           case '$in': {
             const arr = opVal as unknown[];
             const placeholders = arr.map(() => '?').join(', ');
             conditions.push(`json_extract(data, '$.${escapedField}') IN (${placeholders})`);
-            params.push(...arr);
+            params.push(...arr.map(bindValue));
             break;
           }
           case '$nin': {
             const arr = opVal as unknown[];
             const placeholders = arr.map(() => '?').join(', ');
             conditions.push(`json_extract(data, '$.${escapedField}') NOT IN (${placeholders})`);
-            params.push(...arr);
+            params.push(...arr.map(bindValue));
             break;
           }
           case '$contains':
@@ -72,7 +75,7 @@ export function filterToSql(filter: Filter): { sql: string; params: unknown[] } 
       }
     } else {
       conditions.push(`json_extract(data, '$.${escapedField}') = ?`);
-      params.push(value);
+      params.push(bindValue(value));
     }
   }
 
