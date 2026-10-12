@@ -10,7 +10,7 @@ vi.mock('../../../src/data/agent/anthropic', () => ({
   getAIProvider: () => ({ provider: 'openai', apiKey: 'sk-test', baseUrl: '', model: 'gpt-4o' }),
 }));
 
-const { enrichDeliverable } = await import('../../../src/assets/enrich');
+const { enrichDeliverable, enrichSystemPrompt } = await import('../../../src/assets/enrich');
 const { listDeliverables } = await import('../../../src/assets/deliverables');
 
 const e = env as unknown as Env;
@@ -20,6 +20,7 @@ beforeAll(async () => {
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS asset_deliverables (id TEXT PRIMARY KEY, bucket_artifact_id TEXT, workspace_id TEXT, owner_id TEXT, name TEXT, folder_id TEXT, visibility TEXT NOT NULL DEFAULT 'workspace', deleted_at TEXT, type_metadata TEXT, updated_at TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS blobs (id TEXT PRIMARY KEY, artifact_id TEXT, deliverable_id TEXT, version_no INTEGER, filename TEXT, mime_type TEXT, size_bytes INTEGER, r2_key TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS ai_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, kind TEXT, model TEXT, units INTEGER, unit_kind TEXT, base_cost_micro_usd INTEGER, source TEXT, created_at TEXT)`);
+  await e.DB.exec(`CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, locale TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS file_artifact_usage (deliverable_id TEXT, artifact_id TEXT, created_at TEXT, PRIMARY KEY (deliverable_id, artifact_id))`);
 });
 
@@ -40,6 +41,7 @@ beforeEach(async () => {
   await e.DB.exec(`DELETE FROM asset_deliverables`);
   await e.DB.exec(`DELETE FROM blobs`);
   await e.DB.exec(`DELETE FROM ai_usage_events`);
+  await e.DB.exec(`DELETE FROM workspaces`);
 });
 
 describe('enrichDeliverable (work/042 P4)', () => {
@@ -86,5 +88,16 @@ describe('enrichDeliverable (work/042 P4)', () => {
     await enrichDeliverable(e, BK, 'd5'); // re-enriches b6
     const rows2 = await listDeliverables(e, BK);
     expect(rows2.find(r => r.id === 'd5')!.enrichment!.blobId).toBe('b6');
+  });
+});
+
+describe('file summary language follows the workspace', () => {
+  it('asks for rioplatense Spanish in an es workspace', async () => {
+    expect(enrichSystemPrompt('es')).toContain('Spanish as spoken in Argentina');
+    expect(enrichSystemPrompt('en')).toContain('in English');
+    await e.DB.prepare(`INSERT INTO workspaces (id, locale) VALUES ('wsp', 'es')`).run();
+    await seedFile('dl1', 'bl1');
+    await enrichDeliverable(e, BK, 'dl1');
+    expect(chatComplete.mock.calls[0][2]).toBe(enrichSystemPrompt('es'));
   });
 });
