@@ -70,12 +70,15 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
     fetch('/v1/artifacts/' + encodeURIComponent(rec.art.id) + '/editor', { credentials: 'same-origin' })
       .then(function (r) {
         if (r.status === 403) {
-          rec.publishBtn.hidden = true; setSaveStatus(rec, '');
+          setSaveStatus(rec, '');
           return r.json().catch(function () { return {}; }).then(function (j) {
             var msg = (j && j.code === 'FEATURE_DISABLED')
               ? t('edit.disabled')
               : t('edit.viewOnly');
-            rec.editframe.srcdoc = '<div style="${EDIT_PLACEHOLDER_STYLE}">' + msg + '</div>';
+            // No edit surface for someone who can't edit: back to View with one message.
+            rec.art.canEdit = false;
+            setEditMode(rec, 'view');
+            try { wsxToast(msg, true); } catch (e) {}
             throw 'forbidden';
           });
         }

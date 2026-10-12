@@ -59,14 +59,38 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   }
 
   // ----- Details -----
-  function renderDetails(art) {
-    if (!art.id) { paintDetails(art, null); return; }
-    if (metaCache[art.id] !== undefined) { paintDetails(art, metaCache[art.id]); return; }
-    rbodyEl.innerHTML = '<div class="wsx__details">' + i18nLoad() + '</div>';
-    fetch('/v1/artifacts/' + encodeURIComponent(art.id), { credentials: 'same-origin' })
+  // GET /v1/artifacts/{id|slug} is the one access check the rail follows: a tab opened by
+  // deep link (#a/<slug>) has no id until it resolves; can_edit/can_delete gate controls.
+  function adoptMeta(art, d) {
+    metaCache[d.id] = d;
+    var rec = panes[art.key];
+    [art, rec && rec.art].forEach(function (a) {
+      if (!a) return;
+      a.id = d.id; a.canEdit = !!d.can_edit;
+      if (d.name && (!a.name || a.name === t('inspector.artifact'))) a.name = d.name;
+    });
+    if (rec) setTabLabel(art.key, rec.art.name);
+    if (rec && !rec.art.canEdit && rec.mode === 'edit') setEditMode(rec, 'view');
+    syncTabMode();
+  }
+  function fetchMeta(art, cb) {
+    if (art.id && metaCache[art.id]) { cb(metaCache[art.id]); return; }
+    fetch('/v1/artifacts/' + encodeURIComponent(art.id || art.slug), { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { metaCache[art.id] = d; paintDetails(art, d); })
-      .catch(function () { paintDetails(art, null); });
+      .then(function (d) { if (d && d.id) adoptMeta(art, d); cb(d && d.id ? d : null); })
+      .catch(function () { cb(null); });
+  }
+  function railRetry(k, onRetry) {
+    rbodyEl.innerHTML = '<div class="wsx__details"><div class="wsx-empty">' + esc(t(k)) + ' <button class="wsx-link" type="button" data-rail-retry>' + esc(t('common.retry')) + '</button></div></div>';
+    rbodyEl.querySelector('[data-rail-retry]').addEventListener('click', onRetry);
+  }
+  function renderDetails(art) {
+    if (art.id && metaCache[art.id]) { paintDetails(art, metaCache[art.id]); return; }
+    rbodyEl.innerHTML = '<div class="wsx__details">' + i18nLoad() + '</div>';
+    fetchMeta(art, function (d) {
+      if (activeArt !== art) return;
+      if (d) paintDetails(art, d); else railRetry('inspector.detailsFailed', function () { renderDetails(art); });
+    });
   }
   function iconBtn(act, title, path, extra) {
     return '<button class="wsx-det__icon ' + (extra || '') + '" data-iact="' + act + '" type="button" data-tip="' + esc(title) + '" aria-label="' + esc(title) + '">' + isvg(path) + '</button>';
@@ -81,7 +105,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   // Details helpers (GRIP_SVG, loadSecOrder/saveSecOrder, sec, aboutHtml, deliverHtml,
   // wsxToast, bgAgent, wireSecDnd) live in inspector-details.ts — same IIFE scope.
   function paintDetails(art, meta) {
-    var editable = !!meta;
+    var editable = !!(meta && meta.can_edit);
     var name = (meta && meta.name) || art.name || t('inspector.artifact');
     var desc = (meta && meta.description) || '';
     var vis = (meta && meta.visibility) || '';
@@ -97,7 +121,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
 
     // Header: name + star (banner removed to reclaim vertical space).
     var favTip = fav ? t('inspector.favRemove') : t('inspector.favAdd');
-    var star = editable ? '<button class="wsx-det__star' + (fav ? ' is-on' : '') + '" data-iact="fav" type="button" data-tip="' + esc(favTip) + '" aria-label="' + esc(favTip) + '">' + isvg(SVG_STAR) + '</button>' : '';
+    var star = meta ? '<button class="wsx-det__star' + (fav ? ' is-on' : '') + '" data-iact="fav" type="button" data-tip="' + esc(favTip) + '" aria-label="' + esc(favTip) + '">' + isvg(SVG_STAR) + '</button>' : '';
     var visBlock = editable
       ? '<div class="wsx-vis-seg" id="wsxVisSeg" role="radiogroup" aria-label="' + esc(t('inspector.visibility')) + '">'
         + visOpts.map(function (o) { return '<button data-vis="' + o + '" role="radio" aria-checked="' + (o === visCur ? 'true' : 'false') + '" type="button" class="' + (o === visCur ? 'is-sel vk-' + o : '') + '"><span class="dot"></span>' + esc(visName(o)) + '</button>'; }).join('')
@@ -121,9 +145,9 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     }
     h += '<div class="wsx-det__actions2">'
       + '<button class="wsx-abtn wsx-det__act" data-iact="open" type="button">' + isvg(SVG_OPEN) + esc(t('inspector.openLabel')) + '</button>'
-      + '<button class="wsx-abtn wsx-det__act" data-iact="edit" type="button">' + isvg(SVG_EDIT) + esc(t('inspector.editLabel')) + '</button>'
+      + (editable ? '<button class="wsx-abtn wsx-det__act" data-iact="edit" type="button">' + isvg(SVG_EDIT) + esc(t('inspector.editLabel')) + '</button>' : '')
       + iconBtn('copy', t('inspector.act.copy'), SVG_COPY)
-      + iconBtn('trash', t('inspector.act.trash'), SVG_TRASH, 'is-danger')
+      + (meta && meta.can_delete ? iconBtn('trash', t('inspector.act.trash'), SVG_TRASH, 'is-danger') : '')
       + '</div>';
 
     // Section bodies, keyed; rendered in the user's saved order.
@@ -131,7 +155,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       share: '<div class="wsx-det__chips wsx-det__sharecard" id="wsxShare"></div>',
       deliver: deliverHtml(),
       about: meta ? aboutHtml(meta, type, vis) : '',
-      description: '<div class="wsx-det__desc"' + ce + ' data-edit="description">' + esc(desc) + '</div>',
+      description: '<div class="wsx-det__desc"' + ce + ' data-edit="description" data-ph="' + esc(t('inspector.addDescription')) + '">' + esc(desc) + '</div>',
       tags: '<div class="wsx-det__chips" id="wsxTags"></div>',
       folder: '<div id="wsxFolder"></div>',
       tests: '<div id="wsxTests"></div>',
@@ -149,7 +173,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       analytics: [t('inspector.analytics'), t('inspector.analyticsHelp')],
       watches: [t('inspector.watches'), t('inspector.watchesHelp')]
     };
-    var order = editable ? loadSecOrder() : ['description'];
+    var order = editable ? loadSecOrder() : (desc ? ['description'] : []);
     h += '<div class="wsx-det__secs" id="wsxSecs">' + order.map(function (k) {
       if (!secBody[k]) return '';
       return sec(k, secMeta[k][0], secMeta[k][1], secBody[k], editable);
@@ -316,7 +340,8 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
 
     renderShare(art, meta, editable);
     if (editable) { renderTags(art, (meta.tags || []).slice()); renderFolder(art, meta); renderTests(art); renderWatches(art); }
-    if (art.id) loadAnalytics(art.id, root.querySelector('#wsxDetStats'));
+    var statsEl = root.querySelector('#wsxDetStats');
+    if (art.id && statsEl) loadAnalytics(art.id, statsEl);
   }
   // Share-with: role-aware collaborators + always-visible workspace-member search (multi-add).
   var memberCache = {};
@@ -551,12 +576,20 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
 
   // ----- Comments (full thread + composer; cached) -----
   function renderComments(art) {
-    if (!art.id) { rbodyEl.innerHTML = '<div class="wsx-cm">' + i18nEmpty('inspector.openPageToComment') + '</div>'; return; }
+    if (!art.id) {
+      rbodyEl.innerHTML = '<div class="wsx-cm">' + i18nLoad() + '</div>';
+      fetchMeta(art, function (d) { if (activeArt !== art) return; if (d) renderComments(art); else railRetry('inspector.detailsFailed', function () { renderComments(art); }); });
+      return;
+    }
     if (cmtCache[art.id] !== undefined) { paintComments(art, cmtCache[art.id]); return; }
     rbodyEl.innerHTML = '<div class="wsx-cm">' + i18nLoad() + '</div>';
     fetch('/v1/home/comments?artifactId=' + encodeURIComponent(art.id) + '&limit=200', { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { cmtCache[art.id] = (d && d.comments) || []; paintComments(art, cmtCache[art.id]); })
+      .then(function (r) { return r.status === 403 ? { forbidden: true } : (r.ok ? r.json() : null); })
+      .then(function (d) {
+        if (d && d.forbidden) { rbodyEl.innerHTML = '<div class="wsx-cm">' + i18nEmpty('inspector.cannotComment') + '</div>'; return; }
+        if (!d) { rbodyEl.innerHTML = '<div class="wsx-cm">' + i18nEmpty('inspector.couldNotComments') + '</div>'; return; }
+        cmtCache[art.id] = d.comments || []; paintComments(art, cmtCache[art.id]);
+      })
       .catch(function () { rbodyEl.innerHTML = '<div class="wsx-cm">' + i18nEmpty('inspector.couldNotComments') + '</div>'; });
   }
   function cmAvatar(name) { return '<span class="wsx-cm__av">' + esc((name || '?').charAt(0).toUpperCase()) + '</span>'; }
@@ -630,7 +663,13 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       +     '<button class="wsx-cc__send js-send" type="button" title="' + esc(t('inspector.send')) + '" aria-label="' + esc(t('inspector.send')) + '" disabled>' + isvg(SVG_SEND) + '</button>'
       +   '</div>'
       + '</div>'
+      + '<div class="wsx-cc__err" role="alert" hidden></div>'
       + '</div>';
+  }
+  // A failed send keeps the typed text and says why next to the composer.
+  function ccError(ta, msg) {
+    var err = ta.closest('.wsx-cc').querySelector('.wsx-cc__err');
+    err.textContent = msg || ''; err.hidden = !msg;
   }
   function insertAtCursor(ta, str) { var s = ta.selectionStart || 0, e = ta.selectionEnd || s; ta.value = ta.value.slice(0, s) + str + ta.value.slice(e); ta.focus(); ta.selectionStart = ta.selectionEnd = s + str.length; }
   function insertTrigger(ta, ch) { var s = ta.selectionStart || 0, pre = ta.value.slice(0, s); insertAtCursor(ta, (pre && !/\\s$/.test(pre) ? ' ' : '') + ch); ta.dispatchEvent(new Event('input')); }
@@ -641,7 +680,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     var menu = cc.querySelector('.wsx-cm__mentions');
     function autosize() { ta.style.height = 'auto'; ta.style.height = Math.min(160, ta.scrollHeight) + 'px'; }
     function refreshSend() { send.disabled = !ta.value.trim(); }
-    ta.addEventListener('input', function () { autosize(); refreshSend(); });
+    ta.addEventListener('input', function () { autosize(); refreshSend(); ccError(ta, ''); });
     cc.querySelector('.js-emojibtn').addEventListener('click', function (e) { e.stopPropagation(); emoji.hidden = !emoji.hidden; });
     emoji.addEventListener('click', function (e) { var b = e.target.closest('[data-emoji]'); if (!b) return; insertAtCursor(ta, b.getAttribute('data-emoji')); emoji.hidden = true; autosize(); refreshSend(); });
     cc.querySelector('.js-at').addEventListener('click', function () { insertTrigger(ta, '@'); });
@@ -756,14 +795,14 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     });
     btn.disabled = true;
     fetch('/v1/home/comments', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ artifactId: art.id, content: text, parentId: parentId || undefined, mentions: mentions.length ? mentions : undefined }) })
-      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (r) { return r.json().catch(function () { return null; }).then(function (j) { return r.ok ? j : { status: r.status }; }); })
       .then(function (j) {
         btn.disabled = false;
-        if (!j || !j.comment) { ta.value = ''; ta.placeholder = t('inspector.couldNotPost'); return; }
+        if (!j || !j.comment) { ccError(ta, t(j && j.status === 403 ? 'inspector.cannotComment' : 'inspector.couldNotPost')); return; }
         (cmtCache[art.id] = cmtCache[art.id] || []).push(j.comment);
         paintComments(art, cmtCache[art.id]);
       })
-      .catch(function () { btn.disabled = false; });
+      .catch(function () { btn.disabled = false; ccError(ta, t('inspector.couldNotPost')); });
   }
 
   // ----- Automate (per-artifact schedules + alerts) -----

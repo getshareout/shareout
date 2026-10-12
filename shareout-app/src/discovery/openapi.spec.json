@@ -609,6 +609,7 @@
           "Artifacts"
         ],
         "summary": "Get an artifact",
+        "description": "The path also accepts the artifact's slug. Any signed-in caller who can view the artifact gets its details; `can_edit` and `can_delete` say which writes the API will accept from this caller.",
         "operationId": "getArtifact",
         "responses": {
           "200": {
@@ -9526,6 +9527,14 @@
           "user_role": {
             "type": "string",
             "description": "Caller's role (list endpoint only)."
+          },
+          "can_edit": {
+            "type": "boolean",
+            "description": "Caller may update the artifact and use the editor (detail endpoint only)."
+          },
+          "can_delete": {
+            "type": "boolean",
+            "description": "Caller may move the artifact to Trash (detail endpoint only)."
           },
           "is_favorite": {
             "type": "boolean"

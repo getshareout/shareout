@@ -26,8 +26,8 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
   function assetKind(m) { m = m || ''; if (m.indexOf('image/') === 0) return 'image'; if (m.indexOf('video/') === 0) return 'video'; return 'doc'; }
   function assetExt(name) { var p = (name || '').split('.'); return p.length > 1 ? p.pop().slice(0, 4).toUpperCase() : 'FILE'; }
   function assetItems() {
-    var ds = (ASSET_STATE.deliverables || []).map(function (d) { return { type: 'deliverable', id: d.id, blobId: d.blobId, name: d.name, filename: d.filename, mimeType: d.mimeType, sizeBytes: d.sizeBytes, url: d.url, versionCount: d.versionCount, latestVersion: d.latestVersion, visibility: d.visibility, folderId: d.folderId || '', enrichment: d.enrichment || null, usageCount: d.usageCount || 0 }; });
-    var ls = (ASSET_STATE.loose || []).map(function (b) { return { type: 'loose', id: b.id, blobId: b.id, name: b.filename, filename: b.filename, mimeType: b.mimeType, sizeBytes: b.sizeBytes, url: b.url, versionCount: 1, latestVersion: 1, visibility: null, folderId: '' }; });
+    var ds = (ASSET_STATE.deliverables || []).map(function (d) { return { type: 'deliverable', id: d.id, blobId: d.blobId, name: d.name, filename: d.filename, mimeType: d.mimeType, sizeBytes: d.sizeBytes, url: d.url, versionCount: d.versionCount, latestVersion: d.latestVersion, visibility: d.visibility, folderId: d.folderId || '', enrichment: d.enrichment || null, usageCount: d.usageCount || 0, canDelete: !!d.canDelete }; });
+    var ls = (ASSET_STATE.loose || []).map(function (b) { return { type: 'loose', id: b.id, blobId: b.id, name: b.filename, filename: b.filename, mimeType: b.mimeType, sizeBytes: b.sizeBytes, url: b.url, versionCount: 1, latestVersion: 1, visibility: null, folderId: '', canDelete: !!b.canDelete }; });
     return ds.concat(ls);
   }
   function findItem(id) { return assetItems().filter(function (x) { return x.id === id; })[0]; }
@@ -62,7 +62,7 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
       + '<div class="wsx-asset__meta"><span class="wsx-asset__name" title="' + esc(nameTitle) + '">' + esc(a.name) + '</span><span class="wsx-asset__sz">' + adBytes(a.sizeBytes) + (a.versionCount > 1 ? ' \\u00b7 ' + esc(t('assets.versionsCount').replace('{n}', String(a.versionCount))) : '') + '</span>' + tags + '</div>'
       + '<div class="wsx-asset__actions">' + actions + aBtn('copy', t('assets.copyLink'), ASVG.copy)
       +   '<a class="wsx-asset__act" href="' + esc(a.url) + '" download title="' + esc(t('assets.download')) + '" aria-label="' + esc(t('assets.download')) + '">' + isvg(ASVG.dl) + '</a>'
-      +   aBtn('del', t('common.delete'), ASVG.trash, 'danger')
+      +   (a.canDelete ? aBtn('del', t('common.delete'), ASVG.trash, 'danger') : '')
       + '</div></article>';
   }
   function renderFolderBar() {

@@ -167,8 +167,9 @@ export async function handleGetArtifact(
     LEFT JOIN workspaces w ON w.id = a.workspace_id
     LEFT JOIN artifact_presentation pres_a ON pres_a.artifact_id = a.id
     LEFT JOIN artifact_moderation mod_a ON mod_a.artifact_id = a.id
-    WHERE a.id = ? AND a.deleted_at IS NULL
-  `).bind(user.id, artifactId).first<{
+    WHERE (a.id = ? OR a.slug = ?) AND a.deleted_at IS NULL
+    ORDER BY a.id = ? DESC LIMIT 1
+  `).bind(user.id, artifactId, artifactId, artifactId).first<{
     id: string;
     name: string;
     slug: string;
@@ -202,6 +203,7 @@ export async function handleGetArtifact(
   if (!artifact) {
     return json({ error: 'Artifact not found', code: 'NOT_FOUND' }, 404);
   }
+  artifactId = artifact.id;
 
   const role = await getUserRole(env, artifactId, user.id);
   if (!role && !(await canViewArtifact(env, artifact, user.id, user.email ?? null))) {
@@ -266,12 +268,12 @@ export async function handleGetArtifact(
   ).bind(artifactId).all<{ label: string }>();
   const tags = (tagRows.results || []).map(t => t.label);
 
+  const canDelete = !(await requireOwnerOrWorkspaceAdmin(env, user, artifactId, artifact.workspace_id));
   // Surface a held-artifact moderation object — but only to the owner/workspace-admin,
   // never to a plain viewer/collaborator, and never on an approved artifact.
   let moderation: ArtifactDetail['moderation'];
   if (artifact.moderation_status && artifact.moderation_status !== 'approved') {
-    const denied = await requireOwnerOrWorkspaceAdmin(env, user, artifactId, artifact.workspace_id);
-    if (!denied) {
+    if (canDelete) {
       moderation = {
         status: artifact.moderation_status as 'pending' | 'blocked',
         reason: artifact.moderation_reason,
@@ -281,7 +283,11 @@ export async function handleGetArtifact(
     }
   }
 
-  return json({ ...detail, folder_id: artifact.folder_id, tags, ...(moderation ? { moderation } : {}) });
+  // What the caller may do, so clients hide controls the API would refuse
+  // (PATCH/editor need editor+; trash needs owner or workspace owner/admin).
+  const permissions = { can_edit: role === 'owner' || role === 'editor', can_delete: canDelete };
+
+  return json({ ...detail, folder_id: artifact.folder_id, tags, ...permissions, ...(moderation ? { moderation } : {}) });
 }
 
 export async function handleUpdateArtifact(

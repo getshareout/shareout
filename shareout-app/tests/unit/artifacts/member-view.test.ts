@@ -11,16 +11,16 @@ import type { Env } from '../../../src/types';
 const member = { id: 'usr_m', email: 'm@x.com', username: null };
 const vis = { userIds: ['usr_m'], emails: ['m@x.com'] };
 
-function env(visibility: string, opts: { member: boolean }): Env {
-  const row = { ...artifactRow, owner_id: 'usr_owner', workspace_id: 'wsp_1', visibility };
+function env(visibility: string, opts: { member: boolean; wsRole?: string; ownerId?: string }): Env {
+  const row = { ...artifactRow, owner_id: opts.ownerId ?? 'usr_owner', workspace_id: 'wsp_1', visibility };
   return {
     ...baseEnv,
     DB: makeDbMock({
-      first: (sql) => {
-        if (sql.includes('is_favorite')) return row;
+      first: (sql, ...args) => {
+        if (sql.includes('is_favorite')) return args.includes(row.id) || (sql.includes('a.slug = ?') && args.includes(row.slug)) ? row : null;
         if (sql.includes('owner_id FROM artifacts')) return row;
         if (sql.includes('email FROM users')) return { email: member.email };
-        if (sql.includes('workspace_members')) return opts.member ? { role: 'member' } : null;
+        if (sql.includes('workspace_members')) return opts.member ? { role: opts.wsRole ?? 'member' } : null;
         return null;
       },
       all: (sql) => sql.includes('collaborators')
@@ -35,6 +35,24 @@ describe('workspace member on a workspace-visible artifact', () => {
     const res = await handleGetArtifact(new Request('https://x'), env('workspace', { member: true }), member, 'art_1');
     expect(res.status).toBe(200);
     expect(await jsonBody(res)).toMatchObject({ visibility: 'workspace', viewers: [] });
+  });
+
+  it('GET details tells a plain member they cannot edit or trash', async () => {
+    const res = await handleGetArtifact(new Request('https://x'), env('workspace', { member: true }), member, 'art_1');
+    expect(await jsonBody(res)).toMatchObject({ can_edit: false, can_delete: false });
+  });
+
+  it('GET details lets a workspace admin trash but not edit, and the owner do both', async () => {
+    const admin = await handleGetArtifact(new Request('https://x'), env('workspace', { member: true, wsRole: 'admin' }), member, 'art_1');
+    expect(await jsonBody(admin)).toMatchObject({ can_edit: false, can_delete: true });
+    const owner = await handleGetArtifact(new Request('https://x'), env('workspace', { member: true, ownerId: 'usr_m' }), member, 'art_1');
+    expect(await jsonBody(owner)).toMatchObject({ can_edit: true, can_delete: true });
+  });
+
+  it('GET details resolves a slug (Home deep link #a/<slug>) to the artifact id', async () => {
+    const res = await handleGetArtifact(new Request('https://x'), env('workspace', { member: true }), member, artifactRow.slug);
+    expect(res.status).toBe(200);
+    expect(await jsonBody(res)).toMatchObject({ id: 'art_1', slug: artifactRow.slug });
   });
 
   it('GET details → 403 for a non-member and for a member on a private artifact', async () => {

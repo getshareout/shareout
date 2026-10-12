@@ -16,7 +16,7 @@
  *   POST   /v1/assets/collections                  { name, deliverableIds[] } → collection
  *   POST   /v1/assets/collections/{id}/share       { expiresAt? } → { url }
  *   POST   /v1/assets/collections/{id}/send        { to, expiresAt? } → email the link
- *   ...same under /v1/workspaces/{ws}/assets (any member).
+ *   ...same under /v1/workspaces/{ws}/assets (any member; deleting another member's file needs owner/admin).
  */
 import type { FetchContext } from '../context';
 import type { Env } from '../../types';
@@ -66,10 +66,14 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
   const user = await requireTokenOrSession(ctx);
   if (!isAuthUser(user)) return user;
 
+  // Deleting someone else's workspace file is an owner/admin action; personal scope is all yours.
+  let isWsAdmin = !workspaceId;
   if (workspaceId) {
     const role = await getInternalWorkspaceRole(env, workspaceId, user.id);
     if (!role) return addCORS(Response.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 }));
+    isWsAdmin = role === 'owner' || role === 'admin';
   }
+  const forbidden = () => addCORS(Response.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 }));
 
   const bucket = await getOrCreateAssetBucket(env, user.id, workspaceId);
   const sub = rest.replace(/^\//, '');
@@ -84,7 +88,7 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
   };
 
   if ((rest === '' || rest === '/') && method === 'GET') {
-    return addCORS(await listAssets(request, env, bucket, user.id));
+    return addCORS(await listAssets(request, env, bucket, user.id, isWsAdmin));
   }
 
   // ----- deliverables -----
@@ -127,6 +131,11 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
     return ok ? json({ ok: true }) : json({ error: 'file not found' }, 404);
   }
   if (dm && method === 'DELETE') {
+    if (!isWsAdmin) {
+      const own = await env.DB.prepare('SELECT owner_id FROM asset_deliverables WHERE id = ? AND bucket_artifact_id = ?')
+        .bind(dm[1], bucket.id).first<{ owner_id: string }>();
+      if (own?.owner_id !== user.id) return forbidden();
+    }
     const res = await deleteDeliverable(request, env, bucket, dm[1]);
     if (res.ok) learn(dm[1], `deleted:${Date.now()}`);
     return addCORS(res);
@@ -214,6 +223,7 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
     return json({ ok: true });
   }
 
+  if (method === 'DELETE' && !isWsAdmin) return forbidden();
   return addCORS(await handleBlobs(request, bctx, sub));
 }
 
@@ -230,7 +240,7 @@ async function deleteDeliverable(request: Request, env: Env, bucket: AssetBucket
   return Response.json({ success: true });
 }
 
-async function listAssets(request: Request, env: Env, bucket: AssetBucketRow, viewerId: string): Promise<Response> {
+async function listAssets(request: Request, env: Env, bucket: AssetBucketRow, viewerId: string, isWsAdmin: boolean): Promise<Response> {
   const url = new URL(request.url);
   const base = `${url.protocol}//${url.host}/v1/data/${bucket.id}/blobs`;
   const fileBase = `${url.protocol}//${url.host}/v1/files`;
@@ -261,10 +271,12 @@ async function listAssets(request: Request, env: Env, bucket: AssetBucketRow, vi
       url: `${fileBase}/${d.id}/content?v=${d.latestVersion}`,
       enrichment: d.enrichment,
       usageCount: d.usageCount,
+      canDelete: isWsAdmin || d.ownerId === viewerId,
     })),
     loose: (loose.results || []).map((b) => ({
       id: b.id, filename: b.filename, mimeType: b.mime_type, sizeBytes: b.size_bytes,
       url: `${base}/${b.id}/content`,
+      canDelete: isWsAdmin,
     })),
     usedBytes: storage?.used_bytes || 0,
     count: storage?.blob_count || 0,
