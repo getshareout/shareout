@@ -4,7 +4,8 @@ import type { DataContext } from './data/middleware';
 import { errorResponse, successResponse, verifyOwner } from './data/middleware';
 import { createLogger, logError } from './logging';
 import { getClientIp } from './rate-limit';
-import { isBlockedDestination } from './data/secrets/blocklist';
+import { BlockedRedirectError, fetchCheckingRedirects, isBlockedDestination } from './data/secrets/blocklist';
+import { isOwnHost } from './config/origins';
 
 const MAX_RESPONSE_SIZE = 10 * 1024 * 1024; // 10 MB
 const DEFAULT_TIMEOUT = 10000; // 10 seconds
@@ -26,7 +27,13 @@ const STRIPPED_RESPONSE_HEADERS = [
   'proxy-authenticate',
 ];
 
-function isValidUrl(urlStr: string): { valid: boolean; url?: URL; error?: string } {
+function ownHostRefusal(env: Env, request: Request, url: URL): string | null {
+  return isOwnHost(env, url.hostname, [new URL(request.url).hostname])
+    ? `Blocked host: ${url.hostname} is served by this instance`
+    : null;
+}
+
+function isValidUrl(urlStr: string, env: Env, request: Request): { valid: boolean; url?: URL; error?: string } {
   let url: URL;
   try {
     url = new URL(urlStr);
@@ -36,6 +43,10 @@ function isValidUrl(urlStr: string): { valid: boolean; url?: URL; error?: string
   const blocked = isBlockedDestination(urlStr);
   if (blocked.blocked) {
     return { valid: false, error: blocked.reason || 'Blocked destination' };
+  }
+  const own = ownHostRefusal(env, request, url);
+  if (own) {
+    return { valid: false, error: own };
   }
   return { valid: true, url };
 }
@@ -159,7 +170,7 @@ export async function handleProxy(
     }, ctx.origin);
   }
 
-  const validation = isValidUrl(targetUrl);
+  const validation = isValidUrl(targetUrl, ctx.env, request);
   if (!validation.valid || !validation.url) {
     return errorResponse({
       ...DATA_ERRORS.BLOCKED_DESTINATION,
@@ -226,7 +237,7 @@ export async function handleProxy(
   const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT);
 
   try {
-    const proxyResponse = await fetch(targetUrl, {
+    const proxyResponse = await fetchCheckingRedirects(targetUrl, {
       method: 'GET',
       headers: {
         'User-Agent': 'ShareOut-Proxy/1.0',
@@ -234,7 +245,8 @@ export async function handleProxy(
         'Accept-Language': request.headers.get('Accept-Language') || 'en-US,en;q=0.9',
       },
       signal: controller.signal,
-    });
+    }, (next) => ownHostRefusal(ctx.env, request, next)
+      ?? (isHostAllowed(next.hostname, config) ? null : `Host ${next.hostname} not allowed`));
 
     clearTimeout(timeoutId);
 
@@ -279,6 +291,9 @@ export async function handleProxy(
     });
   } catch (err) {
     clearTimeout(timeoutId);
+    if (err instanceof BlockedRedirectError) {
+      return errorResponse({ ...DATA_ERRORS.BLOCKED_DESTINATION, message: err.message }, ctx.origin);
+    }
     logProxyFailure(ctx.env, err, {
       targetUrl,
       artifactId: ctx.artifactId,
@@ -327,7 +342,7 @@ export async function handleGlobalProxy(
     }, { status: 400 });
   }
 
-  const validation = isValidUrl(targetUrl);
+  const validation = isValidUrl(targetUrl, env, request);
   if (!validation.valid || !validation.url) {
     return Response.json({
       success: false,
@@ -376,14 +391,14 @@ export async function handleGlobalProxy(
   const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT);
 
   try {
-    const proxyResponse = await fetch(targetUrl, {
+    const proxyResponse = await fetchCheckingRedirects(targetUrl, {
       method: 'GET',
       headers: {
         'User-Agent': 'ShareOut-Proxy/1.0',
         'Accept': request.headers.get('Accept') || '*/*',
       },
       signal: controller.signal,
-    });
+    }, (next) => ownHostRefusal(env, request, next));
 
     clearTimeout(timeoutId);
 
@@ -427,6 +442,9 @@ export async function handleGlobalProxy(
     });
   } catch (err) {
     clearTimeout(timeoutId);
+    if (err instanceof BlockedRedirectError) {
+      return Response.json({ success: false, error: err.message, code: 'BLOCKED_DESTINATION' }, { status: 403 });
+    }
     logProxyFailure(env, err, { targetUrl, scope: 'global' });
     if (err instanceof Error && err.name === 'AbortError') {
       return Response.json({ success: false, error: 'Request timed out', code: 'PROXY_ERROR' }, { status: 504 });

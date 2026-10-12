@@ -96,6 +96,10 @@ await fetch(`/v1/data/${artifactId}/proxy/config`, {
 **Blocked schemes:**
 - `file://`, `javascript:`, `data:`
 
+**Blocked hosts:** this instance's own app, workspace-subdomain and artifact hosts (call those directly, not through the proxy).
+
+**Redirects:** followed up to 5 hops; every hop is re-checked against the rules above and the artifact's `allowed_hosts`/`blocked_hosts`. A hop that fails returns `BLOCKED_DESTINATION`.
+
 **Sanitized:**
 - `Set-Cookie` headers stripped
 
@@ -110,7 +114,7 @@ await fetch(`/v1/data/${artifactId}/proxy/config`, {
 
 | Code | Status | Description |
 |------|--------|-------------|
-| `BLOCKED_DESTINATION` | 403 | Internal IP or scheme |
+| `BLOCKED_DESTINATION` | 403 | Internal IP, scheme, own host, or a redirect to one |
 | `HOST_NOT_ALLOWED` | 403 | Not in allowlist |
 | `PROXY_RATE_LIMITED` | 429 | Rate limit exceeded |
 | `FILE_TOO_LARGE` | 413 | Response > 10MB |

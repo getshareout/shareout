@@ -68,3 +68,26 @@ export function getCdnRegistrable(env: Env): string | null {
     return null;
   }
 }
+
+/**
+ * True when `hostname` is served by this worker: the platform apex and its
+ * workspace subdomains, the artifact/CDN origin, or any extra host the caller
+ * knows it was reached on. Outbound proxies refuse these instead of looping.
+ */
+export function isOwnHost(env: Env, hostname: string, extraHosts: string[] = []): boolean {
+  const host = hostname.toLowerCase().replace(/\.$/, '');
+  const owned = [getPlatformHostname(env), ...extraHosts];
+  if (env.ARTIFACT_ORIGIN) {
+    try {
+      owned.push(new URL(env.ARTIFACT_ORIGIN).hostname);
+    } catch {
+      owned.push('');
+    }
+  }
+  const cdn = getCdnRegistrable(env);
+  if (cdn) owned.push(cdn);
+  return owned.some((h) => {
+    const o = h.toLowerCase().replace(/^www\./, '');
+    return !!o && !isLoopbackHost(o) && (host === o || host.endsWith(`.${o}`));
+  });
+}

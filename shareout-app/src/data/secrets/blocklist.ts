@@ -118,3 +118,62 @@ export function validateAllowedHost(requestHost: string, allowedHosts: string[])
 
   return false;
 }
+
+export class BlockedRedirectError extends Error {
+  constructor(reason: string) {
+    super(`Blocked redirect: ${reason}`);
+    this.name = 'BlockedRedirectError';
+  }
+}
+
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+const MAX_REDIRECTS = 5;
+const CROSS_ORIGIN_SAFE_HEADERS = new Set(['accept', 'accept-language', 'content-type', 'user-agent']);
+
+/**
+ * fetch() that follows redirects itself so every hop is re-checked against the SSRF
+ * blocklist plus the caller's own allowlist (`checkHop` returns a refusal reason or null).
+ * With `stripCredentialsCrossOrigin`, a hop to a different origin drops every header
+ * except a small safe set, so injected credentials never leave the original origin.
+ */
+export async function fetchCheckingRedirects(
+  url: string,
+  init: RequestInit,
+  checkHop: (next: URL) => string | null,
+  opts: { stripCredentialsCrossOrigin?: boolean; fetcher?: (url: string, init: RequestInit) => Promise<Response> } = {},
+): Promise<Response> {
+  const fetcher = opts.fetcher ?? fetch;
+  const origin = new URL(url).origin;
+  let current = url;
+  let method = (init.method || 'GET').toUpperCase();
+  let body = init.body;
+  let headers = init.headers;
+
+  for (let hop = 0; ; hop++) {
+    const response = await fetcher(current, { ...init, method, body, headers, redirect: 'manual' });
+    const location = response.headers.get('Location');
+    if (!REDIRECT_STATUSES.has(response.status) || !location) return response;
+    await response.body?.cancel();
+    if (hop >= MAX_REDIRECTS) throw new BlockedRedirectError('too many redirects');
+
+    let next: URL;
+    try {
+      next = new URL(location, current);
+    } catch {
+      throw new BlockedRedirectError('invalid redirect location');
+    }
+    const blocked = isBlockedDestination(next.toString());
+    if (blocked.blocked) throw new BlockedRedirectError(blocked.reason || 'blocked destination');
+    const refusal = checkHop(next);
+    if (refusal) throw new BlockedRedirectError(refusal);
+
+    if (response.status === 303 || ((response.status === 301 || response.status === 302) && method === 'POST')) {
+      method = 'GET';
+      body = undefined;
+    }
+    if (opts.stripCredentialsCrossOrigin && next.origin !== origin) {
+      headers = [...new Headers(headers)].filter(([k]) => CROSS_ORIGIN_SAFE_HEADERS.has(k.toLowerCase()));
+    }
+    current = next.toString();
+  }
+}

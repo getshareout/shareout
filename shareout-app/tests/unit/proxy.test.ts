@@ -242,6 +242,48 @@ describe('handleProxy', () => {
     });
   });
 
+  it('re-validates every redirect hop against the blocklist and host lists', async () => {
+    const { env } = createProxyEnv({
+      proxyConfig: {
+        enabled: 1,
+        allowed_hosts: JSON.stringify(['api.example.com', 'cdn.example.com']),
+        blocked_hosts: null,
+        cache_ttl: 300,
+        max_requests_per_minute: 100,
+      },
+    });
+    for (const location of ['http://127.0.0.1/', 'http://[::1]/x', 'https://evil.example.org/x', 'https://shareout.site/health']) {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response(null, { status: 302, headers: { Location: location } }),
+      );
+      const response = await handleProxy(proxyRequest(`https://api.example.com/r?to=${location}`), createCtx(env), 'proxy');
+      expect(response.status, location).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ code: 'BLOCKED_DESTINATION' });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][1]?.redirect).toBe('manual');
+      fetchMock.mockRestore();
+    }
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(null, { status: 301, headers: { Location: 'https://cdn.example.com/final' } }))
+      .mockResolvedValueOnce(new Response('done', { status: 200 }));
+    const ok = await handleProxy(proxyRequest('https://api.example.com/ok'), createCtx(env), 'proxy');
+    expect(ok.status).toBe(200);
+    expect(await ok.text()).toBe('done');
+    expect(fetchMock.mock.calls[1][0]).toBe('https://cdn.example.com/final');
+  });
+
+  it('refuses this instance\'s own hosts', async () => {
+    const { env } = createProxyEnv();
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    for (const target of ['https://shareout.site/health', 'https://incro.shareout.site/v1/features']) {
+      const response = await handleProxy(proxyRequest(target), createCtx(env), 'proxy');
+      expect(response.status, target).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ code: 'BLOCKED_DESTINATION' });
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('returns 429 when artifact rate limit is exceeded', async () => {
     const { env } = createProxyEnv({
       proxyConfig: {

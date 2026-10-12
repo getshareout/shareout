@@ -897,6 +897,124 @@ describe('executeProxy', () => {
     expect(String(fetchMock.mock.calls[0][0])).toContain('extra=1');
   });
 
+  it('sends the query-injected credential on the fetched URL', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await handleSecrets(
+      secretsRequest('POST', 'query/proxy', { path: '/v1/test', query: { a: '1' } }),
+      makeCtx(makeSecretsEnv({
+        secret: proxySecret({
+          name: 'query',
+          injection_type: 'query',
+          injection_config: JSON.stringify({ queryParam: 'apikey' }),
+          allowed_methods: '["GET"]',
+        }),
+      })),
+      'query/proxy',
+    );
+    expect(response.status).toBe(200);
+    const fetched = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(fetched.searchParams.get('apikey')).toBe('sk_test_123');
+    expect(fetched.searchParams.get('a')).toBe('1');
+  });
+
+  it('refuses paths that escape allowedPaths via dot segments or encodings', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const secret = proxySecret({ allowed_paths: '["/anything/**"]', allowed_methods: '["GET"]' });
+
+    for (const path of [
+      '/anything/../../etc',
+      '/anything/../etc',
+      '/anything/./../etc',
+      '/anything/%2e%2e/%2E%2E/etc',
+      '/anything/.%2e/etc',
+      '/anything/..%2fetc',
+      '/anything\\..\\..\\etc',
+      '/anything/%5c..%5cetc',
+    ]) {
+      const response = await handleSecrets(
+        secretsRequest('POST', 'stripe_key/proxy', { path }),
+        makeCtx(makeSecretsEnv({ secret })),
+        'stripe_key/proxy',
+      );
+      expect(response.status, path).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ code: 'PATH_NOT_ALLOWED' });
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const ok = await handleSecrets(
+      secretsRequest('POST', 'stripe_key/proxy', { path: '/anything/a/b' }),
+      makeCtx(makeSecretsEnv({ secret })),
+      'stripe_key/proxy',
+    );
+    expect(ok.status).toBe(200);
+    expect(new URL(String(fetchMock.mock.calls[0][0])).pathname).toBe('/anything/a/b');
+  });
+
+  it('refuses hosts served by this instance', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const env = { ...makeSecretsEnv({
+      secret: proxySecret({ allowed_hosts: '["acme.shareout.example.com"]', allowed_paths: '["/**"]', allowed_methods: '["GET"]' }),
+    }), SHAREOUT_BASE_URL: BASE_URL } as Env;
+    const response = await handleSecrets(
+      secretsRequest('POST', 'stripe_key/proxy', { path: '/v1/features' }),
+      makeCtx(env),
+      'stripe_key/proxy',
+    );
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: 'BLOCKED_DESTINATION' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('re-validates redirect targets and never forwards credentials off-origin', async () => {
+    const secret = proxySecret({ allowed_hosts: '["api.stripe.com", "files.stripe.com"]', allowed_paths: '["/v1/**"]' });
+    const redirectTo = (location: string) => vi.fn(async (url: string, init?: RequestInit) => {
+      expect(init?.redirect).toBe('manual');
+      if (url.startsWith('https://api.stripe.com/v1/charges')) {
+        return new Response(null, { status: 302, headers: { Location: location } });
+      }
+      return new Response('{"ok":true}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+
+    for (const location of [
+      'http://127.0.0.1/v1/x',
+      'http://169.254.169.254/latest/meta-data',
+      'https://evil.example.org/v1/x',
+      'https://api.stripe.com/admin',
+    ]) {
+      const fetchMock = redirectTo(location);
+      vi.stubGlobal('fetch', fetchMock);
+      const response = await handleSecrets(
+        secretsRequest('POST', 'stripe_key/proxy', { path: '/v1/charges' }),
+        makeCtx(makeSecretsEnv({ secret })),
+        'stripe_key/proxy',
+      );
+      expect(response.status, location).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ code: 'BLOCKED_DESTINATION' });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+
+    const fetchMock = redirectTo('https://files.stripe.com/v1/download');
+    vi.stubGlobal('fetch', fetchMock);
+    const ok = await handleSecrets(
+      secretsRequest('POST', 'stripe_key/proxy', { path: '/v1/charges' }),
+      makeCtx(makeSecretsEnv({ secret })),
+      'stripe_key/proxy',
+    );
+    expect(ok.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const first = new Headers(fetchMock.mock.calls[0][1]?.headers);
+    const second = new Headers(fetchMock.mock.calls[1][1]?.headers);
+    expect(first.get('Authorization')).toBe('Bearer sk_test_123');
+    expect(second.get('Authorization')).toBeNull();
+  });
+
   it('proxies without credentials when none are stored', async () => {
     vi.stubGlobal('fetch', vi.fn(async (_url, init?: RequestInit) => {
       expect(init?.headers).not.toHaveProperty('Authorization');
