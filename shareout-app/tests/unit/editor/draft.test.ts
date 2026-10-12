@@ -136,6 +136,29 @@ describe('handleDraft', () => {
     expect(run).toHaveBeenCalledTimes(2);
   });
 
+  it('POST returns 409 when the draft is gone and the live version is newer than the base', async () => {
+    const run = vi.fn(async () => ({ success: true }));
+    const env = (live: string) => ({
+      DB: makeDbMock({
+        first: (sql) => (String(sql).includes('FROM deployments') ? { updated_at: live } : null),
+        run,
+      }),
+      ARTIFACTS: makeR2Mock(),
+    } as unknown as Env);
+    const post = () => new Request('http://x/draft', {
+      method: 'POST',
+      body: JSON.stringify({ html: '<p>stale</p>', baseUpdatedAt: '2026-10-12T17:00:00.000Z' }),
+    });
+
+    const stale = await handleDraft(post(), baseCtx({ env: env('2026-10-12T17:05:00.000Z') }), 'POST');
+    expect(stale.status).toBe(409);
+    expect((await jsonBody(stale)).currentUpdatedAt).toBe('2026-10-12T17:05:00.000Z');
+    expect(run).not.toHaveBeenCalled();
+
+    const fresh = await handleDraft(post(), baseCtx({ env: env('2026-10-12T16:00:00.000Z') }), 'POST');
+    expect(fresh.status).toBe(200);
+  });
+
   it('POST returns 409 on a stale baseUpdatedAt and does not clobber the other writer (F1)', async () => {
     const run = vi.fn(async () => ({ success: true }));
     const ctx = baseCtx({

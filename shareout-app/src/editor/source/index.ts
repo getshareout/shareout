@@ -122,6 +122,11 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
     if (!isSourceEditable(artifact.artifact_type)) {
       return errorResponse('UNSUPPORTED', 'This artifact type is not source-editable', 400);
     }
+    if (artifact.artifact_type === 'json') {
+      try { JSON.parse(body.content); } catch {
+        return errorResponse('VALIDATION_ERROR', 'content is not valid JSON', 400);
+      }
+    }
 
     // Artifact Tests BLOCK gate (see specs §3, §11): stage as a candidate when tests
     // block and a passing baseline exists; otherwise publish live. Never goes dark.

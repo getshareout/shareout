@@ -250,6 +250,7 @@ export async function publish(ctx: EditorContext, opts: { force?: boolean } = {}
     if (data.success) {
       showToast('Published successfully', 'success');
       ctx.state.isDirty = false;
+      ctx.state.draftUpdatedAt = undefined;
       if (data.versionNo) {
         ctx.state.version = data.versionNo;
         const versionIndicator = document.getElementById('version-indicator');

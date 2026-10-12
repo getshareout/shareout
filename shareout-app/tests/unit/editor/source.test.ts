@@ -190,4 +190,16 @@ describe('handleSourceEditor publish', () => {
     expect(res.status).toBe(400);
     expect((await res.json() as Record<string, unknown>).code).toBe('UNSUPPORTED');
   });
+
+  it('rejects invalid JSON for a json artifact without writing a version', async () => {
+    const env = publishEnv('json');
+    const res = await handleSourceEditor(
+      new Request('http://x/source/publish', { method: 'POST', body: JSON.stringify({ content: '{not json' }) }),
+      ctxFor(env),
+      'publish',
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json() as Record<string, unknown>).code).toBe('VALIDATION_ERROR');
+    expect(env.ARTIFACTS.put).not.toHaveBeenCalled();
+  });
 });

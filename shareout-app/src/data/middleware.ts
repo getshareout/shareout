@@ -439,6 +439,22 @@ async function verifyGoogleSession(
   return (await closedArtifactViewer(env, artifact, payload.userId, payload.email)) ?? deny;
 }
 
+/** Whether a signed-in user may view an artifact's metadata and comment on it: owner,
+ *  or the closed-artifact viewer rule (collaborator, internal member of a
+ *  workspace-visible artifact, grant). Public artifacts count for internal members of
+ *  their workspace. */
+export async function canViewArtifact(
+  env: Env,
+  artifact: { id: string; visibility: string; workspace_id: string | null; owner_id: string | null },
+  userId: string,
+  email: string | null,
+): Promise<boolean> {
+  if (artifact.owner_id && artifact.owner_id === userId) return true;
+  if (normalizeVisibility(artifact.visibility) === 'public' && artifact.workspace_id &&
+      await getInternalWorkspaceRole(env, artifact.workspace_id, userId)) return true;
+  return !!(await closedArtifactViewer(env, artifact, userId, email));
+}
+
 /** A signed-in non-owner's access to a closed (private/workspace) artifact: collaborator,
  *  internal member of a workspace-visible artifact, or a view grant. Null = no access. */
 async function closedArtifactViewer(

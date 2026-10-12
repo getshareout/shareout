@@ -26,7 +26,7 @@ export async function resolveArtifactEditorAccess(
   | { ok: false; response: Response }
 > {
   const artifact = await env.DB.prepare(
-    'SELECT id, owner_id, workspace_id, name, slug FROM artifacts WHERE id = ?'
+    'SELECT id, owner_id, workspace_id, name, slug FROM artifacts WHERE id = ? AND deleted_at IS NULL'
   ).bind(artifactId).first<ArtifactRow>();
 
   if (!artifact) {
@@ -110,7 +110,7 @@ export async function resolveSlugEditorAccess(
     SELECT a.id, a.slug, a.owner_id, a.workspace_id, a.visibility, a.name, a.description, a.artifact_type
     FROM artifacts a
     JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
-    WHERE d.slug = ?
+    WHERE d.slug = ? AND a.deleted_at IS NULL
   `).bind(slug).first<{
     id: string;
     slug: string;
