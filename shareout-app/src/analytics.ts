@@ -307,10 +307,12 @@ export async function getAccountAnalytics(
   env: Env,
   userIds: string[],
   days: number = 30,
+  workspaceId?: string,
 ): Promise<AccountAnalytics> {
   if (!userIds.length) return emptyAccountAnalytics(days);
   const uPh = userIds.map(() => '?').join(',');
-  const owned = `(SELECT id FROM artifacts WHERE owner_id IN (${uPh}) AND deleted_at IS NULL)`;
+  const owned = `(SELECT id FROM artifacts WHERE owner_id IN (${uPh}) AND deleted_at IS NULL${workspaceId ? ' AND workspace_id = ?' : ''})`;
+  const ownedParams = workspaceId ? [...userIds, workspaceId] : userIds;
 
   const now = Date.now();
   const todayStr = dayStr(now);
@@ -324,26 +326,26 @@ export async function getAccountAnalytics(
       env.DB.prepare(`SELECT date, SUM(views) AS views, SUM(unique_visitors) AS uniques,
           json_group_array(top_countries) AS countries, json_group_array(top_referrers) AS referrers
         FROM analytics_daily WHERE artifact_id IN ${owned} AND date >= ? AND date < ?
-        GROUP BY date ORDER BY date`).bind(...userIds, startStr, todayStr),
+        GROUP BY date ORDER BY date`).bind(...ownedParams, startStr, todayStr),
       env.DB.prepare(`SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_hash) AS uniques
-        FROM analytics_events WHERE artifact_id IN ${owned} AND created_at >= ?`).bind(...userIds, todayStart),
+        FROM analytics_events WHERE artifact_id IN ${owned} AND created_at >= ?`).bind(...ownedParams, todayStart),
       env.DB.prepare(`SELECT COALESCE(SUM(views),0) AS views, COALESCE(SUM(unique_visitors),0) AS uniques
-        FROM analytics_daily WHERE artifact_id IN ${owned} AND date >= ? AND date < ?`).bind(...userIds, prevStartStr, startStr),
+        FROM analytics_daily WHERE artifact_id IN ${owned} AND date >= ? AND date < ?`).bind(...ownedParams, prevStartStr, startStr),
       env.DB.prepare(`SELECT ad.artifact_id, a.name, COALESCE(d.slug, a.slug) AS slug,
           SUM(ad.views) AS views, SUM(ad.unique_visitors) AS uniques, MAX(ad.date) AS last
         FROM analytics_daily ad
         JOIN artifacts a ON a.id = ad.artifact_id
         LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
         WHERE ad.artifact_id IN ${owned} AND ad.date >= ?
-        GROUP BY ad.artifact_id ORDER BY views DESC LIMIT 20`).bind(...userIds, startStr),
+        GROUP BY ad.artifact_id ORDER BY views DESC LIMIT 20`).bind(...ownedParams, startStr),
       env.DB.prepare(`SELECT artifact_id, COUNT(*) AS views, COUNT(DISTINCT visitor_hash) AS uniques
         FROM analytics_events WHERE artifact_id IN ${owned} AND created_at >= ?
-        GROUP BY artifact_id`).bind(...userIds, todayStart),
+        GROUP BY artifact_id`).bind(...ownedParams, todayStart),
       env.DB.prepare(`SELECT fcp, lcp, dcl, ttfb FROM artifact_perf
         WHERE artifact_id IN ${owned} AND created_at >= ? ORDER BY created_at DESC LIMIT 2000`)
-        .bind(...userIds, new Date((todayStart - (days - 1) * 86400) * 1000).toISOString()),
+        .bind(...ownedParams, new Date((todayStart - (days - 1) * 86400) * 1000).toISOString()),
       env.DB.prepare(`SELECT COUNT(DISTINCT artifact_id) AS n FROM analytics_daily
-        WHERE artifact_id IN ${owned} AND date >= ?`).bind(...userIds, startStr),
+        WHERE artifact_id IN ${owned} AND date >= ?`).bind(...ownedParams, startStr),
     ]);
 
     const dailyRows = (dailyRes.results || []) as Array<{ date: string; views: number; uniques: number; countries: string; referrers: string }>;

@@ -3,6 +3,7 @@ import type { AccountTool } from './types';
 import type { PendingAction } from '../actions';
 import { listRulesForOwner, getRule } from '../../metric-alerts/rules';
 import { listJobs } from '../../scheduling/jobs/crud';
+import { PERSONAL_SCOPE } from '../../chat-platforms/types';
 import { resolveArtifactAccessForUser } from '../access';
 import { getCrew } from '../../crew/store';
 import { proposeEdit } from '../../data/agent/headless-edit';
@@ -25,12 +26,18 @@ async function artifactName(env: Env, artifactId: string): Promise<string> {
 
 // ── Read tools (so the agent can find the id to act on) ──────────────────────
 
+/** The chat's workspace selection as a list filter: undefined = all, null = personal. */
+function scopeOf(ctx: { selectedWorkspaceId?: string | null }): string | null | undefined {
+  const ws = ctx.selectedWorkspaceId;
+  return ws === PERSONAL_SCOPE ? null : ws || undefined;
+}
+
 export const listAlertsTool: AccountTool = {
   name: 'list_alerts',
   description: "List the user's metric alerts (id, name, metric, enabled). Use the id with manage_alert.",
   input_schema: { type: 'object', properties: {} },
   async execute(ctx) {
-    const rules = await listRulesForOwner(ctx.env, ctx.userId);
+    const rules = await listRulesForOwner(ctx.env, ctx.userId, scopeOf(ctx));
     return { alerts: rules.map((r) => ({ id: r.id, name: r.name, metric_id: r.metric_id, enabled: r.enabled })) };
   },
 };
@@ -40,7 +47,7 @@ export const listJobsTool: AccountTool = {
   description: "List the user's scheduled jobs (id, action, schedule, enabled). Use the id with manage_job.",
   input_schema: { type: 'object', properties: {} },
   async execute(ctx) {
-    const jobs = await listJobs(ctx.env, ctx.userId);
+    const jobs = await listJobs(ctx.env, ctx.userId, undefined, scopeOf(ctx));
     return { jobs: jobs.map((j) => ({ id: j.id, action: j.action, schedule: j.schedule, enabled: j.enabled })) };
   },
 };
@@ -83,7 +90,7 @@ export const manageJobTool: AccountTool = {
     const jobId = typeof input.job_id === 'string' ? input.job_id : '';
     const op = input.operation;
     // Existence + a friendly label; permission is enforced when the action runs.
-    const jobs = await listJobs(ctx.env, ctx.userId);
+    const jobs = await listJobs(ctx.env, ctx.userId, undefined, scopeOf(ctx));
     const job = jobs.find((j) => j.id === jobId);
     if (!job) return { error: 'Schedule not found (or not yours).' };
     const kind = op === 'delete' ? 'job_delete' : op === 'resume' ? 'job_resume' : 'job_pause';

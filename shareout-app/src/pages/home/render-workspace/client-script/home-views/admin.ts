@@ -413,7 +413,7 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
     var run = function () { return Promise.all([
       fetch(wsUrl('/audit?limit=50'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
       fetch(wsUrl('/access-policy'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      fetch('/v1/access-requests/incoming', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+      fetch('/v1/access-requests/incoming?workspace_id=' + encodeURIComponent(window.WSX_WS), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
       fetch(wsUrl('/session-policy'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
       fetch(wsUrl('/agent-tokens'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
       fetch(wsUrl('/publish-approvals'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })

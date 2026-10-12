@@ -113,10 +113,11 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
       })
       .catch(function () {});
   }
-  fillCardWidget('wsxForYou', '/v1/home/for-you?limit=12', t('activity.nothingForYou'));
+  var homeWsq = window.WSX_WS ? '&workspace=' + encodeURIComponent(window.WSX_WS) : '';
+  fillCardWidget('wsxForYou', '/v1/home/for-you?limit=12' + homeWsq, t('activity.nothingForYou'));
   (function () {
     var id = 'wsxRecentW';
-    fetch('/v1/home/recent?limit=8', { credentials: 'same-origin' })
+    fetch('/v1/home/recent?limit=8' + homeWsq, { credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         var el = document.getElementById(id); var cEl = document.getElementById(id + 'Count');

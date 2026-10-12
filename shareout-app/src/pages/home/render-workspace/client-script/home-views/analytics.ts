@@ -47,7 +47,7 @@ export const workspace_client_home_views_analytics_JS = `  // ----- Analytics â€
   }
   function loadAccountAnalytics() {
     var m = document.getElementById('wsxAnalyticsMount'); m.innerHTML = i18nLoad();
-    fetch('/v1/home/analytics?range=' + anRange, { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; })
+    fetch('/v1/home/analytics?range=' + anRange + (window.WSX_WS ? '&workspace=' + encodeURIComponent(window.WSX_WS) : ''), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) { if (!d) { m.innerHTML = i18nEmpty('analytics.none'); return; } paintAnalytics(d); })
       .catch(function () { m.innerHTML = i18nError('common.couldNotLoad'); });
   }

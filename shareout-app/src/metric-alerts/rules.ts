@@ -197,11 +197,15 @@ export async function listRulesForArtifact(
   return { rules };
 }
 
-/** A user's own alert rules across every artifact (the personal "My alerts" view). */
-export async function listRulesForOwner(env: Env, userId: string): Promise<MetricAlertRule[]> {
+/** A user's own alert rules (the "My alerts" view). workspaceId: undefined = every workspace, null = personal pages only. */
+export async function listRulesForOwner(env: Env, userId: string, workspaceId?: string | null): Promise<MetricAlertRule[]> {
+  const scope = workspaceId === null
+    ? ' AND artifact_id IN (SELECT id FROM artifacts WHERE workspace_id IS NULL)'
+    : workspaceId ? ' AND artifact_id IN (SELECT id FROM artifacts WHERE workspace_id = ?)' : '';
+  const params = workspaceId ? [userId, workspaceId] : [userId];
   const result = await env.DB.prepare(
-    'SELECT * FROM metric_alert_rules WHERE owner_id = ? ORDER BY created_at DESC'
-  ).bind(userId).all<Record<string, unknown>>();
+    `SELECT * FROM metric_alert_rules WHERE owner_id = ?${scope} ORDER BY created_at DESC`
+  ).bind(...params).all<Record<string, unknown>>();
   const rules = (result.results || []).map(rowToRule);
   await attachHistories(env, rules);
   return rules;

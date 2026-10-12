@@ -7,7 +7,7 @@ import { quickSearch, type SearchGroup } from '../../search/quick-search';
 import { getAccountAnalytics } from '../../analytics';
 import { hostWorkspaceId } from './host';
 import { renderFolderReadme } from './folder-readme';
-import { parseHomeFilters } from './filters';
+import { parseHomeFilters, isLinkedWorkspaceMember } from './filters';
 import { queryHomeArtifacts, queryHomeArtifactCatalog, queryHomeCounts, queryForYou, queryRecentlyViewed, recordRecentView } from './queries/artifacts';
 import { queryHomeTags } from './queries/tags';
 import { queryPersonalFolders, queryTeamFolders, queryFoldersInParent, queryFolderPath, queryFolderReadme } from './queries/folders';
@@ -26,11 +26,19 @@ import { renderArtifactCard, renderArtifactRow, renderHomeEmptyState, renderRece
 import { buildResultLabel } from './utils';
 import { getUserProfile, setUserProfile, addFollow, removeFollow, type Follow, type FollowKind } from '../../users/user-profile';
 
-/** Resolve the active workspace: pinned by host on a subdomain, else ?workspace. */
-async function resolveWorkspace(request: Request, env: Env): Promise<string | null> {
-  const hostWs = await hostWorkspaceId(request, env);
-  if (hostWs) return hostWs;
-  return new URL(request.url).searchParams.get('workspace')?.trim() || null;
+/**
+ * Resolve the active workspace: pinned by host on a subdomain, else ?workspace.
+ * A workspace the user is not a member of yields a 403 Response.
+ */
+async function resolveWorkspace(
+  request: Request,
+  env: Env,
+  user: { id: string; email: string | null },
+): Promise<string | null | Response> {
+  const ws = (await hostWorkspaceId(request, env)) || new URL(request.url).searchParams.get('workspace')?.trim() || null;
+  if (!ws) return null;
+  if (await isLinkedWorkspaceMember(env, await getVisibilityScope(env, user), ws)) return ws;
+  return Response.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
 }
 
 const PULSE_WINDOWS: PulseWindow[] = ['today', '7d', '30d'];
@@ -42,7 +50,8 @@ export async function handleHomeActivityFeedApi(
   user: { id: string; email: string | null },
 ): Promise<Response> {
   const url = new URL(request.url);
-  const workspaceId = await resolveWorkspace(request, env);
+  const workspaceId = await resolveWorkspace(request, env, user);
+  if (workspaceId instanceof Response) return workspaceId;
   const limit = Number(url.searchParams.get('limit')) || 30;
   const w = url.searchParams.get('window');
   const window: PulseWindow = PULSE_WINDOWS.includes(w as PulseWindow) ? (w as PulseWindow) : '7d';
@@ -56,7 +65,8 @@ export async function handleHomeEventVisibilityGetApi(
   env: Env,
   user: { id: string; email: string | null },
 ): Promise<Response> {
-  const workspaceId = await resolveWorkspace(request, env);
+  const workspaceId = await resolveWorkspace(request, env, user);
+  if (workspaceId instanceof Response) return workspaceId;
   const role = workspaceId ? await getInternalWorkspaceRole(env, workspaceId, user.id) : null;
   const canManage = role === 'owner' || role === 'admin';
   const audiences = await resolveWorkspaceAudiences(env, workspaceId);
@@ -74,7 +84,8 @@ export async function handleHomeEventVisibilitySetApi(
   env: Env,
   user: { id: string; email: string | null },
 ): Promise<Response> {
-  const workspaceId = await resolveWorkspace(request, env);
+  const workspaceId = await resolveWorkspace(request, env, user);
+  if (workspaceId instanceof Response) return workspaceId;
   if (!workspaceId) return Response.json({ error: 'workspace required' }, { status: 400 });
   const role = await getInternalWorkspaceRole(env, workspaceId, user.id);
   if (role !== 'owner' && role !== 'admin') return Response.json({ error: 'Forbidden' }, { status: 403 });
@@ -93,7 +104,8 @@ export async function handleHomeForYouApi(
   user: { id: string; email: string | null },
 ): Promise<Response> {
   const url = new URL(request.url);
-  const workspaceId = await resolveWorkspace(request, env);
+  const workspaceId = await resolveWorkspace(request, env, user);
+  if (workspaceId instanceof Response) return workspaceId;
   const limit = Number(url.searchParams.get('limit')) || 12;
   const artifacts = await queryForYou(env, user, { workspaceId, limit });
   return Response.json({
@@ -111,7 +123,8 @@ export async function handleHomeRecentApi(
 ): Promise<Response> {
   const url = new URL(request.url);
   const limit = Number(url.searchParams.get('limit')) || 24;
-  const workspaceId = await resolveWorkspace(request, env);
+  const workspaceId = await resolveWorkspace(request, env, user);
+  if (workspaceId instanceof Response) return workspaceId;
   const artifacts = await queryRecentlyViewed(env, user, { workspaceId, limit });
   return Response.json({
     cardsHtml: artifacts.map((a) => renderArtifactCard(a, url.hostname, env)).join(''),
@@ -250,7 +263,8 @@ export async function handleHomeActivityApi(
   env: Env,
   user: { id: string; email: string | null },
 ): Promise<Response> {
-  const workspaceId = await resolveWorkspace(request, env);
+  const workspaceId = await resolveWorkspace(request, env, user);
+  if (workspaceId instanceof Response) return workspaceId;
   const rows = await queryRecentActivity(env, user, workspaceId);
   return Response.json({ html: renderRecentActivity(rows) });
 }
@@ -260,7 +274,8 @@ export async function handleHomeCommentActivityApi(
   env: Env,
   user: { id: string; email: string | null },
 ): Promise<Response> {
-  const workspaceId = await resolveWorkspace(request, env);
+  const workspaceId = await resolveWorkspace(request, env, user);
+  if (workspaceId instanceof Response) return workspaceId;
   const rows = await queryRecentComments(env, user, workspaceId);
   return Response.json({ html: renderRecentComments(rows) });
 }
@@ -272,8 +287,10 @@ export async function handleHomeAnalyticsApi(
 ): Promise<Response> {
   const raw = Number(new URL(request.url).searchParams.get('range'));
   const range = raw === 7 || raw === 90 ? raw : 30;
+  const workspaceId = await resolveWorkspace(request, env, user);
+  if (workspaceId instanceof Response) return workspaceId;
   const scope = await getVisibilityScope(env, user);
-  const data = await getAccountAnalytics(env, scope.userIds, range);
+  const data = await getAccountAnalytics(env, scope.userIds, range, workspaceId || undefined);
   return Response.json(data);
 }
 

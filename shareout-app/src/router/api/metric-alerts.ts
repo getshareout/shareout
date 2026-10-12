@@ -89,8 +89,8 @@ export async function routeMetricAlertsApi(ctx: FetchContext): Promise<Response 
         const result = await listRulesForArtifact(env, user.id, artifactId);
         return addCORS(result.error ? errorJson(result.error) : json({ alerts: result.rules }));
       }
-      // No artifact_id → the caller's own alerts across every artifact (personal view).
-      const rules = await listRulesForOwner(env, user.id);
+      // No artifact_id → the caller's own alerts, optionally narrowed to one workspace.
+      const rules = await listRulesForOwner(env, user.id, url.searchParams.get('workspace_id') || undefined);
       return addCORS(json({ alerts: rules }));
     }
     if (request.method === 'POST') {

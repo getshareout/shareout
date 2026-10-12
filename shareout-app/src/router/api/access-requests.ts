@@ -21,7 +21,7 @@ export async function routeAccessRequestsApi(ctx: FetchContext): Promise<Respons
   if (path === '/v1/access-requests/incoming' && request.method === 'GET') {
     const user = await requireAuthUser(ctx);
     if (!isAuthUser(user)) return user;
-    return addCORS(await handleListIncomingAccessRequests(env, user));
+    return addCORS(await handleListIncomingAccessRequests(env, user, ctx.url.searchParams.get('workspace_id')));
   }
 
   const decideMatch = path.match(/^\/v1\/access-requests\/([^/]+)$/);

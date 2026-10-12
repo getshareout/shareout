@@ -142,7 +142,7 @@ async function handleBrief(ctx: FetchContext, ws: string | null, user: AuthUser)
   const u = { id: user.id, email: user.email };
   const [feed, an, row] = await Promise.all([
     queryActivityFeed(env, u, { workspaceId: ws, limit: 30, window: '7d' }).catch(() => null),
-    getVisibilityScope(env, u).then((s) => getAccountAnalytics(env, s.userIds, 7)).catch(() => null),
+    getVisibilityScope(env, u).then((s) => getAccountAnalytics(env, s.userIds, 7, ws || undefined)).catch(() => null),
     env.DB.prepare('SELECT name FROM users WHERE id = ?').bind(user.id).first<{ name: string | null }>().catch(() => null),
   ]);
 

@@ -778,8 +778,8 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     if (autoCache[art.id] !== undefined) { paintAutomate(art, autoCache[art.id]); return; }
     rbodyEl.innerHTML = '<div class="wsx-cm">' + i18nLoad() + '</div>';
     Promise.all([
-      fetch('/v1/jobs', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      fetch('/v1/metric-alerts', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+      fetch('/v1/jobs' + (window.WSX_WS ? '?workspace_id=' + encodeURIComponent(window.WSX_WS) : ''),{ credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+      fetch('/v1/metric-alerts' + (window.WSX_WS ? '?workspace_id=' + encodeURIComponent(window.WSX_WS) : ''), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
     ]).then(function (res) {
       var jobs = ((res[0] && (res[0].jobs || res[0].items)) || []).filter(function (j) { return !art.id || j.artifact_id === art.id; });
       var alerts = ((res[1] && res[1].alerts) || []).filter(function (a) { return !art.id || a.artifact_id === art.id; });
