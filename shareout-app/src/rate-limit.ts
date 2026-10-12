@@ -64,7 +64,8 @@ function calculateSlidingWindowCount(
 export async function checkSlidingWindowRateLimit(
   kv: KVNamespace | undefined,
   identifier: string,
-  action: RateLimitAction
+  action: RateLimitAction,
+  defer?: (write: Promise<unknown>) => void
 ): Promise<RateLimitResult> {
   const config = RATE_LIMITS[action];
   const reset = getWindowEnd(config.windowSeconds);
@@ -104,9 +105,11 @@ export async function checkSlidingWindowRateLimit(
   // Atomic increment using KV with metadata for optimistic concurrency
   // Note: KV doesn't support true atomic increment, so we accept eventual consistency
   // For strict atomicity, use Durable Objects (see RateLimitCoordinator below)
-  await kv.put(currKey, String(currCount + 1), {
+  const write = kv.put(currKey, String(currCount + 1), {
     expirationTtl: config.windowSeconds * 2 + 60
   });
+  if (defer) defer(write);
+  else await write;
 
   return {
     allowed: true,
@@ -120,9 +123,10 @@ export async function checkSlidingWindowRateLimit(
 export async function checkKVRateLimit(
   kv: KVNamespace | undefined,
   identifier: string,
-  action: RateLimitAction
+  action: RateLimitAction,
+  defer?: (write: Promise<unknown>) => void
 ): Promise<RateLimitResult> {
-  return checkSlidingWindowRateLimit(kv, identifier, action);
+  return checkSlidingWindowRateLimit(kv, identifier, action, defer);
 }
 
 export async function checkAccountCreation(
@@ -134,16 +138,18 @@ export async function checkAccountCreation(
 
 export async function checkAiChatLimit(
   env: Env,
-  userId: string
+  userId: string,
+  defer?: (write: Promise<unknown>) => void
 ): Promise<RateLimitResult> {
-  return checkKVRateLimit(env.RATE_LIMIT_KV, userId, 'aiChat');
+  return checkKVRateLimit(env.RATE_LIMIT_KV, userId, 'aiChat', defer);
 }
 
 export async function checkWebAgentWorkspaceLimit(
   env: Env,
-  workspaceId: string
+  workspaceId: string,
+  defer?: (write: Promise<unknown>) => void
 ): Promise<RateLimitResult> {
-  return checkKVRateLimit(env.RATE_LIMIT_KV, workspaceId, 'webAgentWorkspace');
+  return checkKVRateLimit(env.RATE_LIMIT_KV, workspaceId, 'webAgentWorkspace', defer);
 }
 
 export async function checkWebAgentQueryLimit(

@@ -53,6 +53,8 @@ export interface ChatTurnConfig {
   threadId?: string;
   buildSnapshot: () => Promise<string>;
   extraTools?: AccountTool[];
+  /** Pre-stream phase timings (ms) from the route, folded into the turn's chat.timing line. */
+  timing?: Record<string, number>;
 }
 
 /** One streamed chat turn. Creates a thread if none was supplied, then runs the
@@ -94,7 +96,7 @@ export function streamAgentChat(env: Env, cfg: ChatTurnConfig): Response {
       reply,
       workspaceContext: snapshot,
       extraTools: cfg.extraTools,
-      timing: { context_ms: contextAt - started, save_ms: Date.now() - contextAt },
+      timing: { ...cfg.timing, context_ms: contextAt - started, save_ms: Date.now() - contextAt },
     });
 
     const summary = result.proposal ? describeAction(result.proposal, locale) : '';

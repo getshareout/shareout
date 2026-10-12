@@ -158,6 +158,24 @@ describe('env rate limit wrappers', () => {
   });
 });
 
+describe('deferred counter write', () => {
+  it('decides without waiting for the KV write when given a defer hook', async () => {
+    const deferred: Promise<unknown>[] = [];
+    const env = {
+      RATE_LIMIT_KV: {
+        get: async () => '3',
+        put: () => new Promise<void>(() => {}),
+      },
+    } as unknown as Env;
+
+    await expect(checkAiChatLimit(env, 'user_1', (p) => deferred.push(p))).resolves.toMatchObject({
+      allowed: true,
+      limit: 100,
+    });
+    expect(deferred).toHaveLength(1);
+  });
+});
+
 describe('auth / access / bridge helpers', () => {
   it('enforces emailOtpStart per IP', async () => {
     const env = kvEnv();
