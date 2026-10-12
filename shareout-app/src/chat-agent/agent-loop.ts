@@ -1,6 +1,8 @@
 import type { Env } from '../types';
 import { crewProviderFor, getCrewProvider, type NeutralTurn, type NeutralToolCall, type ProviderTool } from '../crew/provider';
-import { getWorkspaceByoConfig, resolveGatewayModel } from '../data/agent/ai-config';
+import { resolveWorkspaceAi } from '../data/agent/ai-config';
+import { recordAiUsage } from '../data/ai-usage';
+import { computeBaseCostMicroUsd } from '../data/agent/model-costs';
 import type { ChatReplyPort, PlatformId, WorkspaceSelection } from '../chat-platforms/types';
 import { PERSONAL_SCOPE } from '../chat-platforms/types';
 import { selectTools, defaultCapabilities, type Capabilities } from './tools/index';
@@ -53,6 +55,12 @@ export interface TurnInput {
   capabilities?: Capabilities;
   /** Language to speak; resolved from the user + workspace when omitted. */
   locale?: Locale;
+  /** Caller's pre-turn phase timings (ms), folded into the turn's chat.timing log line. */
+  timing?: Record<string, number>;
+  /** Usage-ledger kind for this turn (default 'assistant_chat'). */
+  usageKind?: string;
+  /** Sees every tool call's result (e.g. to collect the pages an answer drew on). */
+  onToolResult?: (name: string, input: Record<string, unknown>, output: unknown) => void;
 }
 
 const MAX_ITERATIONS = 12;
@@ -169,23 +177,36 @@ function truncate(s: string): string {
 }
 
 export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResult> {
+  const started = Date.now();
   const platform = input.platform ?? 'telegram';
-  const flagWs = typeof input.selectedWorkspaceId === 'string' && input.selectedWorkspaceId !== PERSONAL_SCOPE
+  const selectedWs = typeof input.selectedWorkspaceId === 'string' && input.selectedWorkspaceId !== PERSONAL_SCOPE
     ? input.selectedWorkspaceId
-    : (await getUserWorkspaceIds(env, input.userId))[0] ?? null;
-  const locale = input.locale
-    ?? await localeForRecipient(env, { userId: input.userId, workspaceId: flagWs }).catch((): Locale => 'en');
+    : null;
+  const flagWs = selectedWs ?? (await getUserWorkspaceIds(env, input.userId))[0] ?? null;
+  // Per-user skills the user attached to their agent (same scope semantics as the
+  // Library attach UI): personal → '__personal', else the selected/first workspace.
+  const skillScope = input.selectedWorkspaceId === PERSONAL_SCOPE
+    ? '__personal'
+    : typeof input.selectedWorkspaceId === 'string'
+      ? input.selectedWorkspaceId
+      : (flagWs ?? '__personal');
+  const wsAt = Date.now();
+  const [locale, enabled, ai, agentSkillsDoc] = await Promise.all([
+    input.locale ?? localeForRecipient(env, { userId: input.userId, workspaceId: flagWs }).catch((): Locale => 'en'),
+    isFeatureEnabled(env, botFeatureFlag(platform), flagWs),
+    resolveWorkspaceAi(env, flagWs),
+    buildAgentSkillsDoc(env, skillScope, input.userId),
+  ]);
+  const setupAt = Date.now();
   const replies = agentFallbackReplies(locale);
-  if (!(await isFeatureEnabled(env, botFeatureFlag(platform), flagWs))) {
+  if (!enabled) {
     if (platform === 'web') {
       return { reply: await webAgentBlockedMessage(env, flagWs) };
     }
     return { reply: botDisabledMessage(platform, locale) };
   }
 
-  const gatewayModel = await resolveGatewayModel(env, flagWs);
-  const byo = flagWs ? await getWorkspaceByoConfig(env, flagWs, gatewayModel) : null;
-  const provider = byo ? crewProviderFor(env, byo) : getCrewProvider(env, gatewayModel);
+  const provider = ai.byo ? crewProviderFor(env, ai.byo) : getCrewProvider(env, ai.gatewayModel);
   if (!provider) return { reply: await noProviderReply(env, input.userId, locale) };
 
   const caps = input.capabilities ?? defaultCapabilities(platform);
@@ -199,14 +220,6 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
     const closed = Object.keys(TOOLKITS).filter((k) => !openKits.has(k) && TOOLKITS[k].tools.some((n) => available.has(n)));
     return closed.length ? [...visible, openToolkitTool(closed, available)] : visible;
   };
-  // Per-user skills the user attached to their agent (same scope semantics as the
-  // Library attach UI): personal → '__personal', else the selected/first workspace.
-  const skillScope = input.selectedWorkspaceId === PERSONAL_SCOPE
-    ? '__personal'
-    : typeof input.selectedWorkspaceId === 'string'
-      ? input.selectedWorkspaceId
-      : (flagWs ?? '__personal');
-  const agentSkillsDoc = await buildAgentSkillsDoc(env, skillScope, input.userId);
   const system = systemPrompt(platform, caps, input.selectedWorkspaceId, input.workspaceContext, locale)
     + (agentSkillsDoc ? '\n\n' + agentSkillsDoc : '');
 
@@ -223,15 +236,18 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
   }
   transcript.push({ role: 'user', text: input.userText });
 
-  const started = Date.now();
-  const deadline = started + TURN_DEADLINE_MS;
+  const deadline = Date.now() + TURN_DEADLINE_MS;
   const notes: string[] = [];
   const toolsUsed: string[] = [];
   let iterations = 0;
   let inputTokens = 0;
   let outputTokens = 0;
+  let firstTokenMs: number | null = null;
+  let llmMs = 0;
+  let toolsMs = 0;
 
-  const finish = (r: TurnResult): TurnResult => {
+  const finish = async (r: TurnResult): Promise<TurnResult> => {
+    const totalMs = Date.now() - started;
     createLogger(env, { scope: 'chat-agent', event: 'chat_agent.turn' }).info('agent turn', {
       platform,
       provider: provider.provider,
@@ -243,17 +259,46 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
       output_tokens: outputTokens,
       proposal: r.proposal?.kind ?? null,
     });
+    createLogger(env, { scope: 'chat.timing' }).info('agent turn timing', {
+      platform,
+      model: provider.model,
+      ...input.timing,
+      workspace_ms: wsAt - started,
+      setup_ms: setupAt - wsAt,
+      ttft_ms: firstTokenMs,
+      llm_ms: llmMs,
+      tools_ms: toolsMs,
+      rounds: iterations,
+      tools: toolsUsed.length,
+      system_chars: system.length,
+      total_ms: totalMs + (input.timing ? Object.values(input.timing).reduce((a, b) => a + b, 0) : 0),
+      turn_ms: totalMs,
+    });
+    if (inputTokens + outputTokens > 0) {
+      await recordAiUsage(env, {
+        workspaceId: selectedWs,
+        userId: input.userId,
+        kind: input.usageKind ?? 'assistant_chat',
+        model: provider.model,
+        units: inputTokens + outputTokens,
+        unitKind: 'tokens',
+        baseCostMicroUsd: computeBaseCostMicroUsd(provider.model, inputTokens, outputTokens),
+        source: platform,
+      }).catch(() => {});
+    }
     const toolNotes = notes.join('\n').slice(0, MAX_NOTES_CHARS);
     return toolNotes ? { ...r, toolNotes } : r;
   };
 
   const callModel = async (callTools: ProviderTool[]) => {
     iterations++;
+    const callAt = Date.now();
     let text = '';
     const toolCalls: NeutralToolCall[] = [];
     let stopReason = 'end_turn';
     let errored = false;
     for await (const ev of provider.streamTurn({ system, transcript, tools: callTools, maxTokens: MAX_TOKENS })) {
+      if (firstTokenMs === null && ev.type !== 'error') firstTokenMs = Date.now() - callAt;
       if (ev.type === 'text_delta') { text += ev.text; await input.reply?.sendTextDelta?.(ev.text); }
       else if (ev.type === 'tool_use') toolCalls.push({ id: ev.id, name: ev.name, input: ev.input });
       else if (ev.type === 'message_stop') {
@@ -263,6 +308,7 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
       }
       else if (ev.type === 'error') errored = true;
     }
+    llmMs += Date.now() - callAt;
     return { text, toolCalls, stopReason, errored };
   };
 
@@ -286,6 +332,7 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
       return finish({ reply: text || replies.empty });
     }
 
+    const toolsAt = Date.now();
     const results: Array<{ id: string; content: string }> = [];
     for (const tc of toolCalls) {
       if (tc.name === OPEN_TOOLKIT) {
@@ -318,8 +365,10 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
             selectedWorkspaceId: input.selectedWorkspaceId,
           }, tc.input);
           if (out && typeof out === 'object' && '__propose' in out) {
+            toolsMs += Date.now() - toolsAt;
             return finish({ reply: text, proposal: (out as { __propose: PendingAction }).__propose });
           }
+          input.onToolResult?.(tc.name, tc.input, out);
           content = JSON.stringify(out);
         } catch (err) {
           logAgentToolFailure(env, { tool: tc.name, userId: input.userId, platform }, err);
@@ -329,6 +378,7 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
       }
       results.push({ id: tc.id, content: truncate(content) });
     }
+    toolsMs += Date.now() - toolsAt;
     transcript.push({ role: 'tool', results });
   }
 

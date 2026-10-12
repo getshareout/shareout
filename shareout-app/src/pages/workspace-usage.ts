@@ -237,17 +237,17 @@ const pageScript = `
   function loadUsage() {
     return fetch(base + '/usage?limit=50', { credentials: 'include' }).then(function (r) { return r.json(); }).then(function (d) {
       document.getElementById('totalReq').textContent = d.totals.requests;
-      document.getElementById('totalTok').textContent = (d.totals.inputTokens + d.totals.outputTokens).toLocaleString();
+      document.getElementById('totalTok').textContent = (d.totals.tokens != null ? d.totals.tokens : d.totals.inputTokens + d.totals.outputTokens).toLocaleString();
       var tb = document.getElementById('usageRows');
       if (!d.events.length) { tb.innerHTML = '<tr><td colspan="8" class="muted">No usage yet.</td></tr>'; return; }
       tb.innerHTML = d.events.map(function (e) {
         return '<tr>' +
           '<td>' + new Date(e.createdAt + 'Z').toLocaleString() + '</td>' +
-          '<td>' + (e.artifactName || e.artifactId) + '</td>' +
+          '<td>' + (e.artifactName || e.artifactId || '—') + '</td>' +
           '<td>' + e.mode + '</td>' +
           '<td>' + e.model + '</td>' +
-          '<td class="num">' + e.inputTokens + '</td>' +
-          '<td class="num">' + e.outputTokens + '</td>' +
+          '<td class="num">' + (e.inputTokens == null ? '—' : e.inputTokens) + '</td>' +
+          '<td class="num">' + (e.outputTokens == null ? e.tokens + ' total' : e.outputTokens) + '</td>' +
           '<td class="num">' + usd(e.billedCostUsd) + '</td>' +
           '<td>' + (e.byo ? '<span class="tag byo">own key</span>' : '<span class="tag">platform</span>') + '</td>' +
         '</tr>';

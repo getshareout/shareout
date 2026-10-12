@@ -44,8 +44,11 @@ vi.mock('../../../src/superadmin/auth', () => ({
   isPlatformAdmin: vi.fn(async () => h.admin),
 }));
 vi.mock('../../../src/data/agent/ai-config', () => ({
-  resolveGatewayModel: vi.fn().mockResolvedValue(null),
-  getWorkspaceByoConfig: vi.fn(async (...args: unknown[]) => { h.byoArgs = args; return h.byo; }),
+  resolveWorkspaceAi: vi.fn(async (...args: unknown[]) => {
+    if (!args[1]) return { gatewayModel: null, byo: null };
+    h.byoArgs = args;
+    return { gatewayModel: null, byo: h.byo };
+  }),
 }));
 vi.mock('../../../src/logging', async (orig) => {
   const actual = await orig<typeof import('../../../src/logging')>();

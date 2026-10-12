@@ -21,7 +21,10 @@ function makeEnv(rows: Array<{ role: string; content: string }> = []): Env {
     prepare: (sql: string) => ({
       bind: (...args: unknown[]) => ({
         first: async () => null,
-        all: async () => ({ results: sql.includes('FROM agent_messages') ? [...rows].reverse() : [] }),
+        all: async () => {
+          if (sql.includes('FROM agent_messages')) log.push('history');
+          return { results: sql.includes('FROM agent_messages') ? [...rows].reverse() : [] };
+        },
         run: async () => {
           if (sql.includes('INSERT INTO agent_messages')) { inserts.push(args); log.push(`insert:${args[2]}`); }
           return { meta: { changes: 1 } };
@@ -53,7 +56,22 @@ describe('streamAgentChat', () => {
 
     await events(streamAgentChat(env, { scopeKey: 'ws1', user, selectedWorkspaceId: 'ws1', text: 'hola', threadId: 'wat_1', buildSnapshot: async () => '' }));
 
-    expect(log).toEqual(['insert:user', 'turn']);
+    expect(log).toEqual(['history', 'insert:user', 'turn']);
+  });
+
+  it('opens a new thread without loading history, and hands the turn its context and timing', async () => {
+    runAgentTurn.mockImplementation(async () => { log.push('turn'); return { reply: 'ok' }; });
+    const env = makeEnv();
+
+    const evs = await events(streamAgentChat(env, { scopeKey: 'ws1', user, selectedWorkspaceId: 'ws1', text: 'hola', buildSnapshot: async () => 'SNAP' }));
+
+    const thread = evs.find((e) => e.type === 'thread')!;
+    expect(evs.map((e) => e.type)).toEqual(['thread', 'text', 'done']);
+    expect(log).toEqual(['insert:user', 'turn', 'insert:assistant']);
+    expect(inserts[0][1]).toBe(thread.id);
+    const input = runAgentTurn.mock.calls[0][1];
+    expect(input).toMatchObject({ locale: 'en', platform: 'web', userId: 'u1', selectedWorkspaceId: 'ws1', userText: 'hola', history: [], workspaceContext: 'SNAP' });
+    expect(Object.keys(input.timing)).toEqual(['context_ms', 'save_ms']);
   });
 
   it('does not save a retried message twice or replay it to the model as history', async () => {
