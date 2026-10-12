@@ -1,4 +1,4 @@
-import { handleServe } from '../serve/handle-serve';
+import { handleServe, gateArtifactSideAsset } from '../serve/handle-serve';
 import { handleServeText } from '../serve/handle-serve-text';
 import { handleServeNamespaced } from '../serve/namespaced';
 import { handleServeEmbed } from '../serve/embed';
@@ -415,22 +415,15 @@ async function routeArtifactServe(ctx: FetchContext): Promise<Response | null> {
 
   const [, slug, assetPath] = match;
 
-  if (assetPath === 'manifest.json') {
-    return handleManifest(env, slug);
-  }
-
-  if (assetPath === 'sw.js') {
-    return handleServiceWorker(env, slug);
-  }
-
-  const iconMatch = assetPath.match(/^_pwa\/icon-(\d+)\.png$/);
-  if (iconMatch) {
-    return handlePWAIcon(env, slug, parseInt(iconMatch[1], 10));
-  }
-
-  const screenshotMatch = assetPath.match(/^_pwa\/screenshot-(mobile|desktop)\.png$/);
-  if (screenshotMatch) {
-    return handlePWAScreenshot(env, slug, screenshotMatch[1] as 'mobile' | 'desktop');
+  const pwa = servePwaAsset(env, slug, assetPath);
+  if (pwa) {
+    const gate = await gateArtifactSideAsset(request, env, slug);
+    if (gate instanceof Response) return gate;
+    const res = await pwa();
+    if (gate.isOpen) return res;
+    const headers = new Headers(res.headers);
+    headers.set('Cache-Control', 'private, no-store');
+    return new Response(res.body, { status: res.status, headers });
   }
 
   if (assetPath === 'edit' || assetPath.startsWith('edit/')) {
@@ -439,6 +432,16 @@ async function routeArtifactServe(ctx: FetchContext): Promise<Response | null> {
 
   const cached = ctx.deployment?.slug === slug ? ctx.deployment.record : undefined;
   return handleServe(request, env, slug, assetPath, { executionCtx: ctx.executionCtx, cached });
+}
+
+function servePwaAsset(env: Env, slug: string, assetPath: string): (() => Promise<Response>) | null {
+  if (assetPath === 'manifest.json') return () => handleManifest(env, slug);
+  if (assetPath === 'sw.js') return () => handleServiceWorker(env, slug);
+  const iconMatch = assetPath.match(/^_pwa\/icon-(\d+)\.png$/);
+  if (iconMatch) return () => handlePWAIcon(env, slug, parseInt(iconMatch[1], 10));
+  const screenshotMatch = assetPath.match(/^_pwa\/screenshot-(mobile|desktop)\.png$/);
+  if (screenshotMatch) return () => handlePWAScreenshot(env, slug, screenshotMatch[1] as 'mobile' | 'desktop');
+  return null;
 }
 
 async function routeEditorServe(
