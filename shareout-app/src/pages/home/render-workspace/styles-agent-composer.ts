@@ -43,6 +43,10 @@ export const WORKSPACE_AGENT_COMPOSER_STYLES = `/* ---- agent dock (inside canva
 .wsx-msg.bot code { font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.92em; background: var(--color-bg); padding: 1px 5px; border-radius: 5px; }
 .wsx-msg.bot .wsx-pre { margin: 6px 0; padding: 10px 12px; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow-x: auto; }
 .wsx-msg.bot .wsx-pre code { background: transparent; padding: 0; font-size: 0.86em; line-height: 1.5; white-space: pre; }
+.wsx-msg.bot .wsx-tablewrap { margin: 6px 0; overflow-x: auto; }
+.wsx-msg.bot .wsx-table { border-collapse: collapse; font-size: 0.92em; }
+.wsx-msg.bot .wsx-table th, .wsx-msg.bot .wsx-table td { padding: 5px 10px; border: 1px solid var(--color-border); text-align: left; vertical-align: top; }
+.wsx-msg.bot .wsx-table th { background: var(--color-bg); font-weight: 600; }
 .wsx-msg.bot .wsx-bq { margin: 6px 0; padding: 2px 0 2px 11px; border-left: 3px solid var(--color-border-strong); color: var(--color-text-secondary); }
 .wsx-msg.bot .wsx-hr { border: 0; border-top: 1px solid var(--color-border); margin: 9px 0; }
 .wsx-msg.bot a { color: var(--color-primary); }

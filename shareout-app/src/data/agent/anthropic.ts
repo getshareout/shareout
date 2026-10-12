@@ -2,7 +2,7 @@ import type { Env } from '../../types';
 import type { ChatChunk, MessageRole } from './types';
 import { fetchWithTimeout, FetchTimeoutError } from '../../fetch-utils';
 import { createLogger } from '../../logging';
-import { DEFAULT_CLAUDE_MODEL, OPENAI_CHAT_MODEL, temperatureParams, thinkingOffParams } from './models';
+import { DEFAULT_CLAUDE_MODEL, OPENAI_CHAT_MODEL, gatewayReasoningParams, temperatureParams, thinkingOffParams } from './models';
 
 const AI_TIMEOUT_MS = 30000;
 const AI_STREAM_TIMEOUT_MS = 60000;
@@ -133,6 +133,7 @@ function completionRequest(
           }
           : { role: m.role, content: m.content }),
       ],
+      ...(cfg.provider === 'vercel-gateway' ? gatewayReasoningParams(cfg.model) : {}),
       ...temperature,
       ...(stream ? { stream: true, stream_options: { include_usage: true } } : {}),
     },

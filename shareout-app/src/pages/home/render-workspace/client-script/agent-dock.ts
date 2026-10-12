@@ -30,6 +30,7 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
   function closeComposer() {
     if (!isSheet()) return;
     setComposer('resting');
+    if (typeof exitCreate === 'function') exitCreate();
     if (pill) { try { pill.focus({ preventScroll: true }); } catch (e) { pill.focus(); } }
   }
   if (pill) pill.addEventListener('click', openComposer);

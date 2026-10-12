@@ -5,7 +5,7 @@
  */
 export const workspace_client_agent_format_JS = `  // ===== agent dock: text helpers (pure) =====
   function mdEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-  // ----- safe Markdown: fenced code -> headings/lists/quote/hr -> paragraphs, inline last -----
+  // ----- safe Markdown: fenced code -> tables/headings/lists/quote/hr -> paragraphs, inline last -----
   function mdInline(t) {
     var BT = String.fromCharCode(96);
     var s = mdEsc(t);
@@ -29,6 +29,13 @@ export const workspace_client_agent_format_JS = `  // ===== agent dock: text hel
       var cm = ln.trim().match(/^\\u0000C(\\d+)\\u0000$/);
       if (cm) { closeList(); html += '<pre class="wsx-pre"><code>' + mdEsc(blocks[+cm[1]]) + '</code></pre>'; continue; }
       if (/^\\s*$/.test(ln)) { closeList(); continue; }
+      if (/^\\s*\\|.*\\|\\s*$/.test(ln) && /^\\s*\\|?\\s*:?-{2,}:?\\s*(\\|\\s*:?-{2,}:?\\s*)+\\|?\\s*$/.test(lines[i + 1] || '')) {
+        closeList();
+        var cells = function (r) { return r.trim().replace(/^\\|/, '').replace(/\\|$/, '').split('|').map(function (c) { return mdInline(c.trim()); }); };
+        html += '<div class="wsx-tablewrap"><table class="wsx-table"><thead><tr>' + cells(ln).map(function (c) { return '<th>' + c + '</th>'; }).join('') + '</tr></thead><tbody>';
+        for (i += 2; i < lines.length && /^\\s*\\|/.test(lines[i]); i++) html += '<tr>' + cells(lines[i]).map(function (c) { return '<td>' + c + '</td>'; }).join('') + '</tr>';
+        i--; html += '</tbody></table></div>'; continue;
+      }
       var h = ln.match(/^(#{1,3})\\s+(.*)$/);
       if (h) { closeList(); var lvl = h[1].length + 2; html += '<h' + lvl + ' class="wsx-h">' + mdInline(h[2]) + '</h' + lvl + '>'; continue; }
       if (/^\\s*[-*]\\s+/.test(ln)) { if (listType !== 'ul') { closeList(); html += '<ul class="wsx-ul">'; listType = 'ul'; } html += '<li>' + mdInline(ln.replace(/^\\s*[-*]\\s+/, '')) + '</li>'; continue; }

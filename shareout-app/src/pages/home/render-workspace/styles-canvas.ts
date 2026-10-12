@@ -120,15 +120,11 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 /* command palette + inline quick-jump styles live in styles-palette.ts (concatenated below). */
 
 /* Create with AI mode */
-.wsx__chero { margin-bottom: var(--space-5); }
-.wsx__csub { color: var(--color-text-secondary); font-size: var(--text-sm); margin-top: 4px; max-width: 60ch; }
-.wsx__ccols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
-.wsx-cpanel { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg-elevated); padding: 14px 16px; }
 .wsx-clarify { align-self: flex-start; max-width: 94%; padding: 11px 13px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elevated); }
 .wsx-clarify__q { font: 600 var(--text-sm) var(--font-body); margin-bottom: 8px; }
 .wsx-clarify__opts, .wsx-suggest { display: flex; flex-wrap: wrap; gap: 6px; }
 .wsx.is-create .wsx__thread { max-height: 52vh; }
-@media (max-width: 900px) { .wsx__ccols { grid-template-columns: 1fr; } .wsx__brief { grid-template-columns: 1fr; } .wsx-widget, .wsx-widget--wide, .wsx-widget[data-span="2"], .wsx-widget[data-span="1"] { grid-column: auto; } }
+@media (max-width: 900px) { .wsx__brief { grid-template-columns: 1fr; } .wsx-widget, .wsx-widget--wide, .wsx-widget[data-span="2"], .wsx-widget[data-span="1"] { grid-column: auto; } }
 
 /* list rows (schedules / alerts) */
 .wsx-list { display: flex; flex-direction: column; gap: 8px; }
