@@ -49,6 +49,9 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
 
   function catRenderOnboard(m, mode) {
     var admin = !!window.WSX_ADMIN;
+    // A member can't enable or fill the catalog: an empty one just says what will show up
+    // (asking an admin to "turn on" a catalog that is already on contradicted itself).
+    if (mode === 'empty' && !admin) { m.innerHTML = emptyState(t('catalog.emptyMemberTitle'), t('catalog.emptyMemberSub')); return; }
     var msg = mode === 'off' ? t('catalog.offTitle') : t('catalog.emptyTitle');
     var sub = mode === 'off' ? t('catalog.offSub') : t('catalog.emptySub');
     var btn = '';
@@ -57,7 +60,7 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
       : '<button class="so-c-btn so-c-btn--primary" id="catSeed" type="button">' + esc(t('catalog.seedConnectors')) + '</button>'
         + ' <a class="wsx-cat__hint" href="#l/connectors">' + esc(t('catalog.connectDataSource')) + '</a>';
     else btn = '<p class="wsx-cat__hint">' + esc(t('catalog.askAdmin')) + '</p>';
-    m.innerHTML = '<div class="wsx-cat__onboard"><p>' + esc(msg) + '</p><p class="wsx-cat__hint">' + esc(sub) + '</p>' + btn + '</div>';
+    m.innerHTML = emptyState(msg, sub, btn);
     var en = document.getElementById('catEnable');
     if (en) en.addEventListener('click', function () {
       en.disabled = true;

@@ -6920,6 +6920,97 @@
         }
       }
     },
+    "/v1/home/new": {
+      "post": {
+        "tags": [
+          "Home"
+        ],
+        "summary": "Create a blank document or one from a template",
+        "description": "The Studio \"New\" menu's no-AI path. Creates a private HTML document owned by the caller — blank or from a simple template (report, meeting notes, proposal) — and returns where to open it. Inside a workspace (subdomain or `workspace` query) the caller must be an internal member. Counts toward the daily publish limit and the storage cap. Agent (`sot_`) tokens are refused.",
+        "operationId": "createHomeDocument",
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Workspace id (ignored on a workspace subdomain, which pins it)."
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "template": {
+                    "type": "string",
+                    "enum": [
+                      "blank",
+                      "report",
+                      "meeting",
+                      "proposal"
+                    ],
+                    "default": "blank"
+                  },
+                  "lang": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "es"
+                    ],
+                    "default": "en",
+                    "description": "Language of the document's title and headings."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "artifactId": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "413": {
+            "description": "Storage limit reached"
+          },
+          "429": {
+            "description": "Daily publish limit reached"
+          }
+        }
+      }
+    },
     "/v1/home/agent/brief": {
       "get": {
         "tags": [

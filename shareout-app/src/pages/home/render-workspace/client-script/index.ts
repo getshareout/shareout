@@ -18,6 +18,7 @@ import { workspace_client_agent_dock_JS } from './agent-dock';
 import { workspace_client_agent_threads_JS } from './agent-threads';
 import { workspace_client_onboarding_JS } from './onboarding';
 import { workspace_client_create_ai_JS } from './create-ai';
+import { workspace_client_new_menu_JS } from './new-menu';
 import { workspace_client_widget_layout_JS } from './widget-layout';
 import { workspace_client_account_menu_JS } from './account-menu';
 import { workspace_client_notifications_JS } from './notifications';
@@ -44,6 +45,7 @@ export const WORKSPACE_CLIENT = [
   workspace_client_agent_threads_JS,
   workspace_client_onboarding_JS,
   workspace_client_create_ai_JS,
+  workspace_client_new_menu_JS,
   workspace_client_widget_layout_JS,
   workspace_client_account_menu_JS,
   workspace_client_notifications_JS,

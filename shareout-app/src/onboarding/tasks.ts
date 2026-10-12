@@ -9,6 +9,7 @@
  *   page  → open a same-origin connect page in a new tab (url)
  *   skill → ack "got the skill" + open the skill library
  *   invite → open the "Invite people" dialog
+ *   new   → open the "New" menu (upload a file, blank document, template)
  */
 import type { Env } from '../types';
 
@@ -19,7 +20,8 @@ export type OnboardingAction =
   | { kind: 'nav'; target: string }
   | { kind: 'page'; url: string }
   | { kind: 'skill' }
-  | { kind: 'invite' };
+  | { kind: 'invite' }
+  | { kind: 'new' };
 
 export interface OnboardingTaskDef {
   key: string;
@@ -40,11 +42,12 @@ export const ADMIN_TASKS: OnboardingTaskDef[] = [
   { key: 'skill', signal: 'skillAck', action: { kind: 'skill' } },
 ];
 
-// Member track leads with the fastest path to a first page: connect the agent they
-// already use (Claude / ChatGPT) from the Connect view, then publish from it.
+// Member track leads with a first page made right here (the New menu needs no AI and
+// no external agent). Connecting Claude / ChatGPT is a bonus — skippable, since many
+// members have no agent to connect.
 export const MEMBER_TASKS: OnboardingTaskDef[] = [
-  { key: 'connect_agent', signal: 'agentConnected', action: { kind: 'nav', target: 'connect' } },
-  { key: 'first_artifact', signal: 'firstArtifact', action: { kind: 'nav', target: 'connect' } },
+  { key: 'first_artifact', signal: 'firstArtifact', action: { kind: 'new' } },
+  { key: 'connect_agent', signal: 'agentConnected', action: { kind: 'nav', target: 'connect' }, skippable: true },
   { key: 'explore', signal: 'viewed', action: { kind: 'nav', target: 'artifacts' } },
   { key: 'comment', signal: 'commented', action: { kind: 'nav', target: 'artifacts' } },
   { key: 'telegram', signal: 'telegram', action: { kind: 'page', url: '/settings/telegram?go=1' } },

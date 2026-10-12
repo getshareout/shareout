@@ -1,0 +1,43 @@
+import type { HomeLocaleCopy } from '../types';
+
+/** The rail "New" menu: upload a file, blank document, from a template (no AI). */
+export const NEW_MENU_COPY: HomeLocaleCopy = {
+  en: {
+    'nav.new': 'New',
+    'new.menu': 'Create something new',
+    'new.upload': 'Upload a file',
+    'new.uploadHint': 'PDF, Excel, images — saved in Assets',
+    'new.blank': 'Blank document',
+    'new.blankHint': 'Start from scratch',
+    'new.template': 'From a template',
+    'new.templateHint': 'Report, meeting notes or proposal',
+    'new.back': '← Back',
+    'new.tpl.report': 'Report',
+    'new.tplHint.report': 'Summary, details and next steps',
+    'new.tpl.meeting': 'Meeting notes',
+    'new.tplHint.meeting': 'Topics, decisions and action items',
+    'new.tpl.proposal': 'Proposal',
+    'new.tplHint.proposal': 'Context, what you propose, cost and timeline',
+    'new.creating': 'Creating your document…',
+    'new.failed': 'Couldn’t create the document. Try again?',
+  },
+  es: {
+    'nav.new': 'Nuevo',
+    'new.menu': 'Crear algo nuevo',
+    'new.upload': 'Subir un archivo',
+    'new.uploadHint': 'PDF, Excel, imágenes — se guarda en Recursos',
+    'new.blank': 'Documento en blanco',
+    'new.blankHint': 'Empezá desde cero',
+    'new.template': 'Desde una plantilla',
+    'new.templateHint': 'Informe, minuta de reunión o propuesta',
+    'new.back': '← Volver',
+    'new.tpl.report': 'Informe',
+    'new.tplHint.report': 'Resumen, detalle y próximos pasos',
+    'new.tpl.meeting': 'Minuta de reunión',
+    'new.tplHint.meeting': 'Temas, decisiones y tareas',
+    'new.tpl.proposal': 'Propuesta',
+    'new.tplHint.proposal': 'Contexto, qué proponés, costos y plazos',
+    'new.creating': 'Creando tu documento…',
+    'new.failed': 'No se pudo crear el documento. ¿Probás de nuevo?',
+  },
+};

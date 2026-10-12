@@ -1,6 +1,7 @@
 import { handleHomeBrowserApi, handleHomeQuickSearchApi, handleHomeCatalogApi, handleHomeCountsApi, handleHomeActivityApi, handleHomeCommentActivityApi, handleHomeAnalyticsApi, handleHomeActivityFeedApi, handleHomeForYouApi, handleHomeProfileGetApi, handleHomeProfileSetApi, handleHomeFollowApi, handleHomeRecentApi, handleHomeRecordViewApi, handleHomeDismissEventApi, handleHomeCommentsApi, handleHomeCommentPostApi } from '../../pages/home/api';
 import { handleHomeEventVisibilityGetApi, handleHomeEventVisibilitySetApi } from '../../pages/home/api';
 import { handleOnboardingGetApi, handleOnboardingDismissApi, handleOnboardingSkillAckApi, handleOnboardingCelebrateApi } from '../../onboarding/api';
+import { handleHomeNewArtifactApi } from '../../pages/home/new-artifact';
 import type { FetchContext } from '../context';
 import { isAuthUser, requireAuthUser } from '../helpers/auth-guard';
 
@@ -95,6 +96,13 @@ export async function routeHomeApi(ctx: FetchContext): Promise<Response | null> 
     const user = await requireAuthUser(ctx);
     if (!isAuthUser(user)) return user;
     return addCORS(await handleOnboardingGetApi(request, env, user));
+  }
+
+  if (path === '/v1/home/new' && request.method === 'POST') {
+    const user = await requireAuthUser(ctx);
+    if (!isAuthUser(user)) return user;
+    if (user.service) return addCORS(Response.json({ error: 'Agent tokens cannot perform this action', code: 'INSUFFICIENT_SCOPE' }, { status: 403 }));
+    return addCORS(await handleHomeNewArtifactApi(request, env, user));
   }
 
   if (path === '/v1/home/onboarding/dismiss' && request.method === 'POST') {

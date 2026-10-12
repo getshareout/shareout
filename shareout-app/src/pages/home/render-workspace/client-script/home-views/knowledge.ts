@@ -104,7 +104,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     var admin = !!window.WSX_ADMIN;
     var paid = !!window.WSX_KNOWLEDGE_PAID;
     var msg = mode === 'off' ? t('knowledge.offTitle') : t('knowledge.emptyTitle');
-    var sub = mode === 'off' ? t('knowledge.offSub') : t('knowledge.emptySub');
+    var sub = mode === 'off' ? t('knowledge.offSub') : t(admin ? 'knowledge.emptySub' : 'knowledge.emptyMemberSub');
     var btn = '';
     if (mode === 'off') {
       if (!paid) btn = '<p class="wsx-cat__hint">' + esc(t('knowledge.upsellTitle')) + '</p>'
@@ -113,7 +113,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
         ? '<button class="so-c-btn so-c-btn--primary" id="knEnable" type="button">' + esc(t('knowledge.turnOn')) + '</button>'
         : '<p class="wsx-cat__hint">' + esc(t('knowledge.askAdmin')) + '</p>';
     }
-    m.innerHTML = '<div class="wsx-cat__onboard"><p>' + esc(msg) + '</p><p class="wsx-cat__hint">' + esc(sub) + '</p>' + btn + '</div>';
+    m.innerHTML = emptyState(msg, sub, btn);
     var en = document.getElementById('knEnable');
     if (en) en.addEventListener('click', function () {
       en.disabled = true;
@@ -185,6 +185,10 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
       [Math.max(n('entity'), typeof kmEntityTotal === 'function' ? kmEntityTotal() : 0).toLocaleString(), t('knowledge.kpiEntities')],
       [knState.lastUpdated ? adRelDate(knState.lastUpdated) : '\\u2014', t('knowledge.kpiUpdated'), t('knowledge.tipUpdated')]
     ];
+    // A zero next to real numbers reads as a contradiction ("0 pages learned Â· 8 entities"
+    // while the nightly tidy-up hasn't run yet) â€” show only the tiles that have something.
+    var some = tiles.filter(function (tile) { return tile[0] !== '0' && tile[0] !== '\\u2014'; });
+    if (some.length) tiles = some;
     return '<div class="wsx-an__cards wsx-cat__kpis">' + tiles.map(function (tile) {
       return '<div class="wsx-an__card"' + (tile[2] ? ' data-tip="' + esc(tile[2]) + '"' : '') + '><div class="wsx-an__n">' + tile[0] + '</div><div class="wsx-an__l">' + esc(tile[1]) + '</div></div>';
     }).join('') + '</div>';

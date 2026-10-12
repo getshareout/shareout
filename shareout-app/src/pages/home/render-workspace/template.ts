@@ -15,6 +15,12 @@ export function canManageWorkspace(args: RenderArgs): boolean {
   return args.workspaceRole === 'owner' || args.workspaceRole === 'admin';
 }
 
+/** True when the viewer may create here: their own space, or a workspace they are an
+ *  internal member of (externals and non-members can't publish there — the API 403s). */
+export function canCreateHere(args: RenderArgs): boolean {
+  return !(args.workspaceId || args.workspace) || !!args.workspaceRole;
+}
+
 /** Rail nav, scoped to context: workspace-only lenses appear only inside a workspace.
  *  Uses the same effective workspace the client hydrates with (workspaceId or ?workspace).
  *  Grouped into titled sections; empty groups are dropped. A group with no title renders a divider. */
@@ -92,6 +98,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
         <button class="wsx__railclose" id="wsxRailClose" type="button" data-i18n-aria="nav.closeMenu" aria-label="Close menu">${svg('<path d="M6 6l12 12M18 6L6 18"/>')}</button>
       </div>
       ${args.createEnabled ? `<button class="wsx__create" id="wsxCreateBtn" type="button" data-tip-rail data-i18n-tip="nav.create" data-tip="Create with AI">${svg(ICON.foryou)}<span data-i18n="nav.create">Create with AI</span></button>` : ''}
+      ${canCreateHere(args) ? `<button class="wsx__new" id="wsxNewBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="wsxNewMenu" data-tip-rail data-i18n-tip="nav.new" data-tip="New">${svg('<path d="M12 5v14M5 12h14"/>')}<span data-i18n="nav.new">New</span></button>` : ''}
       ${railHtml(buildNav(args, canManage))}
       <div class="wsx__railspace"></div>
       <footer class="wsx__railfoot">
@@ -250,10 +257,11 @@ export function buildWorkspaceBody(args: RenderArgs): string {
     </aside>
   </div>
 
+  <div class="wsx-newmenu" id="wsxNewMenu" role="menu" data-i18n-aria="new.menu" aria-label="Create something new" hidden></div>
   <div class="wsx__railscrim" id="wsxRailScrim" hidden></div>
   <div class="wsx__scrim" id="wsxScrim" hidden></div>
   <section class="wsx__composer" id="wsxComposer" data-state="resting" aria-labelledby="wsxComposerTitle">
-    <button type="button" class="wsx__pill" id="wsxPill" aria-haspopup="dialog"><span class="wsx__pill-text" data-i18n="composer.pill">Ask your workspace…</span><span class="wsx__pill-dot" id="wsxPillDot" hidden><span class="wsx-sr" data-i18n="composer.unread">New reply</span></span></button>
+    <button type="button" class="wsx__pill" id="wsxPill" aria-haspopup="dialog"><span class="wsx__pill-text" data-i18n="composer.pill">Ask your workspace…</span><span class="wsx__pill-dot" id="wsxPillDot" hidden><span class="wsx-sr" data-i18n="composer.unread">New message</span></span></button>
     <div class="wsx__composer-grip" id="wsxComposerGrip" data-i18n-title="widget.resize" title="Drag to resize" aria-hidden="true"></div>
     <header class="wsx__composer-bar">
       <h2 class="wsx__composer-title" id="wsxComposerTitle" data-i18n="composer.chat">Chat</h2>
