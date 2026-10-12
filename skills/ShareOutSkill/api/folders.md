@@ -61,6 +61,7 @@ Content-Type: application/json
 - Slugs are unique per owner among siblings (same `parent_id`).
 - `parent_id`: optional — nest under another owned folder.
 - `readme`: optional markdown **folder guide** — see below.
+- `workspace_id`: optional — creates a Team Space folder in that workspace instead (same as `POST /v1/workspaces/{id}/folders`: admins/owners only; `403` if you are not a member).
 
 **Response (201):** folder object with `artifact_count: 0`.
 

@@ -3,6 +3,7 @@ import { generateId } from './crypto-utils';
 import type { AuthUser } from './api-auth';
 import { getVisibilityScope, placeholders } from './account-links';
 import { jsonWithApiErrors } from './http/api-error';
+import { handleCreateFolder } from './folders';
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
 
@@ -42,15 +43,21 @@ export async function handleCreatePersonalFolder(
   env: Env,
   user: AuthUser
 ): Promise<Response> {
-  let body: { name: string; slug?: string; description?: string; parent_id?: string; readme?: string };
+  let body: { name: string; slug?: string; description?: string; parent_id?: string; readme?: string; workspace_id?: string };
   try {
     body = await request.json();
   } catch {
     return json({ error: 'Invalid JSON', code: 'INVALID_JSON' }, 400);
   }
 
-  if (!body.name?.trim()) {
-    return json({ error: 'name is required', code: 'VALIDATION_ERROR' }, 400);
+  // A workspace_id means a Team Space folder: same rules as POST /v1/workspaces/{id}/folders.
+  if (body?.workspace_id) {
+    const forward = new Request(request.url, { method: 'POST', headers: request.headers, body: JSON.stringify(body) });
+    return handleCreateFolder(forward, env, user, String(body.workspace_id));
+  }
+
+  if (typeof body?.name !== 'string' || !body.name.trim()) {
+    return json({ error: 'name is required', code: 'VALIDATION_ERROR', param: 'name' }, 400);
   }
 
   const slug = body.slug || generateFolderSlug(body.name);

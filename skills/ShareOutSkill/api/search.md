@@ -19,7 +19,7 @@ Auth: any ShareOut credential works.
 
 | Param | Default | Notes |
 |-------|---------|-------|
-| `q` | *(required)* | The search text. Typo/gap tolerant — `revnue` matches "Revenue Report". Empty `q` returns recents. |
+| `q` | *(required)* | The search text. Typo/gap tolerant — `revnue` matches "Revenue Report". Send `q=` (empty) for recents; omitting `q` is a `400 VALIDATION_ERROR`. |
 | `groups` | all | Comma-separated subset of `artifacts,folders,datasets,connectors,people,schedules,crew,alerts`. |
 | `limit` | 10 | Max results **per group** (capped at 25). |
 | `workspace` | — | Workspace id to scope to (personal tokens only; Agent tokens are already scoped). |

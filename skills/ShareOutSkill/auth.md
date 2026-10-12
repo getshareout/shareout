@@ -158,6 +158,7 @@ Content-Type: application/json
 ```
 
 - Omit `regenerate` (or set `false`) to **add** a token alongside existing ones.
+- `name` (optional, up to 100 chars) labels the token in `GET /v1/me/tokens` — e.g. `{ "name": "CI deploy" }`; defaults to `self-serve`.
 - Set `"regenerate": true` to revoke all existing tokens first, then mint exactly one new token.
 - Session cookies (`credentials: 'include'`) work instead of Bearer for browser calls from the home UI.
 

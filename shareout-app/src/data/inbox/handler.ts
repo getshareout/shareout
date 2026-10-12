@@ -1,6 +1,7 @@
 import type { DataContext } from '../middleware';
 import { errorResponse, successResponse, verifyOwner } from '../middleware';
 import { DATA_ERRORS } from '../../types';
+import { Errors } from '../errors';
 import {
   getInboxStatus,
   enableInbound,
@@ -42,6 +43,12 @@ function serializeMessage(row: InboxMessageRow, full: boolean) {
   };
 }
 
+const ALLOWLIST_INVALID = Errors.validation('allowlist', 'allowlist must be an array of strings or null', { example: '["@example.com"]' });
+
+function isStringArray(v: unknown): v is string[] {
+  return Array.isArray(v) && v.every((x) => typeof x === 'string');
+}
+
 export async function handleInbox(
   request: Request,
   ctx: DataContext,
@@ -58,7 +65,8 @@ export async function handleInbox(
     let allowlist: string[] | undefined;
     try {
       const body = await request.json() as { allowlist?: string[] };
-      if (Array.isArray(body.allowlist)) allowlist = body.allowlist;
+      if (Array.isArray(body?.allowlist)) allowlist = body.allowlist;
+      else if (body?.allowlist != null) return errorResponse(ALLOWLIST_INVALID, ctx.origin);
     } catch { /* no body is fine */ }
     await enableInbound(ctx.env, ctx.artifactId);
     if (allowlist !== undefined) await setInboundAllowlist(ctx.env, ctx.artifactId, allowlist);
@@ -76,10 +84,11 @@ export async function handleInbox(
     let allowlist: string[] | null = null;
     try {
       const body = await request.json() as { allowlist?: string[] | null };
-      allowlist = body.allowlist ?? null;
+      allowlist = body?.allowlist ?? null;
     } catch {
       return errorResponse(DATA_ERRORS.INVALID_JSON, ctx.origin);
     }
+    if (allowlist !== null && !isStringArray(allowlist)) return errorResponse(ALLOWLIST_INVALID, ctx.origin);
     await setInboundAllowlist(ctx.env, ctx.artifactId, allowlist);
     return successResponse(await getInboxStatus(ctx.env, ctx.artifactId), 200, ctx.origin);
   }

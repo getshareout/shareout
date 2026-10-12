@@ -18,12 +18,14 @@ import { renderNotFoundPage } from '../pages/not-found';
 import { blockDisabledMarketingPages } from '../marketing-us-gate';
 import { asGetForHead, stripBodyForHead, wrongMethodOnKnownPath } from './method-policy';
 import { routeMcp } from '../mcp';
+import { simpleApiError } from '../http/api-error';
 
-// HTML document navigations get the styled 404 page; API/data/asset requests keep
-// the lightweight plain-text body so non-browser clients aren't handed markup.
+// HTML document navigations get the styled 404 page; /v1 gets the JSON error envelope;
+// other data/asset requests keep the lightweight plain-text body.
 function notFound(request: Request, path: string): Response {
+  if (path.startsWith('/v1/')) return simpleApiError(`No API route for ${request.method} ${path}`, 'ROUTE_NOT_FOUND', 404);
   const accept = request.headers.get('Accept') || '';
-  const wantsHtml = request.method === 'GET' && accept.includes('text/html') && !path.startsWith('/v1/');
+  const wantsHtml = request.method === 'GET' && accept.includes('text/html');
   return wantsHtml ? renderNotFoundPage() : new Response('Not Found', { status: 404 });
 }
 

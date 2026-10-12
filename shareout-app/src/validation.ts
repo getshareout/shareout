@@ -146,7 +146,7 @@ export function validatePublishRequest(req: PublishRequest): ApiError | null {
   }
 
   if (req.visibility && !['public', 'workspace', 'private', 'unlisted'].includes(req.visibility as string)) {
-    errors.push('visibility must be one of: public, workspace, private');
+    fail('visibility', 'visibility must be one of: public, workspace, private');
   }
 
   if (req.pwa) {

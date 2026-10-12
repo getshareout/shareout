@@ -94,11 +94,11 @@ const FUNNEL_STEPS: Array<{ event: string; label: string }> = [
 export async function getFunnelMetrics(env: Env, days: number): Promise<FunnelMetrics> {
   const [counts, daily] = await Promise.all([
     env.DB.prepare(
-      `SELECT event, COUNT(*) AS n FROM funnel_events WHERE ts >= strftime('%Y-%m-%dT%H:%M:%fZ','now', ?) GROUP BY event`
+      `SELECT event, COUNT(*) AS n FROM funnel_events WHERE created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now', ?) GROUP BY event`
     ).bind(since(days)).all<{ event: string; n: number }>(),
     env.DB.prepare(
-      `SELECT date(ts) AS date, COUNT(*) AS value FROM funnel_events
-       WHERE event = 'submit' AND ts >= strftime('%Y-%m-%dT%H:%M:%fZ','now', ?) GROUP BY date(ts) ORDER BY date`
+      `SELECT date(created_at) AS date, COUNT(*) AS value FROM funnel_events
+       WHERE event = 'submit' AND created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now', ?) GROUP BY date(created_at) ORDER BY date`
     ).bind(since(days)).all<{ date: string; value: number }>(),
   ]);
 

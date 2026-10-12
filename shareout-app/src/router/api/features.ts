@@ -13,7 +13,7 @@ import { hostWorkspaceId } from '../../pages/home/host';
  * FEATURE_DISABLED rejection by re-checking what IS available.
  *
  * GET /v1/features            -> the host's workspace on a workspace subdomain (if a member), else personal scope
- * GET /v1/features?workspace_id=...  -> that workspace (caller must be a member)
+ * GET /v1/features?workspace_id=...  -> that workspace (caller must be a member); `?workspace=` is an alias
  * GET /v1/features?artifact_id=...   -> the artifact's workspace (caller must have access)
  */
 const routeFeatures = createApiRouter([
@@ -37,7 +37,7 @@ const routeFeatures = createApiRouter([
           .bind(artifactId).first<{ workspace_id: string | null }>();
         workspaceId = art?.workspace_id ?? null;
       } else {
-        const wid = url.searchParams.get('workspace_id');
+        const wid = url.searchParams.get('workspace_id') || url.searchParams.get('workspace');
         if (wid) {
           const role = await getInternalWorkspaceRole(env, wid, authUser.id);
           if (!role) {

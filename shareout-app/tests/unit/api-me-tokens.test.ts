@@ -74,6 +74,22 @@ describe('handleCreateMyToken', () => {
     expect(deleted).toBe(false);
   });
 
+  it('stores the given name, defaulting to self-serve', async () => {
+    const names: unknown[] = [];
+    const env = {
+      DB: makeDbMock({
+        run: (sql, ...args) => {
+          if (sql.startsWith('INSERT')) names.push(args[args.length - 1]);
+          return { success: true, meta: { changes: 1 } };
+        },
+      }),
+    } as unknown as Env;
+    for (const body of ['{"name":"  CI deploy  "}', '{}', '{"name":42}']) {
+      await handleCreateMyToken(new Request('https://x/v1/me/tokens', { method: 'POST', body }), env, user);
+    }
+    expect(names).toEqual(['CI deploy', 'self-serve', 'self-serve']);
+  });
+
   it('revokes existing tokens first when regenerate is true', async () => {
     const order: string[] = [];
     const env = {

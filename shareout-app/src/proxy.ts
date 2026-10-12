@@ -507,14 +507,13 @@ export async function handleProxyConfig(
       return errorResponse({ ...DATA_ERRORS.INVALID_REQUEST, message: 'No valid fields to update' }, ctx.origin);
     }
 
-    updates.push("updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')");
-    values.push(ctx.artifactId);
+    const cols = updates.map(u => u.split(' = ')[0]);
 
     await ctx.env.DB.prepare(`
-      INSERT INTO artifact_proxy_config (artifact_id, ${updates.map(u => u.split(' = ')[0]).join(', ')}, updated_at)
-      VALUES (?, ${updates.map(() => '?').join(', ')}, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-      ON CONFLICT(artifact_id) DO UPDATE SET ${updates.join(', ')}
-    `).bind(ctx.artifactId, ...values.slice(0, -1)).run();
+      INSERT INTO artifact_proxy_config (artifact_id, ${cols.join(', ')}, updated_at)
+      VALUES (?, ${cols.map(() => '?').join(', ')}, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      ON CONFLICT(artifact_id) DO UPDATE SET ${cols.map(c => `${c} = excluded.${c}`).join(', ')}, updated_at = excluded.updated_at
+    `).bind(ctx.artifactId, ...values).run();
 
     const config = await getProxyConfig(ctx.env, ctx.artifactId);
     return successResponse(config, 200, ctx.origin);

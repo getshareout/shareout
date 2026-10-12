@@ -209,6 +209,18 @@ describe('createRule viewer self-delivery', () => {
     message: undefined,
   };
 
+  it('rejects a missing metric_id before looking up the definition', async () => {
+    getDefinition.mockClear();
+    const { db } = routedDb([]);
+    const result = await createRule({ DB: db } as unknown as Env, 'user_1', {
+      ...baseReq,
+      metric_id: undefined as unknown as string,
+      destination: { kind: 'email', config: { recipients: ['me@example.com'] } },
+    });
+    expect(result.error).toBe('metric_id is required');
+    expect(getDefinition).not.toHaveBeenCalled();
+  });
+
   it('rejects a viewer trying to deliver to a Slack channel', async () => {
     const { db } = routedDb([
       { match: 'COUNT(*) AS n FROM metric_alert_rules WHERE artifact_id', first: { n: 0 } },

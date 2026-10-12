@@ -128,7 +128,7 @@ export async function getAnalystContext(env: Env): Promise<AnalystContext> {
        GROUP BY e.workspace_id ORDER BY rev DESC LIMIT 5`
     ).all<{ name: string; rev: number; tokens: number }>(),
     env.DB.prepare(
-      "SELECT ts, route, substr(message,1,160) AS message FROM ops_error_log ORDER BY ts DESC LIMIT 5"
+      "SELECT created_at AS ts, route, substr(message,1,160) AS message FROM ops_error_log ORDER BY created_at DESC LIMIT 5"
     ).all<{ ts: string; route: string | null; message: string | null }>(),
   ]);
 

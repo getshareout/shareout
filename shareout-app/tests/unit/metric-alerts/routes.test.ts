@@ -120,6 +120,15 @@ describe('metric-alerts invalid JSON', () => {
     expect(createRule).not.toHaveBeenCalled();
   });
 
+  it('returns VALIDATION_ERROR for POST /v1/metric-alerts without artifact_id', async () => {
+    for (const body of ['{}', 'null']) {
+      const res = await post('/v1/metric-alerts', body, { Cookie: 'shareout_session=x' });
+      expect(res?.status).toBe(400);
+      expect(await res!.json()).toMatchObject({ success: false, code: 'VALIDATION_ERROR', param: 'artifact_id' });
+    }
+    expect(createRule).not.toHaveBeenCalled();
+  });
+
   it('returns INVALID_JSON for malformed PUT /v1/metric-alerts/definitions body', async () => {
     const res = await put('/v1/metric-alerts/definitions', '{bad', { Cookie: 'shareout_session=x' });
     expect(res?.status).toBe(400);
