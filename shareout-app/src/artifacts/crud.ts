@@ -7,6 +7,7 @@ import { generateId } from '../crypto-utils';
 import { emitJobEvent } from '../scheduling/events';
 import { purgeInbox } from '../email/inbox-store';
 import { validateAccessPolicy } from '../data/access-policy';
+import { canViewArtifact } from '../data/middleware';
 import { coerceVisibility, normalizeVisibility } from '../visibility-config';
 import { resolveAllowOpen, OPEN_VISIBILITY_PAYWALL_MESSAGE } from '../access/allow-open';
 import { classifyAndPersist, clearModerationHold, findBlockedCdnHosts } from '../moderation/check';
@@ -199,12 +200,14 @@ export async function handleGetArtifact(
     return json({ error: 'Artifact not found', code: 'NOT_FOUND' }, 404);
   }
 
-  const forbidden = await requireRole(env, artifactId, user.id, 'viewer');
-  if (forbidden) return forbidden;
+  const role = await getUserRole(env, artifactId, user.id);
+  if (!role && !(await canViewArtifact(env, artifact, user.id, user.email ?? null))) {
+    return json({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
+  }
 
-  const collaborators = await env.DB.prepare(
+  const collaborators = role ? await env.DB.prepare(
     'SELECT email, role FROM collaborators WHERE artifact_id = ?'
-  ).bind(artifactId).all<{ email: string; role: string }>();
+  ).bind(artifactId).all<{ email: string; role: string }>() : { results: [] };
 
   const viewers = (collaborators.results || [])
     .filter(c => c.role === 'viewer')
