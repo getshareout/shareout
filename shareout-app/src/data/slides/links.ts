@@ -73,7 +73,18 @@ async function createLink(request: Request, ctx: DataContext, presId: string): P
     return errorResponse({ code: 'INVALID_JSON', message: 'Invalid JSON body', status: 400 });
   }
 
-  const gate: Gate = body.gate && GATES.includes(body.gate) ? body.gate : 'none';
+  if (body.gate != null && !GATES.includes(body.gate)) {
+    return errorResponse({ code: 'VALIDATION_ERROR', message: `gate must be one of: ${GATES.join(', ')}`, param: 'gate', status: 400 });
+  }
+  const gate: Gate = body.gate ?? 'none';
+  let expiresAt: string | null = null;
+  if (body.expiresAt != null) {
+    const ms = typeof body.expiresAt === 'string' ? Date.parse(body.expiresAt) : NaN;
+    if (!Number.isFinite(ms)) {
+      return errorResponse({ code: 'VALIDATION_ERROR', message: 'expiresAt must be an ISO 8601 date-time', param: 'expiresAt', status: 400 });
+    }
+    expiresAt = new Date(ms).toISOString();
+  }
   let gateValue: string | null = null;
   if (gate === 'password') {
     if (!body.password) return errorResponse({ code: 'PASSWORD_REQUIRED', message: 'password required for password gate', status: 400 });
@@ -91,13 +102,13 @@ async function createLink(request: Request, ctx: DataContext, presId: string): P
   await ctx.env.DB.prepare(
     `INSERT INTO share_links (id, presentation_id, artifact_id, recipient_label, gate, gate_value, expires_at, max_views, created_by, created_at, revoked)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
-  ).bind(id, presId, ctx.artifactId, body.recipientLabel ?? null, gate, gateValue, body.expiresAt ?? null, maxViews, ctx.artifact.owner_id ?? null, now).run();
+  ).bind(id, presId, ctx.artifactId, body.recipientLabel ?? null, gate, gateValue, expiresAt, maxViews, ctx.artifact.owner_id ?? null, now).run();
 
   return successResponse({
     id,
     url: `${ctx.env.SHAREOUT_BASE_URL}/p/${ctx.artifact.name}?l=${id}`,
     recipientLabel: body.recipientLabel ?? null,
-    gate, expiresAt: body.expiresAt ?? null, maxViews,
+    gate, expiresAt, maxViews,
   }, 201, ctx.origin);
 }
 

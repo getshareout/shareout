@@ -69,14 +69,14 @@ export function shareModalMarkup(locale: Locale = 'en'): string {
     #soShareOverlay .so-people-name{font-size:13px;color:${colors.text};}
     #soShareOverlay .so-people-email{font-size:12px;color:${colors.textTertiary};}
   </style>
-  <div class="so-share-backdrop" onclick="closeShare()"></div>
+  <div class="so-share-backdrop" data-share-action="close"></div>
   <div class="so-share-panel">
     <h3 id="soShareTitle">${c.share}</h3>
     <div class="so-field">
       <label for="soShareLink">${c.link}</label>
       <div class="so-link-row">
         <input type="text" id="soShareLink" readonly>
-        <button type="button" class="so-btn so-copy" onclick="shareCopyLink()">${c.copy}</button>
+        <button type="button" class="so-btn so-copy" data-share-action="copy">${c.copy}</button>
       </div>
     </div>
     <div class="so-field">
@@ -101,8 +101,8 @@ export function shareModalMarkup(locale: Locale = 'en'): string {
     </div>
     <div class="so-status" id="soShareStatus"></div>
     <div class="so-actions">
-      <button type="button" class="so-btn so-ghost" onclick="closeShare()">${c.cancel}</button>
-      <button type="button" class="so-btn so-primary" id="soShareSend" onclick="submitShare()">${c.send}</button>
+      <button type="button" class="so-btn so-ghost" data-share-action="close">${c.cancel}</button>
+      <button type="button" class="so-btn so-primary" id="soShareSend" data-share-action="send">${c.send}</button>
     </div>
   </div>
 </div>`;
@@ -153,7 +153,7 @@ export function shareModalScript(opts: { baseUrl: string; locale?: Locale }): st
     }).slice(0,6);
     if(!matches.length){box.classList.remove('open');box.innerHTML='';return;}
     box.innerHTML=matches.map(function(p){
-      return '<div class="so-people-item" onmousedown="shareePick(event,'+JSON.stringify(p.email)+')">'+
+      return '<div class="so-people-item" data-email="'+esc(p.email)+'">'+
         '<span class="so-people-name">'+esc(p.name||p.email)+'</span>'+
         (p.name?'<span class="so-people-email">'+esc(p.email)+'</span>':'')+'</div>';
     }).join('');
@@ -207,6 +207,16 @@ export function shareModalScript(opts: { baseUrl: string; locale?: Locale }): st
     emailInp.addEventListener('focus',renderPeople);
     emailInp.addEventListener('blur',function(){setTimeout(function(){var b=$('soSharePeople');if(b)b.classList.remove('open');},150);});
   }
+  document.addEventListener('click',function(e){
+    var el=e.target&&e.target.closest?e.target.closest('#soShareOverlay [data-share-action]'):null;
+    if(!el)return;
+    var a=el.getAttribute('data-share-action');
+    if(a==='close')window.closeShare();else if(a==='copy')window.shareCopyLink();else if(a==='send')window.submitShare();
+  });
+  document.addEventListener('mousedown',function(e){
+    var el=e.target&&e.target.closest?e.target.closest('#soShareOverlay .so-people-item[data-email]'):null;
+    if(el)window.shareePick(e,el.getAttribute('data-email'));
+  });
   document.addEventListener('keydown',function(e){
     if(e.key!=='Escape')return;
     var ov=$('soShareOverlay');

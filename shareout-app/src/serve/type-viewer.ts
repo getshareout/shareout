@@ -1,7 +1,7 @@
 import type { Env, TypeMetadata } from '../types';
 import { trackPageView } from '../analytics';
 import { trackViewerView } from '../view-tracking';
-import { hasCustomViewer, renderViewer } from '../viewers';
+import { hasCustomViewer, renderViewer, viewerScriptCsp } from '../viewers';
 import { loadSkillViewerMetrics } from '../skill-marketplace';
 import { loadLibraryViewerMetrics } from '../workspace-library';
 import { getSessionUser } from '../auth/session';
@@ -67,6 +67,7 @@ export async function serveTypeViewer(
   const effectiveType = skillMetrics ? 'skill' : libraryMetrics ? 'library' : artifact.artifact_type;
 
   // Render the type-specific viewer
+  const nonce = crypto.randomUUID().replace(/-/g, '');
   const html = renderViewer(
     effectiveType,
     slug,
@@ -82,6 +83,7 @@ export async function serveTypeViewer(
     skillMetrics,
     libraryMetrics,
     locale,
+    nonce,
   );
 
   if (!html) {
@@ -102,12 +104,14 @@ export async function serveTypeViewer(
   }
 
   const isOpen = normalizeVisibility(artifact.visibility) === 'public';
+  const securityHeaders = getSecurityHeaders(false, env);
   return new Response(html, {
     status: 200,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': isOpen ? 'public, max-age=0, must-revalidate' : 'private, no-store',
-      ...getSecurityHeaders(false, env),
+      ...securityHeaders,
+      'Content-Security-Policy': `${securityHeaders['Content-Security-Policy']}; ${viewerScriptCsp(nonce)}`,
       ...(!isOpen ? { 'X-Robots-Tag': NOINDEX_ROBOTS } : {}),
     },
   });

@@ -5,7 +5,7 @@ import { escapeHtml, notFound, pausedPage } from './utils';
 import { getCacheControl } from './assets';
 import { googleFontsPreconnect } from '../../packages/design-tokens/src/index';
 import { standalonePageStyles } from '../design-system/standalone-page';
-import { hasCustomViewer, renderViewer } from '../viewers';
+import { hasCustomViewer, renderViewer, viewerScriptCsp } from '../viewers';
 import { getPlatformOrigin } from '../config/origins';
 
 export async function handleServeEmbed(
@@ -112,6 +112,7 @@ async function serveEmbedTypeViewer(
   }
 
   const baseUrl = getPlatformOrigin(env);
+  const nonce = crypto.randomUUID().replace(/-/g, '');
   const html = renderViewer(
     result.artifact_type,
     slug,
@@ -123,6 +124,11 @@ async function serveEmbedTypeViewer(
     result.artifact_id,
     false,
     false,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    nonce,
   );
 
   if (!html) {
@@ -134,7 +140,7 @@ async function serveEmbedTypeViewer(
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'public, max-age=0, must-revalidate',
-      'Content-Security-Policy': getEmbedCSP(allowedOrigins, env),
+      'Content-Security-Policy': `${getEmbedCSP(allowedOrigins, env)}, ${viewerScriptCsp(nonce)}`,
       ...getEmbedSecurityHeaders(),
     },
   });

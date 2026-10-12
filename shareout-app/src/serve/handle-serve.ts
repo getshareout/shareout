@@ -71,6 +71,29 @@ async function serveCaptureView(
   }).transform(resp);
 }
 
+// Gate for artifact side-assets served outside handleServe (PWA manifest, service
+// worker, icons, screenshots): same paused/blocked/visibility checks as the page.
+// Returns a denial response, or { isOpen } when the caller may serve.
+export async function gateArtifactSideAsset(
+  request: Request,
+  env: Env,
+  slug: string,
+): Promise<Response | { isOpen: boolean }> {
+  let cached = await getCachedDeployment(env, slug);
+  if (cached && !('entry_asset' in cached)) cached = null;
+  const result = cached ?? await env.DB.prepare(`${DEPLOYMENT_SELECT} WHERE d.slug = ? AND d.channel = 'production'`)
+    .bind(null, slug).first<ArtifactWithAsset>();
+  if (!result) return new Response('Not Found', { status: 404 });
+  if (result.paused === 1) {
+    return pausedPage(undefined, await localeForArtifactWorkspace(env, result.workspace_id, request));
+  }
+  if ((result.moderation_status ?? 'approved') === 'blocked') {
+    return takedownPage(undefined, await localeForArtifactWorkspace(env, result.workspace_id, request));
+  }
+  if ((normalizeVisibility(result.visibility) || 'public') === 'public') return { isOpen: true };
+  return (await checkAccess(request, env, slug, result)) ?? { isOpen: false };
+}
+
 export async function handleServe(
   request: Request,
   env: Env,

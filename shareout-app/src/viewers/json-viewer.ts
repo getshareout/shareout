@@ -1,4 +1,4 @@
-import { generateViewerShell, type ViewerContext } from './viewer-shell';
+import { generateViewerShell, scriptOpen, type ViewerContext } from './viewer-shell';
 import { viewerCopy, VIEWER_COPY, type ViewerCopy } from './copy';
 
 function escapeHtml(str: string): string {
@@ -45,9 +45,9 @@ export function renderJsonViewer(ctx: ViewerContext): string {
       <div class="json-viewer">
         ${statsHtml}
         <div class="toolbar">
-          <button class="tool-btn" onclick="expandAll()">${c.expandAll}</button>
-          <button class="tool-btn" onclick="collapseAll()">${c.collapseAll}</button>
-          <button class="tool-btn" onclick="copyPath()">${c.copyPath}</button>
+          <button class="tool-btn" data-json-action="expand">${c.expandAll}</button>
+          <button class="tool-btn" data-json-action="collapse">${c.collapseAll}</button>
+          <button class="tool-btn" data-json-action="copy">${c.copyPath}</button>
         </div>
         <div class="content-wrapper">
           <div class="tree" id="json-tree">${treeHtml}</div>
@@ -172,7 +172,7 @@ export function renderJsonViewer(ctx: ViewerContext): string {
   `;
 
   const extraHead = `
-  <script>
+  ${scriptOpen(ctx)}
     let currentPath = '';
     function toggle(el) {
       el.parentElement.classList.toggle('collapsed');
@@ -202,6 +202,14 @@ export function renderJsonViewer(ctx: ViewerContext): string {
     document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('.node').forEach(n => n.classList.add('expanded'));
     });
+    document.addEventListener('click', e => {
+      const el = e.target.closest('.toggle, [data-path], [data-json-action]');
+      if (!el) return;
+      if (el.classList.contains('toggle')) return toggle(el);
+      if (el.hasAttribute('data-path')) return showPath(el.getAttribute('data-path'));
+      const a = el.getAttribute('data-json-action');
+      if (a === 'expand') expandAll(); else if (a === 'collapse') collapseAll(); else if (a === 'copy') copyPath();
+    });
   </script>
   `;
 
@@ -210,26 +218,26 @@ export function renderJsonViewer(ctx: ViewerContext): string {
 
 function renderJsonTree(value: unknown, path: string, depth: number, c: ViewerCopy = VIEWER_COPY.en): string {
   if (value === null) {
-    return `<span class="value null" onclick="showPath('${path}')">null</span>`;
+    return `<span class="value null" data-path="${escapeHtml(path)}">null</span>`;
   }
 
   if (typeof value === 'boolean') {
-    return `<span class="value boolean" onclick="showPath('${path}')">${value}</span>`;
+    return `<span class="value boolean" data-path="${escapeHtml(path)}">${value}</span>`;
   }
 
   if (typeof value === 'number') {
-    return `<span class="value number" onclick="showPath('${path}')">${value}</span>`;
+    return `<span class="value number" data-path="${escapeHtml(path)}">${value}</span>`;
   }
 
   if (typeof value === 'string') {
     const escaped = escapeHtml(value).replace(/\n/g, '\\n');
     const display = escaped.length > 100 ? escaped.slice(0, 100) + '...' : escaped;
-    return `<span class="value string" onclick="showPath('${path}')">"${display}"</span>`;
+    return `<span class="value string" data-path="${escapeHtml(path)}">"${display}"</span>`;
   }
 
   if (Array.isArray(value)) {
     if (value.length === 0) {
-      return `<span class="bracket" onclick="showPath('${path}')">[]</span>`;
+      return `<span class="bracket" data-path="${escapeHtml(path)}">[]</span>`;
     }
 
     const items = value.map((item, i) => {
@@ -238,7 +246,7 @@ function renderJsonTree(value: unknown, path: string, depth: number, c: ViewerCo
     }).join('');
 
     return `<div class="node ${depth === 0 ? 'node-root' : ''}">
-      <span class="toggle" onclick="toggle(this)"></span>
+      <span class="toggle"></span>
       <span class="bracket">[</span>
       <span class="count">${value.length} ${c.items}</span>
       <div class="children">${items}</div>
@@ -249,7 +257,7 @@ function renderJsonTree(value: unknown, path: string, depth: number, c: ViewerCo
   if (typeof value === 'object') {
     const keys = Object.keys(value);
     if (keys.length === 0) {
-      return `<span class="bracket" onclick="showPath('${path}')">{}</span>`;
+      return `<span class="bracket" data-path="${escapeHtml(path)}">{}</span>`;
     }
 
     const entries = keys.map(key => {
@@ -259,7 +267,7 @@ function renderJsonTree(value: unknown, path: string, depth: number, c: ViewerCo
     }).join('');
 
     return `<div class="node ${depth === 0 ? 'node-root' : ''}">
-      <span class="toggle" onclick="toggle(this)"></span>
+      <span class="toggle"></span>
       <span class="bracket">{</span>
       <span class="count">${keys.length} ${c.keys}</span>
       <div class="children">${entries}</div>

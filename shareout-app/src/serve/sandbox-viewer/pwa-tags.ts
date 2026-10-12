@@ -25,7 +25,7 @@ export function renderPwaMetaTags(
   const appName = escapeHtml(pwaConfig.name || slug);
 
   return `
-  <link rel="manifest" href="${baseUrl}/a/${slug}/manifest.json">
+  <link rel="manifest" href="${baseUrl}/a/${slug}/manifest.json" crossorigin="use-credentials">
   <meta name="theme-color" content="${themeColor}">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
