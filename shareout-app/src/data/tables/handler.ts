@@ -30,7 +30,7 @@ import { exportTableCsv } from './export';
 import { getOrCreateTable, getTableId, listTables } from './meta';
 import { countRows, distinctValues, queryRows } from './query';
 import type { Filter, QueryBody } from './types';
-import { parseJsonBody, validateTableName } from './validation';
+import { parseJsonBody, validateFilter, validateInsertBody, validateTableName } from './validation';
 import { denyTableWrite } from './write-policy';
 
 export { buildScopeClause } from './scope';
@@ -93,6 +93,8 @@ export async function handleTables(
     }
     const body = await parseJsonBody(request, ctx.origin);
     if (body instanceof Response) return body;
+    const filterError = validateFilter(body.filter);
+    if (filterError) return errorResponse(filterError, ctx.origin);
 
     switch (action) {
       case 'query':
@@ -139,6 +141,8 @@ export async function handleTables(
       if (denied) return errorResponse(denied, ctx.origin);
       const body = await parseJsonBody(request, ctx.origin);
       if (body instanceof Response) return body;
+      const bodyError = validateInsertBody(body);
+      if (bodyError) return errorResponse(bodyError, ctx.origin);
       const table = await getOrCreateTable(ctx, tableName);
       if (table instanceof Response) return table;
       return insertRows(ctx, table.id, body);
@@ -148,6 +152,8 @@ export async function handleTables(
       if (denied) return errorResponse(denied, ctx.origin);
       const body = await parseJsonBody(request, ctx.origin);
       if (body instanceof Response) return body;
+      const filterError = validateFilter(body.filter);
+      if (filterError) return errorResponse(filterError, ctx.origin);
       return updateRows(ctx, tableName, body as { filter: Filter; changes: Record<string, unknown> });
     }
     case 'DELETE': {
@@ -159,6 +165,8 @@ export async function handleTables(
       }
       const body = await parseJsonBody(request, ctx.origin);
       if (body instanceof Response) return body;
+      const filterError = validateFilter(body.filter);
+      if (filterError) return errorResponse(filterError, ctx.origin);
       return deleteRows(ctx, tableName, body as { filter: Filter });
     }
     default:
