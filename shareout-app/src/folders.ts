@@ -119,7 +119,8 @@ export async function handleCreateFolder(
     user.id
   ).run();
 
-  return handleGetFolder(request, env, user, workspaceId, folderId);
+  const created = await handleGetFolder(request, env, user, workspaceId, folderId);
+  return created.ok ? new Response(created.body, { status: 201, headers: created.headers }) : created;
 }
 
 export async function handleGetFolder(
