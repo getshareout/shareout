@@ -5,7 +5,7 @@ LATAM e-commerce integration via Data Platform.
 ## Quick Start
 
 ```javascript
-const sdk = new ShareOut();
+const sdk = await ShareOut.create();
 
 // Connect to store
 await sdk.tiendanube.connect({

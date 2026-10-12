@@ -1,5 +1,7 @@
 # ShareOut Dashboards
 
+> **Not available — design spec only.** The `sdk.dashboards.*` module has no backend: `/v1/data/{artifactId}/dashboards` returns 404 on every deployment. Do not build on it. For a dashboard with data, use [`sdk.table`](../../sdk/table.md) / [`sdk.json`](../../sdk/json.md) and the patterns in [patterns/dashboards.md](../../patterns/dashboards.md).
+
 Collaborative real-time dashboards with live data, interactive filtering, and presenter mode. A complete dashboard solution built on ShareOut's infrastructure.
 
 ## Why ShareOut Dashboards?
@@ -190,7 +192,7 @@ dashboard.interactions.define({
 ### Create a Dashboard
 
 ```javascript
-const sdk = new ShareOut();
+const sdk = await ShareOut.create();
 
 const result = await sdk.dashboards.create({
   title: 'Sales Dashboard',

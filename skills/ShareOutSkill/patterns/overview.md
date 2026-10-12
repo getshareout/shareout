@@ -26,13 +26,13 @@ Copy-paste reference implementations with best practices baked in. Adapt librari
 
 | Building... | Start With |
 |-------------|------------|
-| Contact form | [Forms: Basic](forms.md#basic) |
-| Survey | [Forms: Multi-step](forms.md#multi-step) |
-| Data table with search | [Tables: Searchable](tables.md#searchable) |
-| KPI dashboard | [Dashboards: KPI Grid](dashboards.md#kpi-grid) |
-| Chart dashboard | [Dashboards: Charts](dashboards.md#charts) |
-| Image gallery | [Uploads: Gallery](uploads.md#gallery) |
-| File manager | [Uploads: Manager](uploads.md#manager) |
+| Contact form | [Forms: Contact](forms.md#contact-form-emails-owner) |
+| Survey | [Forms: Data collection](forms.md#data-collection-form) |
+| Sortable data table | [Tables: Sortable](tables.md#sortable-table) |
+| KPI dashboard | [Dashboards: Metric cards](dashboards.md#metric-cards) |
+| Chart dashboard | [Dashboards: Charts](dashboards.md#chart-dashboard) |
+| Image gallery | [Uploads: Image upload](uploads.md#basic-image-upload) |
+| Multi-file upload | [Uploads: Drag & drop](uploads.md#drag--drop-upload) |
 
 ## Libraries Used
 

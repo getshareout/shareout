@@ -29,7 +29,7 @@ checklist; do not skip `npm run deploy` / `provision:cf`.
 | Browser Rendering | Optional | `BROWSER` | Thumbnails |
 | Queues | Optional | analytics views queue | Async analytics |
 
-OSS template: [`shareout-app/wrangler.toml`](../../../shareout-app/wrangler.toml).
+OSS template: `shareout-app/wrangler.toml`.
 
 ---
 
@@ -175,7 +175,7 @@ openssl rand -hex 32 | npx wrangler secret put CREDENTIALS_KEY   # then team/sso
 # ARTIFACT_ORIGIN=https://…   # optional
 ```
 
-Full table: [self-host secrets](../../../docs-site/src/content/docs/self-host/secrets.md).
+Full table: self-host secrets (`docs-site/src/content/docs/self-host/secrets.md` in the `getshareout/shareout` repo).
 
 ---
 

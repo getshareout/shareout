@@ -465,7 +465,7 @@ These are for artifact **viewers**, not artifact **owners**.
 
 ```typescript
 // Initialize client
-const shareout = new ShareOut();
+const shareout = await ShareOut.create();
 
 // Check for existing credentials
 const hasCredentials = await shareout.hasCredentials();

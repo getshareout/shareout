@@ -1,5 +1,7 @@
 # Dashboard Design Module
 
+> **Visual guidance only.** The `sdk.dashboards.*` module these docs were written for has no backend (`/v1/data/{artifactId}/dashboards` returns 404). The layout/chart/color advice still applies; for a dashboard with data, use [`sdk.table`](../../../sdk/table.md) / [`sdk.json`](../../../sdk/json.md) and the patterns in [patterns/dashboards.md](../../../patterns/dashboards.md).
+
 Visual design guidelines for creating professional, data-driven dashboards.
 
 ## How Claude Uses This

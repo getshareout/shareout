@@ -5,7 +5,7 @@ GA4 reports and metrics via Data Platform.
 ## Quick Start
 
 ```javascript
-const sdk = new ShareOut();
+const sdk = await ShareOut.create();
 
 // Check connection
 if (!await sdk.analytics.isConnected()) {

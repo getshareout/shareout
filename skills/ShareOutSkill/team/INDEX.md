@@ -18,7 +18,7 @@ language.
 | Okta / OIDC single sign-on | [sso.md](sso.md) | [admin-portal.md](admin-portal.md) |
 | Workspace house style for agents | [workspace-context.md](workspace-context.md) | [SKILL.md](SKILL.md#workspace-context-files) |
 | Workspace schedules / automations | [api.md](api.md#workspace-schedules-and-automations) | [../api/jobs.md](../api/jobs.md) |
-| Team-wide metric alert management | [../api/metric-alerts.md](../api/metric-alerts.md) | [api.md](api.md#metric-alerts-in-teams) |
+| Team-wide metric alert management | [../api/metric-alerts.md](../api/metric-alerts.md) | [api.md](api.md#metric-alerts-in-workspaces) |
 | Workspace connections | [workspace-connections.md](workspace-connections.md) | [api.md](api.md#workspace-connections) |
 | Data catalog / lineage / glossary | [catalog.md](catalog.md) | [workspace-connections.md](workspace-connections.md) |
 | One-shot deliver artifact | [../core/workspace-home.md](../core/workspace-home.md#inspector-right-rail) | [api.md](api.md#artifact-delivery-one-shot) |

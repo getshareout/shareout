@@ -443,7 +443,7 @@ Regenerate the preview thumbnail (headless browser screenshot, 1200×750 webp). 
 
 ### PUT /v1/artifacts/{id}/thumbnail
 
-Upload a custom thumbnail (max 500KB, webp/png/jpeg). See [SKILL.md § Thumbnails](../SKILL.md#thumbnails).
+Upload a custom thumbnail (max 500KB, webp/png/jpeg). See [publishing § custom thumbnail](../modules/_shared/publishing.md#option-3-upload-a-custom-thumbnail).
 
 ## Analytics
 
@@ -552,7 +552,7 @@ Personal home — archives your own unused personal pages.
 |-----|---------|
 | `/a/{slug}/manifest.json` | Web app manifest |
 | `/a/{slug}/sw.js` | Service worker |
-| `/a/{slug}/_pwa/icon-{size}.png` | App icons |
+| `/a/{slug}/_pwa/icon-{size}.png` | App icons (every size returns the one 512×512 `pwa.icon`; not resized) |
 
 ## Related
 

@@ -32,7 +32,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Private notes ABOUT a client (AI auto-reads + updates) | [team/external-sharing.md](team/external-sharing.md#client-notes-ai-memory-about-a-client) | [team/workspace-assistant.md](team/workspace-assistant.md) |
 | Style an artifact / make it on-brand | [modules/ui/overview.md](modules/ui/overview.md) | [modules/ui/classes.md](modules/ui/classes.md), [modules/ui/components.md](modules/ui/components.md) |
 | Make it look good / design taste / avoid a generic AI look | [modules/ui/taste.md](modules/ui/taste.md) | [modules/ui/overview.md](modules/ui/overview.md) |
-| Dashboard with data | [modules/dashboards/overview.md](modules/dashboards/overview.md) | [sdk/table.md](sdk/table.md), [patterns/dashboards.md](patterns/dashboards.md) |
+| Dashboard with data | [patterns/dashboards.md](patterns/dashboards.md) | [sdk/table.md](sdk/table.md), [sdk/json.md](sdk/json.md) (`modules/dashboards/` is an unshipped design spec — don't use `sdk.dashboards`) |
 | Editable spreadsheet grid in an artifact | [sdk/grid.md](sdk/grid.md) | [sdk/table.md](sdk/table.md), [integrations/google-sheets.md](integrations/google-sheets.md) |
 | Live Mixpanel / BigQuery / REST in HTML | [sdk/live-data.md](sdk/live-data.md) | [sdk/connections.md](sdk/connections.md), [integrations/overview.md](integrations/overview.md) |
 | Show viewers where data comes from / data sources drawer / how to replicate | [patterns/data-provenance.md](patterns/data-provenance.md) | [core/html-spec/manifest.md](core/html-spec/manifest.md#provenance-where-the-data-comes-from), [agents/crew.md](agents/crew.md) |
@@ -99,7 +99,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Raise a support ticket / bug report (agent or app) | [api/support.md](api/support.md) | [api/overview.md](api/overview.md) |
 | REST API reference | [api/overview.md](api/overview.md) | [api/artifacts.md](api/artifacts.md) |
 | Publish CSV/Markdown/JSON | [api/artifact-types.md](api/artifact-types.md) | [SKILL.md](SKILL.md) |
-| Link preview when sharing (Slack, WhatsApp) | [modules/_shared/publishing.md](modules/_shared/publishing.md#link-previews-slack-whatsapp-imessage) | [SKILL.md](SKILL.md#thumbnails) |
+| Link preview when sharing (Slack, WhatsApp) | [modules/_shared/publishing.md](modules/_shared/publishing.md#link-previews-slack-whatsapp-imessage) | [api/artifacts.md](api/artifacts.md#put-v1artifactsidthumbnail) |
 | Authentication | [auth.md](auth.md) | [api/overview.md](api/overview.md) |
 | Self-serve API token (avatar menu / /v1/me/tokens) | [auth.md](auth.md#self-serve-api-tokens) | [api/overview.md](api/overview.md) |
 | Request access to a private page | [modules/_shared/permissions.md](modules/_shared/permissions.md#access-requests-private--workspace-artifacts) | [core/access-policy.md](core/access-policy.md) |
@@ -116,7 +116,8 @@ ShareOutSkill/
 ├── auth.md                     # Token format, credentials, API auth
 ├── deploy/                     # Install on Cloudflare (agents: start here to self-host)
 │   ├── SKILL.md                # Deploy protocol + success criteria
-│   └── cloudflare.md           # CF resources, domain/DNS, companion skills
+│   ├── cloudflare.md           # CF resources, domain/DNS, companion skills
+│   └── configure.md            # Configure a running instance (AI, email, features)
 │
 ├── creating/                   # End-to-end new-artifact build flow (start here to build)
 │   ├── overview.md             # The orchestrator: discovery → design → stack → build → QA
@@ -141,6 +142,12 @@ ShareOutSkill/
 │   ├── assets.md                 # Asset library — folders, visibility, deliverables, gated links
 │   ├── knowledge.md              # Workspace Knowledge — learned library, Guidance, consolidator
 │   ├── external-sharing.md       # Share OUTSIDE the team — clients, grants, /shared portal, scoped tokens
+│   ├── admin-portal.md           # Admin lens — members, roles, governance
+│   ├── agent-tokens.md           # Workspace Agent tokens (sot_ service accounts)
+│   ├── folders.md                # Team Space folders
+│   ├── workspace-tables.md       # Tables shared across a workspace's artifacts
+│   ├── libraries.md              # Workspace Library — private versioned JS modules
+│   └── catalog.md                # Data Catalog — lineage, glossary
 │
 ├── core/                       # Mandatory specs (every artifact)
 │   ├── README.md               # Core overview
@@ -168,7 +175,8 @@ ShareOutSkill/
 │   ├── python.md               # sdk.python - run Python in the browser
 │   ├── connections.md          # sdk.connection - REST + materialize
 │   ├── live-data.md            # Mixpanel/BigQuery/live queries in artifacts (READ FIRST)
-│   └── datasets.md             # sdk.dataset - read materialized extracts
+│   ├── datasets.md             # sdk.dataset - read materialized extracts
+│   └── libraries.md            # so.lib - import workspace library modules
 │
 ├── api/                        # REST API reference
 │   ├── overview.md             # Base URL, auth, rate limits
@@ -183,6 +191,9 @@ ShareOutSkill/
 │   ├── destinations.md         # Delivery layer (slack/email/discord/webhook)
 │   ├── templates.md            # /v1/templates endpoints
 │   ├── webhooks.md             # Webhook payloads
+│   ├── tests.md                # Artifact Tests — safety nets on change
+│   ├── features.md             # /v1/features — per-workspace feature flags
+│   ├── support.md              # /v1/support/tickets — support tickets
 │   └── errors.md               # Error codes
 │
 ├── integrations/               # External services
@@ -195,6 +206,8 @@ ShareOutSkill/
 │   ├── shopify.md              # Shopify proxy
 │   ├── tiendanube.md           # Tienda Nube proxy
 │   ├── cors-proxy.md           # Generic CORS proxy
+│   ├── inbound-email.md        # Per-artifact inbound email address
+│   ├── mcp-connector.md        # ShareOut as a remote MCP server (Claude, ChatGPT)
 │   └── github.md               # GitHub backup/export
 │
 ├── agents/                     # AI agent integration
@@ -222,21 +235,31 @@ ShareOutSkill/
 │   │   ├── overview.md         # Entry, quick start
 │   │   ├── sdk-api.md          # Slide SDK methods
 │   │   ├── analytics.md        # Viewer analytics, tracked links, open alerts
-│   │   ├── presenter.md        # Presenter mode
+│   │   ├── presenter-mode.md   # Presenter mode
+│   │   ├── permissions.md      # Presentation + per-slide permissions
+│   │   ├── publishing.md       # Editor vs published deck
+│   │   ├── versions.md         # Version history
 │   │   ├── data-model.md       # Y.js structure
+│   │   ├── sdk-authoring-spec.md   # Design spec: higher-level authoring API (roadmap)
+│   │   ├── experience-roadmap.md   # Roadmap (not agent guidance)
+│   │   ├── b2b-expansion.md        # Roadmap (not agent guidance)
 │   │   └── design/             # Visual guidelines
 │   │
-│   ├── dashboards/             # Dashboard module
+│   ├── dashboards/             # UNSHIPPED design spec — no backend; use patterns/dashboards.md
 │   │   ├── overview.md         # Entry, quick start
-│   │   ├── sdk-api.md          # Dashboard SDK methods
-│   │   ├── widgets.md          # Widget reference
+│   │   ├── sdk-api.md          # Dashboard SDK methods (not implemented)
 │   │   ├── data-model.md       # Y.js structure
-│   │   └── design/             # Visual guidelines
+│   │   ├── permissions.md      # Permissions model
+│   │   ├── presenter-mode.md   # Presenter mode
+│   │   ├── publishing.md       # Editor vs published
+│   │   ├── versions.md         # Version history
+│   │   └── design/             # Visual guidelines (still applicable; widgets.md = widget reference)
 │   │
 │   └── mobile/                 # Mobile/PWA module
 │       ├── overview.md         # Entry, quick start
 │       ├── sdk-api.md          # Mobile SDK methods
 │       ├── pwa.md              # PWA features
+│       ├── publishing.md       # Publish with PWA via REST
 │       └── design/             # Visual guidelines
 │
 └── patterns/                   # Copy-paste starters

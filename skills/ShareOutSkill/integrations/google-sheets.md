@@ -5,7 +5,7 @@ OAuth and data fetching from Google Spreadsheets.
 ## Quick Start
 
 ```javascript
-const sdk = new ShareOut();
+const sdk = await ShareOut.create();
 
 // Check connection
 if (!await sdk.sheets.isConnected()) {
@@ -103,8 +103,8 @@ POST /v1/data/{artifactId}/sheets/fetch
 }
 </script>
 <script src="/sdk/shareout.js"></script>
-<script>
-  const sdk = new ShareOut();
+<script type="module">
+  const sdk = await ShareOut.create();
 
   async function loadData() {
     if (!await sdk.sheets.isConnected()) {

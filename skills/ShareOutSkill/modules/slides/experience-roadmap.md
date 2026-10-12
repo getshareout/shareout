@@ -4,7 +4,7 @@ Making the *act of presenting and collaborating* best-in-class. This is the feat
 
 > Companion to [b2b-expansion.md](./b2b-expansion.md) (monetization/analytics). This doc is about the craft of the product itself.
 >
-> Grounded in the **current** build: D1 + `broadcastEvent` ([presenter.ts](../../../../shareout-app/src/data/slides/presenter.ts)), basic `window.open` presenter popup ([editor/presentation/index.ts:336](../../../../shareout-app/src/editor/presentation/index.ts#L336)). The Y.js CRDT in [overview.md](./overview.md) is **designed but not built** — collaboration today is broadcast-based.
+> Grounded in the **current** build: D1 + `broadcastEvent` (`shareout-app/src/data/slides/presenter.ts`), basic `window.open` presenter popup (`shareout-app/src/editor/presentation/index.ts:336`). The Y.js CRDT in [overview.md](./overview.md) is **designed but not built** — collaboration today is broadcast-based.
 
 ## Where we are honestly
 
@@ -83,7 +83,7 @@ All of these ride the existing `broadcastEvent` channel — no CRDT dependency.
 This is the biggest *build*, and the largest gap between [overview.md](./overview.md)'s promise and reality.
 
 **Improve (data exists, surface it):**
-- **Per-slide ownership & locking** — columns `owner_id` / `locked` already in `slides` ([db.ts:22](../../../../shareout-app/src/data/slides/db.ts#L22)); add the UI (claim/lock/unlock) and enforce on edit
+- **Per-slide ownership & locking** — columns `owner_id` / `locked` already in `slides` (`shareout-app/src/data/slides/db.ts:22`); add the UI (claim/lock/unlock) and enforce on edit
 - **Presence** — "who's here, who's on which slide"
 
 **Add:**
@@ -96,7 +96,7 @@ Sequence CRDT carefully: it underpins live cursors, comments, and simultaneous e
 
 ## 6. SDK & authoring — richer creation primitives
 
-Today the authoring API is **low-level**. `slides.create()` takes metadata only ([index.ts:147](../../../../shareout-app/sdk/src/stores/slides/index.ts#L147)); slides are built by writing **raw HTML** into `setContent()`; helpers cover content primitives + a few layouts (`textBlock`, `heading`, `bulletList`, `image`, `codeBlock`, `bigNumber`, `quote`, `twoColumn`, `centered`) in [slide-helpers.ts](../../../../shareout-app/sdk/src/presentation/slide-helpers.ts) — but there's no theme cascade, no data components, no full-slide layouts, and no way to build a deck in one call. Anyone generating a deck programmatically (or via an AI agent) still hand-assembles HTML. That's the friction to remove. See [sdk-authoring-spec.md](./sdk-authoring-spec.md) for the concrete API.
+Today the authoring API is **low-level**. `slides.create()` takes metadata only (`shareout-app/sdk/src/stores/slides/index.ts:147`); slides are built by writing **raw HTML** into `setContent()`; helpers cover content primitives + a few layouts (`textBlock`, `heading`, `bulletList`, `image`, `codeBlock`, `bigNumber`, `quote`, `twoColumn`, `centered`) in `shareout-app/sdk/src/presentation/slide-helpers.ts` — but there's no theme cascade, no data components, no full-slide layouts, and no way to build a deck in one call. Anyone generating a deck programmatically (or via an AI agent) still hand-assembles HTML. That's the friction to remove. See [sdk-authoring-spec.md](./sdk-authoring-spec.md) for the concrete API.
 
 **Improve (exists, thin):**
 - **Create-with-content** — let `create()` accept slides inline (array of slides, or a markdown/outline string) so a deck is one call, not create-then-N-adds
