@@ -104,6 +104,31 @@ describe('slides tracked links — owner CRUD', () => {
     expect(json.code).toBe('PASSWORD_REQUIRED');
   });
 
+  it('rejects an unknown gate instead of creating an open link', async () => {
+    mockVerifyOwner.mockResolvedValue(true);
+    const { status, json } = await call('POST', [], { gate: 'bogus' });
+    expect(status).toBe(400);
+    expect(json.code).toBe('VALIDATION_ERROR');
+    expect(json.param).toBe('gate');
+    const list = await call('GET', []);
+    expect(list.json.data.links).toHaveLength(0);
+  });
+
+  it('rejects an unparseable expiresAt', async () => {
+    mockVerifyOwner.mockResolvedValue(true);
+    const { status, json } = await call('POST', [], { expiresAt: 'not-a-date' });
+    expect(status).toBe(400);
+    expect(json.code).toBe('VALIDATION_ERROR');
+    expect(json.param).toBe('expiresAt');
+  });
+
+  it('stores expiresAt as an ISO timestamp', async () => {
+    mockVerifyOwner.mockResolvedValue(true);
+    const { status, json } = await call('POST', [], { expiresAt: '2030-01-02T03:04:05+02:00' });
+    expect(status).toBe(201);
+    expect(json.data.expiresAt).toBe('2030-01-02T01:04:05.000Z');
+  });
+
   it('revokes a link', async () => {
     const id = await createLink({ recipientLabel: 'X' });
     mockVerifyOwner.mockResolvedValue(true);
