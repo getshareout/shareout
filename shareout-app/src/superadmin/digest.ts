@@ -267,7 +267,7 @@ export async function getDailyPlatformDigest(
       scalarOnDay(env, 'artifacts', 'created_at', priorDate),
       scalarOnDay(env, 'users', 'created_at', priorDate),
       scalarOnDay(env, 'users', 'last_login_at', priorDate),
-      scalarOnDay(env, 'funnel_events', 'ts', priorDate, " AND event = 'view'"),
+      scalarOnDay(env, 'funnel_events', 'created_at', priorDate, " AND event = 'view'"),
       env.DB.prepare(
         `SELECT COALESCE(SUM(views),0) AS v FROM analytics_daily WHERE date = ?`
       )
@@ -311,14 +311,14 @@ export async function getDailyPlatformDigest(
       .first<{ sessions: number }>(),
     env.DB.prepare(
       `SELECT COALESCE(country, 'XX') AS country, COUNT(*) AS count
-       FROM funnel_events WHERE date(ts) = ? AND event = 'view'
+       FROM funnel_events WHERE date(created_at) = ? AND event = 'view'
        GROUP BY country ORDER BY count DESC LIMIT 8`
     )
       .bind(reportDate)
       .all<{ country: string; count: number }>(),
     env.DB.prepare(
       `SELECT label, COUNT(*) AS count FROM funnel_events
-       WHERE date(ts) = ? AND event = 'chip' AND label IS NOT NULL
+       WHERE date(created_at) = ? AND event = 'chip' AND label IS NOT NULL
        GROUP BY label ORDER BY count DESC LIMIT 8`
     )
       .bind(reportDate)
@@ -383,8 +383,8 @@ export async function getDailyPlatformDigest(
       .bind(reportDate)
       .all<DailyPlatformDigest['publishes'][0]>(),
     env.DB.prepare(
-      `SELECT ts, status, route, substr(message, 1, 200) AS message
-       FROM ops_error_log WHERE date(ts) = ? ORDER BY ts DESC LIMIT 8`
+      `SELECT created_at AS ts, status, route, substr(message, 1, 200) AS message
+       FROM ops_error_log WHERE date(created_at) = ? ORDER BY created_at DESC LIMIT 8`
     )
       .bind(reportDate)
       .all<DailyPlatformDigest['recentErrors'][0]>(),
