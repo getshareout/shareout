@@ -119,9 +119,9 @@ Per-scope asset library — one hidden bucket per workspace (shared) and one per
 | --- | --- | --- |
 | `GET` | `/v1/workspaces/{id}/assets` | List deliverables + loose files (`deliverables[]`, `loose[]`, `bucketId`, `usedBytes`). Member+. |
 | `POST` | `/v1/workspaces/{id}/assets/upload` | Request upload → `{ uploadUrl, tokenId }`; `PUT` bytes to `uploadUrl`. Member+. |
-| `POST` | `/v1/workspaces/{id}/assets/deliverables` | `{ blobId, name? }` → new deliverable (v1). Member+. |
+| `POST` | `/v1/workspaces/{id}/assets/deliverables` | `{ blobId, name?, visibility? }` → new deliverable (v1). `visibility` defaults to `team`. Member+. |
 | `POST` | `/v1/workspaces/{id}/assets/deliverables/{id}/version` | `{ blobId }` → add version. Member+. |
-| `PATCH` | `/v1/workspaces/{id}/assets/deliverables/{id}` | `{ visibility?, folderId? }` — `private` \| `workspace`. Member+. |
+| `PATCH` | `/v1/workspaces/{id}/assets/deliverables/{id}` | `{ visibility?, folderId? }` — `team` (workspace members) \| `private` (owner + direct shares) \| `workspace` (anyone with the link). Member+. |
 | `GET` | `/v1/workspaces/{id}/assets/deliverables/{id}/versions` | Version history. Member+. |
 | `DELETE` | `/v1/workspaces/{id}/assets/deliverables/{id}` | Delete deliverable + all versions. Member+. |
 | `POST` | `/v1/workspaces/{id}/assets/collections` | `{ name?, deliverableIds[] }` → bundle. Member+. |

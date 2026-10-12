@@ -154,7 +154,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
                 <button class="wsx-assets__upload" id="wsxAssetUpload" type="button">${svg('<path d="M12 5v14"/><path d="M5 12h14"/>')}<span data-i18n="assets.uploadFiles">Upload files</span></button>
               </div>
             </div>
-            <p class="wsx-lens__intro" data-i18n="intro.assets">Store images, video, and files once and reuse them across pages — every asset gets a permanent link you can embed in an artifact or send to a customer. Any file type.</p>
+            <p class="wsx-lens__intro" data-i18n="intro.assets">Keep images, video, and files for your team in one place. New files are visible to the team only; open a public link when you want to show one in an artifact or send it to a customer. Any file type.</p>
             <div class="wsx__chips" id="wsxAssetChips">
               <button class="wsx-chip is-on" data-asset-filter="all" type="button" data-i18n="filter.all">All</button>
               <button class="wsx-chip" data-asset-filter="image" type="button" data-i18n="filter.images">Images</button>

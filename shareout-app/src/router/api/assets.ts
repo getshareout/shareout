@@ -8,10 +8,13 @@
  *   POST   /v1/assets/upload                       request an upload
  *   PUT    /v1/assets/_upload/{token}              receive bytes (member-authorized)
  *   DELETE /v1/assets/{blobId}                     delete a loose blob
- *   POST   /v1/assets/deliverables                 { blobId, name } → new deliverable (v1)
+ *   POST   /v1/assets/deliverables                 { blobId, name, visibility? } → new deliverable (v1)
  *   POST   /v1/assets/deliverables/{id}/version    { blobId } → add a version
  *   GET    /v1/assets/deliverables/{id}/versions   version history
  *   PATCH  /v1/assets/deliverables/{id}            { visibility?, folderId? } → set file props
+ *
+ * File visibility: 'team' (internal workspace members; the workspace default),
+ * 'private' (owner + direct grants), 'workspace' (anyone with the link).
  *   DELETE /v1/assets/deliverables/{id}            delete deliverable + its versions
  *   POST   /v1/assets/collections                  { name, deliverableIds[] } → collection
  *   POST   /v1/assets/collections/{id}/share       { expiresAt? } → { url }
@@ -49,6 +52,9 @@ async function resolveGate(b: { gate?: string; password?: string; domains?: stri
 }
 import { dispatchLifecycleEmail } from '../../email/gateway';
 import { writeBlobOrigin } from '../../serve/share-target';
+
+const FILE_VISIBILITIES = ['team', 'private', 'workspace'];
+const VISIBILITY_ERROR = 'visibility must be team, private or workspace';
 
 export async function routeAssetApi(ctx: FetchContext): Promise<Response | null> {
   const { request, env, path, addCORS } = ctx;
@@ -89,13 +95,17 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
 
   // ----- deliverables -----
   if (sub === 'deliverables' && method === 'POST') {
-    const b = await body<{ blobId?: string; name?: string }>();
+    const b = await body<{ blobId?: string; name?: string; visibility?: string }>();
     if (!b.blobId) return json({ error: 'blobId required' }, 400);
+    if (b.visibility !== undefined && !FILE_VISIBILITIES.includes(b.visibility)) return json({ error: VISIBILITY_ERROR }, 400);
     const name = (b.name || '').trim() || 'Untitled';
-    const d = await createDeliverable(env, bucket.id, workspaceId, user.id, name, b.blobId);
+    // New workspace files are team-only unless the uploader opts into a public link;
+    // personal-library files keep the link-shareable default (no team to scope to).
+    const visibility = b.visibility || (workspaceId ? 'team' : 'workspace');
+    const d = await createDeliverable(env, bucket.id, workspaceId, user.id, name, b.blobId, { visibility });
     ctx.executionCtx?.waitUntil(enrichDeliverable(env, bucket.id, d.id).catch(() => {}));
     learn(d.id, b.blobId);
-    return json({ id: d.id, name }, 201);
+    return json({ id: d.id, name, visibility }, 201);
   }
   let dm = sub.match(/^deliverables\/([^/]+)\/version$/);
   if (dm && method === 'POST') {
@@ -119,7 +129,7 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
     const b = await body<{ visibility?: string; folderId?: string | null }>();
     const fields: { visibility?: string; folderId?: string | null } = {};
     if (b.visibility !== undefined) {
-      if (b.visibility !== 'private' && b.visibility !== 'workspace') return json({ error: 'visibility must be private or workspace' }, 400);
+      if (!FILE_VISIBILITIES.includes(b.visibility)) return json({ error: VISIBILITY_ERROR }, 400);
       fields.visibility = b.visibility;
     }
     if (b.folderId !== undefined) fields.folderId = b.folderId || null;

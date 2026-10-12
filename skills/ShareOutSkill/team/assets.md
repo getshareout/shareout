@@ -32,9 +32,13 @@ Sharing a **folder** with a client (Admin → Sharing) also shares the **files**
 
 ## Visibility
 
-Each file is either **link-shareable** (default — anyone who has the file's id/URL can open it) or **private** (only you, until you share it). Toggle visibility on a file tile. Private files show a small badge; link-shareable ones show an "Anyone with link" badge.
+Each workspace file has a `visibility`, shown as a badge on its tile and chosen at upload (Team only preselected); change it by clicking the file → **Who can see it**:
 
-- **Link-shareable is not membership-gated**, unlike artifact-page `workspace` visibility (which does check membership). The id is an unguessable random token (not enumerable), but ShareOut does **not** check workspace membership before serving the bytes — anyone who obtains the URL (a leaked link, a screenshot, a shared page's source) can open it. Don't upload anything you'd need real access control on; use **private** + an explicit grant instead.
+- **`team`** — "Team only", the default for new workspace uploads (API default too). Signed-in internal members of the workspace can open it; anonymous viewers, outsiders, external members and folder-grant sharees get 403. Not loadable inside a published artifact (needs a signed-in session).
+- **`private`** — "Only you": owner + direct shares.
+- **`workspace`** — "Anyone with the link". Use this for files embedded in artifacts or sent outside the team. Existing files keep whatever they had; personal-library uploads still default to this.
+
+- **Anyone with the link (`workspace`) is not membership-gated**, unlike artifact-page `workspace` visibility (which does check membership). The id is an unguessable random token (not enumerable), but ShareOut does **not** check workspace membership before serving the bytes — anyone who obtains the URL (a leaked link, a screenshot, a shared page's source) can open it. Don't upload anything you'd need real access control on; use **team**, or **private** + an explicit grant, instead.
 - **Private** files are hidden from other members and anonymous delivery links — share deliberately via [external-sharing.md](external-sharing.md) or **Share with a person** (below).
 
 ## Versions

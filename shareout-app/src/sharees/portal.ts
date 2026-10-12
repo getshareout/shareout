@@ -125,7 +125,7 @@ export async function listGrantedFiles(
         LEFT JOIN workspaces w ON w.id = d.workspace_id
        WHERE d.deleted_at IS NULL
          AND ( d.id IN (${placeholders(fileIds.length)})
-            OR (d.folder_id IN (SELECT id FROM sub) AND d.visibility != 'private') )
+            OR (d.folder_id IN (SELECT id FROM sub) AND d.visibility NOT IN ('private', 'team')) )
        ORDER BY d.name`
   ).bind(...folderIds, ...fileIds).all<{
     id: string; name: string; bucket_artifact_id: string; workspace_id: string | null;

@@ -205,10 +205,10 @@ async function resourceFolderId(
   if (resourceType === 'file') {
     const row = await env.DB.prepare('SELECT folder_id, visibility FROM asset_deliverables WHERE id = ?')
       .bind(resourceId).first<{ folder_id: string | null; visibility: string }>();
-    // A private file is NOT reachable via a folder grant — it needs a direct 'file' grant.
+    // A private/team file is NOT reachable via a folder grant — it needs a direct 'file' grant.
     // Keeps canAccess in agreement with the portal enumeration (listGrantedFiles excludes
     // private files from a granted folder's subtree).
-    if (!row || row.visibility === 'private') return null;
+    if (!row || row.visibility === 'private' || row.visibility === 'team') return null;
     return row.folder_id ?? null;
   }
   // dataset/connection/asset_bucket/subdomain: no folder coupling in Phase 1.

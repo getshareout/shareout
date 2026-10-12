@@ -117,9 +117,9 @@ Biblioteca de assets por alcance — un bucket oculto por workspace (compartido)
 | --- | --- | --- |
 | `GET` | `/v1/workspaces/{id}/assets` | Listar deliverables + archivos sueltos (`deliverables[]`, `loose[]`, `bucketId`, `usedBytes`). Member+. |
 | `POST` | `/v1/workspaces/{id}/assets/upload` | Pedir upload → `{ uploadUrl, tokenId }`; `PUT` de bytes a `uploadUrl`. Member+. |
-| `POST` | `/v1/workspaces/{id}/assets/deliverables` | `{ blobId, name? }` → deliverable nuevo (v1). Member+. |
+| `POST` | `/v1/workspaces/{id}/assets/deliverables` | `{ blobId, name?, visibility? }` → deliverable nuevo (v1). `visibility` por defecto es `team`. Member+. |
 | `POST` | `/v1/workspaces/{id}/assets/deliverables/{id}/version` | `{ blobId }` → agregar versión. Member+. |
-| `PATCH` | `/v1/workspaces/{id}/assets/deliverables/{id}` | `{ visibility?, folderId? }` — `private` \| `workspace`. Member+. |
+| `PATCH` | `/v1/workspaces/{id}/assets/deliverables/{id}` | `{ visibility?, folderId? }` — `team` (miembros del espacio) \| `private` (dueño + compartidos directos) \| `workspace` (cualquiera con el enlace). Member+. |
 | `GET` | `/v1/workspaces/{id}/assets/deliverables/{id}/versions` | Historial de versiones. Member+. |
 | `DELETE` | `/v1/workspaces/{id}/assets/deliverables/{id}` | Borrar deliverable + todas las versiones. Member+. |
 | `POST` | `/v1/workspaces/{id}/assets/collections` | `{ name?, deliverableIds[] }` → bundle. Member+. |

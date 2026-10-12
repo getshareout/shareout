@@ -85,6 +85,24 @@ describe('GET /v1/files/:id/content (work/042 P3)', () => {
     expect(await res.text()).toBe('secret');
   });
 
+  it('team file: workspace members read it; anonymous, outsiders and external members get 403', async () => {
+    await e.DB.exec(`INSERT INTO users (id, email) VALUES ('usr_mem','mem@x.com'),('usr_xm','xm@client.com')`);
+    await e.DB.exec(`INSERT INTO workspace_members (id, workspace_id, user_id, role, member_class) VALUES ('m1','${WS}','usr_mem','member','internal'),('m2','${WS}','usr_xm','member','external')`);
+    await e.DB.exec(`INSERT INTO asset_deliverables (id, bucket_artifact_id, workspace_id, owner_id, name, visibility) VALUES ('dT','bk','${WS}','usr_owner','Plano','team')`);
+    await e.DB.exec(`INSERT INTO blobs (id, artifact_id, deliverable_id, version_no, filename, mime_type, size_bytes, r2_key) VALUES ('bT','bk','dT',1,'plano.txt','text/plain',5,'bk/blobs/bT/plano.txt')`);
+    await putBytes('bk/blobs/bT/plano.txt', 'plano');
+
+    expect((await handleFileContent(req('dT'), e, 'dT')).status).toBe(403);
+    expect((await handleFileContent(req('dT', await cookieFor('usr_other', 'other@x.com')), e, 'dT')).status).toBe(403);
+    expect((await handleFileContent(req('dT', await cookieFor('usr_xm', 'xm@client.com')), e, 'dT')).status).toBe(403);
+    const res = await handleFileContent(req('dT', await cookieFor('usr_mem', 'mem@x.com')), e, 'dT');
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('plano');
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    expect((await handleFileMeta(req('dT'), e, 'dT')).status).toBe(403);
+    expect((await handleFileMeta(req('dT', await cookieFor('usr_mem', 'mem@x.com')), e, 'dT')).status).toBe(200);
+  });
+
   it('?v=N pins a specific version; default serves the latest', async () => {
     await e.DB.exec(`INSERT INTO blobs (id, artifact_id, deliverable_id, version_no, filename, mime_type, size_bytes, r2_key) VALUES ('bW2','bk','dW',2,'logo.txt','text/plain',5,'bk/blobs/bW2/logo.txt')`);
     await putBytes('bk/blobs/bW2/logo.txt', 'LOGO2');
