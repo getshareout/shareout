@@ -196,12 +196,14 @@ function unescapeHtml(str: string): string {
 // Allow http(s)/mailto and scheme-less (relative, /path, #anchor, ?query) URLs only.
 // Browsers drop ASCII whitespace/control chars when parsing a scheme, so strip them first.
 export function isSafeMarkdownUrl(escapedUrl: string): boolean {
+  // eslint-disable-next-line no-control-regex
   const url = unescapeHtml(escapedUrl).replace(/[\x00-\x20\x7f]/g, '').toLowerCase();
   const scheme = /^([a-z][a-z0-9+.-]*):/.exec(url);
   return !scheme || SAFE_URL_SCHEMES.has(scheme[1]);
 }
 
 export function parseMarkdown(md: string): string {
+  // eslint-disable-next-line no-control-regex
   let html = md.replace(/\u0000/g, '');
 
   // Remove frontmatter
@@ -282,6 +284,7 @@ export function parseMarkdown(md: string): string {
   // Clean up empty paragraphs
   html = html.replace(/<p>\s*<\/p>/g, '');
 
+  // eslint-disable-next-line no-control-regex
   html = html.replace(/\u0000(\d+)\u0000/g, (_, i) => codeBlocks[Number(i)]);
 
   // Clean up nested elements

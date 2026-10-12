@@ -24,6 +24,7 @@ function expectInert(html: string) {
     expect(['script', 'iframe', 'svg', 'object', 'embed', 'style', 'base', 'form', 'meta', 'link']).not.toContain(name);
     expect(tag.replace(/"[^"]*"|'[^']*'/g, '""')).not.toMatch(/\son[a-z]+\s*=/i);
     for (const [, url] of tag.matchAll(/\s(?:href|src)\s*=\s*"([^"]*)"/gi)) {
+      // eslint-disable-next-line no-control-regex
       expect(decode(url).replace(/[\x00-\x20]/g, '')).not.toMatch(/^(?:javascript|vbscript|data):/i);
     }
   }
