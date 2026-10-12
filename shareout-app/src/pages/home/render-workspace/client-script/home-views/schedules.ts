@@ -85,13 +85,13 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
       .then(function (d) {
         var jobs = (d && (d.jobs || d.items)) || [];
         if (!jobs.length) {
-          m.innerHTML = '<div class="wsx-qa-grid wsx-qa-grid--lens">'
+          m.innerHTML = '<p class="wsx-lens__intro">' + esc(t('autof.schedEmpty')) + '</p><div class="wsx-qa-grid wsx-qa-grid--lens">'
+            + '<button class="wsx-qa" data-autoform="schedule" type="button"><span class="wsx-qa__ic">' + isvg(SCHED_ICON.check) + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('sched.emptyStep')) + '</span><span class="wsx-qa__s">' + esc(t('sched.emptyStepSub')) + '</span></span></button>'
             + '<button class="wsx-qa" data-newauto="' + esc(t('sched.prefillChat')) + '" type="button"><span class="wsx-qa__ic">' + isvg(SCHED_ICON.clock) + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('sched.emptyChat')) + '</span><span class="wsx-qa__s">' + esc(t('sched.emptyChatSub')) + '</span></span></button>'
-            + '<button class="wsx-qa" data-newauto="' + esc(t('sched.prefillStep')) + '" type="button"><span class="wsx-qa__ic">' + isvg(SCHED_ICON.check) + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('sched.emptyStep')) + '</span><span class="wsx-qa__s">' + esc(t('sched.emptyStepSub')) + '</span></span></button>'
             + '</div>';
-          wireNewAuto(m); return;
+          wireNewAuto(m); wireAutoForm(m); return;
         }
-        m.innerHTML = runsLink() + jobs.map(function (j) {
+        m.innerHTML = autoBar('schedule') + runsLink() + jobs.map(function (j) {
           var meta = schedDest(j.action);
           var cfg = j.config || {};
           var src = cfg.connection || cfg.bqConnection || '';
@@ -101,20 +101,22 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
           if (j.artifact_name) flow += schedChip(j.artifact_name, 'doc', 'is-origin');
           if (src) flow += '<span class="wsx-sched__arrow">' + isvg('<path d="M5 12h14M13 6l6 6-6 6"/>') + '</span>' + schedChip(src, 'db', '');
           flow += '<span class="wsx-sched__arrow">' + isvg('<path d="M5 12h14M13 6l6 6-6 6"/>') + '</span>' + schedChip(meta[0], meta[1], 'is-dest');
-          return '<div class="wsx-sched" data-job="' + esc(j.id) + '">'
+          var paused = j.enabled === false;
+          return '<div class="wsx-sched" data-job="' + esc(j.id) + '" data-af-id="' + esc(j.id) + '" data-af-on="' + (paused ? '0' : '1') + '">'
             + '<div class="wsx-sched__head"><div class="wsx-sched__title">' + esc(title) + '</div>'
-            +   (st ? '<span class="wsx-sched__badge ' + cls + '">' + esc(st) + '</span>' : '<span class="wsx-sched__badge">' + esc(j.enabled === false ? t('sched.badgePaused') : t('sched.badgeIdle')) + '</span>') + '</div>'
+            +   (st && !paused ? '<span class="wsx-sched__badge ' + cls + '">' + esc(st) + '</span>' : '<span class="wsx-sched__badge">' + esc(paused ? t('sched.badgePaused') : t('sched.badgeIdle')) + '</span>') + '</div>'
             + '<div class="wsx-sched__flow">' + flow + '</div>'
             + '<div class="wsx-sched__meta"><span class="wsx-sched__when">' + isvg(SCHED_ICON.clock) + esc(cronHuman(j.schedule)) + '</span>'
             +   (j.last_run_at ? '<span>' + esc(t('sched.lastRun')) + ' ' + esc(whenAgo(j.last_run_at)) + '</span>' : '')
             +   (j.next_run_at ? '<span>' + esc(t('sched.next')) + ' ' + esc(whenAgo(j.next_run_at)) + '</span>' : '') + '</div>'
             + (st === 'failed' && j.last_error ? '<div class="wsx-runst is-fail" data-last-err>' + esc(j.last_error) + '</div>' : '')
             + '<div class="wsx-runbars" data-runs="' + esc(j.id) + '"><span class="wsx-sched__noruns">' + esc(t('sched.loadingRuns')) + '</span></div>'
-            + '<div class="wsx-sched__actions"><button class="wsx-abtn" data-sched-run type="button">' + esc(t('sched.runNow')) + '</button><span class="wsx-runst" aria-live="polite"></span></div>'
+            + '<div class="wsx-sched__actions"><button class="wsx-abtn" data-sched-run type="button">' + esc(t('sched.runNow')) + '</button>' + autoCardButtons(!paused) + '<span class="wsx-runst" aria-live="polite"></span></div>'
             + '</div>';
         }).join('');
         m.querySelectorAll('[data-runs]').forEach(function (host) { loadJobLogs(host.getAttribute('data-runs'), host); });
         m.querySelectorAll('[data-sched-run]').forEach(function (b) { b.addEventListener('click', function () { runJobNow(b); }); });
+        wireNewAuto(m); wireAutoForm(m); wireAutoCardActions(m, 'schedule');
       }).catch(function () { m.innerHTML = i18nError('common.couldNotLoad'); });
   }
   function durLabel(ms) { return ms < 1000 ? Math.round(ms) + ' ms' : (ms / 1000).toFixed(1) + ' s'; }
@@ -151,25 +153,27 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
       .then(function (d) {
         var al = (d && d.alerts) || [];
         if (!al.length) {
-          m.innerHTML = '<p class="wsx-lens__intro">' + esc(t('alerts.intro')) + '</p>'
+          m.innerHTML = '<p class="wsx-lens__intro">' + esc(t('autof.alertsEmpty')) + ' ' + esc(t('alerts.intro')) + '</p>'
             + '<div class="wsx-qa-grid wsx-qa-grid--lens">'
+            + '<button class="wsx-qa" data-autoform="alert" type="button"><span class="wsx-qa__ic">' + isvg('<path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/>') + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('alerts.emptyStep')) + '</span><span class="wsx-qa__s">' + esc(t('alerts.emptyStepSub')) + '</span></span></button>'
             + '<button class="wsx-qa" data-newauto="' + esc(t('alerts.prefillChat')) + '" type="button"><span class="wsx-qa__ic">' + isvg('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>') + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('alerts.emptyChat')) + '</span><span class="wsx-qa__s">' + esc(t('alerts.emptyChatSub')) + '</span></span></button>'
-            + '<button class="wsx-qa" data-newauto="' + esc(t('alerts.prefillStep')) + '" type="button"><span class="wsx-qa__ic">' + isvg('<path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/>') + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('alerts.emptyStep')) + '</span><span class="wsx-qa__s">' + esc(t('alerts.emptyStepSub')) + '</span></span></button>'
             + '</div>';
-          wireNewAuto(m); return;
+          wireNewAuto(m); wireAutoForm(m); return;
         }
-        m.innerHTML = runsLink() + al.map(function (a) {
+        m.innerHTML = autoBar('alert') + runsLink() + al.map(function (a) {
           var cond = a.condition || (a.config && (a.config.condition || a.config.comparator)) || '';
           var thr = (a.threshold != null ? a.threshold : (a.config && a.config.threshold));
           var sub = [esc(a.metric_id || a.metric || ''), cond ? esc(cond) + (thr != null ? ' ' + esc(thr) : '') : '', a.schedule ? esc(cronHuman(a.schedule)) : ''].filter(Boolean).join(' \\u00B7 ');
-          return '<div class="wsx-sched"><div class="wsx-sched__head"><div class="wsx-sched__title">' + isvg('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>') + ' ' + esc(a.name || a.metric_id || t('alerts.defaultName'))
+          return '<div class="wsx-sched" data-af-id="' + esc(a.id) + '" data-af-on="' + (a.enabled ? '1' : '0') + '"><div class="wsx-sched__head"><div class="wsx-sched__title">' + isvg('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>') + ' ' + esc(a.name || a.metric_id || t('alerts.defaultName'))
             + '</div><span class="wsx-sched__badge ' + (a.enabled ? 'ok' : '') + '">' + esc(a.enabled ? t('alerts.badgeOn') : t('alerts.badgeOff')) + '</span></div>'
             + (sub ? '<div class="wsx-sched__meta"><span>' + sub + '</span></div>' : '')
             + (a.artifact_name ? '<div class="wsx-sched__flow">' + schedChip(a.artifact_name, 'doc', 'is-origin') + '</div>' : '')
             + (window.WSX_WS ? '<div class="wsx-runbars" data-alert-runs="' + esc(a.id) + '"><span class="wsx-sched__noruns">' + esc(t('sched.loadingRuns')) + '</span></div>' : '')
+            + '<div class="wsx-sched__actions">' + autoCardButtons(!!a.enabled) + '</div>'
             + '</div>';
         }).join('');
         m.querySelectorAll('[data-alert-runs]').forEach(function (h) { loadAlertEvents(h.getAttribute('data-alert-runs'), h); });
+        wireNewAuto(m); wireAutoForm(m); wireAutoCardActions(m, 'alert');
       }).catch(function () { m.innerHTML = i18nError('common.couldNotLoad'); });
   }
   function loadAlertEvents(id, host) {

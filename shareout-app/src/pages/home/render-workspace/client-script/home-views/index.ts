@@ -5,6 +5,7 @@
 import { workspace_client_home_views_artifactsBrowser_JS } from './artifacts-browser';
 import { workspace_client_home_views_cardActions_JS } from './card-actions';
 import { workspace_client_home_views_schedules_JS } from './schedules';
+import { workspace_client_home_views_autoForms_JS } from './auto-forms';
 import { workspace_client_home_views_analytics_JS } from './analytics';
 import { workspace_client_home_views_datasets_JS } from './datasets';
 import { workspace_client_home_views_crew_JS } from './crew';
@@ -27,6 +28,7 @@ export const workspace_client_home_views_JS = [
   workspace_client_home_views_artifactsBrowser_JS,
   workspace_client_home_views_cardActions_JS,
   workspace_client_home_views_schedules_JS,
+  workspace_client_home_views_autoForms_JS,
   workspace_client_home_views_analytics_JS,
   workspace_client_home_views_datasets_JS,
   workspace_client_home_views_crew_JS,

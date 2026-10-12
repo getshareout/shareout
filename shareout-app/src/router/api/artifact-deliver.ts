@@ -76,7 +76,8 @@ export async function handleDeliverStatus(
   return jsonResponse({
     telegram: { linked: linked != null, connectUrl: '/settings/telegram?go=1' },
     slack,
-    email: { available: true },
+    email: { available: true, address: user.email || null },
+    role,
   });
 }
 

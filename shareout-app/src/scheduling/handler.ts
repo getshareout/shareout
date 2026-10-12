@@ -123,6 +123,9 @@ export async function handleCreateJob(request: Request, env: Env, user: Authenti
   }
 
   if (result.error) {
+    if (/^(Permission denied|Viewers can only)/.test(result.error)) {
+      return errorResponse(result.error, 'FORBIDDEN', 403);
+    }
     return errorResponse(result.error, 'INVALID_REQUEST', 400);
   }
 

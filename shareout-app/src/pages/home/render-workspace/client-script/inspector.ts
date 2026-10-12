@@ -807,8 +807,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     rbodyEl.querySelectorAll('[data-aauto]').forEach(function (b) {
       b.addEventListener('click', function () {
         var n = art.name || t('inspector.thisPage'); var k = b.getAttribute('data-aauto');
-        if (k === 'schedule') agentAsk(t('inspector.askSchedule').replace('{name}', n));
-        else if (k === 'alert') agentAsk(t('inspector.askAlert').replace('{name}', n));
+        if (k === 'schedule' || k === 'alert') openAutoForm(k, { id: art.id, name: n }, function () { delete autoCache[art.id]; });
         else if (k === 'crew') agentAsk(t('inspector.askCrew').replace('{name}', n));
         else agentAsk(t('inspector.askCustom').replace('{name}', n));
       });
