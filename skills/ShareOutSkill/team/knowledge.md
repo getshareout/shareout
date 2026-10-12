@@ -218,6 +218,20 @@ All routes require workspace membership. When Knowledge is off, root `GET` retur
 | `GET` | `/v1/workspaces/{id}/knowledge/graph?focus=&depth=&limit=` | Member+ | Nodes + edges (neighbourhood or top entities) |
 | `GET` | `/v1/workspaces/{id}/knowledge/usage?days=30` | Admin+ | Metered cost: AI, storage, vectors (micro-USD, tracking only) |
 
+**Writing a note (`PUT .../knowledge/files/{path}`).** `{path}` must end in `.md` (e.g. `topics/retention.md`). Send the note itself as `Content-Type: text/markdown`, or JSON `{"content": "<markdown>"}`. The markdown must start with frontmatter carrying `kind` (`artifact-digest`, `topic`, `entity`, `decision`, `timeline`, `overview`), `id` and `title`:
+
+```markdown
+---
+kind: topic
+id: topic.retention
+title: Retention
+topics: [retention]
+---
+Retention overview.
+```
+
+A note that wouldn't parse (no frontmatter, missing `kind`/`id`/`title`, unknown `kind`) or a JSON body without a string `content` is rejected with `400 VALIDATION_ERROR` (`param: "content"` or `"path"`) — nothing is stored.
+
 ## Related
 
 - [workspace-assistant.md](workspace-assistant.md) — `knowledge_search` / `knowledge_get` tools

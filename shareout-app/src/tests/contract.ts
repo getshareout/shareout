@@ -32,14 +32,16 @@ async function checkTable(
   }
   if (expect.columns?.length) {
     const sample = await db.prepare(
-      'SELECT data FROM artifact_rows WHERE table_id = ? LIMIT 1',
-    ).bind(tbl.id).first<{ data: string }>();
-    if (!sample) {
+      'SELECT data FROM artifact_rows WHERE table_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 50',
+    ).bind(tbl.id).all<{ data: string }>();
+    if (!sample.results.length) {
       if (expect.minRows === undefined || expect.minRows > 0) problems.push('no rows to verify columns');
     } else {
-      let cols: string[] = [];
-      try { cols = Object.keys(JSON.parse(sample.data)); } catch { /* ignore */ }
-      const missing = expect.columns.filter((c) => !cols.includes(c));
+      const cols = new Set<string>();
+      for (const r of sample.results) {
+        try { for (const k of Object.keys(JSON.parse(r.data))) cols.add(k); } catch { /* ignore */ }
+      }
+      const missing = expect.columns.filter((c) => !cols.has(c));
       if (missing.length) problems.push(`missing columns: ${missing.join(', ')}`);
     }
   }

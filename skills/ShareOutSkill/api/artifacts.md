@@ -101,7 +101,7 @@ Tell the user the page is private and why; don't call the link public and don't 
 |-------|------|----------|-------------|
 | `name` | string | Yes | Display name |
 | `slug` | string | No | Human-facing slug (auto-generated from `name` if omitted). Unique **per workspace** (or per owner for personal artifacts). Drives subdomain/namespaced URLs and publish dedup. |
-| `entrypoint` | string | No | Default: `index.html` |
+| `entrypoint` | string | No | Default: `index.html`, or the only file's path when `files` has a single file (e.g. a lone `data.csv`). Must name a path in `files` |
 | `files` | FileEntry[] | Yes | Files to publish |
 | `visibility` | string | No | Omitted → `public` when the instance and account allow it, otherwise `private` with `visibility_downgraded` (see above). `private` (owner + explicitly shared), `workspace` (all members of the artifact's workspace), `public` (anyone on the internet with the link; discoverable). (`unlisted` is a retired legacy alias, still accepted and treated as `public`.) |
 | `mobile_html` | string | No | Mobile-specific HTML |
@@ -192,6 +192,14 @@ Fetch all files for an artifact version.
   ]
 }
 ```
+
+## Versions & rollback
+
+`GET /v1/artifacts/{id}/versions` lists published versions (`id`, `version_no`, `entrypoint`, `created_at`, newest first).
+
+`POST /v1/artifacts/{id}/rollback` with `{"version_no": 1}` (or `{"version_id": "ver_…"}`) re-points the production deployment at that version — no new version is created. Editor or owner. Returns `{success, deployed_version, version_id}`; `404 VERSION_NOT_FOUND`, `409 NOT_DEPLOYED`.
+
+On `GET /v1/artifacts/{id}`, `current_version` is the version **live in production** (so it reflects a rollback) and `latest_version` is the highest published `version_no`. The next publish becomes `latest_version + 1` and goes live.
 
 ## Collaborator API
 
@@ -332,6 +340,7 @@ Common fields:
 | `name` | string | Display name |
 | `description` | string | Short description |
 | `visibility` | string | `private`, `workspace`, `public` |
+| `tags` | string[] | Replaces the artifact's tag set (max 12, ≤32 chars each; `[]` clears). Single-tag edits: `POST /v1/artifacts/{id}/tags {"label"}` / `DELETE /v1/artifacts/{id}/tags/{label}` |
 | `access_policy` | object | Row-level access policy — see [core/access-policy.md](../core/access-policy.md) |
 | `social_title` / `social_description` / `social_image_url` | string \| null | Link preview overrides |
 | `allow_anon_write` | boolean | Let anonymous visitors mutate json/tables/blobs/datasets on public artifacts |

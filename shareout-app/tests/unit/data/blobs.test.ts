@@ -39,12 +39,14 @@ type DbScenario = {
 
 function makeR2Mock(options: {
   getResult?: R2ObjectBody | null;
+  headResult?: { size: number } | null;
   putImpl?: (...args: unknown[]) => Promise<void>;
   deleteImpl?: (...args: unknown[]) => Promise<void>;
 } = {}): Env['ARTIFACTS'] {
   return {
     put: vi.fn(options.putImpl ?? (async () => undefined)),
     get: vi.fn(async () => options.getResult ?? null),
+    head: vi.fn(async () => options.headResult ?? null),
     delete: vi.fn(options.deleteImpl ?? (async () => undefined)),
   } as unknown as Env['ARTIFACTS'];
 }
@@ -549,6 +551,59 @@ describe('handleBlobUpload — confirm upload flow', () => {
       { httpMetadata: { contentType: 'image/png' } },
     );
     expect(env.DB.batch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('confirmBlobUpload — direct (presigned) flow', () => {
+  const presignEnv = { R2_ACCESS_KEY_ID: 'AK', R2_SECRET_ACCESS_KEY: 'SK', R2_ACCOUNT_ID: 'acct', R2_BUCKET: 'my-artifacts' };
+  const confirmReq = () => new Request(`${BASE_URL}/v1/data/${ARTIFACT_ID}/blobs/upl_token/confirm`, { method: 'POST' });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-30T14:00:00.000Z'));
+  });
+
+  it('server callers get a presigned PUT into R2_BUCKET at the token key', async () => {
+    const captures: Array<{ sql: string; args: unknown[] }> = [];
+    const env = { ...makeBlobEnv({ storage: { artifact_id: ARTIFACT_ID, used_bytes: 0, blob_count: 0 } }, {}, { bindCaptures: captures }), ...presignEnv } as Env;
+    const response = await handleBlobs(uploadRequest(validUploadBody()), makeCtx(env, null), 'upload');
+    const body = await response.json() as { data: { direct: boolean; uploadUrl: string; tokenId: string } };
+    expect(body.data.direct).toBe(true);
+    const tokenInsert = captures.find((c) => c.sql.includes('INSERT INTO upload_tokens'))!;
+    const r2Key = tokenInsert.args[4] as string;
+    expect(body.data.uploadUrl).toContain(`acct.r2.cloudflarestorage.com/my-artifacts/${r2Key}`);
+  });
+
+  it('confirms once the object exists in the bound bucket', async () => {
+    const env = makeBlobEnv(
+      { uploadToken: sampleToken, storage: { artifact_id: ARTIFACT_ID, used_bytes: 0, blob_count: 0 } },
+      { headResult: { size: 11 } },
+    );
+    const response = await handleBlobs(confirmReq(), makeCtx(env, null), 'upl_token/confirm');
+    expect(response.status).toBe(201);
+    expect(env.ARTIFACTS.head).toHaveBeenCalledWith(sampleToken.r2_key);
+    await expect(response.json()).resolves.toMatchObject({ data: { filename: 'photo.png', sizeBytes: 11 } });
+  });
+
+  it('is idempotent for a token already finalized (proxied PUT or repeat confirm)', async () => {
+    const env = makeBlobEnv({ uploadToken: { ...sampleToken, used_at: '2026-05-30T13:59:00.000Z' }, blob: sampleBlob });
+    const response = await handleBlobs(confirmReq(), makeCtx(env, null), 'upl_token/confirm');
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ data: { id: 'blob_abc', sizeBytes: 1024 } });
+    expect(env.ARTIFACTS.head).not.toHaveBeenCalled();
+    expect(env.DB.batch).not.toHaveBeenCalled();
+  });
+
+  it('download-url presigns a GET for the blob key in R2_BUCKET', async () => {
+    const env = { ...makeBlobEnv({ blob: sampleBlob }), ...presignEnv } as Env;
+    const response = await handleBlobs(
+      new Request(`${BASE_URL}/v1/data/${ARTIFACT_ID}/blobs/${sampleBlob.id}/download-url`),
+      makeCtx(env),
+      `${sampleBlob.id}/download-url`,
+    );
+    const body = await response.json() as { data: { direct: boolean; url: string } };
+    expect(body.data.direct).toBe(true);
+    expect(body.data.url).toContain(`/my-artifacts/${sampleBlob.r2_key}`);
   });
 });
 

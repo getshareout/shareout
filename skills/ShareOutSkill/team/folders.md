@@ -55,6 +55,7 @@ Content-Type: application/json
 
 - `visibility`: `inherit` (default), `private`, `workspace`, `public` — controls who sees artifacts filed here when artifact visibility inherits from folder.
 - Slugs are unique per parent level within the workspace.
+- Response: `201` with the folder object (same shape as `GET .../folders/{folderId}`). Admin/owner only (`403 ADMIN_REQUIRED` otherwise).
 - `readme`: optional markdown **folder guide** — see below.
 
 ## Folder guide (README) — the instruction surface for agents

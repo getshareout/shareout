@@ -67,6 +67,7 @@ import {
   updateJob,
 } from '../../src/scheduling/jobs';
 import { calculateBackoffDelay } from '../../src/scheduling/jobs/retry';
+import { miniDbBinding } from './helpers/minidb-mock';
 
 type DbCall =
   | { method: 'first'; result: unknown }
@@ -816,12 +817,22 @@ describe('runScheduledJobs', () => {
       { method: 'all', results: [jobWithData] },
       { method: 'run' }, // claim
       { method: 'first', result: artifact },
-      { method: 'all', results: [{ key: 'kpi', value: '{"value":42}' }] },
       { method: 'run' }, // claim
       { method: 'run' },
       { method: 'run' },
       { method: 'run' },
-    ]);
+    ], {
+      // Artifact json lives in the per-artifact MiniDB DO, not D1.
+      MINIDB: miniDbBinding({
+        prepare: (sql: string) => ({
+          bind: () => ({
+            first: async () => null,
+            all: async () => ({ results: sql.includes('FROM artifact_json') ? [{ key: 'kpi', value: '{"value":42}' }] : [] }),
+            run: async () => ({ meta: { changes: 0 } }),
+          }),
+        }),
+      }) as unknown as Env['MINIDB'],
+    });
 
     await runScheduledJobs(env);
 

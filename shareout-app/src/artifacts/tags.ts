@@ -16,6 +16,24 @@ function normalizeTag(raw: unknown): string | null {
   return label.length ? label : null;
 }
 
+/** Validate a PATCH `tags` value; returns the normalized label set or an error string. */
+export function parseTagList(raw: unknown): string[] | string {
+  if (!Array.isArray(raw)) return 'tags must be an array of strings';
+  const labels = [...new Set(raw.map(normalizeTag))];
+  if (labels.some(l => l === null)) return 'tags must be non-empty strings';
+  if (labels.length > TAG_MAX_PER_ARTIFACT) return `At most ${TAG_MAX_PER_ARTIFACT} tags per artifact`;
+  return labels as string[];
+}
+
+/** Replace an artifact's tags wholesale (PATCH /v1/artifacts/{id} `tags`). */
+export async function replaceTags(env: Env, artifactId: string, labels: string[]): Promise<void> {
+  const insert = env.DB.prepare('INSERT OR IGNORE INTO artifact_tags (id, artifact_id, label) VALUES (?, ?, ?)');
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM artifact_tags WHERE artifact_id = ?').bind(artifactId),
+    ...labels.map(l => insert.bind(generateId('tag'), artifactId, l)),
+  ]);
+}
+
 export async function handleGetTags(
   _request: Request,
   env: Env,

@@ -199,7 +199,7 @@ async function artifactCandidates(
     LEFT JOIN artifact_view_totals avt ON avt.artifact_id = a.id
     LEFT JOIN artifact_presentation pres_a ON pres_a.artifact_id = a.id
     LEFT JOIN collaborators c ON c.artifact_id = a.id AND c.email IN (${emailPh})
-    WHERE (${scopeClause})${extraWhere}
+    WHERE a.deleted_at IS NULL AND (${scopeClause})${extraWhere}
     GROUP BY a.id
     ORDER BY COALESCE(d.updated_at, a.created_at) DESC
     LIMIT ?`;
@@ -259,7 +259,7 @@ function rankArtifacts(rows: ArtifactCandidate[], q: string, limit: number): Sea
 
 async function rankFolders(env: Env, workspaceId: string, q: string, limit: number): Promise<SearchHit[]> {
   const res = await env.DB.prepare(
-    `SELECT f.id, f.name, (SELECT COUNT(*) FROM artifacts a WHERE a.folder_id = f.id) AS n
+    `SELECT f.id, f.name, (SELECT COUNT(*) FROM artifacts a WHERE a.folder_id = f.id AND a.deleted_at IS NULL) AS n
      FROM folders f WHERE f.workspace_id = ? AND f.parent_id IS NULL`
   ).bind(workspaceId).all<{ id: string; name: string; n: number }>();
   return rankSimple(res.results.map((r) => ({ id: r.id, title: r.name, subtitle: `${r.n} page${r.n === 1 ? '' : 's'}` })), 'folder', q, limit);
@@ -380,7 +380,7 @@ async function rankSchedules(env: Env, scope: OwnerScope, q: string, limit: numb
   const res = await env.DB.prepare(
     `SELECT s.id, s.action, s.schedule, s.enabled, s.last_status, a.name AS art_name
      FROM scheduled_jobs s JOIN artifacts a ON a.id = s.artifact_id
-     WHERE ${where} ORDER BY s.enabled DESC, s.next_run_at ASC LIMIT 200`
+     WHERE ${where} AND a.deleted_at IS NULL ORDER BY s.enabled DESC, s.next_run_at ASC LIMIT 200`
   ).bind(...binds).all<{ id: string; action: string; schedule: string; enabled: number; last_status: string | null; art_name: string }>();
   return rankSimple(
     res.results.map((r) => ({

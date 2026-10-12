@@ -23,7 +23,7 @@ vi.mock('../../../src/data/platform', async (orig) => {
   };
 });
 
-import { seedCatalogForConnection, recordDatasetLineage } from '../../../src/catalog/seed-resources';
+import { seedCatalogForConnection, recordDatasetLineage, removeCatalogForConnection } from '../../../src/catalog/seed-resources';
 import { listCatalogFiles, upsertCatalogFile } from '../../../src/catalog/store';
 
 const e = env as unknown as Env;
@@ -216,5 +216,30 @@ describe('recordDatasetLineage', () => {
     const entry = (await listCatalogFiles(e, WS)).find((f) => f.path === 'datasets/snowflake-prod/sales.md');
     expect(entry?.content).toContain('hand-written');
     expect(entry?.source).toBe('manual');
+  });
+});
+
+describe('seedCatalogForConnection — scope', () => {
+  it('seeds only the created connection, not every connector in the workspace', async () => {
+    await insertConnection('c1', 'Snowflake Prod', 'snowflake');
+    await insertConnection('c2', 'My API', 'rest_api');
+    await seedCatalogForConnection(e, WS, 'c2');
+    const files = await listCatalogFiles(e, WS);
+    expect(files.map((f) => f.path)).toEqual(['sources/my-api.md']);
+  });
+});
+
+describe('removeCatalogForConnection', () => {
+  it('drops the seeded source + dataset entries, keeps manual edits, provenance, and other connectors', async () => {
+    await upsertCatalogFile(e, WS, { path: 'sources/snowflake-prod.md', content: 'x', source: 'seed:connector' });
+    await upsertCatalogFile(e, WS, { path: 'datasets/snowflake-prod/orders.md', content: 'x', source: 'seed:connector' });
+    await upsertCatalogFile(e, WS, { path: 'datasets/snowflake-prod/notes.md', content: 'x', source: 'manual' });
+    await upsertCatalogFile(e, WS, { path: 'datasets/snowflake-prod/sales.md', content: 'x', source: 'seed:provenance' });
+    await upsertCatalogFile(e, WS, { path: 'sources/other.md', content: 'x', source: 'seed:connector' });
+
+    await removeCatalogForConnection(e, WS, 'Snowflake Prod');
+
+    const paths = (await listCatalogFiles(e, WS)).map((f) => f.path);
+    expect(paths).toEqual(['datasets/snowflake-prod/notes.md', 'datasets/snowflake-prod/sales.md', 'sources/other.md']);
   });
 });

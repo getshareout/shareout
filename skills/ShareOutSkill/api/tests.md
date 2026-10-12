@@ -45,7 +45,8 @@ and easy to generate. Phase 1 uses read-only contract assertions:
 ```
 
 `store` is `table:<name>` or `json:<key>`. `expect` supports `columns`, `minRows`,
-`maxRows` (tables) and `schema` (json: a field→type map of `string|number|boolean|object|array|null`).
+`maxRows` (tables) and `schema` (json: a field→type map of `string|number|boolean|object|array|null`). A `columns`
+check passes when each column appears in at least one of the table's 50 most recent rows.
 
 Smoke + policy run automatically with no spec. The spec only adds contract checks.
 
@@ -91,7 +92,7 @@ already has enabled against the live version (no extra config to author). The wo
 cron is **hourly**, so schedules are hourly-granular.
 
 ```bash
-curl -X POST $ORIGIN/v1/artifacts/$ID/jobs \
+curl -X POST $ORIGIN/v1/jobs \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"artifact_id":"'$ID'","action":"artifact_test","trigger_type":"cron","schedule":"0 * * * *","config":{}}'
 ```

@@ -42,6 +42,8 @@ text/plain             → txt
 
 ## Publishing Non-HTML Artifacts
 
+A single-file publish needs no `entrypoint` — it defaults to that file. With several files, set `entrypoint` to the main one (otherwise `index.html` is assumed and a `400 VALIDATION_ERROR` with `param: "entrypoint"` is returned).
+
 ### CSV Example
 
 ```bash

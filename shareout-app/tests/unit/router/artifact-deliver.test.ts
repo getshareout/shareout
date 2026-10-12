@@ -113,6 +113,21 @@ describe('handleDeliverNow', () => {
     expect([200, 400]).toContain(ownerRes.status);
   });
 
+  it('never reports success with an empty step trace', async () => {
+    const { getDestination } = await import('../../../src/delivery/registry');
+    vi.spyOn(getDestination('email')!, 'validate').mockResolvedValueOnce(null);
+    vi.mocked(executeJobAction).mockResolvedValueOnce({ success: true } as never);
+    const res = await handleDeliverNow(
+      post({ action: 'email', config: { recipients: ['owner@x.com'] } }),
+      e,
+      owner,
+      'art1',
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as { success: boolean; steps: Array<{ step: string; status: string }> };
+    expect(body.steps).toEqual([{ step: 'deliver', status: 'success' }]);
+  });
+
   it('returns 502 when delivery execution fails', async () => {
     // Bypass destination.validate by mocking getDestination... simpler: mock validate via execute after patching.
     // Use telegram with empty config — may 400. Force execute path with slack dm if validate is soft.

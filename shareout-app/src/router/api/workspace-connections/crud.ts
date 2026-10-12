@@ -8,7 +8,7 @@ import { generateId } from '../../../crypto-utils';
 import { logAudit } from '../../../audit';
 import { encryptCredentials, decryptCredentials } from '../../../data/connections/credentials';
 import { getProvider, hasProvider, listProviders } from '../../../data/platform';
-import { seedCatalogForConnection } from '../../../catalog/seed-resources';
+import { removeCatalogForConnection, seedCatalogForConnection } from '../../../catalog/seed-resources';
 import { buildProbeCredentials, summarizeCredentials } from './credentials';
 import {
   GENERIC_TYPES,
@@ -387,8 +387,8 @@ export async function handleDeleteWorkspaceConnection(
   }
 
   const conn = await env.DB.prepare(
-    "SELECT id FROM connections WHERE scope_type = 'workspace' AND scope_id = ? AND id = ?"
-  ).bind(workspaceId, connectionId).first();
+    "SELECT id, name FROM connections WHERE scope_type = 'workspace' AND scope_id = ? AND id = ?"
+  ).bind(workspaceId, connectionId).first<{ id: string; name: string }>();
   if (!conn) {
     return json({ error: 'Connection not found', code: 'NOT_FOUND' }, 404);
   }
@@ -396,6 +396,7 @@ export async function handleDeleteWorkspaceConnection(
   await env.DB.prepare(
     "DELETE FROM connections WHERE scope_type = 'workspace' AND scope_id = ? AND id = ?"
   ).bind(workspaceId, connectionId).run();
+  await removeCatalogForConnection(env, workspaceId, conn.name);
 
   await logAudit(env, {
     workspaceId, actorId: user.id, actorEmail: user.email,

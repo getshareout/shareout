@@ -5,7 +5,7 @@
  * delegates to {@link publishArtifact}.
  */
 import type { Env, PublishRequest } from '../types';
-import { validatePublishRequest, generateSlug, detectArtifactType } from '../validation';
+import { validatePublishRequest, generateSlug, detectArtifactType, resolveEntrypoint } from '../validation';
 import { validateToken, checkRateLimit, incrementRateLimit, hasScope } from '../api-auth';
 import { unauthorizedFor } from '../auth/unauthorized';
 import { SUPPORT_CONTACT } from '../http/api-error';
@@ -60,7 +60,7 @@ export async function handlePublish(
     }
 
     const slug = body.slug || generateSlug(body.name);
-    const entrypoint = body.entrypoint || 'index.html';
+    const entrypoint = resolveEntrypoint(body);
 
     let workspaceId: string | null = body.workspace_id ?? null;
     // External-sharing spine (work/030) Phase 2: an external author (no internal role)

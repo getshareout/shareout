@@ -6,6 +6,7 @@ import { getWorkspaceLlmConfig } from '../../data/agent/ai-config';
 import { jsonWithApiErrors } from '../../http/api-error';
 
 const BYO_PROVIDERS = ['openai', 'vercel-gateway'] as const;
+const ASSISTANT_USAGE_KINDS = ['assistant_chat', 'ask_workspace'];
 
 function json(data: unknown, status = 200): Response {
   return jsonWithApiErrors(data, status);
@@ -181,38 +182,58 @@ export async function handleGetWorkspaceUsage(
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '50', 10), 200);
   const offset = Math.max(parseInt(url.searchParams.get('offset') || '0', 10), 0);
 
+  // Assistant chat and /v1/ask turns have no artifact, so they live in ai_usage_events
+  // (total tokens, no in/out split); list them alongside the per-artifact agent rows.
   const rows = await env.DB.prepare(`
-    SELECT e.id, e.artifact_id, a.name AS artifact_name, e.mode, e.provider, e.model,
-           e.input_tokens, e.output_tokens, e.base_cost_micro_usd, e.byo, e.created_at
-    FROM agent_usage_events e
-    LEFT JOIN artifacts a ON a.id = e.artifact_id
-    WHERE e.workspace_id = ?
-    ORDER BY e.created_at DESC
+    SELECT * FROM (
+      SELECT e.id, e.artifact_id, a.name AS artifact_name, e.mode, e.provider, e.model,
+             e.input_tokens, e.output_tokens, e.input_tokens + e.output_tokens AS tokens,
+             e.base_cost_micro_usd, e.byo, e.created_at
+      FROM agent_usage_events e
+      LEFT JOIN artifacts a ON a.id = e.artifact_id
+      WHERE e.workspace_id = ?
+      UNION ALL
+      SELECT u.id, NULL, NULL, u.kind, NULL, u.model, NULL, NULL, CAST(u.units AS INTEGER),
+             u.base_cost_micro_usd, 0, u.created_at
+      FROM ai_usage_events u
+      WHERE u.workspace_id = ? AND u.kind IN (${ASSISTANT_USAGE_KINDS.map(() => '?').join(',')}) AND u.unit_kind = 'tokens'
+    )
+    ORDER BY created_at DESC
     LIMIT ? OFFSET ?
-  `).bind(workspaceId, limit, offset).all<{
+  `).bind(workspaceId, workspaceId, ...ASSISTANT_USAGE_KINDS, limit, offset).all<{
     id: string;
-    artifact_id: string;
+    artifact_id: string | null;
     artifact_name: string | null;
     mode: string;
-    provider: string;
+    provider: string | null;
     model: string;
-    input_tokens: number;
-    output_tokens: number;
+    input_tokens: number | null;
+    output_tokens: number | null;
+    tokens: number;
     base_cost_micro_usd: number;
     byo: number;
     created_at: string;
   }>();
 
-  const totals = await env.DB.prepare(`
-    SELECT
-      COUNT(*) AS requests,
-      COALESCE(SUM(input_tokens), 0) AS input_tokens,
-      COALESCE(SUM(output_tokens), 0) AS output_tokens,
-      COALESCE(SUM(base_cost_micro_usd), 0) AS cost
-    FROM agent_usage_events
-    WHERE workspace_id = ?
-  `).bind(workspaceId).first<{ requests: number; input_tokens: number; output_tokens: number; cost: number }>();
+  const [totals, assistant] = await Promise.all([
+    env.DB.prepare(`
+      SELECT
+        COUNT(*) AS requests,
+        COALESCE(SUM(input_tokens), 0) AS input_tokens,
+        COALESCE(SUM(output_tokens), 0) AS output_tokens,
+        COALESCE(SUM(base_cost_micro_usd), 0) AS cost
+      FROM agent_usage_events
+      WHERE workspace_id = ?
+    `).bind(workspaceId).first<{ requests: number; input_tokens: number; output_tokens: number; cost: number }>(),
+    env.DB.prepare(`
+      SELECT COUNT(*) AS requests, COALESCE(SUM(units), 0) AS tokens, COALESCE(SUM(base_cost_micro_usd), 0) AS cost
+      FROM ai_usage_events
+      WHERE workspace_id = ? AND kind IN (${ASSISTANT_USAGE_KINDS.map(() => '?').join(',')}) AND unit_kind = 'tokens'
+    `).bind(workspaceId, ...ASSISTANT_USAGE_KINDS).first<{ requests: number; tokens: number; cost: number }>(),
+  ]);
 
+  const inputTokens = totals?.input_tokens ?? 0;
+  const outputTokens = totals?.output_tokens ?? 0;
   return json({
     events: rows.results.map((r) => ({
       id: r.id,
@@ -223,15 +244,17 @@ export async function handleGetWorkspaceUsage(
       model: r.model,
       inputTokens: r.input_tokens,
       outputTokens: r.output_tokens,
+      tokens: r.tokens,
       costUsd: microToUsd(r.base_cost_micro_usd),
       byo: !!r.byo,
       createdAt: r.created_at,
     })),
     totals: {
-      requests: totals?.requests ?? 0,
-      inputTokens: totals?.input_tokens ?? 0,
-      outputTokens: totals?.output_tokens ?? 0,
-      costUsd: microToUsd(totals?.cost ?? 0),
+      requests: (totals?.requests ?? 0) + (assistant?.requests ?? 0),
+      inputTokens,
+      outputTokens,
+      tokens: inputTokens + outputTokens + Math.round(assistant?.tokens ?? 0),
+      costUsd: microToUsd((totals?.cost ?? 0) + (assistant?.cost ?? 0)),
     },
     limit,
     offset,

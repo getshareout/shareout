@@ -18,6 +18,13 @@ describe('r2-presign', () => {
     expect(isPresignConfigured(unconfigured)).toBe(false);
   });
 
+  it('is unconfigured without R2_BUCKET — never guesses a bucket the binding may not use', async () => {
+    const noBucket = { ...configured, R2_BUCKET: undefined } as unknown as Env;
+    expect(isPresignConfigured(noBucket)).toBe(false);
+    expect(await presignPut(noBucket, 'art/blobs/x/file.png')).toBeNull();
+    expect(await presignGet(noBucket, 'art/blobs/x/file.png')).toBeNull();
+  });
+
   it('returns null when unconfigured (Worker-proxied fallback)', async () => {
     expect(await presignGet(unconfigured, 'art/blobs/x/file.png')).toBeNull();
     expect(await presignPut(unconfigured, 'art/blobs/x/file.png')).toBeNull();

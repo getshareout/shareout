@@ -175,7 +175,7 @@ At the bottom of the canvas, **Ask your workspace…** is a two-state composer:
 
 Tap the pill (or focus the composer) to open the sheet. **Minimize**, click the scrim, or press **Escape** to return to resting. Drag the **top grip** to resize the sheet height (280px up to nearly full viewport); **double-click the grip** toggles full height ↔ default. Height persists per browser (`localStorage` key `wsx_sheet_h`). On first open the sheet defaults to a compact height — `min(480px, 52vh)` — so the workspace stays visible behind it.
 
-The chat uses **named threads** — multiple conversations, inline confirmation cards, and (on Home) canvas tools to search and open artifacts. It can orient you, run read-only connector queries when enabled, propose schedules, and stream artifact builds after confirmation. Same guardrails as the [workspace assistant](../team/workspace-assistant.md).
+The chat uses **named threads** — multiple conversations, inline confirmation cards, and (on Home) canvas tools to search and open artifacts. It can orient you, run read-only connector queries when enabled, propose schedules, and stream artifact builds after confirmation (a page built from the chat is published **private**, in the workspace you are chatting in — share it afterwards). Same guardrails as the [workspace assistant](../team/workspace-assistant.md).
 
 Tap the **microphone** in the composer to dictate a message — audio is transcribed into the text box before you send (see [workspace assistant → Voice input](../team/workspace-assistant.md#voice-input)).
 

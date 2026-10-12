@@ -27,7 +27,7 @@ The **owner artifact always has full read/write** to its own table — the acces
 
 ## Share A Table (owner action)
 
-Only the **artifact owner** can share one of its tables. The shared name is unique per workspace (defaults to the table name; pick another with `as` if it collides).
+Only the **artifact owner** can share one of its tables. The shared name is unique per workspace (defaults to the table name; pick another with `as` if it collides). Shared names follow the table-name rule: letter first, then letters, digits, or `_` (max 64) — hyphens return `400 Invalid shared name`.
 
 ```js
 const so = await ShareOut.create();

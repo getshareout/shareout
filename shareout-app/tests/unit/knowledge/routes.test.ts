@@ -181,6 +181,33 @@ describe('knowledge routes', () => {
     expect(files.find(f => f.path === 'topics/retention.md')?.source).toBe('manual');
   });
 
+  it('PUT accepts JSON {content} and rejects malformed notes with 400 instead of storing them', async () => {
+    await setKnowledgeEnabled(e, WS, true);
+    const json = (body: unknown) => routeKnowledgeApi(createFetchContext(new Request(BASE + '/files/topics/retention.md', {
+      method: 'PUT',
+      headers: { Cookie: 'shareout_session=x', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }), e, execCtx));
+
+    expect((await json({ content: NODE }))?.status).toBe(200);
+    const got = await call('GET', '/files/topics/retention.md');
+    expect(got?.status).toBe(200);
+
+    const noContent = await json({ markdown: NODE });
+    expect(noContent?.status).toBe(400);
+    expect(await noContent?.json()).toMatchObject({ code: 'VALIDATION_ERROR', param: 'content' });
+
+    const noFrontmatter = await call('PUT', '/files/topics/other.md', 'just text');
+    expect(noFrontmatter?.status).toBe(400);
+    expect(await noFrontmatter?.json()).toMatchObject({ code: 'VALIDATION_ERROR', param: 'content' });
+
+    const notMd = await call('PUT', '/files/topics/other.txt', NODE);
+    expect(await notMd?.json()).toMatchObject({ code: 'VALIDATION_ERROR', param: 'path' });
+
+    const files = await listKnowledgeFiles(e, WS);
+    expect(files.map((f) => f.path)).toEqual(['topics/retention.md']);
+  });
+
   it('DELETE with ?forget=1 tombstones the node (admin)', async () => {
     await setKnowledgeEnabled(e, WS, true);
     await upsertKnowledgeFile(e, WS, { path: 'topics/retention.md', content: NODE });

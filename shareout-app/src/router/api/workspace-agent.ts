@@ -17,28 +17,25 @@ import {
 
 /** Lightweight orientation snapshot injected into the system prompt. Untrusted user data. */
 export async function buildWorkspaceSnapshot(env: Env, wsId: string, user: AuthUser): Promise<string> {
-  const cat = await queryHomeArtifactCatalog(env, { id: user.id, email: user.email }, wsId)
-    .catch(() => ({ artifacts: [] as { id: string; name: string }[], total: 0, truncated: false }));
-  const pages = cat.artifacts.slice(0, 15).map((a) => `- ${a.name} (id: ${a.id})`).join('\n');
-
-  const [conns, mc, wsRow] = await Promise.all([
+  const [cat, conns, mc, wsRow, clientNotes, trunk, guidance] = await Promise.all([
+    queryHomeArtifactCatalog(env, { id: user.id, email: user.email }, wsId)
+      .catch(() => ({ artifacts: [] as { id: string; name: string }[], total: 0, truncated: false })),
     env.DB.prepare(
       "SELECT name, provider, kind, agent_query_enabled FROM connections WHERE scope_type = 'workspace' AND scope_id = ? ORDER BY name"
     ).bind(wsId).all<{ name: string; provider: string; kind: string; agent_query_enabled: number }>(),
     env.DB.prepare('SELECT COUNT(*) AS n FROM workspace_members WHERE workspace_id = ?')
       .bind(wsId).first<{ n: number }>(),
     env.DB.prepare('SELECT slug FROM workspaces WHERE id = ?').bind(wsId).first<{ slug: string }>(),
+    buildClientsContextForWorkspace(env, wsId).catch(() => ''),
+    knowledgeTrunkForContext(env, wsId),
+    guidanceEntryForContext(env, wsId),
   ]);
+  const pages = cat.artifacts.slice(0, 15).map((a) => `- ${a.name} (id: ${a.id})`).join('\n');
 
   const connLines = conns.results
     .map((c) => `- ${c.name} (${c.provider}${c.kind === 'platform' && c.agent_query_enabled === 1 ? ', queryable' : ''})`)
     .join('\n');
 
-  const clientNotes = await buildClientsContextForWorkspace(env, wsId).catch(() => '');
-  const [trunk, guidance] = await Promise.all([
-    knowledgeTrunkForContext(env, wsId),
-    guidanceEntryForContext(env, wsId),
-  ]);
   const inboxLine = wsRow?.slug
     ? `Members can email files to ${inboxAddress(wsRow.slug, env)}; they appear in list_files.`
     : '';

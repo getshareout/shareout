@@ -8,7 +8,7 @@ import { FEATURE_META, TYPE_META } from './constants';
 import { artifactTypeGroup } from './filters';
 import { buildResultLabel, fmtCount, buildArtifactShareUrl } from './utils';
 
-/** analytics_events.timestamp is stored as unix seconds; tolerate ms and ISO too. */
+/** analytics_events.created_at is ISO text; tolerate unix seconds and ms too. */
 function parseTs(ts: string | number): number {
   const n = typeof ts === 'number' ? ts : Number(ts);
   if (Number.isFinite(n)) return n < 1e12 ? n * 1000 : n;

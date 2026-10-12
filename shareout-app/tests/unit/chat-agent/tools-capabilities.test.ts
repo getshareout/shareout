@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { selectTools, defaultCapabilities, ACCOUNT_TOOLS, CONNECTOR_TOOLS, SCHEDULE_TOOLS, BUILD_TOOLS } from '../../../src/chat-agent/tools/index';
 import { createArtifactTool } from '../../../src/chat-agent/tools/build';
+import { PERSONAL_SCOPE } from '../../../src/chat-platforms/types';
 
 const names = (ts: { name: string }[]) => ts.map((t) => t.name);
 
@@ -32,6 +33,13 @@ describe('create_artifact tool', () => {
   it('proposes a build_artifact action (no work until confirmed)', async () => {
     const out = await createArtifactTool.execute({ env: {} as never, userId: 'u1' }, { prompt: 'a pricing page for my SaaS' });
     expect(out).toEqual({ __propose: { kind: 'build_artifact', name: 'a pricing page for my SaaS', prompt: 'a pricing page for my SaaS' } });
+  });
+
+  it('captures the chat\'s workspace so the build lands there (not when personal)', async () => {
+    const inWs = await createArtifactTool.execute({ env: {} as never, userId: 'u1', selectedWorkspaceId: 'wsp_1' }, { prompt: 'x page' }) as { __propose: { workspace_id?: string } };
+    expect(inWs.__propose.workspace_id).toBe('wsp_1');
+    const personal = await createArtifactTool.execute({ env: {} as never, userId: 'u1', selectedWorkspaceId: PERSONAL_SCOPE }, { prompt: 'x page' }) as { __propose: { workspace_id?: string } };
+    expect(personal.__propose.workspace_id).toBeUndefined();
   });
 
   it('honors an explicit name', async () => {

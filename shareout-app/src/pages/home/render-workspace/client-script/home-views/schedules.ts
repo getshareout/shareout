@@ -51,7 +51,7 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
     return t('sched.cronWeeklyAt').replace('{day}', days).replace('{time}', time);
   }
   function hhmm(h, m) { return (h.length < 2 ? '0' : '') + h + ':' + (m.length < 2 ? '0' : '') + m; }
-  function whenAgo(ms) { if (!ms) return ''; try { return timeAgo(ms); } catch (e) { return ''; } }
+  function whenAgo(ms) { if (!ms) return ''; try { return timeAgo(typeof ms === 'string' && isNaN(ms) ? Date.parse(ms) : ms); } catch (e) { return ''; } }
   // One run-history bar. Clickable (opens the Run Inspector drawer) only inside a
   // Team Space, where the workspace-scoped run-detail endpoint is reachable.
   function runBar(status, surface, runId, note) {

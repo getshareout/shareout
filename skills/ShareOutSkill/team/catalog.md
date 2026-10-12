@@ -81,8 +81,11 @@ A business term (e.g. *Active User*). Other entries reference it via `terms: [ac
 connector, so the catalog starts half-populated. Re-seeding is idempotent and **never
 overwrites a file a human/agent edited** (those are marked `source: manual`).
 
-When the catalog is already enabled, **new connectors auto-seed on create** — each
-connection becomes a `source` entry without a manual seed click. Dataset writes
+When the catalog is already enabled, **new connectors auto-seed on create** — the new
+connection (only that one) becomes a `source` entry, plus `dataset` entries for its
+tables/sheets where the provider lists them cheaply, without a manual seed click. Deleting
+a connection removes its auto-seeded `source` and `dataset` entries; entries a human/agent
+edited (`source: manual`) and dataset provenance records stay. Dataset writes
 (materialize jobs, table/json updates) can also append **lineage edges** to catalog
 entries when the catalog is enabled.
 

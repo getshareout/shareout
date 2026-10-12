@@ -1,7 +1,7 @@
 import type { Env } from '../types';
 import { getBuildChain, isProviderLevelStatus, providerHeaders, type AIConfig } from '../data/agent/anthropic';
 import { logCrewProviderFailure, userFacingCrewProviderError } from './errors';
-import { gatewayReasoningParams, thinkingOffParams } from '../data/agent/models';
+import { GATEWAY_CACHING_PARAMS, gatewayReasoningParams, thinkingOffParams } from '../data/agent/models';
 
 // Provider-neutral tool-calling turn. The run loop keeps a neutral transcript;
 // each provider serializes it to its own wire format: the OpenAI-compatible
@@ -165,7 +165,7 @@ export class OpenAICompatCrewProvider implements CrewProvider {
       max_tokens: args.maxTokens,
       messages: this.toWireMessages(args.system, args.transcript),
       ...(wireTools.length ? { tools: wireTools } : {}),
-      ...(this.provider === 'vercel-gateway' ? gatewayReasoningParams(this.model) : {}),
+      ...(this.provider === 'vercel-gateway' ? { ...gatewayReasoningParams(this.model), ...GATEWAY_CACHING_PARAMS } : {}),
       stream: true,
       stream_options: { include_usage: true },
     });
@@ -354,9 +354,12 @@ export function crewProviderFor(env: Env, cfg: AIConfig): CrewProvider {
 }
 
 /** Resolve the crew provider over every configured AI provider, in failover order.
- *  `gatewayModel` overrides the Vercel AI Gateway model (workspace or instance choice). */
-export function getCrewProvider(env: Env, gatewayModel?: string | null): CrewProvider | null {
-  const providers = getBuildChain(env, gatewayModel).map((cfg) => crewProviderFor(env, cfg));
+ *  `gatewayModel` overrides the Vercel AI Gateway model (workspace or instance choice);
+ *  `anthropicModel` overrides the model on the native Anthropic entry. */
+export function getCrewProvider(env: Env, gatewayModel?: string | null, anthropicModel?: string | null): CrewProvider | null {
+  const providers = getBuildChain(env, gatewayModel)
+    .map((cfg) => (anthropicModel && cfg.provider === 'anthropic' ? { ...cfg, model: anthropicModel } : cfg))
+    .map((cfg) => crewProviderFor(env, cfg));
   if (providers.length === 0) return null;
   return providers.length === 1 ? providers[0] : new FailoverCrewProvider(providers);
 }

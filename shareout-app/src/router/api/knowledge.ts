@@ -5,7 +5,7 @@ import { requireTokenOrSession, isAuthUser } from '../helpers/auth-guard';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { isKnowledgeEnabled, setKnowledgeEnabled, listKnowledgeFiles, upsertKnowledgeFile, deleteKnowledgeFile, type StoredKnowledgeFile } from '../../knowledge/store';
 import { enqueueIngest } from '../../knowledge/ingest';
-import { parseKnowledge } from '../../knowledge/parse';
+import { parseKnowledge, parseNode } from '../../knowledge/parse';
 import { runKnowledgeDistill } from '../../knowledge/distill';
 import { NODE_KINDS, type KnowledgeNode } from '../../knowledge/types';
 import { getAIProvider } from '../../data/agent/anthropic';
@@ -176,9 +176,35 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
 
     if (method === 'PUT') {
       if (!target) return cors(jsonError('path is required', 'BAD_REQUEST', 400));
-      const raw = await request.text();
+      let raw = await request.text();
+      if ((request.headers.get('Content-Type') || '').includes('application/json')) {
+        let content: unknown;
+        try { content = (JSON.parse(raw) as { content?: unknown })?.content; } catch { /* handled below */ }
+        if (typeof content !== 'string') {
+          return cors(apiErrorResponse({
+            message: 'JSON body must be {"content": "<markdown with frontmatter>"}',
+            code: 'VALIDATION_ERROR',
+            status: 400,
+            param: 'content',
+            hint: 'Or send the markdown itself with Content-Type: text/markdown.',
+          }));
+        }
+        raw = content;
+      }
       if (typeof raw !== 'string' || !raw.trim()) {
         return cors(jsonError('markdown body is required', 'BAD_REQUEST', 400));
+      }
+      const { issue } = target.toLowerCase().endsWith('.md')
+        ? parseNode(target, raw)
+        : { issue: { message: 'path must end in .md' } };
+      if (issue) {
+        return cors(apiErrorResponse({
+          message: `Invalid knowledge note: ${issue.message}`,
+          code: 'VALIDATION_ERROR',
+          status: 400,
+          param: issue.message.startsWith('path') ? 'path' : 'content',
+          hint: `Start the markdown with frontmatter: ---\nkind: topic\nid: topic.example\ntitle: Example\n---. kind is one of ${NODE_KINDS.join(', ')}.`,
+        }));
       }
       await upsertKnowledgeFile(ctx.env, workspaceId, { path: target, content: raw, source: 'manual' });
       return cors(jsonResponse({ ok: true, source: 'manual' }));

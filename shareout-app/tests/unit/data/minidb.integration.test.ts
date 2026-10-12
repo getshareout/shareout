@@ -103,6 +103,31 @@ describe('MiniDB Durable Object — real runtime (ADR 28)', () => {
     expect(await list.json()).toMatchObject({ success: true, data: { tables: [{ name: 'bulk', rowCount: 100 }] } });
   });
 
+  it('rejects an unknown filter operator with 400 VALIDATION_ERROR + param', async () => {
+    const ctx = ctxFor('art_badop_rt');
+    await handleTables(req('POST', '/tables/t', { a: 1 }), ctx, 't');
+    for (const [path, method] of [['t/query', 'POST'], ['t/count', 'POST'], ['t', 'PATCH'], ['t', 'DELETE']] as const) {
+      const res = await handleTables(req(method, `/tables/${path}`, { filter: { a: { $bogus: 1 } }, changes: { a: 2 } }), ctx, path);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ code: 'VALIDATION_ERROR', param: 'filter.a.$bogus' });
+    }
+    const nonArrayIn = await handleTables(req('POST', '/tables/t/query', { filter: { a: { $in: 1 } } }), ctx, 't/query');
+    expect(nonArrayIn.status).toBe(400);
+    const ok = await handleTables(req('POST', '/tables/t/query', { filter: { a: { $gte: 1 } } }), ctx, 't/query');
+    expect(ok.status).toBe(200);
+  });
+
+  it('rejects a top-level JSON array on single-row insert instead of storing a malformed row', async () => {
+    const ctx = ctxFor('art_arrins_rt');
+    const res = await handleTables(req('POST', '/tables/t', [{ a: 1 }, { a: 2 }]), ctx, 't');
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: 'VALIDATION_ERROR', param: 'body' });
+    const badRow = await handleTables(req('POST', '/tables/t', { rows: [{ a: 1 }, 5] }), ctx, 't');
+    expect(await badRow.json()).toMatchObject({ code: 'VALIDATION_ERROR', param: 'rows[1]' });
+    const list = await handleTables(req('GET', '/tables'), ctx, '');
+    expect(await list.json()).toMatchObject({ data: { tables: [] } });
+  });
+
   it('enforces the workspace_id partition invariant (binds first, rejects mismatch)', async () => {
     const stub = env.MINIDB.get(env.MINIDB.idFromName('art_ws_rt'));
     const exec = (workspace: string) =>

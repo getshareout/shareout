@@ -166,6 +166,11 @@ describe('getCrewProvider', () => {
     expect(p?.model).toBe('claude-sonnet-5-5');
   });
 
+  it('runs the native Anthropic entry on a pinned model', () => {
+    expect(getCrewProvider({ ANTHROPIC_API_KEY: 'sk-ant' } as Env, null, 'claude-haiku-4-5-20251001')?.model).toBe('claude-haiku-4-5-20251001');
+    expect(getCrewProvider({ VERCEL_AI_GATEWAY: 'vk' } as Env, 'anthropic/claude-haiku-4.5', 'claude-haiku-4-5-20251001')?.model).toBe('anthropic/claude-haiku-4.5');
+  });
+
   it('chains every configured provider in AI_PROVIDER_ORDER', () => {
     const p = getCrewProvider({ ANTHROPIC_API_KEY: 'sk-ant', OPENAI_API_KEY: 'sk', AI_PROVIDER_ORDER: 'openai' } as Env);
     expect(p).toBeInstanceOf(FailoverCrewProvider);
@@ -176,6 +181,24 @@ describe('getCrewProvider', () => {
 describe('OpenAICompatCrewProvider', () => {
   const oaCfg = { provider: 'openai' as const, apiKey: 'sk', baseUrl: 'https://gw.example/v1', model: 'x/y' };
   const chunk = (delta: unknown, finish_reason: string | null = null) => ({ choices: [{ delta, finish_reason }] });
+
+  it('asks the Vercel AI Gateway for automatic prompt caching and low reasoning effort', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(sse([chunk({}, 'stop')]));
+
+    await collect(new OpenAICompatCrewProvider({ ...oaCfg, provider: 'vercel-gateway', model: 'anthropic/claude-sonnet-5.5' }, env), args);
+
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.providerOptions).toEqual({ gateway: { caching: 'auto' } });
+    expect(body.reasoning).toEqual({ effort: 'low' });
+  });
+
+  it('sends no gateway options to plain OpenAI', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(sse([chunk({}, 'stop')]));
+
+    await collect(new OpenAICompatCrewProvider(oaCfg, env), args);
+
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string).providerOptions).toBeUndefined();
+  });
 
   it('treats emitted tool calls as tool_use even when finish_reason is stop', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(sse([

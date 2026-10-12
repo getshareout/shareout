@@ -28,10 +28,10 @@ your ShareOut account"). Allow, and the app is connected.
 | --- | --- |
 | `whoami` | Connected account + workspaces |
 | `list_workspaces` | Workspaces and their ids |
-| `list_artifacts` | Pages the person can see (`workspace_id`, `search`, `limit`) |
+| `list_artifacts` | The person's pages across all their workspaces + personal space; `workspace_id` (id or slug) narrows to one; `search`, `limit` (1–50) |
 | `get_artifact` | One page; `include_content: true` adds the source |
-| `publish_artifact` | New page from `content` (HTML or Markdown), `title`, optional `workspace_id`, `visibility` (`workspace` default, `private`, `public`) |
-| `update_artifact` | Replace a page's content (same link, new version) |
+| `publish_artifact` | New page from `content` (HTML or Markdown), `title`, optional `workspace_id`, `visibility` (`workspace` default, `private`, `public`), `folder` (name or id of a folder in that workspace) |
+| `update_artifact` | Replace a page's content (same link, new version); optional `title` renames it, `folder` (name or id) moves it into a folder of its workspace |
 | `invite_members` | Owners/admins: invite `emails` (list or comma/newline text) as `member`/`admin`; per-email result + join link |
 | `list_members` | People in a workspace + pending invites (admins) |
 | `resend_invite` / `revoke_invite` | Admins: resend or cancel a pending invite by `email` |
@@ -41,12 +41,22 @@ your ShareOut account"). Allow, and the app is connected.
 | `knowledge_status` | Whether Knowledge is on, what's learned / processing / unreadable, and how many entities it knows |
 | `get_help` | Short how-to and links |
 | `report_problem` | Opens a support ticket for the ShareOut team |
-| `search` / `fetch` | Read-only, ChatGPT deep-research shape |
+| `search` / `fetch` | Read-only, ChatGPT deep-research shape. `search` covers all the person's workspaces unless `workspace_id` (id or slug) narrows it; `fetch` is by id |
 
 Rules the tools follow:
 
-- **Workspace default** — the person's only workspace; with several, the tool asks which.
-  With none, pages are private in their personal space.
+- **Workspace default** — tools that act on one workspace (`publish_artifact`, `knowledge_*`,
+  member tools) use the person's only workspace; with several, they ask which. With none,
+  pages are private in their personal space. Lookups (`list_artifacts`, `search`) cover every
+  workspace unless `workspace_id` narrows them; `get_artifact`, `fetch` and `update_artifact`
+  go by page id.
+- **Arguments are checked** — a value outside a tool's input schema (an unknown `visibility`,
+  a non-number `limit`, a missing required field) returns an error result and nothing is done;
+  it is never replaced by a default. A `workspace_id` the person doesn't belong to gets the same
+  "not a member of that workspace" error from every tool.
+- **Folders** — `folder` takes a folder's name (case-insensitive) or id in the page's workspace.
+  An unknown name, or one shared by several folders, is refused with the ids to pick from.
+  Personal pages have no folders. There is no folder listing or delete tool; do those in ShareOut.
 - **Never overwrites by name** — `publish_artifact` always creates a new page; changing an
   existing one is `update_artifact`.
 - **Plain results** — each result says the link, who can see it, and any notice
