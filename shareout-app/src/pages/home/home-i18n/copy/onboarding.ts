@@ -58,7 +58,7 @@ export const ONBOARDING_COPY: HomeLocaleCopy = {
     'onb.cta.data_source': 'Conectar',
     'onb.cta.explore': 'Ver',
     'onb.cta.invite_team': 'Invitar',
-    'onb.cta.first_artifact': 'Crear una',
+    'onb.cta.first_artifact': 'Crear uno',
     'onb.cta.share_page': 'Abrí un artefacto',
     'onb.cta.skill': 'Conseguirla',
     'onb.cta.connect_agent': 'Conectar',

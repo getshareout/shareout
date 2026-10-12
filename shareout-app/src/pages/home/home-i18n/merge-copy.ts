@@ -11,6 +11,7 @@ import { INVITE_COPY } from './copy/invite';
 import { KNOWLEDGE_MAP_COPY } from './copy/knowledge-map';
 import { LIBRARY_COPY } from './copy/library';
 import { MODALS_COPY } from './copy/modals';
+import { NEW_MENU_COPY } from './copy/new-menu';
 import { NOTIF_COPY } from './copy/notifications';
 import { ONBOARDING_COPY } from './copy/onboarding';
 import { SHELL_COPY } from './copy/shell';
@@ -38,6 +39,7 @@ const COPY_MODULES: HomeLocaleCopy[] = [
   AGENT_COPY,
   TIME_COPY,
   STUDIO_COPY,
+  NEW_MENU_COPY,
 ];
 
 function mergeLocale(locale: HomeLocale): Record<string, string> {

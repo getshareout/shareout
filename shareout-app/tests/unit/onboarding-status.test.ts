@@ -76,7 +76,7 @@ describe('getOnboardingStatus', () => {
     expect(s?.tasks.find((t) => t.key === 'slack')?.done).toBe(true);
   });
 
-  it('routes a plain member to the 5-task member track, connect-your-agent first', async () => {
+  it('routes a plain member to the 5-task member track, a first page from the New menu first', async () => {
     const env = { ...INTEGRATIONS, DB: makeDb({
       member: { role: 'member', created_at: nowIso, member_class: 'internal' },
       signals: NO_SIGNALS,
@@ -84,7 +84,9 @@ describe('getOnboardingStatus', () => {
     const s = await getOnboardingStatus(env, WS, U);
     expect(s?.track).toBe('member');
     expect(s?.tasks).toHaveLength(5);
-    expect(s?.tasks[0]).toMatchObject({ key: 'connect_agent', done: false, action: { kind: 'nav', target: 'connect' } });
+    expect(s?.tasks[0]).toMatchObject({ key: 'first_artifact', done: false, action: { kind: 'new' } });
+    // Connecting an external agent is a bonus, not a requirement for a member.
+    expect(s?.tasks[1]).toMatchObject({ key: 'connect_agent', skippable: true, action: { kind: 'nav', target: 'connect' } });
   });
 
   it('marks connect_agent done once the member has a personal key', async () => {

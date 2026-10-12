@@ -23,7 +23,7 @@ export const workspace_client_home_views_analytics_JS = `  // ----- Analytics â€
     var views = tot.views || 0, uniq = tot.uniques || 0, active = tot.activeArtifacts || 0;
     var seg = [7, 30, 90].map(function (r) { return '<button class="wsx-an__seg' + (r === anRange ? ' is-on' : '') + '" data-an-range="' + r + '" type="button">' + r + 'd</button>'; }).join('');
     if (!views && !uniq) {
-      m.innerHTML = '<div class="wsx-an__top"><div class="wsx-an__rangeseg">' + seg + '</div></div><div class="wsx-empty" style="padding:32px">' + esc(t('analytics.noViews').replace('{n}', String(anRange))) + '</div>';
+      m.innerHTML = '<div class="wsx-an__top"><div class="wsx-an__rangeseg">' + seg + '</div></div>' + emptyState(t('analytics.noViews').replace('{n}', String(anRange)), t('analytics.noViewsSub'));
       wireAnRange(m); return;
     }
     var perf = d.perf || {};
@@ -47,8 +47,10 @@ export const workspace_client_home_views_analytics_JS = `  // ----- Analytics â€
   }
   function loadAccountAnalytics() {
     var m = document.getElementById('wsxAnalyticsMount'); m.innerHTML = i18nLoad();
+    var asked = anRange;
     fetch('/v1/home/analytics?range=' + anRange + (window.WSX_WS ? '&workspace=' + encodeURIComponent(window.WSX_WS) : ''), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { if (!d) { m.innerHTML = i18nEmpty('analytics.none'); return; } paintAnalytics(d); })
+      // A slower earlier range must not paint over the one now selected.
+      .then(function (d) { if (asked !== anRange) return; if (!d) { m.innerHTML = i18nEmpty('analytics.none'); return; } paintAnalytics(d); })
       .catch(function () { m.innerHTML = i18nError('common.couldNotLoad'); });
   }
 

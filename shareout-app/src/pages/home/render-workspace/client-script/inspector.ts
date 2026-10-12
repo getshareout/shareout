@@ -815,13 +815,18 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     });
   }
   var HOUSE_SVG = isvg('<path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/>');
+  // The first tab names the section you're in (Artifacts, Assets…), not always "Home".
+  function homeTabLabel() {
+    var on = ws.querySelector('[data-lens].is-active'), k = on ? on.getAttribute('data-lens') : 'brief';
+    return k === 'brief' ? t('tabs.home') : t('nav.' + k);
+  }
   function renderTabs() {
     tabsEl.innerHTML = tabs.map(function (tab) {
       var dirty = !tab.home && panes[tab.key] && panes[tab.key].dirty;
       return '<div class="wsx-tab' + (tab.key === activeKey ? ' is-active' : '') + (tab.home ? ' wsx-tab--home' : '') + '" data-tab="' + esc(tab.key) + '"' + (tab.home ? '' : ' draggable="true"') + '>'
         + (dirty ? '<span class="wsx-tab__dot" title="' + esc(t('inspector.unsavedDot')) + '"></span>' : '')
         + (tab.home ? '<span class="wsx-tab__ic">' + HOUSE_SVG + '</span>' : '')
-        + '<span class="wsx-tab__label">' + esc(tab.label) + '</span>'
+        + '<span class="wsx-tab__label">' + esc(tab.home ? homeTabLabel() : tab.label) + '</span>'
         + (tab.home ? '' : '<button class="wsx-tab__x" data-close="' + esc(tab.key) + '" aria-label="' + esc(t('inspector.closeTab')) + '">\\u00D7</button>')
         + '</div>';
     }).join('');

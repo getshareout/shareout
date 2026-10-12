@@ -15,6 +15,8 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
   function kmColor(ty) { var i = kmState.types.indexOf(ty); return i >= 0 && i < KM_PALETTE.length ? KM_PALETTE[i] : 'var(--color-text-tertiary)'; }
   function kmDot(ty) { return '<span class="km__dot" style="background:' + kmColor(ty) + '"></span>'; }
   function kmTrunc(s, n) { s = String(s || ''); n = n || 26; return s.length > n ? s.slice(0, n - 1) + '\\u2026' : s; }
+  // Quotes are lifted from markdown sources — drop the bold/italic markers, show the words.
+  function kmPlain(s) { return String(s || '').replace(/\\*\\*|__/g, ''); }
   function kmMentions(n) { n = Number(n || 0); return n === 1 ? t('kmap.mentionsOne') : t('kmap.mentionsCount').replace('{n}', n.toLocaleString()); }
   function kmName(id) { return kmState.names[id] || id; }
   function kmEntityTotal() { var n = 0; for (var k in kmState.counts) if (kmState.counts.hasOwnProperty(k)) n += Number(kmState.counts[k] || 0); return n; }
@@ -327,7 +329,7 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
       var since = f.validFrom ? '<span class="km__since">' + esc(t('kmap.since').replace('{d}', fmtDay(f.validFrom, true) || f.validFrom)) + '</span>' : '';
       return '<div class="km__fact"><div class="km__fk">' + esc(kmHuman(f.predicate)) + '</div>'
         + '<div class="km__fv">' + esc(f.value) + (f.unit ? ' <span class="km__unit">' + esc(f.unit) + '</span>' : '') + since + '</div>'
-        + (f.quote ? '<blockquote class="km__q">\\u201C' + esc(f.quote) + '\\u201D</blockquote>' : '') + kmSrc(f.source) + '</div>';
+        + (f.quote ? '<blockquote class="km__q">\\u201C' + esc(kmPlain(f.quote)) + '\\u201D</blockquote>' : '') + kmSrc(f.source) + '</div>';
     }).join('') : '<div class="km__none">' + esc(t('kmap.noFacts')) + '</div>';
     var groups = {}, order = [];
     (d.relations || []).forEach(function (r) {
@@ -341,7 +343,7 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
         }).join('') + '</div>';
     }).join('') : '<div class="km__none">' + esc(t('kmap.noConnections')) + '</div>';
     var ms = (d.mentions || []), LIMIT = 6;
-    var mrow = function (m) { return '<div class="km__mention"><blockquote class="km__q">\\u201C' + esc(m.quote) + '\\u201D</blockquote><div class="km__cite">' + kmSrc(m.source) + (m.locator ? '<span class="km__loc">' + esc(m.locator) + '</span>' : '') + '</div></div>'; };
+    var mrow = function (m) { return '<div class="km__mention"><blockquote class="km__q">\\u201C' + esc(kmPlain(m.quote)) + '\\u201D</blockquote><div class="km__cite">' + kmSrc(m.source) + (m.locator ? '<span class="km__loc">' + esc(m.locator) + '</span>' : '') + '</div></div>'; };
     var mbody = ms.length ? ms.slice(0, LIMIT).map(mrow).join('')
       + (ms.length > LIMIT ? '<div class="km__more" id="kmMore">' + ms.slice(LIMIT).map(mrow).join('') + '</div><button class="wsx-link km__morebtn" id="kmMoreBtn" type="button">' + esc(t('kmap.showMore').replace('{n}', (ms.length - LIMIT).toLocaleString())) + '</button>' : '')
       : '<div class="km__none">' + esc(t('kmap.noMentions')) + '</div>';
@@ -372,22 +374,9 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
       }
       kmPaintFinder();
       if (kmState.focus) { if (!kmState.trail.length) kmState.trail = [kmState.focus]; kmGo(kmState.focus, 'none'); return; }
-      kmDefaultFocus(function (id) { kmState.trail = [id]; kmGo(id, 'none'); });
+      // First open is a list, not a random entity: the person picks what to look at.
+      var c = document.getElementById('kmCanvas'); if (c) c.innerHTML = i18nEmpty('kmap.pickHint');
     };
     if (kmState.types.length) start(true); else kmLoadTypes(start);
-  }
-
-  // First open: the best-connected entity among the most mentioned (ties → more mentions).
-  function kmDefaultFocus(cb) {
-    fetch(knBase() + '/graph?limit=80', { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (g) {
-        if (!g || !g.nodes || !g.nodes.length) { cb(kmState.top[0].id); return; }
-        kmRemember(g.nodes);
-        var deg = {}; (g.edges || []).forEach(function (e) { deg[e.from] = (deg[e.from] || 0) + 1; deg[e.to] = (deg[e.to] || 0) + 1; });
-        var best = g.nodes.slice().sort(function (a, b) { return (deg[b.id] || 0) - (deg[a.id] || 0) || Number(b.mentions || 0) - Number(a.mentions || 0); })[0];
-        cb(best.id);
-      })
-      .catch(function () { cb(kmState.top[0].id); });
   }
 `;

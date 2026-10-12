@@ -33,6 +33,8 @@ export const workspace_client_onboarding_JS = `  // ===== onboarding checklist =
     else if (action.kind === 'nav') { var b = ws.querySelector('[data-lens="' + action.target + '"]'); if (b) b.click(); }
     else if (action.kind === 'page') { window.open(action.url, '_blank', 'noopener'); }
     else if (action.kind === 'invite') { wsxInvite(function () { refreshOnb(false); }); }
+    // Deferred so the click that picked the step doesn't close the menu it opens.
+    else if (action.kind === 'new') { closeComposer(); setTimeout(openNewMenu, 0); }
     else if (action.kind === 'skill') {
       fetch(ONB_API + '/skill-ack' + onbQs(), { method: 'POST', credentials: 'same-origin' }).then(function () { refreshOnb(false); }).catch(function () {});
       var lb = ws.querySelector('[data-lens="library"]'); if (lb) lb.click();
@@ -150,16 +152,8 @@ export const workspace_client_onboarding_JS = `  // ===== onboarding checklist =
         if (mode === true) { if (!s.eligible) return; }
         else if (mode !== 'force' && !onbCard) { return; }
         renderOnb(s, mode === true || mode === 'force');
-        if (mode === true && s.pct === 0) onbWelcomeOnce();
       })
       .catch(function () { onbBusy = false; });
-  }
-  // The very first visit to a fresh account opens the chat on the welcome, once ever;
-  // every later visit only marks the pill unread.
-  function onbWelcomeOnce() {
-    var k = 'wsx_onb_welcomed_' + SCOPE;
-    try { if (localStorage.getItem(k)) return; localStorage.setItem(k, '1'); } catch (e) { return; }
-    openDock();
   }
   // Agent-triggered surfacing (show_onboarding tool → ui_action). Hoisted, so the dock's
   // ui_action handler can call it even though this fragment loads after agent-dock.

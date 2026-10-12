@@ -129,9 +129,12 @@ describe('agent dock — markup and behaviour contracts', () => {
     expect(render).not.toContain("'role', 'status'");
   });
 
-  it('opens the chat on the welcome only on the first visit to a fresh account', () => {
-    const once = workspace_client_onboarding_JS.slice(workspace_client_onboarding_JS.indexOf('function onbWelcomeOnce'));
-    expect(once).toMatch(/localStorage\.getItem\(k\)\) return; localStorage\.setItem\(k, '1'\)/);
-    expect(workspace_client_onboarding_JS).toContain("if (mode === true && s.pct === 0) onbWelcomeOnce();");
+  it('never opens the chat over Home on a first visit (the checklist waits behind the pill)', () => {
+    const kickoff = workspace_client_onboarding_JS.slice(
+      workspace_client_onboarding_JS.indexOf('function refreshOnb'),
+      workspace_client_onboarding_JS.indexOf('function onbForce')
+    );
+    expect(kickoff).not.toMatch(/openDock\(\)|openComposer\(\)|setComposer\('sheet'\)/);
+    expect(workspace_client_onboarding_JS).not.toContain('onbWelcomeOnce');
   });
 });

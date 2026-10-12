@@ -18,13 +18,19 @@ export const workspace_client_routing_JS = `  // ===== deep-link routing (hash) 
     routeLastHash = h;
     try { history.pushState(null, '', h); } catch (e) { location.hash = h; }
   }
-  function applyHash() {
+  function applyHash(boot) {
     var raw = (location.hash || '').replace(/^#\\/?/, '');
     routeApplying = true;
     try {
       if (raw.indexOf('a/') === 0) {
         var slug = decodeURIComponent(raw.slice(2));
         if (!slug) return;
+        // A shared link lands on an artifact: the rail shows Artifacts, not Home.
+        var onLens = ws.querySelector('[data-lens].is-active');
+        if (boot && (!onLens || onLens.getAttribute('data-lens') === 'brief') && ws.querySelector('[data-lens="artifacts"]')) {
+          lenses.forEach(function (x) { x.classList.toggle('is-active', x.getAttribute('data-lens') === 'artifacts'); });
+          openView('artifacts');
+        }
         var key = null;
         for (var i = 0; i < tabs.length; i++) { if (!tabs[i].home && panes[tabs[i].key] && panes[tabs[i].key].art.slug === slug) key = tabs[i].key; }
         if (key) activateTab(key); else openArtifact(slug, null, '');
@@ -47,7 +53,7 @@ export const workspace_client_routing_JS = `  // ===== deep-link routing (hash) 
   }
   window.addEventListener('popstate', function () { applyHash(); });
   window.addEventListener('hashchange', function () { if (location.hash === routeLastHash) return; applyHash(); });
-  if (location.hash) applyHash();
+  if (location.hash) applyHash(true);
   else {
     // Query deep link (/home?view=connect&tab=code) — what emails and docs link to.
     var qp = new URLSearchParams(location.search), qv = qp.get('view') || '', qt = qp.get('tab') || '';
