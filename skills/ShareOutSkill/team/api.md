@@ -473,7 +473,7 @@ Per-scope asset library: upload reusable files, group into versioned **deliverab
 | --- | --- | --- | --- |
 | `GET` | `/v1/assets` or `…/workspaces/{id}/assets` | Member | List deliverables, loose blobs, bucket usage. |
 | `POST` | `…/assets/upload` → `PUT …/_upload/{token}` | Member | Two-step upload. |
-| `POST` | `…/assets/deliverables` | Member | `{ blobId, name }` → versioned deliverable. |
+| `POST` | `…/assets/deliverables` | Member | `{ blobId, name, visibility? }` → versioned deliverable. `visibility`: `team` (default — workspace members only; bytes need a signed-in member), `private` (owner + direct shares), `workspace` (anyone with the link — use this for files embedded in artifacts). |
 | `POST` | `…/assets/deliverables/{id}/version` | Member | Add a new version. |
 | `POST` | `…/assets/collections` | Member | Bundle deliverables. |
 | `POST` | `…/assets/collections/{id}/share` | Member | `{ expiresAt?, gate?, password?, domains? }` → `/d/<token>`. |

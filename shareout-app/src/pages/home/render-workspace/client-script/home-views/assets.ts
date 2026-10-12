@@ -8,17 +8,9 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
   var assetSelect = false;
   var assetSel = {};
   var ASVG = {
-    copy: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
     dl: '<path d="M12 3v12"/><path d="M7 12l5 5 5-5"/><path d="M5 21h14"/>',
-    trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>',
-    plus: '<path d="M12 5v14M5 12h14"/>',
-    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
-    globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18"/>',
-    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
-    chat: '<path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5a8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8A8.5 8.5 0 0 1 12.5 3a8.38 8.38 0 0 1 8.5 8.5z"/>',
-    userplus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
-    link: '<path d="M4 5a1 1 0 0 1 1-1h6l2 2h6a1 1 0 0 1 1 1v3"/><rect x="3" y="10" width="12" height="10" rx="1"/><path d="M18 13v7M21 13v7"/>'
+    globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18"/>'
   };
   function commentsBase() { return '/v1/data/' + encodeURIComponent(ASSET_STATE.bucketId) + '/comments'; }
   function assetApiBase() { return window.WSX_WS ? '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/assets' : '/v1/assets'; }
@@ -26,8 +18,8 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
   function assetKind(m) { m = m || ''; if (m.indexOf('image/') === 0) return 'image'; if (m.indexOf('video/') === 0) return 'video'; return 'doc'; }
   function assetExt(name) { var p = (name || '').split('.'); return p.length > 1 ? p.pop().slice(0, 4).toUpperCase() : 'FILE'; }
   function assetItems() {
-    var ds = (ASSET_STATE.deliverables || []).map(function (d) { return { type: 'deliverable', id: d.id, blobId: d.blobId, name: d.name, filename: d.filename, mimeType: d.mimeType, sizeBytes: d.sizeBytes, url: d.url, versionCount: d.versionCount, latestVersion: d.latestVersion, visibility: d.visibility, folderId: d.folderId || '', enrichment: d.enrichment || null, usageCount: d.usageCount || 0 }; });
-    var ls = (ASSET_STATE.loose || []).map(function (b) { return { type: 'loose', id: b.id, blobId: b.id, name: b.filename, filename: b.filename, mimeType: b.mimeType, sizeBytes: b.sizeBytes, url: b.url, versionCount: 1, latestVersion: 1, visibility: null, folderId: '' }; });
+    var ds = (ASSET_STATE.deliverables || []).map(function (d) { return { type: 'deliverable', id: d.id, blobId: d.blobId, name: d.name, filename: d.filename, mimeType: d.mimeType, sizeBytes: d.sizeBytes, url: d.url, versionCount: d.versionCount, latestVersion: d.latestVersion, visibility: d.visibility, folderId: d.folderId || '', enrichment: d.enrichment || null, usageCount: d.usageCount || 0, canDelete: !!d.canDelete }; });
+    var ls = (ASSET_STATE.loose || []).map(function (b) { return { type: 'loose', id: b.id, blobId: b.id, name: b.filename, filename: b.filename, mimeType: b.mimeType, sizeBytes: b.sizeBytes, url: b.url, versionCount: 1, latestVersion: 1, visibility: null, folderId: '', canDelete: !!b.canDelete }; });
     return ds.concat(ls);
   }
   function findItem(id) { return assetItems().filter(function (x) { return x.id === id; })[0]; }
@@ -38,32 +30,78 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
     if (kind === 'video') return '<div class="wsx-asset__thumb wsx-asset__thumb--vid"><video src="' + esc(a.url) + '#t=0.1" preload="metadata" muted></video><span class="wsx-asset__play">' + isvg('<path d="M8 5v14l11-7z"/>') + '</span></div>';
     return '<div class="wsx-asset__thumb wsx-asset__thumb--file">' + isvg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>') + '<span class="wsx-asset__ext">' + esc(assetExt(a.filename)) + '</span></div>';
   }
-  function aBtn(act, title, svg, cls) { return '<button class="wsx-asset__act' + (cls ? ' ' + cls : '') + '" data-asset-act="' + act + '" title="' + esc(title) + '" aria-label="' + esc(title) + '">' + isvg(svg) + '</button>'; }
+  // Visibility of a workspace File: team (members), private (owner + direct shares),
+  // workspace (anyone with the link — the legacy, link-shareable value).
+  var ASSET_VIS = [
+    { v: 'team', label: 'assets.visTeam', hint: 'assets.visTeamHint', icon: 'lock' },
+    { v: 'private', label: 'assets.visPrivate', hint: 'assets.visPrivateHint', icon: 'lock' },
+    { v: 'workspace', label: 'assets.visLink', hint: 'assets.visLinkHint', icon: 'globe' }
+  ];
+  function visInfo(v) { return ASSET_VIS.filter(function (o) { return o.v === v; })[0] || null; }
+  function visBadge(a) {
+    var o = window.WSX_WS && a.type === 'deliverable' ? visInfo(a.visibility) : null;
+    if (!o) return '';
+    return '<span class="wsx-asset__vis wsx-asset__vis--' + o.v + '" title="' + esc(t(o.hint)) + '">' + isvg(ASVG[o.icon]) + esc(t(o.label)) + '</span>';
+  }
   function assetTile(a) {
     var on = assetSel[a.id];
     var check = assetSelect ? '<button class="wsx-asset__check' + (on ? ' on' : '') + '" data-asset-sel="' + esc(a.id) + '" aria-label="' + esc(t('assets.select')) + '"></button>' : '';
     var ver = a.versionCount > 1 ? '<span class="wsx-asset__ver">v' + a.latestVersion + '</span>' : '';
-    var priv = (window.WSX_WS && a.visibility === 'private') ? '<span class="wsx-asset__ver wsx-asset__ver--lock">' + esc(t('assets.private')) + '</span>' : '';
-    var link = (window.WSX_WS && a.visibility !== 'private') ? '<span class="wsx-asset__ver wsx-asset__ver--link" title="' + esc(t('assets.linkVisibleTitle')) + '">' + esc(t('assets.linkVisible')) + '</span>' : '';
-    var actions = '';
-    if (a.type === 'deliverable') {
-      actions += aBtn('ver', t('assets.uploadNewVersion'), ASVG.plus) + aBtn('hist', t('assets.versionHistory'), ASVG.clock) + aBtn('cmt', t('assets.comments'), ASVG.chat) + aBtn('move', t('assets.moveToFolder'), ASVG.folder);
-      if (window.WSX_WS) actions += aBtn('vis', a.visibility === 'private' ? t('assets.makeWorkspace') : t('assets.makePrivate'), a.visibility === 'private' ? ASVG.lock : ASVG.globe)
-        + aBtn('sharep', t('assets.shareWithPerson'), ASVG.userplus);
-      if (a.usageCount > 0) actions += aBtn('usage', t('assets.usedIn'), ASVG.link);
-    }
     var enr = a.enrichment && a.enrichment.status === 'ok' ? a.enrichment : null;
     var tags = enr && enr.tags && enr.tags.length
       ? '<div class="wsx-asset__tags">' + enr.tags.slice(0, 4).map(function (tg) { return '<span class="wsx-asset__tag">' + esc(tg) + '</span>'; }).join('') + '</div>'
       : '';
     var nameTitle = enr && enr.summary ? enr.summary : a.filename;
-    return '<article class="wsx-asset' + (on ? ' is-sel' : '') + '" data-asset-id="' + esc(a.id) + '" data-type="' + a.type + '" data-kind="' + assetKind(a.mimeType) + '">'
-      + check + assetThumb(a) + ver + priv + link
-      + '<div class="wsx-asset__meta"><span class="wsx-asset__name" title="' + esc(nameTitle) + '">' + esc(a.name) + '</span><span class="wsx-asset__sz">' + adBytes(a.sizeBytes) + (a.versionCount > 1 ? ' \\u00b7 ' + esc(t('assets.versionsCount').replace('{n}', String(a.versionCount))) : '') + '</span>' + tags + '</div>'
-      + '<div class="wsx-asset__actions">' + actions + aBtn('copy', t('assets.copyLink'), ASVG.copy)
-      +   '<a class="wsx-asset__act" href="' + esc(a.url) + '" download title="' + esc(t('assets.download')) + '" aria-label="' + esc(t('assets.download')) + '">' + isvg(ASVG.dl) + '</a>'
-      +   aBtn('del', t('common.delete'), ASVG.trash, 'danger')
-      + '</div></article>';
+    return '<article class="wsx-asset' + (on ? ' is-sel' : '') + '" data-asset-id="' + esc(a.id) + '" data-type="' + a.type + '" data-kind="' + assetKind(a.mimeType) + '" tabindex="0" role="button" aria-label="' + esc(a.name) + '">'
+      + check + assetThumb(a) + ver
+      + '<div class="wsx-asset__meta"><span class="wsx-asset__name" title="' + esc(nameTitle) + '">' + esc(a.name) + '</span><span class="wsx-asset__sz">' + adBytes(a.sizeBytes) + (a.versionCount > 1 ? ' \\u00b7 ' + esc(t('assets.versionsCount').replace('{n}', String(a.versionCount))) : '') + '</span>' + visBadge(a) + tags + '</div>'
+      + '</article>';
+  }
+  // Click a file → preview with labeled actions (no hover-only icons; works on touch).
+  function openAssetPreview(id) {
+    var a = findItem(id); if (!a) return;
+    var kind = assetKind(a.mimeType);
+    var media = kind === 'image' ? '<img src="' + esc(a.url) + '" alt="">'
+      : kind === 'video' ? '<video src="' + esc(a.url) + '" controls preload="metadata"></video>'
+      : '<div class="wsx-asset__thumb--file">' + isvg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>') + '<span class="wsx-asset__ext">' + esc(assetExt(a.filename)) + '</span></div>';
+    var isDlv = a.type === 'deliverable';
+    var inWs = !!window.WSX_WS;
+    var vis = '';
+    if (isDlv && inWs) {
+      var cur = visInfo(a.visibility) || ASSET_VIS[2];
+      vis = '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('assets.visLabel')) + '</span><select class="wsx-field__in" id="pv_vis">'
+        + ASSET_VIS.map(function (o) { return '<option value="' + o.v + '"' + (o.v === cur.v ? ' selected' : '') + '>' + esc(t(o.label)) + '</option>'; }).join('')
+        + '</select></label><p class="wsx-field__note" id="pv_vishint">' + esc(t(cur.hint)) + '</p>';
+    }
+    function btn(act, label) { return '<button class="wsx-abtn" type="button" data-pv-act="' + act + '">' + esc(label) + '</button>'; }
+    var acts = '<a class="wsx-abtn wsx-abtn--primary" href="' + esc(a.url) + '" download>' + isvg(ASVG.dl) + esc(t('assets.download')) + '</a>'
+      + btn('copy', t('assets.copyLink'))
+      + (isDlv && inWs ? btn('sharep', t('assets.share')) : '')
+      + (isDlv ? btn('move', t('assets.move')) + btn('ver', t('assets.uploadNewVersion')) + btn('hist', t('assets.versionHistory')) + btn('cmt', t('assets.comments')) : '')
+      + (isDlv && a.usageCount > 0 ? btn('usage', t('assets.usedIn')) : '')
+      + (a.canDelete ? '<button class="so-c-btn so-c-btn--danger-outline" type="button" data-pv-act="del">' + esc(t('common.delete')) + '</button>' : '');
+    var mo = wsxModal(a.name, '<div class="wsx-asset-pv"><div class="wsx-asset-pv__media">' + media + '</div>'
+      + '<p class="wsx-field__note">' + adBytes(a.sizeBytes) + (a.versionCount > 1 ? ' \\u00b7 ' + esc(t('assets.versionsCount').replace('{n}', String(a.versionCount))) : '') + '</p>'
+      + vis + '<div class="wsx-asset-pv__acts">' + acts + '</div></div>');
+    var sel = mo.body.querySelector('#pv_vis');
+    if (sel) sel.addEventListener('change', function () {
+      var o = visInfo(sel.value); var h = mo.body.querySelector('#pv_vishint'); if (o && h) h.textContent = t(o.hint);
+      patchDeliverable(a.id, { visibility: sel.value });
+    });
+    mo.body.querySelectorAll('[data-pv-act]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var act = b.getAttribute('data-pv-act');
+        if (act === 'copy') { copyText(a.url, b); return; }
+        mo.close();
+        if (act === 'del') deleteAsset(a);
+        else if (act === 'ver') uploadVersion(a.id);
+        else if (act === 'hist') showHistory(a.id);
+        else if (act === 'cmt') openComments(a.id);
+        else if (act === 'sharep') openSharePerson(a.id);
+        else if (act === 'usage') openUsage(a.id);
+        else if (act === 'move') moveAsset(a.id);
+      });
+    });
   }
   function renderFolderBar() {
     var pills = '<button class="wsx-abtn' + (assetFolder ? '' : ' wsx-abtn--primary') + '" data-folder="" type="button">' + esc(t('assets.allFiles')) + '</button>';
@@ -96,20 +134,11 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
     m.querySelectorAll('[data-asset-sel]').forEach(function (b) {
       b.addEventListener('click', function () { var id = b.getAttribute('data-asset-sel'); assetSel[id] = !assetSel[id]; renderAssets(); });
     });
-    m.querySelectorAll('[data-asset-act]').forEach(function (b) {
-      b.addEventListener('click', function (e) {
-        var act = b.getAttribute('data-asset-act'); if (act === 'copy') e.preventDefault();
-        var card = b.closest('[data-asset-id]'); var id = card.getAttribute('data-asset-id'); var it = findItem(id);
-        if (act === 'copy') { if (it) copyText(it.url, b); }
-        else if (act === 'del') { e.preventDefault(); deleteAsset(it); }
-        else if (act === 'ver') { e.preventDefault(); uploadVersion(id); }
-        else if (act === 'hist') { e.preventDefault(); showHistory(id); }
-        else if (act === 'cmt') { e.preventDefault(); openComments(id); }
-        else if (act === 'sharep') { e.preventDefault(); openSharePerson(id); }
-        else if (act === 'usage') { e.preventDefault(); openUsage(id); }
-        else if (act === 'move') { e.preventDefault(); moveAsset(id); }
-        else if (act === 'vis') { e.preventDefault(); toggleAssetVis(it); }
-      });
+    m.querySelectorAll('.wsx-asset[data-asset-id]').forEach(function (card) {
+      var id = card.getAttribute('data-asset-id');
+      function open(e) { if (e.target.closest('[data-asset-sel]')) return; if (assetSelect) { assetSel[id] = !assetSel[id]; renderAssets(); return; } openAssetPreview(id); }
+      card.addEventListener('click', open);
+      card.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(e); } });
     });
   }
   function newAssetFolder() {
@@ -270,7 +299,6 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
         }).join('') : '<p class="wsx-field__note">' + esc(t('assets.usedInNone')) + '</p>';
       }).catch(function () {});
   }
-  function toggleAssetVis(it) { if (it) patchDeliverable(it.id, { visibility: it.visibility === 'private' ? 'workspace' : 'private' }); }
   function patchDeliverable(id, body, mo) {
     fetch(assetApiBase() + '/deliverables/' + encodeURIComponent(id), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(function () { if (mo) mo.close(); fetchAssets(); }).catch(function () {});
@@ -286,9 +314,14 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
   }
   function deleteAsset(it) {
     if (!it) return;
-    if (!window.confirm(t('assets.deleteConfirm').replace('{name}', it.name || t('assets.thisAsset')))) return;
-    var url = it.type === 'deliverable' ? assetApiBase() + '/deliverables/' + encodeURIComponent(it.id) : assetApiBase() + '/' + encodeURIComponent(it.blobId);
-    fetch(url, { method: 'DELETE', credentials: 'same-origin' }).then(function () { fetchAssets(); }).catch(function () {});
+    var mo = wsxModal(t('assets.deleteTitle'), '<div class="wsx-cform"><p class="wsx-field__note">' + esc(t('assets.deleteConfirm').replace('{name}', it.name || t('assets.thisAsset'))) + '</p>'
+      + '<div class="wsx-cform__foot"><button class="wsx-abtn" type="button" id="del_no">' + esc(t('assets.cancel')) + '</button><button class="so-c-btn so-c-btn--danger" type="button" id="del_go">' + esc(t('common.delete')) + '</button></div></div>');
+    mo.body.querySelector('#del_no').addEventListener('click', mo.close);
+    mo.body.querySelector('#del_go').addEventListener('click', function () {
+      mo.close();
+      var url = it.type === 'deliverable' ? assetApiBase() + '/deliverables/' + encodeURIComponent(it.id) : assetApiBase() + '/' + encodeURIComponent(it.blobId);
+      fetch(url, { method: 'DELETE', credentials: 'same-origin' }).then(function () { fetchAssets(); }).catch(function () {});
+    });
   }
   function fetchAssets() {
     var m = document.getElementById('wsxAssetMount'); if (m && !ASSET_STATE.deliverables) m.innerHTML = i18nLoad();
@@ -298,7 +331,7 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
     fetchFolders();
   }
   // Upload one file, then link it as a new deliverable (default) or a new version.
-  function uploadOne(f, deliverableId, cb) {
+  function uploadOne(f, deliverableId, cb, visibility) {
     var mime = f.type || 'application/octet-stream';
     fetch(assetApiBase() + '/upload', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: f.name, mimeType: mime, size: f.size }) })
       .then(function (r) { return r.json(); })
@@ -306,7 +339,8 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
       .then(function (pj) { var blobId = pj && pj.data && pj.data.id; if (!blobId) throw new Error((pj && (pj.message || pj.error)) || '');
         if (deliverableId) return fetch(assetApiBase() + '/deliverables/' + encodeURIComponent(deliverableId) + '/version', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blobId: blobId }) });
         var name = (f.name || t('assets.untitled')).replace(/\\.[^.]+$/, '');
-        return fetch(assetApiBase() + '/deliverables', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blobId: blobId, name: name }) });
+        var dbody = { blobId: blobId, name: name }; if (visibility) dbody.visibility = visibility;
+        return fetch(assetApiBase() + '/deliverables', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dbody) });
       })
       .then(function () { if (cb) cb(true); })
       .catch(function (err) { if (cb) cb(false, err && err.message); });
@@ -325,7 +359,23 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
       .then(function (blobId) { if (cb) cb(blobId, f.name); })
       .catch(function () { if (cb) cb(null, f.name); });
   }
-  function uploadAssets(files) {
+  // In a workspace, ask who can see the files before uploading (team is preselected).
+  function askUploadVisibility(files) {
+    if (!files.length) return;
+    if (!window.WSX_WS) { uploadAssets(files); return; }
+    var opts = ASSET_VIS.map(function (o, i) {
+      return '<label class="wsx-vis-opt"><input type="radio" name="up_vis" value="' + o.v + '"' + (i === 0 ? ' checked' : '') + '>'
+        + '<span><b>' + isvg(ASVG[o.icon]) + esc(t(o.label)) + '</b><span class="wsx-field__note">' + esc(t(o.hint)) + '</span></span></label>';
+    }).join('');
+    var mo = wsxModal(t('assets.visAsk'), '<div class="wsx-cform"><div class="wsx-vis-opts">' + opts + '</div>'
+      + '<div class="wsx-cform__foot"><button class="wsx-abtn wsx-abtn--primary" type="button" id="up_go">' + esc(t('assets.upload')) + '</button></div></div>');
+    mo.body.querySelector('#up_go').addEventListener('click', function () {
+      var c = mo.body.querySelector('input[name="up_vis"]:checked');
+      mo.close();
+      uploadAssets(files, c ? c.value : 'team');
+    });
+  }
+  function uploadAssets(files, visibility) {
     if (!files.length) return;
     var btn = document.getElementById('wsxAssetUpload'); if (btn) { btn.disabled = true; btn.classList.add('is-busy'); }
     var failed = 0; var firstErr = '';
@@ -336,7 +386,7 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
         if (failed) showToast(firstErr || (failed === 1 ? t('assets.uploadFailedOne') : t('assets.uploadFailedMany').replace('{n}', String(failed))), 'error');
         return;
       }
-      uploadOne(files[i], null, function (ok, msg) { if (ok === false) { failed++; if (!firstErr && msg) firstErr = msg; } next(i + 1); });
+      uploadOne(files[i], null, function (ok, msg) { if (ok === false) { failed++; if (!firstErr && msg) firstErr = msg; } next(i + 1); }, visibility);
     }
     next(0);
   }

@@ -5,12 +5,14 @@
 //
 // Access model:
 //   private   → owner OR a direct 'file' grant (canAccess). Anonymous/others get 403.
+//   team      → private's readers plus any internal member of the file's workspace.
 //   workspace → served to anyone with the id (embeddable; the asset bucket is public, so
 //               this matches the raw blob route it replaces). Identity is not resolved.
 import type { Env } from '../types';
 import { getSessionUser } from '../auth/session';
 import { getVisibilityScope } from '../account-links';
 import { canAccess } from '../access/can-access';
+import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { corsHeaders } from './middleware';
 import { isInlineType } from './blobs/handler';
 import { listFileUsage } from '../assets/usage';
@@ -19,6 +21,7 @@ import { jsonWithApiErrors } from '../http/api-error';
 interface FileRow {
   bucket_artifact_id: string;
   owner_id: string | null;
+  workspace_id: string | null;
   visibility: string;
   blob_id: string;
   r2_key: string;
@@ -47,7 +50,7 @@ export async function handleFileContent(request: Request, env: Env, deliverableI
     : 'b.version_no = (SELECT MAX(version_no) FROM blobs WHERE deliverable_id = d.id)';
 
   const row = await env.DB.prepare(`
-    SELECT d.bucket_artifact_id, d.owner_id, d.visibility,
+    SELECT d.bucket_artifact_id, d.owner_id, d.workspace_id, d.visibility,
            b.id AS blob_id, b.r2_key, b.mime_type, b.size_bytes, b.filename, b.version_no
       FROM asset_deliverables d
       JOIN blobs b ON b.deliverable_id = d.id AND ${versionClause}
@@ -58,8 +61,8 @@ export async function handleFileContent(request: Request, env: Env, deliverableI
     return json({ error: 'File not found', code: 'FILE_NOT_FOUND' }, 404, origin);
   }
 
-  if (row.visibility === 'private') {
-    const allowed = await viewerCanReadPrivate(request, env, deliverableId, row.owner_id);
+  if (isGatedVisibility(row.visibility)) {
+    const allowed = await viewerCanReadPrivate(request, env, deliverableId, row);
     if (!allowed) {
       return json({ error: 'This file is private.', code: 'FORBIDDEN' }, 403, origin);
     }
@@ -79,7 +82,7 @@ export async function handleFileContent(request: Request, env: Env, deliverableI
       ...(inline ? {} : { 'X-Content-Type-Options': 'nosniff' }),
       // URL is dlv-keyed (stable across versions), so it must NOT be immutable-cached:
       // a new version reuses the same URL. Private bytes are never cached (per-viewer).
-      'Cache-Control': row.visibility === 'private' ? 'no-store' : 'private, max-age=300',
+      'Cache-Control': isGatedVisibility(row.visibility) ? 'no-store' : 'private, max-age=300',
       ...(corsHeaders(origin) as Record<string, string>),
     },
   });
@@ -106,7 +109,7 @@ export async function handleFileMeta(request: Request, env: Env, deliverableId: 
   }>();
   if (!row) return json({ error: 'File not found', code: 'FILE_NOT_FOUND' }, 404, origin);
 
-  if (row.visibility === 'private' && !(await viewerCanReadPrivate(request, env, deliverableId, row.owner_id))) {
+  if (isGatedVisibility(row.visibility) && !(await viewerCanReadPrivate(request, env, deliverableId, row))) {
     return json({ error: 'This file is private.', code: 'FORBIDDEN' }, 403, origin);
   }
 
@@ -127,15 +130,27 @@ export async function handleFileMeta(request: Request, env: Env, deliverableId: 
   }, 200, origin);
 }
 
-// Owner or a direct/inherited 'file' grant. Uses the same session identity the shared
-// portal resolves, so a sharee reading a directly-granted private file is authorized here.
+/** Visibilities whose bytes need a verified viewer (everything but link-shareable 'workspace'). */
+export function isGatedVisibility(v: string | null | undefined): boolean {
+  return v === 'private' || v === 'team';
+}
+
+// Owner or a direct/inherited 'file' grant; a 'team' file also admits internal members of
+// its workspace. Uses the same session identity the shared portal resolves, so a sharee
+// reading a directly-granted private file is authorized here.
 async function viewerCanReadPrivate(
-  request: Request, env: Env, deliverableId: string, ownerId: string | null,
+  request: Request, env: Env, deliverableId: string,
+  file: { owner_id: string | null; workspace_id: string | null; visibility: string },
 ): Promise<boolean> {
   const user = await getSessionUser(request, env);
   if (!user) return false;
   const identity = await getVisibilityScope(env, user);
-  if (ownerId && identity.userIds.includes(ownerId)) return true;
+  if (file.owner_id && identity.userIds.includes(file.owner_id)) return true;
+  if (file.visibility === 'team' && file.workspace_id) {
+    const wsId = file.workspace_id;
+    const roles = await Promise.all(identity.userIds.map((id) => getInternalWorkspaceRole(env, wsId, id)));
+    if (roles.some((r) => !!r)) return true;
+  }
   return canAccess(env, identity, 'file', deliverableId, 'view');
 }
 

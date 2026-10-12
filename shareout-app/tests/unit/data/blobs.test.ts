@@ -190,6 +190,16 @@ describe('handleBlobs routing', () => {
     await expect(response.json()).resolves.toMatchObject({ code: 'FORBIDDEN' });
   });
 
+  it('403s a team-only deliverable blob on the raw content route too', async () => {
+    const env = makeBlobEnv({ blob: { ...sampleBlob, deliverable_visibility: 'team' } as unknown as BlobRow });
+    const response = await handleBlobs(
+      new Request(`${BASE_URL}/v1/data/${ARTIFACT_ID}/blobs/${sampleBlob.id}/content`),
+      makeCtx(env),
+      `${sampleBlob.id}/content`,
+    );
+    expect(response.status).toBe(403);
+  });
+
   it('download-url falls back to the Worker content URL when R2 presign is unconfigured', async () => {
     const env = makeBlobEnv({ blob: sampleBlob });
     const ctx = makeCtx(env);

@@ -29,32 +29,38 @@ A **page inbox** (`your-page@inbox.YOUR_DOMAIN`) captures mail *into one artifac
 
 ## Organize in folders
 
-Use the **folder bar** at the top of Assets to group files — client deliverables, brand assets, raw footage, whatever makes sense. **New folder** creates a folder in the same shared folder tree your pages use; **Move** on a file tile puts it inside a folder.
+Use the **folder bar** at the top of Assets to group files — client deliverables, brand assets, raw footage, whatever makes sense. **New folder** creates a folder in the same shared folder tree your pages use; click a file and choose **Move** to put it inside a folder.
 
 Sharing a **folder** with a client (Admin → Sharing) also shares the **files** inside it — folders are one tree for pages and files.
 
 ## Visibility
 
-Each file is either **link-shareable** (default — anyone who has the file's link can open it) or **private** (only you, until you share it). Toggle visibility on a file tile. Private files show a small badge; link-shareable ones show an "Anyone with link" badge.
+Every workspace file has one of three settings, shown as a badge on its tile:
 
-:::caution[Link-shareable is not membership-gated]
+- **Team only** (default for new uploads) — signed-in members of the workspace can open it; nobody else.
+- **Only you** — hidden from other members until you share it with someone.
+- **Anyone with the link** — no sign-in needed. Pick this to show the file inside an artifact or to send it outside the team.
+
+When you upload, ShareOut asks who can see the files (Team only is preselected). To change it later, click the file and pick a new option under **Who can see it**. Files uploaded before this default existed keep the setting they had.
+
+:::caution[Anyone with the link is not membership-gated]
 The link's id is an unguessable random token, but opening it does **not** check that you're signed in or a workspace member — anyone who gets the URL (a leaked link, a screenshot, a shared page's source) can open the file. That's different from a page set to `workspace` visibility, which does check membership. Don't upload anything you'd need real access control on — use **private** plus an explicit grant instead.
 :::
 
-- **Link-shareable** files can be embedded in any page via a stable file URL (`/v1/files/dlv_…/content`).
-- **Private** files are hidden from other members and from anonymous delivery links — share them deliberately via [external sharing](/teams/external-sharing/) or **Share with a person** (below).
+- **Anyone with the link** files can be embedded in any page via a stable file URL (`/v1/files/dlv_…/content`). **Team only** and **Only you** files need a signed-in viewer, so they won't load inside a published artifact.
+- **Only you** files are hidden from other members and from anonymous delivery links — share them deliberately via [external sharing](/teams/external-sharing/) or **Share with a person** (below).
 
 ## Versions
 
-Re-sending the third cut of a video? Open a deliverable's **＋** and upload the new file — it becomes **v2**, **v3**, and so on. The tile always shows the latest version with a small `v3` badge; the clock icon shows the full history, so you can grab an older one anytime.
+Re-sending the third cut of a video? Click the file, choose **Upload new version**, and pick the new file — it becomes **v2**, **v3**, and so on. The tile always shows the latest version with a small `v3` badge; **Version history** lists every version, so you can grab an older one anytime.
 
 ## Comment on a file
 
-Open a file's **comments** control (chat icon on the tile) to leave a thread on that file.
+Click a file and choose **Comments** to leave a thread on that file.
 
 - Same storage and notifications as page comments, but **scoped only to that file**.
-- Workspace members can comment on **workspace-visible** files (and always on files they own).
-- **Private** files: only the owner (and people you shared with) see the thread.
+- Workspace members can comment on **Team only** and **Anyone with the link** files (and always on files they own).
+- **Only you** files: only the owner (and people you shared with) see the thread.
 - External sharees need a **comment** grant to post; a **view** grant is enough to read.
 - Threads also appear on the recipient's **`/shared`** portal for files shared with them.
 

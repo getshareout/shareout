@@ -15,6 +15,12 @@ export function canManageWorkspace(args: RenderArgs): boolean {
   return args.workspaceRole === 'owner' || args.workspaceRole === 'admin';
 }
 
+/** True when the viewer may create here: their own space, or a workspace they are an
+ *  internal member of (externals and non-members can't publish there — the API 403s). */
+export function canCreateHere(args: RenderArgs): boolean {
+  return !(args.workspaceId || args.workspace) || !!args.workspaceRole;
+}
+
 /** Rail nav, scoped to context: workspace-only lenses appear only inside a workspace.
  *  Uses the same effective workspace the client hydrates with (workspaceId or ?workspace).
  *  Grouped into titled sections; empty groups are dropped. A group with no title renders a divider. */
@@ -92,6 +98,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
         <button class="wsx__railclose" id="wsxRailClose" type="button" data-i18n-aria="nav.closeMenu" aria-label="Close menu">${svg('<path d="M6 6l12 12M18 6L6 18"/>')}</button>
       </div>
       ${args.createEnabled ? `<button class="wsx__create" id="wsxCreateBtn" type="button" data-tip-rail data-i18n-tip="nav.create" data-tip="Create with AI">${svg(ICON.foryou)}<span data-i18n="nav.create">Create with AI</span></button>` : ''}
+      ${canCreateHere(args) ? `<button class="wsx__new" id="wsxNewBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="wsxNewMenu" data-tip-rail data-i18n-tip="nav.new" data-tip="New">${svg('<path d="M12 5v14M5 12h14"/>')}<span data-i18n="nav.new">New</span></button>` : ''}
       ${railHtml(buildNav(args, canManage))}
       <div class="wsx__railspace"></div>
       <footer class="wsx__railfoot">
@@ -154,7 +161,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
                 <button class="wsx-assets__upload" id="wsxAssetUpload" type="button">${svg('<path d="M12 5v14"/><path d="M5 12h14"/>')}<span data-i18n="assets.uploadFiles">Upload files</span></button>
               </div>
             </div>
-            <p class="wsx-lens__intro" data-i18n="intro.assets">Store images, video, and files once and reuse them across pages — every asset gets a permanent link you can embed in an artifact or send to a customer. Any file type.</p>
+            <p class="wsx-lens__intro" data-i18n="intro.assets">Keep images, video, and files for your team in one place. New files are visible to the team only; open a public link when you want to show one in an artifact or send it to a customer. Any file type.</p>
             <div class="wsx__chips" id="wsxAssetChips">
               <button class="wsx-chip is-on" data-asset-filter="all" type="button" data-i18n="filter.all">All</button>
               <button class="wsx-chip" data-asset-filter="image" type="button" data-i18n="filter.images">Images</button>
@@ -178,7 +185,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
           </div>
           <div class="wsx__view" data-view="datasets">
             <h2 class="wsx__viewtitle" data-i18n="view.datasets">Datasets</h2>
-            <p class="wsx-lens__intro" data-i18n="intro.datasets">Tables that workspace pages have shared — query them from any page with <code>so.workspace.table(name)</code>.</p>
+            <p class="wsx-lens__intro" data-i18n="intro.datasets">Tables that workspace pages have shared. Any page in the workspace can read them.</p>
             <div id="wsxDatasetMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="catalog">
@@ -250,10 +257,11 @@ export function buildWorkspaceBody(args: RenderArgs): string {
     </aside>
   </div>
 
+  <div class="wsx-newmenu" id="wsxNewMenu" role="menu" data-i18n-aria="new.menu" aria-label="Create something new" hidden></div>
   <div class="wsx__railscrim" id="wsxRailScrim" hidden></div>
   <div class="wsx__scrim" id="wsxScrim" hidden></div>
   <section class="wsx__composer" id="wsxComposer" data-state="resting" aria-labelledby="wsxComposerTitle">
-    <button type="button" class="wsx__pill" id="wsxPill" aria-haspopup="dialog"><span class="wsx__pill-text" data-i18n="composer.pill">Ask your workspace…</span><span class="wsx__pill-dot" id="wsxPillDot" hidden><span class="wsx-sr" data-i18n="composer.unread">New reply</span></span></button>
+    <button type="button" class="wsx__pill" id="wsxPill" aria-haspopup="dialog"><span class="wsx__pill-text" data-i18n="composer.pill">Ask your workspace…</span><span class="wsx__pill-dot" id="wsxPillDot" hidden><span class="wsx-sr" data-i18n="composer.unread">New message</span></span></button>
     <div class="wsx__composer-grip" id="wsxComposerGrip" data-i18n-title="widget.resize" title="Drag to resize" aria-hidden="true"></div>
     <header class="wsx__composer-bar">
       <h2 class="wsx__composer-title" id="wsxComposerTitle" data-i18n="composer.chat">Chat</h2>
@@ -351,8 +359,8 @@ export function buildWorkspaceBody(args: RenderArgs): string {
       <div class="wsx__accactions">
         <a class="wsx-accbtn" href="/home?view=connect" data-cn-open="claude">${svg(ICON.link)}<span data-i18n="nav.connect">Connect your agent</span></a>
         <a class="wsx-accbtn" href="/home?view=analytics" data-acc-lens="analytics">${svg(ICON.chart)}<span data-i18n="nav.analytics">Analytics</span></a>
-        <a class="wsx-accbtn" href="/home?view=connect&amp;tab=code" data-cn-open="code">${svg('<circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 19 4M18 5l2 2M15 8l2 2"/>')}<span data-i18n="account.apiToken">API token</span></a>
-        <a class="wsx-accbtn" href="/settings/telegram?go=1" target="_blank" rel="noopener">${svg('<path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>')}<span data-i18n="account.telegram">Connect Telegram</span></a>
+${!(args.workspaceId || args.workspace) || canManage ? `        <a class="wsx-accbtn" href="/home?view=connect&amp;tab=code" data-cn-open="code">${svg('<circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 19 4M18 5l2 2M15 8l2 2"/>')}<span data-i18n="account.apiToken">Key for your agent</span></a>
+` : ''}        <a class="wsx-accbtn" href="/settings/telegram?go=1" target="_blank" rel="noopener">${svg('<path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>')}<span data-i18n="account.telegram">Connect Telegram</span></a>
         <a class="wsx-accbtn" href="/v1/auth/link-google?redirect=%2Fhome%3Fnext%3D1">${svg('<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>')}<span data-i18n="account.linkGoogle">Link Google account</span></a>
         <a class="wsx-accbtn wsx-accbtn--out" href="/auth/logout">${svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>')}<span data-i18n="account.signOut">Sign out</span></a>
       </div>

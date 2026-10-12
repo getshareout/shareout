@@ -62,7 +62,8 @@ async function getSignals(env: Env, workspaceId: string, userId: string, skillAc
   const row = await env.DB.prepare(
     `SELECT
        EXISTS(SELECT 1 FROM artifacts WHERE owner_id=?1 AND is_example=0 AND deleted_at IS NULL) AS firstArtifact,
-       EXISTS(SELECT 1 FROM tokens WHERE principal_type='user' AND principal_id=?1)            AS agentConnected,
+       EXISTS(SELECT 1 FROM tokens WHERE principal_type='user' AND principal_id=?1
+         AND revoked_at IS NULL AND last_used_at IS NOT NULL AND name <> 'admin-issued')       AS agentConnected,
        EXISTS(SELECT 1 FROM connections WHERE scope_type='workspace' AND scope_id=?2 AND provider<>'slack') AS dataSource,
        EXISTS(SELECT 1 FROM connections WHERE scope_type='workspace' AND scope_id=?2 AND provider='slack')  AS slack,
        EXISTS(SELECT 1 FROM metric_alert_rules WHERE workspace_id=?2 AND enabled=1)             AS alert,

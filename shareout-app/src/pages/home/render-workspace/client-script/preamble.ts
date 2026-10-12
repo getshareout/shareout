@@ -15,6 +15,11 @@ export const workspace_client_preamble_JS = `
   function tOr(k, fallback) { var v = t(k); return v === k ? fallback : v; }
   function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
   function i18nEmpty(k) { return '<div class="wsx-empty">' + esc(t(k)) + '</div>'; }
+  // The one empty-state pattern for lenses (Design/system/components.md "Empty States"):
+  // a plain title, one line on what happens next, and at most one action (pre-built HTML).
+  function emptyState(title, sub, action) {
+    return '<div class="wsx-cat__onboard"><p>' + esc(title) + '</p>' + (sub ? '<p class="wsx-cat__hint">' + esc(sub) + '</p>' : '') + (action || '') + '</div>';
+  }
   // Error state (a failed load, not a genuine empty) — carries a Retry that re-runs the
   // active lens loader (wired in lens-routing). Use for catch handlers, not empty data.
   function i18nError(k) { return '<div class="wsx-empty">' + esc(t(k)) + ' <button class="wsx-link" type="button" data-empty-retry>' + esc(t('common.retry')) + '</button></div>'; }

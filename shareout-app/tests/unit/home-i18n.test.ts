@@ -61,3 +61,19 @@ describe('home i18n', () => {
     expect(() => new Function(getHomeI18nScript())).not.toThrow();
   });
 });
+
+describe('connector taglines', () => {
+  const configs = Object.values(import.meta.glob('../../src/data/platform/providers/*/config.ts', { eager: true }))
+    .flatMap((m) => Object.values(m as Record<string, unknown>))
+    .filter((v): v is { id: string; display: { tagline: string } } =>
+      !!v && typeof v === 'object' && typeof (v as { id?: unknown }).id === 'string' && !!(v as { display?: { tagline?: unknown } }).display?.tagline);
+
+  it('every catalog tagline has a Spanish translation and an English copy that matches the provider', () => {
+    expect(configs.length).toBeGreaterThan(5);
+    for (const p of configs) {
+      expect(HOME_COPY.en[`conn.tag.${p.id}`], p.id).toBe(p.display.tagline);
+      expect(HOME_COPY.es[`conn.tag.${p.id}`], p.id).toBeTruthy();
+      expect(HOME_COPY.es[`conn.tag.${p.id}`], p.id).not.toBe(p.display.tagline);
+    }
+  });
+});

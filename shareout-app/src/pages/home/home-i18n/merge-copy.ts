@@ -3,6 +3,7 @@ import { ACCOUNT_COPY } from './copy/account';
 import { ADMIN_COPY } from './copy/admin';
 import { AGENT_COPY } from './copy/agent';
 import { ASSETS_COPY } from './copy/assets';
+import { AUTOMATION_COPY } from './copy/automation';
 import { CLIENTS_COPY } from './copy/clients';
 import { COMPOSER_COPY } from './copy/composer';
 import { CONNECT_COPY } from './copy/connect';
@@ -11,6 +12,7 @@ import { INVITE_COPY } from './copy/invite';
 import { KNOWLEDGE_MAP_COPY } from './copy/knowledge-map';
 import { LIBRARY_COPY } from './copy/library';
 import { MODALS_COPY } from './copy/modals';
+import { NEW_MENU_COPY } from './copy/new-menu';
 import { NOTIF_COPY } from './copy/notifications';
 import { ONBOARDING_COPY } from './copy/onboarding';
 import { SHELL_COPY } from './copy/shell';
@@ -26,6 +28,7 @@ const COPY_MODULES: HomeLocaleCopy[] = [
   CLIENTS_COPY,
   ASSETS_COPY,
   WORKSPACE_COPY,
+  AUTOMATION_COPY,
   KNOWLEDGE_MAP_COPY,
   LIBRARY_COPY,
   CONNECT_COPY,
@@ -38,6 +41,7 @@ const COPY_MODULES: HomeLocaleCopy[] = [
   AGENT_COPY,
   TIME_COPY,
   STUDIO_COPY,
+  NEW_MENU_COPY,
 ];
 
 function mergeLocale(locale: HomeLocale): Record<string, string> {

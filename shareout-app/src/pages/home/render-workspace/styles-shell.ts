@@ -24,10 +24,21 @@ export const WORKSPACE_SHELL_STYLES = `.wsx { position: relative; height: 100vh;
 .wsx__railclose { display: none; }
 .wsx__create { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border: 0; border-radius: var(--radius-md); background: var(--color-primary); color: var(--color-text-inverse); font: 600 var(--text-sm) var(--font-body); cursor: pointer; transition: background var(--duration-fast); margin-bottom: var(--space-2); white-space: nowrap; overflow: hidden; }
 .wsx__create:hover { background: var(--color-primary-hover); }
+/* "New" (upload / blank / template) — the primary rail action; quiet when Create with AI is above it. */
+.wsx__new { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid transparent; border-radius: var(--radius-md); background: var(--color-primary); color: var(--color-text-inverse); font: 600 var(--text-sm) var(--font-body); cursor: pointer; transition: background var(--duration-fast); margin-bottom: var(--space-2); white-space: nowrap; overflow: hidden; }
+.wsx__new:hover { background: var(--color-primary-hover); }
+.wsx__create ~ .wsx__new { background: var(--color-bg-elevated); color: var(--color-text); border-color: var(--color-border); }
+.wsx__create ~ .wsx__new:hover { background: var(--color-surface); }
+.wsx-newmenu { position: fixed; z-index: 70; width: 280px; max-width: calc(100vw - 24px); padding: var(--space-2); background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 2px; }
+.wsx-newmenu[hidden] { display: none; }
+.wsx-newmenu__item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 10px 12px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text); font: 600 var(--text-sm) var(--font-body); text-align: left; cursor: pointer; }
+.wsx-newmenu__item span { font-weight: 400; font-size: var(--text-xs); color: var(--color-text-secondary); }
+.wsx-newmenu__item:hover, .wsx-newmenu__item:focus-visible { background: var(--color-surface); outline: none; }
+.wsx-newmenu__back { align-self: flex-start; padding: 6px 12px; border: 0; background: transparent; color: var(--color-text-secondary); font: 600 var(--text-xs) var(--font-body); cursor: pointer; }
 .wsx-lens { display: flex; align-items: center; gap: 11px; width: 100%; padding: 9px 12px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); text-align: left; cursor: pointer; transition: background var(--duration-fast), color var(--duration-fast); white-space: nowrap; overflow: hidden; }
 .wsx-lens:hover { background: var(--color-surface); color: var(--color-text); }
 .wsx-lens.is-active { background: var(--color-primary-light); color: var(--color-primary); }
-.wsx-lens svg, .wsx__create svg { flex: none; }
+.wsx-lens svg, .wsx__create svg, .wsx__new svg { flex: none; }
 .wsx__raildiv { height: 1px; margin: var(--space-2) 12px; background: var(--color-border); flex: none; }
 .wsx__railgroup-title { font: 600 var(--text-xs) var(--font-body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-tertiary); padding: var(--space-3) 12px var(--space-1); white-space: nowrap; }
 .wsx__follows:empty::after { content: 'Nothing followed yet'; font-size: var(--text-xs); color: var(--color-text-tertiary); padding: 0 12px; white-space: nowrap; }
@@ -40,11 +51,11 @@ export const WORKSPACE_SHELL_STYLES = `.wsx { position: relative; height: 100vh;
 .wsx__acctname { font: 600 var(--text-sm) var(--font-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
 .wsx__acctout { color: var(--color-text-tertiary); flex: none; }
 /* collapsed rail: icons only */
-.wsx.is-rail-collapsed .wsx-lens span, .wsx.is-rail-collapsed .wsx__create span,
+.wsx.is-rail-collapsed .wsx-lens span, .wsx.is-rail-collapsed .wsx__create span, .wsx.is-rail-collapsed .wsx__new span,
 .wsx.is-rail-collapsed .wsx__brand, .wsx.is-rail-collapsed .wsx__railgroup-title,
 .wsx.is-rail-collapsed .wsx__follows, .wsx.is-rail-collapsed .wsx__acctname,
 .wsx.is-rail-collapsed .wsx__acctout, .wsx.is-rail-collapsed .wsx__footver { display: none; }
-.wsx.is-rail-collapsed .wsx-lens, .wsx.is-rail-collapsed .wsx__create, .wsx.is-rail-collapsed .wsx__acct { justify-content: center; padding-inline: 0; } .wsx.is-rail-collapsed .wsx__railfoot { flex-direction: column; gap: 2px; }
+.wsx.is-rail-collapsed .wsx-lens, .wsx.is-rail-collapsed .wsx__create, .wsx.is-rail-collapsed .wsx__new, .wsx.is-rail-collapsed .wsx__acct { justify-content: center; padding-inline: 0; } .wsx.is-rail-collapsed .wsx__railfoot { flex-direction: column; gap: 2px; }
 /* collapsed: logo mark only (no wordmark), stacked above the expand chevron so
    neither gets clipped in the 58px rail. */
 .wsx.is-rail-collapsed .wsx__railtop { flex-direction: column; gap: 8px; padding: 4px 0 10px; }

@@ -40,6 +40,7 @@ function loadLens(): Lens {
       if (prop === 'knBindShell') return () => {};
       if (prop === 'syncHash') return () => { hash = String(target.knCurrentPath ?? ''); };
       if (prop === 'i18nLoad') return () => '<div class="wsx-empty">…</div>';
+      if (prop === 'i18nEmpty') return (k: string) => '<div class="wsx-empty">' + (KNOWLEDGE_MAP_COPY[locale][k] ?? k) + '</div>';
       if (prop === 'i18nError') return (k: string) => '<div class="wsx-empty">' + k + '</div>';
       if (prop === 'fmtDay') return (v: string) => v;
       if (prop === 'openArtifact') return (...a: unknown[]) => { opened = a; };
@@ -223,6 +224,15 @@ describe('knowledge map — evidence panel', () => {
     expect(text).toContain('desde 2026-07-13');
   });
 
+  it('shows quotes as words, without the markdown bold markers of their source', () => {
+    const lens = loadLens();
+    document.body.innerHTML = '<aside id="kmPanel"></aside>';
+    const quote = '**LTI (Lost Time Injury)** — __lesión__ con días perdidos';
+    lens.kmPaintPanel({ ...DETAIL, facts: [{ ...DETAIL.facts[0], quote }], mentions: [{ ...DETAIL.mentions[0], quote }] });
+    const qs = Array.from(document.querySelectorAll('.km__q')).map((q) => q.textContent);
+    expect(qs).toEqual(['“LTI (Lost Time Injury) — lesión con días perdidos”', '“LTI (Lost Time Injury) — lesión con días perdidos”']);
+  });
+
   it('opens a page source in a Studio tab', () => {
     const lens = loadLens();
     lens.kmState.types = ['Organization'];
@@ -234,7 +244,7 @@ describe('knowledge map — evidence panel', () => {
 });
 
 describe('knowledge map — finder and shell', () => {
-  it('boots on the best-connected entity, draws its neighbourhood and syncs the hash', async () => {
+  it('boots on a list (nothing picked for the person), then draws what they pick and syncs the hash', async () => {
     const lens = loadLens();
     fetchMock.mockImplementation(async (url: string) => {
       if (/\/entities\?limit=40$/.test(url)) return { ok: true, json: async () => ({ types: [{ type: 'Organization', count: 2 }, { type: 'Product', count: 2 }, { type: 'Project', count: 1 }, { type: 'Metric', count: 2 }], entities: GRAPH.nodes.slice(0, 5) }) };
@@ -245,6 +255,11 @@ describe('knowledge map — finder and shell', () => {
     });
     document.body.innerHTML = '<div id="wsxKnMount"></div>';
     lens.kmRender(document.getElementById('wsxKnMount')!, '<div id="top"></div>');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(lens.kmState.focus).toBe('');
+    expect(document.getElementById('kmCanvas')!.textContent).toBe('Pick something on the left to see how it connects.');
+    expect(fetchMock.mock.calls.some((c) => /\/graph\?limit=80$/.test(String(c[0])))).toBe(false);
+    (document.querySelector('[data-km-go="org"]') as HTMLButtonElement).click();
     await new Promise((r) => setTimeout(r, 0));
     await new Promise((r) => setTimeout(r, 0));
     expect(lens.kmState.focus).toBe('org');
@@ -277,6 +292,8 @@ describe('knowledge map — finder and shell', () => {
     });
     document.body.innerHTML = '<div id="wsxKnMount"></div>';
     lens.kmRender(document.getElementById('wsxKnMount')!, '');
+    await vi.runAllTimersAsync();
+    (document.querySelector('[data-km-go="org"]') as HTMLButtonElement).click();
     await vi.runAllTimersAsync();
     (document.querySelector('[data-km-type="Product"]') as HTMLButtonElement).click();
     expect(Array.from(document.querySelectorAll('#kmList .km__item .km__iname')).map((n) => n.textContent)).toEqual(['Lighthouse', 'Metricly']);

@@ -609,6 +609,7 @@
           "Artifacts"
         ],
         "summary": "Get an artifact",
+        "description": "The path also accepts the artifact's slug. Any signed-in caller who can view the artifact gets its details; `can_edit` and `can_delete` say which writes the API will accept from this caller.",
         "operationId": "getArtifact",
         "responses": {
           "200": {
@@ -920,7 +921,7 @@
           "Artifacts"
         ],
         "summary": "Deliver channel status",
-        "description": "Per-channel connection status for the Home Inspector Deliver section — whether Telegram is linked for the signed-in user, Slack is connected for the artifact workspace (with OAuth `connectUrl` when not), and email is always available.",
+        "description": "Per-channel connection status for the Home Inspector Deliver section — whether Telegram is linked for the signed-in user, Slack is connected for the artifact workspace (with OAuth `connectUrl` when not), email is always available (with the caller's own address), and the caller's role.",
         "operationId": "getArtifactDeliverStatus",
         "responses": {
           "200": {
@@ -969,8 +970,24 @@
                       "properties": {
                         "available": {
                           "type": "boolean"
+                        },
+                        "address": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "The signed-in user's own email — the default recipient."
                         }
                       }
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "owner",
+                        "editor",
+                        "viewer"
+                      ],
+                      "description": "Caller's role on the artifact. Viewers may only schedule or deliver to themselves (own email, own Telegram, Slack DM)."
                     }
                   }
                 }
@@ -3064,18 +3081,33 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "Created",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Job"
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "$ref": "#/components/schemas/Job"
+                    }
+                  }
                 }
               }
             }
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "description": "No access to the artifact, or a viewer scheduling delivery to someone other than themselves (viewers may only send to their own email, their own Telegram, or a Slack DM to themselves).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -6888,6 +6920,97 @@
         }
       }
     },
+    "/v1/home/new": {
+      "post": {
+        "tags": [
+          "Home"
+        ],
+        "summary": "Create a blank document or one from a template",
+        "description": "The Studio \"New\" menu's no-AI path. Creates a private HTML document owned by the caller — blank or from a simple template (report, meeting notes, proposal) — and returns where to open it. Inside a workspace (subdomain or `workspace` query) the caller must be an internal member. Counts toward the daily publish limit and the storage cap. Agent (`sot_`) tokens are refused.",
+        "operationId": "createHomeDocument",
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Workspace id (ignored on a workspace subdomain, which pins it)."
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "template": {
+                    "type": "string",
+                    "enum": [
+                      "blank",
+                      "report",
+                      "meeting",
+                      "proposal"
+                    ],
+                    "default": "blank"
+                  },
+                  "lang": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "es"
+                    ],
+                    "default": "en",
+                    "description": "Language of the document's title and headings."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "artifactId": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "413": {
+            "description": "Storage limit reached"
+          },
+          "429": {
+            "description": "Daily publish limit reached"
+          }
+        }
+      }
+    },
     "/v1/home/agent/brief": {
       "get": {
         "tags": [
@@ -9526,6 +9649,14 @@
           "user_role": {
             "type": "string",
             "description": "Caller's role (list endpoint only)."
+          },
+          "can_edit": {
+            "type": "boolean",
+            "description": "Caller may update the artifact and use the editor (detail endpoint only)."
+          },
+          "can_delete": {
+            "type": "boolean",
+            "description": "Caller may move the artifact to Trash (detail endpoint only)."
           },
           "is_favorite": {
             "type": "boolean"

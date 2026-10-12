@@ -13,7 +13,7 @@ vi.mock('../../../src/data/agent/anthropic', () => ({
   getAIProvider: () => ({ provider: 'openai', apiKey: 'sk-test', baseUrl: '', model: 'gpt-4o' }),
 }));
 
-const { generateArtifactSummary } = await import('../../../src/publish/auto-summary');
+const { generateArtifactSummary, summarySystemPrompt } = await import('../../../src/publish/auto-summary');
 
 const e = env as unknown as Env;
 
@@ -24,6 +24,7 @@ beforeAll(async () => {
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS versions (id TEXT PRIMARY KEY, artifact_id TEXT, entrypoint TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS assets (id TEXT PRIMARY KEY, version_id TEXT, path TEXT, r2_key TEXT, mime TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS artifact_tags (id TEXT PRIMARY KEY, artifact_id TEXT, label TEXT, UNIQUE(artifact_id, label))`);
+  await e.DB.exec(`CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, locale TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS ai_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, kind TEXT, model TEXT, units INTEGER, unit_kind TEXT, base_cost_micro_usd INTEGER, source TEXT, created_at TEXT)`);
 });
 
@@ -58,6 +59,7 @@ beforeEach(async () => {
   await e.DB.exec(`DELETE FROM assets`);
   await e.DB.exec(`DELETE FROM artifact_tags`);
   await e.DB.exec(`DELETE FROM ai_usage_events`);
+  await e.DB.exec(`DELETE FROM workspaces`);
 });
 
 describe('generateArtifactSummary (post-publish, background)', () => {
@@ -99,5 +101,28 @@ describe('generateArtifactSummary (post-publish, background)', () => {
 
     expect(chatComplete).toHaveBeenCalledTimes(2);
     expect((await artifactOf('a4'))!.auto_summary_hash).not.toBe(firstHash);
+  });
+});
+
+describe('summary language follows the workspace', () => {
+  it('asks for rioplatense Spanish when the workspace speaks es, English otherwise', () => {
+    expect(summarySystemPrompt('es')).toContain('Spanish as spoken in Argentina');
+    expect(summarySystemPrompt('es')).toContain('artefactos');
+    expect(summarySystemPrompt('en')).toContain('in English');
+    expect(summarySystemPrompt('en')).not.toContain('Spanish');
+  });
+
+  it('passes the Spanish prompt for an es workspace', async () => {
+    await e.DB.prepare(`INSERT INTO workspaces (id, locale) VALUES ('wsp', 'es')`).run();
+    await seedArtifact('a5');
+    await generateArtifactSummary(e, 'a5');
+    expect(chatComplete.mock.calls[0][2]).toBe(summarySystemPrompt('es'));
+  });
+
+  it('passes the English prompt when the workspace has no Spanish locale', async () => {
+    await e.DB.prepare(`INSERT INTO workspaces (id, locale) VALUES ('wsp', 'en')`).run();
+    await seedArtifact('a6');
+    await generateArtifactSummary(e, 'a6');
+    expect(chatComplete.mock.calls[0][2]).toBe(summarySystemPrompt('en'));
   });
 });

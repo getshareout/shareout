@@ -29,6 +29,7 @@ export default defineConfig({
           name: 'workers',
           include: ['tests/unit/**/*.test.ts'],
           exclude: [
+            'tests/unit/**/*.dom.test.ts',
             'tests/unit/openapi-contract.test.ts',
             'tests/unit/pages/home-views.test.ts',
             'tests/unit/bundle-versions.test.ts',
@@ -41,7 +42,10 @@ export default defineConfig({
             'tests/unit/design-system/components-dom.test.ts',
             'tests/unit/pages/admin-lens-smoke.test.ts',
             'tests/unit/pages/schedules-lens.test.ts',
+            'tests/unit/pages/auto-forms.test.ts',
             'tests/unit/pages/knowledge-map.test.ts',
+            'tests/unit/pages/member-permissions-dom.test.ts',
+            'tests/unit/pages/home-new-and-empty.test.ts',
           ],
         },
       },
@@ -62,6 +66,7 @@ export default defineConfig({
         test: {
           name: 'happy-dom',
           include: [
+            'tests/unit/**/*.dom.test.ts',
             'tests/unit/editor/chat.test.ts',
             'tests/unit/editor/collab.test.ts',
             'tests/unit/editor/dashboard.test.ts',
@@ -70,7 +75,10 @@ export default defineConfig({
             'tests/unit/design-system/components-dom.test.ts',
             'tests/unit/pages/admin-lens-smoke.test.ts',
             'tests/unit/pages/schedules-lens.test.ts',
+            'tests/unit/pages/auto-forms.test.ts',
             'tests/unit/pages/knowledge-map.test.ts',
+            'tests/unit/pages/member-permissions-dom.test.ts',
+            'tests/unit/pages/home-new-and-empty.test.ts',
           ],
           environment: 'happy-dom',
         },

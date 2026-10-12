@@ -26,6 +26,12 @@ export const WORKSPACE_FORMS_EDIT_STYLES = `/* ---- Modal + native create forms 
 .wsx-cform__test.ok { color: var(--color-success); }
 .wsx-cform__test.bad { color: var(--color-danger, var(--color-error)); }
 .wsx-cform__foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.wsx-cform__foot .wsx-link { margin-right: auto; }
+.wsx-cform__row { display: flex; flex-wrap: wrap; gap: 8px; }
+.wsx-cform__row > .wsx-field { flex: 1 1 140px; min-width: 0; }
+.wsx-field[hidden] { display: none; }
+.wsx-field__in[readonly] { background: var(--color-bg-elevated); color: var(--color-text-secondary); }
+.wsx-auto-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 14px; }
 .wsx-abtn--primary { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-text-inverse); }
 .wsx-abtn--primary:hover { background: var(--color-primary-hover); border-color: var(--color-primary-hover); color: var(--color-text-inverse); }
 .wsx-abtn--primary:disabled { opacity: 0.6; cursor: default; }

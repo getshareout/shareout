@@ -49,6 +49,7 @@ import { jsonError, jsonResponse } from './helpers/json-response';
 import { googleOAuthConfigured } from '../config/auth-providers';
 import { appLoginPage } from '../auth/pages';
 import { pageLocale } from '../i18n/accept-language';
+import { loadLoginBrand } from '../workspaces/branding';
 import { handleSsoStart, handleSsoCallback } from '../auth/oidc';
 import { getSsoConfigBySlug, getSsoConfigForEmail, ssoStartPath } from '../auth/sso-config';
 import { parseSubdomainFromEnv } from '../subdomain';
@@ -237,6 +238,7 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
     const loginHint = url.searchParams.get('login_hint');
     const slug = parseSubdomainFromEnv(url.hostname, env).workspaceSlug;
     const sso = slug ? await getSsoConfigBySlug(env, slug) : null;
+    const ws = slug ? await loadLoginBrand(env, slug) : null;
     return appLoginPage({
       redirect,
       turnstileSiteKey: env.TURNSTILE_CLOUDFLARE_SITEKEY,
@@ -244,7 +246,8 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
       loginHint,
       emailConfigured: Boolean(env.EMAIL),
       sso: sso ? { label: sso.buttonLabel, href: ssoStartPath(sso.workspaceSlug, redirect, loginHint), enforced: sso.enforced } : null,
-      locale: pageLocale(request),
+      locale: pageLocale(request, ws?.locale),
+      brand: ws?.brand,
     });
   }
 

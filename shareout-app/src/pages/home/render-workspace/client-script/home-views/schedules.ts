@@ -27,28 +27,68 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
     return '<span class="wsx-sched__chip ' + (cls || '') + '">' + ico + '<span>' + esc(label) + '</span></span>';
   }
   var CRON_DAYS = ['sched.daySun', 'sched.dayMon', 'sched.dayTue', 'sched.dayWed', 'sched.dayThu', 'sched.dayFri', 'sched.daySat'];
-  function cronHuman(c) {
+  // Minutes the zone is ahead of UTC at a given instant (Buenos Aires = -180).
+  function tzOffset(tz, at) {
+    try {
+      var p = {};
+      new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' })
+        .formatToParts(at).forEach(function (x) { p[x.type] = x.value; });
+      var local = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute);
+      return Math.round((local - (at.getTime() - at.getTime() % 60000)) / 60000);
+    } catch (e) { return 0; }
+  }
+  function viewerTz() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) { return 'UTC'; } }
+  function tzLabel(tz) { return /^(Etc\\/)?UTC$/.test(tz) ? 'UTC' : String(tz).split('/').pop().replace(/_/g, ' '); }
+  function clockLabel(h, m, tz) {
+    var loc = (typeof locTag === 'function' && locTag()) || 'en-US', s;
+    try { s = new Date(Date.UTC(2000, 0, 1, h, m)).toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hourCycle: /^es/.test(loc) ? 'h23' : undefined }); } catch (e) { s = hhmm(String(h), String(m)); }
+    return s + ' (' + tzLabel(tz) + ')';
+  }
+  // Weekday field ("1", "1,3", "1-5", "0-4") → sorted day numbers 0–6, or null.
+  function dowSet(f) {
+    var out = [];
+    var ok = String(f).split(',').every(function (seg) {
+      var r = /^([0-7])(?:-([0-7]))?$/.exec(seg); if (!r) return false;
+      for (var d = +r[1]; d <= +(r[2] || r[1]); d++) if (out.indexOf(d % 7) < 0) out.push(d % 7);
+      return true;
+    });
+    return ok && out.length ? out : null;
+  }
+  // Schedules are stored as UTC cron; show them in the viewer's time zone, moving the
+  // weekday / day of month when the conversion crosses midnight.
+  function cronHuman(c, tz) {
     if (!c) return t('sched.cronOnSchedule');
     var p = String(c).trim().split(/\\s+/); if (p.length < 5) return c;
     var num = /^\\d+$/, step = /^\\*\\/(\\d+)$/;
     var custom = t('sched.cronCustom').replace('{cron}', p.join(' '));
+    tz = tz || viewerTz();
+    var off = tzOffset(tz, new Date());
+    function mm(m) { var v = (((+m + off) % 60) + 60) % 60; return (v < 10 ? '0' : '') + v; }
+    function local(h, m) {
+      var x = +h * 60 + +m + off; var shift = x < 0 ? -1 : x >= 1440 ? 1 : 0; x = ((x % 1440) + 1440) % 1440;
+      return { shift: shift, time: clockLabel(Math.floor(x / 60), x % 60, tz) };
+    }
     if (p[2] !== '*' || p[3] !== '*') {
-      if (p[3] === '*' && num.test(p[2]) && num.test(p[1]) && num.test(p[0]) && p[4] === '*') return t('sched.cronMonthlyAt').replace('{day}', p[2]).replace('{time}', hhmm(p[1], p[0]));
+      if (p[3] === '*' && num.test(p[2]) && num.test(p[1]) && num.test(p[0]) && p[4] === '*') {
+        var lm = local(p[1], p[0]); var day = +p[2] + lm.shift;
+        if (day < 1 || day > 31) return custom;
+        return t('sched.cronMonthlyAt').replace('{day}', String(day)).replace('{time}', lm.time);
+      }
       return custom;
     }
     if (p[0] === '*' && p[1] === '*' && p[4] === '*') return t('sched.cronEveryMin');
     if (step.test(p[0]) && p[1] === '*' && p[4] === '*') return t('sched.cronEveryNMin').replace('{n}', p[0].match(step)[1]);
     if (!num.test(p[0])) return custom;
-    var mm = (p[0].length < 2 ? '0' : '') + p[0];
-    if (p[1] === '*' && p[4] === '*') return t('sched.cronHourlyAt').replace('{mm}', mm);
-    if (step.test(p[1]) && p[4] === '*') return t('sched.cronEveryNHours').replace('{n}', p[1].match(step)[1]).replace('{mm}', mm);
+    if (p[1] === '*' && p[4] === '*') return t('sched.cronHourlyAt').replace('{mm}', mm(p[0]));
+    if (step.test(p[1]) && p[4] === '*') return t('sched.cronEveryNHours').replace('{n}', p[1].match(step)[1]).replace('{mm}', mm(p[0]));
     if (!num.test(p[1])) return custom;
-    var time = hhmm(p[1], p[0]);
-    if (p[4] === '*') return t('sched.cronDailyAt').replace('{time}', time);
-    if (p[4] === '1-5') return t('sched.cronWeekdaysAt').replace('{time}', time);
-    if (!/^[0-7](,[0-7])*$/.test(p[4])) return custom;
-    var days = p[4].split(',').map(function (d) { return t(CRON_DAYS[parseInt(d, 10) % 7]); }).join(', ');
-    return t('sched.cronWeeklyAt').replace('{day}', days).replace('{time}', time);
+    var lt = local(p[1], p[0]);
+    if (p[4] === '*') return t('sched.cronDailyAt').replace('{time}', lt.time);
+    var set = dowSet(p[4]); if (!set) return custom;
+    set = set.map(function (d) { return (d + lt.shift + 7) % 7; }).sort(function (a, b) { return ((a + 6) % 7) - ((b + 6) % 7); });
+    if (set.join(',') === '1,2,3,4,5') return t('sched.cronWeekdaysAt').replace('{time}', lt.time);
+    var days = set.map(function (d) { return t(CRON_DAYS[d]); }).join(', ');
+    return t('sched.cronWeeklyAt').replace('{day}', days).replace('{time}', lt.time);
   }
   function hhmm(h, m) { return (h.length < 2 ? '0' : '') + h + ':' + (m.length < 2 ? '0' : '') + m; }
   function whenAgo(ms) { if (!ms) return ''; try { return timeAgo(typeof ms === 'string' && isNaN(ms) ? Date.parse(ms) : ms); } catch (e) { return ''; } }
@@ -85,13 +125,13 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
       .then(function (d) {
         var jobs = (d && (d.jobs || d.items)) || [];
         if (!jobs.length) {
-          m.innerHTML = '<div class="wsx-qa-grid wsx-qa-grid--lens">'
+          m.innerHTML = '<p class="wsx-lens__intro">' + esc(t('autof.schedEmpty')) + '</p><div class="wsx-qa-grid wsx-qa-grid--lens">'
+            + '<button class="wsx-qa" data-autoform="schedule" type="button"><span class="wsx-qa__ic">' + isvg(SCHED_ICON.check) + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('sched.emptyStep')) + '</span><span class="wsx-qa__s">' + esc(t('sched.emptyStepSub')) + '</span></span></button>'
             + '<button class="wsx-qa" data-newauto="' + esc(t('sched.prefillChat')) + '" type="button"><span class="wsx-qa__ic">' + isvg(SCHED_ICON.clock) + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('sched.emptyChat')) + '</span><span class="wsx-qa__s">' + esc(t('sched.emptyChatSub')) + '</span></span></button>'
-            + '<button class="wsx-qa" data-newauto="' + esc(t('sched.prefillStep')) + '" type="button"><span class="wsx-qa__ic">' + isvg(SCHED_ICON.check) + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('sched.emptyStep')) + '</span><span class="wsx-qa__s">' + esc(t('sched.emptyStepSub')) + '</span></span></button>'
             + '</div>';
-          wireNewAuto(m); return;
+          wireNewAuto(m); wireAutoForm(m); return;
         }
-        m.innerHTML = runsLink() + jobs.map(function (j) {
+        m.innerHTML = autoBar('schedule') + runsLink() + jobs.map(function (j) {
           var meta = schedDest(j.action);
           var cfg = j.config || {};
           var src = cfg.connection || cfg.bqConnection || '';
@@ -101,20 +141,22 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
           if (j.artifact_name) flow += schedChip(j.artifact_name, 'doc', 'is-origin');
           if (src) flow += '<span class="wsx-sched__arrow">' + isvg('<path d="M5 12h14M13 6l6 6-6 6"/>') + '</span>' + schedChip(src, 'db', '');
           flow += '<span class="wsx-sched__arrow">' + isvg('<path d="M5 12h14M13 6l6 6-6 6"/>') + '</span>' + schedChip(meta[0], meta[1], 'is-dest');
-          return '<div class="wsx-sched" data-job="' + esc(j.id) + '">'
+          var paused = j.enabled === false;
+          return '<div class="wsx-sched" data-job="' + esc(j.id) + '" data-af-id="' + esc(j.id) + '" data-af-on="' + (paused ? '0' : '1') + '">'
             + '<div class="wsx-sched__head"><div class="wsx-sched__title">' + esc(title) + '</div>'
-            +   (st ? '<span class="wsx-sched__badge ' + cls + '">' + esc(st) + '</span>' : '<span class="wsx-sched__badge">' + esc(j.enabled === false ? t('sched.badgePaused') : t('sched.badgeIdle')) + '</span>') + '</div>'
+            +   (st && !paused ? '<span class="wsx-sched__badge ' + cls + '">' + esc(st) + '</span>' : '<span class="wsx-sched__badge">' + esc(paused ? t('sched.badgePaused') : t('sched.badgeIdle')) + '</span>') + '</div>'
             + '<div class="wsx-sched__flow">' + flow + '</div>'
             + '<div class="wsx-sched__meta"><span class="wsx-sched__when">' + isvg(SCHED_ICON.clock) + esc(cronHuman(j.schedule)) + '</span>'
             +   (j.last_run_at ? '<span>' + esc(t('sched.lastRun')) + ' ' + esc(whenAgo(j.last_run_at)) + '</span>' : '')
             +   (j.next_run_at ? '<span>' + esc(t('sched.next')) + ' ' + esc(whenAgo(j.next_run_at)) + '</span>' : '') + '</div>'
             + (st === 'failed' && j.last_error ? '<div class="wsx-runst is-fail" data-last-err>' + esc(j.last_error) + '</div>' : '')
             + '<div class="wsx-runbars" data-runs="' + esc(j.id) + '"><span class="wsx-sched__noruns">' + esc(t('sched.loadingRuns')) + '</span></div>'
-            + '<div class="wsx-sched__actions"><button class="wsx-abtn" data-sched-run type="button">' + esc(t('sched.runNow')) + '</button><span class="wsx-runst" aria-live="polite"></span></div>'
+            + '<div class="wsx-sched__actions"><button class="wsx-abtn" data-sched-run type="button">' + esc(t('sched.runNow')) + '</button>' + autoCardButtons(!paused) + '<span class="wsx-runst" aria-live="polite"></span></div>'
             + '</div>';
         }).join('');
         m.querySelectorAll('[data-runs]').forEach(function (host) { loadJobLogs(host.getAttribute('data-runs'), host); });
         m.querySelectorAll('[data-sched-run]').forEach(function (b) { b.addEventListener('click', function () { runJobNow(b); }); });
+        wireNewAuto(m); wireAutoForm(m); wireAutoCardActions(m, 'schedule');
       }).catch(function () { m.innerHTML = i18nError('common.couldNotLoad'); });
   }
   function durLabel(ms) { return ms < 1000 ? Math.round(ms) + ' ms' : (ms / 1000).toFixed(1) + ' s'; }
@@ -151,25 +193,27 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
       .then(function (d) {
         var al = (d && d.alerts) || [];
         if (!al.length) {
-          m.innerHTML = '<p class="wsx-lens__intro">' + esc(t('alerts.intro')) + '</p>'
+          m.innerHTML = '<p class="wsx-lens__intro">' + esc(t('autof.alertsEmpty')) + ' ' + esc(t('alerts.intro')) + '</p>'
             + '<div class="wsx-qa-grid wsx-qa-grid--lens">'
+            + '<button class="wsx-qa" data-autoform="alert" type="button"><span class="wsx-qa__ic">' + isvg('<path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/>') + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('alerts.emptyStep')) + '</span><span class="wsx-qa__s">' + esc(t('alerts.emptyStepSub')) + '</span></span></button>'
             + '<button class="wsx-qa" data-newauto="' + esc(t('alerts.prefillChat')) + '" type="button"><span class="wsx-qa__ic">' + isvg('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>') + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('alerts.emptyChat')) + '</span><span class="wsx-qa__s">' + esc(t('alerts.emptyChatSub')) + '</span></span></button>'
-            + '<button class="wsx-qa" data-newauto="' + esc(t('alerts.prefillStep')) + '" type="button"><span class="wsx-qa__ic">' + isvg('<path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/>') + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('alerts.emptyStep')) + '</span><span class="wsx-qa__s">' + esc(t('alerts.emptyStepSub')) + '</span></span></button>'
             + '</div>';
-          wireNewAuto(m); return;
+          wireNewAuto(m); wireAutoForm(m); return;
         }
-        m.innerHTML = runsLink() + al.map(function (a) {
+        m.innerHTML = autoBar('alert') + runsLink() + al.map(function (a) {
           var cond = a.condition || (a.config && (a.config.condition || a.config.comparator)) || '';
           var thr = (a.threshold != null ? a.threshold : (a.config && a.config.threshold));
           var sub = [esc(a.metric_id || a.metric || ''), cond ? esc(cond) + (thr != null ? ' ' + esc(thr) : '') : '', a.schedule ? esc(cronHuman(a.schedule)) : ''].filter(Boolean).join(' \\u00B7 ');
-          return '<div class="wsx-sched"><div class="wsx-sched__head"><div class="wsx-sched__title">' + isvg('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>') + ' ' + esc(a.name || a.metric_id || t('alerts.defaultName'))
+          return '<div class="wsx-sched" data-af-id="' + esc(a.id) + '" data-af-on="' + (a.enabled ? '1' : '0') + '"><div class="wsx-sched__head"><div class="wsx-sched__title">' + isvg('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>') + ' ' + esc(a.name || a.metric_id || t('alerts.defaultName'))
             + '</div><span class="wsx-sched__badge ' + (a.enabled ? 'ok' : '') + '">' + esc(a.enabled ? t('alerts.badgeOn') : t('alerts.badgeOff')) + '</span></div>'
             + (sub ? '<div class="wsx-sched__meta"><span>' + sub + '</span></div>' : '')
             + (a.artifact_name ? '<div class="wsx-sched__flow">' + schedChip(a.artifact_name, 'doc', 'is-origin') + '</div>' : '')
             + (window.WSX_WS ? '<div class="wsx-runbars" data-alert-runs="' + esc(a.id) + '"><span class="wsx-sched__noruns">' + esc(t('sched.loadingRuns')) + '</span></div>' : '')
+            + '<div class="wsx-sched__actions">' + autoCardButtons(!!a.enabled) + '</div>'
             + '</div>';
         }).join('');
         m.querySelectorAll('[data-alert-runs]').forEach(function (h) { loadAlertEvents(h.getAttribute('data-alert-runs'), h); });
+        wireNewAuto(m); wireAutoForm(m); wireAutoCardActions(m, 'alert');
       }).catch(function () { m.innerHTML = i18nError('common.couldNotLoad'); });
   }
   function loadAlertEvents(id, host) {

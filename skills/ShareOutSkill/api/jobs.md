@@ -17,6 +17,9 @@ GET    /v1/jobs/{id}/logs    # Recent execution logs (status, error, duration)
 `GET /v1/jobs?artifact_id=…` is owner-aware: the artifact's owner/editor sees **every**
 schedule on it (including viewer DM subscriptions); anyone else sees only their own.
 A job's creator **or** the artifact owner may pause/delete/run it.
+Viewers may only schedule delivery to themselves (their own email, their linked
+Telegram, or a Slack DM); anything else — or an artifact you can't access — is `403 FORBIDDEN`.
+Cron schedules run in **UTC**: convert the recipient's local time before sending.
 
 ## Action Types
 

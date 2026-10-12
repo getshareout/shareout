@@ -2,6 +2,7 @@ import type { Env } from '../types';
 import type { AuthUser } from '../api-auth';
 import { json } from './json-response';
 import { requireWorkspaceRole } from './roles';
+import { isLocale, type Locale } from '../i18n/locale';
 
 export interface WorkspaceBranding {
   logo_ext: string | null;
@@ -26,6 +27,21 @@ export function parseBranding(raw: string | null | undefined): WorkspaceBranding
   } catch {
     return { ...EMPTY_BRANDING };
   }
+}
+
+/** What a workspace subdomain's sign-in page shows: name, logo, accent and language. */
+export async function loadLoginBrand(env: Env, slug: string): Promise<{
+  brand: { name: string; logoUrl: string | null; accent: string | null };
+  locale: Locale | null;
+} | null> {
+  const row = await env.DB.prepare('SELECT id, name, branding, locale FROM workspaces WHERE slug = ?')
+    .bind(slug).first<{ id: string; name: string; branding: string | null; locale: string | null }>();
+  if (!row) return null;
+  const b = parseBranding(row.branding);
+  return {
+    brand: { name: row.name, logoUrl: brandingResponse(row.id, b).logo_url, accent: b.accent_color },
+    locale: isLocale(row.locale) ? row.locale : null,
+  };
 }
 
 async function loadBranding(env: Env, workspaceId: string): Promise<WorkspaceBranding | null> {

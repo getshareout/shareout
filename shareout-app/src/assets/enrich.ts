@@ -13,6 +13,7 @@ import type { Env } from '../types';
 import { summarizeFile } from '../data/files';
 import { chatComplete, getAIProvider } from '../data/agent/anthropic';
 import { recordAiUsage } from '../data/ai-usage';
+import { localeForContent, summaryLanguageRule, type Locale } from '../i18n';
 
 // Memory guard is the important one: parseXlsx/arrayBuffer run in the request isolate
 // (128MB). Reject on size_bytes BEFORE fetching bytes. ~25MB covers real docs; a 300MB
@@ -26,6 +27,10 @@ Given extracted text (a spreadsheet schema+sample, slides, or a document), respo
 - summary: ONE paragraph, <= 400 characters, plain language, what the file IS and contains.
 - tags: up to 8 short lowercase keywords (topics, entities, doc type). No # prefix.
 No prose outside the JSON.`;
+
+export function enrichSystemPrompt(locale: Locale): string {
+  return `${ENRICH_SYSTEM}\n${summaryLanguageRule(locale)}`;
+}
 
 interface EnrichmentMeta {
   status: 'ok' | 'unsupported' | 'failed';
@@ -86,7 +91,8 @@ export async function enrichDeliverable(env: Env, bucketId: string, deliverableI
 
   let meta: EnrichmentMeta;
   try {
-    const out = await chatComplete(env, [{ role: 'user', content: text }], ENRICH_SYSTEM, 400);
+    const locale = await localeForContent(env, row.workspace_id, row.owner_id).catch((): Locale => 'en');
+    const out = await chatComplete(env, [{ role: 'user', content: text }], enrichSystemPrompt(locale), 400);
     const parsed = parseModelJson(out);
     meta = parsed
       ? { status: 'ok', summary: parsed.summary, tags: parsed.tags, blobId: row.blob_id, model: ENRICH_MODEL_LABEL, at: now }

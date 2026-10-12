@@ -25,12 +25,26 @@ export const assetGalleryStyles = `/* ── Assets lens ───────�
 .wsx-asset__sz { font-size: 0.72rem; color: var(--color-text-tertiary); }
 .wsx-asset__tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
 .wsx-asset__tag { font-size: 0.65rem; line-height: 1.4; padding: 0 6px; border-radius: 999px; background: var(--color-surface-sunken, rgba(127,127,127,.12)); color: var(--color-text-secondary); white-space: nowrap; }
-.wsx-asset__actions { position: absolute; top: 7px; right: 7px; display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s; }
-.wsx-asset:hover .wsx-asset__actions, .wsx-asset:focus-within .wsx-asset__actions { opacity: 1; }
-.wsx-asset__act { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: none; border-radius: var(--radius-sm); background: var(--color-bg-elevated); color: var(--color-text-secondary); cursor: pointer; box-shadow: var(--shadow-sm); text-decoration: none; }
-.wsx-asset__act:hover { color: var(--color-text); background: rgba(0,0,0,0.06); }
-.wsx-asset__act.danger:hover { color: var(--color-error); }
-.wsx-asset__act svg { width: 15px; height: 15px; }
+.wsx-asset { cursor: pointer; }
+.wsx-asset:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.wsx-asset__vis { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; margin-top: 4px; font-size: 0.68rem; font-weight: 600; line-height: 1.5; padding: 0 7px; border-radius: 999px; background: var(--color-surface-sunken, rgba(127,127,127,.12)); color: var(--color-text-secondary); }
+.wsx-asset__vis svg { width: 11px; height: 11px; }
+.wsx-asset__vis--workspace { background: var(--color-warning-light); color: var(--color-warning); }
+/* file preview (click a tile) */
+.wsx-asset-pv__media { display: flex; align-items: center; justify-content: center; min-height: 140px; max-height: 50vh; border-radius: var(--radius-md); background: rgba(0,0,0,0.04); overflow: hidden; }
+.wsx-asset-pv__media img, .wsx-asset-pv__media video { max-width: 100%; max-height: 50vh; display: block; }
+.wsx-asset-pv__media .wsx-asset__thumb--file { display: flex; align-items: center; padding: var(--space-4); }
+.wsx-asset-pv__acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: var(--space-3); }
+.wsx-asset-pv__acts a.wsx-abtn { text-decoration: none; }
+.wsx-asset-pv__acts svg { width: 15px; height: 15px; }
+/* upload: who can see these files */
+.wsx-vis-opts { display: flex; flex-direction: column; gap: 8px; }
+.wsx-vis-opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1.5px solid var(--color-border); border-radius: var(--radius-md); cursor: pointer; }
+.wsx-vis-opt:has(input:checked) { border-color: var(--color-primary); background: var(--color-primary-light); }
+.wsx-vis-opt input { margin-top: 3px; accent-color: var(--color-primary); }
+.wsx-vis-opt b { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-text); }
+.wsx-vis-opt b svg { width: 14px; height: 14px; }
+.wsx-vis-opt .wsx-field__note { display: block; margin-top: 2px; }
 /* deliverables: versions, selection, collection bar, share output */
 .wsx-asset__ver { position: absolute; top: 8px; left: 8px; font-size: 0.68rem; font-weight: 700; color: var(--color-text-inverse); background: var(--color-primary); border-radius: 999px; padding: 1px 7px; }
 .wsx-asset.is-sel { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-light); }
@@ -48,8 +62,6 @@ export const assetGalleryStyles = `/* ── Assets lens ───────�
 /* sent deliveries (manage + revoke) */
 .wsx-assets__headr { display: flex; gap: 8px; align-items: center; }
 .wsx-asset-folders { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 var(--space-3); }
-.wsx-asset__ver--lock { background: var(--color-text-secondary); }
-.wsx-asset__ver--link { background: var(--color-text-tertiary); cursor: help; }
 .wsx-deliv { display: flex; flex-direction: column; gap: 8px; }
 .wsx-deliv__row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elevated); }
 .wsx-deliv__main { flex: 1; min-width: 0; }

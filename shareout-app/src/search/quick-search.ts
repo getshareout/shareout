@@ -199,7 +199,7 @@ async function artifactCandidates(
     LEFT JOIN artifact_view_totals avt ON avt.artifact_id = a.id
     LEFT JOIN artifact_presentation pres_a ON pres_a.artifact_id = a.id
     LEFT JOIN collaborators c ON c.artifact_id = a.id AND c.email IN (${emailPh})
-    WHERE a.deleted_at IS NULL AND (${scopeClause})${extraWhere}
+    WHERE a.deleted_at IS NULL AND a.id NOT IN (SELECT artifact_id FROM asset_buckets) AND (${scopeClause})${extraWhere}
     GROUP BY a.id
     ORDER BY COALESCE(d.updated_at, a.created_at) DESC
     LIMIT ?`;
