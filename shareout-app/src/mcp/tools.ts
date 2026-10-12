@@ -22,6 +22,7 @@ import {
   type Args, type ToolContext, type ToolDef, type ToolResult,
 } from './tool-kit';
 import { MEMBER_TOOLS } from './member-tools';
+import { KNOWLEDGE_TOOLS } from './knowledge-tools';
 
 export type { ToolContext, ToolResult } from './tool-kit';
 
@@ -36,6 +37,9 @@ export const SERVER_INSTRUCTIONS = [
   'If they have several workspaces and did not say which one, ask them before publishing.',
   'Workspace owners and admins can invite people with invite_members: confirm the emails and the role with them first,',
   'then say who was invited, who already was a member and who was skipped.',
+  'For questions about what the team knows (clients, projects, people, numbers, decisions), call knowledge_search first,',
+  'then knowledge_entity or knowledge_facts for one company, person or project. Answer only from what they return and always',
+  'say where each fact comes from (the page or file name, with its link). If nothing is found, knowledge_status says what is covered.',
   'If anything fails or behaves unexpectedly, call report_problem with what happened, then tell the person',
   'the ShareOut team was notified. For how-to questions about ShareOut, call get_help.',
 ].join(' ');
@@ -461,7 +465,7 @@ const fetchTool: ToolDef = {
 // Deterministic order (lets clients cache the list).
 export const TOOLS: ToolDef[] = [
   whoami, listWorkspaces, listArtifacts, getArtifact, publishArtifact, updateArtifact,
-  ...MEMBER_TOOLS, getHelp, reportProblem, search, fetchTool,
+  ...MEMBER_TOOLS, ...KNOWLEDGE_TOOLS, getHelp, reportProblem, search, fetchTool,
 ];
 
 export function listTools() {

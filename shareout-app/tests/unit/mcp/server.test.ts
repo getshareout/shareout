@@ -109,6 +109,7 @@ describe('/mcp protocol', () => {
     expect(names).toEqual(expect.arrayContaining([
       'whoami', 'list_workspaces', 'list_artifacts', 'get_artifact', 'publish_artifact',
       'update_artifact', 'invite_members', 'list_members', 'resend_invite', 'revoke_invite',
+      'knowledge_search', 'knowledge_entity', 'knowledge_facts', 'knowledge_status',
       'get_help', 'report_problem', 'search', 'fetch',
     ]));
     const publish = (body!.result.tools as Array<{ name: string; description: string }>).find((t) => t.name === 'publish_artifact')!;

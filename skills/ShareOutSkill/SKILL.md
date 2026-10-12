@@ -375,6 +375,11 @@ team was notified and give them the ticket id — and stop retrying. Using the S
 connector (`$ORIGIN/mcp`) instead of the REST API? Call its `report_problem` tool with the
 same details.
 
+Answering questions about what a workspace knows (clients, projects, numbers) through the
+connector? Use its `knowledge_search`, `knowledge_entity`, `knowledge_facts` and
+`knowledge_status` tools and cite the source of every fact — see
+[integrations/mcp-connector.md](integrations/mcp-connector.md) and [team/knowledge.md](team/knowledge.md).
+
 ---
 
 ## Non-negotiable rules
