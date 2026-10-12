@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseMarkdown } from '../../src/viewers/markdown-viewer';
 import { renderViewer } from '../../src/viewers';
+import { renderLibraryViewer } from '../../src/viewers/library-viewer';
 import { serveTypeViewer } from '../../src/serve/type-viewer';
 import type { ArtifactType, Env } from '../../src/types';
 import { renderToolbarScriptCore } from '../../src/serve/sandbox-viewer/toolbar/script-core';
@@ -162,5 +163,24 @@ describe('sandbox-viewer toolbar escaping', () => {
 
   it('never splices escaped user strings into inline-handler JS', () => {
     expect(scripts).not.toMatch(/on[a-z]+="[^"]*\\'' *\+ *escapeHtml\(/);
+  });
+});
+
+describe('library viewer keeps code out of the reader view (L6)', () => {
+  it('shows the README first and tucks import snippets into a closed "For developers" panel', () => {
+    const html = renderLibraryViewer({
+      slug: 'fmt', artifactName: 'Formato es-AR', artifactType: 'library' as ArtifactType,
+      typeMetadata: { library: { exports: ['formatUSD'] } } as never,
+      baseUrl: 'https://x.test', content: '# Formato\n\nFormatea montos.', isAdmin: false, artifactId: 'art_1',
+      loggedIn: false, isFavorite: false, locale: 'es',
+      libraryMetrics: { scope: 'workspace', version: '1.0.0', versions: ['1.0.0'], importPath: '/lib/fmt.js', moduleName: 'fmt' } as never,
+    });
+    const readme = html.indexOf('Formatea montos');
+    const dev = html.indexOf('<details class="lib-dev">');
+    expect(readme).toBeGreaterThan(-1);
+    expect(dev).toBeGreaterThan(readme);
+    expect(html).toContain('<summary>Para desarrolladores</summary>');
+    expect(html.indexOf('ESM import')).toBeGreaterThan(dev);
+    expect(html.indexOf('class="lib-chip lib-export"')).toBeGreaterThan(dev);
   });
 });

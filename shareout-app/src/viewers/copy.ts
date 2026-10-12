@@ -45,6 +45,7 @@ const en = {
   save: 'Save',
   attachedTo: 'Attached to artifacts',
   usesByAgents: 'Uses by agents',
+  forDevelopers: 'For developers',
 };
 
 export type ViewerCopy = typeof en;
@@ -92,6 +93,7 @@ const es: ViewerCopy = {
   save: 'Guardar',
   attachedTo: 'Sumada a artefactos',
   usesByAgents: 'Usos de agentes',
+  forDevelopers: 'Para desarrolladores',
 };
 
 export const VIEWER_COPY: LocaleCopy<ViewerCopy> = { en, es };
