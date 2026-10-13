@@ -156,6 +156,18 @@ export async function handleEmailOtpStart(ctx: FetchContext): Promise<Response> 
   return json(result, result.ok ? 200 : 400);
 }
 
+// First-ever activation (parity with Google OAuth). Self-signup gets personal kit;
+// pre-created invitee (or a domain auto-join) gets a workspace-scoped welcome instead.
+export function scheduleFirstActivation(ctx: FetchContext, user: NonNullable<VerifyResult['user']>): void {
+  if (!user.firstActivation) return;
+  if (user.isNew && !user.autoJoined) {
+    scheduleSeedStarterKit(ctx.env, { id: user.id, email: user.email, username: null }, { workspaceId: null, tier: 'personal' }, ctx.executionCtx);
+    scheduleWelcomeEmail(ctx.env, user.email, ctx.executionCtx);
+  } else {
+    scheduleWorkspaceWelcome(ctx.env, user.id, user.email, ctx.executionCtx);
+  }
+}
+
 export async function handleEmailOtpVerify(ctx: FetchContext): Promise<Response> {
   const body = await ctx.request.json().catch(() => ({})) as { email?: string; code?: string };
   const rl = await checkEmailOtpVerifyLimit(ctx.env, ctx.request);
@@ -166,16 +178,7 @@ export async function handleEmailOtpVerify(ctx: FetchContext): Promise<Response>
   if (!result.ok || !result.user) {
     return json({ ok: false, error: result.error }, 400);
   }
-  // First-ever activation (parity with Google OAuth). Self-signup gets personal kit;
-  // pre-created invitee (or a domain auto-join) gets a workspace-scoped welcome instead.
-  if (result.user.firstActivation) {
-    if (result.user.isNew && !result.user.autoJoined) {
-      scheduleSeedStarterKit(ctx.env, { id: result.user.id, email: result.user.email, username: null }, { workspaceId: null, tier: 'personal' }, ctx.executionCtx);
-      scheduleWelcomeEmail(ctx.env, result.user.email, ctx.executionCtx);
-    } else {
-      scheduleWorkspaceWelcome(ctx.env, result.user.id, result.user.email, ctx.executionCtx);
-    }
-  }
+  scheduleFirstActivation(ctx, result.user);
   const cookie = await createSessionCookieForUser(ctx.env, ctx.url, result.user.id, result.user.email);
   return json({ ok: true, user: { email: result.user.email } }, 200, { 'Set-Cookie': cookie });
 }
