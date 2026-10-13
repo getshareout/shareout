@@ -308,14 +308,14 @@ export function createCommentsDb(initial?: {
           }
 
           if (sql.includes('INSERT INTO artifact_comments')) {
-            // createCommentForTool binds parent_id/position/state as SQL literals,
+            // createCommentForTool binds position/state as SQL literals,
             // so its arg layout differs from addComment's.
             if (sql.includes("'agent'")) {
-              const [id, artifactId, contextId, authorId, authorName, content, createdAt, updatedAt, mentions, aUserId, aEmail, dueAt] =
+              const [id, artifactId, contextId, parentId, authorId, authorName, content, createdAt, updatedAt, mentions, aUserId, aEmail, dueAt] =
                 args as (string | null)[];
               comments.push({
                 id: id as string, artifact_id: artifactId as string, context_id: contextId,
-                parent_id: null, author_id: authorId, author_name: authorName as string,
+                parent_id: parentId, author_id: authorId, author_name: authorName as string,
                 content: content as string, created_at: createdAt as string, updated_at: updatedAt as string,
                 position: null, state: null, mentions: mentions ?? null,
                 assignee_user_id: aUserId ?? null, assignee_email: aEmail ?? null, due_at: dueAt ?? null,

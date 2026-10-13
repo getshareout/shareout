@@ -256,6 +256,21 @@ conexión se cierra automáticamente cuando todos los suscriptores se eliminan.
 </Aside>
 
 
+## Pedirle cambios a la IA desde un comentario
+
+Escribí `@IA` (también `@AI` o `@ShareOut`) en un comentario o respuesta, seguido del
+cambio: `@IA cambiá el gráfico a barras y agregá el total`. El editor de la página hace
+el cambio, lo publica como una **nueva versión** (se deshace desde el historial de
+versiones) y responde en el mismo hilo: un "Estoy en eso…" que pasa a ser el resumen de
+lo que cambió, o el motivo por el que no pudo.
+
+- Solo el **dueño o un editor** del artefacto puede pedir cambios. El resto (viewers,
+  anónimos o externos) recibe una respuesta avisando que necesita permiso de edición.
+- Cuenta contra los mismos límites que las otras publicaciones con IA: el límite de chat
+  con IA por usuario, el límite diario de publicaciones y la cuota de almacenamiento del dueño.
+- Requiere un editor de IA configurado para la página (igual que la edición en Studio).
+- No disponible en comentarios de archivos.
+
 ## Overlay del viewer
 
 Según `identityMode` en `_comments_config`:

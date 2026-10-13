@@ -163,6 +163,13 @@ GET /v1/data/{artifactId}/comments?assignee=alice@example.com
 | `assigneeEmail` | `string \| null` | Email of the assignee |
 | `dueAt` | `string \| null` | ISO 8601 due datetime |
 
+## Ask the AI from a comment
+
+A comment containing `@AI` (or `@IA` / `@ShareOut`) by the artifact's owner or an editor
+runs the page editor: it publishes a new version and replies in the same thread with
+what changed. Others get a reply saying edit access is needed. Counts against the daily
+publish limit and storage quota. Not for file comments.
+
 ## Examples
 
 ```javascript

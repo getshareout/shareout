@@ -9,6 +9,7 @@ import { resolveAssignee } from './people';
 import { attachReactions } from './reactions';
 import { broadcastEvent } from './broadcast';
 import { isAssetBucketArtifact, authorizeFileComment } from './file-comments';
+import { mentionsAi, runCommentAiEdit } from './ai-edit';
 
 /** GET `/` — list comments with optional filters. */
 export async function listComments(request: Request, ctx: DataContext): Promise<Response> {
@@ -204,6 +205,13 @@ export async function addComment(
 
   dispatchCommentNotify(ctx, comment);
   emitJobEvent(ctx.env, ctx.artifactId, 'comment.added').catch(() => {});
+
+  // "@AI …" asks the page editor to change the artifact; it answers in this thread.
+  if (mentionsAi(comment.content) && !(await isAssetBucketArtifact(ctx))) {
+    const edit = runCommentAiEdit(ctx, comment);
+    if (ctx.waitUntil) ctx.waitUntil(edit);
+    else await edit;
+  }
 
   return successResponse(comment, 201);
 }
