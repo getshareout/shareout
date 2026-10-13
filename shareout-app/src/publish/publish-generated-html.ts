@@ -1,6 +1,7 @@
 /**
  * Session-authenticated single-page HTML publish (/create build flow).
- * Skips token/rate-limit gating — caller already authenticated by cookie.
+ * Skips token/rate-limit gating — callers authenticate the session and enforce the
+ * daily publish limit + storage quota themselves (same as POST /v1/publish).
  */
 import type { Env, PublishResponse, FileEntry, Visibility } from '../types';
 import { generateSlug } from '../validation';
