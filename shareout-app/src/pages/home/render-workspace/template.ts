@@ -2,7 +2,7 @@
  * Server-rendered HTML skeleton for the workspace shell (rail, canvas, activity, agent dock).
  */
 import { escapeHtml } from '../../../html/utils';
-import { brandLockupHtml } from '../../../brand';
+import { brandLockupHtml, brandMarkImg } from '../../../brand';
 import { parseBranding } from '../../../workspaces/branding';
 import type { RenderArgs } from '../types';
 import { ICON } from './constants';
@@ -264,7 +264,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
     <button type="button" class="wsx__pill" id="wsxPill" aria-haspopup="dialog"><span class="wsx__pill-text" data-i18n="composer.pill">Ask your workspace…</span><span class="wsx__pill-dot" id="wsxPillDot" hidden><span class="wsx-sr" data-i18n="composer.unread">New message</span></span></button>
     <div class="wsx__composer-grip" id="wsxComposerGrip" data-i18n-title="widget.resize" title="Drag to resize" aria-hidden="true"></div>
     <header class="wsx__composer-bar">
-      <h2 class="wsx__composer-title" id="wsxComposerTitle" data-i18n="composer.chat">Chat</h2>
+      <h2 class="wsx__composer-title" id="wsxComposerTitle"><span class="wsx__ai-av">${brandMarkImg('wsx__ai-mark', 22)}<i class="wsx__ai-live" aria-hidden="true"></i></span><span class="wsx__ai-id"><span class="wsx__ai-name" data-i18n="composer.chat">Chat</span><span class="wsx__ai-sub" data-i18n="composer.status">Watching your workspace</span></span></h2>
       <div class="wsx__composer-btns">
         <button type="button" class="wsx__composer-new" id="wsxNewChat" data-i18n-title="composer.newChat" title="New chat">${svg('<path d="M12 5v14M5 12h14"/>')}<span data-i18n="composer.newChat">New chat</span></button>
         <button type="button" id="wsxSearchBtn" data-i18n-title="composer.search" data-i18n-aria="composer.search" title="Search this chat" aria-label="Search this chat">${svg('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>')}</button>
