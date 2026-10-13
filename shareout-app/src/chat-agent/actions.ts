@@ -10,6 +10,9 @@ import { botSetJson } from '../data/json-store';
 import { buildBotDataContext } from './data-write';
 import { generateArtifactHtml } from '../data/agent/build-page';
 import { publishGeneratedHtml } from '../publish/publish-generated-html';
+import { checkRateLimit, incrementRateLimit } from '../api-auth';
+import { checkStorageQuota } from '../quota';
+import { rateLimitMessage, storageLimitMessage } from '../publish/limits';
 import { getInternalWorkspaceRole } from '../workspaces/roles';
 import type { Locale } from '../i18n';
 
@@ -170,6 +173,8 @@ export async function executeBuildArtifact(
 ): Promise<BuildResult> {
   const u = await env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first<{ email: string | null }>();
   if (!u?.email) return { text: 'Couldn’t find your account to publish under.', name: a.name };
+  const rate = await checkRateLimit(env, userId, 'publish', u.email);
+  if (!rate.allowed) return { text: rateLimitMessage(rate.reset), name: a.name };
   onProgress?.('Designing your page…');
   let html: string;
   try {
@@ -178,10 +183,13 @@ export async function executeBuildArtifact(
     return { text: 'The builder hit a snag generating that page. Try again?', name: a.name };
   }
   if (!html || html.length < 40) return { text: 'I couldn’t build that one — try rephrasing what you want.', name: a.name };
+  const quota = await checkStorageQuota(env, userId, [{ path: 'index.html', content: html, mime: 'text/html' }]);
+  if (!quota.allowed) return { text: storageLimitMessage(quota), name: a.name };
   onProgress?.('Publishing it live…');
   try {
     const workspaceId = a.workspace_id && await getInternalWorkspaceRole(env, a.workspace_id, userId) ? a.workspace_id : null;
     const published = await publishGeneratedHtml(env, { id: userId, email: u.email }, { name: a.name, html, workspaceId, visibility: 'private' });
+    await incrementRateLimit(env, userId, 'publish', u.email);
     if (a.source_file_id) {
       await env.DB.prepare(
         'INSERT INTO blob_artifact_links (blob_id, artifact_id, created_at) VALUES (?, ?, ?)'
