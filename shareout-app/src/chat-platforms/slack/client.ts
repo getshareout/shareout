@@ -104,6 +104,26 @@ export async function resolveSlackTokenByTeam(
   return null;
 }
 
+/** Bot token of `workspaceId`'s Slack connection installed in `teamId`, or null when
+ *  that Slack team is not connected to that ShareOut workspace. */
+export async function resolveSlackTokenForWorkspaceTeam(
+  env: Env,
+  workspaceId: string,
+  teamId: string
+): Promise<string | null> {
+  if (!env.CREDENTIALS_KEY || !workspaceId || !teamId) return null;
+  const rows = await env.DB.prepare(
+    `SELECT encrypted_credentials, iv FROM connections
+      WHERE scope_type = 'workspace' AND scope_id = ? AND provider = 'slack'`
+  ).bind(workspaceId).all<{ encrypted_credentials: string; iv: string }>();
+  for (const r of rows.results) {
+    const creds = await decryptCredentials(r.encrypted_credentials, r.iv, env.CREDENTIALS_KEY);
+    const extra = creds.extra as { team_id?: string } | undefined;
+    if (extra?.team_id === teamId && creds.access_token) return creds.access_token as string;
+  }
+  return null;
+}
+
 export async function slackPost(token: string, method: string, body: unknown): Promise<{ ok: boolean; error?: string }> {
   const response = await fetch(`${SLACK_API}/${method}`, {
     method: 'POST',

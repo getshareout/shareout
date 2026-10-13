@@ -263,7 +263,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     }
     function actionRowHtml(ctl) {
       return ctl
-        + '<div class="wsx-det__delact"><button class="wsx-abtn wsx-abtn--primary wsx-det__send" data-dsend="now" type="button">' + esc(t('inspector.sendNow')) + '</button>'
+        + '<div class="wsx-det__delact"><button class="wsx-abtn wsx-abtn--primary wsx-det__send" data-dsend="now" type="button">' + esc(t(dest === 'Slack' ? 'inspector.postToSlack' : 'inspector.sendNow')) + '</button>'
         + '<button class="wsx-abtn wsx-det__sched" data-dsend="schedule" type="button">' + esc(t('inspector.schedule')) + '</button></div>'
         + '<div class="wsx-det__freq" id="wsxFreq" hidden>' + ['Daily', 'Weekly', 'Monthly'].map(function (f) { return '<button class="wsx-abtn wsx-det__freqbtn" data-freq="' + f + '" type="button">' + esc(t('inspector.freq' + f)) + '</button>'; }).join('') + '</div>';
     }
@@ -305,9 +305,11 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
         b.addEventListener('click', function () {
           if (b.getAttribute('data-dsend') === 'schedule') { if (freqRow) freqRow.hidden = !freqRow.hidden; return; }
           var label = b.textContent; b.disabled = true; b.textContent = t('inspector.deliverSending');
-          fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/deliver', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: dest.toLowerCase(), config: deliverConfig() }) })
+          // Slack "Post to Slack" sends the rich preview card (TL;DR, image, owner, updated).
+          var cfg = deliverConfig(), slack = dest === 'Slack';
+          fetch('/v1/artifacts/' + encodeURIComponent(art.id) + (slack ? '/share/slack' : '/deliver'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(slack ? { connection: cfg.connection, channelId: cfg.channelId, preview: true } : { action: dest.toLowerCase(), config: cfg }) })
             .then(function (r) { return r.json().catch(function () { return null; }); })
-            .then(function (j) { b.disabled = false; b.textContent = label; if (j && j.success) wsxToast(t('inspector.deliverSent').replace('{dest}', dest)); else wsxToast((j && j.error) || t('inspector.deliverFailed'), true); })
+            .then(function (j) { b.disabled = false; b.textContent = label; if (j && (j.success || j.delivered)) wsxToast(t('inspector.deliverSent').replace('{dest}', dest)); else wsxToast((j && j.error) || t('inspector.deliverFailed'), true); })
             .catch(function () { b.disabled = false; b.textContent = label; wsxToast(t('inspector.deliverFailed'), true); });
         });
       });
