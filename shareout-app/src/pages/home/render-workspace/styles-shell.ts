@@ -35,6 +35,20 @@ export const WORKSPACE_SHELL_STYLES = `.wsx { position: relative; height: 100vh;
 .wsx-newmenu__item span { font-weight: 400; font-size: var(--text-xs); color: var(--color-text-secondary); }
 .wsx-newmenu__item:hover, .wsx-newmenu__item:focus-visible { background: var(--color-surface); outline: none; }
 .wsx-newmenu__back { align-self: flex-start; padding: 6px 12px; border: 0; background: transparent; color: var(--color-text-secondary); font: 600 var(--text-xs) var(--font-body); cursor: pointer; }
+.wsx-dropzone { position: fixed; inset: 12px; z-index: 80; display: grid; place-items: center; border: 2px dashed var(--color-primary); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--color-bg) 82%, transparent); pointer-events: none; }
+.wsx-dropzone__card { display: flex; flex-direction: column; gap: 6px; max-width: 420px; padding: var(--space-4, 16px) var(--space-6, 24px); text-align: center; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); font: 600 var(--text-sm) var(--font-body); color: var(--color-text); }
+.wsx-dropzone__card span { font-weight: 400; font-size: var(--text-xs); color: var(--color-text-secondary); }
+.wsx-drop { position: fixed; right: 16px; bottom: 16px; z-index: 75; width: 340px; max-width: calc(100vw - 32px); max-height: 50vh; overflow: auto; padding: var(--space-2); background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); font: 400 var(--text-xs) var(--font-body); color: var(--color-text); }
+.wsx-drop__head { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; font-size: var(--text-sm); }
+.wsx-drop__x { border: 0; background: transparent; color: var(--color-text-secondary); font-size: 18px; line-height: 1; cursor: pointer; }
+.wsx-drop__list { list-style: none; margin: 0; padding: 0; }
+.wsx-drop__row { display: flex; flex-wrap: wrap; gap: 2px 8px; padding: 8px; border-top: 1px solid var(--color-border); }
+.wsx-drop__name { flex: 1 1 60%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.wsx-drop__st { color: var(--color-text-secondary); }
+.wsx-drop__row[data-state="ok"] .wsx-drop__st { color: var(--color-success); }
+.wsx-drop__row[data-state="warn"] .wsx-drop__st { color: var(--color-warning); }
+.wsx-drop__row[data-state="err"] .wsx-drop__st { flex-basis: 100%; color: var(--color-error); }
+.wsx-drop__acts { display: flex; flex-wrap: wrap; gap: 12px; flex-basis: 100%; }
 .wsx-lens { display: flex; align-items: center; gap: 11px; width: 100%; padding: 9px 12px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); text-align: left; cursor: pointer; transition: background var(--duration-fast), color var(--duration-fast); white-space: nowrap; overflow: hidden; }
 .wsx-lens:hover { background: var(--color-surface); color: var(--color-text); }
 .wsx-lens.is-active { background: var(--color-primary-light); color: var(--color-primary); }
