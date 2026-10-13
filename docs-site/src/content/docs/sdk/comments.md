@@ -336,6 +336,21 @@ Owners and collaborators can also manage threads from the **Comments** tab in th
 
 These UIs use the same REST API; they do not open a WebSocket.
 
+## Ask the AI from a comment
+
+Write `@AI` (also `@IA` or `@ShareOut`) in a comment or reply, followed by the change:
+`@AI make the chart a bar chart and add a total`. The page editor makes the change,
+publishes it as a **new version** (undo it from version history) and answers in the
+same thread: a "Working on it…" reply that turns into a summary of what changed, or
+the reason it couldn't.
+
+- Only the artifact's **owner or an editor** can trigger an edit. Anyone else
+  (viewers, anonymous or external commenters) gets a reply saying edit access is needed.
+- Counts against the same limits as other AI publishes: the per-user AI chat limit, the
+  daily publish limit and the owner's storage quota.
+- Needs an AI editor configured for the page (same as the in-Studio edit).
+- Not available on file comments.
+
 ## Notifications
 
 | Trigger | Channel |

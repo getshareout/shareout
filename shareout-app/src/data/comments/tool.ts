@@ -6,14 +6,15 @@ import { resolveAssignee } from './people';
 import { broadcastEvent } from './broadcast';
 
 /**
- * Create a top-level comment attributed to a non-human author (e.g. a Crew),
- * returning data (not a Response). No request/identity validation — the caller
- * supplies the author. Used by the Crew comment_create write tool.
+ * Create a comment attributed to a non-human author (e.g. a Crew), returning
+ * data (not a Response). No request/identity validation — the caller supplies
+ * the author. Used by the Crew comment_create write tool and @AI replies
+ * (`parentId`; `notify: false` skips the mention/reply notifications).
  */
 export async function createCommentForTool(
   ctx: DataContext,
   author: { id: string; name: string },
-  body: { content: string; contextId?: string; mentions?: string[]; assigneeEmail?: string; dueAt?: string },
+  body: { content: string; contextId?: string; parentId?: string; mentions?: string[]; assigneeEmail?: string; dueAt?: string; notify?: boolean },
 ): Promise<{ comment: Comment } | { error: string }> {
   if (!body.content || typeof body.content !== 'string') return { error: 'content is required' };
   if (body.content.length > MAX_CONTENT_LENGTH) {
@@ -44,15 +45,15 @@ export async function createCommentForTool(
 
   await ctx.env.DB.prepare(
     `INSERT INTO artifact_comments (id, artifact_id, context_id, parent_id, author_id, author_name, content, created_at, updated_at, position, state, mentions, author_type, assignee_user_id, assignee_email, due_at)
-     VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL, NULL, ?, 'agent', ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, 'agent', ?, ?, ?)`
   )
-    .bind(id, ctx.artifactId, body.contextId || null, author.id, author.name, body.content, now, now, mentionsJson, assigneeUserId, assigneeEmail, dueAt)
+    .bind(id, ctx.artifactId, body.contextId || null, body.parentId || null, author.id, author.name, body.content, now, now, mentionsJson, assigneeUserId, assigneeEmail, dueAt)
     .run();
 
   const comment: Comment = {
     id,
     contextId: body.contextId || null,
-    parentId: null,
+    parentId: body.parentId || null,
     authorId: author.id,
     authorName: author.name,
     content: body.content,
@@ -71,6 +72,6 @@ export async function createCommentForTool(
   };
 
   await broadcastEvent(ctx, { type: 'comment:added', comment });
-  dispatchCommentNotify(ctx, comment);
+  if (body.notify !== false) dispatchCommentNotify(ctx, comment);
   return { comment };
 }
