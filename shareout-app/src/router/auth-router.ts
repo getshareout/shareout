@@ -21,6 +21,7 @@ import {
 import {
   handlePasswordRegister,
   handlePasswordLogin,
+  handlePasswordReset,
   handlePasswordSet,
   handlePasswordStatus,
 } from '../auth/password-routes';
@@ -91,6 +92,10 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
 
   if (path === '/v1/auth/password/login' && request.method === 'POST') {
     return addCORS(await handlePasswordLogin(ctx));
+  }
+
+  if (path === '/v1/auth/password/reset' && request.method === 'POST') {
+    return addCORS(await handlePasswordReset(ctx));
   }
 
   if (path === '/v1/auth/password' && request.method === 'POST') {

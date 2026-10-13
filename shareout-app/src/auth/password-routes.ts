@@ -10,6 +10,8 @@
  *     every other sign-in path mints.
  *   POST /v1/auth/password — set or change the password on the signed-in account.
  *     Changing an existing one requires the current password.
+ *   POST /v1/auth/password/reset — forgot password: the emailed one-time code stands
+ *     in for the current password, then signs the person in.
  */
 import type { FetchContext } from '../router/context';
 import { getSessionUser } from './session';
@@ -17,7 +19,8 @@ import { getTokenOrSessionUser } from '../router/helpers/auth-guard';
 import { createSessionCookieForUser } from './session';
 import { ssoRequiredFor, ssoRequiredBody } from './sso-config';
 import { needsSetup, schemaReady } from '../pages/setup';
-import { checkPasswordLoginLimit, rateLimitResponse } from '../rate-limit';
+import { checkEmailOtpVerifyLimit, checkPasswordLoginLimit, rateLimitResponse } from '../rate-limit';
+import { scheduleFirstActivation, verifyEmailOtp } from '../auth-otp';
 import { scheduleSeedStarterKit } from '../starter-kit/schedule';
 import { scheduleWelcomeEmail, scheduleWorkspaceWelcome } from '../onboarding/welcome-email';
 import { generateId } from '../crypto-utils';
@@ -40,7 +43,7 @@ function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-async function readBody(ctx: FetchContext): Promise<{ email?: string; password?: string; current_password?: string; name?: string }> {
+async function readBody(ctx: FetchContext): Promise<{ email?: string; password?: string; current_password?: string; name?: string; code?: string }> {
   return (await ctx.request.json().catch(() => ({}))) as Record<string, string>;
 }
 
@@ -147,6 +150,29 @@ export async function handlePasswordSet(ctx: FetchContext): Promise<Response> {
 
   await setUserPassword(ctx.env, user.id, password);
   return json({ ok: true });
+}
+
+/** Forgot password: email + emailed code + new password. Same code store and limits as code sign-in. */
+export async function handlePasswordReset(ctx: FetchContext): Promise<Response> {
+  const rl = await checkEmailOtpVerifyLimit(ctx.env, ctx.request);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
+  const body = await readBody(ctx);
+  const sso = await ssoRequiredFor(ctx.env, body.email || '');
+  if (sso) return json(ssoRequiredBody(sso, (body.email || '').trim().toLowerCase()), 403);
+
+  // Checked before the code so a weak password does not burn it.
+  const password = body.password || '';
+  const problem = passwordProblem(password);
+  if (problem) return json({ ok: false, error: problem }, 400);
+
+  const result = await verifyEmailOtp(ctx.env, body.email || '', body.code || '');
+  if (!result.ok || !result.user) return json({ ok: false, error: result.error }, 400);
+
+  await setUserPassword(ctx.env, result.user.id, password);
+  scheduleFirstActivation(ctx, result.user);
+  const cookie = await createSessionCookieForUser(ctx.env, ctx.url, result.user.id, result.user.email);
+  return json({ ok: true, user: { email: result.user.email } }, 200, { 'Set-Cookie': cookie });
 }
 
 /** Whether the signed-in account has a password — drives the Settings UI. */

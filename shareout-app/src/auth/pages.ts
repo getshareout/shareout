@@ -40,6 +40,11 @@ const SIGN_IN_COPY = {
     inviteTitle: 'Join your team',
     invitedAs: 'You were invited as <strong>{email}</strong>. We’ll email a one-time code to that address — no password needed.',
     inviteGoogleNote: 'With Google, pick the {email} account. Another account won’t see the invite.',
+    forgot: 'Forgot your password?',
+    resetIntro: 'We’ll email you a code to choose a new password.',
+    newPasswordLabel: 'New password',
+    passwordTooShort: 'Use at least 12 characters.',
+    saveAndSignIn: 'Save and sign in',
   },
   es: {
     lang: 'es' as PageLocale,
@@ -73,6 +78,11 @@ const SIGN_IN_COPY = {
     inviteTitle: 'Sumate a tu equipo',
     invitedAs: 'Te invitaron como <strong>{email}</strong>. Te mandamos un código a esa dirección: no necesitás contraseña.',
     inviteGoogleNote: 'Si usás Google, elegí la cuenta {email}. Con otra cuenta no vas a ver la invitación.',
+    forgot: '¿Olvidaste tu contraseña?',
+    resetIntro: 'Te mandamos un código por email para que elijas una contraseña nueva.',
+    newPasswordLabel: 'Contraseña nueva',
+    passwordTooShort: 'Usá al menos 12 caracteres.',
+    saveAndSignIn: 'Guardar y entrar',
   },
 };
 type SignInCopy = (typeof SIGN_IN_COPY)['en'];
@@ -238,7 +248,7 @@ export function appLoginPage(opts: {
     ${sso ? ssoButtonHtml(sso) : ''}
     ${googleEnabled ? googleButtonHtml(redirect, opts.loginHint, c) : ''}
     ${googleEnabled ? `<div class="auth-divider"><span>${escapeHtml(c.or)}</span></div>` : ''}
-    ${passwordFormHtml(c)}
+    ${passwordFormHtml(c, emailConfigured)}
     ${otpSection}
     </div>
     ${footer}
@@ -251,7 +261,7 @@ function ssoButtonHtml(sso: { label: string; href: string }): string {
   return `<a href="${escapeHtml(sso.href)}" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(sso.label)}</a>`;
 }
 
-function passwordFormHtml(c: SignInCopy = EN): string {
+function passwordFormHtml(c: SignInCopy = EN, canReset = false): string {
   return `<form id="password-login" class="email-code-form" novalidate>
       <div class="field">
         <label class="field-label" for="password-email">${escapeHtml(c.emailLabel)}</label>
@@ -264,6 +274,7 @@ function passwordFormHtml(c: SignInCopy = EN): string {
       </div>
       <button id="password-submit" type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(c.signIn)}</button>
       <div id="password-status" class="status" role="status" aria-live="polite" hidden></div>
+      ${canReset ? `<a id="password-forgot" class="auth-forgot" href="#">${escapeHtml(c.forgot)}</a>` : ''}
     </form>`;
 }
 
@@ -352,6 +363,7 @@ function googleButtonHtml(redirect: string, loginHint?: string | null, c: SignIn
 function emailOtpFormsHtml(turnstileSiteKey?: string, c: SignInCopy = EN, prefill = ''): string {
   const value = prefill ? ` value="${escapeHtml(prefill)}"` : '';
   return `<form id="email-code-start" class="email-code-form" novalidate>
+      <p id="email-code-reset-note" class="auth-help" hidden>${escapeHtml(c.resetIntro)}</p>
       <div class="field">
         <label class="field-label" for="email-code-email">${escapeHtml(c.emailLabel)}</label>
         <input id="email-code-email" type="email" name="email" autocomplete="email" placeholder="you@company.com"${value} required>
@@ -364,6 +376,10 @@ function emailOtpFormsHtml(turnstileSiteKey?: string, c: SignInCopy = EN, prefil
       <div class="field">
         <label class="field-label" for="email-code-code">${escapeHtml(c.codeLabel)}</label>
         <input id="email-code-code" type="text" name="code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="123456" required>
+      </div>
+      <div class="field" id="email-code-newpw" hidden>
+        <label class="field-label" for="email-code-password">${escapeHtml(c.newPasswordLabel)}</label>
+        <input id="email-code-password" type="password" name="new_password" autocomplete="new-password" minlength="12">
       </div>
       <button id="email-code-continue" type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(c.continue)}</button>
       <button id="email-code-change" type="button" class="so-c-btn so-c-btn--secondary so-c-btn--block">${escapeHtml(c.otherEmail)}</button>
@@ -387,9 +403,33 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
     var target = document.getElementById('email-code-target');
     var pendingEmail = '';
     var redirectAfter = ${dest};
+    var resetMode = false;
+    var newPwField = document.getElementById('email-code-newpw');
+    var newPwInput = document.getElementById('email-code-password');
+    var forgotLink = document.getElementById('password-forgot');
 
     if (!startForm || !verifyForm || !emailInput || !codeInput || !sendButton || !continueButton || !changeButton || !statusBox || !target || !window.fetch) {
       return;
+    }
+
+    // Forgot password: same code flow, plus a new-password field on the code step.
+    if (forgotLink && newPwField && newPwInput) {
+      forgotLink.addEventListener('click', function (event) {
+        event.preventDefault();
+        resetMode = true;
+        var section = startForm.closest('details');
+        if (section) section.open = true;
+        document.getElementById('email-code-reset-note').hidden = false;
+        newPwField.hidden = false;
+        newPwInput.required = true;
+        continueButton.textContent = L.saveAndSignIn;
+        var typed = document.getElementById('password-email');
+        if (typed && typed.value.trim() && !emailInput.value.trim()) emailInput.value = typed.value.trim();
+        verifyForm.hidden = true;
+        startForm.hidden = false;
+        startForm.scrollIntoView({ block: 'center' });
+        emailInput.focus();
+      });
     }
 
     function setStatus(message, kind) {
@@ -460,14 +500,22 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
         return;
       }
 
+      if (resetMode && newPwInput.value.length < 12) {
+        setStatus(L.passwordTooShort, 'error');
+        newPwInput.focus();
+        return;
+      }
+
       setBusy(continueButton, true, L.checking);
       setStatus('', '');
       try {
-        var response = await fetch('/v1/auth/email/verify', {
+        var response = await fetch(resetMode ? '/v1/auth/password/reset' : '/v1/auth/email/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ email: pendingEmail, code: code })
+          body: JSON.stringify(resetMode
+            ? { email: pendingEmail, code: code, password: newPwInput.value }
+            : { email: pendingEmail, code: code })
         });
         var data = await readJson(response);
         if (!response.ok || !data.ok) {
@@ -478,7 +526,7 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
         window.location.href = redirectAfter || '/home';
       } catch (err) {
         setStatus(err && err.message ? err.message : L.badCode, 'error');
-        setBusy(continueButton, false, L.continue);
+        setBusy(continueButton, false, resetMode ? L.saveAndSignIn : L.continue);
       }
     });
 

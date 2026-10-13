@@ -81,6 +81,27 @@ describe('sign-in page on a workspace subdomain', () => {
   });
 });
 
+describe('forgot password link', () => {
+  it('offers it under the password form when email can be delivered, in the page language', async () => {
+    const h = await appLoginPage({ redirect: '/home', locale: 'es' }).text();
+    expect(h).toContain('id="password-forgot"');
+    expect(h).toContain('¿Olvidaste tu contraseña?');
+    expect(h).toContain('id="email-code-password"');
+  });
+
+  it('ships inline scripts that parse', async () => {
+    const h = await appLoginPage({ redirect: '/home', locale: 'es' }).text();
+    const scripts = [...h.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+    expect(scripts.length).toBeGreaterThan(1);
+    for (const js of scripts) expect(() => new Function(js)).not.toThrow();
+  });
+
+  it('hides it when codes cannot be emailed, and on invite sign-in', async () => {
+    expect(await appLoginPage({ redirect: '/home', emailConfigured: false }).text()).not.toContain('id="password-forgot"');
+    expect(await appLoginPage({ redirect: '/invite/abc' }).text()).not.toContain('id="password-forgot"');
+  });
+});
+
 describe('device login success page', () => {
   it('speaks to chat users in their language and shows the token for copy-paste', async () => {
     const h = await deviceDonePage('ana@example.com', null, 'so_abc123', req('https://x/auth/device', 'es-AR')).text();

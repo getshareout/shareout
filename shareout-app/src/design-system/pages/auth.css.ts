@@ -151,6 +151,13 @@ p strong { color: var(--color-text); }
   color: var(--color-warning);
 }
 
+.auth-forgot {
+  display: block;
+  margin-top: var(--space-3);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
 .status {
   margin-top: var(--space-4);
   padding: var(--space-3) var(--space-4);

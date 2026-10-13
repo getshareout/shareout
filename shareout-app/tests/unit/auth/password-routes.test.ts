@@ -5,6 +5,7 @@ import type { Env } from '../../../src/types';
 
 const { needsSetup, schemaReady } = vi.hoisted(() => ({ needsSetup: vi.fn(), schemaReady: vi.fn() }));
 const { getTokenOrSessionUser } = vi.hoisted(() => ({ getTokenOrSessionUser: vi.fn() }));
+const { verifyEmailOtp } = vi.hoisted(() => ({ verifyEmailOtp: vi.fn() }));
 
 vi.mock('../../../src/pages/setup', () => ({ needsSetup, schemaReady }));
 vi.mock('../../../src/router/helpers/auth-guard', () => ({ getTokenOrSessionUser }));
@@ -15,6 +16,7 @@ vi.mock('../../../src/auth/session', async (importOriginal) => ({
 vi.mock('../../../src/auth/session', () => ({
   createSessionCookieForUser: vi.fn(async () => 'shareout_session=abc; Path=/'),
 }));
+vi.mock('../../../src/auth-otp', () => ({ verifyEmailOtp, scheduleFirstActivation: vi.fn() }));
 vi.mock('../../../src/starter-kit/schedule', () => ({ scheduleSeedStarterKit: vi.fn() }));
 vi.mock('../../../src/onboarding/welcome-email', () => ({
   scheduleWelcomeEmail: vi.fn(),
@@ -24,6 +26,7 @@ vi.mock('../../../src/onboarding/welcome-email', () => ({
 import {
   handlePasswordLogin,
   handlePasswordRegister,
+  handlePasswordReset,
   handlePasswordSet,
 } from '../../../src/auth/password-routes';
 import { hashPassword } from '../../../src/auth/password';
@@ -176,5 +179,39 @@ describe('POST /v1/auth/password (set / change)', () => {
   it('401s when nobody is signed in', async () => {
     getTokenOrSessionUser.mockResolvedValue(null);
     expect((await handlePasswordSet(ctxFor({ password: GOOD }))).status).toBe(401);
+  });
+});
+
+describe('POST /v1/auth/password/reset (forgot password)', () => {
+  const user = { id: 'usr_1', email: 'a@example.com', isNew: false, firstActivation: false };
+
+  it('sets the new password with a valid emailed code and signs in', async () => {
+    verifyEmailOtp.mockResolvedValue({ ok: true, user });
+    const ran: string[] = [];
+    const res = await handlePasswordReset(
+      ctxFor({ email: 'a@example.com', code: '123456', password: GOOD }, {}, { onRun: (sql) => ran.push(sql) }),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Set-Cookie')).toContain('shareout_session');
+    expect(verifyEmailOtp).toHaveBeenCalledWith(expect.anything(), 'a@example.com', '123456');
+    expect(ran.some((s) => s.includes('user_passwords'))).toBe(true);
+  });
+
+  it('does not touch the password when the code is wrong', async () => {
+    verifyEmailOtp.mockResolvedValue({ ok: false, error: 'That code didn’t match. Try again.' });
+    const ran: string[] = [];
+    const res = await handlePasswordReset(
+      ctxFor({ email: 'a@example.com', code: '000000', password: GOOD }, {}, { onRun: (sql) => ran.push(sql) }),
+    );
+    expect(res.status).toBe(400);
+    expect(res.headers.get('Set-Cookie')).toBeNull();
+    expect(ran).toHaveLength(0);
+  });
+
+  // A weak password must not consume the one-time code.
+  it('rejects a weak password before checking the code', async () => {
+    const res = await handlePasswordReset(ctxFor({ email: 'a@example.com', code: '123456', password: 'short' }));
+    expect(res.status).toBe(400);
+    expect(verifyEmailOtp).not.toHaveBeenCalled();
   });
 });
