@@ -2,6 +2,7 @@ import { handleHomeBrowserApi, handleHomeQuickSearchApi, handleHomeCatalogApi, h
 import { handleHomeEventVisibilityGetApi, handleHomeEventVisibilitySetApi } from '../../pages/home/api';
 import { handleOnboardingGetApi, handleOnboardingDismissApi, handleOnboardingSkillAckApi, handleOnboardingCelebrateApi } from '../../onboarding/api';
 import { handleHomeNewArtifactApi } from '../../pages/home/new-artifact';
+import { handleHomeImportApi } from '../../pages/home/import';
 import type { FetchContext } from '../context';
 import { isAuthUser, requireAuthUser } from '../helpers/auth-guard';
 
@@ -103,6 +104,13 @@ export async function routeHomeApi(ctx: FetchContext): Promise<Response | null> 
     if (!isAuthUser(user)) return user;
     if (user.service) return addCORS(Response.json({ error: 'Agent tokens cannot perform this action', code: 'INSUFFICIENT_SCOPE' }, { status: 403 }));
     return addCORS(await handleHomeNewArtifactApi(request, env, user));
+  }
+
+  if (path === '/v1/home/import' && request.method === 'POST') {
+    const user = await requireAuthUser(ctx);
+    if (!isAuthUser(user)) return user;
+    if (user.service) return addCORS(Response.json({ error: 'Agent tokens cannot perform this action', code: 'INSUFFICIENT_SCOPE' }, { status: 403 }));
+    return addCORS(await handleHomeImportApi(request, env, user, ctx.executionCtx));
   }
 
   if (path === '/v1/home/onboarding/dismiss' && request.method === 'POST') {
