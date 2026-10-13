@@ -4,6 +4,7 @@ import { getUserRole } from '../artifacts/roles';
 import { createLogger, logError } from '../logging';
 import { invalidSlackBlocks, sendArtifactToSlack, type SlackDeliveryMode } from '../chat-platforms/slack/delivery';
 import { userFacingSlackDeliveryError } from '../chat-platforms/slack/client';
+import { artifactPreviewBlocksById } from '../chat-platforms/slack/unfurl';
 import { jsonWithApiErrors } from '../http/api-error';
 
 function json(data: unknown, status = 200): Response {
@@ -13,7 +14,8 @@ function json(data: unknown, status = 200): Response {
 const MODES: SlackDeliveryMode[] = ['message', 'snapshot', 'pdf', 'both'];
 
 // POST /v1/artifacts/{id}/share/slack — one-shot delivery to a Slack channel via
-// a workspace bot-token connection. Editors and owners may share.
+// a workspace bot-token connection. Editors and owners may share. `preview: true`
+// posts the same rich card as a Slack link preview (TL;DR, image, owner, updated).
 export async function handleShareToSlack(
   request: Request,
   env: Env,
@@ -33,6 +35,7 @@ export async function handleShareToSlack(
     mode?: string;
     message?: string;
     blocks?: unknown;
+    preview?: boolean;
     waitMs?: number;
   };
   try {
@@ -74,6 +77,9 @@ export async function handleShareToSlack(
   });
 
   try {
+    const blocks = body.blocks === undefined && body.preview === true
+      ? await artifactPreviewBlocksById(env, artifactId) ?? undefined
+      : body.blocks as unknown[] | undefined;
     const result = await sendArtifactToSlack(env, artifactId, {
       connection: body.connection,
       targetType,
@@ -81,7 +87,7 @@ export async function handleShareToSlack(
       slackUserId: body.slackUserId,
       mode: body.mode as SlackDeliveryMode | undefined,
       message: body.message,
-      blocks: body.blocks as unknown[] | undefined,
+      blocks,
       waitMs: typeof body.waitMs === 'number' ? body.waitMs : undefined,
     });
 

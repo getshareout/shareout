@@ -11,6 +11,7 @@ import {
   unlinkSlackDm,
 } from '../chat-platforms/slack/linking';
 import { verifySlackRequest, slackEventDedupId } from '../chat-platforms/slack/verify';
+import { handleLinkShared } from '../chat-platforms/slack/unfurl';
 import { PERSONAL_SCOPE } from '../chat-platforms/types';
 import { listWorkspacesForUser, TELEGRAM_PERSONAL_WORKSPACE } from '../chat-agent/access';
 import { listArtifactsForUser } from '../chat-agent/tools/artifacts';
@@ -106,6 +107,7 @@ async function handleEvents(ctx: FetchContext): Promise<Response> {
 
 async function dispatchEventCallback(env: Env, body: Record<string, unknown>): Promise<void> {
   const event = body.event as Record<string, unknown> | undefined;
+  if (event?.type === 'link_shared') return handleLinkShared(env, body);
   if (!event || event.type !== 'message') return;
   if (event.subtype || event.bot_id) return;
   if (event.channel_type !== 'im') return;

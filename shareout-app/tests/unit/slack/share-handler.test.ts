@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { handleShareToSlack } from '../../../src/slack/share-handler';
 import * as artifacts from '../../../src/artifacts/roles';
 import * as slackSend from '../../../src/chat-platforms/slack/delivery';
+import * as unfurl from '../../../src/chat-platforms/slack/unfurl';
 import type { Env } from '../../../src/types';
 import type { AuthUser } from '../../../src/api-auth';
 
@@ -107,5 +108,22 @@ describe('handleShareToSlack', () => {
 
     expect(res.status).toBe(200);
     expect(body).toEqual({ delivered: true });
+  });
+
+  it('posts the rich preview card when preview is true', async () => {
+    vi.spyOn(artifacts, 'getUserRole').mockResolvedValue('editor');
+    const card = [{ type: 'section', text: { type: 'mrkdwn', text: 'TL;DR' } }];
+    vi.spyOn(unfurl, 'artifactPreviewBlocksById').mockResolvedValue(card);
+    const send = vi.spyOn(slackSend, 'sendArtifactToSlack').mockResolvedValue({ success: true });
+
+    const res = await handleShareToSlack(
+      makeRequest({ connection: 'slack', channelId: 'C1', preview: true }),
+      makeEnv(),
+      USER,
+      ARTIFACT_ID,
+    );
+
+    expect(res.status).toBe(200);
+    expect(send).toHaveBeenCalledWith(expect.anything(), ARTIFACT_ID, expect.objectContaining({ blocks: card }));
   });
 });
