@@ -1,7 +1,7 @@
 # Miniflare / Vitest pool config for unit tests.
 # Placeholder resource IDs only — not a deploy target. No real zones or account IDs.
 name = "shareout"
-main = "src/index.ts"
+main = "tests/worker-main.ts"
 compatibility_date = "2025-05-01"
 compatibility_flags = ["nodejs_compat"]
 

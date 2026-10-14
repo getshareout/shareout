@@ -10,9 +10,20 @@
  *
  * See migrations/CONVENTIONS.md § "Timestamps: one type, one format, one vocabulary".
  */
+// @vitest-environment node
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-// Vite inlines these at build time — the workers pool has no filesystem.
-const sources = import.meta.glob('../../src/**/*.ts', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+
+// Runs in the node project: reading files directly is ~0.2s, where pulling the same
+// tree through import.meta.glob inside the workers pool cost ~18s per run.
+const SRC = join(dirname(fileURLToPath(import.meta.url)), '../../src');
+const sources: Record<string, string> = Object.fromEntries(
+  (readdirSync(SRC, { recursive: true }) as string[])
+    .filter((rel) => rel.endsWith('.ts'))
+    .map((rel) => [`../../src/${rel.split('\\').join('/')}`, readFileSync(join(SRC, rel), 'utf8')]),
+);
 
 /** Every spelling of the banned call, in either quoting style. */
 const BANNED = [/datetime\(\s*'now'/, /datetime\(\s*"now"/, /\bunixepoch\s*\(/];
