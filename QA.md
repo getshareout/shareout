@@ -87,25 +87,22 @@ Default **`npm run dev`** uses **local** D1/R2/KV. **`npm run dev:prod`** binds 
 
 Exploratory scenarios are throwaway. When a scenario proves valuable and stable, promote it into a committed spec:
 
-- **Critical journeys, money paths, auth** → `e2e/*.spec.ts` (runs in CI on every PR). Keep these **few and high-value**.
+- **Critical journeys, money paths, auth** → `e2e/*.spec.ts` (run locally before merging). Keep these **few and high-value**.
 - **Endpoint/edge logic** → `test/*.test.ts` (Vitest). Push detail *down* the pyramid.
 
-If CI gets slow or flaky, you've promoted too much to E2E.
+If the checks get slow or flaky, you've promoted too much to E2E.
 
 ---
 
 ## What already exists (don't rebuild)
 
-- Vitest suite + coverage thresholds enforced in CI (`npm run coverage`)
-- Local mirrors: `./tooling/scripts/ci-check.sh` (full) and `ci-check-fast.sh`
-  (pre-push via `./tooling/scripts/install-hooks.sh`)
-- 15 scripted E2E agent flows + smoke suite (`e2e-live/`) — not yet required in public CI
-- Design-token CI check (`check:design-tokens`)
-- Public CI on every push and PR (`.github/workflows/ci.yml`): static gates (boundaries,
-  design tokens, domains, migrations, UI conventions, access seams, file size), fresh D1
-  migrate, typecheck, **`test:critical`** (auth/access/publish/error contract — fail-fast),
-  unit tests **with coverage floors**, workspace tests, bundles, production
-  `npm audit --omit=dev --audit-level=high`, docs-site build, and gitleaks
+- Vitest suite + coverage thresholds (`npm run coverage`, or `SHAREOUT_COVERAGE=1 ./tooling/scripts/ci-check.sh`)
+- Local checks — there is no hosted CI: `./tooling/scripts/ci-check.sh` (full: static gates,
+  fresh D1 migrate, typecheck, unit + workspace tests, bundles, production
+  `npm audit --omit=dev --audit-level=high`, gitleaks, docs-site build) and
+  `ci-check-fast.sh` (pre-push via `./tooling/scripts/install-hooks.sh`)
+- 15 scripted E2E agent flows + smoke suite (`e2e-live/`) — not part of the gate
+- Design-token check (`check:design-tokens`)
 
 The gaps this methodology closes: **Cloudflare Workers Builds preview URLs**, **QA state on work**, **visual/UX judgment**, **agent-triggered QA runs**.
 

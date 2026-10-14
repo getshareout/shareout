@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
 # Fast checks for daily work + git pre-push hooks.
 #
-# This is the local half of the deal struck in .github/workflows/ci.yml: PR CI runs
-# static gates and the critical-path subset only, so THIS script is what stands
-# between a change and main. Keep the two in sync.
+# There is no hosted CI: this script is what stands between a change and main.
 #
 # Tests run as critical-path + whatever the change actually touches (vitest module
-# graph); main and nightly still run the full suite in full.yml. Force it here with
-# SHAREOUT_FULL_TESTS=1.
+# graph). Force the whole suite with SHAREOUT_FULL_TESTS=1.
 #
 # Independent checks run in parallel; each one's output is printed only if it fails.
 # check:bundles runs last, alone: it rewrites public/_bundles/ (as does the

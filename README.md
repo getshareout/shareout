@@ -15,7 +15,6 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="Apache-2.0"></a>
-  <a href="https://github.com/getshareout/shareout/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/getshareout/shareout/ci.yml?branch=main" alt="CI"></a>
   <a href="https://github.com/getshareout/shareout/releases/tag/v0.1.0-pre"><img src="https://img.shields.io/github/v/release/getshareout/shareout?include_prereleases&label=release" alt="Release"></a>
   <img src="https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white" alt="Cloudflare Workers">
   <img src="https://img.shields.io/badge/status-pre--release-yellow" alt="Pre-release">

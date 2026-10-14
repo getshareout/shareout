@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-# Local mirror of .github/workflows/ci.yml (worker + docs).
+# Full local check (worker + docs). There is no hosted CI; this is the complete gate.
 # Prefer this before opening a PR. Fast subset: ci-check-fast.sh
 #
-# Runs the whole unit suite (~4m40s). Istanbul instrumentation more than doubles that
-# (~10m) and PR CI does not check coverage floors anyway — full.yml does, on main and
-# nightly. So coverage is opt-in here: SHAREOUT_COVERAGE=1 ./tooling/scripts/ci-check.sh
+# Runs the whole unit suite. Istanbul instrumentation more than doubles that, so
+# coverage floors are opt-in: SHAREOUT_COVERAGE=1 ./tooling/scripts/ci-check.sh
 set -euo pipefail
 
 # Production (Cloudflare Workers) runs in UTC — pin tests so non-UTC contributors
