@@ -357,6 +357,7 @@ Codes and fields: [api/errors.md](api/errors.md).
 | `201` with `visibility_downgraded: true` | It published, but private. Don't re-publish to "fix" it. | "It's published, but only you can see it for now, because …" (the `notice`) |
 | `moderation` in the publish result, or `202 MODERATION_HELD` | Under automatic review; it goes public by itself when it clears. Don't re-publish. | "It's published and under a quick automatic review; it'll open to everyone on its own." |
 | `SIGNUPS_PAUSED` | Use device login if they already have an account; otherwise they need an invite. | "This ShareOut only lets invited people in — ask whoever runs it for an invite." |
+| A `403`/`5xx` whose body is **not JSON** (e.g. `error code: 1010`, an HTML "Attention Required" page) | That's Cloudflare in front of ShareOut, not ShareOut. Retry once with `curl` (some clients' user agents are blocked); if it still fails, stop and file a ticket (below) with the status, the body's first line and any Ray ID. Don't invent workarounds (other IPs, other tools, asking the user to whitelist anything). | "ShareOut's network blocked my request. I've told the team (ticket #…)." |
 | Any `5xx`, or the same error twice after following its `hint` | Stop and file a ticket (below). | "Something broke on ShareOut's side. I've told the team (ticket #…)." |
 
 **Ask a human — don't loop silently.** After **2 failed attempts** at the same step, or on
