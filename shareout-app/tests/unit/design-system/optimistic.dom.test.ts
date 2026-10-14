@@ -16,7 +16,6 @@ type Leave = { restore(): void; commit(): void };
 type Opt = ((o: Opts) => Promise<boolean>) & { busy(k: string): boolean; flush(): void; leave(els: unknown): Leave; labels: Record<string, string> };
 const opt = () => (window as unknown as { soOptimistic: Opt }).soOptimistic;
 const toasts = () => [...document.querySelectorAll('.so-c-toast')];
-const tick = async () => { for (let i = 0; i < 5; i++) await Promise.resolve(); };
 
 beforeEach(() => {
   document.body.innerHTML = '<ul><li id="a">A</li><li id="b">B</li></ul>';

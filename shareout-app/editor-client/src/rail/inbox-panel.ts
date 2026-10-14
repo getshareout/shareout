@@ -178,7 +178,7 @@ function wireInboxPanel(ctx: EditorContext, host: HTMLElement, status: InboxStat
     });
   });
 
-  host.querySelector<HTMLButtonElement>('[data-inbox-disable]')?.addEventListener('click', async (e) => {
+  host.querySelector<HTMLButtonElement>('[data-inbox-disable]')?.addEventListener('click', async () => {
     const ok = await showConfirmDialog({
       title: 'Disable the inbox?',
       body: 'New mail will be rejected. Messages already stored are kept.',
