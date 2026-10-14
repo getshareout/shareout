@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateSlug, resolveEntrypoint, shortHash, validatePublishRequest } from '../../src/validation';
+import { detectArtifactType, generateSlug, resolveEntrypoint, shortHash, validatePublishRequest } from '../../src/validation';
 import { jsonWithApiErrors } from '../../src/http/api-error';
 import type { PublishRequest, PWAConfig } from '../../src/types';
 
@@ -129,6 +129,12 @@ describe('validatePublishRequest', () => {
     }));
 
     expect(error).toBeNull();
+  });
+
+  it('accepts a .mov video published as video/quicktime', () => {
+    const files = [{ path: 'clip.mov', content: 'AAAA', encoding: 'base64' as const, mime: 'video/quicktime' }];
+    expect(validatePublishRequest({ name: 'clip', files })).toBeNull();
+    expect(detectArtifactType(files)).toBe('video');
   });
 });
 

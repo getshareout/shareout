@@ -9,7 +9,7 @@ Open it from the left rail in your Home: **Assets**.
 
 ## Add files
 
-Click **Upload files** and pick one or many. There's no "what type?" — drop in a 2&nbsp;GB video, a `.xlsx`, a `.pptx`, a `.zip`. Each file becomes a **deliverable** you can reuse and share.
+Click **Upload files** and pick one or many. There's no "what type?" — drop in a video, a `.xlsx`, a `.pptx`, a `.zip`. Each file becomes a **deliverable** you can reuse and share. Each file can be up to 500&nbsp;MB; your instance admin may set a lower cap.
 
 ### Without opening Assets
 

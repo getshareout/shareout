@@ -9,7 +9,7 @@ Abrilo desde el rail izquierdo de Home: **Assets**.
 
 ## Agregar archivos
 
-Hacé clic en **Upload files** y elegí uno o varios. No hay "¿qué tipo?" — podés subir un video de 2&nbsp;GB, un `.xlsx`, un `.pptx`, un `.zip`. Cada archivo se convierte en un **deliverable** que podés reutilizar y compartir.
+Hacé clic en **Upload files** y elegí uno o varios. No hay "¿qué tipo?" — podés subir un video, un `.xlsx`, un `.pptx`, un `.zip`. Cada archivo se convierte en un **deliverable** que podés reutilizar y compartir. Cada archivo puede pesar hasta 500&nbsp;MB; el admin de tu instancia puede fijar un tope menor.
 
 ### Sin abrir Assets
 

@@ -1,6 +1,6 @@
 # Artifact Types
 
-ShareOut supports multiple artifact types beyond HTML. Each type auto-detects from MIME/extension and renders with a specialized viewer.
+ShareOut supports multiple artifact types beyond HTML. Each type auto-detects from MIME/extension. Text types render with a specialized viewer; binary types (`pdf`, `image`, `video`) are served as the raw file.
 
 ## Supported Types
 
@@ -11,9 +11,9 @@ ShareOut supports multiple artifact types beyond HTML. Each type auto-detects fr
 | `markdown` | Stable | View-only | Source editor at `/a/{slug}/edit` |
 | `json` | Stable | View-only | Source editor at `/a/{slug}/edit` |
 | `txt` | Stable | View-only | Source editor at `/a/{slug}/edit` |
-| `pdf` | Planned | - | - |
-| `image` | Planned | - | - |
-| `video` | Planned | - | - |
+| `pdf` | Stable — served raw (browser's PDF viewer; Studio renders it) | - | Not editable (`409 NOT_EDITABLE`) |
+| `image` | Stable — served raw (browser's image view) | - | Not editable (`409 NOT_EDITABLE`) |
+| `video` | Stable — served raw (browser's video player) | - | Not editable (`409 NOT_EDITABLE`) |
 
 ## Type Detection
 
@@ -28,6 +28,9 @@ text/markdown          → markdown
 text/x-markdown        → markdown
 application/json       → json
 text/plain             → txt
+application/pdf        → pdf
+image/*                → image
+video/*                → video
 ```
 
 ### Extension → Type Mapping
@@ -38,7 +41,14 @@ text/plain             → txt
 .md, .markdown         → markdown
 .json                  → json
 .txt                   → txt
+.pdf                   → pdf
+.png, .jpg, .jpeg, .gif, .webp, .avif, .svg → image
+.mp4, .webm, .mov      → video
 ```
+
+Binary files are sent base64 (`"encoding": "base64"`). Allowed binary MIME types:
+`application/pdf`, `image/png`, `image/jpeg`, `image/gif`, `image/webp`, `image/avif`,
+`image/svg+xml`, `video/mp4`, `video/webm`, `video/quicktime` (`.mov`).
 
 ## Publishing Non-HTML Artifacts
 
