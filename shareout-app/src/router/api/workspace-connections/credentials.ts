@@ -8,13 +8,13 @@ const SAFE_CRED_KEYS = new Set([
   'client_email', 'project_id', 'project', 'team_id', 'team_name', 'bot_user_id',
   'app_id', 'account', 'user', 'username', 'public_key_fingerprint', 'header_name',
   'base_url', 'baseurl', 'host', 'port', 'database', 'client_id', 'expires_at',
-  'scope', 'warehouse', 'schema', 'role',
+  'scope', 'warehouse', 'schema', 'role', 'access_key_id',
 ]);
 
 // Keys whose VALUES are secret — we report only that they're configured, never the value.
 const SECRET_CRED_KEYS = new Set([
   'private_key', 'access_token', 'refresh_token', 'client_secret', 'api_key',
-  'apikey', 'password', 'token', 'secret',
+  'apikey', 'password', 'token', 'secret', 'secret_access_key', 'session_token',
 ]);
 
 /**
@@ -65,5 +65,19 @@ export function buildProbeCredentials(creds: { type: string; data?: Record<strin
   if (type === 'key_pair') {
     return { access_token: '', extra: { ...data } };
   }
+  if (type === 'aws_access_key') {
+    return { access_token: '', extra: awsKeyExtra(data) };
+  }
   return { access_token: (data.access_token as string) || (data.api_key as string) || '' };
+}
+
+/** The stored shape of an AWS IAM access key (S3, Redshift, Aurora connectors). */
+export function awsKeyExtra(data: Record<string, unknown>): Record<string, unknown> {
+  const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+  const token = str(data.session_token);
+  return {
+    access_key_id: str(data.access_key_id),
+    secret_access_key: str(data.secret_access_key),
+    ...(token ? { session_token: token } : {}),
+  };
 }

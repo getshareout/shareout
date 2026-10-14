@@ -12,6 +12,7 @@ External service connections via Data Platform and **Teams workspace connectors*
 | Google Analytics | [google-analytics.md](google-analytics.md) | GA4 reports and metrics |
 | Google Ads | [google-ads.md](google-ads.md) | Campaign spend/clicks via pasted OAuth credentials |
 | Facebook Ads | [facebook-ads.md](facebook-ads.md) | Meta Marketing API via pasted access token |
+| Amazon S3 · Supabase · Amazon Redshift · Amazon Aurora | [databases-and-storage.md](databases-and-storage.md) | Bucket files + read-only SQL over HTTPS (IAM key / Supabase token) |
 | Shopify | [shopify.md](shopify.md) | Products, orders, inventory |
 | Tienda Nube | [tiendanube.md](tiendanube.md) | LATAM e-commerce |
 | GitHub | [github.md](github.md) | Backup and export |

@@ -12,7 +12,7 @@ export const TOOLKITS: Record<string, { summary: string; tools: string[] }> = {
   },
   data: {
     summary: 'fresh numbers: run a page’s data sources, SQL on connectors, write table rows / JSON values, watch a metric',
-    tools: ['list_data_sources', 'run_data_source', 'list_connections', 'query_connection', 'add_table_row', 'update_table_row', 'set_json_value', 'watch_metric'],
+    tools: ['list_data_sources', 'run_data_source', 'list_connections', 'query_connection', 'browse_storage', 'add_table_row', 'update_table_row', 'set_json_value', 'watch_metric'],
   },
   automations: {
     summary: 'alerts, scheduled jobs and sends, and asking a page’s crew to do work',

@@ -1,6 +1,7 @@
 import type { Env } from '../types';
 import { PlatformEngine } from '../data/platform';
 import { parseSnowflakeRows } from '../data/connections/warehouse-exec';
+import { SQL_QUERY_ENDPOINT } from '../data/platform/providers/sql-endpoint';
 import { upsertCatalogFile, listCatalogFiles } from './store';
 import { buildConnectorEntry, slugifyName } from './seed';
 
@@ -57,6 +58,42 @@ async function listSnowflakeTables(env: Env, workspaceId: string, conn: Connecti
   if (!resp.success) return [];
   return parseSnowflakeRows(resp.data)
     .map((row) => pickCaseInsensitive(row, 'name'))
+    .filter((n): n is string => !!n);
+}
+
+// Supabase / Redshift / Aurora (PostgreSQL or MySQL): information_schema exists on all
+// of them, so one metadata query lists user tables. System and Supabase-internal
+// schemas are skipped; non-public schemas are kept as schema.table.
+const SYSTEM_SCHEMAS = [
+  'pg_catalog', 'information_schema', 'pg_internal', 'pg_toast', 'mysql', 'performance_schema', 'sys',
+  'auth', 'storage', 'realtime', 'extensions', 'graphql', 'graphql_public', 'pgsodium', 'pgsodium_masks',
+  'vault', 'supabase_functions', 'supabase_migrations', 'net', 'cron', 'pgbouncer',
+];
+
+async function listSqlTables(env: Env, workspaceId: string, conn: ConnectionRow): Promise<string[]> {
+  const engine = new PlatformEngine({ artifactId: '', env, workspaceId });
+  const excluded = SYSTEM_SCHEMAS.map((s) => `'${s}'`).join(', ');
+  const resp = await engine.execute<{ rows?: Record<string, unknown>[] }>({
+    provider: conn.provider,
+    endpoint: SQL_QUERY_ENDPOINT,
+    connectionId: conn.id,
+    params: {
+      body: {
+        sql: `select table_schema, table_name from information_schema.tables where table_schema not in (${excluded}) order by 1, 2 limit ${MAX_RESOURCES}`,
+        maxRows: MAX_RESOURCES,
+        timeoutMs: 30_000,
+      },
+    },
+    options: { cache: false },
+  });
+  if (!resp.success) return [];
+  return (resp.data?.rows || [])
+    .map((row) => {
+      const schema = pickCaseInsensitive(row, 'table_schema');
+      const table = pickCaseInsensitive(row, 'table_name');
+      if (!table) return undefined;
+      return schema && schema !== 'public' ? `${schema}.${table}` : table;
+    })
     .filter((n): n is string => !!n);
 }
 
@@ -139,6 +176,10 @@ async function listResources(env: Env, workspaceId: string, conn: ConnectionRow)
       return listBigQueryTables(env, workspaceId, conn);
     case 'google-sheets':
       return listGoogleSheetTabs(env, workspaceId, conn);
+    case 'supabase':
+    case 'redshift':
+    case 'aurora':
+      return listSqlTables(env, workspaceId, conn);
     default:
       return [];
   }

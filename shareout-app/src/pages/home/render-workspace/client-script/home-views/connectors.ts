@@ -1,7 +1,7 @@
 /** Provider catalog and existing workspace connections. */
 export const workspace_client_home_views_connectors_JS = `  // ----- Connectors — provider catalog grouped by category + existing connections -----
   function connCats() {
-    return [['warehouse', 'conn.cat.warehouse'], ['analytics', 'conn.cat.analytics'], ['ads', 'conn.cat.ads'], ['ecommerce', 'conn.cat.ecommerce'], ['productivity', 'conn.cat.productivity'], ['messaging', 'conn.cat.messaging'], ['other', 'conn.cat.other'], ['custom', 'conn.cat.custom']];
+    return [['warehouse', 'conn.cat.warehouse'], ['analytics', 'conn.cat.analytics'], ['ads', 'conn.cat.ads'], ['storage', 'conn.cat.storage'], ['ecommerce', 'conn.cat.ecommerce'], ['productivity', 'conn.cat.productivity'], ['messaging', 'conn.cat.messaging'], ['other', 'conn.cat.other'], ['custom', 'conn.cat.custom']];
   }
   function loadConnectors() {
     var m = document.getElementById('wsxConnMount'); if (needWs(m)) return;

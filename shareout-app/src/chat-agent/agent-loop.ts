@@ -88,7 +88,7 @@ function systemPrompt(platform: PlatformId, caps: Capabilities, selectedWorkspac
         ? 'You are the ShareOut workspace assistant, embedded in the workspace home. Keep replies short and clear; light Markdown is fine.'
         : 'You are the ShareOut assistant. Keep replies short and clear.';
   const dataLine = caps.canQueryConnections
-    ? 'You can also run ad-hoc read-only SQL against the workspace’s data connectors (query_connection) — only connectors the admin has enabled for the assistant. Use list_connections first to see names and which are enabled. Write only SELECT queries; never attempt to change data.'
+    ? 'You can also run ad-hoc read-only SQL against the workspace’s data connectors (query_connection) — only connectors the admin has enabled for the assistant. Use list_connections first to see names and which are enabled. Write only SELECT queries; never attempt to change data. For storage connectors (Amazon S3) use browse_storage to list folders and read CSV/JSON/text files.'
     : null;
   const scheduleLine = caps.canSchedule
     ? 'You can set up a recurring scheduled send of a page (create_schedule) — e.g. “email me this dashboard every Monday”. It asks the user to confirm before anything is created.'

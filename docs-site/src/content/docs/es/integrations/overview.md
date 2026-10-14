@@ -14,6 +14,10 @@ hacia donde tu equipo ya trabaja.
 | [Google Analytics](/es/integrations/google-analytics/) | Reportes GA4 con clave de cuenta de servicio |
 | [Google Ads](/es/integrations/google-ads/) | Gasto, clics y conversiones de campañas |
 | [Facebook Ads](/es/integrations/facebook-ads/) | Insights de campañas de Meta |
+| [Amazon S3](/es/integrations/databases-and-storage/#amazon-s3) | Listar y leer archivos CSV, JSON y de texto de un bucket |
+| [Supabase](/es/integrations/databases-and-storage/#supabase) | SQL de solo lectura sobre tu base de Supabase |
+| [Amazon Redshift](/es/integrations/databases-and-storage/#amazon-redshift) | SQL sobre un workgroup Serverless o un clúster |
+| [Amazon Aurora](/es/integrations/databases-and-storage/#amazon-aurora) | SQL sobre Aurora PostgreSQL o MySQL |
 | [Shopify](/es/integrations/shopify/) | Productos, pedidos, inventario |
 | [Slack](/es/integrations/slack/) | Entregar artifacts a un canal o DM |
 | Tienda Nube | E-commerce de LATAM |

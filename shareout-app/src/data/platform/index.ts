@@ -23,6 +23,10 @@ import './providers/snowflake';
 import './providers/slack';
 import './providers/facebook-ads';
 import './providers/google-ads';
+import './providers/s3';
+import './providers/supabase';
+import './providers/redshift';
+import './providers/aurora';
 
 export { registerProvider, getProvider, listProviders, hasProvider } from './registry';
 export { BaseProvider } from './providers/base-provider';
