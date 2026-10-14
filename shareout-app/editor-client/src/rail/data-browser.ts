@@ -4,6 +4,7 @@ import { createLogger } from '../editor/logger';
 import { buildManifestSummary, type ManifestSummary } from '../manifest/manifest-parser';
 import { escapeHtml } from '../utils';
 import { showToast } from '../toast';
+import { optimistic, withBusy } from '../optimistic';
 import { showConfirmDialog } from '../ui/confirm-dialog';
 import { syncHtmlFromCanvas } from '../history/html-sync';
 import { markDirty } from '../persistence/draft';
@@ -60,6 +61,9 @@ async function fetchTableRowCounts(
   return counts;
 }
 
+const pendingJsonDeletes = new Set<string>();
+const pendingBlobDeletes = new Set<string>();
+
 export async function renderDataBrowser(ctx: EditorContext): Promise<void> {
   const host = ctx.dom.dataBrowser;
   if (!host) return;
@@ -71,8 +75,9 @@ export async function renderDataBrowser(ctx: EditorContext): Promise<void> {
     sdkGet<{ files: BlobFile[] }>(ctx, 'blobs'),
   ]);
 
-  const jsonKeys = json?.keys ?? [];
-  const files = blobs?.files ?? [];
+  // Hide rows whose delete is still in its undo window / in flight so a reload can't flash them back.
+  const jsonKeys = (json?.keys ?? []).filter((k) => !pendingJsonDeletes.has(k.key));
+  const files = (blobs?.files ?? []).filter((f) => !pendingBlobDeletes.has(f.id));
   const dataModel = buildManifestSummary(ctx.state.manifest);
   const rowCounts = await fetchTableRowCounts(ctx, dataModel?.tables ?? []);
 
@@ -133,12 +138,19 @@ function wireJson(ctx: EditorContext, host: HTMLElement): void {
   host.querySelector('[data-add="json"]')?.addEventListener('click', () => showAddKeyForm(ctx, host));
 
   host.querySelectorAll<HTMLInputElement>('[data-json-value]').forEach((input) => {
-    input.addEventListener('change', async () => {
+    // Optimistic: the input already shows the new value; defaultValue holds the last saved one.
+    input.addEventListener('change', () => {
       const key = input.dataset.jsonValue!;
-      let value: unknown = input.value;
-      try { value = JSON.parse(input.value); } catch { /* keep string */ }
-      await postJson(ctx, 'set', { key, value });
-      showToast(`Saved ${key}`, 'success');
+      const typed = input.value;
+      let value: unknown = typed;
+      try { value = JSON.parse(typed); } catch { /* keep string */ }
+      void optimistic({
+        rollback: () => { if (input.value === typed) input.value = input.defaultValue; },
+        request: () => postJson(ctx, 'set', { key, value }),
+        success: `Saved ${key}`,
+        error: `Couldn’t save ${key}. Check your connection?`,
+        done: () => { input.defaultValue = typed; },
+      });
     });
   });
 
@@ -151,18 +163,18 @@ function wireJson(ctx: EditorContext, host: HTMLElement): void {
   });
 }
 
-async function postJson(ctx: EditorContext, action: string, body: unknown): Promise<void> {
-  try {
-    await fetch(sdkUrl(ctx, 'json', action), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify(body),
-    });
-  } catch (err) {
+/** JSON-store write; resolves to the Response (non-ok = failure for optimistic()). */
+function postJson(ctx: EditorContext, action: string, body: unknown, opts: { keepalive?: boolean } = {}): Promise<Response> {
+  return fetch(sdkUrl(ctx, 'json', action), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify(body),
+    keepalive: !!opts.keepalive,
+  }).catch((err) => {
     log.error('postJson failed', err);
-    showToast('Could not save. Check your connection?', 'error');
-  }
+    throw err;
+  });
 }
 
 /** Inline "add key" form (replaces window.prompt) — appended into the JSON list. */
@@ -182,15 +194,25 @@ function showAddKeyForm(ctx: EditorContext, host: HTMLElement): void {
   const keyInput = row.querySelector<HTMLInputElement>('[data-new-key]');
   keyInput?.focus();
 
-  const save = async (): Promise<void> => {
+  // Optimistic: the form row becomes the real row at once; a failure brings the form back as typed.
+  const save = (): void => {
     const key = keyInput?.value.trim();
     if (!key) { keyInput?.focus(); return; }
     const raw = row.querySelector<HTMLInputElement>('[data-new-value]')?.value ?? '';
     let value: unknown = raw;
     try { value = JSON.parse(raw); } catch { /* keep as string */ }
-    await postJson(ctx, 'set', { key, value });
-    showToast(`Added ${key}`, 'success');
-    void renderDataBrowser(ctx);
+    const tmp = document.createElement('div');
+    tmp.innerHTML = renderJsonRow({ key, value } as JsonKey);
+    const added = tmp.firstElementChild as HTMLElement;
+    void optimistic({
+      key: `json-add:${key}`,
+      apply: () => row.replaceWith(added),
+      rollback: () => added.replaceWith(row),
+      request: () => postJson(ctx, 'set', { key, value }),
+      success: `Added ${key}`,
+      error: `Couldn’t add ${key}. Check your connection?`,
+      done: () => void renderDataBrowser(ctx),
+    });
   };
 
   row.querySelector('[data-new-save]')?.addEventListener('click', () => void save());
@@ -216,10 +238,18 @@ function confirmDeleteJson(ctx: EditorContext, btn: HTMLButtonElement): void {
   btn.replaceWith(confirmEl);
 
   confirmEl.querySelector('[data-cancel-del]')?.addEventListener('click', () => void renderDataBrowser(ctx));
-  confirmEl.querySelector('[data-confirm-del]')?.addEventListener('click', async () => {
-    await postJson(ctx, 'delete', { key });
-    row.remove();
-    showToast(`Deleted ${key}`, 'success');
+  confirmEl.querySelector('[data-confirm-del]')?.addEventListener('click', () => {
+    const el = row as HTMLElement;
+    void optimistic({
+      key: `json-del:${key}`,
+      undo: true,
+      apply: () => { pendingJsonDeletes.add(key); el.style.display = 'none'; },
+      rollback: () => { pendingJsonDeletes.delete(key); el.style.display = ''; confirmEl.replaceWith(btn); },
+      request: () => postJson(ctx, 'delete', { key }, { keepalive: true }),
+      success: `Deleted ${key}`,
+      error: `Couldn’t delete ${key}. Check your connection?`,
+      done: () => { pendingJsonDeletes.delete(key); el.remove(); },
+    });
   });
 }
 
@@ -267,26 +297,31 @@ function renderBlobRow(f: BlobFile): string {
 
 function wireFiles(ctx: EditorContext, host: HTMLElement): void {
   const input = host.querySelector<HTMLInputElement>('[data-blob-input]');
-  host.querySelector('[data-add="blob"]')?.addEventListener('click', () => input?.click());
+  const uploadBtn = host.querySelector<HTMLButtonElement>('[data-add="blob"]');
+  uploadBtn?.addEventListener('click', () => input?.click());
 
+  // Exception to optimistic: the file's id/URL come from the server, so the button shows
+  // "Uploading…" until the upload settles.
   input?.addEventListener('change', async () => {
     const file = input.files?.[0];
     if (!file) return;
     const form = new FormData();
     form.append('file', file);
-    try {
-      const res = await fetch(sdkUrl(ctx, 'blobs', 'upload'), {
-        method: 'POST',
-        credentials: 'same-origin',
-        body: form,
-      });
-      if (!res.ok) throw new Error(String(res.status));
-      showToast(`Uploaded ${file.name}`, 'success');
-      renderDataBrowser(ctx);
-    } catch (err) {
-      log.error('upload failed', err);
-      showToast('Upload failed', 'error');
-    }
+    await withBusy(uploadBtn, 'Uploading…', async () => {
+      try {
+        const res = await fetch(sdkUrl(ctx, 'blobs', 'upload'), {
+          method: 'POST',
+          credentials: 'same-origin',
+          body: form,
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        showToast(`Uploaded ${file.name}`, 'success');
+        void renderDataBrowser(ctx);
+      } catch (err) {
+        log.error('upload failed', err);
+        showToast(`Couldn’t upload ${file.name}. Check your connection?`, 'error');
+      }
+    });
   });
 
   host.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((btn) => {
@@ -307,18 +342,25 @@ function wireFiles(ctx: EditorContext, host: HTMLElement): void {
         danger: true,
       });
       if (!ok) return;
-      try {
-        await fetch(sdkUrl(ctx, 'blobs', 'delete'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ id }),
-        });
-        host.querySelector(`.data-row[data-id="${CSS.escape(id)}"]`)?.remove();
-      } catch (err) {
-        log.error('delete blob failed', err);
-        showToast('Could not delete', 'error');
-      }
+      const row = host.querySelector<HTMLElement>(`.data-row[data-id="${CSS.escape(id)}"]`);
+      const name = row?.querySelector('.data-row-name')?.textContent || 'file';
+      void optimistic({
+        key: `blob-del:${id}`,
+        undo: true,
+        apply: () => { pendingBlobDeletes.add(id); if (row) row.style.display = 'none'; },
+        rollback: () => { pendingBlobDeletes.delete(id); if (row) row.style.display = ''; },
+        request: () =>
+          fetch(sdkUrl(ctx, 'blobs', 'delete'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ id }),
+            keepalive: true,
+          }),
+        success: `Deleted ${name}`,
+        error: `Couldn’t delete ${name}. Check your connection?`,
+        done: () => { pendingBlobDeletes.delete(id); row?.remove(); },
+      });
     });
   });
 }

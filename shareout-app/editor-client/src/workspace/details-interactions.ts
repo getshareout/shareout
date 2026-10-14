@@ -4,6 +4,7 @@ import { showToast } from '../toast';
 import { invalidateCache } from './details-cache';
 import { stripEditorAttributes } from '../dom/editor-ids';
 import { openEditorApproverPicker } from './approval-picker';
+import { optimistic, withBusy } from '../optimistic';
 
 export function setupDetailsPanelInteractions(ctx: EditorContext): void {
   const drawer = ctx.dom.workspaceDrawer;
@@ -322,44 +323,55 @@ function formatDate(iso: string): string {
 export function setupDetailsManagement(ctx: EditorContext): void {
   const visSelect = document.querySelector<HTMLSelectElement>('[data-visibility-select]');
   if (visSelect) {
-    visSelect.addEventListener('change', async () => {
+    // Optimistic: the select already shows the new value; a failure puts the old one back.
+    let currentVis = visSelect.value;
+    visSelect.addEventListener('change', () => {
       const visibility = visSelect.value;
-      visSelect.disabled = true;
-      try {
-        const res = await fetch(`/v1/artifacts/${ctx.config.artifactId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ visibility }),
-        });
-        // 202 = the change was held (governance/moderation), not a hard failure.
-        const data = res.status === 202 ? await res.json().catch(() => null) : null;
-        if (res.status === 202 && data) {
-          invalidateCache();
-          if (data.approval_required && data.approval_required.workspace_id) {
+      const prev = currentVis;
+      currentVis = visibility;
+      void optimistic<{ held: { visibility?: string; message?: string; approval_required?: { workspace_id?: string; required: number } } | null }>({
+        rollback: () => {
+          if (currentVis !== visibility) return; // a newer change owns the select now
+          currentVis = prev;
+          visSelect.value = prev;
+        },
+        request: async () => {
+          const res = await fetch(`/v1/artifacts/${ctx.config.artifactId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ visibility }),
+          });
+          // 202 = the change was held (governance/moderation), not a hard failure.
+          if (res.status === 202) return { held: (await res.json().catch(() => null)) || {} };
+          if (!res.ok) throw new Error(String(res.status));
+          return { held: null };
+        },
+        error: 'Could not update visibility',
+        done: ({ held }) => {
+          invalidateCache(); // so re-opening Details reflects the new value
+          if (!held) {
+            showToast('Visibility updated', 'success');
+            return;
+          }
+          if (held.approval_required && held.approval_required.workspace_id) {
             openEditorApproverPicker({
               artifactId: ctx.config.artifactId,
-              workspaceId: data.approval_required.workspace_id,
+              workspaceId: held.approval_required.workspace_id,
               visibility,
-              required: data.approval_required.required,
+              required: held.approval_required.required,
               selfUserId: ctx.config.userId,
             });
           } else {
-            showToast(data.message || 'Change held by workspace policy', 'info');
+            showToast(held.message || 'Change held by workspace policy', 'info');
           }
           // Reflect the held visibility (workspace/private), not the requested one.
-          if (data.visibility) visSelect.value = data.visibility;
-        } else if (!res.ok) {
-          throw new Error(String(res.status));
-        } else {
-          invalidateCache(); // so re-opening Details reflects the new value
-          showToast('Visibility updated', 'success');
-        }
-      } catch {
-        showToast('Could not update visibility', 'error');
-      } finally {
-        visSelect.disabled = false;
-      }
+          if (held.visibility && currentVis === visibility) {
+            currentVis = held.visibility;
+            visSelect.value = held.visibility;
+          }
+        },
+      });
     });
   }
 
@@ -386,21 +398,21 @@ export function setupDetailsManagement(ctx: EditorContext): void {
       danger: true,
     });
     if (!ok) return;
-    deleteBtn.disabled = true;
-    try {
-      const res = await fetch(`/v1/artifacts/${ctx.config.artifactId}`, {
-        method: 'DELETE',
-        credentials: 'same-origin',
-      });
-      if (!res.ok) throw new Error(String(res.status));
-      showToast('Artifact deleted', 'success');
-      setTimeout(() => {
+    // Exception to optimistic: this page leaves for /home on success, so it waits for the
+    // server (busy label) instead of offering an Undo it couldn't honor after navigating.
+    await withBusy(deleteBtn, 'Deleting…', async () => {
+      try {
+        const res = await fetch(`/v1/artifacts/${ctx.config.artifactId}`, {
+          method: 'DELETE',
+          credentials: 'same-origin',
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        showToast('Artifact deleted', 'success');
         window.location.href = '/home';
-      }, 500);
-    } catch {
-      showToast('Could not delete the artifact', 'error');
-      deleteBtn.disabled = false;
-    }
+      } catch {
+        showToast('Could not delete the artifact', 'error');
+      }
+    });
   });
 }
 

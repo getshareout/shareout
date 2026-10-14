@@ -200,23 +200,31 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
     window.toggleReaction = function(id, emoji) {
       var picker = document.getElementById('so-rp-' + id);
       if (picker) picker.classList.remove('open');
-      var map = cmtReactState[id] || (cmtReactState[id] = {});
-      var cur = map[emoji] || { count: 0, mine: false };
-      if (cur.mine) { cur.count = Math.max(0, cur.count - 1); cur.mine = false; if (!cur.count) delete map[emoji]; else map[emoji] = cur; }
-      else { cur.count += 1; cur.mine = true; map[emoji] = cur; }
-      refreshReactionBar(id);
-      fetch(cmtApi + '/' + id + '/reactions', {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emoji: emoji })
-      })
-        .then(function(r) { if (r.status === 401) throw new Error('auth'); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(function(res) { var d = res.data || {}; cmtReactState[id] = d.reactions || {}; refreshReactionBar(id); })
-        .catch(function(err) {
-          if (err.message === 'auth') alert('${js(c.loginReact)}');
-          else console.error('Reaction error:', err);
-          loadComments();
-        });
+      var before = JSON.parse(JSON.stringify(cmtReactState[id] || {}));
+      soOpt({
+        key: 'react:' + id + ':' + emoji,
+        apply: function() {
+          var map = cmtReactState[id] || (cmtReactState[id] = {});
+          var cur = map[emoji] || { count: 0, mine: false };
+          if (cur.mine) { cur.count = Math.max(0, cur.count - 1); cur.mine = false; if (!cur.count) delete map[emoji]; else map[emoji] = cur; }
+          else { cur.count += 1; cur.mine = true; map[emoji] = cur; }
+          refreshReactionBar(id);
+        },
+        rollback: function() { cmtReactState[id] = before; refreshReactionBar(id); },
+        request: function() {
+          return fetch(cmtApi + '/' + id + '/reactions', {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ emoji: emoji })
+          }).then(function(r) {
+            if (r.status === 401) { var e = new Error('auth'); e.noRetry = true; throw e; }
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          });
+        },
+        error: function(err) { return err && err.message === 'auth' ? '${js(c.loginReact)}' : '${js(c.reactFail)}'; },
+        done: function(res) { var d = (res && res.data) || {}; cmtReactState[id] = d.reactions || {}; refreshReactionBar(id); }
+      });
     };
 
     function applyReactionEvent(id, incoming) {
@@ -279,15 +287,20 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
     };
 
     window.toggleResolve = function(id, resolved) {
-      applyResolveLive(id, resolved);
-      fetch(cmtApi + '/' + id + '/resolve', {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resolved: resolved })
-      })
-        .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .catch(function(err) { console.error('Resolve error:', err); loadComments(); });
+      soOpt({
+        key: 'resolve:' + id,
+        apply: function() { applyResolveLive(id, resolved); },
+        rollback: function() { loadComments(); },
+        request: function() {
+          return fetch(cmtApi + '/' + id + '/resolve', {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ resolved: resolved })
+          });
+        },
+        error: '${js(c.resolveFail)}'
+      });
     };
 
     // ----- Assign picker -----
@@ -345,25 +358,34 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
       // If dueOnly (set due button), keep existing email
       var assignee = dueOnly ? (cmtRoots.filter(function(x) { return x.id === id; })[0] || {}).assigneeEmail || null : (email || null);
       closeAssignPicker();
-      fetch(cmtApi + '/' + id + '/assign', {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignee: assignee, dueAt: dueAt })
-      })
-        .then(function(r) {
-          if (r.status === 401) throw new Error('auth');
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.json();
-        })
-        .then(function(res) {
-          var updated = res && res.data;
-          if (updated && updated.id) applyAssignLive(updated);
-        })
-        .catch(function(err) {
-          if (err.message === 'auth') alert('${js(c.loginAssign)}');
-          else console.error('Assign error:', err);
-        });
+      // Optimistic: the card shows the new assignee / due date at once; the server's copy
+      // replaces it when it lands, and a failure puts the old card back.
+      var prev = cmtRoots.filter(function(x) { return x.id === id; })[0];
+      soOpt({
+        key: 'assign:' + id,
+        apply: function() {
+          if (!prev) return;
+          var next = {}; for (var k in prev) next[k] = prev[k];
+          next.assigneeEmail = assignee; next.dueAt = dueAt;
+          if (!assignee) next.assigneeUserId = null;
+          applyAssignLive(next);
+        },
+        rollback: function() { if (prev) applyAssignLive(prev); },
+        request: function() {
+          return fetch(cmtApi + '/' + id + '/assign', {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assignee: assignee, dueAt: dueAt })
+          }).then(function(r) {
+            if (r.status === 401) { var e = new Error('auth'); e.noRetry = true; throw e; }
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          });
+        },
+        error: function(err) { return err && err.message === 'auth' ? '${js(c.loginAssign)}' : '${js(c.assignFail)}'; },
+        done: function(res) { var updated = res && res.data; if (updated && updated.id) applyAssignLive(updated); }
+      });
     };
 
     function applyAssignLive(c) {

@@ -177,7 +177,7 @@ export const workspace_client_home_views_cardActions_JS = `  // ===== artifact c
   function deleteArtifacts(ids) {
     var leaving = {};
     function back(id) { delete pendingArtDeletes[id]; if (leaving[id]) leaving[id].restore(); showArtEls(id); }
-    optimistic({
+    return optimistic({
       key: 'del:art:' + ids.join(','),
       undo: true,
       apply: function () {

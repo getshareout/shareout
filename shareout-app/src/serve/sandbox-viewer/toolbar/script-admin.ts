@@ -1,5 +1,7 @@
+import { TOOLBAR_COPY, js, type ToolbarCopy } from './copy';
+
 /** Auto-extracted client script for the sandbox viewer toolbar. */
-export function renderToolbarScriptAdmin(baseUrl: string, slug: string, artifactId: string): string {
+export function renderToolbarScriptAdmin(baseUrl: string, slug: string, artifactId: string, c: ToolbarCopy = TOOLBAR_COPY.en): string {
   return `
     var statsLoaded = false;
     var adminLoaded = false;
@@ -281,19 +283,22 @@ export function renderToolbarScriptAdmin(baseUrl: string, slug: string, artifact
         })
         .catch(function() { updateViewerToggles(); });
     }
+    // Optimistic toggles: the label flips at once; the page reloads once the setting is
+    // saved (the toolbar is server-rendered from it), and a failure flips it back.
+    function soViewerToggle(key, patch, flip) {
+      soOpt({
+        key: key,
+        apply: function() { flip(); updateViewerToggles(); },
+        rollback: function() { flip(); updateViewerToggles(); },
+        request: function() { return saveViewerConfig(patch, true); },
+        error: '${js(c.settingFail)}'
+      });
+    }
     window.toggleViewerToolbar = function() {
-      var b = document.getElementById('so-toolbar-toggle');
-      if (b) b.disabled = true;
-      saveViewerConfig({ hide_toolbar: viewerToolbarOn }, true)
-        .catch(function(err) { console.error('Toggle viewer toolbar error:', err); })
-        .finally(function() { if (b) b.disabled = false; });
+      soViewerToggle('viewer-toolbar', { hide_toolbar: viewerToolbarOn }, function() { viewerToolbarOn = !viewerToolbarOn; });
     };
     window.toggleViewerToolbarMobile = function() {
-      var b = document.getElementById('so-mobile-toolbar-toggle');
-      if (b) b.disabled = true;
-      saveViewerConfig({ show_on_mobile: !viewerToolbarMobileOn }, true)
-        .catch(function(err) { console.error('Toggle mobile toolbar error:', err); })
-        .finally(function() { if (b) b.disabled = false; });
+      soViewerToggle('viewer-toolbar-mobile', { show_on_mobile: !viewerToolbarMobileOn }, function() { viewerToolbarMobileOn = !viewerToolbarMobileOn; });
     };
     function updateCmtToggle() {
       var b = document.getElementById('so-cmt-toggle');
@@ -311,17 +316,19 @@ export function renderToolbarScriptAdmin(baseUrl: string, slug: string, artifact
     }
     window.toggleCommentsOverlay = function() {
       var next = !cmtOverlayOn;
-      var b = document.getElementById('so-cmt-toggle');
-      if (b) b.disabled = true;
-      fetch('${baseUrl}/v1/data/${artifactId}/comments/_config', {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ overlayEnabled: next })
-      })
-        .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(function() { cmtOverlayOn = next; updateCmtToggle(); })
-        .catch(function(err) { console.error('Toggle comments error:', err); })
-        .finally(function() { if (b) b.disabled = false; });
+      soOpt({
+        key: 'cmt-overlay',
+        apply: function() { cmtOverlayOn = next; updateCmtToggle(); },
+        rollback: function() { cmtOverlayOn = !next; updateCmtToggle(); },
+        request: function() {
+          return fetch('${baseUrl}/v1/data/${artifactId}/comments/_config', {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ overlayEnabled: next })
+          });
+        },
+        error: '${js(c.settingFail)}'
+      });
     };`;
 }

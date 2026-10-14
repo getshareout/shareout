@@ -4,23 +4,24 @@ import { TOOLBAR_COPY, js, type ToolbarCopy } from './copy';
 export function renderToolbarScriptAuth(baseUrl: string, artifactId: string, userEmail: string, c: ToolbarCopy = TOOLBAR_COPY.en): string {
   const userEmailLiteral = JSON.stringify(userEmail || '');
   return `
+    function soFavDom(btn, on) {
+      btn.classList.toggle('active', on);
+      btn.title = on ? '${js(c.favRemove)}' : '${js(c.favAdd)}';
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      var svg = btn.querySelector('svg'); if (svg) svg.setAttribute('fill', on ? 'currentColor' : 'none');
+      var lbl = document.getElementById('so-fav-label'); if (lbl) lbl.textContent = on ? '${js(c.favorited)}' : '${js(c.favorite)}';
+    }
     window.toggleFav = function() {
       var btn = document.getElementById('so-fav-btn');
       if (!btn) return;
-      var on = btn.classList.contains('active');
-      btn.disabled = true;
-      fetch('${baseUrl}/v1/artifacts/${artifactId}/favorite', { method: on ? 'DELETE' : 'POST', credentials: 'include' })
-        .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(function() {
-          on = !on;
-          btn.classList.toggle('active', on);
-          btn.title = on ? '${js(c.favRemove)}' : '${js(c.favAdd)}';
-          btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-          var svg = btn.querySelector('svg'); if (svg) svg.setAttribute('fill', on ? 'currentColor' : 'none');
-          var lbl = document.getElementById('so-fav-label'); if (lbl) lbl.textContent = on ? '${js(c.favorited)}' : '${js(c.favorite)}';
-        })
-        .catch(function(err) { console.error('Favorite error:', err); })
-        .finally(function() { btn.disabled = false; });
+      var on = !btn.classList.contains('active');
+      soOpt({
+        key: 'fav',
+        apply: function() { soFavDom(btn, on); },
+        rollback: function() { soFavDom(btn, !on); },
+        request: function() { return fetch('${baseUrl}/v1/artifacts/${artifactId}/favorite', { method: on ? 'POST' : 'DELETE', credentials: 'include' }); },
+        error: '${js(c.favFailed)}'
+      });
     };
     var SO_SCHED_CRONS = [['${js(c.cronDaily)}','0 9 * * *'],['${js(c.cronWeekdays)}','0 9 * * 1-5'],['${js(c.cronWeekly)}','0 9 * * 1'],['${js(c.cronHourly)}','0 * * * *']];
     var SO_ICON_TELEGRAM = '<img src="${baseUrl}/brand/telegram-icon.png" alt="" width="36" height="36" class="so-sched-dest-logo" decoding="async">';
@@ -159,10 +160,24 @@ export function renderToolbarScriptAuth(baseUrl: string, artifactId: string, use
         else { var ch = (document.getElementById('so-sched-channel').value || '').trim(); if (!ch) { err.textContent = '${js(c.errChannel)}'; return; } config.channelId = ch; }
         action = 'slack';
       }
-      fetch('${baseUrl}/v1/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ artifact_id: '${artifactId}', action: action, schedule: cron, config: config }) })
-        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
-        .then(function(res) { if (!res.ok) { err.textContent = (res.d && res.d.error) ? res.d.error : '${js(c.errSchedule)}'; return; } soCloseSchedule(); })
-        .catch(function() { err.textContent = '${js(c.errNetwork)}'; });
+      // Optimistic: the modal hides at once with a "Schedule created" toast; a refusal
+      // brings it back exactly as filled in, with the reason inline.
+      var ov = document.getElementById('so-sched-modal');
+      soOpt({
+        key: 'sched-create',
+        apply: function() { if (ov) ov.style.display = 'none'; },
+        rollback: function(e) { if (ov) ov.style.display = ''; err.textContent = (e && e.userMessage) || '${js(c.errNetwork)}'; },
+        request: function() {
+          return fetch('${baseUrl}/v1/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ artifact_id: '${artifactId}', action: action, schedule: cron, config: config }) })
+            .then(function(r) {
+              if (r.ok) return r;
+              return r.json().catch(function() { return null; }).then(function(d) { var e = new Error('schedule'); e.noRetry = true; e.userMessage = (d && d.error) ? d.error : '${js(c.errSchedule)}'; throw e; });
+            });
+        },
+        success: '${js(c.scheduleCreated)}',
+        error: false,
+        done: function() { soCloseSchedule(); }
+      });
     };
     window.soCloseFollow = function() { var ov = document.getElementById('so-follow-modal'); if (ov) ov.remove(); };
     window.soFollowPickDest = function(dest) {
@@ -254,9 +269,21 @@ export function renderToolbarScriptAuth(baseUrl: string, artifactId: string, use
         })
         .catch(function() {});
     };
+    // Optimistic + undo: the row leaves at once; the DELETE waits out the Undo toast.
     window.soFollowCancel = function(id) {
-      fetch('${baseUrl}/v1/metric-alerts/' + id, { method: 'DELETE', credentials: 'include' })
-        .then(function(r) { if (r.ok) soFollowLoadMine(); });
+      var btn = document.querySelector('#so-follow-mine [onclick*="' + id + '"]');
+      var row = btn ? btn.parentNode : null;
+      var h = null;
+      soOpt({
+        key: 'alert-del:' + id,
+        undo: true,
+        apply: function() { if (row) h = window.soOptimistic.leave(row); },
+        rollback: function() { if (h) h.restore(); },
+        request: function() { return fetch('${baseUrl}/v1/metric-alerts/' + id, { method: 'DELETE', credentials: 'include', keepalive: true }); },
+        success: '${js(c.alertCancelled)}',
+        error: '${js(c.alertCancelFail)}',
+        done: function() { soFollowLoadMine(); }
+      });
     };
     window.soFollowDestChange = function() { soFollowPickDest(document.getElementById('so-follow-dest').value); };
     window.soFollowCreate = function() {
@@ -282,14 +309,22 @@ export function renderToolbarScriptAuth(baseUrl: string, artifactId: string, use
       var crew = !!(document.getElementById('so-follow-crew') && document.getElementById('so-follow-crew').checked);
       var body = { artifact_id: '${artifactId}', metric_id: metricId, name: '${js(c.followPrefix)}' + metricId, condition: { op: op, value: value }, schedule: cron, destination: destination };
       if (crew) body.on_trigger = { crew: true };
-      fetch('${baseUrl}/v1/metric-alerts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(body) })
-        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
-        .then(function(res) {
-          if (!res.ok) { err.textContent = (res.d && res.d.error) ? res.d.error : '${js(c.errAlert)}'; return; }
-          document.getElementById('so-follow-value').value = '';
-          err.style.color = 'var(--color-success)'; err.textContent = '${js(c.alertCreated)}';
-          soFollowLoadMine();
-        })
-        .catch(function() { err.textContent = '${js(c.errNetwork)}'; });
+      // Optimistic: "Alert created" shows and the form clears at once; a refusal puts the
+      // threshold back and shows the reason inline.
+      var valueEl = document.getElementById('so-follow-value');
+      soOpt({
+        key: 'alert-create',
+        apply: function() { valueEl.value = ''; err.style.color = 'var(--color-success)'; err.textContent = '${js(c.alertCreated)}'; },
+        rollback: function(e) { valueEl.value = String(value); err.style.color = ''; err.textContent = (e && e.userMessage) || '${js(c.errNetwork)}'; },
+        request: function() {
+          return fetch('${baseUrl}/v1/metric-alerts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(body) })
+            .then(function(r) {
+              if (r.ok) return r;
+              return r.json().catch(function() { return null; }).then(function(d) { var e = new Error('alert'); e.noRetry = true; e.userMessage = (d && d.error) ? d.error : '${js(c.errAlert)}'; throw e; });
+            });
+        },
+        error: false,
+        done: function() { soFollowLoadMine(); }
+      });
     };`;
 }

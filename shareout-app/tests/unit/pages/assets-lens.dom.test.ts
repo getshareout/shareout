@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { workspace_client_home_views_assets_JS as assetsJs } from '../../../src/pages/home/render-workspace/client-script/home-views/assets';
 import { workspace_client_home_views_modalsForms_JS as modalsJs } from '../../../src/pages/home/render-workspace/client-script/home-views/modals-forms';
 import { ASSETS_COPY } from '../../../src/pages/home/home-i18n/copy/assets';
+import { componentScripts } from '../../../src/design-system/components/index';
 
 const copy = { ...(ASSETS_COPY.es as Record<string, string>), 'common.delete': 'Eliminar' };
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -17,8 +18,12 @@ type Lens = {
   setState: (s: unknown) => void;
 };
 
+type Opt = ((o: unknown) => Promise<boolean>) & { flush(): void };
+const opt = () => (window as unknown as { soOptimistic: Opt }).soOptimistic;
+
 function load(ws: string | null): Lens {
   const win = globalThis.window as unknown as Record<string, unknown>;
+  if (!win.soOptimistic) eval(componentScripts);
   win.WSX_WS = ws;
   const scope = new Proxy({}, {
     has: () => true,
@@ -31,6 +36,7 @@ function load(ws: string | null): Lens {
       if (prop === 'isvg') return (p: string) => `<svg>${p}</svg>`;
       if (prop === 'adBytes') return (n: number) => `${n} B`;
       if (prop === 'fetch') return (...a: unknown[]) => fetchMock(...a);
+      if (prop === 'optimistic') return (o: unknown) => opt()(o);
       if (prop in globalThis) return (globalThis as Record<string, unknown>)[prop];
       return () => '';
     },
@@ -105,7 +111,43 @@ describe('Recursos lens', () => {
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
     document.querySelector<HTMLElement>('#del_go')!.click();
-    expect(fetchMock.mock.calls[0]).toEqual(['/v1/workspaces/wsp_1/assets/deliverables/t', { method: 'DELETE', credentials: 'same-origin' }]);
+    // Optimistic: the dialog closes, the tile leaves, and the DELETE waits behind Undo.
+    expect(document.querySelector('.wsx-modal')).toBeNull();
+    expect(document.querySelector('.wsx-asset[data-asset-id="t"]')).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+    opt().flush();
+    expect(fetchMock.mock.calls[0]).toEqual(['/v1/workspaces/wsp_1/assets/deliverables/t', { method: 'DELETE', credentials: 'same-origin', keepalive: true }]);
+  });
+
+  it('Undo on a deleted file brings the tile back and never sends the DELETE', () => {
+    const lens = load('wsp_1');
+    lens.setState({ deliverables: [dlv('u', 'team')], loose: [] });
+    lens.renderAssets();
+    document.querySelector<HTMLElement>('.wsx-asset')!.click();
+    document.querySelector<HTMLElement>('[data-pv-act="del"]')!.click();
+    document.querySelector<HTMLElement>('#del_go')!.click();
+    expect(document.querySelector('.wsx-asset[data-asset-id="u"]')).toBeNull();
+    const undo = [...document.querySelectorAll<HTMLButtonElement>('.so-c-toast__act')].pop()!;
+    undo.click();
+    expect(document.querySelector('.wsx-asset[data-asset-id="u"]')).not.toBeNull();
+    opt().flush();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a failed visibility change puts the old badge back and shows an error', async () => {
+    fetchMock = vi.fn(async () => new Response('{}', { status: 500 }));
+    const lens = load('wsp_1');
+    lens.setState({ deliverables: [dlv('v', 'team')], loose: [] });
+    lens.renderAssets();
+    document.querySelector<HTMLElement>('.wsx-asset')!.click();
+    const sel = document.querySelector('#pv_vis') as HTMLSelectElement;
+    sel.value = 'workspace';
+    sel.dispatchEvent(new Event('change'));
+    expect(document.querySelector('.wsx-asset__vis')!.textContent).toBe('Cualquiera con el enlace');
+    await flush();
+    expect(document.querySelector('.wsx-asset__vis')!.textContent).toBe('Solo el equipo');
+    expect(sel.value).toBe('team');
+    expect(document.querySelector('.so-c-toast--error')).not.toBeNull();
   });
 
   it('a workspace upload asks who can see it (team preselected) and sends the choice', async () => {

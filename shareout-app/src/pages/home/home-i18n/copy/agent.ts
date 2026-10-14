@@ -47,6 +47,7 @@ export const AGENT_COPY: HomeLocaleCopy = {
     'agent.noMatches': 'No matches',
     'agent.noSavedChats': 'No saved chats yet.',
     'agent.renameChat': 'Rename chat',
+    'agent.chatDeleted': 'Chat deleted',
   },
   es: {
     'agent.buildIt': 'Crear artefacto',
@@ -93,5 +94,6 @@ export const AGENT_COPY: HomeLocaleCopy = {
     'agent.noMatches': 'Sin coincidencias',
     'agent.noSavedChats': 'Todavía no hay chats guardados.',
     'agent.renameChat': 'Renombrar chat',
+    'agent.chatDeleted': 'Chat eliminado',
   },
 };

@@ -1,17 +1,24 @@
 /** Open artifact links as tabs. */
 export const workspace_client_artifact_links_JS = `  // ===== dismiss a "Needs you" event (server-side, cross-device) =====
-  function dismissEvents(csv) {
+  // Optimistic: the row leaves at once; a failed dismiss brings it back.
+  function dismissEvents(csv, row) {
     var ids = (csv || '').split(',').filter(Boolean);
     if (!ids.length) return;
-    fetch('/v1/home/dismiss-event', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventIds: ids }) })
-      .then(function () { loadFeed(); })
-      .catch(function () {});
+    var leaving = null;
+    optimistic({
+      key: 'dismiss:' + csv,
+      apply: function () { if (row) leaving = window.soOptimistic.leave(row); },
+      rollback: function () { if (leaving) leaving.restore(); },
+      request: function () { return fetch('/v1/home/dismiss-event', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventIds: ids }) }); },
+      error: t('evt.dismissFailed'),
+      done: function () { loadFeed(); },
+    });
   }
 
   // ===== open any artifact link as a tab (cards, widgets, activity) =====
   document.getElementById('wsxBody').addEventListener('click', function (e) {
     var dx = e.target.closest('.wsx-ev__x, .wsx-tl__x');
-    if (dx) { e.preventDefault(); e.stopPropagation(); dismissEvents(dx.getAttribute('data-eids')); return; }
+    if (dx) { e.preventDefault(); e.stopPropagation(); dismissEvents(dx.getAttribute('data-eids'), dx.closest('.wsx-ev, .wsx-tl')); return; }
     var a = e.target.closest('a[href]');
     if (!a) return;
     var m = (a.getAttribute('href') || '').match(/^\\/a\\/([^/]+)\\//);

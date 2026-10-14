@@ -12,6 +12,7 @@ import { renderConnectPanel } from './connect-panel';
 import { renderMetricsPanel } from './metrics-panel';
 import { renderInboxPanel } from './inbox-panel';
 import { showToast } from '../toast';
+import { optimistic, withBusy, ActionError } from '../optimistic';
 import { showConfirmDialog } from '../ui/confirm-dialog';
 
 const log = createLogger('rail-panels');
@@ -113,8 +114,11 @@ function renderShare(ctx: EditorContext, host: HTMLElement): void {
 
   const sendBtn = host.querySelector<HTMLButtonElement>('#share-send');
   const statusEl = host.querySelector<HTMLElement>('#share-status');
-  sendBtn?.addEventListener('click', async () => {
-    const emailsRaw = host.querySelector<HTMLInputElement>('#share-emails')?.value || '';
+  // Optimistic: the invite form clears and "N invites sent" shows at once; a refusal
+  // puts the emails back and says why.
+  sendBtn?.addEventListener('click', () => {
+    const emailsInput = host.querySelector<HTMLInputElement>('#share-emails');
+    const emailsRaw = emailsInput?.value || '';
     const emails = emailsRaw.split(/[,\s]+/).map((e) => e.trim()).filter(Boolean);
     if (!emails.length) {
       if (statusEl) statusEl.textContent = 'Enter at least one email, or use Copy.';
@@ -122,30 +126,33 @@ function renderShare(ctx: EditorContext, host: HTMLElement): void {
     }
     const role = host.querySelector<HTMLInputElement>('input[name="share-role"]:checked')?.value || 'none';
     const message = host.querySelector<HTMLTextAreaElement>('#share-message')?.value || undefined;
-    sendBtn.disabled = true;
-    if (statusEl) statusEl.textContent = 'Sending…';
-    try {
-      const r = await fetch(`/v1/artifacts/${ctx.config.artifactId}/share`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ recipients: emails, message, role }),
-      });
-      const payload = await r.json().catch(() => ({}));
-      if (r.ok) {
-        const n = (payload.sent || []).length;
-        showToast(`${n} invite${n === 1 ? '' : 's'} sent`, 'success');
-        if (statusEl) statusEl.textContent = '';
-        const emailsInput = host.querySelector<HTMLInputElement>('#share-emails');
+    const n = emails.length;
+    void optimistic({
+      key: 'share-send',
+      apply: () => {
         if (emailsInput) emailsInput.value = '';
-      } else if (statusEl) {
-        statusEl.textContent = payload.error || 'Failed to share.';
-      }
-    } catch {
-      if (statusEl) statusEl.textContent = 'Network error.';
-    } finally {
-      sendBtn.disabled = false;
-    }
+        if (statusEl) statusEl.textContent = '';
+      },
+      rollback: (err) => {
+        if (emailsInput && !emailsInput.value) emailsInput.value = emailsRaw;
+        if (statusEl && err instanceof ActionError) statusEl.textContent = err.message;
+      },
+      request: async () => {
+        const r = await fetch(`/v1/artifacts/${ctx.config.artifactId}/share`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ recipients: emails, message, role }),
+        });
+        if (!r.ok) {
+          const payload = (await r.json().catch(() => ({}))) as { error?: string };
+          throw new ActionError(payload.error || 'Failed to share.');
+        }
+        return r;
+      },
+      success: `${n} invite${n === 1 ? '' : 's'} sent`,
+      error: (e) => (e instanceof ActionError ? `Couldn’t share: ${e.message}` : 'Couldn’t share. Check your connection?'),
+    });
   });
 }
 
@@ -214,19 +221,22 @@ async function renderHistory(ctx: EditorContext, host: HTMLElement): Promise<voi
         });
         if (!ok) return;
         const versionId = btn.dataset.versionRestore;
-        const r = await fetch(`/v1/artifacts/${ctx.config.artifactId}/editor/rollback`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ versionId }),
+        // Exception to optimistic: restore swaps the draft server-side and reloads the editor.
+        await withBusy(btn, 'Restoring…', async () => {
+          const r = await fetch(`/v1/artifacts/${ctx.config.artifactId}/editor/rollback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ versionId }),
+          }).catch(() => null);
+          const payload = r ? await r.json().catch(() => ({})) : {};
+          if (r && r.ok && payload.success) {
+            showToast('Version restored', 'success');
+            location.reload();
+          } else {
+            showToast(payload.error || 'Couldn’t restore that version. Check your connection?', 'error');
+          }
         });
-        const payload = await r.json().catch(() => ({}));
-        if (r.ok && payload.success) {
-          showToast('Version restored', 'success');
-          location.reload();
-        } else {
-          showToast(payload.error || 'Failed to restore version', 'error');
-        }
       });
     });
   } catch (err) {

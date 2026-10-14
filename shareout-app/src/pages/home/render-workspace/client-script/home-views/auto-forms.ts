@@ -142,17 +142,19 @@ export const workspace_client_home_views_autoForms_JS = `  // ----- Step-by-step
     });
     q('af_submit').addEventListener('click', function () {
       var sub = this; err(); var b = build(); if (b.err) { err(b.err); return; }
-      sub.disabled = true;
+      // Exception to optimistic: the server validates the cron/destination and returns the
+      // new job (id, next run) the list needs, so the button shows "Saving…" until then.
+      var label = sub.textContent; sub.disabled = true; sub.textContent = t('common.saving');
       fetch(b.url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b.body) })
         .then(function (r) { return r.json().catch(function () { return null; }).then(function (d) { return { ok: r.ok, d: d }; }); })
         .then(function (res) {
-          sub.disabled = false;
+          sub.disabled = false; sub.textContent = label;
           if (!res.ok) { err(null, (res.d && res.d.error) || t('autof.couldNotSave')); return; }
           modal.close(); wsxToast(t(isAlert ? 'autof.alertOk' : 'autof.scheduledOk'));
           if (isAlert ? loaded.alerts : loaded.schedules) { if (isAlert) loadAlerts(); else loadSchedules(); }
           if (onDone) onDone();
         })
-        .catch(function () { sub.disabled = false; err('autof.couldNotSave'); });
+        .catch(function () { sub.disabled = false; sub.textContent = label; err('autof.couldNotSave'); });
     });
     if (preset && preset.id) { loadArt(); return modal; }
     q('af_art').addEventListener('change', loadArt);
@@ -165,23 +167,42 @@ export const workspace_client_home_views_autoForms_JS = `  // ----- Step-by-step
     return modal;
   }
   // Pause / resume / delete on a schedule or alert card (the list only holds the caller's own).
+  // Optimistic: pause/resume flips at once; delete removes the card behind an Undo toast.
+  var pendingAfDeletes = {};
+  function paintAfToggle(card, on) {
+    card.setAttribute('data-af-on', on ? '1' : '0');
+    var tb = card.querySelector('[data-af-act="toggle"]'); if (tb) tb.textContent = t(on ? 'autof.pause' : 'autof.resume');
+  }
   function wireAutoCardActions(m, kind) {
+    m.querySelectorAll('[data-af-id]').forEach(function (c) { if (pendingAfDeletes[c.getAttribute('data-af-id')]) c.style.display = 'none'; });
     m.querySelectorAll('[data-af-act]').forEach(function (b) {
       b.addEventListener('click', function () {
         var card = b.closest('[data-af-id]'); var id = card.getAttribute('data-af-id'); var act = b.getAttribute('data-af-act');
         var base = (kind === 'alert' ? '/v1/metric-alerts/' : '/v1/jobs/') + encodeURIComponent(id);
         var reload = kind === 'alert' ? loadAlerts : loadSchedules;
         if (act === 'toggle') {
-          var on = card.getAttribute('data-af-on') === '1'; b.disabled = true;
-          fetch(base, { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: !on }) })
-            .then(function (r) { if (!r.ok) throw new Error('failed'); reload(); })
-            .catch(function () { b.disabled = false; wsxToast(t('autof.couldNotUpdate'), true); });
+          var on = card.getAttribute('data-af-on') === '1';
+          optimistic({
+            key: 'af:toggle:' + id,
+            apply: function () { paintAfToggle(card, !on); },
+            rollback: function () { paintAfToggle(card, on); },
+            request: function () { return fetch(base, { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: !on }) }); },
+            error: t('autof.couldNotUpdate'),
+            done: function () { reload(); },
+          });
         } else if (act === 'del') {
           if (!window.confirm(t(kind === 'alert' ? 'autof.deleteAlertConfirm' : 'autof.deleteSchedConfirm'))) return;
-          b.disabled = true;
-          fetch(base, { method: 'DELETE', credentials: 'same-origin' })
-            .then(function (r) { if (!r.ok) throw new Error('failed'); card.remove(); })
-            .catch(function () { b.disabled = false; wsxToast(t('autof.couldNotDelete'), true); });
+          var gone = null;
+          optimistic({
+            key: 'af:del:' + id,
+            undo: true,
+            apply: function () { pendingAfDeletes[id] = true; gone = window.soOptimistic.leave(card); },
+            rollback: function () { delete pendingAfDeletes[id]; if (gone) gone.restore(); },
+            request: function () { return fetch(base, { method: 'DELETE', credentials: 'same-origin', keepalive: true }); },
+            success: t(kind === 'alert' ? 'autof.alertDeleted' : 'autof.schedDeleted'),
+            error: t('autof.couldNotDelete'),
+            done: function () { delete pendingAfDeletes[id]; if (gone) gone.commit(); },
+          });
         }
       });
     });

@@ -69,7 +69,12 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     var empty = curFolder ? t('artifacts.folderEmpty') : t('artifacts.nothingHere');
     ART_DATA['wsxArtMount'] = { cardsHtml: d.cardsHtml, rowsHtml: d.rowsHtml, count: d.count, empty: empty, folderHead: folderHead(d) };
     renderArtView('wsxArtMount');
+    hidePendingFolders();
   }
+  // Folders deleted optimistically whose DELETE hasn't landed (undo window / in flight).
+  var pendingFolderDeletes = {};
+  function folderEls(id) { return document.querySelectorAll('.wsx-folder-card[data-folder-id="' + CSS.escape(id) + '"]'); }
+  function hidePendingFolders() { Object.keys(pendingFolderDeletes).forEach(function (id) { folderEls(id).forEach(function (el) { el.style.display = 'none'; }); }); }
   function fetchArt(f, cb, fld) {
     var k = artKey(f, fld);
     if (!artPending[k]) {
@@ -169,8 +174,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     function submit() {
       var nm = cv('fld_name'); var err = document.getElementById('fld_err');
       if (!nm) { err.textContent = t('artifacts.nameRequired'); return; }
-      var b = document.getElementById('fld_go'); b.disabled = true;
-      go(nm, function (msg) { b.disabled = false; err.textContent = msg; }, mo);
+      go(nm, mo);
     }
     document.getElementById('fld_go').addEventListener('click', submit);
     if (inp) inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
@@ -188,13 +192,29 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     row.appendChild(wrap); inp.focus();
     var done = false;
     function cleanup() { if (done) return; done = true; wrap.remove(); btn.style.display = ''; }
+    // Optimistic: the folder card appears at once (inert until the real one lands on the
+    // silent reload); a failed create removes it and says why, with Retry.
     function submit() {
       var nm = inp.value.trim(); if (!nm) { cleanup(); return; }
-      inp.disabled = true;
-      fetch(folderApiBase(), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: nm, parent_id: curFolder || undefined }) })
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-        .then(function (res) { if (!res.ok) { inp.disabled = false; showToast((res.j && res.j.error) || t('artifacts.couldNotCreate'), 'error'); inp.focus(); return; } cleanup(); reloadFolders(); })
-        .catch(function () { inp.disabled = false; showToast(t('modal.networkError'), 'error'); inp.focus(); });
+      var parent = curFolder, ph = null;
+      cleanup();
+      optimistic({
+        key: 'folder:new:' + parent + ':' + nm,
+        apply: function () {
+          var grid = row.parentNode && row.parentNode.querySelector('.wsx-folder-grid'); if (!grid) return;
+          ph = document.createElement('article'); ph.className = 'wsx-folder-card'; ph.setAttribute('aria-busy', 'true');
+          ph.innerHTML = '<span class="wsx-folder-card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span><span class="wsx-folder-card__txt"><span class="wsx-folder-card__name"></span></span>';
+          ph.querySelector('.wsx-folder-card__name').textContent = nm;
+          grid.appendChild(ph);
+        },
+        rollback: function () { if (ph && ph.parentNode) ph.remove(); },
+        request: function () {
+          return fetch(folderApiBase(), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: nm, parent_id: parent || undefined }) })
+            .then(function (r) { if (r.ok) return r; return r.json().catch(function () { return null; }).then(function (j) { var e = new Error('create'); e.userMessage = j && j.error; throw e; }); });
+        },
+        error: function (e) { return (e && e.userMessage) || t('artifacts.couldNotCreate'); },
+        done: function () { reloadFolders(); },
+      });
     }
     inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); submit(); } else if (e.key === 'Escape') cleanup(); });
     inp.addEventListener('blur', function () { if (!inp.value.trim()) cleanup(); });
@@ -218,22 +238,53 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     homePane.addEventListener('drop', function (e) { if (!dragId) return; var el = dropEl(e); if (!el) return; e.preventDefault(); var fid = el.getAttribute('data-folder-id') || null; var id = dragId; dragId = null; clearDrop(); moveArtifactsToFolder([id], fid, { close: function () {} }); });
   })();
   window.renameFolder = function (id, name) {
-    folderNameModal(t('artifacts.renameFolder'), name || '', t('common.save'), function (nm, fail, mo) {
-      fetch(folderApiBase() + '/' + encodeURIComponent(id), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: nm }) })
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-        .then(function (res) { if (!res.ok) { fail((res.j && res.j.error) || t('artifacts.couldNotRename')); return; } if (curFolder === id) curFolderName = nm; mo.close(); reloadFolders(); })
-        .catch(function () { fail(t('modal.networkError')); });
+    folderNameModal(t('artifacts.renameFolder'), name || '', t('common.save'), function (nm, mo) {
+      var prev = name || '', prevCur = curFolderName;
+      function setName(n) {
+        folderEls(id).forEach(function (el) { el.setAttribute('data-folder-name', n); var nmEl = el.querySelector('.wsx-folder-card__name'); if (nmEl) nmEl.textContent = n; });
+        document.querySelectorAll('.folders-breadcrumb .crumb-current').forEach(function (c) { if (curFolder === id) c.textContent = n; });
+      }
+      optimistic({
+        key: 'folder:rename:' + id,
+        apply: function () { mo.close(); setName(nm); if (curFolder === id) curFolderName = nm; },
+        rollback: function () { setName(prev); if (curFolder === id) curFolderName = prevCur; },
+        request: function () {
+          return fetch(folderApiBase() + '/' + encodeURIComponent(id), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: nm }) })
+            .then(function (r) { if (r.ok) return r; return r.json().catch(function () { return null; }).then(function (j) { var e = new Error('rename'); e.userMessage = j && j.error; throw e; }); });
+        },
+        error: function (e) { return (e && e.userMessage) || t('artifacts.couldNotRename'); },
+        done: function () { reloadFolders(); },
+      });
     });
   };
   window.deleteFolder = function (id, name) {
-    var mo = wsxModal(t('artifacts.deleteFolder'), '<div class="wsx-cform"><p class="wsx-field__note">' + esc(t('artifacts.deleteBody').replace('{name}', name || t('artifacts.thisFolder'))) + '</p><div class="wsx-cform__err" id="fld_err"></div><div class="wsx-cform__foot"><button class="wsx-abtn" id="fld_cancel" type="button">' + esc(t('artifacts.cancel')) + '</button><button class="wsx-abtn danger" id="fld_go" type="button">' + esc(t('artifacts.deleteFolder')) + '</button></div></div>');
+    var mo = wsxModal(t('artifacts.deleteFolder'), '<div class="wsx-cform"><p class="wsx-field__note">' + esc(t('artifacts.deleteBody').replace('{name}', name || t('artifacts.thisFolder'))) + '</p><div class="wsx-cform__foot"><button class="wsx-abtn" id="fld_cancel" type="button">' + esc(t('artifacts.cancel')) + '</button><button class="wsx-abtn danger" id="fld_go" type="button">' + esc(t('artifacts.deleteFolder')) + '</button></div></div>');
     document.getElementById('fld_cancel').addEventListener('click', function () { mo.close(); });
     document.getElementById('fld_go').addEventListener('click', function () {
-      var b = this; b.disabled = true; var err = document.getElementById('fld_err');
-      fetch(folderApiBase() + '/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin' })
-        .then(function (r) { return r.ok ? r.json() : r.json().then(function (j) { throw j; }); })
-        .then(function () { mo.close(); if (curFolder === id) { curFolder = ''; curFolderName = ''; } reloadFolders(); })
-        .catch(function (j) { b.disabled = false; err.textContent = (j && j.error) || t('artifacts.couldNotDelete'); });
+      mo.close();
+      var leaving = null, wasIn = curFolder === id;
+      optimistic({
+        key: 'folder:del:' + id,
+        undo: true,
+        apply: function () {
+          pendingFolderDeletes[id] = true;
+          if (wasIn) { curFolder = ''; curFolderName = ''; loadArtifacts(); }
+          leaving = window.soOptimistic.leave(folderEls(id));
+        },
+        rollback: function () {
+          delete pendingFolderDeletes[id];
+          if (leaving) leaving.restore();
+          folderEls(id).forEach(function (el) { el.classList.remove('so-c-leaving'); el.style.display = ''; });
+          if (wasIn) window.enterFolder(id, name);
+        },
+        request: function () {
+          return fetch(folderApiBase() + '/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin', keepalive: true })
+            .then(function (r) { if (r.ok || r.status === 404) return r; return r.json().catch(function () { return null; }).then(function (j) { var e = new Error('delete'); e.userMessage = j && j.error; throw e; }); });
+        },
+        success: t('artifacts.folderDeleted'),
+        error: function (e) { return (e && e.userMessage) || t('artifacts.couldNotDelete'); },
+        done: function () { delete pendingFolderDeletes[id]; reloadFolders(); },
+      });
     });
   };
   // Edit the current folder's guide (README markdown). PATCHes the folder, then a silent
@@ -242,15 +293,23 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     if (!curFolder) return;
     var d = artCache[artKey(artFilter)];
     var cur = (d && d.folderReadme) || '';
-    var mo = wsxModal(t('artifacts.guideTitle'), '<div class="wsx-cform"><p class="wsx-field__note">' + esc(t('artifacts.guideModalHint')) + '</p><textarea class="wsx-fguide__ta" id="fg_txt" rows="14" spellcheck="false" placeholder="' + escAttr(t('artifacts.guidePh')) + '"></textarea><div class="wsx-cform__err" id="fg_err"></div><div class="wsx-cform__foot"><button class="wsx-abtn" id="fg_cancel" type="button">' + esc(t('artifacts.cancel')) + '</button><button class="wsx-abtn wsx-abtn--primary" id="fg_go" type="button">' + esc(t('common.save')) + '</button></div></div>');
+    var mo = wsxModal(t('artifacts.guideTitle'), '<div class="wsx-cform"><p class="wsx-field__note">' + esc(t('artifacts.guideModalHint')) + '</p><textarea class="wsx-fguide__ta" id="fg_txt" rows="14" spellcheck="false" placeholder="' + escAttr(t('artifacts.guidePh')) + '"></textarea><div class="wsx-cform__foot"><button class="wsx-abtn" id="fg_cancel" type="button">' + esc(t('artifacts.cancel')) + '</button><button class="wsx-abtn wsx-abtn--primary" id="fg_go" type="button">' + esc(t('common.save')) + '</button></div></div>');
     var ta = document.getElementById('fg_txt'); if (ta) { ta.value = cur; ta.focus(); }
     document.getElementById('fg_cancel').addEventListener('click', function () { mo.close(); });
     document.getElementById('fg_go').addEventListener('click', function () {
-      var b = this; b.disabled = true; var err = document.getElementById('fg_err');
-      fetch(folderApiBase() + '/' + encodeURIComponent(curFolder), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ readme: ta ? ta.value : '' }) })
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-        .then(function (res) { if (!res.ok) { b.disabled = false; err.textContent = (res.j && res.j.error) || t('artifacts.couldNotSaveGuide'); return; } mo.close(); reloadFolders(); })
-        .catch(function () { b.disabled = false; err.textContent = t('modal.networkError'); });
+      var fid = curFolder, txt = ta ? ta.value : '';
+      optimistic({
+        key: 'folder:readme:' + fid,
+        apply: function () { mo.close(); if (d) d.folderReadme = txt; },
+        rollback: function () { if (d) d.folderReadme = cur; },
+        request: function () {
+          return fetch(folderApiBase() + '/' + encodeURIComponent(fid), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ readme: txt }) })
+            .then(function (r) { if (r.ok) return r; return r.json().catch(function () { return null; }).then(function (j) { var e = new Error('guide'); e.userMessage = j && j.error; throw e; }); });
+        },
+        success: t('common.saved'),
+        error: function (e) { return (e && e.userMessage) || t('artifacts.couldNotSaveGuide'); },
+        done: function () { reloadFolders(); },
+      });
     });
   };
 

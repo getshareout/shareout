@@ -60,7 +60,7 @@ export const workspace_client_home_views_modalsForms_JS = `  // ===== Modal + na
     return { payload: pl };
   }
   function connOAuth(pid, name, extra, modal) {
-    fetch(wsUrl('/connections/' + encodeURIComponent(pid) + '/auth-url?connection=' + encodeURIComponent(name) + '&returnUrl=' + encodeURIComponent(location.href) + (extra || '')), { credentials: 'same-origin' })
+    return fetch(wsUrl('/connections/' + encodeURIComponent(pid) + '/auth-url?connection=' + encodeURIComponent(name) + '&returnUrl=' + encodeURIComponent(location.href) + (extra || '')), { credentials: 'same-origin' })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {
         var e = modal.body.querySelector('#cf_err');
@@ -104,24 +104,31 @@ export const workspace_client_home_views_modalsForms_JS = `  // ===== Modal + na
       if (oauth) {
         var extra = '';
         if (meta.connectMethod === 'oauth_shop') { var shop = window.prompt(t('modal.storeDomainPrompt'), ''); if (!shop) return; extra = '&shop=' + encodeURIComponent(shop.trim().replace(/^https?:\\/\\//, '').replace(/\\/.*$/, '')); }
-        connOAuth(pid, name, extra, modal); return;
+        // Exception to optimistic: the auth URL comes from the server; hold the button so a
+        // double click can't open two consent popups.
+        sub.disabled = true;
+        connOAuth(pid, name, extra, modal).then(function () { sub.disabled = false; }); return;
       }
       var built = connBuild(pid); if (built.err) { err.textContent = built.err; return; }
-      var pl = built.payload; pl.name = name; sub.disabled = true;
+      // Exception to optimistic: the server validates the credentials before saving.
+      var pl = built.payload; pl.name = name;
+      var label = sub.textContent; sub.disabled = true; sub.textContent = t('common.saving');
+      function idle() { sub.disabled = false; sub.textContent = label; }
       fetch(wsUrl('/connections'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pl) })
         .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-        .then(function (res) { sub.disabled = false; if (!res.ok) { err.textContent = (res.d && res.d.error) || t('modal.failedAdd'); return; } modal.close(); loaded.connectors = 0; loadConnectors(); })
-        .catch(function () { sub.disabled = false; err.textContent = t('modal.networkError'); });
+        .then(function (res) { idle(); if (!res.ok) { err.textContent = (res.d && res.d.error) || t('modal.failedAdd'); return; } modal.close(); loaded.connectors = 0; loadConnectors(); })
+        .catch(function () { idle(); err.textContent = t('modal.networkError'); });
     });
     var tb = document.getElementById('cf_testbtn');
     if (tb) tb.addEventListener('click', function () {
       var built = connBuild(pid), st = document.getElementById('cf_test'), err = document.getElementById('cf_err'); err.textContent = '';
       if (built.err) { err.textContent = built.err; return; }
-      st.className = 'wsx-cform__test testing'; st.textContent = t('modal.testing');
+      st.className = 'wsx-cform__test testing'; st.textContent = t('modal.testing'); tb.disabled = true;
       fetch(wsUrl('/connections/test'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: built.payload.provider || built.payload.type, config: built.payload.config, credentials: built.payload.credentials }) })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) { if (d && d.ok) { st.className = 'wsx-cform__test ok'; st.textContent = '\\u2713 ' + (d.message || t('modal.verified')); } else { st.className = 'wsx-cform__test bad'; st.textContent = '\\u2717 ' + ((d && d.message) || t('modal.testFailed')); } })
-        .catch(function () { st.className = 'wsx-cform__test bad'; st.textContent = '\\u2717 ' + t('modal.testRequestFailed'); });
+        .catch(function () { st.className = 'wsx-cform__test bad'; st.textContent = '\\u2717 ' + t('modal.testRequestFailed'); })
+        .then(function () { tb.disabled = false; });
     });
   }
   function openModuleModal() {
@@ -144,11 +151,13 @@ export const workspace_client_home_views_modalsForms_JS = `  // ===== Modal + na
       var rd = cv('lm_readme'); if (rd) b.readme = rd;
       var ex = cv('lm_exports'); if (ex) b.exports = ex;
       if (scope === 'workspace') b.workspace_id = window.WSX_WS;
-      sub.disabled = true;
+      // Exception to optimistic: the server validates and versions the module.
+      var label = sub.textContent; sub.disabled = true; sub.textContent = t('library.publishing');
+      function idle() { sub.disabled = false; sub.textContent = label; }
       fetch('/v1/me/libraries', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) })
         .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-        .then(function (res) { sub.disabled = false; if (!res.ok) { err.textContent = (res.d && res.d.error) || t('modal.failedPublish'); return; } modal.close(); loaded.library = 0; loadLibrary(); })
-        .catch(function () { sub.disabled = false; err.textContent = t('modal.networkError'); });
+        .then(function (res) { idle(); if (!res.ok) { err.textContent = (res.d && res.d.error) || t('modal.failedPublish'); return; } modal.close(); loaded.library = 0; loadLibrary(); })
+        .catch(function () { idle(); err.textContent = t('modal.networkError'); });
     });
   }
 

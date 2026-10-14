@@ -189,16 +189,34 @@ export function shareModalScript(opts: { baseUrl: string; locale?: Locale }): st
     if(!emails.length){$('soShareStatus').textContent='${c.needEmail}';return;}
     var roleEl=document.querySelector('input[name=soShareRole]:checked');
     var role=roleEl?roleEl.value:'none';
+    var id=current.id, message=$('soShareMessage').value||undefined;
+    function send(){
+      return fetch(BASE+'/v1/artifacts/'+id+'/share',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({recipients:emails,message:message,role:role})})
+        .then(function(r){return r.json().catch(function(){return null;}).then(function(d){
+          if(!r.ok){var e=new Error('share');e.noRetry=true;e.userMessage=(d&&d.error)||'${c.failed}';throw e;}
+          return d||{};
+        });});
+    }
+    // Optimistic (shared soOptimistic helper, when the page ships it): the dialog closes
+    // with "N invites sent" at once; a refusal reopens it as filled in, with the reason.
+    if(window.soOptimistic){
+      var n=emails.length;
+      window.soOptimistic({key:'share:'+id,
+        apply:function(){$('soShareStatus').textContent='';window.closeShare();},
+        rollback:function(e){var ov=$('soShareOverlay');if(ov)ov.style.display='flex';$('soShareStatus').textContent=(e&&e.userMessage)||'${c.network}';},
+        request:send,
+        success:n+(n===1?'${c.invite}':'${c.invites}')+'${c.sent}',
+        error:false});
+      return;
+    }
     var btn=$('soShareSend'); btn.disabled=true; $('soShareStatus').textContent='${c.sending}';
-    fetch(BASE+'/v1/artifacts/'+current.id+'/share',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({recipients:emails,message:$('soShareMessage').value||undefined,role:role})})
-      .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
-      .then(function(res){
-        if(!res.ok){$('soShareStatus').textContent=(res.d&&res.d.error)||'${c.failed}';return;}
-        var n=(res.d.sent||[]).length;
+    send()
+      .then(function(d){
+        var n=(d.sent||[]).length;
         toast(n+(n===1?'${c.invite}':'${c.invites}')+'${c.sent}');
         window.closeShare();
       })
-      .catch(function(){$('soShareStatus').textContent='${c.network}';})
+      .catch(function(e){$('soShareStatus').textContent=(e&&e.userMessage)||'${c.network}';})
       .finally(function(){btn.disabled=false;});
   };
   var emailInp=$('soShareEmails');

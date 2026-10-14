@@ -64,12 +64,19 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
     e.preventDefault(); e.stopPropagation();
     var wid = b.getAttribute('data-unused-archive'); var n = b.getAttribute('data-unused-n') || '0';
     if (!window.confirm(n === '1' ? t('evt.archiveConfirmOne') : t('evt.archiveConfirm').replace('{n}', n))) return;
+    // Exception to optimistic: the server recomputes which pages are unused, so the
+    // button stays busy until it answers; then the feed refreshes and a toast confirms.
     b.disabled = true; b.textContent = t('evt.archiving');
     var url = wid ? '/v1/workspaces/' + encodeURIComponent(wid) + '/unused/archive' : '/v1/artifacts/unused/archive';
     fetch(url, { method: 'POST', credentials: 'same-origin' })
-      .then(function (r) { return r.json(); })
-      .then(function () { loadFeed(); })
-      .catch(function () { b.disabled = false; b.textContent = t('evt.archiveAll'); });
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json().catch(function () { return {}; }); })
+      .then(function (d) {
+        var k = (d && (d.archived != null ? d.archived : d.count)); if (k == null) k = n;
+        showToast(t('evt.archived').replace('{n}', String(k)), 'success');
+        if (typeof artCache !== 'undefined') artCache = {};
+        loadFeed();
+      })
+      .catch(function () { b.disabled = false; b.textContent = t('evt.archiveAll'); showToast(t('evt.archiveFailed'), 'error'); });
   });
 
   // ===== artifact widgets: tile (cards) <-> table (rows), per-widget + persisted =====

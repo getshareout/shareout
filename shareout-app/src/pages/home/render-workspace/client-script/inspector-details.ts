@@ -84,16 +84,22 @@ export const workspace_client_inspector_details_JS = `  // ===== Inspector Detai
   }
   function toggleFav(id, btn) {
     var on = btn.classList.contains('is-on');
-    btn.classList.toggle('is-on', !on);
-    if (metaCache[id]) metaCache[id].is_favorite = on ? 0 : 1;
-    fetch('/v1/artifacts/' + encodeURIComponent(id) + '/favorite', { method: on ? 'DELETE' : 'POST', credentials: 'same-origin' })
-      .then(function (r) { if (!r.ok) throw new Error('failed'); })
-      .catch(function () { btn.classList.toggle('is-on', on); if (metaCache[id]) metaCache[id].is_favorite = on ? 1 : 0; try { wsxToast(t('cards.favFailed'), true); } catch (e) {} });
+    function set(v) { btn.classList.toggle('is-on', v); if (metaCache[id]) metaCache[id].is_favorite = v ? 1 : 0; if (typeof applyFavoriteDom === 'function') applyFavoriteDom(id, v); }
+    optimistic({
+      key: 'fav:' + id,
+      apply: function () { set(!on); },
+      rollback: function () { set(on); },
+      request: function () { return fetch('/v1/artifacts/' + encodeURIComponent(id) + '/favorite', { method: on ? 'DELETE' : 'POST', credentials: 'same-origin' }); },
+      error: t('cards.favFailed'),
+    });
   }
+  // Confirm, then the tab closes at once and the shared card-actions delete takes over
+  // (cards leave, "Deleted · Undo" toast, deferred DELETE, rollback on failure).
   function trashArtifact(art) {
-    if (!window.confirm(t('inspector.trashConfirm').replace('{name}', art.name || 'this page'))) return;
-    fetch('/v1/artifacts/' + encodeURIComponent(art.id), { method: 'DELETE', credentials: 'same-origin' })
-      .then(function (r) { if (r.ok) closeTab(art.key); });
+    if (!art.id || !window.confirm(t('inspector.trashConfirm').replace('{name}', art.name || t('cards.thisPage')))) return;
+    closeTab(art.key);
+    // Undo (or a failed DELETE) also brings the closed tab back.
+    deleteArtifacts([art.id]).then(function (ok) { if (!ok && art.slug) openArtifact(art.slug, art.name, art.id); });
   }
 
   // ----- Watches (metric_watches via /v1/metric-watch). No table-list plumbing —
@@ -124,11 +130,21 @@ export const workspace_client_inspector_details_JS = `  // ===== Inspector Detai
     box.innerHTML = listH + watchFormHtml();
     box.querySelectorAll('[data-wdel]').forEach(function (b) {
       b.addEventListener('click', function () {
-        b.disabled = true;
-        fetch('/v1/metric-watch/' + encodeURIComponent(b.getAttribute('data-wdel')), { method: 'DELETE', credentials: 'same-origin' })
-          .then(function (r) { return r.ok ? r.json() : null; })
-          .then(function (j) { if (!j || !j.success) { b.disabled = false; try { wsxToast(t('inspector.watchDeleteFailed'), true); } catch (e) {} return; } loadWatches(art, box); })
-          .catch(function () { b.disabled = false; try { wsxToast(t('inspector.watchDeleteFailed'), true); } catch (e) {} });
+        var wid = b.getAttribute('data-wdel'), row = b.closest('.wsx-row'), leaving = null;
+        optimistic({
+          key: 'watch:del:' + wid,
+          undo: true,
+          apply: function () { leaving = window.soOptimistic.leave(row); },
+          rollback: function () { if (leaving) leaving.restore(); },
+          request: function () {
+            return fetch('/v1/metric-watch/' + encodeURIComponent(wid), { method: 'DELETE', credentials: 'same-origin', keepalive: true })
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .then(function (j) { if (!j || !j.success) throw new Error('watch'); });
+          },
+          success: t('inspector.watchRemoved'),
+          error: t('inspector.watchDeleteFailed'),
+          done: function () { if (leaving) leaving.commit(); },
+        });
       });
     });
     var kindSel = box.querySelector('#wsxWKind'), colInp = box.querySelector('#wsxWColumn');
@@ -143,11 +159,14 @@ export const workspace_client_inspector_details_JS = `  // ===== Inspector Detai
       var body = { artifact_id: art.id, table: table, kind: kindSel.value };
       if (column) body.column = column;
       if (threshold) body.threshold_pct = Number(threshold);
-      btn.disabled = true;
+      // Exception to optimistic: the server validates the table/column and returns the new
+      // watch id the row's delete needs — keep a busy button until it answers.
+      var btnLabel = btn.textContent;
+      btn.disabled = true; btn.textContent = t('common.saving');
       fetch('/v1/metric-watch', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         .then(function (r) { return r.json().catch(function () { return null; }).then(function (j) { return { ok: r.ok, j: j }; }); })
-        .then(function (res) { if (!res.ok || !res.j || !res.j.watch) { btn.disabled = false; try { wsxToast((res.j && res.j.error) || t('inspector.watchAddFailed'), true); } catch (e) {} return; } loadWatches(art, box); })
-        .catch(function () { btn.disabled = false; try { wsxToast(t('inspector.watchAddFailed'), true); } catch (e) {} });
+        .then(function (res) { if (!res.ok || !res.j || !res.j.watch) { btn.disabled = false; btn.textContent = btnLabel; wsxToast((res.j && res.j.error) || t('inspector.watchAddFailed'), true); return; } loadWatches(art, box); })
+        .catch(function () { btn.disabled = false; btn.textContent = btnLabel; wsxToast(t('inspector.watchAddFailed'), true); });
     });
   }
   function renderWatches(art) {

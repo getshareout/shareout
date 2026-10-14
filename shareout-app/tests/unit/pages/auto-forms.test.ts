@@ -7,6 +7,7 @@ import { workspace_client_home_views_schedules_JS as schedulesJs } from '../../.
 import { workspace_client_home_views_autoForms_JS as autoFormsJs } from '../../../src/pages/home/render-workspace/client-script/home-views/auto-forms';
 import { workspace_client_home_views_modalsForms_JS as modalsJs } from '../../../src/pages/home/render-workspace/client-script/home-views/modals-forms';
 import { HOME_COPY } from '../../../src/pages/home/home-i18n/merge-copy';
+import { componentScripts } from '../../../src/design-system/components/index';
 
 type Lens = {
   afCron: (freq: string, time: string, day: string, tz: string, at?: Date) => { cron?: string; err?: string };
@@ -20,8 +21,12 @@ let fetchMock: ReturnType<typeof vi.fn>;
 const agentAsk = vi.fn();
 const toast = vi.fn();
 
+type Opt = ((o: unknown) => Promise<boolean>) & { flush(): void };
+const opt = () => (window as unknown as { soOptimistic: Opt }).soOptimistic;
+
 function loadLens(): Lens {
   const win = globalThis.window as unknown as Record<string, unknown>;
+  if (!win.soOptimistic) eval(componentScripts);
   win.WSX_WS = 'wsp_test';
   const scope = new Proxy({}, {
     has: () => true,
@@ -34,6 +39,7 @@ function loadLens(): Lens {
       if (prop === 'fetch') return (...a: unknown[]) => fetchMock(...a);
       if (prop === 'agentAsk') return agentAsk;
       if (prop === 'wsxToast') return toast;
+      if (prop === 'optimistic') return (o: unknown) => opt()(o);
       if (prop === 'loaded') return {};
       if (prop in globalThis) return (globalThis as Record<string, unknown>)[prop];
       return () => '';
@@ -233,9 +239,29 @@ describe('Schedules / Alerts lens', () => {
     expect(card.querySelector('[data-af-act="del"]')).not.toBeNull();
     expect($('[data-autoform="schedule"]')).not.toBeNull();
     card.querySelector<HTMLButtonElement>('[data-af-act="toggle"]')!.click();
+    // Optimistic: the button reads Resume before the PATCH lands.
+    expect(card.querySelector('[data-af-act="toggle"]')!.textContent).toBe(copy['autof.resume']);
     await flush();
     const patch = calls.find(([u, i]) => u === '/v1/jobs/job_1' && i?.method === 'PATCH');
     expect(JSON.parse(String(patch![1]!.body))).toEqual({ enabled: false });
+  });
+
+  it('a failed Pause flips the button back and says so', async () => {
+    document.body.innerHTML = '<div id="wsxSchedMount"></div>';
+    fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.startsWith('/v1/jobs?')) return json({ jobs: [{ id: 'job_2', action: 'email', schedule: '0 12 * * 1', enabled: true }] });
+      if (init?.method === 'PATCH') return json({ error: 'nope' }, 500);
+      return json({ logs: [] });
+    });
+    loadLens().loadSchedules();
+    await flush();
+    const card = $('[data-af-id="job_2"]');
+    card.querySelector<HTMLButtonElement>('[data-af-act="toggle"]')!.click();
+    expect(card.getAttribute('data-af-on')).toBe('0');
+    await flush();
+    expect(card.getAttribute('data-af-on')).toBe('1');
+    expect(card.querySelector('[data-af-act="toggle"]')!.textContent).toBe(copy['autof.pause']);
+    expect(document.querySelector('.so-c-toast--error')!.textContent).toContain(copy['autof.couldNotUpdate']);
   });
 
   it('a paused job reads as paused even after a past run', async () => {
@@ -261,6 +287,11 @@ describe('Schedules / Alerts lens', () => {
     loadLens().loadAlerts();
     await flush();
     $<HTMLButtonElement>('[data-af-id="alert_1"] [data-af-act="del"]').click();
+    // Optimistic: the card leaves at once; the DELETE waits behind the Undo toast.
+    expect($('[data-af-id="alert_1"]').classList.contains('so-c-leaving')).toBe(true);
+    expect(document.querySelector('.so-c-toast')!.textContent).toContain(copy['autof.alertDeleted']);
+    expect(calls.some(([, i]) => i?.method === 'DELETE')).toBe(false);
+    opt().flush();
     await flush();
     expect(calls.some(([u, i]) => u === '/v1/metric-alerts/alert_1' && i?.method === 'DELETE')).toBe(true);
     expect(document.querySelector('[data-af-id="alert_1"]')).toBeNull();

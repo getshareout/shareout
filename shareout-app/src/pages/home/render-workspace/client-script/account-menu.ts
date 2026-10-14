@@ -45,17 +45,30 @@ export const workspace_client_account_menu_JS = `
             return '<div class="wsx-acct-row"><span class="wsx-acct-row__av">' + av + '</span><span class="wsx-acct-row__email">' + label + '</span>' + tail + '</div>';
           }).join('');
           list.querySelectorAll('[data-unlink]').forEach(function (b) {
-            b.addEventListener('click', function () { unlink(b.getAttribute('data-unlink')); });
+            b.addEventListener('click', function () { unlink(b.getAttribute('data-unlink'), b.closest('.wsx-acct-row')); });
           });
         })
         .catch(function () { list.innerHTML = i18nEmpty('account.couldNotLoadAccounts'); });
     }
-    function unlink(id) {
+    // Confirm, then the row leaves at once behind an "Unlinked · Undo" toast; the DELETE
+    // waits for the undo window and a failure brings the row back.
+    function unlink(id, row) {
       if (!window.confirm(t('account.unlinkConfirm'))) return;
-      fetch('/v1/auth/linked-accounts/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin' })
-        .then(function (r) { return r.json(); })
-        .then(function (d) { if (d && d.ok) loadLinked(); else showToast(t('account.unlinkFailed'), 'error'); })
-        .catch(function () { showToast(t('account.unlinkFailed'), 'error'); });
+      var leaving = null;
+      optimistic({
+        key: 'unlink:' + id,
+        undo: true,
+        apply: function () { if (row) leaving = window.soOptimistic.leave(row); },
+        rollback: function () { if (leaving) leaving.restore(); },
+        request: function () {
+          return fetch('/v1/auth/linked-accounts/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin', keepalive: true })
+            .then(function (r) { return r.json().catch(function () { return null; }); })
+            .then(function (d) { if (!d || !d.ok) throw new Error('unlink'); });
+        },
+        success: t('account.unlinked'),
+        error: t('account.unlinkFailed'),
+        done: function () { if (leaving) leaving.commit(); loadLinked(); },
+      });
     }
 
     // Switch space: subdomain-based in prod; degrades to apex Personal on localhost.
@@ -107,19 +120,36 @@ export const workspace_client_account_menu_JS = `
         })
         .catch(function () { list.innerHTML = i18nEmpty('common.couldNotLoad'); });
     }
+    // Restore is optimistic: the row leaves the trash at once; a failure puts it back.
     function restore(b) {
-      b.disabled = true; b.textContent = t('trash.restoring');
-      fetch('/v1/artifacts/' + encodeURIComponent(b.getAttribute('data-restore')) + '/restore', { method: 'POST', credentials: 'same-origin' })
-        .then(function (r) { if (!r.ok) throw new Error('failed'); return r.json(); })
-        .then(function () { var row = b.closest('.wsx-trash-item'); if (row) row.remove(); })
-        .catch(function () { b.disabled = false; b.textContent = t('trash.restore'); showToast(t('trash.restoreFailed'), 'error'); });
+      var id = b.getAttribute('data-restore'), row = b.closest('.wsx-trash-item'), leaving = null;
+      optimistic({
+        key: 'restore:' + id,
+        apply: function () { if (row) leaving = window.soOptimistic.leave(row); },
+        rollback: function () { if (leaving) leaving.restore(); },
+        request: function () { return fetch('/v1/artifacts/' + encodeURIComponent(id) + '/restore', { method: 'POST', credentials: 'same-origin' }); },
+        success: t('trash.restored'),
+        error: t('trash.restoreFailed'),
+        done: function () {
+          if (leaving) leaving.commit();
+          if (typeof artCache !== 'undefined') artCache = {};
+          var list = document.getElementById('wsxTrashList');
+          if (list && !list.querySelector('.wsx-trash-item')) list.innerHTML = i18nEmpty('trash.nothing');
+        },
+      });
     }
     function restoreAll(n) {
       if (!window.confirm(t('trash.restoreAllConfirm').replace('{n}', String(n)))) return;
-      fetch('/v1/artifacts/deleted/restore-all', { method: 'POST', credentials: 'same-origin' })
-        .then(function (r) { if (!r.ok) throw new Error('failed'); return r.json(); })
-        .then(function () { loadTrash(); })
-        .catch(function () { showToast(t('trash.restoreFailed'), 'error'); });
+      var list = document.getElementById('wsxTrashList');
+      optimistic({
+        key: 'restore:all',
+        apply: function () { if (list) list.innerHTML = i18nEmpty('trash.nothing'); },
+        rollback: function () { loadTrash(); },
+        request: function () { return fetch('/v1/artifacts/deleted/restore-all', { method: 'POST', credentials: 'same-origin' }); },
+        success: t('trash.restoredAll').replace('{n}', String(n)),
+        error: t('trash.restoreFailed'),
+        done: function () { if (typeof artCache !== 'undefined') artCache = {}; loadTrash(); },
+      });
     }
   })();
 

@@ -262,6 +262,20 @@ Transitions: `--duration-fast`/`--duration-normal` with `--ease-out`. Animate on
 ### Success toast
 
 Green border + light green background (`--color-success-light`). Auto-dismiss; `toast` z-index token (1000).
+One toast system: `window.showToast(msg, type, { action })` (`src/design-system/components/toast.ts`).
+A toast carries at most one text action (**Undo** / **Retry**).
+
+### Optimistic actions
+
+Actions feel instant. On click the UI shows the result (the row leaves, the name
+changes, the toggle flips, the dialog closes) and the request runs in the background.
+Use `soOptimistic({ key, apply, rollback, request, success, error, undo })` from
+`src/design-system/components/optimistic.ts`. Do not write a one-off version.
+
+- **Failure:** roll back exactly (the row returns to its old spot, the old value comes back) and show an error toast that names what failed, with **Retry**.
+- **Destructive:** remove at once and show "Deleted · Undo". The request waits until the toast expires. Keep a confirm dialog only where one already guards something irreversible, and close it at once (no spinner).
+- **No double-fire:** a repeat click on the same `key` is ignored while that action is pending. A list reload during the undo window must not bring the item back (`soOptimistic.busy(key)`).
+- **Exceptions:** use an inline progress state instead when the UI can't know the result ahead of time: uploads with progress, AI generation, publishing that needs approval, payments, or anything that needs server-generated data right away.
 
 ### Error / validation
 

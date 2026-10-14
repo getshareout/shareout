@@ -138,46 +138,61 @@ export const workspace_client_home_views_library_JS = `  // ----- Library — ma
       b.classList.toggle('is-on', on); b.textContent = on ? t('library.attachedAgent') : t('library.attachAgent');
     });
   }
+  // Attach / detach, re-pin and vote flip on click; the request runs behind and a
+  // failure puts the button back with an error toast (shared optimistic helper).
   function toggleAttach(id, btn) {
-    if (!id || btn.disabled) return;
-    var on = !!libAttached[id]; btn.disabled = true;
+    if (!id) return;
+    var on = !!libAttached[id], prev = libAttached[id];
     var url = '/v1/workspaces/' + encodeURIComponent(libAgentScope) + '/agent-skills';
-    if (on) {
-      fetch(url + '/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin' })
-        .then(function (r) { return r.ok; }).then(function (ok) { btn.disabled = false; if (ok) { delete libAttached[id]; paintAttachBtns(id, false); } })
-        .catch(function () { btn.disabled = false; });
-    } else {
-      fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ skill_artifact_id: id }) })
-        .then(function (r) { return r.ok ? r.json() : null; }).then(function (d) { btn.disabled = false; if (d) { libAttached[id] = { skill_artifact_id: id, version_no: d.version_no, latest_version_no: d.version_no, outdated: false }; paintAttachBtns(id, true); } })
-        .catch(function () { btn.disabled = false; });
-    }
+    optimistic({
+      key: 'skattach:' + id,
+      apply: function () { if (on) delete libAttached[id]; else libAttached[id] = { skill_artifact_id: id, outdated: false }; paintAttachBtns(id, !on); },
+      rollback: function () { if (on) libAttached[id] = prev; else delete libAttached[id]; paintAttachBtns(id, on); },
+      request: function () {
+        return on
+          ? fetch(url + '/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin' })
+          : fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ skill_artifact_id: id }) });
+      },
+      error: t(on ? 'library.detachFailed' : 'library.attachFailed'),
+      done: function (r) {
+        if (on || !r || !r.json) return;
+        r.json().then(function (d) { if (d && libAttached[id]) libAttached[id] = { skill_artifact_id: id, version_no: d.version_no, latest_version_no: d.version_no, outdated: false }; }).catch(function () {});
+      },
+    });
   }
   // Re-pin an attached skill to the published version — the half that was missing.
   function syncAttached(id, btn) {
-    if (!id || btn.disabled) return;
-    btn.disabled = true;
-    fetch('/v1/workspaces/' + encodeURIComponent(libAgentScope) + '/agent-skills/' + encodeURIComponent(id), { method: 'POST', credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) {
-        btn.disabled = false;
-        if (!d) return;
-        libAttached[id] = { skill_artifact_id: id, version_no: d.version_no, latest_version_no: d.version_no, outdated: false };
-        btn.remove();
-      })
-      .catch(function () { btn.disabled = false; });
+    if (!id) return;
+    var gone = null;
+    optimistic({
+      key: 'sksync:' + id,
+      apply: function () { gone = window.soOptimistic.leave(btn); },
+      rollback: function () { if (gone) gone.restore(); },
+      request: function () { return fetch('/v1/workspaces/' + encodeURIComponent(libAgentScope) + '/agent-skills/' + encodeURIComponent(id), { method: 'POST', credentials: 'same-origin' }); },
+      error: t('library.syncFailed'),
+      done: function (r) {
+        if (gone) gone.commit();
+        if (r && r.json) r.json().then(function (d) { if (d) libAttached[id] = { skill_artifact_id: id, version_no: d.version_no, latest_version_no: d.version_no, outdated: false }; }).catch(function () {});
+      },
+    });
+  }
+  function paintVote(btn, k) {
+    btn.classList.toggle('is-on', !!k.voted);
+    var n = btn.querySelector('span'); if (n) n.textContent = k.upvotes;
   }
   function toggleVote(id, btn) {
-    var k = libSkillMap[id]; if (!k || btn.disabled) return;
-    var on = !!k.voted; btn.disabled = true;
-    fetch('/v1/artifacts/' + encodeURIComponent(id) + '/skill/vote', { method: on ? 'DELETE' : 'POST', credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) {
-        btn.disabled = false; if (!d) return;
-        k.voted = !on; k.upvotes = (d.upvotes != null ? d.upvotes : (k.upvotes || 0) + (on ? -1 : 1));
-        btn.classList.toggle('is-on', k.voted);
-        var n = btn.querySelector('span'); if (n) n.textContent = k.upvotes;
-      })
-      .catch(function () { btn.disabled = false; });
+    var k = libSkillMap[id]; if (!k) return;
+    var on = !!k.voted, prevN = k.upvotes || 0;
+    optimistic({
+      key: 'skvote:' + id,
+      apply: function () { k.voted = !on; k.upvotes = Math.max(0, prevN + (on ? -1 : 1)); paintVote(btn, k); },
+      rollback: function () { k.voted = on; k.upvotes = prevN; paintVote(btn, k); },
+      request: function () { return fetch('/v1/artifacts/' + encodeURIComponent(id) + '/skill/vote', { method: on ? 'DELETE' : 'POST', credentials: 'same-origin' }); },
+      error: t('library.voteFailed'),
+      done: function (r) {
+        if (r && r.json) r.json().then(function (d) { if (d && d.upvotes != null) { k.upvotes = d.upvotes; paintVote(btn, k); } }).catch(function () {});
+      },
+    });
   }
   // Store-only ZIP (no compression) — a Claude skill folder is just <slug>/SKILL.md.
   // ponytail: store method + one file is plenty for a single markdown doc; no zip lib.
@@ -218,11 +233,13 @@ export const workspace_client_home_views_library_JS = `  // ----- Library — ma
       if (!name) { err.textContent = t('library.enterSkillName'); return; }
       if (!md) { err.textContent = t('library.enterSkillBody'); return; }
       var b = { name: name, markdown: md }; var c = cv('sk_cat'); if (c) b.category = c;
-      sub.disabled = true;
+      // Exception to optimistic: the server creates the skill (id, slug, rendered body).
+      var label = sub.textContent; sub.disabled = true; sub.textContent = t('library.publishing');
+      function idle() { sub.disabled = false; sub.textContent = label; }
       fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/skills', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) })
         .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-        .then(function (res) { sub.disabled = false; if (!res.ok) { err.textContent = (res.d && res.d.error) || t('modal.failedPublish'); return; } modal.close(); loaded.library = 0; loadLibSkills(); })
-        .catch(function () { sub.disabled = false; err.textContent = t('modal.networkError'); });
+        .then(function (res) { idle(); if (!res.ok) { err.textContent = (res.d && res.d.error) || t('modal.failedPublish'); return; } modal.close(); loaded.library = 0; loadLibSkills(); })
+        .catch(function () { idle(); err.textContent = t('modal.networkError'); });
     });
   }
   // The re-sync story: one command that writes the whole catalog where the agent looks.
@@ -296,9 +313,17 @@ export const workspace_client_home_views_library_JS = `  // ----- Library — ma
         document.getElementById('skZip').addEventListener('click', function () { dlBlob(slug + '.zip', zipStore(slug + '/SKILL.md', md)); });
         document.getElementById('skAttach').addEventListener('click', function () { toggleAttach(id, this); });
         var pol = document.getElementById('skPolicy');
+        var polPrev = pol ? pol.value : '';
         if (pol) pol.addEventListener('change', function () {
-          fetch('/v1/skills/' + encodeURIComponent(id) + '/policy', { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ edit_policy: pol.value }) })
-            .then(function () { loaded.library = 0; }).catch(function () {});
+          var next = pol.value, before = polPrev;
+          optimistic({
+            key: 'skpolicy:' + id,
+            apply: function () { polPrev = next; d.edit_policy = next; pol.value = next; },
+            rollback: function () { polPrev = before; d.edit_policy = before; pol.value = before; },
+            request: function () { return fetch('/v1/skills/' + encodeURIComponent(id) + '/policy', { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ edit_policy: next }) }); },
+            error: t('library.policyFailed'),
+            done: function () { loaded.library = 0; },
+          });
         });
 
         function openEditor(mode) {
@@ -309,19 +334,20 @@ export const workspace_client_home_views_library_JS = `  // ----- Library — ma
             var sub = this, err = document.getElementById('skEditErr'); err.textContent = '';
             var next = ta.value.trim();
             if (!next) { err.textContent = t('library.enterSkillBody'); return; }
-            sub.disabled = true;
+            // Exception to optimistic: the saved body is rendered server-side (src/skills/render.ts).
+            var label = sub.textContent; sub.disabled = true; sub.textContent = t(mode === 'edit' ? 'common.saving' : 'library.sending');
             var req = mode === 'edit'
               ? fetch('/v1/skills/' + encodeURIComponent(id) + '/markdown', { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markdown: next }) })
               : fetch('/v1/skills/' + encodeURIComponent(id) + '/changes', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markdown: next, note: cv('skEditNote') }) });
             req.then(function (r) { return r.json().then(function (j) { return { ok: r.ok, d: j }; }); })
               .then(function (res) {
-                sub.disabled = false;
+                sub.disabled = false; sub.textContent = label;
                 if (!res.ok) { err.textContent = (res.d && res.d.error) || t('modal.failedPublish'); return; }
                 loaded.library = 0;
                 if (mode === 'edit') { md = next; d.markdown = next; }
                 mdEl.innerHTML = '<p class="wsx-lens__intro">' + esc(t(mode === 'edit' ? 'library.savedVersion' : 'library.proposalSent')) + '</p>';
               })
-              .catch(function () { sub.disabled = false; err.textContent = t('modal.networkError'); });
+              .catch(function () { sub.disabled = false; sub.textContent = label; err.textContent = t('modal.networkError'); });
           });
         }
         var eb = document.getElementById('skEdit'); if (eb) eb.addEventListener('click', function () { openEditor('edit'); });
@@ -336,12 +362,27 @@ export const workspace_client_home_views_library_JS = `  // ----- Library — ma
               mdEl.innerHTML = '<div class="wsx-skill__changes">' + skRenderChanges(id, cd.changes || [], cd.can_review) + '</div>'
                 + '<div class="wsx-cform__foot"><button class="wsx-abtn" id="skBackBody" type="button">' + esc(t('library.backToSkill')) + '</button></div>';
               document.getElementById('skBackBody').addEventListener('click', paintBody);
-              function review(changeId, action) {
-                fetch('/v1/skills/' + encodeURIComponent(id) + '/changes/' + encodeURIComponent(changeId), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: action }) })
-                  .then(function () { loaded.library = 0; cb.click(); }).catch(function () {});
+              // Merge / reject: the card shows the outcome at once; a failure restores it.
+              function review(changeId, action, btn) {
+                var card = btn.closest('.wsx-sched'), before = card ? card.innerHTML : '';
+                optimistic({
+                  key: 'skreview:' + changeId,
+                  apply: function () {
+                    if (!card) return;
+                    var acts = card.querySelector('.wsx-sched__actions'); if (acts) acts.remove();
+                    var bdg = card.querySelector('.wsx-sched__badge'); if (bdg) { bdg.className = 'wsx-sched__badge ok'; bdg.textContent = action === 'merge' ? 'merged' : 'rejected'; }
+                  },
+                  rollback: function () { if (card) { card.innerHTML = before; wireReview(card); } },
+                  request: function () { return fetch('/v1/skills/' + encodeURIComponent(id) + '/changes/' + encodeURIComponent(changeId), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: action }) }); },
+                  error: t('library.reviewFailed'),
+                  done: function () { loaded.library = 0; },
+                });
               }
-              mdEl.querySelectorAll('[data-ch-merge]').forEach(function (b) { b.addEventListener('click', function () { review(b.getAttribute('data-ch-merge'), 'merge'); }); });
-              mdEl.querySelectorAll('[data-ch-reject]').forEach(function (b) { b.addEventListener('click', function () { review(b.getAttribute('data-ch-reject'), 'reject'); }); });
+              function wireReview(root) {
+                root.querySelectorAll('[data-ch-merge]').forEach(function (b) { b.addEventListener('click', function () { review(b.getAttribute('data-ch-merge'), 'merge', b); }); });
+                root.querySelectorAll('[data-ch-reject]').forEach(function (b) { b.addEventListener('click', function () { review(b.getAttribute('data-ch-reject'), 'reject', b); }); });
+              }
+              wireReview(mdEl);
               mdEl.querySelectorAll('[data-ch-view]').forEach(function (b) {
                 b.addEventListener('click', function () {
                   fetch('/v1/skills/' + encodeURIComponent(id) + '/changes/' + encodeURIComponent(b.getAttribute('data-ch-view')), { credentials: 'same-origin' })

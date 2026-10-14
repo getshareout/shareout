@@ -6,6 +6,7 @@ import type { EditorContext } from '../editor/context';
 import { escapeHtml } from '../utils';
 import { showToast } from '../toast';
 import { showConfirmDialog } from '../ui/confirm-dialog';
+import { optimistic, withBusy } from '../optimistic';
 
 export interface InboxStatus {
   enabled: boolean;
@@ -42,7 +43,7 @@ export async function renderInboxPanel(ctx: EditorContext, host: HTMLElement): P
     const status = ((await res.json()) as { data?: InboxStatus }).data
       ?? { enabled: false, address: null, allowlist: null, receivedToday: 0 };
     host.innerHTML = inboxPanelMarkup(status);
-    wireInboxPanel(ctx, host);
+    wireInboxPanel(ctx, host, status);
     if (status.enabled) void loadMessages(ctx, host);
   } catch {
     host.innerHTML = '<div class="rail-empty"><p class="rail-empty-hint">Couldn’t load the inbox.</p></div>';
@@ -162,16 +163,19 @@ function wireMessageRows(ctx: EditorContext, host: HTMLElement): void {
   });
 }
 
-function wireInboxPanel(ctx: EditorContext, host: HTMLElement): void {
+function wireInboxPanel(ctx: EditorContext, host: HTMLElement, status: InboxStatus): void {
+  // Exception to optimistic: enabling mints the inbox address server-side, and the
+  // panel needs it — so the button shows "Enabling…" until the server answers.
   host.querySelector<HTMLButtonElement>('[data-inbox-enable]')?.addEventListener('click', async (e) => {
     const btn = e.currentTarget as HTMLButtonElement;
-    btn.disabled = true;
-    if (await mutate(ctx, 'enable')) {
-      showToast('Inbox enabled', 'success');
-      await renderInboxPanel(ctx, host);
-    } else {
-      btn.disabled = false;
-    }
+    await withBusy(btn, 'Enabling…', async () => {
+      if (await mutate(ctx, 'enable')) {
+        showToast('Inbox enabled', 'success');
+        await renderInboxPanel(ctx, host);
+      } else {
+        showToast('Couldn’t enable the inbox. Check your connection?', 'error');
+      }
+    });
   });
 
   host.querySelector<HTMLButtonElement>('[data-inbox-disable]')?.addEventListener('click', async (e) => {
@@ -182,14 +186,20 @@ function wireInboxPanel(ctx: EditorContext, host: HTMLElement): void {
       cancelLabel: 'Cancel',
     });
     if (!ok) return;
-    const btn = e.currentTarget as HTMLButtonElement;
-    btn.disabled = true;
-    if (await mutate(ctx, 'disable')) {
-      showToast('Inbox disabled', 'success');
-      await renderInboxPanel(ctx, host);
-    } else {
-      btn.disabled = false;
-    }
+    // Optimistic: the panel flips to "off" at once; a failure re-renders it from the server.
+    void optimistic({
+      key: 'inbox-toggle',
+      apply: () => {
+        host.innerHTML = inboxPanelMarkup({ ...status, enabled: false });
+        wireInboxPanel(ctx, host, { ...status, enabled: false });
+      },
+      rollback: () => void renderInboxPanel(ctx, host),
+      request: async () => {
+        if (!(await mutate(ctx, 'disable'))) throw new Error('disable failed');
+      },
+      success: 'Inbox disabled',
+      error: 'Couldn’t disable the inbox. Check your connection?',
+    });
   });
 
   host.querySelector<HTMLButtonElement>('[data-inbox-copy]')?.addEventListener('click', () => {
@@ -198,25 +208,25 @@ function wireInboxPanel(ctx: EditorContext, host: HTMLElement): void {
     showToast('Address copied!', 'success');
   });
 
-  host.querySelector<HTMLButtonElement>('[data-inbox-allowlist-save]')?.addEventListener('click', async (e) => {
-    const btn = e.currentTarget as HTMLButtonElement;
-    const raw = host.querySelector<HTMLTextAreaElement>('#inbox-allowlist')?.value || '';
+  // Optimistic: the textarea already shows the new list; defaultValue holds the saved one.
+  host.querySelector<HTMLButtonElement>('[data-inbox-allowlist-save]')?.addEventListener('click', () => {
+    const ta = host.querySelector<HTMLTextAreaElement>('#inbox-allowlist');
+    const raw = ta?.value || '';
     const allowlist = raw.split(/[\n,]+/).map((x) => x.trim().toLowerCase()).filter(Boolean);
-    btn.disabled = true;
-    try {
-      const res = await fetch(`/v1/data/${ctx.config.artifactId}/inbox/allowlist`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ allowlist: allowlist.length ? allowlist : null }),
-      });
-      if (!res.ok) throw new Error(String(res.status));
-      showToast('Allowlist saved', 'success');
-    } catch {
-      showToast('Couldn’t save allowlist', 'error');
-    } finally {
-      btn.disabled = false;
-    }
+    void optimistic({
+      key: 'inbox-allowlist',
+      rollback: () => { if (ta && ta.value === raw) ta.value = ta.defaultValue; },
+      request: () =>
+        fetch(`/v1/data/${ctx.config.artifactId}/inbox/allowlist`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ allowlist: allowlist.length ? allowlist : null }),
+        }),
+      success: 'Allowlist saved',
+      error: 'Couldn’t save allowlist',
+      done: () => { if (ta) ta.defaultValue = raw; },
+    });
   });
 }
 

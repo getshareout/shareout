@@ -5,6 +5,7 @@
 import type { EditorContext } from '../editor/context';
 import { escapeHtml } from '../utils';
 import { showToast } from '../toast';
+import { withBusy } from '../optimistic';
 
 export interface ConnectionSummary {
   name: string;
@@ -80,25 +81,27 @@ function wireAddConnection(ctx: EditorContext, host: HTMLElement): void {
       if (status) status.textContent = 'Name and base URL are required.';
       return;
     }
-    addBtn.disabled = true;
-    try {
-      const body: Record<string, unknown> = { name, type: 'rest_api', config: { baseUrl: url } };
-      if (key) body.credentials = { type: 'api_key', data: { apiKey: key } };
-      const res = await fetch(`/v1/data/${ctx.config.artifactId}/connections`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as { message?: string };
-        throw new Error(err.message || `Request failed (${res.status})`);
+    // Exception to optimistic: the server validates the URL/credentials and mints the
+    // connection, so the button shows "Adding…" until it answers.
+    await withBusy(addBtn, 'Adding…', async () => {
+      try {
+        const body: Record<string, unknown> = { name, type: 'rest_api', config: { baseUrl: url } };
+        if (key) body.credentials = { type: 'api_key', data: { apiKey: key } };
+        const res = await fetch(`/v1/data/${ctx.config.artifactId}/connections`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const err = (await res.json().catch(() => ({}))) as { message?: string };
+          throw new Error(err.message || `Request failed (${res.status})`);
+        }
+        showToast('Connection added', 'success');
+        await renderConnectPanel(ctx, host); // re-fetch + re-render (re-wires handlers)
+      } catch (e) {
+        if (status) status.textContent = `Couldn’t add: ${(e as Error).message}`;
       }
-      showToast('Connection added', 'success');
-      await renderConnectPanel(ctx, host); // re-fetch + re-render (re-wires handlers)
-    } catch (e) {
-      if (status) status.textContent = `Couldn’t add: ${(e as Error).message}`;
-      addBtn.disabled = false;
-    }
+    });
   });
 }

@@ -33,20 +33,23 @@ export const workspace_client_home_views_connect_JS = `  // ----- Connect your a
       + '<div class="wsx-sched"><div class="wsx-sched__title">' + esc(t('connect.promptTitle')) + '</div>'
       + (cnNewKey ? '' : '<p class="wsx-field__note">' + esc(t('connect.promptNeedsKey')) + '</p>')
       + '<pre class="wsx-skill__pre">' + esc(prompt) + '</pre><div class="wsx-skill__btns">' + cnCopyBtn('prompt', 'connect.copyPrompt', !!cnNewKey) + '</div></div></div>';
+    // Exception to optimistic: the key is generated server-side and shown once.
     document.getElementById('wsxCnCreate').addEventListener('click', function () {
-      var b = this; b.disabled = true;
+      var b = this, label = b.textContent; b.disabled = true; b.textContent = t('common.creating');
       fetch('/v1/me/tokens', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}' })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) { if (!d || !d.token) throw new Error('failed'); cnNewKey = d.token; loadConnect(); })
-        .catch(function () { b.disabled = false; var e = document.getElementById('wsxCnErr'); if (e) e.textContent = t('connect.keyError'); });
+        .catch(function () { b.disabled = false; b.textContent = label; var e = document.getElementById('wsxCnErr'); if (e) e.textContent = t('connect.keyError'); });
     });
     cnLoadKeys();
   }
+  // Keys revoked optimistically whose DELETE hasn't landed — a reload keeps them out.
+  var pendingKeyRevokes = {};
   function cnLoadKeys() {
     var k = document.getElementById('wsxCnKeys'); if (!k) return;
     fetch('/v1/me/tokens', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
-        var ts = (d && d.tokens) || [];
+        var ts = ((d && d.tokens) || []).filter(function (tk) { return !pendingKeyRevokes[tk.id]; });
         if (!ts.length) { k.innerHTML = '<p class="wsx-field__note">' + esc(t('connect.keysNone')) + '</p>'; return; }
         k.innerHTML = ts.map(function (tk) {
           var used = tk.last_used_at ? t('connect.keyUsed').replace('{date}', adRelDate(tk.last_used_at)) : t('connect.keyNeverUsed');
@@ -64,10 +67,17 @@ export const workspace_client_home_views_connect_JS = `  // ----- Connect your a
     var rv = tg.closest('[data-cn-revoke]');
     if (rv) {
       if (!window.confirm(t('connect.revokeConfirm'))) return;
-      rv.disabled = true;
-      fetch('/v1/me/tokens/' + encodeURIComponent(rv.getAttribute('data-cn-revoke')), { method: 'DELETE', credentials: 'same-origin' })
-        .then(function (r) { if (!r.ok) throw new Error('failed'); cnLoadKeys(); })
-        .catch(function () { rv.disabled = false; showToast(t('connect.revokeError'), 'error'); });
+      var kid = rv.getAttribute('data-cn-revoke'), gone = null;
+      optimistic({
+        key: 'key:revoke:' + kid,
+        undo: true,
+        apply: function () { pendingKeyRevokes[kid] = true; gone = window.soOptimistic.leave(rv.closest('.wsx-cn__key')); },
+        rollback: function () { delete pendingKeyRevokes[kid]; if (gone) gone.restore(); },
+        request: function () { return fetch('/v1/me/tokens/' + encodeURIComponent(kid), { method: 'DELETE', credentials: 'same-origin', keepalive: true }); },
+        success: t('connect.revoked'),
+        error: t('connect.revokeError'),
+        done: function () { delete pendingKeyRevokes[kid]; if (gone) gone.commit(); cnLoadKeys(); },
+      });
       return;
     }
     // Account menu "API token": open the view in place so ?workspace= context is kept.

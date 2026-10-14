@@ -87,8 +87,15 @@ export const RUN_DRAWER_JS = `(function(){
       + (run.result?'<div class="so-rd__sect">Result</div><div class="so-rd__result">'+esc(run.result)+'</div>':'');
     foot.innerHTML = run.rerunPath?'<button class="so-rd__btn" data-rerun="'+esc(run.rerunPath)+'" type="button">Run now</button>':'';
     var rb=foot.querySelector('[data-rerun]');
-    if(rb) rb.addEventListener('click',function(){ rb.disabled=true; rb.textContent='Running…';
-      fetch(rb.getAttribute('data-rerun'),{method:'POST',credentials:'same-origin'}).then(function(){ rb.textContent='Queued ✓'; }).catch(function(){ rb.textContent='Failed'; }); });
+    // Optimistic: shows queued at once; a refused POST puts the button back with an error toast.
+    if(rb) rb.addEventListener('click',function(){
+      window.soOptimistic({
+        key:'rerun:'+rb.getAttribute('data-rerun'),
+        apply:function(){ rb.disabled=true; rb.textContent='Queued \u2713'; },
+        rollback:function(){ rb.disabled=false; rb.textContent='Run now'; },
+        request:function(){ return fetch(rb.getAttribute('data-rerun'),{method:'POST',credentials:'same-origin'}); },
+        error:'Couldn\u2019t start the run. Try again?'
+      }); });
   }
 
   window.SO_openRunDrawer = function(surface, runId){

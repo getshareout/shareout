@@ -162,6 +162,17 @@ const en = {
   connecting: 'Connecting…',
   reconnecting: 'Reconnecting…',
   connLost: 'Connection lost. Reopen comments to retry.',
+  undo: 'Undo',
+  retry: 'Retry',
+  actionFailed: "Couldn't save that change. Check your connection?",
+  favFailed: "Couldn't update favorite.",
+  reactFail: "Couldn't save your reaction.",
+  resolveFail: "Couldn't update the comment.",
+  assignFail: "Couldn't assign. Check your connection?",
+  scheduleCreated: 'Schedule created.',
+  alertCancelled: 'Alert cancelled.',
+  alertCancelFail: "Couldn't cancel the alert.",
+  settingFail: "Couldn't save the setting.",
 };
 
 export type ToolbarCopy = typeof en;
@@ -320,6 +331,17 @@ const es: ToolbarCopy = {
   connecting: 'Conectando…',
   reconnecting: 'Reconectando…',
   connLost: 'Se perdió la conexión. Volvé a abrir los comentarios para reintentar.',
+  undo: 'Deshacer',
+  retry: 'Reintentar',
+  actionFailed: 'No se pudo guardar el cambio. ¿Revisás la conexión?',
+  favFailed: 'No se pudo actualizar el favorito.',
+  reactFail: 'No se pudo guardar tu reacción.',
+  resolveFail: 'No se pudo actualizar el comentario.',
+  assignFail: 'No se pudo asignar. ¿Revisás la conexión?',
+  scheduleCreated: 'Envío programado.',
+  alertCancelled: 'Aviso cancelado.',
+  alertCancelFail: 'No se pudo cancelar el aviso.',
+  settingFail: 'No se pudo guardar el ajuste.',
 };
 
 export const TOOLBAR_COPY: LocaleCopy<ToolbarCopy> = { en, es };

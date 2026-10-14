@@ -68,6 +68,8 @@ export const KNOWLEDGE_MAP_COPY: HomeLocaleCopy = {
     'kmap.rel.delivers_to': 'delivers to',
     'kmap.rel.connected_to': 'connected to',
     'kmap.rel.reviews': 'reviews',
+    'knowledge.forgotten': 'Forgotten. Agents won’t use it anymore.',
+    'knowledge.gDeleted': 'File deleted',
   },
   es: {
     'knowledge.viewMap': 'Mapa',
@@ -135,5 +137,7 @@ export const KNOWLEDGE_MAP_COPY: HomeLocaleCopy = {
     'kmap.rel.delivers_to': 'entrega a',
     'kmap.rel.connected_to': 'conectado con',
     'kmap.rel.reviews': 'revisa',
+    'knowledge.forgotten': 'Olvidado. Los agentes ya no lo van a usar.',
+    'knowledge.gDeleted': 'Archivo eliminado',
   },
 };

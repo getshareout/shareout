@@ -39,6 +39,8 @@ export const CONNECT_COPY: HomeLocaleCopy = {
     'connect.keyPlaceholder': '<your key>',
     'connect.prompt': 'Connect to ShareOut and publish pages for me.\n1. Install the ShareOut skill: download {origin}/v1/skill (a .zip) and follow its SKILL.md.\n2. Save these credentials to ~/.shareout/credentials (permissions 600):\n   {"origin": "{origin}", "token": "{token}"}\n3. Publish into my team workspace: always send "workspace_id": "{ws}" and "visibility": "workspace" so my team can see it.\n4. To test it, publish a simple page that says "Hello" and send me the link.',
     'connect.promptPersonal': 'Connect to ShareOut and publish pages for me.\n1. Install the ShareOut skill: download {origin}/v1/skill (a .zip) and follow its SKILL.md.\n2. Save these credentials to ~/.shareout/credentials (permissions 600):\n   {"origin": "{origin}", "token": "{token}"}\n3. Publish pages as private unless I say otherwise.\n4. To test it, publish a simple page that says "Hello" and send me the link.',
+    'connect.revoked': 'Key revoked',
+    'connectors.removed': 'Connection removed',
   },
   es: {
     'nav.connect': 'Conectá tu agente',
@@ -73,5 +75,7 @@ export const CONNECT_COPY: HomeLocaleCopy = {
     'connect.keyPlaceholder': '<tu clave>',
     'connect.prompt': 'Conectate a ShareOut y publicá artefactos por mí.\n1. Instalá la skill de ShareOut: descargá {origin}/v1/skill (es un .zip) y seguí su SKILL.md.\n2. Guardá estas credenciales en ~/.shareout/credentials (permisos 600):\n   {"origin": "{origin}", "token": "{token}"}\n3. Publicá en el espacio de mi equipo: mandá siempre "workspace_id": "{ws}" y "visibility": "workspace" para que lo vea mi equipo.\n4. Para probar, publicá un artefacto simple que diga "Hola" y pasame el link.',
     'connect.promptPersonal': 'Conectate a ShareOut y publicá artefactos por mí.\n1. Instalá la skill de ShareOut: descargá {origin}/v1/skill (es un .zip) y seguí su SKILL.md.\n2. Guardá estas credenciales en ~/.shareout/credentials (permisos 600):\n   {"origin": "{origin}", "token": "{token}"}\n3. Publicá los artefactos como privados salvo que te diga otra cosa.\n4. Para probar, publicá un artefacto simple que diga "Hola" y pasame el link.',
+    'connect.revoked': 'Clave revocada',
+    'connectors.removed': 'Conexión quitada',
   },
 };

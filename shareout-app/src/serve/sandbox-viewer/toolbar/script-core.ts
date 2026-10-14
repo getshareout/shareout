@@ -11,6 +11,10 @@ export function renderToolbarScriptCore(c: ToolbarCopy = TOOLBAR_COPY.en, locale
       if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
       return Math.floor(seconds / 86400) + 'd ago';`;
   return `
+    // Shared optimistic-action helper (design-system/components/optimistic.ts) with this
+    // viewer's Undo / Retry labels. componentScripts always load before the toolbar script.
+    if (window.soOptimistic) window.soOptimistic.labels = { undo: '${js(c.undo)}', retry: '${js(c.retry)}', failed: '${js(c.actionFailed)}' };
+    function soOpt(o) { return window.soOptimistic(o); }
     function escapeHtml(s) {
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     }

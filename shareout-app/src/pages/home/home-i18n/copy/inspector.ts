@@ -191,6 +191,8 @@ export const INSPECTOR_COPY: HomeLocaleCopy = {
     'inspector.watchTableRequired': 'Table is required',
     'inspector.watchAddFailed': 'Couldn\\\'t add watch. Try again?',
     'inspector.watchDeleteFailed': 'Couldn\\\'t remove watch. Try again?',
+    'inspector.watchRemoved': 'Watch removed',
+    'inspector.audienceFailed': 'Couldn’t change who sees this. Check your connection?',
   },
   es: {
     'inspector.about': 'Acerca de',
@@ -381,5 +383,7 @@ export const INSPECTOR_COPY: HomeLocaleCopy = {
     'inspector.watchTableRequired': 'La tabla es obligatoria',
     'inspector.watchAddFailed': 'No se pudo agregar el vigía. ¿Reintentar?',
     'inspector.watchDeleteFailed': 'No se pudo quitar el vigía. ¿Reintentar?',
+    'inspector.watchRemoved': 'Vigía quitado',
+    'inspector.audienceFailed': 'No se pudo cambiar quién lo ve. ¿Revisás la conexión?',
   },
 };

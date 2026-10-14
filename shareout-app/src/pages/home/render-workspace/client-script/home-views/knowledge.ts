@@ -45,6 +45,9 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
   var KN_CHEV = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
   function knIcon(k) { return KN_ICONS[k] || KN_ICONS.overview; }
 
+  // Notes / guidance files forgotten or deleted optimistically whose DELETE hasn't landed;
+  // a reload during the undo window keeps them out of the tree.
+  var knPendingRemove = {};
   function loadKnowledge() {
     var m = knMount(); if (needWs(m)) return;
     knStopPoll();
@@ -70,6 +73,8 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
           knState.guidance = gfiles.map(function (f) { return { path: 'guidance/' + f.name, kind: 'guidance', name: f.name, title: f.name, is_entry: !!f.is_entry, size: f.size, updated_at: f.updated_at }; });
           var admin = !!window.WSX_ADMIN;
           var finish = function () {
+          nodes = nodes.filter(function (n) { return !knPendingRemove[n.path]; });
+          knState.guidance = knState.guidance.filter(function (g) { return !knPendingRemove[g.path]; });
           knState.nodes = nodes;
           knState.byPath = {};
           nodes.forEach(function (n) { knState.byPath[n.path] = n; });
@@ -115,11 +120,12 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     }
     m.innerHTML = emptyState(msg, sub, btn);
     var en = document.getElementById('knEnable');
+    // Exception to optimistic: turning Knowledge on loads server-built content next.
     if (en) en.addEventListener('click', function () {
-      en.disabled = true;
+      var label = en.textContent; en.disabled = true; en.textContent = t('common.saving');
       fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/knowledge/enable', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: '{"enabled":true}' })
-        .then(function () { loadKnowledge(); })
-        .catch(function () { en.disabled = false; showToast(t('knowledge.updateError'), 'error'); });
+        .then(function (r) { if (!r.ok) throw new Error('failed'); loadKnowledge(); })
+        .catch(function () { en.disabled = false; en.textContent = label; showToast(t('knowledge.updateError'), 'error'); });
     });
   }
 
@@ -591,15 +597,42 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
   }
 
   function knPin(node) {
-    var btn = document.getElementById('knPin'); if (btn) btn.disabled = true;
     var next = !node.pinned;
-    knPut(node, knSetPinnedLine(knRaw(node), next))
-      .then(function () {
-        showToast(t('knowledge.updated'), 'success');
-        node.pinned = next; if (knState.byPath[node.path]) knState.byPath[node.path].pinned = next;
-        knReopen(node.path);
-      })
-      .catch(function () { if (btn) btn.disabled = false; showToast(t('knowledge.updateError'), 'error'); });
+    function paint(v) {
+      node.pinned = v; if (knState.byPath[node.path]) knState.byPath[node.path].pinned = v;
+      var btn = document.getElementById('knPin'); if (btn) btn.textContent = t(v ? 'knowledge.unpin' : 'knowledge.pin');
+    }
+    optimistic({
+      key: 'kn:pin:' + node.path,
+      apply: function () { paint(next); },
+      rollback: function () { paint(!next); },
+      request: function () { return knPut(node, knSetPinnedLine(knRaw(node), next)); },
+      error: t('knowledge.updateError'),
+      done: function () { if (knCurrentPath === node.path) knReopen(node.path); },
+    });
+  }
+
+  // Take a note / guidance file out of the tree now (Undo puts it back where it was).
+  function knRemoveLocal(node) {
+    function cur() { return node.kind === 'guidance' ? knState.guidance : knState.nodes; }
+    var orig = knState.byPath[node.path] || node, idx = cur().indexOf(orig), wasOpen = knCurrentPath === node.path;
+    return {
+      apply: function () {
+        knPendingRemove[node.path] = true;
+        var list = cur(), i = list.indexOf(orig); if (i >= 0) list.splice(i, 1);
+        delete knState.byPath[node.path];
+        if (wasOpen) knCurrentPath = '';
+        knReopen(knCurrentPath);
+      },
+      rollback: function () {
+        delete knPendingRemove[node.path];
+        var list = cur();
+        if (!list.some(function (n) { return n.path === node.path; })) list.splice(Math.max(0, Math.min(idx, list.length)), 0, orig);
+        knState.byPath[node.path] = orig;
+        knReopen(wasOpen ? node.path : knCurrentPath);
+      },
+      done: function () { delete knPendingRemove[node.path]; },
+    };
   }
 
   function knEdit(node) {
@@ -623,17 +656,18 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
       + '<button class="so-c-btn" id="knForgetKeep" type="button">' + esc(t('knowledge.keep')) + '</button></div>');
     modal.body.querySelector('#knForgetKeep').addEventListener('click', modal.close);
     modal.body.querySelector('#knForgetGo').addEventListener('click', function () {
-      var go = modal.body.querySelector('#knForgetGo'); go.disabled = true;
-      fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/knowledge/files/' + knApiPath(node.path) + '?forget=1', { method: 'DELETE', credentials: 'same-origin' })
-        .then(function (r) { if (!r.ok) throw new Error('failed'); })
-        .then(function () {
-          modal.close();
-          showToast(t('knowledge.updated'), 'success');
-          delete knState.byPath[node.path];
-          knState.nodes = knState.nodes.filter(function (n) { return n.path !== node.path; });
-          knCurrentPath = ''; knReopen('');
-        })
-        .catch(function () { go.disabled = false; showToast(t('knowledge.updateError'), 'error'); });
+      modal.close();
+      var local = knRemoveLocal(node);
+      optimistic({
+        key: 'kn:forget:' + node.path,
+        undo: true,
+        apply: local.apply,
+        rollback: local.rollback,
+        request: function () { return fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/knowledge/files/' + knApiPath(node.path) + '?forget=1', { method: 'DELETE', credentials: 'same-origin', keepalive: true }); },
+        success: t('knowledge.forgotten'),
+        error: t('knowledge.updateError'),
+        done: local.done,
+      });
     });
   }
 
@@ -698,10 +732,19 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
   }
 
   function knGuidanceSetEntry(node) {
-    fetch(knWsBase() + '/context', { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ entry: node.name }) })
-      .then(function (r) { if (!r.ok) throw new Error('failed'); })
-      .then(function () { showToast(t('knowledge.updated'), 'success'); loadKnowledge(); })
-      .catch(function () { showToast(t('knowledge.updateError'), 'error'); });
+    var prev = (knState.guidance || []).filter(function (g) { return g.is_entry; }).map(function (g) { return g.path; });
+    function mark(paths) {
+      (knState.guidance || []).forEach(function (g) { g.is_entry = paths.indexOf(g.path) >= 0; });
+      node.is_entry = paths.indexOf(node.path) >= 0;
+      if (knCurrentPath === node.path) knReopen(node.path);
+    }
+    optimistic({
+      key: 'kn:entry:' + node.path,
+      apply: function () { mark([node.path]); },
+      rollback: function () { mark(prev); },
+      request: function () { return fetch(knWsBase() + '/context', { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ entry: node.name }) }); },
+      error: t('knowledge.updateError'),
+    });
   }
 
   function knGuidanceDelete(node) {
@@ -710,11 +753,18 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
       + '<button class="so-c-btn" id="knGDelKeep" type="button">' + esc(t('knowledge.keep')) + '</button></div>');
     modal.body.querySelector('#knGDelKeep').addEventListener('click', modal.close);
     modal.body.querySelector('#knGDelGo').addEventListener('click', function () {
-      var go = modal.body.querySelector('#knGDelGo'); go.disabled = true;
-      fetch(knWsBase() + '/context/' + encodeURIComponent(node.name), { method: 'DELETE', credentials: 'same-origin' })
-        .then(function (r) { if (!r.ok) throw new Error('failed'); })
-        .then(function () { modal.close(); showToast(t('knowledge.updated'), 'success'); knCurrentPath = ''; loadKnowledge(); })
-        .catch(function () { go.disabled = false; showToast(t('knowledge.updateError'), 'error'); });
+      modal.close();
+      var local = knRemoveLocal(node);
+      optimistic({
+        key: 'kn:gdel:' + node.path,
+        undo: true,
+        apply: local.apply,
+        rollback: local.rollback,
+        request: function () { return fetch(knWsBase() + '/context/' + encodeURIComponent(node.name), { method: 'DELETE', credentials: 'same-origin', keepalive: true }); },
+        success: t('knowledge.gDeleted'),
+        error: t('knowledge.updateError'),
+        done: local.done,
+      });
     });
   }
 
@@ -730,10 +780,24 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
       var name = (inp.value || '').trim().toLowerCase();
       if (name.length > 64 || !/^[a-z0-9][a-z0-9._-]*\\.md$/.test(name)) { err.style.display = 'block'; return; }
       err.style.display = 'none';
-      var go = modal.body.querySelector('#knGCreate'); go.disabled = true;
-      knGuidancePut(name, t('knowledge.gStarter').replace('{name}', name.replace(/\\.md$/, '')) + '\\n')
-        .then(function () { modal.close(); showToast(t('knowledge.updated'), 'success'); knCurrentPath = 'guidance/' + name; loadKnowledge(); })
-        .catch(function () { go.disabled = false; showToast(t('knowledge.updateError'), 'error'); });
+      // Optimistic: the file shows in the tree and opens right away; a failed PUT takes it out.
+      var path = 'guidance/' + name, prevPath = knCurrentPath, existed = !!knState.byPath[path];
+      var g = { path: path, kind: 'guidance', name: name, title: name, is_entry: false, updated_at: new Date().toISOString() };
+      optimistic({
+        key: 'kn:gnew:' + name,
+        apply: function () {
+          modal.close();
+          if (!existed) { knState.guidance.push(g); knState.byPath[path] = g; }
+          knReopen(path);
+        },
+        rollback: function () {
+          if (!existed) { var i = knState.guidance.indexOf(g); if (i >= 0) knState.guidance.splice(i, 1); delete knState.byPath[path]; }
+          knReopen(knCurrentPath === path ? prevPath : knCurrentPath);
+        },
+        request: function () { return knGuidancePut(name, t('knowledge.gStarter').replace('{name}', name.replace(/\\.md$/, '')) + '\\n'); },
+        error: t('knowledge.updateError'),
+        done: function () { if (knCurrentPath === path) knReopen(path); },
+      });
     });
   }
 

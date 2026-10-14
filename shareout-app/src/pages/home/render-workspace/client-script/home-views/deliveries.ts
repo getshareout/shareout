@@ -30,8 +30,18 @@ export const workspace_client_home_views_deliveries_JS = `  // ----- sent delive
               if (act === 'copy') { if (l) copyText(l.url, b); }
               else if (act === 'revoke') {
                 if (!window.confirm(t('deliveries.revokeConfirm'))) return;
-                b.disabled = true;
-                fetch(assetApiBase() + '/links/' + encodeURIComponent(id) + '/revoke', { method: 'POST', credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error('failed'); load(); }).catch(function () { b.disabled = false; showToast(t('deliveries.couldNotRevoke'), 'error'); });
+                // Shows as revoked at once; the revoke waits out the Undo toast.
+                var stEl = row.querySelector('.wsx-deliv__st'), acts = row.querySelector('.wsx-deliv__acts');
+                var was = { t: stEl.textContent, c: stEl.className };
+                optimistic({
+                  key: 'deliv-revoke:' + id, undo: true,
+                  apply: function () { stEl.textContent = t('deliveries.statusRevoked'); stEl.className = 'wsx-deliv__st rv'; acts.hidden = true; },
+                  rollback: function () { stEl.textContent = was.t; stEl.className = was.c; acts.hidden = false; },
+                  request: function () { return fetch(assetApiBase() + '/links/' + encodeURIComponent(id) + '/revoke', { method: 'POST', credentials: 'same-origin', keepalive: true }); },
+                  success: t('deliveries.revoked'),
+                  error: t('deliveries.couldNotRevoke'),
+                  done: function () { if (document.getElementById('wsxDelivBody')) load(); },
+                });
               }
             });
           });

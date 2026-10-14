@@ -50,12 +50,19 @@ export const workspace_client_home_views_crew_JS = `  // ----- Crew AI — works
       .catch(function (err) { line(started ? t('crew.streamLost') : (err instanceof TypeError ? t('crew.couldNotRun') : err.message), 'is-fail'); })
       .then(function () { b.disabled = false; b.textContent = t('crew.runNow'); crewRuns(card.getAttribute('data-crew'), card.querySelector('[data-crew-runs]')); });
   }
+  // Crews deleted optimistically whose DELETE hasn't landed — a reload must not show them.
+  var crewPendingDel = {};
+  function crewPaintEnabled(card, on) {
+    card.setAttribute('data-crew-enabled', on ? '1' : '0');
+    var badge = card.querySelector('.wsx-sched__badge'); if (badge) { badge.textContent = on ? t('crew.badgeOn') : t('crew.badgePaused'); badge.classList.toggle('ok', on); }
+    var tb = card.querySelector('[data-crew-act="toggle"]'); if (tb) tb.textContent = on ? t('crew.pause') : t('crew.resume');
+  }
   function loadCrew() {
     var m = document.getElementById('wsxCrewMount'); if (needWs(m)) return;
     m.innerHTML = i18nLoad();
     fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/automations', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
-        var a = (d && d.automations) || [];
+        var a = ((d && d.automations) || []).filter(function (c) { return !crewPendingDel[c.id]; });
         if (!a.length) {
           m.innerHTML = '<div class="wsx-qa-grid wsx-qa-grid--lens"><button class="wsx-qa" data-newauto="' + esc(t('crew.prefillChat')) + '" type="button"><span class="wsx-qa__ic">' + isvg('<circle cx="9" cy="7" r="3"/><path d="M2 21v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"/><circle cx="18" cy="8" r="2.5"/>') + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('crew.emptyChat')) + '</span><span class="wsx-qa__s">' + esc(t('crew.emptyChatSub')) + '</span></span></button></div>';
           wireNewAuto(m); return;
@@ -78,8 +85,31 @@ export const workspace_client_home_views_crew_JS = `  // ----- Crew AI — works
             var card = b.closest('[data-crew]'); var id = card.getAttribute('data-crew'); var act = b.getAttribute('data-crew-act');
             var base = '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/automations/' + encodeURIComponent(id);
             if (act === 'run') crewRunLive(b, card, base);
-            else if (act === 'toggle') { var on = card.getAttribute('data-crew-enabled') === '1'; fetch(base, { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: !on }) }).then(function (r) { if (!r.ok) throw new Error('failed'); loaded.crew = 0; loadCrew(); }).catch(function () { showToast(t('crew.couldNotUpdate'), 'error'); }); }
-            else if (act === 'del') { if (!window.confirm(t('crew.deleteConfirm'))) return; fetch(base, { method: 'DELETE', credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error('failed'); card.remove(); }).catch(function () { showToast(t('crew.couldNotDelete'), 'error'); }); }
+            else if (act === 'toggle') {
+              var on = card.getAttribute('data-crew-enabled') === '1';
+              optimistic({
+                key: 'crew-toggle:' + id,
+                apply: function () { crewPaintEnabled(card, !on); },
+                rollback: function () { crewPaintEnabled(card, on); },
+                request: function () { return fetch(base, { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: !on }) }); },
+                success: on ? t('crew.pausedToast') : t('crew.resumedToast'),
+                error: t('crew.couldNotUpdate'),
+                done: function () { loaded.crew = 0; },
+              });
+            }
+            else if (act === 'del') {
+              if (!window.confirm(t('crew.deleteConfirm'))) return;
+              var h = null;
+              optimistic({
+                key: 'crew-del:' + id, undo: true,
+                apply: function () { crewPendingDel[id] = true; h = window.soOptimistic.leave(card); },
+                rollback: function () { delete crewPendingDel[id]; h.restore(); if (!card.isConnected) { loaded.crew = 0; loadCrew(); } },
+                request: function () { return fetch(base, { method: 'DELETE', credentials: 'same-origin', keepalive: true }); },
+                success: t('crew.deleted'),
+                error: t('crew.couldNotDelete'),
+                done: function () { delete crewPendingDel[id]; h.commit(); loaded.crew = 0; },
+              });
+            }
           });
         });
       }).catch(function () { m.innerHTML = i18nError('common.couldNotLoad'); });

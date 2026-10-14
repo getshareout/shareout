@@ -7,6 +7,8 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
   var assetsWired = false;
   var assetSelect = false;
   var assetSel = {};
+  // Files deleted optimistically whose DELETE hasn't landed — a reload keeps them hidden.
+  var assetPendingDel = {};
   var ASVG = {
     dl: '<path d="M12 3v12"/><path d="M7 12l5 5 5-5"/><path d="M5 21h14"/>',
     lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
@@ -20,7 +22,7 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
   function assetItems() {
     var ds = (ASSET_STATE.deliverables || []).map(function (d) { return { type: 'deliverable', id: d.id, blobId: d.blobId, name: d.name, filename: d.filename, mimeType: d.mimeType, sizeBytes: d.sizeBytes, url: d.url, versionCount: d.versionCount, latestVersion: d.latestVersion, visibility: d.visibility, folderId: d.folderId || '', enrichment: d.enrichment || null, usageCount: d.usageCount || 0, canDelete: !!d.canDelete }; });
     var ls = (ASSET_STATE.loose || []).map(function (b) { return { type: 'loose', id: b.id, blobId: b.id, name: b.filename, filename: b.filename, mimeType: b.mimeType, sizeBytes: b.sizeBytes, url: b.url, versionCount: 1, latestVersion: 1, visibility: null, folderId: '', canDelete: !!b.canDelete }; });
-    return ds.concat(ls);
+    return ds.concat(ls).filter(function (x) { return !assetPendingDel[x.id]; });
   }
   function findItem(id) { return assetItems().filter(function (x) { return x.id === id; })[0]; }
   function selCount() { return Object.keys(assetSel).filter(function (k) { return assetSel[k]; }).length; }
@@ -86,8 +88,10 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
       + vis + '<div class="wsx-asset-pv__acts">' + acts + '</div></div>');
     var sel = mo.body.querySelector('#pv_vis');
     if (sel) sel.addEventListener('change', function () {
-      var o = visInfo(sel.value); var h = mo.body.querySelector('#pv_vishint'); if (o && h) h.textContent = t(o.hint);
-      patchDeliverable(a.id, { visibility: sel.value });
+      var before = a.visibility;
+      function hint(v) { var o = visInfo(v); var h = mo.body.querySelector('#pv_vishint'); if (o && h) h.textContent = t(o.hint); }
+      hint(sel.value);
+      patchDeliverable(a.id, { visibility: sel.value }, null, function () { sel.value = before; hint(before); });
     });
     mo.body.querySelectorAll('[data-pv-act]').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -143,13 +147,20 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
       card.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(e); } });
     });
   }
+  // Optimistic: the folder pill appears at once; the real one replaces it when the POST lands.
   function newAssetFolder() {
     var mo = wsxModal(t('assets.newFolder'), '<div class="wsx-cform">' + fld(t('assets.folderName'), 'fld_name', '') + '<div class="wsx-cform__foot"><button class="wsx-abtn wsx-abtn--primary" id="fld_go" type="button">' + esc(t('common.create')) + '</button></div></div>');
     document.getElementById('fld_go').addEventListener('click', function () {
       var name = cv('fld_name'); if (!name) return;
-      fetch(folderApiBase(), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name }) })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function () { mo.close(); fetchFolders(); }).catch(function () {});
+      var tmp = { id: 'tmp_' + Date.now(), name: name };
+      optimistic({
+        key: 'asset:folder:' + name,
+        apply: function () { mo.close(); assetFolders = assetFolders.concat([tmp]); renderAssets(); },
+        rollback: function () { assetFolders = assetFolders.filter(function (f) { return f !== tmp; }); if (assetFolder === tmp.id) assetFolder = ''; renderAssets(); },
+        request: function () { return fetch(folderApiBase(), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name }) }); },
+        error: t('assets.toast.folderFailed'),
+        done: function () { fetchFolders(); },
+      });
     });
   }
   function moveAsset(id) {
@@ -231,16 +242,18 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
         });
     }
     load();
+    // Exception to optimistic: the comment needs its server id + author to thread replies.
     document.getElementById('cmt_go').addEventListener('click', function () {
       var v = cv('cmt_in'); if (!v) return;
-      var btn = document.getElementById('cmt_go'); if (btn) btn.disabled = true;
+      var btn = document.getElementById('cmt_go'); if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = t('assets.sending'); }
+      function idle() { if (btn) { btn.disabled = false; btn.textContent = t('assets.postComment'); } }
       var err = document.getElementById('cmt_err'); if (err) err.textContent = '';
       var body = { content: v, contextId: ctxq };
       if (replyTo) body.parentId = replyTo;
       fetch(commentsBase(), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
         .then(function (res) {
-          if (btn) btn.disabled = false;
+          idle();
           if (!res.ok) {
             if (err) err.textContent = (res.j && (typeof res.j.error === 'string' ? res.j.error : res.j.message)) || t('common.error');
             return;
@@ -249,7 +262,7 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
           setReply(null);
           load();
         }).catch(function () {
-          if (btn) btn.disabled = false;
+          idle();
           if (err) err.textContent = t('common.error');
         });
     });
@@ -257,6 +270,7 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
   function openSharePerson(resId, resType) {
     var rt = resType || 'file';
     var grantsBase = '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/grants';
+    var pendingRevokes = {};
     var cap = '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('assets.shareAccess')) + '</span><select class="wsx-field__in" id="sp_cap"><option value="view">' + esc(t('assets.shareCapView')) + '</option><option value="comment">' + esc(t('assets.shareCapComment')) + '</option></select></label>';
     var mo = wsxModal(t(rt === 'folder' ? 'assets.shareFolder' : 'assets.shareWithPerson'), '<div class="wsx-cform">'
       + '<div id="sp_shared" class="wsx-cform__note">' + esc(t('common.loading')) + '</div>'
@@ -267,25 +281,38 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
       fetch(grantsBase + '?resource_type=' + encodeURIComponent(rt) + '&resource_id=' + encodeURIComponent(resId), { credentials: 'same-origin' })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
-          var gs = (d && d.grants) || []; var el = document.getElementById('sp_shared'); if (!el) return;
+          var gs = ((d && d.grants) || []).filter(function (g) { return !pendingRevokes[g.id]; }); var el = document.getElementById('sp_shared'); if (!el) return;
           el.innerHTML = gs.length ? '<div class="wsx-field__lbl">' + esc(t('assets.sharedWith')) + '</div>' + gs.map(function (g) {
             return '<div class="wsx-share-send"><span>' + esc(g.subject_label || g.subject_id) + ' \\u00b7 ' + esc(g.capability) + '</span><button class="wsx-abtn" type="button" data-rv="' + esc(g.id) + '">' + esc(t('assets.revoke')) + '</button></div>';
           }).join('') : '<p class="wsx-field__note">' + esc(t('assets.noShares')) + '</p>';
           Array.prototype.forEach.call(el.querySelectorAll('[data-rv]'), function (b) {
             b.addEventListener('click', function () {
-              fetch(grantsBase + '/' + encodeURIComponent(b.getAttribute('data-rv')), { method: 'DELETE', credentials: 'same-origin' })
-                .then(function (r) { if (r.ok) loadShares(); }).catch(function () {});
+              var gid = b.getAttribute('data-rv'), gone = null;
+              optimistic({
+                key: 'grant:del:' + gid,
+                undo: true,
+                apply: function () { pendingRevokes[gid] = true; gone = window.soOptimistic.leave(b.closest('.wsx-share-send')); },
+                rollback: function () { delete pendingRevokes[gid]; if (gone) gone.restore(); },
+                request: function () { return fetch(grantsBase + '/' + encodeURIComponent(gid), { method: 'DELETE', credentials: 'same-origin', keepalive: true }); },
+                success: t('assets.toast.revoked'),
+                error: t('assets.toast.revokeFailed'),
+                done: function () { delete pendingRevokes[gid]; if (gone) gone.commit(); },
+              });
             });
           });
         }).catch(function () {});
     }
     loadShares();
+    // Exception to optimistic: the server resolves the email to a person and invites them.
     document.getElementById('sp_go').addEventListener('click', function () {
       var email = cv('sp_email'); var msg = document.getElementById('sp_msg'); if (!email) return;
+      var go = this; if (go.disabled) return;
+      var label = go.textContent; go.disabled = true; go.textContent = t('assets.sending');
+      function idle() { go.disabled = false; go.textContent = label; }
       fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/share-person', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resource_type: rt, resource_id: resId, email: email, capability: cv('sp_cap') || 'view' }) })
         .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-        .then(function (res) { if (res.ok) { var i = document.getElementById('sp_email'); if (i) i.value = ''; if (msg) msg.textContent = ''; loadShares(); } else if (msg) { msg.textContent = (res.j && (res.j.error || res.j.message)) || t('assets.shareErr'); } })
-        .catch(function () { if (msg) msg.textContent = t('assets.shareErr'); });
+        .then(function (res) { idle(); if (res.ok) { var i = document.getElementById('sp_email'); if (i) i.value = ''; if (msg) msg.textContent = ''; loadShares(); } else if (msg) { msg.textContent = (res.j && (res.j.error || res.j.message)) || t('assets.shareErr'); } })
+        .catch(function () { idle(); if (msg) msg.textContent = t('assets.shareErr'); });
     });
   }
   function openUsage(dlv) {
@@ -301,9 +328,20 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
         }).join('') : '<p class="wsx-field__note">' + esc(t('assets.usedInNone')) + '</p>';
       }).catch(function () {});
   }
-  function patchDeliverable(id, body, mo) {
-    fetch(assetApiBase() + '/deliverables/' + encodeURIComponent(id), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      .then(function () { if (mo) mo.close(); fetchAssets(); }).catch(function () {});
+  // Optimistic: the file's folder / visibility changes in the list at once; a failed PATCH
+  // restores the old values (and onRollback fixes any control that showed the new one).
+  function patchDeliverable(id, body, mo, onRollback) {
+    var d = (ASSET_STATE.deliverables || []).filter(function (x) { return x.id === id; })[0];
+    var prev = {};
+    Object.keys(body).forEach(function (k) { prev[k] = d ? d[k] : undefined; });
+    optimistic({
+      key: 'asset:patch:' + id,
+      apply: function () { if (mo) mo.close(); if (d) { Object.keys(body).forEach(function (k) { d[k] = body[k]; }); renderAssets(); } },
+      rollback: function () { if (d) { Object.keys(prev).forEach(function (k) { d[k] = prev[k]; }); renderAssets(); } if (onRollback) onRollback(); },
+      request: function () { return fetch(assetApiBase() + '/deliverables/' + encodeURIComponent(id), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); },
+      error: t('assets.toast.updateFailed'),
+      done: function () { fetchAssets(); },
+    });
   }
   function fetchFolders() {
     fetch(folderApiBase(), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; })
@@ -314,6 +352,7 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
     var c = m.querySelector('#wsxAssetCancel'); if (c) c.addEventListener('click', function () { assetSelect = false; assetSel = {}; renderAssets(); });
     var sh = m.querySelector('#wsxAssetShare'); if (sh) sh.addEventListener('click', openShareModal);
   }
+  // Delete: confirm closes at once, the tile leaves, and an Undo toast holds the DELETE.
   function deleteAsset(it) {
     if (!it) return;
     var mo = wsxModal(t('assets.deleteTitle'), '<div class="wsx-cform"><p class="wsx-field__note">' + esc(t('assets.deleteConfirm').replace('{name}', it.name || t('assets.thisAsset'))) + '</p>'
@@ -322,7 +361,16 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
     mo.body.querySelector('#del_go').addEventListener('click', function () {
       mo.close();
       var url = it.type === 'deliverable' ? assetApiBase() + '/deliverables/' + encodeURIComponent(it.id) : assetApiBase() + '/' + encodeURIComponent(it.blobId);
-      fetch(url, { method: 'DELETE', credentials: 'same-origin' }).then(function () { fetchAssets(); }).catch(function () {});
+      optimistic({
+        key: 'asset:del:' + it.id,
+        undo: true,
+        apply: function () { assetPendingDel[it.id] = true; delete assetSel[it.id]; renderAssets(); },
+        rollback: function () { delete assetPendingDel[it.id]; renderAssets(); },
+        request: function () { return fetch(url, { method: 'DELETE', credentials: 'same-origin', keepalive: true }); },
+        success: t('assets.toast.deleted'),
+        error: t('assets.toast.deleteFailed'),
+        done: function () { delete assetPendingDel[it.id]; fetchAssets(); },
+      });
     });
   }
   function fetchAssets() {
@@ -394,7 +442,12 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
   }
   function uploadVersion(deliverableId) {
     var inp = document.createElement('input'); inp.type = 'file';
-    inp.addEventListener('change', function () { var f = inp.files && inp.files[0]; if (!f) return; uploadOne(f, deliverableId, fetchAssets); });
+    // Exception to optimistic (upload): say it started, then report the outcome.
+    inp.addEventListener('change', function () {
+      var f = inp.files && inp.files[0]; if (!f) return;
+      showToast(t('common.uploading'));
+      uploadOne(f, deliverableId, function (ok, msg) { fetchAssets(); showToast(ok ? t('common.uploaded') : (msg || t('assets.uploadFailedOne')), ok ? 'success' : 'error'); });
+    });
     inp.click();
   }
   function showHistory(deliverableId) {
@@ -434,14 +487,15 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
     document.getElementById('dl_go').addEventListener('click', function () {
       var name = cv('dl_name') || t('assets.defaultDeliveryName'); var exp = cv('dl_exp'); var err = document.getElementById('dl_err'); var b = this; err.textContent = '';
       var gp = gatePayload(err); if (!gp) return;
-      b.disabled = true;
+      // Exception to optimistic: the share link is generated by the server.
+      var label = b.textContent; b.disabled = true; b.textContent = t('common.creating');
       var expIso = exp ? new Date(exp).toISOString() : null;
       function shareBody() { var o = { gate: gp.gate }; if (expIso) o.expiresAt = expIso; if (gp.password) o.password = gp.password; if (gp.domains) o.domains = gp.domains; return o; }
       fetch(assetApiBase() + '/collections', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, deliverableIds: ids }) })
         .then(function (r) { return r.json(); })
         .then(function (c) { if (!c || !c.id) throw 0; return fetch(assetApiBase() + '/collections/' + encodeURIComponent(c.id) + '/share', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(shareBody()) }).then(function (r) { return r.json().then(function (s) { return { id: c.id, url: s.url }; }); }); })
-        .then(function (res) { b.disabled = false; showShareResult(res.id, res.url, expIso, gp); })
-        .catch(function () { b.disabled = false; err.textContent = t('assets.errCreateLink'); });
+        .then(function (res) { b.disabled = false; b.textContent = label; showShareResult(res.id, res.url, expIso, gp); })
+        .catch(function () { b.disabled = false; b.textContent = label; err.textContent = t('assets.errCreateLink'); });
     });
   }
   function showShareResult(colId, url, expIso, gp) {

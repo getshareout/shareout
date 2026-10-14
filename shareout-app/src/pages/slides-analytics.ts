@@ -174,9 +174,19 @@ function clientScript(artifactId: string, presId: string): string {
     }).join('');
     el.innerHTML='<table class="sa-tbl">'+head+body+'</table>';
     el.querySelectorAll('.sa-copy').forEach(function(b){b.onclick=function(){navigator.clipboard.writeText(b.getAttribute('data-url'));b.textContent='Copied';setTimeout(function(){b.textContent='Copy';},1200);};});
+    // Revoke is optimistic: the row reads "revoked" now and Undo holds the DELETE.
     el.querySelectorAll('.sa-revoke').forEach(function(b){b.onclick=function(){
       if(!confirm('Revoke this link? Existing analytics are kept.'))return;
-      fetch(BASE+'/links/'+b.getAttribute('data-id'),{method:'DELETE',credentials:'include'}).then(loadLinks);
+      var tr=b.closest('tr'),cell=tr.firstElementChild,was=cell.textContent;
+      window.soOptimistic({
+        key:'sa-revoke:'+b.getAttribute('data-id'),undo:true,
+        apply:function(){cell.textContent=was+' (revoked)';tr.querySelectorAll('button').forEach(function(x){x.hidden=true;});},
+        rollback:function(){cell.textContent=was;tr.querySelectorAll('button').forEach(function(x){x.hidden=false;});},
+        request:function(){return fetch(BASE+'/links/'+b.getAttribute('data-id'),{method:'DELETE',credentials:'include',keepalive:true});},
+        success:'Link revoked',
+        error:'Couldn\u2019t revoke the link. Try again?',
+        done:loadLinks
+      });
     };});
   }
   function loadLinks(){get('/links').then(function(r){if(r&&r.success)renderLinks(r.data.links);});}
@@ -189,8 +199,15 @@ function clientScript(artifactId: string, presId: string): string {
     var g=gate.value,payload={recipientLabel:form.recipientLabel.value||undefined,gate:g};
     if(g==='password')payload.password=gv.value;
     if(g==='domain')payload.domains=gv.value.split(',').map(function(s){return s.trim();}).filter(Boolean);
+    // Creating a link waits: the URL is minted by the server.
+    var sb=form.querySelector('button'),label=sb.textContent;
+    if(sb.disabled)return;
+    sb.disabled=true;sb.textContent='Creating\u2026';
     fetch(BASE+'/links',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-      .then(function(r){return r.json();}).then(function(){form.reset();gv.style.display='none';loadLinks();});
+      .then(function(r){return r.json().catch(function(){return null;}).then(function(j){if(!r.ok||!j||j.success===false)throw j;return j;});})
+      .then(function(){form.reset();gv.style.display='none';loadLinks();window.showToast('Link created','success');})
+      .catch(function(j){window.showToast((j&&j.error)||'Couldn\u2019t create the link. Try again?','error');})
+      .then(function(){sb.disabled=false;sb.textContent=label;});
   };
 
   loadAnalytics();loadLinks();

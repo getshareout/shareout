@@ -64,14 +64,24 @@ export const workspace_client_home_views_lensRouting_JS = `  var lenses = ws.que
           var th = m.querySelector('.wsx__help-thread'); if (th) th.scrollTop = th.scrollHeight;
         }).catch(function () {});
     }
+    // Optimistic: the reply lands in the thread at once; a failure takes it back out and
+    // returns the text to the box.
     function sendReply(id) {
       var ta = document.getElementById('wsxHelpReply'), out = document.getElementById('wsxHelpReplyMsg');
       var body = ta ? ta.value.trim() : '';
       if (!body) return;
-      if (out) out.textContent = t('help.sending');
-      fetch('/v1/support/tickets/' + encodeURIComponent(id) + '/message', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body: body }) })
-        .then(function (r) { if (!r.ok) throw new Error(); openThread(id); })
-        .catch(function () { if (out) out.textContent = t('help.couldNotSend'); });
+      var th = document.querySelector('#wsxHelpMine .wsx__help-thread'), row = null;
+      optimistic({
+        key: 'help:reply:' + id,
+        apply: function () {
+          if (out) out.textContent = '';
+          if (ta) ta.value = '';
+          if (th) { row = document.createElement('div'); row.className = 'wsx__help-msg'; row.innerHTML = '<div class="wsx-admin__sub">' + esc(t('help.you')) + ' \\u00B7 ' + adRelDate(new Date().toISOString()) + '</div>' + esc(body); th.appendChild(row); th.scrollTop = th.scrollHeight; }
+        },
+        rollback: function () { if (row) row.remove(); var box = document.getElementById('wsxHelpReply'); if (box && !box.value) box.value = body; },
+        request: function () { return fetch('/v1/support/tickets/' + encodeURIComponent(id) + '/message', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body: body }) }); },
+        error: t('help.couldNotSend'),
+      });
     }
     var mineEl = document.getElementById('wsxHelpMine');
     if (mineEl) {
@@ -96,7 +106,10 @@ export const workspace_client_home_views_lensRouting_JS = `  var lenses = ws.que
       var body = (document.getElementById('wsxHelpBody') || {}).value || '';
       var msg = document.getElementById('wsxHelpMsg');
       if (!subj.trim() || !body.trim()) { if (msg) msg.textContent = t('help.addSummary'); return; }
+      // Exception to optimistic: the server opens the ticket (id + thread) we list next.
+      if (send.disabled) return;
       if (msg) msg.textContent = t('help.sending');
+      send.disabled = true;
       var payload = {
         subject: subj, body: body,
         category: (document.getElementById('wsxHelpCategory') || {}).value || 'other',
@@ -107,12 +120,13 @@ export const workspace_client_home_views_lensRouting_JS = `  var lenses = ws.que
       fetch('/v1/support/tickets', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (res) {
+          send.disabled = false;
           if (res && res.success) {
             if (msg) msg.textContent = t('help.sent');
             document.getElementById('wsxHelpSubject').value = ''; document.getElementById('wsxHelpBody').value = '';
             mineLoaded = true; loadMine();
           } else { if (msg) msg.textContent = t('help.couldNotSend'); }
-        }).catch(function () { if (msg) msg.textContent = t('help.couldNotSend'); });
+        }).catch(function () { send.disabled = false; if (msg) msg.textContent = t('help.couldNotSend'); });
     });
   })();
 
