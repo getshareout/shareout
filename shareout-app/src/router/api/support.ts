@@ -14,6 +14,7 @@ import { triageTicket } from '../../support/triage';
 import { deliverReply } from '../../support/deliver';
 import { ingestSupportEmail } from '../../support/email-ingest';
 import { dispatchLifecycleEmail } from '../../email/gateway';
+import { alertOperator } from '../../support/alert';
 
 /** Constant-time-ish secret compare for the trusted email-gateway ingest. */
 function secretOk(provided: string | null, expected: string | undefined): boolean {
@@ -142,6 +143,7 @@ export async function routeSupportApi(ctx: FetchContext): Promise<Response | nul
       });
       // Triage runs after the response — never block ticket creation.
       ctx.executionCtx?.waitUntil(triageTicket(ctx.env, ticket.id).catch(() => null));
+      ctx.executionCtx?.waitUntil(alertOperator(ctx.env, ticket, body.body));
       return cors(jsonResponse(created(ticket, false), 201));
     }
 

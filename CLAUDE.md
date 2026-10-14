@@ -78,6 +78,7 @@ tooling/scripts/       ← ci-check, gitleaks, boundary helpers
 | `STORAGE_QUOTA_BYTES` / `STORAGE_MAX_FILE_BYTES` | Optional storage caps; unset = unlimited |
 | `PUBLIC_ARTIFACT_LIMIT` | Optional per-account public-artifact cap; unset = unlimited |
 | `GOOGLE_CLIENT_ID` / `SECRET` | Optional; email OTP always available |
+| `SUPPORT_ALERT_TELEGRAM_CHAT_ID` | Optional; Telegram chat pinged on every new support ticket (needs `TELEGRAM_BOT_TOKEN`) |
 
 ---
 
