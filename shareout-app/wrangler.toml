@@ -160,6 +160,24 @@ new_sqlite_classes = ["Showtime"]
 tag = "v8"
 new_sqlite_classes = ["KnowledgeStore"]
 
+# Optional: slide decks (.pptx/.ppt/.odp) import as a PDF artifact, converted by LibreOffice
+# in a Cloudflare Container (containers/slides/). Needs Workers Paid and Docker on the machine
+# that runs `wrangler deploy` (it builds and pushes the image). Without it, decks stay in
+# Assets and POST /v1/home/import answers 422 CONVERT_UNAVAILABLE. Uncomment all three.
+# [[containers]]
+# class_name = "SlidesConverter"
+# image = "./containers/slides/Dockerfile"
+# instance_type = "standard-1"
+# max_instances = 1
+#
+# [[durable_objects.bindings]]
+# name = "SLIDES_CONVERTER"
+# class_name = "SlidesConverter"
+#
+# [[migrations]]
+# tag = "v9"
+# new_sqlite_classes = ["SlidesConverter"]
+
 # Optional hourly cron — disable on free accounts if undesired
 [triggers]
 crons = ["0 * * * *"]

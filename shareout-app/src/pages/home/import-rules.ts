@@ -19,8 +19,14 @@ export const IMPORT_ARTIFACT_EXTS: Record<string, ArtifactType> = {
 export const IMPORT_CONVERTED_EXTS: Record<string, 'word' | 'sheet'> = {
   docx: 'word', odt: 'word', xlsx: 'sheet', xls: 'sheet', ods: 'sheet',
 };
+/**
+ * Slide decks become a PDF artifact (LibreOffice in a Container, import-slides.ts). Only
+ * where the instance binds SLIDES_CONVERTER: the client routes them here when
+ * window.WSX_SLIDES is set, and to Assets otherwise.
+ */
+export const IMPORT_SLIDES_EXTS = ['pptx', 'ppt', 'odp'];
 /** Sent as base64 by the client (binary formats). */
-export const IMPORT_BINARY_EXTS = ['pdf', 'docx', 'odt', 'xlsx', 'xls', 'ods'];
+export const IMPORT_BINARY_EXTS = ['pdf', 'docx', 'odt', 'xlsx', 'xls', 'ods', ...IMPORT_SLIDES_EXTS];
 export const IMPORT_MAX_BYTES = 25 * 1024 * 1024;
 /** Share links we try to fetch once (no per-vendor scraping). Subdomains match too. */
 export const IMPORT_SHARE_HOSTS = ['claude.ai', 'claude.site', 'chatgpt.com', 'chat.openai.com', 'gemini.google.com', 'g.co'];

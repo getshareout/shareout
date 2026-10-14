@@ -91,6 +91,23 @@ describe('handleGetArtifact', () => {
     });
   });
 
+  it('names the kept original of an imported file (Studio "Download original")', async () => {
+    const withMeta = (type_metadata: string | null) => ({
+      ...baseEnv,
+      DB: makeDbMock({
+        first: (sql, ...args) => {
+          const row = ownerRoleFirst(sql, ...args);
+          return row && typeof row === 'object' && 'embed_origins' in row ? { ...row, type_metadata } : row;
+        },
+        all: () => ({ results: [] }),
+      }),
+    });
+    const get = async (meta: string | null) => jsonBody(await handleGetArtifact(new Request('https://shareout.example.com/v1/artifacts/art_1'), withMeta(meta), user, 'art_1'));
+    expect(await get(JSON.stringify({ source: { original: 'original/Deck.pptx' } }))).toMatchObject({ original: 'original/Deck.pptx' });
+    expect(await get(null)).not.toHaveProperty('original');
+    expect(await get('{bad')).not.toHaveProperty('original');
+  });
+
   it('ignores invalid embed_origins JSON', async () => {
     const env = {
       ...baseEnv,

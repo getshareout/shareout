@@ -27,6 +27,7 @@ checklist; do not skip `npm run deploy` / `provision:cf`.
 | Email binding | Optional | `EMAIL` | OTP/mail vs logs |
 | Workers AI / Vectorize | Optional | `AI`, `VECTORIZE` | Semantic search |
 | Browser Rendering | Optional | `BROWSER` | Thumbnails |
+| Container (LibreOffice) | Optional | `SLIDES_CONVERTER` (`[[containers]]` block in `wrangler.toml`; Docker at deploy) | .pptx/.ppt/.odp import as PDF; else decks stay in Assets |
 | Queues | Optional | analytics views queue | Async analytics |
 
 OSS template: `shareout-app/wrangler.toml`.

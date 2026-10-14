@@ -14,6 +14,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   var SVG_STAR = '<path d="M12 17.3l-5.5 3.3 1.5-6.3-4.9-4.2 6.4-.5L12 3.5l2.5 5.9 6.4.5-4.9 4.2 1.5 6.3z"/>';
   var SVG_TRASH = '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>';
   var SVG_EMOJI = '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5s1.3 1.8 3.5 1.8 3.5-1.8 3.5-1.8"/><line x1="9" y1="9.2" x2="9.01" y2="9.2"/><line x1="15" y1="9.2" x2="15.01" y2="9.2"/>';
+  var SVG_DOWNLOAD = '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>';
   var SVG_SEND = '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>';
   var EMOJI_SET = ['\\uD83D\\uDC4D','\\u2764\\uFE0F','\\uD83D\\uDE04','\\uD83C\\uDF89','\\uD83D\\uDC40','\\uD83D\\uDE4F','\\uD83D\\uDD25','\\u2705','\\u26A0\\uFE0F','\\uD83D\\uDE80','\\uD83D\\uDCA1','\\uD83D\\uDC4F','\\uD83E\\uDD14','\\uD83D\\uDE0D','\\uD83D\\uDE05','\\uD83D\\uDE0E','\\uD83D\\uDCAF','\\uD83D\\uDE4C','\\uD83D\\uDC4C','\\uD83D\\uDE2C'];
 
@@ -127,6 +128,8 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       + '<button class="wsx-abtn wsx-det__act" data-iact="open" type="button">' + isvg(SVG_OPEN) + esc(t('inspector.openLabel')) + '</button>'
       + (editable ? '<button class="wsx-abtn wsx-det__act" data-iact="edit" type="button">' + isvg(SVG_EDIT) + esc(t('inspector.editLabel')) + '</button>' : '')
       + iconBtn('copy', t('inspector.act.copy'), SVG_COPY)
+      // A PDF has no viewer shell, so a converted deck's "Download original" lives here.
+      + (meta && meta.original && type === 'pdf' ? iconBtn('original', t('inspector.act.original'), SVG_DOWNLOAD) : '')
       + (canMoveToAssets(meta) ? iconBtn('toassets', t('move.toAssets'), SVG_TO_ASSETS) : '')
       + (meta && meta.can_delete ? iconBtn('trash', t('inspector.act.trash'), SVG_TRASH, 'is-danger') : '')
       + '</div>';
@@ -204,6 +207,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
         else if (act === 'fav') { toggleFav(art.id, b); var ft = b.classList.contains('is-on') ? t('inspector.favRemove') : t('inspector.favAdd'); b.setAttribute('data-tip', ft); b.setAttribute('aria-label', ft); }
         else if (act === 'trash') { trashArtifact(art); }
         else if (act === 'toassets') { moveToAssets(art, meta); }
+        else if (act === 'original') { var dl = document.createElement('a'); dl.href = '/a/' + encodeURIComponent(slug) + '/download'; dl.download = ''; document.body.appendChild(dl); dl.click(); dl.remove(); }
       });
     });
 

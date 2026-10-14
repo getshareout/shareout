@@ -31,6 +31,9 @@ const OFFICE_MIME: Record<string, string> = {
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   xls: 'application/vnd.ms-excel',
   ods: 'application/vnd.oasis.opendocument.spreadsheet',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  ppt: 'application/vnd.ms-powerpoint',
+  odp: 'application/vnd.oasis.opendocument.presentation',
 };
 const IMAGE_MIME: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
 
@@ -45,12 +48,12 @@ export function base64ToBytes(b64: string): Uint8Array {
 }
 
 /** A path segment that stays readable but never escapes its folder. */
-function safeSegment(name: string, fallback: string): string {
+export function safeSegment(name: string, fallback: string): string {
   const s = name.normalize('NFC').replace(/[^\p{L}\p{N}_. -]+/gu, '-').replace(/\s+/g, ' ').replace(/^[.\s-]+|[.\s-]+$/g, '').slice(0, 80);
   return s || fallback;
 }
 
-function originalFile(filename: string, ext: string, bytes: Uint8Array): FileEntry {
+export function originalFile(filename: string, ext: string, bytes: Uint8Array): FileEntry {
   return { path: `original/${safeSegment(filename, `original.${ext}`)}`, content: bytesToBase64(bytes), mime: OFFICE_MIME[ext], encoding: 'base64' };
 }
 

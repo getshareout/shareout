@@ -6,15 +6,17 @@
  * upload (uploadOne, which also triggers AI enrichment). import-rules.ts decides, for
  * the server too. Only wired where the New button renders (template.ts canCreateHere).
  */
-import { IMPORT_ARTIFACT_EXTS, IMPORT_BINARY_EXTS, IMPORT_MAX_BYTES, IMPORT_SHARE_HOSTS } from '../../import-rules';
+import { IMPORT_ARTIFACT_EXTS, IMPORT_BINARY_EXTS, IMPORT_MAX_BYTES, IMPORT_SHARE_HOSTS, IMPORT_SLIDES_EXTS } from '../../import-rules';
 
 export const workspace_client_drop_import_JS = `  // ===== One-step import: drop or paste on the Home → artifact (or Assets) =====
-  var DROP_EXTS = ${JSON.stringify(Object.keys(IMPORT_ARTIFACT_EXTS))};
+  // Slide decks become a PDF only where the instance has the converter; elsewhere they stay Assets.
+  var DROP_SLIDES = ${JSON.stringify(IMPORT_SLIDES_EXTS)};
+  var DROP_EXTS = ${JSON.stringify(Object.keys(IMPORT_ARTIFACT_EXTS))}.concat(window.WSX_SLIDES ? DROP_SLIDES : []);
   var DROP_BINARY = ${JSON.stringify(IMPORT_BINARY_EXTS)};
   var DROP_HOSTS = ${JSON.stringify(IMPORT_SHARE_HOSTS)};
   var DROP_MAX = ${IMPORT_MAX_BYTES};
   var DROP_LIVE = { html: 1, csv: 1, json: 1 };
-  var DROP_ERR = { RATE_LIMIT_EXCEEDED: 'drop.err.limit', STORAGE_LIMIT_EXCEEDED: 'drop.err.quota', FILE_TOO_LARGE: 'drop.err.tooBig', UNSUPPORTED_TYPE: 'drop.err.type', URL_NOT_FETCHABLE: 'drop.err.url', URL_NOT_SUPPORTED: 'drop.err.url', SPREADSHEET_TOO_LARGE: 'drop.err.sheetTooBig', CONVERT_FAILED: 'drop.err.convert', CONVERT_UNAVAILABLE: 'drop.err.odt' };
+  var DROP_ERR = { RATE_LIMIT_EXCEEDED: 'drop.err.limit', STORAGE_LIMIT_EXCEEDED: 'drop.err.quota', FILE_TOO_LARGE: 'drop.err.tooBig', UNSUPPORTED_TYPE: 'drop.err.type', URL_NOT_FETCHABLE: 'drop.err.url', URL_NOT_SUPPORTED: 'drop.err.url', SPREADSHEET_TOO_LARGE: 'drop.err.sheetTooBig', CONVERT_FAILED: 'drop.err.convert', CONVERT_UNAVAILABLE: 'drop.err.odt', CONVERT_TIMEOUT: 'drop.err.retry', CONVERT_BUSY: 'drop.err.retry' };
   var dropPanel = null, dropOverlay = null, dropDepth = 0;
   function dropExt(n) { var m = /\\.([a-z0-9]+)$/i.exec(n || ''); return m ? m[1].toLowerCase() : ''; }
   function dropIsShareLink(s) {
@@ -53,7 +55,7 @@ export const workspace_client_drop_import_JS = `  // ===== One-step import: drop
     });
     li.appendChild(acts);
   }
-  function dropErr(e) { var k = e && DROP_ERR[e.code]; return k ? t(k).replace('{mb}', String(DROP_MAX / 1048576)) : ((e && e.message) || t('drop.err.generic')); }
+  function dropErr(e, name) { var k = e && (e.code === 'CONVERT_UNAVAILABLE' && DROP_SLIDES.indexOf(dropExt(name)) >= 0 ? 'drop.err.slides' : DROP_ERR[e.code]); return k ? t(k).replace('{mb}', String(DROP_MAX / 1048576)) : ((e && e.message) || t('drop.err.generic')); }
   function dropPost(payload) {
     payload.lang = typeof window.__SO_HOME_LOCALE === 'function' ? window.__SO_HOME_LOCALE() : 'en';
     if (typeof curFolder === 'string' && curFolder) payload.folder = curFolder;
@@ -84,7 +86,7 @@ export const workspace_client_drop_import_JS = `  // ===== One-step import: drop
     }
     if (item.file && item.file.size > DROP_MAX) { dropSet(li, 'err', dropErr({ code: 'FILE_TOO_LARGE' })); return Promise.resolve(); }
     var p = item.kind === 'file' ? dropRead(item.file).then(dropPost) : dropPost(item.kind === 'url' ? { url: item.value } : { html: item.value });
-    return p.then(function (d) { dropDone(li, d); out.published.push(d); }, function (e) { dropSet(li, 'err', dropErr(e)); });
+    return p.then(function (d) { dropDone(li, d); out.published.push(d); }, function (e) { dropSet(li, 'err', dropErr(e, item.label)); });
   }
   // Sequential, so per-file rows settle in order and a 429 shows on each remaining file.
   function importDropped(items) {
