@@ -23,6 +23,8 @@ import { artifactsBody, funnelBody, tokensBody, trafficBody } from './bodies/met
 import { overviewBody, costsBody, workspaceCostsBody } from './bodies/overview-costs';
 import { supportBody } from './bodies/support';
 import { storageBody } from './bodies/storage';
+import { usageBody } from './bodies/usage';
+import { getMonthlyUsage, previousMonth, utcDay } from '../../workspaces/usage-ledger';
 import { instanceBody } from './bodies/instance';
 import { buildInstanceConfig } from '../instance-config';
 import { listAll } from '../../support/store';
@@ -34,6 +36,12 @@ export async function renderView(env: Env, view: string, range: RangeDef): Promi
   switch (view) {
     case 'workspace-costs':
       return workspaceCostsBody(await getWorkspaceCosts(env, range.sinceExpr, days));
+    case 'usage': {
+      const thisMonth = utcDay().slice(0, 7);
+      const lastMonth = previousMonth();
+      const [current, previous] = await Promise.all([getMonthlyUsage(env, thisMonth), getMonthlyUsage(env, lastMonth)]);
+      return usageBody(thisMonth, current, lastMonth, previous);
+    }
     case 'costs':
       return costsBody(await getCostMetrics(env, days));
     case 'artifacts': {

@@ -7,6 +7,7 @@ import { suppressedSet } from '../email/suppressions';
 import { getPlatformHostname } from '../config/origins';
 import { isLocale } from '../i18n/locale';
 import { t } from '../i18n';
+import { recordArtifactUsage } from '../workspaces/usage-ledger';
 
 // Fallback words around a scheduled delivery, in the page's workspace language.
 const DELIVERY_COPY = {
@@ -57,6 +58,8 @@ export interface SendEmailResult {
   success: boolean;
   error?: string;
   messageId?: string;
+  /** Recipients actually sent to, after suppression filtering. */
+  recipients?: number;
 }
 
 export function artifactEmailDomain(env: Env): string {
@@ -147,7 +150,7 @@ export async function sendEmail(env: Env, params: SendEmailParams): Promise<Send
       ...(attachments && attachments.length ? { attachments } : {}),
     });
 
-    return { success: true, messageId: result.messageId };
+    return { success: true, messageId: result.messageId, recipients: recipients.length };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { success: false, error: `Cloudflare Email Service error: ${message}` };
@@ -270,7 +273,7 @@ export async function sendArtifactEmail(
     htmlContent = `<p>${copy.scheduledFrom} <strong>${artifact.name}</strong></p><p><a href="${artifactUrl}">${copy.viewButton}</a></p>`;
   }
 
-  return sendEmail(env, {
+  const result = await sendEmail(env, {
     from: fromEmail,
     replyTo: config.replyTo || emailRecord?.reply_to || undefined,
     to: config.recipients,
@@ -279,6 +282,10 @@ export async function sendArtifactEmail(
     html: htmlContent || undefined,
     attachments: attachments.length ? attachments : undefined,
   });
+  if (result.success) {
+    await recordArtifactUsage(env, artifactId, 'email_sent', result.recipients ?? 0).catch(() => {});
+  }
+  return result;
 }
 
 export async function checkEmailRateLimit(

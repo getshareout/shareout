@@ -4,6 +4,7 @@ import type { Env } from '../../types';
 import { createAccessToken } from '../../token';
 import { getPlatformOrigin } from '../../config/origins';
 import { logCrewToolFailure, userFacingPilotVerifyToolError } from '../errors';
+import { recordBrowserSince } from '../../workspaces/usage-ledger';
 
 // Verify runs are short and cheap: cap steps low and wall-clock the whole in-page
 // run so a stuck agent can never burn budget or hold the browser open.
@@ -146,6 +147,7 @@ export const pilotVerifyTool: CrewTool = {
     const url = `${base}/a/${resolved.slug}/?_capture=${encodeURIComponent(captureToken)}`;
 
     let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
+    const startedAt = Date.now();
     try {
       browser = await puppeteer.launch(env.BROWSER as Parameters<typeof puppeteer.launch>[0]);
       const page = await browser.newPage();
@@ -180,7 +182,10 @@ export const pilotVerifyTool: CrewTool = {
       }, err);
       return { success: false, error: userFacingPilotVerifyToolError(err), data: '' };
     } finally {
-      if (browser) await browser.close().catch(() => {});
+      if (browser) {
+        await browser.close().catch(() => {});
+        await recordBrowserSince(env, artifactId, startedAt);
+      }
     }
   },
 };

@@ -3,6 +3,7 @@ import type { Env } from './types';
 import { createAccessToken } from './token';
 import { getPlatformOrigin } from './config/origins';
 import { setPresentation } from './artifacts/satellites';
+import { recordBrowserSince } from './workspaces/usage-ledger';
 
 const THUMB_WIDTH = 1200;
 const THUMB_HEIGHT = 750;
@@ -90,6 +91,7 @@ export async function withArtifactPage<T>(
   const settleMs = waits.settleMs ?? 1200;
 
   let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
+  const startedAt = Date.now();
   try {
     browser = await puppeteer.launch(env.BROWSER as Parameters<typeof puppeteer.launch>[0]);
     const page = await browser.newPage();
@@ -113,7 +115,10 @@ export async function withArtifactPage<T>(
     console.error('withArtifactPage failed', { artifactId, url, error_stack: (err as Error)?.stack || String(err) });
     return null;
   } finally {
-    if (browser) await browser.close().catch(() => {});
+    if (browser) {
+      await browser.close().catch(() => {});
+      await recordBrowserSince(env, artifactId, startedAt);
+    }
   }
 }
 
