@@ -88,3 +88,7 @@ With **AI** switched on for the connector (Connectors card → AI checkbox):
 
 Crews, materialize and scheduled snapshots use `queryConnectionAny`, which accepts the
 three SQL providers by name.
+
+The same three tools are on the MCP connector (`{origin}/mcp`), so Claude, ChatGPT and
+other MCP clients signed in as a workspace member get the same read-only access, under
+the same AI switch — see [mcp-connector.md](mcp-connector.md).
