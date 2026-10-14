@@ -9,7 +9,7 @@ import { logAudit } from '../../../audit';
 import { encryptCredentials, decryptCredentials } from '../../../data/connections/credentials';
 import { getProvider, hasProvider, listProviders } from '../../../data/platform';
 import { removeCatalogForConnection, seedCatalogForConnection } from '../../../catalog/seed-resources';
-import { buildProbeCredentials, summarizeCredentials } from './credentials';
+import { awsKeyExtra, buildProbeCredentials, summarizeCredentials } from './credentials';
 import {
   GENERIC_TYPES,
   STATIC_AUTH_TYPES,
@@ -284,8 +284,8 @@ async function createPlatformConnection(
     authType = perUserType;
     credentialPayload = {};
   } else {
-    if (!body.credentials || !['oauth', 'service_account', 'authorized_user', 'key_pair'].includes(body.credentials.type)) {
-      return json({ error: "credentials.type must be 'oauth', 'service_account', 'authorized_user', or 'key_pair' for a platform connection", code: 'VALIDATION_ERROR' }, 400);
+    if (!body.credentials || !['oauth', 'service_account', 'authorized_user', 'key_pair', 'aws_access_key'].includes(body.credentials.type)) {
+      return json({ error: "credentials.type must be 'oauth', 'service_account', 'authorized_user', 'key_pair', or 'aws_access_key' for a platform connection", code: 'VALIDATION_ERROR' }, 400);
     }
     const creds = body.credentials;
     const data = creds.data || {};
@@ -304,6 +304,13 @@ async function createPlatformConnection(
           ...(data.public_key_fingerprint ? { public_key_fingerprint: data.public_key_fingerprint } : {}),
         },
       };
+    } else if (creds.type === 'aws_access_key') {
+      const extra = awsKeyExtra(data);
+      if (!extra.access_key_id || !extra.secret_access_key) {
+        return json({ error: 'aws_access_key credentials require access_key_id and secret_access_key', code: 'VALIDATION_ERROR' }, 400);
+      }
+      authType = 'aws_access_key';
+      credentialPayload = { access_token: '', extra };
     } else if (creds.type === 'service_account') {
       if (!data.client_email || !data.private_key) {
         return json({ error: 'service_account credentials require client_email and private_key', code: 'VALIDATION_ERROR' }, 400);

@@ -13,7 +13,7 @@ import {
 } from './actions';
 import { addTableRowTool, updateTableRowTool, setJsonValueTool } from './data';
 import { setClientNotesTool } from './client-notes';
-import { listConnectionsTool, queryConnectionTool } from './connection-query';
+import { browseStorageTool, listConnectionsTool, queryConnectionTool } from './connection-query';
 import { createScheduleTool } from './create-schedule';
 import { createArtifactTool } from './build';
 import { catalogSearchTool, catalogGetTool } from './catalog';
@@ -71,7 +71,7 @@ export const ACCOUNT_TOOLS: AccountTool[] = [
 
 // Capability-gated tool groups. A surface opts into each via Capabilities
 // instead of branching on platform id.
-export const CONNECTOR_TOOLS: AccountTool[] = [listConnectionsTool, queryConnectionTool];
+export const CONNECTOR_TOOLS: AccountTool[] = [listConnectionsTool, queryConnectionTool, browseStorageTool];
 export const SCHEDULE_TOOLS: AccountTool[] = [createScheduleTool];
 export const BUILD_TOOLS: AccountTool[] = [createArtifactTool];
 
@@ -80,7 +80,7 @@ export const BUILD_TOOLS: AccountTool[] = [createArtifactTool];
  * surface (web, telegram, slack, visitor) declares what it can do.
  */
 export interface Capabilities {
-  /** Ad-hoc read-only SQL against workspace connectors (list_connections, query_connection). */
+  /** Ad-hoc read-only access to workspace connectors (list_connections, query_connection, browse_storage). */
   canQueryConnections: boolean;
   /** Set up recurring scheduled sends (create_schedule). */
   canSchedule: boolean;

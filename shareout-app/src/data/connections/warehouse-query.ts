@@ -1,12 +1,15 @@
 // Server-side querying of workspace connections, generic REST *or* a platform
-// warehouse (BigQuery today; Snowflake/others extensible). The generic path is the
-// existing rest_api executor; the platform path runs through PlatformEngine on the
+// warehouse (BigQuery, Snowflake, or any provider exposing `sql.query`: Supabase,
+// Redshift, Aurora). The generic path is the existing rest_api executor; the
+// platform path runs through PlatformEngine on the
 // caller's per-user credentials (e.g. the crew/artifact owner), so unattended jobs
 // and crews can query a per_user BigQuery connection the same way the interactive
 // data API does.
 
 import type { Env } from '../../types';
 import { PlatformEngine } from '../platform';
+import { getProvider } from '../platform/registry';
+import { SQL_QUERY_ENDPOINT } from '../platform/providers/sql-endpoint';
 import { queryConnectionData } from './query';
 import { parseBqRows, parseSnowflakeRows, type WarehouseQueryOptions } from './warehouse-exec';
 
@@ -32,17 +35,20 @@ export async function resolvePlatformConnection(
   ).bind(ws.workspace_id, name).first<PlatformConnRow>();
 }
 
-/** Run a SQL query against a platform warehouse connection. Returns parsed row objects. */
-export async function queryPlatformConnection(
-  env: Env,
-  artifactId: string,
+/** True when the platform provider can run SQL server-side (assistant, crews, jobs). */
+export function isSqlProvider(provider: string): boolean {
+  if (provider === 'bigquery' || provider === 'snowflake') return true;
+  return !!getProvider(provider)?.getEndpoint(SQL_QUERY_ENDPOINT);
+}
+
+/** Run SQL on a platform connection through an engine already anchored on an
+ *  artifact or workspace. Returns parsed row objects for every SQL provider. */
+async function runPlatformSql(
+  engine: PlatformEngine,
   conn: PlatformConnRow,
   sql: string,
-  opts: WarehouseQueryOptions,
-  userId?: string | null
+  opts: WarehouseQueryOptions
 ): Promise<Record<string, unknown>[]> {
-  const engine = new PlatformEngine({ artifactId, env, requesterUserId: userId ?? undefined });
-
   if (conn.provider === 'bigquery') {
     const cfg = (conn.config ? JSON.parse(conn.config) : {}) as Record<string, unknown>;
     const projectId = opts.projectId || cfg.projectId || cfg.project || cfg.defaultProject;
@@ -73,7 +79,32 @@ export async function queryPlatformConnection(
     return parseSnowflakeRows(resp.data);
   }
 
+  if (isSqlProvider(conn.provider)) {
+    const resp = await engine.execute<{ rows?: Record<string, unknown>[] }>({
+      provider: conn.provider,
+      endpoint: SQL_QUERY_ENDPOINT,
+      connectionId: conn.id,
+      params: { body: { sql, maxRows: opts.maxResults, timeoutMs: opts.timeoutMs } },
+      options: { cache: false },
+    });
+    if (!resp.success) throw new Error(resp.error?.message || 'Query failed');
+    return resp.data?.rows ?? [];
+  }
+
   throw new Error(`Server-side SQL query is not yet supported for platform provider "${conn.provider}"`);
+}
+
+/** Run a SQL query against a platform warehouse connection. Returns parsed row objects. */
+export async function queryPlatformConnection(
+  env: Env,
+  artifactId: string,
+  conn: PlatformConnRow,
+  sql: string,
+  opts: WarehouseQueryOptions,
+  userId?: string | null
+): Promise<Record<string, unknown>[]> {
+  const engine = new PlatformEngine({ artifactId, env, requesterUserId: userId ?? undefined });
+  return await runPlatformSql(engine, conn, sql, opts);
 }
 
 function pickNum(v: unknown): number | undefined {
@@ -125,36 +156,5 @@ export async function queryWorkspaceConnection(
   userId?: string | null
 ): Promise<Record<string, unknown>[]> {
   const engine = new PlatformEngine({ artifactId: '', env, workspaceId, requesterUserId: userId ?? undefined });
-
-  if (conn.provider === 'bigquery') {
-    const cfg = (conn.config ? JSON.parse(conn.config) : {}) as Record<string, unknown>;
-    const projectId = opts.projectId || cfg.projectId || cfg.project || cfg.defaultProject;
-    if (!projectId) throw new Error('projectId is required to query this BigQuery connection (pass params.projectId)');
-    const resp = await engine.execute({
-      provider: 'bigquery',
-      endpoint: 'jobs.query',
-      connectionId: conn.id,
-      params: {
-        pathParams: { projectId: String(projectId) },
-        body: { query: sql, useLegacySql: false, maxResults: opts.maxResults ?? 10000, timeoutMs: opts.timeoutMs ?? 120000 },
-      },
-      options: { cache: false },
-    });
-    if (!resp.success) throw new Error(resp.error?.message || 'BigQuery query failed');
-    return parseBqRows(resp.data);
-  }
-
-  if (conn.provider === 'snowflake') {
-    const resp = await engine.execute({
-      provider: 'snowflake',
-      endpoint: 'statements.execute',
-      connectionId: conn.id,
-      params: { body: { statement: sql, timeout: Math.ceil((opts.timeoutMs ?? 60000) / 1000) } },
-      options: { cache: false },
-    });
-    if (!resp.success) throw new Error(resp.error?.message || 'Snowflake query failed');
-    return parseSnowflakeRows(resp.data);
-  }
-
-  throw new Error(`Server-side SQL query is not yet supported for platform provider "${conn.provider}"`);
+  return await runPlatformSql(engine, conn, sql, opts);
 }

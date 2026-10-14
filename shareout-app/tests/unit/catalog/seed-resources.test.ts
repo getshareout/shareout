@@ -243,3 +243,27 @@ describe('removeCatalogForConnection', () => {
     expect(paths).toEqual(['datasets/snowflake-prod/notes.md', 'datasets/snowflake-prod/sales.md', 'sources/other.md']);
   });
 });
+
+describe('seedCatalogForConnection — Supabase / Redshift / Aurora', () => {
+  it('lists user tables through sql.query, keeping non-public schemas qualified', async () => {
+    await insertConnection('c_rs', 'Warehouse', 'redshift');
+    let sent = '';
+    EXECUTE_IMPL = async (req) => {
+      if (req.provider === 'redshift' && req.endpoint === 'sql.query') {
+        sent = String((req.params?.body as { sql: string }).sql);
+        return { success: true, data: { columns: ['table_schema', 'table_name'], rows: [
+          { table_schema: 'public', table_name: 'orders' },
+          { table_schema: 'finance', table_name: 'invoices' },
+        ] } };
+      }
+      return { success: false };
+    };
+    const res = await seedCatalogForConnection(e, WS, 'c_rs');
+    expect(res).toEqual({ seeded: 2, skipped: 0, provider: 'redshift' });
+    expect(sent).toContain('information_schema.tables');
+    expect(sent).toContain("'auth'");
+    const paths = (await listCatalogFiles(e, WS)).map((f) => f.path);
+    expect(paths).toContain('datasets/warehouse/orders.md');
+    expect(paths.some((p) => p.startsWith('datasets/warehouse/finance'))).toBe(true);
+  });
+});

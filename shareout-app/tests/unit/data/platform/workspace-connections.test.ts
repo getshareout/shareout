@@ -228,6 +228,49 @@ describe('workspace connections routes', () => {
     await expect(settle()).resolves.toBeDefined();
   });
 
+  it('creates an S3 connector from an aws_access_key, storing the secret encrypted', async () => {
+    let inserted: unknown[] | undefined;
+    const env = makeEnv({
+      role: 'admin',
+      onRun: (sql, bindings) => { if (sql.includes('INSERT INTO connections')) inserted = bindings; },
+    });
+    const req = new Request('https://x/connections', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'exports', kind: 'platform', provider: 's3',
+        config: { bucket: 'acme-exports', region: 'us-east-1' },
+        credentials: { type: 'aws_access_key', data: { access_key_id: ' AKIAEXAMPLE ', secret_access_key: 'wJalrXUtnFEMI/K7MDENG' } },
+      }),
+    });
+    const res = await handleCreateWorkspaceConnection(req, env, USER, WORKSPACE_ID);
+    expect(res.status).toBe(201);
+    expect(inserted![3]).toBe('s3');
+    expect(inserted![4]).toBe('aws_access_key');
+    expect(String(inserted![5])).not.toContain('wJalr');
+    expect(String(inserted![6])).not.toContain('wJalr');
+  });
+
+  it('rejects aws_access_key without a secret', async () => {
+    const env = makeEnv({ role: 'admin' });
+    const req = new Request('https://x/connections', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'rs', kind: 'platform', provider: 'redshift',
+        credentials: { type: 'aws_access_key', data: { access_key_id: 'AKIA' } },
+      }),
+    });
+    const res = await handleCreateWorkspaceConnection(req, env, USER, WORKSPACE_ID);
+    expect(res.status).toBe(400);
+  });
+
+  it('builds probe credentials for an aws_access_key and never surfaces the secret in summaries', () => {
+    const probe = buildProbeCredentials({ type: 'aws_access_key', data: { access_key_id: 'AKIA1', secret_access_key: 'sek', session_token: '' } });
+    expect(probe).toEqual({ access_token: '', extra: { access_key_id: 'AKIA1', secret_access_key: 'sek' } });
+    const summary = summarizeCredentials(probe.extra as Record<string, unknown>);
+    expect(summary.identifiers).toEqual({ access_key_id: 'AKIA1' });
+    expect(summary.secretsConfigured).toEqual(['secret_access_key']);
+  });
+
   it('rejects key_pair without a private_key', async () => {
     const env = makeEnv({ role: 'admin' });
     const req = new Request('https://x/connections', {

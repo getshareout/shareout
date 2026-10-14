@@ -217,6 +217,7 @@ export default defineConfig({
 						{ label: 'Google Sheets', slug: 'integrations/google-sheets', translations: { es: 'Google Sheets' } },
 						{ label: 'BigQuery', slug: 'integrations/bigquery', translations: { es: 'BigQuery' } },
 						{ label: 'Snowflake', slug: 'integrations/snowflake', translations: { es: 'Snowflake' } },
+						{ label: 'S3, Supabase, Redshift & Aurora', slug: 'integrations/databases-and-storage', translations: { es: 'S3, Supabase, Redshift y Aurora' } },
 						{ label: 'Google Analytics', slug: 'integrations/google-analytics', translations: { es: 'Google Analytics' } },
 						{ label: 'Google Ads', slug: 'integrations/google-ads', translations: { es: 'Google Ads' } },
 						{ label: 'Facebook Ads', slug: 'integrations/facebook-ads', translations: { es: 'Facebook Ads' } },
