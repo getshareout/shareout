@@ -3,10 +3,11 @@
  * file, pasted HTML, or the share link of a chat-made page becomes a private artifact
  * in the current workspace/folder. Same gates as /v1/home/new and /v1/publish: internal
  * membership, the daily publish count, the storage cap; moderation runs inside
- * publishArtifact. Images, video and other files are not artifacts here — the client
- * sends them to the Assets library (upload + AI enrichment) instead.
+ * publishArtifact. Word and spreadsheet files are converted (import-office.ts) and keep
+ * their original for download. Images, video and other files are not artifacts here —
+ * the client sends them to the Assets library (upload + AI enrichment) instead.
  */
-import type { ArtifactType, Env, FileEntry } from '../../types';
+import type { ArtifactType, Env, FileEntry, ImportedSource } from '../../types';
 import { checkRateLimit, incrementRateLimit } from '../../api-auth';
 import { checkStorageQuota } from '../../quota';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
@@ -14,7 +15,8 @@ import { publishArtifact } from '../../publish/publish-artifact';
 import { rateLimitExceededResponse, storageLimitExceededResponse } from '../../publish/limits';
 import { generateSlug } from '../../validation';
 import { hostWorkspaceId } from './host';
-import { IMPORT_ARTIFACT_EXTS, IMPORT_MAX_BYTES, importArtifactType, isShareLink } from './import-rules';
+import { IMPORT_ARTIFACT_EXTS, IMPORT_CONVERTED_EXTS, IMPORT_MAX_BYTES, importArtifactType, importExt, isShareLink } from './import-rules';
+import { ImportError, base64ToBytes, convertOfficeImport } from './import-office';
 
 const TYPE_MIME: Partial<Record<ArtifactType, string>> = {
   html: 'text/html', csv: 'text/csv', markdown: 'text/markdown', json: 'application/json', txt: 'text/plain', pdf: 'application/pdf',
@@ -65,6 +67,9 @@ export async function handleHomeImportApi(
   let name: string;
   let type: ArtifactType;
   let file: FileEntry;
+  let files: FileEntry[] | null = null;
+  let entrypoint: string | null = null;
+  let source: ImportedSource | undefined;
   if (typeof body.url === 'string' && body.url) {
     if (!isShareLink(body.url)) return json({ error: 'Only Claude, ChatGPT and Gemini share links can be imported', code: 'URL_NOT_SUPPORTED' }, 400);
     const html = await fetchSharedHtml(body.url);
@@ -82,6 +87,20 @@ export async function handleHomeImportApi(
     type = t;
     name = body.name.replace(/\.[^.]+$/, '').trim().slice(0, 120) || body.name;
     const base64 = body.encoding === 'base64';
+    const convert = IMPORT_CONVERTED_EXTS[importExt(body.name)];
+    if (convert) {
+      if (!base64) return json({ error: 'Send Word and spreadsheet files base64-encoded', code: 'VALIDATION_ERROR' }, 400);
+      if (Math.floor((body.content.length * 3) / 4) > IMPORT_MAX_BYTES) return json({ error: `File is larger than ${IMPORT_MAX_BYTES / 1024 / 1024} MB`, code: 'FILE_TOO_LARGE' }, 413);
+      let bytes: Uint8Array;
+      try { bytes = base64ToBytes(body.content); } catch { return json({ error: 'File content is not valid base64', code: 'VALIDATION_ERROR' }, 400); }
+      try {
+        const out = await convertOfficeImport(env, body.name, importExt(body.name), convert, bytes);
+        ({ files, entrypoint, source } = out);
+      } catch (e) {
+        if (e instanceof ImportError) return json({ error: e.message, code: e.code }, e.status);
+        throw e;
+      }
+    }
     file = {
       path: type === 'html' ? 'index.html' : body.name.replace(/[^\w.-]+/g, '-'),
       content: body.content,
@@ -93,17 +112,19 @@ export async function handleHomeImportApi(
   }
 
   const size = file.encoding === 'base64' ? Math.floor((file.content.length * 3) / 4) : file.content.length;
-  if (size > IMPORT_MAX_BYTES) return json({ error: `File is larger than ${IMPORT_MAX_BYTES / 1024 / 1024} MB`, code: 'FILE_TOO_LARGE' }, 413);
+  if (!files && size > IMPORT_MAX_BYTES) return json({ error: `File is larger than ${IMPORT_MAX_BYTES / 1024 / 1024} MB`, code: 'FILE_TOO_LARGE' }, 413);
+  files = files || [file];
+  entrypoint = entrypoint || file.path;
 
   const rate = await checkRateLimit(env, user.id, 'publish', user.email);
   if (!rate.allowed) return rateLimitExceededResponse(rate.reset);
-  const quota = await checkStorageQuota(env, user.id, [file]);
+  const quota = await checkStorageQuota(env, user.id, files);
   if (!quota.allowed) return storageLimitExceededResponse(quota);
 
   const slug = `${generateSlug(name.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))}-${crypto.randomUUID().slice(0, 6)}`;
   const published = await publishArtifact(env, { id: user.id, email: user.email || '', username: null }, {
-    name, slug, entrypoint: file.path, files: [file], visibility: 'private', authMethod: 'google',
-    shareWith: [], credentials: [], workspaceId, folderId, artifactType: type,
+    name, slug, entrypoint, files, visibility: 'private', authMethod: 'google',
+    shareWith: [], credentials: [], workspaceId, folderId, artifactType: type, source,
   }, executionCtx);
   await incrementRateLimit(env, user.id, 'publish', user.email);
   return json({

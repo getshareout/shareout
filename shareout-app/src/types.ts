@@ -275,6 +275,11 @@ export interface LibraryTypeMetadata extends MarkdownTypeMetadata {
   exports?: string[];     // api surface (export names) — discovery + agent injection
 }
 
+export interface ImportedSource {
+  original: string;
+  sheets?: Array<{ name: string; path: string }>;
+}
+
 export interface TypeMetadata {
   csv?: CsvTypeMetadata;
   markdown?: MarkdownTypeMetadata;
@@ -285,6 +290,9 @@ export interface TypeMetadata {
   video?: VideoTypeMetadata;
   skill?: SkillTypeMetadata;
   library?: LibraryTypeMetadata;
+  // An imported Office file: the converted artifact keeps its original (asset path) for
+  // download, and a workbook lists one CSV asset per sheet (entrypoint = first sheet).
+  source?: ImportedSource;
   // AI enrichment for Files (work/042 P4) — summary + tags of the latest version.
   enrichment?: {
     status: 'ok' | 'unsupported' | 'failed';

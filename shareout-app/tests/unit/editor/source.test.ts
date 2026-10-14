@@ -37,15 +37,15 @@ function makeSlugsMock(): Env['SLUGS'] {
   return { delete: vi.fn(async () => undefined) } as unknown as Env['SLUGS'];
 }
 
-function publishEnv(type: ArtifactType, overrides: Partial<Env> = {}): Env {
+function publishEnv(type: ArtifactType, overrides: Partial<Env> = {}, typeMetadata: unknown = null, entrypoint = 'notes.md'): Env {
   return {
     DB: makeDbMock({
-      first: (sql) => {
+      first: (sql, ...args) => {
         if (sql.includes('FROM artifacts WHERE id')) {
-          return { id: 'art_1', name: 'Notes', slug: 'notes', artifact_type: type };
+          return { id: 'art_1', name: 'Notes', slug: 'notes', artifact_type: type, type_metadata: typeMetadata ? JSON.stringify(typeMetadata) : null };
         }
-        if (sql.includes('JOIN assets a')) return { r2_key: 'k', mime: 'text/markdown' };
-        if (sql.includes('SELECT v.entrypoint')) return { entrypoint: 'notes.md', version_no: 1 };
+        if (sql.includes('FROM assets WHERE version_id = ? AND path = ?')) return { r2_key: `k/${String(args[1])}`, mime: type === 'csv' ? 'text/csv' : 'text/markdown' };
+        if (sql.includes('v.entrypoint, v.version_no')) return { version_id: 'ver_1', entrypoint, version_no: 1 };
         if (sql.includes('MAX(version_no)')) return { max_version: 1 };
         return null;
       },
@@ -201,5 +201,50 @@ describe('handleSourceEditor publish', () => {
     expect(res.status).toBe(400);
     expect((await res.json() as Record<string, unknown>).code).toBe('VALIDATION_ERROR');
     expect(env.ARTIFACTS.put).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleSourceEditor publish keeps the rest of the version', () => {
+  const SOURCE = { original: 'original/book.xlsx', sheets: [{ name: 'Sales', path: 'sheets/01-Sales.csv' }, { name: 'Team', path: 'sheets/02-Team.csv' }] };
+  const publish = (env: Env, body: unknown) => handleSourceEditor(new Request('http://x/source/publish', { method: 'POST', body: JSON.stringify(body) }), ctxFor(env), 'publish');
+  const batchSql = (env: Env) => (env.DB.prepare as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0]));
+  const batchBinds = (env: Env, needle: string) => {
+    const i = (env.DB.prepare as ReturnType<typeof vi.fn>).mock.calls.findIndex((c) => String(c[0]).includes(needle));
+    return (env.DB.prepare as ReturnType<typeof vi.fn>).mock.results[i].value.bind.mock.calls[0];
+  };
+
+  it('carries every other file (images, original, other sheets) into the new version', async () => {
+    const env = publishEnv('markdown', {}, { source: { original: 'original/Plan.docx' } }, 'Plan.md');
+    expect((await publish(env, { content: '# Edited' })).status).toBe(200);
+    expect(batchSql(env).some((q) => q.includes('SELECT \'ast_\' || lower(hex(randomblob(12)))'))).toBe(true);
+    expect(batchBinds(env, 'randomblob')).toEqual([expect.stringMatching(/^ver_/), 'ver_1', 'Plan.md']);
+    // The imported original survives a re-generated metadata blob.
+    const meta = JSON.parse(batchBinds(env, 'UPDATE artifacts SET type_metadata')[0]);
+    expect(meta.source).toEqual({ original: 'original/Plan.docx' });
+    expect(meta.markdown).toBeTruthy();
+  });
+
+  it('publishes an edited workbook sheet back to that sheet, leaving the entry metadata', async () => {
+    const env = publishEnv('csv', {}, { source: SOURCE, csv: { rowCount: 1 } }, 'sheets/01-Sales.csv');
+    expect((await publish(env, { content: 'Name\nBea', path: 'sheets/02-Team.csv' })).status).toBe(200);
+    const [key, , opts] = (env.ARTIFACTS.put as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(key).toMatch(/\/sheets\/02-Team\.csv$/);
+    expect(opts.httpMetadata.contentType).toBe('text/csv');
+    expect(batchBinds(env, 'randomblob')[2]).toBe('sheets/02-Team.csv');
+    expect(JSON.parse(batchBinds(env, 'UPDATE artifacts SET type_metadata')[0])).toEqual({ source: SOURCE, csv: { rowCount: 1 } });
+  });
+
+  it('refuses a path that is not one of the sheets', async () => {
+    const env = publishEnv('csv', {}, { source: SOURCE }, 'sheets/01-Sales.csv');
+    const res = await publish(env, { content: 'x', path: '../index.html' });
+    expect(res.status).toBe(400);
+    expect(env.ARTIFACTS.put).not.toHaveBeenCalled();
+  });
+
+  it('opens the sheet the viewer shows (?sheet=2) in the grid editor', async () => {
+    const env = publishEnv('csv', {}, { source: SOURCE }, 'sheets/01-Sales.csv');
+    (env.DB.prepare as ReturnType<typeof vi.fn>).mockClear();
+    const page = await (await serveSourceEditorPage(env, { id: 'art_1', slug: 'notes', name: 'Book', artifact_type: 'csv' }, 'csv', 'https://shareout.site', '2')).text();
+    expect(page).toContain('path: "sheets/02-Team.csv"');
   });
 });

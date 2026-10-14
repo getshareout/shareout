@@ -50,8 +50,17 @@ export function renderCsvViewer(ctx: ViewerContext): string {
     </div>
   ` : '';
 
+  // Imported workbook: one tab per sheet (plain links, so it works with scripts off).
+  const sheets = ctx.source?.sheets;
+  const tabsHtml = sheets && sheets.length > 1 ? `
+    <nav class="sheet-tabs" aria-label="${c.sheets}">
+      ${sheets.map((name, i) => `<a class="sheet-tab${i === (ctx.source!.activeSheet ?? 0) ? ' is-on' : ''}" href="?sheet=${i + 1}"${i === (ctx.source!.activeSheet ?? 0) ? ' aria-current="page"' : ''}>${escapeHtml(name)}</a>`).join('')}
+    </nav>
+  ` : '';
+
   const bodyContent = `
     <div class="csv-viewer">
+      ${tabsHtml}
       ${statsHtml}
       <div class="toolbar">
         <input type="text" class="search-input" placeholder="${c.filterRows}">
@@ -77,6 +86,24 @@ export function renderCsvViewer(ctx: ViewerContext): string {
       display: flex;
       flex-direction: column;
     }
+    .sheet-tabs {
+      display: flex;
+      gap: 4px;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+    .sheet-tab {
+      padding: 8px 12px;
+      font-size: 13px;
+      color: var(--text-muted);
+      text-decoration: none;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .sheet-tab:hover { color: var(--text); }
+    .sheet-tab.is-on { color: var(--text); font-weight: 600; border-bottom-color: var(--primary); }
     .stats {
       display: flex;
       gap: 16px;

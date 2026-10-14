@@ -1,6 +1,7 @@
 import type { Env } from '../../types';
 import { createMiniDb, type MiniDb } from '../../data/minidb-client';
 import { extractTextFromHtml } from '../../serve/utils';
+import { toMarkdown } from '../../knowledge/corpus/ingest';
 import { buildScopeClause } from '../../data/tables/scope';
 import type { ViewerScope } from '../../data/access-policy';
 import {
@@ -15,6 +16,8 @@ import { quickSearch, type SearchGroup, type SearchHit } from '../../search/quic
 import type { AccountTool } from './types';
 
 const MAX_REPORT_CHARS = 12_000;
+// Same isolate-memory guard as knowledge ingest + assets/enrich.ts.
+const MAX_BINARY_READ_BYTES = 25_000_000;
 const MAX_JSON_CHARS = 8_000;
 const SAMPLE_ROWS = 5;
 const MAX_TABLES = 20;
@@ -181,7 +184,7 @@ export const searchWorkspaceTool: AccountTool = {
   },
 };
 
-async function readReportText(env: Env, artifactId: string): Promise<string | null> {
+export async function readReportText(env: Env, artifactId: string): Promise<string | null> {
   const dep = await env.DB.prepare(
     "SELECT version_id FROM deployments WHERE artifact_id = ? AND channel = 'production'"
   ).bind(artifactId).first<{ version_id: string }>();
@@ -193,13 +196,20 @@ async function readReportText(env: Env, artifactId: string): Promise<string | nu
   if (!ver?.entrypoint) return null;
 
   const asset = await env.DB.prepare(
-    'SELECT r2_key, mime FROM assets WHERE version_id = ? AND path = ?'
-  ).bind(dep.version_id, ver.entrypoint).first<{ r2_key: string; mime: string }>();
+    'SELECT r2_key, mime, size_bytes FROM assets WHERE version_id = ? AND path = ?'
+  ).bind(dep.version_id, ver.entrypoint).first<{ r2_key: string; mime: string; size_bytes: number }>();
   if (!asset) return null;
 
+  // A PDF (or other binary) page is read like the same file in Assets: through toMarkdown,
+  // never as raw bytes.
+  const binary = !/^text\/|json|xml|javascript/.test(asset.mime);
+  if (binary && asset.size_bytes > MAX_BINARY_READ_BYTES) return null;
   const obj = await env.ARTIFACTS.get(asset.r2_key);
   if (!obj) return null;
-  const raw = await obj.text();
+  const raw = binary
+    ? await toMarkdown(env, ver.entrypoint, asset.mime, await obj.arrayBuffer())
+    : await obj.text();
+  if (raw == null) return null;
   const text = asset.mime.includes('html') ? extractTextFromHtml(raw) : raw;
   return text.length > MAX_REPORT_CHARS ? text.slice(0, MAX_REPORT_CHARS) + '\n…(truncated)' : text;
 }

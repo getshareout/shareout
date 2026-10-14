@@ -4212,10 +4212,13 @@ paths:
       tags: [Home]
       summary: Import a dropped or pasted file as an artifact
       description: >-
-        One-step import from the Studio Home. Publishes a file (HTML, CSV, Markdown,
-        JSON, text or PDF), pasted HTML, or a Claude / ChatGPT / Gemini share link
-        (best-effort fetch) as a private artifact in the current workspace and folder.
-        Images, video and other files belong in Assets (`/v1/assets`). Inside a
+        One-step import from the Studio Home. Publishes a document (HTML, CSV, Markdown,
+        JSON, text, PDF, Word .docx/.odt, or a spreadsheet .xlsx/.xls/.ods), pasted HTML,
+        or a Claude / ChatGPT / Gemini share link (best-effort fetch) as a private
+        artifact in the current workspace and folder. Word files become Markdown and
+        spreadsheets one CSV per sheet; both keep the original file for download and
+        must be sent base64-encoded. Images, video and other files belong in Assets
+        (`/v1/assets`). Inside a
         workspace the caller must be an internal member. Counts toward the daily
         publish limit and the storage cap. Agent (`sot_`) tokens are refused.
       operationId: importHomeArtifact
@@ -4278,11 +4281,11 @@ paths:
         "404":
           description: Folder not found
         "413":
-          description: File too large or storage limit reached
+          description: File too large, spreadsheet too large to convert, or storage limit reached
         "415":
           description: File type belongs in Assets
         "422":
-          description: Share link could not be read (login wall or JS-rendered)
+          description: Share link could not be read (login wall or JS-rendered), or a Word/spreadsheet file could not be converted
         "429":
           description: Daily publish limit reached
   /v1/home/agent/brief:

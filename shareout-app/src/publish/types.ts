@@ -14,6 +14,7 @@ import type {
   PWAConfig,
   Visibility,
   FileEntry,
+  ImportedSource,
 } from '../types';
 import type { ArtifactSdkPin, CapabilityContract } from '@shareout/types';
 
@@ -78,6 +79,8 @@ export interface PublishParams {
   accessPolicy?: unknown;
   agent?: AgentPublishConfig;
   artifactType: ArtifactType;
+  /** Imported Office file: original + sheet list, stored on type_metadata.source. */
+  source?: ImportedSource;
   attachedSkillIds?: string[];
   isExample?: boolean;
   library?: LibraryPublishConfig;

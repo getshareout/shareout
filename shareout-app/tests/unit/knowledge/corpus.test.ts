@@ -256,3 +256,29 @@ describe('POST /knowledge/backfill (corpus)', () => {
     expect(await corpusFor(e, ws)!.getSource('art_gone')).toBeNull();
   });
 });
+
+describe('imported workbook pages', () => {
+  it('learns every sheet from the original file (as an Asset would), not just the first sheet', async () => {
+    for (const sql of ['ALTER TABLE artifacts ADD COLUMN type_metadata TEXT', 'ALTER TABLE assets ADD COLUMN size_bytes INTEGER']) {
+      await e.DB.exec(sql).catch(() => {});
+    }
+    const ws = nextWs();
+    await setKnowledgeEnabled(e, ws, true);
+    const meta = JSON.stringify({ source: { original: 'original/book.xlsx', sheets: [{ name: 'Sales', path: 'sheets/01-Sales.csv' }, { name: 'Team', path: 'sheets/02-Team.csv' }] } });
+    await e.ARTIFACTS.put('test/book-s1.csv', 'Region,Total\nNorth,120');
+    await e.ARTIFACTS.put('test/book.xlsx', 'PK');
+    await e.DB.batch([
+      e.DB.prepare("INSERT INTO artifacts (id, name, slug, owner_id, visibility, workspace_id, type_metadata) VALUES ('art_book', 'Book', 'book', 'u1', 'public', ?, ?)").bind(ws, meta),
+      e.DB.prepare("INSERT INTO deployments (artifact_id, version_id, channel) VALUES ('art_book', 'ver_book', 'production')"),
+      e.DB.prepare("INSERT INTO versions (id, entrypoint) VALUES ('ver_book', 'sheets/01-Sales.csv')"),
+      e.DB.prepare("INSERT INTO assets (version_id, path, r2_key, mime, size_bytes) VALUES ('ver_book', 'sheets/01-Sales.csv', 'test/book-s1.csv', 'text/csv', 22)"),
+      e.DB.prepare("INSERT INTO assets (version_id, path, r2_key, mime, size_bytes) VALUES ('ver_book', 'original/book.xlsx', 'test/book.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 2)"),
+    ]);
+    const toMarkdown = vi.fn(async () => ({ format: 'markdown', data: '## Sales\n\nNorth 120\n\n## Team\n\nAna Gomez leads the design team.' }));
+    const withAi = { ...e, AI: { toMarkdown, run: async () => ({}) } } as unknown as Env;
+    await queueKnowledgeSource(withAi, undefined, { workspaceId: ws, kind: 'page', refId: 'art_book' }, 'ver_book');
+    expect(toMarkdown).toHaveBeenCalledWith(expect.objectContaining({ name: 'book.xlsx' }));
+    const [hit] = (await searchCorpus(e, ws, 'u1', 'design team')).hits;
+    expect(hit.source).toMatchObject({ kind: 'page', id: 'art_book' });
+  });
+});

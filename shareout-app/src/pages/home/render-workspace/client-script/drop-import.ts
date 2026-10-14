@@ -1,18 +1,20 @@
 /**
  * One-step import on the Home: drop files (or paste files, HTML, or a Claude/ChatGPT/
- * Gemini share link) and each becomes a private artifact in the current workspace and
- * folder (POST /v1/home/import), or — images, video, anything without a viewer — an
- * asset via the Assets upload (uploadOne, which also triggers AI enrichment). Only
- * wired where the New button renders (template.ts canCreateHere); the API re-checks.
+ * Gemini share link), or pick them with New → Upload. Documents become a private
+ * artifact in the current workspace and folder (POST /v1/home/import); building
+ * material — images, video, fonts, anything else — goes to Recursos via the Assets
+ * upload (uploadOne, which also triggers AI enrichment). import-rules.ts decides, for
+ * the server too. Only wired where the New button renders (template.ts canCreateHere).
  */
-import { IMPORT_ARTIFACT_EXTS, IMPORT_MAX_BYTES, IMPORT_SHARE_HOSTS } from '../../import-rules';
+import { IMPORT_ARTIFACT_EXTS, IMPORT_BINARY_EXTS, IMPORT_MAX_BYTES, IMPORT_SHARE_HOSTS } from '../../import-rules';
 
 export const workspace_client_drop_import_JS = `  // ===== One-step import: drop or paste on the Home → artifact (or Assets) =====
   var DROP_EXTS = ${JSON.stringify(Object.keys(IMPORT_ARTIFACT_EXTS))};
+  var DROP_BINARY = ${JSON.stringify(IMPORT_BINARY_EXTS)};
   var DROP_HOSTS = ${JSON.stringify(IMPORT_SHARE_HOSTS)};
   var DROP_MAX = ${IMPORT_MAX_BYTES};
   var DROP_LIVE = { html: 1, csv: 1, json: 1 };
-  var DROP_ERR = { RATE_LIMIT_EXCEEDED: 'drop.err.limit', STORAGE_LIMIT_EXCEEDED: 'drop.err.quota', FILE_TOO_LARGE: 'drop.err.tooBig', UNSUPPORTED_TYPE: 'drop.err.type', URL_NOT_FETCHABLE: 'drop.err.url', URL_NOT_SUPPORTED: 'drop.err.url' };
+  var DROP_ERR = { RATE_LIMIT_EXCEEDED: 'drop.err.limit', STORAGE_LIMIT_EXCEEDED: 'drop.err.quota', FILE_TOO_LARGE: 'drop.err.tooBig', UNSUPPORTED_TYPE: 'drop.err.type', URL_NOT_FETCHABLE: 'drop.err.url', URL_NOT_SUPPORTED: 'drop.err.url', SPREADSHEET_TOO_LARGE: 'drop.err.sheetTooBig', CONVERT_FAILED: 'drop.err.convert', CONVERT_UNAVAILABLE: 'drop.err.odt' };
   var dropPanel = null, dropOverlay = null, dropDepth = 0;
   function dropExt(n) { var m = /\\.([a-z0-9]+)$/i.exec(n || ''); return m ? m[1].toLowerCase() : ''; }
   function dropIsShareLink(s) {
@@ -66,7 +68,7 @@ export const workspace_client_drop_import_JS = `  // ===== One-step import: drop
   }
   function dropRead(f) {
     return new Promise(function (ok, no) {
-      var r = new FileReader(), bin = dropExt(f.name) === 'pdf';
+      var r = new FileReader(), bin = DROP_BINARY.indexOf(dropExt(f.name)) >= 0;
       r.onload = function () { ok(bin ? { name: f.name, content: String(r.result).split(',')[1] || '', encoding: 'base64' } : { name: f.name, content: String(r.result) }); };
       r.onerror = function () { no(new Error('')); };
       if (bin) r.readAsDataURL(f); else r.readAsText(f);

@@ -1,5 +1,5 @@
 import type { ArtifactType, TypeMetadata } from '../types';
-import type { ViewerContext } from './viewer-shell';
+import type { ViewerContext, ViewerSource } from './viewer-shell';
 import type { SocialPreview } from '../serve/social-meta';
 import type { Locale } from '../i18n';
 import { renderTxtViewer } from './txt-viewer';
@@ -47,6 +47,7 @@ export function renderViewer(
   libraryMetrics?: ViewerContext['libraryMetrics'],
   locale?: Locale,
   nonce?: string,
+  source?: ViewerSource,
 ): string | null {
   const renderer = getViewer(type);
   if (!renderer) return null;
@@ -67,6 +68,7 @@ export function renderViewer(
     libraryMetrics,
     locale,
     nonce,
+    source,
   };
 
   return renderer(ctx);

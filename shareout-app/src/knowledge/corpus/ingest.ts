@@ -2,7 +2,7 @@
 // FTS5 (KnowledgeStore) → embeddings (KNOWLEDGE_VECTORS, namespace = workspace).
 // Runs as a Workflow (one instance per source version, retried per step) when the
 // KNOWLEDGE_INGEST binding exists, else inline in waitUntil — same steps either way.
-import type { Env } from '../../types';
+import type { Env, TypeMetadata } from '../../types';
 import { sha256 } from '../../crypto-utils';
 import { extractTextFromHtml } from '../../serve/utils';
 import { parsePptx } from '../../data/files/parse-pptx';
@@ -54,6 +54,13 @@ async function loadAsset(env: Env, workspaceId: string, refId: string): Promise<
   return { meta, filename: row.filename, mime: row.mime_type, bytes: await obj.arrayBuffer() };
 }
 
+function importedWorkbookOriginal(typeMetadata: string | null): string | null {
+  try {
+    const src = (JSON.parse(typeMetadata || '{}') as TypeMetadata).source;
+    return src?.sheets?.length ? src.original : null;
+  } catch { return null; }
+}
+
 async function loadPage(env: Env, workspaceId: string, refId: string): Promise<Loaded | 'gone'> {
   const row = await env.DB.prepare(`
     SELECT a.name, a.owner_id, dep.version_id, s.r2_key, s.mime, v.entrypoint
@@ -66,12 +73,23 @@ async function loadPage(env: Env, workspaceId: string, refId: string): Promise<L
     name: string; owner_id: string; version_id: string; r2_key: string; mime: string; entrypoint: string;
   }>();
   if (!row) return 'gone';
-  const obj = await env.ARTIFACTS.get(row.r2_key);
+  // An imported workbook's entrypoint is only its first sheet: learn the original file
+  // (every sheet, via toMarkdown) — the same text it would give as an Asset.
+  let file = { path: row.entrypoint, r2_key: row.r2_key, mime: row.mime };
+  const sourceFile = env.AI
+    ? importedWorkbookOriginal((await env.DB.prepare('SELECT type_metadata FROM artifacts WHERE id = ?').bind(refId).first<{ type_metadata: string | null }>())?.type_metadata ?? null)
+    : null;
+  if (sourceFile) {
+    const orig = await env.DB.prepare('SELECT r2_key, mime, size_bytes FROM assets WHERE version_id = ? AND path = ?')
+      .bind(row.version_id, sourceFile).first<{ r2_key: string; mime: string; size_bytes: number }>();
+    if (orig && orig.size_bytes <= MAX_SOURCE_BYTES) file = { path: sourceFile, r2_key: orig.r2_key, mime: orig.mime };
+  }
+  const obj = await env.ARTIFACTS.get(file.r2_key);
   if (!obj) return 'gone';
   return {
     meta: { refId, kind: 'page', version: row.version_id, title: row.name, ownerId: row.owner_id },
-    filename: row.entrypoint,
-    mime: row.mime,
+    filename: file.path.split('/').pop()!,
+    mime: file.mime,
     bytes: await obj.arrayBuffer(),
   };
 }

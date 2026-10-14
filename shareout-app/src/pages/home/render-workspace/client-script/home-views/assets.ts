@@ -77,6 +77,7 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
     var acts = '<a class="wsx-abtn wsx-abtn--primary" href="' + esc(a.url) + '" download>' + isvg(ASVG.dl) + esc(t('assets.download')) + '</a>'
       + btn('copy', t('assets.copyLink'))
       + (isDlv && inWs ? btn('sharep', t('assets.share')) : '')
+      + (canPublishAsset(a) ? btn('publish', t('move.toArtifact')) : '')
       + (isDlv ? btn('move', t('assets.move')) + btn('ver', t('assets.uploadNewVersion')) + btn('hist', t('assets.versionHistory')) + btn('cmt', t('assets.comments')) : '')
       + (isDlv && a.usageCount > 0 ? btn('usage', t('assets.usedIn')) : '')
       + (a.canDelete ? '<button class="so-c-btn so-c-btn--danger-outline" type="button" data-pv-act="del">' + esc(t('common.delete')) + '</button>' : '');
@@ -100,6 +101,7 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
         else if (act === 'sharep') openSharePerson(a.id);
         else if (act === 'usage') openUsage(a.id);
         else if (act === 'move') moveAsset(a.id);
+        else if (act === 'publish') publishFromAssets(a);
       });
     });
   }

@@ -17,6 +17,7 @@ vi.mock('../../../src/quota', () => ({ checkStorageQuota }));
 
 import { handleHomeImportApi } from '../../../src/pages/home/import';
 import { importArtifactType, isShareLink } from '../../../src/pages/home/import-rules';
+import { DOCX_MARKDOWN, docxFixture, toBase64, xlsxFixture } from '../helpers/office-fixtures';
 
 let folderRow: unknown = { id: 'fld_1' };
 const folderBinds: unknown[][] = [];
@@ -49,7 +50,9 @@ describe('import routing by file type', () => {
     expect(importArtifactType('deck.pdf')).toBe('pdf');
     expect(importArtifactType('photo.png')).toBeNull();
     expect(importArtifactType('clip.mp4')).toBeNull();
-    expect(importArtifactType('book.xlsx')).toBeNull();
+    expect(importArtifactType('book.xlsx')).toBe('csv');
+    expect(importArtifactType('plan.docx')).toBe('markdown');
+    expect(importArtifactType('slides.pptx')).toBeNull();
   });
 
   it.each([
@@ -154,6 +157,47 @@ describe('limits', () => {
   it('404s a folder outside the target workspace', async () => {
     folderRow = null;
     expect((await post({ name: 'a.csv', content: 'a', folder: 'fld_other' }, '?workspace=wsp_1')).status).toBe(404);
+    expect(publishArtifact).not.toHaveBeenCalled();
+  });
+});
+
+describe('Word and spreadsheet import', () => {
+  it('a .docx becomes a Markdown artifact that keeps its images and the original', async () => {
+    const res = await post({ name: 'Plan Q3.docx', content: toBase64(docxFixture()), encoding: 'base64' }, '?workspace=wsp_1');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, type: 'markdown', name: 'Plan Q3' });
+    expect(params()).toMatchObject({ artifactType: 'markdown', entrypoint: 'Plan Q3.md', source: { original: 'original/Plan Q3.docx' } });
+    expect(params().files.map((f: { path: string }) => f.path)).toEqual(['Plan Q3.md', 'media/image1.png', 'original/Plan Q3.docx']);
+    expect(params().files[0].content).toBe(DOCX_MARKDOWN);
+    expect(checkStorageQuota.mock.calls[0][2]).toHaveLength(3);
+  });
+
+  it('a 2-sheet .xlsx becomes a CSV artifact with both sheets and the original', async () => {
+    const book = xlsxFixture({ Sales: [['Region', 'Total'], ['North', 120]], Team: [['Name'], ['Ana']] });
+    const res = await post({ name: 'book.xlsx', content: toBase64(book), encoding: 'base64' });
+    expect(res.status).toBe(200);
+    expect(params()).toMatchObject({
+      artifactType: 'csv',
+      entrypoint: 'sheets/01-Sales.csv',
+      source: { original: 'original/book.xlsx', sheets: [{ name: 'Sales', path: 'sheets/01-Sales.csv' }, { name: 'Team', path: 'sheets/02-Team.csv' }] },
+    });
+    expect(params().files.slice(0, 2).map((f: { content: string }) => f.content)).toEqual(['Region,Total\nNorth,120', 'Name\nAna']);
+  });
+
+  it('an oversized workbook gets a clear 413 and nothing is published', async () => {
+    const res = await post({ name: 'huge.xlsx', content: toBase64(new Uint8Array(8_000_001)), encoding: 'base64' });
+    expect(res.status).toBe(413);
+    const j = await res.json();
+    expect(j.code).toBe('SPREADSHEET_TOO_LARGE');
+    expect(j.error).toMatch(/Recursos/);
+    expect(publishArtifact).not.toHaveBeenCalled();
+  });
+
+  it('a damaged Word file gets a 422, and Office files must be base64', async () => {
+    const bad = await post({ name: 'x.docx', content: toBase64(new Uint8Array([1, 2, 3])), encoding: 'base64' });
+    expect(bad.status).toBe(422);
+    expect((await bad.json()).code).toBe('CONVERT_FAILED');
+    expect((await post({ name: 'x.docx', content: 'plain text' })).status).toBe(400);
     expect(publishArtifact).not.toHaveBeenCalled();
   });
 });

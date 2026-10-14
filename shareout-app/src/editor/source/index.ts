@@ -1,6 +1,6 @@
 // ShareOut Source Editor — request handlers for non-HTML artifact editing.
 
-import type { Env, ArtifactType } from '../../types';
+import type { Env, ArtifactType, TypeMetadata } from '../../types';
 import type { EditorContext } from '../index';
 import { generateId, sha256 } from '../../crypto-utils';
 import { invalidateDeploymentCache } from '../../serve/deployment-cache';
@@ -28,35 +28,47 @@ const DEFAULT_MIME: Record<SourceEditableType, string> = {
 
 interface CurrentSource {
   entrypoint: string;
+  /** The file being edited: the entrypoint, or one sheet of an imported workbook. */
+  file: string;
   mime: string;
   content: string;
   versionNo: number;
+  versionId: string | null;
+}
+
+/** One sheet of an imported workbook, by 1-based number (?sheet=2, as the viewer
+ *  links it) or by asset path — null unless it is one of this artifact's sheets. */
+export function sheetPath(meta: string | null, ref: string | null | undefined): string | null {
+  if (!ref) return null;
+  try {
+    const sheets = (JSON.parse(meta || '{}') as TypeMetadata).source?.sheets || [];
+    if (/^\d+$/.test(ref)) return sheets[Number(ref) - 1]?.path ?? null;
+    return sheets.some((s) => s.path === ref) ? ref : null;
+  } catch { return null; }
 }
 
 async function loadCurrentSource(
   env: Env,
   artifactId: string,
-  type: SourceEditableType
+  type: SourceEditableType,
+  path?: string | null,
 ): Promise<CurrentSource> {
   const row = await env.DB.prepare(`
-    SELECT v.entrypoint, v.version_no
+    SELECT v.id AS version_id, v.entrypoint, v.version_no
     FROM deployments d
     JOIN versions v ON v.id = d.version_id
     WHERE d.artifact_id = ? AND d.channel = 'production'
-  `).bind(artifactId).first<{ entrypoint: string | null; version_no: number | null }>();
+  `).bind(artifactId).first<{ version_id: string; entrypoint: string | null; version_no: number | null }>();
 
   const entrypoint = row?.entrypoint || `index.${type === 'markdown' ? 'md' : type}`;
+  const file = path || entrypoint;
   let mime = DEFAULT_MIME[type];
   let content = '';
 
   if (row?.entrypoint) {
-    const asset = await env.DB.prepare(`
-      SELECT a.r2_key, a.mime
-      FROM deployments d
-      JOIN versions v ON v.id = d.version_id
-      JOIN assets a ON a.version_id = v.id AND a.path = v.entrypoint
-      WHERE d.artifact_id = ? AND d.channel = 'production'
-    `).bind(artifactId).first<{ r2_key: string; mime: string }>();
+    const asset = await env.DB.prepare(
+      'SELECT r2_key, mime FROM assets WHERE version_id = ? AND path = ?'
+    ).bind(row.version_id, file).first<{ r2_key: string; mime: string }>();
     if (asset) {
       if (asset.mime) mime = asset.mime;
       const obj = await env.ARTIFACTS.get(asset.r2_key);
@@ -64,23 +76,28 @@ async function loadCurrentSource(
     }
   }
 
-  return { entrypoint, mime, content, versionNo: row?.version_no || 0 };
+  return { entrypoint, file, mime, content, versionNo: row?.version_no || 0, versionId: row?.version_id ?? null };
 }
 
 export async function serveSourceEditorPage(
   env: Env,
   artifact: { id: string; slug: string; name: string | null; artifact_type: ArtifactType },
   type: SourceEditableType,
-  baseUrl: string
+  baseUrl: string,
+  sheet?: string | null,
 ): Promise<Response> {
-  const current = await loadCurrentSource(env, artifact.id, type);
+  const meta = sheet
+    ? await env.DB.prepare('SELECT type_metadata FROM artifacts WHERE id = ?').bind(artifact.id).first<{ type_metadata: string | null }>()
+    : null;
+  const current = await loadCurrentSource(env, artifact.id, type, sheetPath(meta?.type_metadata ?? null, sheet));
 
   const html = generateSourceEditorPage({
     artifactId: artifact.id,
     slug: artifact.slug,
     name: artifact.name || artifact.slug,
     type,
-    entrypoint: current.entrypoint,
+    entrypoint: current.file,
+    path: current.file === current.entrypoint ? null : current.file,
     content: current.content,
     baseUrl,
     versionNo: current.versionNo,
@@ -107,14 +124,14 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
   const { artifactId, env } = ctx;
 
   try {
-    const body = await request.json() as { content?: string };
+    const body = await request.json() as { content?: string; path?: string };
     if (typeof body.content !== 'string') {
       return errorResponse('INVALID_REQUEST', 'content required', 400);
     }
 
     const artifact = await env.DB.prepare(
-      `SELECT id, name, slug, workspace_id, artifact_type FROM artifacts WHERE id = ?`
-    ).bind(artifactId).first<{ id: string; name: string; slug: string; workspace_id: string | null; artifact_type: ArtifactType }>();
+      `SELECT id, name, slug, workspace_id, artifact_type, type_metadata FROM artifacts WHERE id = ?`
+    ).bind(artifactId).first<{ id: string; name: string; slug: string; workspace_id: string | null; artifact_type: ArtifactType; type_metadata: string | null }>();
 
     if (!artifact) {
       return errorResponse('ARTIFACT_NOT_FOUND', 'Artifact not found', 404);
@@ -134,8 +151,11 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
     const channel = blocking ? 'candidate' : 'production';
 
     const type = artifact.artifact_type;
-    const current = await loadCurrentSource(env, artifactId, type);
+    const sheet = sheetPath(artifact.type_metadata, body.path);
+    if (body.path && !sheet) return errorResponse('VALIDATION_ERROR', 'path is not a sheet of this artifact', 400);
+    const current = await loadCurrentSource(env, artifactId, type, sheet);
     const entrypoint = current.entrypoint;
+    const file = current.file;
     const mime = current.mime;
 
     const currentVersion = await env.DB.prepare(
@@ -149,13 +169,18 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
 
     const bytes = new TextEncoder().encode(body.content);
     const hash = await sha256(bytes.buffer as ArrayBuffer);
-    const r2Key = `${artifactId}/${versionId}/${entrypoint}`;
+    const r2Key = `${artifactId}/${versionId}/${file}`;
     await env.ARTIFACTS.put(r2Key, body.content, {
       httpMetadata: { contentType: mime },
       customMetadata: { sha256: hash },
     });
 
-    const typeMetadata = JSON.stringify(generateTypeMetadata(type, body.content, mime));
+    // Keep an imported file's original + sheet list; a sheet edit leaves the entry's metadata.
+    let prevMeta: TypeMetadata = {};
+    try { prevMeta = JSON.parse(artifact.type_metadata || '{}') as TypeMetadata; } catch { /* rebuilt below */ }
+    const typeMetadata = JSON.stringify(file === entrypoint
+      ? { ...generateTypeMetadata(type, body.content, mime), ...(prevMeta.source ? { source: prevMeta.source } : {}) }
+      : prevMeta);
 
     await env.DB.batch([
       env.DB.prepare(
@@ -165,7 +190,14 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
       env.DB.prepare(
         `INSERT INTO assets (id, version_id, path, r2_key, mime, size_bytes, sha256)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(assetId, versionId, entrypoint, r2Key, mime, bytes.length, hash),
+      ).bind(assetId, versionId, file, r2Key, mime, bytes.length, hash),
+      // Every other file of the live version (images, other sheets, the original) carries
+      // over unchanged — same R2 objects, which only an artifact purge ever deletes.
+      env.DB.prepare(
+        `INSERT INTO assets (id, version_id, path, r2_key, mime, size_bytes, sha256)
+         SELECT 'ast_' || lower(hex(randomblob(12))), ?, path, r2_key, mime, size_bytes, sha256
+           FROM assets WHERE version_id = ? AND path != ?`
+      ).bind(versionId, current.versionId ?? '', file),
       env.DB.prepare(
         `INSERT INTO deployments (id, artifact_id, version_id, channel, slug, updated_at)
          VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))

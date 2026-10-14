@@ -97,7 +97,7 @@ describe('New menu', () => {
     setup();
     (document.getElementById('wsxNewBtn') as HTMLButtonElement).click();
     expect(document.getElementById('wsxNewMenu')!.hidden).toBe(false);
-    expect(items()).toEqual(['Subir un archivo', 'Documento en blanco', 'Desde una plantilla']);
+    expect(items()).toEqual(['Subir archivos', 'Documento en blanco', 'Desde una plantilla']);
     (document.querySelector('[data-new="tpl"]') as HTMLButtonElement).click();
     expect(items()).toEqual(['Informe', 'Minuta de reunión', 'Propuesta']);
   });
@@ -119,15 +119,17 @@ describe('New menu', () => {
     expect(edited[1]).toBe('edit');
   });
 
-  it('"Upload a file" goes to Assets and opens the file picker', () => {
+  it('"Upload files" opens a picker on the spot, without jumping to Assets', () => {
     setup();
-    const lens = vi.fn(), pick = vi.fn();
+    const lens = vi.fn(), assetPick = vi.fn(), pick = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
     document.querySelector('[data-lens="assets"]')!.addEventListener('click', lens);
-    document.getElementById('wsxAssetUpload')!.addEventListener('click', pick);
+    document.getElementById('wsxAssetUpload')!.addEventListener('click', assetPick);
     (document.getElementById('wsxNewBtn') as HTMLButtonElement).click();
     (document.querySelector('[data-new="upload"]') as HTMLButtonElement).click();
-    expect(lens).toHaveBeenCalledOnce();
     expect(pick).toHaveBeenCalledOnce();
+    expect(lens).not.toHaveBeenCalled();
+    expect(assetPick).not.toHaveBeenCalled();
+    pick.mockRestore();
   });
 });
 
