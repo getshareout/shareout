@@ -60,11 +60,11 @@ instead — token minting is skipped for any non-loopback base URL.
 
 Local collab e2e also needs a migrated D1 (`npm run db:migrate` in `shareout-app/`) and a
 fresh editor bundle (`npm run build:editor` after editor-client changes). Specs are
-local-only — no CI job runs Playwright.
+local-only.
 
 ## Checks before a PR
 
-Prefer the full local mirror of public CI:
+There is no hosted CI — these local checks are the gate. Before a PR:
 
 ```bash
 ./tooling/scripts/ci-check.sh
@@ -73,7 +73,7 @@ Prefer the full local mirror of public CI:
 That runs static gates, fresh D1 migrate, typecheck, the **full unit suite**, workspace
 tests, bundles, `npm audit --omit=dev --audit-level=high` (runtime deps), gitleaks, and
 the docs-site build. Coverage floors are opt-in — `SHAREOUT_COVERAGE=1` roughly doubles
-the run (~10m) and PR CI does not check them; `full.yml` enforces them on main/nightly.
+the run; run them when a change could move coverage.
 
 Faster loop while iterating (skips migrate, coverage, audit, docs, and runs only the
 tests your change touches):
@@ -99,14 +99,11 @@ npm run check:ui
 npm run check:access-seams
 npm run db:migrate:fresh
 npm run typecheck
-TZ=UTC npm test                  # whole unit suite (~4m40s)
+TZ=UTC npm test                  # whole unit suite (~3m)
 TZ=UTC npm run coverage          # enforces vitest coverage thresholds (~10m)
 ```
 
-Public CI (`.github/workflows/ci.yml`) must be green to merge. It also builds
-`docs-site/` and fails on high-severity dependency advisories.
-
-Fast feedback on the hottest paths (also run in CI before full coverage):
+Fast feedback on the hottest paths:
 
 ```bash
 cd shareout-app
@@ -115,7 +112,7 @@ TZ=UTC npm run test:critical
 
 Maintainer release steps: [RELEASING.md](RELEASING.md).
 
-### Lint / format (optional locally; not a full-tree CI gate yet)
+### Lint / format (optional locally; not a full-tree gate yet)
 
 Configs ship so new code can match the house style without a repo-wide reformat:
 

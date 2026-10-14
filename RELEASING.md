@@ -40,7 +40,7 @@ Or draft the GitHub Release UI from the tag and paste the CHANGELOG section.
 - Apply D1 migrations on deploy (`npm run deploy` runs migrations then wrangler).
 - Rotate secrets if upgrading from a compromised instance — see [SECURITY.md](SECURITY.md).
 
-## Not in public CI
+## Not automated
 
 - Publishing to npm (packages stay `"private": true` until an intentional SDK release).
 - Production deploy of shareout.site (maintainer private pipeline).

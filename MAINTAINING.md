@@ -13,7 +13,7 @@ they never push to `main` directly.
 | Require a pull request before merging | On |
 | Required approving reviews | **0** (solo maintainer; you review then merge) |
 | Require review from Code Owners | On (`.github/CODEOWNERS` → `@leorfer23`) |
-| Required status checks | `Checks`, `Gitleaks` (see `.github/workflows/ci.yml`) |
+| Required status checks | None — there is no hosted CI; the pre-push hook is the gate |
 | Require branches to be up to date | On (**strict**) |
 | Restrict who can push / merge | **Only `@leorfer23`** |
 | Do not allow force pushes | On |
@@ -45,7 +45,8 @@ Squash is fine for tiny single-commit fixes.
 ## Dependabot
 
 Config: `.github/dependabot.yml` — low open-PR limits and grouped production/dev updates
-so Actions runners are not saturated. Cancel stuck Dependabot runs if they block product CI.
+so the PR list stays manageable. Dependabot PRs get no hosted checks: run
+`./tooling/scripts/ci-check.sh` on the branch before merging one.
 
 ## Releases
 
@@ -62,6 +63,7 @@ git worktree add ../shareout-wt-<topic> -b chore/<topic> origin/main
 
 ## CI truth
 
-- Public: `.github/workflows/ci.yml`
-- Local mirror: `./tooling/scripts/ci-check.sh`
+There is no hosted CI (no GitHub Actions). Checks run on the machine that pushes.
+
+- Full: `./tooling/scripts/ci-check.sh` (add `SHAREOUT_COVERAGE=1` for coverage floors)
 - Fast pre-push: `./tooling/scripts/ci-check-fast.sh` + `install-hooks.sh`
