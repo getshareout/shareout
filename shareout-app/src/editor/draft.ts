@@ -201,14 +201,19 @@ export async function handlePublish(
     // /a/<slug> + caches and may be suffixed if the human slug collides across
     // workspaces — fall back to the human slug only if no deployment exists yet.
     const artifact = await env.DB.prepare(`
-      SELECT a.id, a.name, a.workspace_id, COALESCE(d.slug, a.slug) AS slug
+      SELECT a.id, a.name, a.workspace_id, a.artifact_type, COALESCE(d.slug, a.slug) AS slug
       FROM artifacts a
       LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
       WHERE a.id = ?
-    `).bind(artifactId).first<{ id: string; name: string; workspace_id: string | null; slug: string }>();
+    `).bind(artifactId).first<{ id: string; name: string; workspace_id: string | null; artifact_type?: string | null; slug: string }>();
 
     if (!artifact) {
       return errorResponse('ARTIFACT_NOT_FOUND', 'Artifact not found', 404);
+    }
+    // This path always writes index.html. On a Markdown / CSV / PDF artifact that would
+    // swap its file for HTML; those publish through /editor/source/publish instead.
+    if ((artifact.artifact_type || 'html') !== 'html') {
+      return errorResponse('NOT_HTML_ARTIFACT', 'Only HTML artifacts publish through this endpoint.', 409);
     }
 
     // Artifact Tests BLOCK gate: when tests are set to block and a passing baseline

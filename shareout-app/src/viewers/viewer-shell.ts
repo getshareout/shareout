@@ -91,6 +91,43 @@ export function scriptOpen(ctx: ViewerContext): string {
   return ctx.nonce ? `<script nonce="${ctx.nonce}">` : '<script>';
 }
 
+/** Page base the typed viewers share (reset, tokens, light/dark palette, body type). */
+export function viewerBaseStyles(componentCss = ''): string {
+  return `
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    ${cssVariables}
+    ${componentCss}
+    :root {
+      --bg: var(--color-bg);
+      --surface: var(--color-bg-elevated);
+      --text: var(--color-text);
+      --text-muted: var(--color-text-secondary);
+      --border: var(--color-border);
+      --primary: var(--color-primary);
+      --primary-hover: var(--color-primary-hover);
+      --code-bg: var(--color-surface);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --color-bg: ${colors.text};
+        --color-bg-elevated: color-mix(in srgb, ${colors.text} 90%, ${colors.bgElevated});
+        --color-surface: color-mix(in srgb, ${colors.text} 82%, ${colors.surface});
+        --color-text: ${colors.bg};
+        --color-text-secondary: ${colors.textTertiary};
+        --color-border: color-mix(in srgb, ${colors.text} 70%, ${colors.borderStrong});
+      }
+    }
+    html, body {
+      height: 100%;
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+  `;
+}
+
 export function generateViewerShell(
   ctx: ViewerContext,
   bodyContent: string,
@@ -137,37 +174,7 @@ export function generateViewerShell(
   ${brandFaviconHead}
   ${googleFontsPreconnect}
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    ${cssVariables}
-    ${componentStylesheet()}
-    :root {
-      --bg: var(--color-bg);
-      --surface: var(--color-bg-elevated);
-      --text: var(--color-text);
-      --text-muted: var(--color-text-secondary);
-      --border: var(--color-border);
-      --primary: var(--color-primary);
-      --primary-hover: var(--color-primary-hover);
-      --code-bg: var(--color-surface);
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --color-bg: ${colors.text};
-        --color-bg-elevated: color-mix(in srgb, ${colors.text} 90%, ${colors.bgElevated});
-        --color-surface: color-mix(in srgb, ${colors.text} 82%, ${colors.surface});
-        --color-text: ${colors.bg};
-        --color-text-secondary: ${colors.textTertiary};
-        --color-border: color-mix(in srgb, ${colors.text} 70%, ${colors.borderStrong});
-      }
-    }
-    html, body {
-      height: 100%;
-      font-family: var(--font-body);
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-    }
+    ${viewerBaseStyles(componentStylesheet())}
     .viewer-container {
       display: flex;
       flex-direction: column;

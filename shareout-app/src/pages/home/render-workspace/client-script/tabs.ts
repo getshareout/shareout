@@ -13,7 +13,12 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
   // Global View/Edit toggle lives in the tab bar; it drives the active artifact pane.
   var tabModeEl = document.getElementById('wsxTabMode');
   if (tabModeEl) tabModeEl.querySelectorAll('[data-mode]').forEach(function (b) {
-    b.addEventListener('click', function () { var rec = panes[activeKey]; if (rec) setEditMode(rec, b.getAttribute('data-mode')); });
+    b.addEventListener('click', function () {
+      var rec = panes[activeKey]; if (!rec) return;
+      // Text/JSON/CSV have their own full editor (grid for CSV); Edit-Lite is for pages + Markdown.
+      if (b.getAttribute('data-mode') === 'edit' && EDIT_IN_FULL[rec.art.type]) { window.open('/a/' + encodeURIComponent(rec.art.slug) + '/edit', '_blank', 'noopener'); return; }
+      setEditMode(rec, b.getAttribute('data-mode'));
+    });
   });
   // Device (mobile/web) preview toggle — lives next to View/Edit, drives the active pane.
   var tabDeviceEl = document.getElementById('wsxTabDevice');
@@ -36,7 +41,7 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
   function syncTabMode() {
     if (!tabModeEl) return;
     var rec = panes[activeKey];
-    tabModeEl.hidden = !rec || rec.art.canEdit === false;
+    tabModeEl.hidden = !rec || rec.art.canEdit === false || !canEditType(rec.art);
     if (rec) tabModeEl.querySelectorAll('[data-mode]').forEach(function (b) { b.classList.toggle('is-on', b.getAttribute('data-mode') === rec.mode); });
     if (tabDeviceEl) {
       tabDeviceEl.hidden = !rec;
@@ -45,6 +50,30 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
       tabDeviceEl.setAttribute('aria-pressed', mob ? 'true' : 'false');
     }
     if (tabFullEl) tabFullEl.hidden = !rec;
+  }
+
+  // Artifact type decides the stage and the Edit toggle. A PDF is inert bytes: Chrome
+  // refuses to run its PDF viewer in ANY sandboxed frame ("blocked by Chrome"), and the
+  // sandbox only guards HTML — so PDF stages load unsandboxed. Every other type keeps it.
+  var STAGE_SANDBOX = 'allow-scripts allow-same-origin allow-popups allow-forms allow-downloads';
+  var STAGE_UNSANDBOXED = { pdf: 1 };
+  var EDIT_NONE = { pdf: 1, image: 1, video: 1 };
+  var EDIT_IN_FULL = { txt: 1, json: 1, csv: 1 };
+  function canEditType(art) { return !!art.type && !EDIT_NONE[art.type] && !art.noEdit; }
+  function stageUrl(slug) { return '/a/' + encodeURIComponent(slug) + '/?wsx=1'; }
+  function paintStage(rec) {
+    if (STAGE_UNSANDBOXED[rec.art.type]) rec.iframe.removeAttribute('sandbox');
+    else rec.iframe.setAttribute('sandbox', STAGE_SANDBOX);
+    rec.iframe.src = stageUrl(rec.art.slug);
+    syncTabMode();
+  }
+  // The sandbox is fixed at navigation time, so the type must be known before the first load:
+  // from the opener / saved tab, the meta cache, or one (shared, deduped) meta fetch.
+  function loadStage(rec) {
+    var a = rec.art;
+    if (!a.type && a.id && metaCache[a.id]) a.type = metaCache[a.id].artifact_type;
+    if (a.type) { paintStage(rec); return; }
+    fetchMeta(a, function (d) { a.type = (d && d.artifact_type) || 'html'; paintStage(rec); });
   }
 
   // The pane = a View/Edit toolbar + the live stage iframe + a hidden edit iframe.
@@ -61,7 +90,7 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
     + '<button class="wsx__publish js-publish" type="button" hidden>' + esc(t('tabs.publish')) + '</button>'
     + '<a class="wsx__fulledit js-fulledit" target="_blank" rel="noopener" hidden title="' + esc(t('tabs.editLiteHint')) + '">' + esc(t('tabs.openFullEditor')) + '</a>'
     + '</div>'
-    + '<iframe class="wsx__stageframe" title="' + esc(t('tabs.frameArtifact')) + '" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-downloads"></iframe>'
+    + '<iframe class="wsx__stageframe" title="' + esc(t('tabs.frameArtifact')) + '" sandbox="' + STAGE_SANDBOX + '"></iframe>'
     + '<iframe class="wsx__editframe" title="' + esc(t('tabs.edit')) + '" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>';
 
   function spark(daily) {
@@ -129,7 +158,6 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
     pane.setAttribute('data-pane', art.key);
     pane.innerHTML = ART_PANE_HTML;
     var iframe = pane.querySelector('.wsx__stageframe');
-    iframe.src = '/a/' + encodeURIComponent(art.slug) + '/?wsx=1';
     var editframe = pane.querySelector('.wsx__editframe');
     var rec = {
       pane: pane, iframe: iframe, editframe: editframe, art: art,
@@ -149,6 +177,7 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
     rec.redoBtn.addEventListener('click', function () { redoEdit(rec); });
     rec.discardBtn.addEventListener('click', function () { discardDraft(rec); });
     rec.mobileBtn.addEventListener('click', function () { var on = !rec.pane.classList.contains('is-mobile'); rec.pane.classList.toggle('is-mobile', on); rec.mobileBtn.classList.toggle('is-on', on); syncTabMode(); });
+    loadStage(rec);
     return rec;
   }
   function discardDraft(rec) {

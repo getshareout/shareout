@@ -59,27 +59,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   }
 
   // ----- Details -----
-  // GET /v1/artifacts/{id|slug} is the one access check the rail follows: a tab opened by
-  // deep link (#a/<slug>) has no id until it resolves; can_edit/can_delete gate controls.
-  function adoptMeta(art, d) {
-    metaCache[d.id] = d;
-    var rec = panes[art.key];
-    [art, rec && rec.art].forEach(function (a) {
-      if (!a) return;
-      a.id = d.id; a.canEdit = !!d.can_edit;
-      if (d.name && (!a.name || a.name === t('inspector.artifact'))) a.name = d.name;
-    });
-    if (rec) setTabLabel(art.key, rec.art.name);
-    if (rec && !rec.art.canEdit && rec.mode === 'edit') setEditMode(rec, 'view');
-    syncTabMode();
-  }
-  function fetchMeta(art, cb) {
-    if (art.id && metaCache[art.id]) { cb(metaCache[art.id]); return; }
-    fetch('/v1/artifacts/' + encodeURIComponent(art.id || art.slug), { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { if (d && d.id) adoptMeta(art, d); cb(d && d.id ? d : null); })
-      .catch(function () { cb(null); });
-  }
+  // adoptMeta / fetchMeta (artifact meta + access, shared with the stage) live in inspector-details.ts.
   function railRetry(k, onRetry) {
     rbodyEl.innerHTML = '<div class="wsx__details"><div class="wsx-empty">' + esc(t(k)) + ' <button class="wsx-link" type="button" data-rail-retry>' + esc(t('common.retry')) + '</button></div></div>';
     rbodyEl.querySelector('[data-rail-retry]').addEventListener('click', onRetry);
@@ -952,10 +932,10 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     var made = makeArtifactPane(art);
     panes[key] = made; panesEl.appendChild(made.pane); tabs.push({ key: key, label: art.name });
   }
-  function openArtifact(slug, name, id) {
+  function openArtifact(slug, name, id, type) {
     var key = id || slug;
     if (!panes[key]) {
-      makeTab(key, { key: key, id: id || '', slug: slug, name: name || t('inspector.artifact') });
+      makeTab(key, { key: key, id: id || '', slug: slug, name: name || t('inspector.artifact'), type: type || '' });
       saveTabs();
       if (id) fetch('/v1/home/viewed', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ artifactId: id }) }).catch(function () {});
     }
@@ -965,7 +945,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   // Persist open artifact tabs so they reopen next session.
   function saveTabs() {
     try {
-      var open = tabs.filter(function (t) { return !t.home && panes[t.key]; }).map(function (t) { return { key: t.key, label: t.label, id: panes[t.key].art.id, slug: panes[t.key].art.slug }; });
+      var open = tabs.filter(function (t) { return !t.home && panes[t.key]; }).map(function (t) { var a = panes[t.key].art; return { key: t.key, label: t.label, id: a.id, slug: a.slug, type: a.type || '' }; });
       localStorage.setItem(LS.tabs, JSON.stringify(open));
     } catch (e) {}
   }
@@ -975,7 +955,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     if (!saved || !saved.length) return;
     saved.forEach(function (tab) {
       if (!tab || !tab.slug || panes[tab.key]) return;
-      makeTab(tab.key, { key: tab.key, id: tab.id || '', slug: tab.slug, name: tab.label || t('inspector.artifact') });
+      makeTab(tab.key, { key: tab.key, id: tab.id || '', slug: tab.slug, name: tab.label || t('inspector.artifact'), type: tab.type || '' });
     });
     renderTabs();
   }

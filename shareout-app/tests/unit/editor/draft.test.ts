@@ -414,6 +414,21 @@ describe('handlePublish', () => {
     const res = await handlePublish(req, ctx);
     expect(res.status).toBe(400);
   });
+
+  it('refuses to overwrite a non-HTML artifact with index.html', async () => {
+    for (const type of ['markdown', 'csv', 'pdf']) {
+      const env = {
+        DB: makeDbMock({ first: (sql) => (String(sql).includes('FROM artifacts') ? { id: 'art_1', name: 'Doc', slug: 'doc', artifact_type: type } : null) }),
+        ARTIFACTS: makeR2Mock(),
+        SLUGS: makeSlugsMock(),
+      } as unknown as Env;
+      const ctx = baseCtx({ env });
+      const res = await handlePublish(new Request('http://x/publish', { method: 'POST', body: JSON.stringify({ html: '<p>x</p>' }) }), ctx);
+      expect(res.status, type).toBe(409);
+      expect((await jsonBody(res)).code).toBe('NOT_HTML_ARTIFACT');
+      expect(env.ARTIFACTS.put).not.toHaveBeenCalled();
+    }
+  });
 });
 
 describe('handleHistory', () => {

@@ -46,7 +46,7 @@ export const workspace_client_drop_import_JS = `  // ===== One-step import: drop
       + (DROP_LIVE[d.type] ? '<button type="button" class="wsx-link" data-drop="live">' + esc(t('drop.live')) + '</button>' : '');
     acts.addEventListener('click', function (e) {
       var a = e.target && e.target.getAttribute && e.target.getAttribute('data-drop');
-      if (a === 'open') openArtifact(d.slug, d.name, d.artifactId);
+      if (a === 'open') openArtifact(d.slug, d.name, d.artifactId, d.type);
       else if (a === 'live') agentAsk(t('drop.liveAsk').replace('{name}', d.name).replace('{id}', d.artifactId));
     });
     li.appendChild(acts);
@@ -91,7 +91,7 @@ export const workspace_client_drop_import_JS = `  // ===== One-step import: drop
     return items.reduce(function (p, it) { return p.then(function () { return dropOne(it, out); }); }, Promise.resolve()).then(function () {
       if (out.published.length && typeof reloadFolders === 'function') reloadFolders();
       if (out.assets && typeof fetchAssets === 'function' && document.getElementById('wsxAssetMount')) fetchAssets();
-      if (items.length === 1 && out.published.length === 1) { var d = out.published[0]; openArtifact(d.slug, d.name, d.artifactId); }
+      if (items.length === 1 && out.published.length === 1) { var d = out.published[0]; openArtifact(d.slug, d.name, d.artifactId, d.type); }
     });
   }
   function dropShowOverlay(on) {

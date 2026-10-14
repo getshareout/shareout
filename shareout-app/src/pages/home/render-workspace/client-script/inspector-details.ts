@@ -166,4 +166,37 @@ export const workspace_client_inspector_details_JS = `  // ===== Inspector Detai
     loadWatches(art, box);
   }
 
+  // ----- Artifact meta -----
+  // GET /v1/artifacts/{id|slug} is the one access check the rail follows: a tab opened by
+  // deep link (#a/<slug>) has no id until it resolves; can_edit/can_delete gate controls.
+  function adoptMeta(art, d) {
+    metaCache[d.id] = d;
+    var rec = panes[art.key];
+    [art, rec && rec.art].forEach(function (a) {
+      if (!a) return;
+      a.id = d.id; a.canEdit = !!d.can_edit;
+      if (d.artifact_type) a.type = d.artifact_type;
+      if (d.name && (!a.name || a.name === t('inspector.artifact'))) a.name = d.name;
+    });
+    if (rec) setTabLabel(art.key, rec.art.name);
+    if (rec && !rec.art.canEdit && rec.mode === 'edit') setEditMode(rec, 'view');
+    syncTabMode();
+  }
+  // One request per artifact in flight: the stage (type) and the rail (details) both ask.
+  var metaWait = {};
+  function fetchMeta(art, cb) {
+    if (art.id && metaCache[art.id]) { cb(metaCache[art.id]); return; }
+    var k = art.id || art.slug;
+    if (metaWait[k]) { metaWait[k].push([art, cb]); return; }
+    metaWait[k] = [[art, cb]];
+    function done(d) {
+      var waiting = metaWait[k] || []; delete metaWait[k];
+      waiting.forEach(function (w) { if (d) adoptMeta(w[0], d); w[1](d); });
+    }
+    fetch('/v1/artifacts/' + encodeURIComponent(k), { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { done(d && d.id ? d : null); })
+      .catch(function () { done(null); });
+  }
+
 `;
