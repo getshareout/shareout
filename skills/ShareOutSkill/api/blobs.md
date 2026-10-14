@@ -146,10 +146,12 @@ the instance) returns the Worker `.../content` URL with `expiresIn: null`.
 
 ## Allowed MIME Types
 
-- Images: `image/png`, `image/jpeg`, `image/gif`, `image/webp`, `image/svg+xml`
-- Video: `video/mp4`, `video/webm`
-- Audio: `audio/mpeg`, `audio/wav`, `audio/ogg`
-- Documents: `application/pdf`, `text/plain`, `text/csv`, `text/markdown`
+- Media: any `image/*`, `video/*` or `audio/*` type
+- Documents: `application/pdf`, `application/json`, `text/plain`, `text/csv`, `text/markdown`
+- Office / OpenDocument: xlsx, docx, pptx, xls, doc, ppt, ods, odt, odp
+- Archives: `application/zip`, `application/x-zip-compressed`, `application/gzip`, `application/x-tar`
+
+Script and executable extensions (`.js`, `.html`, `.py`, `.sh`, `.exe`, …) are always rejected.
 
 ## Error Codes
 
