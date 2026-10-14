@@ -30,6 +30,7 @@ export const VIEWS: ViewDef[] = [
   { key: 'health', title: 'Health', range: false, icon: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>' },
   { key: 'costs', title: 'Costs', range: true, icon: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>' },
   { key: 'workspace-costs', title: 'Cost by workspace', range: true, icon: '<path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="7" width="3" height="10"/><rect x="17" y="13" width="3" height="4"/>' },
+  { key: 'usage', title: 'Usage ledger', range: false, icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>' },
   { key: 'artifacts', title: 'Artifacts', range: true, icon: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>' },
   { key: 'traffic', title: 'Traffic', range: true, icon: '<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>' },
   { key: 'funnel', title: 'Funnel', range: true, icon: '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>' },

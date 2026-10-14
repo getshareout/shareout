@@ -3,6 +3,7 @@ import { errorResponse, type DataContext } from '../middleware';
 import { canEditPresentation } from './auth';
 import type { DbPresentation, DbSlide } from './db';
 import { mapPresentation } from './db';
+import { recordBrowserSince } from '../../workspaces/usage-ledger';
 
 const NAV_TIMEOUT = 20000;
 
@@ -88,6 +89,7 @@ export async function handleExportRoute(request: Request, ctx: DataContext, pres
   const style = deckStyle(pres);
 
   let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
+  const startedAt = Date.now();
   try {
     browser = await puppeteer.launch(ctx.env.BROWSER as Parameters<typeof puppeteer.launch>[0]);
     const page = await browser.newPage();
@@ -123,6 +125,9 @@ export async function handleExportRoute(request: Request, ctx: DataContext, pres
     console.error('slide export failed', { presId, format, error_stack: (err as Error)?.stack || String(err) });
     return errorResponse({ code: 'EXPORT_FAILED', message: 'Export failed', status: 502 });
   } finally {
-    if (browser) await browser.close().catch(() => {});
+    if (browser) {
+      await browser.close().catch(() => {});
+      await recordBrowserSince(ctx.env, ctx.artifactId, startedAt);
+    }
   }
 }

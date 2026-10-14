@@ -101,7 +101,7 @@ describe('sendEmail', () => {
       html: '<p>HTML</p>',
     });
 
-    expect(result).toEqual({ success: true, messageId: 'msg_abc' });
+    expect(result).toEqual({ success: true, messageId: 'msg_abc', recipients: 2 });
     expect(send).toHaveBeenCalledWith({
       from: { email: 'report@artifacts.shareout.site', name: 'ShareOut' },
       to: ['a@example.com', 'b@example.com'],
@@ -190,7 +190,7 @@ describe('sendArtifactEmail', () => {
       includeArtifactContent: true,
     });
 
-    expect(result).toEqual({ success: true, messageId: 'msg_art' });
+    expect(result).toEqual({ success: true, messageId: 'msg_art', recipients: 1 });
     expect(send).toHaveBeenCalledWith({
       from: { email: 'report@mail.example.com', name: 'ShareOut' },
       to: 'team@example.com',
@@ -272,7 +272,7 @@ describe('sendArtifactEmail', () => {
       useArtifactEmailHtml: true,
     });
 
-    expect(result).toEqual({ success: true, messageId: 'msg_render' });
+    expect(result).toEqual({ success: true, messageId: 'msg_render', recipients: 1 });
     const call = send.mock.calls[0][0];
     expect(call.subject).toBe('Live Subject');
     expect(call.html).toBe('<h1>Live numbers</h1>');

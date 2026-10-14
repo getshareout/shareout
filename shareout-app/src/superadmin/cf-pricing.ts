@@ -32,6 +32,11 @@ export const CF_PRICING = {
   kvReadsPerMillion: 0.5,
   kvWritesPerMillion: 5.0,
   kvStoragePerGbMonth: 0.5,
+
+  // Browser Rendering $/browser-hour beyond the 10 h/mo included.
+  browserPerHour: 0.09,
+  // Email Service outbound $/1,000 sends beyond the 3,000/mo included.
+  emailPerThousand: 0.35,
 } as const;
 
 export const BYTES_PER_GB = 1024 * 1024 * 1024;

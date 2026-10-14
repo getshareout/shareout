@@ -29,6 +29,15 @@ import { isKnownFeature } from '../../features/registry';
 import { setGlobalFlag, setWorkspaceFlag, GLOBAL_TARGET } from '../../features/flags';
 import { defaultReportDate, getDailyPlatformDigest } from '../../superadmin/digest';
 import { backfillVectors } from '../../search/semantic';
+import {
+  dailyUsageCsv,
+  getDailyUsage,
+  getMonthlyUsage,
+  previousMonth,
+  rollupWorkspaceUsage,
+  usageCsv,
+  utcDay,
+} from '../../workspaces/usage-ledger';
 
 export async function routeAdminApi(ctx: FetchContext): Promise<Response | null> {
   const { request, env, path, url } = ctx;
@@ -48,6 +57,35 @@ export async function routeAdminApi(ctx: FetchContext): Promise<Response | null>
     const reportDate =
       dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : defaultReportDate();
     return jsonResponse(await getDailyPlatformDigest(env, reportDate));
+  }
+
+  // GET /v1/admin/usage.csv?month=YYYY-MM[&by=day] — per-workspace usage + cost for a
+  // month (default: last month), monthly totals or one row per day.
+  if (path === '/v1/admin/usage.csv' && request.method === 'GET') {
+    const monthParam = url.searchParams.get('month')?.trim() || '';
+    const month = /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : previousMonth();
+    const byDay = url.searchParams.get('by') === 'day';
+    const csv = byDay ? dailyUsageCsv(await getDailyUsage(env, month)) : usageCsv(month, await getMonthlyUsage(env, month));
+    return new Response(csv, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="shareout-usage-${month}${byDay ? '-daily' : ''}.csv"`,
+      },
+    });
+  }
+
+  // POST /v1/admin/usage/rollup {day: YYYY-MM-DD} — (re)build one day of the usage
+  // ledger. Storage is measured only for yesterday or today (R2 has no history).
+  if (path === '/v1/admin/usage/rollup' && request.method === 'POST') {
+    const body = await request.json<{ day?: string }>().catch(() => ({}) as { day?: string });
+    const day = body.day?.trim() || '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(Date.parse(day))) {
+      return jsonError('day must be YYYY-MM-DD', 'VALIDATION_ERROR', 400);
+    }
+    const today = utcDay();
+    if (day > today) return jsonError('day is in the future', 'VALIDATION_ERROR', 400);
+    const measureStorage = day >= utcDay(new Date(Date.now() - 86_400_000));
+    return jsonResponse({ ...(await rollupWorkspaceUsage(env, day, { measureStorage })), measureStorage });
   }
 
   // GET /v1/admin/view?view=&range= — content fragment for client-side nav

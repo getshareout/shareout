@@ -20,6 +20,7 @@ import { cleanupObservability } from '../observability/store';
 import { cleanupAuditLog } from '../audit';
 import { createLogger } from '../logging';
 import { runStorageSnapshots } from '../storage-snapshots';
+import { rollupWorkspaceUsage, utcDay } from '../workspaces/usage-ledger';
 import { runLifecycleEmails } from '../email/lifecycle-cron';
 import { runWeeklyWorkspaceDigest } from '../email/weekly-digest';
 import { runStaleDataSweep } from '../data/sheets/stale-sweep';
@@ -335,6 +336,15 @@ export async function handleScheduledEvent(env: Env, scheduledTime?: number): Pr
         over_cap: snap.overCap,
       });
     }
+  }
+
+  // Workspace usage ledger: roll up the UTC day that just ended. Storage is measured
+  // from R2 now, i.e. as of that day's close.
+  if (hour === 0 && minute === 0) {
+    const yesterday = utcDay(new Date(now.getTime() - 86_400_000));
+    await rollupWorkspaceUsage(env, yesterday, { measureStorage: true }).catch((err) => {
+      logger.error('usage rollup failed', { day: yesterday, error: err instanceof Error ? err.message : String(err) });
+    });
   }
 
   // Official skills: keep the "Recommended by ShareOut" catalog fresh in every
