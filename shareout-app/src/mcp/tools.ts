@@ -23,6 +23,7 @@ import {
 } from './tool-kit';
 import { MEMBER_TOOLS } from './member-tools';
 import { KNOWLEDGE_TOOLS } from './knowledge-tools';
+import { CONNECTOR_TOOLS } from './connector-tools';
 
 export type { ToolContext, ToolResult } from './tool-kit';
 
@@ -40,6 +41,8 @@ export const SERVER_INSTRUCTIONS = [
   'For questions about what the team knows (clients, projects, people, numbers, decisions), call knowledge_search first,',
   'then knowledge_entity or knowledge_facts for one company, person or project. Answer only from what they return and always',
   'say where each fact comes from (the page or file name, with its link). If nothing is found, knowledge_status says what is covered.',
+  'For live numbers from the team’s databases or files (warehouses, Supabase, Amazon S3), call list_connections, then',
+  'query_connection (one read-only SELECT) or browse_storage (S3 files), and say which connector the answer came from.',
   'If anything fails or behaves unexpectedly, call report_problem with what happened, then tell the person',
   'the ShareOut team was notified. For how-to questions about ShareOut, call get_help.',
 ].join(' ');
@@ -515,7 +518,7 @@ const fetchTool: ToolDef = {
 // Deterministic order (lets clients cache the list).
 export const TOOLS: ToolDef[] = [
   whoami, listWorkspaces, listArtifacts, getArtifact, publishArtifact, updateArtifact,
-  ...MEMBER_TOOLS, ...KNOWLEDGE_TOOLS, getHelp, reportProblem, search, fetchTool,
+  ...MEMBER_TOOLS, ...KNOWLEDGE_TOOLS, ...CONNECTOR_TOOLS, getHelp, reportProblem, search, fetchTool,
 ];
 
 export function listTools() {

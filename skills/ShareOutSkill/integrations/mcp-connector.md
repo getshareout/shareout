@@ -39,6 +39,9 @@ your ShareOut account"). Allow, and the app is connected.
 | `knowledge_entity` | One company, person or project by `name` (or entity id): its connections, sources and quoted mentions |
 | `knowledge_facts` | Facts about `about` (amounts, dates, statuses), each with the quoted sentence and its source; optional `filter` |
 | `knowledge_status` | Whether Knowledge is on, what's learned / processing / unreadable, and how many entities it knows |
+| `list_connections` | The workspace's data connectors; `queryable` (SQL) / `files` (S3) only when an admin switched AI on for that connector |
+| `query_connection` | One read-only `SELECT` on a warehouse connector (Snowflake, BigQuery, Redshift, Aurora, Supabase); `connection`, `sql`, optional `project_id` (BigQuery); ≤ 1000 rows |
+| `browse_storage` | Amazon S3 connector: `action: "list"` (+ `prefix`) or `"read"` (+ `key`); CSV → rows, JSON → data, text → text |
 | `get_help` | Short how-to and links |
 | `report_problem` | Opens a support ticket for the ShareOut team |
 | `search` / `fetch` | Read-only, ChatGPT deep-research shape. `search` covers all the person's workspaces unless `workspace_id` (id or slug) narrows it; `fetch` is by id |
@@ -46,7 +49,7 @@ your ShareOut account"). Allow, and the app is connected.
 Rules the tools follow:
 
 - **Workspace default** — tools that act on one workspace (`publish_artifact`, `knowledge_*`,
-  member tools) use the person's only workspace; with several, they ask which. With none,
+  member tools, connector tools) use the person's only workspace; with several, they ask which. With none,
   pages are private in their personal space. Lookups (`list_artifacts`, `search`) cover every
   workspace unless `workspace_id` narrows them; `get_artifact`, `fetch` and `update_artifact`
   go by page id.
