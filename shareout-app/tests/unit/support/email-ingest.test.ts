@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 
 vi.mock('../../../src/support/triage', () => ({ triageTicket: vi.fn(async () => null) }));

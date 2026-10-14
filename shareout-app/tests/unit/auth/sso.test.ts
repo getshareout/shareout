@@ -1,6 +1,6 @@
 // Workspace SSO (OIDC): config validation, domain policy, and the start → callback flow
 // against a fake IdP whose ID tokens are signed with a key generated per run.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 

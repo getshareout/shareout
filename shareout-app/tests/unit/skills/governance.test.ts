@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { Env } from '../../../src/types';
 import type { AuthUser } from '../../../src/api-auth';

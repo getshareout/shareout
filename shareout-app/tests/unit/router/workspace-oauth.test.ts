@@ -1,5 +1,5 @@
 // P1 robustness: workspace connector OAuth URL + callback guards.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 import type { AuthUser } from '../../../src/api-auth';

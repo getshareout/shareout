@@ -1,6 +1,6 @@
 // Applies the real migrations to the test D1 so queries run against the production
 // schema (a hand-written fixture table would have hidden `ae.timestamp`).
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import type { Env } from '../../../src/types';
 
 const files = import.meta.glob('../../../migrations/*.sql', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;

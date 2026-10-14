@@ -1,6 +1,6 @@
 // Scheduled file delivery (work/042 P4). Real Miniflare D1: validate guards the collection
 // to the job's own bucket; deliver mints a share link. Email dispatch is best-effort (mocked away).
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 import type { DeliveryContext } from '../../../src/delivery/types';

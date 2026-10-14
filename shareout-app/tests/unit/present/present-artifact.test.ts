@@ -2,7 +2,7 @@
 // the LLM call, the publish path, and the access check are mocked so we exercise the
 // JSON contract, auth gating, publish params (private + right workspace/owner), and
 // the LLM-failure "no artifact" guarantee without network or the full publish stack.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 

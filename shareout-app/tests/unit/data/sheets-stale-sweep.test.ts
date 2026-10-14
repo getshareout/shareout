@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, it, expect } from 'vitest';
 import type { Env } from '../../../src/types';
 import { runStaleDataSweep } from '../../../src/data/sheets/stale-sweep';

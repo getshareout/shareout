@@ -1,7 +1,7 @@
 // GET /v1/files/:id/content truth table (work/042 P3). Real Miniflare D1 + R2 so the
 // deliverable→latest-blob join, the canAccess grant path, and the R2 byte serve all run
 // for real. SESSION_SECRET is overridden to a known value so session cookies verify.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, it, expect } from 'vitest';
 import type { Env } from '../../../src/types';
 import { handleFileContent, handleFileMeta } from '../../../src/data/files-content';

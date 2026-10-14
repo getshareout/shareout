@@ -1,6 +1,6 @@
 // Shared D1 fixture for the MCP connector tests: the real 0008 migration plus the
 // slice of users/tokens it points at.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import mcpSql from '../../../migrations/0008_mcp_oauth.sql?raw';
 import type { Env } from '../../../src/types';
 import { generateToken, hashToken } from '../../../src/api-auth';

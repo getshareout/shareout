@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, describe, expect, it } from 'vitest';
 import initSql from '../../migrations/0000_init.sql?raw';
 import ledgerSql from '../../migrations/0010_workspace_usage_daily.sql?raw';

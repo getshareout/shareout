@@ -1,6 +1,6 @@
 // AI enrichment of files (work/042 P4). Real Miniflare D1 + R2; the LLM call is mocked so
 // the guards, JSON parsing, and the stale-version write guard are exercised without network.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 

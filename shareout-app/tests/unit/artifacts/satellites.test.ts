@@ -3,7 +3,7 @@
 // dangerous — an INNER JOIN would drop the artifact from listings, and a missing
 // COALESCE would make `moderation_status` NULL, which is not 'approved' and would hide
 // a perfectly good page.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, it, expect } from 'vitest';
 import { setPresentation, setModeration } from '../../../src/artifacts/satellites';
 import type { Env } from '../../../src/types';

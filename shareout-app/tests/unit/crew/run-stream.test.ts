@@ -1,5 +1,5 @@
 // Workspace "Run now" streams the crew run as SSE instead of blocking until it ends.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { startCrewRunStream } from '../../../src/crew/triggers';
 import type { CrewRow } from '../../../src/crew/types';

@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 
 let CURRENT_USER: { id: string; email: string | null; service?: { workspaceId: string; scopes: string[] } } | null = { id: 'usr_req', email: 'req@example.com' };

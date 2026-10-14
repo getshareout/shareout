@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import type { Env } from '../../../src/types';
 
 // Auth collaborators behind requireTokenOrSession + the workspace role gate.

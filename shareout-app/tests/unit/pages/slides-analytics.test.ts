@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, it, expect } from 'vitest';
 import { renderSlidesAnalyticsPage } from '../../../src/pages/slides-analytics';
 import type { Env } from '../../../src/types';

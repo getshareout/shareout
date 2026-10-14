@@ -1,6 +1,6 @@
 // Deliver-now / job email: the destination must surface a step trace (recipients + messageId),
 // so a successful send is never reported as `steps: []`.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { describe, it, expect, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 import type { DeliveryContext } from '../../../src/delivery/types';

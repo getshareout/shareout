@@ -1,6 +1,6 @@
 // Real-runtime check that the SDK bundle is served from the Workers Static Asset
 // (public/_bundles/shareout-sdk.js) via the ASSETS binding — workers pool, no node pragma.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
 import { handleServeSDK } from '../../src/sdk-serve';
 

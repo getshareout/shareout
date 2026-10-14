@@ -2,7 +2,7 @@
 // window key of its own shape — an ISO day (publish), an ISO hour (present), a bare
 // date (scheduling), `YYYY-MM-DDTHH:MM` (agent minute). The nightly prune has to
 // understand all four with one string cutoff, and the four principals must not collide.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, it, expect } from 'vitest';
 import { cleanupOldRateLimits } from '../../src/api-auth';
 import type { Env } from '../../src/types';

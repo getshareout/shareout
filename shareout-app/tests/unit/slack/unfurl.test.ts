@@ -1,6 +1,6 @@
 // Slack link previews must never leak a closed artifact to a Slack team that is not
 // connected to the artifact's ShareOut workspace.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 import { encryptCredentials } from '../../../src/data/connections/credentials';

@@ -1,6 +1,6 @@
 // File usage graph (work/042 P4). Real Miniflare D1 + R2: scan a version's source for
 // deliverable refs, populate file_artifact_usage, read it back.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, it, expect } from 'vitest';
 import type { Env } from '../../../src/types';
 import { scanFileUsage, listFileUsage } from '../../../src/assets/usage';

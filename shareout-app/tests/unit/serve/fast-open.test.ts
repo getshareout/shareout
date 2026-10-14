@@ -1,7 +1,7 @@
 // First-open hot path against real Miniflare D1 + KV: route records resolve in one
 // lookup, cache writes leave the response path, publish/visibility purges reach the
 // merged keys, and nested folder URLs verify in one query.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 import {

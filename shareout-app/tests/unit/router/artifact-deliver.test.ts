@@ -1,5 +1,5 @@
 // P1 robustness: deliver-now validation, role gate, viewer self-delivery, execute path.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 import type { AuthUser } from '../../../src/api-auth';

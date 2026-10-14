@@ -6,9 +6,15 @@
 # between a change and main. Keep the two in sync.
 #
 # Tests run as critical-path + whatever the change actually touches (vitest module
-# graph). The full 466-file suite is ~4m40s of which ~34s is assertions, so running
-# all of it on every push bought almost nothing; main and nightly still run it in
-# full.yml. Force it here with SHAREOUT_FULL_TESTS=1.
+# graph); main and nightly still run the full suite in full.yml. Force it here with
+# SHAREOUT_FULL_TESTS=1.
+#
+# Independent checks run in parallel; each one's output is printed only if it fails.
+# check:bundles runs last, alone: it rewrites public/_bundles/ (as does the
+# stage-skill-bundle test), so it must not race the test run.
+#
+# Secret scan covers the commits being pushed (base..HEAD), not the whole tree.
+# Full-tree scan: ./tooling/scripts/check-secrets.sh
 #
 # Skips docs-site build, fresh migrate, coverage, and audit (see ci-check.sh).
 set -euo pipefail
@@ -17,61 +23,96 @@ export TZ="${TZ:-UTC}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 WORKER="$REPO_ROOT/shareout-app"
-
-worker_npm_ci() {
-  cd "$WORKER"
-  if [ ! -d node_modules ] || [ package-lock.json -nt node_modules ]; then
-    echo "==> npm ci (worker)"
-    npm ci
-  else
-    echo "==> Skipping npm ci (worker lockfile unchanged)"
-  fi
-}
+BASE="${SHAREOUT_TEST_BASE:-origin/main}"
 
 if [ ! -d "$WORKER/node_modules" ] && [ ! -f "$WORKER/package-lock.json" ]; then
   echo "error: $WORKER not set up — run: cd shareout-app && npm ci" >&2
   exit 1
 fi
 
-echo "==> Fast CI checks (worker)"
-worker_npm_ci
-npm run check:boundaries
-npm run check:design-tokens
-npm run check:ui
-npm run check:domains
-npm run check:customer-names
-npm run check:skill-links
-npm run check:migrations
-npm run check:access-seams
-npm run check:file-size
-npm run typecheck
-if [ "${SHAREOUT_FULL_TESTS:-}" = "1" ]; then
-  npm test -- --reporter=dot
+cd "$WORKER"
+if [ ! -d node_modules ] || [ package-lock.json -nt node_modules ]; then
+  echo "==> npm ci (worker)"
+  npm ci
 else
-  npm run test:critical -- --reporter=dot
-  npm run test:affected
+  echo "==> Skipping npm ci (worker lockfile unchanged)"
 fi
 
-echo "==> Fast CI checks (chat-core workspace)"
-npm run typecheck --workspace @shareout/chat-core
-npm test --workspace @shareout/chat-core -- --reporter=dot
+LOGS="$(mktemp -d)"
+trap 'rm -rf "$LOGS"' EXIT
+PIDS=()
+NAMES=()
 
-echo "==> Fast CI checks (SDK workspace)"
-npm run typecheck --workspace @shareout/sdk
-npm test --workspace @shareout/sdk -- --reporter=dot
+job() {
+  local name="$1"
+  shift
+  ( "$@" ) >"$LOGS/$name.log" 2>&1 &
+  PIDS+=("$!")
+  NAMES+=("$name")
+}
 
-echo "==> Fast CI checks (editor workspace)"
-npm run typecheck --workspace @shareout/editor-client
-npm test --workspace @shareout/editor-client -- --reporter=dot
+static_checks() {
+  for c in boundaries design-tokens ui domains customer-names skill-links migrations access-seams file-size; do
+    npm run -s "check:$c"
+  done
+}
 
-# check:bundles rebuilds editor + chat-core + sdk and diffs staged output
-# against what's committed — it IS the workspace build step.
-echo "==> Fast CI checks (bundles)"
+app_tests() {
+  if [ "${SHAREOUT_FULL_TESTS:-}" = "1" ]; then
+    npm test -- --reporter=dot
+  else
+    npm run test:critical -- --reporter=dot
+    npm run test:affected
+  fi
+}
+
+workspace() {
+  npm run typecheck --workspace "@shareout/$1"
+  npm test --workspace "@shareout/$1" -- --reporter=dot
+}
+
+secrets() {
+  local base
+  base="$(git merge-base "$BASE" HEAD 2>/dev/null || true)"
+  if [ -n "$base" ]; then
+    SHAREOUT_SECRETS_RANGE="$base..HEAD" "$REPO_ROOT/tooling/scripts/check-secrets.sh"
+  else
+    "$REPO_ROOT/tooling/scripts/check-secrets.sh"
+  fi
+}
+
+echo "==> Fast CI checks (parallel)"
+START=$SECONDS
+job static static_checks
+job typecheck npm run typecheck
+job tests app_tests
+job chat-core workspace chat-core
+job sdk workspace sdk
+job editor workspace editor-client
+job secrets secrets
+
+FAILED=()
+for i in "${!PIDS[@]}"; do
+  if wait "${PIDS[$i]}"; then
+    echo "  ✓ ${NAMES[$i]}"
+  else
+    echo "  ✗ ${NAMES[$i]}"
+    FAILED+=("${NAMES[$i]}")
+  fi
+done
+
+if [ "${#FAILED[@]}" -gt 0 ]; then
+  for n in "${FAILED[@]}"; do
+    echo ""
+    echo "──── $n ────"
+    tail -n 80 "$LOGS/$n.log"
+  done
+  exit 1
+fi
+
+echo "==> Bundles"
 npm run check:bundles
 npm run check:bundle-size
 
-echo "==> Secret scan (gitleaks)"
-"$REPO_ROOT/tooling/scripts/check-secrets.sh"
-
 echo ""
-echo "✓ Fast checks passed (full suite: SHAREOUT_FULL_TESTS=1 $0)"
+echo "✓ Fast checks passed in $((SECONDS - START))s (full suite: SHAREOUT_FULL_TESTS=1 $0)"

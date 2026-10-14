@@ -1,5 +1,5 @@
 // A crew's chosen model is the one it runs on, on the gateway and the Anthropic API alike.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { startCrewRunStream } from '../../../src/crew/triggers';
 import { crewPinnedModel } from '../../../src/crew/run-loop';

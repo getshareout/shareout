@@ -1,6 +1,6 @@
 // Real D1: after a rollback, GET /v1/artifacts/{id} reports the deployed version as
 // current_version (and the highest published one as latest_version).
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { Env } from '../../../src/types';
 import type { AuthUser } from '../../../src/api-auth';
