@@ -185,6 +185,7 @@ async function buildHomeBody(
     wsKnowledgePaid,
     inboxDomain,
     isInstanceAdmin,
+    slidesImport: !!env.SLIDES_CONVERTER,
     platformOrigin: getPlatformOrigin(env),
     accessRequests,
     hostname: new URL(request.url).hostname,

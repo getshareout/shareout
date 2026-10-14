@@ -79,6 +79,7 @@
     "predeploy": "npm run build:editor && npm run build:chat-core && npm run build:sdk && npm run build:mobile && npm run build:grid && npm run build:official-skills && npm run build:skill && npm run build:discovery"
   },
   "dependencies": {
+    "@cloudflare/containers": "0.3.7",
     "@cloudflare/puppeteer": "^1.4.0",
     "aws4fetch": "^1.0.20",
     "fflate": "^0.8.3",

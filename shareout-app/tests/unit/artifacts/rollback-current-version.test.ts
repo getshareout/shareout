@@ -12,7 +12,7 @@ const owner: AuthUser = { id: 'usr_rb', email: 'rb@x.com', username: null };
 beforeAll(async () => {
   for (const sql of [
     `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT, username TEXT, name TEXT)`,
-    `CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, owner_id TEXT, workspace_id TEXT, folder_id TEXT, name TEXT, slug TEXT, display_slug TEXT, visibility TEXT, paused INTEGER DEFAULT 0, created_at TEXT, artifact_type TEXT, description TEXT, auth_method TEXT, deleted_at TEXT)`,
+    `CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, owner_id TEXT, workspace_id TEXT, folder_id TEXT, name TEXT, slug TEXT, display_slug TEXT, visibility TEXT, paused INTEGER DEFAULT 0, created_at TEXT, artifact_type TEXT, type_metadata TEXT, description TEXT, auth_method TEXT, deleted_at TEXT)`,
     `CREATE TABLE IF NOT EXISTS versions (id TEXT PRIMARY KEY, artifact_id TEXT, version_no INTEGER, entrypoint TEXT, created_at TEXT)`,
     `CREATE TABLE IF NOT EXISTS deployments (id TEXT PRIMARY KEY, artifact_id TEXT, channel TEXT, version_id TEXT, slug TEXT, updated_at TEXT)`,
     `CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, slug TEXT, locale TEXT)`,

@@ -7,13 +7,14 @@ import { PresenceCoordinator } from './realtime/presence-coordinator';
 import { Showtime } from './demo/showtime';
 import { KnowledgeStore } from './knowledge/corpus/store-do';
 import { KnowledgeIngestWorkflow } from './knowledge/corpus/workflow';
+import { SlidesConverter } from './pages/home/slides-converter-do';
 import { handleScheduledEvent } from './scheduling/handler';
 import { handleViewEventBatch } from './analytics';
 import { logScheduledRun, withRequestLogging } from './request-logging';
 import { handleFetch } from './router/handle-fetch';
 import { handleInboundEmail } from './email/inbound';
 
-export { RealtimeCoordinator, CommentsCoordinator, MiniDB, ChatDO, PresenceCoordinator, Showtime, KnowledgeStore, KnowledgeIngestWorkflow };
+export { RealtimeCoordinator, CommentsCoordinator, MiniDB, ChatDO, PresenceCoordinator, Showtime, KnowledgeStore, KnowledgeIngestWorkflow, SlidesConverter };
 
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {

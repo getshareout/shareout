@@ -17,6 +17,7 @@ vi.mock('../../../src/quota', () => ({ checkStorageQuota }));
 
 import { handleHomeImportApi } from '../../../src/pages/home/import';
 import { importArtifactType, isShareLink } from '../../../src/pages/home/import-rules';
+import { convertSlidesImport } from '../../../src/pages/home/import-slides';
 import { DOCX_MARKDOWN, docxFixture, toBase64, xlsxFixture } from '../helpers/office-fixtures';
 
 let folderRow: unknown = { id: 'fld_1' };
@@ -199,5 +200,83 @@ describe('Word and spreadsheet import', () => {
     expect((await bad.json()).code).toBe('CONVERT_FAILED');
     expect((await post({ name: 'x.docx', content: 'plain text' })).status).toBe(400);
     expect(publishArtifact).not.toHaveBeenCalled();
+  });
+});
+
+describe('slide deck import (LibreOffice container)', () => {
+  const PDF = new TextEncoder().encode('%PDF-1.7\n%fake\n');
+  const DECK = new Uint8Array([80, 75, 3, 4, 9, 9]);
+  let convert: ReturnType<typeof vi.fn>;
+  const withConverter = (impl: (req: Request) => Promise<Response>) => {
+    convert = vi.fn((url: string, init: RequestInit) => impl(new Request(url, init)));
+    return { ...env, SLIDES_CONVERTER: { idFromName: (n: string) => n, get: () => ({ fetch: convert }) } } as unknown as Env;
+  };
+  const postTo = (e: Env, body: unknown) =>
+    handleHomeImportApi(new Request('https://shareout.site/v1/home/import', { method: 'POST', body: JSON.stringify(body) }), e, user);
+
+  it('a .pptx becomes a PDF artifact and keeps the original deck', async () => {
+    const e = withConverter(async () => new Response(PDF, { headers: { 'content-type': 'application/pdf' } }));
+    const res = await postTo(e, { name: 'Q3 review.pptx', content: toBase64(DECK), encoding: 'base64' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, type: 'pdf', name: 'Q3 review' });
+    const req = new Request(...(convert.mock.calls[0] as [string, RequestInit]));
+    expect(req.headers.get('x-ext')).toBe('pptx');
+    expect(new Uint8Array(await req.arrayBuffer())).toEqual(DECK);
+    expect(params()).toMatchObject({ artifactType: 'pdf', entrypoint: 'Q3 review.pdf', source: { original: 'original/Q3 review.pptx' } });
+    expect(params().files).toEqual([
+      { path: 'Q3 review.pdf', content: toBase64(PDF), mime: 'application/pdf', encoding: 'base64' },
+      { path: 'original/Q3 review.pptx', content: toBase64(DECK), mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', encoding: 'base64' },
+    ]);
+    expect(incrementRateLimit).toHaveBeenCalledOnce();
+  });
+
+  it('.ppt and .odp go through the same converter', async () => {
+    const e = withConverter(async () => new Response(PDF));
+    expect((await postTo(e, { name: 'a.ppt', content: toBase64(DECK), encoding: 'base64' })).status).toBe(200);
+    expect((await postTo(e, { name: 'b.odp', content: toBase64(DECK), encoding: 'base64' })).status).toBe(200);
+    expect(convert.mock.calls.map((c) => new Headers((c as [string, RequestInit])[1].headers).get('x-ext'))).toEqual(['ppt', 'odp']);
+  });
+
+  it('without the converter binding: 422 CONVERT_UNAVAILABLE, nothing published', async () => {
+    const res = await post({ name: 'deck.pptx', content: toBase64(DECK), encoding: 'base64' });
+    expect(res.status).toBe(422);
+    const j = await res.json();
+    expect(j.code).toBe('CONVERT_UNAVAILABLE');
+    expect(j.error).toMatch(/PDF/);
+    expect(publishArtifact).not.toHaveBeenCalled();
+    expect(incrementRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('an oversized deck is refused with 413 before it reaches the converter', async () => {
+    const e = withConverter(async () => new Response(PDF));
+    const res = await postTo(e, { name: 'big.pptx', content: 'A'.repeat(Math.ceil((25 * 1024 * 1024 + 1) / 3) * 4), encoding: 'base64' });
+    expect(res.status).toBe(413);
+    expect((await res.json()).code).toBe('FILE_TOO_LARGE');
+    expect(convert).not.toHaveBeenCalled();
+    expect(publishArtifact).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['the converter errors', async () => new Response('boom', { status: 500 }), 422, 'CONVERT_FAILED'],
+    ['the converter answers something that is not a PDF', async () => new Response('<html>'), 422, 'CONVERT_FAILED'],
+    ['the converter throws', (): Promise<Response> => { throw new Error('container crashed'); }, 422, 'CONVERT_FAILED'],
+    ['the container times out', async () => new Response('', { status: 504 }), 422, 'CONVERT_TIMEOUT'],
+    ['the container refuses the size', async () => new Response('', { status: 413 }), 413, 'FILE_TOO_LARGE'],
+    ['no container instance is free', async () => new Response('', { status: 503 }), 503, 'CONVERT_BUSY'],
+  ] as const)('%s → %s %s, nothing published', async (_label, impl, status, code) => {
+    const res = await postTo(withConverter(impl), { name: 'deck.pptx', content: toBase64(DECK), encoding: 'base64' });
+    expect(res.status).toBe(status);
+    expect((await res.json()).code).toBe(code);
+    expect(publishArtifact).not.toHaveBeenCalled();
+    expect(incrementRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('gives up after the timeout when the converter hangs', async () => {
+    const e = withConverter(() => new Promise<Response>(() => {}));
+    await expect(convertSlidesImport(e, 'deck.pptx', 'pptx', DECK, 20)).rejects.toMatchObject({ code: 'CONVERT_TIMEOUT', status: 422 });
+  });
+
+  it('decks must be sent base64', async () => {
+    expect((await postTo(withConverter(async () => new Response(PDF)), { name: 'deck.pptx', content: 'plain' })).status).toBe(400);
   });
 });

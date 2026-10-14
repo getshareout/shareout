@@ -1,7 +1,7 @@
 /**
  * Core artifact CRUD: list, read, update, delete, and hard purge.
  */
-import type { Env, Visibility, AuthMethod, ArtifactType } from '../types';
+import type { Env, Visibility, AuthMethod, ArtifactType, TypeMetadata } from '../types';
 import type { AuthUser } from '../api-auth';
 import { generateId } from '../crypto-utils';
 import { emitJobEvent } from '../scheduling/events';
@@ -150,7 +150,7 @@ export async function handleGetArtifact(
 ): Promise<Response> {
   const artifact = await env.DB.prepare(`
     SELECT
-      a.id, a.name, a.slug, a.visibility, a.paused, a.created_at, a.artifact_type,
+      a.id, a.name, a.slug, a.visibility, a.paused, a.created_at, a.artifact_type, a.type_metadata,
       a.description, pres_a.social_title, pres_a.social_description, pres_a.social_image_url,
       pres_a.thumbnail_ext,
       a.auth_method, a.owner_id, a.workspace_id, a.folder_id, a.display_slug,
@@ -190,6 +190,7 @@ export async function handleGetArtifact(
     deploy_slug: string | null;
     workspace_slug: string | null;
     artifact_type: string;
+    type_metadata: string | null;
     current_version: number;
     latest_version: number | null;
     embed_allowed: number;
@@ -287,7 +288,11 @@ export async function handleGetArtifact(
   // (PATCH/editor need editor+; trash needs owner or workspace owner/admin).
   const permissions = { can_edit: role === 'owner' || role === 'editor', can_delete: canDelete };
 
-  return json({ ...detail, folder_id: artifact.folder_id, tags, ...permissions, ...(moderation ? { moderation } : {}) });
+  // An imported Office file / slide deck kept its original (served at /a/{slug}/download).
+  let original: string | undefined;
+  try { original = (JSON.parse(artifact.type_metadata || '{}') as TypeMetadata).source?.original; } catch { /* no original */ }
+
+  return json({ ...detail, folder_id: artifact.folder_id, tags, ...permissions, ...(moderation ? { moderation } : {}), ...(original ? { original } : {}) });
 }
 
 export async function handleUpdateArtifact(

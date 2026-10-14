@@ -16,11 +16,13 @@ let uploads: string[];
 let opened: unknown[][];
 let asked: string[];
 let reloaded: number;
+let slidesOn: boolean;
 
 function load(extra: Record<string, unknown> = {}) {
   document.body.innerHTML = '<div id="wsx"></div><button id="wsxNewBtn"></button>';
   const win = globalThis.window as unknown as Record<string, unknown>;
   win.WSX_WS = 'wsp_1';
+  win.WSX_SLIDES = slidesOn;
   const base: Record<string, unknown> = {
     ws: document.getElementById('wsx'),
     newBtn: document.getElementById('wsxNewBtn'),
@@ -69,7 +71,7 @@ document.addEventListener = ((type: string, fn: EventListener) => { docListeners
 
 beforeEach(() => {
   for (const [type, fn] of docListeners.splice(0)) document.removeEventListener(type, fn);
-  fetchMock = vi.fn(); uploads = []; opened = []; asked = []; reloaded = 0;
+  fetchMock = vi.fn(); uploads = []; opened = []; asked = []; reloaded = 0; slidesOn = false;
 });
 
 describe('drop routing', () => {
@@ -87,6 +89,25 @@ describe('drop routing', () => {
     const bodies = fetchMock.mock.calls.map((c) => JSON.parse(String((c as [string, RequestInit])[1].body)));
     expect(bodies[0]).toMatchObject({ name: 'Plan.docx', content: 'UEsDBA==', encoding: 'base64' });
     expect(bodies[1]).toMatchObject({ name: 'b.xlsx', encoding: 'base64' });
+  });
+
+  it('sends slide decks to import as base64 only where the instance converts them', async () => {
+    expect(load().dropItems([new File(['a'], 'deck.pptx'), new File(['a'], 'old.ppt'), new File(['a'], 'o.odp')]).map((k) => k.kind)).toEqual(['asset', 'asset', 'asset']);
+    slidesOn = true;
+    const { importDropped, dropItems } = load();
+    expect(dropItems([new File(['a'], 'deck.pptx'), new File(['a'], 'old.ppt'), new File(['a'], 'o.odp')]).map((k) => k.kind)).toEqual(['file', 'file', 'file']);
+    fetchMock.mockResolvedValue(okJson({ ok: true, slug: 's', name: 'Deck', artifactId: 'a', type: 'pdf' }));
+    await importDropped(dropItems([new File([new Uint8Array([80, 75, 3, 4])], 'Deck.pptx')]));
+    expect(JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body))).toMatchObject({ name: 'Deck.pptx', content: 'UEsDBA==', encoding: 'base64' });
+    expect(opened[0]).toEqual(['s', 'Deck', 'a', 'pdf']);
+  });
+
+  it('explains a deck the server cannot convert, or that took too long', async () => {
+    slidesOn = true;
+    const { importDropped, dropItems } = load();
+    fetchMock.mockResolvedValueOnce(okJson({ error: 'no', code: 'CONVERT_UNAVAILABLE' }, 422)).mockResolvedValueOnce(okJson({ error: 'slow', code: 'CONVERT_TIMEOUT' }, 422));
+    await importDropped(dropItems([new File(['x'], 'a.pptx'), new File(['x'], 'b.pptx')]));
+    expect(rows()).toEqual([['a.pptx', 'err', t('drop.err.slides')], ['b.pptx', 'err', t('drop.err.retry')]]);
   });
 
   it('explains a workbook too big to open', async () => {

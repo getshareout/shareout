@@ -3,8 +3,9 @@
  * file, pasted HTML, or the share link of a chat-made page becomes a private artifact
  * in the current workspace/folder. Same gates as /v1/home/new and /v1/publish: internal
  * membership, the daily publish count, the storage cap; moderation runs inside
- * publishArtifact. Word and spreadsheet files are converted (import-office.ts) and keep
- * their original for download. Images, video and other files are not artifacts here —
+ * publishArtifact. Word and spreadsheet files are converted (import-office.ts), slide decks
+ * become a PDF when the instance has the converter (import-slides.ts); both keep their
+ * original for download. Images, video and other files are not artifacts here —
  * the client sends them to the Assets library (upload + AI enrichment) instead.
  */
 import type { ArtifactType, Env, FileEntry, ImportedSource } from '../../types';
@@ -15,8 +16,9 @@ import { publishArtifact } from '../../publish/publish-artifact';
 import { rateLimitExceededResponse, storageLimitExceededResponse } from '../../publish/limits';
 import { generateSlug } from '../../validation';
 import { hostWorkspaceId } from './host';
-import { IMPORT_ARTIFACT_EXTS, IMPORT_CONVERTED_EXTS, IMPORT_MAX_BYTES, importArtifactType, importExt, isShareLink } from './import-rules';
+import { IMPORT_ARTIFACT_EXTS, IMPORT_CONVERTED_EXTS, IMPORT_MAX_BYTES, IMPORT_SLIDES_EXTS, importArtifactType, importExt, isShareLink } from './import-rules';
 import { ImportError, base64ToBytes, convertOfficeImport } from './import-office';
+import { convertSlidesImport } from './import-slides';
 
 const TYPE_MIME: Partial<Record<ArtifactType, string>> = {
   html: 'text/html', csv: 'text/csv', markdown: 'text/markdown', json: 'application/json', txt: 'text/plain', pdf: 'application/pdf',
@@ -82,19 +84,21 @@ export async function handleHomeImportApi(
     type = 'html';
     file = { path: 'index.html', content: body.html, mime: 'text/html' };
   } else if (typeof body.name === 'string' && typeof body.content === 'string') {
-    const t = importArtifactType(body.name);
+    const ext = importExt(body.name);
+    const slides = IMPORT_SLIDES_EXTS.includes(ext);
+    const t = slides ? 'pdf' : importArtifactType(body.name);
     if (!t) return json({ error: 'This file type is stored in Assets, not published as an artifact', code: 'UNSUPPORTED_TYPE', allowed: Object.keys(IMPORT_ARTIFACT_EXTS) }, 415);
     type = t;
     name = body.name.replace(/\.[^.]+$/, '').trim().slice(0, 120) || body.name;
     const base64 = body.encoding === 'base64';
-    const convert = IMPORT_CONVERTED_EXTS[importExt(body.name)];
-    if (convert) {
-      if (!base64) return json({ error: 'Send Word and spreadsheet files base64-encoded', code: 'VALIDATION_ERROR' }, 400);
+    const convert = IMPORT_CONVERTED_EXTS[ext];
+    if (convert || slides) {
+      if (!base64) return json({ error: 'Send Office files base64-encoded', code: 'VALIDATION_ERROR' }, 400);
       if (Math.floor((body.content.length * 3) / 4) > IMPORT_MAX_BYTES) return json({ error: `File is larger than ${IMPORT_MAX_BYTES / 1024 / 1024} MB`, code: 'FILE_TOO_LARGE' }, 413);
       let bytes: Uint8Array;
       try { bytes = base64ToBytes(body.content); } catch { return json({ error: 'File content is not valid base64', code: 'VALIDATION_ERROR' }, 400); }
       try {
-        const out = await convertOfficeImport(env, body.name, importExt(body.name), convert, bytes);
+        const out = convert ? await convertOfficeImport(env, body.name, ext, convert, bytes) : await convertSlidesImport(env, body.name, ext, bytes);
         ({ files, entrypoint, source } = out);
       } catch (e) {
         if (e instanceof ImportError) return json({ error: e.message, code: e.code }, e.status);

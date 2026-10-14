@@ -42,7 +42,7 @@ export const workspace_client_doc_moves_JS = `  // ===== Move a document: artifa
         showToast(t('move.toArtifactDone'), 'success');
         openArtifact(d.slug, d.name, d.artifactId, d.type);
       })
-      .catch(function (e) { showToast(e && e.code ? dropErr(e) : t('move.failed'), 'error'); });
+      .catch(function (e) { showToast(e && e.code ? dropErr(e, a.filename || a.name) : t('move.failed'), 'error'); });
   }
 
 `;

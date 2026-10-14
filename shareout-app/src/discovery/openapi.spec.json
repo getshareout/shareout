@@ -7104,7 +7104,7 @@
           "Home"
         ],
         "summary": "Import a dropped or pasted file as an artifact",
-        "description": "One-step import from the Studio Home. Publishes a document (HTML, CSV, Markdown, JSON, text, PDF, Word .docx/.odt, or a spreadsheet .xlsx/.xls/.ods), pasted HTML, or a Claude / ChatGPT / Gemini share link (best-effort fetch) as a private artifact in the current workspace and folder. Word files become Markdown and spreadsheets one CSV per sheet; both keep the original file for download and must be sent base64-encoded. Images, video and other files belong in Assets (`/v1/assets`). Inside a workspace the caller must be an internal member. Counts toward the daily publish limit and the storage cap. Agent (`sot_`) tokens are refused.",
+        "description": "One-step import from the Studio Home. Publishes a document (HTML, CSV, Markdown, JSON, text, PDF, Word .docx/.odt, or a spreadsheet .xlsx/.xls/.ods), pasted HTML, or a Claude / ChatGPT / Gemini share link (best-effort fetch) as a private artifact in the current workspace and folder. Word files become Markdown and spreadsheets one CSV per sheet. Slide decks (.pptx/.ppt/.odp) become a PDF on instances with the optional LibreOffice converter (`SLIDES_CONVERTER`); without it they answer 422 `CONVERT_UNAVAILABLE`. All of these keep the original file for download and must be sent base64-encoded. Images, video and other files belong in Assets (`/v1/assets`). Inside a workspace the caller must be an internal member. Counts toward the daily publish limit and the storage cap. Agent (`sot_`) tokens are refused.",
         "operationId": "importHomeArtifact",
         "parameters": [
           {
@@ -7207,7 +7207,7 @@
             "description": "File type belongs in Assets"
           },
           "422": {
-            "description": "Share link could not be read (login wall or JS-rendered), or a Word/spreadsheet file could not be converted"
+            "description": "Share link could not be read (login wall or JS-rendered), or an Office file or slide deck could not be converted (`CONVERT_FAILED`, `CONVERT_TIMEOUT`, `CONVERT_UNAVAILABLE`)"
           },
           "429": {
             "description": "Daily publish limit reached"

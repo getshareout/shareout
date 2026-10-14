@@ -97,6 +97,8 @@ export interface RenderArgs {
   inboxDomain: string;
   /** Viewer administers the instance itself → Settings links to the admin portal. */
   isInstanceAdmin: boolean;
+  /** Instance has the slides converter (SLIDES_CONVERTER) → .pptx/.ppt/.odp import as PDF, not Assets. */
+  slidesImport?: boolean;
   /** Public origin of this instance — the Connect view's MCP / skill URLs point here. */
   platformOrigin?: string;
   hostname: string;

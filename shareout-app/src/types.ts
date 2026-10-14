@@ -152,6 +152,8 @@ export interface Env {
   SHOWTIME: DurableObjectNamespace;
   /** Per-workspace knowledge corpus (chunks + FTS5) — SQLite-in-DO. Optional: Knowledge search is off without it. */
   KNOWLEDGE_STORE?: DurableObjectNamespace<import('./knowledge/corpus/store-do').KnowledgeStore>;
+  /** LibreOffice container: slide decks (.pptx/.ppt/.odp) → PDF on import. Optional: decks stay in Assets without it. */
+  SLIDES_CONVERTER?: DurableObjectNamespace<import('./pages/home/slides-converter-do').SlidesConverter>;
   /** Durable per-source ingest. Optional: ingest runs inline in waitUntil when absent. */
   KNOWLEDGE_INGEST?: Workflow<import('./knowledge/corpus/ingest').IngestParams>;
   /** Vectorize index over knowledge chunks (namespace = workspace id). Optional: search degrades to keyword. */
