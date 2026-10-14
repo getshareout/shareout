@@ -5,6 +5,7 @@ import { stripEditorAttributes } from '../dom/editor-ids';
 import { saveStatusView, type SaveState } from './save-status';
 import { refreshValidityChip } from '../validation/validity-chip';
 import { showConfirmDialog } from '../ui/confirm-dialog';
+import { withBusy } from '../optimistic';
 
 const SAVE_DEBOUNCE_MS = 2000;
 const MAX_SAVE_RETRIES = 3;
@@ -213,6 +214,12 @@ export async function publish(ctx: EditorContext, opts: { force?: boolean } = {}
     if (!ok) return;
   }
 
+  // Exception to optimistic: publishing can be held by a draft conflict (409) or fail
+  // server-side, so the button shows "Publishing…" and ignores repeat clicks until it settles.
+  await withBusy(document.getElementById('btn-publish') as HTMLButtonElement | null, 'Publishing…', () => publishNow(ctx, opts));
+}
+
+async function publishNow(ctx: EditorContext, opts: { force?: boolean } = {}): Promise<void> {
   updateHtmlFromCanvas(ctx.state, ctx.dom.canvasFrame);
 
   try {
@@ -243,7 +250,7 @@ export async function publish(ctx: EditorContext, opts: { force?: boolean } = {}
         return;
       }
       ctx.state.draftUpdatedAt = data.currentUpdatedAt;
-      return publish(ctx, { force: true });
+      return publishNow(ctx, { force: true });
     }
 
     const data = await response.json();
@@ -349,21 +356,24 @@ export async function openVersionHistory(ctx: EditorContext) {
             return;
           }
 
-          const res = await fetch(`/v1/artifacts/${ctx.config.artifactId}/editor/rollback`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({ versionId }),
-          });
+          // Exception to optimistic: restore swaps the draft server-side and reloads the editor.
+          await withBusy(btn as HTMLButtonElement, 'Restoring…', async () => {
+            const res = await fetch(`/v1/artifacts/${ctx.config.artifactId}/editor/rollback`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({ versionId }),
+            }).catch(() => null);
 
-          const payload = await res.json().catch(() => ({}));
-          if (res.ok && payload.success) {
-            showToast('Version restored', 'success');
-            panel.remove();
-            location.reload();
-          } else {
-            showToast(payload.error || 'Failed to restore version', 'error');
-          }
+            const payload = res ? await res.json().catch(() => ({})) : {};
+            if (res && res.ok && payload.success) {
+              showToast('Version restored', 'success');
+              panel.remove();
+              location.reload();
+            } else {
+              showToast(payload.error || 'Couldn’t restore that version. Check your connection?', 'error');
+            }
+          });
         });
       });
     } else if (list) {

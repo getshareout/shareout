@@ -8,6 +8,31 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
   function adLoading(m) { m.innerHTML = i18nSpin(); }
   function adBusy(b) { if (b) { b.disabled = true; b.classList.add('is-busy'); } }
   function adIdle(b) { if (b) { b.disabled = false; b.classList.remove('is-busy'); } }
+  // Rows removed optimistically whose request hasn't landed (undo window / in flight):
+  // painters skip them so an SWR repaint never flashes them back in.
+  var adPending = {};
+  // Destructive row action: the row leaves now, an Undo toast holds the DELETE, a failure
+  // brings the row back (or repaints the tab if the row was re-rendered meanwhile).
+  function adRemoveRow(key, row, url, okMsg, failMsg, cacheKey, opts) {
+    opts = opts || {};
+    var h = null;
+    return optimistic({
+      key: key, undo: true,
+      apply: function () { adPending[key] = true; if (row) h = window.soOptimistic.leave(row); },
+      rollback: function () { delete adPending[key]; if (h) h.restore(); if (row && !row.isConnected && cacheKey) { delete adDataCache[cacheKey]; if (adminTab === cacheKey) loadAdmin(); } },
+      request: function () { return adReq(url, { method: opts.method || 'DELETE', credentials: 'same-origin', keepalive: true }); },
+      success: okMsg, error: adErr(failMsg),
+      done: function () { delete adPending[key]; if (h && !opts.keepRow) h.commit(); if (cacheKey) delete adDataCache[cacheKey]; if (opts.after) opts.after(); },
+    });
+  }
+  function adErr(fallback) { return function (e) { return (e && e.userMessage) || fallback; }; }
+  // Fetch → throw with the server's error text so optimistic() can show it.
+  function adReq(url, init) {
+    return fetch(url, init).then(function (r) {
+      if (r.ok) return r.json().catch(function () { return {}; }).then(function (j) { if (j && j.error) { var e = new Error('x'); e.userMessage = j.error; throw e; } return j; });
+      return r.json().catch(function () { return null; }).then(function (j) { var e = new Error('HTTP ' + r.status); e.userMessage = j && j.error; throw e; });
+    });
+  }
   // Stale-while-revalidate per-tab data cache: paint cached data instantly on
   // revisit, refetch in the background, repaint only if the data changed (so
   // in-progress form edits aren't clobbered). Cache drops on workspace switch.
@@ -171,11 +196,21 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
             + '</tr>';
         }
         function actUrl(id, action) { return wsUrl('/admin/artifacts/' + encodeURIComponent(id) + '/' + action); }
-        function postAct(id, action, body, done) {
-          fetch(actUrl(id, action), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-            .then(function (r) { return r.ok ? r.json().catch(function () { return {}; }) : null; })
-            .then(function (j) { if (!j || j.error) { try { alert((j && j.error) || t('admin.actionFailed')); } catch (e) {} done(false); } else { done(true, j); } })
-            .catch(function () { done(false); });
+        function postAct(id, action, body) {
+          return adReq(actUrl(id, action), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        }
+        function artOf(id) { return arts.filter(function (x) { return x.id === id; })[0]; }
+        // Flip a field on one row now; put it back if the server refuses.
+        function optArt(id, action, field, next, body) {
+          var a = artOf(id); if (!a) return;
+          var prev = a[field];
+          optimistic({
+            key: 'adart:' + action + ':' + id,
+            apply: function () { a[field] = next; renderTable(); },
+            rollback: function () { a[field] = prev; renderTable(); },
+            request: function () { return postAct(id, action, body); },
+            error: adErr(t('admin.actionFailed')),
+          });
         }
         function renderTable() {
           var filterBtns = '<div class="wsx-admin__artfilter wsx__chips">'
@@ -200,22 +235,14 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
             b.addEventListener('click', function () {
               var id = b.getAttribute('data-art-pause'); var paused = b.getAttribute('data-next') === '1';
               if (paused && !window.confirm(t('admin.pauseConfirm'))) return;
-              var a = arts.filter(function (x) { return x.id === id; })[0]; var prev = a ? a.paused : null;
-              if (a) a.paused = paused ? 1 : 0; renderTable(); // optimistic
-              postAct(id, 'pause', { paused: paused }, function (ok) {
-                if (!ok && a) { a.paused = prev; renderTable(); } // roll back (postAct alerts)
-              });
+              optArt(id, 'pause', 'paused', paused ? 1 : 0, { paused: paused });
             });
           });
           m.querySelectorAll('[data-art-vis]').forEach(function (b) {
             b.addEventListener('click', function () {
               var id = b.getAttribute('data-art-vis'); var next = b.getAttribute('data-next');
               if (next === 'public' && !window.confirm(t('admin.makePublicConfirm'))) return;
-              var a = arts.filter(function (x) { return x.id === id; })[0]; var prev = a ? a.visibility : null;
-              if (a) a.visibility = next; renderTable(); // optimistic
-              postAct(id, 'visibility', { visibility: next }, function (ok) {
-                if (!ok && a) { a.visibility = prev; renderTable(); } // roll back (postAct alerts)
-              });
+              optArt(id, 'visibility', 'visibility', next, { visibility: next });
             });
           });
           m.querySelectorAll('[data-art-reassign]').forEach(function (b) {
@@ -223,9 +250,16 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
               var id = b.getAttribute('data-art-reassign');
               var email = (window.prompt(t('admin.reassignPrompt')) || '').trim();
               if (!email) return;
-              b.disabled = true;
-              postAct(id, 'transfer', { email: email }, function (ok, j) {
-                if (ok) { var a = arts.filter(function (x) { return x.id === id; })[0]; if (a) { a.owner_email = (j && j.new_owner) || email; a.owner_name = null; } renderTable(); } else { b.disabled = false; }
+              var a = artOf(id); if (!a) return;
+              var prev = { e: a.owner_email, n: a.owner_name };
+              optimistic({
+                key: 'adart:transfer:' + id,
+                apply: function () { a.owner_email = email; a.owner_name = null; renderTable(); },
+                rollback: function () { a.owner_email = prev.e; a.owner_name = prev.n; renderTable(); },
+                request: function () { return postAct(id, 'transfer', { email: email }); },
+                success: t('admin.ownerChanged'),
+                error: adErr(t('admin.actionFailed')),
+                done: function (j) { if (j && j.new_owner && j.new_owner !== email) { a.owner_email = j.new_owner; renderTable(); } },
               });
             });
           });
@@ -242,8 +276,8 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
       fetch(wsUrl('/invites'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
     ]); };
     swr('members', function (res) {
-      var list = (res[0] && res[0].members) || [];
-      var invites = (res[2] && res[2].invites) || [];
+      var list = ((res[0] && res[0].members) || []).filter(function (x) { return !adPending['mem:' + x.user_id]; });
+      var invites = ((res[2] && res[2].invites) || []).filter(function (x) { return !adPending['inv:' + x.id]; });
       var sub = res[1] && res[1].subscription;
       var seatsTotal = sub ? sub.seats : null;
       var atLimit = seatsTotal !== null && seatsTotal > 0 && list.length >= seatsTotal;
@@ -349,15 +383,20 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
         if (ib) ib.addEventListener('click', function () { wsxInvite(adReload); });
         m.querySelectorAll('[data-inv-resend]').forEach(function (b) {
           b.addEventListener('click', function () {
-            b.disabled = true; b.textContent = t('admin.sending');
-            fetch(wsUrl('/invites/' + encodeURIComponent(b.getAttribute('data-inv-resend')) + '/resend'), { method: 'POST', credentials: 'same-origin' })
-              .then(function (r) { return r.ok ? r.json().catch(function () { return {}; }) : null; })
-              .then(function (j) { b.disabled = false; b.textContent = (j && !j.error) ? t('common.sent') : t('common.failed'); setTimeout(function () { b.textContent = t('admin.resend'); }, 1500); });
+            var id = b.getAttribute('data-inv-resend'), tmr = null;
+            optimistic({
+              key: 'inv:resend:' + id,
+              apply: function () { b.textContent = t('common.sent'); tmr = setTimeout(function () { b.textContent = t('admin.resend'); }, 1500); },
+              rollback: function () { clearTimeout(tmr); b.textContent = t('admin.resend'); },
+              request: function () { return adReq(wsUrl('/invites/' + encodeURIComponent(id) + '/resend'), { method: 'POST', credentials: 'same-origin' }); },
+              error: adErr(t('admin.inviteResendFailed')),
+              done: function () { delete adDataCache['members']; },
+            });
           });
         });
         m.querySelectorAll('[data-inv-copy]').forEach(function (b) {
           b.addEventListener('click', function () {
-            b.disabled = true;
+            adBusy(b);
             // notify:false — minting a link must not re-email the invitee every time an
             // admin copies it. This is the only way to invite on an instance with no
             // EMAIL binding, so the link is shown even when the clipboard is unavailable.
@@ -366,9 +405,10 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
               headers: { 'Content-Type': 'application/json' }, body: '{"notify":false}'
             })
               .then(function (r) { return r.ok ? r.json().catch(function () { return {}; }) : null; })
+              .catch(function () { return null; })
               .then(function (j) {
-                b.disabled = false;
-                if (!j || !j.inviteUrl) { b.textContent = t('common.failed'); }
+                adIdle(b);
+                if (!j || !j.inviteUrl) { showToast(t('admin.inviteLinkFailed'), 'error'); return; }
                 else {
                   var done = function () { b.textContent = t('admin.inviteLinkCopied'); };
                   try {
@@ -382,25 +422,33 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
         m.querySelectorAll('[data-inv-revoke]').forEach(function (b) {
           b.addEventListener('click', function () {
             if (!window.confirm(t('admin.revokeInviteConfirm'))) return;
-            adBusy(b);
-            fetch(wsUrl('/invites/' + encodeURIComponent(b.getAttribute('data-inv-revoke'))), { method: 'DELETE', credentials: 'same-origin' })
-              .then(function (r) { if (r.ok) adReload(); else adIdle(b); });
+            var id = b.getAttribute('data-inv-revoke');
+            adRemoveRow('inv:' + id, m.querySelector('[data-inv="' + CSS.escape(id) + '"]'), wsUrl('/invites/' + encodeURIComponent(id)), t('admin.inviteRevoked'), t('admin.inviteRevokeFailed'), 'members');
           });
         });
         m.querySelectorAll('[data-mem-rm]').forEach(function (b) {
           b.addEventListener('click', function () {
             if (!window.confirm(t('admin.removeMemberConfirm'))) return;
-            fetch(wsUrl('/members/' + encodeURIComponent(b.getAttribute('data-mem-rm'))), { method: 'DELETE', credentials: 'same-origin' }).then(function (r) { if (r.ok) { var el = m.querySelector('[data-mem="' + b.getAttribute('data-mem-rm') + '"]'); if (el) el.remove(); delete adDataCache['members']; } });
+            var id = b.getAttribute('data-mem-rm');
+            adRemoveRow('mem:' + id, m.querySelector('[data-mem="' + CSS.escape(id) + '"]'), wsUrl('/members/' + encodeURIComponent(id)), t('admin.memberRemoved'), t('admin.memberRemoveFailed'), 'members');
           });
         });
         // Change role in place — POST /members upserts the role for an existing member.
         m.querySelectorAll('[data-mem-role]').forEach(function (s) {
           var prev = s.value;
           s.addEventListener('change', function () {
-            s.disabled = true;
-            fetch(wsUrl('/members'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: s.getAttribute('data-mem-role'), role: s.value }) })
-              .then(function (r) { return r.ok ? r.json().catch(function () { return {}; }) : null; })
-              .then(function (j) { s.disabled = false; if (!j || j.error) { s.value = prev; if (j && j.error) try { alert(j.error); } catch (e) {} } else { prev = s.value; delete adDataCache['members']; } });
+            var next = s.value, was = prev, key = 'role:' + s.getAttribute('data-mem-role');
+            // One change at a time per member: a change while the last one saves snaps back.
+            if (optBusy(key)) { s.value = prev; return; }
+            optimistic({
+              key: key,
+              apply: function () { prev = next; s.value = next; },
+              rollback: function () { prev = was; s.value = was; },
+              request: function () { return adReq(wsUrl('/members'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: s.getAttribute('data-mem-role'), role: next }) }); },
+              success: t('admin.roleChanged'),
+              error: adErr(t('admin.roleFailed')),
+              done: function () { delete adDataCache['members']; },
+            });
           });
         });
       }
@@ -420,10 +468,10 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
     ]); };
     swr('security', function (res) {
       var entries = (res[0] && res[0].entries) || [];
-      var accessReqs = (res[2] && res[2].requests) || [];
+      var accessReqs = ((res[2] && res[2].requests) || []).filter(function (q) { return !adPending['req:' + q.id]; });
       var sessionPol = res[3] || null;
       var agentTokens = (res[4] && res[4].tokens) || [];
-      var approvals = (res[5] && res[5].approvals) || [];
+      var approvals = ((res[5] && res[5].approvals) || []).filter(function (a) { return !adPending['appr:' + a.id]; });
       var policy = res[1] || { allowed_domains: [], allowed_emails: [] };
       var domains = (policy.allowed_domains || []).slice();
       var emails = (policy.allowed_emails || []).slice();
@@ -475,7 +523,7 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
           + '</div>';
       }
       // Agent tokens (service accounts).
-      var tokRows = agentTokens.map(function (tok) {
+      var tokRows = agentTokens.filter(function (tok) { return !adPending['tok:' + tok.id]; }).map(function (tok) {
         var revoked = !!tok.revoked_at;
         return '<tr' + (revoked ? ' class="is-paused"' : '') + '><td><span class="wsx-atbl__link">' + esc(tok.name || t('admin.tokenDefault')) + '</span>' + (revoked ? '<span class="wsx-atbl__flag">' + esc(t('admin.revoked')) + '</span>' : '') + '</td>'
           + '<td class="wsx-atbl__owner">' + esc(((tok.scopes || []).join ? (tok.scopes || []).join(', ') : String(tok.scopes || ''))) + '</td>'
@@ -503,12 +551,17 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
       // Session policy save.
       var sessSave = document.getElementById('wsxSessSave');
       if (sessSave) sessSave.addEventListener('click', function () {
-        var btn = this; var msg = document.getElementById('wsxSessMsg'); var v = (document.getElementById('wsxSessDays').value || '').trim();
-        adBusy(btn); msg.textContent = t('common.saving');
-        fetch(wsUrl('/session-policy'), { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_max_days: v ? parseInt(v, 10) : null }) })
-          .then(function (r) { return r.ok ? r.json().catch(function () { return {}; }) : null; })
-          .then(function (j) { adIdle(btn); if (j && !j.error) delete adDataCache['security']; msg.textContent = (j && !j.error) ? t('common.saved') : ((j && j.error) || t('common.failed')); setTimeout(function () { msg.textContent = ''; }, 1500); })
-          .catch(function () { adIdle(btn); msg.textContent = t('modal.networkError'); });
+        var inp = document.getElementById('wsxSessDays'); var v = (inp.value || '').trim();
+        var was = cur ? String(cur) : '';
+        optimistic({
+          key: 'sess-policy',
+          apply: function () { cur = v ? parseInt(v, 10) : null; inp.value = v; },
+          rollback: function () { cur = was ? parseInt(was, 10) : null; inp.value = was; },
+          request: function () { return adReq(wsUrl('/session-policy'), { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_max_days: v ? parseInt(v, 10) : null }) }); },
+          success: t('common.saved'),
+          error: adErr(t('admin.saveFailed')),
+          done: function () { delete adDataCache['security']; },
+        });
       });
       // Agent token create + revoke.
       var tokCreate = document.getElementById('wsxTokCreate');
@@ -528,47 +581,63 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
       m.querySelectorAll('[data-tok-rm]').forEach(function (b) {
         b.addEventListener('click', function () {
           if (!window.confirm(t('admin.revokeTokenConfirm'))) return;
-          adBusy(b);
-          fetch(wsUrl('/agent-tokens/' + encodeURIComponent(b.getAttribute('data-tok-rm'))), { method: 'DELETE', credentials: 'same-origin' }).then(function (r) { if (r.ok) adReload(); else adIdle(b); });
+          var id = b.getAttribute('data-tok-rm');
+          adRemoveRow('tok:' + id, b.closest('tr'), wsUrl('/agent-tokens/' + encodeURIComponent(id)), t('admin.tokenRevoked'), t('admin.tokenRevokeFailed'), 'security', { keepRow: true, after: function () { if (adminTab === 'security') loadAdmin(); } });
         });
       });
       m.querySelectorAll('[data-appr]').forEach(function (b) {
         b.addEventListener('click', function () {
-          adBusy(b);
-          fetch('/v1/artifacts/' + encodeURIComponent(b.getAttribute('data-appr-art')) + '/publish-approval/' + encodeURIComponent(b.getAttribute('data-appr')) + '/decision', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision: 'approve' }) })
-            .then(function (r) { if (r.ok) adReload(); else adIdle(b); });
+          var row = b.closest('.wsx-admin__row'), h = null, id = b.getAttribute('data-appr');
+          optimistic({
+            key: 'appr:' + id,
+            apply: function () { adPending['appr:' + id] = true; h = window.soOptimistic.leave(row); },
+            rollback: function () { delete adPending['appr:' + id]; h.restore(); },
+            request: function () { return adReq('/v1/artifacts/' + encodeURIComponent(b.getAttribute('data-appr-art')) + '/publish-approval/' + encodeURIComponent(id) + '/decision', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision: 'approve' }) }); },
+            success: t('admin.approved'),
+            error: adErr(t('admin.decisionFailed')),
+            done: function () { delete adPending['appr:' + id]; adReload(); },
+          });
         });
       });
       function decideReq(id, action) {
-        var row = m.querySelector('[data-req="' + id + '"]');
-        fetch('/v1/access-requests/' + encodeURIComponent(id), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: action }) })
-          .then(function (r) { if (r.ok && row) { row.remove(); delete adDataCache['security']; } });
+        var row = m.querySelector('[data-req="' + CSS.escape(id) + '"]'), h = null;
+        optimistic({
+          key: 'req:' + id,
+          apply: function () { adPending['req:' + id] = true; if (row) h = window.soOptimistic.leave(row); },
+          rollback: function () { delete adPending['req:' + id]; if (h) h.restore(); },
+          request: function () { return adReq('/v1/access-requests/' + encodeURIComponent(id), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: action }) }); },
+          success: t(action === 'approve' ? 'admin.approved' : 'admin.requestDenied'),
+          error: adErr(t('admin.decisionFailed')),
+          done: function () { delete adPending['req:' + id]; if (h) h.commit(); delete adDataCache['security']; },
+        });
       }
       m.querySelectorAll('[data-req-approve]').forEach(function (b) { b.addEventListener('click', function () { decideReq(b.getAttribute('data-req-approve'), 'approve'); }); });
       m.querySelectorAll('[data-req-deny]').forEach(function (b) { b.addEventListener('click', function () { decideReq(b.getAttribute('data-req-deny'), 'deny'); }); });
-      var pmsg = document.getElementById('wsxPolicyMsg');
-      function saveDomains(prev) {
-        fetch(wsUrl('/access-policy'), { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ allowed_domains: domains, allowed_emails: emails }) })
-          .then(function (r) { return r.json().catch(function () { return null; }).then(function (j) { return r.ok ? j : { error: (j && j.error) || t('common.error') }; }); })
-          .then(function (j) {
-            if (j && !j.error) {
-              delete adDataCache['security'];
-              pmsg.textContent = t('common.saved'); document.getElementById('wsxDomainList').innerHTML = domainTagsHtml(domains); bindDomainRm();
-              setTimeout(function () { pmsg.textContent = ''; }, 1500);
-            } else { if (prev) domains = prev; pmsg.textContent = (j && j.error) || t('common.error'); }
-          }).catch(function () { pmsg.textContent = t('modal.networkError'); });
+      function paintDomains() { document.getElementById('wsxDomainList').innerHTML = domainTagsHtml(domains); bindDomainRm(); }
+      // Tags update at once; the PUT runs behind and a refusal restores the old list.
+      function saveDomains(next) {
+        var prev = domains.slice();
+        optimistic({
+          key: 'access-policy',
+          apply: function () { domains = next; paintDomains(); },
+          rollback: function () { domains = prev; paintDomains(); },
+          request: function () { return adReq(wsUrl('/access-policy'), { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ allowed_domains: next, allowed_emails: emails }) }); },
+          success: t('common.saved'),
+          error: adErr(t('admin.saveFailed')),
+          done: function () { delete adDataCache['security']; },
+        });
       }
       function bindDomainRm() {
         m.querySelectorAll('[data-rm-domain]').forEach(function (b) {
           b.addEventListener('click', function () {
-            var d = b.getAttribute('data-rm-domain'); domains = domains.filter(function (x) { return x !== d; }); saveDomains();
+            var d = b.getAttribute('data-rm-domain'); saveDomains(domains.filter(function (x) { return x !== d; }));
           });
         });
       }
       bindDomainRm();
       document.getElementById('wsxDomainAdd').addEventListener('click', function () {
         var inp = document.getElementById('wsxDomainInput'); var v = (inp.value || '').trim().toLowerCase().replace(/^@/, '');
-        if (!v || domains.indexOf(v) !== -1) return; var prev = domains.slice(); domains.push(v); inp.value = ''; saveDomains(prev);
+        if (!v || domains.indexOf(v) !== -1) return; inp.value = ''; saveDomains(domains.concat([v]));
       });
     }, run);
   }
@@ -644,25 +713,43 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
           setTimeout(function () { copyBtn.textContent = t('admin.copyAddress'); }, 1500);
         }).catch(function () {});
       });
-      function savePol() {
-        delete adDataCache['settings'];
-        var num = parseInt((document.getElementById('wsxApprvN') || {}).value, 10) || 1;
-        fetch(wsUrl('/publish-policy'), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ policy: cur, approvals_required: num }) });
+      var nn = document.getElementById('wsxApprvN');
+      var savedPol = { p: cur, n: n };
+      function paintPol(p) {
+        m.querySelectorAll('[data-pol]').forEach(function (x) { x.classList.toggle('is-sel', x.getAttribute('data-pol') === p); });
+        document.getElementById('wsxApprvRow').hidden = p !== 'require_approval';
+      }
+      // Selection shows at once; a refused PATCH puts the last saved policy back.
+      function savePol(next) {
+        var num = parseInt((nn || {}).value, 10) || 1;
+        var prev = savedPol;
+        optimistic({
+          apply: function () { cur = next; paintPol(next); },
+          rollback: function () { cur = prev.p; paintPol(prev.p); if (nn) nn.value = prev.n; },
+          request: function () { return adReq(wsUrl('/publish-policy'), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ policy: next, approvals_required: num }) }); },
+          success: t('common.saved'),
+          error: adErr(t('admin.saveFailed')),
+          done: function () { savedPol = { p: next, n: num }; delete adDataCache['settings']; },
+        });
       }
       m.querySelectorAll('[data-pol]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          cur = b.getAttribute('data-pol');
-          m.querySelectorAll('[data-pol]').forEach(function (x) { x.classList.toggle('is-sel', x === b); });
-          document.getElementById('wsxApprvRow').hidden = cur !== 'require_approval';
-          savePol();
-        });
+        b.addEventListener('click', function () { savePol(b.getAttribute('data-pol')); });
       });
-      var nn = document.getElementById('wsxApprvN'); if (nn) nn.addEventListener('change', savePol);
+      if (nn) nn.addEventListener('change', function () { savePol(cur); });
       var bmsg = document.getElementById('wsxBrandMsg');
+      var accEl = document.getElementById('wsxBrandAccent'), footEl = document.getElementById('wsxBrandFooter');
+      var savedBrand = { a: accEl.value, f: footEl.checked };
       document.getElementById('wsxBrandSave').addEventListener('click', function () {
-        var btn = this; adBusy(btn); bmsg.textContent = t('common.saving');
-        fetch(wsUrl('/branding'), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accent_color: document.getElementById('wsxBrandAccent').value, hide_footer: document.getElementById('wsxBrandFooter').checked }) })
-          .then(function (r) { adIdle(btn); if (r.ok) delete adDataCache['settings']; bmsg.textContent = r.ok ? t('common.saved') : t('common.failed'); setTimeout(function () { bmsg.textContent = ''; }, 1500); });
+        var next = { a: accEl.value, f: footEl.checked }, prev = savedBrand;
+        optimistic({
+          key: 'branding',
+          apply: function () { savedBrand = next; accEl.value = next.a; footEl.checked = next.f; },
+          rollback: function () { savedBrand = prev; accEl.value = prev.a; footEl.checked = prev.f; },
+          request: function () { return adReq(wsUrl('/branding'), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accent_color: next.a, hide_footer: next.f }) }); },
+          success: t('common.saved'),
+          error: adErr(t('admin.saveFailed')),
+          done: function () { delete adDataCache['settings']; },
+        });
       });
       var upBtn = document.getElementById('wsxBrandUpload');
       upBtn.addEventListener('click', function () {
@@ -673,15 +760,24 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
           adBusy(upBtn); bmsg.textContent = t('common.uploading');
           fetch(wsUrl('/logo'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': file.type }, body: file })
             .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (j) { if (j) { bmsg.textContent = t('common.uploaded'); adReload(); } else { adIdle(upBtn); bmsg.textContent = t('admin.uploadFailed'); } });
+            .catch(function () { return null; })
+            .then(function (j) { if (j) { bmsg.textContent = t('common.uploaded'); adReload(); } else { adIdle(upBtn); bmsg.textContent = ''; showToast(t('admin.uploadFailed'), 'error'); } });
         });
         f.click();
       });
       var del = document.getElementById('wsxBrandLogoDel');
       if (del) del.addEventListener('click', function () {
         if (!window.confirm(t('admin.removeLogoConfirm'))) return;
-        adBusy(del); bmsg.textContent = t('common.removing');
-        fetch(wsUrl('/logo'), { method: 'DELETE', credentials: 'same-origin' }).then(function (r) { if (r.ok) adReload(); else { adIdle(del); bmsg.textContent = t('common.failed'); } });
+        var box = m.querySelector('.wsx-admin__logo'), was = box.innerHTML, wasCls = box.className;
+        optimistic({
+          key: 'logo-rm', undo: true,
+          apply: function () { box.className = 'wsx-admin__logo wsx-admin__logo--empty'; box.textContent = t('admin.noLogo'); del.style.display = 'none'; },
+          rollback: function () { box.className = wasCls; box.innerHTML = was; del.style.display = ''; },
+          request: function () { return adReq(wsUrl('/logo'), { method: 'DELETE', credentials: 'same-origin', keepalive: true }); },
+          success: t('admin.logoRemoved'),
+          error: adErr(t('admin.actionFailed')),
+          done: function () { adReload(); },
+        });
       });
     }, run);
   }
@@ -757,14 +853,22 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
             if (llm.gatewayModel) gwSel.value = llm.gatewayModel;
           })
           .catch(function () { gwMsg.textContent = t('admin.aiModelLoadError'); });
+        var savedModel = llm.gatewayModel || '';
         gwSave.addEventListener('click', function () {
-          adBusy(gwSave); gwMsg.textContent = t('common.saving');
-          var val = gwSel.value;
-          var req = val
-            ? fetch(wsUrl('/llm/model'), { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: val }) })
-            : fetch(wsUrl('/llm/model'), { method: 'DELETE', credentials: 'same-origin' });
-          req.then(function (r) { adIdle(gwSave); gwMsg.textContent = r.ok ? t('admin.aiModelSaved') : t('common.failed'); })
-            .catch(function () { adIdle(gwSave); gwMsg.textContent = t('modal.networkError'); });
+          var val = gwSel.value, prev = savedModel;
+          optimistic({
+            key: 'gw-model',
+            apply: function () { savedModel = val; gwSel.value = val; },
+            rollback: function () { savedModel = prev; gwSel.value = prev; },
+            request: function () {
+              return val
+                ? adReq(wsUrl('/llm/model'), { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: val }) })
+                : adReq(wsUrl('/llm/model'), { method: 'DELETE', credentials: 'same-origin' });
+            },
+            success: t('admin.aiModelSaved'),
+            error: adErr(t('admin.saveFailed')),
+            done: function () { delete adDataCache['ai']; },
+          });
         });
       }
       var bsave = document.getElementById('wsxByoSave');
@@ -780,8 +884,7 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
       var bdel = document.getElementById('wsxByoDel');
       if (bdel) bdel.addEventListener('click', function () {
         if (!window.confirm(t('admin.aiRemoveKeyConfirm'))) return;
-        adBusy(bdel);
-        fetch(wsUrl('/llm'), { method: 'DELETE', credentials: 'same-origin' }).then(function (r) { if (r.ok) adReload(); else adIdle(bdel); });
+        adRemoveRow('byo-key', bdel.closest('.wsx-admin__row'), wsUrl('/llm'), t('admin.keyRemoved'), t('admin.actionFailed'), 'ai', { keepRow: true, after: function () { if (adminTab === 'ai') loadAdmin(); } });
       });
     }, run);
   }
@@ -832,70 +935,6 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
         + adTableSection('admin.autoScheduledJobs', 'admin.autoScheduledIntro', ['admin.colName', 'admin.colSchedule', 'admin.colLastRun', 'admin.lblStatus'], jobRows, 'admin.noScheduledJobs')
         + adTableSection('admin.autoCrewAutomations', 'admin.autoCrewIntro', ['admin.colCrew', 'admin.colTrigger', 'admin.colModel', 'admin.colLastRun', 'admin.lblStatus'], crewRows, 'admin.noAutomations');
     }, run);
-  }
-  function supPriorityBadge(p) { var c = { urgent: 'var(--color-error)', high: 'var(--color-warning)', normal: 'var(--color-primary)', low: 'var(--color-text-tertiary)' }[p] || 'var(--color-text-tertiary)'; return p ? '<span class="wsx-atbl__badge" style="background:color-mix(in srgb,' + c + ' 10%,transparent);color:' + c + '">' + esc(p) + '</span>' : ''; }
-  function adSupportDetail(id) {
-    var m = document.getElementById('wsxAdminMount'); if (!m) return;
-    adLoading(m);
-    fetch('/v1/support/tickets/' + encodeURIComponent(id), { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) {
-        if (!j || !j.ticket) { m.innerHTML = i18nEmpty('admin.couldNotTicket'); return; }
-        var ticket = j.ticket;
-        var thread = (j.thread || []).map(function (x) {
-          var who = x.author === 'customer' ? t('admin.supportAuthorCustomer') : x.author === 'ai' ? t('admin.supportAuthorAi') : t('admin.supportAuthorStaff');
-          return '<div class="wsx-admin__audit-row"><span class="wsx-admin__audit-actor">' + esc(who) + '</span>'
-            + '<span class="wsx-admin__audit-action">' + esc(x.body) + '</span>'
-            + '<span class="wsx-admin__audit-ts">' + adRelDate(x.created_at) + '</span></div>';
-        }).join('');
-        m.innerHTML = '<button class="wsx-abtn" id="supBack" type="button">' + esc(t('admin.allTickets')) + '</button>'
-          + '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(ticket.subject) + ' ' + supPriorityBadge(ticket.priority) + '</div>'
-          + '<p class="wsx-lens__intro">' + esc(ticket.channel) + ' \\u00B7 ' + esc(ticket.status) + (ticket.category ? ' \\u00B7 ' + esc(ticket.category) : '') + ' \\u00B7 ' + esc(ticket.requester_email || t('admin.unknown')) + '</p>'
-          + '<div class="wsx-admin__auditfeed">' + thread + '</div></div>'
-          + '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.supportReply')) + '</div>'
-          + '<p class="wsx-lens__intro">' + esc(t('admin.supportReplyIntro')) + '</p>'
-          + '<textarea class="wsx-admin__email" id="supDraft" style="width:100%;min-height:120px">' + esc(ticket.ai_draft || '') + '</textarea>'
-          + '<div class="wsx-admin__domain-add"><button class="wsx-abtn" id="supSend" type="button">' + esc(t('admin.supportApproveSend')) + '</button>'
-          + '<button class="wsx-abtn" id="supResolve" type="button">' + esc(t('admin.supportResolve')) + '</button>'
-          + '<span class="wsx-admin__savemsg" id="supMsg"></span></div></div>';
-        var msg = function (s) { var e = document.getElementById('supMsg'); if (e) e.textContent = s; };
-        document.getElementById('supBack').onclick = function () { adSupport(); };
-        document.getElementById('supSend').onclick = function () {
-          var btn = this;
-          var body = (document.getElementById('supDraft') || {}).value || '';
-          if (!body.trim()) { msg(t('admin.supportWriteReply')); return; }
-          adBusy(btn); msg(t('admin.sending'));
-          fetch('/v1/support/tickets/' + encodeURIComponent(id) + '/reply', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body: body }) })
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (res) { if (res && res.success) { adSupportDetail(id); } else { adIdle(btn); msg(t('admin.supportSendFailed')); } });
-        };
-        document.getElementById('supResolve').onclick = function () {
-          adBusy(this);
-          fetch('/v1/support/tickets/' + encodeURIComponent(id) + '/status', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'resolved' }) })
-            .then(function (r) { if (r.ok) adSupport(); });
-        };
-      }).catch(function () { m.innerHTML = i18nEmpty('common.couldNotLoad'); });
-  }
-  function adSupport() {
-    var m = document.getElementById('wsxAdminMount'); if (needWs(m)) return;
-    adLoading(m);
-    fetch('/v1/support/tickets?scope=workspace&workspace=' + encodeURIComponent(window.WSX_WS), { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) {
-        var tickets = (j && j.tickets) || [];
-        var rows = tickets.map(function (tk) {
-          return '<tr class="wsx-atbl__row is-click" data-sup-id="' + esc(tk.id) + '">'
-            + '<td>' + esc(tk.subject) + '</td>'
-            + '<td>' + supPriorityBadge(tk.priority) + '</td>'
-            + '<td class="wsx-atbl__date">' + esc(tk.status) + '</td>'
-            + '<td>' + esc(tk.channel) + '</td>'
-            + '<td class="wsx-atbl__date">' + adRelDate(tk.last_msg_at) + '</td></tr>';
-        }).join('');
-        m.innerHTML = adTableSection('admin.supportTickets', 'admin.supportIntro', ['admin.colSubject', 'admin.colPriority', 'admin.lblStatus', 'admin.colChannel', 'admin.colUpdated'], rows, 'admin.noTickets');
-        m.querySelectorAll('[data-sup-id]').forEach(function (row) {
-          row.addEventListener('click', function () { adSupportDetail(row.getAttribute('data-sup-id')); });
-        });
-      }).catch(function () { m.innerHTML = i18nEmpty('common.couldNotLoad'); });
   }
   function loadAdmin() { if (adminTab === 'intelligence') { location.hash = '#l/knowledge'; return; } var fn = { overview: adOverview, artifacts: adArtifacts, members: adMembers, clients: adClients, automation: adAutomation, ai: adAI, security: adSecurity, support: adSupport, settings: adSettings }[adminTab]; if (fn) fn(); }
   ws.querySelectorAll('[data-admin-tab]').forEach(function (b) {

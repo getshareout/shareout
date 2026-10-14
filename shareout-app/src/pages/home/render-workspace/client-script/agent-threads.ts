@@ -53,8 +53,10 @@ export const workspace_client_agent_threads_JS = `  // ----- thread history draw
       .catch(function () { if (silent) showEmpty(); });
     if (threadsPanel) threadsPanel.hidden = true;
   }
+  // Chats deleted optimistically whose DELETE hasn't landed (undo window / in flight).
+  var pendingThreadDeletes = {};
   function threadPost(id, suffix, method, body) {
-    return fetch(API + '/threads/' + encodeURIComponent(id) + suffix, { method: method, credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
+    return fetch(API + '/threads/' + encodeURIComponent(id) + suffix, { method: method, credentials: 'same-origin', keepalive: method === 'DELETE', headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
       .then(function (r) { if (!r.ok) throw new Error('thread ' + method + ' ' + r.status); return r; });
   }
   // One row per saved chat: open button + always-visible ⋯ that reveals Rename / Delete.
@@ -84,18 +86,20 @@ export const workspace_client_agent_threads_JS = `  // ----- thread history draw
     function showRename() {
       panel.innerHTML = '';
       var inp = el('input', 'wsx-thread__input'); inp.type = 'text'; inp.value = th.title || ''; inp.setAttribute('aria-label', t('agent.renameChat'));
-      var msg = el('span', 'wsx-thread__msg');
       function save() {
-        var nv = inp.value.trim(); if (!nv) { closePanel(true); return; }
-        threadPost(th.id, '/rename', 'POST', { title: nv })
-          .then(function () { th.title = nv; ti.textContent = nv; closePanel(true); })
-          .catch(function () { msg.textContent = t('agent.renameFail'); });
+        var nv = inp.value.trim(), prev = th.title; if (!nv || nv === prev) { closePanel(true); return; }
+        optimistic({
+          key: 'thread:rename:' + th.id,
+          apply: function () { th.title = nv; ti.textContent = nv; closePanel(true); },
+          rollback: function () { th.title = prev; ti.textContent = prev || t('agent.newChat'); },
+          request: function () { return threadPost(th.id, '/rename', 'POST', { title: nv }); },
+          error: t('agent.renameFail'),
+        });
       }
       inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); save(); } });
       panel.appendChild(inp);
       panel.appendChild(btn('wsx-thread__opt is-primary', t('common.save'), save));
       panel.appendChild(btn('wsx-thread__opt', t('agent.cancel'), function () { closePanel(true); }));
-      panel.appendChild(msg);
       inp.focus(); inp.select();
     }
     function showDelete() {
@@ -103,9 +107,21 @@ export const workspace_client_agent_threads_JS = `  // ----- thread history draw
       var q = el('span', 'wsx-thread__msg'); q.textContent = t('agent.deleteChat');
       panel.appendChild(q);
       var yes = btn('wsx-thread__opt is-danger', t('common.delete'), function () {
-        threadPost(th.id, '', 'DELETE')
-          .then(function () { row.remove(); if (th.id === currentThreadId) newChat(); if (threadsList && !threadsList.children.length) threadsList.innerHTML = i18nEmpty('agent.noSavedChats'); })
-          .catch(function () { q.textContent = t('agent.deleteFail'); });
+        var wasOpen = th.id === currentThreadId, gone = null;
+        closePanel(false);
+        optimistic({
+          key: 'thread:del:' + th.id,
+          undo: true,
+          apply: function () { pendingThreadDeletes[th.id] = true; gone = window.soOptimistic.leave(row); if (wasOpen) newChat(); },
+          rollback: function () { delete pendingThreadDeletes[th.id]; if (gone) gone.restore(); if (wasOpen) openThread(th.id, true); },
+          request: function () { return threadPost(th.id, '', 'DELETE'); },
+          success: t('agent.chatDeleted'),
+          error: t('agent.deleteFail'),
+          done: function () {
+            delete pendingThreadDeletes[th.id]; if (gone) gone.commit();
+            if (threadsList && !threadsList.querySelector('.wsx-thread')) threadsList.innerHTML = i18nEmpty('agent.noSavedChats');
+          },
+        });
       });
       panel.appendChild(yes);
       panel.appendChild(btn('wsx-thread__opt', t('agent.cancel'), function () { closePanel(true); }));
@@ -120,7 +136,7 @@ export const workspace_client_agent_threads_JS = `  // ----- thread history draw
     fetch(API + '/threads', { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : { threads: [] }; })
       .then(function (j) {
-        var ts = (j && j.threads) || [];
+        var ts = ((j && j.threads) || []).filter(function (th) { return !pendingThreadDeletes[th.id]; });
         if (!ts.length) { threadsList.innerHTML = i18nEmpty('agent.noSavedChats'); return; }
         threadsList.innerHTML = '';
         ts.forEach(function (th) { threadsList.appendChild(threadRow(th)); });

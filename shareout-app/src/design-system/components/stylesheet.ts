@@ -14,6 +14,7 @@ import { modalClasses, modalScript } from './modal';
 import { cardClasses } from './card';
 import { badgeClasses } from './badge';
 import { toastClasses, toastScript } from './toast';
+import { optimisticClasses, optimisticScript } from './optimistic';
 import { themeClasses } from './themes';
 
 export function componentStylesheet(opts?: { withVars?: boolean }): string {
@@ -24,9 +25,10 @@ export function componentStylesheet(opts?: { withVars?: boolean }): string {
     cardClasses,
     badgeClasses,
     toastClasses,
+    optimisticClasses,
     themeClasses,
   ].join('\n');
   return opts?.withVars ? cssVariables + sheet : sheet;
 }
 
-export const componentScripts = [modalScript, toastScript].join('\n');
+export const componentScripts = [modalScript, toastScript, optimisticScript].join('\n');

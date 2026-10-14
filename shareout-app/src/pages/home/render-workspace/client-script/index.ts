@@ -11,6 +11,7 @@ import { workspace_client_edit_lite_JS } from './edit-lite';
 import { workspace_client_inspector_details_JS } from './inspector-details';
 import { workspace_client_inspector_activity_JS } from './inspector-activity';
 import { workspace_client_inspector_JS } from './inspector';
+import { workspace_client_inspector_automate_JS } from './inspector-automate';
 import { workspace_client_home_views_JS } from './home-views/index';
 import { workspace_client_routing_JS } from './routing';
 import { workspace_client_artifact_links_JS } from './artifact-links';
@@ -41,6 +42,7 @@ export const WORKSPACE_CLIENT = [
   workspace_client_inspector_details_JS,
   workspace_client_inspector_activity_JS,
   workspace_client_inspector_JS,
+  workspace_client_inspector_automate_JS,
   workspace_client_home_views_JS,
   workspace_client_routing_JS,
   workspace_client_artifact_links_JS,

@@ -109,11 +109,18 @@ export const workspace_client_home_views_invite_JS = `  // ===== Invite people =
         cb.addEventListener('change', function () {
           var d = cb.getAttribute('data-inv-dom');
           if (cb.checked && !window.confirm(t('invite.domainConfirm').replace(/\\{domain\\}/g, d))) { cb.checked = false; return; }
-          var next = cb.checked ? domains.concat([d]) : domains.filter(function (x) { return x !== d; });
-          cb.disabled = true;
-          fetch(wsUrl('/access-policy'), { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ allowed_domains: next }) })
-            .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return r.ok ? j : null; }); })
-            .then(function (j) { if (!j) { cb.disabled = false; cb.checked = !cb.checked; return; } delete adDataCache['security']; invTeamAccess(mount, members); });
+          var on = cb.checked;
+          var next = on ? domains.concat([d]) : domains.filter(function (x) { return x !== d; });
+          // The box already shows the new state; a refused PUT unticks/reticks it.
+          optimistic({
+            key: 'inv-dom:' + d,
+            apply: function () { domains = next; cb.checked = on; },
+            rollback: function () { domains = on ? domains.filter(function (x) { return x !== d; }) : (domains.indexOf(d) < 0 ? domains.concat([d]) : domains); cb.checked = !on; },
+            request: function () { return adReq(wsUrl('/access-policy'), { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ allowed_domains: next }) }); },
+            success: t('common.saved'),
+            error: adErr(t('admin.saveFailed')),
+            done: function () { delete adDataCache['security']; invTeamAccess(mount, members); },
+          });
         });
       });
       var tl = mount.querySelector('#invTeamLink');

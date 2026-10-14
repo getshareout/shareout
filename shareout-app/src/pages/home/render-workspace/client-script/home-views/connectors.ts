@@ -28,8 +28,10 @@ export const workspace_client_home_views_connectors_JS = `  // ----- Connectors 
   }
   // Adding/removing workspace connections is an owner/admin action (server: canManage);
   // members see what is connected and who to ask.
+  // Connections removed optimistically whose DELETE hasn't landed — a reload keeps them out.
+  var pendingConnDeletes = {};
   function connCard(p, canManage) {
-    var conns = p.connections || [];
+    var conns = (p.connections || []).filter(function (c) { return !pendingConnDeletes[c.id]; });
     var ico = '<span class="wsx-conn__ic" style="color:' + esc(p.color || 'var(--color-primary)') + '">' + isvg(p.iconSvg || SCHED_ICON.db) + '</span>';
     var insts = conns.map(function (c) {
       return '<div class="wsx-conn__inst" data-conn="' + esc(c.id) + '"><span class="wsx-conn__instname">' + esc(c.name) + '</span>'
@@ -48,14 +50,30 @@ export const workspace_client_home_views_connectors_JS = `  // ----- Connectors 
     root.querySelectorAll('[data-conn-add]').forEach(function (b) { b.addEventListener('click', function () { openConnectModal(b.getAttribute('data-conn-add')); }); });
     root.querySelectorAll('[data-conn-ai]').forEach(function (cb) {
       cb.addEventListener('change', function () {
-        fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/connections/' + encodeURIComponent(cb.getAttribute('data-conn-ai')), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_query_enabled: cb.checked }) }).then(function (r) { if (!r.ok) throw new Error('failed'); }).catch(function () { cb.checked = !cb.checked; showToast(t('connectors.updateAiError'), 'error'); });
+        var id = cb.getAttribute('data-conn-ai'), on = cb.checked;
+        optimistic({
+          key: 'conn:ai:' + id,
+          apply: function () { cb.checked = on; },
+          rollback: function () { cb.checked = !on; },
+          request: function () { return fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/connections/' + encodeURIComponent(id), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_query_enabled: on }) }); },
+          error: t('connectors.updateAiError'),
+        });
       });
     });
     root.querySelectorAll('[data-conn-del]').forEach(function (b) {
       b.addEventListener('click', function () {
         if (!window.confirm(t('connectors.removeConfirm'))) return;
-        var id = b.getAttribute('data-conn-del');
-        fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/connections/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error('failed'); var el = root.querySelector('[data-conn="' + id + '"]'); if (el) el.remove(); }).catch(function () { showToast(t('connectors.removeError'), 'error'); });
+        var id = b.getAttribute('data-conn-del'), gone = null;
+        optimistic({
+          key: 'conn:del:' + id,
+          undo: true,
+          apply: function () { pendingConnDeletes[id] = true; gone = window.soOptimistic.leave(root.querySelector('[data-conn="' + CSS.escape(id) + '"]')); },
+          rollback: function () { delete pendingConnDeletes[id]; if (gone) gone.restore(); },
+          request: function () { return fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/connections/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin', keepalive: true }); },
+          success: t('connectors.removed'),
+          error: t('connectors.removeError'),
+          done: function () { delete pendingConnDeletes[id]; if (gone) gone.commit(); },
+        });
       });
     });
   }

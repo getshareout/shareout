@@ -83,16 +83,27 @@ export const workspace_client_inspector_activity_JS = `
             var opts = AUD.map(function (a) { return '<option value="' + a[0] + '"' + (a[0] === k.audience ? ' selected' : '') + '>' + a[1] + '</option>'; }).join('');
             return '<div class="wsx__evrow"><span class="wsx__evtier">' + esc(tOr('evt.tier.' + k.tier, k.tier)) + '</span>'
               + '<span><b>' + esc(tOr('evt.' + k.kind, k.label)) + '</b><small>' + esc(tOr('evt.' + k.kind + '.hint', k.hint)) + '</small></span>'
-              + '<select data-kind="' + esc(k.kind) + '"' + (d.canManage ? '' : ' disabled') + '>' + opts + '</select></div>';
+              + '<select data-kind="' + esc(k.kind) + '" data-prev="' + esc(k.audience) + '"' + (d.canManage ? '' : ' disabled') + '>' + opts + '</select></div>';
           }).join('');
           var em = panel.querySelector('.wsx-empty'); if (em) em.outerHTML = rows;
           if (!d.canManage) return;
           panel.addEventListener('change', function (ev) {
             var sel = ev.target.closest('select[data-kind]'); if (!sel) return;
-            fetch('/v1/home/event-visibility?workspace=' + encodeURIComponent(window.WSX_WS), {
-              method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ kind: sel.getAttribute('data-kind'), audience: sel.value }),
-            }).then(function () { loadFeed(); }).catch(function () {});
+            var kind = sel.getAttribute('data-kind'), next = sel.value, prev = sel.getAttribute('data-prev') || '';
+            // The select already shows the new audience; roll it back if the PUT fails.
+            optimistic({
+              apply: function () { sel.setAttribute('data-prev', next); },
+              rollback: function () { sel.value = prev; sel.setAttribute('data-prev', prev); },
+              request: function () {
+                return fetch('/v1/home/event-visibility?workspace=' + encodeURIComponent(window.WSX_WS), {
+                  method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ kind: kind, audience: next }),
+                });
+              },
+              success: t('common.saved'),
+              error: t('inspector.audienceFailed'),
+              done: function () { loadFeed(); },
+            });
           });
         })
         .catch(function () { panel.innerHTML = i18nEmpty('inspector.couldNotSettings'); });

@@ -48,10 +48,10 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     }
   }
 
-  function patchArtifact(id, body, cb) {
-    fetch('/v1/artifacts/' + encodeURIComponent(id), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      .then(function (r) { return r.ok ? r.json().catch(function () { return {}; }) : null; })
-      .then(function (j) { if (cb) cb(j); }).catch(function () { if (cb) cb(null); });
+  // PATCH /v1/artifacts/:id → parsed JSON; rejects on a non-ok response (for optimistic()).
+  function patchArtifact(id, body) {
+    return fetch('/v1/artifacts/' + encodeURIComponent(id), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json().catch(function () { return {}; }); });
   }
   function setTabLabel(key, label) {
     for (var i = 0; i < tabs.length; i++) if (tabs[i].key === key) { tabs[i].label = label; }
@@ -168,12 +168,13 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     var nameEl = root.querySelector('[data-edit="name"]');
     if (nameEl && editable) {
       nameEl.addEventListener('blur', function () {
-        var v = nameEl.textContent.trim(); if (!v || v === name) return; var prevName = name; name = v;
-        art.name = v; if (metaCache[art.id]) metaCache[art.id].name = v; if (panes[art.key]) panes[art.key].art.name = v; setTabLabel(art.key, v);
-        patchArtifact(art.id, { name: v }, function (j) {
-          if (j) return; // roll back an unsaved rename instead of showing false success
-          name = prevName; art.name = prevName; if (metaCache[art.id]) metaCache[art.id].name = prevName; if (panes[art.key]) panes[art.key].art.name = prevName; setTabLabel(art.key, prevName); nameEl.textContent = prevName;
-          try { wsxToast(t('inspector.saveNameFailed'), true); } catch (e) {}
+        var v = nameEl.textContent.trim(); if (!v || v === name) return; var prevName = name;
+        var setName = function (n) { name = n; art.name = n; if (metaCache[art.id]) metaCache[art.id].name = n; if (panes[art.key]) panes[art.key].art.name = n; setTabLabel(art.key, n); if (nameEl.textContent.trim() !== n) nameEl.textContent = n; };
+        optimistic({
+          apply: function () { setName(v); },
+          rollback: function () { setName(prevName); },
+          request: function () { return patchArtifact(art.id, { name: v }); },
+          error: t('inspector.saveNameFailed'),
         });
       });
       enterSaves(nameEl);
@@ -181,11 +182,13 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     var descEl = root.querySelector('[data-edit="description"]');
     if (descEl && editable) {
       descEl.addEventListener('blur', function () {
-        var v = descEl.textContent.trim(); if (v === desc) return; var prevDesc = desc; desc = v; if (metaCache[art.id]) metaCache[art.id].description = v;
-        patchArtifact(art.id, { description: v }, function (j) {
-          if (j) return;
-          desc = prevDesc; if (metaCache[art.id]) metaCache[art.id].description = prevDesc; descEl.textContent = prevDesc;
-          try { wsxToast(t('inspector.saveDescFailed'), true); } catch (e) {}
+        var v = descEl.textContent.trim(); if (v === desc) return; var prevDesc = desc;
+        var setDesc = function (d) { desc = d; if (metaCache[art.id]) metaCache[art.id].description = d; if (descEl.textContent.trim() !== d) descEl.textContent = d; };
+        optimistic({
+          apply: function () { setDesc(v); },
+          rollback: function () { setDesc(prevDesc); },
+          request: function () { return patchArtifact(art.id, { description: v }); },
+          error: t('inspector.saveDescFailed'),
         });
       });
       enterSaves(descEl);
@@ -220,12 +223,17 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
           var next = b.getAttribute('data-vis'), prev = visCur;
           seg.querySelectorAll('[data-vis]').forEach(function (x) { if (x.classList.contains('is-sel')) prev = x.getAttribute('data-vis'); });
           if (next === prev) return;
-          applyVis(next); // optimistic
-          patchArtifact(art.id, { visibility: next }, function (j) {
-            if (!j) { applyVis(prev); try { wsxToast(t('cards.visFailed'), true); } catch (e) {} return; } // failed — roll back
-            var applied = j.visibility || next;
-            if (j.message) { try { wsxToast(j.message, true); } catch (e) {} }
-            if (applied !== next) applyVis(applied); // server overrode (moderation)
+          optimistic({
+            key: 'vis:' + art.id,
+            apply: function () { applyVis(next); },
+            rollback: function () { applyVis(prev); },
+            request: function () { return patchArtifact(art.id, { visibility: next }); },
+            error: t('cards.visFailed'),
+            done: function (j) {
+              var applied = (j && j.visibility) || next;
+              if (j && j.message) wsxToast(j.message, true);
+              if (applied !== next) applyVis(applied); // server overrode (moderation)
+            },
           });
         });
       });
@@ -297,11 +305,19 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       });
       delBody.querySelectorAll('[data-freq]').forEach(function (b) {
         b.addEventListener('click', function () {
-          var f = b.getAttribute('data-freq');
-          fetch('/v1/jobs', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ artifact_id: art.id, action: dest.toLowerCase(), config: deliverConfig(), schedule: CRON[f] }) })
-            .then(function (r) { return r.json().catch(function () { return null; }); })
-            .then(function (j) { if (freqRow) freqRow.hidden = true; if (j && (j.id || j.job || j.success)) wsxToast(t('inspector.scheduled').replace('{freq}', t('inspector.freq' + f)).replace('{dest}', dest)); else wsxToast((j && j.error) || t('inspector.deliverFailed'), true); })
-            .catch(function () { wsxToast(t('inspector.deliverFailed'), true); });
+          var f = b.getAttribute('data-freq'), d = dest, cfg = deliverConfig();
+          optimistic({
+            key: 'sched:' + art.id,
+            apply: function () { if (freqRow) freqRow.hidden = true; },
+            rollback: function () { if (freqRow) freqRow.hidden = false; },
+            request: function () {
+              return fetch('/v1/jobs', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ artifact_id: art.id, action: d.toLowerCase(), config: cfg, schedule: CRON[f] }) })
+                .then(function (r) { return r.json().catch(function () { return null; }); })
+                .then(function (j) { if (j && (j.id || j.job || j.success)) return j; var e = new Error('schedule'); e.userMessage = j && j.error; throw e; });
+            },
+            success: t('inspector.scheduled').replace('{freq}', t('inspector.freq' + f)).replace('{dest}', d),
+            error: function (e) { return (e && e.userMessage) || t('inspector.deliverFailed'); },
+          });
         });
       });
     }
@@ -346,17 +362,22 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     }
     function addEmails(emails) {
       if (!emails.length) return;
-      var last = emails[emails.length - 1];
-      fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/collaborators', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emails: emails, role: role }) })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (d) {
-          if (!d) { wsxToast(t('inspector.inviteFailed'), true); return; }
-          if (d.collaborators) list = d.collaborators;
-          else emails.forEach(function (em) { if (!list.some(function (c) { return c.email === em; })) list.push({ email: em, role: role }); });
-          metaCache[art.id] = undefined; paint();
-          wsxToast(t('inspector.inviteSent').replace('{email}', last));
-        })
-        .catch(function () { wsxToast(t('inspector.inviteFailed'), true); });
+      var last = emails[emails.length - 1], r0 = role, added = [];
+      optimistic({
+        key: 'collab:add:' + art.id + ':' + emails.join(','),
+        apply: function () {
+          emails.forEach(function (em) { if (!list.some(function (c) { return c.email === em; })) { list.push({ email: em, role: r0 }); added.push(em); } });
+          paint();
+        },
+        rollback: function () { list = list.filter(function (c) { return added.indexOf(c.email) < 0; }); added = []; paint(); },
+        request: function () {
+          return fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/collaborators', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emails: emails, role: r0 }) })
+            .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+        },
+        success: t('inspector.inviteSent').replace('{email}', last),
+        error: t('inspector.inviteFailed'),
+        done: function (d) { if (d && d.collaborators) { list = d.collaborators; paint(); } metaCache[art.id] = undefined; },
+      });
     }
     function paint() {
       var count = list.length;
@@ -381,10 +402,15 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       box.innerHTML = head + emptyState + input + chipWrap;
       box.querySelectorAll('[data-rm]').forEach(function (b) {
         b.addEventListener('click', function () {
-          var em = b.getAttribute('data-rm');
-          fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/collaborators/' + encodeURIComponent(em), { method: 'DELETE', credentials: 'same-origin' })
-            .then(function (r) { if (!r.ok) throw new Error('failed'); list = list.filter(function (c) { return c.email !== em; }); metaCache[art.id] = undefined; paint(); })
-            .catch(function () { try { wsxToast(t('inspector.removeCollabFailed'), true); } catch (e) {} });
+          var em = b.getAttribute('data-rm'), idx = -1, removed = null;
+          optimistic({
+            key: 'collab:rm:' + art.id + ':' + em,
+            apply: function () { list.forEach(function (c, i) { if (c.email === em) { idx = i; removed = c; } }); list = list.filter(function (c) { return c.email !== em; }); paint(); },
+            rollback: function () { if (removed && !list.some(function (c) { return c.email === em; })) list.splice(idx < 0 ? list.length : idx, 0, removed); paint(); },
+            request: function () { return fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/collaborators/' + encodeURIComponent(em), { method: 'DELETE', credentials: 'same-origin' }); },
+            error: t('inspector.removeCollabFailed'),
+            done: function () { metaCache[art.id] = undefined; },
+          });
         });
       });
       box.querySelectorAll('[data-role]').forEach(function (b) {
@@ -443,10 +469,13 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       box.querySelectorAll('[data-rmtag]').forEach(function (b) {
         b.addEventListener('click', function () {
           var tag = b.getAttribute('data-rmtag'), idx = tags.indexOf(tag);
-          tags = tags.filter(function (x) { return x !== tag; }); sync(); paint(); // optimistic
-          fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/tags/' + encodeURIComponent(tag), { method: 'DELETE', credentials: 'same-origin' })
-            .then(function (r) { if (!r.ok) throw 0; })
-            .catch(function () { if (tags.indexOf(tag) < 0) tags.splice(idx < 0 ? tags.length : idx, 0, tag); sync(); paint(); try { wsxToast(t('inspector.removeTagFailed'), true); } catch (e) {} }); // roll back
+          optimistic({
+            key: 'tag:' + art.id + ':' + tag,
+            apply: function () { tags = tags.filter(function (x) { return x !== tag; }); sync(); paint(); },
+            rollback: function () { if (tags.indexOf(tag) < 0) tags.splice(idx < 0 ? tags.length : idx, 0, tag); sync(); paint(); },
+            request: function () { return fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/tags/' + encodeURIComponent(tag), { method: 'DELETE', credentials: 'same-origin' }); },
+            error: t('inspector.removeTagFailed'),
+          });
         });
       });
       var add = box.querySelector('#wsxTagAdd');
@@ -455,10 +484,14 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
         add.replaceWith(inp); inp.focus();
         function commit() {
           var tag = inp.value.trim().replace(/^#/, ''); if (!tag) { paint(); return; }
-          var added = tags.indexOf(tag) < 0; if (added) tags.push(tag); sync(); paint(); // optimistic
-          fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/tags', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: tag }) })
-            .then(function (r) { if (!r.ok) throw 0; })
-            .catch(function () { if (added) tags = tags.filter(function (x) { return x !== tag; }); sync(); paint(); try { wsxToast(t('inspector.addTagFailed'), true); } catch (e) {} }); // roll back
+          var added = false;
+          optimistic({
+            key: 'tag:' + art.id + ':' + tag,
+            apply: function () { added = tags.indexOf(tag) < 0; if (added) tags.push(tag); sync(); paint(); },
+            rollback: function () { if (added) tags = tags.filter(function (x) { return x !== tag; }); sync(); paint(); },
+            request: function () { return fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/tags', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: tag }) }); },
+            error: t('inspector.addTagFailed'),
+          });
         }
         inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
         inp.addEventListener('blur', commit);
@@ -493,12 +526,16 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     var open = false;
     function move(fid, folders) {
       var prev = meta.folder_id || '';
-      meta.folder_id = fid; if (metaCache[art.id]) metaCache[art.id].folder_id = fid; // optimistic
-      paint(folders);
+      var setF = function (f) { meta.folder_id = f; if (metaCache[art.id]) metaCache[art.id].folder_id = f; paint(folders); };
       var url = wsId ? '/v1/workspaces/' + encodeURIComponent(wsId) + '/artifacts/' + encodeURIComponent(art.id) + '/move' : '/v1/artifacts/' + encodeURIComponent(art.id) + '/folder';
-      fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folder_id: fid || null }) })
-        .then(function (r) { if (!r.ok) throw 0; })
-        .catch(function () { meta.folder_id = prev; if (metaCache[art.id]) metaCache[art.id].folder_id = prev; paint(folders); try { wsxToast(t('inspector.movePageFailed'), true); } catch (e) {} }); // roll back
+      optimistic({
+        key: 'move:' + art.id,
+        apply: function () { setF(fid); },
+        rollback: function () { setF(prev); },
+        request: function () { return fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folder_id: fid || null }) }); },
+        error: t('inspector.movePageFailed'),
+        done: function () { if (typeof artCache !== 'undefined') artCache = {}; },
+      });
     }
     function paint(folders) {
       var cur = meta.folder_id || '';
@@ -524,38 +561,6 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) { folderCache = (d && (d.folders || d.items || d)) || []; if (!Array.isArray(folderCache)) folderCache = []; paint(folderCache); })
       .catch(function () { box.innerHTML = i18nEmpty('inspector.couldNotFolders'); });
-  }
-
-  // ----- Tests (artifact_tests via /v1/artifacts/:id/tests) -----
-  function renderTests(art) {
-    var box = rbodyEl.querySelector('#wsxTests'); if (!box) return;
-    box.innerHTML = i18nLoad();
-    fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/tests', { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { paintTests(art, box, d); })
-      .catch(function () { box.innerHTML = i18nEmpty('inspector.couldNotTests'); });
-  }
-  function paintTests(art, box, d) {
-    var cfg = d && d.config, latest = d && d.latest;
-    if (!cfg || !cfg.enabled) {
-      box.innerHTML = '<div class="wsx-tests__off">' + esc(t('inspector.testsOff')) + ' <button class="wsx-link" data-tst="open" type="button">' + esc(t('inspector.openEditor')) + '</button></div>';
-      box.querySelector('[data-tst="open"]').addEventListener('click', function () { window.open('/a/' + encodeURIComponent(art.slug) + '/edit', '_blank', 'noopener'); });
-      return;
-    }
-    var st = latest && latest.status;
-    var badge = st === 'passed' ? '<span class="wsx-row__badge ok">passed</span>'
-      : st === 'failed' || st === 'errored' ? '<span class="wsx-row__badge fail">' + esc(st) + '</span>'
-      : st === 'running' ? '<span class="wsx-row__badge">running</span>' : '<span class="wsx-row__badge">no runs</span>';
-    var counts = latest ? '<div class="wsx-row__sub">' + (latest.passed_count || 0) + ' passed \\u00B7 ' + (latest.failed_count || 0) + ' failed' + (latest.errored_count ? ' \\u00B7 ' + latest.errored_count + ' errored' : '') + '</div>' : '';
-    box.innerHTML = '<div class="wsx-row"><div class="wsx-row__main"><div class="wsx-row__title">' + esc((cfg.mode || 'monitor')) + ' mode</div>' + counts + '</div>' + badge + '</div>'
-      + '<button class="wsx-abtn wsx-abtn--block wsx-tests__run" data-tst="run" type="button">' + esc(t('inspector.runTestsNow')) + '</button>';
-    box.querySelector('[data-tst="run"]').addEventListener('click', function (e) {
-      var b = e.currentTarget; b.disabled = true; b.textContent = t('inspector.running');
-      fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/tests/run', { method: 'POST', credentials: 'same-origin' })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (j) { if (j && j.run) paintTests(art, box, { config: cfg, latest: j.run }); else { b.disabled = false; b.textContent = t('inspector.runTestsNow'); try { wsxToast(t('inspector.testRunFailed'), true); } catch (e) {} } })
-        .catch(function () { b.disabled = false; b.textContent = t('inspector.runTestsNow'); try { wsxToast(t('inspector.testRunFailed'), true); } catch (e) {} });
-    });
   }
 
   // ----- Comments (full thread + composer; cached) -----
@@ -789,53 +794,6 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       .catch(function () { btn.disabled = false; ccError(ta, t('inspector.couldNotPost')); });
   }
 
-  // ----- Automate (per-artifact schedules + alerts) -----
-  function autoJobRow(j) {
-    var st = j.last_status || ''; var cls = st === 'success' ? ' ok' : st === 'failed' ? ' fail' : '';
-    return '<div class="wsx-row"><div class="wsx-row__main"><div class="wsx-row__title">' + esc(j.title || j.action || t('admin.jobDefault')) + '</div><div class="wsx-row__sub">' + esc(cronHuman(j.schedule)) + (j.action ? ' \\u00B7 ' + esc(j.action) : '') + '</div></div>' + (st ? '<span class="wsx-row__badge' + cls + '">' + esc(st) + '</span>' : '') + '</div>';
-  }
-  function autoAlertRow(a) {
-    return '<div class="wsx-row"><div class="wsx-row__main"><div class="wsx-row__title">' + esc(a.name || a.metric_id || t('inspector.alertDefault')) + '</div><div class="wsx-row__sub">' + esc(a.schedule ? cronHuman(a.schedule) : '') + '</div></div>' + (a.enabled ? '<span class="wsx-row__badge ok">' + esc(t('admin.on')) + '</span>' : '<span class="wsx-row__badge">' + esc(t('admin.off')) + '</span>') + '</div>';
-  }
-  function renderAutomate(art) {
-    if (autoCache[art.id] !== undefined) { paintAutomate(art, autoCache[art.id]); return; }
-    rbodyEl.innerHTML = '<div class="wsx-cm">' + i18nLoad() + '</div>';
-    Promise.all([
-      fetch('/v1/jobs' + (window.WSX_WS ? '?workspace_id=' + encodeURIComponent(window.WSX_WS) : ''),{ credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      fetch('/v1/metric-alerts' + (window.WSX_WS ? '?workspace_id=' + encodeURIComponent(window.WSX_WS) : ''), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
-    ]).then(function (res) {
-      var jobs = ((res[0] && (res[0].jobs || res[0].items)) || []).filter(function (j) { return !art.id || j.artifact_id === art.id; });
-      var alerts = ((res[1] && res[1].alerts) || []).filter(function (a) { return !art.id || a.artifact_id === art.id; });
-      autoCache[art.id] = { jobs: jobs, alerts: alerts };
-      paintAutomate(art, autoCache[art.id]);
-    });
-  }
-  function autoTile(act, icon, title, sub) {
-    return '<button class="wsx-qa" data-aauto="' + act + '" type="button"><span class="wsx-qa__ic">' + isvg(icon) + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(title) + '</span><span class="wsx-qa__s">' + esc(sub) + '</span></span></button>';
-  }
-  function paintAutomate(art, data) {
-    var jobs = data.jobs || [], alerts = data.alerts || [];
-    var h = '<div class="wsx-auto">';
-    if (jobs.length) h += '<div class="wsx-det__label">' + esc(t('inspector.autoSchedules')) + '</div><div class="wsx-list">' + jobs.map(autoJobRow).join('') + '</div>';
-    if (alerts.length) h += '<div class="wsx-det__label"' + (jobs.length ? ' style="margin-top:10px"' : '') + '>' + esc(t('inspector.autoAlerts')) + '</div><div class="wsx-list">' + alerts.map(autoAlertRow).join('') + '</div>';
-    h += '<div class="wsx-det__label"' + (jobs.length || alerts.length ? ' style="margin-top:12px"' : '') + '>' + esc(t('inspector.autoQuick')) + '</div>'
-      + '<div class="wsx-qa-grid">'
-      + autoTile('schedule', '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', t('inspector.autoScheduleSend'), t('inspector.autoScheduleSub'))
-      + autoTile('alert', '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>', t('inspector.autoSetAlert'), t('inspector.autoSetAlertSub'))
-      + autoTile('crew', '<circle cx="9" cy="7" r="3"/><path d="M2 21v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"/><circle cx="18" cy="8" r="2.5"/>', t('inspector.autoStartCrew'), t('inspector.autoStartCrewSub'))
-      + '</div>'
-      + '<button class="wsx-auto__chat" data-aauto="chat" type="button">' + isvg('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>') + esc(t('inspector.autoCustom')) + '</button>'
-      + '</div>';
-    rbodyEl.innerHTML = h;
-    rbodyEl.querySelectorAll('[data-aauto]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var n = art.name || t('inspector.thisPage'); var k = b.getAttribute('data-aauto');
-        if (k === 'schedule' || k === 'alert') openAutoForm(k, { id: art.id, name: n }, function () { delete autoCache[art.id]; });
-        else if (k === 'crew') agentAsk(t('inspector.askCrew').replace('{name}', n));
-        else agentAsk(t('inspector.askCustom').replace('{name}', n));
-      });
-    });
-  }
   var HOUSE_SVG = isvg('<path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/>');
   // The first tab names the section you're in (Artifacts, Assets…), not always "Home".
   function homeTabLabel() {

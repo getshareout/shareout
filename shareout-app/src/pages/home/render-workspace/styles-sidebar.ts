@@ -165,11 +165,6 @@ export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspect
 .wsx-det__sched { justify-content: center; }
 .wsx-det__freq { display: flex; gap: 6px; margin-top: 7px; } .wsx-det__freq[hidden] { display: none; }
 .wsx-det__freqbtn { flex: 1; justify-content: center; } .wsx-det__delbody:empty { display: none; } .wsx-det__connect { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; } .wsx-det__connhint { margin-top: 8px; font: 400 var(--text-xs) var(--font-body); color: var(--color-text-tertiary); line-height: 1.45; } .wsx-det__connect .wsx-det__connhint { margin-top: 0; } a.wsx-det__send { text-decoration: none; }
-.wsx-toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 8px); z-index: 1000; display: inline-flex; align-items: center; gap: 8px; max-width: 90vw; padding: 10px 16px; border-radius: var(--radius-sm); background: var(--color-success-light); border: 1px solid var(--color-success); color: var(--color-text); font: 500 var(--text-sm) var(--font-body); box-shadow: var(--shadow-lg); opacity: 0; pointer-events: none; transition: opacity var(--duration-slow) var(--ease-out), transform var(--duration-slow) var(--ease-out); }
-.wsx-toast svg { color: var(--color-success); flex: none; }
-.wsx-toast.is-error { background: var(--color-error-light); border-color: var(--color-error); } .wsx-toast.is-error svg { color: var(--color-error); }
-.wsx-toast.is-show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; cursor: pointer; }
-@media (prefers-reduced-motion: reduce) { .wsx-toast { transition: opacity var(--duration-fast); } }
 /* comments: fixed-bottom composer + mention dropdown */
 .wsx-cm { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; gap: 0; }
 .wsx-cm__list { flex: 1; min-height: 0; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }

@@ -255,32 +255,48 @@ const pageScript = `
     });
   }
 
+  // Payment: the outcome comes from the processor, so this one waits (exception to optimistic).
+  function busy(btn, label) { var was = btn.textContent; btn.disabled = true; btn.textContent = label; return function () { btn.disabled = false; btn.textContent = was; }; }
   function buyTopup(amount, btn) {
-    btn.disabled = true;
+    var idle = busy(btn, 'Processing\u2026');
     fetch(base + '/llm/topup', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amountUsd: amount }) })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (res) {
-        btn.disabled = false;
+        idle();
         if (res.ok && res.j.status === 'approved') { flash('Added $' + amount + ' AI credit', true); loadConfig(); }
         else if (res.ok && res.j.status === 'pending') { flash('Payment processing — credit will appear shortly.', true); }
         else { flash(res.j.error || 'Top-up failed', false); }
       })
-      .catch(function () { btn.disabled = false; flash('Top-up failed', false); });
+      .catch(function () { idle(); flash('Top-up failed', false); });
   }
 
   if (isAdmin) {
-    document.getElementById('saveKey').addEventListener('click', function () {
+    // Saving a key waits: the server checks the key, so success isn't known up front.
+    var saveBtn = document.getElementById('saveKey');
+    saveBtn.addEventListener('click', function () {
       var provider = document.getElementById('provider').value;
       var apiKey = document.getElementById('apiKey').value.trim();
       if (!apiKey) { flash('Enter an API key', false); return; }
+      if (saveBtn.disabled) return;
+      var idle = busy(saveBtn, 'Saving\u2026');
       fetch(base + '/llm', { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: provider, apiKey: apiKey }) })
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-        .then(function (res) { if (res.ok) { document.getElementById('apiKey').value = ''; flash('Key saved', true); loadConfig(); } else { flash(res.j.error || 'Failed', false); } });
+        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (res) { idle(); if (res.ok) { document.getElementById('apiKey').value = ''; flash('Key saved', true); loadConfig(); } else { flash(res.j.error || 'Couldn\u2019t save the key.', false); } })
+        .catch(function () { idle(); flash('Couldn\u2019t save the key. Check your connection?', false); });
     });
+    // Removing is optimistic: status flips now, Undo holds the DELETE for a few seconds.
     document.getElementById('removeKey').addEventListener('click', function () {
-      fetch(base + '/llm', { method: 'DELETE', credentials: 'include' })
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-        .then(function (res) { if (res.ok) { flash('Key removed', true); loadConfig(); } else { flash(res.j.error || 'Failed', false); } });
+      var st = document.getElementById('byoStatus');
+      var was = { t: st.textContent, c: st.className };
+      window.soOptimistic({
+        key: 'byo-rm', undo: true,
+        apply: function () { st.className = 'byo-status platform'; st.textContent = 'Using the platform key \u2014 usage draws from your balance.'; },
+        rollback: function () { st.className = was.c; st.textContent = was.t; },
+        request: function () { return fetch(base + '/llm', { method: 'DELETE', credentials: 'include', keepalive: true }); },
+        success: 'Key removed',
+        error: 'Couldn\u2019t remove the key. Check your connection?',
+        done: function () { loadConfig(); },
+      });
     });
   }
 

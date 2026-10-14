@@ -13,6 +13,13 @@ export const workspace_client_preamble_JS = `
   });
   var t = window.__SO_HOME_T || function (k) { return k; };
   function tOr(k, fallback) { var v = t(k); return v === k ? fallback : v; }
+  // Undo / Retry labels for the shared optimistic-action helper (design-system/components/optimistic.ts).
+  function optLabels() { if (window.soOptimistic) window.soOptimistic.labels = { undo: t('common.undo'), retry: t('common.retry'), failed: t('common.actionFailed') }; }
+  optLabels();
+  document.addEventListener('shareout:locale', optLabels);
+  // Optimistic action: apply now, request in the background, roll back + toast on failure.
+  function optimistic(o) { return window.soOptimistic(o); }
+  function optBusy(key) { return !!(window.soOptimistic && window.soOptimistic.busy(key)); }
   function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
   function i18nEmpty(k) { return '<div class="wsx-empty">' + esc(t(k)) + '</div>'; }
   // The one empty-state pattern for lenses (Design/system/components.md "Empty States"):

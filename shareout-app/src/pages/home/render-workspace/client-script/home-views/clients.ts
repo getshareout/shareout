@@ -13,6 +13,48 @@ export const workspace_client_home_views_clients_JS = `  // ----- Admin — Clie
     try { showToast(t('admin.actionFailed'), 'error'); } catch (e) {}
   }
 
+  // Client-detail rows (person, shared folder, note, token) leave at once behind an Undo
+  // toast; the DELETE fires when it closes and a failure repaints the detail.
+  function clientRemoveRow(key, row, url, okMsg, client, after) {
+    var h = null;
+    return optimistic({
+      key: key, undo: true,
+      apply: function () { adPending[key] = true; if (row) h = window.soOptimistic.leave(row); },
+      rollback: function () { delete adPending[key]; if (h) h.restore(); if (row && !row.isConnected) { if (client) adClientDetail(client); else if (after) after(); } },
+      request: function () { return adReq(url, { method: 'DELETE', credentials: 'same-origin', keepalive: true }); },
+      success: okMsg,
+      error: adErr(t('admin.actionFailed')),
+      done: function () { delete adPending[key]; if (h) h.commit(); if (after) after(); },
+    });
+  }
+
+  // Add a person / shared folder: the row shows up at once (replacing the empty note),
+  // the POST runs behind, and a refusal removes it and says why.
+  function clientAddRow(key, sec, av, name, sub, apply, rollback, url, body, okMsg, failMsg, client) {
+    var row = null, empty = null;
+    return optimistic({
+      key: key,
+      apply: function () {
+        var list = sec.querySelector('.wsx-admin__list');
+        empty = sec.querySelector('.wsx-empty');
+        if (!list) { list = document.createElement('div'); list.className = 'wsx-admin__list'; sec.appendChild(list); }
+        if (empty) empty.hidden = true;
+        row = document.createElement('div'); row.className = 'wsx-admin__row';
+        row.innerHTML = '<span class="wsx-cm__av">' + esc(av) + '</span><div class="wsx-admin__who"><span class="wsx-admin__nm">' + esc(name) + '</span><span class="wsx-admin__sub">' + esc(sub) + '</span></div>';
+        list.appendChild(row);
+        if (apply) apply();
+      },
+      rollback: function () { if (row) row.remove(); if (empty) empty.hidden = false; if (rollback) rollback(); },
+      request: function () {
+        return fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+          .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok || (j && j.error)) { var e = new Error('x'); e.userMessage = clientErr(j, failMsg); throw e; } return j; }); });
+      },
+      success: okMsg,
+      error: adErr(failMsg),
+      done: function () { adClientDetail(client); },
+    });
+  }
+
   function adClients() {
     var m = document.getElementById('wsxAdminMount'); if (needWs(m)) return;
     adLoading(m);
@@ -90,7 +132,7 @@ export const workspace_client_home_views_clients_JS = `  // ----- Admin — Clie
       fetch(wsUrl('/sharees'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, type: type }) })
         .then(function (r) { return r.json().catch(function () { return {}; }); })
         .then(function (res) {
-          if (res && res.error) { try { alert(clientErr(res, t('clients.couldNotAdd'))); } catch (e) {} adIdle(btn); return; }
+          if (res && res.error) { showToast(clientErr(res, t('clients.couldNotAdd')), 'error'); adIdle(btn); return; }
           if (res && res.sharee && res.sharee.id) adClientDetail(res.sharee); else adClients();
         })
         .catch(function () { clientNetFail(btn); });
@@ -109,11 +151,11 @@ export const workspace_client_home_views_clients_JS = `  // ----- Admin — Clie
       fetch(wsUrl('/sharees/' + encodeURIComponent(sid) + '/activity'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : { activity: [] }; }).catch(function () { return { activity: [] }; }),
       fetch(wsUrl('/sharees/' + encodeURIComponent(sid) + '/context'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : { files: [] }; }).catch(function () { return { files: [] }; })
     ]).then(function (res) {
-      var members = (res[0] && res[0].members) || [];
-      var grants = (res[1] && res[1].grants) || [];
+      var members = ((res[0] && res[0].members) || []).filter(function (mm) { return !adPending['cm:' + sid + ':' + (mm.user_id || mm.id)]; });
+      var grants = ((res[1] && res[1].grants) || []).filter(function (g) { return !adPending['grant:' + g.id]; });
       var folders = (res[2] && res[2].folders) || [];
       var activity = (res[3] && res[3].activity) || [];
-      var notes = (res[4] && res[4].files) || [];
+      var notes = ((res[4] && res[4].files) || []).filter(function (n) { return !adPending['cnote:' + sid + ':' + n.name]; });
       var folderName = {}; folders.forEach(function (f) { folderName[f.id] = f.name; });
       var capLabel = {}; CLIENT_CAPS().forEach(function (c) { capLabel[c[0]] = c[1]; });
 
@@ -180,38 +222,32 @@ export const workspace_client_home_views_clients_JS = `  // ----- Admin — Clie
       m.innerHTML = back + membersSection + sharedSection + notesSection + actSection;
 
       document.getElementById('wsxClientBack').addEventListener('click', adClients);
+      var secs = m.querySelectorAll('.wsx-admin__settings-section');
+      var membersSec = secs[1], sharedSec = secs[2];
       var inv = document.getElementById('wsxCmInvite');
       inv.addEventListener('click', function () {
-        var em = (document.getElementById('wsxCmEmail').value || '').trim(); if (!em) return;
-        adBusy(inv);
-        fetch(wsUrl('/sharees/' + encodeURIComponent(sid) + '/members'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: em }) })
-          .then(function (r) { return r.json().catch(function () { return {}; }); })
-          .then(function (res2) { if (res2 && res2.error) { try { alert(clientErr(res2, t('clients.couldNotInvite'))); } catch (e) {} adIdle(inv); return; } adClientDetail(client); })
-          .catch(function () { clientNetFail(inv); });
+        var emEl = document.getElementById('wsxCmEmail'); var em = (emEl.value || '').trim(); if (!em) return;
+        clientAddRow('cm-add:' + sid + ':' + em, membersSec, '@', em, t('clients.invited') + ' ' + t('time.justNow'), function () { emEl.value = ''; }, function () { if (!emEl.value) emEl.value = em; },
+          wsUrl('/sharees/' + encodeURIComponent(sid) + '/members'), { email: em }, t('clients.invitedOk').replace('{email}', em), t('clients.couldNotInvite'), client);
       });
       m.querySelectorAll('[data-cm-rm]').forEach(function (b) {
         b.addEventListener('click', function () {
           if (!window.confirm(t('clients.removeMember').replace('{name}', client.name))) return;
-          adBusy(b);
-          fetch(wsUrl('/sharees/' + encodeURIComponent(sid) + '/members/' + encodeURIComponent(b.getAttribute('data-cm-rm'))), { method: 'DELETE', credentials: 'same-origin' })
-            .then(function () { adClientDetail(client); }).catch(function () { clientNetFail(b); });
+          var uid = b.getAttribute('data-cm-rm');
+          clientRemoveRow('cm:' + sid + ':' + uid, b.closest('.wsx-admin__row'), wsUrl('/sharees/' + encodeURIComponent(sid) + '/members/' + encodeURIComponent(uid)), t('clients.memberRemoved'), client);
         });
       });
       var sh = document.getElementById('wsxClShare');
       if (sh) sh.addEventListener('click', function () {
         var fid = document.getElementById('wsxClFolder').value; if (!fid) return;
         var cap = document.getElementById('wsxClCap').value;
-        adBusy(sh);
-        fetch(wsUrl('/grants'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject_type: 'sharee', subject_id: sid, resource_type: 'folder', resource_id: fid, capability: cap }) })
-          .then(function (r) { return r.json().catch(function () { return {}; }); })
-          .then(function (res2) { if (res2 && res2.error) { try { alert(clientErr(res2, t('clients.couldNotShare'))); } catch (e) {} adIdle(sh); return; } adClientDetail(client); })
-          .catch(function () { clientNetFail(sh); });
+        clientAddRow('grant-add:' + sid + ':' + fid, sharedSec, '\\u25A0', folderName[fid] || t('clients.folder'), (capLabel[cap] || cap) + ' \\u00B7 ' + t('time.justNow'), null, null,
+          wsUrl('/grants'), { subject_type: 'sharee', subject_id: sid, resource_type: 'folder', resource_id: fid, capability: cap }, t('clients.shared'), t('clients.couldNotShare'), client);
       });
       m.querySelectorAll('[data-grant-rm]').forEach(function (b) {
         b.addEventListener('click', function () {
-          adBusy(b);
-          fetch(wsUrl('/grants/' + encodeURIComponent(b.getAttribute('data-grant-rm'))), { method: 'DELETE', credentials: 'same-origin' })
-            .then(function () { adClientDetail(client); }).catch(function () { clientNetFail(b); });
+          var gid = b.getAttribute('data-grant-rm');
+          clientRemoveRow('grant:' + gid, b.closest('.wsx-admin__row'), wsUrl('/grants/' + encodeURIComponent(gid)), t('clients.shareStopped'), client);
         });
       });
       var noteNew = document.getElementById('wsxClNoteNew');
@@ -229,9 +265,7 @@ export const workspace_client_home_views_clients_JS = `  // ----- Admin — Clie
         b.addEventListener('click', function () {
           var name = b.getAttribute('data-note-rm');
           if (!window.confirm(t('clients.deleteNoteConfirm').replace('{name}', name))) return;
-          adBusy(b);
-          fetch(wsUrl('/sharees/' + encodeURIComponent(sid) + '/context/' + encodeURIComponent(name)), { method: 'DELETE', credentials: 'same-origin' })
-            .then(function () { adClientDetail(client); }).catch(function () { clientNetFail(b); });
+          clientRemoveRow('cnote:' + sid + ':' + name, b.closest('.wsx-admin__row'), wsUrl('/sharees/' + encodeURIComponent(sid) + '/context/' + encodeURIComponent(name)), t('clients.noteDeleted'), client);
         });
       });
       m.querySelectorAll('[data-cm-tok]').forEach(function (b) {
@@ -247,7 +281,7 @@ export const workspace_client_home_views_clients_JS = `  // ----- Admin — Clie
     function render() {
       fetch(base, { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : { tokens: [] }; }).then(function (j) {
         var toks = (j && j.tokens) || [];
-        var rows = toks.filter(function (tk) { return !tk.revoked_at; }).map(function (tk) {
+        var rows = toks.filter(function (tk) { return !tk.revoked_at && !adPending['ctok:' + tk.id]; }).map(function (tk) {
           return '<div class="wsx-admin__row"><div class="wsx-admin__who"><span class="wsx-admin__nm">' + esc(tk.name || t('clients.tokenDefault')) + '</span>'
             + '<span class="wsx-admin__sub">' + esc(tk.scopes || '') + '</span></div>'
             + '<button class="wsx-conn__del" data-tok-rm="' + esc(tk.id) + '" title="' + esc(t('common.delete')) + '" type="button">\\u00D7</button></div>';
@@ -265,14 +299,13 @@ export const workspace_client_home_views_clients_JS = `  // ----- Admin — Clie
                   + '<input class="wsx-field__in" readonly value="' + esc(res.token) + '" onclick="this.select()" style="width:100%">'
                   + '<div class="wsx-mt-12"><button class="wsx-abtn" id="wsxTokDone" type="button">' + esc(t('clients.done')) + '</button></div>';
                 document.getElementById('wsxTokDone').addEventListener('click', render);
-              } else { try { alert(clientErr(res, t('clients.couldNotCreateToken'))); } catch (e) {} adIdle(btn); render(); }
+              } else { showToast(clientErr(res, t('clients.couldNotCreateToken')), 'error'); adIdle(btn); render(); }
             }).catch(function () { clientNetFail(btn); render(); });
         });
         md.body.querySelectorAll('[data-tok-rm]').forEach(function (b) {
           b.addEventListener('click', function () {
-            adBusy(b);
-            fetch(base + '/' + encodeURIComponent(b.getAttribute('data-tok-rm')), { method: 'DELETE', credentials: 'same-origin' })
-              .then(function () { render(); }).catch(function () { clientNetFail(b); });
+            var tid = b.getAttribute('data-tok-rm');
+            clientRemoveRow('ctok:' + tid, b.closest('.wsx-admin__row'), base + '/' + encodeURIComponent(tid), t('admin.tokenRevoked'), null, render);
           });
         });
       }).catch(function () { md.body.innerHTML = i18nEmpty('common.couldNotLoad'); });
@@ -294,12 +327,17 @@ export const workspace_client_home_views_clients_JS = `  // ----- Admin — Clie
     document.getElementById('cn_save').addEventListener('click', function () {
       var nm = cv('cn_name') || 'notes.md'; if (nm.indexOf('.md') < 0) nm += '.md';
       var body = document.getElementById('cn_body').value || '';
-      if (!body.trim()) { try { alert(t('clients.writeFirst')); } catch (e) {} return; }
-      var btn = this; adBusy(btn);
-      fetch(wsUrl('/sharees/' + encodeURIComponent(sid) + '/context/' + encodeURIComponent(nm)), { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: body }) })
-        .then(function (r) { return r.json().catch(function () { return {}; }); })
-        .then(function (res) { if (res && res.error) { try { alert(res.error); } catch (e) {} adIdle(btn); return; } md.close(); adClientDetail(client); })
-        .catch(function () { clientNetFail(btn); });
+      if (!body.trim()) { showToast(t('clients.writeFirst'), 'error'); return; }
+      // The editor closes at once; a failed save reopens it with the text intact.
+      optimistic({
+        key: 'cnote-save:' + sid + ':' + nm,
+        apply: function () { md.close(); },
+        rollback: function () { openClientNote(sid, client, isNew ? '' : nm, body); },
+        request: function () { return adReq(wsUrl('/sharees/' + encodeURIComponent(sid) + '/context/' + encodeURIComponent(nm)), { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: body }) }); },
+        success: t('clients.noteSaved'),
+        error: adErr(t('clients.noteSaveFailed')),
+        done: function () { adClientDetail(client); },
+      });
     });
   }
 `;

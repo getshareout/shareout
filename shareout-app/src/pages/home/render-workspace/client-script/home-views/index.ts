@@ -17,6 +17,7 @@ import { workspace_client_home_views_knowledge_JS } from './knowledge';
 import { workspace_client_home_views_knowledgeMap_JS } from './knowledge-map';
 import { workspace_client_home_views_modalsForms_JS } from './modals-forms';
 import { workspace_client_home_views_admin_JS } from './admin';
+import { workspace_client_home_views_adminSupport_JS } from './admin-support';
 import { workspace_client_home_views_invite_JS } from './invite';
 import { workspace_client_home_views_clients_JS } from './clients';
 import { workspace_client_home_views_assets_JS } from './assets';
@@ -40,6 +41,7 @@ export const workspace_client_home_views_JS = [
   workspace_client_home_views_knowledgeMap_JS,
   workspace_client_home_views_modalsForms_JS,
   workspace_client_home_views_admin_JS,
+  workspace_client_home_views_adminSupport_JS,
   workspace_client_home_views_invite_JS,
   workspace_client_home_views_clients_JS,
   workspace_client_home_views_assets_JS,

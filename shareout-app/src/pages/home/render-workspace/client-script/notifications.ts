@@ -173,86 +173,77 @@ export const workspace_client_notifications_JS = `
     if (scrim) scrim.addEventListener('click', close);
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !panel.hidden) close(); });
 
+    // Every card action is optimistic: the card changes or leaves at once, the request
+    // runs behind, and a failure puts the item back where it was with an error toast.
+    function takeOut(arr, id) { var at = -1, it = null; var rest = arr.filter(function (x, i) { if (x.id === id) { at = i; it = x; return false; } return true; }); return { rest: rest, at: at, it: it }; }
+    function putBack(arr, id, at, it) { if (it && !arr.some(function (x) { return x.id === id; })) arr.splice(at < 0 ? arr.length : at, 0, it); }
+    function afterChange() { setBadge(); if (readAll) readAll.hidden = !needs.length; if (!approvals.length && !actions.length && !needs.length) render(); }
+    function post(url, method, payload) {
+      return fetch(url, { method: method, credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+    }
+    // Swap a card to its "Approved" / "Rejected" line, then let it leave.
+    function doneCard(card, label) {
+      var prev = card ? card.innerHTML : '';
+      if (card) card.innerHTML = '<div class="wsx-ncard__done">' + esc(label) + '</div>';
+      return function () { if (card) card.innerHTML = prev; };
+    }
+
     function dismiss(id, el) {
-      var card = el.closest('.wsx-ncard');
-      needs = needs.filter(function (x) { return x.id !== id; });
-      if (card) card.remove();
-      setBadge();
-      if (readAll) readAll.hidden = !needs.length;
-      if (!approvals.length && !needs.length) render();
-      fetch('/v1/home/dismiss-event', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ eventId: id }) }).catch(function () {});
+      var card = el.closest('.wsx-ncard'), out = null;
+      optimistic({
+        key: 'notif:dismiss:' + id,
+        apply: function () { out = takeOut(needs, id); needs = out.rest; if (card) card.remove(); afterChange(); },
+        rollback: function () { putBack(needs, id, out.at, out.it); render(); afterChange(); },
+        request: function () { return post('/v1/home/dismiss-event', 'POST', { eventId: id }); },
+        error: t('evt.dismissFailed'),
+      });
     }
 
     function decide(el, decision) {
       var id = el.getAttribute('data-' + decision);
       var art = el.getAttribute('data-art');
-      var card = el.closest('.wsx-ncard');
-      var acts = el.closest('.wsx-ncard__actions');
-      el.classList.add('is-busy');
-      if (acts) acts.querySelectorAll('.wsx-abtn').forEach(function (b) { b.disabled = true; });
-      fetch('/v1/artifacts/' + encodeURIComponent(art) + '/publish-approval/' + encodeURIComponent(id) + '/decision', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ decision: decision }) })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-          if (d && d.ok) {
-            approvals = approvals.filter(function (x) { return x.id !== id; });
-            setBadge();
-            if (card) {
-              card.innerHTML = '<div class="wsx-ncard__done">' + esc(decision === 'approve' ? t('notif.approved') : t('notif.rejected')) + '</div>';
-              setTimeout(function () { if (card) card.remove(); if (!approvals.length && !needs.length) render(); }, 900);
-            }
-          } else {
-            el.classList.remove('is-busy');
-            if (acts) acts.querySelectorAll('.wsx-abtn').forEach(function (b) { b.disabled = false; });
-            showToast(t('notif.decisionFailed'), 'error');
-          }
-        })
-        .catch(function () {
-          el.classList.remove('is-busy');
-          if (acts) acts.querySelectorAll('.wsx-abtn').forEach(function (b) { b.disabled = false; });
-          showToast(t('notif.decisionFailed'), 'error');
-        });
+      var card = el.closest('.wsx-ncard'), out = null, undoCard = null;
+      optimistic({
+        key: 'notif:decide:' + id,
+        apply: function () { out = takeOut(approvals, id); approvals = out.rest; setBadge(); undoCard = doneCard(card, decision === 'approve' ? t('notif.approved') : t('notif.rejected')); },
+        rollback: function () { putBack(approvals, id, out.at, out.it); if (undoCard) undoCard(); setBadge(); },
+        request: function () {
+          return post('/v1/artifacts/' + encodeURIComponent(art) + '/publish-approval/' + encodeURIComponent(id) + '/decision', 'POST', { decision: decision })
+            .then(function (r) { return r.json().catch(function () { return null; }); })
+            .then(function (d) { if (!d || !d.ok) throw new Error('decision'); });
+        },
+        error: t('notif.decisionFailed'),
+        done: function () { setTimeout(function () { if (card) card.remove(); afterChange(); }, 900); },
+      });
     }
 
     function resolveAction(el, resolved) {
       var id = el.getAttribute(resolved ? 'data-done' : 'data-reopen');
       var art = el.getAttribute('data-art');
-      var card = el.closest('.wsx-ncard');
-      el.disabled = true; el.classList.add('is-busy');
-      fetch('/v1/data/' + encodeURIComponent(art) + '/comments/' + encodeURIComponent(id) + '/resolve', { method: 'PATCH', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ resolved: resolved }) })
-        .then(function (r) { return r.ok ? r.json().catch(function () { return {}; }) : Promise.reject(); })
-        .then(function () {
-          actions = actions.filter(function (x) { return x.id !== id; });
-          if (card) card.remove();
-          setBadge();
-          if (!approvals.length && !actions.length && !needs.length) render();
-        })
-        .catch(function () { el.disabled = false; el.classList.remove('is-busy'); showToast(t('notif.commentFailed'), 'error'); });
+      var card = el.closest('.wsx-ncard'), out = null, leaving = null;
+      optimistic({
+        key: 'notif:resolve:' + id,
+        apply: function () { out = takeOut(actions, id); actions = out.rest; if (card) leaving = window.soOptimistic.leave(card); setBadge(); },
+        rollback: function () { putBack(actions, id, out.at, out.it); if (leaving) leaving.restore(); setBadge(); },
+        request: function () { return post('/v1/data/' + encodeURIComponent(art) + '/comments/' + encodeURIComponent(id) + '/resolve', 'PATCH', { resolved: resolved }); },
+        error: t('notif.commentFailed'),
+        done: function () { if (leaving) leaving.commit(); afterChange(); },
+      });
     }
     function decideAccess(el, action) {
       var id = el.getAttribute(action === 'approve' ? 'data-access-approve' : 'data-access-deny');
       if (!id) return;
       var card = el.closest('.wsx-ncard');
       if (!card) return;
-      card.querySelectorAll('.wsx-abtn').forEach(function (b) { b.disabled = true; b.classList.add('is-busy'); });
-      fetch('/v1/access-requests/' + encodeURIComponent(id), {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: action }),
-      })
-        .then(function (r) { return r.ok ? r.json().catch(function () { return {}; }) : Promise.reject(); })
-        .then(function () {
-          needs = needs.filter(function (x) { return x.id !== id; });
-          setBadge();
-          if (card) {
-            card.innerHTML = '<div class="wsx-ncard__done">' + esc(action === 'approve' ? t('notif.approved') : t('notif.rejected')) + '</div>';
-            setTimeout(function () { if (card) card.remove(); if (!approvals.length && !actions.length && !needs.length) render(); }, 900);
-          }
-        })
-        .catch(function () {
-          card.querySelectorAll('.wsx-abtn').forEach(function (b) { b.disabled = false; b.classList.remove('is-busy'); });
-          showToast(t('notif.accessFailed'), 'error');
-        });
+      var out = null, undoCard = null;
+      optimistic({
+        key: 'notif:access:' + id,
+        apply: function () { out = takeOut(needs, id); needs = out.rest; setBadge(); undoCard = doneCard(card, action === 'approve' ? t('notif.approved') : t('notif.rejected')); },
+        rollback: function () { putBack(needs, id, out.at, out.it); if (undoCard) undoCard(); setBadge(); },
+        request: function () { return post('/v1/access-requests/' + encodeURIComponent(id), 'POST', { action: action }); },
+        error: t('notif.accessFailed'),
+        done: function () { setTimeout(function () { if (card) card.remove(); afterChange(); }, 900); },
+      });
     }
 
     body.addEventListener('click', function (e) {
@@ -293,9 +284,14 @@ export const workspace_client_notifications_JS = `
     if (readAll) readAll.addEventListener('click', function () {
       var ids = needs.map(function (x) { return x.id; });
       if (!ids.length) return;
-      needs = [];
-      render(); setBadge();
-      fetch('/v1/home/dismiss-event', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ eventIds: ids }) }).catch(function () {});
+      var prev = needs.slice();
+      optimistic({
+        key: 'notif:readall',
+        apply: function () { needs = []; render(); setBadge(); },
+        rollback: function () { needs = prev.concat(needs.filter(function (x) { return ids.indexOf(x.id) < 0; })); render(); setBadge(); },
+        request: function () { return post('/v1/home/dismiss-event', 'POST', { eventIds: ids }); },
+        error: t('evt.dismissFailed'),
+      });
     });
 
     // Prime the badge on load so the count shows without opening the panel.

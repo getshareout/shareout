@@ -6,15 +6,15 @@
  */
 export const workspace_client_home_views_cardActions_JS = `  // ===== artifact card actions =====
   function cardEls(id) { return document.querySelectorAll('.artifact-card[data-id="' + CSS.escape(id) + '"]'); }
-  function removeCardDom(id) {
-    cardEls(id).forEach(function (card) {
-      card.classList.add('is-removing');
-      var done = function () { if (card.parentNode) card.remove(); };
-      card.addEventListener('animationend', done, { once: true });
-      setTimeout(done, 400);
-    });
-    if (typeof artCache !== 'undefined') artCache = {};
+  // Card + table row for one artifact (both views render it).
+  function artEls(id) { return document.querySelectorAll('.artifact-card[data-id="' + CSS.escape(id) + '"], .wsx-tr[data-id="' + CSS.escape(id) + '"]'); }
+  // Artifacts deleted optimistically whose DELETE hasn't landed (undo window / in flight);
+  // renderArtView hides them so a background reload never flashes them back in.
+  var pendingArtDeletes = {};
+  function hidePendingArts(root) {
+    (root || document).querySelectorAll('.artifact-card[data-id], .wsx-tr[data-id]').forEach(function (el) { if (pendingArtDeletes[el.getAttribute('data-id')]) el.style.display = 'none'; });
   }
+  function showArtEls(id) { artEls(id).forEach(function (el) { el.classList.remove('so-c-leaving', 'is-removing'); el.style.display = ''; }); }
 
   // ── Favorite ──
   function applyFavoriteDom(id, on) {
@@ -31,10 +31,14 @@ export const workspace_client_home_views_cardActions_JS = `  // ===== artifact c
   window.toggleFavorite = function (id, silent) {
     var card = cardEls(id)[0]; if (!card) return;
     var on = card.dataset.favorite !== '1';
-    applyFavoriteDom(id, on);
-    fetch('/v1/artifacts/' + encodeURIComponent(id) + '/favorite', { method: on ? 'POST' : 'DELETE', credentials: 'same-origin' })
-      .then(function (r) { if (!r.ok) throw new Error('failed'); if (!silent) showToast(on ? t('cards.favAdded') : t('cards.favRemoved'), 'success'); })
-      .catch(function () { applyFavoriteDom(id, !on); if (!silent) showToast(t('cards.favFailed'), 'error'); });
+    optimistic({
+      key: 'fav:' + id,
+      apply: function () { applyFavoriteDom(id, on); },
+      rollback: function () { applyFavoriteDom(id, !on); },
+      request: function () { return fetch('/v1/artifacts/' + encodeURIComponent(id) + '/favorite', { method: on ? 'POST' : 'DELETE', credentials: 'same-origin' }); },
+      success: silent ? '' : (on ? t('cards.favAdded') : t('cards.favRemoved')),
+      error: t('cards.favFailed'),
+    });
   };
 
   // ── Visibility ──
@@ -64,15 +68,21 @@ export const workspace_client_home_views_cardActions_JS = `  // ===== artifact c
   window.toggleVisibility = function (id, newVis) {
     var card = cardEls(id)[0]; if (!card) return;
     var prevVis = card.dataset.visibility;
-    applyVisibilityDom(id, newVis);
-    fetch('/v1/artifacts/' + encodeURIComponent(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ visibility: newVis }) })
-      .then(function (r) { return r.json().catch(function () { return null; }).then(function (j) { return { ok: r.ok, status: r.status, j: j }; }); })
-      .then(function (res) {
-        if (res.status === 202) { applyVisibilityDom(id, prevVis); showToast((res.j && res.j.message) || t('cards.approvalRequired'), 'error'); return; }
-        if (!res.ok) throw new Error('failed');
-        showToast(newVis === 'workspace' ? t('cards.sharedWs') : t('cards.nowPrivate'), 'success');
-      })
-      .catch(function () { applyVisibilityDom(id, prevVis); showToast(t('cards.visFailed'), 'error'); });
+    optimistic({
+      key: 'vis:' + id,
+      apply: function () { applyVisibilityDom(id, newVis); },
+      rollback: function () { applyVisibilityDom(id, prevVis); },
+      request: function () {
+        return fetch('/v1/artifacts/' + encodeURIComponent(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ visibility: newVis }) })
+          .then(function (r) {
+            if (r.status !== 202) return r;
+            // Held for approval: not an error to retry — roll back and say why.
+            return r.json().catch(function () { return null; }).then(function (j) { var e = new Error('approval'); e.noRetry = true; e.userMessage = (j && j.message) || t('cards.approvalRequired'); throw e; });
+          });
+      },
+      success: newVis === 'workspace' ? t('cards.sharedWs') : t('cards.nowPrivate'),
+      error: function (e) { return (e && e.userMessage) || t('cards.visFailed'); },
+    });
   };
 
   // ── Tag filter (client-side, over whichever cards are currently rendered) ──
@@ -103,21 +113,40 @@ export const workspace_client_home_views_cardActions_JS = `  // ===== artifact c
   };
 
   // ── Move to folder ──
+  // Optimistic: the picker closes and the card leaves a folder view it no longer belongs
+  // to right away; the POSTs run behind. A failed id comes back where it was.
   function moveArtifactsToFolder(ids, folderId, mo) {
-    Promise.all(ids.map(function (id) {
-      var card = cardEls(id)[0];
-      var wsId = card ? (card.dataset.workspace || '') : '';
-      var url = wsId ? '/v1/workspaces/' + encodeURIComponent(wsId) + '/artifacts/' + encodeURIComponent(id) + '/move' : '/v1/artifacts/' + encodeURIComponent(id) + '/folder';
-      return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ folder_id: folderId }) })
-        .then(function (r) { return r.ok; }).catch(function () { return false; });
-    })).then(function (results) {
-      mo.close();
-      var ok = results.filter(Boolean).length;
-      ids.forEach(function (id, i) { if (results[i]) cardEls(id).forEach(function (c) { c.dataset.folder = folderId || ''; }); });
-      if (typeof reloadFolders === 'function') reloadFolders();
-      if (ok && selectedIds.size) clearSelection();
-      showToast(ok ? t(ok === 1 ? 'cards.movedOne' : 'cards.movedMany').replace('{n}', ok) : t('cards.moveFailed'), ok ? 'success' : 'error');
-    });
+    var prev = {}, leaving = {};
+    ids.forEach(function (id) { var c = cardEls(id)[0]; prev[id] = c ? (c.dataset.folder || '') : ''; });
+    function setFolder(id, f) { cardEls(id).forEach(function (c) { c.dataset.folder = f || ''; }); }
+    function back(id) { setFolder(id, prev[id]); if (leaving[id]) { leaving[id].restore(); delete leaving[id]; } }
+    optimistic({
+      key: 'move:' + ids.join(','),
+      apply: function () {
+        mo.close();
+        ids.forEach(function (id) {
+          setFolder(id, folderId);
+          if (curFolder && curFolder !== (folderId || '')) leaving[id] = window.soOptimistic.leave(artEls(id));
+        });
+        if (selectedIds.size) clearSelection();
+      },
+      rollback: function (err) { (err && err.failed ? err.failed : ids).forEach(back); },
+      request: function () {
+        return Promise.all(ids.map(function (id) {
+          var card = cardEls(id)[0];
+          var wsId = card ? (card.dataset.workspace || '') : '';
+          var url = wsId ? '/v1/workspaces/' + encodeURIComponent(wsId) + '/artifacts/' + encodeURIComponent(id) + '/move' : '/v1/artifacts/' + encodeURIComponent(id) + '/folder';
+          return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ folder_id: folderId }) })
+            .then(function (r) { return r.ok; }).catch(function () { return false; });
+        })).then(function (results) {
+          var failed = ids.filter(function (id, i) { return !results[i]; });
+          if (failed.length) { var e = new Error('move'); e.failed = failed; e.ok = ids.length - failed.length; throw e; }
+        });
+      },
+      success: t(ids.length === 1 ? 'cards.movedOne' : 'cards.movedMany').replace('{n}', ids.length),
+      error: function (e) { return e && e.ok ? t(e.ok === 1 ? 'cards.movedOne' : 'cards.movedMany').replace('{n}', e.ok) + ' \u00b7 ' + t('cards.moveFailed') : t('cards.moveFailed'); },
+      done: function () { if (typeof reloadFolders === 'function') reloadFolders(); },
+    }).then(function (ok) { if (!ok && typeof reloadFolders === 'function') reloadFolders(); });
   }
   window.openFolderPicker = function (ids) {
     ids = (ids || []).filter(Boolean); if (!ids.length) return;
@@ -138,21 +167,37 @@ export const workspace_client_home_views_cardActions_JS = `  // ===== artifact c
   };
 
   // ── Delete (single + bulk share the same confirm flow) ──
+  // Confirm closes at once, the cards leave, and an "Deleted · Undo" toast holds the
+  // DELETE for a few seconds. Undo (or a failed DELETE) puts the cards back in place.
   function deleteArtifactsFlow(ids, title) {
-    var mo = wsxModal(title, '<div class="wsx-cform"><p class="wsx-field__note">' + esc(t(ids.length === 1 ? 'cards.deleteNoteOne' : 'cards.deleteNoteMany')) + '</p><div class="wsx-cform__err" id="fld_err"></div><div class="wsx-cform__foot"><button class="wsx-abtn" id="fld_cancel" type="button">' + esc(t('artifacts.cancel')) + '</button><button class="wsx-abtn danger" id="fld_go" type="button">' + esc(t('common.delete')) + '</button></div></div>');
+    var mo = wsxModal(title, '<div class="wsx-cform"><p class="wsx-field__note">' + esc(t(ids.length === 1 ? 'cards.deleteNoteOne' : 'cards.deleteNoteMany')) + '</p><div class="wsx-cform__foot"><button class="wsx-abtn" id="fld_cancel" type="button">' + esc(t('artifacts.cancel')) + '</button><button class="wsx-abtn danger" id="fld_go" type="button">' + esc(t('common.delete')) + '</button></div></div>');
     document.getElementById('fld_cancel').addEventListener('click', function () { mo.close(); });
-    document.getElementById('fld_go').addEventListener('click', function () {
-      var b = this; b.disabled = true;
-      Promise.all(ids.map(function (id) {
-        return fetch('/v1/artifacts/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin' })
-          .then(function (r) { return r.ok || r.status === 404; }).catch(function () { return false; });
-      })).then(function (results) {
-        mo.close();
-        var ok = 0;
-        ids.forEach(function (id, i) { if (results[i]) { removeCardDom(id); ok++; } });
+    document.getElementById('fld_go').addEventListener('click', function () { mo.close(); deleteArtifacts(ids); });
+  }
+  function deleteArtifacts(ids) {
+    var leaving = {};
+    function back(id) { delete pendingArtDeletes[id]; if (leaving[id]) leaving[id].restore(); showArtEls(id); }
+    return optimistic({
+      key: 'del:art:' + ids.join(','),
+      undo: true,
+      apply: function () {
+        ids.forEach(function (id) { pendingArtDeletes[id] = true; leaving[id] = window.soOptimistic.leave(artEls(id)); });
         if (selectedIds.size) clearSelection();
-        showToast(ok === ids.length ? t(ok === 1 ? 'cards.deletedOne' : 'cards.deletedMany').replace('{n}', ok) : t('cards.deletedSome').replace('{ok}', ok).replace('{n}', ids.length), ok === ids.length ? 'success' : 'error');
-      });
+      },
+      rollback: function (err) { (err && err.failed ? err.failed : ids).forEach(back); },
+      request: function () {
+        return Promise.all(ids.map(function (id) {
+          return fetch('/v1/artifacts/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin', keepalive: true })
+            .then(function (r) { return r.ok || r.status === 404; }).catch(function () { return false; });
+        })).then(function (results) {
+          var failed = ids.filter(function (id, i) { return !results[i]; });
+          ids.forEach(function (id, i) { if (results[i]) { delete pendingArtDeletes[id]; if (leaving[id]) leaving[id].commit(); } });
+          if (typeof artCache !== 'undefined') artCache = {};
+          if (failed.length) { var e = new Error('delete'); e.failed = failed; e.ok = ids.length - failed.length; throw e; }
+        });
+      },
+      success: t(ids.length === 1 ? 'cards.deletedOne' : 'cards.deletedMany').replace('{n}', ids.length),
+      error: function (e) { return e && e.ok ? t('cards.deletedSome').replace('{ok}', e.ok).replace('{n}', ids.length) : t('cards.deleteFailed'); },
     });
   }
   window.confirmDelete = function (id) {

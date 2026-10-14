@@ -17,7 +17,7 @@ export function renderToolbarScript(ctx: ToolbarRenderContext): string {
   if (loggedIn) sections.push(shareModalScript({ baseUrl, locale }));
   if (loggedIn) sections.push(renderToolbarScriptPresence(baseUrl, artifactId, c));
   if (loggedIn && commentsEnabled) sections.push(renderToolbarScriptComments(baseUrl, artifactId, c, locale));
-  if (adminInfo) sections.push(renderToolbarScriptAdmin(baseUrl, slug, artifactId));
+  if (adminInfo) sections.push(renderToolbarScriptAdmin(baseUrl, slug, artifactId, c));
 
   return `
   <script>

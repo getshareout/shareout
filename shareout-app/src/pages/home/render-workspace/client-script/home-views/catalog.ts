@@ -62,17 +62,17 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
     else btn = '<p class="wsx-cat__hint">' + esc(t('catalog.askAdmin')) + '</p>';
     m.innerHTML = emptyState(msg, sub, btn);
     var en = document.getElementById('catEnable');
-    if (en) en.addEventListener('click', function () {
-      en.disabled = true;
-      fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/catalog/enable', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: '{"enabled":true}' })
-        .then(function () { loadCatalog(); });
-    });
+    // Exceptions to optimistic: both load server-built catalog content, so they keep an
+    // inline busy state and restore the button (with an error toast) if the call fails.
+    function busyCall(b, busyLabel, url, body) {
+      var label = b.textContent; b.disabled = true; if (busyLabel) b.textContent = busyLabel;
+      fetch(url, body ? { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: body } : { method: 'POST', credentials: 'same-origin' })
+        .then(function (r) { if (!r.ok) throw new Error('failed'); loadCatalog(); })
+        .catch(function () { b.disabled = false; b.textContent = label; showToast(t('common.actionFailed'), 'error'); });
+    }
+    if (en) en.addEventListener('click', function () { busyCall(en, t('common.saving'), '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/catalog/enable', '{"enabled":true}'); });
     var sd = document.getElementById('catSeed');
-    if (sd) sd.addEventListener('click', function () {
-      sd.disabled = true; sd.textContent = t('catalog.seeding');
-      fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/catalog/seed', { method: 'POST', credentials: 'same-origin' })
-        .then(function () { loadCatalog(); });
-    });
+    if (sd) sd.addEventListener('click', function () { busyCall(sd, t('catalog.seeding'), '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/catalog/seed'); });
   }
 
   function catKpiTiles() {
