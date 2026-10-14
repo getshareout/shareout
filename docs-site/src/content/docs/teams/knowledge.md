@@ -148,15 +148,24 @@ Bookmark or share a Knowledge view from Home:
 ## For agents
 
 When Knowledge is on, the [workspace assistant](/teams/workspace-assistant/) can consult it
-instead of re-reading every page. It has two read-only tools:
+instead of re-reading every page. It has the same read-only tools as the
+MCP connector, plus the notes reader:
 
 - **`knowledge_search`** — search what the workspace knows by topic, client, person or
-  question, optionally filtered by note kind. Returns matching note summaries.
+  question. Returns cited **passages** from uploaded Files (PDFs, docs, sheets…) and pages,
+  plus matching note summaries. A `kind` filter narrows it to notes only.
 - **`knowledge_get`** — read one note in full, including its distilled body and the pages it was
   learned from. Pass the note's `path` or `id` from a search result.
+- **`knowledge_entity`** — one client, person, product or project: what it connects to and the
+  quoted passages that mention it.
+- **`knowledge_facts`** — recorded facts (amounts, dates, statuses…) about an entity, each with
+  the sentence it came from.
+- **`knowledge_status`** — what has been learned, what is still processing, and what could not
+  be read.
 
-Both tools work only inside a workspace (not on your Personal space), and both return
-`{ "enabled": false }` when Knowledge is off for that workspace.
+All of them work only inside a workspace you belong to (not on your Personal space), return
+`{ "enabled": false }` when Knowledge is off, and only show passages and facts from Files and
+pages you can open.
 
 ## REST API
 

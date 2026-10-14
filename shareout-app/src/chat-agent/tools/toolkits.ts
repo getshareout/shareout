@@ -19,8 +19,8 @@ export const TOOLKITS: Record<string, { summary: string; tools: string[] }> = {
     tools: ['list_alerts', 'manage_alert', 'list_jobs', 'manage_job', 'create_schedule', 'ask_crew'],
   },
   knowledge: {
-    summary: 'data catalog, workspace knowledge, uploaded files, client notes',
-    tools: ['catalog_search', 'catalog_get', 'knowledge_search', 'knowledge_get', 'list_files', 'read_file', 'set_client_notes'],
+    summary: 'data catalog, workspace knowledge (what uploaded files and pages say: passages, clients, people, facts), uploaded files, client notes',
+    tools: ['catalog_search', 'catalog_get', 'knowledge_search', 'knowledge_get', 'knowledge_entity', 'knowledge_facts', 'knowledge_status', 'list_files', 'read_file', 'set_client_notes'],
   },
   skills: {
     summary: 'read and save skills (reusable instructions) in the Library',

@@ -41,7 +41,7 @@ Never send anyone to a billing page — there isn't one.
 | **Present a deck** | **`present_artifact`** — turn a published dashboard/report into a new private slides artifact (AI outline + reveal.js publish) |
 | **Watch a metric** | **`watch_metric`** — one-click table watch; bell alert when a value moves ≥ threshold (hourly sweep) |
 | **File library** | **`list_files`** / **`read_file`** — browse uploads, chat attachments, emailed-in files, and phone shares; see provenance and prior artifacts built from the same file |
-| **Knowledge** | **`knowledge_search`** / **`knowledge_get`** — when Knowledge is enabled, search and read distilled workspace notes instead of re-reading every page |
+| **Knowledge** | **`knowledge_search`** / **`knowledge_get`** / **`knowledge_entity`** / **`knowledge_facts`** / **`knowledge_status`** — when Knowledge is enabled: cited passages from uploaded Files and pages, distilled notes, entities and quoted facts (same as the MCP connector) |
 | **Build from a file** | Pass `source_file_id` on confirmed **build artifact** after `read_file` — spreadsheets, decks, and CSVs become live pages |
 | Canvas actions (Home only) | Home agent adds tools to search and open artifacts in the workspace canvas |
 | Streaming builds | Confirming a **build artifact** action streams progress steps, then returns the new page URL. The page is published **private**, in the workspace the chat is scoped to (personal on personal Home) |

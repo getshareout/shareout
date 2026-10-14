@@ -17,7 +17,7 @@ import { browseStorageTool, listConnectionsTool, queryConnectionTool } from './c
 import { createScheduleTool } from './create-schedule';
 import { createArtifactTool } from './build';
 import { catalogSearchTool, catalogGetTool } from './catalog';
-import { knowledgeSearchTool, knowledgeGetTool } from './knowledge';
+import { knowledgeSearchTool, knowledgeGetTool, knowledgeEntityTool, knowledgeFactsTool, knowledgeStatusTool } from './knowledge';
 import { listFilesTool, readFileTool } from './files';
 import { watchMetricTool } from './watch-metric';
 import { presentArtifactTool } from './present-artifact';
@@ -57,6 +57,9 @@ export const ACCOUNT_TOOLS: AccountTool[] = [
   catalogGetTool,
   knowledgeSearchTool,
   knowledgeGetTool,
+  knowledgeEntityTool,
+  knowledgeFactsTool,
+  knowledgeStatusTool,
   listFilesTool,
   readFileTool,
   watchMetricTool,
