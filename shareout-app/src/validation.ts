@@ -18,6 +18,7 @@ const ALLOWED_MIMES = new Set([
   'image/avif',
   'video/mp4',
   'video/webm',
+  'video/quicktime',
   'audio/mpeg',
   'audio/wav',
   'audio/ogg',
