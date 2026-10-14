@@ -1,7 +1,9 @@
 import { env } from 'cloudflare:test';
-import { beforeAll, beforeEach, describe, it, expect } from 'vitest';
+import { beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 import type { ToolContext } from '../../../src/chat-agent/tools/types';
+
+vi.mock('../../../src/chat-agent/access', () => ({ getUserWorkspaceIds: async () => ['wsp_kn_tools'] }));
 import { knowledgeSearchTool, knowledgeGetTool } from '../../../src/chat-agent/tools/knowledge';
 import { setKnowledgeEnabled, upsertKnowledgeFile } from '../../../src/knowledge';
 

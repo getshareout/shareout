@@ -128,13 +128,22 @@ Marcá o compartí una vista de Knowledge desde Home:
 ## Para agentes
 
 Con Knowledge activo, el [asistente del workspace](/es/teams/workspace-assistant/) puede
-consultarlo en lugar de re-leer cada página. Tiene dos tools de solo lectura:
+consultarlo en lugar de re-leer cada página. Tiene las mismas tools de solo lectura que el
+conector MCP, más el lector de notas:
 
 - **`knowledge_search`** — buscar lo que el workspace sabe por tema, cliente, persona o pregunta.
+  Devuelve **pasajes** citados de los Archivos subidos (PDFs, docs, planillas…) y páginas, más
+  las notas que coinciden. El filtro `kind` lo limita a notas.
 - **`knowledge_get`** — leer una nota completa, con cuerpo destilado y páginas fuente.
+- **`knowledge_entity`** — un cliente, persona, producto o proyecto: con qué se conecta y los
+  pasajes que lo mencionan.
+- **`knowledge_facts`** — datos registrados (montos, fechas, estados…) de una entidad, cada uno
+  con la frase de donde salió.
+- **`knowledge_status`** — qué se aprendió, qué sigue procesándose y qué no se pudo leer.
 
-Ambas tools funcionan solo dentro de un workspace (no en tu espacio Personal) y devuelven
-`{ "enabled": false }` cuando Knowledge está apagado.
+Todas funcionan solo dentro de un workspace del que sos miembro (no en tu espacio Personal),
+devuelven `{ "enabled": false }` cuando Knowledge está apagado y solo muestran pasajes y datos
+de Archivos y páginas que podés abrir.
 
 ## API REST
 

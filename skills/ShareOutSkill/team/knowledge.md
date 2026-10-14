@@ -181,10 +181,13 @@ When Knowledge is on, the [workspace assistant](workspace-assistant.md) can cons
 
 | Tool | Purpose |
 | --- | --- |
-| `knowledge_search` | Search by topic, client, person or question; optional kind filter; returns note summaries |
+| `knowledge_search` | Search by topic, client, person or question; returns cited `passages` from uploaded Files and pages plus note summaries (`kind` filter = notes only) |
 | `knowledge_get` | Read one note in full, including sources; pass `path` or `id` from search |
+| `knowledge_entity` | One client, person, product or project: connections and quoted mentions |
+| `knowledge_facts` | Recorded facts about an entity, each with its source sentence; optional `filter` |
+| `knowledge_status` | What is learned, processing, unreadable; entity counts |
 
-Both tools work only inside a workspace (not Personal home), and return `{ "enabled": false }` when Knowledge is off.
+All work only inside a workspace the person belongs to (not Personal home), return `{ "enabled": false }` when Knowledge is off, and only show what the person can open.
 
 Claude, ChatGPT and Claude Code connected through the [MCP connector](../integrations/mcp-connector.md) get the cited corpus and the graph directly:
 
@@ -234,7 +237,7 @@ A note that wouldn't parse (no frontmatter, missing `kind`/`id`/`title`, unknown
 
 ## Related
 
-- [workspace-assistant.md](workspace-assistant.md) — `knowledge_search` / `knowledge_get` tools
+- [workspace-assistant.md](workspace-assistant.md) — `knowledge_search` / `knowledge_get` / `knowledge_entity` / `knowledge_facts` / `knowledge_status` tools
 - [workspace-context.md](workspace-context.md) — Guidance files (same REST as context)
 - [catalog.md](catalog.md) — governed map of your *data* (complementary to Knowledge)
 - [../core/workspace-home.md](../core/workspace-home.md#workspace-lenses) — Knowledge lens in Home
