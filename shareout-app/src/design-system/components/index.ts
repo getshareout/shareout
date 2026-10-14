@@ -12,5 +12,6 @@ export * from './modal';
 export * from './card';
 export * from './badge';
 export * from './toast';
+export * from './optimistic';
 export { themeClasses } from './themes';
 export { componentStylesheet, componentScripts } from './stylesheet';

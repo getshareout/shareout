@@ -49,18 +49,8 @@ export const workspace_client_inspector_details_JS = `  // ===== Inspector Detai
       + '<div class="wsx-det__delbody" id="wsxDelBody"></div>';
   }
 
-  // One toast, reused for invites + deliver. Body-appended so it never clips.
-  var toastEl = null, toastTmr = null;
-  function wsxToast(text, isError) {
-    if (!toastEl) { toastEl = document.createElement('div'); toastEl.className = 'wsx-toast'; toastEl.setAttribute('role', 'status'); toastEl.setAttribute('aria-live', 'polite'); document.body.appendChild(toastEl); toastEl.addEventListener('click', function () { toastEl.classList.remove('is-show'); }); }
-    toastEl.classList.toggle('is-error', !!isError);
-    var check = isError ? '' : '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
-    toastEl.innerHTML = check + '<span></span>';
-    toastEl.querySelector('span').textContent = text;
-    toastEl.classList.add('is-show');
-    if (toastTmr) clearTimeout(toastTmr);
-    toastTmr = setTimeout(function () { if (toastEl) toastEl.classList.remove('is-show'); }, 3500);
-  }
+  // Thin alias over the shared design-system toast (window.showToast).
+  function wsxToast(text, isError) { if (typeof window.showToast === 'function') window.showToast(text, isError ? 'error' : 'success'); }
   // Live drag-reorder of sections; persists the resulting order on drop.
   function wireSecDnd(root) {
     var cont = root.querySelector('#wsxSecs'); if (!cont) return;
