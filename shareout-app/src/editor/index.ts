@@ -1,6 +1,6 @@
 // ShareOut Visual Editor - Main Router
 
-import type { Env } from '../types';
+import type { ArtifactType, Env } from '../types';
 import { generateEditorPage } from './page/generate-editor-page';
 import { handleDraft, handlePublish, handleHistory, handleUpload } from './draft';
 import { handleEditorWebSocket } from './collab/index';
@@ -11,6 +11,10 @@ import { detectComponents } from './detector';
 import { getPlatformOrigin } from '../config/origins';
 import { openVisibilityDisabled } from '../visibility-config';
 import { getAIProvider } from '../data/agent/anthropic';
+import { isHtmlDocument, markdownEditPayload, markdownEditShell } from './markdown-edit';
+
+/** Binary artifact types: served as files, never opened in an editor. */
+export const NOT_EDITABLE_TYPES: ReadonlySet<ArtifactType> = new Set<ArtifactType>(['pdf', 'image', 'video']);
 
 // Re-export modules for external use
 export * from './visual-editor';
@@ -143,7 +147,7 @@ async function handleLoadEditor(
   try {
     // Get artifact info
     const artifact = await env.DB.prepare(`
-      SELECT a.id, a.name, a.slug, a.visibility, a.owner_id,
+      SELECT a.id, a.name, a.slug, a.visibility, a.owner_id, a.artifact_type,
              d.version_id, v.entrypoint, v.version_no
       FROM artifacts a
       LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
@@ -155,6 +159,7 @@ async function handleLoadEditor(
       slug: string;
       visibility: string;
       owner_id: string;
+      artifact_type: ArtifactType | null;
       version_id: string | null;
       entrypoint: string | null;
       version_no: number | null;
@@ -163,6 +168,11 @@ async function handleLoadEditor(
     if (!artifact) {
       return errorResponse('ARTIFACT_NOT_FOUND', 'Artifact not found', 404);
     }
+    // A PDF / image / video is bytes, not a page: there is nothing to edit inline.
+    if (artifact.artifact_type && NOT_EDITABLE_TYPES.has(artifact.artifact_type)) {
+      return errorResponse('NOT_EDITABLE', 'This file type cannot be edited.', 409);
+    }
+    const isMarkdown = artifact.artifact_type === 'markdown';
 
     // Get current HTML content
     let html = '';
@@ -225,12 +235,14 @@ async function handleLoadEditor(
       size: a.size_bytes,
     })) || [];
 
-    const editorHtml = draft?.html_content || html;
+    // Markdown drafts hold Markdown; an HTML draft left by the old Edit-Lite is ignored.
+    const usableDraft = draft && !(isMarkdown && isHtmlDocument(draft.html_content)) ? draft : null;
+    const editorHtml = usableDraft?.html_content || html;
     console.log('[Editor:server] load', {
       artifactId,
       userId: ctx.userId,
       htmlBytes: editorHtml.length,
-      hasDraft: !!draft,
+      hasDraft: !!usableDraft,
       collaboratorCount: collaborators.length,
       assetCount: assetRefs.length,
     });
@@ -241,10 +253,11 @@ async function handleLoadEditor(
         artifactId: artifact.id,
         name: artifact.name,
         slug: artifact.slug,
-        html: editorHtml,
+        html: isMarkdown ? markdownEditShell() : editorHtml,
+        ...(isMarkdown ? { kind: 'markdown', markdown: markdownEditPayload(editorHtml) } : {}),
         versionNo: artifact.version_no || 0,
-        hasDraft: !!draft,
-        draftUpdatedAt: draft?.updated_at,
+        hasDraft: !!usableDraft,
+        draftUpdatedAt: usableDraft?.updated_at,
         assets: assetRefs,
         collaborators,
       },

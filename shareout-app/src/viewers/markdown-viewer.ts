@@ -202,6 +202,42 @@ export function isSafeMarkdownUrl(escapedUrl: string): boolean {
   return !scheme || SAFE_URL_SCHEMES.has(scheme[1]);
 }
 
+const LIST_ITEM = /^([ \t]*)([-*+]|\d+\.)[ \t]+(.*)$/;
+
+// Each run of consecutive list lines becomes one <ul>/<ol>; deeper indentation nests
+// inside the previous item, a marker-kind change at the same depth starts a new list.
+function renderLists(html: string): string {
+  const lines = html.split('\n');
+  const out: string[] = [];
+  for (let i = 0; i < lines.length;) {
+    if (!LIST_ITEM.test(lines[i])) { out.push(lines[i++]); continue; }
+    const stack: Array<{ indent: number; tag: 'ul' | 'ol' }> = [];
+    let list = '';
+    for (; i < lines.length && LIST_ITEM.test(lines[i]); i++) {
+      const [, ws, marker, text] = LIST_ITEM.exec(lines[i])!;
+      const indent = ws.replace(/\t/g, '    ').length;
+      const tag = marker.endsWith('.') ? 'ol' : 'ul';
+      while (stack.length && indent < stack[stack.length - 1].indent) list += `</li></${stack.pop()!.tag}>`;
+      const top = stack[stack.length - 1];
+      if (top && indent === top.indent && top.tag !== tag) { list += `</li></${stack.pop()!.tag}>`; }
+      const cur = stack[stack.length - 1];
+      if (cur && indent <= cur.indent) list += '</li>';
+      else {
+        const start = tag === 'ol' ? parseInt(marker, 10) : 1;
+        list += `<${tag}${start !== 1 ? ` start="${start}"` : ''}>`;
+        stack.push({ indent, tag });
+      }
+      const task = tag === 'ul' ? /^\[([ xX])\] (.*)$/.exec(text) : null;
+      list += task
+        ? `<li class="task-list-item"><input type="checkbox"${task[1] === ' ' ? '' : ' checked'} disabled> ${task[2]}`
+        : `<li>${text}`;
+    }
+    while (stack.length) list += `</li></${stack.pop()!.tag}>`;
+    out.push(list);
+  }
+  return out.join('\n');
+}
+
 export function parseMarkdown(md: string): string {
   // eslint-disable-next-line no-control-regex
   let html = md.replace(/\u0000/g, '');
@@ -255,18 +291,8 @@ export function parseMarkdown(md: string): string {
   html = html.replace(/^&gt;\s?(.*)$/gm, '<blockquote>$1</blockquote>');
   html = html.replace(/<\/blockquote>\n<blockquote>/g, '\n');
 
-  // Task lists
-  html = html.replace(/^(\s*)- \[x\] (.*)$/gm, '$1<li class="task-list-item"><input type="checkbox" checked disabled> $2</li>');
-  html = html.replace(/^(\s*)- \[ \] (.*)$/gm, '$1<li class="task-list-item"><input type="checkbox" disabled> $2</li>');
-
-  // Unordered lists
-  html = html.replace(/^(\s*)[-*+]\s+(.*)$/gm, '$1<li>$2</li>');
-
-  // Ordered lists
-  html = html.replace(/^(\s*)\d+\.\s+(.*)$/gm, '$1<li>$2</li>');
-
-  // Wrap consecutive list items
-  html = html.replace(/(<li>[\s\S]*?<\/li>)(\n(?!<li>))/g, '<ul>$1</ul>$2');
+  // Lists (unordered, ordered, task, nested by indentation)
+  html = renderLists(html);
 
   // Tables
   html = html.replace(/^\|(.+)\|\n\|[-:| ]+\|\n((?:\|.+\|\n?)+)/gm, (_, header, body) => {

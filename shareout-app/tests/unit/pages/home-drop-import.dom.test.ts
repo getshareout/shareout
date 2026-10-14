@@ -111,7 +111,7 @@ describe('drop routing', () => {
     const { importDropped, dropItems } = load();
     fetchMock.mockResolvedValueOnce(okJson({ ok: true, slug: 's1', name: 'Q3', artifactId: 'art_9', type: 'html' }));
     await importDropped(dropItems([new File(['<p>'], 'q3.html')]));
-    expect(opened).toEqual([['s1', 'Q3', 'art_9']]);
+    expect(opened).toEqual([['s1', 'Q3', 'art_9', 'html']]);
     (document.querySelector('[data-drop="live"]') as HTMLButtonElement).click();
     expect(asked[0]).toContain('"Q3" (art_9)');
   });

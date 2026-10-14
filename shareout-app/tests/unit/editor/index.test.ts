@@ -378,6 +378,54 @@ describe('handleEditor load (GET /editor)', () => {
     expect(res.status).toBe(500);
     expect((await jsonBody(res)).code).toBe('INTERNAL_ERROR');
   });
+
+  function typedCtx(type: string, published: string, draft: string | null) {
+    const r2Get = vi.fn(async () => ({ text: async () => published }));
+    const ctx = baseCtx({
+      env: {
+        DB: makeDbMock({
+          first: (sql) => {
+            if (sql.includes('FROM artifacts a')) {
+              return { id: 'art_1', name: 'Doc', slug: 'doc', visibility: 'private', owner_id: 'usr_1', artifact_type: type, version_id: 'ver_1', entrypoint: 'doc.md', version_no: 2 };
+            }
+            if (sql.includes('FROM assets') && sql.includes('path = ?')) return { r2_key: 'r2/doc' };
+            if (sql.includes('FROM artifact_drafts')) return draft == null ? null : { id: 'd1', html_content: draft, updated_at: 't1' };
+            return null;
+          },
+        }),
+        ARTIFACTS: { get: r2Get } as unknown as Env['ARTIFACTS'],
+      } as unknown as Env,
+    });
+    return { ctx, r2Get };
+  }
+
+  it('refuses binary types with NOT_EDITABLE and never reads their bytes', async () => {
+    for (const type of ['pdf', 'image', 'video']) {
+      const { ctx, r2Get } = typedCtx(type, '%PDF-1.7 stream', null);
+      const res = await handleEditor(new Request('http://x/editor'), ctx, '');
+      expect(res.status, type).toBe(409);
+      expect((await jsonBody(res)).code).toBe('NOT_EDITABLE');
+      expect(r2Get).not.toHaveBeenCalled();
+    }
+  });
+
+  it('returns Markdown as rendered blocks plus the viewer-styled edit shell', async () => {
+    const { ctx } = typedCtx('markdown', '# Hi\n\nText.\n', null);
+    const editor = (await jsonBody(await handleEditor(new Request('http://x/editor'), ctx, ''))).editor as Record<string, any>;
+    expect(editor.kind).toBe('markdown');
+    expect(editor.html).toContain('data-md-root');
+    expect(editor.markdown.blocks.map((b: { src: string }) => b.src)).toEqual(['# Hi', 'Text.']);
+    expect(editor.markdown.blocks[0].html).toBe('<h1 id="hi">Hi</h1>');
+  });
+
+  it('uses a Markdown draft but ignores an HTML draft left by the old Edit-Lite', async () => {
+    const md = (await jsonBody(await handleEditor(new Request('http://x/editor'), typedCtx('markdown', '# Live\n', '# Draft\n').ctx, ''))).editor as Record<string, any>;
+    expect(md.hasDraft).toBe(true);
+    expect(md.markdown.blocks[0].src).toBe('# Draft');
+    const html = (await jsonBody(await handleEditor(new Request('http://x/editor'), typedCtx('markdown', '# Live\n', '<!DOCTYPE html><html><body># Live</body></html>').ctx, ''))).editor as Record<string, any>;
+    expect(html.hasDraft).toBe(false);
+    expect(html.markdown.blocks[0].src).toBe('# Live');
+  });
 });
 
 describe('handleEditor rollback', () => {

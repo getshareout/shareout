@@ -6,6 +6,7 @@ import { workspace_client_preamble_JS } from './preamble';
 import { workspace_client_rail_resizers_JS } from './rail-resizers';
 import { workspace_client_activity_feed_JS } from './activity-feed';
 import { workspace_client_tabs_JS } from './tabs';
+import { workspace_client_md_edit_JS } from './md-edit';
 import { workspace_client_edit_lite_JS } from './edit-lite';
 import { workspace_client_inspector_details_JS } from './inspector-details';
 import { workspace_client_inspector_activity_JS } from './inspector-activity';
@@ -34,6 +35,7 @@ export const WORKSPACE_CLIENT = [
   workspace_client_rail_resizers_JS,
   workspace_client_activity_feed_JS,
   workspace_client_tabs_JS,
+  workspace_client_md_edit_JS,
   workspace_client_edit_lite_JS,
   workspace_client_inspector_details_JS,
   workspace_client_inspector_activity_JS,
