@@ -1,4 +1,5 @@
 // @vitest-environment node
+// vitest-isolate: fails when it shares an isolate with the other artifact suites.
 // A plain workspace member reads details of, and comments on, a workspace-visible
 // artifact (same closed-artifact viewer rule as the data API).
 import './setup';
