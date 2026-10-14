@@ -1,5 +1,5 @@
 // P0 robustness: artifact share email path — not found, JSON, emails, role, rate limit.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 import type { AuthUser } from '../../../src/api-auth';

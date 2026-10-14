@@ -1,5 +1,5 @@
 // P0 robustness: email OTP start/verify guards (invalid input, rate limits, wrong code).
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 

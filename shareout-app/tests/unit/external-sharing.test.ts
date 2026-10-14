@@ -2,7 +2,7 @@
 // Real Miniflare D1 so the folder-ancestor recursive CTE and the member_class SQL
 // filters are exercised for real (not mocked). KV (env.SLUGS) is unbound in tests, so
 // canAccess hits D1 fresh every call — which makes the revocation assertion exact.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, it, expect } from 'vitest';
 import type { Env } from '../../src/types';
 import type { AuthUser } from '../../src/api-auth';

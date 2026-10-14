@@ -3,7 +3,7 @@
 // the existing `description` column and `artifact_tags` table — the same columns
 // quick-search (src/search/quick-search.ts) already reads, so this also pins that
 // generated summaries/tags are stored where search finds them.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 

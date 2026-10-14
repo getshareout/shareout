@@ -1,7 +1,7 @@
 // Run Inspector serializer: normalize crew / job / alert runs into one shape and
 // list them across surfaces. Uses real env.DB (the workers pool doesn't apply
 // migrations, so the tables the serializer reads are created here).
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, describe, it, expect } from 'vitest';
 import { getRunDetail, listWorkspaceRuns } from '../../../src/runs/inspector';
 

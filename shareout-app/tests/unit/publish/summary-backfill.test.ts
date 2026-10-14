@@ -2,7 +2,7 @@
 // itself is covered in auto-summary.test.ts — this only pins the candidate selection
 // (empty description + null hash, html, not deleted, LIMIT, freshest-first) and that
 // one artifact's failure doesn't stop the rest of the run.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 

@@ -1,6 +1,6 @@
 // A failing job must never be silent: manual runs persist their outcome on the job,
 // and the owner gets one actionable email when a job starts failing.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../src/types';
 

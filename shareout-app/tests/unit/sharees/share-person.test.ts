@@ -1,6 +1,6 @@
 // Share a file/folder with ONE person by email (work/042 P2b). Real Miniflare D1 so the
 // entitlement gate, the internal-member 409 guard, edge creation, and grant minting all run.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, it, expect } from 'vitest';
 import type { Env } from '../../../src/types';
 import type { AuthUser } from '../../../src/api-auth';

@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
 import { generateEditorPage } from '../../../../src/editor/page/generate-editor-page';
 import { EDITOR_CLIENT_SCRIPT_URL } from '../../../../src/editor/page/generate-editor-page';

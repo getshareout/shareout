@@ -3,7 +3,7 @@
  * json_valid/json_each, which a mocked DB cannot tell you parses, let alone that it
  * survives the NULL `mentions` every non-mentioning comment has.
  */
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Env } from '../../../src/types';
 import { queryNeedsYou } from '../../../src/pages/home/queries/activity-needs-you';

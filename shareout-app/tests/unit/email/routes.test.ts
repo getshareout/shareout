@@ -1,5 +1,5 @@
 // P2 robustness: /v1/email/* + email-events webhook (auth, token, suppressions).
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 import { createFetchContext } from '../../../src/router/context';

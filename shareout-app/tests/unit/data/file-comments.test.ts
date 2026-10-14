@@ -1,6 +1,6 @@
 // File comments access gate (work/042 P2). Real Miniflare D1 + sessions so the bucket
 // detection, member-visibility filter, cross-bucket guard, and canAccess grant path all run.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, it, expect } from 'vitest';
 import type { Env } from '../../../src/types';
 import type { DataContext } from '../../../src/data/middleware';

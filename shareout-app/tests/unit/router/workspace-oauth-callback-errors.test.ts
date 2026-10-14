@@ -1,5 +1,5 @@
 // Workspace connector OAuth callback error handling — HTML pages, no internal leaks.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 

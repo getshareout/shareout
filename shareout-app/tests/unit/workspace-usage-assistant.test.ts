@@ -1,5 +1,5 @@
 // Assistant chat and /v1/ask turns (ai_usage_events) show up in the workspace usage ledger.
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { handleGetWorkspaceUsage } from '../../src/router/api/workspace-llm';
 import type { AuthUser } from '../../src/api-auth';

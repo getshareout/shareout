@@ -75,7 +75,7 @@
     "lint:changed": "eslint --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsc.tsbuildinfo",
     "predeploy": "npm run build:editor && npm run build:chat-core && npm run build:sdk && npm run build:mobile && npm run build:grid && npm run build:official-skills && npm run build:skill && npm run build:discovery"
   },
   "dependencies": {
