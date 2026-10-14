@@ -14,6 +14,8 @@ export interface SourceEditorOptions {
   name: string;
   type: SourceEditableType;
   entrypoint: string;
+  /** A workbook sheet other than the entrypoint; published back to that same file. */
+  path?: string | null;
   content: string;
   baseUrl: string;
   versionNo: number;
@@ -195,11 +197,12 @@ export function generateSourceEditorPage(opts: SourceEditorOptions): string {
       slug: ${toScriptJson(opts.slug)},
       type: ${toScriptJson(opts.type)},
       entrypoint: ${toScriptJson(opts.entrypoint)},
+      path: ${toScriptJson(opts.path || null)},
       baseUrl: ${toScriptJson(baseUrl)},
       content: ${toScriptJson(opts.content)},
       versionNo: ${opts.versionNo}
     };
-    var DRAFT_KEY = 'so-source-draft:' + CFG.artifactId;
+    var DRAFT_KEY = 'so-source-draft:' + CFG.artifactId + (CFG.path ? ':' + CFG.path : '');
     var dirty = false;
 
     function setStatus(text, cls) {
@@ -418,7 +421,7 @@ export function generateSourceEditorPage(opts: SourceEditorOptions): string {
       btn.disabled = true; setStatus('Publishing\\u2026');
       fetch(CFG.baseUrl + '/a/' + encodeURIComponent(CFG.slug) + '/edit/source/publish', {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: getContent() })
+        body: JSON.stringify(CFG.path ? { content: getContent(), path: CFG.path } : { content: getContent() })
       })
         .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
         .then(function (res) {

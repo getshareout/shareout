@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 
-const MAX_INPUT_BYTES = 8_000_000; // ponytail: parse cap; stream/partial parse if users hit it
+export const XLSX_MAX_INPUT_BYTES = 8_000_000; // ponytail: parse cap; stream/partial parse if users hit it
 const SAMPLE_ROWS = 20;
 
 export interface SheetSummary {
@@ -21,8 +21,8 @@ function inferType(values: unknown[]): string {
 }
 
 export function parseXlsx(bytes: ArrayBuffer): SheetSummary[] {
-  if (bytes.byteLength > MAX_INPUT_BYTES) {
-    throw new Error(`Spreadsheet too large to read (max ${MAX_INPUT_BYTES / 1_000_000}MB)`);
+  if (bytes.byteLength > XLSX_MAX_INPUT_BYTES) {
+    throw new Error(`Spreadsheet too large to read (max ${XLSX_MAX_INPUT_BYTES / 1_000_000}MB)`);
   }
   const wb = XLSX.read(bytes, { type: 'array', cellDates: true, dense: true });
   return wb.SheetNames.map(name => {

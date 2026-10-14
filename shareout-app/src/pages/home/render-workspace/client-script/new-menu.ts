@@ -1,7 +1,8 @@
 /**
- * Rail "New" menu (no AI): upload a file (the Assets upload), a blank document, or a
- * document from a template (POST /v1/home/new → opens it in Edit). The button is only
- * rendered where the viewer may create (template.ts canCreateHere); the API re-checks.
+ * Rail "New" menu (no AI): upload files (the same routing as drag & drop: documents
+ * become artifacts, the rest goes to Recursos), a blank document, or a document from a
+ * template (POST /v1/home/new → opens it in Edit). The button is only rendered where
+ * the viewer may create (template.ts canCreateHere); the API re-checks.
  */
 export const workspace_client_new_menu_JS = `  // ===== New menu: upload a file · blank document · from a template =====
   var newBtn = document.getElementById('wsxNewBtn');
@@ -34,8 +35,9 @@ export const workspace_client_new_menu_JS = `  // ===== New menu: upload a file 
   function newPicked() { closeNewMenu(false); if (typeof setRail === 'function') setRail(false); }
   function newUpload() {
     newPicked();
-    var lb = ws.querySelector('[data-lens="assets"]'); if (lb) lb.click();
-    var up = document.getElementById('wsxAssetUpload'); if (up) up.click();
+    var inp = document.createElement('input'); inp.type = 'file'; inp.multiple = true;
+    inp.addEventListener('change', function () { if (inp.files && inp.files.length) importDropped(dropItems(inp.files)); });
+    inp.click();
   }
   function newDoc(tpl) {
     newPicked();

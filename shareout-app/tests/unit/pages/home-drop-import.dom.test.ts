@@ -73,10 +73,27 @@ beforeEach(() => {
 });
 
 describe('drop routing', () => {
-  it('sends viewer types to /v1/home/import and images/other files to Assets', () => {
+  it('sends documents to /v1/home/import and building material to Assets', () => {
     const { dropItems } = load();
-    const kinds = dropItems([new File(['a'], 'v.csv'), new File(['a'], 'p.HTML'), new File(['a'], 'd.pdf'), new File(['a'], 'logo.png'), new File(['a'], 'x.xlsx')]);
-    expect(kinds.map((k) => k.kind)).toEqual(['file', 'file', 'file', 'asset', 'asset']);
+    const names = ['v.csv', 'p.HTML', 'd.pdf', 'x.xlsx', 'w.docx', 'o.odt', 'c.ods', 'n.md', 'logo.png', 'logo.svg', 'clip.mp4', 'font.woff2', 'deck.pptx'];
+    const kinds = dropItems(names.map((n) => new File(['a'], n)));
+    expect(kinds.map((k) => k.kind)).toEqual(['file', 'file', 'file', 'file', 'file', 'file', 'file', 'file', 'asset', 'asset', 'asset', 'asset', 'asset']);
+  });
+
+  it('sends Word and spreadsheet files as base64', async () => {
+    const { importDropped, dropItems } = load();
+    fetchMock.mockResolvedValue(okJson({ ok: true, slug: 's', name: 'Plan', artifactId: 'a', type: 'markdown' }));
+    await importDropped(dropItems([new File([new Uint8Array([80, 75, 3, 4])], 'Plan.docx'), new File(['x'], 'b.xlsx')]));
+    const bodies = fetchMock.mock.calls.map((c) => JSON.parse(String((c as [string, RequestInit])[1].body)));
+    expect(bodies[0]).toMatchObject({ name: 'Plan.docx', content: 'UEsDBA==', encoding: 'base64' });
+    expect(bodies[1]).toMatchObject({ name: 'b.xlsx', encoding: 'base64' });
+  });
+
+  it('explains a workbook too big to open', async () => {
+    const { importDropped, dropItems } = load();
+    fetchMock.mockResolvedValueOnce(okJson({ error: 'too big', code: 'SPREADSHEET_TOO_LARGE' }, 413));
+    await importDropped(dropItems([new File(['x'], 'huge.xlsx')]));
+    expect(rows()[0]).toEqual(['huge.xlsx', 'err', t('drop.err.sheetTooBig')]);
   });
 
   it('imports several files in order with per-file status, into the current workspace + folder', async () => {

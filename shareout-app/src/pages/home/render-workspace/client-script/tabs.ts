@@ -16,7 +16,7 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
     b.addEventListener('click', function () {
       var rec = panes[activeKey]; if (!rec) return;
       // Text/JSON/CSV have their own full editor (grid for CSV); Edit-Lite is for pages + Markdown.
-      if (b.getAttribute('data-mode') === 'edit' && EDIT_IN_FULL[rec.art.type]) { window.open('/a/' + encodeURIComponent(rec.art.slug) + '/edit', '_blank', 'noopener'); return; }
+      if (b.getAttribute('data-mode') === 'edit' && EDIT_IN_FULL[rec.art.type]) { window.open('/a/' + encodeURIComponent(rec.art.slug) + '/edit' + stageSheet(rec), '_blank', 'noopener'); return; }
       setEditMode(rec, b.getAttribute('data-mode'));
     });
   });
@@ -60,6 +60,10 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
   var EDIT_NONE = { pdf: 1, image: 1, video: 1 };
   var EDIT_IN_FULL = { txt: 1, json: 1, csv: 1 };
   function canEditType(art) { return !!art.type && !EDIT_NONE[art.type] && !art.noEdit; }
+  // The workbook sheet the stage shows (?sheet=N), so Edit opens that same sheet.
+  function stageSheet(rec) {
+    try { var m = /[?&]sheet=(\\d+)/.exec(rec.iframe.contentWindow.location.search); return m ? '?sheet=' + m[1] : ''; } catch (e) { return ''; }
+  }
   function stageUrl(slug) { return '/a/' + encodeURIComponent(slug) + '/?wsx=1'; }
   function paintStage(rec) {
     if (STAGE_UNSANDBOXED[rec.art.type]) rec.iframe.removeAttribute('sandbox');

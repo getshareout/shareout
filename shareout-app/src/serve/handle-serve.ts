@@ -1,4 +1,4 @@
-import type { Env } from '../types';
+import type { Env, TypeMetadata } from '../types';
 import type { ArtifactWithAsset, CachedDeployment } from './types';
 import { getCachedDeployment, cacheDeployment, buildCacheRecord, fetchAssetRow, DEPLOYMENT_SELECT } from './deployment-cache';
 import { checkAccess } from './access';
@@ -92,6 +92,10 @@ export async function gateArtifactSideAsset(
   }
   if ((normalizeVisibility(result.visibility) || 'public') === 'public') return { isOpen: true };
   return (await checkAccess(request, env, slug, result)) ?? { isOpen: false };
+}
+
+function importedOriginal(typeMetadata: string | null): string | null {
+  try { return (JSON.parse(typeMetadata || '{}') as TypeMetadata).source?.original || null; } catch { return null; }
 }
 
 function isViewerDownloadPath(path: string, entrypoint: string): boolean {
@@ -297,14 +301,17 @@ export async function handleServe(
   const socialPreview = resolveArtifactSocialPreview(result, baseUrl, slug);
 
   // The typed viewers' Download link targets /a/{slug}/download or /a/{slug}/{name}{ext}
-  // (no such asset): serve the source file as an attachment.
-  if (!asset && assetPath && hasCustomViewer(result.artifact_type || 'html') &&
+  // (no such asset): serve the source file as an attachment. /download is "the file" for
+  // every non-HTML artifact — an imported Word/Excel file's original when it kept one.
+  if (!asset && assetPath && ((result.artifact_type || 'html') !== 'html' || hasCustomViewer(result.artifact_type || 'html')) &&
       isViewerDownloadPath(assetPath, result.entrypoint)) {
-    const source = await fetchAssetRow(env, result.version_id, result.entrypoint);
+    const original = assetPath === 'download' ? importedOriginal(result.type_metadata) : null;
+    const filePath = original || result.entrypoint;
+    const source = await fetchAssetRow(env, result.version_id, filePath);
     if (source) {
       const resp = await serveAsset(request, env, source, slug, true, { noStore, relaxCsp: !isOpen });
       const out = new Response(resp.body, resp);
-      let filename = result.entrypoint.split('/').pop()!;
+      let filename = filePath.split('/').pop()!;
       if (assetPath !== 'download') { try { filename = decodeURIComponent(assetPath); } catch { /* keep entrypoint name */ } }
       out.headers.set('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
       return out;

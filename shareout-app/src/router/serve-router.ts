@@ -480,6 +480,7 @@ async function routeEditorServe(
         artifact,
         artifact.artifact_type,
         getPlatformOrigin(env),
+        url.searchParams.get('sheet'),
       );
     }
     return serveEditorPage(

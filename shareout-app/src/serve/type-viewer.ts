@@ -2,6 +2,8 @@ import type { Env, TypeMetadata } from '../types';
 import { trackPageView } from '../analytics';
 import { trackViewerView } from '../view-tracking';
 import { hasCustomViewer, renderViewer, viewerScriptCsp } from '../viewers';
+import type { ViewerSource } from '../viewers/viewer-shell';
+import { generateTypeMetadata } from '../validation';
 import { loadSkillViewerMetrics } from '../skill-marketplace';
 import { loadLibraryViewerMetrics } from '../workspace-library';
 import { getSessionUser } from '../auth/session';
@@ -24,14 +26,6 @@ export async function serveTypeViewer(
 ): Promise<Response> {
   const baseUrl = env.SHAREOUT_BASE_URL.replace(/\/$/, '');
 
-  // Fetch the raw content
-  const obj = await env.ARTIFACTS.get(asset.r2_key);
-  if (!obj) {
-    return notFound();
-  }
-
-  const content = await obj.text();
-
   // Parse type metadata
   let typeMetadata: TypeMetadata = {};
   if (artifact.type_metadata) {
@@ -41,6 +35,29 @@ export async function serveTypeViewer(
       // Invalid metadata, use empty
     }
   }
+
+  // Imported workbook: ?sheet=N shows another sheet's CSV (its own column metadata).
+  const imported = typeMetadata.source;
+  const sheetNo = Number(new URL(request.url).searchParams.get('sheet')) || 1;
+  const sheet = imported?.sheets && sheetNo > 1 ? imported.sheets[sheetNo - 1] : undefined;
+  let file = asset;
+  if (sheet) {
+    const row = await env.DB.prepare('SELECT r2_key, mime, size_bytes FROM assets WHERE version_id = ? AND path = ?')
+      .bind(artifact.version_id, sheet.path).first<{ r2_key: string; mime: string; size_bytes: number }>();
+    if (row) file = row;
+  }
+
+  // Fetch the raw content
+  const obj = await env.ARTIFACTS.get(file.r2_key);
+  if (!obj) {
+    return notFound();
+  }
+
+  const content = await obj.text();
+  if (file !== asset) typeMetadata = { ...typeMetadata, ...generateTypeMetadata(artifact.artifact_type, content, file.mime) };
+  const source: ViewerSource | undefined = imported?.original
+    ? { original: imported.original, sheets: imported.sheets?.map((x) => x.name), activeSheet: file !== asset ? sheetNo - 1 : 0 }
+    : undefined;
 
   // Resolve the session once, then check admin + favorite state.
   const sessionUser = await getSessionUser(request, env);
@@ -84,6 +101,7 @@ export async function serveTypeViewer(
     libraryMetrics,
     locale,
     nonce,
+    source,
   );
 
   if (!html) {

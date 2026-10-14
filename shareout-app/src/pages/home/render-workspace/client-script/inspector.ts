@@ -127,6 +127,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       + '<button class="wsx-abtn wsx-det__act" data-iact="open" type="button">' + isvg(SVG_OPEN) + esc(t('inspector.openLabel')) + '</button>'
       + (editable ? '<button class="wsx-abtn wsx-det__act" data-iact="edit" type="button">' + isvg(SVG_EDIT) + esc(t('inspector.editLabel')) + '</button>' : '')
       + iconBtn('copy', t('inspector.act.copy'), SVG_COPY)
+      + (canMoveToAssets(meta) ? iconBtn('toassets', t('move.toAssets'), SVG_TO_ASSETS) : '')
       + (meta && meta.can_delete ? iconBtn('trash', t('inspector.act.trash'), SVG_TRASH, 'is-danger') : '')
       + '</div>';
 
@@ -199,6 +200,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
         else if (act === 'copy') { copyText(fullUrl, b); }
         else if (act === 'fav') { toggleFav(art.id, b); var ft = b.classList.contains('is-on') ? t('inspector.favRemove') : t('inspector.favAdd'); b.setAttribute('data-tip', ft); b.setAttribute('aria-label', ft); }
         else if (act === 'trash') { trashArtifact(art); }
+        else if (act === 'toassets') { moveToAssets(art, meta); }
       });
     });
 

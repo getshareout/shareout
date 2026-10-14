@@ -5,8 +5,8 @@ export const NEW_MENU_COPY: HomeLocaleCopy = {
   en: {
     'nav.new': 'New',
     'new.menu': 'Create something new',
-    'new.upload': 'Upload a file',
-    'new.uploadHint': 'PDF, Excel, images — saved in Assets',
+    'new.upload': 'Upload files',
+    'new.uploadHint': 'Documents become artifacts; the rest goes to Assets',
     'new.blank': 'Blank document',
     'new.blankHint': 'Start from scratch',
     'new.template': 'From a template',
@@ -24,8 +24,8 @@ export const NEW_MENU_COPY: HomeLocaleCopy = {
   es: {
     'nav.new': 'Nuevo',
     'new.menu': 'Crear algo nuevo',
-    'new.upload': 'Subir un archivo',
-    'new.uploadHint': 'PDF, Excel, imágenes — se guarda en Recursos',
+    'new.upload': 'Subir archivos',
+    'new.uploadHint': 'Los documentos son artefactos; el resto va a Recursos',
     'new.blank': 'Documento en blanco',
     'new.blankHint': 'Empezá desde cero',
     'new.template': 'Desde una plantilla',

@@ -20,7 +20,7 @@ export function resolveStoredArtifactType(artifactType: ArtifactType): ArtifactT
 
 export async function buildTypeMetadata(
   env: Env,
-  params: Pick<PublishParams, 'artifactType' | 'entrypoint' | 'files' | 'slug' | 'library' | 'workspaceId'>,
+  params: Pick<PublishParams, 'artifactType' | 'entrypoint' | 'files' | 'slug' | 'library' | 'workspaceId' | 'source'>,
   user: AuthUser,
 ): Promise<{ typeMetadata: TypeMetadata; libraryScope: LibraryScope | null }> {
   const { artifactType, entrypoint, files, slug, library, workspaceId } = params;
@@ -28,6 +28,8 @@ export async function buildTypeMetadata(
   const typeMetadata: TypeMetadata = mainFile
     ? generateTypeMetadata(artifactType, mainFile.content, mainFile.mime)
     : {};
+
+  if (params.source) typeMetadata.source = params.source;
 
   let libraryScope: LibraryScope | null = null;
   if (artifactType === 'library' && library) {
