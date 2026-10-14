@@ -1551,6 +1551,69 @@ paths:
                           type: string
         "403":
           $ref: "#/components/responses/Forbidden"
+  /v1/data/{artifactId}/platform/{provider}/{endpoint}/execute:
+    parameters:
+      - name: artifactId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+        example: redshift
+      - name: endpoint
+        in: path
+        required: true
+        schema:
+          type: string
+        description: >-
+          Provider endpoint id. SQL providers (`supabase`, `redshift`, `aurora`):
+          `sql.query` with `params.body = { sql, maxRows? }` → `{ columns, rows }`. `s3`:
+          `objects.list` (`params.queryParams.prefix`), `objects.get`
+          (`params.queryParams.key`; CSV → `rows`, JSON → `data`, text → `text`, ≤ 10 MB),
+          `objects.presign` (`params.body = { key, expiresIn? }` → signed URL). Snowflake:
+          `statements.execute`; BigQuery: `jobs.query`.
+        example: sql.query
+    post:
+      tags: [Data]
+      summary: Run a platform connector endpoint
+      description: >-
+        Runs a workspace platform connector server-side; credentials never reach the
+        caller. Allowed for the artifact owner and workspace members. Under a row-level
+        access policy, a scoped viewer's SQL must contain `:viewer_scope`. Connection
+        ids: `GET /v1/workspaces/{workspaceId}/connections` (any member), or
+        `GET /v1/data/{artifactId}/platform/connections` (artifact owner).
+      operationId: executePlatformEndpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [connectionId]
+              properties:
+                connectionId:
+                  type: string
+                params:
+                  type: object
+                  properties:
+                    body:
+                      type: object
+                    queryParams:
+                      type: object
+                    pathParams:
+                      type: object
+            example:
+              connectionId: conn_abc123
+              params: { body: { sql: "select region, sum(revenue) as revenue from sales group by 1" } }
+      responses:
+        "200":
+          description: "`{ success, data, meta }` — `data` is the provider result."
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /v1/data/{artifactId}/blobs:
     parameters:
       - $ref: "#/components/parameters/DataArtifactId"
@@ -4604,7 +4667,20 @@ paths:
     post:
       tags: [Workspaces]
       summary: Create a workspace connector
-      description: "Admin+. `credentialScope`: `shared` (default) or `per_user`."
+      description: >-
+        Admin+. Two kinds. **Generic** (`type`: `rest_api`, `bigquery`, `snowflake`;
+        `credentials.type`: `api_key`, `basic_auth`, `service_account`). **Platform**
+        (`kind: platform` + `provider`): the Connectors catalog — `s3`, `supabase`,
+        `redshift`, `aurora`, `snowflake`, `bigquery`, `google-analytics`, `google-ads`,
+        `facebook-ads`, `shopify`, `tiendanube`. Platform credential types: `aws_access_key`
+        (`access_key_id`, `secret_access_key`, optional `session_token` — s3, redshift,
+        aurora), `oauth` (`access_token` — supabase, shopify, tiendanube, facebook-ads),
+        `key_pair` (snowflake), `service_account`, `authorized_user`. Per-provider `config`:
+        s3 `bucket`, `region`, optional `prefix`, `endpoint`; supabase `project_ref` (ref or
+        project URL); redshift `region`, `database` and one of `workgroup_name` /
+        `cluster_identifier` (+ `db_user` or `secret_arn`); aurora `resource_arn`,
+        `secret_arn`, `database`. `credentialScope`: `shared` (default) or `per_user`.
+        Secrets are encrypted and never returned.
       operationId: createWorkspaceConnection
       requestBody:
         required: true
@@ -4612,13 +4688,23 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name, type]
+              required: [name]
               properties:
                 name:
                   type: string
+                  description: Letters, digits, `_` and `-`; max 64.
+                kind:
+                  type: string
+                  enum: [generic, platform]
+                  default: generic
                 type:
                   type: string
-                  example: rest_api
+                  description: Generic connectors only.
+                  enum: [rest_api, bigquery, snowflake]
+                provider:
+                  type: string
+                  description: "Platform connectors only (`kind: platform`)."
+                  example: s3
                 credentialScope:
                   type: string
                   enum: [shared, per_user]
@@ -4629,6 +4715,34 @@ paths:
                   type: object
                 credentials:
                   type: object
+                  properties:
+                    type:
+                      type: string
+                      enum: [api_key, basic_auth, service_account, authorized_user, key_pair, oauth, aws_access_key]
+                    data:
+                      type: object
+            examples:
+              s3:
+                value:
+                  name: exports
+                  kind: platform
+                  provider: s3
+                  config: { bucket: acme-exports, region: us-east-1, prefix: exports/ }
+                  credentials: { type: aws_access_key, data: { access_key_id: AKIA..., secret_access_key: "..." } }
+              supabase:
+                value:
+                  name: app-db
+                  kind: platform
+                  provider: supabase
+                  config: { project_ref: "https://abcdefghijklmnopqrst.supabase.co" }
+                  credentials: { type: oauth, data: { access_token: sbp_... } }
+              redshift:
+                value:
+                  name: warehouse
+                  kind: platform
+                  provider: redshift
+                  config: { region: us-east-1, database: dev, workgroup_name: analytics }
+                  credentials: { type: aws_access_key, data: { access_key_id: AKIA..., secret_access_key: "..." } }
       responses:
         "200":
           description: Created
@@ -4654,7 +4768,8 @@ paths:
               properties:
                 provider:
                   type: string
-                  example: google-analytics
+                  description: "Any platform provider id, e.g. `s3`, `supabase`, `redshift`, `aurora`, `google-analytics`. Same `config` and `credentials` shape as create."
+                  example: s3
                 config:
                   type: object
                 credentials:
