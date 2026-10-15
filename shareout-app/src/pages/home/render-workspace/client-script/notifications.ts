@@ -36,7 +36,7 @@ export const workspace_client_notifications_JS = `
     function needCard(e, isSeen) {
       var isAccess = e.kind === 'access';
       var top = e.actor ? esc(e.actor) : esc(e.artifact_name || t('notif.activity'));
-      var sum = e.actor ? (esc(e.summary) + ' \\u00B7 ' + esc(e.artifact_name || '')) : esc(e.summary);
+      var sum = e.actor && e.artifact_name ? (esc(e.summary) + ' \\u00B7 ' + esc(e.artifact_name)) : esc(e.summary);
       var href = !isAccess && e.slug ? '/a/' + encodeURIComponent(e.slug) + '/' : '';
       var cls = isSeen ? 'wsx-ncard is-seen' : 'wsx-ncard';
       if (isAccess) cls += ' wsx-ncard--access';

@@ -190,8 +190,9 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
     if (rec.saveTimer) clearTimeout(rec.saveTimer);
     setSaveStatus(rec, t('tabs.discarding'));
     fetch('/v1/artifacts/' + encodeURIComponent(rec.art.id) + '/editor/draft', { method: 'DELETE', credentials: 'same-origin' })
-      .then(function (r) { if (!r.ok) throw new Error('discard'); rec.dirty = false; renderTabs(); rec.loaded = false; rec.sel = null; loadEditSource(rec); })
-      .catch(function () { setSaveStatus(rec, t('tabs.couldNotDiscard'), 'warn'); });
+      .then(okOr)
+      .then(function () { rec.dirty = false; renderTabs(); rec.loaded = false; rec.sel = null; loadEditSource(rec); })
+      .catch(function (e) { setSaveStatus(rec, errReason(e, t('tabs.couldNotDiscard')), 'warn'); });
   }
   // Undo/redo snapshots the SOURCE doc; restore re-renders the live preview.
   function pushHistory(rec) {

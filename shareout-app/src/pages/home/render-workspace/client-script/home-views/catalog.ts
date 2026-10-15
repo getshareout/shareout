@@ -67,8 +67,9 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
     function busyCall(b, busyLabel, url, body) {
       var label = b.textContent; b.disabled = true; if (busyLabel) b.textContent = busyLabel;
       fetch(url, body ? { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: body } : { method: 'POST', credentials: 'same-origin' })
-        .then(function (r) { if (!r.ok) throw new Error('failed'); loadCatalog(); })
-        .catch(function () { b.disabled = false; b.textContent = label; showToast(t('common.actionFailed'), 'error'); });
+        .then(okOr)
+        .then(function () { loadCatalog(); })
+        .catch(function (e) { b.disabled = false; b.textContent = label; failToast(e, t('common.actionFailed')); });
     }
     if (en) en.addEventListener('click', function () { busyCall(en, t('common.saving'), '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/catalog/enable', '{"enabled":true}'); });
     var sd = document.getElementById('catSeed');

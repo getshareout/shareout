@@ -6,6 +6,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { workspace_client_inspector_JS as inspectorJs } from '../../../src/pages/home/render-workspace/client-script/inspector';
 import { workspace_client_home_views_connectors_JS as connectorsJs } from '../../../src/pages/home/render-workspace/client-script/home-views/connectors';
+import { fetchErrorHelpers } from '../helpers/fetch-errors';
+
+const errHelpers = fetchErrorHelpers();
 
 type Fn = (...a: unknown[]) => unknown;
 let fetchImpl: Fn = () => new Promise(() => {});
@@ -33,6 +36,7 @@ function load(src: string, names: string[]): Record<string, Fn> {
       if (prop === 't') return (k: unknown) => String(k);
       if (prop === 'fetch') return (...a: unknown[]) => fetchImpl(...a);
       if (prop === 'loadSecOrder') return () => ['description'];
+      if (prop in errHelpers) return errHelpers[prop];
       if (prop in globalThis) return (globalThis as Record<string, unknown>)[prop];
       return blackhole;
     },

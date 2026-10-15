@@ -328,7 +328,8 @@ function passwordLoginScript(redirectAfter: string, c: SignInCopy = EN): string 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: form.email.value.trim(), password: form.password.value })
     }).then(function (r) {
-      return r.json().then(function (d) { return { ok: r.ok, data: d }; });
+      // A non-JSON 5xx is our failure, not the visitor's network: fall through to the server-error copy.
+      return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, data: d || {} }; });
     }).then(function (res) {
       if (res.ok && res.data.ok) { window.location.href = ${dest}; return; }
       if (res.data.redirect_url) { window.location.href = res.data.redirect_url; return; }

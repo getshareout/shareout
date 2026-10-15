@@ -314,7 +314,13 @@ function wireFiles(ctx: EditorContext, host: HTMLElement): void {
           credentials: 'same-origin',
           body: form,
         });
-        if (!res.ok) throw new Error(String(res.status));
+        if (!res.ok) {
+          // A refusal (too large, no permission, over quota) says why; only a network
+          // failure lands in the generic "check your connection" below.
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          showToast(`Couldn’t upload ${file.name}. ${body.error || `Request failed (${res.status})`}`, 'error');
+          return;
+        }
         showToast(`Uploaded ${file.name}`, 'success');
         void renderDataBrowser(ctx);
       } catch (err) {

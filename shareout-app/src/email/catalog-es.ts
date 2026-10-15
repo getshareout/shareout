@@ -17,6 +17,7 @@ import type {
   ActionItemResolvedData,
   ShareData,
   AccessRequestData,
+  AdminRequestData,
   AccessApprovedData,
   AccessDeclinedData,
   PublishApprovalData,
@@ -181,6 +182,20 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
       p('Abrí la página para aprobar o rechazar el pedido.'),
     cta: { label: 'Ver el pedido', href: url },
     bodyText: `${requesterEmail} pidió acceso a tu página "${pageName}". Abrí la página para aprobar o rechazar el pedido: ${url}`,
+  }),
+
+  admin_request: ({ requesterName, workspaceName, action, reason, url }: AdminRequestData) => ({
+    subject: `${requesterName} necesita a un admin en ${workspaceName}`,
+    preheader: `${requesterName} intentó algo que solo puede hacer un admin.`,
+    heading: 'Alguien del equipo necesita a un admin',
+    bodyHtml:
+      p(`<strong>${escapeHtml(requesterName)}</strong> intentó algo en <strong>${escapeHtml(workspaceName)}</strong> que solo puede hacer un admin.`) +
+      (action ? p(`Qué intentó: ${escapeHtml(action)}`) : '') +
+      (reason ? p(`Qué vio: ${escapeHtml(reason)}`) : '') +
+      p('Podés hacerlo vos, o cambiarle el rol o la configuración del workspace.'),
+    cta: { label: 'Abrir tu workspace', href: url },
+    footerNote: 'Te llega porque sos admin del workspace.',
+    bodyText: `${requesterName} intentó algo en ${workspaceName} que solo puede hacer un admin.${action ? `\nQué intentó: ${action}` : ''}${reason ? `\nQué vio: ${reason}` : ''}\nAbrir tu workspace: ${url}`,
   }),
 
   access_approved: ({ pageName, url }: AccessApprovedData) => ({

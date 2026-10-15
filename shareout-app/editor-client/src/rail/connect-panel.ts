@@ -94,8 +94,9 @@ function wireAddConnection(ctx: EditorContext, host: HTMLElement): void {
           body: JSON.stringify(body),
         });
         if (!res.ok) {
-          const err = (await res.json().catch(() => ({}))) as { message?: string };
-          throw new Error(err.message || `Request failed (${res.status})`);
+          // The API error envelope carries the reason in `error` (src/http/api-error.ts).
+          const err = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+          throw new Error(err.error || err.message || `Request failed (${res.status})`);
         }
         showToast('Connection added', 'success');
         await renderConnectPanel(ctx, host); // re-fetch + re-render (re-wires handlers)

@@ -457,7 +457,10 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
           return resp.json().catch(function () { return null; }).then(function (j) {
             if (j && j.error && (j.code === 'UPGRADE_REQUIRED' || j.code === 'FEATURE_DISABLED')) { addBot(j.error); return; }
             console.warn('[agent] chat request failed', resp.status, j && j.error);
-            addError(resp.status === 429 ? 'agent.err.busy' : 'agent.err.unavailable', text);
+            // Retry only where it can work (busy / our side / network); otherwise say why.
+            var why = window.soOptimistic.describe({ status: resp.status, code: j && j.code, serverMessage: j && typeof j.error === 'string' ? j.error : '' });
+            if (why.retry || !why.detail) addError(resp.status === 429 ? 'agent.err.busy' : 'agent.err.unavailable', why.retry ? text : null);
+            else addError('agent.err.unavailable').querySelector('.wsx-err__msg').textContent = why.detail;
           });
         }
         return readStream(resp, function (ev) {

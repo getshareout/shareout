@@ -302,9 +302,10 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
           // Slack "Post to Slack" sends the rich preview card (TL;DR, image, owner, updated).
           var cfg = deliverConfig(), slack = dest === 'Slack';
           fetch('/v1/artifacts/' + encodeURIComponent(art.id) + (slack ? '/share/slack' : '/deliver'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(slack ? { connection: cfg.connection, channelId: cfg.channelId, preview: true } : { action: dest.toLowerCase(), config: cfg }) })
+            .then(okOr)
             .then(function (r) { return r.json().catch(function () { return null; }); })
             .then(function (j) { b.disabled = false; b.textContent = label; if (j && (j.success || j.delivered)) wsxToast(t('inspector.deliverSent').replace('{dest}', dest)); else wsxToast((j && j.error) || t('inspector.deliverFailed'), true); })
-            .catch(function () { b.disabled = false; b.textContent = label; wsxToast(t('inspector.deliverFailed'), true); });
+            .catch(function (e) { b.disabled = false; b.textContent = label; failToast(e, t('inspector.deliverFailed')); });
         });
       });
       delBody.querySelectorAll('[data-freq]').forEach(function (b) {
@@ -316,6 +317,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
             rollback: function () { if (freqRow) freqRow.hidden = false; },
             request: function () {
               return fetch('/v1/jobs', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ artifact_id: art.id, action: d.toLowerCase(), config: cfg, schedule: CRON[f] }) })
+                .then(okOr)
                 .then(function (r) { return r.json().catch(function () { return null; }); })
                 .then(function (j) { if (j && (j.id || j.job || j.success)) return j; var e = new Error('schedule'); e.userMessage = j && j.error; throw e; });
             },
@@ -788,14 +790,15 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     });
     btn.disabled = true;
     fetch('/v1/home/comments', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ artifactId: art.id, content: text, parentId: parentId || undefined, mentions: mentions.length ? mentions : undefined }) })
-      .then(function (r) { return r.json().catch(function () { return null; }).then(function (j) { return r.ok ? j : { status: r.status }; }); })
+      .then(okOr)
+      .then(function (r) { return r.json().catch(function () { return null; }); })
       .then(function (j) {
         btn.disabled = false;
-        if (!j || !j.comment) { ccError(ta, t(j && j.status === 403 ? 'inspector.cannotComment' : 'inspector.couldNotPost')); return; }
+        if (!j || !j.comment) { ccError(ta, t('inspector.couldNotPost')); return; }
         (cmtCache[art.id] = cmtCache[art.id] || []).push(j.comment);
         paintComments(art, cmtCache[art.id]);
       })
-      .catch(function () { btn.disabled = false; ccError(ta, t('inspector.couldNotPost')); });
+      .catch(function (e) { btn.disabled = false; ccError(ta, e && e.status === 403 ? t('inspector.cannotComment') : errReason(e, t('inspector.couldNotPost'))); });
   }
 
   var HOUSE_SVG = isvg('<path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/>');

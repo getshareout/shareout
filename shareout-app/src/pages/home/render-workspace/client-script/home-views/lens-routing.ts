@@ -118,7 +118,8 @@ export const workspace_client_home_views_lensRouting_JS = `  var lenses = ws.que
       };
       if (window.WSX_WS) payload.workspaceId = window.WSX_WS;
       fetch('/v1/support/tickets', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
-        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(okOr)
+        .then(function (r) { return r.json(); })
         .then(function (res) {
           send.disabled = false;
           if (res && res.success) {
@@ -126,7 +127,7 @@ export const workspace_client_home_views_lensRouting_JS = `  var lenses = ws.que
             document.getElementById('wsxHelpSubject').value = ''; document.getElementById('wsxHelpBody').value = '';
             mineLoaded = true; loadMine();
           } else { if (msg) msg.textContent = t('help.couldNotSend'); }
-        }).catch(function () { send.disabled = false; if (msg) msg.textContent = t('help.couldNotSend'); });
+        }).catch(function (e) { send.disabled = false; if (msg) msg.textContent = errReason(e, t('help.couldNotSend')); });
     });
   })();
 

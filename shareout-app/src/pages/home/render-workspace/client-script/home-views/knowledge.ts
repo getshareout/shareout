@@ -124,8 +124,9 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     if (en) en.addEventListener('click', function () {
       var label = en.textContent; en.disabled = true; en.textContent = t('common.saving');
       fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/knowledge/enable', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: '{"enabled":true}' })
-        .then(function (r) { if (!r.ok) throw new Error('failed'); loadKnowledge(); })
-        .catch(function () { en.disabled = false; en.textContent = label; showToast(t('knowledge.updateError'), 'error'); });
+        .then(okOr)
+        .then(function () { loadKnowledge(); })
+        .catch(function (e) { en.disabled = false; en.textContent = label; failToast(e, t('knowledge.updateError')); });
     });
   }
 
@@ -165,7 +166,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     fetch(knBase() + '/backfill', { method: 'POST', credentials: 'same-origin' })
       .then(function (r) {
         if (r.status === 403) return { __gate: true };
-        if (!r.ok) throw new Error('failed');
+        if (!r.ok) return okOr(r);
         return r.json();
       })
       .then(function (d) {
@@ -179,7 +180,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
         knStopPoll(); knPolls = 0; knPollErrs = 0; knShowProg(true); knSetProg(0, q);
         knPollTimer = setTimeout(knPoll, 4000);
       })
-      .catch(function () { if (btn) btn.disabled = false; showToast(t('knowledge.updateError'), 'error'); });
+      .catch(function (e) { if (btn) btn.disabled = false; failToast(e, t('knowledge.updateError')); });
   }
 
   function knKpiTiles() {
@@ -593,7 +594,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
   function knPut(node, raw) {
     return fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/knowledge/files/' + knApiPath(node.path), {
       method: 'PUT', credentials: 'same-origin', headers: { 'content-type': 'text/markdown' }, body: raw
-    }).then(function (r) { if (!r.ok) throw new Error('failed'); });
+    }).then(okOr);
   }
 
   function knPin(node) {
@@ -646,7 +647,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
       var sv = document.getElementById('knSave'); sv.disabled = true; sv.textContent = t('knowledge.saving');
       knPut(node, document.getElementById('knText').value)
         .then(function () { showToast(t('knowledge.updated'), 'success'); knReopen(node.path); })
-        .catch(function () { sv.disabled = false; sv.textContent = t('knowledge.save'); showToast(t('knowledge.updateError'), 'error'); });
+        .catch(function (e) { sv.disabled = false; sv.textContent = t('knowledge.save'); failToast(e, t('knowledge.updateError')); });
     });
   }
 
@@ -713,7 +714,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
 
   function knGuidancePut(name, body) {
     return fetch(knWsBase() + '/context/' + encodeURIComponent(name), { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'text/markdown' }, body: body })
-      .then(function (r) { if (!r.ok) throw new Error('failed'); });
+      .then(okOr);
   }
 
   function knGuidanceEdit(node) {
@@ -727,7 +728,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
       var sv = document.getElementById('knGSave'); sv.disabled = true; sv.textContent = t('knowledge.saving');
       knGuidancePut(node.name, document.getElementById('knGText').value)
         .then(function () { showToast(t('knowledge.updated'), 'success'); knReopen(node.path); })
-        .catch(function () { sv.disabled = false; sv.textContent = t('knowledge.save'); showToast(t('knowledge.updateError'), 'error'); });
+        .catch(function (e) { sv.disabled = false; sv.textContent = t('knowledge.save'); failToast(e, t('knowledge.updateError')); });
     });
   }
 

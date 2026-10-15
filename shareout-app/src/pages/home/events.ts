@@ -13,7 +13,7 @@ import type { Env } from '../../types';
 import type { WorkspaceRole } from '../../types';
 
 export type ActivityKind =
-  | 'comment' | 'reply' | 'mention' | 'share' | 'access' | 'alert' | 'test' | 'file' | 'stale_data' | 'metric_watch' | 'unused_artifacts' | 'moderation' | 'support_reply'  // actionable
+  | 'comment' | 'reply' | 'mention' | 'share' | 'access' | 'alert' | 'test' | 'file' | 'stale_data' | 'metric_watch' | 'unused_artifacts' | 'moderation' | 'support_reply' | 'admin_request'  // actionable
   | 'run' | 'publish' | 'create' | 'favorite' | 'view'
   | 'connection' | 'skill' | 'member' | 'agent';                  // ambient
 
@@ -52,6 +52,8 @@ export const EVENT_DEFS: Record<ActivityKind, EventDef> = {
   unused_artifacts:{ tier: 'actionable', defaultAudience: 'admins', label: 'Unused pages',    hint: 'Published pages nobody has opened in 90+ days' },
   moderation:  { tier: 'actionable', defaultAudience: 'self',    label: 'Safety review',     hint: 'When a held page passes review or gets blocked' },
   support_reply: { tier: 'actionable', defaultAudience: 'self', label: 'Support replies',   hint: 'When the team answers a help request you opened' },
+  // Directed at the admins a member asked (rows exist only for them), so 'admins' is a label, not a filter.
+  admin_request: { tier: 'actionable', defaultAudience: 'admins', label: 'Admin requests',  hint: 'A member asked an admin to do something only admins can' },
   run:        { tier: 'ambient',    defaultAudience: 'members', label: 'Job & crew runs',   hint: 'Scheduled job and crew executions' },
   publish:    { tier: 'ambient',    defaultAudience: 'members', label: 'Publishes',         hint: 'New versions published' },
   create:     { tier: 'ambient',    defaultAudience: 'members', label: 'New artifacts',     hint: 'Artifacts created' },
