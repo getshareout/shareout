@@ -15,7 +15,7 @@ Think of it as a boutique studio intake: understand the *why* and *who* before t
 7. **Decide placement.** Which workspace, folder, and visibility. Personal artifacts default to no folder; Teams artifacts can be foldered. See [../api/folders.md](../api/folders.md) and [../team/folders.md](../team/folders.md).
 8. **Build from a skeleton.** Start from a known-good base, never a blank file. See [blueprint.md](blueprint.md).
 9. **Self-QA gate.** Run the pre-ship checklist. Do not publish until it passes. See [pre-ship.md](pre-ship.md).
-10. **Publish.** Pipe the payload to `curl` (Cloudflare blocks Python `requests`). See [Publishing](../SKILL.md#publishing) and [../api/artifacts.md](../api/artifacts.md). Share the one-line `editor_readiness` summary the publish returns.
+10. **Publish.** Pipe the payload to `curl` (Cloudflare blocks Python `urllib` with `403 error code: 1010`). See [Publishing](../SKILL.md#publishing) and [../api/artifacts.md](../api/artifacts.md). Share the one-line `editor_readiness` summary the publish returns.
 
 ## Decision record
 

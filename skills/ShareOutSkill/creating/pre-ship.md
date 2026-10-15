@@ -65,7 +65,7 @@ Run this before every publish. If a box can't be honestly ticked, it's not done.
 
 ## Then publish
 
-Pipe the payload to `curl` (Cloudflare blocks Python `requests`). See [Publishing](../SKILL.md#publishing). Read back the advisory `editor_readiness` profile and share the one-line summary with the user — treat it as guidance, not a gate.
+Pipe the payload to `curl` (Cloudflare blocks Python `urllib` with `403 error code: 1010`). See [Publishing](../SKILL.md#publishing). Read back the advisory `editor_readiness` profile and share the one-line summary with the user — treat it as guidance, not a gate.
 
 ## Related
 

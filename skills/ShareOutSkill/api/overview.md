@@ -93,7 +93,7 @@ Full envelope and recovery steps: [errors.md](errors.md).
 
 ## Cloudflare Protection
 
-ShareOut uses Cloudflare. Python `requests` triggers 1010 block.
+ShareOut uses Cloudflare. Some HTTP clients identify themselves with a user agent Cloudflare blocks before the request reaches ShareOut: you get `403` with the body `error code: 1010` (not a JSON error). Python `urllib` (`Python-urllib/3.x`) is the common one. `curl`, `requests`, `httpx` and Node `fetch` pass.
 
 **Solution:** Build payload in Python, pipe to curl:
 
