@@ -2192,12 +2192,15 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/Folder"
+                  can_create:
+                    type: boolean
+                    description: Whether the caller may create folders in this workspace.
         "403":
           $ref: "#/components/responses/Forbidden"
     post:
       tags: [Folders]
       summary: Create a Team Space folder
-      description: Owner/admin only (members get 403 ADMIN_REQUIRED).
+      description: Owners/admins always; members while the workspace setting `members_can_create_folders` is on (the default), otherwise 403 ADMIN_REQUIRED.
       operationId: createWorkspaceFolder
       requestBody:
         required: true
@@ -2286,7 +2289,7 @@ paths:
     patch:
       tags: [Folders]
       summary: Update a Team Space folder
-      description: Also accepts PUT. Any member.
+      description: Also accepts PUT. Owners/admins for any folder; a member only for folders they created, while `members_can_create_folders` is on (otherwise 403 ADMIN_REQUIRED).
       operationId: updateWorkspaceFolder
       requestBody:
         required: true
@@ -2322,7 +2325,7 @@ paths:
     delete:
       tags: [Folders]
       summary: Delete a Team Space folder
-      description: Owner/admin only. Artifacts become unfiled and subfolders move to the top level.
+      description: Owners/admins for any folder; a member only for folders they created, while `members_can_create_folders` is on (otherwise 403 ADMIN_REQUIRED). Artifacts become unfiled and subfolders move to the top level.
       operationId: deleteWorkspaceFolder
       responses:
         "200":

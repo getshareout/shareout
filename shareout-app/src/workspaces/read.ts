@@ -14,6 +14,7 @@ interface WorkspaceReadRow {
   artifact_count: number;
   folder_count: number;
   member_count: number;
+  member_folders_enabled: number;
 }
 
 interface Seats {
@@ -25,8 +26,12 @@ interface Seats {
 // This build has no plans, and nothing ever enforced a seat limit on invite — it was
 // only reported. Reporting one told self-hosters they were capped at three members
 // on their own instance, so the count is now unlimited and honest.
-function seatsFor(row: WorkspaceReadRow): Seats {
+function seatsFor(row: Pick<WorkspaceReadRow, 'member_count'>): Seats {
   return { used: row.member_count, limit: null, remaining: null };
+}
+
+function present({ member_folders_enabled, ...row }: WorkspaceReadRow) {
+  return { ...row, members_can_create_folders: !!member_folders_enabled, seats: seatsFor(row) };
 }
 
 const READ_SELECT = `
@@ -50,7 +55,7 @@ export async function handleGetWorkspace(
     return json({ error: 'Workspace not found', code: 'NOT_FOUND' }, 404);
   }
 
-  return json({ ...workspace, seats: seatsFor(workspace) });
+  return json(present(workspace));
 }
 
 export async function handleGetWorkspaceBySlug(
@@ -66,5 +71,5 @@ export async function handleGetWorkspaceBySlug(
     return json({ error: 'Workspace not found', code: 'NOT_FOUND' }, 404);
   }
 
-  return json({ ...workspace, seats: seatsFor(workspace) });
+  return json(present(workspace));
 }

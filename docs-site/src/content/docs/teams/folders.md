@@ -6,8 +6,10 @@ description: Organize workspace artifacts into shared folders visible to all wor
 import { Aside } from '@astrojs/starlight/components';
 
 **Team Space folders** are shared folders inside a Teams workspace. Every
-member can see and move artifacts into them; only `owner` and `admin` can
-create, rename, or delete folders.
+member can see and move artifacts into them. `owner` and `admin` create,
+rename, and delete any folder. Members create folders and rename or delete the
+ones they created, unless an admin turned **Members can create folders** off
+(Admin → Settings, or `members_can_create_folders` on `PATCH /v1/workspaces/{id}`).
 
 <Aside>
 Personal folders (not tied to any workspace) use `/v1/folders`. This page
@@ -18,7 +20,7 @@ covers workspace folders only.
 
 | Scope | Visible to | Folder creation | API prefix |
 | --- | --- | --- | --- |
-| Team Space | All workspace members | `owner` / `admin` only | `/v1/workspaces/{id}/folders` |
+| Team Space | All workspace members | `owner` / `admin`; `member` unless turned off | `/v1/workspaces/{id}/folders` |
 | Personal | Owner (+ linked accounts) | Owner | `/v1/folders` |
 
 ## Endpoints
@@ -103,5 +105,5 @@ per workspace.
 
 | Code | Meaning |
 | --- | --- |
-| `403 ADMIN_REQUIRED` | Member tried to create/delete a folder. |
+| `403 ADMIN_REQUIRED` | Member tried to create a folder while member folders are off, or to change one someone else created. |
 | `409 SLUG_CONFLICT` | Slug already exists at this folder level. |

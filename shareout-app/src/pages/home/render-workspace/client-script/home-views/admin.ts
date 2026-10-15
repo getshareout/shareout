@@ -647,10 +647,11 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
     var run = function () { return Promise.all([
       fetch(wsUrl('/publish-policy'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
       fetch(wsUrl('/branding'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      fetch(wsUrl('/features'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+      fetch(wsUrl('/features'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+      fetch(wsUrl(''), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
     ]); };
     swr('settings', function (res) {
-      var pol = res[0]; var brd = res[1] || {}; var feat = res[2];
+      var pol = res[0]; var brd = res[1] || {}; var feat = res[2]; var wsInfo = res[3] || {};
       var cur = (pol && pol.policy) || 'allow'; var n = (pol && (pol.approvals_required || pol.approvalsRequired)) || 1;
       var pubSection = '<div class="wsx-admin__settings-section">'
         + '<div class="wsx-admin__settings-title">' + esc(t('admin.publishingPolicy')) + '</div>'
@@ -660,6 +661,10 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
         }).join('') + '</div>'
         + '<div class="wsx-admin__apprv" id="wsxApprvRow"' + (cur === 'require_approval' ? '' : ' hidden') + '><label>' + esc(t('admin.approvalsRequired')) + ' <input type="number" id="wsxApprvN" min="1" max="10" value="' + n + '"></label></div>'
         + '</div>';
+      var memberFolders = wsInfo.members_can_create_folders !== false;
+      var folderSection = '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.teamFolders')) + '</div>'
+        + '<p class="wsx-lens__intro">' + esc(t('admin.teamFoldersIntro')) + '</p>'
+        + '<label class="wsx-admin__check"><input type="checkbox" id="wsxMemberFolders"' + (memberFolders ? ' checked' : '') + '> ' + esc(t('admin.membersCreateFolders')) + '</label></div>';
       var accent = brd.accent_color || '${colors.primary}';
       var brdSection = '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.branding')) + '</div>'
         + '<div class="wsx-admin__brand"><div class="wsx-admin__logocol">'
@@ -701,7 +706,7 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
         + '<div class="wsx-home-lang" role="group" aria-label="Language" data-i18n-aria="settings.language">'
         + '<button class="home-lang-btn" type="button" data-scope="workspace" data-lang="en" aria-selected="true" title="English" data-i18n-title="settings.languageEn">\\uD83C\\uDDFA\\uD83C\\uDDF8 EN</button>'
         + '<button class="home-lang-btn" type="button" data-scope="workspace" data-lang="es" aria-selected="false" title="Espa\\u00f1ol" data-i18n-title="settings.languageEs">\\uD83C\\uDDE6\\uD83C\\uDDF7 ES</button>'
-        + '</div></div>' + pubSection + brdSection + featSection;
+        + '</div></div>' + pubSection + folderSection + brdSection + featSection;
       if (typeof window.__SO_APPLY_HOME_I18N === 'function') window.__SO_APPLY_HOME_I18N();
       if (typeof window.__SO_WIRE_HOME_LANG === 'function') window.__SO_WIRE_HOME_LANG(m);
       var copyBtn = document.getElementById('wsxInboxCopy');
@@ -736,6 +741,19 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
         b.addEventListener('click', function () { savePol(b.getAttribute('data-pol')); });
       });
       if (nn) nn.addEventListener('change', function () { savePol(cur); });
+      var mfEl = document.getElementById('wsxMemberFolders');
+      mfEl.addEventListener('change', function () {
+        var next = mfEl.checked;
+        optimistic({
+          key: 'member-folders',
+          apply: function () { mfEl.checked = next; },
+          rollback: function () { mfEl.checked = !next; },
+          request: function () { return adReq(wsUrl(''), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ members_can_create_folders: next }) }); },
+          success: t('common.saved'),
+          error: adErr(t('admin.saveFailed')),
+          done: function () { delete adDataCache['settings']; },
+        });
+      });
       var bmsg = document.getElementById('wsxBrandMsg');
       var accEl = document.getElementById('wsxBrandAccent'), footEl = document.getElementById('wsxBrandFooter');
       var savedBrand = { a: accEl.value, f: footEl.checked };

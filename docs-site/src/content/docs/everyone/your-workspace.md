@@ -113,7 +113,8 @@ becomes a **hamburger drawer** instead of a fixed sidebar.
 
 In **All Artifacts**, folders appear above your page cards — click a folder to
 drill in (Drive-style) with a **breadcrumb** to climb back. Create, rename, or
-delete folders from the header (team folders require `owner`/`admin`; personal
+delete folders from the header (team folders: `owner`/`admin` for any folder,
+members for the ones they created unless an admin turned that off; personal
 folders are yours). Deleting a folder orphans its pages back to All Artifacts —
 it never deletes the pages themselves. Recent, Favorites, Shared, and Mine
 filters still show everything; folders are navigation, not a filter that hides pages.

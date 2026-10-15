@@ -113,8 +113,9 @@ izquierdo es un **drawer hamburguesa** en lugar de barra fija.
 
 En **Todos los artifacts**, las carpetas aparecen arriba de las tarjetas de páginas —
 hacé clic en una carpeta para entrar (estilo Drive) con un **breadcrumb** para
-volver. Creá, renombrá o borrá carpetas desde el encabezado (carpetas de equipo
-requieren `owner`/`admin`; las personales son tuyas). Borrar una carpeta deja
+volver. Creá, renombrá o borrá carpetas desde el encabezado (carpetas de equipo:
+`owner`/`admin` cualquiera, los miembros las que crearon salvo que un admin lo
+desactive; las personales son tuyas). Borrar una carpeta deja
 sus páginas en Todos los artifacts — nunca borra las páginas. Los filtros Recent,
 Favorites, Shared y Mine siguen mostrando todo; las carpetas son navegación, no
 un filtro que oculta páginas.

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  canManageTeamFolder,
   handleCreateFolder,
   handleDeleteFolder,
   handleGetFolder,
@@ -25,7 +26,9 @@ function makeDbMock(handlers: {
   return {
     prepare: vi.fn((sql: string) => ({
       bind: vi.fn((...bindArgs: unknown[]) => ({
-        first: vi.fn(async () => handlers.first?.(sql, ...bindArgs) ?? null),
+        // members_can_create_folders defaults ON, like the column; a handler may override it.
+        first: vi.fn(async () => handlers.first?.(sql, ...bindArgs)
+          ?? (sql.includes('member_folders_enabled') ? { member_folders_enabled: 1 } : null)),
         all: vi.fn(async () => handlers.all?.(sql, ...bindArgs) ?? { results: [] }),
         run: vi.fn(async () => handlers.run?.(sql, ...bindArgs) ?? { success: true }),
       })),
@@ -71,8 +74,8 @@ function folderDetailFirst(sql: string, ...args: unknown[]): unknown {
   if (sql.includes('SELECT visibility, parent_id FROM folders WHERE id = ?')) {
     return { visibility: 'public', parent_id: null };
   }
-  if (sql.includes('SELECT id FROM folders WHERE id = ? AND workspace_id = ?')) {
-    return { id: folderId };
+  if (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?')) {
+    return { id: folderId, created_by: user.id };
   }
   if (sql.includes('SELECT parent_id FROM folders WHERE id = ?')) {
     return { parent_id: null };
@@ -119,6 +122,22 @@ describe('handleListFolders', () => {
     expect((await jsonBody(response)).folders).toEqual(folders);
   });
 
+  it('reports can_create for a member from members_can_create_folders', async () => {
+    for (const [enabled, expected] of [[1, true], [0, false]] as const) {
+      const env = {
+        ...baseEnv,
+        DB: makeDbMock({ first: roleFirst('member', (sql) => (sql.includes('member_folders_enabled') ? { member_folders_enabled: enabled } : null)) }),
+      };
+      const response = await handleListFolders(
+        new Request(`https://shareout.example.com/v1/workspaces/${workspaceId}/folders`),
+        env,
+        user,
+        workspaceId,
+      );
+      expect((await jsonBody(response)).can_create).toBe(expected);
+    }
+  });
+
   it('filters by parent_id when provided', async () => {
     const parentId = 'fld_parent';
     const env = {
@@ -160,8 +179,15 @@ describe('handleCreateFolder', () => {
     expect(response.status).toBe(403);
   });
 
-  it('returns 403 when member (non-admin) tries to create', async () => {
-    const env = { ...baseEnv, DB: makeDbMock({ first: roleFirst('member') }) };
+  it('returns 403 ADMIN_REQUIRED when a member creates and members_can_create_folders is off', async () => {
+    const run = vi.fn(async () => ({ success: true }));
+    const env = {
+      ...baseEnv,
+      DB: makeDbMock({
+        first: roleFirst('member', (sql) => (sql.includes('member_folders_enabled') ? { member_folders_enabled: 0 } : null)),
+        run,
+      }),
+    };
     const response = await handleCreateFolder(
       new Request(`https://shareout.example.com/v1/workspaces/${workspaceId}/folders`, {
         method: 'POST',
@@ -173,7 +199,41 @@ describe('handleCreateFolder', () => {
       workspaceId,
     );
     expect(response.status).toBe(403);
-    expect((await jsonBody(response)).code).toBe('ADMIN_REQUIRED');
+    const body = await jsonBody(response);
+    expect(body.code).toBe('ADMIN_REQUIRED');
+    expect(String(body.hint)).toContain('workspace settings');
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('lets a member create a folder when members_can_create_folders is on, recording them as creator', async () => {
+    const run = vi.fn(async () => ({ success: true }));
+    const env = {
+      ...baseEnv,
+      DB: makeDbMock({
+        first: (sql, ...args) => {
+          if (sql.includes('SELECT role FROM workspace_members')) return { role: 'member' };
+          if (sql.includes('member_folders_enabled')) return { member_folders_enabled: 1 };
+          return folderDetailFirst(sql, ...args);
+        },
+        run,
+      }),
+    };
+    const response = await handleCreateFolder(
+      new Request(`https://shareout.example.com/v1/workspaces/${workspaceId}/folders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Mine' }),
+      }),
+      env,
+      user,
+      workspaceId,
+    );
+    expect(response.status).toBe(201);
+    const prepare = env.DB.prepare as ReturnType<typeof vi.fn>;
+    const insertIdx = prepare.mock.calls.findIndex(([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO folders'));
+    expect(insertIdx).toBeGreaterThanOrEqual(0);
+    const bindArgs = prepare.mock.results[insertIdx].value.bind.mock.calls[0];
+    expect(bindArgs[bindArgs.length - 1]).toBe(user.id);
   });
 
   it('returns 400 for invalid JSON', async () => {
@@ -228,7 +288,7 @@ describe('handleCreateFolder', () => {
       ...baseEnv,
       DB: makeDbMock({
         first: roleFirst('admin', (sql) => {
-          if (sql.includes('SELECT id FROM folders WHERE id = ? AND workspace_id = ?')) return null;
+          if (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?')) return null;
           return null;
         }),
       }),
@@ -455,6 +515,56 @@ describe('handleGetFolderByPath', () => {
 });
 
 describe('handleUpdateFolder', () => {
+  it('returns 403 ADMIN_REQUIRED when a member renames a folder someone else created', async () => {
+    const run = vi.fn(async () => ({ success: true }));
+    const env = {
+      ...baseEnv,
+      DB: makeDbMock({
+        first: roleFirst('member', (sql) => (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?') ? { id: folderId, created_by: 'usr_other' } : null)),
+        run,
+      }),
+    };
+    const response = await handleUpdateFolder(
+      new Request(`https://shareout.example.com/v1/workspaces/${workspaceId}/folders/${folderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Renamed' }),
+      }),
+      env,
+      user,
+      workspaceId,
+      folderId,
+    );
+    expect(response.status).toBe(403);
+    expect((await jsonBody(response)).code).toBe('ADMIN_REQUIRED');
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('lets an admin rename a folder someone else created', async () => {
+    const env = {
+      ...baseEnv,
+      DB: makeDbMock({
+        first: (sql, ...args) => {
+          if (sql.includes('SELECT role FROM workspace_members')) return { role: 'admin' };
+          if (sql.includes('created_by FROM folders')) return { id: folderId, created_by: 'usr_other' };
+          return folderDetailFirst(sql, ...args);
+        },
+      }),
+    };
+    const response = await handleUpdateFolder(
+      new Request(`https://shareout.example.com/v1/workspaces/${workspaceId}/folders/${folderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Renamed' }),
+      }),
+      env,
+      user,
+      workspaceId,
+      folderId,
+    );
+    expect(response.status).toBe(200);
+  });
+
   it('returns 403 when not a member', async () => {
     const env = { ...baseEnv, DB: makeDbMock({ first: roleFirst(null) }) };
     const response = await handleUpdateFolder(
@@ -476,7 +586,7 @@ describe('handleUpdateFolder', () => {
       ...baseEnv,
       DB: makeDbMock({
         first: roleFirst('member', (sql) => {
-          if (sql.includes('SELECT id FROM folders WHERE id = ? AND workspace_id = ?')) return null;
+          if (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?')) return null;
           return null;
         }),
       }),
@@ -501,7 +611,7 @@ describe('handleUpdateFolder', () => {
       DB: makeDbMock({
         first: (sql, ...args) => {
           if (sql.includes('SELECT role FROM workspace_members')) return { role: 'member' };
-          if (sql.includes('SELECT id FROM folders WHERE id = ? AND workspace_id = ?')) return { id: folderId };
+          if (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?')) return { id: folderId, created_by: user.id };
           return null;
         },
       }),
@@ -527,8 +637,8 @@ describe('handleUpdateFolder', () => {
       DB: makeDbMock({
         first: (sql, ...args) => {
           if (sql.includes('SELECT role FROM workspace_members')) return { role: 'member' };
-          if (sql.includes('SELECT id FROM folders WHERE id = ? AND workspace_id = ?') && !sql.includes('slug = ?')) {
-            return { id: folderId };
+          if (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?') && !sql.includes('slug = ?')) {
+            return { id: folderId, created_by: user.id };
           }
           if (sql.includes('SELECT parent_id FROM folders WHERE id = ?')) return { parent_id: null };
           if (sql.includes('slug = ? AND id != ?')) return { id: 'fld_other' };
@@ -557,7 +667,7 @@ describe('handleUpdateFolder', () => {
       DB: makeDbMock({
         first: (sql) => {
           if (sql.includes('SELECT role FROM workspace_members')) return { role: 'member' };
-          if (sql.includes('SELECT id FROM folders WHERE id = ? AND workspace_id = ?')) return { id: folderId };
+          if (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?')) return { id: folderId, created_by: user.id };
           return null;
         },
       }),
@@ -605,8 +715,15 @@ describe('handleUpdateFolder', () => {
 });
 
 describe('handleDeleteFolder', () => {
-  it('returns 403 for member role', async () => {
-    const env = { ...baseEnv, DB: makeDbMock({ first: roleFirst('member') }) };
+  it('returns 403 ADMIN_REQUIRED when a member deletes a folder someone else created', async () => {
+    const run = vi.fn(async () => ({ success: true }));
+    const env = {
+      ...baseEnv,
+      DB: makeDbMock({
+        first: roleFirst('member', (sql) => (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?') ? { id: folderId, created_by: 'usr_other' } : null)),
+        run,
+      }),
+    };
     const response = await handleDeleteFolder(
       new Request(`https://shareout.example.com/v1/workspaces/${workspaceId}/folders/${folderId}`, { method: 'DELETE' }),
       env,
@@ -615,6 +732,50 @@ describe('handleDeleteFolder', () => {
       folderId,
     );
     expect(response.status).toBe(403);
+    expect((await jsonBody(response)).code).toBe('ADMIN_REQUIRED');
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('lets a member delete a folder they created while members_can_create_folders is on', async () => {
+    const run = vi.fn(async () => ({ success: true }));
+    const env = {
+      ...baseEnv,
+      DB: makeDbMock({
+        first: roleFirst('member', (sql) => (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?') ? { id: folderId, created_by: user.id } : null)),
+        run,
+      }),
+    };
+    const response = await handleDeleteFolder(
+      new Request(`https://shareout.example.com/v1/workspaces/${workspaceId}/folders/${folderId}`, { method: 'DELETE' }),
+      env,
+      user,
+      workspaceId,
+      folderId,
+    );
+    expect(response.status).toBe(200);
+    expect(run).toHaveBeenCalled();
+  });
+
+  it('blocks a member deleting their own folder once members_can_create_folders is off', async () => {
+    const env = {
+      ...baseEnv,
+      DB: makeDbMock({
+        first: roleFirst('member', (sql) => {
+          if (sql.includes('member_folders_enabled')) return { member_folders_enabled: 0 };
+          if (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?')) return { id: folderId, created_by: user.id };
+          return null;
+        }),
+      }),
+    };
+    const response = await handleDeleteFolder(
+      new Request(`https://shareout.example.com/v1/workspaces/${workspaceId}/folders/${folderId}`, { method: 'DELETE' }),
+      env,
+      user,
+      workspaceId,
+      folderId,
+    );
+    expect(response.status).toBe(403);
+    expect((await jsonBody(response)).code).toBe('ADMIN_REQUIRED');
   });
 
   it('returns 403 when not a member', async () => {
@@ -635,7 +796,7 @@ describe('handleDeleteFolder', () => {
       DB: makeDbMock({
         first: (sql) => {
           if (sql.includes('SELECT role FROM workspace_members')) return { role: 'admin' };
-          if (sql.includes('SELECT id FROM folders WHERE id = ? AND workspace_id = ?')) return null;
+          if (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?')) return null;
           return null;
         },
       }),
@@ -657,7 +818,7 @@ describe('handleDeleteFolder', () => {
       DB: makeDbMock({
         first: (sql) => {
           if (sql.includes('SELECT role FROM workspace_members')) return { role: 'admin' };
-          if (sql.includes('SELECT id FROM folders WHERE id = ? AND workspace_id = ?')) return { id: folderId };
+          if (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?')) return { id: folderId, created_by: user.id };
           return null;
         },
         run: (sql) => { runSql.push(sql); return { success: true }; },
@@ -684,7 +845,7 @@ describe('handleDeleteFolder', () => {
       DB: makeDbMock({
         first: (sql) => {
           if (sql.includes('SELECT role FROM workspace_members')) return { role: 'admin' };
-          if (sql.includes('SELECT id FROM folders WHERE id = ? AND workspace_id = ?')) return { id: folderId };
+          if (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?')) return { id: folderId, created_by: user.id };
           if (sql.includes('FROM artifacts WHERE folder_id')) return { count: 0 };
           if (sql.includes('FROM folders WHERE parent_id')) return { count: 0 };
           return null;
@@ -752,7 +913,7 @@ describe('handleMoveArtifactToFolder', () => {
       DB: makeDbMock({
         first: roleFirst('member', (sql) => {
           if (sql.includes('FROM artifacts WHERE id = ? AND workspace_id = ?')) return { id: 'art_1' };
-          if (sql.includes('SELECT id FROM folders WHERE id = ? AND workspace_id = ?')) return null;
+          if (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?')) return null;
           return null;
         }),
       }),
@@ -779,7 +940,7 @@ describe('handleMoveArtifactToFolder', () => {
       DB: makeDbMock({
         first: roleFirst('member', (sql) => {
           if (sql.includes('FROM artifacts WHERE id = ? AND workspace_id = ?')) return { id: 'art_1' };
-          if (sql.includes('SELECT id FROM folders WHERE id = ? AND workspace_id = ?')) return { id: folderId };
+          if (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?')) return { id: folderId, created_by: user.id };
           return null;
         }),
         run,
@@ -854,5 +1015,20 @@ describe('resolveFolderPath', () => {
       }),
     };
     await expect(resolveFolderPath(env, workspaceId, 'parent/child')).resolves.toBe('fld_child');
+  });
+});
+
+describe('canManageTeamFolder', () => {
+  it('lets admins and owners manage any folder, whatever the setting', () => {
+    expect(canManageTeamFolder('admin', false, 'usr_other', user.id)).toBe(true);
+    expect(canManageTeamFolder('owner', false, null, user.id)).toBe(true);
+  });
+
+  it('lets a member manage only the folders they created, only while the setting is on', () => {
+    expect(canManageTeamFolder('member', true, user.id, user.id)).toBe(true);
+    expect(canManageTeamFolder('member', true, 'usr_other', user.id)).toBe(false);
+    expect(canManageTeamFolder('member', true, null, user.id)).toBe(false);
+    expect(canManageTeamFolder('member', false, user.id, user.id)).toBe(false);
+    expect(canManageTeamFolder(null, true, user.id, user.id)).toBe(false);
   });
 });

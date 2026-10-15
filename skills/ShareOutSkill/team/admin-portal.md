@@ -39,7 +39,7 @@ workspace-scoped member endpoints, which require you to already be in it.
 | **Automation** | Workspace-wide schedules and crew automations as tables — enable/disable, run now, open **Run Inspector** drawer for any run |
 | **AI** | Workspace assistant toggles and connector **AI query** settings — which connectors the home agent may query |
 | **Security** | Session policy, audit log, workspace Agent tokens (`sot_`) — see [agent-tokens.md](agent-tokens.md) |
-| **Settings** | Publish governance policy, workspace branding (logo, accent, footer), **file inbox** address (`{slug}@inbox.example.com`), read-only feature flags |
+| **Settings** | Publish governance policy, whether members can create Team Space folders (`members_can_create_folders`), workspace branding (logo, accent, footer), **file inbox** address (`{slug}@inbox.example.com`), read-only feature flags |
 | **Support** | Customer ticket workbench for this workspace — list, open thread, edit AI draft, **Approve & send** reply on the origin channel, assign, resolve. Super-admins also use the global `/admin?view=support` view for cross-workspace tickets |
 
 Deep-link a tab with hash routing inside Admin: `#l/admin` then pick a tab in the UI.

@@ -34,7 +34,7 @@ Workspace roles:
 | --- | --- |
 | `owner` | Full workspace control. |
 | `admin` | Manage members, policy, subdomain, settings, workspace admin tasks. |
-| `member` | Create/edit own artifacts; view workspace-visible artifacts. |
+| `member` | Create/edit own artifacts; view workspace-visible artifacts. Create Team Space folders and rename/delete the ones they created, unless an admin turned [`members_can_create_folders`](#workspace-settings) off. |
 
 Endpoints:
 
@@ -85,6 +85,25 @@ curl -sS -X POST "$ORIGIN/v1/workspaces/$WS/members/invite" \
 
 Seat usage: `GET /v1/workspaces/{id}` may include `seats: { used, limit, remaining }`.
 On self-host, `limit` is typically unlimited / unset — do not invent seat paywalls.
+
+## Workspace Settings
+
+```http
+GET   /v1/workspaces/{workspaceId}
+PATCH /v1/workspaces/{workspaceId}
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{ "members_can_create_folders": false }
+```
+
+- `PATCH` requires `admin` or `owner` (`403 INSUFFICIENT_ROLE` otherwise); `GET` requires membership.
+  It also takes `name`, `description` and `slug`; omit a field to leave it unchanged.
+- `members_can_create_folders` (boolean, default `true`): when on, members create
+  [Team Space folders](folders.md) and rename/delete the ones they created; folders made
+  by someone else stay admin/owner-only. When off, only admins/owners create, rename or
+  delete folders and members get `403 ADMIN_REQUIRED`. A non-boolean value is
+  `400 VALIDATION_ERROR`. In the app: **Admin → Settings → Team Space folders**.
 
 ## Workspace Membership Policy
 
@@ -193,7 +212,7 @@ Authorization: Bearer {token}
 }
 ```
 
-Records member add/remove, bulk invite, ownership transfer, subdomain enable/disable, membership-policy changes, connection create/delete, and session-policy changes. Retained one year.
+Records member add/remove, bulk invite, ownership transfer, subdomain enable/disable, membership-policy changes, connection create/delete, session-policy changes, and `members_can_create_folders` changes. Retained one year.
 
 ## Workspace Context
 

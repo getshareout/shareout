@@ -38,6 +38,7 @@ export interface HomeFolder {
   id: string;
   name: string;
   artifact_count: number;
+  created_by?: string | null;
 }
 
 export interface HomeTag {

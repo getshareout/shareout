@@ -61,7 +61,7 @@ Content-Type: application/json
 - Slugs are unique per owner among siblings (same `parent_id`).
 - `parent_id`: optional — nest under another owned folder.
 - `readme`: optional markdown **folder guide** — see below.
-- `workspace_id`: optional — creates a Team Space folder in that workspace instead (same as `POST /v1/workspaces/{id}/folders`: admins/owners only; `403` if you are not a member).
+- `workspace_id`: optional — creates a Team Space folder in that workspace instead (same as `POST /v1/workspaces/{id}/folders`: admins/owners, and members unless the workspace turned `members_can_create_folders` off; `403` if you are not a member).
 
 **Response (201):** folder object with `artifact_count: 0`.
 
@@ -89,7 +89,7 @@ Only the artifact **owner** can move it. Folder assignment does not affect publi
 
 The home screen uses a **Personal vs Team** model. Use the **avatar switcher** (avatar menu) to move between **Personal** and each team workspace you belong to. Personal and Team Space each have their own folder chips in one unified top bar.
 
-In the **All Artifacts** lens, click a folder to drill in (breadcrumb **All › {folder}**). Owners/admins can create, rename, or delete Team Space folders from that view; personal-folder owners can do the same on Personal home. Deleting a folder unfiles its pages — artifacts are not deleted.
+In the **All Artifacts** lens, click a folder to drill in (breadcrumb **All › {folder}**). Owners/admins can create, rename, or delete Team Space folders from that view, and members can create folders and manage the ones they created unless an admin turned that off; personal-folder owners can do the same on Personal home. Deleting a folder unfiles its pages — artifacts are not deleted.
 
 On the personal home catalog (`GET /home`), the folders rail shows **"Private to you"**. Workspace catalogs switch to Team Space folders when a workspace is selected (labeled **"Team Space · {workspace name}"**).
 

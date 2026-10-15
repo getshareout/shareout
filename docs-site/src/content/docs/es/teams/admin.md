@@ -22,7 +22,7 @@ workspace con diez pestañas — sin app de admin separada:
 | **AI** | Gasto/balance/requests/tokens, uso por modelo, gestión de clave LLM propia (OpenAI / Vercel Gateway) |
 | **Security** | Editor de dominios permitidos (preserva emails explícitos al guardar), feed del **audit log** |
 | **Support** | Tickets de soporte de tu workspace desde todos los canales — lista, hilo, editar el borrador de respuesta de la IA, **Aprobar y enviar**, resolver |
-| **Settings** | Política de publicación, logo del workspace (branding), dirección del **inbox de archivos** (`{slug}@inbox.shareout.site`), feature flags de solo lectura |
+| **Settings** | Política de publicación, si los miembros pueden crear carpetas del Team Space, logo del workspace (branding), dirección del **inbox de archivos** (`{slug}@inbox.shareout.site`), feature flags de solo lectura |
 
 Los enlaces rápidos desde Overview saltan a la pestaña que necesita atención.
 Schedules, Alerts y Crew AI también tienen sus propios lentes en Home.

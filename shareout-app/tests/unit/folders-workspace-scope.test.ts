@@ -29,9 +29,12 @@ describe('POST /v1/folders with workspace_id', () => {
     expect(getInternalWorkspaceRole).toHaveBeenCalledWith(env, 'wsp_000000000000000000000000', 'usr_1');
   });
 
-  it('applies the Team Space admin rule for plain members', async () => {
+  it('applies the Team Space rule for plain members when member folders are off', async () => {
     getInternalWorkspaceRole.mockResolvedValue('member');
-    const res = await handleCreatePersonalFolder(post({ name: 'X', workspace_id: 'wsp_1' }), env, user);
+    const offEnv = {
+      DB: { prepare: (sql: string) => ({ bind: () => ({ first: async () => (sql.includes('member_folders_enabled') ? { member_folders_enabled: 0 } : null) }) }) },
+    } as unknown as Env;
+    const res = await handleCreatePersonalFolder(post({ name: 'X', workspace_id: 'wsp_1' }), offEnv, user);
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({ code: 'ADMIN_REQUIRED' });
   });

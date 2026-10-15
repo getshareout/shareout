@@ -23,7 +23,7 @@ export async function queryFoldersInParent(
     if (!(await isLinkedWorkspaceMember(env, vis, opts.workspaceId))) return [];
     const params = opts.parentId ? [opts.workspaceId, opts.parentId] : [opts.workspaceId];
     const rows = await env.DB.prepare(`
-      SELECT f.id, f.name,
+      SELECT f.id, f.name, f.created_by,
              (SELECT COUNT(*) FROM artifacts WHERE folder_id = f.id AND deleted_at IS NULL) as artifact_count
       FROM folders f
       WHERE f.workspace_id = ? AND ${parentSql}

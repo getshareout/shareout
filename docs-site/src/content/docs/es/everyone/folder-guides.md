@@ -38,7 +38,7 @@ Editala o borrala cuando quieras con el lápiz en la guía.
 ## Quién puede editarla
 
 - **Carpetas personales** — vos, el dueño.
-- **Carpetas de Team Space** — dueños y admins del espacio. Todo el equipo ve la guía; mantiene alineado a todo el equipo (y a sus agentes).
+- **Carpetas de Team Space** — dueños y admins del espacio, y el miembro que creó la carpeta (mientras los miembros puedan crear carpetas). Todo el equipo ve la guía; mantiene alineado a todo el equipo (y a sus agentes).
 
 ## Funciona para los agentes
 

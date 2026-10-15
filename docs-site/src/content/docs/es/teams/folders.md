@@ -6,8 +6,11 @@ description: Organizá los artifacts del workspace en carpetas compartidas visib
 import { Aside } from '@astrojs/starlight/components';
 
 Las **carpetas del Team Space** son carpetas compartidas dentro de un workspace
-de Teams. Todos los miembros pueden verlas y mover artifacts; solo `owner` y
-`admin` pueden crear, renombrar o eliminar carpetas.
+de Teams. Todos los miembros pueden verlas y mover artifacts. `owner` y `admin`
+crean, renombran y eliminan cualquier carpeta. Los miembros crean carpetas y
+renombran o eliminan las que crearon, salvo que un admin haya desactivado
+**Los miembros pueden crear carpetas** (Admin → Settings, o
+`members_can_create_folders` en `PATCH /v1/workspaces/{id}`).
 
 <Aside>
 Las carpetas personales (fuera de cualquier workspace) usan `/v1/folders`.
@@ -18,7 +21,7 @@ Esta página cubre solo carpetas de workspace.
 
 | Alcance | Visible para | Creación de carpetas | Prefijo de API |
 | --- | --- | --- | --- |
-| Team Space | Todos los miembros del workspace | Solo `owner` / `admin` | `/v1/workspaces/{id}/folders` |
+| Team Space | Todos los miembros del workspace | `owner` / `admin`; `member` salvo que esté desactivado | `/v1/workspaces/{id}/folders` |
 | Personal | Owner (+ cuentas vinculadas) | Owner | `/v1/folders` |
 
 ## Endpoints
@@ -103,5 +106,5 @@ por workspace.
 
 | Código | Significado |
 | --- | --- |
-| `403 ADMIN_REQUIRED` | Un miembro intentó crear o eliminar una carpeta. |
+| `403 ADMIN_REQUIRED` | Un miembro intentó crear una carpeta con la opción desactivada, o cambiar una que creó otra persona. |
 | `409 SLUG_CONFLICT` | El slug ya existe en este nivel de carpeta. |

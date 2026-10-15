@@ -43,7 +43,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
   function folderGuide(d) {
     if (!curFolder) return '';
     var html = d && d.folderReadmeHtml;
-    var canManage = !!(d && d.canManageFolders);
+    var canManage = !!(d && (d.canEditFolder != null ? d.canEditFolder : d.canManageFolders));
     if (!html && !canManage) return '';
     if (!html) {
       return '<button type="button" class="wsx-fguide wsx-fguide--empty" onclick="editFolderReadme()">' + GUIDE_SVG + '<span class="wsx-fguide__cta"><strong>' + esc(t('artifacts.addGuide')) + '</strong><em>' + esc(t('artifacts.guideHint')) + '</em></span></button>';
@@ -79,7 +79,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     var k = artKey(f, fld);
     if (!artPending[k]) {
       artPending[k] = fetch(artUrl(f, fld), { credentials: 'same-origin' }).then(function (r) { return r.json(); })
-        .then(function (d) { artCache[k] = { cardsHtml: d && d.cardsHtml, rowsHtml: d && d.rowsHtml, count: (d && d.cardsHtml) ? 1 : 0, foldersHtml: d && d.foldersHtml, folderName: d && d.folderName, folderPath: d && d.folderPath, canManageFolders: d && d.canManageFolders, folderReadme: d && d.folderReadme, folderReadmeHtml: d && d.folderReadmeHtml }; })
+        .then(function (d) { artCache[k] = { cardsHtml: d && d.cardsHtml, rowsHtml: d && d.rowsHtml, count: (d && d.cardsHtml) ? 1 : 0, foldersHtml: d && d.foldersHtml, folderName: d && d.folderName, folderPath: d && d.folderPath, canManageFolders: d && d.canManageFolders, canEditFolder: d && d.canEditFolder, folderReadme: d && d.folderReadme, folderReadmeHtml: d && d.folderReadmeHtml }; })
         .catch(function () {})
         .then(function () { delete artPending[k]; });
     }
