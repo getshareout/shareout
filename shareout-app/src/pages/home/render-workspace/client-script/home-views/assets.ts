@@ -3,6 +3,9 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
   var ASSET_STATE = {};
   var assetFilter = 'all';
   var assetFolders = [];
+  // Team Space folder creation follows members_can_create_folders; the folder list says
+  // can_create. Admins (and personal folders) always can, so they never see it flicker.
+  var assetCanCreateFolder = !window.WSX_WS || !!window.WSX_ADMIN;
   var assetFolder = '';
   var assetsWired = false;
   var assetSelect = false;
@@ -112,7 +115,7 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
   function renderFolderBar() {
     var pills = '<button class="wsx-abtn' + (assetFolder ? '' : ' wsx-abtn--primary') + '" data-folder="" type="button">' + esc(t('assets.allFiles')) + '</button>';
     pills += assetFolders.map(function (f) { return '<button class="wsx-abtn' + (assetFolder === f.id ? ' wsx-abtn--primary' : '') + '" data-folder="' + esc(f.id) + '" type="button">' + esc(f.name) + '</button>'; }).join('');
-    pills += '<button class="wsx-abtn" id="wsxFolderNew" type="button">' + esc(t('assets.newFolder')) + '</button>';
+    if (assetCanCreateFolder) pills += '<button class="wsx-abtn" id="wsxFolderNew" type="button">' + esc(t('assets.newFolder')) + '</button>';
     if (assetFolder && window.WSX_WS) pills += '<button class="wsx-abtn" id="wsxFolderShare" type="button">' + esc(t('assets.shareFolder')) + '</button>';
     return '<div class="wsx-asset-folders">' + pills + '</div>';
   }
@@ -345,7 +348,7 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
   }
   function fetchFolders() {
     fetch(folderApiBase(), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { assetFolders = (d && d.folders) || []; renderAssets(); }).catch(function () {});
+      .then(function (d) { assetFolders = (d && d.folders) || []; if (d && typeof d.can_create === 'boolean') assetCanCreateFolder = d.can_create; renderAssets(); }).catch(function () {});
   }
   function wireBar(m) {
     var s = m.querySelector('#wsxAssetSelect'); if (s) s.addEventListener('click', function () { assetSelect = true; assetSel = {}; renderAssets(); });

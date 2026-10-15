@@ -8,6 +8,7 @@ import { invalidateWorkspaceRole, requireWorkspaceRole } from './roles';
 import { generateWorkspaceSlug, SLUG_REGEX } from './slug';
 import { handleGetWorkspace } from './read';
 import { scheduleSeedStarterKit } from '../starter-kit/schedule';
+import { logAudit } from '../audit';
 
 export async function handleListWorkspaces(
   request: Request,
@@ -150,7 +151,7 @@ export async function handleUpdateWorkspace(
   const forbidden = await requireWorkspaceRole(env, workspaceId, user.id, 'admin');
   if (forbidden) return forbidden;
 
-  let body: { name?: string; description?: string; slug?: string };
+  let body: { name?: string; description?: string; slug?: string; members_can_create_folders?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -158,7 +159,7 @@ export async function handleUpdateWorkspace(
   }
 
   const updates: string[] = [];
-  const values: (string | null)[] = [];
+  const values: (string | number | null)[] = [];
 
   if (body.name !== undefined) {
     updates.push('name = ?');
@@ -184,6 +185,15 @@ export async function handleUpdateWorkspace(
     values.push(body.slug);
   }
 
+  const membersCanCreateFolders = body.members_can_create_folders;
+  if (membersCanCreateFolders !== undefined) {
+    if (typeof membersCanCreateFolders !== 'boolean') {
+      return json({ error: 'members_can_create_folders must be true or false', code: 'VALIDATION_ERROR', param: 'members_can_create_folders' }, 400);
+    }
+    updates.push('member_folders_enabled = ?');
+    values.push(membersCanCreateFolders ? 1 : 0);
+  }
+
   if (updates.length === 0) {
     return json({ error: 'No fields to update', code: 'NO_UPDATES' }, 400);
   }
@@ -194,6 +204,14 @@ export async function handleUpdateWorkspace(
   await env.DB.prepare(
     `UPDATE workspaces SET ${updates.join(', ')} WHERE id = ?`
   ).bind(...values).run();
+
+  if (typeof membersCanCreateFolders === 'boolean') {
+    await logAudit(env, {
+      workspaceId, actorId: user.id, actorEmail: user.email,
+      action: 'workspace.member_folders_update', targetType: 'workspace', targetId: workspaceId,
+      detail: { members_can_create_folders: membersCanCreateFolders },
+    });
+  }
 
   return handleGetWorkspace(request, env, user, workspaceId);
 }

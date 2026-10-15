@@ -21,7 +21,7 @@ control panel — no separate admin app:
 | **AI** | Spend/balance/requests/tokens, per-model usage, BYO LLM key management (OpenAI / Vercel Gateway) |
 | **Security** | Membership domain allowlist editor (preserves explicit emails on save), append-only **audit log** feed |
 | **Support** | Support tickets from your workspace across every channel — list, thread, edit the AI-drafted reply, **Approve & send**, resolve |
-| **Settings** | Publishing policy, workspace logo (branding), **file inbox** address (`{slug}@inbox.shareout.site`), read-only feature flags |
+| **Settings** | Publishing policy, whether members can create Team Space folders, workspace logo (branding), **file inbox** address (`{slug}@inbox.shareout.site`), read-only feature flags |
 
 Quick links from Overview jump into the tab that needs attention. Schedules,
 Alerts, and Crew AI also have their own Home lenses for day-to-day work.

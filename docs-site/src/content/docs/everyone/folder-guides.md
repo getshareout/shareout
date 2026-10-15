@@ -38,7 +38,7 @@ Edit or clear it anytime with the pencil on the guide.
 ## Who can edit it
 
 - **Personal folders** — you, the owner.
-- **Team Space folders** — workspace owners and admins. Everyone on the team sees the guide; it keeps the whole team (and its agents) aligned.
+- **Team Space folders** — workspace owners and admins, and the member who created the folder (while members may create folders). Everyone on the team sees the guide; it keeps the whole team (and its agents) aligned.
 
 ## It works for agents
 

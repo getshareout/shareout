@@ -126,7 +126,7 @@ The five paths: **membership** (`workspace_members`), **per-artifact invite**
 
 | Table | Holds |
 |---|---|
-| `workspaces` | The tenant. Carries its own policy: `allowed_email_domains`/`allowed_emails` gate joining, `session_max_days` caps session life, `public_publish_policy` + `public_publish_approvals_required` govern publishing, `branding` and `feature_flags` are JSON. `locale` (`en`/`es`) is the language emails, the agent, the home shell and shared pages speak to its people. |
+| `workspaces` | The tenant. Carries its own policy: `allowed_email_domains`/`allowed_emails` gate joining, `session_max_days` caps session life, `public_publish_policy` + `public_publish_approvals_required` govern publishing, `branding` and `feature_flags` are JSON. `locale` (`en`/`es`) is the language emails, the agent, the home shell and shared pages speak to its people. `member_folders_enabled` (default 1) lets plain members create Team Space folders and rename/delete the ones they created. |
 | `workspace_members` | Membership and `role` (`owner`/`admin`/`member`). `member_class` separates internal staff from external collaborators. |
 | `workspace_invite_claims` | Pending invites. `code_hash` only; `expires_at` and `claimed_at` make each single-use. `email_status` (`sent`/`failed`/`skipped`/`link_only`) with `email_sent_at` and `email_error` record whether the invite mail actually went out — null on rows minted before that was tracked. |
 | `workspace_llm_config` | Per-workspace AI settings: bring-your-own provider credentials (encrypted), `balance_micro_usd`, `markup_multiplier`, monthly budget, `gateway_model` override. |

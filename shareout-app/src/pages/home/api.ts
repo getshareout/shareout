@@ -20,6 +20,7 @@ import {
 } from './events';
 import type { PulseWindow } from './types';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
+import { canManageTeamFolder, membersCanCreateFolders } from '../../folders';
 import { isFeatureEnabled } from '../../features/flags';
 import { CREATE_FEATURE } from '../create-gate';
 import { renderArtifactCard, renderArtifactRow, renderHomeEmptyState, renderRecentActivity, renderRecentComments, renderFolderCard } from './render-cards';
@@ -356,20 +357,21 @@ export async function handleHomeBrowserApi(
   const vis = await getVisibilityScope(env, user);
   const { artifacts, total, totalPages } = await queryHomeArtifacts(env, user, filters, vis);
 
-  // Folder context: return the level's folders + can-manage flag, plus (inside a folder)
+  // Folder context: return the level's folders + can-manage flags, plus (inside a folder)
   // the root-to-current breadcrumb trail. Nesting repeats the root behaviour at any depth
-  // (arbitrary depth via parent_id): Team Space → workspace folders (admins/owners manage),
-  // personal → the user's folders (always manageable). canManage is the same whether at
-  // root or drilled in, so the New folder / rename / delete affordances follow you down.
+  // (arbitrary depth via parent_id). Personal folders are always the user's to manage.
+  // Team Space: admins/owners manage every folder; members create folders and manage the
+  // ones they created while the workspace allows it (members_can_create_folders).
+  // canManageFolders = may create folders here (New folder); canEditFolder = may edit the
+  // open folder (guide); each card carries its own rename/delete affordance.
   const folderScope: 'workspace' | 'personal' = hostWs ? 'workspace' : 'personal';
   const workspaceId = hostWs || null;
-  let canManageFolders: boolean;
-  if (hostWs) {
-    const role = await getInternalWorkspaceRole(env, hostWs, user.id);
-    canManageFolders = role === 'owner' || role === 'admin';
-  } else {
-    canManageFolders = true;
-  }
+  const role = hostWs ? await getInternalWorkspaceRole(env, hostWs, user.id) : null;
+  const memberCreates = !!hostWs && role === 'member' && await membersCanCreateFolders(env, hostWs);
+  const canManageFolders = !hostWs || role === 'owner' || role === 'admin' || memberCreates;
+  const canManage = (createdBy: string | null | undefined) =>
+    !hostWs || canManageTeamFolder(role, memberCreates, createdBy ?? null, user.id);
+  let canEditFolder = canManageFolders && !memberCreates;
   let folderName: string | null = null;
   let folderPath: { id: string; name: string }[] = [];
   let folderReadme: string | null = null;
@@ -377,9 +379,14 @@ export async function handleHomeBrowserApi(
     folderPath = await queryFolderPath(env, user, { workspaceId, folderId: filters.folder }, vis);
     folderName = folderPath.length ? folderPath[folderPath.length - 1].name : null;
     folderReadme = await queryFolderReadme(env, user, { workspaceId, folderId: filters.folder }, vis);
+    if (memberCreates) {
+      const open = await env.DB.prepare('SELECT created_by FROM folders WHERE id = ? AND workspace_id = ?')
+        .bind(filters.folder, hostWs).first<{ created_by: string | null }>();
+      canEditFolder = canManage(open?.created_by);
+    }
   }
   const folders = await queryFoldersInParent(env, user, { workspaceId, parentId: filters.folder || null }, vis);
-  const foldersHtml = folders.map(f => renderFolderCard(f, folderScope, canManageFolders)).join('');
+  const foldersHtml = folders.map(f => renderFolderCard(f, folderScope, canManage(f.created_by))).join('');
 
   return Response.json({
     cardsHtml: artifacts.map(a => renderArtifactCard(a, hostname, env)).join(''),
@@ -392,6 +399,7 @@ export async function handleHomeBrowserApi(
     folderReadmeHtml: renderFolderReadme(folderReadme),
     folderScope,
     canManageFolders,
+    canEditFolder,
     hasMore: filters.page < totalPages,
     resultLabel: buildResultLabel(filters, total),
     total,

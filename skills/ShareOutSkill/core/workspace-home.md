@@ -83,7 +83,7 @@ Each lens has native create flows — you stay in Home instead of handing off to
 
 ## All Artifacts — folder drill-in
 
-The **All Artifacts** lens lists pages with filter chips (Recent, Favorites, Shared with me, Mine). A **Folders** row at the top shows Team Space or personal folders; click a folder to drill in (Drive-style breadcrumb **All › {folder}**). Create, rename, or delete folders from the same view (owners/admins for Team Space; owners for personal). Deleting a folder unfiles its pages — it does not delete artifacts.
+The **All Artifacts** lens lists pages with filter chips (Recent, Favorites, Shared with me, Mine). A **Folders** row at the top shows Team Space or personal folders; click a folder to drill in (Drive-style breadcrumb **All › {folder}**). Create, rename, or delete folders from the same view (Team Space: owners/admins for any folder, members for the ones they created unless an admin turned that off; owners for personal). Deleting a folder unfiles its pages — it does not delete artifacts.
 
 ## Open pages in tabs
 

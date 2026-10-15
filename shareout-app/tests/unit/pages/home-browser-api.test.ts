@@ -63,3 +63,58 @@ describe('work/026 — handleHomeBrowserApi renders nested folder navigation', (
     expect((body.emptyHtml as string).length).toBeGreaterThan(0);
   });
 });
+
+describe('handleHomeBrowserApi — Team Space folder rights for a member', () => {
+  function wsEnv(enabled: number): Env {
+    const DB = {
+      prepare: (sql: string) => ({
+        bind: (..._args: unknown[]) => ({
+          first: async () => {
+            if (sql.includes('SELECT id FROM workspaces WHERE slug')) return { id: 'wsp_1' };
+            if (sql.includes('SELECT role FROM workspace_members')) return { role: 'member' };
+            if (sql.includes('member_folders_enabled')) return { member_folders_enabled: enabled };
+            if (sql.includes('SELECT 1 FROM workspace_members')) return { 1: 1 };
+            if (sql.includes('SELECT created_by FROM folders')) return { created_by: 'usr_other' };
+            if (sql.includes('COUNT(DISTINCT a.id) as total')) return { total: 0 };
+            return null;
+          },
+          all: async () => {
+            if (sql.includes('FROM folders f') && sql.includes('f.workspace_id = ?')) {
+              return { results: [
+                { id: 'fld_mine', name: 'Mine', artifact_count: 0, created_by: user.id },
+                { id: 'fld_theirs', name: 'Theirs', artifact_count: 0, created_by: 'usr_other' },
+              ] };
+            }
+            return { results: [] };
+          },
+          run: async () => ({ success: true }),
+        }),
+      }),
+    };
+    return { DB, SHAREOUT_BASE_URL: 'https://shareout.site' } as unknown as Env;
+  }
+  const cards = (html: string) => html.split('<article').slice(1);
+
+  it('setting on: New folder offered, rename/delete only on the folders they created', async () => {
+    const res = await handleHomeBrowserApi(new Request('https://team.shareout.site/v1/home/browser'), wsEnv(1), user);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.canManageFolders).toBe(true);
+    const [mine, theirs] = cards(body.foldersHtml as string);
+    expect(mine).toContain('fld_mine');
+    expect(mine).toContain('wsx-folder-card__actions');
+    expect(theirs).toContain('fld_theirs');
+    expect(theirs).not.toContain('wsx-folder-card__actions');
+  });
+
+  it('setting on: cannot edit the guide of a folder someone else created', async () => {
+    const res = await handleHomeBrowserApi(new Request('https://team.shareout.site/v1/home/browser?folder=fld_theirs'), wsEnv(1), user);
+    expect((await res.json() as Record<string, unknown>).canEditFolder).toBe(false);
+  });
+
+  it('setting off: no New folder and no rename/delete anywhere', async () => {
+    const res = await handleHomeBrowserApi(new Request('https://team.shareout.site/v1/home/browser'), wsEnv(0), user);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.canManageFolders).toBe(false);
+    expect(body.foldersHtml).not.toContain('wsx-folder-card__actions');
+  });
+});

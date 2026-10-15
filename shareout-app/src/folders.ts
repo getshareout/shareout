@@ -1,4 +1,4 @@
-import type { Env, FolderVisibility, Visibility } from './types';
+import type { Env, FolderVisibility, Visibility, WorkspaceRole } from './types';
 import { generateId } from './crypto-utils';
 import { normalizeVisibility } from './visibility-config';
 import type { AuthUser } from './api-auth';
@@ -17,6 +17,54 @@ export interface FolderSummary {
   artifact_count: number;
   subfolder_count: number;
   created_at: string;
+}
+
+const ENABLE_HINT = 'A workspace admin can let members create folders in workspace settings (members_can_create_folders).';
+
+/** Whether this workspace lets plain members create Team Space folders (on by default). */
+export async function membersCanCreateFolders(env: Env, workspaceId: string): Promise<boolean> {
+  const row = await env.DB.prepare('SELECT member_folders_enabled FROM workspaces WHERE id = ?')
+    .bind(workspaceId).first<{ member_folders_enabled: number }>();
+  return !!row?.member_folders_enabled;
+}
+
+function isWorkspaceAdmin(role: WorkspaceRole | null): boolean {
+  return role === 'owner' || role === 'admin';
+}
+
+/** Admins/owners manage every Team Space folder; a member only the ones they created,
+ *  and only while the workspace lets members create folders. */
+export function canManageTeamFolder(
+  role: WorkspaceRole | null,
+  membersCanCreate: boolean,
+  createdBy: string | null,
+  userId: string
+): boolean {
+  return isWorkspaceAdmin(role) || (role === 'member' && membersCanCreate && createdBy === userId);
+}
+
+/** Loads a Team Space folder and checks the caller may change it. Returns the error
+ *  response to send, or null when the change may go ahead. */
+async function requireFolderManager(
+  env: Env,
+  user: AuthUser,
+  workspaceId: string,
+  folderId: string
+): Promise<Response | null> {
+  const role = await getInternalWorkspaceRole(env, workspaceId, user.id);
+  if (!role) return json({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
+
+  const folder = await env.DB.prepare(
+    'SELECT id, created_by FROM folders WHERE id = ? AND workspace_id = ?'
+  ).bind(folderId, workspaceId).first<{ id: string; created_by: string | null }>();
+  if (!folder) return json({ error: 'Folder not found', code: 'NOT_FOUND' }, 404);
+
+  if (isWorkspaceAdmin(role)) return null;
+  const enabled = await membersCanCreateFolders(env, workspaceId);
+  if (canManageTeamFolder(role, enabled, folder.created_by, user.id)) return null;
+  return enabled
+    ? json({ error: 'Only workspace admins can change folders created by someone else', code: 'ADMIN_REQUIRED' }, 403)
+    : json({ error: 'Only workspace admins can change Team Space folders in this workspace', code: 'ADMIN_REQUIRED', hint: ENABLE_HINT }, 403);
 }
 
 export async function handleListFolders(
@@ -44,7 +92,8 @@ export async function handleListFolders(
     ORDER BY f.name
   `).bind(...binds).all<FolderSummary>();
 
-  return json({ folders: results.results || [] });
+  const canCreate = isWorkspaceAdmin(role) || await membersCanCreateFolders(env, workspaceId);
+  return json({ folders: results.results || [], can_create: canCreate });
 }
 
 export async function handleCreateFolder(
@@ -55,10 +104,10 @@ export async function handleCreateFolder(
 ): Promise<Response> {
   const role = await getInternalWorkspaceRole(env, workspaceId, user.id);
   if (!role) return json({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
-  // Team Space folders are the workspace's shared structure — only admins/owners
-  // shape it. Members add and remove their own artifacts within those folders.
-  if (role === 'member') {
-    return json({ error: 'Only workspace admins can create Team Space folders', code: 'ADMIN_REQUIRED' }, 403);
+  // Team Space folders are the workspace's shared structure. Admins/owners always
+  // shape it; members do too unless an admin turned members_can_create_folders off.
+  if (!isWorkspaceAdmin(role) && !(await membersCanCreateFolders(env, workspaceId))) {
+    return json({ error: 'Only workspace admins can create Team Space folders in this workspace', code: 'ADMIN_REQUIRED', hint: ENABLE_HINT }, 403);
   }
 
   let body: {
@@ -197,16 +246,8 @@ export async function handleUpdateFolder(
   workspaceId: string,
   folderId: string
 ): Promise<Response> {
-  const role = await getInternalWorkspaceRole(env, workspaceId, user.id);
-  if (!role) return json({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
-
-  const folder = await env.DB.prepare(
-    'SELECT id FROM folders WHERE id = ? AND workspace_id = ?'
-  ).bind(folderId, workspaceId).first();
-
-  if (!folder) {
-    return json({ error: 'Folder not found', code: 'NOT_FOUND' }, 404);
-  }
+  const denied = await requireFolderManager(env, user, workspaceId, folderId);
+  if (denied) return denied;
 
   let body: {
     name?: string;
@@ -289,18 +330,8 @@ export async function handleDeleteFolder(
   workspaceId: string,
   folderId: string
 ): Promise<Response> {
-  const role = await getInternalWorkspaceRole(env, workspaceId, user.id);
-  if (!role || role === 'member') {
-    return json({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
-  }
-
-  const folder = await env.DB.prepare(
-    'SELECT id FROM folders WHERE id = ? AND workspace_id = ?'
-  ).bind(folderId, workspaceId).first();
-
-  if (!folder) {
-    return json({ error: 'Folder not found', code: 'NOT_FOUND' }, 404);
-  }
+  const denied = await requireFolderManager(env, user, workspaceId, folderId);
+  if (denied) return denied;
 
   // Orphan artifacts back to "no folder" and promote any subfolders to the top
   // level so deleting a folder never deletes its contents.
