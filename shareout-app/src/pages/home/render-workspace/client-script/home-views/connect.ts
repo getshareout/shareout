@@ -37,9 +37,10 @@ export const workspace_client_home_views_connect_JS = `  // ----- Connect your a
     document.getElementById('wsxCnCreate').addEventListener('click', function () {
       var b = this, label = b.textContent; b.disabled = true; b.textContent = t('common.creating');
       fetch('/v1/me/tokens', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(okOr)
+        .then(function (r) { return r.json(); })
         .then(function (d) { if (!d || !d.token) throw new Error('failed'); cnNewKey = d.token; loadConnect(); })
-        .catch(function () { b.disabled = false; b.textContent = label; var e = document.getElementById('wsxCnErr'); if (e) e.textContent = t('connect.keyError'); });
+        .catch(function (err) { b.disabled = false; b.textContent = label; var e = document.getElementById('wsxCnErr'); if (e) e.textContent = errReason(err, t('connect.keyError')); });
     });
     cnLoadKeys();
   }

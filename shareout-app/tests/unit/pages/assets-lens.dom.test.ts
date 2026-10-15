@@ -7,18 +7,24 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { workspace_client_home_views_assets_JS as assetsJs } from '../../../src/pages/home/render-workspace/client-script/home-views/assets';
 import { workspace_client_home_views_modalsForms_JS as modalsJs } from '../../../src/pages/home/render-workspace/client-script/home-views/modals-forms';
 import { ASSETS_COPY } from '../../../src/pages/home/home-i18n/copy/assets';
+import { LIBRARY_COPY } from '../../../src/pages/home/home-i18n/copy/library';
+import { ERRORS_COPY } from '../../../src/pages/home/home-i18n/copy/errors';
 import { componentScripts } from '../../../src/design-system/components/index';
+import { fetchErrorHelpers } from '../helpers/fetch-errors';
 
-const copy = { ...(ASSETS_COPY.es as Record<string, string>), 'common.delete': 'Eliminar' };
+const errHelpers = fetchErrorHelpers();
+
+const copy = { ...(ASSETS_COPY.es as Record<string, string>), ...(LIBRARY_COPY.es as Record<string, string>), ...(ERRORS_COPY.es as Record<string, string>), 'common.delete': 'Eliminar' };
 let fetchMock: ReturnType<typeof vi.fn>;
 
 type Lens = {
   renderAssets: () => void;
   askUploadVisibility: (f: File[]) => void;
   setState: (s: unknown) => void;
+  newAssetFolder: () => void;
 };
 
-type Opt = ((o: unknown) => Promise<boolean>) & { flush(): void };
+type Opt = ((o: unknown) => Promise<boolean>) & { flush(): void; labels: Record<string, string>; adminRequestUrl?: string };
 const opt = () => (window as unknown as { soOptimistic: Opt }).soOptimistic;
 
 function load(ws: string | null): Lens {
@@ -37,11 +43,12 @@ function load(ws: string | null): Lens {
       if (prop === 'adBytes') return (n: number) => `${n} B`;
       if (prop === 'fetch') return (...a: unknown[]) => fetchMock(...a);
       if (prop === 'optimistic') return (o: unknown) => opt()(o);
+      if (prop in errHelpers) return errHelpers[prop];
       if (prop in globalThis) return (globalThis as Record<string, unknown>)[prop];
       return () => '';
     },
   });
-  const body = `with (scope) {\n${modalsJs}\n${assetsJs}\n; return { renderAssets, askUploadVisibility, setState: function (s) { ASSET_STATE = s; } }; }`;
+  const body = `with (scope) {\n${modalsJs}\n${assetsJs}\n; return { renderAssets, askUploadVisibility, newAssetFolder, setState: function (s) { ASSET_STATE = s; } }; }`;
   return new Function('scope', body)(scope);
 }
 
@@ -148,6 +155,32 @@ describe('Recursos lens', () => {
     expect(document.querySelector('.wsx-asset__vis')!.textContent).toBe('Solo el equipo');
     expect(sel.value).toBe('team');
     expect(document.querySelector('.so-c-toast--error')).not.toBeNull();
+  });
+
+  it('a member refused New folder sees why and can ask an admin — never Retry', async () => {
+    fetchMock = vi.fn(async (url: string) => url.endsWith('/admin-requests')
+      ? json({ ok: true, status: 'sent' })
+      : new Response(JSON.stringify({ success: false, error: 'Only workspace admins can create Team Space folders', code: 'ADMIN_REQUIRED' }), { status: 403 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const lens = load('wsp_1');
+    opt().labels = { askAdmin: copy['err.askAdmin'], askSent: copy['err.askSent'] };
+    opt().adminRequestUrl = '/v1/workspaces/wsp_1/admin-requests';
+    lens.setState({ deliverables: [], loose: [] });
+    lens.newAssetFolder();
+    (document.getElementById('fld_name') as HTMLInputElement).value = 'Planos';
+    document.querySelector<HTMLElement>('#fld_go')!.click();
+    await flush(); await flush();
+    const t = [...document.querySelectorAll('.so-c-toast--error')].pop()!;
+    expect(t.querySelector('.so-c-toast__msg')!.textContent).toBe('No se pudo crear la carpeta.');
+    expect(t.querySelector('.so-c-toast__detail')!.textContent).toBe('Solo los admins del workspace pueden crear carpetas acá.');
+    const btn = t.querySelector<HTMLButtonElement>('.so-c-toast__act')!;
+    expect(btn.textContent).toBe('Pedir acceso al admin');
+    btn.click();
+    await flush(); await flush();
+    const ask = fetchMock.mock.calls.find(([u]) => u === '/v1/workspaces/wsp_1/admin-requests') as [string, RequestInit];
+    expect(JSON.parse(String(ask[1].body))).toMatchObject({ code: 'ADMIN_REQUIRED' });
+    expect([...document.querySelectorAll('.so-c-toast--success')].pop()!.textContent).toContain(copy['err.askSent']);
+    vi.unstubAllGlobals();
   });
 
   it('a workspace upload asks who can see it (team preselected) and sends the choice', async () => {

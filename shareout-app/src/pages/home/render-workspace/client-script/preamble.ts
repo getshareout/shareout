@@ -13,13 +13,25 @@ export const workspace_client_preamble_JS = `
   });
   var t = window.__SO_HOME_T || function (k) { return k; };
   function tOr(k, fallback) { var v = t(k); return v === k ? fallback : v; }
-  // Undo / Retry labels for the shared optimistic-action helper (design-system/components/optimistic.ts).
-  function optLabels() { if (window.soOptimistic) window.soOptimistic.labels = { undo: t('common.undo'), retry: t('common.retry'), failed: t('common.actionFailed') }; }
+  // Labels + error reasons for the shared optimistic-action helper (design-system/components/optimistic.ts).
+  function optLabels() {
+    var o = window.soOptimistic; if (!o) return;
+    o.labels = { undo: t('common.undo'), retry: t('common.retry'), failed: t('common.actionFailed') };
+    ['session', 'signIn', 'forbidden', 'adminOnly', 'askAdmin', 'askSent', 'askFailed', 'notFound', 'refresh', 'conflict', 'invalid', 'limit', 'rateLimited', 'server', 'network', 'offline', 'ref', 'copied'].forEach(function (k) { o.labels[k] = t('err.' + k); });
+    // "Ask an admin" on a permission refusal goes to this workspace's owners/admins.
+    o.adminRequestUrl = window.WSX_WS ? '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/admin-requests' : '';
+  }
   optLabels();
   document.addEventListener('shareout:locale', optLabels);
   // Optimistic action: apply now, request in the background, roll back + toast on failure.
   function optimistic(o) { return window.soOptimistic(o); }
   function optBusy(key) { return !!(window.soOptimistic && window.soOptimistic.busy(key)); }
+  // Plain fetches share optimistic()'s error mapping: .then(okOr) rejects a non-ok reply
+  // with its API error; failToast(e, headline, retry?) shows why + the action that fits;
+  // errReason(e, fallback) is the "why" line for an inline form error.
+  function okOr(r) { return window.soOptimistic.check(r); }
+  function failToast(e, msg, retry) { return window.soOptimistic.report(e, msg, retry); }
+  function errReason(e, fallback) { return window.soOptimistic.text(e, fallback); }
   function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
   function i18nEmpty(k) { return '<div class="wsx-empty">' + esc(t(k)) + '</div>'; }
   // The one empty-state pattern for lenses (Design/system/components.md "Empty States"):
@@ -67,6 +79,7 @@ export const workspace_client_preamble_JS = `
     member: { c: 'var(--color-success)', i: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
     _: { c: 'var(--color-text-secondary)', i: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/>' }
   };
+  KIND_META.admin_request = KIND_META.access; KIND_ICON.admin_request = KIND_ICON.access;
   // Icon chip for an event: actor avatar if present, else the kind's tinted line icon.
   function iconChip(e, cls) {
     if (e.actor_picture) return '<span class="' + cls + '"><img src="' + esc(e.actor_picture) + '" alt=""></span>';

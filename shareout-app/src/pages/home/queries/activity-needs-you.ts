@@ -241,6 +241,27 @@ export async function queryNeedsYou(
       })));
   }
 
+  // A member asked you (an admin) to do something only admins can ("Ask an admin").
+  // Scoped to the workspace you're looking at; the action they tried rides as the summary.
+  if (on('admin_request')) {
+    push(env.DB.prepare(`
+      SELECT e.id AS id, e.message AS action,
+             json_extract(e.payload, '$.requester_name') AS actor,
+             json_extract(e.payload, '$.message') AS reason,
+             CAST(strftime('%s', e.created_at) AS INTEGER) AS ts
+      FROM notifications e
+      WHERE e.recipient_type = 'user' AND e.recipient_id IN (${idPh}) AND e.kind = 'admin_request'
+        AND (? IS NULL OR e.subject_id = ?)
+        AND e.created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now', '-14 days')
+      ORDER BY e.created_at DESC LIMIT ?
+    `).bind(...vis.userIds, workspaceId, workspaceId, limit).all(),
+      (rows) => rows.map((r) => ({
+        kind: 'admin_request' as const, id: r.id, artifact_id: null, artifact_name: r.reason || null,
+        slug: null, actor: r.actor, actor_picture: null,
+        summary: r.action ? `needs an admin: ${r.action}` : 'needs an admin', ts: r.ts,
+      })));
+  }
+
   // Failed / errored test runs.
   if (on('test')) {
     push(env.DB.prepare(`

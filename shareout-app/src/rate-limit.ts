@@ -28,6 +28,8 @@ const RATE_LIMITS = {
   passwordLogin: { limit: 20, windowSeconds: 900 },
   accessRequest: { limit: 30, windowSeconds: 3600 },
   adminBridgeAsk: { limit: 30, windowSeconds: 3600 },
+  // "Ask an admin" from a refused action; per-reason dedupe sits in the handler.
+  adminRequest: { limit: 20, windowSeconds: 3600 },
   // MCP connector OAuth. Registration is per IP but generous: hosted AI apps register
   // one client per connection from a handful of shared egress IPs. Token calls are
   // per client (one connection), MCP calls per user.
@@ -178,6 +180,10 @@ export async function checkPasswordLoginLimit(env: Env, request: Request): Promi
 
 export async function checkAccessRequestLimit(env: Env, userId: string): Promise<RateLimitResult> {
   return checkKVRateLimit(env.RATE_LIMIT_KV, userId, 'accessRequest');
+}
+
+export async function checkAdminRequestLimit(env: Env, userId: string): Promise<RateLimitResult> {
+  return checkKVRateLimit(env.RATE_LIMIT_KV, userId, 'adminRequest');
 }
 
 export async function checkAdminBridgeAskLimit(env: Env): Promise<RateLimitResult> {

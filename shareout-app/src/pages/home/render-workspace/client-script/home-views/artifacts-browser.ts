@@ -209,10 +209,10 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
         },
         rollback: function () { if (ph && ph.parentNode) ph.remove(); },
         request: function () {
-          return fetch(folderApiBase(), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: nm, parent_id: parent || undefined }) })
-            .then(function (r) { if (r.ok) return r; return r.json().catch(function () { return null; }).then(function (j) { var e = new Error('create'); e.userMessage = j && j.error; throw e; }); });
+          return fetch(folderApiBase(), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: nm, parent_id: parent || undefined }) });
         },
-        error: function (e) { return (e && e.userMessage) || t('artifacts.couldNotCreate'); },
+        error: t('artifacts.couldNotCreate'),
+        errors: { ADMIN_REQUIRED: t('assets.err.adminFolders') },
         done: function () { reloadFolders(); },
       });
     }
@@ -249,10 +249,9 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
         apply: function () { mo.close(); setName(nm); if (curFolder === id) curFolderName = nm; },
         rollback: function () { setName(prev); if (curFolder === id) curFolderName = prevCur; },
         request: function () {
-          return fetch(folderApiBase() + '/' + encodeURIComponent(id), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: nm }) })
-            .then(function (r) { if (r.ok) return r; return r.json().catch(function () { return null; }).then(function (j) { var e = new Error('rename'); e.userMessage = j && j.error; throw e; }); });
+          return fetch(folderApiBase() + '/' + encodeURIComponent(id), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: nm }) });
         },
-        error: function (e) { return (e && e.userMessage) || t('artifacts.couldNotRename'); },
+        error: t('artifacts.couldNotRename'),
         done: function () { reloadFolders(); },
       });
     });
@@ -279,10 +278,10 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
         },
         request: function () {
           return fetch(folderApiBase() + '/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin', keepalive: true })
-            .then(function (r) { if (r.ok || r.status === 404) return r; return r.json().catch(function () { return null; }).then(function (j) { var e = new Error('delete'); e.userMessage = j && j.error; throw e; }); });
+            .then(function (r) { return r.status === 404 ? null : r; });
         },
         success: t('artifacts.folderDeleted'),
-        error: function (e) { return (e && e.userMessage) || t('artifacts.couldNotDelete'); },
+        error: t('artifacts.couldNotDelete'),
         done: function () { delete pendingFolderDeletes[id]; reloadFolders(); },
       });
     });
@@ -303,11 +302,10 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
         apply: function () { mo.close(); if (d) d.folderReadme = txt; },
         rollback: function () { if (d) d.folderReadme = cur; },
         request: function () {
-          return fetch(folderApiBase() + '/' + encodeURIComponent(fid), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ readme: txt }) })
-            .then(function (r) { if (r.ok) return r; return r.json().catch(function () { return null; }).then(function (j) { var e = new Error('guide'); e.userMessage = j && j.error; throw e; }); });
+          return fetch(folderApiBase() + '/' + encodeURIComponent(fid), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ readme: txt }) });
         },
         success: t('common.saved'),
-        error: function (e) { return (e && e.userMessage) || t('artifacts.couldNotSaveGuide'); },
+        error: t('artifacts.couldNotSaveGuide'),
         done: function () { reloadFolders(); },
       });
     });

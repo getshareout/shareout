@@ -78,6 +78,7 @@ export interface ShareData {
 export interface FirstPublishData { pageName: string; url: string }
 export interface MemberJoinedData { memberName: string; workspaceName: string }
 export interface AccessRequestData { requesterEmail: string; pageName: string; url: string }
+export interface AdminRequestData { requesterName: string; workspaceName: string; action: string; reason: string; url: string }
 export interface FirstViewData { pageName: string; url: string }
 export interface WeeklyDigestData { views: number; comments: number; published: number }
 export interface WorkspaceDigestData {
@@ -533,6 +534,25 @@ export const EMAILS = {
       bodyText: `${requesterEmail} asked for access to your page "${pageName}". Open the page to approve or decline: ${url}`,
     }),
   } satisfies EmailTemplate<AccessRequestData>,
+
+  admin_request: {
+    category: 'product',
+    audiences: ['ANY'],
+    trigger: 'workspaces/admin-requests.ts — a member hit an admin-only action and tapped "Ask an admin".',
+    build: ({ requesterName, workspaceName, action, reason, url }: AdminRequestData) => ({
+      subject: `${requesterName} needs an admin in ${workspaceName}`,
+      preheader: `${requesterName} tried something only an admin can do.`,
+      heading: 'A teammate needs an admin',
+      bodyHtml:
+        p(`<strong>${escapeHtml(requesterName)}</strong> tried something in <strong>${escapeHtml(workspaceName)}</strong> that only an admin can do.`) +
+        (action ? p(`What they tried: ${escapeHtml(action)}`) : '') +
+        (reason ? p(`What they saw: ${escapeHtml(reason)}`) : '') +
+        p('You can do it for them, or change their role or the workspace setting.'),
+      cta: { label: 'Open your workspace', href: url },
+      footerNote: 'You’re receiving this as a workspace admin.',
+      bodyText: `${requesterName} tried something in ${workspaceName} that only an admin can do.${action ? `\nWhat they tried: ${action}` : ''}${reason ? `\nWhat they saw: ${reason}` : ''}\nOpen your workspace: ${url}`,
+    }),
+  } satisfies EmailTemplate<AdminRequestData>,
 
   slides_deck_opened: {
     category: 'product',

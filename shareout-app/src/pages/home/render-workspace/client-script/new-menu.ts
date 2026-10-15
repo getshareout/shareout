@@ -47,13 +47,14 @@ export const workspace_client_new_menu_JS = `  // ===== New menu: upload a file 
       method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ template: tpl, lang: lang })
     })
-      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(okOr)
+      .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d || !d.slug) throw new Error('create');
         openArtifact(d.slug, d.name, d.artifactId);
         if (panes[d.artifactId]) setEditMode(panes[d.artifactId], 'edit');
       })
-      .catch(function () { showToast(t('new.failed'), 'error'); });
+      .catch(function (e) { failToast(e, t('new.failed')); });
   }
   if (newBtn && newMenu) {
     newBtn.addEventListener('click', function (e) { e.stopPropagation(); if (newMenu.hidden) openNewMenu(); else closeNewMenu(true); });

@@ -3,8 +3,10 @@ import { handleRevokeMemberTokens, handleCreateMemberToken } from '../../workspa
 import { handleListAgentTokens, handleCreateAgentToken, handleRevokeAgentToken } from '../../agent-tokens';
 import { handleListWorkspaceInvites, handleResendWorkspaceInvite, handleRevokeWorkspaceInvite } from '../../workspaces/invites-admin';
 import { handleListWorkspaceSharedTables } from './workspace-shared-tables';
+import { handleCreateAdminRequest } from '../../workspaces/admin-requests';
+import { checkAdminRequestLimit, rateLimitResponse } from '../../rate-limit';
 import type { FetchContext } from '../context';
-import { isAuthUser, requireTokenOrSession } from '../helpers/auth-guard';
+import { isAuthUser, requireAuthUser, requireTokenOrSession } from '../helpers/auth-guard';
 
 /** Workspace membership, invites, people, and token routes.
  *  Split out of workspaces.ts to keep the main router under the size cap.
@@ -119,6 +121,17 @@ export async function routeWorkspaceMembers(ctx: FetchContext): Promise<Response
     const user = await requireTokenOrSession(ctx);
     if (!isAuthUser(user)) return user;
     return addCORS(await handleRemoveWorkspaceMember(request, env, user, workspaceId, userId));
+  }
+
+  // "Ask an admin": a member refused by a role gate pings the workspace's admins.
+  const adminRequestMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/admin-requests$/);
+  if (adminRequestMatch && request.method === 'POST') {
+    const [, workspaceId] = adminRequestMatch;
+    const user = await requireAuthUser(ctx);
+    if (!isAuthUser(user)) return user;
+    const rl = await checkAdminRequestLimit(env, user.id);
+    if (!rl.allowed) return addCORS(rateLimitResponse(rl));
+    return addCORS(await handleCreateAdminRequest(request, env, user, workspaceId));
   }
 
   const workspaceTransferMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/transfer-ownership$/);

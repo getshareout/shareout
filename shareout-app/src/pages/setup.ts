@@ -94,7 +94,8 @@ function setupScript(): string {
         password: form.password.value
       })
     }).then(function (r) {
-      return r.json().then(function (d) { return { ok: r.ok, data: d }; });
+      // A non-JSON 5xx is our failure, not the visitor's network: fall through to the server-error copy.
+      return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, data: d || {} }; });
     }).then(function (res) {
       if (res.ok && res.data.ok) { window.location.href = '/home'; return; }
       btn.disabled = false;

@@ -25,9 +25,10 @@ export const workspace_client_inspector_automate_JS = `  // ----- Tests (artifac
     box.querySelector('[data-tst="run"]').addEventListener('click', function (e) {
       var b = e.currentTarget; b.disabled = true; b.textContent = t('inspector.running');
       fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/tests/run', { method: 'POST', credentials: 'same-origin' })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (j) { if (j && j.run) paintTests(art, box, { config: cfg, latest: j.run }); else { b.disabled = false; b.textContent = t('inspector.runTestsNow'); try { wsxToast(t('inspector.testRunFailed'), true); } catch (e) {} } })
-        .catch(function () { b.disabled = false; b.textContent = t('inspector.runTestsNow'); try { wsxToast(t('inspector.testRunFailed'), true); } catch (e) {} });
+        .then(okOr)
+        .then(function (r) { return r.json(); })
+        .then(function (j) { if (j && j.run) paintTests(art, box, { config: cfg, latest: j.run }); else throw new Error('run'); })
+        .catch(function (err) { b.disabled = false; b.textContent = t('inspector.runTestsNow'); failToast(err, t('inspector.testRunFailed')); });
     });
   }
 

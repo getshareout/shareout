@@ -7,6 +7,7 @@ import { workspace_client_drop_import_JS as dropJs } from '../../../src/pages/ho
 import { workspace_client_doc_moves_JS as movesJs } from '../../../src/pages/home/render-workspace/client-script/doc-moves';
 import { workspace_client_new_menu_JS as newMenuJs } from '../../../src/pages/home/render-workspace/client-script/new-menu';
 import { HOME_COPY } from '../../../src/pages/home/home-i18n/merge-copy';
+import { fetchErrorHelpers } from '../helpers/fetch-errors';
 
 const t = (k: string) => HOME_COPY.en[k] ?? k;
 const esc = (s: unknown) => (s == null ? '' : String(s));
@@ -27,6 +28,7 @@ function load(extra: Record<string, unknown> = {}) {
     fetch: (...a: unknown[]) => fetchMock(...a),
     uploadOne: (f: File, _d: unknown, cb: (ok: boolean) => void) => { uploads.push(f); cb(true); },
     showToast: (m: string, k: string) => { toasts.push([m, k]); },
+    ...fetchErrorHelpers((m, k) => { toasts.push([m, k]); }),
     openArtifact: (...a: unknown[]) => { opened.push(a); },
     closeTab: (k: string) => { closed.push(k); },
     panes: { art_1: {} },

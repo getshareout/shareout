@@ -26,11 +26,12 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
     });
   }
   function adErr(fallback) { return function (e) { return (e && e.userMessage) || fallback; }; }
-  // Fetch → throw with the server's error text so optimistic() can show it.
+  // Fetch → a non-ok reply rejects with the mapped API error (optimistic() shows the
+  // reason + the right action); a 2xx that still carries { error } throws its text.
   function adReq(url, init) {
     return fetch(url, init).then(function (r) {
-      if (r.ok) return r.json().catch(function () { return {}; }).then(function (j) { if (j && j.error) { var e = new Error('x'); e.userMessage = j.error; throw e; } return j; });
-      return r.json().catch(function () { return null; }).then(function (j) { var e = new Error('HTTP ' + r.status); e.userMessage = j && j.error; throw e; });
+      if (!r.ok) return window.soOptimistic.check(r);
+      return r.json().catch(function () { return {}; }).then(function (j) { if (j && j.error) { var e = new Error('x'); e.userMessage = j.error; throw e; } return j; });
     });
   }
   // Stale-while-revalidate per-tab data cache: paint cached data instantly on
@@ -404,10 +405,12 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
               method: 'POST', credentials: 'same-origin',
               headers: { 'Content-Type': 'application/json' }, body: '{"notify":false}'
             })
-              .then(function (r) { return r.ok ? r.json().catch(function () { return {}; }) : null; })
-              .catch(function () { return null; })
+              .then(okOr)
+              .then(function (r) { return r.json().catch(function () { return {}; }); })
+              .catch(function (e) { failToast(e, t('admin.inviteLinkFailed')); return false; })
               .then(function (j) {
                 adIdle(b);
+                if (j === false) return;
                 if (!j || !j.inviteUrl) { showToast(t('admin.inviteLinkFailed'), 'error'); return; }
                 else {
                   var done = function () { b.textContent = t('admin.inviteLinkCopied'); };
@@ -571,12 +574,13 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
         var scopes = (document.getElementById('wsxTokScopes').value || 'artifacts:publish,data:read').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
         adBusy(tokCreate); msg.textContent = t('common.creating');
         fetch(wsUrl('/agent-tokens'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, scopes: scopes }) })
-          .then(function (r) { return r.ok ? r.json().catch(function () { return {}; }) : null; })
+          .then(okOr)
+          .then(function (r) { return r.json().catch(function () { return {}; }); })
           .then(function (j) {
             adIdle(tokCreate);
             if (j && j.token) { try { window.prompt(t('admin.copyTokenPrompt'), j.token); } catch (e) {} adReload(); }
             else { msg.textContent = (j && j.error) || t('common.failed'); }
-          }).catch(function () { adIdle(tokCreate); msg.textContent = t('modal.networkError'); });
+          }).catch(function (e) { adIdle(tokCreate); msg.textContent = errReason(e, '') || t('common.failed'); });
       });
       m.querySelectorAll('[data-tok-rm]').forEach(function (b) {
         b.addEventListener('click', function () {
@@ -777,9 +781,10 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
           if (file.size > 512 * 1024) { bmsg.textContent = t('admin.tooLarge'); return; }
           adBusy(upBtn); bmsg.textContent = t('common.uploading');
           fetch(wsUrl('/logo'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': file.type }, body: file })
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .catch(function () { return null; })
-            .then(function (j) { if (j) { bmsg.textContent = t('common.uploaded'); adReload(); } else { adIdle(upBtn); bmsg.textContent = ''; showToast(t('admin.uploadFailed'), 'error'); } });
+            .then(okOr)
+            .then(function (r) { return r.json(); })
+            .then(function () { bmsg.textContent = t('common.uploaded'); adReload(); })
+            .catch(function (e) { adIdle(upBtn); bmsg.textContent = ''; failToast(e, t('admin.uploadFailed')); });
         });
         f.click();
       });
@@ -895,9 +900,10 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
         if (key.length < 8) { msg.textContent = t('admin.aiKeyTooShort'); return; }
         adBusy(bsave); msg.textContent = t('common.saving');
         fetch(wsUrl('/llm'), { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: document.getElementById('wsxByoProvider').value, apiKey: key }) })
-          .then(function (r) { return r.ok ? r.json().catch(function () { return {}; }) : null; })
+          .then(okOr)
+          .then(function (r) { return r.json().catch(function () { return {}; }); })
           .then(function (j) { if (j && !j.error) { adReload(); } else { adIdle(bsave); msg.textContent = (j && j.error) || t('common.failed'); } })
-          .catch(function () { adIdle(bsave); msg.textContent = t('modal.networkError'); });
+          .catch(function (e) { adIdle(bsave); msg.textContent = errReason(e, '') || t('common.failed'); });
       });
       var bdel = document.getElementById('wsxByoDel');
       if (bdel) bdel.addEventListener('click', function () {

@@ -11,6 +11,7 @@ import { workspace_client_home_views_catalog_JS as catalogJs } from '../../../sr
 import { workspace_client_home_views_knowledge_JS as knowledgeJs } from '../../../src/pages/home/render-workspace/client-script/home-views/knowledge';
 import { HOME_COPY } from '../../../src/pages/home/home-i18n/merge-copy';
 import type { RenderArgs } from '../../../src/pages/home/types';
+import { fetchErrorHelpers } from '../helpers/fetch-errors';
 
 let locale: 'en' | 'es' = 'en';
 const t = (k: string) => HOME_COPY[locale][k] ?? k;
@@ -86,6 +87,7 @@ describe('New menu', () => {
       panes,
       fetch: (...a: unknown[]) => fetchMock(...a),
       showToast: () => {},
+      ...fetchErrorHelpers(() => {}),
       openArtifact: (...a: unknown[]) => { opened = a; panes[String(a[2])] = { id: a[2] }; },
       setEditMode: (...a: unknown[]) => { edited = a; },
     });

@@ -162,6 +162,7 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
         rollback: function () { assetFolders = assetFolders.filter(function (f) { return f !== tmp; }); if (assetFolder === tmp.id) assetFolder = ''; renderAssets(); },
         request: function () { return fetch(folderApiBase(), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name }) }); },
         error: t('assets.toast.folderFailed'),
+        errors: { ADMIN_REQUIRED: t('assets.err.adminFolders') },
         done: function () { fetchFolders(); },
       });
     });
@@ -254,19 +255,15 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
       var body = { content: v, contextId: ctxq };
       if (replyTo) body.parentId = replyTo;
       fetch(commentsBase(), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-        .then(function (res) {
+        .then(okOr)
+        .then(function () {
           idle();
-          if (!res.ok) {
-            if (err) err.textContent = (res.j && (typeof res.j.error === 'string' ? res.j.error : res.j.message)) || t('common.error');
-            return;
-          }
           var i = document.getElementById('cmt_in'); if (i) i.value = '';
           setReply(null);
           load();
-        }).catch(function () {
+        }).catch(function (e) {
           idle();
-          if (err) err.textContent = t('common.error');
+          if (err) err.textContent = errReason(e, '') || t('common.error');
         });
     });
   }
@@ -313,9 +310,9 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
       var label = go.textContent; go.disabled = true; go.textContent = t('assets.sending');
       function idle() { go.disabled = false; go.textContent = label; }
       fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/share-person', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resource_type: rt, resource_id: resId, email: email, capability: cv('sp_cap') || 'view' }) })
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-        .then(function (res) { idle(); if (res.ok) { var i = document.getElementById('sp_email'); if (i) i.value = ''; if (msg) msg.textContent = ''; loadShares(); } else if (msg) { msg.textContent = (res.j && (res.j.error || res.j.message)) || t('assets.shareErr'); } })
-        .catch(function () { idle(); if (msg) msg.textContent = t('assets.shareErr'); });
+        .then(okOr)
+        .then(function () { idle(); var i = document.getElementById('sp_email'); if (i) i.value = ''; if (msg) msg.textContent = ''; loadShares(); })
+        .catch(function (e) { idle(); if (msg) msg.textContent = errReason(e, '') || t('assets.shareErr'); });
     });
   }
   function openUsage(dlv) {
@@ -384,19 +381,22 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
     fetchFolders();
   }
   // Upload one file, then link it as a new deliverable (default) or a new version.
+  // cb(false, reason, err) on failure — every step's reply is checked, the last one too.
   function uploadOne(f, deliverableId, cb, visibility) {
     var mime = f.type || 'application/octet-stream';
+    function json(r) { return r.json(); }
     fetch(assetApiBase() + '/upload', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: f.name, mimeType: mime, size: f.size }) })
-      .then(function (r) { return r.json(); })
-      .then(function (j) { var d = j && j.data; if (!d || !d.uploadUrl) throw new Error((j && (j.message || j.error)) || ''); return fetch(d.uploadUrl, { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': mime }, body: f }).then(function (r) { return r.json(); }); })
-      .then(function (pj) { var blobId = pj && pj.data && pj.data.id; if (!blobId) throw new Error((pj && (pj.message || pj.error)) || '');
+      .then(okOr).then(json)
+      .then(function (j) { var d = j && j.data; if (!d || !d.uploadUrl) throw new Error('upload'); return fetch(d.uploadUrl, { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': mime }, body: f }).then(okOr).then(json); })
+      .then(function (pj) { var blobId = pj && pj.data && pj.data.id; if (!blobId) throw new Error('upload');
         if (deliverableId) return fetch(assetApiBase() + '/deliverables/' + encodeURIComponent(deliverableId) + '/version', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blobId: blobId }) });
         var name = (f.name || t('assets.untitled')).replace(/\\.[^.]+$/, '');
         var dbody = { blobId: blobId, name: name }; if (visibility) dbody.visibility = visibility;
         return fetch(assetApiBase() + '/deliverables', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dbody) });
       })
+      .then(okOr)
       .then(function () { if (cb) cb(true); })
-      .catch(function (err) { if (cb) cb(false, err && err.message); });
+      .catch(function (err) { if (cb) cb(false, window.soOptimistic.describe(err).detail || '', err); });
   }
   // Upload blob only (no deliverable) — for chat attach + share-target handoff.
   function uploadBlobOnly(f, cb) {
@@ -431,15 +431,15 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
   function uploadAssets(files, visibility) {
     if (!files.length) return;
     var btn = document.getElementById('wsxAssetUpload'); if (btn) { btn.disabled = true; btn.classList.add('is-busy'); }
-    var failed = 0; var firstErr = '';
+    var failed = 0; var firstErr = null;
     function next(i) {
       if (i >= files.length) {
         if (btn) { btn.disabled = false; btn.classList.remove('is-busy'); }
         fetchAssets();
-        if (failed) showToast(firstErr || (failed === 1 ? t('assets.uploadFailedOne') : t('assets.uploadFailedMany').replace('{n}', String(failed))), 'error');
+        if (failed) failToast(firstErr, failed === 1 ? t('assets.uploadFailedOne') : t('assets.uploadFailedMany').replace('{n}', String(failed)));
         return;
       }
-      uploadOne(files[i], null, function (ok, msg) { if (ok === false) { failed++; if (!firstErr && msg) firstErr = msg; } next(i + 1); }, visibility);
+      uploadOne(files[i], null, function (ok, msg, err) { if (ok === false) { failed++; if (!firstErr) firstErr = err; } next(i + 1); }, visibility);
     }
     next(0);
   }
@@ -449,7 +449,7 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
     inp.addEventListener('change', function () {
       var f = inp.files && inp.files[0]; if (!f) return;
       showToast(t('common.uploading'));
-      uploadOne(f, deliverableId, function (ok, msg) { fetchAssets(); showToast(ok ? t('common.uploaded') : (msg || t('assets.uploadFailedOne')), ok ? 'success' : 'error'); });
+      uploadOne(f, deliverableId, function (ok, msg, err) { fetchAssets(); if (ok) showToast(t('common.uploaded'), 'success'); else failToast(err, t('assets.uploadFailedOne')); });
     });
     inp.click();
   }
@@ -495,10 +495,10 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
       var expIso = exp ? new Date(exp).toISOString() : null;
       function shareBody() { var o = { gate: gp.gate }; if (expIso) o.expiresAt = expIso; if (gp.password) o.password = gp.password; if (gp.domains) o.domains = gp.domains; return o; }
       fetch(assetApiBase() + '/collections', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, deliverableIds: ids }) })
-        .then(function (r) { return r.json(); })
-        .then(function (c) { if (!c || !c.id) throw 0; return fetch(assetApiBase() + '/collections/' + encodeURIComponent(c.id) + '/share', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(shareBody()) }).then(function (r) { return r.json().then(function (s) { return { id: c.id, url: s.url }; }); }); })
+        .then(okOr).then(function (r) { return r.json(); })
+        .then(function (c) { if (!c || !c.id) throw new Error('collection'); return fetch(assetApiBase() + '/collections/' + encodeURIComponent(c.id) + '/share', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(shareBody()) }).then(okOr).then(function (r) { return r.json().then(function (s) { return { id: c.id, url: s.url }; }); }); })
         .then(function (res) { b.disabled = false; b.textContent = label; showShareResult(res.id, res.url, expIso, gp); })
-        .catch(function () { b.disabled = false; b.textContent = label; err.textContent = t('assets.errCreateLink'); });
+        .catch(function (e) { b.disabled = false; b.textContent = label; err.textContent = errReason(e, t('assets.errCreateLink')); });
     });
   }
   function showShareResult(colId, url, expIso, gp) {
@@ -513,8 +513,8 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
       var sendBody = { to: to }; if (expIso) sendBody.expiresAt = expIso;
       if (gp && gp.gate && gp.gate !== 'none') { sendBody.gate = gp.gate; if (gp.password) sendBody.password = gp.password; if (gp.domains) sendBody.domains = gp.domains; }
       fetch(assetApiBase() + '/collections/' + encodeURIComponent(colId) + '/send', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sendBody) })
-        .then(function (r) { return r.json(); }).then(function (j) { b.disabled = false; msg.textContent = j && j.sent ? t('assets.sentTo').replace('{email}', to) : t('assets.errCouldNotSend'); })
-        .catch(function () { b.disabled = false; msg.textContent = t('assets.errCouldNotSend'); });
+        .then(okOr).then(function (r) { return r.json(); }).then(function (j) { b.disabled = false; msg.textContent = j && j.sent ? t('assets.sentTo').replace('{email}', to) : t('assets.errCouldNotSend'); })
+        .catch(function (e) { b.disabled = false; msg.textContent = errReason(e, t('assets.errCouldNotSend')); });
     });
     assetSelect = false; assetSel = {}; renderAssets();
   }

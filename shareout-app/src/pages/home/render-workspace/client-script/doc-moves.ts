@@ -17,22 +17,24 @@ export const workspace_client_doc_moves_JS = `  // ===== Move a document: artifa
   function moveToAssets(art, meta) {
     showToast(t('move.moving'), 'info');
     fetch('/a/' + encodeURIComponent(meta.slug || art.slug) + '/download', { credentials: 'same-origin' })
-      .then(function (r) { if (!r.ok) throw 0; return r.blob().then(function (b) { return new File([b], moveFilename(r, meta.name || 'file'), { type: b.type }); }); })
-      .then(function (f) { return new Promise(function (ok, no) { uploadOne(f, null, function (done) { if (done === false) no(0); else ok(); }, 'private'); }); })
+      .then(okOr)
+      .then(function (r) { return r.blob().then(function (b) { return new File([b], moveFilename(r, meta.name || 'file'), { type: b.type }); }); })
+      .then(function (f) { return new Promise(function (ok, no) { uploadOne(f, null, function (done, err) { if (done === false) no(err); else ok(); }, 'private'); }); })
       .then(function () { return fetch('/v1/artifacts/' + encodeURIComponent(art.id), { method: 'DELETE', credentials: 'same-origin' }); })
-      .then(function (r) {
-        if (!r.ok) throw 0;
+      .then(okOr)
+      .then(function () {
         if (panes[art.key]) closeTab(art.key);
         if (typeof reloadFolders === 'function') reloadFolders();
         if (document.getElementById('wsxAssetMount')) fetchAssets();
         showToast(t('move.toAssetsDone'), 'success');
       })
-      .catch(function () { showToast(t('move.failed'), 'error'); });
+      .catch(function (e) { failToast(e, t('move.failed')); });
   }
   function publishFromAssets(a) {
     showToast(t('move.moving'), 'info');
     fetch('/v1/files/' + encodeURIComponent(a.id) + '/content', { credentials: 'same-origin' })
-      .then(function (r) { if (!r.ok) throw 0; return r.blob(); })
+      .then(okOr)
+      .then(function (r) { return r.blob(); })
       .then(function (b) { if (b.size > DROP_MAX) { var e = new Error(''); e.code = 'FILE_TOO_LARGE'; throw e; } return dropRead(new File([b], a.filename || a.name, { type: b.type })); })
       .then(dropPost)
       .then(function (d) { return fetch(assetApiBase() + '/deliverables/' + encodeURIComponent(a.id), { method: 'DELETE', credentials: 'same-origin' }).then(function () { return d; }); })
@@ -42,7 +44,7 @@ export const workspace_client_doc_moves_JS = `  // ===== Move a document: artifa
         showToast(t('move.toArtifactDone'), 'success');
         openArtifact(d.slug, d.name, d.artifactId, d.type);
       })
-      .catch(function (e) { showToast(e && e.code ? dropErr(e, a.filename || a.name) : t('move.failed'), 'error'); });
+      .catch(function (e) { if (e && e.code && !e.status) showToast(dropErr(e, a.filename || a.name), 'error'); else failToast(e, t('move.failed')); });
   }
 
 `;

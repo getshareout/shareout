@@ -5,7 +5,7 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
     var e = g.e || g; var count = g.count || 1; var ids = g.ids ? g.ids.join(',') : e.id; var ts = g.ts || e.ts;
     var ic = e.actor_picture ? '<img src="' + esc(e.actor_picture) + '" alt="">' : (KIND_ICON[e.kind] || '\\u2022');
     var top = e.actor ? esc(e.actor) : esc(e.artifact_name || (e.kind === 'unused_artifacts' ? t('evt.cleanup') : ''));
-    var sum = e.actor ? (esc(e.summary) + ' \\u00B7 ' + esc(e.artifact_name)) : esc(e.summary);
+    var sum = e.actor && e.artifact_name ? (esc(e.summary) + ' \\u00B7 ' + esc(e.artifact_name)) : esc(e.summary);
     if (count > 1) sum += ' \\u00B7 ' + count + '\\u00D7';
     var x = dismissable ? '<button class="wsx-ev__x" data-eids="' + esc(ids) + '" type="button" title="' + esc(t('inspector.dismiss')) + '" aria-label="' + esc(t('inspector.dismiss')) + '">\\u00D7</button>' : '';
     // One-click "archive all" for the janitor card → 30-day trash. Workspace card: admins
@@ -69,14 +69,15 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
     b.disabled = true; b.textContent = t('evt.archiving');
     var url = wid ? '/v1/workspaces/' + encodeURIComponent(wid) + '/unused/archive' : '/v1/artifacts/unused/archive';
     fetch(url, { method: 'POST', credentials: 'same-origin' })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json().catch(function () { return {}; }); })
+      .then(okOr)
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
       .then(function (d) {
         var k = (d && (d.archived != null ? d.archived : d.count)); if (k == null) k = n;
         showToast(t('evt.archived').replace('{n}', String(k)), 'success');
         if (typeof artCache !== 'undefined') artCache = {};
         loadFeed();
       })
-      .catch(function () { b.disabled = false; b.textContent = t('evt.archiveAll'); showToast(t('evt.archiveFailed'), 'error'); });
+      .catch(function (e) { b.disabled = false; b.textContent = t('evt.archiveAll'); failToast(e, t('evt.archiveFailed')); });
   });
 
   // ===== artifact widgets: tile (cards) <-> table (rows), per-widget + persisted =====
