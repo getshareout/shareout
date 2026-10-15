@@ -23,6 +23,9 @@ vi.mock('../../../src/workspaces/roles', () => ({ getWorkspaceRole: async () => 
 const triageMock = vi.fn(async () => ({ category: 'bug', priority: 'high', draft: 'd' }));
 vi.mock('../../../src/support/triage', () => ({ triageTicket: (...a: unknown[]) => triageMock(...a) }));
 
+const alertMock = vi.fn(async () => true);
+vi.mock('../../../src/support/alert', () => ({ alertOperator: (...a: unknown[]) => alertMock(...a) }));
+
 const deliverMock = vi.fn(async () => ({ delivered: true, via: 'ui' }));
 vi.mock('../../../src/support/deliver', () => ({ deliverReply: (...a: unknown[]) => deliverMock(...a) }));
 
@@ -57,6 +60,7 @@ beforeEach(async () => {
   SUPERADMINS = new Set();
   WS_ROLE = null;
   triageMock.mockClear();
+  alertMock.mockClear();
   deliverMock.mockClear();
   await e.DB.exec('DELETE FROM ticket_messages');
   await e.DB.exec('DELETE FROM tickets');
@@ -74,6 +78,7 @@ describe('create', () => {
     const { ticket } = await res!.json() as { ticket: { id: string; channel: string } };
     expect(ticket.channel).toBe('ui');
     expect(triageMock).toHaveBeenCalledWith(e, ticket.id);
+    expect(alertMock).toHaveBeenCalledWith(e, expect.objectContaining({ id: ticket.id }), expect.any(String));
   });
 
   it('token caller is tagged channel=skill', async () => {

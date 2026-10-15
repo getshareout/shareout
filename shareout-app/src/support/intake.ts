@@ -1,6 +1,7 @@
 import type { Env } from '../types';
 import { createTicket, type CreateTicketInput, type Ticket } from './store';
 import { triageTicket } from './triage';
+import { alertOperator } from './alert';
 
 async function lookupEmail(env: Env, userId: string | null | undefined): Promise<string | null> {
   if (!userId) return null;
@@ -19,6 +20,7 @@ export async function openTicket(env: Env, input: CreateTicketInput): Promise<Ti
     input = { ...input, requesterEmail: await lookupEmail(env, input.requesterUserId) };
   }
   const ticket = await createTicket(env, input);
+  await alertOperator(env, ticket, input.body);
   await triageTicket(env, ticket.id).catch(() => null);
   return ticket;
 }

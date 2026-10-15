@@ -190,6 +190,8 @@ export interface Env {
   TELEGRAM_WEBHOOK_SECRET?: string;
   /** Shared secret for the trusted support email-gateway ingest (AgentsEmail → /v1/support/ingest/email). */
   SUPPORT_INGEST_KEY?: string;
+  /** Telegram chat id that gets a ping for every new support ticket (uses TELEGRAM_BOT_TOKEN). Optional. */
+  SUPPORT_ALERT_TELEGRAM_CHAT_ID?: string;
   /** Cloudflare account id + API token (Analytics:Read) for infra cost monitoring in the admin portal. Optional. */
   CF_ACCOUNT_ID?: string;
   CF_API_TOKEN?: string;
