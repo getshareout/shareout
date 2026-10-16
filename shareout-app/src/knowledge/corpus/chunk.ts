@@ -5,6 +5,10 @@ export interface Chunk {
   ord: number;
   locator: string;
   text: string;
+  /** Sub-page path of a multi-page artifact (null/absent = its home page or a file). */
+  page?: string | null;
+  /** Heading id to deep-link to (`?section=`), when the source has one. */
+  anchor?: string | null;
 }
 
 const MAX_CHARS = 1500;

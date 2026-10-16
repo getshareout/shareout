@@ -29,6 +29,8 @@ export interface ChunkHit {
   ord: number;
   locator: string;
   text: string;
+  page: string | null;
+  anchor: string | null;
 }
 
 export function corpusFor(env: Env, workspaceId: string): DurableObjectStub<KnowledgeStore> | null {

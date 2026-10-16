@@ -68,7 +68,7 @@ Each card has:
 
 | Button | What it does |
 | --- | --- |
-| **Open Page** | Opens the live artifact URL |
+| **Open Page** | Opens the live artifact (one-tap sign-in when enabled — see [Links that open](#links-that-open)) |
 | **Snapshot** | Renders a PNG and sends it in chat |
 | **PDF** | Renders a PDF and sends it in chat |
 | **Ask AI** | Starts an agent turn about that page |
@@ -92,9 +92,12 @@ See [Get help](/everyone/get-help/) for the full ticket lifecycle.
 
 | Capability | Description |
 | --- | --- |
-| List artifacts | All pages you can access |
-| Search artifacts | By name or slug |
-| Read artifact | HTML as text, JSON store, table samples, blob metadata |
+| List artifacts | All pages you can access, each with a link that opens |
+| Search artifacts | By name, tags or description |
+| Read artifact | HTML as text, JSON store, table samples, blob metadata; a multi-page site lists its sub-pages and the bot can read any one of them |
+| Find the right section | “Where is X covered?” → the artifact, sub-page, section heading and a short quote, with a link that opens on that section |
+| What changed | Version history: who published, change notes, approvals, which version is live (owner or collaborator) |
+| Review status | Comment threads: open or resolved, assignee, version |
 | List data sources | Live REST connections on an artifact |
 | Run data source | Execute a live REST query (owner or workspace member) |
 | Send snapshot | Render a page to PNG and deliver in chat |
@@ -117,6 +120,9 @@ re-checked at the moment you tap Confirm — not when the proposal is created.
 | Add a row to a table (`sdk.table()`) | Owner or editor |
 | Update rows in a table (by id or filter) | Owner or editor |
 | Set a key in the JSON store (`sdk.json`) | Owner or editor |
+| Bring back an old version (saved as a new one) | Owner or editor |
+| Approve a version, or withdraw it | Anyone with comment access |
+| Resolve, reopen or assign a comment | Anyone with comment access |
 
 Data writes go through the same handlers as the [data API](/guides/data/). Row-level
 `access_policy` rules apply — a row-scoped editor can only write within their allowed
@@ -124,6 +130,35 @@ scope, and the JSON store stays owner/editor-only when a policy is active.
 
 The bot writes to **existing** tables only; it won't create a table from chat. Use
 `read_artifact` first to learn a table's columns or JSON keys before shaping a write.
+
+## Ask where something is covered
+
+Ask in your own words — *“where do our procedures cover waste classification and how do
+we identify it?”* — and the bot answers with the artifact, the sub-page (for a
+multi-page site), the section heading or number, a short quote, and a link that opens
+that sub-page scrolled to the section.
+
+- With [Knowledge](/teams/knowledge/) on, published pages are learned **section by
+  section across every page of a multi-page site**, so the answer is instant.
+- Without it, the bot reads the few best-matching artifacts you can open on the spot.
+- Either way it only quotes pages **you** can open.
+
+## Links that open
+
+Every link the bot sends is a full URL on your instance (`/a/{slug}/`, plus
+`?page=` for a sub-page and `&section=` for a heading), written as plain text so
+Telegram makes it tappable.
+
+Private and workspace artifacts still need you signed in, in the browser Telegram
+opens:
+
+- **By default**, the sign-in screen (email code or Google) takes you back to the exact
+  page and section. You sign in once per browser.
+- **One-tap sign-in** (instance setting): an admin sets `TELEGRAM_LOGIN_LINKS=1` and
+  links the bot to the instance domain with BotFather `/setdomain`. Replies then carry
+  **Open** buttons that sign you in with your linked Telegram account. They only work
+  for you: a forwarded button is signed by Telegram for whoever taps it, so it just shows
+  the normal sign-in screen. Each tap is single-use and expires in minutes.
 
 ## Security
 

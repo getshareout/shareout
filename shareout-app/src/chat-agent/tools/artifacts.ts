@@ -14,6 +14,8 @@ import {
 import { placeholders } from '../../account-links';
 import { quickSearch, type SearchGroup, type SearchHit } from '../../search/quick-search';
 import type { AccountTool } from './types';
+import { artifactLink, livePages } from '../../artifacts/page-links';
+import { isSafePagePath } from '../../serve/page-agent';
 
 const MAX_REPORT_CHARS = 12_000;
 // Same isolate-memory guard as knowledge ingest + assets/enrich.ts.
@@ -89,10 +91,11 @@ export async function listArtifactsForUser(
   return res.results;
 }
 
-function toSummary(items: ArtifactListItem[]) {
+function toSummary(env: Env, items: ArtifactListItem[]) {
   return items.map((a) => ({
     id: a.id,
     name: a.name,
+    url: artifactLink(env, a.slug),
     type: a.artifact_type || 'html',
     visibility: a.visibility,
     updated_at: a.updated_at || a.created_at,
@@ -102,11 +105,11 @@ function toSummary(items: ArtifactListItem[]) {
 export const listArtifactsTool: AccountTool = {
   name: 'list_artifacts',
   description:
-    "List the user's ShareOut pages (most recently updated first). Returns id, name, type, visibility, updated_at. Use the id with read_artifact.",
+    "List the user's ShareOut pages (most recently updated first). Returns id, name, url, type, visibility, updated_at. Use the id with read_artifact; link a page only with its `url`.",
   input_schema: { type: 'object', properties: {} },
   async execute(ctx) {
     const items = await listArtifactsForUser(ctx.env, ctx.userId, { limit: 50, workspaceId: ctx.selectedWorkspaceId });
-    return { artifacts: toSummary(items) };
+    return { artifacts: toSummary(ctx.env, items) };
   },
 };
 
@@ -126,7 +129,7 @@ export const searchArtifactsTool: AccountTool = {
       limit: 25,
       workspaceId: ctx.selectedWorkspaceId,
     });
-    return { artifacts: toSummary(items) };
+    return { artifacts: toSummary(ctx.env, items) };
   },
 };
 
@@ -166,6 +169,7 @@ export const searchWorkspaceTool: AccountTool = {
         name: h.title,
         ...(h.subtitle ? { detail: h.subtitle } : {}),
         ...(h.slug ? { slug: h.slug } : {}),
+        ...(h.slug && h.artifactType !== undefined ? { url: artifactLink(ctx.env, h.slug) } : {}),
         ...(h.artifactType ? { type: h.artifactType } : {}),
         ...(h.views != null ? { views: h.views } : {}),
         ...(h.owner ? { owner: h.owner } : {}),
@@ -184,7 +188,8 @@ export const searchWorkspaceTool: AccountTool = {
   },
 };
 
-export async function readReportText(env: Env, artifactId: string): Promise<string | null> {
+/** The live text of a page — its entrypoint, or `page` (a sibling HTML page of a multi-page artifact). */
+export async function readReportText(env: Env, artifactId: string, page?: string): Promise<string | null> {
   const dep = await env.DB.prepare(
     "SELECT version_id FROM deployments WHERE artifact_id = ? AND channel = 'production'"
   ).bind(artifactId).first<{ version_id: string }>();
@@ -194,10 +199,12 @@ export async function readReportText(env: Env, artifactId: string): Promise<stri
     .bind(dep.version_id)
     .first<{ entrypoint: string }>();
   if (!ver?.entrypoint) return null;
+  const path = page && isSafePagePath(page) ? page : ver.entrypoint;
 
   const asset = await env.DB.prepare(
     'SELECT r2_key, mime, size_bytes FROM assets WHERE version_id = ? AND path = ?'
-  ).bind(dep.version_id, ver.entrypoint).first<{ r2_key: string; mime: string; size_bytes: number }>();
+  ).bind(dep.version_id, path).first<{ r2_key: string; mime: string; size_bytes: number }>();
+  if (path !== ver.entrypoint && asset?.mime !== 'text/html') return null;
   if (!asset) return null;
 
   // A PDF (or other binary) page is read like the same file in Assets: through toMarkdown,
@@ -207,7 +214,7 @@ export async function readReportText(env: Env, artifactId: string): Promise<stri
   const obj = await env.ARTIFACTS.get(asset.r2_key);
   if (!obj) return null;
   const raw = binary
-    ? await toMarkdown(env, ver.entrypoint, asset.mime, await obj.arrayBuffer())
+    ? await toMarkdown(env, path, asset.mime, await obj.arrayBuffer())
     : await obj.text();
   if (raw == null) return null;
   const text = asset.mime.includes('html') ? extractTextFromHtml(raw) : raw;
@@ -267,10 +274,13 @@ async function readBlobMeta(env: Env, artifactId: string) {
 export const readArtifactTool: AccountTool = {
   name: 'read_artifact',
   description:
-    'Read a page so you can summarize it or answer questions about its numbers. Returns the rendered report text, stored JSON values, table samples (respecting the viewer’s row access), and a list of files (metadata only — you cannot read file contents). Get the id from list_artifacts or search_artifacts.',
+    'Read a page so you can summarize it or answer questions about its numbers. Returns its `url`, the rendered report text, stored JSON values, table samples (respecting the viewer’s row access), and a list of files (metadata only — you cannot read file contents). A multi-page artifact also lists its `pages` (path + url): pass `page` to read one of them. Get the id from list_artifacts or search_workspace.',
   input_schema: {
     type: 'object',
-    properties: { artifact_id: { type: 'string', description: 'The id of the page to read.' } },
+    properties: {
+      artifact_id: { type: 'string', description: 'The id of the page to read.' },
+      page: { type: 'string', description: 'Optional. One of the `pages` paths of a multi-page artifact; defaults to its home page.' },
+    },
     required: ['artifact_id'],
   },
   async execute(ctx, input) {
@@ -284,17 +294,24 @@ export const readArtifactTool: AccountTool = {
       'SELECT name, slug, visibility, artifact_type FROM artifacts WHERE id = ?'
     ).bind(artifactId).first<{ name: string; slug: string; visibility: string; artifact_type: string }>();
 
+    const page = typeof input.page === 'string' && input.page.trim() ? input.page.trim() : undefined;
     const db = createMiniDb(ctx.env, artifactId, access.workspaceId ?? '');
-    const [reportText, json, tables, files] = await Promise.all([
-      readReportText(ctx.env, artifactId),
+    const [reportText, json, tables, files, site] = await Promise.all([
+      readReportText(ctx.env, artifactId, page),
       readJsonStore(db, artifactId),
       readTables(db, artifactId, access.viewerScope),
       readBlobMeta(ctx.env, artifactId),
+      livePages(ctx.env, artifactId),
     ]);
+    const slug = meta?.slug ?? '';
+    const link = (p?: string) => (slug ? artifactLink(ctx.env, slug, { page: p, entrypoint: site.entrypoint }) : null);
 
     return {
       id: artifactId,
       name: meta?.name ?? '',
+      url: link(page),
+      ...(site.pages.length ? { pages: site.pages.map((p) => ({ path: p, url: link(p) })) } : {}),
+      ...(page ? { page } : {}),
       type: meta?.artifact_type || 'html',
       visibility: meta?.visibility ?? '',
       reportText,

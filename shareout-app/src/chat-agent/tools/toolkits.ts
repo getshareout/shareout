@@ -18,6 +18,10 @@ export const TOOLKITS: Record<string, { summary: string; tools: string[] }> = {
     summary: 'alerts, scheduled jobs and sends, and asking a page’s crew to do work',
     tools: ['list_alerts', 'manage_alert', 'list_jobs', 'manage_job', 'create_schedule', 'ask_crew'],
   },
+  review: {
+    summary: 'what changed on a page (version history), bring back an old version, approve a version, and its comments (list, resolve, assign)',
+    tools: ['list_versions', 'restore_version', 'approve_version', 'list_comments', 'resolve_comment', 'assign_comment'],
+  },
   knowledge: {
     summary: 'data catalog, workspace knowledge (what uploaded files and pages say: passages, clients, people, facts), uploaded files, client notes',
     tools: ['catalog_search', 'catalog_get', 'knowledge_search', 'knowledge_get', 'knowledge_entity', 'knowledge_facts', 'knowledge_status', 'list_files', 'read_file', 'set_client_notes'],

@@ -71,6 +71,11 @@ export function isSafePagePath(p: string): boolean {
   return !p.split('/').some((seg) => seg === '' || seg === '.' || seg === '..');
 }
 
+// Heading ids a deep link may scroll to (`?section=`): plain id characters only.
+export function isSafeSectionId(id: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/.test(id);
+}
+
 // Wrapper side of the page bridge (the viewer around the content frame). Relays the
 // content frame's page reports and cross-artifact link requests. In the /home shell
 // (`?wsx=1`) it forwards both to the shell; standalone it mirrors the sub-page into

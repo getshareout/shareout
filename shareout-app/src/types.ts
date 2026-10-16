@@ -187,6 +187,8 @@ export interface Env {
   PROXY_CACHE?: KVNamespace;
   /** Telegram bot token (from BotFather) for the artifact chat bot. */
   TELEGRAM_BOT_TOKEN?: string;
+  /** `1` = page links in bot replies sign the linked member in with one tap (Telegram login_url). Needs BotFather /setdomain. */
+  TELEGRAM_LOGIN_LINKS?: string;
   /** Shared Bearer secret for the worker-to-worker admin bridge (/internal/admin/*), called by the headless-email bot. */
   ADMIN_BRIDGE_SECRET?: string;
   /** Shared secret echoed by Telegram in X-Telegram-Bot-Api-Secret-Token to authenticate webhook calls. */

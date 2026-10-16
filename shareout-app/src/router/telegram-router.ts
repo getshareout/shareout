@@ -28,6 +28,7 @@ import { isSuperAdminEmail } from '../superadmin/recipients';
 import { getRecentWebhooks } from '../observability/store';
 import { openTicket } from '../support/intake';
 import { getPlatformHostname, getPlatformOrigin } from '../config/origins';
+import { artifactCardButtons, artifactCardText } from '../chat-platforms/telegram/format';
 
 const ARTIFACT_CARD_LIMIT = 10;
 
@@ -53,7 +54,7 @@ const HELP_TEXT = [
   '/settings - open Telegram settings',
   '/unlink - disconnect this chat',
   '',
-  'You can also type normally, like "summarize the adoption report" or "what changed in the sales dashboard?"',
+  'You can also type normally, like "summarize the adoption report", "what changed in the sales dashboard?" or "where do our procedures cover returns?" (I answer with the page, the section and a link that opens right there).',
 ].join('\n');
 
 const NOT_LINKED_TEXT =
@@ -86,38 +87,10 @@ function parseCommand(text: string): ParsedCommand | null {
   return { name: match[1].toLowerCase(), args: (match[2] || '').trim() };
 }
 
-function artifactUrl(env: Env, slug: string): string {
-  const base = getPlatformOrigin(env);
-  return `${base.replace(/\/$/, '')}/a/${slug}/`;
-}
-
 function artifactTitle(item: ArtifactCardItem): string {
   return item.name?.trim() || item.slug;
 }
 
-function artifactCardText(item: ArtifactCardItem): string {
-  const updated = item.updated_at || item.created_at;
-  const meta = [
-    item.artifact_type || 'page',
-    item.visibility,
-    updated ? `updated ${updated.slice(0, 10)}` : '',
-  ].filter(Boolean).join(' · ');
-  return meta ? `${artifactTitle(item)}\n${meta}` : artifactTitle(item);
-}
-
-function artifactButtons(env: Env, item: ArtifactCardItem): InlineButton[][] {
-  return [
-    [{ text: 'Open Page', url: artifactUrl(env, item.slug) }],
-    [
-      { text: 'Snapshot', callback_data: `snap:${item.id}` },
-      { text: 'PDF', callback_data: `pdf:${item.id}` },
-    ],
-    [
-      { text: 'Ask AI', callback_data: `ask:${item.id}` },
-      { text: 'Share', callback_data: `share:${item.id}` },
-    ],
-  ];
-}
 
 function workspaceButtons(workspaces: TelegramWorkspace[]): InlineButton[][] {
   const rows = workspaces.slice(0, 20).map((w) => ([
@@ -463,7 +436,7 @@ async function handleListArtifacts(env: Env, chatId: number, userId: string): Pr
     await sendMessage(env, chatId, `No pages found in ${scope}. Try /workspace all or create one at ${getPlatformHostname(env)}.`);
     return;
   }
-  await sendArtifactCards(env, chatId, `Your pages in ${scope}:`, items);
+  await sendArtifactCards(env, chatId, userId, `Your pages in ${scope}:`, items);
 }
 
 async function handleSearchArtifacts(env: Env, chatId: number, userId: string, query: string): Promise<void> {
@@ -482,18 +455,19 @@ async function handleSearchArtifacts(env: Env, chatId: number, userId: string, q
     await sendMessage(env, chatId, `No pages matched “${query}” in ${scope}. Try /workspace all to search everywhere.`);
     return;
   }
-  await sendArtifactCards(env, chatId, `Matches for “${query}” in ${scope}:`, items);
+  await sendArtifactCards(env, chatId, userId, `Matches for “${query}” in ${scope}:`, items);
 }
 
 async function sendArtifactCards(
   env: Env,
   chatId: number,
+  userId: string,
   heading: string,
   items: ArtifactCardItem[]
 ): Promise<void> {
   await sendMessage(env, chatId, `${heading}\nShowing ${items.length} page${items.length === 1 ? '' : 's'}.`);
   for (const item of items) {
-    await sendMessageWithButtons(env, chatId, artifactCardText(item), artifactButtons(env, item));
+    await sendMessageWithButtons(env, chatId, artifactCardText(item), await artifactCardButtons(env, item, userId));
   }
 }
 

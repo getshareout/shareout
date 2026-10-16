@@ -24,6 +24,8 @@ import { presentArtifactTool } from './present-artifact';
 import { listSkillsTool, readSkillTool, saveSkillTool } from './skills';
 import { reportProblemTool } from './report-problem';
 import { listMembersTool, inviteMembersTool } from './members';
+import { findPassagesTool } from './passages';
+import { listVersionsTool, listCommentsTool, restoreVersionTool, approveVersionTool, resolveCommentTool, assignCommentTool } from './history';
 
 import type { PlatformId } from '../../chat-platforms/types';
 
@@ -38,6 +40,13 @@ export const ACCOUNT_TOOLS: AccountTool[] = [
   searchArtifactsTool,
   searchWorkspaceTool,
   readArtifactTool,
+  findPassagesTool,
+  listVersionsTool,
+  listCommentsTool,
+  restoreVersionTool,
+  approveVersionTool,
+  resolveCommentTool,
+  assignCommentTool,
   listDataSourcesTool,
   runDataSourceTool,
   sendSnapshotTool,

@@ -39,7 +39,7 @@ Default scope includes **all pages** you can access across personal + workspaces
 
 | Button | Action |
 |--------|--------|
-| **Open Page** | Opens the live artifact URL |
+| **Open Page** | Opens the live artifact URL (one-tap sign-in when [`TELEGRAM_LOGIN_LINKS`](#links-that-open) is on) |
 | **Snapshot** | Renders PNG and sends in chat |
 | **PDF** | Renders PDF and sends in chat |
 | **Ask AI** | Starts an agent turn about that page |
@@ -53,9 +53,12 @@ Slash shortcuts mirror the cards: `/snapshot {page}`, `/pdf {page}`, `/refresh {
 
 | Tool | Capability |
 |------|------------|
-| `list_artifacts` | List pages you can access |
-| `search_artifacts` | Search by name/slug |
-| `read_artifact` | Read HTML-as-text, JSON state, scoped table samples, blob metadata |
+| `list_artifacts` | List pages you can access, each with its absolute `url` |
+| `search_artifacts` / `search_workspace` | Search by name, tags, description (results carry `url`) |
+| `read_artifact` | Read HTML-as-text, JSON state, scoped table samples, blob metadata; a multi-page site lists its `pages` (path + url) and `page` reads one sub-page |
+| `find_passages` | "Where is X covered?" → artifact, sub-page, section heading/number, short excerpt and a deep link (see [Citations](#citations)) |
+| `list_versions` | What changed: versions, who published, change notes, approvals, which is live (owner/collaborator, same rule as the REST history) |
+| `list_comments` | Review status: comment threads, open/resolved, assignee, version |
 | `list_data_sources` | List live REST connections on an artifact |
 | `run_data_source` | Execute a live REST query (owner or workspace member only) |
 | `send_snapshot` | Render a page to PNG and send it in chat |
@@ -79,10 +82,52 @@ Destructive or mutating actions **never run until you tap Confirm** on an inline
 | `add_table_row` | Add a record to a page's SDK data table (`sdk.table()`) | Owner or editor |
 | `update_table_row` | Change an existing record — by row id, or every row matching a filter | Owner or editor |
 | `set_json_value` | Set a key in a page's JSON store (`sdk.json`) | Owner or editor |
+| `restore_version` | Bring an old version back live (saved as a new version) | Owner or editor |
+| `approve_version` | Approve (or withdraw approval of) a version | Comment access |
+| `resolve_comment` | Resolve or reopen a comment thread | Comment access |
+| `assign_comment` | Assign a thread to someone on the page by email | Comment access |
 
 `edit_page` reuses the server-side editor agent (`proposeEdit` → staged edits → publish on confirm). If the agent only answers a question (no staged files), the bot relays the reply instead of showing buttons.
 
 The data-write tools go through the same handlers as the data API (row/key limits and validation are identical) and honour the row-level `access_policy` — so a row-scoped editor can only write within their scope, and the JSON store stays owner/editor-only when a policy is active. The bot adds to **existing** tables only (it won't create one from chat); ask `read_artifact` first to learn a table's columns or the JSON keys before shaping the write.
+
+## Links that open
+
+Every page link the bot sends is **absolute** on the instance apex (`$ORIGIN/a/{slug}/`), with
+`?page={path}` for a multi-page site's sub-page and `&section={heading-id}` to open the page
+scrolled to that heading. Tools return the `url`; the agent is told to paste it exactly and
+never build one. Replies go out as plain text (no `parse_mode`), and stray Markdown
+(Markdown links, `**bold**`) is flattened so Telegram auto-links the bare URL.
+
+Workspace and private pages still need a ShareOut session in the browser Telegram opens:
+
+- **Default:** the sign-in gate (email code or Google) lands back on the **exact** URL —
+  sub-page and section included. One sign-in per browser.
+- **One-tap sign-in (opt-in):** set `TELEGRAM_LOGIN_LINKS=1` and run BotFather `/setdomain`
+  with the instance's apex host. Replies with page links then get **Open** buttons
+  (Telegram `login_url`), and cards' **Open Page** uses it too. Telegram signs the tapping
+  account into the URL; `/auth/telegram/open` signs the member in only when our signature
+  (user + page, 24 h) and Telegram's (≤ 5 min) both hold, the tapping Telegram account is
+  the chat linked to that same user, the link was not used before, and the account is
+  enabled and not under an SSO-only policy. A forwarded button is signed for whoever taps
+  it, so it never matches; any failure is a plain redirect to the page's own sign-in gate.
+  Plain URLs in the text are never bearer links.
+
+## Citations
+
+`find_passages` answers "where do our procedures cover waste classification?" with
+`{ artifact, page, page_title, section, excerpt, url }`:
+
+1. **Indexed** — when Knowledge is on, published HTML pages are learned **section by
+   section across every HTML page of the live version** (up to 60 pages), with each
+   heading's id, so hits name the sub-page and the numbered heading. Searched in the chat's
+   workspace, or every workspace you're an internal member of when the scope is *all*.
+2. **Live scan** — otherwise, the few best-matching pages you can open (name/tag match
+   first, then the most recent) are split into sections on the fly: at most 6 pages and 40
+   page reads per question, no AI call.
+
+Both re-check visibility per page (corpus: `visibleSources`; scan: the bot's access gate),
+so a passage from a page you can't open is never returned.
 
 ## Security model
 

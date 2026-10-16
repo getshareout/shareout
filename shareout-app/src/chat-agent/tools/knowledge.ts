@@ -101,7 +101,7 @@ function substringPaths(nodes: KnowledgeNode[], query: string): string[] {
 export const knowledgeSearchTool: AccountTool = {
   name: 'knowledge_search',
   description:
-    "Search what this workspace knows. Returns `passages` (cited excerpts from its uploaded Files — PDFs, docs, sheets — and pages) plus `nodes` (distilled notes: topics, clients, decisions). Use it first for any question about the workspace's clients, projects, procedures, numbers or people, and cite each passage's `cite`.",
+    "Search what this workspace knows. Returns `passages` (cited excerpts from its uploaded Files — PDFs, docs, sheets — and pages) plus `nodes` (distilled notes: topics, clients, decisions). Use it first for any question about the workspace's clients, projects, numbers or people, and cite each passage's `cite` with its `url` (it opens the right sub-page and section). For where-is-this-covered questions prefer find_passages.",
   input_schema: {
     type: 'object',
     properties: {
@@ -125,7 +125,7 @@ export const knowledgeSearchTool: AccountTool = {
     const scope = query.trim() && !input.kind ? await corpusScope(ctx) : null;
     const passages = scope && isScope(scope)
       ? (await searchCorpus(ctx.env, wsId, ctx.userId, query, { limit: PASSAGES })).hits
-          .map(h => ({ cite: h.cite, text: h.text, source: h.source }))
+          .map(h => ({ cite: h.cite, text: h.text, source: h.source, ...(h.page ? { page: h.page } : {}), url: h.url }))
       : [];
     const kind = typeof input.kind === 'string' ? input.kind : undefined;
 

@@ -112,6 +112,10 @@ export type InlineButton =
   | {
     text: string;
     url: string;
+  }
+  | {
+    text: string;
+    login_url: { url: string; request_write_access?: boolean };
   };
 
 /** Send a message with inline-keyboard buttons. Returns the sent message_id (for later editing). */

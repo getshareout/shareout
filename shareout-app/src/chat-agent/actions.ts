@@ -21,6 +21,7 @@ import type { Locale } from '../i18n';
 import { executeSaveSkill } from '../skills/agent-save';
 import { inviteMany, MAX_BULK_INVITES } from '../workspaces/invite';
 import { isWorkspaceAdmin } from './tools/members';
+import { executeReviewAction } from './review-actions';
 
 export type PendingAction =
   | { kind: 'alert_pause' | 'alert_resume' | 'alert_delete'; ruleId: string; label: string }
@@ -34,7 +35,11 @@ export type PendingAction =
   | { kind: 'job_create'; artifactId: string; artifactName: string; schedule: string; recipients: string[]; subject: string; includePdf: boolean }
   | { kind: 'build_artifact'; name: string; prompt: string; source_file_id?: string; workspace_id?: string }
   | { kind: 'save_skill'; workspaceId: string; name: string; markdown: string; skillArtifactId?: string; category?: string }
-  | { kind: 'invite_members'; workspaceId: string; workspaceName: string; emails: string[]; role: 'member' | 'admin'; message?: string; invalid?: string[] };
+  | { kind: 'invite_members'; workspaceId: string; workspaceName: string; emails: string[]; role: 'member' | 'admin'; message?: string; invalid?: string[] }
+  | { kind: 'version_restore'; artifactId: string; artifactName: string; versionNo: number; message?: string }
+  | { kind: 'version_approve'; artifactId: string; artifactName: string; versionNo: number | null; approved: boolean }
+  | { kind: 'comment_resolve'; artifactId: string; artifactName: string; commentId: string; excerpt: string; resolved: boolean }
+  | { kind: 'comment_assign'; artifactId: string; artifactName: string; commentId: string; excerpt: string; assignee: string | null };
 
 // Compact one-line JSON for confirmation prompts (trimmed so a big object can't
 // blow past Telegram's message limit).
@@ -89,6 +94,10 @@ export function describeActionRich(a: PendingAction, locale: Locale = 'en'): Act
       detail: `As ${a.role}${a.message ? ` · “${a.message}”` : ''}${a.invalid?.length ? ` · skipping invalid: ${a.invalid.join(', ')}` : ''}`,
       lines: a.emails.length > 8 ? [...a.emails.slice(0, 7), `+${a.emails.length - 7} more`] : a.emails,
     };
+    case 'version_restore': return { kind: a.kind, title: `Bring back version ${a.versionNo}`, subject: a.artifactName, detail: 'Saved as a new version; nothing is deleted.' };
+    case 'version_approve': return { kind: a.kind, title: a.approved ? 'Approve version' : 'Withdraw approval', subject: a.artifactName, detail: a.versionNo ? `Version ${a.versionNo}` : 'The live version' };
+    case 'comment_resolve': return { kind: a.kind, title: a.resolved ? 'Resolve comment' : 'Reopen comment', subject: a.artifactName, detail: a.excerpt };
+    case 'comment_assign': return { kind: a.kind, title: a.assignee ? `Assign comment to ${a.assignee}` : 'Unassign comment', subject: a.artifactName, detail: a.excerpt };
   }
 }
 
@@ -120,6 +129,10 @@ function describeActionRichEs(a: PendingAction): ActionCard {
       detail: `Como ${ROLE_MEMBER_ES[a.role]}${a.message ? ` · “${a.message}”` : ''}${a.invalid?.length ? ` · se saltean los inválidos: ${a.invalid.join(', ')}` : ''}`,
       lines: a.emails.length > 8 ? [...a.emails.slice(0, 7), `+${a.emails.length - 7} más`] : a.emails,
     };
+    case 'version_restore': return { kind: a.kind, title: `Volver a la versión ${a.versionNo}`, subject: a.artifactName, detail: 'Se guarda como una versión nueva; no se borra nada.' };
+    case 'version_approve': return { kind: a.kind, title: a.approved ? 'Aprobar versión' : 'Retirar aprobación', subject: a.artifactName, detail: a.versionNo ? `Versión ${a.versionNo}` : 'La versión publicada' };
+    case 'comment_resolve': return { kind: a.kind, title: a.resolved ? 'Resolver comentario' : 'Reabrir comentario', subject: a.artifactName, detail: a.excerpt };
+    case 'comment_assign': return { kind: a.kind, title: a.assignee ? `Asignar comentario a ${a.assignee}` : 'Quitar la asignación', subject: a.artifactName, detail: a.excerpt };
   }
 }
 
@@ -151,6 +164,14 @@ function describeActionEs(a: PendingAction): string {
       return `¿${a.skillArtifactId ? 'Actualizo' : 'Guardo'} la skill del equipo “${a.name}” en la Biblioteca del espacio?`;
     case 'invite_members':
       return `¿Invito a ${a.emails.join(', ')} a “${a.workspaceName}” como ${ROLE_MEMBER_ES[a.role]}?`;
+    case 'version_restore':
+      return `¿Vuelvo “${a.artifactName}” a la versión ${a.versionNo}? Se guarda como una versión nueva; no se borra nada.`;
+    case 'version_approve':
+      return `¿${a.approved ? 'Apruebo' : 'Retiro la aprobación de'} ${a.versionNo ? `la versión ${a.versionNo}` : 'la versión publicada'} de “${a.artifactName}”?`;
+    case 'comment_resolve':
+      return `¿${a.resolved ? 'Resuelvo' : 'Reabro'} este comentario en “${a.artifactName}”?\n\n“${a.excerpt}”`;
+    case 'comment_assign':
+      return `¿${a.assignee ? `Le asigno a ${a.assignee}` : 'Le quito la asignación a'} este comentario en “${a.artifactName}”?\n\n“${a.excerpt}”`;
   }
 }
 
@@ -237,6 +258,14 @@ export function describeAction(a: PendingAction, locale: Locale = 'en'): string 
       return `${a.skillArtifactId ? 'Update' : 'Save'} the team skill “${a.name}” in your workspace Library?`;
     case 'invite_members':
       return `Invite ${a.emails.join(', ')} to “${a.workspaceName}” as ${a.role}?`;
+    case 'version_restore':
+      return `Bring “${a.artifactName}” back to version ${a.versionNo}? It is saved as a new version; nothing is deleted.`;
+    case 'version_approve':
+      return `${a.approved ? 'Approve' : 'Withdraw your approval of'} ${a.versionNo ? `version ${a.versionNo}` : 'the live version'} of “${a.artifactName}”?`;
+    case 'comment_resolve':
+      return `${a.resolved ? 'Resolve' : 'Reopen'} this comment on “${a.artifactName}”?\n\n“${a.excerpt}”`;
+    case 'comment_assign':
+      return `${a.assignee ? `Assign this comment to ${a.assignee}` : 'Unassign this comment'} on “${a.artifactName}”?\n\n“${a.excerpt}”`;
   }
 }
 
@@ -325,6 +354,11 @@ export async function executeAction(env: Env, userId: string, a: PendingAction):
       return await executeSaveSkill(env, userId, a);
     case 'invite_members':
       return await executeInviteMembers(env, userId, a);
+    case 'version_restore':
+    case 'version_approve':
+    case 'comment_resolve':
+    case 'comment_assign':
+      return await executeReviewAction(env, userId, a);
   }
 }
 

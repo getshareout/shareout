@@ -69,6 +69,8 @@ export async function serveSandboxedViewer(
   executionCtx?: ExecutionContext,
   // The artifact's home page when `entrypoint` is a sibling page opened via ?page=.
   homeEntrypoint: string = entrypoint,
+  // `?section=<heading id>`: open the page scrolled to that heading (validated by the caller).
+  section?: string,
 ): Promise<Response> {
   const baseUrl = env.SHAREOUT_BASE_URL.replace(/\/$/, '');
   // The home Studio loads the artifact in an iframe with ?wsx=1; the Studio's right
@@ -86,7 +88,8 @@ export async function serveSandboxedViewer(
   const ct = contentHost && !isOpen
     ? await createAccessToken(artifactId, 'content', env, 45 * 60)
     : undefined;
-  const rawUrl = artifactContentUrl(env, artifactId, slug, entrypoint, ct, request);
+  const rawUrl = artifactContentUrl(env, artifactId, slug, entrypoint, ct, request)
+    + (section ? `#${encodeURIComponent(section)}` : '');
   const encoder = new TextEncoder();
 
   const { config: pwaConfig, tags: pwaTags } = resolvePwa(pwaConfigJson, baseUrl, slug);
