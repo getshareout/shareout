@@ -2,14 +2,19 @@ import { generateId } from '../../../crypto-utils';
 import { createMiniDb } from '../../minidb-client';
 import type { CacheEntry, Env } from '../types';
 
-function createHash(input: string): string {
-	let hash = 0;
-	for (let i = 0; i < input.length; i++) {
-		const char = input.charCodeAt(i);
-		hash = ((hash << 5) - hash) + char;
-		hash = hash & hash;
+async function sha256Hex(input: string): Promise<string> {
+	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+	return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Key-order independent JSON, nested objects included.
+function stableStringify(value: unknown): string {
+	if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+	if (value && typeof value === 'object') {
+		const obj = value as Record<string, unknown>;
+		return `{${Object.keys(obj).sort().map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`).join(',')}}`;
 	}
-	return Math.abs(hash).toString(36);
+	return JSON.stringify(value) ?? 'null';
 }
 
 export interface CacheConfig {
@@ -44,20 +49,19 @@ export class PlatformCache {
 		return createMiniDb(this.env, this.artifactId, '');
 	}
 
-	static generateCacheKey(
+	static async generateCacheKey(
 		provider: string,
 		endpoint: string,
 		params?: Record<string, unknown>,
 		scopeKey = 'all'
-	): string {
+	): Promise<string> {
 		// scopeKey segments the cache per viewer scope so a filtered result for one
 		// viewer is never served to another. 'all' = unscoped (owner / no policy).
 		const base = `${provider}:${endpoint}:${scopeKey}`;
 		if (!params || Object.keys(params).length === 0) {
 			return base;
 		}
-		const sorted = JSON.stringify(params, Object.keys(params).sort());
-		const hash = createHash(sorted).substring(0, 12);
+		const hash = await sha256Hex(stableStringify(params));
 		return `${base}:${hash}`;
 	}
 

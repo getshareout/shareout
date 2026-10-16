@@ -39,30 +39,36 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('PlatformCache.generateCacheKey', () => {
-  it('returns provider:endpoint:scope when params are absent', () => {
-    expect(PlatformCache.generateCacheKey('google-sheets', 'values.get')).toBe('google-sheets:values.get:all');
+describe('PlatformCache.generateCacheKey', async () => {
+  it('returns provider:endpoint:scope when params are absent', async () => {
+    expect(await PlatformCache.generateCacheKey('google-sheets', 'values.get')).toBe('google-sheets:values.get:all');
   });
 
-  it('includes a stable hash when params are provided', () => {
-    const withParams = PlatformCache.generateCacheKey('google-sheets', 'values.get', { sheet: 'A1', range: 'B2' });
-    const reordered = PlatformCache.generateCacheKey('google-sheets', 'values.get', { range: 'B2', sheet: 'A1' });
+  it('includes a stable hash when params are provided', async () => {
+    const withParams = await PlatformCache.generateCacheKey('google-sheets', 'values.get', { sheet: 'A1', range: 'B2' });
+    const reordered = await PlatformCache.generateCacheKey('google-sheets', 'values.get', { range: 'B2', sheet: 'A1' });
 
-    expect(withParams).toMatch(/^google-sheets:values\.get:all:[a-z0-9]+$/);
+    expect(withParams).toMatch(/^google-sheets:values\.get:all:[0-9a-f]{64}$/);
     expect(withParams).toBe(reordered);
   });
 
-  it('returns provider:endpoint:scope when params object is empty', () => {
-    expect(PlatformCache.generateCacheKey('google-sheets', 'values.get', {})).toBe('google-sheets:values.get:all');
+  it('returns provider:endpoint:scope when params object is empty', async () => {
+    expect(await PlatformCache.generateCacheKey('google-sheets', 'values.get', {})).toBe('google-sheets:values.get:all');
   });
 
-  it('segments the key by viewer scope so filtered results never collide', () => {
-    const acme = PlatformCache.generateCacheKey('snowflake', 'statements.execute', { body: { statement: 'X' } }, 'company_id:1,2');
-    const globex = PlatformCache.generateCacheKey('snowflake', 'statements.execute', { body: { statement: 'X' } }, 'company_id:3');
-    const owner = PlatformCache.generateCacheKey('snowflake', 'statements.execute', { body: { statement: 'X' } });
+  it('segments the key by viewer scope so filtered results never collide', async () => {
+    const acme = await PlatformCache.generateCacheKey('snowflake', 'statements.execute', { body: { statement: 'X' } }, 'company_id:1,2');
+    const globex = await PlatformCache.generateCacheKey('snowflake', 'statements.execute', { body: { statement: 'X' } }, 'company_id:3');
+    const owner = await PlatformCache.generateCacheKey('snowflake', 'statements.execute', { body: { statement: 'X' } });
     expect(acme).not.toBe(globex);
     expect(acme).not.toBe(owner);
     expect(acme).toContain(':company_id:1,2:');
+  });
+
+  it('hashes nested params by value', async () => {
+    const x = await PlatformCache.generateCacheKey('s3', 'object.get', { body: { key: 'a.csv' } });
+    const y = await PlatformCache.generateCacheKey('s3', 'object.get', { body: { key: 'b.csv' } });
+    expect(x).not.toBe(y);
   });
 });
 
