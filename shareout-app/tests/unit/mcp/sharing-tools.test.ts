@@ -6,6 +6,8 @@ import type { AuthUser } from '../../../src/api-auth';
 import { invalidateGrants } from '../../../src/access/can-access';
 import { callTool } from '../../../src/mcp/tools';
 import { applyMigrations, e } from '../helpers/migrated-db';
+import { setWorkspaceFlag } from '../../../src/features/flags';
+import { EXTERNAL_SHARING_FEATURE } from '../../../src/sharees/guard';
 
 const WS = 'wsp_mcps';
 const u = (id: string, email: string): AuthUser => ({ id, email, username: null });
@@ -43,6 +45,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   await e.DB.exec(`DELETE FROM grants WHERE workspace_id = '${WS}'`);
   await e.DB.prepare('UPDATE workspaces SET member_folders_enabled = 1 WHERE id = ?').bind(WS).run();
+  await setWorkspaceFlag(e, WS, EXTERNAL_SHARING_FEATURE, null);
   await invalidateGrants(e, WS);
 });
 
@@ -111,6 +114,26 @@ describe('share_with_person', () => {
     const r = await call(creator, 'share_with_person', { email: 'client@acme.test', folder: 'Q3', expires_at: '2000-01-01' });
     expect(r.isError).toBe(true);
     expect(r.content[0].text).toContain('expires_at must be in the future');
+    expect(await grantCount('fld_mcps_q3')).toBe(0);
+  });
+});
+
+describe('external sharing turned off', () => {
+  it("refuses the folder's creator and an admin, and creates no grant", async () => {
+    await setWorkspaceFlag(e, WS, EXTERNAL_SHARING_FEATURE, false);
+    for (const who of [creator, admin]) {
+      const r = await call(who, 'share_with_person', { email: 'client@acme.test', folder: 'Q3' });
+      expect(r.isError).toBe(true);
+      expect(r.structuredContent).toMatchObject({ status: 403, code: 'EXTERNAL_SHARING_NOT_ENTITLED' });
+    }
+    expect(await grantCount('fld_mcps_q3')).toBe(0);
+  });
+
+  it("still lets the folder's creator revoke an existing share", async () => {
+    await grantOn('fld_mcps_q3', 'grt_mcps_off');
+    await setWorkspaceFlag(e, WS, EXTERNAL_SHARING_FEATURE, false);
+    const r = await call(creator, 'revoke_share', { grant_id: 'grt_mcps_off' });
+    expect(r.isError).toBeUndefined();
     expect(await grantCount('fld_mcps_q3')).toBe(0);
   });
 });

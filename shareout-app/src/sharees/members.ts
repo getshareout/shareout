@@ -98,7 +98,7 @@ export async function handleRemoveShareeMember(
   request: Request, env: Env, user: AuthUser,
   workspaceId: string, shareeId: string, memberUserId: string,
 ): Promise<Response> {
-  const forbidden = await requireExternalSharing(env, workspaceId, user.id);
+  const forbidden = await requireWorkspaceRole(env, workspaceId, user.id, 'admin');
   if (forbidden) return forbidden;
   if (!(await shareeExists(env, workspaceId, shareeId)))
     return json({ error: 'Not found', code: 'NOT_FOUND' }, 404);

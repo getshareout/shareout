@@ -156,7 +156,7 @@ export async function handleUpdateSharee(
 export async function handleDeleteSharee(
   request: Request, env: Env, user: AuthUser, workspaceId: string, shareeId: string,
 ): Promise<Response> {
-  const forbidden = await requireExternalSharing(env, workspaceId, user.id);
+  const forbidden = await requireWorkspaceRole(env, workspaceId, user.id, 'admin');
   if (forbidden) return forbidden;
   const row = await loadSharee(env, workspaceId, shareeId);
   if (!row) return json({ error: 'Not found', code: 'NOT_FOUND' }, 404);

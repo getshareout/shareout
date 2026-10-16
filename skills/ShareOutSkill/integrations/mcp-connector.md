@@ -39,10 +39,10 @@ your ShareOut account"). Allow, and the app is connected.
 | `resolve_comment` / `assign_comment` | Resolve or reopen (`resolved: false`) a thread; assign it to someone on the page by email (`assignee: null` clears). Anyone with comment access |
 | `approve_version` | Approve the live version (or `version_no`); `approved: false` withdraws. A record, not a publish gate. Comment access |
 | `list_jobs` | Scheduled sends; with `artifact_id` the page's schedules (owner/editors see shared ones plus their own personal deliveries, never someone else's DM subscription), else the person's own (`workspace_id` narrows) |
-| `folder_access` | Who can see a folder (`folder` name or id): own or inherited visibility and every outside grant, with grant ids. Internal members only |
+| `folder_access` | Who can see a folder (`folder` name or id): the real audience (the most open of the folder's own or inherited visibility and the pages and files inside, which keep their own), how many items are more open than the folder, and every outside grant, with grant ids. Admins and the folder's creator also get those items by name. Internal members only |
 | `folder_activity` | What outside people opened in a folder's subtree (newest 100). Admins and the folder's creator |
-| `share_with_person` | Share a `folder` (or `file_id`) with one outside `email`: `capability` `view`/`comment`, optional `expires_in_days` or `expires_at`; returns the `/shared?folder=` portal link and the grant id. Admins and the folder's creator |
-| `revoke_share` | Remove a grant by `grant_id` (from `folder_access`). Admins and the folder's creator |
+| `share_with_person` | Share a `folder` (or `file_id`) with one outside `email`: `capability` `view`/`comment`, optional `expires_in_days` or `expires_at`; returns the `/shared?folder=` portal link and the grant id. Admins and the folder's creator, when the workspace has external sharing |
+| `revoke_share` | Remove a grant by `grant_id` (from `folder_access`). Admins and the folder's creator, even with external sharing off |
 | `invite_members` | Owners/admins: invite `emails` (list or comma/newline text) as `member`/`admin`; per-email result + join link |
 | `list_members` | People in a workspace + pending invites (admins) |
 | `resend_invite` / `revoke_invite` | Admins: resend or cancel a pending invite by `email` |

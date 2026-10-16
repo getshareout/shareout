@@ -4,8 +4,11 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { applyMigrations, e } from '../helpers/migrated-db';
 import type { AuthUser } from '../../../src/api-auth';
 import { handleDeleteGrant, handleListGrants, handleShareWithPerson } from '../../../src/sharees/grants';
+import { handleListFolderActivity } from '../../../src/sharees/activity';
 import { invalidateGrants } from '../../../src/access/can-access';
 import { queryFolderAccess } from '../../../src/pages/home/queries/folders';
+import { setWorkspaceFlag } from '../../../src/features/flags';
+import { EXTERNAL_SHARING_FEATURE } from '../../../src/sharees/guard';
 
 const WS = 'wsp_fmg';
 const u = (id: string, email: string) => ({ id, email, username: null } as AuthUser);
@@ -43,6 +46,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await e.DB.exec(`DELETE FROM grants WHERE workspace_id = '${WS}'`);
+  await setWorkspaceFlag(e, WS, EXTERNAL_SHARING_FEATURE, null);
+  await e.DB.prepare('UPDATE workspaces SET allowed_email_domains = NULL WHERE id = ?').bind(WS).run();
   await e.DB.prepare('UPDATE workspaces SET member_folders_enabled = 1 WHERE id = ?').bind(WS).run();
   await invalidateGrants(e, WS);
 });
@@ -92,6 +97,58 @@ describe('grants on a folder — folder managers', () => {
     await grantOn('fld_fmg_other', 'grt_fmg_4');
     expect((await list(admin, '')).status).toBe(200);
     expect((await del(admin, 'grt_fmg_4')).status).toBe(200);
+  });
+});
+
+// The folder-manager path relaxes only the role: the external-sharing entitlement and the
+// workspace's email policy still apply to every share, while list and revoke stay open
+// so access can always be wound down.
+describe('grants on a folder — entitlement and policy', () => {
+  const code = async (r: Response) => ((await r.json()) as { code?: string }).code;
+
+  it('with external sharing off, neither the manager nor an admin can share', async () => {
+    await setWorkspaceFlag(e, WS, EXTERNAL_SHARING_FEATURE, false);
+    const byCreator = await share(creator, 'fld_fmg_mine', 'dave@acme.test');
+    expect(byCreator.status).toBe(403);
+    expect(await code(byCreator)).toBe('EXTERNAL_SHARING_NOT_ENTITLED');
+    const byAdmin = await share(admin, 'fld_fmg_mine', 'dave@acme.test');
+    expect(byAdmin.status).toBe(403);
+    expect(await code(byAdmin)).toBe('EXTERNAL_SHARING_NOT_ENTITLED');
+    expect(await e.DB.prepare("SELECT COUNT(*) AS n FROM grants WHERE resource_id = 'fld_fmg_mine'").first('n')).toBe(0);
+    expect(await e.DB.prepare("SELECT COUNT(*) AS n FROM users WHERE email = 'dave@acme.test'").first('n')).toBe(0);
+  });
+
+  it('with external sharing off, the manager can still list and revoke, and see activity', async () => {
+    await grantOn('fld_fmg_mine', 'grt_fmg_off');
+    await setWorkspaceFlag(e, WS, EXTERNAL_SHARING_FEATURE, false);
+    expect((await list(creator, 'resource_type=folder&resource_id=fld_fmg_mine')).status).toBe(200);
+    expect((await handleListFolderActivity(e, creator, WS, 'fld_fmg_mine')).status).toBe(200);
+    expect((await del(creator, 'grt_fmg_off')).status).toBe(200);
+    expect(await e.DB.prepare('SELECT COUNT(*) AS n FROM grants WHERE id = ?').bind('grt_fmg_off').first('n')).toBe(0);
+  });
+
+  it('with external sharing on, the manager can share', async () => {
+    await setWorkspaceFlag(e, WS, EXTERNAL_SHARING_FEATURE, true);
+    expect((await share(creator, 'fld_fmg_mine', 'bob@acme.test')).status).toBe(201);
+  });
+
+  it('a plain member is still refused on role first, whatever the entitlement', async () => {
+    await setWorkspaceFlag(e, WS, EXTERNAL_SHARING_FEATURE, false);
+    const r = await share(member, 'fld_fmg_mine');
+    expect(r.status).toBe(403);
+    expect(await code(r)).toBe('INSUFFICIENT_ROLE');
+  });
+
+  it("applies the workspace's allowed email domains to the manager's shares", async () => {
+    await e.DB.prepare('UPDATE workspaces SET allowed_email_domains = ? WHERE id = ?').bind(JSON.stringify(['example.com']), WS).run();
+    const r = await share(creator, 'fld_fmg_mine', 'carol@elsewhere.test');
+    expect(r.status).toBe(403);
+    expect(await code(r)).toBe('DOMAIN_NOT_ALLOWED');
+    expect((await share(creator, 'fld_fmg_mine', 'outsider@example.com')).status).toBe(201);
+    // An existing account outside the allowed domains gets no grant either.
+    await e.DB.prepare('UPDATE workspaces SET allowed_email_domains = ? WHERE id = ?').bind(JSON.stringify(['acme.test']), WS).run();
+    const blocked = await share(creator, 'fld_fmg_mine', 'outsider@example.com');
+    expect(blocked.status).toBe(403);
   });
 });
 

@@ -146,9 +146,11 @@ SDK: [`sdk.files.getUrl('dlv_…')`](/es/sdk/files/).
 
 Función Teams/Enterprise. Compartí carpetas y artifacts con orgs de clientes
 fuera de tu equipo — portal agrupado, páginas con marca, tokens API acotados,
-recibos de lectura y notas privadas sobre cada cliente. Todas las rutas requieren
-`admin` del workspace más el entitlement
-(`403 EXTERNAL_SHARING_NOT_ENTITLED` si no). Ver
+recibos de lectura y notas privadas sobre cada cliente. Las rutas que crean acceso
+requieren `admin` del workspace más el entitlement
+(`403 EXTERNAL_SHARING_NOT_ENTITLED` si no); listar y revocar solo requieren `admin`, y
+quien gestiona una carpeta puede compartir, listar y revocar en esa carpeta (compartir
+igual requiere el entitlement). Ver
 [Compartir con clientes](/es/teams/external-sharing/).
 
 ### Clientes
@@ -181,7 +183,7 @@ recibos de lectura y notas privadas sobre cada cliente. Todas las rutas requiere
 
 | Método | Endpoint | Notas |
 | --- | --- | --- |
-| `POST` | `/v1/workspaces/{id}/share-person` | `{ email, resource_type: "file"\|"folder", resource_id, capability: "view"\|"comment" }` — admin + entitlement Teams; invita usuario externo si hace falta. `409` si el email es miembro interno. |
+| `POST` | `/v1/workspaces/{id}/share-person` | `{ email, resource_type: "file"\|"folder", resource_id, capability: "view"\|"comment" }` — admin o quien gestiona la carpeta, + entitlement Teams en ambos casos; invita usuario externo si hace falta. `403 DOMAIN_NOT_ALLOWED` fuera de los dominios permitidos del workspace. `409` si el email es miembro interno. |
 
 Body del grant (API admin de grants):
 

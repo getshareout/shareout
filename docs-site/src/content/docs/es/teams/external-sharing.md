@@ -29,9 +29,9 @@ Un nivel más alto incluye los de abajo. Podés compartir una carpeta entera con
 
 ### Compartir con una persona (sin org de cliente)
 
-`POST /v1/workspaces/{id}/share-person` invita un email externo y otorga **view** o **comment** sobre un **archivo** o **carpeta**. Requiere Teams/Enterprise + admin. La persona aparece en `/shared` sin crear una org de cliente. Devuelve `409 ALREADY_MEMBER` si el email ya es miembro interno.
+`POST /v1/workspaces/{id}/share-person` invita un email externo y otorga **view** o **comment** sobre un **archivo** o **carpeta**. Requiere Teams/Enterprise (la función **External sharing** en self-host) + admin. La persona aparece en `/shared` sin crear una org de cliente. Devuelve `409 ALREADY_MEMBER` si el email ya es miembro interno.
 
-Quienes gestionan una carpeta (no solo los admins) también pueden hacerlo desde el panel **Quién tiene acceso** de la carpeta, y elegir cuándo termina el acceso: **En 7 días**, **En 30 días**, **En 90 días**, **En una fecha…** o **Nunca**. El acceso se corta apenas vence; si volvés a compartir, la fecha nueva reemplaza a la anterior. El email de invitación lleva directo al portal de la carpeta. Mirá [Portales de clientes](/es/teams/client-portals/).
+Quienes gestionan una carpeta (no solo los admins) también pueden hacerlo desde el panel **Quién tiene acceso** de la carpeta. Solo se relaja el rol de admin: el workspace igual necesita compartir con externos activado, y el email tiene que pasar los dominios permitidos del workspace. Quitar a alguien nunca necesita el entitlement. Pueden elegir cuándo termina el acceso: **En 7 días**, **En 30 días**, **En 90 días**, **En una fecha…** o **Nunca**. El acceso se corta apenas vence; si volvés a compartir, la fecha nueva reemplaza a la anterior. El email de invitación lleva directo al portal de la carpeta. Mirá [Portales de clientes](/es/teams/client-portals/).
 
 ## Recibos de lectura
 

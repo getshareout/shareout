@@ -2561,6 +2561,9 @@ paths:
                   type: string
                   enum: [inherit, public, workspace, private]
                   default: inherit
+                  description: >-
+                    A label for the folder, not enforced on its contents: each artifact
+                    and file keeps its own visibility.
       responses:
         "201":
           description: Created
@@ -3522,7 +3525,8 @@ paths:
       description: >-
         Workspace admins. A folder's manager (an admin, or the member who created it
         while members manage their folders) may also list the grants on that one folder
-        with `resource_type=folder&resource_id=…`.
+        with `resource_type=folder&resource_id=…`. Not gated on the external-sharing
+        entitlement, so existing access can always be reviewed.
       operationId: listGrants
       parameters:
         - name: subject_id
@@ -3553,6 +3557,9 @@ paths:
     post:
       tags: [External sharing]
       summary: Create a grant
+      description: >-
+        Workspace admins, with the external-sharing entitlement
+        (`403 EXTERNAL_SHARING_NOT_ENTITLED` otherwise).
       operationId: createGrant
       requestBody:
         required: true
@@ -3584,7 +3591,8 @@ paths:
       summary: Revoke a grant
       description: >-
         Hard delete, effective within about a minute. Workspace admins, or the folder's
-        manager for a grant on a folder.
+        manager for a grant on a folder. Not gated on the external-sharing entitlement,
+        so access can always be removed.
       operationId: deleteGrant
       responses:
         "200":
@@ -3598,7 +3606,11 @@ paths:
       tags: [External sharing]
       summary: Share a file or folder with one person by email
       description: >-
-        Teams/Enterprise. Admin, or the folder's manager for a folder. Invites an
+        Admin, or the folder's manager for a folder. Only the role is relaxed for a
+        manager: every share needs the external-sharing entitlement (Teams/Enterprise,
+        or the `collab.external_sharing` feature on self-host; `403
+        EXTERNAL_SHARING_NOT_ENTITLED`) and an email the workspace's allowed domains or
+        emails accept (`403 DOMAIN_NOT_ALLOWED`). Invites an
         external user if needed and mints an `external_user` grant; re-sharing is
         idempotent and replaces the expiry. For a folder, the invite email's join link
         carries `?folder=<id>` through sign-in and lands on `/shared?folder=<id>` (that

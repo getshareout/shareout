@@ -70,6 +70,26 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     var tip = g.subject_label + (g.inherited ? ' \\u00b7 ' + inheritedNote(g.folder_name) : '');
     return '<span class="wsx-fav' + (g.inherited ? ' is-inherited' : '') + (g.subject_type === 'sharee' ? ' is-org' : '') + '" title="' + escAttr(tip) + '">' + esc(initials(g.subject_label)) + '</span>';
   }
+  // The folder's setting is not enforced on what is inside it, so the pill shows the real
+  // audience and this note says why it differs from the setting.
+  function moreOpenNote(fa) {
+    var m = fa && fa.moreOpen; if (!m || !(m.public || m.workspace)) return '';
+    var n = function (k, c) { return t('artifacts.access.' + k + (c === 1 ? 'One' : 'Many')).replace('{n}', String(c)); };
+    var parts = [t('artifacts.access.folderIs').replace('{setting}', t('artifacts.access.' + fa.effective))];
+    if (m.public) parts.push(n('morePublic', m.public));
+    if (m.workspace) parts.push(n('moreWorkspace', m.workspace));
+    return parts.join(' \\u00b7 ');
+  }
+  // Managers get the items to fix, each linking to its page; files have no page of their own.
+  function openItemsHtml(fa) {
+    var items = (fa && fa.openItems) || []; if (!items.length) return '';
+    var total = (fa.moreOpen.public || 0) + (fa.moreOpen.workspace || 0);
+    return '<div class="wsx-field__lbl">' + esc(t('artifacts.access.openItems')) + '</div>' + items.map(function (i) {
+      var name = i.kind === 'artifact' && i.slug ? '<a href="/a/' + encodeURIComponent(i.slug) + '/" target="_blank" rel="noopener">' + esc(i.name) + '</a>' : esc(i.name);
+      return '<div class="wsx-faccess__row wsx-faccess__open"><span class="wsx-faccess__pill" data-access="' + escAttr(i.visibility) + '">' + accessIcon(i.visibility) + '<span>' + esc(t('artifacts.access.' + i.visibility)) + '</span></span><span class="wsx-faccess__who"><b>' + name + '</b></span></div>';
+    }).join('') + (total > items.length ? '<p class="wsx-field__note">' + esc(t('artifacts.access.openItemsMore').replace('{n}', String(total - items.length))) + '</p>' : '')
+      + '<p class="wsx-field__note">' + esc(t('artifacts.access.openItemsHint')) + '</p>';
+  }
   // Who can see the open folder: one pill (Private / Workspace / Public / Shared externally)
   // plus the people and orgs holding a grant on it or an ancestor; opens the access panel.
   function folderAccessBar(d) {
@@ -80,10 +100,13 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     var pill = '<span class="wsx-faccess__pill" data-access="' + escAttr(fa.access) + '">' + accessIcon(fa.access) + '<span>' + esc(lbl) + '</span></span>';
     var ppl = grantPeople(fa);
     var avs = ppl.length ? '<span class="wsx-favs">' + ppl.slice(0, 4).map(personAvatar).join('') + (ppl.length > 4 ? '<span class="wsx-fav wsx-fav--more">+' + (ppl.length - 4) + '</span>' : '') + '</span>' : '';
-    var tip = fa.inheritedFrom ? lbl + ' \\u00b7 ' + inheritedNote(fa.inheritedFrom.name) : lbl;
-    var ctl = d.folderScope === 'workspace'
-      ? '<button type="button" class="wsx-faccess" onclick="openFolderAccess()" title="' + escAttr(tip) + '" aria-label="' + escAttr(t('artifacts.access.title') + ': ' + lbl) + '">' + pill + avs + '</button>'
-      : '<span class="wsx-faccess is-static" title="' + escAttr(tip) + '">' + pill + '</span>';
+    var more = moreOpenNote(fa);
+    var note = more ? '<span class="wsx-faccess__note">' + esc(more) + '</span>' : '';
+    var tip = [lbl, fa.inheritedFrom ? inheritedNote(fa.inheritedFrom.name) : '', more].filter(Boolean).join(' \\u00b7 ');
+    var opens = d.folderScope === 'workspace' || (fa.openItems && fa.openItems.length);
+    var ctl = opens
+      ? '<button type="button" class="wsx-faccess" onclick="openFolderAccess()" title="' + escAttr(tip) + '" aria-label="' + escAttr(t('artifacts.access.title') + ': ' + tip) + '">' + pill + avs + note + '</button>'
+      : '<span class="wsx-faccess is-static" title="' + escAttr(tip) + '">' + pill + note + '</span>';
     return '<div class="wsx-fbar__acts">' + ctl + link + '</div>';
   }
   function folderHead(d) {
@@ -248,7 +271,10 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
       if (!fa) { b.innerHTML = i18nEmpty('common.couldNotLoad'); return; }
       var can = !!d.canEditFolder;
       var lbl = t('artifacts.access.' + fa.access);
-      var html = '<p class="wsx-faccess__now"><span class="wsx-faccess__pill" data-access="' + escAttr(fa.access) + '">' + accessIcon(fa.access) + '<span>' + esc(lbl) + '</span></span>' + (fa.inheritedFrom ? '<span class="wsx-field__note">' + esc(inheritedNote(fa.inheritedFrom.name)) + '</span>' : '') + '</p>';
+      var more = moreOpenNote(fa);
+      var html = '<p class="wsx-faccess__now"><span class="wsx-faccess__pill" data-access="' + escAttr(fa.access) + '">' + accessIcon(fa.access) + '<span>' + esc(lbl) + '</span></span>' + (fa.inheritedFrom ? '<span class="wsx-field__note">' + esc(inheritedNote(fa.inheritedFrom.name)) + '</span>' : '') + (more ? '<span class="wsx-field__note">' + esc(more) + '</span>' : '') + '</p>';
+      html += openItemsHtml(fa);
+      if (d.folderScope !== 'workspace') { b.innerHTML = html; return; }
       if (can) {
         html += '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('artifacts.access.visibility')) + '</span><select class="wsx-field__in" id="fa_vis">'
           + ['inherit', 'workspace', 'public', 'private'].map(function (v) { return '<option value="' + v + '"' + (fa.visibility === v ? ' selected' : '') + '>' + esc(t('artifacts.access.opt.' + v)) + '</option>'; }).join('')
@@ -326,9 +352,10 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
           .catch(function (e) { go.disabled = false; go.textContent = label; if (msg) msg.textContent = errReason(e, '') || t('assets.shareErr'); });
       });
     }
+    function wantsActivity(d) { return d && d.canEditFolder && d.folderScope === 'workspace'; }
     render();
-    if (artCache[artKey(artFilter, fid)] && artCache[artKey(artFilter, fid)].canEditFolder) loadActivity();
-    if (mo && !artCache[artKey(artFilter, fid)]) fetchArt(artFilter, function () { render(); var d = artCache[artKey(artFilter, fid)]; if (d && d.canEditFolder) loadActivity(); }, fid);
+    if (wantsActivity(artCache[artKey(artFilter, fid)])) loadActivity();
+    if (mo && !artCache[artKey(artFilter, fid)]) fetchArt(artFilter, function () { render(); if (wantsActivity(artCache[artKey(artFilter, fid)])) loadActivity(); }, fid);
   };
   function folderNameModal(title, initial, action, go) {
     var mo = wsxModal(title, '<div class="wsx-cform">' + fld(t('artifacts.folderNameLabel'), 'fld_name', t('artifacts.folderNamePh')) + '<div class="wsx-cform__err" id="fld_err"></div><div class="wsx-cform__foot"><button class="wsx-abtn wsx-abtn--primary" id="fld_go" type="button">' + esc(action) + '</button></div></div>');

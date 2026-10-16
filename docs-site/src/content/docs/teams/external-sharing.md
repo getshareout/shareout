@@ -29,9 +29,9 @@ A higher level includes the ones below it. You can share a whole folder with a c
 
 ### Share with one person (no client org)
 
-`POST /v1/workspaces/{id}/share-person` invites one outside email and grants **view** or **comment** on a **file** or **folder**. Teams/Enterprise + admin required. The person appears on `/shared` without creating a client org. Returns `409 ALREADY_MEMBER` if the email is already an internal workspace member.
+`POST /v1/workspaces/{id}/share-person` invites one outside email and grants **view** or **comment** on a **file** or **folder**. Teams/Enterprise (the **External sharing** feature on self-host) + admin required. The person appears on `/shared` without creating a client org. Returns `409 ALREADY_MEMBER` if the email is already an internal workspace member.
 
-Folder managers (not only admins) can also do this from a folder's **Who has access** panel, and pick when access ends: **In 7 days**, **In 30 days**, **In 90 days**, **On a date…** or **Never**. Access stops as soon as it lapses; sharing again replaces the end date. The invite email links straight to the folder's portal. See [Client portals](/teams/client-portals/).
+Folder managers (not only admins) can also do this from a folder's **Who has access** panel. Only the admin role is relaxed: the workspace still needs external sharing, and the email must pass the workspace's allowed domains. Removing someone never needs the entitlement. Managers pick when access ends: **In 7 days**, **In 30 days**, **In 90 days**, **On a date…** or **Never**. Access stops as soon as it lapses; sharing again replaces the end date. The invite email links straight to the folder's portal. See [Client portals](/teams/client-portals/).
 
 ## Read receipts
 

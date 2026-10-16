@@ -8,7 +8,7 @@ import { requireWorkspaceRole } from '../workspaces/roles';
 import { generateId } from '../crypto-utils';
 import { invalidateGrants } from '../access/can-access';
 import { logAudit } from '../audit';
-import { requireExternalSharing } from './guard';
+import { requireExternalSharing, requireExternalSharingEnabled } from './guard';
 import { inviteOrAddMember } from '../workspaces/invite';
 import { requireFolderManager } from '../folders';
 
@@ -84,13 +84,16 @@ async function insertGrant(
   ).bind(workspaceId, subjectType, subjectId, resourceType, resourceId, capability).first();
 }
 
-// Admins manage every grant; whoever may manage a Team Space folder (rename/delete
-// rights) also manages the grants on that one folder.
-async function requireGrantManager(
+// Role half of the grant gate. Admins manage every grant; whoever may manage a Team Space
+// folder (rename/delete rights) also manages the grants on that one folder. This is the
+// ONLY thing a folder manager is excused from: creating a grant still runs the
+// external-sharing entitlement (requireExternalSharingEnabled) on top, for admins and
+// managers alike. Listing and revoking need only this, so access can always be removed.
+async function requireGrantManagerRole(
   env: Env, workspaceId: string, user: AuthUser, resourceType: string | null, resourceId: string | null,
 ): Promise<Response | null> {
   if (resourceType === 'folder' && resourceId && !(await requireFolderManager(env, user, workspaceId, resourceId))) return null;
-  return requireExternalSharing(env, workspaceId, user.id);
+  return requireWorkspaceRole(env, workspaceId, user.id, 'admin');
 }
 
 export async function handleListGrants(
@@ -101,9 +104,7 @@ export async function handleListGrants(
   const resourceType = url.searchParams.get('resource_type');
   const resourceId = url.searchParams.get('resource_id');
 
-  const forbidden = resourceType === 'folder' && resourceId
-    ? await requireGrantManager(env, workspaceId, user, resourceType, resourceId)
-    : await requireWorkspaceRole(env, workspaceId, user.id, 'admin');
+  const forbidden = await requireGrantManagerRole(env, workspaceId, user, resourceType, resourceId);
   if (forbidden) return forbidden;
 
   const where: string[] = ['g.workspace_id = ?'];
@@ -217,7 +218,8 @@ export async function handleShareWithPerson(
   const resourceId = body.resource_id ?? '';
   const capability = body.capability ?? 'view';
 
-  const forbidden = await requireGrantManager(env, workspaceId, user, resourceType, resourceId);
+  const forbidden = (await requireGrantManagerRole(env, workspaceId, user, resourceType, resourceId))
+    ?? (await requireExternalSharingEnabled(env, workspaceId));
   if (forbidden) return forbidden;
 
   if (!email || !email.includes('@'))
@@ -244,8 +246,15 @@ export async function handleShareWithPerson(
   }
 
   // Ensure the external edge (pre-creates the user + sends the invite/claim email if new).
-  await inviteOrAddMember(env, workspaceId, user.id, email, 'member', undefined, 'external',
+  // Workspace policy (allowed email domains) applies to every sharer: a skipped invite
+  // means no external edge, so no grant either.
+  const invite = await inviteOrAddMember(env, workspaceId, user.id, email, 'member', undefined, 'external',
     resourceType === 'folder' ? { folderId: resourceId } : {});
+  if (invite.status === 'skipped') {
+    return invite.code === 'domain_not_allowed'
+      ? json({ error: 'This workspace only shares with people at its allowed email domains.', code: 'DOMAIN_NOT_ALLOWED' }, 403)
+      : json({ error: 'That email cannot be invited.', code: 'VALIDATION_ERROR' }, 400);
+  }
   const target = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: string }>();
   if (!target) return json({ error: 'Could not resolve the invited person', code: 'INTERNAL_ERROR' }, 500);
 
@@ -263,7 +272,7 @@ export async function handleDeleteGrant(
   const row = await env.DB.prepare(
     'SELECT subject_type, subject_id, resource_type, resource_id FROM grants WHERE id = ? AND workspace_id = ?'
   ).bind(grantId, workspaceId).first<{ subject_type: string; subject_id: string; resource_type: string; resource_id: string }>();
-  const forbidden = await requireGrantManager(env, workspaceId, user, row?.resource_type ?? null, row?.resource_id ?? null);
+  const forbidden = await requireGrantManagerRole(env, workspaceId, user, row?.resource_type ?? null, row?.resource_id ?? null);
   if (forbidden) return forbidden;
   if (!row) return json({ error: 'Not found', code: 'NOT_FOUND' }, 404);
 
