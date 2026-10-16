@@ -85,7 +85,7 @@ erDiagram
 
 | Table | Holds |
 |---|---|
-| `users` | The account. `tier` drives quota lookups, `disabled` soft-bans, `is_service` marks non-human accounts, `identity_id` links merged identities, `last_janitor_at` tracks background cleanup. `locale` (`en`/`es`) is the person's own language; NULL follows the workspace. |
+| `users` | The account. `google_id` and `microsoft_id` (`<tid>:<oid>`) key the social sign-ins. `tier` drives quota lookups, `disabled` soft-bans, `is_service` marks non-human accounts, `identity_id` links merged identities, `last_janitor_at` tracks background cleanup. `locale` (`en`/`es`) is the person's own language; NULL follows the workspace. |
 | `user_passwords` | PBKDF2 digest, `salt`, and the `iterations` used, stored per row so the cost can be raised later without invalidating existing credentials. Deliberately **not** columns on `users`, so no ordinary `SELECT` on `users` carries a password hash. It is the credential a fresh instance can issue with no EMAIL binding and no OAuth client. |
 | `user_profiles` | Optional public profile: freeform `profile_md` and a `follows` list. |
 | `tokens` | Every bearer token. `principal_type` is `user` (a personal `so_` token) or `workspace` (a `sot_` agent token); `user_id` is always the identity it authenticates as. Only `token_hash` is stored — the plaintext is shown once at creation. `scopes` is NULL for personal tokens, a csv for workspace ones, and `subject_external_user_id` lets a token act on behalf of an external user. Revocable via `revoked_at`. |

@@ -67,6 +67,7 @@ no de ShareOut.
 |----------|-----------|
 | Dominio custom | Adjuntá ruta/dominio en Cloudflare; actualizá `SHAREOUT_BASE_URL` |
 | Google sign-in | `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`; callback `{origin}/auth/callback` |
+| Microsoft sign-in | `MICROSOFT_CLIENT_ID` + `MICROSOFT_CLIENT_SECRET` (`MICROSOFT_TENANT` opcional); callback `{origin}/auth/microsoft/callback` — [setup](/es/self-host/secrets/#entrar-con-microsoft) |
 | OTP por email real | Binding `EMAIL` + vars de from-address |
 | Subdominios de workspace | DNS wildcard `*.tudominio` → worker; apex = host de `SHAREOUT_BASE_URL` |
 | CDN de contenido separado | Seteá `ARTIFACT_ORIGIN` a una segunda zona (hardening opcional) |

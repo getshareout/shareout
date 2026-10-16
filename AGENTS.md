@@ -78,6 +78,8 @@ tooling/scripts/       ← ci-check, gitleaks, boundary helpers
 | `STORAGE_QUOTA_BYTES` / `STORAGE_MAX_FILE_BYTES` | Optional storage caps; unset = unlimited |
 | `PUBLIC_ARTIFACT_LIMIT` | Optional per-account public-artifact cap; unset = unlimited |
 | `GOOGLE_CLIENT_ID` / `SECRET` | Optional; email OTP always available |
+| `MICROSOFT_CLIENT_ID` / `SECRET` | Optional Sign in with Microsoft (personal + work/school); callback `/auth/microsoft/callback`. Work accounts need the `xms_edov` optional claim |
+| `MICROSOFT_TENANT` | Optional authority: `common` (default), `organizations`, `consumers`, or one tenant GUID |
 | `D1_READ_REPLICAS` | `1` to read through D1 Sessions (read replicas; enable read replication on the database first); writes hand back an `x-d1-bookmark` header / `__d1b` cookie for read-your-writes. Unset = primary only |
 | `SUPPORT_ALERT_TELEGRAM_CHAT_ID` | Optional; Telegram chat pinged on every new support ticket (needs `TELEGRAM_BOT_TOKEN`) |
 

@@ -2,6 +2,7 @@ import type { Env } from '../types';
 import { getSessionUser } from '../auth/session';
 import { loginPage, accessDeniedPage, passwordLoginPage, credentialsLoginPage } from '../auth/pages';
 import { verifyAccessToken } from '../auth/artifact-auth';
+import { microsoftOAuthConfigured } from '../config/auth-providers';
 import { getVisibilityScope, placeholders } from '../account-links';
 import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { canAccess } from '../access/can-access';
@@ -86,6 +87,7 @@ export async function checkAccess(
       sharedBy,
       Boolean(env.GOOGLE_CLIENT_ID?.trim() && env.GOOGLE_CLIENT_SECRET?.trim()),
       returnPath(request, slug),
+      microsoftOAuthConfigured(env),
     );
   }
 

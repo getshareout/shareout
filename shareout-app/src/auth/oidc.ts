@@ -1,6 +1,6 @@
 /**
  * Workspace SSO over OpenID Connect (authorization code + PKCE). Works with any OIDC
- * IdP; Okta is the one it is tested against.
+ * IdP; tested against Okta- and Entra ID-shaped fixtures.
  *
  * GET /auth/sso?workspace=<slug>|login_hint=<email>&redirect=/path  → IdP
  * GET /auth/sso/callback                                           → session cookie
@@ -58,14 +58,46 @@ export interface IdTokenClaims {
   aud: string | string[];
   azp?: string;
   exp: number;
+  nbf?: number;
   nonce?: string;
   email?: string;
   email_verified?: boolean | string;
   name?: string;
+  /** Entra ID: tenant the user signed in to, object id, and sign-in name. */
+  tid?: string;
+  oid?: string;
+  preferred_username?: string;
+  /** Entra ID optional claim: the email's domain owner is verified. Arrives as a boolean or "1"/"0". */
+  xms_edov?: boolean | string | number;
 }
 
+/** Microsoft's multi-tenant metadata publishes this placeholder in `issuer`. */
+export const TENANT_ID_PLACEHOLDER = '{tenantid}';
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isGuid(value: unknown): value is string {
+  return typeof value === 'string' && GUID.test(value);
+}
+
+export function isEntraIssuer(issuer: string): boolean {
+  try {
+    return new URL(issuer).hostname === 'login.microsoftonline.com';
+  } catch {
+    return false;
+  }
+}
+
+/** `xms_edov` is documented as a boolean but is often sent as the string "1". */
+export function claimFlag(value: unknown): boolean | undefined {
+  if (value === true || value === 1 || value === '1' || value === 'true') return true;
+  if (value === false || value === 0 || value === '0' || value === 'false') return false;
+  return undefined;
+}
+
+interface JwksEntry { key: CryptoKey; issuer?: string }
+
 const discoveryCache = new Map<string, { doc: Discovery; expiresAt: number }>();
-const jwksCache = new Map<string, { keys: Record<string, CryptoKey>; expiresAt: number }>();
+const jwksCache = new Map<string, { keys: Record<string, JwksEntry>; expiresAt: number }>();
 
 export function resetOidcCaches(): void {
   discoveryCache.clear();
@@ -84,11 +116,11 @@ function base64UrlDecode(input: string): Uint8Array {
   return Uint8Array.from(bin, (c) => c.charCodeAt(0));
 }
 
-function randomToken(): string {
+export function randomToken(): string {
   return base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
 }
 
-async function pkceChallenge(verifier: string): Promise<string> {
+export async function pkceChallenge(verifier: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
   return base64UrlEncode(new Uint8Array(digest));
 }
@@ -109,28 +141,41 @@ export async function discover(issuer: string): Promise<Discovery> {
   return doc;
 }
 
-async function signingKey(jwksUri: string, kid: string): Promise<CryptoKey> {
+async function signingKey(jwksUri: string, kid: string): Promise<JwksEntry> {
   const cached = jwksCache.get(jwksUri);
   if (cached && cached.expiresAt > Date.now() && cached.keys[kid]) return cached.keys[kid];
   // Unknown kid on a warm cache = the IdP rotated keys; refetch once.
   const res = await fetch(jwksUri);
   if (!res.ok) throw new Error('Failed to fetch IdP signing keys');
-  const jwks = await res.json<{ keys: Array<JsonWebKey & { kid?: string; kty?: string; use?: string }> }>();
-  const keys: Record<string, CryptoKey> = {};
+  const jwks = await res.json<{ keys: Array<JsonWebKey & { kid?: string; kty?: string; use?: string; issuer?: string }> }>();
+  const keys: Record<string, JwksEntry> = {};
   for (const jwk of jwks.keys || []) {
     if (jwk.kty !== 'RSA' || !jwk.kid || (jwk.use && jwk.use !== 'sig')) continue;
-    keys[jwk.kid] = await crypto.subtle.importKey(
+    const key = await crypto.subtle.importKey(
       'jwk',
       { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: 'RS256', ext: true },
       { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
       false,
       ['verify'],
     );
+    // Entra's keys documents name the issuer each key may sign for.
+    keys[jwk.kid] = { key, issuer: typeof jwk.issuer === 'string' ? jwk.issuer : undefined };
   }
   jwksCache.set(jwksUri, { keys, expiresAt: Date.now() + CACHE_TTL_MS });
   const key = keys[kid];
   if (!key) throw new Error('Unknown signing key');
   return key;
+}
+
+/**
+ * The issuer a token must carry. A tenant-independent issuer
+ * (`https://login.microsoftonline.com/{tenantid}/v2.0`) resolves against the token's own
+ * `tid`, which must be a GUID — Microsoft's documented rule for multi-tenant validation.
+ */
+function expectedIssuer(issuer: string, claims: IdTokenClaims): string {
+  if (!issuer.includes(TENANT_ID_PLACEHOLDER)) return issuer;
+  if (!isGuid(claims.tid)) throw new Error('Wrong issuer');
+  return issuer.replace(TENANT_ID_PLACEHOLDER, claims.tid);
 }
 
 export async function verifyIdToken(
@@ -143,7 +188,7 @@ export async function verifyIdToken(
   const header = JSON.parse(new TextDecoder().decode(base64UrlDecode(headerB64)));
   if (header.alg !== 'RS256') throw new Error('Unexpected token algorithm');
 
-  const key = await signingKey(expected.jwksUri, header.kid);
+  const { key, issuer: keyIssuer } = await signingKey(expected.jwksUri, header.kid);
   const valid = await crypto.subtle.verify(
     { name: 'RSASSA-PKCS1-v1_5' },
     key,
@@ -153,12 +198,18 @@ export async function verifyIdToken(
   if (!valid) throw new Error('Invalid ID token signature');
 
   const claims: IdTokenClaims = JSON.parse(new TextDecoder().decode(base64UrlDecode(payloadB64)));
-  if ((claims.iss || '').replace(/\/$/, '') !== expected.issuer) throw new Error('Wrong issuer');
+  const iss = (claims.iss || '').replace(/\/$/, '');
+  if (iss !== expectedIssuer(expected.issuer, claims)) throw new Error('Wrong issuer');
+  // A key scoped to one issuer (Entra's consumer-tenant key) must not vouch for another.
+  if (keyIssuer && iss !== expectedIssuer(keyIssuer.replace(/\/$/, ''), claims)) throw new Error('Wrong issuer for signing key');
   const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
   if (!aud.includes(expected.clientId)) throw new Error('Wrong audience');
   if (aud.length > 1 && claims.azp !== expected.clientId) throw new Error('Wrong authorized party');
   if (typeof claims.exp !== 'number' || claims.exp + CLOCK_SKEW_SECONDS < Date.now() / 1000) {
     throw new Error('Expired ID token');
+  }
+  if (typeof claims.nbf === 'number' && claims.nbf - CLOCK_SKEW_SECONDS > Date.now() / 1000) {
+    throw new Error('ID token not yet valid');
   }
   if (!claims.nonce || claims.nonce !== expected.nonce) throw new Error('Nonce mismatch');
   return claims;
@@ -168,27 +219,27 @@ function callbackUrl(env: Env): string {
   return `${env.SHAREOUT_BASE_URL.replace(/\/$/, '')}/auth/sso/callback`;
 }
 
-async function encodeState(state: SsoState, env: Env): Promise<string> {
+export async function encodeState(state: { exp: number }, env: Env): Promise<string> {
   const data = base64UrlEncode(new TextEncoder().encode(JSON.stringify(state)));
   const sig = await signPayload(data, env.SESSION_SECRET);
   return `${data}.${base64UrlEncode(Uint8Array.from(atob(sig), (c) => c.charCodeAt(0)))}`;
 }
 
-async function decodeState(raw: string | null, env: Env): Promise<SsoState | null> {
+export async function decodeState<T extends { exp: number } = SsoState>(raw: string | null, env: Env): Promise<T | null> {
   if (!raw) return null;
   const [data, sigB64Url] = raw.split('.');
   if (!data || !sigB64Url) return null;
   const sig = btoa(String.fromCharCode(...base64UrlDecode(sigB64Url)));
   try {
     if (!(await verifySignature(data, sig, env.SESSION_SECRET))) return null;
-    const state: SsoState = JSON.parse(new TextDecoder().decode(base64UrlDecode(data)));
+    const state: T = JSON.parse(new TextDecoder().decode(base64UrlDecode(data)));
     return state.exp > Date.now() / 1000 ? state : null;
   } catch {
     return null;
   }
 }
 
-function readCookie(request: Request, name: string): string | null {
+export function readCookie(request: Request, name: string): string | null {
   const header = request.headers.get('Cookie') || '';
   for (const part of header.split(';')) {
     const [k, ...v] = part.trim().split('=');
@@ -320,7 +371,7 @@ export async function handleSsoCallback(request: Request, env: Env, executionCtx
     return fail(`Sign-in was not completed: ${description || idpError}`);
   }
 
-  const saved = await decodeState(readCookie(request, STATE_COOKIE), env);
+  const saved = await decodeState<SsoState>(readCookie(request, STATE_COOKIE), env);
   const code = url.searchParams.get('code');
   if (!saved || !code || url.searchParams.get('state') !== saved.state) {
     return fail('This sign-in link expired or was opened in another browser. Start again.');
@@ -349,6 +400,11 @@ export async function handleSsoCallback(request: Request, env: Env, executionCtx
   if (!email) return fail('Your identity provider did not share an email address. Ask your administrator to grant the "email" scope.');
   if (claims.email_verified === false || claims.email_verified === 'false') {
     return fail('Your identity provider reports this email address as unverified.');
+  }
+  // Entra ID does not verify `email`; a user can carry any address in their mail
+  // attribute. Only `xms_edov` (an optional claim) says the domain owner vouched for it.
+  if (isEntraIssuer(config.issuer) && claimFlag(claims.xms_edov) !== true) {
+    return fail('Microsoft Entra ID did not confirm this email address. Ask your administrator to add the "xms_edov" optional claim to the ShareOut app registration.');
   }
   if (!config.emailDomains.includes(emailDomain(email))) {
     return fail(`${email} cannot sign in through this workspace's single sign-on.`);

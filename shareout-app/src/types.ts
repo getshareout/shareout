@@ -125,6 +125,11 @@ export interface Env {
   PUBLIC_ABUSE_AUTOKILL_PER_DAY?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  /** Sign in with Microsoft (identity platform v2.0). Button shows only when both are set. */
+  MICROSOFT_CLIENT_ID?: string;
+  MICROSOFT_CLIENT_SECRET?: string;
+  /** `common` (default), `organizations`, `consumers`, or a directory (tenant) GUID. */
+  MICROSOFT_TENANT?: string;
   SHOPIFY_CLIENT_ID: string;
   SHOPIFY_CLIENT_SECRET: string;
   TIENDANUBE_CLIENT_ID: string;

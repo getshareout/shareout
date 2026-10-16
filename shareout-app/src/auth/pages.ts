@@ -16,12 +16,15 @@ const SIGN_IN_COPY = {
     ssoOnly: 'Your organization signs in with single sign-on.',
     intro: 'Use your email and password to continue.',
     introGoogle: 'Use your email and password, or Google, to continue.',
+    introMicrosoft: 'Use your email and password, or Microsoft, to continue.',
+    introSocial: 'Use your email and password, Google or Microsoft to continue.',
     or: 'or',
     codeInstead: 'Email me a one-time code instead',
     noEmailBinding: 'This instance has no email binding configured, so the code is written to the Worker log rather than sent.',
     emailLabel: 'Email address',
     passwordLabel: 'Password',
     google: 'Sign in with Google',
+    microsoft: 'Sign in with Microsoft',
     sendCode: 'Send code',
     sentTo: 'We sent a 6-digit code to',
     codeLabel: 'One-time code',
@@ -54,12 +57,15 @@ const SIGN_IN_COPY = {
     ssoOnly: 'Tu organización inicia sesión con inicio de sesión único (SSO).',
     intro: 'Usá tu email y contraseña para seguir.',
     introGoogle: 'Usá tu email y contraseña, o Google, para seguir.',
+    introMicrosoft: 'Usá tu email y contraseña, o Microsoft, para seguir.',
+    introSocial: 'Usá tu email y contraseña, Google o Microsoft para seguir.',
     or: 'o',
     codeInstead: 'Mandame un código por email',
     noEmailBinding: 'Esta instancia no tiene email configurado: el código se escribe en el log del Worker en vez de enviarse.',
     emailLabel: 'Email',
     passwordLabel: 'Contraseña',
     google: 'Entrar con Google',
+    microsoft: 'Entrar con Microsoft',
     sendCode: 'Mandar código',
     sentTo: 'Te mandamos un código de 6 dígitos a',
     codeLabel: 'Código',
@@ -135,6 +141,7 @@ export function loginPage(
   // Where to land after sign-in: the exact URL that hit the gate (path + query, e.g. a
   // multi-page `?page=` deep link from a bot). Same-host paths only.
   returnTo?: string,
+  microsoftEnabled = false,
 ): Response {
   // Private-by-default gates must not reveal title, description, or thumbnail to
   // unauthorized visitors (or crawlers). Optional sharedBy is a first-name hint only
@@ -152,7 +159,8 @@ export function loginPage(
     <p class="share-subtitle">${subtitle}</p>
     <div class="auth-methods">
     ${googleEnabled ? googleButtonHtml(redirect) : ''}
-    ${googleEnabled ? '<div class="auth-divider"><span>or</span></div>' : ''}
+    ${microsoftEnabled ? microsoftButtonHtml(redirect) : ''}
+    ${googleEnabled || microsoftEnabled ? '<div class="auth-divider"><span>or</span></div>' : ''}
     ${emailOtpFormsHtml(turnstileSiteKey)}
     <div id="email-code-status" class="status" role="status" aria-live="polite" hidden></div>
     </div>
@@ -168,6 +176,8 @@ export function appLoginPage(opts: {
   redirect?: string;
   turnstileSiteKey?: string;
   googleEnabled?: boolean;
+  /** MICROSOFT_CLIENT_ID + SECRET set (and a valid MICROSOFT_TENANT). */
+  microsoftEnabled?: boolean;
   loginHint?: string | null;
   /** EMAIL binding present. Without it, OTP codes only reach the worker log. */
   emailConfigured?: boolean;
@@ -179,6 +189,8 @@ export function appLoginPage(opts: {
 }): Response {
   const redirect = opts.redirect && opts.redirect.startsWith('/') ? opts.redirect : '/home';
   const googleEnabled = opts.googleEnabled === true;
+  const microsoftEnabled = opts.microsoftEnabled === true;
+  const socialEnabled = googleEnabled || microsoftEnabled;
   const emailConfigured = opts.emailConfigured !== false;
   const sso = opts.sso || null;
   const lang = opts.locale || 'en';
@@ -225,8 +237,9 @@ export function appLoginPage(opts: {
     ${emailConfigured ? '' : `<p class="auth-help">${escapeHtml(c.noEmailBinding)}</p>`}
     ${emailOtpFormsHtml(opts.turnstileSiteKey, c, hint)}
     <div id="email-code-status" class="status" role="status" aria-live="polite" hidden></div>
-    ${googleEnabled ? `<div class="auth-divider"><span>${escapeHtml(c.or)}</span></div>` : ''}
+    ${socialEnabled ? `<div class="auth-divider"><span>${escapeHtml(c.or)}</span></div>` : ''}
     ${googleEnabled ? googleButtonHtml(redirect, hint, c) + googleNote : ''}
+    ${microsoftEnabled ? microsoftButtonHtml(redirect, hint, c) : ''}
     </div>
     ${footer}
   </div>
@@ -248,11 +261,12 @@ export function appLoginPage(opts: {
   ${card}
     ${mark}
     <h1>${escapeHtml(signInTitle)}</h1>
-    <p>${escapeHtml(googleEnabled ? c.introGoogle : c.intro)}</p>
+    <p>${escapeHtml(googleEnabled && microsoftEnabled ? c.introSocial : googleEnabled ? c.introGoogle : microsoftEnabled ? c.introMicrosoft : c.intro)}</p>
     <div class="auth-methods">
     ${sso ? ssoButtonHtml(sso) : ''}
     ${googleEnabled ? googleButtonHtml(redirect, opts.loginHint, c) : ''}
-    ${googleEnabled ? `<div class="auth-divider"><span>${escapeHtml(c.or)}</span></div>` : ''}
+    ${microsoftEnabled ? microsoftButtonHtml(redirect, opts.loginHint, c) : ''}
+    ${socialEnabled ? `<div class="auth-divider"><span>${escapeHtml(c.or)}</span></div>` : ''}
     ${passwordFormHtml(c, emailConfigured)}
     ${otpSection}
     </div>
@@ -363,6 +377,19 @@ function googleButtonHtml(redirect: string, loginHint?: string | null, c: SignIn
         <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
       </svg>
       ${escapeHtml(c.google)}
+    </a>`;
+}
+
+function microsoftButtonHtml(redirect: string, loginHint?: string | null, c: SignInCopy = EN): string {
+  const hint = loginHint ? `&login_hint=${encodeURIComponent(loginHint)}` : '';
+  return `<a href="/auth/microsoft?redirect=${encodeURIComponent(redirect)}${hint}" class="btn btn-google btn-microsoft">
+      <svg viewBox="0 0 23 23" aria-hidden="true">
+        <path fill="#F25022" d="M1 1h10v10H1z"/>
+        <path fill="#7FBA00" d="M12 1h10v10H12z"/>
+        <path fill="#00A4EF" d="M1 12h10v10H1z"/>
+        <path fill="#FFB900" d="M12 12h10v10H12z"/>
+      </svg>
+      ${escapeHtml(c.microsoft)}
     </a>`;
 }
 

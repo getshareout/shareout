@@ -29,8 +29,47 @@ button provisions names; replace placeholder IDs after create if needed.
 |------|------|--------|
 | — | — | **Password sign-in needs no configuration.** It is always available and is how `/setup` creates the first admin. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | secret | Enables Google on `/auth/login`. Callback: `{SHAREOUT_BASE_URL}/auth/callback`. |
+| `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | secret | Enables **Sign in with Microsoft** (personal and work/school accounts) on `/auth/login` and private-page sign-in. Callback: `{SHAREOUT_BASE_URL}/auth/microsoft/callback`. See [below](#sign-in-with-microsoft). |
+| `MICROSOFT_TENANT` | var | Optional. `common` (default: personal + work/school), `organizations` (work/school only), `consumers` (personal only), or one directory's tenant GUID. Any other value hides the button. |
 | Email binding `EMAIL` | binding | Enables emailed one-time codes. Without it those codes only reach the worker log. |
 | `EMAIL_DEFAULT_FROM` | var | From-address when Email is bound. |
+
+## Sign in with Microsoft
+
+One Microsoft Entra app registration serves the whole instance. In the
+[Microsoft Entra admin center](https://entra.microsoft.com), in your own tenant:
+
+1. **Entra ID → App registrations → New registration.** The name is what people see on
+   Microsoft's consent screen. **Supported account types:**
+   - **Any Entra ID Tenant + Personal Microsoft accounts** with `MICROSOFT_TENANT` unset
+     (`common`);
+   - **Multiple Entra ID tenants** with `MICROSOFT_TENANT=organizations`;
+   - **Single tenant only** with `MICROSOFT_TENANT=<Directory (tenant) ID>`.
+2. **Authentication → Add Redirect URI → Web:** `{SHAREOUT_BASE_URL}/auth/microsoft/callback`.
+3. **Certificates & secrets → Client secrets → New client secret.** Copy the **Value**
+   (shown once) into `MICROSOFT_CLIENT_SECRET`; **Overview → Application (client) ID** into
+   `MICROSOFT_CLIENT_ID`. Microsoft recommends secrets that expire in under 12 months;
+   rotate before expiry.
+4. **Token configuration → Add optional claim → ID:** `email` and `xms_edov` (accept the
+   prompt to add the Microsoft Graph `email` permission).
+5. Recommended: have Entra strip unverified addresses from tokens —
+   `PATCH https://graph.microsoft.com/v1.0/applications/{object-id}/authenticationBehaviors`
+   with `{"removeUnverifiedEmailClaim": true}`.
+6. Multi-tenant apps: complete **publisher verification** (Branding & properties), or
+   organizations that only allow consent to verified publishers will block sign-in.
+
+**How email is trusted.** Microsoft documents the `email` claim as unverified and mutable,
+and ShareOut links an existing account by email. So: personal Microsoft accounts
+(tenant `9188040d-6c67-4c5b-b112-36a304b66dad`) use their `email`, or an email-shaped
+`preferred_username`; work/school accounts are accepted only with `xms_edov` true (the
+domain owner verified the address), never from `preferred_username`. The account is then
+keyed by the token's `tid:oid`: an address that later shows up under a different Microsoft
+identity is refused, not merged. Disabled users are refused, and addresses on an
+[enforced workspace SSO](/teams/sso/) domain are sent to that IdP instead.
+
+Tokens are checked against Microsoft's keys (`/discovery/v2.0/keys`): signature, the
+`{tenantid}` issuer resolved from the token's GUID `tid`, the key's own issuer, audience
+(the client ID), expiry and the nonce from the signed state cookie (PKCE included).
 
 ## Optional product features
 

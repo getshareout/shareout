@@ -63,6 +63,7 @@ export function instanceBody(cfg: InstanceConfig): string {
   const signIn = settingsTable(
     kv('Email &amp; password', yesNo(true)) +
       kv('Google sign-in', yesNo(cfg.auth.google)) +
+      kv('Microsoft sign-in', yesNo(cfg.auth.microsoft)) +
       kv(
         'One-time codes',
         cfg.auth.email_otp_delivery === 'email'
