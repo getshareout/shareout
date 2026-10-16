@@ -215,16 +215,24 @@ export async function listRulesForOwner(env: Env, userId: string, workspaceId?: 
 /**
  * Recent evaluated values per rule (oldest→newest, last ~24, last 30 days), for
  * a trend sparkline. One batched query over metric_alert_runs.
+ *
+ * evaluated_at is ISO-8601 TEXT, so the cutoff must be ISO too (an epoch number
+ * compares as text and matches every row). The per-rule cap runs in SQL so D1
+ * returns at most `limit` rows per rule, not the rule's whole run ledger.
  */
 export async function fetchHistories(env: Env, ruleIds: string[], limit = 24): Promise<Record<string, number[]>> {
   if (!ruleIds.length) return {};
-  const since = Math.floor(Date.now() / 1000) - 30 * 86400;
+  const since = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
   const placeholders = ruleIds.map(() => '?').join(',');
   const res = await env.DB.prepare(
-    `SELECT rule_id, value FROM metric_alert_runs
-       WHERE rule_id IN (${placeholders}) AND value IS NOT NULL AND evaluated_at >= ?
-       ORDER BY evaluated_at ASC`
-  ).bind(...ruleIds, since).all<{ rule_id: string; value: number }>();
+    `SELECT rule_id, value FROM (
+       SELECT rule_id, value, evaluated_at,
+              ROW_NUMBER() OVER (PARTITION BY rule_id ORDER BY evaluated_at DESC) AS rn
+         FROM metric_alert_runs
+        WHERE rule_id IN (${placeholders}) AND value IS NOT NULL AND evaluated_at >= ?
+     ) WHERE rn <= ?
+     ORDER BY evaluated_at ASC`
+  ).bind(...ruleIds, since, limit).all<{ rule_id: string; value: number }>();
 
   const out: Record<string, number[]> = {};
   for (const r of res.results || []) (out[r.rule_id] ||= []).push(r.value);

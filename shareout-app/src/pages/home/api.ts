@@ -156,14 +156,24 @@ export async function handleHomeQuickSearchApi(
   return Response.json(result);
 }
 
-/** GET /v1/home/comments?artifactId=&limit= — comments on one artifact for the Inspector. */
+/** GET /v1/home/comments?artifactId=|slug=&limit= — comments on one artifact for the Inspector.
+ *  `slug` lets the Inspector load a deep-linked artifact without first waiting on
+ *  /v1/artifacts/<slug> for its id (resolved the same way that endpoint does). */
 export async function handleHomeCommentsApi(
   request: Request,
   env: Env,
   user: { id: string; email: string | null },
 ): Promise<Response> {
   const url = new URL(request.url);
-  const artifactId = url.searchParams.get('artifactId')?.trim();
+  let artifactId = url.searchParams.get('artifactId')?.trim();
+  const slug = url.searchParams.get('slug')?.trim();
+  if (!artifactId && slug) {
+    const row = await env.DB.prepare(
+      'SELECT id FROM artifacts WHERE (id = ? OR slug = ?) AND deleted_at IS NULL ORDER BY id = ? DESC LIMIT 1'
+    ).bind(slug, slug, slug).first<{ id: string }>();
+    if (!row) return Response.json({ comments: [], count: 0 });
+    artifactId = row.id;
+  }
   if (!artifactId) return Response.json({ error: 'artifactId required' }, { status: 400 });
   const limit = Number(url.searchParams.get('limit')) || 100;
   const comments = await queryArtifactComments(env, user, artifactId, limit);
