@@ -5446,6 +5446,16 @@
                       "comment"
                     ],
                     "default": "view"
+                  },
+                  "expires_in_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3650,
+                    "description": "Access ends this many days from now (UI presets 7/30/90). Wins over expires_at."
+                  },
+                  "expires_at": {
+                    "type": "string",
+                    "description": "ISO date-time (or YYYY-MM-DD = end of that day, UTC) when access ends. Omit both for no expiry; a re-share replaces the previous expiry."
                   }
                 }
               }
@@ -5553,6 +5563,78 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/folders/{folderId}/activity": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        },
+        {
+          "name": "folderId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "External sharing"
+        ],
+        "summary": "Who opened what in a shared folder",
+        "description": "External views on the folder and everything in its subtree, newest first (max 100). Admins, or the folder's creator while members manage their folders.",
+        "operationId": "listFolderActivity",
+        "responses": {
+          "200": {
+            "description": "Activity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "activity": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "user_email": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "resource_type": {
+                            "type": "string"
+                          },
+                          "resource_id": {
+                            "type": "string"
+                          },
+                          "resource_name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "action": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         }
       }

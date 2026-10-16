@@ -277,7 +277,7 @@ export async function routeServe(ctx: FetchContext): Promise<Response | null> {
   if (path === '/shared' && request.method === 'GET') {
     const sessionUser = await getSessionUser(request, env);
     if (!sessionUser) {
-      return Response.redirect(new URL('/auth/login?redirect=/shared', url.origin).toString(), 302);
+      return Response.redirect(new URL('/auth/login?redirect=' + (url.search ? encodeURIComponent('/shared' + url.search) : '/shared'), url.origin).toString(), 302);
     }
     const portal = await handleSharedPortal(request, env);
     if (portal) return portal;

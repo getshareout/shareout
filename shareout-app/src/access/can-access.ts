@@ -64,10 +64,14 @@ function roleSatisfies(role: WorkspaceRole, requested: Capability): boolean {
 
 // --- Grant context (cached) -------------------------------------------------
 
+// A cached capability carries its grant's expiry (`x`, ISO) so a grant that lapses while
+// the context sits in KV is denied at read time, not up to GRANTS_TTL later.
+interface GrantCap { c: Capability; x?: string }
+
 interface GrantContext {
   shareeIds: string[];
-  direct: Record<string, Capability[]>;  // `${resource_type}:${resource_id}` -> caps
-  folders: Record<string, Capability[]>; // folder_id -> caps
+  direct: Record<string, GrantCap[]>;  // `${resource_type}:${resource_id}` -> caps
+  folders: Record<string, GrantCap[]>; // folder_id -> caps
 }
 
 const GRANTS_TTL = 60; // tighter than role cache (300s) — revocation sensitivity.
@@ -105,7 +109,7 @@ async function loadGrantContext(
   identity: AccessIdentity,
 ): Promise<GrantContext> {
   const gen = await grantsGeneration(env, workspaceId);
-  const cacheKey = `grants:${workspaceId}:${gen}:${identityKey(identity)}`;
+  const cacheKey = `grants2:${workspaceId}:${gen}:${identityKey(identity)}`;
 
   if (env.SLUGS) {
     try {
@@ -148,23 +152,23 @@ async function buildGrantContext(
 
   // 2. Grants whose subject is one of those sharee orgs OR this individual external user.
   const subjectIds = [...shareeIds, ...userIds];
-  const direct: Record<string, Capability[]> = {};
-  const folders: Record<string, Capability[]> = {};
+  const direct: Record<string, GrantCap[]> = {};
+  const folders: Record<string, GrantCap[]> = {};
   if (subjectIds.length) {
     const { results } = await env.DB.prepare(
-      `SELECT resource_type, resource_id, capability
+      `SELECT resource_type, resource_id, capability, expires_at
          FROM grants
         WHERE workspace_id = ?
           AND ( (subject_type = 'sharee'        AND subject_id IN (${placeholders(shareeIds.length)}))
              OR (subject_type = 'external_user' AND subject_id IN (${placeholders(userIds.length)})) )
           AND (expires_at IS NULL OR expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
     ).bind(workspaceId, ...shareeIds, ...userIds)
-      .all<{ resource_type: ResourceType; resource_id: string; capability: Capability }>();
+      .all<{ resource_type: ResourceType; resource_id: string; capability: Capability; expires_at: string | null }>();
 
     for (const g of results || []) {
       const bucket = g.resource_type === 'folder' ? folders : direct;
       const key = g.resource_type === 'folder' ? g.resource_id : `${g.resource_type}:${g.resource_id}`;
-      (bucket[key] ||= []).push(g.capability);
+      (bucket[key] ||= []).push(g.expires_at ? { c: g.capability, x: g.expires_at } : { c: g.capability });
     }
   }
   return { shareeIds, direct, folders };
@@ -240,8 +244,8 @@ async function resolveResourceWorkspaceId(
   }
 }
 
-function anySatisfies(caps: Capability[] | undefined, requested: Capability): boolean {
-  return !!caps && caps.some(c => capabilitySatisfies(c, requested));
+function anySatisfies(caps: GrantCap[] | undefined, requested: Capability, now: string): boolean {
+  return !!caps && caps.some(g => (!g.x || g.x > now) && capabilitySatisfies(g.c, requested));
 }
 
 export async function canAccess(
@@ -273,9 +277,10 @@ export async function canAccess(
   // 3. Paid grant path — needs a resolvable owning workspace to scope the cache.
   if (!workspaceId) return false;
   const ctx = await loadGrantContext(env, workspaceId, identity);
+  const now = new Date().toISOString();
 
   // 3a. Direct grant on the resource itself.
-  if (anySatisfies(ctx.direct[`${resourceType}:${resourceId}`], capability)) return true;
+  if (anySatisfies(ctx.direct[`${resourceType}:${resourceId}`], capability, now)) return true;
 
   // 3b. Inherited grant on any ANCESTOR folder.
   if (Object.keys(ctx.folders).length) {
@@ -283,7 +288,7 @@ export async function canAccess(
     if (seed) {
       const chain = await ancestorFolderIds(env, seed);
       for (const fid of chain) {
-        if (anySatisfies(ctx.folders[fid], capability)) return true;
+        if (anySatisfies(ctx.folders[fid], capability, now)) return true;
       }
     }
   }

@@ -123,8 +123,12 @@ export async function checkAccess(
   // after owner/collaborator/workspace checks have already failed.
   if (await canAccess(env, { userIds, emails }, 'artifact', artifact.artifact_id, 'view')) {
     // Phase 4: record the read receipt (deduped per hour, never throws). The workspace
-    // is the artifact's owning workspace; skip if it has none.
-    const wsId = artifact.workspace_id ?? null;
+    // is the artifact's owning workspace; skip if it has none. Deploy records cached
+    // before workspace_id rode on them read it from D1, or the view would go unlogged.
+    const wsId = artifact.workspace_id !== undefined
+      ? artifact.workspace_id
+      : (await env.DB.prepare('SELECT workspace_id FROM artifacts WHERE id = ?')
+          .bind(artifact.artifact_id).first<{ workspace_id: string | null }>())?.workspace_id ?? null;
     if (wsId) {
       await recordShareeView(env, {
         workspaceId: wsId, userId: user.id,

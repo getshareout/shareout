@@ -23,19 +23,54 @@ const GRANTABLE_RESOURCES = new Set(['folder', 'artifact', 'file']);
 // external individual by email. edit/create stay in the admin grant API above.
 const SHAREABLE_RESOURCES = new Set(['file', 'folder']);
 const SHARE_CAPABILITIES = new Set(['view', 'comment']);
+const MAX_EXPIRY_DAYS = 3650;
+
+// Optional expiry for share-with-a-person: `expires_in_days` (the 7/30/90 presets) or an
+// explicit `expires_at` date. Returns null = never, an ISO string, or an error message.
+export function parseShareExpiry(
+  body: { expires_at?: unknown; expires_in_days?: unknown }, now = Date.now(),
+): { expiresAt: string | null } | { error: string } {
+  const days = body.expires_in_days;
+  if (days !== undefined && days !== null && days !== '') {
+    const n = Number(days);
+    if (!Number.isInteger(n) || n < 1 || n > MAX_EXPIRY_DAYS) return { error: `expires_in_days must be 1-${MAX_EXPIRY_DAYS}` };
+    return { expiresAt: new Date(now + n * 86_400_000).toISOString() };
+  }
+  const at = body.expires_at;
+  if (at === undefined || at === null || at === '') return { expiresAt: null };
+  if (typeof at !== 'string') return { error: 'expires_at must be an ISO date' };
+  const ms = /^\d{4}-\d{2}-\d{2}$/.test(at) ? Date.parse(at + 'T23:59:59.999Z') : Date.parse(at);
+  if (!Number.isFinite(ms)) return { error: 'expires_at must be an ISO date' };
+  if (ms <= now) return { error: 'expires_at must be in the future' };
+  if (ms > now + MAX_EXPIRY_DAYS * 86_400_000) return { error: `expires_at must be within ${MAX_EXPIRY_DAYS} days` };
+  return { expiresAt: new Date(ms).toISOString() };
+}
 
 // Insert a grant (idempotent) + bust caches + audit, returning the live row. Shared by the
-// admin grant API and the share-with-a-person flow.
+// admin grant API and the share-with-a-person flow. `expiresAt` undefined keeps the
+// idempotent no-op on re-grant; a value (or null = never) makes the latest share's
+// expiry win, so re-sharing extends, shortens or revives an expired grant.
 async function insertGrant(
   env: Env, workspaceId: string, subjectType: string, subjectId: string,
   resourceType: string, resourceId: string, capability: string, grantedBy: string,
+  expiresAt?: string | null,
 ): Promise<unknown> {
   const id = generateId('grt');
-  await env.DB.prepare(`
-    INSERT OR IGNORE INTO grants
-      (id, workspace_id, subject_type, subject_id, resource_type, resource_id, capability, granted_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(id, workspaceId, subjectType, subjectId, resourceType, resourceId, capability, grantedBy).run();
+  if (expiresAt === undefined) {
+    await env.DB.prepare(`
+      INSERT OR IGNORE INTO grants
+        (id, workspace_id, subject_type, subject_id, resource_type, resource_id, capability, granted_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(id, workspaceId, subjectType, subjectId, resourceType, resourceId, capability, grantedBy).run();
+  } else {
+    await env.DB.prepare(`
+      INSERT INTO grants
+        (id, workspace_id, subject_type, subject_id, resource_type, resource_id, capability, granted_by, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (subject_type, subject_id, resource_type, resource_id, capability)
+      DO UPDATE SET expires_at = excluded.expires_at
+    `).bind(id, workspaceId, subjectType, subjectId, resourceType, resourceId, capability, grantedBy, expiresAt).run();
+  }
 
   await invalidateGrants(env, workspaceId, subjectType === 'external_user' ? subjectId : undefined);
   await logAudit(env, {
@@ -167,7 +202,10 @@ export async function handleCreateGrant(
 export async function handleShareWithPerson(
   request: Request, env: Env, user: AuthUser, workspaceId: string,
 ): Promise<Response> {
-  let body: { email?: string; resource_type?: string; resource_id?: string; capability?: string };
+  let body: {
+    email?: string; resource_type?: string; resource_id?: string; capability?: string;
+    expires_at?: unknown; expires_in_days?: unknown;
+  };
   try { body = await request.json(); }
   catch {
     const forbidden = await requireExternalSharing(env, workspaceId, user.id);
@@ -188,6 +226,8 @@ export async function handleShareWithPerson(
     return json({ error: 'resource_type must be file|folder', code: 'VALIDATION_ERROR' }, 400);
   if (!SHARE_CAPABILITIES.has(capability))
     return json({ error: 'capability must be view|comment', code: 'VALIDATION_ERROR' }, 400);
+  const expiry = parseShareExpiry(body);
+  if ('error' in expiry) return json({ error: expiry.error, code: 'VALIDATION_ERROR' }, 400);
   if (!(await resourceInWorkspace(env, workspaceId, resourceType, resourceId)))
     return json({ error: 'Resource not in this workspace', code: 'VALIDATION_ERROR' }, 400);
 
@@ -208,7 +248,9 @@ export async function handleShareWithPerson(
   const target = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: string }>();
   if (!target) return json({ error: 'Could not resolve the invited person', code: 'INTERNAL_ERROR' }, 500);
 
-  const grant = await insertGrant(env, workspaceId, 'external_user', target.id, resourceType, resourceId, capability, user.id);
+  const grant = await insertGrant(
+    env, workspaceId, 'external_user', target.id, resourceType, resourceId, capability, user.id, expiry.expiresAt,
+  );
   return json({ grant, email }, 201);
 }
 
