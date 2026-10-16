@@ -5,6 +5,21 @@ import { rowToComment } from './mapping';
 import { checkIsAuthor, getSession } from './auth';
 import { resolveAssignee } from './people';
 import { broadcastEvent } from './broadcast';
+import { isAssetBucketArtifact } from './file-comments';
+import { canReviewArtifact } from './review-access';
+import type { CommentSession } from './auth';
+
+/** Anyone with comment access may resolve or assign. On a bucket the handler's file
+ *  gate already required 'comment' on this thread's file. Fails closed. */
+async function isReviewer(ctx: DataContext, session: CommentSession | null): Promise<boolean> {
+  if (!session) return false;
+  try {
+    if (await isAssetBucketArtifact(ctx)) return true;
+    return await canReviewArtifact(ctx.env, ctx.artifactId, { id: session.userId, email: session.email });
+  } catch {
+    return false;
+  }
+}
 
 /** PATCH `/:id/resolve` — mark an action item resolved or reopen it. */
 export async function resolveComment(
@@ -39,8 +54,8 @@ export async function resolveComment(
     (!!existing.assignee_email && session.email.toLowerCase() === existing.assignee_email.toLowerCase())
   );
 
-  if (!isOwner && !isAuthor && !isAssignee) {
-    return errorResponse({ code: 'FORBIDDEN', message: 'Only author, owner, or assignee can resolve', status: 403 });
+  if (!isOwner && !isAuthor && !isAssignee && !(await isReviewer(ctx, session))) {
+    return errorResponse({ code: 'FORBIDDEN', message: 'You need comment access to resolve', status: 403 });
   }
 
   const resolved = body.resolved !== false;
@@ -114,8 +129,8 @@ export async function assignComment(
     (!!existing.assignee_user_id && session.userId === existing.assignee_user_id) ||
     (!!existing.assignee_email && session.email.toLowerCase() === existing.assignee_email.toLowerCase());
 
-  if (!isOwner && !isAuthor && !isAssignee) {
-    return errorResponse({ code: 'FORBIDDEN', message: 'Only author, owner, or assignee can assign', status: 403 });
+  if (!isOwner && !isAuthor && !isAssignee && !(await isReviewer(ctx, session))) {
+    return errorResponse({ code: 'FORBIDDEN', message: 'You need comment access to assign', status: 403 });
   }
 
   let assigneeUserId: string | null = null;

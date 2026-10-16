@@ -19,6 +19,7 @@ import { LIBRARY_COPY } from './copy/library';
 import { MODALS_COPY } from './copy/modals';
 import { NEW_MENU_COPY } from './copy/new-menu';
 import { NOTIF_COPY } from './copy/notifications';
+import { REVIEW_COPY } from './copy/review';
 import { ONBOARDING_COPY } from './copy/onboarding';
 import { SHELL_COPY } from './copy/shell';
 import { STUDIO_COPY } from './copy/studio';
@@ -44,6 +45,7 @@ const COPY_MODULES: HomeLocaleCopy[] = [
   COMPOSER_COPY,
   ACCOUNT_COPY,
   INSPECTOR_COPY,
+  REVIEW_COPY,
   ONBOARDING_COPY,
   MODALS_COPY,
   NOTIF_COPY,

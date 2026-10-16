@@ -44,7 +44,8 @@ export async function handleGetVersions(
     SELECT v.id, v.version_no, v.entrypoint, v.created_at, v.source, v.message, v.message_source,
            u.email AS created_by_email, u.name AS created_by_name,
            rv.version_no AS restored_from_version_no,
-           (SELECT a.size_bytes FROM assets a WHERE a.version_id = v.id AND a.path = v.entrypoint) AS size_bytes
+           (SELECT a.size_bytes FROM assets a WHERE a.version_id = v.id AND a.path = v.entrypoint) AS size_bytes,
+           (SELECT COUNT(*) FROM artifact_comments ac WHERE ac.version_id = v.id AND ac.parent_id IS NULL) AS comment_count
     FROM versions v
     LEFT JOIN users u ON u.id = v.created_by
     LEFT JOIN versions rv ON rv.id = v.restored_from_version_id
@@ -58,11 +59,25 @@ export async function handleGetVersions(
     created_at: string;
   }>();
 
-  const live = await env.DB.prepare(
-    "SELECT version_id FROM deployments WHERE artifact_id = ? AND channel = 'production'"
-  ).bind(artifactId).first<{ version_id: string }>();
+  const [live, approvals] = await Promise.all([
+    env.DB.prepare(
+      "SELECT version_id FROM deployments WHERE artifact_id = ? AND channel = 'production'"
+    ).bind(artifactId).first<{ version_id: string }>(),
+    env.DB.prepare(`
+      SELECT ap.version_id, u.name, u.email, ap.created_at
+      FROM artifact_approvals ap LEFT JOIN users u ON u.id = ap.user_id
+      WHERE ap.artifact_id = ? ORDER BY ap.created_at ASC LIMIT 500
+    `).bind(artifactId).all<{ version_id: string; name: string | null; email: string | null; created_at: string }>(),
+  ]);
+  const byVersion = new Map<string, Array<{ name: string | null; email: string | null; created_at: string }>>();
+  for (const a of approvals.results || []) {
+    const list = byVersion.get(a.version_id) ?? [];
+    list.push({ name: a.name, email: a.email, created_at: a.created_at });
+    byVersion.set(a.version_id, list);
+  }
+  const list = (versions.results || []).map((v) => ({ ...v, approvals: byVersion.get(v.id) ?? [] }));
 
-  return json({ versions: versions.results || [], live_version_id: live?.version_id ?? null });
+  return json({ versions: list, live_version_id: live?.version_id ?? null });
 }
 
 /** GET /v1/artifacts/:id/versions/:no/source — the entrypoint text of one version, for diff and preview. */

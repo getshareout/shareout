@@ -34,7 +34,7 @@ export const workspace_client_inspector_history_JS = `  // ----- History (/v1/ar
       + (live ? '<span class="wsx-row__badge ok">' + esc(t('inspector.histLive')) + '</span>' : '')
       + '<span class="wsx-vh__size">' + esc(size) + '</span></div>'
       + '<div class="wsx-row__sub">' + sub + '</div>'
-      + (note ? '<div class="wsx-vh__note">' + note + '</div>' : '')
+      + (note ? '<div class="wsx-vh__note">' + note + '</div>' : '') + (typeof histReviewLine === 'function' ? histReviewLine(v) : '')
       + '<div class="wsx-vh__acts">'
       + (prev ? '<button class="wsx-link" type="button" data-vh="diff">' + esc(t('inspector.histChanges')) + '</button>' : '')
       + '<button class="wsx-link" type="button" data-vh="preview">' + esc(t('inspector.histPreview')) + '</button>'

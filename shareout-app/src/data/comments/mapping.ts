@@ -33,6 +33,7 @@ export function rowToComment(row: CommentRow): Comment {
     assigneeUserId: row.assignee_user_id ?? null,
     assigneeEmail: row.assignee_email ?? null,
     dueAt: row.due_at ?? null,
+    versionId: row.version_id ?? null,
   };
 }
 

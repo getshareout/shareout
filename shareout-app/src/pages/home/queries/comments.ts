@@ -27,6 +27,10 @@ export interface InspectorComment {
   position?: string | null;
   mentions?: string | null;
   context_id?: string | null;
+  assignee_email?: string | null;
+  // Version live when the comment was written, and its number (null on older comments).
+  version_id?: string | null;
+  version_no?: number | null;
 }
 
 /** Confirm the user can view the artifact (owner/collaborator across linked accounts,
@@ -34,7 +38,7 @@ export interface InspectorComment {
  *
  *  Both branches run concurrently: the viewer rule only needs the artifact row, so it
  *  does not wait for the linked-account scope. Same decision as checking them in turn. */
-async function userCanAccessArtifact(
+export async function userCanAccessArtifact(
   env: Env,
   visP: VisibilityScope | Promise<VisibilityScope>,
   artifactId: string,
@@ -81,10 +85,12 @@ export async function queryArtifactComments(
   const [canView, rows, isBucket] = await Promise.all([
     userCanAccessArtifact(env, visP, artifactId, user),
     env.DB.prepare(`
-    SELECT id, parent_id, author_id, author_name, author_type, content, created_at, resolved, position, mentions, context_id
-    FROM artifact_comments
-    WHERE artifact_id = ?
-    ORDER BY created_at ASC
+    SELECT ac.id, ac.parent_id, ac.author_id, ac.author_name, ac.author_type, ac.content, ac.created_at, ac.resolved, ac.position, ac.mentions, ac.context_id,
+           ac.assignee_email, ac.version_id, v.version_no
+    FROM artifact_comments ac
+    LEFT JOIN versions v ON v.id = ac.version_id
+    WHERE ac.artifact_id = ?
+    ORDER BY ac.created_at ASC
     LIMIT ?
   `).bind(artifactId, lim).all<InspectorComment>(),
     isAssetBucketArtifactId(env, artifactId),
@@ -165,9 +171,9 @@ export async function addArtifactComment(
   const positionJson = opts?.position ? JSON.stringify(opts.position).slice(0, 2000) : null;
   const contextId = opts?.contextId || null;
   await env.DB.prepare(`
-    INSERT INTO artifact_comments (id, artifact_id, parent_id, author_id, author_name, content, created_at, updated_at, mentions, position, context_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(id, artifactId, parentId || null, user.id, authorName, text, now, now, mentionsJson, positionJson, contextId).run();
+    INSERT INTO artifact_comments (id, artifact_id, parent_id, author_id, author_name, content, created_at, updated_at, mentions, position, context_id, version_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT version_id FROM deployments WHERE artifact_id = ? AND channel = 'production'))
+  `).bind(id, artifactId, parentId || null, user.id, authorName, text, now, now, mentionsJson, positionJson, contextId, artifactId).run();
 
   const comment = {
     id,
