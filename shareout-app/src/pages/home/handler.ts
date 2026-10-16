@@ -14,7 +14,7 @@ import { queryHomeArtifactCatalog, queryHomeCounts } from './queries/artifacts';
 import { queryPersonalFolders, queryTeamFolders } from './queries/folders';
 import { queryHomeTags } from './queries/tags';
 import { buildWorkspaceView } from './render-workspace';
-import { homeShellUrls } from './shell-assets';
+import { homeI18nUrl, homeShellUrls } from './shell-assets';
 import { renderHtmlPageStreamed } from '../../design-system/shell';
 import type { HtmlPageOptions } from '../../design-system/shell';
 import { listIncomingAccessRequests } from '../../artifacts/access-requests';
@@ -23,13 +23,15 @@ import { isVisualEditorEnabled } from '../../editor/visual-editor-gate';
 import { CREATE_FEATURE } from '../create-gate';
 import { versionedBundlePath } from '../../bundle-versions';
 import { createLogger, logError } from '../../logging';
-import { getWorkspaceLocale, resolveLocale } from '../../i18n/locale';
+import { getWorkspaceLocale, localeFromAcceptLanguage, resolveLocale, type Locale } from '../../i18n/locale';
 import { serverTimingValue, timeSync } from '../../http/request-scope';
 
-/** Head options for the streamed workspace home shell. The page + workspace styles and
- *  the static client script are cached files (shell-assets), linked from the head so they
- *  download while the body's queries run. */
-function homeHead(shell: { js: string; css: string }): Omit<HtmlPageOptions, 'body' | 'scripts'> {
+/** Head options for the streamed workspace home shell. The page + workspace styles, the
+ *  static client script and one locale's copy are cached files (shell-assets), linked from
+ *  the head so they download while the body's queries run. The head goes out before the
+ *  person's saved language is read, so it preloads the browser language's copy; the body
+ *  then loads the copy for the resolved language (usually the same file). */
+function homeHead(shell: { js: string; css: string }, i18n: string): Omit<HtmlPageOptions, 'body' | 'scripts'> {
   return {
     title: 'My Artifacts · ShareOut',
     pageStyles: '',
@@ -37,6 +39,7 @@ function homeHead(shell: { js: string; css: string }): Omit<HtmlPageOptions, 'bo
     cacheControl: 'private, no-cache',
     extraHead: '<link rel="manifest" href="/manifest.webmanifest">'
       + `<link rel="stylesheet" href="${shell.css}">`
+      + `<link rel="preload" as="script" href="${i18n}">`
       + `<link rel="preload" as="script" href="${shell.js}">`,
   };
 }
@@ -53,10 +56,11 @@ export async function handleUserHomePage(
   // (nor on the host lookup: the head does not depend on it).
   const homeLogger = createLogger(env, { scope: 'home.stream' });
   const shell = await homeShellUrls();
+  const browserLocale = localeFromAcceptLanguage(request.headers.get('Accept-Language')) ?? 'en';
   return renderHtmlPageStreamed({
-    ...homeHead(shell),
+    ...homeHead(shell, await homeI18nUrl(browserLocale)),
     earlyBody: '',
-    body: () => buildHomeBody(request, env, user, filters),
+    body: () => buildHomeBody(request, env, user, filters, browserLocale),
     afterScripts: `<script src="${shell.js}"></script>`,
     onStreamError: (err) => logError(homeLogger, 'home render failed', err),
   });
@@ -67,6 +71,7 @@ async function buildHomeBody(
   env: Env,
   user: { id: string; email: string | null },
   filters: ReturnType<typeof parseHomeFilters>,
+  browserLocale: Locale,
 ): Promise<{ body: string; scripts: string }> {
   // Resolve the linked-account visibility scope once and thread it into every
   // helper below; otherwise each helper re-resolves it. The host lookup, the admin
@@ -210,11 +215,14 @@ async function buildHomeBody(
   // The Server-Timing header went out before these queries ran; the full breakdown
   // (body waves + render) closes the document as a comment.
   const timing = serverTimingValue(env);
+  // The shell's i18n runtime reads this locale's copy, so it loads (parser-blocking, in
+  // order) before the inline boot globals and the shell script.
+  const copyUrl = await homeI18nUrl(renderArgs.locale ?? browserLocale);
   // Shared streaming-chat reading engine for the agent dock (follow/anchor/jump/
   // unread/search/announce). Loaded as a global before the inline hydration script;
   // the dock degrades to its inline fallback if it fails to load.
   return {
-    body: `<script src="${versionedBundlePath('/sdk/chat-core.js')}"></script>${view.body}${timing ? `\n<!-- server-timing: ${timing.replace(/--/g, '')} -->` : ''}`,
+    body: `<script src="${versionedBundlePath('/sdk/chat-core.js')}"></script>${view.body}<script src="${copyUrl}"></script>${timing ? `\n<!-- server-timing: ${timing.replace(/--/g, '')} -->` : ''}`,
     scripts: view.bootScript,
   };
 }

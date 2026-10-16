@@ -1,6 +1,15 @@
 import { HOME_COPY } from './merge-copy';
 import type { HomeLocale } from './types';
 
+/** Global the per-locale copy files fill in: `window.__SO_HOME_COPY[locale] = {…}`. */
+export const HOME_COPY_GLOBAL = '__SO_HOME_COPY';
+
+/** Body of the cached per-locale copy file (/sdk/home-i18n-<locale>.js). */
+export function homeLocaleCopyScript(locale: HomeLocale): string {
+  const copyJson = JSON.stringify(HOME_COPY[locale]).replace(/</g, '\\u003c');
+  return `(window.${HOME_COPY_GLOBAL}=window.${HOME_COPY_GLOBAL}||{})[${JSON.stringify(locale)}]=${copyJson};\n`;
+}
+
 /**
  * Inline client bootstrap for workspace home i18n.
  *
@@ -9,21 +18,24 @@ import type { HomeLocale } from './types';
  * exposes `window.__SO_HOME_T` and friends, and applies `data-i18n*` attributes.
  */
 export function getHomeI18nScript(serverLocale: HomeLocale | null = null): string {
-  return homeI18nSource(JSON.stringify(serverLocale));
+  return homeI18nSource(JSON.stringify(serverLocale), JSON.stringify(HOME_COPY).replace(/</g, '\\u003c'));
 }
 
 /**
- * The same bootstrap with the locale read from `window.WSX_LOCALE` at run time, so the
- * bytes are identical for every viewer and can be served as a cached file.
+ * The same bootstrap with the locale read from `window.WSX_LOCALE` at run time and no
+ * copy of its own, so the bytes are identical for every viewer and can be served as a
+ * cached file. The page loads one locale's copy file before it; any other locale (a
+ * language switch, or a client-side pick that differs from the server's guess) is
+ * fetched from `window.WSX_I18N[locale]` on demand. A locale that fails to load falls
+ * back to the en copy.
  */
 export function getStaticHomeI18nScript(): string {
-  return homeI18nSource('window.WSX_LOCALE || null');
+  return homeI18nSource('window.WSX_LOCALE || null', `window.${HOME_COPY_GLOBAL} || (window.${HOME_COPY_GLOBAL} = {})`);
 }
 
-function homeI18nSource(serverLocaleExpr: string): string {
-  const copyJson = JSON.stringify(HOME_COPY).replace(/</g, '\\u003c');
+function homeI18nSource(serverLocaleExpr: string, copyExpr: string): string {
   return `(function(){
-  var COPY = ${copyJson};
+  var COPY = ${copyExpr};
   var STORAGE_KEY = 'shareout_lang';
   var SERVER_LOCALE = ${serverLocaleExpr};
 
@@ -40,8 +52,26 @@ function homeI18nSource(serverLocaleExpr: string): string {
   var locale = detectLocale();
 
   function t(key){
-    var bag = COPY[locale] || COPY.en;
-    return bag[key] || COPY.en[key] || key;
+    var bag = COPY[locale] || {};
+    return bag[key] || (COPY.en && COPY.en[key]) || key;
+  }
+
+  var copyWaits = {};
+  function loadCopy(next, done){
+    if (COPY[next]) return done();
+    if (copyWaits[next]) return copyWaits[next].push(done);
+    copyWaits[next] = [done];
+    var finish = function(){ var cbs = copyWaits[next] || []; delete copyWaits[next]; cbs.forEach(function(cb){ cb(); }); };
+    var s = document.createElement('script');
+    s.src = (window.WSX_I18N && window.WSX_I18N[next]) || ('/sdk/home-i18n-' + next + '.js');
+    s.onload = finish;
+    s.onerror = function(){ if (next === 'en') return finish(); loadCopy('en', finish); };
+    document.head.appendChild(s);
+  }
+
+  function announceLocale(){
+    applyHomeI18n();
+    try { document.dispatchEvent(new CustomEvent('shareout:locale', { detail: { locale: locale } })); } catch (e2) {}
   }
 
   function applyHomeI18n(root){
@@ -83,10 +113,8 @@ function homeI18nSource(serverLocaleExpr: string): string {
     if (next !== 'en' && next !== 'es') return;
     var url = scope === 'workspace' && window.WSX_WS ? '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/locale' : scope === 'me' ? '/v1/me/locale' : '';
     if (url) fetch(url, { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locale: next }) }).catch(function(){});
-    locale = next;
-    try { localStorage.setItem(STORAGE_KEY, locale); } catch (e) {}
-    applyHomeI18n();
-    try { document.dispatchEvent(new CustomEvent('shareout:locale', { detail: { locale: locale } })); } catch (e2) {}
+    try { localStorage.setItem(STORAGE_KEY, next); } catch (e) {}
+    loadCopy(next, function(){ locale = next; announceLocale(); });
   }
 
   function wireLangButtons(root){
@@ -110,5 +138,6 @@ function homeI18nSource(serverLocaleExpr: string): string {
 
   applyHomeI18n();
   wireLangButtons(document);
+  if (!COPY[locale]) loadCopy(locale, announceLocale);
 })();`;
 }
