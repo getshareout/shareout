@@ -69,6 +69,18 @@ export const WORKSPACE_PALETTE_STYLES = `
 .wsx-cmdk__pill--failing { background: var(--color-error-light); color: var(--color-error); }
 .wsx-cmdk__pill--triggered { background: var(--color-primary-light); color: var(--color-primary); }
 
+/* ---- recent searches + deep (page text) section ---- */
+.wsx-cmdk__tile--recent { background: var(--color-surface); color: var(--color-text-tertiary); }
+.wsx-cmdk__tile--passage { background: color-mix(in srgb, var(--color-success) 15%, transparent); color: var(--color-success); }
+.wsx-cmdk__rm { flex: 0 0 auto; display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text-tertiary); cursor: pointer; opacity: 0; transition: opacity var(--duration-fast), background var(--duration-fast); }
+.wsx-cmdk__rm svg { width: 14px; height: 14px; }
+.wsx-cmdk__item:hover .wsx-cmdk__rm, .wsx-cmdk__item.is-sel .wsx-cmdk__rm, .wsx-cmdk__rm:focus-visible { opacity: 1; }
+.wsx-cmdk__rm:hover { background: var(--color-surface); color: var(--color-text); }
+.wsx-cmdk__clear { margin-left: auto; padding: 2px 6px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text-tertiary); font: 600 var(--text-xs) var(--font-body); letter-spacing: 0; text-transform: none; cursor: pointer; }
+.wsx-cmdk__clear:hover { color: var(--color-primary); background: var(--color-primary-light); }
+.wsx-cmdk__pending { padding: 10px 12px; color: var(--color-text-tertiary); font: 500 var(--text-xs) var(--font-body); }
+@media (hover: none) { .wsx-cmdk__rm { opacity: 1; } }
+
 /* ---- ask workspace (answer mode) ---- */
 .wsx-cmdk__tile--ask { background: color-mix(in srgb, var(--color-primary) 16%, transparent); color: var(--color-primary); }
 .wsx-cmdk__ask { padding: 14px 16px 18px; }

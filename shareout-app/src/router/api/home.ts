@@ -4,6 +4,7 @@ import { handleOnboardingGetApi, handleOnboardingDismissApi, handleOnboardingSki
 import { handleHomeNewArtifactApi } from '../../pages/home/new-artifact';
 import { handleHomeImportApi } from '../../pages/home/import';
 import { handleHomeReviewGetApi, handleHomeCommentResolveApi, handleHomeCommentAssignApi, handleHomeApprovalApi } from '../../pages/home/review-api';
+import { handleHomeDeepSearchApi, handleHomeRecentSearchesApi, handleHomeSearchIndexApi } from '../../pages/home/search-api';
 import type { FetchContext } from '../context';
 import { isAuthUser, requireAuthUser } from '../helpers/auth-guard';
 
@@ -20,6 +21,24 @@ export async function routeHomeApi(ctx: FetchContext): Promise<Response | null> 
     const user = await requireAuthUser(ctx);
     if (!isAuthUser(user)) return user;
     return addCORS(await handleHomeQuickSearchApi(request, env, user));
+  }
+
+  if (path === '/v1/home/search-index' && request.method === 'GET') {
+    const user = await requireAuthUser(ctx);
+    if (!isAuthUser(user)) return user;
+    return addCORS(await handleHomeSearchIndexApi(request, env, user));
+  }
+
+  if (path === '/v1/home/deep-search' && request.method === 'GET') {
+    const user = await requireAuthUser(ctx);
+    if (!isAuthUser(user)) return user;
+    return addCORS(await handleHomeDeepSearchApi(request, env, user));
+  }
+
+  if (path === '/v1/home/recent-searches' && ['GET', 'POST', 'DELETE'].includes(request.method)) {
+    const user = await requireAuthUser(ctx);
+    if (!isAuthUser(user)) return user;
+    return addCORS(await handleHomeRecentSearchesApi(request, env, user));
   }
 
   if (path === '/v1/home/counts' && request.method === 'GET') {

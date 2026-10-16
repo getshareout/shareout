@@ -32,6 +32,8 @@ import { workspace_client_widget_layout_JS } from './widget-layout';
 import { workspace_client_account_menu_JS } from './account-menu';
 import { workspace_client_notifications_JS } from './notifications';
 import { workspace_client_tooltips_JS } from './tooltips';
+import { workspace_client_search_engine_JS } from './search-engine';
+import { workspace_client_search_store_JS } from './search-store';
 import { workspace_client_command_palette_JS } from './command-palette';
 import { workspace_client_pwa_shell_JS } from './pwa-shell';
 import { RUN_DRAWER_JS } from '../../../../runs/run-drawer-client';
@@ -68,6 +70,8 @@ export const WORKSPACE_CLIENT = [
   workspace_client_account_menu_JS,
   workspace_client_notifications_JS,
   workspace_client_tooltips_JS,
+  workspace_client_search_engine_JS,
+  workspace_client_search_store_JS,
   workspace_client_command_palette_JS,
   workspace_client_pwa_shell_JS,
   '})();',

@@ -7933,6 +7933,337 @@
         }
       }
     },
+    "/v1/home/search-index": {
+      "get": {
+        "tags": [
+          "Home",
+          "Search"
+        ],
+        "summary": "Palette search index",
+        "description": "Compact index of everything the signed-in user can find by name in the scope (pages, folders, people), ranked locally by the Cmd+K palette. Same visibility as `/v1/search`; a non-member of `workspace` gets empty lists. Rows are positional arrays. Revalidate with `If-None-Match` for a `304`. `Server-Timing` carries `idx_build` and `idx_etag`.",
+        "operationId": "getHomeSearchIndex",
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Workspace id; omit for everything the user can see."
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "ETag from a previous response."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The index",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Weak ETag of this user's index for this scope."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "v": {
+                      "type": "integer",
+                      "description": "Format version (1)."
+                    },
+                    "truncated": {
+                      "type": "boolean",
+                      "description": "More than 3,000 pages; older ones are left to deep search."
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "description": "[id, slug, name, type ('' = html), folderId, tags (newline-joined), updatedSec, description (80 chars), flags (1 private, 2 thumbnail), ownerIdx, wsIdx]",
+                      "items": {
+                        "type": "array",
+                        "items": {}
+                      }
+                    },
+                    "folders": {
+                      "type": "array",
+                      "description": "[id, name, parentId ('' = top level), pageCount]",
+                      "items": {
+                        "type": "array",
+                        "items": {}
+                      }
+                    },
+                    "people": {
+                      "type": "array",
+                      "description": "[userId, name, email, picture, role]",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "owners": {
+                      "type": "array",
+                      "description": "[name, picture]",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "workspaces": {
+                      "type": "array",
+                      "description": "[id, name] when searching across workspaces",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "recent": {
+                      "type": "array",
+                      "description": "Ids of pages the user opened last, newest first.",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Unchanged since the ETag in `If-None-Match`."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/home/deep-search": {
+      "get": {
+        "tags": [
+          "Home",
+          "Search"
+        ],
+        "summary": "Palette deep search",
+        "description": "What the local index cannot answer: pages whose description matches (`content`), Knowledge passages when the workspace has Knowledge (`passages`), and the datasets, connectors, schedules, crew, alerts and skills groups. Same visibility as `/v1/search`.",
+        "operationId": "getHomeDeepSearch",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search text; under 2 characters returns empty groups, passages need 3."
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "older",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Also match names of pages past the index cap (send when the index was truncated)."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 5,
+              "maximum": 20
+            },
+            "description": "Max results per group."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Grouped hits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "query": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "passages": {
+                      "type": "array",
+                      "description": "{ artifact: { id, title }, page, page_title, section, excerpt, url }",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "datasets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "connectors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "schedules": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "crew": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "alerts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "skills": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/home/recent-searches": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "query",
+          "schema": {
+            "type": "string"
+          },
+          "description": "Workspace id; omit for personal / all pages. Each scope keeps its own list."
+        }
+      ],
+      "get": {
+        "tags": [
+          "Home",
+          "Search"
+        ],
+        "summary": "List recent palette searches",
+        "description": "The signed-in user's last searches in the scope, newest first (max 20).",
+        "operationId": "listHomeRecentSearches",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RecentSearches"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Home",
+          "Search"
+        ],
+        "summary": "Record a palette search",
+        "description": "Records `q` as the newest search. A repeat (any case or accents) moves to the top; the list keeps 20.",
+        "operationId": "recordHomeRecentSearch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "q"
+                ],
+                "properties": {
+                  "q": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RecentSearches"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Home",
+          "Search"
+        ],
+        "summary": "Remove recent palette searches",
+        "description": "Removes the search `q`; without `q`, clears the scope.",
+        "operationId": "deleteHomeRecentSearches",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RecentSearches"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
     "/v1/home/dismiss-event": {
       "post": {
         "tags": [
@@ -10664,6 +10995,33 @@
       }
     },
     "responses": {
+      "RecentSearches": {
+        "description": "The recent searches in the scope, newest first",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "searches": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "q": {
+                        "type": "string"
+                      },
+                      "at": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "BadRequest": {
         "description": "Invalid request",
         "content": {

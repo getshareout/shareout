@@ -12,6 +12,8 @@ import {
   handleHomeRecentApi,
 } from '../../../src/pages/home/api';
 import { quickSearch } from '../../../src/search/quick-search';
+import { buildSearchIndex } from '../../../src/search/search-index';
+import { deepSearch } from '../../../src/search/deep-search';
 import { getVisibilityScope } from '../../../src/account-links';
 import { handleFetch } from '../../../src/router/handle-fetch';
 import { createSessionToken } from '../../../src/token';
@@ -61,6 +63,9 @@ const card = { id: 'art_1', name: 'Q3 report', slug: 'q3', owner_id: alice.id, v
 /** acme.x.test resolves to WS; `isMember` toggles alice's membership; `role` her internal role. */
 function handler(opts: { isMember: boolean; role?: string; folders?: Row[] }): Handler {
   return (sql) => {
+    // Search queries carry visibility in SQL (scope-sql.ts): the double answers them directly.
+    if (sql.includes(' AS ok')) return { ok: opts.isMember ? 1 : 0 };
+    if (sql.includes('FROM artifacts a') && sql.includes('identity_id IS NOT NULL')) return [card];
     if (sql.includes('FROM users WHERE id = ? OR identity_id')) return [{ id: alice.id, email: alice.email, name: null, picture: null }];
     if (sql.includes('SELECT id FROM workspaces WHERE slug = ?')) return { id: WS };
     if (sql.includes("member_class = 'internal'")) return opts.isMember && opts.role ? { role: opts.role } : null;
@@ -126,10 +131,26 @@ describe('GET /v1/home/* boot endpoints — D1 round-trip waves (workspace subdo
     expect(waves).toBeLessThanOrEqual(4);
   });
 
-  it('quick-search on the apex: at most 3 waves (was 5)', async () => {
+  // Visibility rides inside the SQL (scope-sql.ts), so search needs no scope/workspace
+  // lookups first: one wave on the apex and in a workspace (was 3 and 2).
+  for (const ws of [undefined, WS]) {
+    it(`quick-search ${ws ? 'in a workspace' : 'on the apex'}: one wave`, async () => {
+      const db = wavesDb(handler({ isMember: true }));
+      const { waves } = await db.settle(quickSearch(db.env, alice.id, { q: 'q3', workspaceId: ws }));
+      expect(waves).toBe(1);
+    });
+    it(`search index ${ws ? 'in a workspace' : 'on the apex'}: one wave`, async () => {
+      const db = wavesDb(handler({ isMember: true }));
+      const { waves } = await db.settle(buildSearchIndex(db.env, alice.id, ws));
+      expect(waves).toBe(1);
+    });
+  }
+
+  it('deep search (no Knowledge): one wave', async () => {
     const db = wavesDb(handler({ isMember: true }));
-    const { waves } = await db.settle(quickSearch(db.env, alice.id, { q: '', groups: ['artifacts', 'schedules'] }));
-    expect(waves).toBeLessThanOrEqual(3);
+    const { out, waves } = await db.settle(deepSearch(db.env, alice.id, { q: 'q3', workspaceId: WS }));
+    expect(waves).toBe(1);
+    expect(out.content.map((h) => h.id)).toEqual(['art_1']);
   });
 });
 
@@ -238,7 +259,10 @@ describe('perf budget: D1 waves per request through the router (workspace subdom
     ['/v1/home/for-you?limit=12', 4],
     ['/v1/home/recent?limit=8', 4],
     ['/v1/home/browser?sort=recent', 4],
-    ['/v1/home/quick-search?q=q3', 4],
+    // Session + host + one search wave.
+    ['/v1/home/quick-search?q=q3', 3],
+    ['/v1/home/search-index', 3],
+    ['/v1/home/deep-search?q=q3', 3],
   ] as const) {
     it(`${path.split('?')[0]}: at most ${max} waves`, async () => {
       const db = wavesDb(handler({ isMember: true, role: 'member' }));
@@ -248,6 +272,13 @@ describe('perf budget: D1 waves per request through the router (workspace subdom
       expect(out.headers.get('Server-Timing')).toContain(`waves`);
     });
   }
+
+  it('/v1/home/search-index reports its build and ETag time in Server-Timing', async () => {
+    const db = wavesDb(handler({ isMember: true, role: 'member' }));
+    const { out } = await db.settle(routed(db, '/v1/home/search-index'));
+    expect(out.headers.get('Server-Timing')).toMatch(/idx_build;dur=\d+.*idx_etag;dur=\d+/);
+    expect(out.headers.get('ETag')).toMatch(/^W\//);
+  });
 
   it('/home: one wave before the first byte, at most 4 more for the body', async () => {
     const db = wavesDb((sql, args) => (sql.includes('AS n FROM users') ? { n: 1 } : handler({ isMember: true, role: 'member' })(sql, args)));

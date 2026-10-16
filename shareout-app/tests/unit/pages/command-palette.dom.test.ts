@@ -4,6 +4,8 @@
 // top artifact; "Ask AI" is an explicit opt-in that always comes last.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { workspace_client_command_palette_JS as paletteJs } from '../../../src/pages/home/render-workspace/client-script/command-palette';
+import { workspace_client_search_engine_JS as engineJs } from '../../../src/pages/home/render-workspace/client-script/search-engine';
+import { workspace_client_search_store_JS as storeJs } from '../../../src/pages/home/render-workspace/client-script/search-store';
 import { SHELL_COPY } from '../../../src/pages/home/home-i18n/copy/shell';
 
 const copy = SHELL_COPY.es as Record<string, string>;
@@ -31,7 +33,7 @@ function boot() {
       return () => '';
     },
   });
-  new Function('scope', `with (scope) {\n${paletteJs}\n}`)(scope);
+  new Function('scope', `with (scope) {\n${engineJs}${storeJs}${paletteJs}\n}`)(scope);
   return win.openCommandPalette as () => void;
 }
 

@@ -43,7 +43,9 @@ One ranked, typo-tolerant search engine powers every jump surface in Home:
 | **Command palette** | **⌘K** / **Ctrl+K** anywhere in Home — searches pages, folders, datasets, connectors, people, schedules, crew, and alerts; **question-shaped queries** open **Ask mode** (answer + citations via `POST /v1/ask`) |
 | **Inline quick-jump** | Type in the search box above artifact cards in **All Artifacts** — same results, opens as an in-studio tab |
 
-Empty search shows **recents**. Results are grouped (Pages, Folders, Data, People, Schedules, Crew, Alerts, Actions) with thumbnails, owner avatars, view counts, and status pills. **↑↓** navigate, **Enter** opens, **Esc** closes.
+An empty palette shows your **recent searches** (the last 8; × removes one, **Clear** empties the list; they follow you across devices) and **recently opened** pages. A search is remembered when you open a result or press **Enter**, not as you type.
+
+Results come in two sections. **Pages, folders, people and actions** rank in the browser from a local index on every keystroke, so they appear as you type with no wait. **Page text, Knowledge passages, data, schedules, crew, alerts and AI skills** come from the server a moment later, below. Matching ignores case and accents (`clasificacion` finds *Clasificación*). **↑↓** navigate, **Enter** opens the highlighted row (the first one by default), **Esc** closes. Endpoints: [../api/search.md](../api/search.md#palette-endpoints-search-index-deep-search-recent-searches).
 
 Type a **question** (e.g. *"Which dashboards track churn?"*) to switch the palette to **answer mode** — one AI turn over pages you can access, with cited sources you can open. See [../api/search.md](../api/search.md#ask-your-workspace-answer-mode).
 

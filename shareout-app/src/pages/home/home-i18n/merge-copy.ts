@@ -24,6 +24,7 @@ import { NOTIF_COPY } from './copy/notifications';
 import { REVIEW_COPY } from './copy/review';
 import { PAGES_COPY } from './copy/pages';
 import { ONBOARDING_COPY } from './copy/onboarding';
+import { SEARCH_COPY } from './copy/search';
 import { SHELL_COPY } from './copy/shell';
 import { STUDIO_COPY } from './copy/studio';
 import { TIME_COPY } from './copy/time';
@@ -33,6 +34,7 @@ import { WORKSPACE_COPY } from './copy/workspace';
 /** Domain modules in stable merge order (shell first for readability in diffs). */
 const COPY_MODULES: HomeLocaleCopy[] = [
   SHELL_COPY,
+  SEARCH_COPY,
   ADMIN_COPY,
   INVITE_COPY,
   CLIENTS_COPY,
