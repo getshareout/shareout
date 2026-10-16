@@ -3,7 +3,8 @@
  *
  * Word (.docx) → Markdown, converted in-Worker (headings, paragraphs, bold/italic/strike,
  * links, bullet + numbered lists, tables, images kept as artifact assets). .odt goes
- * through Workers AI toMarkdown (text only, no images) when the instance has AI.
+ * through Workers AI toMarkdown (text only, no images) when the instance has AI. Legacy
+ * Word (.doc) → plain paragraphs, read in-Worker (data/files/parse-doc.ts; text only).
  * Spreadsheets (.xlsx/.xls/.ods) → one CSV per sheet via SheetJS. The original file is
  * always stored next to the result so the viewer can offer it for download.
  */
@@ -11,6 +12,7 @@ import { unzipSync } from 'fflate';
 import * as XLSX from 'xlsx';
 import type { Env, FileEntry, ImportedSource } from '../../types';
 import { XLSX_MAX_INPUT_BYTES } from '../../data/files/parse-xlsx';
+import { DocReadError, docToMarkdown } from '../../data/files/parse-doc';
 
 export class ImportError extends Error {
   constructor(public code: string, message: string, public status = 422) { super(message); }
@@ -27,6 +29,7 @@ export const MAX_SHEET_ROWS = 100_000;
 
 const OFFICE_MIME: Record<string, string> = {
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  doc: 'application/msword',
   odt: 'application/vnd.oasis.opendocument.text',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   xls: 'application/vnd.ms-excel',
@@ -314,6 +317,12 @@ export async function convertOfficeImport(
   let markdown: string;
   let media: FileEntry[] = [];
   if (ext === 'docx') ({ markdown, media } = docxToMarkdown(bytes));
+  else if (ext === 'doc') {
+    try { markdown = docToMarkdown(bytes); } catch (e) {
+      if (e instanceof DocReadError) throw new ImportError('CONVERT_FAILED', e.message);
+      throw e;
+    }
+  }
   else {
     if (!env.AI) throw new ImportError('CONVERT_UNAVAILABLE', 'This server can’t convert .odt files. Save it as .docx and try again.');
     const res = await env.AI.toMarkdown({ name: filename, blob: new Blob([bytes], { type: OFFICE_MIME[ext] }) });

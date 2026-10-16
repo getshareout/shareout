@@ -21,6 +21,7 @@ import { routeKnowledgeApi } from '../../../src/router/api/knowledge';
 import { createFetchContext } from '../../../src/router/context';
 import { setKnowledgeEnabled } from '../../../src/knowledge';
 import { softDeleteArtifact } from '../../../src/artifacts/crud';
+import { REAL_DOC, buildDoc } from '../helpers/doc-fixtures';
 
 const e = env as unknown as Env;
 let n = 0;
@@ -48,7 +49,7 @@ beforeEach(() => {
   getInternalWorkspaceRole.mockReset().mockResolvedValue('member');
 });
 
-async function putFile(ws: string, id: string, text: string, opts: { owner?: string; visibility?: string; filename?: string; mime?: string; version?: number } = {}) {
+async function putFile(ws: string, id: string, text: string | Uint8Array, opts: { owner?: string; visibility?: string; filename?: string; mime?: string; version?: number } = {}) {
   const version = opts.version ?? 1;
   const blobId = `blob_${id}_${version}`;
   const key = `test/${blobId}`;
@@ -161,6 +162,23 @@ describe('corpus ingest + search', () => {
     const src = await corpusFor(e, ws)!.getSource('dlv_b');
     expect(src).toMatchObject({ status: 'unsupported' });
     expect(src!.error).toContain("Can't read");
+  });
+
+  it('learns a legacy Word .doc File', async () => {
+    const ws = nextWs();
+    await setKnowledgeEnabled(e, ws, true);
+    await putFile(ws, 'dlv_doc', REAL_DOC(), { filename: 'Procedimiento.doc', mime: 'application/msword' });
+    expect(await corpusFor(e, ws)!.getSource('dlv_doc')).toMatchObject({ status: 'ready' });
+    expect((await searchCorpus(e, ws, 'u1', 'comillas')).hits).toHaveLength(1);
+  });
+
+  it('a .doc it cannot read is unsupported with the reason, not failed', async () => {
+    const ws = nextWs();
+    await setKnowledgeEnabled(e, ws, true);
+    await putFile(ws, 'dlv_enc', buildDoc([{ text: 'Secret\r', compressed: true }], { flags: 0x0300 }), { filename: 'locked.doc', mime: 'application/msword' });
+    expect(await corpusFor(e, ws)!.getSource('dlv_enc')).toMatchObject({ status: 'unsupported', error: 'This .doc file is password-protected.' });
+    await putFile(ws, 'dlv_junk', 'not a word file', { filename: 'junk.doc', mime: 'application/msword' });
+    expect(await corpusFor(e, ws)!.getSource('dlv_junk')).toMatchObject({ status: 'unsupported', error: 'This .doc file could not be opened.' });
   });
 
   it('learns a published page and links to it', async () => {

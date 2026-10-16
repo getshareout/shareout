@@ -192,3 +192,62 @@ describe('isSafePagePath', () => {
     }
   });
 });
+
+describe('page agent: ?section= deep links (the frame #fragment)', () => {
+  // Runs the agent against the real DOM, with the frame's location carrying the hash.
+  function openAt(hash: string, body: string) {
+    document.body.innerHTML = body;
+    const listeners: Record<string, Array<() => void>> = {};
+    const on = (type: string, fn: () => void) => { (listeners[type] ||= []).push(fn); };
+    const loc = { origin: CDN, pathname: '/guide.html', href: `${CDN}/guide.html${hash}`, hash };
+    const parent = { postMessage: () => undefined };
+    const scrolled: Element[] = [];
+    const proto = window.HTMLElement.prototype as unknown as { scrollIntoView: () => void };
+    const orig = proto.scrollIntoView;
+    proto.scrollIntoView = function (this: Element) { scrolled.push(this); };
+    try {
+      new Function('window', 'parent', 'location', 'addEventListener', 'document', buildPageAgent('demo', BASE, 'guide.html', 'index.html'))(
+        { parent, open: vi.fn() }, parent, loc, on, document,
+      );
+    } finally { proto.scrollIntoView = orig; }
+    return { scrolled, loc, fire: (t: string) => (listeners[t] || []).forEach((f) => f()) };
+  }
+
+  it('resolves an h- slug to the matching heading (accents folded, deduped) and highlights it', () => {
+    vi.useFakeTimers();
+    const r = openAt('#h-clasificacion-2', '<h1>Guía</h1><h2>Clasificación</h2><p>a</p><h2>Clasificación</h2><p id="p">b</p>');
+    const target = document.querySelectorAll('h2')[1] as HTMLElement;
+    expect(r.scrolled).toEqual([target]);
+    expect(target.style.outline).toContain('solid');
+    vi.advanceTimersByTime(4000);
+    expect(target.style.outline).toBe('');
+    vi.useRealTimers();
+  });
+
+  it('a real id wins over a heading whose slug matches', () => {
+    const r = openAt('#h-scope', '<h2>Scope</h2><div id="h-scope">real</div>');
+    expect(r.scrolled).toEqual([document.getElementById('h-scope')]);
+  });
+
+  it('plain ids are scrolled + highlighted on load; unknown or unsafe hashes do nothing', () => {
+    const r = openAt('#s3', '<section id="s3"><h2>3. Waste</h2></section>');
+    expect(r.scrolled).toEqual([document.getElementById('s3')]);
+    expect(openAt('#h-missing', '<h2>Other</h2>').scrolled).toEqual([]);
+    expect(openAt('#/route/x', '<h2>Route</h2>').scrolled).toEqual([]);
+  });
+
+  it('later in-page jumps to an h- slug resolve too (hashchange)', () => {
+    const r = openAt('', '<h2>Alpha</h2><h2>Beta</h2>');
+    r.loc.hash = '#h-beta';
+    const proto = window.HTMLElement.prototype as unknown as { scrollIntoView: () => void };
+    const orig = proto.scrollIntoView;
+    const seen: Element[] = [];
+    proto.scrollIntoView = function (this: Element) { seen.push(this); };
+    try { r.fire('hashchange'); } finally { proto.scrollIntoView = orig; }
+    expect(seen).toEqual([document.querySelectorAll('h2')[1]]);
+  });
+
+  it('the agent source is ASCII-only, so it survives pages of any charset', () => {
+    expect(/^[\x00-\x7f]*$/.test(buildPageAgent('demo', BASE, 'a.html', 'index.html'))).toBe(true);
+  });
+});
