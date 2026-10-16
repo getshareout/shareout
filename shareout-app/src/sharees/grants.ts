@@ -244,7 +244,8 @@ export async function handleShareWithPerson(
   }
 
   // Ensure the external edge (pre-creates the user + sends the invite/claim email if new).
-  await inviteOrAddMember(env, workspaceId, user.id, email, 'member', undefined, 'external');
+  await inviteOrAddMember(env, workspaceId, user.id, email, 'member', undefined, 'external',
+    resourceType === 'folder' ? { folderId: resourceId } : {});
   const target = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: string }>();
   if (!target) return json({ error: 'Could not resolve the invited person', code: 'INTERNAL_ERROR' }, 500);
 

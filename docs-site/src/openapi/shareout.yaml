@@ -2552,7 +2552,7 @@ paths:
       operationId: getKnowledgeFile
       responses:
         "200":
-          description: "`{ enabled, node }` with body, `sources` (artifact ids) and `source_artifacts` (`{ id, slug, title, available }` per source; `available: false` with no title when the artifact is gone or not visible to the caller)"
+          description: "`{ enabled, node }` with body, `sources` (artifact ids) and `source_artifacts` (`{ id, slug, title, url, available }` per source; `url` is the absolute `<origin>/a/<slug>/` link; `available: false` with no title or url when the artifact is gone or not visible to the caller)"
         "404":
           description: Not found, or Knowledge is off
     put:

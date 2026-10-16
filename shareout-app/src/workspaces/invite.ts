@@ -51,6 +51,8 @@ export interface InviteOptions {
   keepRole?: boolean;
   /** Optional note from the inviter, passed to the invite email. */
   message?: string;
+  /** A folder shared with this person: the email lands them on its portal (/shared?folder=). */
+  folderId?: string;
 }
 
 /** Add an existing user to the workspace, or pre-create + invite a new one. */
@@ -151,6 +153,7 @@ export async function inviteOrAddMember(
         claimId: claim.id,
         workspaceId,
         personalMessage: opts.message,
+        folderId: opts.folderId,
       });
       status = 'invited';
       emailSent = !!sent?.sent;
@@ -166,7 +169,7 @@ export async function inviteOrAddMember(
         toUserId: target.id,
         toEmail: email,
         workspaceId,
-        data: { workspaceName: inviteCtx.workspaceName, inviterName: inviteCtx.inviterName },
+        data: { workspaceName: inviteCtx.workspaceName, inviterName: inviteCtx.inviterName, ...(opts.folderId ? { folderId: opts.folderId } : {}) },
       }).catch(() => {});
     } catch {
       // Best-effort notification; never block membership.

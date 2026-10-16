@@ -5,7 +5,7 @@ import { visibleSources } from './corpus/search';
 import { parseKnowledge } from './parse';
 import type { KnowledgeNode } from './types';
 
-export interface SourceArtifact { id: string; slug: string | null; title: string | null; available: boolean }
+export interface SourceArtifact { id: string; slug: string | null; title: string | null; url: string | null; available: boolean }
 
 /** A node's sources[] (artifact ids), named and linked only when this member may open them. */
 export async function sourceArtifacts(env: Env, workspaceId: string, userId: string, ids: string[]): Promise<SourceArtifact[]> {
@@ -13,7 +13,7 @@ export async function sourceArtifacts(env: Env, workspaceId: string, userId: str
   const { visible } = await visibleSources(env, workspaceId, userId, ids.map((refId) => ({ refId, kind: 'page' as const })));
   return ids.map((id) => {
     const v = visible.get(id);
-    return v ? { id, slug: v.slug ?? null, title: v.title, available: true } : { id, slug: null, title: null, available: false };
+    return v ? { id, slug: v.slug ?? null, title: v.title, url: v.url, available: true } : { id, slug: null, title: null, url: null, available: false };
   });
 }
 

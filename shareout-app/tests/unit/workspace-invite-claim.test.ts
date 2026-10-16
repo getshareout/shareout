@@ -160,6 +160,7 @@ describe('inviteLandingUrl', () => {
     };
     const url = await inviteLandingUrl(env, 'https://shareout.site', claim);
     expect(url).toBe('https://shareout.site/shared');
+    expect(await inviteLandingUrl(env, 'https://shareout.site', claim, 'fld_acme')).toBe('https://shareout.site/shared?folder=fld_acme');
   });
 
   it('deep-links internals to the workspace subdomain on prod apex', async () => {
@@ -238,5 +239,23 @@ describe('invite join page', () => {
     expect(html).toContain('Te invitaron como <strong>new@acme.com</strong>');
     expect(html).toContain('login_hint=new%40acme.com');
     expect(html).toContain('Sumate a Acme Co');
+  });
+
+  it('keeps the shared folder through sign-in', async () => {
+    const { handleInviteJoinPage } = await import('../../src/workspaces/invite-accept-page');
+    const env = {
+      ...baseEnv,
+      DB: makeDbMock({
+        first: (sql) => {
+          if (sql.includes('FROM workspace_invite_claims')) {
+            return { workspace_id: 'wsp_x', invited_by: 'usr_boss', email: 'new@acme.com', claimed_at: null, expired: 0 };
+          }
+          if (sql.includes('FROM workspaces')) return { name: 'Acme Co' };
+          return null;
+        },
+      }),
+    };
+    const res = await handleInviteJoinPage(new Request('https://x/invite/GOOD1-GOOD2?folder=fld_acme'), env, 'GOOD1-GOOD2');
+    expect(await res.text()).toContain(`redirect=${encodeURIComponent('/invite/GOOD1-GOOD2?folder=fld_acme')}`);
   });
 });

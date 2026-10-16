@@ -1,7 +1,7 @@
 // Spanish (rioplatense, voseo) copy for the member-facing lifecycle emails. Same
 // data shapes as catalog.ts; a type with no entry here falls back to English.
 // Voice: a friend from the team — warm, short, no jargon. "Página", never "artefacto".
-import { EMAILS, p, codeBlock, inviteConnectNote, invitePersonalNote } from './catalog';
+import { EMAILS, p, codeBlock, inviteConnectNote, invitePersonalNote, inviteJoinUrl, addedLandingUrl } from './catalog';
 import type {
   BuiltEmail,
   EmailContext,
@@ -60,8 +60,8 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
       'ShareOut convierte una idea en una página en vivo, con datos reales, para compartir. Te dejamos algunos ejemplos en tu inicio para que arranques; cada uno muestra una función y es tuyo para editar o borrar. Empezá por la primera de la lista: te muestra cómo publicar la tuya.',
   }),
 
-  workspace_invite: ({ workspaceName, inviterName, claimCode, claimTtlDays, personalMessage }: InviteData, { baseUrl }) => {
-    const joinUrl = `${baseUrl}/invite/${encodeURIComponent(claimCode)}`;
+  workspace_invite: ({ workspaceName, inviterName, claimCode, claimTtlDays, personalMessage, folderId }: InviteData, { baseUrl }) => {
+    const joinUrl = inviteJoinUrl(baseUrl, claimCode, folderId);
     const connectUrl = `${baseUrl}/home?view=connect`;
     const note = invitePersonalNote(`${inviterName} te dejó un mensaje:`, personalMessage);
     return {
@@ -78,12 +78,12 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
     };
   },
 
-  added_to_workspace: ({ workspaceName, inviterName }: AddedToWorkspaceData, { baseUrl }) => ({
+  added_to_workspace: ({ workspaceName, inviterName, folderId }: AddedToWorkspaceData, { baseUrl }) => ({
     subject: `Te sumaron a ${workspaceName} en ShareOut`,
     preheader: `${inviterName} te sumó a ${workspaceName}.`,
     heading: `Te sumaron a ${workspaceName}`,
     bodyHtml: p(`${escapeHtml(inviterName)} te sumó al espacio <strong>${escapeHtml(workspaceName)}</strong> en ShareOut. Ya podés armar y publicar páginas ahí.`),
-    cta: { label: 'Abrir ShareOut', href: `${baseUrl}/home` },
+    cta: { label: 'Abrir ShareOut', href: addedLandingUrl(baseUrl, folderId) },
     bodyText: `${inviterName} te sumó al espacio ${workspaceName} en ShareOut. Ya podés armar y publicar páginas ahí.`,
   }),
 

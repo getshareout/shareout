@@ -71,7 +71,7 @@ export async function expireOtherInviteClaims(env: Env, workspaceId: string, use
 // Now the row carries the verdict and the Members view shows it.
 export async function sendInviteEmail(
   env: Env,
-  args: { email: string; workspaceName: string; inviterName: string; claimCode: string; claimId?: string; workspaceId?: string; personalMessage?: string }
+  args: { email: string; workspaceName: string; inviterName: string; claimCode: string; claimId?: string; workspaceId?: string; personalMessage?: string; folderId?: string }
 ): Promise<DispatchResult> {
   const result = await dispatchLifecycleEmail(env, {
     type: 'workspace_invite',
@@ -84,6 +84,7 @@ export async function sendInviteEmail(
       claimCode: args.claimCode,
       claimTtlDays: CLAIM_TTL_DAYS,
       ...(args.personalMessage ? { personalMessage: args.personalMessage } : {}),
+      ...(args.folderId ? { folderId: args.folderId } : {}),
     },
   });
 
@@ -238,13 +239,15 @@ export async function peekInvite(
 }
 
 /**
- * Where to drop someone after they accept. Externals → /shared; internals →
+ * Where to drop someone after they accept. Externals → /shared (the folder's portal,
+ * /shared?folder=, when the invite came from sharing a folder); internals →
  * workspace subdomain /home when on prod apex, else apex /home?workspace=.
  */
 export async function inviteLandingUrl(
   env: Env,
   origin: string,
-  claim: InviteClaim
+  claim: InviteClaim,
+  folderId?: string | null
 ): Promise<string> {
   const row = await env.DB.prepare(
     `SELECT w.slug AS slug, wm.member_class AS member_class
@@ -258,7 +261,7 @@ export async function inviteLandingUrl(
   }>();
 
   if ((row?.member_class ?? 'internal') === 'external') {
-    return new URL('/shared', origin).toString();
+    return new URL(folderId ? `/shared?folder=${encodeURIComponent(folderId)}` : '/shared', origin).toString();
   }
 
   const slug = row?.slug?.trim();
