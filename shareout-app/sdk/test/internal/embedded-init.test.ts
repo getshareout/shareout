@@ -72,10 +72,38 @@ describe('embedded-init', () => {
     expect(parentPostMessage).toHaveBeenCalledWith({ type: 'shareout:ready' }, '*');
 
     listeners.get('message')?.({
+      source: window.parent,
       data: { type: 'shareout:init', data: sampleData },
     } as MessageEvent);
 
     await expect(waitPromise).resolves.toBeUndefined();
     expect(getPostMessageData()).toEqual(sampleData);
+  });
+
+  it('ignores shareout:init from a window other than the parent', async () => {
+    vi.useFakeTimers();
+    const listeners = new Map<string, (event: MessageEvent) => void>();
+    const parent = { postMessage: vi.fn() };
+
+    vi.stubGlobal('window', {
+      parent,
+      addEventListener: vi.fn((type: string, handler: (event: MessageEvent) => void) => {
+        listeners.set(type, handler);
+      }),
+      removeEventListener: vi.fn((type: string) => {
+        listeners.delete(type);
+      }),
+    });
+    Object.defineProperty(window, 'parent', { value: parent, configurable: true });
+
+    const waitPromise = waitForPostMessageInit(500);
+    listeners.get('message')?.({
+      source: {},
+      data: { type: 'shareout:init', data: { ...sampleData, baseUrl: 'https://evil.example' } },
+    } as unknown as MessageEvent);
+
+    await vi.advanceTimersByTimeAsync(500);
+    await expect(waitPromise).resolves.toBeUndefined();
+    expect(getPostMessageData()).toBeNull();
   });
 });
