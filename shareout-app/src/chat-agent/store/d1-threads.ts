@@ -74,13 +74,17 @@ export class WebThreadStore {
     return true;
   }
 
+  /** True when the thread is this user's, in this scope. */
+  async owns(id: string): Promise<boolean> {
+    return !!(await this.env.DB.prepare(
+      `SELECT 1 FROM agent_threads WHERE id = ? AND scope_type = 'workspace' AND scope_key = ? AND user_id = ?`
+    ).bind(id, this.scopeKey, this.userId).first());
+  }
+
   /** Owner-checked. Paged oldest-first; `before` is an ISO created_at cursor for
    *  scroll-up (the same string the previous page returned). */
   async messages(id: string, limit: number, before?: string): Promise<ThreadMessage[] | null> {
-    const owns = await this.env.DB.prepare(
-      `SELECT 1 FROM agent_threads WHERE id = ? AND scope_type = 'workspace' AND scope_key = ? AND user_id = ?`
-    ).bind(id, this.scopeKey, this.userId).first();
-    if (!owns) return null;
+    if (!(await this.owns(id))) return null;
     // '9' sorts above every ISO timestamp, so an absent cursor means "newest page".
     const cursor = before || '9';
     const rows = await this.env.DB.prepare(

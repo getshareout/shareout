@@ -6,7 +6,7 @@
  * plain reads; save_skill proposes and waits for a tap like every other write tool.
  */
 import type { AccountTool, ToolContext } from './types';
-import { PERSONAL_SCOPE } from '../../chat-platforms/types';
+import { scopedWorkspaceId } from '../scope';
 import type { PendingAction } from '../actions';
 import { readSkillMarkdown } from '../../skill-marketplace';
 import { loadSkillGovernance } from '../../skills/policy';
@@ -16,10 +16,8 @@ const NO_WORKSPACE = 'Skills live in a workspace. Pick a workspace first, then a
 /** Enough for the agent to reason over a playbook without flooding the turn. */
 const READ_CAP = 20_000;
 
-function workspaceId(ctx: ToolContext): string | null {
-  const ws = ctx.selectedWorkspaceId;
-  return typeof ws === 'string' && ws !== PERSONAL_SCOPE ? ws : null;
-}
+/** The selected workspace id once internal membership is verified, else null. */
+const workspaceId = (ctx: ToolContext): Promise<string | null> => scopedWorkspaceId(ctx);
 
 export const listSkillsTool: AccountTool = {
   name: 'list_skills',
@@ -33,7 +31,7 @@ export const listSkillsTool: AccountTool = {
     },
   },
   async execute(ctx, input) {
-    const wsId = workspaceId(ctx);
+    const wsId = await workspaceId(ctx);
     if (!wsId) return { error: NO_WORKSPACE };
     const q = typeof input.query === 'string' ? input.query.trim() : '';
     const limit = typeof input.limit === 'number' ? Math.min(Math.max(1, input.limit), 50) : 20;
@@ -124,7 +122,7 @@ export const saveSkillTool: AccountTool = {
     required: ['name', 'markdown'],
   },
   async execute(ctx, input): Promise<{ __propose: PendingAction } | { error: string }> {
-    const wsId = workspaceId(ctx);
+    const wsId = await workspaceId(ctx);
     if (!wsId) return { error: NO_WORKSPACE };
     const name = String(input.name || '').trim();
     const markdown = String(input.markdown || '').trim();

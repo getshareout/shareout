@@ -6,7 +6,13 @@ import type { Env } from '../../../src/types';
 import type { ToolContext } from '../../../src/chat-agent/tools/types';
 
 const getUserWorkspaceIds = vi.hoisted(() => vi.fn());
-vi.mock('../../../src/chat-agent/access', () => ({ getUserWorkspaceIds }));
+vi.mock('../../../src/chat-agent/scope', async (orig) => ({
+  ...(await orig<typeof import('../../../src/chat-agent/scope')>()),
+  scopedWorkspaceId: async (c: { env: Env; userId: string; selectedWorkspaceId?: string | null }) => {
+    const ws = c.selectedWorkspaceId;
+    return typeof ws === 'string' && (await getUserWorkspaceIds(c.env, c.userId)).includes(ws) ? ws : null;
+  },
+}));
 
 import {
   knowledgeSearchTool, knowledgeEntityTool, knowledgeFactsTool, knowledgeStatusTool,

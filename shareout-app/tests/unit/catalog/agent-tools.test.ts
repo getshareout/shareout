@@ -1,5 +1,10 @@
 import { env } from 'cloudflare:workers';
-import { beforeAll, beforeEach, describe, it, expect } from 'vitest';
+import { beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
+
+vi.mock('../../../src/chat-agent/scope', async (orig) => ({
+  ...(await orig<typeof import('../../../src/chat-agent/scope')>()),
+  scopedWorkspaceId: async (c: { selectedWorkspaceId?: string | null }) => (c.selectedWorkspaceId === 'wsp_tools' ? 'wsp_tools' : null),
+}));
 import type { Env } from '../../../src/types';
 import type { ToolContext } from '../../../src/chat-agent/tools/types';
 import { catalogSearchTool, catalogGetTool } from '../../../src/chat-agent/tools/catalog';

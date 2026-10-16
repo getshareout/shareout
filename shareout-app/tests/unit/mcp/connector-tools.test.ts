@@ -4,6 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../src/chat-agent/access', () => ({ listWorkspacesForUser: vi.fn() }));
 const queryWorkspaceConnection = vi.fn();
+// Treat the caller as an internal member of whatever workspace is selected; the
+// membership gate itself is covered in chat-agent/workspace-scope.test.ts.
+vi.mock('../../../src/chat-agent/scope', async (orig) => {
+  const real = await orig<typeof import('../../../src/chat-agent/scope')>();
+  return {
+    ...real,
+    resolveAgentScope: async (_e: unknown, _u: string, sel?: string | null) => ({ selection: sel ?? null, workspaceId: real.selectedWorkspace(sel), role: real.selectedWorkspace(sel) ? 'member' : null }),
+    scopedWorkspaceId: async (c: { selectedWorkspaceId?: string | null }) => real.selectedWorkspace(c.selectedWorkspaceId),
+  };
+});
 vi.mock('../../../src/data/connections/warehouse-query', async (orig) => ({
   ...(await orig<object>()),
   queryWorkspaceConnection: (...a: unknown[]) => queryWorkspaceConnection(...a),

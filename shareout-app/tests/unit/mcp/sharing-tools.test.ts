@@ -69,7 +69,7 @@ describe('folder_access', () => {
   it('refuses an outside person even though they have a membership edge', async () => {
     const r = await call(outsider, 'folder_access', { folder: 'Q3' });
     expect(r.isError).toBe(true);
-    expect(r.content[0].text).toMatch(/not a member of that workspace/);
+    expect(r.content[0].text).toMatch(/not a member of that workspace|has none/);
     expect(r.structuredContent).toBeUndefined();
   });
 });

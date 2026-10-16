@@ -10,6 +10,7 @@ import { type AccountTool } from './tools/types';
 import type { PendingAction } from './actions';
 import { isFeatureEnabled, webAgentBlockedMessage } from '../features/flags';
 import { getUserWorkspaceIds } from './access';
+import { resolveAgentScope, type AgentScope } from './scope';
 import { botDisabledMessage, botFeatureFlag } from './commands';
 import { SHAREOUT_SKILL_PRIMER } from './skill-primer';
 import { buildAgentSkillsDoc } from '../skill-marketplace';
@@ -45,6 +46,8 @@ export interface TurnInput {
   reply?: ChatReplyPort;
   userText: string;
   selectedWorkspaceId?: WorkspaceSelection;
+  /** The selection already verified by the caller (resolveAgentScope); re-checked here when absent or stale. */
+  scope?: AgentScope;
   /** Prior conversation, oldest first (already bounded by the caller). */
   history: ChatMessage[];
   /** Optional pre-built context (e.g. a workspace snapshot) appended to the system prompt. */
@@ -179,9 +182,16 @@ function truncate(s: string): string {
 export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResult> {
   const started = Date.now();
   const platform = input.platform ?? 'telegram';
-  const selectedWs = typeof input.selectedWorkspaceId === 'string' && input.selectedWorkspaceId !== PERSONAL_SCOPE
-    ? input.selectedWorkspaceId
-    : null;
+  // One choke point for the workspace this turn acts in: internal membership is
+  // required before any workspace context, setting, key or tool is touched.
+  const scope = input.scope && input.scope.selection === (input.selectedWorkspaceId ?? null)
+    ? input.scope
+    : await resolveAgentScope(env, input.userId, input.selectedWorkspaceId);
+  if (!scope) {
+    createLogger(env, { scope: 'chat-agent' }).warn('agent turn refused: not an internal member of the selected workspace', { platform });
+    return { reply: agentFallbackReplies(input.locale ?? 'en').notMember };
+  }
+  const selectedWs = scope.workspaceId;
   const flagWs = selectedWs ?? (await getUserWorkspaceIds(env, input.userId))[0] ?? null;
   // Per-user skills the user attached to their agent (same scope semantics as the
   // Library attach UI): personal → '__personal', else the selected/first workspace.
@@ -363,6 +373,7 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
             reply: input.reply,
             platform,
             selectedWorkspaceId: input.selectedWorkspaceId,
+            scope,
           }, tc.input);
           if (out && typeof out === 'object' && '__propose' in out) {
             toolsMs += Date.now() - toolsAt;

@@ -13,6 +13,16 @@ vi.mock('../../../src/rate-limit', async (importOriginal) => ({
   checkWebAgentQueryLimit: async () => ({ allowed: true }),
 }));
 
+// Treat the caller as an internal member of whatever workspace is selected; the
+// membership gate itself is covered in chat-agent/workspace-scope.test.ts.
+vi.mock('../../../src/chat-agent/scope', async (orig) => {
+  const real = await orig<typeof import('../../../src/chat-agent/scope')>();
+  return {
+    ...real,
+    resolveAgentScope: async (_e: unknown, _u: string, sel?: string | null) => ({ selection: sel ?? null, workspaceId: real.selectedWorkspace(sel), role: real.selectedWorkspace(sel) ? 'member' : null }),
+    scopedWorkspaceId: async (c: { selectedWorkspaceId?: string | null }) => real.selectedWorkspace(c.selectedWorkspaceId),
+  };
+});
 import { browseStorageTool, listConnectionsTool } from '../../../src/chat-agent/tools/connection-query';
 import { CONNECTOR_TOOLS } from '../../../src/chat-agent/tools/index';
 import type { ToolContext } from '../../../src/chat-agent/tools/types';
