@@ -392,6 +392,12 @@ of every fact — see [integrations/mcp-connector.md](integrations/mcp-connector
 `assign_comment`, `approve_version`), schedules (`list_jobs`) and folder sharing
 (`folder_access`, `share_with_person`, `revoke_share`, `folder_activity`).
 
+Building a multi-page site through the connector? Pass `files: [{ path, content, encoding? }]`
+(with `index.html` as the first page) to `publish_artifact` or `update_artifact` instead of
+`content`; the result links each page with `?page=`. Same limits as `POST /v1/publish` — see
+[integrations/mcp-connector.md](integrations/mcp-connector.md) and
+[core/html-spec/pages.md](core/html-spec/pages.md#multiple-html-files-sites).
+
 ---
 
 ## Non-negotiable rules

@@ -50,6 +50,12 @@ another artifact open it in its own tab. The viewer URL tracks the page being sh
 (`/a/{slug}/?page=procedures/intake.html`, or `#a/{slug}/procedures/intake.html` in
 Home), and Home lists the pages under Details.
 
+Publish a site by sending every file in one `POST /v1/publish` (`files[]`), or, through the
+MCP connector, `publish_artifact` / `update_artifact` with
+`files: [{ path, content, encoding? }]` — see
+[integrations/mcp-connector.md](../../integrations/mcp-connector.md). An update replaces the
+whole file set.
+
 ## Sections
 
 ```html
@@ -252,3 +258,4 @@ Full compliance checklist: [overview.md](overview.md#compliance-checklist). Page
 
 - [Overview](overview.md) - Quick reference
 - [Bindings](bindings.md) - Data bindings within pages
+- [MCP connector](../../integrations/mcp-connector.md) - Publishing a site with `files`

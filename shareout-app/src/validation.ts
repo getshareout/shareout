@@ -27,6 +27,21 @@ const ALLOWED_MIMES = new Set([
   'application/pdf',
 ]);
 
+// Extension → publish mime, for callers that send paths without a mime (MCP `files`).
+// Unknown extensions map to octet-stream, which the allow-list above then rejects.
+const EXTENSION_TO_MIME: Record<string, string> = {
+  html: 'text/html', htm: 'text/html', css: 'text/css', js: 'text/javascript', mjs: 'text/javascript',
+  json: 'application/json', csv: 'text/csv', txt: 'text/plain', md: 'text/markdown', markdown: 'text/markdown',
+  svg: 'image/svg+xml', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp',
+  gif: 'image/gif', avif: 'image/avif', mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime',
+  mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', woff: 'font/woff', woff2: 'font/woff2', pdf: 'application/pdf',
+};
+
+export function mimeForPath(path: string): string {
+  const ext = path.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? '';
+  return EXTENSION_TO_MIME[ext] ?? 'application/octet-stream';
+}
+
 const MIME_TO_TYPE: Record<string, ArtifactType> = {
   'text/html': 'html',
   'text/csv': 'csv',
