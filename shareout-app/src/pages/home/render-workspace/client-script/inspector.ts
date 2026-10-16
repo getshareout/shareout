@@ -771,8 +771,9 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     ensureReview(art);
     var allRoots = comments.filter(function (c) { return !c.parent_id; }), roots = cmFilterRoots(allRoots);
     var listH = roots.length ? roots.map(function (c) { return cmNode(c, byParent); }).join('') : '<div class="wsx-cm__empty">' + esc(t(allRoots.length ? 'review.noOpen' : 'inspector.noComments')) + '</div>';
-    rbodyEl.innerHTML = '<div class="wsx-cm">' + (allRoots.length ? cmFilterBar(allRoots) : '') + '<div class="wsx-cm__list" id="wsxCmList">' + listH + '</div>' + composerHTML(false) + '</div>';
+    rbodyEl.innerHTML = '<div class="wsx-cm">' + gcArtHtml(art, metaCache[art.id]) + (allRoots.length ? cmFilterBar(allRoots) : '') + '<div class="wsx-cm__list" id="wsxCmList">' + listH + '</div>' + composerHTML(false) + '</div>';
     wireReview(art);
+    if (document.getElementById('wsxGuestCm')) wireGuestArt(art);
     var listEl = document.getElementById('wsxCmList'); if (listEl) listEl.scrollTop = listEl.scrollHeight;
     getCmData(art, function () {}); // warm mention cache
     var mainCc = rbodyEl.querySelector('.wsx-cm > .wsx-cc');

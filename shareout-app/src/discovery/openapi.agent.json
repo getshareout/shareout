@@ -314,7 +314,7 @@
           "Artifacts"
         ],
         "summary": "Get an artifact",
-        "description": "The path also accepts the artifact's slug. Any signed-in caller who can view the artifact gets its details; `can_edit` and `can_delete` say which writes the API will accept from this caller.",
+        "description": "The path also accepts the artifact's slug. Any signed-in caller who can view the artifact gets its details; `can_edit`, `can_delete` and `can_manage_comments` say which writes the API will accept from this caller.",
         "operationId": "getArtifact",
         "responses": {
           "200": {
@@ -1333,6 +1333,10 @@
           "can_delete": {
             "type": "boolean",
             "description": "Caller may move the artifact to Trash (detail endpoint only)."
+          },
+          "can_manage_comments": {
+            "type": "boolean",
+            "description": "Caller may change the artifact's comment settings, such as guest comments (owner; detail endpoint only)."
           },
           "pages": {
             "type": "array",

@@ -12,6 +12,7 @@ import { DROP_IMPORT_COPY } from './copy/drop-import';
 import { ERRORS_COPY } from './copy/errors';
 import { FOLDER_ACCESS_COPY } from './copy/folder-access';
 import { FOLDER_CONTENTS_COPY } from './copy/folder-contents';
+import { GUEST_COMMENTS_COPY } from './copy/guest-comments';
 import { INSPECTOR_COPY } from './copy/inspector';
 import { INVITE_COPY } from './copy/invite';
 import { KNOWLEDGE_MAP_COPY } from './copy/knowledge-map';
@@ -39,6 +40,7 @@ const COPY_MODULES: HomeLocaleCopy[] = [
   WORKSPACE_COPY,
   FOLDER_ACCESS_COPY,
   FOLDER_CONTENTS_COPY,
+  GUEST_COMMENTS_COPY,
   CLIENT_PORTAL_COPY,
   AUTOMATION_COPY,
   KNOWLEDGE_MAP_COPY,

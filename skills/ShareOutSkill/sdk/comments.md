@@ -30,6 +30,10 @@ and the folder's creator; `GET` reads it). An artifact without its own setting i
 nearest folder that has it on. `GET …/_config` also returns `guestCommentsEffective`.
 MCP: `set_guest_comments`.
 
+In the app: the folder's **Who has access** panel has an **Allow guest comments** switch
+(folder managers only), and the artifact's **Comments** tab has **Follow folder / On / Off**
+with the effective state (owner only). Point a human there when they ask where to turn it on.
+
 Who can comment as a guest: only on artifacts they can already open without an account — a
 **public** page, or a **password / credentials** page they unlocked (the access cookie is the
 proof). Private and workspace pages stay account-only.

@@ -289,6 +289,10 @@ con `{ "enabled": true }`; MCP: `set_guest_comments`), quien revisa por un link 
 crear una cuenta: la toolbar muestra **Comentá como invitado** (nombre, email y un código de 6
 dígitos).
 
+En la app, quien administra la carpeta activa **Permitir comentarios de invitados** en el panel
+**Quién tiene acceso** de la carpeta, y el dueño elige **Seguir la carpeta / Sí / No** en la pestaña
+**Comentarios** del artefacto, que también muestra si los invitados pueden comentar ahora.
+
 - Solo donde ya puede abrir el artefacto sin cuenta: **público**, o con **contraseña** ya
   desbloqueada. Los privados y de workspace siguen pidiendo cuenta.
 - El código da una cookie HttpOnly y SameSite=Strict de 12 horas, válida **solo para ese

@@ -40,14 +40,14 @@ describe('workspace member on a workspace-visible artifact', () => {
 
   it('GET details tells a plain member they cannot edit or trash', async () => {
     const res = await handleGetArtifact(new Request('https://x'), env('workspace', { member: true }), member, 'art_1');
-    expect(await jsonBody(res)).toMatchObject({ can_edit: false, can_delete: false });
+    expect(await jsonBody(res)).toMatchObject({ can_edit: false, can_delete: false, can_manage_comments: false });
   });
 
   it('GET details lets a workspace admin trash but not edit, and the owner do both', async () => {
     const admin = await handleGetArtifact(new Request('https://x'), env('workspace', { member: true, wsRole: 'admin' }), member, 'art_1');
-    expect(await jsonBody(admin)).toMatchObject({ can_edit: false, can_delete: true });
+    expect(await jsonBody(admin)).toMatchObject({ can_edit: false, can_delete: true, can_manage_comments: false });
     const owner = await handleGetArtifact(new Request('https://x'), env('workspace', { member: true, ownerId: 'usr_m' }), member, 'art_1');
-    expect(await jsonBody(owner)).toMatchObject({ can_edit: true, can_delete: true });
+    expect(await jsonBody(owner)).toMatchObject({ can_edit: true, can_delete: true, can_manage_comments: true });
   });
 
   it('GET details resolves a slug (Home deep link #a/<slug>) to the artifact id', async () => {

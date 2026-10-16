@@ -1,6 +1,6 @@
 // Spanish (rioplatense, voseo) copy for the member-facing lifecycle emails. Same
 // data shapes as catalog.ts; a type with no entry here falls back to English.
-// Voice: a friend from the team — warm, short, no jargon. "Página", never "artefacto".
+// Voice: a friend from the team — warm, short, no jargon. "Artefacto" for what people publish, never "página".
 import { EMAILS, p, codeBlock, inviteConnectNote, invitePersonalNote, inviteJoinUrl, addedLandingUrl } from './catalog';
 import type {
   BuiltEmail,
@@ -53,12 +53,12 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
     preheader: 'Tu inicio y algunos ejemplos para arrancar ya están listos.',
     heading: 'Tu inicio está listo',
     bodyHtml:
-      p('ShareOut convierte una idea en una página en vivo, con datos reales, para compartir con quien quieras. Sin servidores y sin configurar nada. Publicá un tablero, un formulario, una encuesta o una app entera con un clic.') +
-      p('Te dejamos algunos ejemplos en tu inicio para que arranques: cada uno muestra una función y es tuyo para abrir, editar o borrar. Empezá por la primera de la lista: te muestra cómo publicar la tuya.'),
+      p('ShareOut convierte una idea en un artefacto en vivo, con datos reales, para compartir con quien quieras. Sin servidores y sin configurar nada. Publicá un tablero, un formulario, una encuesta o una app entera con un clic.') +
+      p('Te dejamos algunos ejemplos en tu inicio para que arranques: cada uno muestra una función y es tuyo para abrir, editar o borrar. Empezá por el primero de la lista: te muestra cómo publicar el tuyo.'),
     cta: { label: 'Abrir tu inicio', href: `${baseUrl}/app` },
     footerNote: 'Te llega este mail porque recién creaste tu cuenta de ShareOut.',
     bodyText:
-      'ShareOut convierte una idea en una página en vivo, con datos reales, para compartir. Te dejamos algunos ejemplos en tu inicio para que arranques; cada uno muestra una función y es tuyo para editar o borrar. Empezá por la primera de la lista: te muestra cómo publicar la tuya.',
+      'ShareOut convierte una idea en un artefacto en vivo, con datos reales, para compartir. Te dejamos algunos ejemplos en tu inicio para que arranques; cada uno muestra una función y es tuyo para editar o borrar. Empezá por el primero de la lista: te muestra cómo publicar el tuyo.',
   }),
 
   workspace_invite: ({ workspaceName, inviterName, claimCode, claimTtlDays, personalMessage, folderId }: InviteData, { baseUrl }) => {
@@ -70,7 +70,7 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
       preheader: `${inviterName} te invitó a ${workspaceName} en ShareOut.`,
       heading: `Sumate a ${workspaceName}`,
       bodyHtml:
-        p(`${escapeHtml(inviterName)} te invitó a <strong>${escapeHtml(workspaceName)}</strong> en ShareOut, un lugar para armar y publicar páginas con datos reales. Abrí la invitación y ya estás adentro.`) +
+        p(`${escapeHtml(inviterName)} te invitó a <strong>${escapeHtml(workspaceName)}</strong> en ShareOut, un lugar para armar y publicar artefactos con datos reales. Abrí la invitación y ya estás adentro.`) +
         note.html +
         inviteConnectNote('Después de entrar, conectá Claude o ChatGPT en 2 minutos', connectUrl),
       cta: { label: `Entrar a ${workspaceName}`, href: joinUrl },
@@ -83,9 +83,9 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
     subject: `Te sumaron a ${workspaceName} en ShareOut`,
     preheader: `${inviterName} te sumó a ${workspaceName}.`,
     heading: `Te sumaron a ${workspaceName}`,
-    bodyHtml: p(`${escapeHtml(inviterName)} te sumó al espacio <strong>${escapeHtml(workspaceName)}</strong> en ShareOut. Ya podés armar y publicar páginas ahí.`),
+    bodyHtml: p(`${escapeHtml(inviterName)} te sumó al espacio <strong>${escapeHtml(workspaceName)}</strong> en ShareOut. Ya podés armar y publicar artefactos ahí.`),
     cta: { label: 'Abrir ShareOut', href: addedLandingUrl(baseUrl, folderId) },
-    bodyText: `${inviterName} te sumó al espacio ${workspaceName} en ShareOut. Ya podés armar y publicar páginas ahí.`,
+    bodyText: `${inviterName} te sumó al espacio ${workspaceName} en ShareOut. Ya podés armar y publicar artefactos ahí.`,
   }),
 
   workspace_welcome: ({ workspaceName, inviterName, role }: WorkspaceWelcomeData, { baseUrl }) => {
@@ -113,7 +113,7 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
     subject: `${memberName} se sumó a ${workspaceName}`,
     preheader: `${memberName} ahora es parte de ${workspaceName}.`,
     heading: `${memberName} se sumó a ${workspaceName}`,
-    bodyHtml: p(`<strong>${escapeHtml(memberName)}</strong> ahora es parte de tu espacio <strong>${escapeHtml(workspaceName)}</strong>. Ya puede armar y publicar páginas ahí.`),
+    bodyHtml: p(`<strong>${escapeHtml(memberName)}</strong> ahora es parte de tu espacio <strong>${escapeHtml(workspaceName)}</strong>. Ya puede armar y publicar artefactos ahí.`),
     cta: { label: 'Abrir el espacio', href: `${baseUrl}/home` },
     bodyText: `${memberName} ahora es parte de tu espacio ${workspaceName}.`,
   }),
@@ -153,12 +153,12 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
   }),
 
   artifact_share: (d: ShareData) => {
-    const intro = d.sharerName ? `${d.sharerName} compartió una página con vos.` : 'Compartieron una página con vos.';
+    const intro = d.sharerName ? `${d.sharerName} compartió un artefacto con vos.` : 'Compartieron un artefacto con vos.';
     const desc = d.artifactDescription?.trim();
     const msg = d.customMessage?.trim();
     const role =
-      d.role === 'editor' ? 'Te sumaron como editor: abrila para empezar a editarla en equipo.'
-      : d.role === 'viewer' ? 'Ya tenés acceso para ver esta página.'
+      d.role === 'editor' ? 'Te sumaron como editor: abrilo para empezar a editarlo en equipo.'
+      : d.role === 'viewer' ? 'Ya tenés acceso para ver este artefacto.'
       : '';
     return {
       subject: d.sharerName ? `${d.sharerName} compartió: ${d.artifactName}` : `Compartieron con vos: ${d.artifactName}`,
@@ -170,7 +170,7 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
         (desc ? `<p style="margin:14px 0 0;color:${colors.textSecondary}">${escapeHtml(desc)}</p>` : '') +
         (msg ? `<div style="margin:16px 0 0;background:${colors.surface};border-left:3px solid ${colors.borderStrong};border-radius:8px;padding:12px 14px;color:${colors.textSecondary}">${escapeHtml(msg)}</div>` : '') +
         (role ? `<p style="margin:16px 0 0;color:${colors.textSecondary}">${escapeHtml(role)}</p>` : ''),
-      cta: { label: 'Abrir la página', href: d.viewUrl },
+      cta: { label: 'Abrir el artefacto', href: d.viewUrl },
       bodyText: [intro, '', d.artifactName, desc || '', msg ? `\n"${msg}"` : '', role ? `\n${role}` : ''].filter((x) => x !== '').join('\n'),
     };
   },
@@ -178,12 +178,12 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
   access_request: ({ requesterEmail, pageName, url }: AccessRequestData) => ({
     subject: `${requesterEmail} pidió acceso a ${pageName}`,
     preheader: `${requesterEmail} quiere ver ${pageName}.`,
-    heading: 'Alguien quiere ver tu página',
+    heading: 'Alguien quiere ver tu artefacto',
     bodyHtml:
-      p(`<strong>${escapeHtml(requesterEmail)}</strong> pidió acceso a tu página <strong>${escapeHtml(pageName)}</strong>.`) +
-      p('Abrí la página para aprobar o rechazar el pedido.'),
+      p(`<strong>${escapeHtml(requesterEmail)}</strong> pidió acceso a tu artefacto <strong>${escapeHtml(pageName)}</strong>.`) +
+      p('Abrí el artefacto para aprobar o rechazar el pedido.'),
     cta: { label: 'Ver el pedido', href: url },
-    bodyText: `${requesterEmail} pidió acceso a tu página "${pageName}". Abrí la página para aprobar o rechazar el pedido: ${url}`,
+    bodyText: `${requesterEmail} pidió acceso a tu artefacto "${pageName}". Abrí el artefacto para aprobar o rechazar el pedido: ${url}`,
   }),
 
   admin_request: ({ requesterName, workspaceName, action, reason, url }: AdminRequestData) => ({
@@ -205,29 +205,29 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
     preheader: `Ya podés ver ${pageName}.`,
     heading: `Ya tenés acceso a ${pageName}`,
     bodyHtml: p(`Aprobaron tu pedido: ya podés abrir <strong>${escapeHtml(pageName)}</strong>.`),
-    cta: { label: 'Abrir la página', href: url },
-    bodyText: `Ya tenés acceso a ${pageName}. Abrir la página: ${url}`,
+    cta: { label: 'Abrir el artefacto', href: url },
+    bodyText: `Ya tenés acceso a ${pageName}. Abrir el artefacto: ${url}`,
   }),
 
   access_declined: ({ pageName }: AccessDeclinedData) => ({
     subject: 'Sobre tu pedido de acceso',
     preheader: `Novedades sobre tu pedido para ver ${pageName}.`,
     heading: 'Sobre tu pedido',
-    bodyHtml: p(`Esta vez no te dieron acceso a <strong>${escapeHtml(pageName)}</strong>. Si lo necesitás, escribile directamente a quien la armó.`),
-    bodyText: `Esta vez no te dieron acceso a ${pageName}. Si lo necesitás, escribile directamente a quien la armó.`,
+    bodyHtml: p(`Esta vez no te dieron acceso a <strong>${escapeHtml(pageName)}</strong>. Si lo necesitás, escribile directamente a quien lo armó.`),
+    bodyText: `Esta vez no te dieron acceso a ${pageName}. Si lo necesitás, escribile directamente a quien lo armó.`,
   }),
 
   publish_approval: ({ kind }: PublishApprovalData, { baseUrl }) => {
     const cta = { label: kind === 'request' ? 'Ver el pedido' : 'Abrir ShareOut', href: `${baseUrl}/home` };
     if (kind === 'request') {
-      const body = 'Alguien de tu equipo quiere publicar una página para cualquiera con el link y te eligió para aprobarla.';
-      return { subject: 'Alguien de tu equipo necesita tu aprobación para publicar una página', preheader: 'Te eligieron para aprobar una página pública.', heading: 'Necesitamos tu aprobación', bodyHtml: p(body), cta, bodyText: body };
+      const body = 'Alguien de tu equipo quiere publicar un artefacto para cualquiera con el link y te eligió para aprobarlo.';
+      return { subject: 'Alguien de tu equipo necesita tu aprobación para publicar un artefacto', preheader: 'Te eligieron para aprobar un artefacto público.', heading: 'Necesitamos tu aprobación', bodyHtml: p(body), cta, bodyText: body };
     }
     if (kind === 'approved') {
-      const body = 'Tu equipo aprobó la publicación de tu página. Ya se está publicando; solo falta el control de seguridad automático.';
-      return { subject: 'Aprobaron la publicación de tu página', preheader: 'Aprobaron tu página', heading: 'Aprobaron tu página', bodyHtml: p(body), cta, bodyText: body };
+      const body = 'Tu equipo aprobó la publicación de tu artefacto. Ya se está publicando; solo falta el control de seguridad automático.';
+      return { subject: 'Aprobaron la publicación de tu artefacto', preheader: 'Aprobaron tu artefacto', heading: 'Aprobaron tu artefacto', bodyHtml: p(body), cta, bodyText: body };
     }
-    const body = 'Rechazaron tu pedido para publicar la página para cualquiera con el link. Sigue visible para tu espacio.';
+    const body = 'Rechazaron tu pedido para publicar el artefacto para cualquiera con el link. Sigue visible para tu espacio.';
     return { subject: 'Rechazaron tu pedido de publicación', preheader: 'Rechazaron tu pedido de publicación', heading: 'Rechazaron tu pedido de publicación', bodyHtml: p(body), cta, bodyText: body };
   },
 

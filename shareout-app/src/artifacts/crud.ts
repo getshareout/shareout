@@ -318,8 +318,9 @@ export async function handleGetArtifact(
   }
 
   // What the caller may do, so clients hide controls the API would refuse
-  // (PATCH/editor need editor+; trash needs owner or workspace owner/admin).
-  const permissions = { can_edit: role === 'owner' || role === 'editor', can_delete: canDelete };
+  // (PATCH/editor need editor+; trash needs owner or workspace owner/admin; comment
+  // settings such as guest comments need the owner).
+  const permissions = { can_edit: role === 'owner' || role === 'editor', can_delete: canDelete, can_manage_comments: role === 'owner' };
 
   // An imported Office file / slide deck kept its original (served at /a/{slug}/download).
   let original: string | undefined;
