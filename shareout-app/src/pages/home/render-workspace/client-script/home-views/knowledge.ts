@@ -536,10 +536,10 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     if (!sources || !sources.length) return '<div class="wsx-cat__linnone">' + esc(t('knowledge.srcNone')) + '</div>';
     var rows = sources.map(function (s) {
       if (typeof s === 'string') s = { id: s };
-      var label = s.title || s.id || s.slug || '';
-      var unc = s.title ? '' : ' <span class="wsx-cat__unc">' + esc(t('knowledge.srcNotLearned')) + '</span>';
-      return '<tr class="wsx-cat__linrow wsx-kn__srclink" data-kn-src-slug="' + esc(s.slug || '') + '" data-kn-src-id="' + esc(s.id || '') + '" data-kn-src-title="' + esc(label) + '">'
-        + '<td><span class="wsx-atbl__link">' + esc(label) + '</span>' + unc + '</td></tr>';
+      if (!s.slug || s.available === false) return '<tr class="wsx-cat__linrow"><td><span class="wsx-cat__unc">' + esc(t('knowledge.srcUnavailable')) + '</span></td></tr>';
+      var label = s.title || s.slug;
+      return '<tr class="wsx-cat__linrow wsx-kn__srclink" data-kn-src-slug="' + esc(s.slug) + '" data-kn-src-id="' + esc(s.id || '') + '" data-kn-src-title="' + esc(label) + '">'
+        + '<td><a class="wsx-atbl__link" href="/a/' + encodeURIComponent(s.slug) + '/">' + esc(label) + '</a></td></tr>';
     }).join('');
     return '<div class="wsx-atbl__wrap"><table class="wsx-atbl wsx-cat__lintable"><tbody>' + rows + '</tbody></table></div>';
   }
@@ -561,7 +561,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     if (node.confidence) rows.push([esc(t('knowledge.metaConfidence')), esc(node.confidence)]);
     rows.push([esc(t('knowledge.metaPinned')), node.pinned ? esc(t('knowledge.yes')) : esc(t('knowledge.no'))]);
     var meta = rows.map(function (r) { return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('');
-    var sources = node.sources || [];
+    var sources = node.source_artifacts || node.sources || [];
     var fresh = t('knowledge.freshLearned') + ' ' + adRelDate(node.learned_at);
     if (node.updated_at && node.updated_at !== node.learned_at) fresh += ' \\u00B7 ' + t('knowledge.freshUpdated') + ' ' + adRelDate(node.updated_at);
     var title = node.kind === 'overview' ? t('knowledge.overviewTitle') : (node.title || node.path);
@@ -579,10 +579,12 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
       + (window.WSX_ADMIN ? '<button class="so-c-btn wsx-kn__danger" id="knForget" type="button">' + esc(t('knowledge.forget')) + '</button>' : '')
       + '</div>';
     if (back) { var bk = document.getElementById('knBack'); if (bk) bk.addEventListener('click', back); }
-    host.querySelectorAll('[data-kn-src-id]').forEach(function (r) {
-      r.addEventListener('click', function () {
-        if (typeof openArtifact !== 'function') return;
-        openArtifact(r.getAttribute('data-kn-src-slug') || '', r.getAttribute('data-kn-src-title') || '', r.getAttribute('data-kn-src-id') || '');
+    host.querySelectorAll('[data-kn-src-slug]').forEach(function (r) {
+      r.addEventListener('click', function (e) {
+        var slug = r.getAttribute('data-kn-src-slug');
+        if (!slug || typeof openArtifact !== 'function' || e.metaKey || e.ctrlKey || e.shiftKey) return;
+        e.preventDefault();
+        openArtifact(slug, r.getAttribute('data-kn-src-title') || '', r.getAttribute('data-kn-src-id') || '');
       });
     });
     document.getElementById('knPin').addEventListener('click', function () { knPin(node); });

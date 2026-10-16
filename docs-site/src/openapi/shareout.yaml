@@ -2485,7 +2485,7 @@ paths:
       operationId: getKnowledgeFile
       responses:
         "200":
-          description: "`{ enabled, node }` with body and sources"
+          description: "`{ enabled, node }` with body, `sources` (artifact ids) and `source_artifacts` (`{ id, slug, title, available }` per source; `available: false` with no title when the artifact is gone or not visible to the caller)"
         "404":
           description: Not found, or Knowledge is off
     put:
