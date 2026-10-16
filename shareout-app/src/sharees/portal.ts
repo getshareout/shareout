@@ -4,7 +4,7 @@
 // folders DOWN to their whole subtree (the only downward CTE in the repo) and union
 // directly-granted artifacts.
 import type { Env } from '../types';
-import type { AccessIdentity } from '../access/can-access';
+import { canAccess, type AccessIdentity } from '../access/can-access';
 import { placeholders } from '../account-links';
 
 export interface GrantedArtifact {
@@ -12,6 +12,7 @@ export interface GrantedArtifact {
   name: string;
   slug: string;
   display_slug: string | null;
+  folder_id: string | null;
   workspace_id: string | null;
   workspace_name: string | null;
 }
@@ -24,6 +25,7 @@ export interface GrantedFile {
   sizeBytes: number;
   contentPath: string;
   bucketId: string;
+  folderId: string | null;
   workspace_id: string | null;
   workspace_name: string | null;
 }
@@ -77,7 +79,7 @@ export async function listGrantedArtifacts(
         UNION
         SELECT f.id FROM folders f JOIN sub s ON f.parent_id = s.id
       )
-      SELECT a.id, a.name, a.slug, a.display_slug, a.workspace_id, w.name AS workspace_name
+      SELECT a.id, a.name, a.slug, a.display_slug, a.folder_id, a.workspace_id, w.name AS workspace_name
         FROM artifacts a
         LEFT JOIN workspaces w ON w.id = a.workspace_id
        WHERE a.deleted_at IS NULL
@@ -117,7 +119,7 @@ export async function listGrantedFiles(
         UNION
         SELECT f.id FROM folders f JOIN sub s ON f.parent_id = s.id
       )
-      SELECT d.id, d.name, d.bucket_artifact_id, d.workspace_id, w.name AS workspace_name,
+      SELECT d.id, d.name, d.bucket_artifact_id, d.folder_id, d.workspace_id, w.name AS workspace_name,
              b.id AS blob_id, b.filename, b.mime_type, b.size_bytes
         FROM asset_deliverables d
         JOIN blobs b ON b.deliverable_id = d.id
@@ -128,7 +130,7 @@ export async function listGrantedFiles(
             OR (d.folder_id IN (SELECT id FROM sub) AND d.visibility NOT IN ('private', 'team')) )
        ORDER BY d.name`
   ).bind(...folderIds, ...fileIds).all<{
-    id: string; name: string; bucket_artifact_id: string; workspace_id: string | null;
+    id: string; name: string; bucket_artifact_id: string; folder_id: string | null; workspace_id: string | null;
     workspace_name: string | null; blob_id: string; filename: string; mime_type: string; size_bytes: number;
   }>();
   return (results || []).map((r) => ({
@@ -138,23 +140,66 @@ export async function listGrantedFiles(
     // verified against the grant. Non-private granted files serve here too.
     contentPath: `/v1/files/${r.id}/content`,
     bucketId: r.bucket_artifact_id,
+    folderId: r.folder_id,
     workspace_id: r.workspace_id, workspace_name: r.workspace_name,
   }));
 }
 
-// Branding for the portal header: the first Sharee the identity belongs to that has
-// branding set. Null logo/color → the portal falls back to the neutral default.
+export interface PortalFolder {
+  id: string;
+  name: string;
+  workspaceId: string;
+  subtree: Set<string>;
+}
+
+// The folder landing (/shared?folder=…): only when the identity may view the folder via a
+// grant on it or an ancestor. Returns its subtree so the portal lists just that folder.
+export async function resolvePortalFolder(
+  env: Env, identity: AccessIdentity, folderId: string,
+): Promise<PortalFolder | null> {
+  const folder = await env.DB.prepare('SELECT id, name, workspace_id FROM folders WHERE id = ?')
+    .bind(folderId).first<{ id: string; name: string | null; workspace_id: string | null }>();
+  if (!folder?.workspace_id) return null;
+  if (!(await canAccess(env, identity, 'folder', folderId, 'view'))) return null;
+  const { results } = await env.DB.prepare(
+    `WITH RECURSIVE sub(id) AS (
+        SELECT ?
+        UNION
+        SELECT f.id FROM folders f JOIN sub s ON f.parent_id = s.id
+      )
+      SELECT id FROM sub`
+  ).bind(folderId).all<{ id: string }>();
+  return {
+    id: folder.id, name: folder.name || '', workspaceId: folder.workspace_id,
+    subtree: new Set((results || []).map(r => r.id)),
+  };
+}
+
+// Branding is admin-set free JSON; only let a plain color and an https/data-image logo
+// reach the page (the color lands in a style attribute).
+const SAFE_COLOR = /^(#[0-9a-fA-F]{3,8}|[a-zA-Z]{3,20}|(rgb|hsl)a?\([0-9.,%\s]+\))$/;
+function safeColor(v: unknown): string | null {
+  return typeof v === 'string' && SAFE_COLOR.test(v.trim()) ? v.trim() : null;
+}
+function safeLogo(v: unknown): string | null {
+  return typeof v === 'string' && /^(https:\/\/|data:image\/)/i.test(v.trim()) ? v.trim() : null;
+}
+
+// Branding for the portal header: the first Sharee the identity belongs to (in
+// `workspaceId` when given — a folder landing uses the org of the folder's workspace).
+// Null logo/color → the portal falls back to the neutral default.
 export async function resolvePortalBranding(
-  env: Env, identity: AccessIdentity,
+  env: Env, identity: AccessIdentity, workspaceId?: string,
 ): Promise<PortalBranding | null> {
   const { shareeIds } = await grantSubjects(env, identity);
   if (!shareeIds.length) return null;
   const row = await env.DB.prepare(
     `SELECT name, branding FROM sharees
-      WHERE id IN (${placeholders(shareeIds.length)}) ORDER BY created_at LIMIT 1`
-  ).bind(...shareeIds).first<{ name: string; branding: string | null }>();
+      WHERE id IN (${placeholders(shareeIds.length)})${workspaceId ? ' AND workspace_id = ?' : ''}
+      ORDER BY created_at LIMIT 1`
+  ).bind(...shareeIds, ...(workspaceId ? [workspaceId] : [])).first<{ name: string; branding: string | null }>();
   if (!row) return null;
-  let branding: { logo?: string; color?: string } = {};
-  if (row.branding) { try { branding = JSON.parse(row.branding); } catch { /* ignore */ } }
-  return { shareeName: row.name, logo: branding.logo ?? null, color: branding.color ?? null };
+  let branding: { logo?: unknown; color?: unknown } = {};
+  if (row.branding) { try { branding = JSON.parse(row.branding) || {}; } catch { /* ignore */ } }
+  return { shareeName: row.name, logo: safeLogo(branding.logo), color: safeColor(branding.color) };
 }

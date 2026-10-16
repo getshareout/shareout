@@ -115,6 +115,7 @@ export interface FolderAccessGrant {
   folder_id: string;
   folder_name: string;
   inherited: boolean;
+  expires_at: string | null;
 }
 
 export interface FolderAccess {
@@ -147,7 +148,7 @@ export async function queryFolderAccess(env: Env, workspaceId: string, folderId:
   const names = new Map(chain.map(f => [f.id, f.name]));
 
   const rows = (await env.DB.prepare(`
-    SELECT g.id, g.subject_type, g.capability, g.resource_id,
+    SELECT g.id, g.subject_type, g.capability, g.resource_id, g.expires_at,
            COALESCE(u.email, s.name, g.subject_id) AS subject_label
       FROM grants g
       LEFT JOIN users u ON g.subject_type = 'external_user' AND u.id = g.subject_id
@@ -156,7 +157,7 @@ export async function queryFolderAccess(env: Env, workspaceId: string, folderId:
        AND g.resource_id IN (${placeholders(chain.length)})
        AND (g.expires_at IS NULL OR g.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now'))
      ORDER BY g.created_at
-  `).bind(workspaceId, ...chain.map(f => f.id)).all<{ id: string; subject_type: string; capability: string; resource_id: string; subject_label: string }>()).results || [];
+  `).bind(workspaceId, ...chain.map(f => f.id)).all<{ id: string; subject_type: string; capability: string; resource_id: string; expires_at: string | null; subject_label: string }>()).results || [];
 
   const grants = rows.map(g => ({
     id: g.id,
@@ -166,6 +167,7 @@ export async function queryFolderAccess(env: Env, workspaceId: string, folderId:
     folder_id: g.resource_id,
     folder_name: names.get(g.resource_id) ?? '',
     inherited: g.resource_id !== folderId,
+    expires_at: g.expires_at ?? null,
   }));
   const own = chain[0].visibility || 'inherit';
   return {

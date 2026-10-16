@@ -219,7 +219,29 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     var mo = wsxModal(t('artifacts.access.title'), '<div class="wsx-cform" id="fa_body"></div>');
     var grantsBase = '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/grants';
     var pendingRevokes = {};
+    var activity = null;
     function refresh() { reloadFolders(render); }
+    function expiryNote(iso) {
+      var n = Math.ceil((Date.parse(iso) - Date.now()) / 86400000);
+      return n <= 1 ? t('folderPortal.expiresToday') : t('folderPortal.expiresIn').replace('{n}', String(n));
+    }
+    function activityHtml() {
+      if (!activity) return '<p class="wsx-field__note">\u2026</p>';
+      if (activity.err) return '<p class="wsx-field__note">' + esc(t('common.couldNotLoad')) + '</p>';
+      if (!activity.rows.length) return '<p class="wsx-field__note">' + esc(t('folderPortal.noActivity')) + '</p>';
+      return activity.rows.slice(0, 20).map(function (a) {
+        var verb = t('folderPortal.action.' + a.action) || a.action;
+        return '<div class="wsx-faccess__row wsx-faccess__act"><span class="wsx-faccess__who"><b>' + esc(a.user_email || '?') + '</b><em>' + esc(verb + ' ' + (a.resource_name || a.resource_id)) + ' \u00b7 ' + esc(adRelDate(a.created_at)) + '</em></span></div>';
+      }).join('');
+    }
+    function loadActivity() {
+      fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/folders/' + encodeURIComponent(fid) + '/activity', { credentials: 'same-origin' })
+        .then(okOr)
+        .then(function (r) { return r.json(); })
+        .then(function (j) { activity = { rows: (j && j.activity) || [] }; })
+        .catch(function () { activity = { rows: [], err: true }; })
+        .then(function () { var el = document.getElementById('fa_act'); if (el) el.innerHTML = activityHtml(); });
+    }
     function render() {
       var b = document.getElementById('fa_body'); if (!b) return;
       var d = artCache[artKey(artFilter, fid)], fa = d && d.folderAccess;
@@ -235,18 +257,29 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
       var gs = (fa.grants || []).filter(function (g) { return !pendingRevokes[g.id]; });
       html += '<div class="wsx-field__lbl">' + esc(t('artifacts.access.people')) + '</div>';
       html += gs.length ? gs.map(function (g) {
-        var meta = esc(g.capability === 'comment' ? t('assets.shareCapComment') : g.capability === 'view' ? t('assets.shareCapView') : g.capability) + (g.inherited ? ' \\u00b7 ' + esc(inheritedNote(g.folder_name)) : '');
+        var meta = esc(g.capability === 'comment' ? t('assets.shareCapComment') : g.capability === 'view' ? t('assets.shareCapView') : g.capability) + (g.inherited ? ' \\u00b7 ' + esc(inheritedNote(g.folder_name)) : '') + (g.expires_at ? ' \\u00b7 ' + esc(expiryNote(g.expires_at)) : '');
         var rm = can && !g.inherited ? '<button class="wsx-abtn" type="button" data-rv="' + escAttr(g.id) + '">' + esc(t('artifacts.access.remove')) + '</button>' : '';
         return '<div class="wsx-share-send wsx-faccess__row">' + personAvatar(g) + '<span class="wsx-faccess__who"><b>' + esc(g.subject_label) + '</b><em>' + meta + '</em></span>' + rm + '</div>';
       }).join('') : '<p class="wsx-field__note">' + esc(t('artifacts.access.nobody')) + '</p>';
       if (can) {
         html += fld(t('assets.shareEmail'), 'fa_email', 'alex@example.com', 'email')
           + '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('assets.shareAccess')) + '</span><select class="wsx-field__in" id="fa_cap"><option value="view">' + esc(t('assets.shareCapView')) + '</option><option value="comment">' + esc(t('assets.shareCapComment')) + '</option></select></label>'
+          + '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('folderPortal.expiry')) + '</span><select class="wsx-field__in" id="fa_exp">' + ['', '7', '30', '90', 'date'].map(function (v) { return '<option value="' + v + '">' + esc(t('folderPortal.expiry.' + (v || 'never'))) + '</option>'; }).join('') + '</select></label>'
+          + '<input class="wsx-field__in" id="fa_exp_date" type="date" hidden>'
           + '<div id="fa_msg" class="wsx-field__note"></div><div class="wsx-cform__foot"><button class="wsx-abtn wsx-abtn--primary" id="fa_go" type="button">' + esc(t('assets.shareSend')) + '</button></div>';
       } else {
         html += '<p class="wsx-field__note">' + esc(t('artifacts.access.readOnly')) + '</p>';
       }
+      if (gs.length) html += '<div class="wsx-cform__foot"><button class="wsx-abtn" id="fa_portal" type="button">' + esc(t('folderPortal.copyLink')) + '</button></div>';
+      if (can) html += '<div class="wsx-field__lbl">' + esc(t('folderPortal.activity')) + '</div><div id="fa_act">' + activityHtml() + '</div>';
       b.innerHTML = html;
+      var pl = document.getElementById('fa_portal');
+      if (pl) pl.addEventListener('click', function () {
+        var fail = function () { fToast(t('artifacts.couldNotCopy'), true); };
+        try { navigator.clipboard.writeText(location.origin + '/shared?folder=' + encodeURIComponent(fid)).then(function () { fToast(t('artifacts.linkCopied')); }, fail); } catch (e) { fail(); }
+      });
+      var expSel = document.getElementById('fa_exp'), expDate = document.getElementById('fa_exp_date');
+      if (expSel && expDate) expSel.addEventListener('change', function () { expDate.hidden = expSel.value !== 'date'; });
       var sel = document.getElementById('fa_vis');
       if (sel) sel.addEventListener('change', function () {
         var v = sel.value;
@@ -279,15 +312,23 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
       var go = document.getElementById('fa_go');
       if (go) go.addEventListener('click', function () {
         var email = cv('fa_email'), msg = document.getElementById('fa_msg'); if (!email || go.disabled) return;
+        var payload = { resource_type: 'folder', resource_id: fid, email: email, capability: cv('fa_cap') || 'view' };
+        var ev = cv('fa_exp');
+        if (ev === 'date') {
+          var dv = cv('fa_exp_date'), end = dv ? new Date(dv + 'T23:59:59') : null;
+          if (!end || isNaN(end.getTime())) { if (msg) msg.textContent = t('folderPortal.pickDate'); return; }
+          payload.expires_at = end.toISOString();
+        } else if (ev) payload.expires_in_days = Number(ev);
         var label = go.textContent; go.disabled = true; go.textContent = t('assets.sending');
-        fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/share-person', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resource_type: 'folder', resource_id: fid, email: email, capability: cv('fa_cap') || 'view' }) })
+        fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/share-person', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
           .then(okOr)
           .then(function () { fToast(t('artifacts.access.shared').replace('{email}', email)); refresh(); })
           .catch(function (e) { go.disabled = false; go.textContent = label; if (msg) msg.textContent = errReason(e, '') || t('assets.shareErr'); });
       });
     }
     render();
-    if (mo && !artCache[artKey(artFilter, fid)]) fetchArt(artFilter, render, fid);
+    if (artCache[artKey(artFilter, fid)] && artCache[artKey(artFilter, fid)].canEditFolder) loadActivity();
+    if (mo && !artCache[artKey(artFilter, fid)]) fetchArt(artFilter, function () { render(); var d = artCache[artKey(artFilter, fid)]; if (d && d.canEditFolder) loadActivity(); }, fid);
   };
   function folderNameModal(title, initial, action, go) {
     var mo = wsxModal(title, '<div class="wsx-cform">' + fld(t('artifacts.folderNameLabel'), 'fld_name', t('artifacts.folderNamePh')) + '<div class="wsx-cform__err" id="fld_err"></div><div class="wsx-cform__foot"><button class="wsx-abtn wsx-abtn--primary" id="fld_go" type="button">' + esc(action) + '</button></div></div>');

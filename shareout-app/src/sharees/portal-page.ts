@@ -7,13 +7,15 @@ import { getSessionUser } from '../auth/session';
 import { getVisibilityScope } from '../account-links';
 import { renderHtmlPage } from '../design-system/shell';
 import { escapeHtml } from '../html/utils';
-import { listGrantedArtifacts, listGrantedFiles, resolvePortalBranding } from './portal';
+import { listGrantedArtifacts, listGrantedFiles, resolvePortalBranding, resolvePortalFolder } from './portal';
 
 const PORTAL_STYLES = `
   .pt-wrap { max-width: 880px; margin: 0 auto; padding: var(--space-12) var(--space-6); }
   .pt-head { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-10); }
   .pt-logo { height: 40px; width: auto; border-radius: var(--radius-md); }
   .pt-title { font-size: var(--font-size-2xl); font-weight: 700; color: var(--color-text-primary); margin: 0; }
+  .pt-back { display: inline-block; margin-bottom: var(--space-4); color: var(--color-text-secondary); font-size: var(--font-size-sm); text-decoration: none; }
+  .pt-back:hover { color: var(--color-primary); }
   .pt-sub { color: var(--color-text-secondary); margin: var(--space-1) 0 0; font-size: var(--font-size-sm); }
   .pt-grid { display: grid; gap: var(--space-4); }
   .pt-card { display: block; padding: var(--space-5); border: 1px solid var(--color-border); border-radius: var(--radius-lg); text-decoration: none; transition: border-color .15s, box-shadow .15s; }
@@ -45,15 +47,25 @@ export async function handleSharedPortal(request: Request, env: Env): Promise<Re
   if (!user) return null; // caller redirects to login
 
   const identity = await getVisibilityScope(env, user);
-  const [artifacts, files, branding] = await Promise.all([
+  // ?folder=… is the client-portal landing for one shared folder: only that folder's
+  // subtree, branded by the person's org in the folder's workspace. An unknown or
+  // ungranted folder falls back to the full portal (no existence oracle).
+  const folderParam = new URL(request.url).searchParams.get('folder');
+  const folder = folderParam ? await resolvePortalFolder(env, identity, folderParam) : null;
+  const [allArtifacts, allFiles, branding] = await Promise.all([
     listGrantedArtifacts(env, identity),
     listGrantedFiles(env, identity),
-    resolvePortalBranding(env, identity),
+    resolvePortalBranding(env, identity, folder?.workspaceId),
   ]);
+  const inFolder = (fid: string | null) => !folder || (!!fid && folder.subtree.has(fid));
+  const artifacts = allArtifacts.filter(a => inFolder(a.folder_id));
+  const files = allFiles.filter(f => inFolder(f.folderId));
   const total = artifacts.length + files.length;
 
   const accent = branding?.color;
-  const headerTitle = branding?.shareeName ? `${branding.shareeName} · Shared with you` : 'Shared with you';
+  const scopeTitle = folder?.name || 'Shared with you';
+  const headerTitle = branding?.shareeName ? `${branding.shareeName} · ${scopeTitle}` : scopeTitle;
+  const back = folder ? '<a class="pt-back" href="/shared">&larr; Shared with you</a>' : '';
   const logo = branding?.logo
     ? `<img class="pt-logo" src="${escapeHtml(branding.logo)}" alt="${escapeHtml(branding.shareeName ?? '')}">`
     : '';
@@ -141,6 +153,7 @@ export async function handleSharedPortal(request: Request, env: Env): Promise<Re
 
   const body = `
     <div class="pt-wrap"${accent ? ` style="--color-primary: ${escapeHtml(accent)}"` : ''}>
+      ${back}
       <div class="pt-head">
         ${logo}
         <div>

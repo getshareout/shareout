@@ -1,0 +1,39 @@
+import type { HomeLocaleCopy } from '../types';
+
+/** Folder-as-client-portal: expiring person shares, portal link, folder activity. */
+export const CLIENT_PORTAL_COPY: HomeLocaleCopy = {
+  en: {
+    'folderPortal.expiry': 'Access ends',
+    'folderPortal.expiry.never': 'Never',
+    'folderPortal.expiry.7': 'In 7 days',
+    'folderPortal.expiry.30': 'In 30 days',
+    'folderPortal.expiry.90': 'In 90 days',
+    'folderPortal.expiry.date': 'On a date…',
+    'folderPortal.pickDate': 'Pick the date access ends.',
+    'folderPortal.expiresIn': 'expires in {n} days',
+    'folderPortal.expiresToday': 'expires today',
+    'folderPortal.copyLink': 'Copy client portal link',
+    'folderPortal.activity': 'Who opened what',
+    'folderPortal.noActivity': 'Nobody outside the workspace has opened anything here yet.',
+    'folderPortal.action.view': 'opened',
+    'folderPortal.action.comment': 'commented on',
+    'folderPortal.action.download': 'downloaded',
+  },
+  es: {
+    'folderPortal.expiry': 'El acceso termina',
+    'folderPortal.expiry.never': 'Nunca',
+    'folderPortal.expiry.7': 'En 7 días',
+    'folderPortal.expiry.30': 'En 30 días',
+    'folderPortal.expiry.90': 'En 90 días',
+    'folderPortal.expiry.date': 'En una fecha…',
+    'folderPortal.pickDate': 'Elegí la fecha en que termina el acceso.',
+    'folderPortal.expiresIn': 'vence en {n} días',
+    'folderPortal.expiresToday': 'vence hoy',
+    'folderPortal.copyLink': 'Copiar enlace del portal del cliente',
+    'folderPortal.activity': 'Quién abrió qué',
+    'folderPortal.noActivity': 'Nadie fuera del espacio abrió nada aquí todavía.',
+    'folderPortal.action.view': 'abrió',
+    'folderPortal.action.comment': 'comentó en',
+    'folderPortal.action.download': 'descargó',
+  },
+};

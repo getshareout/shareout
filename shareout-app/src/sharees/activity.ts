@@ -7,6 +7,7 @@ import type { AuthUser } from '../api-auth';
 import { generateId } from '../crypto-utils';
 import { json } from '../workspaces/json-response';
 import { requireWorkspaceRole } from '../workspaces/roles';
+import { requireFolderManager } from '../folders';
 
 interface ViewEvent {
   workspaceId: string;
@@ -88,4 +89,52 @@ export async function handleListShareeActivity(
   if (forbidden) return forbidden;
   const activity = await listShareeActivity(env, workspaceId, shareeId);
   return json({ activity });
+}
+
+export interface FolderActivityRow {
+  user_email: string | null;
+  resource_type: string;
+  resource_id: string;
+  resource_name: string | null;
+  action: string;
+  created_at: string;
+}
+
+// "Who opened what, when" for one folder: external activity on the folder itself and on
+// every artifact/file in its subtree (the same downward expansion the portal uses).
+export async function listFolderActivity(
+  env: Env, workspaceId: string, folderId: string, limit = 100,
+): Promise<FolderActivityRow[]> {
+  const { results } = await env.DB.prepare(`
+    WITH RECURSIVE sub(id) AS (
+      SELECT id FROM folders WHERE id = ? AND workspace_id = ?
+      UNION
+      SELECT f.id FROM folders f JOIN sub s ON f.parent_id = s.id
+    )
+    SELECT u.email AS user_email, a.resource_type, a.resource_id,
+           COALESCE(ar.name, ar.slug, d.name, fo.name) AS resource_name,
+           a.action, a.created_at
+      FROM sharee_activity a
+      LEFT JOIN users u ON u.id = a.user_id
+      LEFT JOIN artifacts ar ON a.resource_type = 'artifact' AND ar.id = a.resource_id
+      LEFT JOIN asset_deliverables d ON a.resource_type = 'file' AND d.id = a.resource_id
+      LEFT JOIN folders fo ON a.resource_type = 'folder' AND fo.id = a.resource_id
+     WHERE a.workspace_id = ?
+       AND ( (a.resource_type = 'artifact' AND ar.folder_id IN (SELECT id FROM sub))
+          OR (a.resource_type = 'file' AND d.folder_id IN (SELECT id FROM sub))
+          OR (a.resource_type = 'folder' AND a.resource_id IN (SELECT id FROM sub)) )
+     ORDER BY a.created_at DESC
+     LIMIT ?
+  `).bind(folderId, workspaceId, workspaceId, Math.min(limit, 500)).all<FolderActivityRow>();
+  return results || [];
+}
+
+// GET /v1/workspaces/{ws}/folders/{folder}/activity — folder managers only (admins, or the
+// folder's creator while members manage their own folders): the same gate as its grants.
+export async function handleListFolderActivity(
+  env: Env, user: AuthUser, workspaceId: string, folderId: string,
+): Promise<Response> {
+  const forbidden = await requireFolderManager(env, user, workspaceId, folderId);
+  if (forbidden) return forbidden;
+  return json({ activity: await listFolderActivity(env, workspaceId, folderId) });
 }
