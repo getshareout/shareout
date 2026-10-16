@@ -52,20 +52,15 @@ function roleFromRank(rank: number | null | undefined): BotWorkspace['role'] {
 }
 
 export async function getBotVisibilityScope(env: Env, userId: string): Promise<VisibilityScope> {
-  const user = await env.DB.prepare('SELECT email, identity_id FROM users WHERE id = ?')
-    .bind(userId)
-    .first<{ email: string | null; identity_id: string | null }>();
-  if (!user?.identity_id) {
-    return { userIds: [userId], emails: user?.email ? [user.email] : [] };
-  }
-
-  const rows = await env.DB.prepare('SELECT id, email FROM users WHERE identity_id = ?')
-    .bind(user.identity_id)
-    .all<{ id: string; email: string | null }>();
-  const userIds = rows.results.map((r) => r.id);
+  // One round trip: the user's row plus every row sharing its non-NULL identity_id.
+  const rows = (await env.DB.prepare(
+    'SELECT id, email FROM users WHERE id = ? OR identity_id = (SELECT identity_id FROM users WHERE id = ?)',
+  ).bind(userId, userId).all<{ id: string; email: string | null }>()).results || [];
+  const self = rows.find((r) => r.id === userId);
+  const userIds = rows.map((r) => r.id);
   if (!userIds.includes(userId)) userIds.unshift(userId);
-  const emails = rows.results.map((r) => r.email).filter((email): email is string => !!email);
-  if (user.email && !emails.includes(user.email)) emails.push(user.email);
+  const emails = rows.map((r) => r.email).filter((email): email is string => !!email);
+  if (self?.email && !emails.includes(self.email)) emails.push(self.email);
   return { userIds, emails };
 }
 
@@ -140,8 +135,8 @@ export async function resolveArtifactAccessForUser(
   };
 }
 
-export async function listWorkspacesForUser(env: Env, userId: string): Promise<BotWorkspace[]> {
-  const scope = await getBotVisibilityScope(env, userId);
+export async function listWorkspacesForUser(env: Env, userId: string, scopeArg?: VisibilityScope): Promise<BotWorkspace[]> {
+  const scope = scopeArg ?? await getBotVisibilityScope(env, userId);
   const idPh = placeholders(scope.userIds.length);
   const res = await env.DB.prepare(`
     SELECT w.id, w.name, w.slug,

@@ -1,5 +1,5 @@
 import type { Env } from '../types';
-import { placeholders } from '../account-links';
+import { placeholders, type VisibilityScope } from '../account-links';
 import { getBotVisibilityScope, listWorkspacesForUser, TELEGRAM_PERSONAL_WORKSPACE } from '../chat-agent/access';
 import { type WorkspaceSelection } from '../chat-platforms/types';
 
@@ -162,8 +162,9 @@ async function artifactCandidates(
   userId: string,
   workspaceId: WorkspaceSelection | undefined,
   q: string,
+  scopeP: Promise<VisibilityScope> = getBotVisibilityScope(env, userId),
 ): Promise<ArtifactCandidate[]> {
-  const scope = await getBotVisibilityScope(env, userId);
+  const scope = await scopeP;
   const idPh = placeholders(scope.userIds.length);
   const emailPh = placeholders(scope.emails.length);
 
@@ -173,12 +174,12 @@ async function artifactCandidates(
     scopeClause = `a.workspace_id IS NULL AND (a.owner_id IN (${idPh}) OR c.email IN (${emailPh}))`;
     scopeBinds = [...scope.userIds, ...scope.emails];
   } else if (workspaceId) {
-    const workspaces = await listWorkspacesForUser(env, userId);
+    const workspaces = await listWorkspacesForUser(env, userId, scope);
     if (!workspaces.some((w) => w.id === workspaceId)) return [];
     scopeClause = `a.workspace_id = ? AND (a.visibility != 'private' OR a.owner_id IN (${idPh}) OR c.email IN (${emailPh}))`;
     scopeBinds = [workspaceId, ...scope.userIds, ...scope.emails];
   } else {
-    const wsIds = (await listWorkspacesForUser(env, userId)).map((w) => w.id);
+    const wsIds = (await listWorkspacesForUser(env, userId, scope)).map((w) => w.id);
     const wsClause = wsIds.length
       ? ` OR (a.visibility = 'workspace' AND a.workspace_id IN (${placeholders(wsIds.length)}))`
       : '';
@@ -463,13 +464,15 @@ export async function quickSearch(env: Env, userId: string, opts: QuickSearchOpt
   const inWs = <T>(g: SearchGroup, run: () => Promise<T[]>): Promise<T[]> =>
     groups.has(g) && wsId ? run() : Promise.resolve([]);
   const needOwner = !wsId && (groups.has('schedules') || groups.has('alerts'));
-  const ownerIds = needOwner ? (await getBotVisibilityScope(env, userId)).userIds : [];
+  // Resolved once and shared by the artifact candidates and the owner-scoped groups.
+  const scopeP = groups.has('artifacts') || needOwner ? getBotVisibilityScope(env, userId) : null;
+  const ownerIds = needOwner && scopeP ? (await scopeP).userIds : [];
   const ownerScope: OwnerScope = { wsId, ownerIds };
   const withOwner = (g: SearchGroup, run: () => Promise<SearchHit[]>): Promise<SearchHit[]> =>
     groups.has(g) && (wsId || ownerIds.length) ? run() : Promise.resolve([]);
 
   const [artifacts, folders, datasets, connectors, people, schedules, crew, alerts, skills] = await Promise.all([
-    groups.has('artifacts') ? artifactCandidates(env, userId, opts.workspaceId, q).then((rows) => rankArtifacts(rows, q, limit)) : Promise.resolve([]),
+    groups.has('artifacts') ? artifactCandidates(env, userId, opts.workspaceId, q, scopeP ?? undefined).then((rows) => rankArtifacts(rows, q, limit)) : Promise.resolve([]),
     inWs('folders', () => rankFolders(env, wsId!, q, limit)),
     inWs('datasets', () => rankDatasets(env, wsId!, q, limit)),
     inWs('connectors', () => rankConnectors(env, wsId!, q, limit)),

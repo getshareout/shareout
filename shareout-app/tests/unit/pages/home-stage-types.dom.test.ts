@@ -32,45 +32,59 @@ function load(meta: Record<string, unknown> | null = null) {
     },
     set: (target, prop, value) => { target[prop as string] = value; return true; },
   });
-  const api = new Function('scope', `with (scope) {\n${tabsJs}\n; return { makeArtifactPane, panes: panes, syncTabMode, activate: function (k, r) { panes[k] = r; activeKey = k; } }; }`)(scope) as {
+  const api = new Function('scope', `with (scope) {\n${tabsJs}\n; return { makeArtifactPane, loadStage, panes: panes, syncTabMode, activate: function (k, r) { panes[k] = r; activeKey = k; } }; }`)(scope) as {
     makeArtifactPane: (a: Art) => Rec;
+    loadStage: (r: Rec) => void;
     panes: Record<string, Rec>;
     syncTabMode: () => void;
     activate: (k: string, r: Rec) => void;
   };
-  return { ...api, metaCalls };
+  // A pane's stage loads on first activation; `stage` builds a pane and activates it.
+  const stage = (a: Art) => { const r = api.makeArtifactPane(a); api.loadStage(r); return r; };
+  return { ...api, stage, metaCalls };
 }
 
 const art = (type?: string): Art => ({ key: 'k', id: 'art_1', slug: 'doc', name: 'Doc', ...(type !== undefined ? { type } : {}) });
 const editToggleHidden = () => (document.getElementById('wsxTabMode') as HTMLElement).hidden;
 
 describe('stage iframe by artifact type', () => {
+  it('builds a pane without loading its stage (restored background tabs stay idle)', () => {
+    const { makeArtifactPane, loadStage, metaCalls } = load({ id: 'art_1', artifact_type: 'html' });
+    const rec = makeArtifactPane(art());
+    expect(rec.iframe.getAttribute('src')).toBeNull();
+    expect(metaCalls).toEqual([]);
+    loadStage(rec);
+    loadStage(rec);
+    expect(metaCalls).toEqual(['doc']);
+    expect(rec.iframe.getAttribute('src')).toBe('/a/doc/?wsx=1');
+  });
+
   it('loads a PDF without a sandbox', () => {
-    const { makeArtifactPane } = load();
-    const rec = makeArtifactPane(art('pdf'));
+    const { stage } = load();
+    const rec = stage(art('pdf'));
     expect(rec.iframe.hasAttribute('sandbox')).toBe(false);
     expect(rec.iframe.getAttribute('src')).toBe('/a/doc/?wsx=1');
   });
 
   it('keeps HTML and Markdown stages sandboxed', () => {
-    const { makeArtifactPane } = load();
+    const { stage } = load();
     for (const type of ['html', 'markdown', 'image']) {
-      const rec = makeArtifactPane(art(type));
+      const rec = stage(art(type));
       expect(rec.iframe.getAttribute('sandbox'), type).toContain('allow-scripts');
     }
   });
 
   it('resolves an unknown type before the first load (tabs opened from links)', () => {
-    const { makeArtifactPane, metaCalls } = load({ id: 'art_1', artifact_type: 'pdf' });
-    const rec = makeArtifactPane(art());
+    const { stage, metaCalls } = load({ id: 'art_1', artifact_type: 'pdf' });
+    const rec = stage(art());
     expect(metaCalls).toEqual(['doc']);
     expect(rec.art.type).toBe('pdf');
     expect(rec.iframe.hasAttribute('sandbox')).toBe(false);
   });
 
   it('falls back to a sandboxed stage when the type cannot be resolved', () => {
-    const { makeArtifactPane } = load(null);
-    const rec = makeArtifactPane(art());
+    const { stage } = load(null);
+    const rec = stage(art());
     expect(rec.iframe.getAttribute('sandbox')).toContain('allow-scripts');
     expect(rec.iframe.getAttribute('src')).toBe('/a/doc/?wsx=1');
   });

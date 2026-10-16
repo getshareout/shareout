@@ -32,10 +32,16 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
     el.innerHTML = groups.length ? groups.map(function (g) { return evRow(g, dismissable); }).join('') : '<div class="wsx-empty">' + empty + '</div>';
   }
   // Two-surface feed: actionable Needs You (individual, dismissable) + aggregated Pulse.
+  // The first (boot) response is kept in feedBoot so the notifications bell primes its
+  // badge from it instead of issuing a second /v1/home/activity-feed at boot.
+  // (WSX_WIN is hoisted from inspector.ts but not yet assigned on this boot call.)
+  var feedBoot = null;
   function loadFeed() {
     var wsq = window.WSX_WS ? '&workspace=' + encodeURIComponent(window.WSX_WS) : '';
-    fetch('/v1/home/activity-feed?limit=50&window=' + WSX_WIN + wsq, { credentials: 'same-origin' })
-      .then(function (r) { return r.json(); })
+    var req = fetch('/v1/home/activity-feed?limit=50&window=' + (WSX_WIN || '7d') + wsq, { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); });
+    if (!feedBoot) feedBoot = req;
+    req
       .then(function (d) {
         needsEvents = (d && d.needs) || [];
         pulseEvents = (d && d.pulse) || [];

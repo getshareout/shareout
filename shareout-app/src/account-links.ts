@@ -23,27 +23,21 @@ export function placeholders(n: number): string {
   return n > 0 ? Array.from({ length: n }, () => '?').join(',') : 'NULL';
 }
 
+/** One round trip for the user's identity group: the row itself, plus every row sharing
+ *  its non-NULL identity_id (a NULL identity_id makes the subquery NULL, so only self). */
+const LINKED_GROUP_SQL = (cols: string, order = '') =>
+  `SELECT ${cols} FROM users WHERE id = ? OR identity_id = (SELECT identity_id FROM users WHERE id = ?)${order}`;
+
 export async function getLinkedUserIds(env: Env, userId: string): Promise<string[]> {
-  const row = await env.DB.prepare('SELECT identity_id FROM users WHERE id = ?')
-    .bind(userId).first<{ identity_id: string | null }>();
-  if (!row?.identity_id) return [userId];
-  const rows = await env.DB.prepare('SELECT id FROM users WHERE identity_id = ?')
-    .bind(row.identity_id).all<{ id: string }>();
+  const rows = await env.DB.prepare(LINKED_GROUP_SQL('id'))
+    .bind(userId, userId).all<{ id: string }>();
   const ids = (rows.results || []).map(r => r.id);
   return ids.includes(userId) ? ids : [userId, ...ids];
 }
 
 export async function getLinkedAccounts(env: Env, userId: string): Promise<LinkedAccount[]> {
-  const row = await env.DB.prepare('SELECT identity_id FROM users WHERE id = ?')
-    .bind(userId).first<{ identity_id: string | null }>();
-  const cols = 'id, email, name, picture';
-  if (!row?.identity_id) {
-    const self = await env.DB.prepare(`SELECT ${cols} FROM users WHERE id = ?`)
-      .bind(userId).first<Omit<LinkedAccount, 'is_current'>>();
-    return self ? [{ ...self, is_current: true }] : [];
-  }
-  const rows = await env.DB.prepare(`SELECT ${cols} FROM users WHERE identity_id = ? ORDER BY created_at ASC`)
-    .bind(row.identity_id).all<Omit<LinkedAccount, 'is_current'>>();
+  const rows = await env.DB.prepare(LINKED_GROUP_SQL('id, email, name, picture', ' ORDER BY created_at ASC'))
+    .bind(userId, userId).all<Omit<LinkedAccount, 'is_current'>>();
   return (rows.results || []).map(r => ({ ...r, is_current: r.id === userId }));
 }
 

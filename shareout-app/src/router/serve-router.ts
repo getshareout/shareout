@@ -254,10 +254,11 @@ export async function routeServe(ctx: FetchContext): Promise<Response | null> {
   }
 
   if (path === '/home') {
-    if (await needsSetup(env)) {
+    // Independent reads, one wave: the setup check still wins over the session.
+    const [setup, sessionUser] = await Promise.all([needsSetup(env), getSessionUser(request, env)]);
+    if (setup) {
       return Response.redirect(new URL('/setup', url.origin).toString(), 302);
     }
-    const sessionUser = await getSessionUser(request, env);
     if (!sessionUser) {
       // Same-origin login so a subdomain visitor returns to the subdomain's /home.
       // Keep the query (e.g. ?view=connect) so a deep link survives sign-in.

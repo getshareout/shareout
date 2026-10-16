@@ -15,8 +15,10 @@ import { escapeHtml } from '../html/utils';
 /** True while the instance has no users yet — the first-admin claim flow. */
 export async function needsSetup(env: Env): Promise<boolean> {
   try {
-    const row = await env.DB.prepare(`SELECT COUNT(*) AS n FROM users`).first<{ n: number }>();
-    return !row || Number(row.n) === 0;
+    // Existence, not a count: one indexed row read instead of scanning the users table
+    // (this runs before every /home first byte).
+    const row = await env.DB.prepare('SELECT 1 AS n FROM users LIMIT 1').first<{ n: number }>();
+    return !row;
   } catch {
     // Migrations not applied yet — still treat as setup needed.
     return true;

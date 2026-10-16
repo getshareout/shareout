@@ -104,17 +104,22 @@ export const workspace_client_command_palette_JS = `
 
     // ---- shared fetch with in-memory cache + prefetch ----
     // Cache lets the palette/dropdown paint instantly on open; the network refresh
-    // still runs and re-invokes cb, so results stay live. Recents are prewarmed at idle.
-    var cache = {};
+    // still runs and re-invokes cb, so results stay live. Recents are prewarmed on intent
+    // (search icon hover, input focus, a held Cmd/Ctrl), never at boot.
+    var cache = {}, inflight = {};
     function ckey(q, groups) { return (groups || '*') + '::' + (q || ''); }
     function fetchResults(q, groups, cb) {
       var k = ckey(q, groups);
       if (cache[k]) { cb(cache[k]); } // instant first paint
       var gq = groups ? '&groups=' + encodeURIComponent(groups) : '';
-      fetch('/v1/home/quick-search?q=' + encodeURIComponent(q) + wsq + gq + '&limit=6', { credentials: 'same-origin' })
-        .then(function (r) { return r.json(); })
-        .then(function (d) { cache[k] = d; cb(d); })
-        .catch(function () { if (!cache[k]) cb(null); });
+      // Callers asking for the same query while it is in flight share one request
+      // (e.g. the Cmd-key prewarm and the palette opening a moment later).
+      if (!inflight[k]) {
+        inflight[k] = fetch('/v1/home/quick-search?q=' + encodeURIComponent(q) + wsq + gq + '&limit=6', { credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (d) { cache[k] = d; delete inflight[k]; return d; }, function (e) { delete inflight[k]; throw e; });
+      }
+      inflight[k].then(function (d) { cb(d); }, function () { if (!cache[k]) cb(null); });
     }
     function collectHits(data, groups) {
       if (!data) return [];
@@ -126,7 +131,6 @@ export const workspace_client_command_palette_JS = `
     }
     var warmed = {};
     function prewarm(groups) { var g = groups || '*'; if (warmed[g]) return; warmed[g] = true; fetchResults('', groups || null, function () {}); }
-    if ('requestIdleCallback' in window) requestIdleCallback(function () { prewarm(); }, { timeout: 1500 }); else setTimeout(function () { prewarm(); }, 600);
 
     // =================== PALETTE ===================
     var pal = null, palInput = null, palList = null, palItems = [], palSel = -1, palTmr = null, palReqId = 0;
@@ -261,6 +265,7 @@ export const workspace_client_command_palette_JS = `
 
     // global hotkey
     document.addEventListener('keydown', function (e) {
+      if (e.key === 'Meta' || e.key === 'Control') { prewarm(); return; }
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); if (pal) closePalette(); else openPalette(); }
     });
     // let the header search icon (if present) open the palette
