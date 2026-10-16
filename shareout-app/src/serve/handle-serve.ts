@@ -17,6 +17,7 @@ import { badgeEnabled, injectBadge } from './badge';
 import { versionedBundlePath } from '../bundle-versions';
 import { localeForArtifactWorkspace } from '../i18n/locale';
 import { injectPageAgent, isSafePagePath, isSafeSectionId } from './page-agent';
+import { hasMcpCapability } from '../mcp-broker/capabilities';
 
 function injectCommentsAgent(resp: Response, baseUrl: string): Response {
   const tag = `<script src="${baseUrl}${versionedBundlePath('/sdk/comments-agent.js')}" defer></script>`;
@@ -278,6 +279,7 @@ export async function handleServe(
 
   // Gated bytes on the content domain must never enter a shared cache.
   const noStore = contentOrigin && !isOpen;
+  const lockCsp = hasMcpCapability(result.manifest_json);
 
   // Determine which entrypoint to use based on device detection
   const useMobile = !forceWeb && result.has_mobile && result.mobile_entrypoint &&
@@ -310,7 +312,7 @@ export async function handleServe(
     const filePath = original || result.entrypoint;
     const source = await fetchAssetRow(env, result.version_id, filePath);
     if (source) {
-      const resp = await serveAsset(request, env, source, slug, true, { noStore, relaxCsp: !isOpen });
+      const resp = await serveAsset(request, env, source, slug, true, { noStore, relaxCsp: !isOpen, lockCsp });
       const out = new Response(resp.body, resp);
       let filename = filePath.split('/').pop()!;
       if (assetPath !== 'download') { try { filename = decodeURIComponent(assetPath); } catch { /* keep entrypoint name */ } }
@@ -379,7 +381,7 @@ export async function handleServe(
       const variant = `${commentsEnabled ? 'cmt' : 'raw'}${showBadge ? '-b' : ''}`;
       return serveAsset(request, env, asset, slug, isRawRequest, {
         noStore,
-        relaxCsp: !isOpen,
+        relaxCsp: !isOpen, lockCsp,
         cacheHtml: true,
         cacheVariant: variant,
         transform: (resp) => {
@@ -396,7 +398,7 @@ export async function handleServe(
     // renders in the content frame, so it carries the page agent too (not edge-cached).
     return serveAsset(request, env, asset, slug, isRawRequest, {
       noStore,
-      relaxCsp: !isOpen,
+      relaxCsp: !isOpen, lockCsp,
       ...(asset.mime === 'text/html' && assetPath ? { transform: (resp: Response) => injectPageAgent(resp, pageAgent) } : {}),
     });
   }
@@ -409,7 +411,7 @@ export async function handleServe(
     `).bind(result.version_id).first<{ r2_key: string; mime: string; size_bytes: number }>();
 
     if (indexAsset) {
-      return serveAsset(request, env, indexAsset, slug, isRawRequest, { noStore, relaxCsp: !isOpen });
+      return serveAsset(request, env, indexAsset, slug, isRawRequest, { noStore, relaxCsp: !isOpen, lockCsp });
     }
   }
 

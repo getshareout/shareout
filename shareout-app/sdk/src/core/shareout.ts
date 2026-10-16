@@ -25,6 +25,7 @@ import { RealtimeDoc } from '../stores/realtime-doc';
 import { Dataset } from '../stores/dataset';
 import { Connection } from '../stores/connection';
 import { SecretsProxy } from '../stores/secrets-proxy';
+import { McpStore } from '../stores/mcp-store';
 import { CommentsStore } from '../stores/comments-store';
 import { SheetsStore } from '../stores/sheets-store';
 import { AgentStore } from '../stores/agent-store';
@@ -449,6 +450,11 @@ export class ShareOut {
 
   get secrets(): SecretsProxy {
     return new SecretsProxy(this);
+  }
+
+  /** The viewer's own workspace MCP connections this page declared at publish. */
+  get mcp(): McpStore {
+    return new McpStore(this);
   }
 
   // Workspace Library: import a private workspace/personal module by name, like a CDN

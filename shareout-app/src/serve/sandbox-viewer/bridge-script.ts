@@ -89,3 +89,36 @@ export function renderBridgeScript(
 })();
 </script>`;
 }
+
+/**
+ * Pages that declare MCP connections: hand the frame a short-lived broker token on
+ * request. The fetch rides this page's session cookie (same-origin), which the
+ * sandboxed frame can never send itself.
+ */
+export function renderMcpHostBridge(artifactId: string): string {
+  return `<script>
+(function() {
+  if (window.__shareoutMcpBridge) return;
+  window.__shareoutMcpBridge = true;
+  var id = ${JSON.stringify(artifactId)};
+  window.addEventListener('message', function(e) {
+    var iframe = document.querySelector('iframe');
+    if (!iframe || e.source !== iframe.contentWindow) return;
+    var d = e.data;
+    if (!d || d.type !== 'shareout:mcp-token-request') return;
+    function reply(msg) {
+      msg.type = 'shareout:mcp-token';
+      msg.requestId = d.requestId;
+      if (iframe.contentWindow) iframe.contentWindow.postMessage(msg, '*');
+    }
+    fetch('/v1/artifacts/' + encodeURIComponent(id) + '/mcp/token', { credentials: 'same-origin' })
+      .then(function(r) { return r.json().then(function(b) { return { ok: r.ok, body: b || {} }; }); })
+      .then(function(res) {
+        if (res.ok) reply({ token: res.body.token, expiresAt: res.body.expiresAt });
+        else reply({ token: null, code: res.body.code || 'UPSTREAM_ERROR', error: res.body.error || 'MCP token request failed' });
+      })
+      .catch(function() { reply({ token: null, code: 'UPSTREAM_ERROR', error: 'MCP token request failed' }); });
+  });
+})();
+</script>`;
+}

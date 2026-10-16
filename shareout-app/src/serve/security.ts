@@ -9,6 +9,10 @@ import { getCdnRegistrable, getPlatformHostname } from '../config/origins';
 export const SANDBOX_PERMISSIONS =
   'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads';
 
+// Pages that call viewers' MCP connections: window.open would be an egress channel
+// for that data, so popups are not granted.
+export const SANDBOX_PERMISSIONS_LOCKED = 'allow-scripts allow-forms allow-modals allow-downloads';
+
 // Single configured artifact-serving origin so moving to a dedicated content domain
 // (shareoutcdn.site) is a config flip, not a refactor (ADR 30).
 export function getArtifactOrigin(env: Env): string {
@@ -234,7 +238,7 @@ export function findBlockedOpenStyleHosts(externalStyleHosts: string[], env?: En
   return findBlockedOpenHosts(externalStyleHosts, new Set<string>(ALLOWED_ARTIFACT_STYLE_HOSTS), env);
 }
 
-export function getSandboxedCSP(artifactOrigin: string, relax = false, env?: Env): string {
+export function getSandboxedCSP(artifactOrigin: string, relax = false, env?: Env, lockEgress = false): string {
   // relax: private / authed-only artifacts (never reachable by anonymous visitors,
   // served no-store so never edge-cached). The public phishing/malware threat model
   // doesn't apply, so we let the owner load scripts, styles and fonts from any https
@@ -246,6 +250,11 @@ export function getSandboxedCSP(artifactOrigin: string, relax = false, env?: Env
   const platform = env ? getPlatformHostname(env) : null;
   const platformHttps = platform && platform !== 'localhost' ? ` https://${platform}` : '';
   const ancestors = env ? platformFrameAncestors(env) : "'self'";
+  // lockEgress: the page reads viewers' MCP connections. Libraries still load from the
+  // tight CDN list, but the page may only fetch, embed or beacon to its own origin and
+  // this platform, so connector data has no direct route off the page.
+  if (lockEgress) relax = false;
+  const ownOnly = `'self' ${artifactOrigin}${platformHttps}`;
   return [
     `default-src 'self' ${artifactOrigin} data: blob:`,
     relax
@@ -254,13 +263,13 @@ export function getSandboxedCSP(artifactOrigin: string, relax = false, env?: Env
     relax
       ? `style-src 'self' ${artifactOrigin} 'unsafe-inline' https:`
       : `style-src 'self' ${artifactOrigin} 'unsafe-inline' ${tightCdns}${platformHttps} https://fonts.googleapis.com https://api.fontshare.com http://localhost:55162 https://localhost:55162`,
-    "img-src 'self' data: blob: https:",
+    lockEgress ? `img-src ${ownOnly} data: blob:` : "img-src 'self' data: blob: https:",
     relax
       ? `font-src 'self' ${artifactOrigin} data: https:`
       : `font-src 'self' ${artifactOrigin} data: ${tightCdns} https://fonts.gstatic.com https://cdn.fontshare.com`,
-    "media-src 'self' blob: data: https:",
-    "connect-src 'self' https: http:",
-    "frame-src 'self' https: http:",
+    lockEgress ? `media-src ${ownOnly} blob: data:` : "media-src 'self' blob: data: https:",
+    lockEgress ? `connect-src ${ownOnly} http://localhost:55162` : "connect-src 'self' https: http:",
+    lockEgress ? `frame-src ${ownOnly}` : "frame-src 'self' https: http:",
     // Trusted shell frames this artifact from the platform apex / workspace subdomains.
     `frame-ancestors ${ancestors}`,
     "base-uri 'self'",

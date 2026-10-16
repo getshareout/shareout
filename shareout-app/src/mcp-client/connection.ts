@@ -9,7 +9,7 @@ import type { Env } from '../types';
 import { decryptCredentials } from '../data/connections/credentials';
 import { McpClientError } from './http';
 import { getMemberAccessToken, type McpConnectionConfig } from './oauth';
-import { listTools, openSession, type McpSession, type ToolInfo } from './transport';
+import { callTool, listTools, McpSessionExpiredError, openSession, type CallToolResult, type McpSession, type ToolInfo } from './transport';
 
 export const MCP_PROVIDER = 'mcp';
 
@@ -74,4 +74,31 @@ export async function refreshMcpTools(env: Env, conn: McpConnection, userId: str
   ).bind(JSON.stringify(config), conn.id).run();
   conn.config = config;
   return tools;
+}
+
+const SESSION_TTL_SECONDS = 10 * 60;
+const sessionKey = (conn: McpConnection, userId: string) => `mcp-sess:${conn.id}:${userId}`;
+
+/**
+ * Call one tool as this member, reusing the server session across requests so a
+ * dashboard does not pay initialize + initialized on every call.
+ */
+export async function callMemberTool(env: Env, conn: McpConnection, userId: string, tool: string, args: unknown): Promise<CallToolResult> {
+  const token = conn.config.auth === 'none' || !conn.config.oauth
+    ? null
+    : await getMemberAccessToken(env, conn.id, userId, conn.config.oauth, conn.clientSecret);
+  const kv = env.RATE_LIMIT_KV;
+  const cached = await kv?.get<{ sessionId?: string; protocolVersion: string }>(sessionKey(conn, userId), 'json');
+  if (cached) {
+    const session: McpSession = { serverUrl: conn.config.serverUrl, token, sessionId: cached.sessionId, protocolVersion: cached.protocolVersion, nextId: 1 };
+    try {
+      return await callTool(env, session, tool, args);
+    } catch (err) {
+      const stale = err instanceof McpSessionExpiredError || (err instanceof McpClientError && err.code === 'bad_response' && err.detail?.status === 400);
+      if (!stale) throw err;
+    }
+  }
+  const session = await openSession(env, conn.config.serverUrl, token);
+  await kv?.put(sessionKey(conn, userId), JSON.stringify({ sessionId: session.sessionId, protocolVersion: session.protocolVersion }), { expirationTtl: SESSION_TTL_SECONDS });
+  return callTool(env, session, tool, args);
 }

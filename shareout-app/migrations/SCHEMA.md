@@ -232,6 +232,7 @@ first. `kind` splits queryable data sources (`generic`) from OAuth app connectio
 | `workspace_shared_tables` | Exposes one artifact's table to the workspace under `shared_name` with an `access` level. |
 | `sheet_syncs` | Sheet binding: spreadsheet, sheet, target table, sync direction and schedule. Holds no credentials — the artifact's Sheets row in `connections` does. |
 | `sheets_sync_log` | Per-sync outcome: direction, status, rows affected, error. |
+| `artifact_mcp_consents` | A member's allow for one page to call one workspace MCP connection as them, bound to `capability_hash` (the page's declared connections + tools); a changed declaration asks again. |
 | `artifact_secrets` | Secret-proxy rule: which `allowed_hosts`/`allowed_methods`/`allowed_paths` a browser call may reach, and how the credential is injected. |
 | `artifact_secret_credentials` | The encrypted credential a proxy rule injects. |
 | `secret_audit_log` | Every proxied call: method, host, path, status, duration. |

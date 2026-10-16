@@ -22,6 +22,7 @@ import { handleProxy, handleProxyConfig } from '../proxy';
 import { handleEmail } from './email/handler';
 import { handleInbox } from './inbox/handler';
 import { handlePlatformRequest } from './platform';
+import { handleMcpBroker } from '../mcp-broker/broker';
 import { isFeatureEnabled, featureDisabledResponse } from '../features/flags';
 import { createLogger, logError } from '../logging';
 
@@ -271,6 +272,12 @@ async function handleDataRequestInner(
     if (artifactId === 'spike' && urlIsLoopback && isLocalRequest(request, urlHost)) {
       return handlePilotSpike(request, env, origin);
     }
+  }
+
+  // Viewer MCP broker authenticates with its own short-lived token only, so it runs
+  // before the data middleware (which would also accept the long-lived data token).
+  if (tier === 'mcp') {
+    return handleMcpBroker(request, env, artifactId, rest[0] ?? '', origin);
   }
 
   const ctx = await dataMiddleware(request, env, artifactId);

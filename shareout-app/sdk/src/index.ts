@@ -22,6 +22,8 @@ export type {
   PlatformExecuteResult,
 } from './stores/platform-store';
 export { PlatformStore, PlatformProvider } from './stores/platform-store';
+export { McpStore, McpError } from './stores/mcp-store';
+export type { McpConnectionState, McpToolInfo, McpToolResult } from './stores/mcp-store';
 
 export type {
   JsonEntry,
