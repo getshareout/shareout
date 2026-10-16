@@ -6,7 +6,7 @@
 // select now and puts it back if the server refuses.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { componentScripts } from '../../../src/design-system/components/index';
-import { workspace_client_home_views_admin_JS as adminJs } from '../../../src/pages/home/render-workspace/client-script/home-views/admin';
+import { workspace_client_home_views_adminCore_JS as adminCoreJs, workspace_client_home_views_admin_JS as adminJs } from '../../../src/pages/home/render-workspace/client-script/home-views/admin';
 
 let fetchMock: ReturnType<typeof vi.fn>;
 let deleteStatus = 200;
@@ -26,7 +26,7 @@ function load(): { adMembers: () => void } {
     apply: () => blackhole,
   });
   // Names admin.ts declares itself must resolve locally, not through the stub scope.
-  const local = new Set([...adminJs.matchAll(/(?:var|function)\s+([A-Za-z_$][\w$]*)/g)].map((m) => m[1]));
+  const local = new Set([...(adminCoreJs + adminJs).matchAll(/(?:var|function)\s+([A-Za-z_$][\w$]*)/g)].map((m) => m[1]));
   const scope = new Proxy({}, {
     has: (_t, p) => typeof p !== 'string' || !local.has(p),
     get: (_t, prop) => {
@@ -47,7 +47,7 @@ function load(): { adMembers: () => void } {
       return blackhole;
     },
   });
-  return new Function('scope', `with (scope) {\n${adminJs}\n; return { adMembers: adMembers }; }`)(scope);
+  return new Function('scope', `with (scope) {\n${adminCoreJs}\n${adminJs}\n; return { adMembers: adMembers }; }`)(scope);
 }
 
 const row = () => document.querySelector<HTMLElement>('[data-mem="u2"]');

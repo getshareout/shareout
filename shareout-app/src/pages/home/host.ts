@@ -3,11 +3,12 @@
  */
 import type { Env } from '../../types';
 import { parseSubdomainFromEnv } from '../../subdomain';
+import { timePhase } from '../../http/request-scope';
 
 export async function hostWorkspaceId(request: Request, env: Env): Promise<string | null> {
   const { isSubdomain, workspaceSlug } = parseSubdomainFromEnv(new URL(request.url).hostname, env);
   if (!isSubdomain || !workspaceSlug) return null;
-  const ws = await env.DB.prepare('SELECT id FROM workspaces WHERE slug = ?')
-    .bind(workspaceSlug).first<{ id: string }>();
+  const ws = await timePhase(env, 'host', () => env.DB.prepare('SELECT id FROM workspaces WHERE slug = ?')
+    .bind(workspaceSlug).first<{ id: string }>());
   return ws?.id || null;
 }

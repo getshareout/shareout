@@ -12,8 +12,8 @@ import { buildWorkspaceBody, canManageWorkspace } from './template';
 export { WORKSPACE_STYLES } from './styles';
 
 /**
- * SSR body + script for the workspace home shell. `scripts` is the whole inline bundle
- * (i18n, window.WSX_* globals, WORKSPACE_CLIENT). `bootScript` is only the per-request
+ * SSR body + script for the workspace home shell. `scripts` is the whole inline boot bundle
+ * (i18n, window.WSX_* globals, WORKSPACE_CLIENT; lazy lens chunks excluded). `bootScript` is only the per-request
  * globals (incl. WSX_LOCALE): the page inlines it and loads the static rest
  * (getStaticHomeI18nScript + WORKSPACE_CLIENT) as one cached file (shell-assets).
  */
@@ -26,7 +26,8 @@ export function buildWorkspaceView(args: RenderArgs): { body: string; scripts: s
   const globals = `window.WSX_WS=${JSON.stringify(wsParam)};window.WSX_SLUG=${JSON.stringify(wsSlug)};window.WSX_ADMIN=${canManage ? 'true' : 'false'};window.WSX_NAME=${JSON.stringify(firstName)};window.WSX_KNOWLEDGE_PAID=${args.wsKnowledgePaid ? 'true' : 'false'};window.WSX_INBOX_DOMAIN=${JSON.stringify(args.inboxDomain || '')};window.WSX_INSTANCE_ADMIN=${args.isInstanceAdmin ? 'true' : 'false'};window.WSX_ORIGIN=${JSON.stringify(args.platformOrigin || '')};window.WSX_SLIDES=${args.slidesImport ? 'true' : 'false'};\n`;
   return {
     body,
-    scripts: `${getHomeI18nScript(args.locale)}\n${globals}${WORKSPACE_CLIENT}`,
+    // Built on read: the page only uses bootScript, and this is ~1 MB of concatenation.
+    get scripts() { return `${getHomeI18nScript(args.locale)}\n${globals}${WORKSPACE_CLIENT}`; },
     bootScript: `window.WSX_LOCALE=${JSON.stringify(args.locale ?? null)};${globals}`,
   };
 }

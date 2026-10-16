@@ -19,6 +19,7 @@ import { blockDisabledMarketingPages } from '../marketing-us-gate';
 import { asGetForHead, stripBodyForHead, wrongMethodOnKnownPath } from './method-policy';
 import { routeMcp } from '../mcp';
 import { simpleApiError } from '../http/api-error';
+import { scopeRequest, timePhase, withServerTiming } from '../http/request-scope';
 
 // HTML document navigations get the styled 404 page; /v1 gets the JSON error envelope;
 // other data/asset requests keep the lightweight plain-text body.
@@ -90,6 +91,11 @@ function isReservedProductPath(path: string): boolean {
   );
 }
 
+// Routes that answer with Server-Timing (authenticated callers only; see request-scope).
+function isTimedPath(path: string): boolean {
+  return path === '/home' || path.startsWith('/v1/home/') || path === '/v1/artifacts' || path.startsWith('/v1/artifacts/');
+}
+
 export async function handleFetch(request: Request, env: Env, executionCtx?: ExecutionContext): Promise<Response> {
   const effectiveRequest = asGetForHead(request);
   let ctx = createFetchContext(effectiveRequest, env, executionCtx);
@@ -106,9 +112,17 @@ export async function handleFetch(request: Request, env: Env, executionCtx?: Exe
     return handleCdnContent(ctx.request, env, executionCtx);
   }
 
+  // Read requests get a per-request memo; the timed routes also meter D1/KV.
+  const scoped = scopeRequest(env, { memo: effectiveRequest.method === 'GET', timing: isTimedPath(ctx.path) });
+  return withServerTiming(scoped, await dispatch(request, { ...ctx, env: scoped }, executionCtx));
+}
+
+async function dispatch(request: Request, ctx: FetchContext, executionCtx?: ExecutionContext): Promise<Response> {
+  const env = ctx.env;
   const subCtx = parseSubdomainFromEnv(ctx.hostname, env);
   if (subCtx.isSubdomain && subCtx.workspaceSlug) {
-    const route = await resolveSubdomainRoute(ctx.request, env, subCtx.workspaceSlug, ctx.path, executionCtx);
+    const slug = subCtx.workspaceSlug;
+    const route = await timePhase(env, 'host', () => resolveSubdomainRoute(ctx.request, env, slug, ctx.path, executionCtx));
     if (route.response) return route.response;
     if (route.rewritePath) ctx = { ...rewriteContextPath(ctx, route.rewritePath), deployment: route.deployment };
     // Otherwise fall through to the shared pipeline unchanged.

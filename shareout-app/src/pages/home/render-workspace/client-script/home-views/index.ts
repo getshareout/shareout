@@ -8,23 +8,16 @@ import { workspace_client_home_views_schedules_JS } from './schedules';
 import { workspace_client_home_views_autoForms_JS } from './auto-forms';
 import { workspace_client_home_views_analytics_JS } from './analytics';
 import { workspace_client_home_views_datasets_JS } from './datasets';
-import { workspace_client_home_views_crew_JS } from './crew';
-import { workspace_client_home_views_library_JS } from './library';
 import { workspace_client_home_views_connectors_JS } from './connectors';
 import { workspace_client_home_views_connect_JS } from './connect';
-import { workspace_client_home_views_catalog_JS } from './catalog';
-import { workspace_client_home_views_knowledge_JS } from './knowledge';
-import { workspace_client_home_views_knowledgeMap_JS } from './knowledge-map';
 import { workspace_client_home_views_modalsForms_JS } from './modals-forms';
-import { workspace_client_home_views_admin_JS } from './admin';
-import { workspace_client_home_views_adminSupport_JS } from './admin-support';
+import { workspace_client_home_views_adminCore_JS } from './admin';
 import { workspace_client_home_views_invite_JS } from './invite';
-import { workspace_client_home_views_clients_JS } from './clients';
 import { workspace_client_home_views_assets_JS } from './assets';
 import { workspace_client_home_views_deliveries_JS } from './deliveries';
 import { workspace_client_home_views_lensRouting_JS } from './lens-routing';
 
-/** Full home-views client script (rail lenses: artifacts, schedules, admin, …). */
+/** Boot home-views script (rail lenses). Admin, Knowledge, Catalog, Crew, Library are lazy chunks. */
 export const workspace_client_home_views_JS = [
   workspace_client_home_views_artifactsBrowser_JS,
   workspace_client_home_views_cardActions_JS,
@@ -32,18 +25,11 @@ export const workspace_client_home_views_JS = [
   workspace_client_home_views_autoForms_JS,
   workspace_client_home_views_analytics_JS,
   workspace_client_home_views_datasets_JS,
-  workspace_client_home_views_crew_JS,
-  workspace_client_home_views_library_JS,
   workspace_client_home_views_connectors_JS,
   workspace_client_home_views_connect_JS,
-  workspace_client_home_views_catalog_JS,
-  workspace_client_home_views_knowledge_JS,
-  workspace_client_home_views_knowledgeMap_JS,
   workspace_client_home_views_modalsForms_JS,
-  workspace_client_home_views_admin_JS,
-  workspace_client_home_views_adminSupport_JS,
+  workspace_client_home_views_adminCore_JS,
   workspace_client_home_views_invite_JS,
-  workspace_client_home_views_clients_JS,
   workspace_client_home_views_assets_JS,
   workspace_client_home_views_deliveries_JS,
   workspace_client_home_views_lensRouting_JS,

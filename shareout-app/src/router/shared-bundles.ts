@@ -10,7 +10,7 @@ import { isSupportedSdkMajor } from '../sdk-version';
 import { handleServeLibModule } from '../workspace-library';
 import { handleServeVendorLib } from '../vendor-cdn/serve';
 import { isCurrentBundleVersion } from '../bundle-versions';
-import { HOME_SHELL_CSS, HOME_SHELL_JS, serveHomeShellAsset } from '../pages/home/shell-assets';
+import { isHomeShellAssetPath, serveHomeShellAsset } from '../pages/home/shell-assets';
 
 // Public, origin-independent SDK / static bundles. These resolve identically on the
 // app origin and on each per-artifact content host (<hex>.shareoutcdn.site), so
@@ -116,8 +116,8 @@ export function serveSharedBundle(
     return withEdgeCache(cacheKey, () => handleServeCommentsAgent(request, env, pinned), executionCtx);
   if (path === '/sdk/chat-core.js')
     return withEdgeCache(cacheKey, () => handleServeChatCore(request, env, pinned), executionCtx);
-  // Workspace home shell script + stylesheet (served from memory, see shell-assets).
-  if (path === HOME_SHELL_JS || path === HOME_SHELL_CSS)
+  // Workspace home shell script + stylesheet + lazy lens chunks (from memory, see shell-assets).
+  if (isHomeShellAssetPath(path))
     return serveHomeShellAsset(path, v).then(r => r ?? new Response('Not found', { status: 404 }));
   if (path === '/sdk/page-pilot.js')
     return withEdgeCache(path, () => handleServePagePilot(request, env), executionCtx);

@@ -1,4 +1,5 @@
 import type { Env } from './types';
+import { markAuthenticated, timePhase } from './http/request-scope';
 import { generateId } from './crypto-utils';
 import { signupsPaused, SIGNUPS_PAUSED_MSG } from './signup-gate';
 import { scheduleSeedStarterKit } from './starter-kit/schedule';
@@ -174,7 +175,10 @@ export async function validateToken(
   const memoized = tokenMemo.get(request);
   if (memoized) return memoized;
 
-  const pending = resolveToken(request, env);
+  const pending = timePhase(env, 'auth', () => resolveToken(request, env)).then((u) => {
+    if (u) markAuthenticated(env);
+    return u;
+  });
   tokenMemo.set(request, pending);
   return pending;
 }

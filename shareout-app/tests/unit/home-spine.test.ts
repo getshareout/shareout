@@ -3,6 +3,7 @@ import { queryNeedsYou, queryPulse, queryActivityFeed, queryActionItems, queryFo
 import { canRoleSee, defaultAudiences, resolveWorkspaceAudiences, EVENT_DEFS } from '../../src/pages/home/events';
 import { getUserProfile, setUserProfile, addFollow, removeFollow } from '../../src/users/user-profile';
 import { buildWorkspaceView, WORKSPACE_STYLES } from '../../src/pages/home/render-workspace';
+import { lazyChunkBody } from '../../src/pages/home/render-workspace/client-script/lazy-chunks';
 import { createWebReplyPort } from '../../src/chat-platforms/web/reply-port';
 import { CANVAS_TOOLS } from '../../src/chat-agent/tools/canvas';
 import { semanticSearchIds, semanticSearchArtifacts, indexArtifactVector, backfillVectors } from '../../src/search/semantic';
@@ -373,7 +374,10 @@ describe('buildWorkspaceView — Phase 1 shell SSR', () => {
   });
 
   it('edit-lite: tab-bar View/Edit toggle wires the editor draft/publish contract', () => {
-    const { body, scripts } = buildWorkspaceView(args);
+    const { body, scripts: shell } = buildWorkspaceView(args);
+    // Edit-Lite itself is the lazy `edit` chunk; the shell keeps the mode switch.
+    expect(shell).toContain('function setEditMode');
+    const scripts = shell + lazyChunkBody('edit');
     expect(scripts).toContain('wsx__editframe');                // separate edit iframe in the pane
     expect(body).toContain('id="wsxTabMode"');                  // View/Edit toggle lives in the tab bar
     expect(body).toContain('data-mode="edit"');

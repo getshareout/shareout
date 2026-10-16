@@ -13,6 +13,8 @@ import {
 } from '../../../src/pages/home/api';
 import { quickSearch } from '../../../src/search/quick-search';
 import { getVisibilityScope } from '../../../src/account-links';
+import { handleFetch } from '../../../src/router/handle-fetch';
+import { createSessionToken } from '../../../src/token';
 import type { Env } from '../../../src/types';
 
 type Row = Record<string, unknown>;
@@ -23,13 +25,14 @@ function wavesDb(handler: Handler) {
   const calls: string[] = [];
   const later = <T>(v: T) => new Promise<T>((res) => pending.push(() => res(v)));
   const DB = {
-    prepare: (sql: string) => ({
-      bind: (...args: unknown[]) => ({
+    prepare: (sql: string) => {
+      const stmt = (args: unknown[]) => ({
         first: () => { calls.push(sql); const r = handler(sql, args); return later(Array.isArray(r) ? (r[0] ?? null) : r); },
         all: () => { calls.push(sql); const r = handler(sql, args); return later({ results: Array.isArray(r) ? r : r ? [r] : [] }); },
         run: () => { calls.push(sql); return later({ success: true, meta: { changes: 1 } }); },
-      }),
-    }),
+      });
+      return { ...stmt([]), bind: (...args: unknown[]) => stmt(args) };
+    },
     batch: (stmts: unknown[]) => later(stmts.map(() => ({ success: true }))),
   };
   async function settle<T>(p: Promise<T>): Promise<{ out: T; waves: number }> {
@@ -48,7 +51,7 @@ function wavesDb(handler: Handler) {
     if (err) throw err;
     return { out, waves };
   }
-  return { env: { DB, SHAREOUT_BASE_URL: 'https://x.test' } as unknown as Env, calls, settle };
+  return { env: { DB, SHAREOUT_BASE_URL: 'https://x.test', SESSION_SECRET: 'test-session-secret' } as unknown as Env, calls, settle };
 }
 
 const alice = { id: 'usr_alice', email: 'alice@example.com' };
@@ -180,3 +183,38 @@ describe('linked-account scope', () => {
     expect(out).toEqual({ userIds: [alice.id, 'usr_alice2'], emails: [alice.email, 'alice@work.example.com'] });
   });
 });
+
+// Perf budget through the real router: session + host + handler, i.e. every D1 wave the
+// viewer waits for before the response. The Server-Timing header reports the same count.
+describe('perf budget: D1 waves per request through the router (workspace subdomain)', () => {
+  const routed = async (db: ReturnType<typeof wavesDb>, path: string) => {
+    const cookie = `shareout_session=${await createSessionToken(alice.id, alice.email, db.env)}`;
+    return handleFetch(new Request(`https://acme.x.test${path}`, { headers: { Cookie: cookie } }), db.env);
+  };
+  for (const [path, max] of [
+    ['/v1/home/activity-feed?limit=50&window=7d', 5],
+    ['/v1/home/for-you?limit=12', 4],
+    ['/v1/home/recent?limit=8', 4],
+    ['/v1/home/browser?sort=recent', 4],
+    ['/v1/home/quick-search?q=q3', 4],
+  ] as const) {
+    it(`${path.split('?')[0]}: at most ${max} waves`, async () => {
+      const db = wavesDb(handler({ isMember: true, role: 'member' }));
+      const { out, waves } = await db.settle(routed(db, path));
+      expect(out.status).toBe(200);
+      expect(waves).toBeLessThanOrEqual(max);
+      expect(out.headers.get('Server-Timing')).toContain(`waves`);
+    });
+  }
+
+  it('/home: one wave before the first byte, at most 4 more for the body', async () => {
+    const db = wavesDb((sql, args) => (sql.includes('AS n FROM users') ? { n: 1 } : handler({ isMember: true, role: 'member' })(sql, args)));
+    const { out, waves } = await db.settle(routed(db, '/home'));
+    expect(out.status).toBe(200);
+    expect(waves).toBeLessThanOrEqual(1);
+    expect(out.headers.get('Server-Timing')).toMatch(/auth;dur=\d+.*d1;desc="\d+ calls, \d+ waves"/);
+    const body = await db.settle(out.text());
+    expect(body.waves).toBeLessThanOrEqual(4);
+  });
+});
+

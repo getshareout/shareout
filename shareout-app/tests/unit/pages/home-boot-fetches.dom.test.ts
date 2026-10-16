@@ -8,6 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { componentScripts } from '../../../src/design-system/components/index';
 import { buildWorkspaceView } from '../../../src/pages/home/render-workspace';
+import { lazyChunkBody } from '../../../src/pages/home/render-workspace/client-script/lazy-chunks';
 import type { RenderArgs } from '../../../src/pages/home/types';
 
 const args = {
@@ -33,6 +34,8 @@ beforeEach(() => {
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const u = String(input instanceof Request ? input.url : input);
     urls.push(u.replace(/^https?:\/\/[^/]+/, ''));
+    const chunk = u.match(/\/sdk\/home-lens-([a-z]+)\.js/);
+    if (chunk) return new Response(lazyChunkBody(chunk[1]), { headers: { 'Content-Type': 'application/javascript' } });
     const body = u.includes('/v1/home/browser') ? { cardsHtml: '', rowsHtml: '', foldersHtml: FOLDERS, canManageFolders: false } : {};
     return new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
   });
@@ -65,6 +68,8 @@ describe('workspace home boot requests', () => {
     expect(count('/v1/home/for-you')).toBeLessThanOrEqual(1);
     const dupes = urls.filter((u, i) => u.startsWith('/v1/') && urls.indexOf(u) !== i);
     expect(dupes).toEqual([]);
+    // Lazy lens chunks (admin, knowledge, catalog, edit, …) are not part of boot.
+    expect(count('/sdk/home-lens-')).toBe(0);
   });
 
   it('restored background tabs do not load their stage iframes', async () => {

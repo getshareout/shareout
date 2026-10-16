@@ -2,6 +2,7 @@ import type { Env, WorkspaceRole } from '../types';
 import { publicShowcaseSlugs, isShowcaseSlug } from '../visibility-config';
 import { json } from './json-response';
 import { deferWork, kvCacheGet } from '../kv-cache';
+import { forgetRequestMemo, requestMemo } from '../http/request-scope';
 
 const ROLE_HIERARCHY: Record<WorkspaceRole, number> = { owner: 3, admin: 2, member: 1 };
 
@@ -28,6 +29,7 @@ export async function invalidateWorkspaceRole(
   workspaceId: string,
   userId: string
 ): Promise<void> {
+  forgetRequestMemo(env, wsInternalRoleCacheKey(workspaceId, userId));
   if (!env.SLUGS) return;
   try { await env.SLUGS.delete(wsRoleCacheKey(workspaceId, userId)); } catch { /* best-effort */ }
   try { await env.SLUGS.delete(wsInternalRoleCacheKey(workspaceId, userId)); } catch { /* best-effort */ }
@@ -61,12 +63,21 @@ export async function getWorkspaceRole(
 // to getWorkspaceRole but ignores external members: an external's workspace_members
 // row (member_class='external') must NEVER satisfy a workspace-visibility check or
 // promote to editor. getWorkspaceRole stays as-is for member-management LISTINGS.
-export async function getInternalWorkspaceRole(
+export function getInternalWorkspaceRole(
   env: Env,
   workspaceId: string,
   userId: string
 ): Promise<WorkspaceRole | null> {
   const cacheKey = wsInternalRoleCacheKey(workspaceId, userId);
+  return requestMemo(env, cacheKey, () => loadInternalWorkspaceRole(env, workspaceId, userId, cacheKey));
+}
+
+async function loadInternalWorkspaceRole(
+  env: Env,
+  workspaceId: string,
+  userId: string,
+  cacheKey: string,
+): Promise<WorkspaceRole | null> {
 
   if (env.SLUGS) {
     try {

@@ -1,7 +1,8 @@
 /** Admin lens — overview, members, security, settings. */
 import { colors } from '@shareout/design-tokens';
 
-export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overview / Artifacts / Members / Billing / Security / Settings -----
+/** Shared admin helpers (members, clients, invite, assets use them) + the tab bar. Stays in the boot shell. */
+export const workspace_client_home_views_adminCore_JS = `  // ----- Admin — Overview / Artifacts / Members / Billing / Security / Settings -----
   function wsUrl(suffix) { return '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + suffix; }
   var adminTab = 'overview';
   // Branded loading + busy-button affordances (design-system spinner).
@@ -66,7 +67,16 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
     return (n / 1000000).toFixed(1) + 'M';
   }
 
-  function adOverview() {
+  ws.querySelectorAll('[data-admin-tab]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      ws.querySelectorAll('[data-admin-tab]').forEach(function (x) { x.classList.remove('is-on'); });
+      b.classList.add('is-on'); adminTab = b.getAttribute('data-admin-tab'); loadAdmin();
+    });
+  });
+`;
+
+/** The admin lens views. Lazily loaded (lazy-chunks.ts); shares the shell scope. */
+export const workspace_client_home_views_admin_JS = `  function adOverview() {
     var m = document.getElementById('wsxAdminMount'); if (needWs(m)) return;
     var run = function () { return Promise.all([
       Promise.resolve(null), // no billing in this build — seat/plan data is gone
@@ -961,10 +971,4 @@ export const workspace_client_home_views_admin_JS = `  // ----- Admin — Overvi
     }, run);
   }
   function loadAdmin() { if (adminTab === 'intelligence') { location.hash = '#l/knowledge'; return; } var fn = { overview: adOverview, artifacts: adArtifacts, members: adMembers, clients: adClients, automation: adAutomation, ai: adAI, security: adSecurity, support: adSupport, settings: adSettings }[adminTab]; if (fn) fn(); }
-  ws.querySelectorAll('[data-admin-tab]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      ws.querySelectorAll('[data-admin-tab]').forEach(function (x) { x.classList.remove('is-on'); });
-      b.classList.add('is-on'); adminTab = b.getAttribute('data-admin-tab'); loadAdmin();
-    });
-  });
 `;

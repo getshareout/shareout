@@ -6,6 +6,7 @@ import { HOME_SHELL_CSS, HOME_SHELL_JS, homeShellUrls, serveHomeShellAsset } fro
 import { serveSharedBundle } from '../../../src/router/shared-bundles';
 import { WORKSPACE_CLIENT } from '../../../src/pages/home/render-workspace/client-script';
 import { WORKSPACE_STYLES } from '../../../src/pages/home/render-workspace/styles';
+import { LAZY_CHUNKS, lazyChunkBody } from '../../../src/pages/home/render-workspace/client-script/lazy-chunks';
 import type { Env } from '../../../src/types';
 
 /** Permissive D1 double: every read comes back empty. */
@@ -58,6 +59,33 @@ describe('home shell assets', () => {
     expect(html.indexOf('window.WSX_LOCALE=')).toBeGreaterThan(0);
     expect(html.indexOf(`<script src="${js}"></script>`)).toBeGreaterThan(html.indexOf('window.WSX_LOCALE='));
     expect(html).not.toContain(WORKSPACE_STYLES);
-    expect(html.length).toBeLessThan(200_000);
+    // Perf budget: the document stays under 200 KB.
+    expect(new TextEncoder().encode(html).length).toBeLessThan(200_000);
+  });
+
+  it('perf budget: the boot shell script stays under 720 KB (1,001 KB inlined before the lens split)', async () => {
+    const { js } = await homeShellUrls();
+    const text = await (await serveHomeShellAsset(HOME_SHELL_JS, new URL(js, 'https://x.test').searchParams.get('v')))!.text();
+    expect(new TextEncoder().encode(text).length).toBeLessThan(720_000);
+    for (const [name, c] of Object.entries(LAZY_CHUNKS)) expect(text.includes(c.src), `${name} is not in the boot shell`).toBe(false);
+  });
+
+  it('lazy lens chunks: the shell names their pinned URLs, served immutable on the /sdk/ rail', async () => {
+    const { js } = await homeShellUrls();
+    const shell = await (await serveHomeShellAsset(HOME_SHELL_JS, null))!.text();
+    const urls = JSON.parse(shell.match(/window\.WSX_CHUNKS=(\{[^\n]*\});/)![1]) as Record<string, string>;
+    expect(Object.keys(urls).sort()).toEqual(Object.keys(LAZY_CHUNKS).sort());
+    for (const [name, url] of Object.entries(urls)) {
+      const u = new URL(url, 'https://x.test');
+      const res = await (await serveSharedBundle(new Request(u), env, u.pathname))!;
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Cache-Control')).toContain('immutable');
+      expect(res.headers.get('Content-Type')).toContain('javascript');
+      expect(await res.text()).toBe(lazyChunkBody(name));
+    }
+    // The shell's own hash covers the chunk URLs, so a chunk change re-pins the shell.
+    expect(js).toMatch(/\?v=[0-9a-f]{12}$/);
+    const unknown = await serveSharedBundle(new Request('https://x.test/sdk/home-lens-nope.js'), env, '/sdk/home-lens-nope.js');
+    expect((await unknown!).status).toBe(404);
   });
 });

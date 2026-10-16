@@ -1,8 +1,8 @@
 // The History panel's line diff (inspector-history.ts) runs in the browser; evaluate the
 // fragment on its own and check the diff + collapsed-context output.
 import { describe, expect, it } from 'vitest';
-import { WORKSPACE_CLIENT } from '../../../src/pages/home/render-workspace/client-script/index';
-import { workspace_client_inspector_history_JS as HISTORY } from '../../../src/pages/home/render-workspace/client-script/inspector-history';
+import { lazyChunkBody } from '../../../src/pages/home/render-workspace/client-script/lazy-chunks';
+import { workspace_client_inspector_history_JS as HISTORY, workspace_client_inspector_history_core_JS as HISTORY_CORE } from '../../../src/pages/home/render-workspace/client-script/inspector-history';
 import { workspace_client_inspector_details_JS as DETAILS } from '../../../src/pages/home/render-workspace/client-script/inspector-details';
 
 type Op = [string, string];
@@ -15,9 +15,9 @@ const lib = new Function('esc', 't', `${HISTORY}; return { lineDiff, diffHtml };
 const lines = (n: number, f = (i: number) => `line ${i}`) => Array.from({ length: n }, (_, i) => f(i)).join('\n');
 
 describe('inspector history diff', () => {
-  it('is part of the workspace client and parses', () => {
-    expect(WORKSPACE_CLIENT).toContain('function renderHistory(art)');
-    expect(() => new Function(WORKSPACE_CLIENT)).not.toThrow();
+  it('ships as the lazy history chunk and parses', () => {
+    expect(lazyChunkBody('history')).toContain('function renderHistory(art)');
+    expect(() => new Function(lazyChunkBody('history'))).not.toThrow();
   });
 
   it('marks changed, added and removed lines only', () => {
@@ -55,7 +55,7 @@ describe('inspector history diff', () => {
 
 describe('version change notes', () => {
   const tt = (k: string) => ({ 'inspector.histAi': 'AI', 'inspector.liveChange': 'Updated {d}:' } as Record<string, string>)[k] ?? k;
-  const notes = new Function('esc', 't', 'tOr', 'adRelDate', `${HISTORY}; ${DETAILS}; return { histRow, liveChangeHtml };`)(
+  const notes = new Function('esc', 't', 'tOr', 'adRelDate', `${HISTORY_CORE}; ${HISTORY}; ${DETAILS}; return { histRow, liveChangeHtml };`)(
     esc, tt, (_k: string, d: string) => d, () => '2h ago',
   ) as { histRow: (v: object, prev: unknown, live: boolean, editable: boolean) => string; liveChangeHtml: (meta: object) => string };
 
