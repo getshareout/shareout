@@ -159,8 +159,8 @@ export async function addComment(
   const mentionsJson = mentions.length ? JSON.stringify(mentions) : null;
 
   await ctx.env.DB.prepare(
-    `INSERT INTO artifact_comments (id, artifact_id, context_id, parent_id, author_id, author_name, content, created_at, updated_at, position, state, mentions, assignee_user_id, assignee_email, due_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO artifact_comments (id, artifact_id, context_id, parent_id, author_id, author_name, content, created_at, updated_at, position, state, mentions, assignee_user_id, assignee_email, due_at, version_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT version_id FROM deployments WHERE artifact_id = ? AND channel = 'production'))`
   ).bind(
     id,
     ctx.artifactId,
@@ -177,6 +177,7 @@ export async function addComment(
     assigneeUserId,
     assigneeEmail,
     dueAt,
+    ctx.artifactId,
   ).run();
 
   const comment: Comment = {

@@ -245,6 +245,8 @@ erDiagram
     artifacts         ||--o{ artifact_comments : "annotated by"
     artifact_comments ||--o{ artifact_comments : "replies to"
     artifact_comments ||--o{ comment_reactions : "reacted to"
+    versions          ||--o{ artifact_comments : "written on"
+    versions          ||--o{ artifact_approvals : "approved as"
     artifacts         ||--o{ artifact_docs     : "has CRDT docs"
     artifact_docs     ||--o{ artifact_doc_updates : "streams"
     artifacts         ||--o{ editor_sessions   : "edited in"
@@ -252,7 +254,8 @@ erDiagram
 
 | Table | Holds |
 |---|---|
-| `artifact_comments` | Threaded via self-referencing `parent_id`. `position` anchors a comment to a spot in the page; `context_id` scopes it to a sub-view. Doubles as a task: `assignee_user_id`/`assignee_email`/`due_at`. `author_type` distinguishes human, agent, and anonymous authors. |
+| `artifact_comments` | Threaded via self-referencing `parent_id`. `position` anchors a comment to a spot in the page; `context_id` scopes it to a sub-view. Doubles as a task: `assignee_user_id`/`assignee_email`/`due_at`. `author_type` distinguishes human, agent, and anonymous authors. `version_id` is the version that was live when it was written (null on older comments). |
+| `artifact_approvals` | Who approved which version of an artifact (one row per version and user). A record, not a publish gate. |
 | `comment_reactions` | Emoji reactions. |
 | `comment_reads` | Per-user `last_read_at` for unread badges. |
 | `artifact_docs` | CRDT documents for real-time collaboration. `snapshot`/`snapshot_sv` are Yjs binary blobs. |

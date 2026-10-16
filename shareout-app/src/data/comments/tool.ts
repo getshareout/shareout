@@ -44,10 +44,10 @@ export async function createCommentForTool(
   const mentionsJson = mentions.length ? JSON.stringify(mentions) : null;
 
   await ctx.env.DB.prepare(
-    `INSERT INTO artifact_comments (id, artifact_id, context_id, parent_id, author_id, author_name, content, created_at, updated_at, position, state, mentions, author_type, assignee_user_id, assignee_email, due_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, 'agent', ?, ?, ?)`
+    `INSERT INTO artifact_comments (id, artifact_id, context_id, parent_id, author_id, author_name, content, created_at, updated_at, position, state, mentions, author_type, assignee_user_id, assignee_email, due_at, version_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, 'agent', ?, ?, ?, (SELECT version_id FROM deployments WHERE artifact_id = ? AND channel = 'production'))`
   )
-    .bind(id, ctx.artifactId, body.contextId || null, body.parentId || null, author.id, author.name, body.content, now, now, mentionsJson, assigneeUserId, assigneeEmail, dueAt)
+    .bind(id, ctx.artifactId, body.contextId || null, body.parentId || null, author.id, author.name, body.content, now, now, mentionsJson, assigneeUserId, assigneeEmail, dueAt, ctx.artifactId)
     .run();
 
   const comment: Comment = {

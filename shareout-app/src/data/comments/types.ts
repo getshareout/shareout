@@ -41,6 +41,8 @@ export interface Comment {
   assigneeUserId: string | null;
   assigneeEmail: string | null;
   dueAt: string | null;
+  /** Version live when the comment was written; null on comments that predate anchoring. */
+  versionId?: string | null;
   reactions?: Record<string, { count: number; mine: boolean }>;
 }
 
@@ -64,6 +66,7 @@ export interface CommentRow {
   assignee_user_id?: string | null;
   assignee_email?: string | null;
   due_at?: string | null;
+  version_id?: string | null;
 }
 
 /** Per-artifact comments feature configuration. */

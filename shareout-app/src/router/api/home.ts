@@ -3,6 +3,7 @@ import { handleHomeEventVisibilityGetApi, handleHomeEventVisibilitySetApi } from
 import { handleOnboardingGetApi, handleOnboardingDismissApi, handleOnboardingSkillAckApi, handleOnboardingCelebrateApi } from '../../onboarding/api';
 import { handleHomeNewArtifactApi } from '../../pages/home/new-artifact';
 import { handleHomeImportApi } from '../../pages/home/import';
+import { handleHomeReviewGetApi, handleHomeCommentResolveApi, handleHomeCommentAssignApi, handleHomeApprovalApi } from '../../pages/home/review-api';
 import type { FetchContext } from '../context';
 import { isAuthUser, requireAuthUser } from '../helpers/auth-guard';
 
@@ -141,6 +142,18 @@ export async function routeHomeApi(ctx: FetchContext): Promise<Response | null> 
     const user = await requireAuthUser(ctx);
     if (!isAuthUser(user)) return user;
     return addCORS(await handleHomeCommentPostApi(request, env, user));
+  }
+
+  const review = path === '/v1/home/review' && request.method === 'GET' ? handleHomeReviewGetApi
+    : request.method !== 'POST' ? null
+    : path === '/v1/home/comments/resolve' ? handleHomeCommentResolveApi
+    : path === '/v1/home/comments/assign' ? handleHomeCommentAssignApi
+    : path === '/v1/home/approvals' ? handleHomeApprovalApi
+    : null;
+  if (review) {
+    const user = await requireAuthUser(ctx);
+    if (!isAuthUser(user)) return user;
+    return addCORS(await review(request, env, user));
   }
 
   if (path === '/v1/home/profile' && request.method === 'GET') {

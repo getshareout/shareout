@@ -135,6 +135,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       + (canMoveToAssets(meta) ? iconBtn('toassets', t('move.toAssets'), SVG_TO_ASSETS) : '')
       + (meta && meta.can_delete ? iconBtn('trash', t('inspector.act.trash'), SVG_TRASH, 'is-danger') : '')
       + '</div>';
+    h += '<div class="wsx-det__sec wsx-det__approval" id="wsxApprove" hidden></div>';
 
     // Section bodies, keyed; rendered in the user's saved order.
     var secBody = {
@@ -169,6 +170,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     h += '</div>';
     rbodyEl.innerHTML = h;
     var root = rbodyEl.querySelector('.wsx__details');
+    paintApprovals(art);
 
     // inline edits — click to type, Enter to save, blur to autosave
     var enterSaves = function (el) { el.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); } }); };
@@ -626,8 +628,8 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     return '<div class="wsx-cm__row">'
       + '<div class="wsx-cm__top">' + cmAvatar(who) + '<span class="wsx-cm__who">' + esc(who) + '</span>' + agent + '<span class="wsx-cm__ago">' + timeAgo(ts) + '</span></div>'
       + pin
-      + '<div class="wsx-cm__body">' + cmBody(c.content) + '</div>' + done
-      + '<button class="wsx-cm__reply" data-reply="' + esc(c.id) + '" type="button">' + esc(t('inspector.reply')) + '</button>'
+      + '<div class="wsx-cm__body">' + cmBody(c.content) + '</div>' + done + (c.parent_id ? '' : cmReviewMeta(c))
+      + '<button class="wsx-cm__reply" data-reply="' + esc(c.id) + '" type="button">' + esc(t('inspector.reply')) + '</button>' + (c.parent_id ? '' : cmReviewActs(c))
       + (kids ? '<div class="wsx-cm__kids">' + kids + '</div>' : '')
       + '</div>';
   }
@@ -765,9 +767,11 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   function paintComments(art, comments) {
     var byParent = {};
     comments.forEach(function (c) { if (c.parent_id) { (byParent[c.parent_id] = byParent[c.parent_id] || []).push(c); } });
-    var roots = comments.filter(function (c) { return !c.parent_id; });
-    var listH = roots.length ? roots.map(function (c) { return cmNode(c, byParent); }).join('') : '<div class="wsx-cm__empty">' + esc(t('inspector.noComments')) + '</div>';
-    rbodyEl.innerHTML = '<div class="wsx-cm"><div class="wsx-cm__list" id="wsxCmList">' + listH + '</div>' + composerHTML(false) + '</div>';
+    ensureReview(art);
+    var allRoots = comments.filter(function (c) { return !c.parent_id; }), roots = cmFilterRoots(allRoots);
+    var listH = roots.length ? roots.map(function (c) { return cmNode(c, byParent); }).join('') : '<div class="wsx-cm__empty">' + esc(t(allRoots.length ? 'review.noOpen' : 'inspector.noComments')) + '</div>';
+    rbodyEl.innerHTML = '<div class="wsx-cm">' + (allRoots.length ? cmFilterBar(allRoots) : '') + '<div class="wsx-cm__list" id="wsxCmList">' + listH + '</div>' + composerHTML(false) + '</div>';
+    wireReview(art);
     var listEl = document.getElementById('wsxCmList'); if (listEl) listEl.scrollTop = listEl.scrollHeight;
     getCmData(art, function () {}); // warm mention cache
     var mainCc = rbodyEl.querySelector('.wsx-cm > .wsx-cc');
