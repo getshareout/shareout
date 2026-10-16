@@ -42,8 +42,8 @@ describe('tables/filter-sql', () => {
     expect(filterToSql({ done: true }).params).toEqual([1]);
     expect(filterToSql({ done: { $eq: false } }).params).toEqual([0]);
     expect(filterToSql({ done: { $ne: true } }).params).toEqual([1]);
-    expect(filterToSql({ done: { $in: [true, false] } }).params).toEqual([1, 0]);
-    expect(filterToSql({ done: { $nin: [true] } }).params).toEqual([1]);
+    expect(filterToSql({ done: { $in: [true, false] } }).params).toEqual(['[1,0]']);
+    expect(filterToSql({ done: { $nin: [true] } }).params).toEqual(['[1]']);
   });
 
   it('compiles operator objects', () => {
@@ -58,9 +58,9 @@ describe('tables/filter-sql', () => {
       tag: { $in: ['a', 'b'] },
       name: { $contains: 'foo' },
     });
-    expect(sql).toContain('IN (?, ?)');
+    expect(sql).toContain('IN (SELECT value FROM json_each(?))');
     expect(sql).toContain('LIKE ?');
-    expect(params).toEqual(['a', 'b', '%foo%']);
+    expect(params).toEqual(['["a","b"]', '%foo%']);
   });
 
   it('handles null field values', () => {
@@ -83,7 +83,7 @@ describe('tables/scope', () => {
   it('builds IN clause for scoped viewers', () => {
     const clause = buildScopeClause({ field: 'ownerId', values: ['u1', 'u2'] });
     expect(clause.sql).toContain('json_extract');
-    expect(clause.sql).toContain('IN (?, ?)');
-    expect(clause.params).toEqual(['u1', 'u2']);
+    expect(clause.sql).toContain('IN (SELECT value FROM json_each(?))');
+    expect(clause.params).toEqual(['["u1","u2"]']);
   });
 });

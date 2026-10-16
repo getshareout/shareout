@@ -6,6 +6,7 @@
 import type { Env } from '../types';
 import { canAccess, type AccessIdentity } from '../access/can-access';
 import { placeholders } from '../account-links';
+import { JSON_IN, jsonList } from '../sql-in';
 
 export interface GrantedArtifact {
   id: string;
@@ -75,7 +76,7 @@ export async function listGrantedArtifacts(
   // Expand granted folders to their whole subtree, then union direct artifact grants.
   const { results } = await env.DB.prepare(
     `WITH RECURSIVE sub(id) AS (
-        SELECT id FROM folders WHERE id IN (${placeholders(folderIds.length)})
+        SELECT id FROM folders WHERE id IN ${JSON_IN}
         UNION
         SELECT f.id FROM folders f JOIN sub s ON f.parent_id = s.id
       )
@@ -83,10 +84,10 @@ export async function listGrantedArtifacts(
         FROM artifacts a
         LEFT JOIN workspaces w ON w.id = a.workspace_id
        WHERE a.deleted_at IS NULL
-         AND ( a.id IN (${placeholders(artifactIds.length)})
+         AND ( a.id IN ${JSON_IN}
             OR a.folder_id IN (SELECT id FROM sub) )
        ORDER BY a.name`
-  ).bind(...folderIds, ...artifactIds).all<GrantedArtifact>();
+  ).bind(jsonList(folderIds), jsonList(artifactIds)).all<GrantedArtifact>();
   return results || [];
 }
 
@@ -115,7 +116,7 @@ export async function listGrantedFiles(
 
   const { results } = await env.DB.prepare(
     `WITH RECURSIVE sub(id) AS (
-        SELECT id FROM folders WHERE id IN (${placeholders(folderIds.length)})
+        SELECT id FROM folders WHERE id IN ${JSON_IN}
         UNION
         SELECT f.id FROM folders f JOIN sub s ON f.parent_id = s.id
       )
@@ -126,10 +127,10 @@ export async function listGrantedFiles(
           AND b.version_no = (SELECT MAX(version_no) FROM blobs WHERE deliverable_id = d.id)
         LEFT JOIN workspaces w ON w.id = d.workspace_id
        WHERE d.deleted_at IS NULL
-         AND ( d.id IN (${placeholders(fileIds.length)})
+         AND ( d.id IN ${JSON_IN}
             OR (d.folder_id IN (SELECT id FROM sub) AND d.visibility NOT IN ('private', 'team')) )
        ORDER BY d.name`
-  ).bind(...folderIds, ...fileIds).all<{
+  ).bind(jsonList(folderIds), jsonList(fileIds)).all<{
     id: string; name: string; bucket_artifact_id: string; folder_id: string | null; workspace_id: string | null;
     workspace_name: string | null; blob_id: string; filename: string; mime_type: string; size_bytes: number;
   }>();

@@ -259,7 +259,7 @@ export function createCommentsDb(initial?: {
 
           if (sql.includes('FROM comment_reactions')) {
             const viewerId = args[0] as string;
-            const ids = args.slice(1) as string[];
+            const ids = JSON.parse(args[1] as string) as string[];
             const groups = new Map<string, { count: number; mine: number }>();
             for (const r of reactions) {
               if (!ids.includes(r.comment_id)) continue;

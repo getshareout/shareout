@@ -202,7 +202,17 @@ export async function listJobs(env: Env, userId: string, artifactId?: string, wo
   }));
 }
 
-/** Owner/editor sees all jobs on the artifact; others see only their own. */
+/** A job that delivers only to its own creator (Slack DM, own email, own linked Telegram):
+ *  the self-delivery shapes checkViewerSelfDelivery allows. Private to that person. */
+const PERSONAL_DELIVERY_SQL = `COALESCE(
+  (sj.action = 'slack' AND json_extract(sj.config, '$.targetType') = 'dm')
+  OR (sj.action = 'telegram' AND json_extract(sj.config, '$.chatId') IS NULL)
+  OR (sj.action = 'email' AND json_array_length(sj.config, '$.recipients') = 1
+      AND lower(json_extract(sj.config, '$.recipients[0]')) = lower((SELECT email FROM users WHERE id = sj.owner_id)))
+, 0)`;
+
+/** Owner/editor sees every shared job on the artifact plus their own personal deliveries;
+ *  other people's DM subscriptions stay hidden. Everyone else sees only their own jobs. */
 export async function listJobsForArtifact(
   env: Env,
   artifactId: string,
@@ -212,9 +222,9 @@ export async function listJobsForArtifact(
   const canManageAll = role === 'owner' || role === 'editor';
 
   const query = canManageAll
-    ? 'SELECT * FROM scheduled_jobs WHERE artifact_id = ? ORDER BY created_at DESC'
+    ? `SELECT sj.* FROM scheduled_jobs sj WHERE sj.artifact_id = ? AND (sj.owner_id = ? OR NOT ${PERSONAL_DELIVERY_SQL}) ORDER BY sj.created_at DESC`
     : 'SELECT * FROM scheduled_jobs WHERE artifact_id = ? AND owner_id = ? ORDER BY created_at DESC';
-  const params = canManageAll ? [artifactId] : [artifactId, requesterId];
+  const params = [artifactId, requesterId];
 
   const result = await env.DB.prepare(query).bind(...params).all<ScheduledJob>();
   return (result.results || []).map(job => ({

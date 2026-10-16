@@ -230,8 +230,8 @@ describe('table read enforcement', () => {
 
     const select = captured.find((c) => c.sql.includes('SELECT r.data FROM artifact_rows'));
     expect(select).toBeDefined();
-    expect(select!.sql).toContain("json_extract(data, '$.company_id') IN (?, ?)");
-    expect(select!.params).toEqual(['art_1', 'sales', 1, 2, 100, 0]);
+    expect(select!.sql).toContain("json_extract(data, '$.company_id') IN (SELECT value FROM json_each(?))");
+    expect(select!.params).toEqual(['art_1', 'sales', '[1,2]', 100, 0]);
   });
 
   it('intersects with a client filter (both clauses AND-ed)', async () => {
@@ -241,8 +241,8 @@ describe('table read enforcement', () => {
 
     const select = captured.find((c) => c.sql.includes('SELECT r.data FROM artifact_rows'));
     expect(select!.sql).toContain("json_extract(data, '$.region') = ?");
-    expect(select!.sql).toContain("json_extract(data, '$.company_id') IN (?)");
-    expect(select!.params).toEqual(['art_1', 'sales', 'EU', 3, 100, 0]);
+    expect(select!.sql).toContain("json_extract(data, '$.company_id') IN (SELECT value FROM json_each(?))");
+    expect(select!.params).toEqual(['art_1', 'sales', 'EU', '[3]', 100, 0]);
   });
 
   it('emits a deny-all (1=0) clause for an empty scope', async () => {
@@ -273,8 +273,8 @@ describe('table read enforcement', () => {
       'sales/row_9'
     );
     const get = captured.find((c) => c.sql.includes('SELECT r.data FROM artifact_rows') && c.sql.includes('AND r.id = ?'));
-    expect(get!.sql).toContain("json_extract(data, '$.company_id') IN (?)");
-    expect(get!.params).toEqual(['art_1', 'sales', 'row_9', 3]);
+    expect(get!.sql).toContain("json_extract(data, '$.company_id') IN (SELECT value FROM json_each(?))");
+    expect(get!.params).toEqual(['art_1', 'sales', 'row_9', '[3]']);
     expect(res.status).toBe(404); // mock returns no row → not found
   });
 
@@ -287,8 +287,8 @@ describe('table read enforcement', () => {
       'sales/row_9'
     );
     const del = captured.find((c) => c.sql.includes('DELETE FROM artifact_rows WHERE table_id = (SELECT id') && c.sql.includes('RETURNING id'));
-    expect(del!.sql).toContain("json_extract(data, '$.company_id') IN (?)");
-    expect(del!.params).toEqual(['art_1', 'sales', 'row_9', 3]);
+    expect(del!.sql).toContain("json_extract(data, '$.company_id') IN (SELECT value FROM json_each(?))");
+    expect(del!.params).toEqual(['art_1', 'sales', 'row_9', '[3]']);
   });
 
   it('scopes filter-based delete to the viewer rows only', async () => {
@@ -304,8 +304,8 @@ describe('table read enforcement', () => {
     );
     const del = captured.find((c) => c.sql.startsWith('DELETE FROM artifact_rows WHERE table_id = (SELECT id') && !c.sql.includes('RETURNING') && c.sql.includes('json_extract'));
     expect(del!.sql).toContain("json_extract(data, '$.month') = ?");
-    expect(del!.sql).toContain("json_extract(data, '$.company_id') IN (?)");
-    expect(del!.params).toEqual(['art_1', 'sales', '2026-05', 3]);
+    expect(del!.sql).toContain("json_extract(data, '$.company_id') IN (SELECT value FROM json_each(?))");
+    expect(del!.params).toEqual(['art_1', 'sales', '2026-05', '[3]']);
   });
 
   it('scopes filter-based update to the viewer rows only', async () => {
@@ -320,7 +320,7 @@ describe('table read enforcement', () => {
       'sales'
     );
     const sel = captured.find((c) => c.sql.includes('SELECT r.id, r.data FROM artifact_rows'));
-    expect(sel!.sql).toContain("json_extract(data, '$.company_id') IN (?)");
-    expect(sel!.params).toEqual(['art_1', 'sales', '2026-05', 3]);
+    expect(sel!.sql).toContain("json_extract(data, '$.company_id') IN (SELECT value FROM json_each(?))");
+    expect(sel!.params).toEqual(['art_1', 'sales', '2026-05', '[3]']);
   });
 });

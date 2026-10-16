@@ -6,6 +6,7 @@ import { getPlatformOrigin } from '../../config/origins';
 import { corpusFor, type SourceKind } from './client';
 import { queueKnowledgeSource } from './ingest';
 import { EMBED_DIMENSIONS, estimateTokens, meterKnowledge, PRICING } from './usage';
+import { JSON_IN, jsonList } from '../../sql-in';
 
 const EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
 const CANDIDATES = 30;
@@ -59,15 +60,15 @@ export async function visibleSources(env: Env, workspaceId: string, userId: stri
       `SELECT a.id, a.name, a.slug, a.owner_id, a.visibility FROM artifacts a
          LEFT JOIN artifact_moderation m ON m.artifact_id = a.id
         WHERE a.workspace_id = ? AND a.deleted_at IS NULL AND COALESCE(m.status, 'approved') = 'approved'
-          AND a.id IN (${pages.map(() => '?').join(',')})`,
-    ).bind(workspaceId, ...pages).all<{ id: string; name: string; slug: string; owner_id: string; visibility: string }>()).results || [];
+          AND a.id IN ${JSON_IN}`,
+    ).bind(workspaceId, jsonList(pages)).all<{ id: string; name: string; slug: string; owner_id: string; visibility: string }>()).results || [];
     for (const r of rows) {
       if (r.visibility !== 'private' || r.owner_id === userId) visible.set(r.id, { title: r.name, url: `${origin}/a/${r.slug}/`, slug: r.slug });
     }
     // Pages awaiting moderation stay in the corpus but out of results until approved.
     const live = new Set(((await env.DB.prepare(
-      `SELECT id FROM artifacts WHERE workspace_id = ? AND deleted_at IS NULL AND id IN (${pages.map(() => '?').join(',')})`,
-    ).bind(workspaceId, ...pages).all<{ id: string }>()).results || []).map((r) => r.id));
+      `SELECT id FROM artifacts WHERE workspace_id = ? AND deleted_at IS NULL AND id IN ${JSON_IN}`,
+    ).bind(workspaceId, jsonList(pages)).all<{ id: string }>()).results || []).map((r) => r.id));
     for (const id of pages) if (!live.has(id)) gone.set(id, 'page');
   }
 
@@ -75,8 +76,8 @@ export async function visibleSources(env: Env, workspaceId: string, userId: stri
   if (assets.length) {
     const rows = (await env.DB.prepare(
       `SELECT id, name, owner_id, visibility FROM asset_deliverables
-        WHERE workspace_id = ? AND deleted_at IS NULL AND id IN (${assets.map(() => '?').join(',')})`,
-    ).bind(workspaceId, ...assets).all<{ id: string; name: string; owner_id: string; visibility: string }>()).results || [];
+        WHERE workspace_id = ? AND deleted_at IS NULL AND id IN ${JSON_IN}`,
+    ).bind(workspaceId, jsonList(assets)).all<{ id: string; name: string; owner_id: string; visibility: string }>()).results || [];
     for (const r of rows) {
       if (r.visibility !== 'private' || r.owner_id === userId) visible.set(r.id, { title: r.name, url: null });
     }

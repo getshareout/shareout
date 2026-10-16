@@ -1,6 +1,7 @@
 import type { ViewerScope } from '../access-policy';
 import type { DataContext } from '../middleware';
 import { escapeField } from './validation';
+import { JSON_IN, jsonList } from '../../sql-in';
 
 /**
  * Server-enforced row-level access clause (0042). AND-ed into every read so the
@@ -12,10 +13,9 @@ export function buildScopeClause(
 ): { sql: string; params: unknown[] } {
   if (!scope) return { sql: '1=1', params: [] };
   if (scope.values.length === 0) return { sql: '1=0', params: [] };
-  const placeholders = scope.values.map(() => '?').join(', ');
   return {
-    sql: `json_extract(data, '$.${escapeField(scope.field)}') IN (${placeholders})`,
-    params: [...scope.values],
+    sql: `json_extract(data, '$.${escapeField(scope.field)}') IN ${JSON_IN}`,
+    params: [jsonList(scope.values)],
   };
 }
 
