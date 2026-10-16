@@ -64,6 +64,11 @@ describe('workspace home boot requests', () => {
     // One idle warm of the default Artifacts payload; no per-folder prefetch fan-out.
     expect(count('/v1/home/browser')).toBeLessThanOrEqual(1);
     expect(count('/v1/home/quick-search')).toBe(0);
+    // The palette's search index warms once when idle (a 304 on repeat visits); the deep
+    // search and recent searches wait for the palette to open.
+    expect(count('/v1/home/search-index')).toBeLessThanOrEqual(1);
+    expect(count('/v1/home/deep-search')).toBe(0);
+    expect(count('/v1/home/recent-searches')).toBe(0);
     expect(count('/v1/home/recent')).toBeLessThanOrEqual(1);
     expect(count('/v1/home/for-you')).toBeLessThanOrEqual(1);
     const dupes = urls.filter((u, i) => u.startsWith('/v1/') && urls.indexOf(u) !== i);

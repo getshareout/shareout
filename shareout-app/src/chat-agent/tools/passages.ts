@@ -63,7 +63,9 @@ function splitLocator(locator: string, page: string | null): { pageTitle: string
   return i > 0 ? { pageTitle: locator.slice(0, i), section: locator.slice(i + 3) } : { pageTitle: null, section: locator };
 }
 
-async function fromCorpus(env: Env, userId: string, wsIds: string[], query: string): Promise<Passage[]> {
+/** Passages from the Knowledge corpus of each workspace that has Knowledge on. Also used by
+ *  the palette's deep search; callers check membership of `wsIds` first. */
+export async function fromCorpus(env: Env, userId: string, wsIds: string[], query: string): Promise<Passage[]> {
   const words = terms(query);
   const results = await Promise.all(wsIds.map(async (ws) => {
     if (!corpusFor(env, ws) || !(await isKnowledgeEnabled(env, ws).catch(() => false))) return [];

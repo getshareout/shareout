@@ -475,6 +475,9 @@ Ranked, typo-tolerant workspace search — same engine as the Home **⌘K** pale
 | Method | Endpoint | Who | Notes |
 | --- | --- | --- | --- |
 | `GET` | `/v1/search?q=&groups=&limit=&workspace=` | Token/session | Pages, folders, datasets, connectors, people, schedules, crew, alerts. `sot_` tokens auto-scope to their workspace. |
+| `GET` | `/v1/home/search-index?workspace=` | Session | Compact index the palette ranks locally; `ETag` / `If-None-Match` → `304`. |
+| `GET` | `/v1/home/deep-search?q=&workspace=` | Session | Page text, Knowledge passages and the groups the index does not carry. |
+| `GET` `POST` `DELETE` | `/v1/home/recent-searches?workspace=` | Session | Your recent palette searches (max 20 per workspace); `POST { q }` records, `DELETE ?q=` removes one, `DELETE` clears. |
 
 ## Features
 

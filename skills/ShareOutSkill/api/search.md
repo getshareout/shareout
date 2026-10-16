@@ -70,6 +70,20 @@ curl "$ORIGIN/v1/search?q=cpm&groups=artifacts,datasets&limit=5" \
   -H "Authorization: Bearer $SHAREOUT_TOKEN"
 ```
 
+## Palette endpoints (search index, deep search, recent searches)
+
+The **⌘K** palette does not call `/v1/search` per keystroke. It loads a compact index once and ranks it in the browser, then asks the server only for what the index cannot see. All three take the same `workspace` param and visibility rules as `/v1/search`; a non-member of the workspace gets empty results.
+
+| Method | Path | Notes |
+|--------|------|-------|
+| `GET` | `/v1/home/search-index?workspace=` | Everything findable by name: pages (`[id, slug, name, type, folderId, tags, updatedSec, description(80 chars), flags, ownerIdx, wsIdx]`), folders, people, owners, workspaces, and the ids you opened last. Sends a weak `ETag`; repeat with `If-None-Match` for a `304`. Capped at 3,000 pages (`truncated: true` past that). `Server-Timing` carries `idx_build` and `idx_etag`. |
+| `GET` | `/v1/home/deep-search?q=&workspace=&older=1` | The second section: `content` (pages whose description matches; with `older=1` also names past the index cap), `passages` (Knowledge, when the workspace has it; `find_passages` shape), plus `datasets`, `connectors`, `schedules`, `crew`, `alerts`, `skills`. `q` needs 2+ characters (3+ for passages). One D1 wave. |
+| `GET` | `/v1/home/recent-searches?workspace=` | Your last searches in that scope, newest first, at most 20: `{ searches: [{ q, at }] }`. |
+| `POST` | `/v1/home/recent-searches?workspace=` | `{ "q": "…" }` records a search. A repeat (any case or accents) moves to the top. Returns the list. |
+| `DELETE` | `/v1/home/recent-searches?workspace=&q=` | Removes one; without `q`, clears the scope. Returns the list. |
+
+Recent searches are per signed-in user and per workspace: nobody else's list is ever read or changed.
+
 ## Ask your workspace (answer mode)
 
 When the query looks like a **question** (ends with `?` or starts with *what / how / why / when / where / who / which / show / list / tell*), the **⌘K** palette switches to **answer mode** instead of listing jump targets. It calls:

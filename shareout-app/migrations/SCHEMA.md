@@ -198,6 +198,7 @@ here would silently drop artifacts from listings.
 | `artifact_agent_config` | Per-artifact agent setup: separate `visitor_*` and `admin_*` model/prompt/context settings, plus `pilot_enabled`. |
 | `favorites` | User-starred artifacts. |
 | `user_recent_views` | Most-recent-view index powering "jump back in". |
+| `user_recent_searches` | *(0017)* The last queries a person ran in the search palette, per `scope_key` (the workspace id, or `''` for personal / all pages). `query_key` is the accent- and case-folded query, so re-running one moves it to the top instead of adding a row; the app keeps 20 per user and scope. |
 | `share_links` | Tokenised links to a presentation or artifact, gated by `gate`/`gate_value`, with `expires_at`, `max_views`, `revoked`. |
 
 ## 04 Data connections

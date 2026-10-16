@@ -1,7 +1,7 @@
 import type { Env } from '../types';
-import { placeholders, type VisibilityScope } from '../account-links';
-import { getBotVisibilityScope, listWorkspacesForUser, TELEGRAM_PERSONAL_WORKSPACE } from '../chat-agent/access';
 import { type WorkspaceSelection } from '../chat-platforms/types';
+import { requestMemo } from '../http/request-scope';
+import { artifactScopeSql, concreteWorkspace, isMemberSql, linkedIds } from './scope-sql';
 
 /**
  * Shared "pro search" service — one ranked, fuzzy, multi-group search behind every
@@ -155,65 +155,38 @@ const LIKE_LIMIT = 150; // extra substring matches beyond the recent window (old
  * Pull a candidate pool the user can see, then rank in JS. The recent slice is ALWAYS
  * fetched unfiltered so typo/subsequence matches work ("revnue" → "Revenue"); when `q`
  * is set we additionally union broad LIKE matches so an exact substring hit older than
- * the recent window still surfaces. Merged + de-duped by id.
+ * the recent window still surfaces. Merged + de-duped by id. Visibility rides inside the
+ * SQL (scope-sql.ts), so both queries go out in the request's first D1 wave.
  */
 async function artifactCandidates(
   env: Env,
   userId: string,
   workspaceId: WorkspaceSelection | undefined,
   q: string,
-  scopeP: Promise<VisibilityScope> = getBotVisibilityScope(env, userId),
 ): Promise<ArtifactCandidate[]> {
-  const scope = await scopeP;
-  const idPh = placeholders(scope.userIds.length);
-  const emailPh = placeholders(scope.emails.length);
-
-  let scopeClause: string;
-  let scopeBinds: unknown[];
-  if (workspaceId === TELEGRAM_PERSONAL_WORKSPACE) {
-    scopeClause = `a.workspace_id IS NULL AND (a.owner_id IN (${idPh}) OR c.email IN (${emailPh}))`;
-    scopeBinds = [...scope.userIds, ...scope.emails];
-  } else if (workspaceId) {
-    const workspaces = await listWorkspacesForUser(env, userId, scope);
-    if (!workspaces.some((w) => w.id === workspaceId)) return [];
-    scopeClause = `a.workspace_id = ? AND (a.visibility != 'private' OR a.owner_id IN (${idPh}) OR c.email IN (${emailPh}))`;
-    scopeBinds = [workspaceId, ...scope.userIds, ...scope.emails];
-  } else {
-    const wsIds = (await listWorkspacesForUser(env, userId, scope)).map((w) => w.id);
-    const wsClause = wsIds.length
-      ? ` OR (a.visibility = 'workspace' AND a.workspace_id IN (${placeholders(wsIds.length)}))`
-      : '';
-    scopeClause = `(a.owner_id IN (${idPh}) OR c.email IN (${emailPh})${wsClause})`;
-    scopeBinds = [...scope.userIds, ...scope.emails, ...(wsIds as string[])];
-  }
-
-  const select = (extraWhere: string, limit: number) => `
+  const scope = artifactScopeSql(userId, workspaceId);
+  const select = (extraWhere: string) => `
     SELECT a.id, a.name, COALESCE(d.slug, a.slug) AS slug, a.description, a.artifact_type,
       COALESCE(d.updated_at, a.created_at) AS updated_at,
       a.visibility AS visibility, pres_a.thumbnail_ext AS thumbnail_ext,
       COALESCE(avt.views, 0) AS views,
-      (SELECT name FROM users u WHERE u.id = a.owner_id) AS owner_name,
-      (SELECT picture FROM users u WHERE u.id = a.owner_id) AS owner_picture,
+      u.name AS owner_name, u.picture AS owner_picture,
       (SELECT GROUP_CONCAT(t.label, char(10)) FROM artifact_tags t WHERE t.artifact_id = a.id) AS tags
     FROM artifacts a
     LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
     LEFT JOIN artifact_view_totals avt ON avt.artifact_id = a.id
     LEFT JOIN artifact_presentation pres_a ON pres_a.artifact_id = a.id
-    LEFT JOIN collaborators c ON c.artifact_id = a.id AND c.email IN (${emailPh})
-    WHERE a.deleted_at IS NULL AND a.id NOT IN (SELECT artifact_id FROM asset_buckets) AND (${scopeClause})${extraWhere}
-    GROUP BY a.id
+    LEFT JOIN users u ON u.id = a.owner_id
+    WHERE a.deleted_at IS NULL AND a.id NOT IN (SELECT artifact_id FROM asset_buckets) AND (${scope.sql})${extraWhere}
     ORDER BY COALESCE(d.updated_at, a.created_at) DESC
     LIMIT ?`;
 
-  const recentP = env.DB.prepare(select('', RECENT_LIMIT))
-    .bind(...scope.emails, ...scopeBinds, RECENT_LIMIT)
-    .all<ArtifactCandidate>();
+  const recentP = env.DB.prepare(select('')).bind(...scope.binds, RECENT_LIMIT).all<ArtifactCandidate>();
 
   const likeP = q
     ? env.DB.prepare(select(
         ` AND (a.name LIKE ? OR a.slug LIKE ? OR a.description LIKE ? OR EXISTS (SELECT 1 FROM artifact_tags at2 WHERE at2.artifact_id = a.id AND at2.label LIKE ?))`,
-        LIKE_LIMIT,
-      )).bind(...scope.emails, ...scopeBinds, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, LIKE_LIMIT)
+      )).bind(...scope.binds, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, LIKE_LIMIT)
         .all<ArtifactCandidate>()
     : Promise.resolve({ results: [] as ArtifactCandidate[] });
 
@@ -372,12 +345,12 @@ async function rankPeople(env: Env, workspaceId: string, q: string, limit: numbe
 }
 
 /** Scope for the personal-capable groups: a workspace, or the user's own owner ids. */
-type OwnerScope = { wsId: string | null; ownerIds: string[] };
+type OwnerScope = { wsId: string | null; userId: string };
 
 async function rankSchedules(env: Env, scope: OwnerScope, q: string, limit: number): Promise<SearchHit[]> {
-  const where = scope.wsId ? 'a.workspace_id = ?' : `s.owner_id IN (${placeholders(scope.ownerIds.length)})`;
-  const binds = scope.wsId ? [scope.wsId] : scope.ownerIds;
-  if (!scope.wsId && !scope.ownerIds.length) return [];
+  const owners = linkedIds(scope.userId);
+  const where = scope.wsId ? 'a.workspace_id = ?' : `s.owner_id IN ${owners.sql}`;
+  const binds = scope.wsId ? [scope.wsId] : owners.binds;
   const res = await env.DB.prepare(
     `SELECT s.id, s.action, s.schedule, s.enabled, s.last_status, a.name AS art_name
      FROM scheduled_jobs s JOIN artifacts a ON a.id = s.artifact_id
@@ -411,9 +384,9 @@ async function rankCrews(env: Env, workspaceId: string, q: string, limit: number
 }
 
 async function rankAlerts(env: Env, scope: OwnerScope, q: string, limit: number): Promise<SearchHit[]> {
-  const where = scope.wsId ? 'workspace_id = ?' : `owner_id IN (${placeholders(scope.ownerIds.length)})`;
-  const binds = scope.wsId ? [scope.wsId] : scope.ownerIds;
-  if (!scope.wsId && !scope.ownerIds.length) return [];
+  const owners = linkedIds(scope.userId);
+  const where = scope.wsId ? 'workspace_id = ?' : `owner_id IN ${owners.sql}`;
+  const binds = scope.wsId ? [scope.wsId] : owners.binds;
   const res = await env.DB.prepare(
     `SELECT id, name, destination_kind, enabled, last_status FROM metric_alert_rules WHERE ${where} ORDER BY created_at DESC LIMIT 200`
   ).bind(...binds).all<{ id: string; name: string; destination_kind: string; enabled: number; last_status: string | null }>();
@@ -451,7 +424,21 @@ export interface QuickSearchOpts {
   limit?: number;
 }
 
-/** Run the ranked multi-group search. `workspaceId` unset → search across everything the user can see. */
+/** True when one of the user's accounts is an internal member of the workspace. */
+export function isWorkspaceMember(env: Env, userId: string, workspaceId: string): Promise<boolean> {
+  return requestMemo(env, `search-member:${workspaceId}:${userId}`, async () => {
+    const m = isMemberSql(userId, workspaceId);
+    return !!(await env.DB.prepare(`SELECT ${m.sql} AS ok`).bind(...m.binds).first<{ ok: number }>())?.ok;
+  });
+}
+
+/**
+ * Run the ranked multi-group search. `workspaceId` unset → search across everything the
+ * user can see. Every query goes out in one D1 wave: artifacts carry their visibility in
+ * SQL, and the workspace groups run beside a membership check that discards them for a
+ * non-member (they are workspace-wide lists, so a caller naming a workspace they are not
+ * in must get nothing back).
+ */
 export async function quickSearch(env: Env, userId: string, opts: QuickSearchOpts): Promise<QuickSearchResult> {
   const q = (opts.q || '').trim();
   const limit = opts.limit ?? 8;
@@ -459,20 +446,20 @@ export async function quickSearch(env: Env, userId: string, opts: QuickSearchOpt
     opts.groups ?? ['artifacts', 'folders', 'datasets', 'connectors', 'people', 'schedules', 'crew', 'alerts', 'skills'],
   );
   // folders/datasets/connectors/crew/people need a concrete workspace; schedules/alerts
-  // also work personally (scoped to the user's own owner ids).
-  const wsId = typeof opts.workspaceId === 'string' && opts.workspaceId !== TELEGRAM_PERSONAL_WORKSPACE ? opts.workspaceId : null;
+  // also work personally (scoped to the user's own linked accounts).
+  const wsId = concreteWorkspace(opts.workspaceId);
+  const needsMember = !!wsId && [...groups].some((g) => g !== 'artifacts');
+  const memberP = needsMember ? isWorkspaceMember(env, userId, wsId!) : Promise.resolve(false);
+  const gate = <T>(run: () => Promise<T[]>): Promise<T[]> =>
+    Promise.all([memberP, run()]).then(([ok, rows]) => (ok ? rows : []));
   const inWs = <T>(g: SearchGroup, run: () => Promise<T[]>): Promise<T[]> =>
-    groups.has(g) && wsId ? run() : Promise.resolve([]);
-  const needOwner = !wsId && (groups.has('schedules') || groups.has('alerts'));
-  // Resolved once and shared by the artifact candidates and the owner-scoped groups.
-  const scopeP = groups.has('artifacts') || needOwner ? getBotVisibilityScope(env, userId) : null;
-  const ownerIds = needOwner && scopeP ? (await scopeP).userIds : [];
-  const ownerScope: OwnerScope = { wsId, ownerIds };
+    groups.has(g) && wsId ? gate(run) : Promise.resolve([]);
+  const ownerScope: OwnerScope = { wsId, userId };
   const withOwner = (g: SearchGroup, run: () => Promise<SearchHit[]>): Promise<SearchHit[]> =>
-    groups.has(g) && (wsId || ownerIds.length) ? run() : Promise.resolve([]);
+    !groups.has(g) ? Promise.resolve([]) : wsId ? gate(run) : run();
 
   const [artifacts, folders, datasets, connectors, people, schedules, crew, alerts, skills] = await Promise.all([
-    groups.has('artifacts') ? artifactCandidates(env, userId, opts.workspaceId, q, scopeP ?? undefined).then((rows) => rankArtifacts(rows, q, limit)) : Promise.resolve([]),
+    groups.has('artifacts') ? artifactCandidates(env, userId, opts.workspaceId, q).then((rows) => rankArtifacts(rows, q, limit)) : Promise.resolve([]),
     inWs('folders', () => rankFolders(env, wsId!, q, limit)),
     inWs('datasets', () => rankDatasets(env, wsId!, q, limit)),
     inWs('connectors', () => rankConnectors(env, wsId!, q, limit)),

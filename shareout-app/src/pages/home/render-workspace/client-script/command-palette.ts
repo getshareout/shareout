@@ -1,15 +1,19 @@
 /**
  * Cmd/Ctrl+K command palette + inline quick-jump dropdown for the workspace shell.
- * Both hit the same ranked endpoint (/v1/home/quick-search); the palette adds an
- * Actions group (navigate lenses, new page) resolved client-side, and renders rich
- * rows — artifact preview thumbnails, owner avatars, view counts, and status pills —
- * across pages, folders, datasets, connectors, people, schedules, crew and alerts.
- * Depends on helpers already in the shared IIFE: esc, t, openView, openArtifact.
+ *
+ * Two sections, so typing never waits on the network:
+ *  - instant: pages, folders, people, actions and lenses ranked in the browser from the
+ *    search index (search-store.ts + search-engine.ts), synchronously on every keystroke;
+ *  - deep: page text, Knowledge passages and the other groups from /v1/home/deep-search,
+ *    debounced, stale requests aborted, filled in below when the answer arrives.
+ * Until the index has loaded once, the instant section falls back to /v1/home/quick-search.
+ * An empty query shows recent searches (remembered on a pick or Enter) and recently
+ * opened pages. Depends on helpers already in the shared IIFE: esc, t, openView,
+ * openArtifact, wsxSearch, wsxSearchStore.
  */
 export const workspace_client_command_palette_JS = `
   // ===== Cmd+K command palette + inline quick-jump =====
   (function () {
-    var wsq = window.WSX_WS ? '&workspace=' + encodeURIComponent(window.WSX_WS) : '';
     var SEARCH_ICONS = {
       artifact: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
       folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>',
@@ -24,20 +28,14 @@ export const workspace_client_command_palette_JS = `
     };
     var EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
 
+    SEARCH_ICONS.skill = SEARCH_ICONS.ask;
+    SEARCH_ICONS.passage = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>';
+    SEARCH_ICONS.recent = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>';
+    var XMARK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+    var store = wsxSearchStore;
+
     function initials(s) { var p = (s || '').trim().split(/\\s+/); return ((p[0] || '')[0] || '') + (p.length > 1 ? (p[p.length - 1][0] || '') : ''); }
     function fmtViews(n) { n = n || 0; if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\\.0$/, '') + 'm'; if (n >= 1000) return (n / 1000).toFixed(1).replace(/\\.0$/, '') + 'k'; return String(n); }
-
-    // ---- local fuzzy for the client-resolved Actions group (mirror of server tiers) ----
-    function norm(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/\\s+/g, ' ').trim(); }
-    function localScore(q, text) {
-      var nq = norm(q), nt = norm(text);
-      if (!nq) return 0.001;
-      if (nt === nq) return 1; if (nt.indexOf(nq) === 0) return 0.9;
-      var i = nt.indexOf(nq); if (i >= 0) return 0.7;
-      var ti = 0, ok = true; // subsequence
-      for (var k = 0; k < nq.length; k++) { if (nq[k] === ' ') continue; var f = nt.indexOf(nq[k], ti); if (f < 0) { ok = false; break; } ti = f + 1; }
-      return ok ? 0.3 : 0;
-    }
 
     // ---- Actions: navigate a lens, or create. Only offer lenses that exist. ----
     function buildActions() {
@@ -50,16 +48,19 @@ export const workspace_client_command_palette_JS = `
         var name = (el.textContent || key).trim();
         acts.push({ label: (t('palette.goTo') || 'Go to') + ' ' + name, run: function () { closePalette(); openView(key); } });
       });
-      return acts;
+      return acts.map(function (a) { a._n = wsxSearch.fold(a.label); return a; });
     }
 
     // ---- open a hit the way the studio does: in-app tab for pages, right lens otherwise ----
-    var LENS_FOR = { schedule: 'schedules', crew: 'crew', alert: 'alerts', person: 'admin', dataset: 'datasets', connector: 'connectors' };
+    var LENS_FOR = { schedule: 'schedules', crew: 'crew', alert: 'alerts', person: 'admin', dataset: 'datasets', connector: 'connectors', skill: 'library' };
     function openHit(h) {
       closePalette();
       if (h.kind === 'artifact') {
+        store.noteOpened(h.id);
         if (typeof openArtifact === 'function' && h.slug) { try { openArtifact(h.slug, h.title || null, h.id || ''); return; } catch (e) {} }
         if (h.slug) location.href = '/a/' + h.slug + '/';
+      } else if (h.kind === 'passage') {
+        if (h.url) location.href = h.url;
       } else if (h.kind === 'folder') {
         openView('artifacts'); if (window.enterFolder) window.enterFolder(h.id, h.title);
       } else if (LENS_FOR[h.kind]) { openView(LENS_FOR[h.kind]); }
@@ -99,21 +100,24 @@ export const workspace_client_command_palette_JS = `
     function askRowHtml(idx, q) {
       return '<button type="button" class="wsx-cmdk__item wsx-cmdk__item--ask" role="option" data-pi="' + idx + '">' +
         '<span class="wsx-cmdk__tile wsx-cmdk__tile--ask">' + SEARCH_ICONS.ask + '</span>' +
-        '<span class="wsx-cmdk__txt"><span class="wsx-cmdk__ttl">' + esc((t('palette.askQuery') || 'Ask AI: \u201c{q}\u201d').replace('{q}', q)) + '</span></span></button>';
+        '<span class="wsx-cmdk__txt"><span class="wsx-cmdk__ttl">' + esc((t('palette.askQuery') || 'Ask AI: “{q}”').replace('{q}', q)) + '</span></span></button>';
+    }
+    // A div, not a button: it holds its own remove button.
+    function recentRowHtml(idx, q) {
+      return '<div class="wsx-cmdk__item wsx-cmdk__item--recent" role="option" tabindex="-1" data-pi="' + idx + '">' +
+        '<span class="wsx-cmdk__tile wsx-cmdk__tile--recent">' + SEARCH_ICONS.recent + '</span>' +
+        '<span class="wsx-cmdk__txt"><span class="wsx-cmdk__ttl">' + esc(q) + '</span></span>' +
+        '<button type="button" class="wsx-cmdk__rm" data-rm="' + idx + '" aria-label="' + esc(t('search.removeOne') || 'Remove') + '" title="' + esc(t('search.removeOne') || 'Remove') + '">' + XMARK + '</button></div>';
     }
 
-    // ---- shared fetch with in-memory cache + prefetch ----
-    // Cache lets the palette/dropdown paint instantly on open; the network refresh
-    // still runs and re-invokes cb, so results stay live. Recents are prewarmed on intent
-    // (search icon hover, input focus, a held Cmd/Ctrl), never at boot.
+    // ---- server search: the fallback before the index loads (and the inline dropdowns) ----
     var cache = {}, inflight = {};
     function ckey(q, groups) { return (groups || '*') + '::' + (q || ''); }
     function fetchResults(q, groups, cb) {
       var k = ckey(q, groups);
-      if (cache[k]) { cb(cache[k]); } // instant first paint
+      if (cache[k]) { cb(cache[k]); }
       var gq = groups ? '&groups=' + encodeURIComponent(groups) : '';
-      // Callers asking for the same query while it is in flight share one request
-      // (e.g. the Cmd-key prewarm and the palette opening a moment later).
+      var wsq = window.WSX_WS ? '&workspace=' + encodeURIComponent(window.WSX_WS) : '';
       if (!inflight[k]) {
         inflight[k] = fetch('/v1/home/quick-search?q=' + encodeURIComponent(q) + wsq + gq + '&limit=6', { credentials: 'same-origin' })
           .then(function (r) { return r.json(); })
@@ -129,13 +133,28 @@ export const workspace_client_command_palette_JS = `
       });
       return out;
     }
-    var warmed = {};
-    function prewarm(groups) { var g = groups || '*'; if (warmed[g]) return; warmed[g] = true; fetchResults('', groups || null, function () {}); }
+
+    // ---- local ranking: every keystroke, no network ----
+    // performance.measure('wsx-search-rank') keeps the last ranking's time for DevTools; nothing is sent.
+    function rankLocal(q) {
+      var ix = store.index(); if (!ix) return null;
+      var pm = typeof performance !== 'undefined' && performance.mark ? performance : null;
+      try { if (pm) pm.mark('wsx-search-rank:start'); } catch (e) { pm = null; }
+      var out = { artifacts: wsxSearch.rank(ix.artifacts, q, 6), folders: wsxSearch.rank(ix.folders, q, 4), people: wsxSearch.rank(ix.people, q, 4) };
+      try { if (pm) { pm.mark('wsx-search-rank:end'); if (pm.clearMeasures) pm.clearMeasures('wsx-search-rank'); pm.measure('wsx-search-rank', 'wsx-search-rank:start', 'wsx-search-rank:end'); pm.clearMarks('wsx-search-rank:start'); pm.clearMarks('wsx-search-rank:end'); } } catch (e) {}
+      return out;
+    }
+    function warm(network) { return store.warm(network); }
 
     // =================== PALETTE ===================
-    var pal = null, palInput = null, palList = null, palItems = [], palSel = -1, palTmr = null, palReqId = 0;
+    var pal = null, palInput = null, palList = null, palItems = [], palSel = -1, palQ = '', palTmr = null, palReqId = 0;
+    var palServer = null, deepData = null, deepPending = false, deepCtl = null, deepTmr = null, deepCache = {}, deepKeys = [];
 
-    function closePalette() { if (pal) { pal.remove(); pal = null; palItems = []; palSel = -1; } }
+    function closePalette() {
+      clearTimeout(deepTmr); clearTimeout(palTmr);
+      if (deepCtl) { try { deepCtl.abort(); } catch (e) {} deepCtl = null; }
+      if (pal) { pal.remove(); pal = null; palItems = []; palSel = -1; }
+    }
     function openPalette() {
       if (pal) { palInput.focus(); return; }
       pal = document.createElement('div');
@@ -155,73 +174,160 @@ export const workspace_client_command_palette_JS = `
       palInput = pal.querySelector('.wsx-cmdk__input');
       palList = pal.querySelector('.wsx-cmdk__list');
       pal.querySelector('.wsx-cmdk__scrim').addEventListener('click', closePalette);
-      palInput.addEventListener('input', function () { schedulePalette(palInput.value); });
+      palInput.addEventListener('input', function () { onQuery(palInput.value); });
       palInput.addEventListener('keydown', paletteKeys);
+      palList.addEventListener('click', onListClick);
+      palList.addEventListener('mousemove', onListHover);
       palInput.focus();
-      schedulePalette('');
+      palQ = ''; palServer = null; deepData = null; deepPending = false;
+      onQuery('');
+      warm(true).then(function () { if (pal && !palQ) renderPalette(); });
+      store.syncSearches().then(function (changed) { if (changed && pal && !palQ) renderPalette(); });
     }
-    function schedulePalette(q) {
-      clearTimeout(palTmr);
-      var run = function () { runPalette(q); };
-      palTmr = setTimeout(run, q ? 130 : 0);
+    store.onChange(function () { if (pal) renderPalette(); });
+
+    // Instant section: synchronous, on the very first keystroke. Deep section: debounced.
+    function onQuery(raw) {
+      palQ = String(raw || '').trim();
+      palServer = null;
+      renderPalette();
+      if (!store.index()) {
+        clearTimeout(palTmr);
+        var q = palQ, myId = ++palReqId;
+        // Only while the index is still loading (first visit): give the disk copy a moment.
+        palTmr = setTimeout(function () {
+          if (store.index()) return;
+          fetchResults(q, null, function (data) { if (myId === palReqId && pal && q === palQ && !store.index()) { palServer = data; renderPalette(); } });
+        }, q ? 130 : 60);
+      }
+      scheduleDeep(palQ);
     }
-    function runPalette(q) {
-      var myId = ++palReqId;
-      var actions = buildActions().map(function (a) { return { s: localScore(q, a.label), a: a }; })
-        .filter(function (x) { return x.s > 0; }).sort(function (a, b) { return b.s - a.s; }).slice(0, q ? 5 : 3).map(function (x) { return x.a; });
-      fetchResults(q, null, function (data) {
-        if (myId !== palReqId || !pal) return;
-        renderPalette(q, data, actions);
-      });
+    function scheduleDeep(q) {
+      clearTimeout(deepTmr);
+      if (deepCtl) { try { deepCtl.abort(); } catch (e) {} deepCtl = null; }
+      deepData = deepCache[q] || null;
+      deepPending = false;
+      if (q.length < 2 || deepData) return;
+      deepPending = true;
+      deepTmr = setTimeout(function () {
+        var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+        deepCtl = ctl;
+        var ix = store.index();
+        var url = '/v1/home/deep-search?q=' + encodeURIComponent(q) + (window.WSX_WS ? '&workspace=' + encodeURIComponent(window.WSX_WS) : '') + (ix && ix.truncated ? '&older=1' : '') + '&limit=5';
+        fetch(url, ctl ? { credentials: 'same-origin', signal: ctl.signal } : { credentials: 'same-origin' })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) {
+            if (ctl !== deepCtl || !pal || q !== palQ) return; // a newer query owns the section
+            deepCtl = null; deepPending = false;
+            if (d) { deepCache[q] = d; deepKeys.push(q); if (deepKeys.length > 30) delete deepCache[deepKeys.shift()]; }
+            deepData = d;
+            renderPalette();
+          }, function () { if (ctl === deepCtl && pal && q === palQ) { deepCtl = null; deepPending = false; renderPalette(); } });
+      }, 150);
     }
-    function renderPalette(q, data, actions) {
+
+    function itemKey(it) {
+      if (it.hit) return it.hit.kind + ':' + it.hit.id;
+      if (it.action) return 'a:' + it.action.label;
+      if (it.recent) return 'r:' + it.recent;
+      return 'ask';
+    }
+    function renderPalette() {
+      if (!pal) return;
+      var q = palQ, prevKey = palSel >= 0 && palItems[palSel] ? itemKey(palItems[palSel]) : null, wasTop = palSel <= 0;
       palItems = [];
       var html = '';
-      function group(title, rows, render) { if (!rows || !rows.length) return; html += '<div class="wsx-cmdk__gtitle">' + esc(title) + '<span class="wsx-cmdk__gcount">' + rows.length + '</span></div>'; rows.forEach(render); }
-      function renderActions() {
-        if (!actions.length) return;
-        group(t('palette.actions') || 'Actions', actions, function (a) {
-          var idx = palItems.push({ action: a }) - 1;
-          html += actionRowHtml(idx, a.label);
-        });
+      function head(title, n, extra) { html += '<div class="wsx-cmdk__gtitle">' + esc(title) + (n ? '<span class="wsx-cmdk__gcount">' + n + '</span>' : '') + (extra || '') + '</div>'; }
+      function hits(title, rows, kind) {
+        if (!rows || !rows.length) return;
+        head(title, rows.length);
+        rows.forEach(function (h) { if (kind) h.kind = kind; var i = palItems.push({ hit: h }) - 1; html += hitRowHtml(i, h); });
       }
-      function renderAsk() {
-        if (!q) return;
-        html += '<div class="wsx-cmdk__gtitle">' + esc(t('palette.ask') || 'Ask AI') + '</div>';
-        var idx = palItems.push({ ask: q }) - 1;
-        html += askRowHtml(idx, q);
+      var actions = buildActions();
+      var ix = store.index();
+      if (!q) {
+        var rs = store.searches();
+        if (rs.length) {
+          head(t('search.recentSearches') || 'Recent searches', 0, '<button type="button" class="wsx-cmdk__clear" data-clear="1">' + esc(t('search.clearAll') || 'Clear') + '</button>');
+          rs.forEach(function (r) { var i = palItems.push({ recent: r.q }) - 1; html += recentRowHtml(i, r.q); });
+        }
+        if (ix) hits(t('search.recentlyOpened') || 'Recently opened', store.opened(5));
+        else if (palServer) hits(t('palette.recent') || 'Recent', palServer.artifacts, 'artifact');
+        var acts = actions.slice(0, 3);
+        if (acts.length) { head(t('palette.actions') || 'Actions', acts.length); acts.forEach(function (a) { var i = palItems.push({ action: a }) - 1; html += actionRowHtml(i, a.label); }); }
+        if (!palItems.length) html = '<div class="wsx-cmdk__empty">' + esc(t('palette.typeToSearch') || 'Type to search\\u2026') + '</div>';
+      } else {
+        // Instant section: ranked from the local index (or the server, until it loads).
+        var inst = ix ? rankLocal(q) : palServer;
+        var shown = {};
+        if (inst) {
+          hits(t('palette.pages') || 'Pages', inst.artifacts, 'artifact');
+          hits(t('palette.folders') || 'Folders', inst.folders, 'folder');
+          hits(t('palette.people') || 'People', inst.people, 'person');
+          if (!ix) {
+            hits(t('palette.datasets') || 'Datasets', inst.datasets, 'dataset');
+            hits(t('palette.connectors') || 'Connectors', inst.connectors, 'connector');
+            hits(t('palette.schedules') || 'Schedules', inst.schedules, 'schedule');
+            hits(t('palette.crew') || 'Crew', inst.crew, 'crew');
+            hits(t('palette.alerts') || 'Alerts', inst.alerts, 'alert');
+          }
+          (inst.artifacts || []).forEach(function (h) { shown[h.id] = 1; });
+        }
+        var acts2 = wsxSearch.rank(actions, q, 5);
+        if (acts2.length) { head(t('palette.actions') || 'Actions', acts2.length); acts2.forEach(function (a) { var i = palItems.push({ action: a }) - 1; html += actionRowHtml(i, a.label); }); }
+        // Deep section: fills in when the server answers; never holds up the rows above.
+        var d = deepData;
+        if (d) {
+          hits(t('search.content') || 'In page text', (d.content || []).filter(function (h) { return !shown[h.id]; }), 'artifact');
+          hits(t('search.passages') || 'In Knowledge', (d.passages || []).map(function (p, n) {
+            return { kind: 'passage', id: (p.artifact && p.artifact.id || '') + '#' + n, title: p.section || (p.artifact && p.artifact.title) || '', subtitle: [p.artifact && p.artifact.title, p.excerpt].filter(Boolean).join(' \\u00b7 '), url: p.url };
+          }));
+          if (ix) {
+            hits(t('palette.datasets') || 'Datasets', d.datasets, 'dataset');
+            hits(t('palette.connectors') || 'Connectors', d.connectors, 'connector');
+            hits(t('palette.schedules') || 'Schedules', d.schedules, 'schedule');
+            hits(t('palette.crew') || 'Crew', d.crew, 'crew');
+            hits(t('palette.alerts') || 'Alerts', d.alerts, 'alert');
+            hits(t('search.skills') || 'AI skills', d.skills, 'skill');
+          }
+        } else if (deepPending) {
+          html += '<div class="wsx-cmdk__pending">' + esc(t('search.searching') || 'Searching page text\\u2026') + '</div>';
+        }
+        // AI is an explicit opt-in, always last.
+        head(t('palette.ask') || 'Ask AI', 0);
+        var ai = palItems.push({ ask: q }) - 1; html += askRowHtml(ai, q);
       }
-      // Real matches first (Enter opens the top one); AI is an explicit opt-in, always last.
-      if (!q) renderActions();
-      if (data) {
-        pushGroup(q ? (t('palette.pages') || 'Pages') : (t('palette.recent') || 'Recent'), data.artifacts, 'artifact');
-        pushGroup(t('palette.folders') || 'Folders', data.folders, 'folder');
-        pushGroup(t('palette.datasets') || 'Datasets', data.datasets, 'dataset');
-        pushGroup(t('palette.connectors') || 'Connectors', data.connectors, 'connector');
-        pushGroup(t('palette.people') || 'People', data.people, 'person');
-        pushGroup(t('palette.schedules') || 'Schedules', data.schedules, 'schedule');
-        pushGroup(t('palette.crew') || 'Crew', data.crew, 'crew');
-        pushGroup(t('palette.alerts') || 'Alerts', data.alerts, 'alert');
-      }
-      if (q) { renderActions(); renderAsk(); }
-      function pushGroup(title, rows, kind) {
-        group(title, rows, function (h) { h.kind = kind; var idx = palItems.push({ hit: h }) - 1; html += hitRowHtml(idx, h); });
-      }
-      if (!palItems.length) html = '<div class="wsx-cmdk__empty">' + esc(q ? ((t('palette.noMatch') || 'No matches for') + ' \\u201c' + q + '\\u201d') : (t('palette.typeToSearch') || 'Type to search\\u2026')) + '</div>';
       palList.innerHTML = html;
       palSel = palItems.length ? 0 : -1;
+      if (prevKey && !wasTop) for (var k = 0; k < palItems.length; k++) if (itemKey(palItems[k]) === prevKey) { palSel = k; break; }
       syncPaletteSel();
-      palList.querySelectorAll('[data-pi]').forEach(function (el) {
-        el.addEventListener('click', function () { activatePalette(parseInt(el.getAttribute('data-pi'), 10)); });
-        el.addEventListener('mousemove', function () { palSel = parseInt(el.getAttribute('data-pi'), 10); syncPaletteSel(); });
-      });
+    }
+    function onListClick(e) {
+      var el = e.target && e.target.closest ? e.target : null; if (!el) return;
+      if (el.closest('[data-clear]')) { e.preventDefault(); store.clearSearches(); renderPalette(); palInput.focus(); return; }
+      var rm = el.closest('[data-rm]');
+      if (rm) { e.preventDefault(); e.stopPropagation(); removeRecent(parseInt(rm.getAttribute('data-rm'), 10)); return; }
+      var row = el.closest('[data-pi]');
+      if (row) activatePalette(parseInt(row.getAttribute('data-pi'), 10));
+    }
+    function onListHover(e) {
+      var row = e.target && e.target.closest ? e.target.closest('[data-pi]') : null; if (!row) return;
+      var i = parseInt(row.getAttribute('data-pi'), 10); if (i !== palSel) { palSel = i; syncPaletteSel(); }
+    }
+    function removeRecent(i) {
+      var it = palItems[i]; if (!it || !it.recent) return;
+      store.forget(it.recent);
+      renderPalette(); palInput.focus();
     }
     function syncPaletteSel() {
       var els = palList.querySelectorAll('[data-pi]');
-      els.forEach(function (el) { var on = parseInt(el.getAttribute('data-pi'), 10) === palSel; el.classList.toggle('is-sel', on); if (on) el.scrollIntoView({ block: 'nearest' }); });
+      els.forEach(function (el) { var on = parseInt(el.getAttribute('data-pi'), 10) === palSel; el.classList.toggle('is-sel', on); el.setAttribute('aria-selected', on ? 'true' : 'false'); if (on && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' }); });
     }
+    // A search is remembered when it is used (a pick or Enter), never per keystroke.
     function activatePalette(idx) {
       var it = palItems[idx]; if (!it) return;
+      if (it.recent) { palInput.value = it.recent; onQuery(it.recent); palInput.focus(); return; }
+      if (palQ) store.remember(palQ);
       if (it.action) { it.action.run(); } else if (it.ask) { runAsk(it.ask); } else if (it.hit) { openHit(it.hit); }
     }
 
@@ -247,7 +353,7 @@ export const workspace_client_command_palette_JS = `
       }
       h += '</div>';
       palList.innerHTML = h;
-      palList.querySelectorAll('[data-ci]').forEach(function (el) { el.addEventListener('click', function () { openCitation(cites[parseInt(el.getAttribute('data-ci'), 10)]); }); });
+      palList.querySelectorAll('[data-ci]').forEach(function (el) { el.addEventListener('click', function (e) { e.stopPropagation(); openCitation(cites[parseInt(el.getAttribute('data-ci'), 10)]); }); });
     }
     function openCitation(c) {
       if (!c) return;
@@ -261,47 +367,57 @@ export const workspace_client_command_palette_JS = `
       if (e.key === 'ArrowDown') { e.preventDefault(); if (palItems.length) { palSel = (palSel + 1) % palItems.length; syncPaletteSel(); } return; }
       if (e.key === 'ArrowUp') { e.preventDefault(); if (palItems.length) { palSel = (palSel - 1 + palItems.length) % palItems.length; syncPaletteSel(); } return; }
       if (e.key === 'Enter') { e.preventDefault(); if (palSel >= 0) activatePalette(palSel); return; }
+      if (e.key === 'Delete' && !palQ && palItems[palSel] && palItems[palSel].recent) { e.preventDefault(); removeRecent(palSel); }
     }
 
-    // global hotkey
+    // global hotkey; a held Cmd/Ctrl warms the index from disk
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Meta' || e.key === 'Control') { prewarm(); return; }
+      if (e.key === 'Meta' || e.key === 'Control') { warm(false); return; }
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); if (pal) closePalette(); else openPalette(); }
     });
-    // let the header search icon (if present) open the palette
     var hdrSearch = document.getElementById('wsxOpenSearch');
-    if (hdrSearch) { hdrSearch.addEventListener('mouseenter', function () { prewarm(); }); hdrSearch.addEventListener('click', function () { openPalette(); }); }
+    if (hdrSearch) { hdrSearch.addEventListener('mouseenter', function () { warm(false); }); hdrSearch.addEventListener('click', function () { openPalette(); }); }
     window.openCommandPalette = openPalette;
+    // Idle after boot: load the index from disk, or fetch it once if there is no copy yet.
+    (function () {
+      var go = function () { warm(false); };
+      try { if (typeof requestIdleCallback === 'function') requestIdleCallback(go, { timeout: 5000 }); else setTimeout(go, 2500); } catch (e) {}
+    })();
 
     // =================== PER-LENS QUICK SEARCH (every .wsx-qsearch__inp) ===================
-    // One binding per lens input; groups scoped by data-qs-groups so each lens searches
-    // only its own entity type. Results are the same ranked hits as the palette, shown as
-    // a jump-dropdown; clicking opens the page as a tab or routes to the lens.
+    // One binding per lens input; groups scoped by data-qs-groups. Pages, folders and
+    // people rank locally once the index is loaded; other groups ask the server.
+    var LOCAL_GROUPS = { artifacts: 1, folders: 1, people: 1 };
     function bindQuickSearch(inp) {
       var groups = inp.getAttribute('data-qs-groups') || 'artifacts';
+      var local = groups.split(',').every(function (g) { return LOCAL_GROUPS[g.trim()]; });
       var wrap = inp.closest('.wsx-qsearch') || inp.parentNode;
       var dd = null, items = [], sel = -1, tmr = null, reqId = 0;
       function close() { if (dd) { dd.remove(); dd = null; items = []; sel = -1; } }
       function sync() { if (!dd) return; dd.querySelectorAll('[data-di]').forEach(function (el) { el.classList.toggle('is-sel', parseInt(el.getAttribute('data-di'), 10) === sel); }); }
+      function show(rows) {
+        if (!rows.length) { close(); return; }
+        if (!dd) { dd = document.createElement('div'); dd.className = 'wsx-qsearch__dd'; wrap.appendChild(dd); }
+        items = rows; sel = 0;
+        dd.innerHTML = rows.map(function (h, i) { return hitRowHtml(i, h).replace('data-pi=', 'data-di='); }).join('');
+        dd.querySelectorAll('[data-di]').forEach(function (el) {
+          el.addEventListener('mousedown', function (ev) { ev.preventDefault(); var h = items[parseInt(el.getAttribute('data-di'), 10)]; close(); openHit(h); });
+          el.addEventListener('mousemove', function () { sel = parseInt(el.getAttribute('data-di'), 10); sync(); });
+        });
+      }
       function open(q) {
         var myId = ++reqId;
         fetchResults(q, groups, function (data) {
           if (myId !== reqId || document.activeElement !== inp) return;
-          var rows = collectHits(data, groups);
-          if (!rows.length) { close(); return; }
-          if (!dd) { dd = document.createElement('div'); dd.className = 'wsx-qsearch__dd'; wrap.appendChild(dd); }
-          items = rows; sel = 0;
-          dd.innerHTML = rows.map(function (h, i) { return hitRowHtml(i, h).replace('data-pi=', 'data-di='); }).join('');
-          dd.querySelectorAll('[data-di]').forEach(function (el) {
-            el.addEventListener('mousedown', function (ev) { ev.preventDefault(); var h = items[parseInt(el.getAttribute('data-di'), 10)]; close(); openHit(h); });
-            el.addEventListener('mousemove', function () { sel = parseInt(el.getAttribute('data-di'), 10); sync(); });
-          });
+          show(collectHits(data, groups));
         });
       }
-      inp.addEventListener('focus', function () { prewarm(groups); });
+      inp.addEventListener('focus', function () { warm(false); });
       inp.addEventListener('input', function () {
         var q = inp.value.trim(); clearTimeout(tmr);
         if (!q) { close(); return; }
+        var ranked = local ? rankLocal(q) : null;
+        if (ranked) { ++reqId; show(collectHits(ranked, groups)); return; }
         tmr = setTimeout(function () { open(q); }, 130);
       });
       inp.addEventListener('keydown', function (e) {
