@@ -15,12 +15,13 @@ import { streamAgentChat, confirmAgentAction } from '../../../src/router/api/web
 const log: string[] = [];
 const inserts: unknown[][] = [];
 
-function makeEnv(rows: Array<{ role: string; content: string }> = []): Env {
+function makeEnv(rows: Array<{ role: string; content: string }> = [], ownsThread = true): Env {
   const kv = new Map<string, string>();
   const DB = {
     prepare: (sql: string) => ({
       bind: (...args: unknown[]) => ({
-        first: async () => null,
+        // The thread wat_1 belongs to user u1 in scope ws1.
+        first: async () => (sql.includes('FROM agent_threads') && ownsThread && args.join('|') === 'wat_1|ws1|u1' ? { owned: 1 } : null),
         all: async () => {
           if (sql.includes('FROM agent_messages')) log.push('history');
           return { results: sql.includes('FROM agent_messages') ? [...rows].reverse() : [] };
@@ -82,6 +83,18 @@ describe('streamAgentChat', () => {
 
     expect(inserts.filter((a) => a[2] === 'user')).toHaveLength(0);
     expect(runAgentTurn.mock.calls[0][1].history).toEqual([]);
+  });
+
+  it('refuses a thread from another scope or user without loading it or running a turn', async () => {
+    runAgentTurn.mockResolvedValue({ reply: 'ok' });
+    const env = makeEnv([{ role: 'assistant', content: 'notes from the other workspace' }]);
+
+    for (const [scopeKey, who] of [['ws2', user], ['ws1', { id: 'u2' } as AuthUser]] as const) {
+      const evs = await events(streamAgentChat(env, { scopeKey, user: who, selectedWorkspaceId: scopeKey, text: 'hola', threadId: 'wat_1', buildSnapshot: async () => '' }));
+      expect(evs).toEqual([{ type: 'error', message: expect.any(String) }]);
+    }
+    expect(log).toEqual([]);
+    expect(runAgentTurn).not.toHaveBeenCalled();
   });
 
   it('remembers a proposal and its confirmed result in the thread', async () => {

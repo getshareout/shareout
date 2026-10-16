@@ -1,5 +1,5 @@
 import type { AccountTool, ToolContext } from './types';
-import { PERSONAL_SCOPE } from '../../chat-platforms/types';
+import { scopedWorkspaceId } from '../scope';
 import { isCatalogEnabled, loadCatalog } from '../../catalog/store';
 import { searchEntries } from '../../catalog/search';
 import { traverseLineage } from '../../catalog/lineage';
@@ -7,10 +7,8 @@ import { type CatalogEntry } from '../../catalog/types';
 
 const MAX_RESULTS = 50;
 
-function workspaceId(ctx: ToolContext): string | null {
-  const ws = ctx.selectedWorkspaceId;
-  return typeof ws === 'string' && ws !== PERSONAL_SCOPE ? ws : null;
-}
+/** The selected workspace id once internal membership is verified, else null. */
+const workspaceId = (ctx: ToolContext): Promise<string | null> => scopedWorkspaceId(ctx);
 
 function summarize(e: CatalogEntry) {
   return {
@@ -44,7 +42,7 @@ export const catalogSearchTool: AccountTool = {
     },
   },
   async execute(ctx, input) {
-    const wsId = workspaceId(ctx);
+    const wsId = await workspaceId(ctx);
     if (!wsId) return { error: 'The catalog is only available inside a workspace.' };
     if (!(await isCatalogEnabled(ctx.env, wsId))) {
       return { enabled: false, message: 'This workspace has no data catalog.' };
@@ -79,7 +77,7 @@ export const catalogGetTool: AccountTool = {
     required: ['id'],
   },
   async execute(ctx, input) {
-    const wsId = workspaceId(ctx);
+    const wsId = await workspaceId(ctx);
     if (!wsId) return { error: 'The catalog is only available inside a workspace.' };
     if (!(await isCatalogEnabled(ctx.env, wsId))) {
       return { enabled: false, message: 'This workspace has no data catalog.' };

@@ -3,6 +3,7 @@ import type { ChatReplyPort, PlatformId } from '../chat-platforms/types';
 import { createTelegramReplyPort } from '../chat-platforms/telegram/reply-port';
 import { createSlackReplyPort } from '../chat-platforms/slack/reply-port';
 import { parseSlackSessionKey } from '../chat-platforms/slack/linking';
+import { resolveAgentScope } from './scope';
 import { runAgentTurn } from './agent-loop';
 import { agentFallbackReplies } from './replies';
 import { executeAction, describeAction } from './actions';
@@ -175,6 +176,13 @@ export class ChatSessionDO implements DurableObject {
 
     await reply.sendTyping();
 
+    // A stored /workspace selection is re-checked every turn (membership can change).
+    const scope = await resolveAgentScope(this.env, b.userId, b.selectedWorkspaceId);
+    if (!scope) {
+      await reply.sendText(agentFallbackReplies(locale).notMember);
+      return;
+    }
+
     const [history, workspaceContext] = await Promise.all([
       this.store.loadHistory(HISTORY_LIMIT),
       workspaceSnapshot(this.env, b.userId, b.selectedWorkspaceId),
@@ -189,6 +197,7 @@ export class ChatSessionDO implements DurableObject {
         platform: b.platform,
         userText: b.text,
         selectedWorkspaceId: b.selectedWorkspaceId,
+        scope,
         history,
         locale,
         ...(workspaceContext ? { workspaceContext } : {}),

@@ -1,12 +1,11 @@
 import type { AccountTool, ToolContext } from './types';
 import type { Env } from '../../types';
-import { PERSONAL_SCOPE } from '../../chat-platforms/types';
 import { isKnowledgeEnabled, loadKnowledge } from '../../knowledge/store';
 import { NODE_KINDS, type KnowledgeNode } from '../../knowledge/types';
 import { corpusFor } from '../../knowledge/corpus/client';
 import { searchCorpus, visibleSources } from '../../knowledge/corpus/search';
 import { listVisibleEntities, visibleEntity } from '../../knowledge/corpus/graph';
-import { getUserWorkspaceIds } from '../access';
+import { scopedWorkspaceId, selectedWorkspace } from '../scope';
 import { sourceArtifacts } from '../../knowledge/source-links';
 
 const MAX_RESULTS = 20;
@@ -17,18 +16,22 @@ const DISABLED_MESSAGE = "Knowledge isn't turned on for this workspace.";
 const NO_WORKSPACE = 'Knowledge is only available inside a workspace.';
 const PASSAGES = 8;
 
-function workspaceId(ctx: ToolContext): string | null {
-  const ws = ctx.selectedWorkspaceId;
-  return typeof ws === 'string' && ws !== PERSONAL_SCOPE ? ws : null;
+const NOT_MEMBER = 'You are not a member of this workspace.';
+
+/** The verified workspace id, or the result to return instead (no workspace selected, or not an internal member). */
+async function memberWorkspace(ctx: ToolContext): Promise<{ wsId: string } | { error: string }> {
+  if (!selectedWorkspace(ctx.selectedWorkspaceId)) return { error: NO_WORKSPACE };
+  const wsId = await scopedWorkspaceId(ctx);
+  return wsId ? { wsId } : { error: NOT_MEMBER };
 }
 
 type Corpus = NonNullable<ReturnType<typeof corpusFor>>;
 
 /** The member's workspace corpus, or the result to return instead (no workspace, not a member, off, not configured). */
 async function corpusScope(ctx: ToolContext): Promise<{ wsId: string; store: Corpus } | Record<string, unknown>> {
-  const wsId = workspaceId(ctx);
-  if (!wsId) return { error: NO_WORKSPACE };
-  if (!(await getUserWorkspaceIds(ctx.env, ctx.userId)).includes(wsId)) return { error: 'You are not a member of this workspace.' };
+  const member = await memberWorkspace(ctx);
+  if (!('wsId' in member)) return member;
+  const { wsId } = member;
   if (!(await isKnowledgeEnabled(ctx.env, wsId))) return { enabled: false, message: DISABLED_MESSAGE };
   const store = corpusFor(ctx.env, wsId);
   return store ? { wsId, store } : { enabled: false, message: 'Knowledge search is not available on this instance.' };
@@ -112,8 +115,9 @@ export const knowledgeSearchTool: AccountTool = {
     required: ['query'],
   },
   async execute(ctx, input) {
-    const wsId = workspaceId(ctx);
-    if (!wsId) return { error: NO_WORKSPACE };
+    const member = await memberWorkspace(ctx);
+    if (!('wsId' in member)) return member;
+    const { wsId } = member;
     if (!(await isKnowledgeEnabled(ctx.env, wsId))) {
       return { enabled: false, message: DISABLED_MESSAGE };
     }
@@ -166,8 +170,9 @@ export const knowledgeGetTool: AccountTool = {
     },
   },
   async execute(ctx, input) {
-    const wsId = workspaceId(ctx);
-    if (!wsId) return { error: NO_WORKSPACE };
+    const member = await memberWorkspace(ctx);
+    if (!('wsId' in member)) return member;
+    const { wsId } = member;
     if (!(await isKnowledgeEnabled(ctx.env, wsId))) {
       return { enabled: false, message: DISABLED_MESSAGE };
     }

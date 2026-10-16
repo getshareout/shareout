@@ -13,6 +13,7 @@ import type { AuthUser } from '../../api-auth';
 import { isAuthUser, requireTokenOrSession } from '../helpers/auth-guard';
 import { PERSONAL_SCOPE, type WorkspaceSelection } from '../../chat-platforms/types';
 import { CANVAS_TOOLS } from '../../chat-agent/tools/canvas';
+import { resolveAgentScope, type AgentScope } from '../../chat-agent/scope';
 import { checkAiChatLimit } from '../../rate-limit';
 import { transcribeAudioBytes } from '../../data/transcribe';
 import { hostWorkspaceId } from '../../pages/home/host';
@@ -83,7 +84,7 @@ export async function buildHomeSnapshot(env: Env, ws: string | null, user: AuthU
   ].join('\n');
 }
 
-async function handleChat(ctx: FetchContext, ws: string | null, user: AuthUser): Promise<Response> {
+async function handleChat(ctx: FetchContext, ws: string | null, user: AuthUser, scope: AgentScope): Promise<Response> {
   const { env } = ctx;
   const body = await ctx.request.json().catch(() => ({})) as { text?: string; threadId?: string };
   const text = typeof body.text === 'string' ? body.text.trim() : '';
@@ -98,6 +99,7 @@ async function handleChat(ctx: FetchContext, ws: string | null, user: AuthUser):
     scopeKey: scopeKey(ws),
     user,
     selectedWorkspaceId,
+    scope,
     text,
     threadId: typeof body.threadId === 'string' ? body.threadId : undefined,
     buildSnapshot: () => buildHomeSnapshot(env, ws, user),
@@ -196,8 +198,11 @@ export async function routeHomeAgentApi(ctx: FetchContext): Promise<Response | n
 
   const ws = await hostWorkspaceId(request, env);
   const key = scopeKey(ws);
+  // The host names the workspace; only its internal members get the assistant there.
+  const scope = await resolveAgentScope(env, user.id, key);
+  if (!scope) return addCORS(jsonResp({ error: 'Forbidden', code: 'FORBIDDEN' }, 403));
 
-  if (rest === 'chat' && method === 'POST') return addCORS(await handleChat(ctx, ws, user));
+  if (rest === 'chat' && method === 'POST') return addCORS(await handleChat(ctx, ws, user, scope));
   if (rest === 'transcribe' && method === 'POST') return addCORS(await handleTranscribe(ctx, ws, user));
   if (rest === 'brief' && method === 'GET') return addCORS(await handleBrief(ctx, ws, user));
   if (rest === 'confirm' && method === 'POST') {

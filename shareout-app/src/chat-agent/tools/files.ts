@@ -1,7 +1,7 @@
 import type { AccountTool, ToolContext } from './types';
 import { getOrCreateAssetBucket, type AssetBucketRow } from '../../assets/bucket';
 import { summarizeFile } from '../../data/files';
-import { PERSONAL_SCOPE } from '../../chat-platforms/types';
+import { scopedWorkspaceId } from '../scope';
 
 interface FileRow {
   id: string;
@@ -18,16 +18,11 @@ interface FileRow {
 }
 
 /** The asset buckets this user may read: personal always, plus the selected
- *  workspace's bucket when they are a member of it. */
+ *  workspace's bucket when they are an internal member of it. */
 async function resolveBuckets(ctx: ToolContext): Promise<AssetBucketRow[]> {
   const buckets = [await getOrCreateAssetBucket(ctx.env, ctx.userId, null)];
-  const wsId = ctx.selectedWorkspaceId;
-  if (wsId && wsId !== PERSONAL_SCOPE) {
-    const member = await ctx.env.DB.prepare(
-      'SELECT 1 FROM workspace_members WHERE workspace_id = ? AND user_id = ? LIMIT 1'
-    ).bind(wsId, ctx.userId).first();
-    if (member) buckets.push(await getOrCreateAssetBucket(ctx.env, ctx.userId, wsId));
-  }
+  const wsId = await scopedWorkspaceId(ctx);
+  if (wsId) buckets.push(await getOrCreateAssetBucket(ctx.env, ctx.userId, wsId));
   return buckets;
 }
 

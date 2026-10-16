@@ -19,6 +19,16 @@ const h = vi.hoisted(() => ({
   },
 }));
 
+// Treat the caller as an internal member of whatever workspace is selected; the
+// membership gate itself is covered in chat-agent/workspace-scope.test.ts.
+vi.mock('../../../src/chat-agent/scope', async (orig) => {
+  const real = await orig<typeof import('../../../src/chat-agent/scope')>();
+  return {
+    ...real,
+    resolveAgentScope: async (_e: unknown, _u: string, sel?: string | null) => ({ selection: sel ?? null, workspaceId: real.selectedWorkspace(sel), role: real.selectedWorkspace(sel) ? 'member' : null }),
+    scopedWorkspaceId: async (c: { selectedWorkspaceId?: string | null }) => real.selectedWorkspace(c.selectedWorkspaceId),
+  };
+});
 vi.mock('../../../src/chat-agent/agent-loop', () => ({ runAgentTurn: h.runAgentTurn }));
 vi.mock('../../../src/chat-agent/actions', () => ({
   executeAction: h.executeAction,

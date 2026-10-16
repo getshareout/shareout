@@ -1,5 +1,6 @@
 import type { Env } from '../../types';
 import type { ChatReplyPort, PlatformId, WorkspaceSelection } from '../../chat-platforms/types';
+import type { AgentScope } from '../scope';
 
 export interface ToolContext {
   env: Env;
@@ -15,6 +16,8 @@ export interface ToolContext {
    * "__personal" means personal pages; otherwise it is a workspace id.
    */
   selectedWorkspaceId?: WorkspaceSelection;
+  /** The turn's verified workspace scope (set by runAgentTurn). Read it via scopedWorkspaceId. */
+  scope?: AgentScope;
 }
 
 export interface AccountTool {

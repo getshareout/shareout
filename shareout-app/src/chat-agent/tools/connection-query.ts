@@ -1,5 +1,5 @@
 import type { AccountTool, ToolContext } from './types';
-import { PERSONAL_SCOPE } from '../../chat-platforms/types';
+import { scopedWorkspaceId } from '../scope';
 import { validateReadOnlySql } from '../../data/connections/sql-guard';
 import { isSqlProvider, queryWorkspaceConnection } from '../../data/connections/warehouse-query';
 import { PlatformEngine } from '../../data/platform';
@@ -8,11 +8,8 @@ import { checkWebAgentQueryLimit } from '../../rate-limit';
 const MAX_ROWS = 1000;
 const TIMEOUT_MS = 60_000;
 
-/** The active workspace id, or null when the scope isn't a concrete workspace. */
-function workspaceId(ctx: ToolContext): string | null {
-  const ws = ctx.selectedWorkspaceId;
-  return typeof ws === 'string' && ws !== PERSONAL_SCOPE ? ws : null;
-}
+/** The selected workspace id once internal membership is verified, else null. */
+const workspaceId = (ctx: ToolContext): Promise<string | null> => scopedWorkspaceId(ctx);
 
 export const listConnectionsTool: AccountTool = {
   name: 'list_connections',
@@ -20,7 +17,7 @@ export const listConnectionsTool: AccountTool = {
     "List this workspace's data connectors (name, provider, and what the assistant may do with it: `queryable` = SQL via query_connection, `files` = browse/read via browse_storage). Use first to pick a connector.",
   input_schema: { type: 'object', properties: {} },
   async execute(ctx) {
-    const wsId = workspaceId(ctx);
+    const wsId = await workspaceId(ctx);
     if (!wsId) return { error: 'Connectors are only available inside a workspace.' };
     const rows = await ctx.env.DB.prepare(
       "SELECT name, provider, kind, agent_query_enabled FROM connections WHERE scope_type = 'workspace' AND scope_id = ? ORDER BY name"
@@ -53,7 +50,7 @@ export const queryConnectionTool: AccountTool = {
     required: ['connection', 'sql'],
   },
   async execute(ctx, input) {
-    const wsId = workspaceId(ctx);
+    const wsId = await workspaceId(ctx);
     if (!wsId) return { error: 'Connector queries are only available inside a workspace.' };
 
     const name = typeof input.connection === 'string' ? input.connection.trim() : '';
@@ -108,7 +105,7 @@ export const browseStorageTool: AccountTool = {
     required: ['connection', 'action'],
   },
   async execute(ctx, input) {
-    const wsId = workspaceId(ctx);
+    const wsId = await workspaceId(ctx);
     if (!wsId) return { error: 'Storage connectors are only available inside a workspace.' };
     const name = typeof input.connection === 'string' ? input.connection.trim() : '';
     if (!name) return { error: 'Tell me which connector to browse (connection).' };

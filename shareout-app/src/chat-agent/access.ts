@@ -83,7 +83,7 @@ export async function resolveArtifactAccessForUser(
 
   const isWorkspaceMember = art.workspace_id
     ? !!(await env.DB.prepare(
-      `SELECT 1 FROM workspace_members WHERE workspace_id = ? AND user_id IN (${idPh}) LIMIT 1`
+      `SELECT 1 FROM workspace_members WHERE workspace_id = ? AND member_class = 'internal' AND user_id IN (${idPh}) LIMIT 1`
     ).bind(art.workspace_id, ...scope.userIds).first())
     : false;
 
@@ -135,6 +135,8 @@ export async function resolveArtifactAccessForUser(
   };
 }
 
+// Internal memberships only: an external (sharee) edge never grants workspace
+// visibility here; externals reach pages through explicit grants elsewhere.
 export async function listWorkspacesForUser(env: Env, userId: string, scopeArg?: VisibilityScope): Promise<BotWorkspace[]> {
   const scope = scopeArg ?? await getBotVisibilityScope(env, userId);
   const idPh = placeholders(scope.userIds.length);
@@ -144,7 +146,7 @@ export async function listWorkspacesForUser(env: Env, userId: string, scopeArg?:
            (SELECT COUNT(*) FROM artifacts a WHERE a.workspace_id = w.id AND a.deleted_at IS NULL) AS artifact_count
       FROM workspaces w
       JOIN workspace_members wm ON wm.workspace_id = w.id
-     WHERE wm.user_id IN (${idPh})
+     WHERE wm.user_id IN (${idPh}) AND wm.member_class = 'internal'
      GROUP BY w.id
      ORDER BY lower(w.name) ASC
   `).bind(...scope.userIds).all<{

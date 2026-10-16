@@ -24,6 +24,16 @@ vi.mock('../../../src/data/ai-usage', () => ({ recordAiUsage: h.recordAiUsage })
 vi.mock('../../../src/features/flags', () => ({ isFeatureEnabled: async () => true, webAgentBlockedMessage: async () => 'off' }));
 vi.mock('../../../src/skill-marketplace', () => ({ buildAgentSkillsDoc: async () => 'SKILLS-DOC' }));
 vi.mock('../../../src/chat-agent/access', () => ({ getUserWorkspaceIds: async () => ['wsp_first'] }));
+// Treat the caller as an internal member of whatever workspace is selected; the
+// membership gate itself is covered in chat-agent/workspace-scope.test.ts.
+vi.mock('../../../src/chat-agent/scope', async (orig) => {
+  const real = await orig<typeof import('../../../src/chat-agent/scope')>();
+  return {
+    ...real,
+    resolveAgentScope: async (_e: unknown, _u: string, sel?: string | null) => ({ selection: sel ?? null, workspaceId: real.selectedWorkspace(sel), role: real.selectedWorkspace(sel) ? 'member' : null }),
+    scopedWorkspaceId: async (c: { selectedWorkspaceId?: string | null }) => real.selectedWorkspace(c.selectedWorkspaceId),
+  };
+});
 vi.mock('../../../src/i18n/locale', async (orig) => ({
   ...(await orig<typeof import('../../../src/i18n/locale')>()),
   localeForRecipient: h.localeForRecipient,

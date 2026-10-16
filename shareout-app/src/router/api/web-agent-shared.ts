@@ -17,6 +17,7 @@ import { generateId } from '../../crypto-utils';
 import { jsonWithApiErrors } from '../../http/api-error';
 import { localeForRecipient, type Locale } from '../../i18n/locale';
 import { PERSONAL_SCOPE } from '../../chat-platforms/types';
+import type { AgentScope } from '../../chat-agent/scope';
 
 const HISTORY_LIMIT = 20;
 const THREAD_PAGE = 50;
@@ -49,6 +50,8 @@ export interface ChatTurnConfig {
   scopeKey: string;
   user: AuthUser;
   selectedWorkspaceId: WorkspaceSelection;
+  /** The selection already verified by the route, passed through to the turn. */
+  scope?: AgentScope;
   text: string;
   threadId?: string;
   buildSnapshot: () => Promise<string>;
@@ -63,6 +66,11 @@ export function streamAgentChat(env: Env, cfg: ChatTurnConfig): Response {
   return sseResp(async (send) => {
     const started = Date.now();
     const ws = typeof cfg.selectedWorkspaceId === 'string' && cfg.selectedWorkspaceId !== PERSONAL_SCOPE ? cfg.selectedWorkspaceId : null;
+    // A supplied thread must be this user's, in this scope: its history is replayed to the model.
+    if (cfg.threadId && !(await new WebThreadStore(env, cfg.scopeKey, cfg.user.id).owns(cfg.threadId))) {
+      send({ type: 'error', message: 'That conversation was not found. Start a new one?' });
+      return;
+    }
     // Thread, history, snapshot and locale don't depend on each other: read them together.
     // A brand-new thread has no history to load.
     const [threadId, history, snapshot, locale] = await Promise.all([
@@ -91,6 +99,7 @@ export function streamAgentChat(env: Env, cfg: ChatTurnConfig): Response {
       platform: 'web',
       userId: cfg.user.id,
       selectedWorkspaceId: cfg.selectedWorkspaceId,
+      ...(cfg.scope ? { scope: cfg.scope } : {}),
       userText: cfg.text,
       history,
       reply,
