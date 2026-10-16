@@ -6,16 +6,17 @@
  * Results are written for a model that talks to a non-technical person: what happened,
  * the link, who can see it, and any notice to pass on, in plain words.
  */
-import type { Env } from '../types';
+import type { Env, FileEntry } from '../types';
 import { hashToken } from '../api-auth';
 import { handlePublish } from '../publish/handle-publish';
-import { handleListArtifacts, handleGetArtifact, handleUpdateArtifact } from '../artifacts/crud';
+import { handleListArtifacts, handleGetArtifact, handleUpdateArtifact, listPages } from '../artifacts/crud';
 import { handleGetArtifactFiles } from '../artifacts/files';
 import { requireRole } from '../artifacts/roles';
 import { listWorkspacesForUser, type BotWorkspace } from '../chat-agent/access';
 import { quickSearch } from '../search/quick-search';
 import { openTicket } from '../support/intake';
-import { generateSlug } from '../validation';
+import { generateSlug, mimeForPath, resolveEntrypoint } from '../validation';
+import { isSafePagePath } from '../serve/page-agent';
 import { createLogger, logError } from '../logging';
 import {
   NOT_MEMBER, ON_FAILURE, errorText, fail, getRequest, invalid, ok, readJson, resolveFolder, resolveWorkspace, str, validateArgs, workspaceChoiceText,
@@ -37,6 +38,7 @@ export const SERVER_INSTRUCTIONS = [
   'person the link and say who can see it. If the result carries a notice (visibility changed, under review,',
   'a warning), tell them plainly.',
   'To change a page they already have: find it with list_artifacts, then call update_artifact (it replaces the whole page).',
+  'For a site of several pages, send files instead of content: index.html plus the other pages and any css/js/images, linked with relative links.',
   'If they have several workspaces and did not say which one, ask them before publishing.',
   'A page\'s history is list_versions; restore_version brings an old one back as a new version (confirm first).',
   'For feedback use list_comments, then resolve_comment, assign_comment or approve_version.',
@@ -71,6 +73,61 @@ function fileFor(content: string, format: Format) {
   return format === 'html'
     ? { entrypoint: 'index.html', files: [{ path: 'index.html', content, mime: 'text/html' }] }
     : { entrypoint: 'index.md', files: [{ path: 'index.md', content, mime: 'text/markdown' }] };
+}
+
+// A multi-file site (`files`) maps straight onto the REST publish payload: the REST
+// validator still owns mime allow-list, per-file/total size, duplicates and the
+// entrypoint rule; this only adds the strict `?page=` path guard and infers mimes.
+const FILES_SCHEMA = {
+  type: 'array',
+  description: 'Instead of content: every file of a multi-page site. index.html is the first page; other pages and assets (css, js, json, md, svg, images, fonts) sit beside it, linked with relative links like "about.html" or "css/site.css". Use encoding "base64" for binary files.',
+  items: {
+    type: 'object',
+    properties: {
+      path: { type: 'string', description: 'Relative path, e.g. "index.html", "guides/setup.html", "img/logo.png". No "..", no leading "/".' },
+      content: { type: 'string', description: 'The file\'s text, or base64 bytes when encoding is "base64".' },
+      encoding: { type: 'string', enum: ['utf8', 'base64'], default: 'utf8' },
+    },
+    required: ['path', 'content'],
+    additionalProperties: false,
+  },
+};
+
+function siteFiles(raw: unknown[]): { files: FileEntry[]; error?: undefined } | { error: string } {
+  if (!raw.length) return { error: 'files must list at least one file.' };
+  const files: FileEntry[] = [];
+  for (const f of raw) {
+    const { path, content, encoding } = (f ?? {}) as { path?: unknown; content?: unknown; encoding?: unknown };
+    if (typeof path !== 'string' || typeof content !== 'string') return { error: 'Each file needs a path and content (both text).' };
+    if (!isSafePagePath(path)) {
+      return { error: `"${path}" is not a safe file path. Use a relative path like "about.html" or "css/site.css" (letters, digits, spaces and . _ - ~ /), with no ".." and no leading "/".` };
+    }
+    if (encoding !== undefined && encoding !== 'utf8' && encoding !== 'base64') return { error: `encoding for "${path}" must be "utf8" or "base64".` };
+    files.push({ path, content, mime: mimeForPath(path), ...(encoding === 'base64' ? { encoding: 'base64' as const } : {}) });
+  }
+  return { files };
+}
+
+/** content XOR files → the REST publish file fields, or a reason nothing was sent. */
+function publishFiles(args: Args, fallbackFormat: unknown): { entrypoint?: string; files: FileEntry[]; error?: undefined } | { error: string } {
+  const content = typeof args.content === 'string' ? args.content : '';
+  if (Array.isArray(args.files)) {
+    if (content) return { error: 'Send either content (one page) or files (a site), not both.' };
+    return siteFiles(args.files);
+  }
+  if (!content.trim()) return { error: 'The page content (or files, for a site) is needed.' };
+  return fileFor(content, detectFormat(content, args.format ?? fallbackFormat));
+}
+
+/** HTML pages of a multi-page publish, entrypoint first (same rule as GET /v1/artifacts/:id). */
+function sitePages(files: FileEntry[]): string[] {
+  const entrypoint = resolveEntrypoint({ files });
+  const rows = files.filter((f) => f.mime === 'text/html').map((f) => f.path).sort().map((path) => ({ entrypoint, path }));
+  return listPages(rows)?.pages ?? [];
+}
+
+function pageUrl(base: string, page: string): string {
+  return `${base}?page=${encodeURIComponent(page).replace(/%2F/g, '/')}`;
 }
 
 function audience(visibility: string, workspace: BotWorkspace | null): string {
@@ -108,6 +165,7 @@ function describePublish(
   title: string,
   result: Record<string, unknown>,
   workspace: BotWorkspace | null,
+  pages: string[] = [],
 ): ToolResult {
   const deployment = (result.deployment ?? {}) as Record<string, string>;
   const url = deployment.subdomain_url || deployment.url;
@@ -125,6 +183,7 @@ function describePublish(
     `${verb} "${title}".`,
     `Link: ${url}`,
     `Who can see it: ${audience(visibility, workspace)}.`,
+    ...(pages.length ? [`Pages (${pages.length}): ${pages.map((p) => pageUrl(url, p)).join(', ')}`] : []),
     ...(notes.length ? ['Tell the person:', ...notes.map((n) => `- ${n}`)] : []),
     'Give the person the link.',
   ];
@@ -136,6 +195,7 @@ function describePublish(
     workspace_id: workspace?.id ?? null,
     notices: notes,
     visibility_downgraded: Boolean(result.visibility_downgraded),
+    ...(pages.length ? { pages: pages.map((path) => ({ path, url: pageUrl(url, path) })) } : {}),
   });
 }
 
@@ -246,7 +306,7 @@ const getArtifact: ToolDef = {
       `Visibility: ${String(body.visibility)}. Version ${String(body.current_version)}. Updated ${String(body.updated_at ?? body.created_at)}.`,
       ...(typeof body.live_message === 'string' && body.live_message ? [`What changed in this version: ${body.live_message}`] : []),
       ...(Array.isArray(body.pages) && body.pages.length > 1
-        ? [`Pages (${body.pages.length}): ${body.pages.map((p) => `${String(body.url)}?page=${encodeURIComponent(String(p)).replace(/%2F/g, '/')}`).join(', ')}`]
+        ? [`Pages (${body.pages.length}): ${body.pages.map((p) => pageUrl(String(body.url), String(p))).join(', ')}`]
         : []),
       ...(content !== null ? ['Content:', content] : []),
     ].join('\n');
@@ -260,6 +320,7 @@ const publishArtifact: ToolDef = {
   description: [
     'Publishes a new page on ShareOut and returns its link.',
     'content is a complete, self-contained HTML document (inline CSS/JS) or Markdown text.',
+    'For a site with several pages, send files instead of content: index.html (the first page) plus the other pages and assets, linked with relative links; the result links every page.',
     'workspace_id: needed when the person has more than one workspace — ask them which one.',
     'visibility: "workspace" (default: everyone in the workspace), "private" (only them) or "public" (anyone with the link).',
     'folder: optional, a folder of that workspace (its name or id) to file the page in.',
@@ -272,20 +333,22 @@ const publishArtifact: ToolDef = {
     properties: {
       title: { type: 'string', description: 'Page name, as the person would call it.' },
       content: { type: 'string', description: 'The full page: an HTML document or Markdown.' },
+      files: FILES_SCHEMA,
       format: { type: 'string', enum: ['html', 'markdown'], description: 'Defaults to a guess from the content.' },
       workspace_id: { type: 'string' },
       visibility: { type: 'string', enum: ['workspace', 'private', 'public'] },
       folder: { type: 'string', description: 'Folder to file the page in: its name or id. Omit to leave it unfiled.' },
       message: { type: 'string', description: 'A short note for the version history.' },
     },
-    required: ['title', 'content'],
+    required: ['title'],
     additionalProperties: false,
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   async run(ctx, args) {
     const title = str(args.title, 120);
-    const content = typeof args.content === 'string' ? args.content : '';
-    if (!title || !content.trim()) return fail('A title and the page content are both needed.');
+    if (!title) return fail('A title is needed.');
+    const payload = publishFiles(args, undefined);
+    if (payload.error !== undefined) return invalid(`Nothing was published: ${payload.error}`);
 
     const resolved = await resolveWorkspace(ctx, str(args.workspace_id, 100));
     if (resolved.notMember) return fail(NOT_MEMBER);
@@ -296,7 +359,6 @@ const publishArtifact: ToolDef = {
 
     const wanted = (args.visibility as string | undefined) ?? 'workspace';
     const visibility = wanted === 'workspace' && !workspace ? 'private' : wanted;
-    const format = detectFormat(content, args.format);
     const folderName = str(args.folder, 200);
     const folder = folderName ? await resolveFolder(ctx, workspace?.id ?? null, folderName) : null;
     if (folder?.error) return invalid(folder.error);
@@ -304,14 +366,14 @@ const publishArtifact: ToolDef = {
     const { status, body } = await runPublish(ctx, {
       name: title,
       slug: await freshSlug(ctx.env, ctx.user.id, workspace?.id ?? null, title),
-      ...fileFor(content, format),
+      ...payload,
       workspace_id: workspace?.id,
       visibility,
       ...(folder?.id ? { folder_id: folder.id } : {}),
       ...(str(args.message, 500) ? { message: str(args.message, 500) } : {}),
     });
     if (status >= 400) return fail(`The page was not published: ${errorText(body, status)}`, { status, code: body.code });
-    return describePublish('Published', title, body, workspace);
+    return describePublish('Published', title, body, workspace, sitePages(payload.files));
   },
 };
 
@@ -322,6 +384,7 @@ const updateArtifact: ToolDef = {
     'Replaces the content of a page the person already has (keeps its link and who can see it) and saves it as a new version.',
     'title renames the page; folder moves it into a folder of its workspace (name or id).',
     'Send the whole new page, not a fragment. Find the artifact_id with list_artifacts; get_artifact with include_content gives the current source.',
+    'For a multi-page site send files instead of content: the full new set (index.html plus every page and asset); it replaces all the files of the previous version.',
     'message: optional one-line note on what changed, shown in the page history.',
     'Afterwards give the person the link.',
     ON_FAILURE,
@@ -331,19 +394,19 @@ const updateArtifact: ToolDef = {
     properties: {
       artifact_id: { type: 'string' },
       content: { type: 'string', description: 'The full new page: an HTML document or Markdown.' },
+      files: { ...FILES_SCHEMA, description: 'Instead of content: the complete new set of files of a multi-page site (replaces every file of the previous version). Same rules as publish_artifact.' },
       title: { type: 'string', description: 'New name, if it should change.' },
       format: { type: 'string', enum: ['html', 'markdown'] },
       folder: { type: 'string', description: 'Folder to move the page into: its name or id.' },
       message: { type: 'string', description: 'A short note on what changed, shown in the version history. Omit it and one is written automatically.' },
     },
-    required: ['artifact_id', 'content'],
+    required: ['artifact_id'],
     additionalProperties: false,
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   async run(ctx, args) {
     const id = str(args.artifact_id, 100);
-    const content = typeof args.content === 'string' ? args.content : '';
-    if (!id || !content.trim()) return fail('artifact_id and the new content are both needed.');
+    if (!id) return fail('artifact_id is needed.');
 
     const row = await ctx.env.DB.prepare(
       'SELECT name, display_slug, owner_id, workspace_id, visibility, artifact_type FROM artifacts WHERE id = ? AND deleted_at IS NULL'
@@ -370,11 +433,12 @@ const updateArtifact: ToolDef = {
     const folderName = str(args.folder, 200);
     const folder = folderName ? await resolveFolder(ctx, row.workspace_id, folderName) : null;
     if (folder?.error) return invalid(folder.error);
-    const format = detectFormat(content, args.format ?? (row.artifact_type === 'markdown' ? 'markdown' : 'html'));
+    const payload = publishFiles(args, row.artifact_type === 'markdown' ? 'markdown' : 'html');
+    if (payload.error !== undefined) return invalid(`Nothing was changed: ${payload.error}`);
     const { status, body } = await runPublish(ctx, {
       name: row.name,
       slug: row.display_slug,
-      ...fileFor(content, format),
+      ...payload,
       workspace_id: row.workspace_id ?? undefined,
       visibility: row.visibility,
       ...(folder?.id ? { folder_id: folder.id } : {}),
@@ -395,7 +459,7 @@ const updateArtifact: ToolDef = {
     const workspace = row.workspace_id
       ? (await listWorkspacesForUser(ctx.env, ctx.user.id)).find((w) => w.id === row.workspace_id) ?? null
       : null;
-    return describePublish('Updated', title, body, workspace);
+    return describePublish('Updated', title, body, workspace, sitePages(payload.files));
   },
 };
 

@@ -30,8 +30,8 @@ your ShareOut account"). Allow, and the app is connected.
 | `list_workspaces` | Workspaces and their ids |
 | `list_artifacts` | The person's pages across all their workspaces + personal space; `workspace_id` (id or slug) narrows to one; `search`, `limit` (1–50) |
 | `get_artifact` | One page; `include_content: true` adds the source. The result names the live version's change note (`live_message`) and, for a multi-page site, links every page (`?page=`) |
-| `publish_artifact` | New page from `content` (HTML or Markdown), `title`, optional `workspace_id`, `visibility` (`workspace` default, `private`, `public`), `folder` (name or id of a folder in that workspace), `message` (history note) |
-| `update_artifact` | Replace a page's content (same link, new version); optional `title` renames it, `folder` (name or id) moves it into a folder of its workspace, `message` is the change note (omit it and one is written automatically) |
+| `publish_artifact` | New page from `content` (HTML or Markdown) — or a multi-page site from `files` (see below) — `title`, optional `workspace_id`, `visibility` (`workspace` default, `private`, `public`), `folder` (name or id of a folder in that workspace), `message` (history note). For a site the result links every page (`?page=`) |
+| `update_artifact` | Replace a page's content, or with `files` a site's whole file set (same link, new version); optional `title` renames it, `folder` (name or id) moves it into a folder of its workspace, `message` is the change note (omit it and one is written automatically) |
 | `list_versions` | A page's history, newest first: who, when, how (`api`/`agent`/`editor`/`restore`), change note, comment count, approvals, which one is live. Viewer+ |
 | `get_version_source` | One version's main file (`artifact_id`, `version_no`), up to 512 KB. Viewer+ |
 | `restore_version` | Brings `version_no` back as a **new** version (history kept), optional `message`. Editor+ |
@@ -80,6 +80,18 @@ Rules the tools follow:
   `folder_activity`, `share_with_person` and `revoke_share` run the
   `/v1/workspaces/{id}/folders/{id}/activity`, `/share-person` and `/grants/{id}` handlers
   (admin, or the folder's manager). A refusal comes back as an error result and nothing changes.
+- **Multi-page sites (`files`)** — instead of `content`, send
+  `files: [{ path, content, encoding? }]`: `index.html` is the first page, other pages and
+  assets (css, js, json, md, svg, images, fonts) sit beside it and link with relative hrefs
+  ([core/html-spec/pages.md](../core/html-spec/pages.md#multiple-html-files-sites)).
+  `encoding: "base64"` for binary files. Paths must be relative (`guides/setup.html`): no
+  `..`, no leading `/`, letters, digits, spaces and `. _ - ~ /` only. The mime comes from the
+  extension. It runs the same `/v1/publish` path as REST, so its rules apply unchanged: an
+  allowed mime per file, no duplicate paths, `index.html` present when there is more than one
+  file, 100 MB per file, 500 MB per publish, the instance storage quota
+  (`STORAGE_QUOTA_BYTES`), the daily publish limit and moderation. On `update_artifact`, `files`
+  is the complete new set and replaces every file of the previous version. Send `content` or
+  `files`, not both.
 - **Never overwrites by name** — `publish_artifact` always creates a new page; changing an
   existing one is `update_artifact`.
 - **Plain results** — each result says the link, who can see it, and any notice
