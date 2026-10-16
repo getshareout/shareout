@@ -48,7 +48,8 @@ with a `manifest.json`. No API scripting required.
 | `GET /v1/workspaces/{id}/export` | Workspace owner or admin | All artifacts (cap **200** per zip) |
 
 Zip layout per artifact: `source/` (published files), `data/json/*.json`,
-`data/tables/{table}.csv`, and `manifest.json` (name, slug, version).
+`data/tables/{table}.csv`, and `manifest.json` (name, slug, version). Stored paths that
+are unsafe to unzip are normalized inside `source/`, listed in `RENAMED.txt`.
 
 ## Custom subdomains and domains move with you
 

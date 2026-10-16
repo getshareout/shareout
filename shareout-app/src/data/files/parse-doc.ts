@@ -1,8 +1,9 @@
 // Legacy binary Word (.doc, Word 97–2003) → plain text, in-Worker. The file is a CFB
 // (OLE2) container, opened with SheetJS's CFB reader (already bundled for .xls). The
 // text is read through the document's piece table ([MS-DOC] Clx/PlcPcd): each piece is
-// either 8-bit (Windows-1252) or UTF-16LE. Only the main body is read — no headers,
-// footnotes, styles or images — and field codes are dropped, keeping what they display.
+// either 8-bit (Windows-1252) or UTF-16LE. Every story is read in CP order (main body,
+// footnotes, headers/footers, annotations, endnotes, text boxes) — no styles or images —
+// and field codes are dropped, keeping what they display.
 import * as XLSX from 'xlsx';
 
 export const DOC_MAX_INPUT_BYTES = 8_000_000;
@@ -76,7 +77,16 @@ function clean(raw: string): string {
     .trim();
 }
 
-/** The main text of a Word 97–2003 .doc. Throws DocReadError with a reader-facing message. */
+export const DOC_IMAGES_ONLY = 'Document has no extractable text (images/drawings only)';
+
+// fibRgLw slots of each story's CP count, in the order the stories follow each other in
+// CP space: ccpText, ccpFtn, ccpHdd, ccpMcr, ccpAtn, ccpEdn, ccpTxbx, ccpHdrTxbx.
+const STORIES = [
+  { slot: 3, header: false }, { slot: 4, header: false }, { slot: 5, header: true }, { slot: 6, header: false },
+  { slot: 7, header: false }, { slot: 8, header: false }, { slot: 9, header: false }, { slot: 10, header: true },
+];
+
+/** The text of a Word 97–2003 .doc, all stories, blank-line separated. Throws DocReadError with a reader-facing message. */
 export function docToText(bytes: Uint8Array): string {
   try { return readDoc(bytes); } catch (e) {
     // Out-of-range reads on a truncated / crafted file surface as RangeError.
@@ -104,7 +114,7 @@ function readDoc(bytes: Uint8Array): string {
   const csw = dv.getUint16(32, true);
   const lwAt = 34 + csw * 2;
   const cslw = dv.getUint16(lwAt, true);
-  const ccpText = dv.getInt32(lwAt + 2 + 12, true);
+  const ccps = STORIES.map((st) => (st.slot < cslw ? Math.max(dv.getInt32(lwAt + 2 + st.slot * 4, true), 0) : 0));
   const fcLcbAt = lwAt + 2 + cslw * 4;
   const cbRgFcLcb = dv.getUint16(fcLcbAt, true);
   const clxAt = fcLcbAt + 2 + 33 * 8; // fcClx / lcbClx
@@ -129,7 +139,7 @@ function readDoc(bytes: Uint8Array): string {
   const n = (lcb - 4) / 12;
   if (!Number.isInteger(n) || n < 1 || n > MAX_PIECES || plc + lcb > lcbClx) throw new DocReadError('This .doc file is damaged.');
 
-  const limit = Math.min(Math.max(ccpText, 0), MAX_CHARS);
+  const limit = Math.min(ccps.reduce((a, b) => a + b, 0), MAX_CHARS);
   const parts: string[] = [];
   let total = 0;
   for (let i = 0; i < n && total < limit; i++) {
@@ -143,7 +153,18 @@ function readDoc(bytes: Uint8Array): string {
     parts.push(pieceText(word, raw & 0x3fffffff, compressed, chars));
     total += chars;
   }
-  return clean(parts.join(''));
+  const all = parts.join('');
+  const stories: string[] = [];
+  let body = false;
+  for (let i = 0, cp = 0; i < STORIES.length && cp < all.length; cp += ccps[i++]) {
+    const text = clean(all.slice(cp, cp + ccps[i]));
+    if (!text) continue;
+    stories.push(text);
+    if (!STORIES[i].header) body = true;
+  }
+  // Body empty but anchors for pictures (0x01) or drawn objects (0x08): say why.
+  if (!body && /[\x01\x08]/.test(all)) throw new DocReadError(DOC_IMAGES_ONLY);
+  return stories.join('\n\n');
 }
 
 /** Paragraphs as Markdown (blank-line separated); table cells joined with " | ". */

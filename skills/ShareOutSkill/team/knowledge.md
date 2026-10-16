@@ -213,9 +213,11 @@ repeats on the page (`3.2 Clasificación` → `h-3-2-clasificacion`). The viewer
 it in the page itself, scrolls there and briefly highlights the heading. Headings with
 no Latin letters or digits get no slug.
 
-Legacy Word `.doc` (97–2003) is read in-Worker: the main body text only (no headers,
-footnotes, images or heading styles), up to 8 MB. Word 6/95, password-protected or
-damaged files show `unsupported` with the reason in `error`. Owners, admins and instance admins see every source; members only
+Legacy Word `.doc` (97–2003) is read in-Worker: the text of every story — main body,
+footnotes, headers/footers, comments, endnotes and text boxes, a blank line between
+stories (no images or heading styles), up to 8 MB. Word 6/95, password-protected or
+damaged files, and files whose body is only pictures or drawings ("Document has no
+extractable text (images/drawings only)"), show `unsupported` with the reason in `error`. Owners, admins and instance admins see every source; members only
 those they may open. A reindexed source shows `queued` until it is learned again.
 
 ## For agents

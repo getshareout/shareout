@@ -13,7 +13,11 @@ export const REAL_DOC = () => gunzipSync(base64ToBytes('H4sIAAAAAAACA+2cT2wUVRzH
 
 export interface DocPiece { text: string; compressed: boolean }
 
-export function buildDoc(pieces: DocPiece[], opts: { flags?: number; nFib?: number } = {}): Uint8Array {
+/** CP counts of the stories after the main one; the main story gets whatever is left. */
+export type DocStories = Partial<Record<'ftn' | 'hdd' | 'mcr' | 'atn' | 'edn' | 'txbx' | 'hdrTxbx', number>>;
+const STORY_SLOT = { ftn: 4, hdd: 5, mcr: 6, atn: 7, edn: 8, txbx: 9, hdrTxbx: 10 } as const;
+
+export function buildDoc(pieces: DocPiece[], opts: { flags?: number; nFib?: number; stories?: DocStories } = {}): Uint8Array {
   const fibSize = 0x400;
   const enc = (p: DocPiece) => {
     const out = new Uint8Array(p.text.length * (p.compressed ? 1 : 2));
@@ -34,7 +38,9 @@ export function buildDoc(pieces: DocPiece[], opts: { flags?: number; nFib?: numb
   dv.setUint16(32, 14, true); // csw
   const lw = 34 + 28;
   dv.setUint16(lw, 22, true); // cslw
-  dv.setInt32(lw + 2 + 12, ccp, true); // ccpText
+  const rest = Object.entries(opts.stories ?? {}) as [keyof DocStories, number][];
+  dv.setInt32(lw + 2 + 12, ccp - rest.reduce((n, [, c]) => n + c, 0), true); // ccpText
+  for (const [story, c] of rest) dv.setInt32(lw + 2 + STORY_SLOT[story] * 4, c, true);
   const fl = lw + 2 + 88;
   dv.setUint16(fl, 93, true); // cbRgFcLcb (Word 97)
   // Piece table in the 1Table stream.
