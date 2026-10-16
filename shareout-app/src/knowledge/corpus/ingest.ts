@@ -7,7 +7,8 @@ import { sha256 } from '../../crypto-utils';
 import { extractTextFromHtml } from '../../serve/utils';
 import { parsePptx } from '../../data/files/parse-pptx';
 import { isKnowledgeEnabled } from '../store';
-import { chunkMarkdown } from './chunk';
+import { chunkMarkdown, MAX_CHUNKS, type Chunk } from './chunk';
+import { chunkSections, htmlSections } from './sections';
 import { corpusFor, type SourceKind, type SourceMeta } from './client';
 import { estimateTokens, meterKnowledge, PRICING } from './usage';
 import { EXTRACT_BATCH, extractBatch } from './extract';
@@ -32,7 +33,13 @@ interface Loaded {
   filename: string;
   mime: string;
   bytes: ArrayBuffer;
+  /** A published HTML page: chunk it by section, across every HTML page of its version. */
+  site?: { versionId: string; entrypoint: string };
 }
+
+// A multi-page site is learned page by page (procedures index + one page per procedure).
+const MAX_SITE_PAGES = 60;
+const MAX_PAGE_CHARS = 2_000_000;
 
 export type ExtractResult = { status: 'gone' | 'unsupported' | 'chunked'; chunkCount: number; previousCount: number };
 
@@ -91,7 +98,28 @@ async function loadPage(env: Env, workspaceId: string, refId: string): Promise<L
     filename: file.path.split('/').pop()!,
     mime: file.mime,
     bytes: await obj.arrayBuffer(),
+    ...(!sourceFile && file.mime.includes('html') ? { site: { versionId: row.version_id, entrypoint: row.entrypoint } } : {}),
   };
+}
+
+/** Section chunks for a published HTML page and its sibling HTML pages (entrypoint first). */
+async function siteChunks(env: Env, loaded: Loaded): Promise<Chunk[]> {
+  const { versionId, entrypoint } = loaded.site!;
+  const rows = (await env.DB.prepare(
+    "SELECT path, r2_key FROM assets WHERE version_id = ? AND mime = 'text/html' AND path != ? ORDER BY path LIMIT ?",
+  ).bind(versionId, entrypoint, MAX_SITE_PAGES - 1).all<{ path: string; r2_key: string }>()).results || [];
+  const chunks: Chunk[] = [];
+  const add = (path: string | null, html: string) => {
+    if (html.length > MAX_PAGE_CHARS) html = html.slice(0, MAX_PAGE_CHARS);
+    chunks.push(...chunkSections(htmlSections(html), { startOrd: chunks.length, page: path, max: MAX_CHUNKS - chunks.length }));
+  };
+  add(null, new TextDecoder().decode(loaded.bytes));
+  for (const r of rows) {
+    if (chunks.length >= MAX_CHUNKS) break;
+    const obj = await env.ARTIFACTS.get(r.r2_key);
+    if (obj) add(r.path, await obj.text());
+  }
+  return chunks;
 }
 
 /** A source's text as markdown, or null when we can't read the format. */
@@ -135,8 +163,8 @@ export async function extractStep(env: Env, p: IngestParams): Promise<ExtractRes
     );
     return { status: 'unsupported', chunkCount: 0, previousCount: 0 };
   }
-  const markdown = await toMarkdown(env, loaded.filename, loaded.mime, loaded.bytes);
-  const chunks = markdown ? chunkMarkdown(markdown) : [];
+  const markdown = loaded.site ? '' : await toMarkdown(env, loaded.filename, loaded.mime, loaded.bytes);
+  const chunks = loaded.site ? await siteChunks(env, loaded) : markdown ? chunkMarkdown(markdown) : [];
   if (!chunks.length) {
     await store.setStatus(loaded.meta, 'unsupported', markdown === null ? `Can't read ${loaded.mime} files yet` : 'No text found');
     return { status: 'unsupported', chunkCount: 0, previousCount: 0 };

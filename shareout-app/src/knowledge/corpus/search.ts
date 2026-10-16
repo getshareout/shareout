@@ -2,7 +2,7 @@
 // rank, then re-checked against D1 for access (Vectorize and the DO are never trusted
 // for access). Every hit carries a citation an agent can quote.
 import type { Env } from '../../types';
-import { getPlatformOrigin } from '../../config/origins';
+import { artifactLink } from '../../artifacts/page-links';
 import { corpusFor, type SourceKind } from './client';
 import { queueKnowledgeSource } from './ingest';
 import { EMBED_DIMENSIONS, estimateTokens, meterKnowledge, PRICING } from './usage';
@@ -20,6 +20,12 @@ export interface SearchHit {
   score: number;
   source: { kind: SourceKind; id: string; title: string; url: string | null };
   cite: string;
+  /** Sub-page of a multi-page artifact the passage is on (null = its home page / a file). */
+  page: string | null;
+  /** Heading id the passage sits under, when the page has one. */
+  anchor: string | null;
+  /** Deep link to the passage: the page (and sub-page), scrolled to its section when possible. */
+  url: string | null;
 }
 
 export interface SearchResult {
@@ -52,7 +58,6 @@ export async function visibleSources(env: Env, workspaceId: string, userId: stri
   const visible = new Map<string, Visible>();
   const gone = new Map<string, SourceKind>();
   const ids = (kind: SourceKind) => [...new Set(hits.filter((h) => h.kind === kind).map((h) => h.refId))];
-  const origin = getPlatformOrigin(env);
 
   const pages = ids('page');
   if (pages.length) {
@@ -63,7 +68,7 @@ export async function visibleSources(env: Env, workspaceId: string, userId: stri
           AND a.id IN ${JSON_IN}`,
     ).bind(workspaceId, jsonList(pages)).all<{ id: string; name: string; slug: string; owner_id: string; visibility: string }>()).results || [];
     for (const r of rows) {
-      if (r.visibility !== 'private' || r.owner_id === userId) visible.set(r.id, { title: r.name, url: `${origin}/a/${r.slug}/`, slug: r.slug });
+      if (r.visibility !== 'private' || r.owner_id === userId) visible.set(r.id, { title: r.name, url: artifactLink(env, r.slug), slug: r.slug });
     }
     // Pages awaiting moderation stay in the corpus but out of results until approved.
     const live = new Set(((await env.DB.prepare(
@@ -137,6 +142,9 @@ export async function searchCorpus(
         score: Number((score.get(key(h)) ?? 0).toFixed(4)),
         source: { kind: h.kind, id: h.refId, title: src.title, url: src.url },
         cite: h.locator ? `${src.title} — ${h.locator}` : src.title,
+        page: h.page ?? null,
+        anchor: h.anchor ?? null,
+        url: src.slug ? artifactLink(env, src.slug, { page: h.page, section: h.anchor }) : src.url,
       };
     });
   return { mode: semantic ? 'hybrid' : 'keyword', hits };
@@ -146,6 +154,6 @@ export async function searchCorpus(
 export function searchResultMarkdown(q: string, r: SearchResult): string {
   if (!r.hits.length) return `No knowledge found for "${q}".`;
   return r.hits
-    .map((h, i) => `[${i + 1}] ${h.cite} (${h.source.kind} ${h.source.id}${h.source.url ? `, ${h.source.url}` : ''})\n${h.text}`)
+    .map((h, i) => `[${i + 1}] ${h.cite} (${h.source.kind} ${h.source.id}${h.url ? `, ${h.url}` : ''})\n${h.text}`)
     .join('\n\n');
 }

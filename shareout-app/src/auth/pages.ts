@@ -132,6 +132,9 @@ export function loginPage(
   turnstileSiteKey?: string,
   sharedBy?: string,
   googleEnabled = true,
+  // Where to land after sign-in: the exact URL that hit the gate (path + query, e.g. a
+  // multi-page `?page=` deep link from a bot). Same-host paths only.
+  returnTo?: string,
 ): Response {
   // Private-by-default gates must not reveal title, description, or thumbnail to
   // unauthorized visitors (or crawlers). Optional sharedBy is a first-name hint only
@@ -139,7 +142,9 @@ export function loginPage(
   const subtitle = sharedBy
     ? `Shared with you by <strong>${escapeHtml(sharedBy)}</strong>. Sign in to view it.`
     : 'This content is private. Sign in to continue.';
-  const redirect = `/a/${escapeHtml(slug)}/`;
+  const redirect = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') && !/[\\\s<>"]/.test(returnTo)
+    ? returnTo
+    : `/a/${escapeHtml(slug)}/`;
   return renderAuthPage('Sign in - ShareOut', `
   <div class="card card-share">
     <div class="icon icon-primary">🔒</div>
@@ -388,7 +393,7 @@ function emailOtpFormsHtml(turnstileSiteKey?: string, c: SignInCopy = EN, prefil
 }
 
 function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
-  const dest = JSON.stringify(redirectAfter);
+  const dest = JSON.stringify(redirectAfter).replace(/</g, '\\u003c');
   const L = JSON.stringify(c).replace(/</g, '\\u003c');
   return `<script>
   (function () {
@@ -524,6 +529,8 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
         }
 
         setStatus(L.signedIn, 'success');
+        // Keep the #fragment the visitor arrived with (it never reaches the server).
+        if (redirectAfter && redirectAfter.indexOf('#') < 0) redirectAfter += window.location.hash;
         window.location.href = redirectAfter || '/home';
       } catch (err) {
         setStatus(err && err.message ? err.message : L.badCode, 'error');

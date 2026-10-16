@@ -3,6 +3,7 @@ import { handleGoogleOneTap } from '../auth/google-one-tap';
 import { handleLogout } from '../auth/logout';
 import { handlePasswordAuth, handleCredentialsAuth } from '../auth/artifact-auth';
 import { handleDevLogin } from '../auth/dev-login';
+import { handleTelegramOpen, OPEN_PATH } from '../telegram/open-link';
 import {
   handleCreateAccount,
   handleLinkEmail,
@@ -280,6 +281,10 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
       return Response.redirect(new URL(`/auth/login?redirect=${encodeURIComponent(redirect)}`, url.origin).toString(), 302);
     }
     return handleGoogleLogin(request, env);
+  }
+
+  if (path === OPEN_PATH && request.method === 'GET') {
+    return handleTelegramOpen(request, env);
   }
 
   if (path === '/auth/dev' && request.method === 'GET') {

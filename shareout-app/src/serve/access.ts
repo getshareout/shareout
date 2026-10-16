@@ -85,6 +85,7 @@ export async function checkAccess(
       env.TURNSTILE_CLOUDFLARE_SITEKEY,
       sharedBy,
       Boolean(env.GOOGLE_CLIENT_ID?.trim() && env.GOOGLE_CLIENT_SECRET?.trim()),
+      returnPath(request, slug),
     );
   }
 
@@ -147,6 +148,13 @@ export async function checkAccess(
     userEmail: user?.email,
     requestPending: !!pendingRequest,
   });
+}
+
+/** The gated URL itself (path + query), so sign-in lands back on the exact page — only for the artifact's own viewer path. */
+function returnPath(request: Request, slug: string): string | undefined {
+  const u = new URL(request.url);
+  if (!u.pathname.startsWith(`/a/${slug}/`) && !u.pathname.startsWith(`/a/${encodeURIComponent(slug)}/`)) return undefined;
+  return u.pathname + u.search;
 }
 
 /**

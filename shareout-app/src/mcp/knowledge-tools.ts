@@ -113,7 +113,7 @@ const knowledgeSearch: ToolDef = {
     const limit = Math.min(Math.max(Number(args.limit) || 8, 1), 20);
     const { status, body } = await knowledgeGet(ctx, w.id, 'search', { q: query, limit: String(limit) });
     if (status !== 200) return notAnswered(w, status, body);
-    const hits = (body.hits ?? []) as Array<{ text: string; locator: string; cite: string; source: Cite }>;
+    const hits = (body.hits ?? []) as Array<{ text: string; locator: string; cite: string; source: Cite; url?: string | null }>;
     if (!hits.length) {
       return ok(`Nothing in "${w.name}" matches "${query}". Tell the person it is not in the workspace's files and pages (or try other words).`, { workspace_id: w.id, query, hits: [] });
     }
@@ -121,7 +121,8 @@ const knowledgeSearch: ToolDef = {
       `${hits.length} passages from "${w.name}" for "${query}":`,
       ...hits.map((h, i) => {
         const label = h.locator && h.locator !== h.source.title ? `${h.source.title} — ${h.locator}` : h.source.title;
-        return `\n[${i + 1}] ${label}${h.source.url ? ` — ${h.source.url}` : ''}\n${h.text}`;
+        const link = h.url ?? h.source.url;
+        return `\n[${i + 1}] ${label}${link ? ` — ${link}` : ''}\n${h.text}`;
       }),
       `\n${ANSWER} Cite by [number].`,
     ].join('\n');

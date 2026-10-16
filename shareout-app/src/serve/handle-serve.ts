@@ -16,7 +16,7 @@ import { injectPresenceBeacon } from './presence-beacon';
 import { badgeEnabled, injectBadge } from './badge';
 import { versionedBundlePath } from '../bundle-versions';
 import { localeForArtifactWorkspace } from '../i18n/locale';
-import { injectPageAgent, isSafePagePath } from './page-agent';
+import { injectPageAgent, isSafePagePath, isSafeSectionId } from './page-agent';
 
 function injectCommentsAgent(resp: Response, baseUrl: string): Response {
   const tag = `<script src="${baseUrl}${versionedBundlePath('/sdk/comments-agent.js')}" defer></script>`;
@@ -352,6 +352,7 @@ export async function handleServe(
         socialPreview,
         opts.executionCtx,
         effectiveEntrypoint,
+        sectionParam(url),
       );
     }
 
@@ -413,4 +414,10 @@ export async function handleServe(
   }
 
   return notFound();
+}
+
+/** `?section=<heading id>` from a deep link (bot citations), when it is a plain id. */
+function sectionParam(url: URL): string | undefined {
+  const s = url.searchParams.get('section');
+  return s && isSafeSectionId(s) ? s : undefined;
 }

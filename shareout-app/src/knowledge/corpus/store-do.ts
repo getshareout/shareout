@@ -55,6 +55,10 @@ export class KnowledgeStore extends DurableObject<Env> {
     this.sql = state.storage.sql;
     state.blockConcurrencyWhile(async () => {
       for (const stmt of [...SCHEMA, ...graphSql.GRAPH_SCHEMA]) this.sql.exec(stmt);
+      // Passage locations (sub-page + heading id) arrived after the first stores were created.
+      const cols = new Set(this.sql.exec('PRAGMA table_info(chunks)').toArray().map((r) => r.name as string));
+      if (!cols.has('page')) this.sql.exec('ALTER TABLE chunks ADD COLUMN page TEXT');
+      if (!cols.has('anchor')) this.sql.exec('ALTER TABLE chunks ADD COLUMN anchor TEXT');
     });
   }
 
@@ -116,8 +120,8 @@ export class KnowledgeStore extends DurableObject<Env> {
         graphSql.clearSourceGraph(this.q.bind(this), meta.refId);
         for (const c of chunks) {
           const id = this.q(
-            'INSERT INTO chunks (ref_id, ord, locator, title, text) VALUES (?, ?, ?, ?, ?) RETURNING id',
-            meta.refId, c.ord, c.locator, meta.title, c.text,
+            'INSERT INTO chunks (ref_id, ord, locator, title, text, page, anchor) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id',
+            meta.refId, c.ord, c.locator, meta.title, c.text, c.page ?? null, c.anchor ?? null,
           ).one().id;
           this.q('INSERT INTO chunks_fts (rowid, title, text) VALUES (?, ?, ?)', id, meta.title, c.text);
         }
@@ -152,7 +156,7 @@ export class KnowledgeStore extends DurableObject<Env> {
       const match = ftsQuery(q);
       if (!match) return [];
       return this.q(
-          `SELECT c.ref_id, s.kind, c.title, c.ord, c.locator, c.text
+          `SELECT c.ref_id, s.kind, c.title, c.ord, c.locator, c.text, c.page, c.anchor
              FROM chunks_fts f JOIN chunks c ON c.id = f.rowid JOIN sources s ON s.ref_id = c.ref_id
             WHERE chunks_fts MATCH ? ORDER BY bm25(chunks_fts, 2.0, 1.0) LIMIT ?`,
           match, limit,
@@ -167,7 +171,7 @@ export class KnowledgeStore extends DurableObject<Env> {
       const out: ChunkHit[] = [];
       for (const k of keys) {
         const r = this.q(
-            `SELECT c.ref_id, s.kind, c.title, c.ord, c.locator, c.text
+            `SELECT c.ref_id, s.kind, c.title, c.ord, c.locator, c.text, c.page, c.anchor
                FROM chunks c JOIN sources s ON s.ref_id = c.ref_id WHERE c.ref_id = ? AND c.ord = ?`,
             k.refId, k.ord,
           )
@@ -270,5 +274,7 @@ function toHit(r: Record<string, SqlStorageValue>): ChunkHit {
     ord: r.ord as number,
     locator: r.locator as string,
     text: r.text as string,
+    page: (r.page as string | null) ?? null,
+    anchor: (r.anchor as string | null) ?? null,
   };
 }
