@@ -514,13 +514,14 @@ Opt-in learned library. Full guide: [knowledge.md](knowledge.md). On self-host, 
 | Method | Endpoint | Who | Notes |
 | --- | --- | --- | --- |
 | `GET` | `/v1/workspaces/{id}/knowledge` | Member+ | Settings + counts. |
-| `GET` | `/v1/workspaces/{id}/knowledge/status` | Member+ | Training progress (24h window). |
+| `GET` | `/v1/workspaces/{id}/knowledge/status` | Member+ | Training progress (24h window) + `corpus`: per-source `status` (`queued`/`ready`/`failed`/`unsupported`), `version`, `chunker_version`, `chunks`, `chunks_with_page`, `chunks_with_anchor`, `error` (members: only sources they may open). Instance admins too. |
 | `GET` | `/v1/workspaces/{id}/knowledge/tree` | Member+ | Note summaries by kind. |
 | `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | One note (full body) + `source_artifacts` `[{ id, slug, title, url, available }]`. |
 | `GET` | `/v1/workspaces/{id}/knowledge/from/{artifactId}` | Member+ | Notes learned from one artifact `{ enabled, notes: [{ path, kind, id, title }] }`; empty when you can't open it. |
 | `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Upsert note markdown. |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Delete; `forget=1` stops re-learn. |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | `{ "enabled": true }`. |
+| `POST` | `/v1/workspaces/{id}/knowledge/reindex` | Admin+ | Re-learn every page/File (or `{ "artifactIds": [...] }`) even at an unchanged version → `202 { queued, remaining, skipped }`. Once per workspace per 10 min (`429` + `Retry-After`). Instance admins too. |
 | `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 pages for notes + every page and File for search → `{ queued, kicked, corpus, corpusRemaining }`. |
 | `GET` | `/v1/workspaces/{id}/knowledge/search?q=&limit=&format=md` | Member+ | Cited passages from Files and pages. |
 | `GET` | `/v1/workspaces/{id}/knowledge/sources?limit=` | Member+ | Learned sources: counts by status + recent list. |

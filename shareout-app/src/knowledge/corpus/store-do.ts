@@ -4,7 +4,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../../types';
 import type { Chunk } from './chunk';
-import type { ChunkHit, SourceKind, SourceMeta, SourceRow, SourceStatus } from './client';
+import type { ChunkHit, SourceKind, SourceMeta, SourceRow, SourceStats, SourceStatus } from './client';
 import type { Extraction } from './extract';
 import * as graphSql from './graph-store';
 
@@ -36,6 +36,7 @@ const SCHEMA = [
     rows_written INTEGER NOT NULL DEFAULT 0,
     calls INTEGER NOT NULL DEFAULT 0
   )`,
+  `CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
   `CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
     title, text, content='chunks', content_rowid='id', tokenize='unicode61 remove_diacritics 2'
   )`,
@@ -59,6 +60,11 @@ export class KnowledgeStore extends DurableObject<Env> {
       const cols = new Set(this.sql.exec('PRAGMA table_info(chunks)').toArray().map((r) => r.name as string));
       if (!cols.has('page')) this.sql.exec('ALTER TABLE chunks ADD COLUMN page TEXT');
       if (!cols.has('anchor')) this.sql.exec('ALTER TABLE chunks ADD COLUMN anchor TEXT');
+      // Which chunker produced a source's chunks (0 = before versioning), and how many
+      // ingests in a row failed — the nightly refresh re-learns stale and failed sources.
+      const srcCols = new Set(this.sql.exec('PRAGMA table_info(sources)').toArray().map((r) => r.name as string));
+      if (!srcCols.has('chunker_version')) this.sql.exec('ALTER TABLE sources ADD COLUMN chunker_version INTEGER NOT NULL DEFAULT 0');
+      if (!srcCols.has('fail_count')) this.sql.exec('ALTER TABLE sources ADD COLUMN fail_count INTEGER NOT NULL DEFAULT 0');
     });
   }
 
@@ -96,24 +102,84 @@ export class KnowledgeStore extends DurableObject<Env> {
   }
 
   /** Mark a source in flight (or finished without chunks). Keeps its previous chunks. */
-  setStatus(meta: SourceMeta, status: SourceStatus, error: string | null = null): void {
-    return this.metered(() => this.writeStatus(meta, status, error));
+  /** `chunkerVersion` records that this chunker has seen the source (chunked or unsupported). */
+  setStatus(meta: SourceMeta, status: SourceStatus, error: string | null = null, chunkerVersion?: number): void {
+    return this.metered(() => this.writeStatus(meta, status, error, chunkerVersion));
   }
 
-  private writeStatus(meta: SourceMeta, status: SourceStatus, error: string | null): void {
+  private writeStatus(meta: SourceMeta, status: SourceStatus, error: string | null, chunkerVersion?: number): void {
     this.q(
-      `INSERT INTO sources (ref_id, kind, version, title, owner_id, status, error)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO sources (ref_id, kind, version, title, owner_id, status, error, chunker_version, fail_count)
+       VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, 0), CASE WHEN ? = 'failed' THEN 1 ELSE 0 END)
        ON CONFLICT(ref_id) DO UPDATE SET kind = excluded.kind, version = excluded.version,
          title = excluded.title, owner_id = excluded.owner_id, status = excluded.status,
-         error = excluded.error, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
-      meta.refId, meta.kind, meta.version, meta.title, meta.ownerId, status, error,
+         error = excluded.error, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+         chunker_version = COALESCE(?, chunker_version),
+         fail_count = CASE excluded.status WHEN 'failed' THEN fail_count + 1 WHEN 'processing' THEN fail_count ELSE 0 END`,
+      meta.refId, meta.kind, meta.version, meta.title, meta.ownerId, status, error, chunkerVersion ?? null, status, chunkerVersion ?? null,
     );
+  }
+
+  /** Mark sources queued for a reindex (status `processing`), keeping their chunks. */
+  markQueued(metas: SourceMeta[]): void {
+    return this.metered(() => {
+      for (const m of metas) this.writeStatus(m, 'processing', null);
+    });
+  }
+
+  /** At most one reindex per `windowMs`: claims the slot, or says when the next one opens. */
+  claimReindex(windowMs: number, now = Date.now()): { ok: true } | { ok: false; retryAfterSec: number } {
+    return this.metered(() => {
+      const last = Number(this.q("SELECT value FROM meta WHERE key = 'last_reindex'").toArray()[0]?.value ?? 0);
+      if (last && now - last < windowMs) return { ok: false as const, retryAfterSec: Math.ceil((windowMs - (now - last)) / 1000) };
+      this.q("INSERT INTO meta (key, value) VALUES ('last_reindex', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", String(now));
+      return { ok: true as const };
+    });
+  }
+
+  lastReindexAt(): string | null {
+    return this.metered(() => {
+      const v = this.q("SELECT value FROM meta WHERE key = 'last_reindex'").toArray()[0]?.value;
+      return v ? new Date(Number(v)).toISOString() : null;
+    });
+  }
+
+  /** Per-source detail for status: chunk count plus how many chunks carry a sub-page / heading anchor. */
+  sourceStats(limit: number): SourceStats[] {
+    return this.metered(() => this.q(
+      `SELECT s.*,
+              (SELECT COUNT(*) FROM chunks c WHERE c.ref_id = s.ref_id AND c.page IS NOT NULL) AS with_page,
+              (SELECT COUNT(*) FROM chunks c WHERE c.ref_id = s.ref_id AND c.anchor IS NOT NULL) AS with_anchor
+         FROM sources s ORDER BY s.updated_at DESC LIMIT ?`, limit,
+    ).toArray().map((r) => ({
+      ...toSource(r),
+      chunkerVersion: r.chunker_version as number,
+      failCount: r.fail_count as number,
+      withPage: r.with_page as number,
+      withAnchor: r.with_anchor as number,
+    })));
+  }
+
+  /**
+   * Sources the nightly refresh should re-learn: chunked by an older chunker, or failed
+   * and past their backoff (1, 2, 4, 8 days; gives up after `maxFails`). Oldest first.
+   * Sources already in flight (processing in the last day) are left alone.
+   */
+  staleSources(chunkerVersion: number, limit: number, maxFails: number): { refId: string; kind: SourceKind; reason: 'chunker' | 'failed' }[] {
+    return this.metered(() => this.q(
+      `SELECT ref_id, kind, CASE WHEN status = 'failed' THEN 'failed' ELSE 'chunker' END AS reason FROM sources
+        WHERE (status = 'failed' AND fail_count < ?
+               AND updated_at <= strftime('%Y-%m-%dT%H:%M:%fZ','now', '-' || ((1 << MAX(fail_count - 1, 0)) * 24 - 1) || ' hours'))
+           OR (status IN ('ready', 'unsupported') AND chunker_version < ?)
+           OR (status = 'processing' AND chunker_version < ? AND updated_at <= strftime('%Y-%m-%dT%H:%M:%fZ','now', '-1 day'))
+        ORDER BY chunker_version ASC, updated_at ASC LIMIT ?`,
+      maxFails, chunkerVersion, chunkerVersion, limit,
+    ).toArray().map((r) => ({ refId: r.ref_id as string, kind: r.kind as SourceKind, reason: r.reason as 'chunker' | 'failed' })));
   }
 
   /** Swap a source's chunks for a new version in one transaction. Returns the old count
    *  so the caller can drop vectors past the new end. */
-  replaceChunks(meta: SourceMeta, chunks: Chunk[]): { previousCount: number } {
+  replaceChunks(meta: SourceMeta, chunks: Chunk[], chunkerVersion?: number): { previousCount: number } {
     return this.metered(() => {
       return this.ctx.storage.transactionSync(() => {
         const previousCount = this.deleteChunks(meta.refId);
@@ -125,7 +191,7 @@ export class KnowledgeStore extends DurableObject<Env> {
           ).one().id;
           this.q('INSERT INTO chunks_fts (rowid, title, text) VALUES (?, ?, ?)', id, meta.title, c.text);
         }
-        this.writeStatus(meta, 'processing', null);
+        this.writeStatus(meta, 'processing', null, chunkerVersion);
         this.q('UPDATE sources SET chunk_count = ? WHERE ref_id = ?', chunks.length, meta.refId);
         return { previousCount };
       });

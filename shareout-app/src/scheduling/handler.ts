@@ -31,6 +31,7 @@ import { runSummaryBackfill } from '../publish/summary-backfill';
 import { syncOfficialSkills, officialSkillsSynced } from '../official-skills/sync';
 import { runKnowledgeDistill } from '../knowledge/distill';
 import { runKnowledgeConsolidate } from '../knowledge/consolidate';
+import { runCorpusRefresh } from '../knowledge/corpus/reindex';
 import { simpleApiError } from '../http/api-error';
 import { JOB_ACTIONS, isJobAction } from './jobs/types';
 
@@ -397,6 +398,19 @@ export async function handleScheduledEvent(env: Env, scheduledTime?: number): Pr
         kn_pruned: cons.pruned,
         kn_llm: cons.llmCalls,
         kn_skipped: cons.skipped,
+      });
+    }
+    // Corpus refresh: re-learn sources chunked by an older chunker, and failed ones past
+    // their backoff. Self-limits (caps in knowledge/corpus/reindex.ts).
+    const refresh = await runCorpusRefresh(env).catch((err) => {
+      logger.error('knowledge corpus refresh failed', { error: err instanceof Error ? err.message : String(err) });
+      return null;
+    });
+    if (refresh && refresh.queued > 0) {
+      logger.info('knowledge corpus refresh finished', {
+        kn_refresh_ws: refresh.workspaces,
+        kn_refresh_outdated: refresh.outdated,
+        kn_refresh_failed: refresh.failed,
       });
     }
   }

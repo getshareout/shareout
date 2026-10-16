@@ -83,6 +83,10 @@ beforeAll(async () => {
     `CREATE TABLE IF NOT EXISTS knowledge_settings (workspace_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0, last_consolidated_at TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now')))`,
     `CREATE TABLE IF NOT EXISTS asset_deliverables (id TEXT PRIMARY KEY, bucket_artifact_id TEXT, workspace_id TEXT, owner_id TEXT NOT NULL, name TEXT NOT NULL, visibility TEXT NOT NULL DEFAULT 'workspace', folder_id TEXT, deleted_at TEXT, type_metadata TEXT)`,
     `CREATE TABLE IF NOT EXISTS blobs (id TEXT PRIMARY KEY, artifact_id TEXT, filename TEXT NOT NULL, mime_type TEXT NOT NULL, r2_key TEXT NOT NULL, size_bytes INTEGER NOT NULL, deliverable_id TEXT, version_no INTEGER)`,
+    `CREATE TABLE IF NOT EXISTS knowledge_ingest (workspace_id TEXT NOT NULL, artifact_id TEXT NOT NULL, content_hash TEXT, reason TEXT NOT NULL, queued_at TEXT NOT NULL DEFAULT (datetime('now')), processed_at TEXT, PRIMARY KEY (workspace_id, artifact_id, reason))`,
+    `CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, name TEXT, slug TEXT, owner_id TEXT, visibility TEXT, workspace_id TEXT, deleted_at TEXT, type_metadata TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))`,
+    `CREATE TABLE IF NOT EXISTS deployments (artifact_id TEXT NOT NULL, version_id TEXT, channel TEXT NOT NULL)`,
+    `CREATE TABLE IF NOT EXISTS artifact_moderation (artifact_id TEXT PRIMARY KEY, status TEXT)`,
     `CREATE TABLE IF NOT EXISTS ai_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, kind TEXT NOT NULL, model TEXT NOT NULL, units REAL NOT NULL DEFAULT 0, unit_kind TEXT NOT NULL, base_cost_micro_usd INTEGER NOT NULL DEFAULT 0, source TEXT, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))`,
   ]) await e.DB.exec(sql);
 
@@ -106,11 +110,11 @@ beforeEach(() => {
 });
 
 describe('knowledge tools are listed', () => {
-  it('exposes all six as read-only, telling the model to cite and use the person\'s language', () => {
+  it('exposes six read-only tools plus reindex, telling the model to cite and use the person\'s language', () => {
     const tools = listTools().filter((t) => t.name.startsWith('knowledge_'));
-    expect(tools.map((t) => t.name)).toEqual(['knowledge_search', 'knowledge_entity', 'knowledge_facts', 'knowledge_status', 'knowledge_get', 'knowledge_from_artifact']);
+    expect(tools.map((t) => t.name)).toEqual(['knowledge_search', 'knowledge_entity', 'knowledge_facts', 'knowledge_status', 'knowledge_reindex', 'knowledge_get', 'knowledge_from_artifact']);
     for (const t of tools) {
-      expect(t.annotations.readOnlyHint).toBe(true);
+      expect(t.annotations.readOnlyHint).toBe(t.name !== 'knowledge_reindex');
       expect(t.description).toMatch(/person's language/);
     }
     expect(tools.find((t) => t.name === 'knowledge_search')!.description).toMatch(/say where each fact comes from/);
@@ -200,6 +204,31 @@ describe('knowledge_status', () => {
     expect(text(r)).toMatch(/Knows about \d+ people, companies, projects/);
     const ids = (r!.structuredContent!.sources as { id: string }[]).map((s) => s.id).sort();
     expect(ids).toEqual(['dlv_a1', 'dlv_a2']);
+  });
+});
+
+describe('knowledge_reindex', () => {
+  it('lets an owner re-learn and check progress; a member is refused', async () => {
+    const bo = ctxFor('so_bo');
+    const refused = await callTool(bo, 'knowledge_reindex', { workspace_id: WS_A });
+    expect(refused!.isError).toBe(true);
+    expect(text(refused)).toMatch(/owner or admin/);
+
+    const r = await callTool(ana, 'knowledge_reindex', { workspace_id: WS_A, artifact_ids: ['dlv_a1'] });
+    expect(r!.isError).toBeUndefined();
+    expect(text(r)).toMatch(/Re-learning 1 files and pages of "Agencia A"/);
+    expect(text(await callTool(ana, 'knowledge_reindex', { workspace_id: WS_A }))).toMatch(/already ran in the last 10 minutes/);
+
+    const check = await callTool(ana, 'knowledge_reindex', { workspace_id: WS_A, check_only: true });
+    expect(text(check)).toMatch(/Corpus of "Agencia A": \d+ ready/);
+    expect((check!.structuredContent!.corpus as { sources: unknown[] }).sources.length).toBe(3);
+  });
+
+  it('refuses a workspace the person is not in (the route decides, not the list)', async () => {
+    const r = await callTool(ana, 'knowledge_reindex', { workspace_id: WS_B, check_only: true });
+    expect(r!.isError).toBe(true);
+    expect(text(r)).toMatch(/not a member/);
+    expect(text(r)).not.toMatch(/Contoso|70k/);
   });
 });
 

@@ -29,10 +29,11 @@ interface EntityDetail {
 
 const citeText = (s: Cite) => (s.url ? `${s.title} (${s.url})` : s.title);
 
-async function knowledgeGet(ctx: ToolContext, workspaceId: string, sub: string, params: Record<string, string> = {}) {
+async function knowledgeGet(ctx: ToolContext, workspaceId: string, sub: string, params: Record<string, string> = {}, post?: unknown) {
   const qs = new URLSearchParams(params).toString();
   const req = new Request(`${ctx.origin}/v1/workspaces/${encodeURIComponent(workspaceId)}/knowledge/${sub}${qs ? `?${qs}` : ''}`, {
-    headers: { Authorization: ctx.authorization },
+    headers: { Authorization: ctx.authorization, ...(post !== undefined ? { 'Content-Type': 'application/json' } : {}) },
+    ...(post !== undefined ? { method: 'POST', body: JSON.stringify(post) } : {}),
   });
   const res = await routeKnowledgeApi(createFetchContext(req, ctx.env, ctx.executionCtx));
   return { status: res?.status ?? 404, body: res ? await readJson(res) : {} };
@@ -55,6 +56,21 @@ async function pickWorkspace(ctx: ToolContext, args: Args, action: string): Prom
   if (!resolved.workspace) return ok('Knowledge lives in a workspace, and the person has none yet.', { enabled: false });
   return resolved.workspace;
 }
+
+/** Like pickWorkspace, but a named workspace the person is not in is still tried: the
+ *  reindex/status routes let instance admins in anywhere and refuse everyone else. */
+async function pickAdminWorkspace(ctx: ToolContext, args: Args, action: string): Promise<BotWorkspace | ToolResult> {
+  const requested = str(args.workspace_id, 100);
+  const resolved = await resolveWorkspace(ctx, requested);
+  if (resolved.notMember && requested) return { id: requested, name: requested, slug: requested, role: 'member', artifactCount: 0 };
+  return pickWorkspace(ctx, args, action);
+}
+
+interface CorpusSource {
+  id: string; kind: SourceKind; title: string; status: string; version: string; chunker_version: number; outdated: boolean;
+  chunks: number; chunks_with_page: number; chunks_with_anchor: number; error: string | null;
+}
+interface CorpusStatusBody { chunker_version: number; last_reindex_at: string | null; counts: Record<string, number>; sources: CorpusSource[] }
 
 const isResult = (v: unknown): v is ToolResult => typeof v === 'object' && v !== null && 'content' in v;
 
@@ -241,10 +257,12 @@ const knowledgeStatus: ToolDef = {
   async run(ctx, args) {
     const w = await pickWorkspace(ctx, args, 'knowledge_status');
     if (isResult(w)) return w;
-    const [src, ent] = await Promise.all([
+    const [src, ent, st] = await Promise.all([
       knowledgeGet(ctx, w.id, 'sources', { limit: '200' }),
       knowledgeGet(ctx, w.id, 'entities', { limit: '1' }),
+      knowledgeGet(ctx, w.id, 'status'),
     ]);
+    const corpus = st.status === 200 ? (st.body.corpus as CorpusStatusBody | null) ?? null : null;
     if (src.status !== 200) return notAnswered(w, src.status, src.body);
     const counts = src.body.counts as Record<string, number>;
     const rows = (src.body.sources ?? []) as Array<{ refId: string; kind: SourceKind; status: string; error: string | null; chunkCount: number }>;
@@ -265,8 +283,60 @@ const knowledgeStatus: ToolDef = {
       ...list('Still processing:', named('processing')),
       ...list('Could not be read:', named('failed')),
       ...list('Not supported (file type):', named('unsupported')),
+      ...(corpus?.sources.some((c) => c.outdated) ? [`${corpus.sources.filter((c) => c.outdated).length} sources were learned by an older chunker; they are re-learned overnight, or now with knowledge_reindex.`] : []),
     ].join('\n');
-    return ok(text, { workspace_id: w.id, enabled: true, counts, passages: src.body.chunks, entity_types: types, sources });
+    return ok(text, { workspace_id: w.id, enabled: true, counts, passages: src.body.chunks, entity_types: types, sources, corpus });
+  },
+};
+
+function corpusText(w: BotWorkspace, enabled: boolean, c: CorpusStatusBody | null): string {
+  if (!enabled) return `Knowledge is turned off for "${w.name}".`;
+  if (!c) return 'Knowledge is not available on this ShareOut instance.';
+  return [
+    `Corpus of "${w.name}": ${c.counts.ready ?? 0} ready, ${c.counts.queued ?? 0} queued, ${c.counts.failed ?? 0} failed, ${c.counts.unsupported ?? 0} unsupported. Last reindex: ${c.last_reindex_at ?? 'never'}.`,
+    ...c.sources.slice(0, 40).map((s) => `- ${s.title} [${s.status}] ${s.chunks} passages (${s.chunks_with_page} on sub-pages, ${s.chunks_with_anchor} with a section link)${s.outdated ? ' — older chunker' : ''}${s.error ? ` — ${s.error}` : ''}`),
+  ].join('\n');
+}
+
+const knowledgeReindex: ToolDef = {
+  name: 'knowledge_reindex',
+  title: 'Re-learn the workspace\'s files and pages',
+  description: [
+    'Re-learns every file and page of a workspace (or only artifact_ids) even when they did not change, so answers can cite the exact sub-page and section.',
+    'Only workspace owners and admins (and instance admins) may run it, once every 10 minutes per workspace. It costs AI usage, so run it only when asked or when knowledge_status shows sources from an older chunker.',
+    'With check_only it starts nothing and reports each source (queued / ready / failed, passages, how many cite a sub-page or section, last error) — use it to follow progress.',
+    'Answer in the person\'s language.', ON_FAILURE,
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      workspace_id: WORKSPACE_ARG,
+      artifact_ids: { type: 'array', items: { type: 'string' }, maxItems: 300, description: 'Only these pages/files. Omit for all of them.' },
+      check_only: { type: 'boolean', description: 'Only report progress; start nothing.' },
+    },
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  async run(ctx, args) {
+    const w = await pickAdminWorkspace(ctx, args, 'knowledge_reindex');
+    if (isResult(w)) return w;
+    if (args.check_only === true) {
+      const st = await knowledgeGet(ctx, w.id, 'status');
+      if (st.status !== 200) return st.status === 403 ? fail(NOT_MEMBER) : notAnswered(w, st.status, st.body);
+      const corpus = (st.body.corpus as CorpusStatusBody | null) ?? null;
+      return ok(corpusText(w, st.body.enabled !== false, corpus), { workspace_id: w.id, enabled: st.body.enabled !== false, corpus });
+    }
+    const ids = Array.isArray(args.artifact_ids) ? (args.artifact_ids as unknown[]).filter((v): v is string => typeof v === 'string') : null;
+    const { status, body } = await knowledgeGet(ctx, w.id, 'reindex', {}, ids?.length ? { artifactIds: ids } : {});
+    if (status === 429) return ok(`A reindex of "${w.name}" already ran in the last 10 minutes. ${String(body.hint ?? '')}`.trim(), { workspace_id: w.id, rate_limited: true });
+    if (status === 403) return fail('Only an owner or admin of that workspace can re-learn it.');
+    if (status !== 202) return notAnswered(w, status, body);
+    const skipped = (body.skipped ?? []) as string[];
+    return ok([
+      `Re-learning ${Number(body.queued)} files and pages of "${w.name}"${Number(body.remaining) ? ` (${Number(body.remaining)} more left for a later run)` : ''}.`,
+      skipped.length ? `Not found or not eligible: ${skipped.join(', ')}.` : '',
+      'Call knowledge_reindex with check_only in a few minutes to see progress.',
+    ].filter(Boolean).join('\n'), { workspace_id: w.id, ...body });
   },
 };
 
@@ -341,4 +411,4 @@ const knowledgeFromArtifact: ToolDef = {
   },
 };
 
-export const KNOWLEDGE_TOOLS: ToolDef[] = [knowledgeSearch, knowledgeEntity, knowledgeFacts, knowledgeStatus, knowledgeNote, knowledgeFromArtifact];
+export const KNOWLEDGE_TOOLS: ToolDef[] = [knowledgeSearch, knowledgeEntity, knowledgeFacts, knowledgeStatus, knowledgeReindex, knowledgeNote, knowledgeFromArtifact];

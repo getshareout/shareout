@@ -175,6 +175,38 @@ Owner/admin only. Returns `totalCostMicroUsd` and its breakdown:
 
 Costs are Cloudflare list prices in micro-USD (1,000,000 = $1) before any account-level free allowance. They are tracking only; nothing is billed.
 
+### Re-learn everything (reindex)
+
+Normal learning skips a page or File whose version hasn't changed. When the way pages
+are chunked improves (for example, section-level passages across every page of a
+multi-page site), sources learned earlier keep their old passages until they are
+re-learned. Two ways that happens:
+
+- **Overnight, automatically.** Every source records the `chunker_version` that read it.
+  The 03:00 UTC knowledge pass re-learns sources from an older chunker, and retries
+  `failed` ones after a backoff (1, 2, 4, 8 days, then it stops). Capped at 10 sources
+  per workspace and 60 per night, so a big workspace catches up over a few nights.
+- **Now, on request.** A workspace owner/admin (or an instance admin, even outside the
+  workspace) calls reindex. It re-learns every live, non-held page and File, or only
+  `artifactIds`, through the normal ingest path and metering. Once per workspace per
+  10 minutes (`429 RATE_LIMITED` + `Retry-After`); up to 300 sources per call.
+
+```bash
+curl -sS -X POST "$ORIGIN/v1/workspaces/$WS/knowledge/reindex" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"artifactIds":["art_…"]}'      # or -d '{}' for everything
+# → 202 { "queued": 1, "remaining": 0, "skipped": [] }
+
+curl -sS "$ORIGIN/v1/workspaces/$WS/knowledge/status" -H "Authorization: Bearer $TOKEN"
+```
+
+`GET …/knowledge/status` carries `corpus`: `chunker_version`, `last_reindex_at`, `counts`
+(`queued`, `ready`, `failed`, `unsupported`) and one row per source: `status`, the
+`version` indexed, its `chunker_version` and `outdated`, `chunks`, `chunks_with_page`
+(passages on a sub-page), `chunks_with_anchor` (passages that link to a section heading)
+and the last `error`. Owners, admins and instance admins see every source; members only
+those they may open. A reindexed source shows `queued` until it is learned again.
+
 ## For agents
 
 When Knowledge is on, the [workspace assistant](workspace-assistant.md) can consult it instead of re-reading every page:
@@ -196,7 +228,8 @@ Claude, ChatGPT and Claude Code connected through the [MCP connector](../integra
 | `knowledge_search` | `GET …/knowledge/search` — numbered passages, each with its source title and link |
 | `knowledge_entity` | `GET …/knowledge/entities?q=` + `…/entities/{id}` — one entity, its neighbours, sources and quotes |
 | `knowledge_facts` | facts from `…/entities/{id}`, each with the quoted evidence; optional `filter` |
-| `knowledge_status` | `GET …/knowledge/sources` + entity counts — what's learned, processing or unreadable |
+| `knowledge_status` | `GET …/knowledge/sources` + entity counts — what's learned, processing or unreadable (plus `corpus` from `…/knowledge/status`) |
+| `knowledge_reindex` | `POST …/knowledge/reindex` (owner/admin, or instance admin); `check_only: true` = `GET …/knowledge/status` per-source progress |
 | `knowledge_get` | `GET …/knowledge/files/{path}` — one note in full with its `source_artifacts` (title + link) |
 | `knowledge_from_artifact` | `GET …/knowledge/from/{artifactId}` — the notes learned from one page |
 
@@ -204,18 +237,19 @@ Pass `workspace_id` when the person has several workspaces (the tool asks otherw
 
 ## REST API
 
-All routes require workspace membership. When Knowledge is off, root `GET` returns `{ "enabled": false }` and per-note routes return `404`.
+All routes require workspace membership (`status` and `reindex` also accept an instance admin). When Knowledge is off, root `GET` returns `{ "enabled": false }` and per-note routes return `404`.
 
 | Method | Endpoint | Who | Purpose |
 | --- | --- | --- | --- |
 | `GET` | `/v1/workspaces/{id}/knowledge` | Member+ | Settings + counts (`enabled`, `counts`, `lastUpdated`, `total`) |
-| `GET` | `/v1/workspaces/{id}/knowledge/status` | Member+ | Training progress (`queued`, `processed`, `total`, `running`, `lastProcessedAt`) — 24h window |
+| `GET` | `/v1/workspaces/{id}/knowledge/status` | Member+ (instance admin too) | Training progress (`queued`, `processed`, `total`, `running`, `lastProcessedAt`) — 24h window — plus `corpus`, per-source status ([reindex](#re-learn-everything-reindex)) |
 | `GET` | `/v1/workspaces/{id}/knowledge/tree` | Member+ | All note summaries grouped by kind (no bodies) |
 | `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | One note — full markdown body, `sources` (artifact ids) and `source_artifacts` |
 | `GET` | `/v1/workspaces/{id}/knowledge/from/{artifactId}` | Member+ | Notes learned from one artifact (the reverse of `sources`) |
 | `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Replace markdown; marks hand-edited |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Delete; `forget=1` stops re-learn |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | Turn learning on/off |
+| `POST` | `/v1/workspaces/{id}/knowledge/reindex` | Admin+ (instance admin too) | Re-learn every page and File (or `{ "artifactIds": [...] }`) even when unchanged → `202 { queued, remaining, skipped }`; once per 10 min |
 | `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 recent live pages for notes, and every page and File for search → `{ queued, kicked, corpus, corpusRemaining }` |
 | `GET` | `/v1/workspaces/{id}/knowledge/search?q=&limit=&format=md` | Member+ | Cited passages from Files and pages (hybrid search) |
 | `GET` | `/v1/workspaces/{id}/knowledge/sources?limit=` | Member+ | What has been learned: counts by status + recent sources |

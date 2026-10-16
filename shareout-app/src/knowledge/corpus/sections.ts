@@ -4,6 +4,13 @@
 import { extractTextFromHtml } from '../../serve/utils';
 import type { Chunk } from './chunk';
 
+/**
+ * Bump whenever chunking or section logic changes (here, chunk.ts or ingest.ts's page
+ * walk): the nightly refresh (refresh.ts) re-learns every source chunked by an older one.
+ * 1 = per-page section chunks with page + anchor.
+ */
+export const CHUNKER_VERSION = 1;
+
 export interface Section {
   heading: string;
   /** The heading's id (or its wrapping section's), when it has one. */

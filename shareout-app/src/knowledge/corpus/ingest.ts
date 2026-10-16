@@ -8,7 +8,7 @@ import { extractTextFromHtml } from '../../serve/utils';
 import { parsePptx } from '../../data/files/parse-pptx';
 import { isKnowledgeEnabled } from '../store';
 import { chunkMarkdown, MAX_CHUNKS, type Chunk } from './chunk';
-import { chunkSections, htmlSections } from './sections';
+import { CHUNKER_VERSION, chunkSections, htmlSections } from './sections';
 import { corpusFor, type SourceKind, type SourceMeta } from './client';
 import { estimateTokens, meterKnowledge, PRICING } from './usage';
 import { EXTRACT_BATCH, extractBatch } from './extract';
@@ -159,17 +159,17 @@ export async function extractStep(env: Env, p: IngestParams): Promise<ExtractRes
     const src = await store.getSource(p.refId);
     await store.setStatus(
       { refId: p.refId, kind: 'asset', version: 'too_big', title: src?.title ?? p.refId, ownerId: src?.ownerId ?? null },
-      'unsupported', 'File is larger than 25 MB',
+      'unsupported', 'File is larger than 25 MB', CHUNKER_VERSION,
     );
     return { status: 'unsupported', chunkCount: 0, previousCount: 0 };
   }
   const markdown = loaded.site ? '' : await toMarkdown(env, loaded.filename, loaded.mime, loaded.bytes);
   const chunks = loaded.site ? await siteChunks(env, loaded) : markdown ? chunkMarkdown(markdown) : [];
   if (!chunks.length) {
-    await store.setStatus(loaded.meta, 'unsupported', markdown === null ? `Can't read ${loaded.mime} files yet` : 'No text found');
+    await store.setStatus(loaded.meta, 'unsupported', markdown === null ? `Can't read ${loaded.mime} files yet` : 'No text found', CHUNKER_VERSION);
     return { status: 'unsupported', chunkCount: 0, previousCount: 0 };
   }
-  const { previousCount } = await store.replaceChunks(loaded.meta, chunks);
+  const { previousCount } = await store.replaceChunks(loaded.meta, chunks, CHUNKER_VERSION);
   return { status: 'chunked', chunkCount: chunks.length, previousCount };
 }
 
@@ -290,6 +290,35 @@ export async function startIngest(
     return;
   }
   const run = ingestInline(env, p);
+  if (ctx) ctx.waitUntil(run);
+  else await run;
+}
+
+const INLINE_CONCURRENCY = 3;
+
+/**
+ * Re-learn sources even when their version is unchanged (reindex, nightly refresh).
+ * A fresh Workflow instance id per call bypasses the same-version dedupe; inline, at
+ * most INLINE_CONCURRENCY run at once, in waitUntil when there is a ctx, else awaited.
+ */
+export async function forceIngest(
+  env: Env,
+  ctx: { waitUntil(p: Promise<unknown>): void } | undefined,
+  items: IngestParams[],
+): Promise<void> {
+  if (!items.length) return;
+  if (env.KNOWLEDGE_INGEST) {
+    const stamp = Date.now();
+    for (const p of items) {
+      await startIngest(env, ctx, p, `force:${stamp}`, false).catch((err) => markFailed(env, p, err));
+    }
+    return;
+  }
+  const queue = [...items];
+  const worker = async () => {
+    for (let p = queue.shift(); p; p = queue.shift()) await ingestInline(env, p);
+  };
+  const run = Promise.all(Array.from({ length: Math.min(INLINE_CONCURRENCY, items.length) }, worker));
   if (ctx) ctx.waitUntil(run);
   else await run;
 }
