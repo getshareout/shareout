@@ -111,12 +111,25 @@ describe('publish_artifact with files', () => {
 describe('what gets refused before anything is stored', () => {
   it('rejects traversal, absolute and odd paths', async () => {
     const before = await artifactCount();
-    for (const path of ['../secret.html', '/etc/index.html', 'a/../index.html', 'guides//x.html', 'a\\b.html']) {
+    for (const path of ['../secret.html', '/etc/index.html', 'a/../index.html', 'guides//x.html', 'a\\b.html', 'page@x.html',
+      '../logo.png', 'img/../../x.css', '/abs/a.css', 'img//a.png', 'img\\a.png', 'a\u0001b.png']) {
       const r = await call(alice, 'publish_artifact', { title: 'Bad', workspace_id: WS, files: [{ path: 'index.html', content: '<h1>x</h1>' }, { path, content: 'x' }] });
       expect(r.isError).toBe(true);
       expect(r.content[0].text).toContain('not a safe file path');
     }
     expect(await artifactCount()).toBe(before);
+  });
+
+  it('accepts asset names REST accepts (@ + , = ( )) but keeps pages strict', async () => {
+    const r = await call(alice, 'publish_artifact', { title: 'Assets', workspace_id: WS, files: [
+      { path: 'index.html', content: '<h1>x</h1>' },
+      { path: 'img/logo@2x.png', content: SITE[4].content, encoding: 'base64' },
+      { path: 'a+b.css', content: 'b{}' },
+      { path: 'css/x,y=(1).css', content: 'i{}' },
+    ] });
+    expect(r.isError).toBeUndefined();
+    const versions = await versionsOf(r.structuredContent!.artifact_id as string);
+    expect((await assetsOf(versions[0].id)).map((a) => a.path)).toEqual(['a+b.css', 'css/x,y=(1).css', 'img/logo@2x.png', 'index.html']);
   });
 
   it('applies the REST validator: entrypoint, mime allow-list and duplicate paths', async () => {

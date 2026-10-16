@@ -50,19 +50,24 @@ function writeToml(text) {
   writeFileSync(tomlPath, text);
 }
 
+function requireTomlValue(match, key) {
+  if (!match?.[1]) throw new Error(`provision:cf: wrangler.toml has no ${key}; set it explicitly (no default is assumed).`);
+  return match[1];
+}
+
 function workerName(toml) {
   const m = toml.match(/^\s*name\s*=\s*"([^"]+)"/m);
-  return m?.[1] || 'shareout';
+  return requireTomlValue(m, 'name');
 }
 
 function databaseName(toml) {
   const m = toml.match(/database_name\s*=\s*"([^"]+)"/);
-  return m?.[1] || 'shareout-db';
+  return requireTomlValue(m, 'database_name');
 }
 
 function bucketName(toml) {
   const m = toml.match(/bucket_name\s*=\s*"([^"]+)"/);
-  return m?.[1] || 'shareout-artifacts';
+  return requireTomlValue(m, 'bucket_name');
 }
 
 function createD1(name) {

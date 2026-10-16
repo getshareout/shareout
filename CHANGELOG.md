@@ -28,6 +28,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - `jsonWithApiErrors` optional extra headers (Set-Cookie / CORS) for OTP and file routes
 - Pilot / editor SDK error helpers use the canonical envelope
 - Bump `@cloudflare/workers-types` to v5 so `npm ci` resolves wrangler 4.114 peerOptional cleanly
+- `npm run sync:skill` (and `prune-skill-orphans.mjs`) have no default R2 bucket: pass `--bucket=<name>` or set `SKILL_R2_BUCKET`, and the target is printed before uploading; `provision:cf` no longer falls back to built-in worker / D1 / R2 names when `wrangler.toml` lacks one. MCP `files` accept asset names REST accepts (`logo@2x.png`, `a+b.css`); HTML pages keep the strict page-path rule
 
 ### Security
 

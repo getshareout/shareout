@@ -84,9 +84,11 @@ Rules the tools follow:
   `files: [{ path, content, encoding? }]`: `index.html` is the first page, other pages and
   assets (css, js, json, md, svg, images, fonts) sit beside it and link with relative hrefs
   ([core/html-spec/pages.md](../core/html-spec/pages.md#multiple-html-files-sites)).
-  `encoding: "base64"` for binary files. Paths must be relative (`guides/setup.html`): no
-  `..`, no leading `/`, letters, digits, spaces and `. _ - ~ /` only. The mime comes from the
-  extension. It runs the same `/v1/publish` path as REST, so its rules apply unchanged: an
+  `encoding: "base64"` for binary files. Paths must be relative: no `..`, no leading `/`, no
+  backslash, no empty segments (`a//b`) and no control characters. HTML pages (`.html`/`.htm`,
+  which become `?page=` links) use letters, digits, spaces and `. _ - ~ /` only
+  (`guides/setup.html`); other assets may also use what REST accepts, e.g. `img/logo@2x.png`,
+  `a+b.css`, `x,y=(1).css`. The mime comes from the extension. It runs the same `/v1/publish` path as REST, so its rules apply unchanged: an
   allowed mime per file, no duplicate paths, `index.html` present when there is more than one
   file, 100 MB per file, 500 MB per publish, the instance storage quota
   (`STORAGE_QUOTA_BYTES`), the daily publish limit and moderation. On `update_artifact`, `files`

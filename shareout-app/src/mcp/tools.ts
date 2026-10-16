@@ -15,7 +15,7 @@ import { requireRole } from '../artifacts/roles';
 import { listWorkspacesForUser, type BotWorkspace } from '../chat-agent/access';
 import { quickSearch } from '../search/quick-search';
 import { openTicket } from '../support/intake';
-import { generateSlug, mimeForPath, resolveEntrypoint } from '../validation';
+import { generateSlug, isSafeAssetPath, mimeForPath, resolveEntrypoint } from '../validation';
 import { isSafePagePath } from '../serve/page-agent';
 import { createLogger, logError } from '../logging';
 import {
@@ -84,7 +84,7 @@ const FILES_SCHEMA = {
   items: {
     type: 'object',
     properties: {
-      path: { type: 'string', description: 'Relative path, e.g. "index.html", "guides/setup.html", "img/logo.png". No "..", no leading "/".' },
+      path: { type: 'string', description: 'Relative path, e.g. "index.html", "guides/setup.html", "img/logo@2x.png". No "..", no leading "/", no backslash, no empty segments. HTML pages: letters, digits, spaces and . _ - ~ / only.' },
       content: { type: 'string', description: 'The file\'s text, or base64 bytes when encoding is "base64".' },
       encoding: { type: 'string', enum: ['utf8', 'base64'], default: 'utf8' },
     },
@@ -99,11 +99,15 @@ function siteFiles(raw: unknown[]): { files: FileEntry[]; error?: undefined } | 
   for (const f of raw) {
     const { path, content, encoding } = (f ?? {}) as { path?: unknown; content?: unknown; encoding?: unknown };
     if (typeof path !== 'string' || typeof content !== 'string') return { error: 'Each file needs a path and content (both text).' };
-    if (!isSafePagePath(path)) {
-      return { error: `"${path}" is not a safe file path. Use a relative path like "about.html" or "css/site.css" (letters, digits, spaces and . _ - ~ /), with no ".." and no leading "/".` };
+    const mime = mimeForPath(path);
+    // Pages become ?page= deep links, so they keep the strict page rule; other assets get REST's.
+    if (mime === 'text/html' ? !isSafePagePath(path) : !isSafeAssetPath(path)) {
+      return { error: mime === 'text/html'
+        ? `"${path}" is not a safe file path. Pages need a relative path like "about.html" or "guides/setup.html" (letters, digits, spaces and . _ - ~ /), with no ".." and no leading "/".`
+        : `"${path}" is not a safe file path. Use a relative path like "css/site.css" or "img/logo@2x.png", with no "..", no leading "/", no backslash and no empty segments.` };
     }
     if (encoding !== undefined && encoding !== 'utf8' && encoding !== 'base64') return { error: `encoding for "${path}" must be "utf8" or "base64".` };
-    files.push({ path, content, mime: mimeForPath(path), ...(encoding === 'base64' ? { encoding: 'base64' as const } : {}) });
+    files.push({ path, content, mime, ...(encoding === 'base64' ? { encoding: 'base64' as const } : {}) });
   }
   return { files };
 }

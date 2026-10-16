@@ -42,6 +42,22 @@ export function mimeForPath(path: string): string {
   return EXTENSION_TO_MIME[ext] ?? 'application/octet-stream';
 }
 
+/** REST's path rule for a published file: relative, no traversal. */
+function isTraversalOrAbsolute(path: string): boolean {
+  return path.includes('..') || path.startsWith('/');
+}
+
+/**
+ * Asset path guard for callers that build REST file entries from loose input (MCP `files`).
+ * REST's rule plus: no backslash, no empty or "." segment, no control characters.
+ * Any other character REST accepts (`@ + , = ( )`, …) is allowed.
+ */
+export function isSafeAssetPath(path: string): boolean {
+  if (!path || path.length > 512 || isTraversalOrAbsolute(path)) return false;
+  if (path.includes('\\') || /[\u0000-\u001f\u007f]/.test(path)) return false;
+  return !path.split('/').some((seg) => seg === '' || seg === '.');
+}
+
 const MIME_TO_TYPE: Record<string, ArtifactType> = {
   'text/html': 'html',
   'text/csv': 'csv',
@@ -206,7 +222,7 @@ function validateFile(file: FileEntry): string[] {
     return errors;
   }
 
-  if (file.path.includes('..') || file.path.startsWith('/')) {
+  if (isTraversalOrAbsolute(file.path)) {
     errors.push(`invalid path "${file.path}": must be relative, no traversal`);
   }
 
