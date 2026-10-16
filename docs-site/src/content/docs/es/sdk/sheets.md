@@ -5,7 +5,7 @@ description: Leé y escribí en Google Sheets vía OAuth, con caché integrado y
 
 import { Aside } from '@astrojs/starlight/components';
 
-Leé y escribí en Google Spreadsheets dentro de un artifact vía OAuth. Accedé vía `sdk.sheets`. Para una guía de configuración completa, consultá [la integración de Google Sheets](/es/integrations/google-sheets/).
+Leé y escribí en Google Spreadsheets dentro de un artefacto vía OAuth. Accedé vía `sdk.sheets`. Para una guía de configuración completa, consultá [la integración de Google Sheets](/es/integrations/google-sheets/).
 
 ## Métodos
 
@@ -144,5 +144,5 @@ const fresh = await sdk.sheets.refresh({
 | `FETCH_ERROR` | 500 | Error de la API de Google Sheets |
 
 <Aside type="note">
-`fetch()` cachea los resultados por 5 minutos por defecto para reducir las llamadas a la API. Usá `refresh()` o `forceRefresh: true` cuando necesités datos en tiempo real. Los métodos de escritura (`update`, `append`) requieren autenticación del owner del artifact.
+`fetch()` cachea los resultados por 5 minutos por defecto para reducir las llamadas a la API. Usá `refresh()` o `forceRefresh: true` cuando necesités datos en tiempo real. Los métodos de escritura (`update`, `append`) requieren autenticación del owner del artefacto.
 </Aside>

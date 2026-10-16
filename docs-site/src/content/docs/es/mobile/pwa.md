@@ -1,6 +1,6 @@
 ---
 title: Configuración PWA
-description: Hacé que un artifact de ShareOut sea instalable — manifest, íconos, caché offline y el prompt de instalación.
+description: Hacé que un artefacto de ShareOut sea instalable — manifest, íconos, caché offline y el prompt de instalación.
 ---
 
 Cuando configurás `pwa.enabled: true` en `sdk.publish()`, ShareOut genera un Web App Manifest, registra un service worker, redimensiona tu ícono automáticamente y muestra un prompt de instalación a los visitantes elegibles. HTTPS está incluido.

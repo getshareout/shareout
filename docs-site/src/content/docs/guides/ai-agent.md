@@ -107,7 +107,7 @@ For **server-side automation** (scheduled summaries, Slack delivery, warehouse
 narratives), see [Crew](/guides/crew/) — a separate agent that runs with owner tools,
 not in the visitor's browser.
 
-## Bring your own keys {#bring-your-own-keys}
+## Bring your own keys
 
 For billing control or advanced features (function calling, vision), proxy your
 own provider key through the encrypted secrets proxy instead of the built-in

@@ -1,9 +1,9 @@
 ---
 title: Componentes UI — panorama general
-description: El sistema de diseño so-c-* — fuentes de marca, tokens y clases de componentes para artifacts de ShareOut sin CSS personalizado.
+description: El sistema de diseño so-c-* — fuentes de marca, tokens y clases de componentes para artefactos de ShareOut sin CSS personalizado.
 ---
 
-ShareOut incluye una stylesheet y un script de comportamiento que convierten HTML plano en páginas accesibles y con la marca correcta. Enlazá la stylesheet, agregá clases `.so-` y tu artifact se ve bien sin escribir una sola línea de CSS.
+ShareOut incluye una stylesheet y un script de comportamiento que convierten HTML plano en páginas accesibles y con la marca correcta. Enlazá la stylesheet, agregá clases `.so-` y tu artefacto se ve bien sin escribir una sola línea de CSS.
 
 ## Cargarlo
 
@@ -35,10 +35,10 @@ Una vez que enlazás la stylesheet, el HTML sin estilar ya se ve con la marca co
 
 El sistema de diseño y el editor en vivo son dos capas separadas sobre el mismo markup — necesitás ambas.
 
-- **Las clases `.so-`** controlan cómo se ve el artifact. El editor nunca elimina tags externos `<link>` o `<script>`, y las clases sobreviven cada round-trip de guardado.
-- **Los atributos `data-shareout-*`** le dicen al editor qué puede ver y editar. Una página con estilos perfectos pero sin manifest ni bindings se abre con paneles vacíos y sin outline.
+- **Las clases `.so-`** controlan cómo se ve el artefacto. El editor nunca elimina tags externos `<link>` o `<script>`, y las clases sobreviven cada round-trip de guardado.
+- **Los atributos `data-shareout-*`** le dicen al editor qué puede ver y editar. Un artefacto con estilos perfectos pero sin manifest ni bindings se abre con paneles vacíos y sin outline.
 
-Todo artifact construido con el sistema de diseño debe seguir también la [especificación HTML](/es/guides/html-spec/):
+Todo artefacto construido con el sistema de diseño debe seguir también la [especificación HTML](/es/spec/overview/):
 
 - `<script type="shareout/manifest">` en `<head>` declarando cada fuente de datos.
 - `data-shareout-page` en cada contenedor de página.
@@ -109,7 +109,7 @@ Todos los tokens son custom properties de CSS — preferílos sobre valores hard
 
 ## Cuándo usarlo
 
-Usá el sistema de diseño de ShareOut para cualquier artifact HTML por defecto. Solo evitalo cuando el usuario pide explícitamente un look completamente personalizado — por ejemplo, un portal de cliente que debe coincidir con un sistema de marca externo.
+Usá el sistema de diseño de ShareOut para cualquier artefacto HTML por defecto. Solo evitalo cuando el usuario pide explícitamente un look completamente personalizado — por ejemplo, un portal de cliente que debe coincidir con un sistema de marca externo.
 
 ## Próximos pasos
 

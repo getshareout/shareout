@@ -1,10 +1,10 @@
 ---
 title: BigQuery
-description: Consultá datasets de Google Cloud desde una página, con tus propias credenciales.
+description: Consultá datasets de Google Cloud desde un artefacto, con tus propias credenciales.
 ---
 
-Consultá BigQuery desde una página. La conexión vive a nivel **espacio de trabajo** con
-tus propias credenciales de Google; las páginas leen a través de ella y nunca ven la
+Consultá BigQuery desde un artefacto. La conexión vive a nivel **espacio de trabajo** con
+tus propias credenciales de Google; los artefactos leen a través de ella y nunca ven la
 clave.
 
 ## Conectar
@@ -22,7 +22,7 @@ También se admite el camino OAuth, pero solo si quien opera la instancia config
 `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` — en una instancia autohospedada suelen estar
 sin configurar, y la cuenta de servicio evita necesitarlos.
 
-## Consultar desde una página
+## Consultar desde un artefacto
 
 ```javascript
 const sdk = await ShareOut.create();
@@ -46,7 +46,7 @@ const rows = await warehouse.fetch('SELECT 1 AS ok');
 ## No consultes en cada visita
 
 Un tablero que golpea BigQuery en cada carga es lento y te factura por visita. Mejor
-materializá: corré la consulta en un horario, guardá el resultado y que la página lea la
+materializá: corré la consulta en un horario, guardá el resultado y que el artefacto lea la
 copia guardada:
 
 ```javascript
@@ -56,7 +56,7 @@ await warehouse.materialize({
 });
 ```
 
-La página después lee `dataset:orders_by_country` sin tocar el warehouse. Combinalo con
+El artefacto después lee `dataset:orders_by_country` sin tocar el warehouse. Combinalo con
 un horario para que los números se mantengan al día.
 
 ## Notas

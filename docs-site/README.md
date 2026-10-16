@@ -53,6 +53,7 @@ a new endpoint, edit the spec — pages rebuild automatically.
 | `npm run dev`     | Dev server at `localhost:4321`          |
 | `npm run build`   | Build to `./dist/`                      |
 | `npm run preview` | Preview the production build            |
+| `npm run check:links` | Check internal links and `#anchors` in `dist/` (run after `build`) |
 
 ## Design system
 

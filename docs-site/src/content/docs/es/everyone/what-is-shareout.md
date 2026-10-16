@@ -1,6 +1,6 @@
 ---
 title: ¿Qué es ShareOut?
-description: En tu ShareOut self-hosted, describí una página y queda en vivo — para tu equipo, en tu cuenta de Cloudflare.
+description: En tu ShareOut self-hosted, describí un artefacto y queda en vivo — para tu equipo, en tu cuenta de Cloudflare.
 ---
 
 ShareOut convierte una idea en una página web de verdad en **tu** instancia. Vos
@@ -21,10 +21,10 @@ entero o solo a unas pocas personas.
 
 ## Por qué le encanta a la gente
 
-- **Vos hablás, ella construye.** Describí tu página con tus palabras (Crear con
+- **Vos hablás, ella construye.** Describí tu artefacto con tus palabras (Crear con
   AI necesita una clave de AI en la instancia — preguntale al admin si ese botón
   no hace nada).
-- **Está en vivo en tu link.** Cada página tiene una dirección real en *tu*
+- **Está en vivo en tu link.** Cada artefacto tiene una dirección real en *tu*
   dominio o URL workers.dev.
 - **Vos tenés el control.** ¿No te gusta el color? ¿El texto? Pedilo, o hacé clic
   y cambialo vos.
@@ -43,4 +43,4 @@ Si lo podés describir, lo podés hacer.
 
 - **¿Todavía no desplegaron?** Empezá en [Install / self-host](/es/self-host/overview/).
 - **¿Ya tenés URL?** Mirá [**qué podés hacer**](/es/everyone/what-you-can-make/),
-  después [**hacé tu primera página**](/es/everyone/make-your-first-page/).
+  después [**hacé tu primer artefacto**](/es/everyone/make-your-first-page/).

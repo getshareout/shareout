@@ -10,24 +10,24 @@ todo a través de una sola API REST.
 
 ¿Sin instancia? [Install / self-host](/es/self-host/overview/) primero.
 
-## La idea central: un artifact
+## La idea central: un artefacto
 
-Todo lo que publicás es un **artifact** — un bundle versionado de archivos
+Todo lo que publicás es un **artefacto** — un bundle versionado de archivos
 servido en una URL en vivo.
 
 - **Archivos** — HTML, CSS, JS, imágenes. El entrypoint es `index.html` por defecto.
 - **Versiones** — cada publicación crea una nueva versión. Avanzás siempre, nunca perdés el historial.
 - **Visibilidad** — `private`, `workspace` o `public` (cualquiera en internet con el enlace).
-- **Datos** — cada artifact tiene su propio store JSON, tablas y file blobs.
-- **Jobs** — tareas programadas o disparadas por eventos asociadas al artifact.
+- **Datos** — cada artefacto tiene su propio store JSON, tablas y file blobs.
+- **Jobs** — tareas programadas o disparadas por eventos asociadas al artefacto.
 
 ## Qué podés hacer con la API
 
 | Querés… | Endpoint |
 | --- | --- |
-| Publicar o actualizar una página | [`POST /v1/publish`](/api/operations/publishartifact/) |
-| Listar y administrar artifacts | [`/v1/artifacts`](/api/operations/listartifacts/) |
-| Leer o escribir datos del artifact | [`/v1/data/{id}/json`](/api/operations/getjson/) |
+| Publicar o actualizar un artefacto | [`POST /v1/publish`](/api/operations/publishartifact/) |
+| Listar y administrar artefactos | [`/v1/artifacts`](/api/operations/listartifacts/) |
+| Leer o escribir datos del artefacto | [`/v1/data/{id}/json`](/api/operations/getjson/) |
 | Guardar archivos | [`/v1/data/{id}/blobs`](/api/operations/listblobs/) |
 | Programar una tarea | [`/v1/jobs`](/api/operations/createjob/) |
 | Compartir con colaboradores | [`/v1/artifacts/{id}/collaborators`](/api/operations/listcollaborators/) |
@@ -42,4 +42,4 @@ custom del install. No hay un host público de API de ShareOut.
 export SHAREOUT_ORIGIN=https://shareout.<tu-cuenta>.workers.dev
 ```
 
-¿Listo para publicar tu primera página? Andá al [Quickstart](/es/start/quickstart/).
+¿Listo para publicar tu primer artefacto? Andá al [Quickstart](/es/start/quickstart/).

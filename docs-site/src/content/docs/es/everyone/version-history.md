@@ -79,4 +79,4 @@ un proveedor de IA configurado en la instancia.
 ## Qué sigue
 
 - [**Revisión y aprobaciones**](/es/everyone/review/): comentá una versión y aprobala.
-- [**Publicar artifacts**](/es/guides/publishing/): versiones, slugs y la API de publicación.
+- [**Publicar artefactos**](/es/guides/publishing/): versiones, slugs y la API de publicación.

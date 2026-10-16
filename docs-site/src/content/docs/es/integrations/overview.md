@@ -1,9 +1,9 @@
 ---
 title: Resumen de integraciones
-description: Conectá servicios externos a tus artifacts.
+description: Conectá servicios externos a tus artefactos.
 ---
 
-Traé datos en vivo de servicios externos a tus artifacts, o mandá tus artifacts
+Traé datos en vivo de servicios externos a tus artefactos, o mandá tus artefactos
 hacia donde tu equipo ya trabaja.
 
 ## Disponibles
@@ -19,17 +19,17 @@ hacia donde tu equipo ya trabaja.
 | [Amazon Redshift](/es/integrations/databases-and-storage/#amazon-redshift) | SQL sobre un workgroup Serverless o un clúster |
 | [Amazon Aurora](/es/integrations/databases-and-storage/#amazon-aurora) | SQL sobre Aurora PostgreSQL o MySQL |
 | [Shopify](/es/integrations/shopify/) | Productos, pedidos, inventario |
-| [Slack](/es/integrations/slack/) | Entregar artifacts a un canal o DM |
+| [Slack](/es/integrations/slack/) | Entregar artefactos a un canal o DM |
 | Tienda Nube | E-commerce de LATAM |
 | GitHub | Backup y exportación |
-| CORS proxy | Llamar a APIs externas de la lista permitida desde la página |
+| CORS proxy | Llamar a APIs externas de la lista permitida desde el artefacto |
 
 ## Dos tipos de conexión
 
-- **Por artifact / OAuth-en-la-página** — por ejemplo Google Sheets: el visitante (o el dueño)
-  autoriza, y el artifact trae los datos. Simple, sin configuración de admin.
+- **Por artefacto / OAuth-en-el-artefacto** — por ejemplo Google Sheets: el visitante (o el dueño)
+  autoriza, y el artefacto trae los datos. Simple, sin configuración de admin.
 - **A nivel workspace** — los conectores de plataforma y warehouse se definen una
-  vez por workspace. Los artifacts los referencian por nombre con
+  vez por workspace. Los artefactos los referencian por nombre con
   `sdk.connection('name')`. La mayoría usa **credenciales propias**: pegá tu token
   o clave de cuenta de servicio en el catálogo de conectores, usá **Test** antes de
   guardar, y copiá el snippet `sdk.connection('name')`.
@@ -38,8 +38,8 @@ El catálogo de conectores es siempre visible en el admin del workspace.
 
 ## Seguridad del token
 
-Las credenciales nunca se exponen a la página — las llamadas pasan por el Worker
+Las credenciales nunca se exponen al artefacto — las llamadas pasan por el Worker
 y los secrets se guardan encriptados. Usá
 `POST /v1/workspaces/{id}/connections/test` para verificar credenciales antes de
 guardar. Para API keys de LLM (OpenAI, Anthropic, …), usá el secrets proxy en la
-[guía del agente de IA](/es/guides/ai-agent/#bring-your-own-keys).
+[guía del agente de IA](/es/guides/ai-agent/#traé-tus-propias-keys).

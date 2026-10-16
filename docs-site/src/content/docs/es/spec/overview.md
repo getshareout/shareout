@@ -1,9 +1,9 @@
 ---
-title: Resumen de la especificación de artifact
-description: Qué es un artifact HTML de ShareOut y cómo funciona el modelo de manifest.
+title: Resumen de la especificación de artefacto
+description: Qué es un artefacto HTML de ShareOut y cómo funciona el modelo de manifest.
 ---
 
-Un artifact de ShareOut es un archivo HTML autocontenido publicado en ShareOut y servido
+Un artefacto de ShareOut es un archivo HTML autocontenido publicado en ShareOut y servido
 en una URL estable. El archivo es dueño de sus datos: las claves de almacenamiento, los
 esquemas de tablas y los IDs de documentos realtime se declaran dentro del archivo mismo,
 en un bloque de manifest. El SDK de ShareOut lee el manifest para conectar la persistencia;
@@ -11,7 +11,7 @@ el editor visual lo lee para poblar su panel de datos y el autocompletado.
 
 ## Lo que requiere la especificación
 
-Todo artifact debe incluir cuatro cosas:
+Todo artefacto debe incluir cuatro cosas:
 
 | Elemento | Propósito |
 |----------|----------|
@@ -24,7 +24,7 @@ Sin el manifest, el editor muestra paneles vacíos y no ofrece autocompletado. S
 `data-shareout-page`, la navegación por el esquema queda en blanco. Sin
 `data-shareout-binding`, el editor no puede rastrear qué valores están en uso.
 
-La publicación **nunca se bloquea** por gaps de spec — los artifacts quedan en vivo igual.
+La publicación **nunca se bloquea** por gaps de spec — los artefactos quedan en vivo igual.
 Cada publish HTML devuelve un perfil advisory `editor_readiness` (ver [Publicar](/es/guides/publishing/))
 que califica estos marcadores y nombra qué deshabilita cada gap en el estudio.
 
@@ -65,7 +65,7 @@ que califica estos marcadores y nombra qué deshabilita cada gap en el estudio.
 
 ## Checklist de cumplimiento
 
-Antes de publicar un artifact, verificá:
+Antes de publicar un artefacto, verificá:
 
 - `<script type="shareout/manifest">` existe en `<head>` con `"version": "2.0"`
 - Cada key de `sdk.json` está declarada en `sources.json`

@@ -70,18 +70,18 @@ Qué es, detalles a tener en cuenta, una consulta de ejemplo.
 | --- | --- |
 | `source` | Datos externos detrás de una [conexión del workspace](/es/teams/connections/) — `connection` + `fqn` |
 | `event` | Eventos crudos de analytics o telemetría (a menudo upstream de tablas y pipelines) |
-| `dataset` | Datos que crean tus artifacts — `artifact` + `store` (ej. `table:daily_metrics`) |
+| `dataset` | Datos que crean tus artefactos — `artifact` + `store` (ej. `table:daily_metrics`) |
 | `table`, `view`, `pipeline`, `dashboard`, `model`, `metric` | Activos más finos en tu data mesh |
 | `term` | Entrada de glosario — otros activos enlazan con `terms: [active-user]` |
 
 Las aristas `upstream` / `downstream` cruzan planos libremente — por ejemplo un `dataset` de
-artifact cuyo `upstream` es un `source` de conector.
+artefacto cuyo `upstream` es un `source` de conector.
 
 ### Mapea los dos tipos de datos
 
 - **Datos externos** — todo lo que está detrás de una conexión del workspace (Snowflake,
   BigQuery, Sheets, Shopify…). Son entradas `source` con `connection` y `fqn`.
-- **Datos que crean tus artifacts** — tablas y JSON guardados dentro de un artifact. Son
+- **Datos que crean tus artefactos** — tablas y JSON guardados dentro de un artefacto. Son
   entradas `dataset`. El linaje une ambos, así podés ver los datos de un dashboard trazados
   hasta la tabla del warehouse que los alimenta.
 

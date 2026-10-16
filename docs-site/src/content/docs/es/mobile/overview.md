@@ -1,9 +1,9 @@
 ---
 title: Mobile y PWA — panorama general
-description: Convertí cualquier artifact de ShareOut en una app móvil con detección de dispositivo, gestos táctiles e instalación PWA opcional.
+description: Convertí cualquier artefacto de ShareOut en una app móvil con detección de dispositivo, gestos táctiles e instalación PWA opcional.
 ---
 
-Los artifacts de ShareOut son responsivos por defecto. Agregá `mobile_html` y `pwa` en tu llamada a `sdk.publish()` y obtenés detección automática de dispositivo, navegación tipo app, soporte offline y un prompt de "Agregar a la pantalla de inicio" — sin pipeline de build separado.
+Los artefactos de ShareOut son responsivos por defecto. Agregá `mobile_html` y `pwa` en tu llamada a `sdk.publish()` y obtenés detección automática de dispositivo, navegación tipo app, soporte offline y un prompt de "Agregar a la pantalla de inicio" — sin pipeline de build separado.
 
 ## Web vs. mobile
 
@@ -18,7 +18,7 @@ Los artifacts de ShareOut son responsivos por defecto. Agregá `mobile_html` y `
 
 ## Cómo funciona la detección de dispositivo
 
-Publicás un solo artifact con ambas versiones. ShareOut sirve la correcta automáticamente:
+Publicás un solo artefacto con ambas versiones. ShareOut sirve la correcta automáticamente:
 
 | User agent | Versión servida |
 |---|---|
@@ -41,7 +41,7 @@ await sdk.publish({
 });
 ```
 
-Agregá la key `pwa` para hacer el artifact instalable — ver [Configuración PWA](/es/mobile/pwa/).
+Agregá la key `pwa` para hacer el artefacto instalable — ver [Configuración PWA](/es/mobile/pwa/).
 
 ## Patrones de navegación
 

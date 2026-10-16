@@ -34,6 +34,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
+- **Docs site: broken links fixed + link checker.** `npm run check:links` in `docs-site/` checks every internal link and `#anchor` in the built `dist/` against the generated heading ids (28 broken links fixed, now 0). Spanish pages say "artefacto" for ShareOut artifacts instead of "artifact"/"página".
 - **Skill OSS hygiene (v2.51.0):** workspace overlay is role-based; `team/billing.md` is a hosted-only stub (no checkout/upsell on self-host); plan language stripped from team entry, API, subdomain, admin portal, assistant docs
 - Official marketplace primer `official-skills/shareout.md` rewritten: origin-aware, short, points agents at `GET $ORIGIN/v1/skill` for the full tree
 - README / AGENTS / self-host overview: agent install path + skill location clarified

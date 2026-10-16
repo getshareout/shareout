@@ -11,7 +11,7 @@ antes de anunciar un build self-host público de forma amplia.
 | Límite | Confianza | Notas |
 |--------|-----------|--------|
 | Browser → Worker (apex) | Cookie de sesión / API token | CSRF vía SameSite; CORS a orígenes de la app |
-| HTML del artifact → data API | Artifact + capability tokens | Sandbox / CSP; `ARTIFACT_ORIGIN` opcional |
+| HTML del artefacto → data API | Artefacto + capability tokens | Sandbox / CSP; `ARTIFACT_ORIGIN` opcional |
 | `/internal/admin/*` | Bearer `ADMIN_BRIDGE_SECRET` | **Dejar unset en OSS** — sin secret deniega todo |
 | UI super-admin | Roster / `SETUP_ADMIN_EMAIL` / primer usuario | Self-host: roster vacío + primer signup |
 | Email OTP | Turnstile (si está) + caps DB por email + KV por IP | Códigos a logs si `EMAIL` no está bound |
@@ -31,7 +31,7 @@ antes de anunciar un build self-host público de forma amplia.
 
 1. **No** setees `ADMIN_BRIDGE_SECRET` salvo que corras un bridge worker aparte que controles.
 2. Seteá un `SESSION_SECRET` largo y único.
-4. Mantené artifacts privados hasta entender open visibility / moderación.
+4. Mantené artefactos privados hasta entender open visibility / moderación.
 5. Habilitá Turnstile para OTP si la instancia es internet-facing.
 6. Revisá WAF / bot fight mode de Cloudflare en tu zona.
 7. Reportá vulns vía [SECURITY.md](https://github.com/getshareout/shareout/blob/main/SECURITY.md).
@@ -41,6 +41,6 @@ antes de anunciar un build self-host público de forma amplia.
 - Inventario más amplio de mutaciones (rutas de moderación admin están gated por
   sesión super-admin — sin cuota KV extra todavía).
 - Fuzz automatizado de capability-token / paths CDN.
-- Review independiente de escapes del sandbox de artifacts.
+- Review independiente de escapes del sandbox de artefactos.
 
 Ver también: [Ops](/es/self-host/ops/) · [Secrets](/es/self-host/secrets/).

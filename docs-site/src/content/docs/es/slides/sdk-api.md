@@ -11,7 +11,7 @@ El campo `visibility` acepta `private`, `workspace` y `public`. (`unlisted` es u
 
 ### `sdk.slides.create()`
 
-Crear una presentación. Devuelve las URLs del artifact de edición y del publicado.
+Crear una presentación. Devuelve las URLs del artefacto de edición y del publicado.
 
 ```typescript
 create(options: CreateOptions): Promise<CreateResult>
@@ -54,7 +54,7 @@ view(id: string): Promise<Presentation>
 
 ### `sdk.slides.list()`
 
-Listar todas las presentaciones asociadas a este artifact.
+Listar todas las presentaciones asociadas a este artefacto.
 
 ```typescript
 list(): Promise<PresentationInfo[]>

@@ -1,9 +1,9 @@
 ---
 title: Conectá tus herramientas
-description: Traé datos de una planilla, tu tienda o tus estadísticas — o mandá cosas a Slack y mail. Tu página, enchufada a lo que ya usás.
+description: Traé datos de una planilla, tu tienda o tus estadísticas — o mandá cosas a Slack y mail. Tu artefacto, enchufado a lo que ya usás.
 ---
 
-Tu página no tiene por qué vivir sola. Podés **conectar las herramientas que ya usás** — así tu página muestra datos en vivo de ellas, o les manda cosas.
+Tu artefacto no tiene por qué vivir solo. Podés **conectar las herramientas que ya usás** — así tu artefacto muestra datos en vivo de ellas, o les manda cosas.
 
 ## Dos direcciones
 
@@ -12,7 +12,7 @@ Tu página no tiene por qué vivir sola. Podés **conectar las herramientas que 
 
 ## Qué podés conectar
 
-| Conectá… | …y tu página puede |
+| Conectá… | …y tu artefacto puede |
 | --- | --- |
 | **Google Sheets** | Mostrar una lista directo de tu planilla, siempre al día |
 | **Tu tienda online** (Shopify, Tienda Nube) | Mostrar tus productos, precios y stock |
@@ -33,7 +33,7 @@ En cualquier caso lleva un minuto, y lo hacés una sola vez.
 
 ## Tus claves quedan seguras
 
-Todo lo que conectás queda **guardado y encriptado** — tus contraseñas y claves nunca se muestran en tu página ni a tus visitantes. La parte segura la manejamos nosotros, así no tenés que pensarla.
+Todo lo que conectás queda **guardado y encriptado** — tus contraseñas y claves nunca se muestran en tu artefacto ni a tus visitantes. La parte segura la manejamos nosotros, así no tenés que pensarla.
 
 ## Qué sigue
 

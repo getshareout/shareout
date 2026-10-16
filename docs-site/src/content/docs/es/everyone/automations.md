@@ -1,16 +1,16 @@
 ---
 title: Ponelo en piloto automático
-description: Tu página puede hacer cosas sola — mandar un reporte semanal, postear a Slack cuando alguien se anota, actualizar tus datos todas las mañanas.
+description: Tu artefacto puede hacer cosas solo — mandar un reporte semanal, postear a Slack cuando alguien se anota, actualizar tus datos todas las mañanas.
 ---
 
-Tu página puede hacer cosas **sola** — sin nadie ahí apretando botones. La configurás una vez, y funciona nomás.
+Tu artefacto puede hacer cosas **solo** — sin nadie ahí apretando botones. Lo configurás una vez, y funciona nomás.
 
-## Desde la página misma
+## Desde el artefacto mismo
 
-Cuando estás viendo una página que podés administrar, la barra de herramientas tiene un
+Cuando estás viendo un artefacto que podés administrar, la barra de herramientas tiene un
 botón de **programar**. Elegí email, Slack o Telegram, definí cada cuánto, y ShareOut crea
 el job por vos — sin llamadas a la API. Los owners y editores pueden programar envíos a
-otras personas; los viewers pueden suscribirse para recibir la página en su propio mail de
+otras personas; los viewers pueden suscribirse para recibir el artefacto en su propio mail de
 forma recurrente.
 
 La pestaña **Automate** del Inspector en Home lista solo los schedules del artefacto que
@@ -26,7 +26,7 @@ privada.
 >
 > *"Todas las mañanas, actualizá mi lista de productos desde la planilla."*
 
-**Cuando pasa algo** — entra una respuesta, se actualiza tu página, alguien deja un comentario:
+**Cuando pasa algo** — entra una respuesta, se actualiza tu artefacto, alguien deja un comentario:
 
 > *"Cuando alguien envía el formulario de RSVP, posteá su nombre en nuestro canal de Slack."*
 >
@@ -55,7 +55,7 @@ privada.
 - **Revisá qué pasó** — hay un registro simple de cada corrida, así ves que funcionó (o por qué no).
 
 :::tip[Empezá de a poco]
-Elegí una cosa que hacés a mano todas las semanas — mandar un reporte, copiar números, avisarle al equipo — y dejá que tu página lo haga en tu lugar.
+Elegí una cosa que hacés a mano todas las semanas — mandar un reporte, copiar números, avisarle al equipo — y dejá que tu artefacto lo haga en tu lugar.
 :::
 
 ## Qué sigue

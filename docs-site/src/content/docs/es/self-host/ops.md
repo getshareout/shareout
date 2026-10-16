@@ -136,7 +136,7 @@ Antes de exponer una instancia a internet:
 
 - Rotá cualquier secret que haya filtrado a un gist o chat
 - Mantené `SESSION_SECRET` largo y único por instancia
-- Preferí artifacts privados + auth hasta entender open visibility
+- Preferí artefactos privados + auth hasta entender open visibility
 - Revisá WAF / bot settings de Cloudflare en tu zona
 - Reportá vulns del producto vía [SECURITY.md](https://github.com/getshareout/shareout/blob/main/SECURITY.md)
 

@@ -36,7 +36,7 @@ await sdk.crew.define({
 - **Warehouse:** `query` = SQL; `params.projectId` para BigQuery
 
 Devuelve filas al contexto del crew — ideal para **agregados y resultados chicos**.
-Corre como el **owner del artifact**, incluyendo conectores per-user.
+Corre como el **owner del artefacto**, incluyendo conectores per-user.
 
 ## Tools de escritura
 
@@ -106,7 +106,7 @@ Ver [integración Slack](/es/integrations/slack/).
 | --- | --- |
 | `never` | Ejecuta de inmediato |
 | `always` | Siempre requiere aprobación del owner |
-| `whenPublic` | Solo si el artifact es público |
+| `whenPublic` | Solo si el artefacto es público |
 
 ```javascript
 const { approvals } = await sdk.crew.approvals.list('pending');

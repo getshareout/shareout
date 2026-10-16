@@ -5,7 +5,7 @@ description: Creá y administrá workspaces de Teams — miembros, roles, visibi
 
 import { Aside } from '@astrojs/starlight/components';
 
-Un workspace es un contenedor compartido para artifacts, miembros, carpetas y
+Un workspace es un contenedor compartido para artefactos, miembros, carpetas y
 conectores. Cada workspace tiene su propia jerarquía de roles, política de
 membresía y subdominio opcional.
 
@@ -39,9 +39,9 @@ Eliminar requiere el rol `owner` y cascadea las membresías.
 
 | Rol | Capacidades |
 | --- | --- |
-| `owner` | Control total del workspace, incluyendo eliminar y transferir propiedad. Puede editar **cualquier** artifact del workspace en Live Studio y Edit-Lite. |
-| `admin` | Gestionar miembros, política, subdominio, conectores, schedules, automaciones. Puede editar **cualquier** artifact del workspace en Live Studio y Edit-Lite. |
-| `member` | Crear/editar sus propios artifacts; ver artifacts con visibilidad workspace. Editar el artifact de otro miembro requiere invitación explícita como **editor**. |
+| `owner` | Control total del workspace, incluyendo eliminar y transferir propiedad. Puede editar **cualquier** artefacto del workspace en Live Studio y Edit-Lite. |
+| `admin` | Gestionar miembros, política, subdominio, conectores, schedules, automaciones. Puede editar **cualquier** artefacto del workspace en Live Studio y Edit-Lite. |
+| `member` | Crear/editar sus propios artefactos; ver artefactos con visibilidad workspace. Editar el artefacto de otro miembro requiere invitación explícita como **editor**. |
 
 | Método | Endpoint | Notas |
 | --- | --- | --- |
@@ -55,7 +55,7 @@ Eliminar requiere el rol `owner` y cascadea las membresías.
 
 ## Política de membresía
 
-Controla quién puede unirse — separada de la `access_policy` por artifact.
+Controla quién puede unirse — separada de la `access_policy` por artefacto.
 
 ```http
 GET /v1/workspaces/{workspaceId}/access-policy
@@ -91,7 +91,7 @@ Reglas:
 
 ## Visibilidad de workspace
 
-Publicá un artifact con `visibility: "workspace"` para que todos los miembros
+Publicá un artefacto con `visibility: "workspace"` para que todos los miembros
 del workspace puedan verlo:
 
 ```json
@@ -148,20 +148,20 @@ DELETE /v1/workspaces/{workspaceId}/logo
 ```
 
 <Aside type="tip">
-Mirá [Subdominios](/es/teams/subdomain/) para servir los artifacts del
+Mirá [Subdominios](/es/teams/subdomain/) para servir los artefactos del
 workspace en `{workspace}.shareout.site`.
 </Aside>
 
 ## Modelo Personal vs workspace
 
-Los artifacts sin `workspace_id` pertenecen al espacio **Personal** del owner.
-Definir `workspace_id` al publicar mueve el artifact al workspace — aparece en
+Los artefactos sin `workspace_id` pertenecen al espacio **Personal** del owner.
+Definir `workspace_id` al publicar mueve el artefacto al workspace — aparece en
 el Team Space junto con carpetas y contenido con visibilidad workspace.
 
 En el home, usá el **selector de avatar** para moverte entre Personal y cada workspace de
 equipo al que pertenecés. Personal y Team Space tienen sus propias carpetas en una barra
 superior unificada.
 
-El [Home del workspace](/es/everyone/your-workspace/) rediseñado agrega artifacts en
+El [Home del workspace](/es/everyone/your-workspace/) rediseñado agrega artefactos en
 pestañas, el Inspector (Details, Comments, Automate), modo Edit rápido y el feed Activity
 (Needs You + Pulse).

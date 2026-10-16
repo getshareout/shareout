@@ -1,10 +1,10 @@
 ---
 title: Homepage del workspace
-description: Qué ven los visitantes en {workspace}.shareout.site — gate de membresía y URLs de artifacts.
+description: Qué ven los visitantes en {workspace}.shareout.site — gate de membresía y URLs de artefactos.
 ---
 
 Cuando un [subdominio personalizado](/es/teams/subdomain/) está habilitado,
-`{workspace}.shareout.site` se comporta distinto en la **raíz** vs las **rutas de artifact**.
+`{workspace}.shareout.site` se comporta distinto en la **raíz** vs las **rutas de artefacto**.
 
 ## Raíz del subdominio (`/`)
 
@@ -18,21 +18,21 @@ La raíz del workspace **nunca es una galería pública**. Está restringida a m
 
 Los workspaces son superficies cerradas — solo los miembros llegan al dashboard desde la raíz.
 
-## URLs de artifacts
+## URLs de artefactos
 
-Las páginas individuales siguen compartiéndose en URLs limpias del subdominio:
+Los artefactos individuales siguen compartiéndose en URLs limpias del subdominio:
 
 ```
 https://{workspace}.shareout.site/{artifact-slug}/
 ```
 
-Los artifacts con visibilidad `workspace` o `public` publicados en el workspace son
-accesibles aquí (según la visibilidad y política de acceso de cada artifact). Los
+Los artefactos con visibilidad `workspace` o `public` publicados en el workspace son
+accesibles aquí (según la visibilidad y política de acceso de cada artefacto). Los
 privados requieren las reglas habituales de colaborador o acceso.
 
 ## Alternativa con namespace
 
-Si el subdominio no está habilitado, los artifacts del workspace también están en:
+Si el subdominio no está habilitado, los artefactos del workspace también están en:
 
 ```
 shareout.site/@{workspaceSlug}/{artifact-slug}/

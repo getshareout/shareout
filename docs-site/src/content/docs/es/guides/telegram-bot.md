@@ -7,7 +7,7 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 
 **@ShareOutAI_bot** es un asistente a nivel de cuenta en Telegram. Una vez vinculado,
 puede encontrar y leer tus artefactos, renderizar snapshots y PDFs, ejecutar fuentes de
-datos REST en vivo, escribir datos en una página, y permitirte pausar alertas o
+datos REST en vivo, escribir datos en un artefacto, y permitirte pausar alertas o
 administrar jobs programados — todo con un paso de confirmación explícito antes de
 cualquier mutación.
 
@@ -15,7 +15,7 @@ cualquier mutación.
 Esto es distinto de `sdk.agent`, el widget de chat para visitantes que se embebe dentro
 de un artefacto publicado. El bot de Telegram opera sobre todos los artefactos a los que
 podés acceder desde tu cuenta. Ver [Agente de chat con IA](/es/guides/ai-agent/) para
-el asistente dentro de la página, y [Crew](/es/guides/crew/) para agentes autónomos del
+el asistente dentro del artefacto, y [Crew](/es/guides/crew/) para agentes autónomos del
 lado del servidor en un artefacto.
 </Aside>
 
@@ -26,7 +26,7 @@ lado del servidor en un artefacto.
 1. Abrí **ShareOut → Settings → Connect Telegram**.
 2. Tocá el deep link — contiene un código de un solo uso válido por **15 minutos**.
 3. El bot confirma la vinculación y registra un menú de comandos slash.
-4. Mandá cualquier mensaje para empezar: pedile que encuentre una página, traiga
+4. Mandá cualquier mensaje para empezar: pedile que encuentre un artefacto, traiga
    números frescos o envíe un snapshot.
 
 </Steps>
@@ -51,16 +51,16 @@ de un workspace.
 
 ## Alcance del workspace
 
-El bot recuerda qué páginas buscar entre sesiones:
+El bot recuerda qué artefactos buscar entre sesiones:
 
 | Comando | Acción |
 | --- | --- |
 | `/workspaces` | Muestra un selector de workspaces (botones inline) |
 | `/workspace {nombre}` | Cambia a un workspace por nombre o slug |
-| `/personal` | Solo páginas personales |
+| `/personal` | Solo artefactos personales |
 | `/status` | Muestra el email de la cuenta vinculada y el alcance actual |
 
-El alcance por defecto cubre **todas las páginas** a las que tenés acceso — artefactos
+El alcance por defecto cubre **todos los artefactos** a los que tenés acceso — artefactos
 personales y de workspaces combinados. Los grupos de identidades vinculadas se respetan,
 así que un login personal que pertenece a una cuenta de workspace también ve esos
 artefactos.
@@ -75,7 +75,7 @@ plano. Cada tarjeta tiene:
 | **Open Page** | Abre el artefacto en vivo (con inicio de sesión en un toque si está activado — ver [Links que abren](#links-que-abren)) |
 | **Snapshot** | Renderiza un PNG y lo manda al chat |
 | **PDF** | Renderiza un PDF y lo manda al chat |
-| **Ask AI** | Inicia un turno del agente sobre esa página |
+| **Ask AI** | Inicia un turno del agente sobre ese artefacto |
 | **Share** | Inicia un flujo para compartir por email |
 
 Los atajos slash replican las tarjetas: `/snapshot {página}`, `/pdf {página}`,
@@ -96,7 +96,7 @@ Ver [Pedir ayuda](/es/everyone/get-help/) para el ciclo completo del ticket.
 
 | Capacidad | Descripción |
 | --- | --- |
-| Listar artefactos | Todas las páginas a las que tenés acceso, cada una con un link que abre |
+| Listar artefactos | Todos los artefactos a los que tenés acceso, cada uno con un link que abre |
 | Buscar artefactos | Por nombre, etiquetas o descripción |
 | Leer artefacto | HTML como texto, JSON store, muestras de tablas, metadatos de blobs; un sitio de varias páginas lista sus subpáginas y el bot puede leer cualquiera |
 | Encontrar la sección justa | “¿Dónde se cubre X?” → el artefacto, la subpágina, el título de la sección y una cita corta, con un link que abre en esa sección |
@@ -104,8 +104,8 @@ Ver [Pedir ayuda](/es/everyone/get-help/) para el ciclo completo del ticket.
 | Estado de revisión | Hilos de comentarios: abiertos o resueltos, asignado, versión |
 | Listar fuentes de datos | Conexiones REST en vivo de un artefacto |
 | Ejecutar fuente de datos | Corre una query REST en vivo (owner o miembro del workspace) |
-| Enviar snapshot | Renderiza la página a PNG y la entrega en el chat |
-| Enviar PDF | Renderiza la página a PDF y la entrega en el chat |
+| Enviar snapshot | Renderiza el artefacto a PNG y lo entrega en el chat |
+| Enviar PDF | Renderiza el artefacto a PDF y lo entrega en el chat |
 
 ### Escritura y gestión (requiere confirmación)
 
@@ -120,8 +120,8 @@ propuesta.
 | Pausar / reanudar / eliminar una alerta | Owner de la alerta |
 | Pausar / reanudar / eliminar un job | Owner del job |
 | Compartir artefacto por email | Owner del artefacto |
-| Ejecutar el crew de IA de la página | Owner o editor |
-| Editar contenido de la página | Owner o editor |
+| Ejecutar el crew de IA del artefacto | Owner o editor |
+| Editar contenido del artefacto | Owner o editor |
 | Agregar una fila a una tabla (`sdk.table()`) | Owner o editor |
 | Actualizar filas de una tabla (por id o filtro) | Owner o editor |
 | Establecer una clave en el JSON store (`sdk.json`) | Owner o editor |
@@ -150,7 +150,7 @@ corta y un link que abre esa subpágina justo en la sección.
   es inmediata.
 - Sin Conocimiento, el bot lee en el momento los pocos artefactos que mejor coinciden y
   que podés abrir.
-- En los dos casos solo cita páginas que **vos** podés abrir.
+- En los dos casos solo cita artefactos que **vos** podés abrir.
 
 ## Links que abren
 
@@ -180,7 +180,7 @@ de ShareOut:
 | Owner | Sí — acceso completo |
 | Colaborador (share explícito) | Sí — rol y política de fila respetados |
 | Miembro del workspace + `visibility: workspace` | Sí — rol viewer + política de fila |
-| Artifact privado del workspace (no compartido con vos) | No |
+| Artefacto privado del workspace (no compartido con vos) | No |
 | Solo link público/no listado | No (salvo que seas owner o colaborador) |
 
 Las credenciales quedan del lado del servidor. El bot nunca recibe tokens de API ni
@@ -202,8 +202,8 @@ app. El bot está controlado por el feature flag `ai.telegram_bot` en tu cuenta.
 ## Relacionado
 
 - [Agente de chat con IA](/es/guides/ai-agent/) — widget de chat para visitantes dentro de un artefacto publicado
-- [Crew](/es/guides/crew/) — agentes autónomos del servidor (destino de `ask_crew` de la página)
+- [Crew](/es/guides/crew/) — agentes autónomos del servidor (destino de `ask_crew` del artefacto)
 - [Jobs programados](/es/guides/jobs/) — programá entregas, incluido `action: telegram`
 - [Alertas de métricas](/es/guides/metric-alerts/) — alertas por umbral con entrega a Telegram
 - [Pedir ayuda](/es/everyone/get-help/) — abrir y seguir tickets de soporte desde cualquier canal
-- [SDK: Agent store](/es/sdk/agent/) — referencia de `sdk.agent` para el chat en la página
+- [SDK: Agent store](/es/sdk/agent/) — referencia de `sdk.agent` para el chat en el artefacto

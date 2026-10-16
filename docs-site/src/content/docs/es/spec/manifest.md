@@ -3,8 +3,8 @@ title: Manifest
 description: El bloque shareout/manifest — declarar fuentes de datos, valores calculados y formateadores.
 ---
 
-Todo artifact debe incluir un bloque `<script type="shareout/manifest">` dentro de
-`<head>`, antes del script tag del SDK. Declara cada fuente de datos que usa el artifact.
+Todo artefacto debe incluir un bloque `<script type="shareout/manifest">` dentro de
+`<head>`, antes del script tag del SDK. Declara cada fuente de datos que usa el artefacto.
 
 ## Ubicación
 
@@ -138,13 +138,13 @@ Opcionalmente, filas `default` permiten al editor visual previsualizar la tabla 
 
 **Roles de escritura** (`write`, opcional) — aplicados en el servidor en cada mutación de
 fila (`insert`, `update`, `delete`). Por defecto `"any"` (quien pueda llegar a la API de
-datos del artifact). Las lecturas nunca se restringen.
+datos del artefacto). Las lecturas nunca se restringen.
 
 | Valor | Quién puede mutar filas |
 | --- | --- |
 | `"any"` (default) | Owner, editores, viewers y (si está habilitado) escritores públicos anónimos |
-| `"collaborator"` | Solo el owner del artifact + colaboradores con rol editor |
-| `"owner"` | Solo el owner del artifact |
+| `"collaborator"` | Solo el owner del artefacto + colaboradores con rol editor |
+| `"owner"` | Solo el owner del artefacto |
 
 Los viewers que mutan una tabla restringida reciben `403 TABLE_WRITE_FORBIDDEN`.
 
@@ -165,7 +165,7 @@ Los viewers que mutan una tabla restringida reciben `403 TABLE_WRITE_FORBIDDEN`.
 Declara nombres de conexiones de workspace usados con `sdk.connection()`. Cada conexión
 puede incluir un array `default` de filas de muestra. El editor visual resuelve
 `sdk.connection(...).query()` desde estos defaults — **sin query live de warehouse ni API** —
-así los artifacts con datos gated siguen renderizando y siendo editables en el estudio.
+así los artefactos con datos gated siguen renderizando y siendo editables en el estudio.
 
 ```json
 "connections": {
@@ -270,8 +270,8 @@ Definiciones de formato con nombre reutilizables en atributos `data-shareout-for
 
 1. Debe ser el primer script en `<head>`, antes del script tag del SDK.
 2. Debe incluir `"version": "2.0"`.
-3. Debe declarar cada key de `sdk.json` usada en el artifact.
-4. Debe declarar cada nombre de `sdk.table()` usado en el artifact.
+3. Debe declarar cada key de `sdk.json` usada en el artefacto.
+4. Debe declarar cada nombre de `sdk.table()` usado en el artefacto.
 5. El esquema de toda tabla debe incluir una columna de clave primaria.
 6. Incluí valores `default` en json, tablas y conexiones para que el editor pueda mostrar previews offline.
 

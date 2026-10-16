@@ -4,7 +4,7 @@ description: Conectar elementos HTML a fuentes de datos con data-shareout-bindin
 ---
 
 Los bindings de datos conectan elementos HTML con las sources del manifest. Todo valor
-dinámico en un artifact debe usar `data-shareout-binding` — la manipulación directa del
+dinámico en un artefacto debe usar `data-shareout-binding` — la manipulación directa del
 DOM vía JavaScript oculta los valores del panel de datos del editor y el rastreador de
 variables.
 
@@ -81,7 +81,7 @@ del editor:
 
 ## Bindings editables
 
-Agregá `data-shareout-editable="true"` para permitir que quienes vean el artifact editen
+Agregá `data-shareout-editable="true"` para permitir que quienes vean el artefacto editen
 el valor in-place:
 
 ```html

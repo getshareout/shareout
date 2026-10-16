@@ -11,10 +11,10 @@ cómo encenderlas, y qué queda apagado si decidís que no.
 
 - **Crew AI** — los agentes automáticos no pueden planificar ni correr
 - **Preguntale a tu espacio** — el asistente del inicio
-- **Chat dentro de la página** — el asistente para visitantes
+- **Chat dentro del artefacto** — el asistente para visitantes
 - **IA del editor** — reescribir, acortar, traducir, corregir
 - **Conocimiento** — ingesta, destilado, consolidación
-- **Resúmenes automáticos** — los TL;DR de cada página
+- **Resúmenes automáticos** — los TL;DR de cada artefacto
 
 Todo lo demás — publicar, datos, tiempo real, compartir, horarios, entregas — funciona sin
 clave de LLM. Una instancia sin IA es una configuración legítima, no una rota.
@@ -37,7 +37,7 @@ Para cambiar el orden, definí `AI_PROVIDER_ORDER` como lista separada por comas
 `anthropic,openai`. Los proveedores configurados que no listes siguen después, en el orden
 por defecto.
 
-Modelos: en el gateway, el asistente, los agentes y la generación de páginas usan el mismo
+Modelos: en el gateway, el asistente, los agentes y la generación de artefactos usan el mismo
 modelo — `anthropic/claude-sonnet-5.5` por defecto (ver [Elegir un modelo](#elegir-un-modelo)
 para cambiarlo sin tocar código; una elección de workspace o instancia tiene prioridad).
 En Anthropic directo todo usa Claude Sonnet 5.5 (`claude-sonnet-5-5`); en OpenAI directo,

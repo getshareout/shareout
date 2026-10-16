@@ -42,7 +42,7 @@ Algunas lecturas de workspace también aceptan una sesión de navegador logueada
 
 Credenciales no humanas, acotadas a un workspace (prefijo `sot_`) para el agente de IA
 de un cliente, un servicio backend o CI/CD. Cada token autentica como un **principal de
-servicio**: un miembro headless de primera clase que es dueño de los artifacts que
+servicio**: un miembro headless de primera clase que es dueño de los artefactos que
 publica y queda confinado a su único workspace. Scopes de acción: `artifacts:read`,
 `artifacts:publish`, `data:read`, `data:write`.
 
@@ -134,7 +134,7 @@ Límites: 500 MB/archivo · 10 GB/bucket · 10 000 archivos. Ver [Archivos y ent
 
 ### Contenido de archivo (cross-artifact)
 
-Incrustá un archivo del workspace en cualquier artifact por su id `dlv_`. Aplica visibilidad por archivo (privados → 403 sin autorización).
+Incrustá un archivo del workspace en cualquier artefacto por su id `dlv_`. Aplica visibilidad por archivo (privados → 403 sin autorización).
 
 | Método | Endpoint | Notas |
 | --- | --- | --- |
@@ -144,7 +144,7 @@ SDK: [`sdk.files.getUrl('dlv_…')`](/es/sdk/files/).
 
 ## Compartir con externos (Clientes)
 
-Función Teams/Enterprise. Compartí carpetas y artifacts con orgs de clientes
+Función Teams/Enterprise. Compartí carpetas y artefactos con orgs de clientes
 fuera de tu equipo — portal agrupado, páginas con marca, tokens API acotados,
 recibos de lectura y notas privadas sobre cada cliente. Las rutas que crean acceso
 requieren `admin` del workspace más el entitlement
@@ -199,7 +199,7 @@ Body del grant (API admin de grants):
 
 `resource_type`: `folder` | `artifact` | `file`. `subject_type`: `sharee` (toda la org cliente) o `external_user` (una persona).
 `capability`: `view` | `comment` | `create` | `edit`. `create` es solo en carpetas —
-deja al externo crear artifacts nuevos encerrados en esa carpeta (forzados a privado).
+deja al externo crear artefactos nuevos encerrados en esa carpeta (forzados a privado).
 
 ### Tokens API acotados
 
@@ -239,7 +239,7 @@ miembro puede leer; admin (o el asistente del workspace vía `set_client_notes`)
 | `POST` | `/v1/workspaces/{id}/connections` | Admin+ | Crear. |
 | `GET` | `/v1/workspaces/{id}/connections/{connectionId}` | Admin+ | Detalle. |
 | `DELETE` | `/v1/workspaces/{id}/connections/{connectionId}` | Admin+ | Eliminar; cascadea credenciales. |
-| `GET` | `/v1/workspaces/{id}/connections/{connectionId}/artifacts` | Member+ | Artifacts que usan este conector. |
+| `GET` | `/v1/workspaces/{id}/connections/{connectionId}/artifacts` | Member+ | Artefactos que usan este conector. |
 | `GET` | `/v1/workspaces/{id}/connections/{connectionId}/my-credentials` | Member+ | Estado per-user. |
 | `PUT` | `/v1/workspaces/{id}/connections/{connectionId}/my-credentials` | Member+ | Guardar token propio. |
 | `DELETE` | `/v1/workspaces/{id}/connections/{connectionId}/my-credentials` | Member+ | Eliminar token propio. |
@@ -278,7 +278,7 @@ Biblioteca aprendida opt-in. **Plan pago** requerido para `enable` y `backfill`.
 | `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Upsert markdown. |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Eliminar; `forget=1` evita re-aprendizaje. |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | `{ "enabled": true }` — plan pago. |
-| `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Encolar hasta 200 páginas → `{ queued, kicked }` — plan pago. |
+| `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Encolar hasta 200 artefactos → `{ queued, kicked }` — plan pago. |
 
 ## Schedules y automaciones
 
@@ -297,7 +297,7 @@ Biblioteca aprendida opt-in. **Plan pago** requerido para `enable` y `backfill`.
 | `GET` | `/v1/workspaces/{id}/runs` | Lista unificada de runs (`surface`, `status`, `limit`). Admin+. |
 | `GET` | `/v1/workspaces/{id}/runs/{surface}/{runId}` | Detalle Run Inspector (`crew`/`job`/`alert`). Admin+. |
 
-## Artifacts admin del workspace
+## Artefactos admin del workspace
 
 | Método | Endpoint | Quién | Notas |
 | --- | --- | --- | --- |
@@ -310,7 +310,7 @@ Biblioteca aprendida opt-in. **Plan pago** requerido para `enable` y `backfill`.
 
 | Método | Endpoint | Quién | Notas |
 | --- | --- | --- | --- |
-| `POST` | `/v1/access-requests` | Público | Pedir acceso a una página con gate. |
+| `POST` | `/v1/access-requests` | Público | Pedir acceso a un artefacto con gate. |
 | `GET` | `/v1/access-requests/incoming` | Owner/admin | Pedidos pendientes para tus workspaces. |
 | `POST` | `/v1/access-requests/{id}` | Owner/admin | `{ "action": "approve" \| "deny" }`. |
 
@@ -329,7 +329,7 @@ Biblioteca aprendida opt-in. **Plan pago** requerido para `enable` y `backfill`.
 | `POST` | `/v1/support/tickets/{id}/assign` | Staff | `{ "assigneeUserId": "usr_…" }` o `null`. |
 | `POST` | `/v1/support/tickets/{id}/triage` | Staff | Re-ejecutar borrador de triage con IA. |
 
-Ver [Pedir ayuda](/es/everyone/get-help/) y [Admin → Soporte](/es/teams/admin/#support-tickets).
+Ver [Pedir ayuda](/es/everyone/get-help/) y [Admin → Soporte](/es/teams/admin/#tickets-de-soporte).
 
 ## Alertas de métricas (permisos de Teams)
 
@@ -337,20 +337,20 @@ Los endpoints siguen en `/v1/metric-alerts`. Teams cambia quién puede gestionar
 
 | Rol | Capacidad |
 | --- | --- |
-| `owner`/`editor` del artifact o `owner`/`admin` del workspace | Gestión completa de alertas en el artifact. |
-| `member` del workspace o `viewer` del artifact | Solo auto-suscribirse a destinos personales. |
+| `owner`/`editor` del artefacto o `owner`/`admin` del workspace | Gestión completa de alertas en el artefacto. |
+| `member` del workspace o `viewer` del artefacto | Solo auto-suscribirse a destinos personales. |
 
 Mirá [Alertas de métricas](/es/guides/metric-alerts/).
 
 ## Metric watches
 
-Watches de anomalía de un clic sobre tablas de artifacts — solo campana, sin destinos.
+Watches de anomalía de un clic sobre tablas de artefactos — solo campana, sin destinos.
 Ver [Alertas de métricas → Watches](/es/guides/metric-alerts/#metric-watches).
 
 | Método | Endpoint | Quién | Notas |
 | --- | --- | --- | --- |
-| `POST` | `/v1/metric-watch` | Viewer+ en el artifact | `{ "artifact_id", "table", "kind", "column?", "threshold_pct?" }` |
-| `GET` | `/v1/metric-watch?artifact_id=` | Viewer+ | Listar watches de una página |
+| `POST` | `/v1/metric-watch` | Viewer+ en el artefacto | `{ "artifact_id", "table", "kind", "column?", "threshold_pct?" }` |
+| `GET` | `/v1/metric-watch?artifact_id=` | Viewer+ | Listar watches de un artefacto |
 | `DELETE` | `/v1/metric-watch/{id}` | Creador | Quitar un watch |
 
 ## Features
@@ -372,8 +372,8 @@ POST  /v1/artifacts/{id}/publish-approval       ← { "visibility": "public", "a
 POST  /v1/artifacts/{id}/publish-approval/{requestId}/decision  ← { "decision": "approve" }
 ```
 
-`PATCH` requiere `admin` u `owner`. Mirá [Política de publicación](/es/teams/admin/#politica-de-publicacion)
-y [Publicar artifacts](/es/guides/publishing/#gobernanza-de-publicacion-del-workspace).
+`PATCH` requiere `admin` u `owner`. Mirá [Política de publicación](/es/teams/admin/#política-de-publicación)
+y [Publicar artefactos](/es/guides/publishing/#gobernanza-de-publicación-del-workspace).
 
 ## Device login
 
@@ -388,7 +388,7 @@ Paso navegador: `GET /auth/device?code=USER-CODE` → Google OAuth. Ver
 ## Search
 
 Búsqueda rankeada y tolerante a typos — el mismo motor detrás de la paleta **⌘K**
-en Home y del salto inline. Encuentra **páginas** (nombre, tags, descripción), más
+en Home y del salto inline. Encuentra **artefactos** (nombre, tags, descripción), más
 **carpetas**, **datasets**, **conectores**, **personas**, **schedules**, **crew** y
 **alertas** cuando está acotada a un workspace.
 
@@ -408,7 +408,7 @@ Auth: token personal `so_…`, Agent `sot_…` (`artifacts:read`) o cookie de se
 Los grupos distintos de `artifacts` requieren alcance de workspace.
 
 La respuesta agrupa (`artifacts`, `folders`, `datasets`, `connectors`, `people`,
-`schedules`, `crew`, `alerts`) con hits puntuados. Los artifacts incluyen `views`,
+`schedules`, `crew`, `alerts`) con hits puntuados. Los artefactos incluyen `views`,
 `owner`, `thumb` y `badge` (ej. `Private`).
 
 En el chat del asistente del workspace, la misma búsqueda se expone como
@@ -417,7 +417,7 @@ exacto de página.
 
 ## Ask your workspace (paleta)
 
-Q&A de un turno sobre páginas a las que el caller puede acceder — solo lectura, sin herramientas.
+Q&A de un turno sobre artefactos a los que el caller puede acceder — solo lectura, sin herramientas.
 
 ```http
 POST /v1/ask
@@ -428,7 +428,7 @@ Content-Type: application/json
 ```
 
 Respuesta: `{ "answer": "…", "citations": [{ "artifact_id", "title", "url" }] }`.
-Las citas son páginas que el modelo referenció con marcadores `[n]` del conjunto
+Las citas son artefactos que el modelo referenció con marcadores `[n]` del conjunto
 acotado. También se dispara desde Home ⌘K cuando la consulta termina en `?`.
 
 ## Export
@@ -437,14 +437,14 @@ Portabilidad de datos de un clic — zip de source + json + tablas.
 
 | Método | Endpoint | Quién | Notas |
 | --- | --- | --- | --- |
-| `GET` | `/v1/artifacts/{id}/export` | Owner o admin del workspace | Zip de un artifact |
-| `GET` | `/v1/workspaces/{id}/export` | Owner/admin del workspace | Todos los artifacts (máx. **200**) |
+| `GET` | `/v1/artifacts/{id}/export` | Owner o admin del workspace | Zip de un artefacto |
+| `GET` | `/v1/workspaces/{id}/export` | Owner/admin del workspace | Todos los artefactos (máx. **200**) |
 
 Ver [Tus datos son portables](/guides/data-portability/).
 
 ## Present this
 
-Generar un deck de slides con IA desde un artifact HTML publicado.
+Generar un deck de slides con IA desde un artefacto HTML publicado.
 
 ```http
 POST /v1/artifacts/{id}/present
@@ -453,14 +453,14 @@ Authorization: Bearer {token}
 
 Devuelve `{ "artifact_id", "url" }`. Rate limit por usuario. Ver [Slides → Present this](/es/slides/overview/#present-this-deck-con-ia).
 
-## Páginas sin uso (janitor)
+## Artefactos sin uso (janitor)
 
 | Método | Endpoint | Quién | Notas |
 | --- | --- | --- | --- |
-| `POST` | `/v1/workspaces/{id}/unused/archive` | Owner/admin del workspace | Archivar todas las páginas marcadas (lote 100) |
-| `POST` | `/v1/artifacts/unused/archive` | Dueño de cuenta personal | Igual para páginas personales |
+| `POST` | `/v1/workspaces/{id}/unused/archive` | Owner/admin del workspace | Archivar todos los artefactos marcados (lote 100) |
+| `POST` | `/v1/artifacts/unused/archive` | Dueño de cuenta personal | Igual para artefactos personales |
 
-Ver [Publicar → Janitor de páginas sin uso](/es/guides/publishing/#janitor-de-páginas-sin-uso).
+Ver [Publicar → Janitor de artefactos sin uso](/es/guides/publishing/#janitor-de-artefactos-sin-uso).
 
 ## Skill Marketplace
 
@@ -517,9 +517,9 @@ proveedor directamente.
 | `POST` | `/v1/home/onboarding/celebrate?workspace=` | Member+ | Registrar el momento único del 100%. |
 | `GET` | `/v1/artifacts/{id}/presence` | Owner/colaborador+ | Conteo concurrente de viewers (best-effort). |
 
-## Entrega de artifacts (puntual)
+## Entrega de artefactos (puntual)
 
-Enviá un artifact a email, Slack o Telegram al instante desde el Inspector
+Enviá un artefacto a email, Slack o Telegram al instante desde el Inspector
 **Deliver** en Home o por API — mismo registro de destinos que los jobs programados.
 
 | Método | Endpoint | Quién | Notas |

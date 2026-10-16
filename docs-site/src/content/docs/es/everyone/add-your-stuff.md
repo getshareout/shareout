@@ -1,9 +1,9 @@
 ---
 title: Fotos y contenido
-description: Sumá tus propias fotos, agregá secciones, botones y un mapa — las piezas que hacen que la página se sienta tuya.
+description: Sumá tus propias fotos, agregá secciones, botones y un mapa — las piezas que hacen que el artefacto se sienta tuya.
 ---
 
-Una página se siente *tuya* cuando tiene tus fotos y las piezas justas. Sumalas pidiéndolas, o haciendo clic para agregarlas.
+Un artefacto se siente *tuya* cuando tiene tus fotos y las piezas justas. Sumalas pidiéndolas, o haciendo clic para agregarlas.
 
 ## Tus fotos
 
@@ -13,11 +13,11 @@ Subí tus propias imágenes — tus productos, tu local, tu equipo, tu evento:
 >
 > *"Poné una foto grande del local arriba de todo."*
 
-Subí tus imágenes y quedan directo en la página — sin un hosting de fotos aparte para configurar.
+Subí tus imágenes y quedan directo en el artefacto — sin un hosting de fotos aparte para configurar.
 
 ## Secciones que cuentan tu historia
 
-Armá la página con las secciones que la gente espera:
+Armá el artefacto con las secciones que la gente espera:
 
 - un **Sobre nosotros** — quién sos, en una o dos frases
 - **horarios** o un cronograma
@@ -29,7 +29,7 @@ Armá la página con las secciones que la gente espera:
 
 ## Botones, links y un mapa
 
-Las cositas que hacen útil a una página:
+Las cositas que hacen útil a un artefacto:
 
 - **Botones** — *"agregá un botón de 'Pedí por WhatsApp'"* · *"agregá un botón de 'Reservá ahora'."*
 - **Links** — a tus redes, tu tienda, tu último posteo.
@@ -43,10 +43,10 @@ Estas tienen su propia guía:
 - [**Listas y datos**](/es/everyone/your-data/) — mostrá una lista de productos, eventos o precios.
 - [**Sumá un asistente**](/es/everyone/assistant/) — un ayudante de chat para tus visitantes.
 
-## ¿No sabés qué necesita tu página?
+## ¿No sabés qué necesita tu artefacto?
 
 Solo describí para quién es y qué querés que haga la gente — *"esto es para clientes nuevos y quiero que reserven una mesa"* — y el asistente te sugiere las piezas.
 
 ## Qué sigue
 
-- [**Compartila**](/es/everyone/share-it/) — mandá tu página terminada al mundo.
+- [**Compartilo**](/es/everyone/share-it/) — mandá tu artefacto terminado al mundo.

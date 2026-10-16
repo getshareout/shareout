@@ -5,7 +5,7 @@ description: Creá y renderizá templates de email reutilizables con interpolaci
 
 Templates de email reutilizables con interpolación estilo mustache (`{{variable}}`), usables en jobs programados y métodos de email del SDK. Accedé vía `sdk.templates`.
 
-Los templates pueden estar disponibles para toda la cuenta o restringidos a un artifact específico.
+Los templates pueden estar disponibles para toda la cuenta o restringidos a un artefacto específico.
 
 ## Métodos
 
@@ -62,8 +62,8 @@ interface RenderedEmail {
 
 | Variable | Valor |
 |----------|-------|
-| `{{artifact.id}}` | ID del artifact |
-| `{{artifact.name}}` | Nombre del artifact |
+| `{{artifact.id}}` | ID del artefacto |
+| `{{artifact.name}}` | Nombre del artefacto |
 | `{{artifact.url}}` | URL pública |
 | `{{artifact.slug}}` | Slug de URL |
 | `{{date}}` | Fecha ISO (YYYY-MM-DD) |
@@ -132,6 +132,6 @@ Referenciá un template ID en la config de email del job:
 
 | Code | Status | Descripción |
 |------|--------|-------------|
-| `NOT_FOUND` | 404 | Template o artifact no encontrado |
+| `NOT_FOUND` | 404 | Template o artefacto no encontrado |
 | `FORBIDDEN` | 403 | Sin permiso o template del sistema |
 | `INVALID_REQUEST` | 400 | Campo faltante o inválido |

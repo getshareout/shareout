@@ -1,15 +1,15 @@
 ---
 title: Slack
-description: Entregá artifacts a un canal o DM de Slack.
+description: Entregá artefactos a un canal o DM de Slack.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Mandá un artifact a Slack — un mensaje, un snapshot renderizado, o un PDF — a demanda,
+Mandá un artefacto a Slack — un mensaje, un snapshot renderizado, o un PDF — a demanda,
 de forma programada, o ante un evento.
 
 <Aside type="note">
-Para un **bot conversacional por DM** que lee y escribe tus páginas desde Slack, ver
+Para un **bot conversacional por DM** que lee y escribe tus artefactos desde Slack, ver
 [Bot de Slack](/es/guides/slack-bot/). Esta página cubre la **entrega saliente** a
 canales y DMs.
 </Aside>
@@ -17,7 +17,7 @@ canales y DMs.
 ## Cómo funciona
 
 Slack es una conexión **a nivel workspace**: conectá una app de OAuth de Slack una vez por
-workspace (un bot token, guardado encriptado), y cualquier artifact de ese workspace puede
+workspace (un bot token, guardado encriptado), y cualquier artefacto de ese workspace puede
 entregar a Slack. Un workspace puede tener varias conexiones con nombre (por ejemplo `team`,
 `alerts`).
 
@@ -35,7 +35,7 @@ entrega de DM falla con `missing_scope` en una conexión más vieja, reconectá 
 
 ## Entrega de una sola vez
 
-Desde **Home**, abrí una pestaña de página y usá la sección **Deliver** del
+Desde **Home**, abrí una pestaña de artefacto y usá la sección **Deliver** del
 Inspector — elegí email, Slack o Telegram, seleccioná un canal de Slack desde el
 picker buscable y enviá al instante (`POST /v1/artifacts/{id}/deliver`). Si Slack
 no está conectado, **Connect** inicia OAuth desde el mismo panel.

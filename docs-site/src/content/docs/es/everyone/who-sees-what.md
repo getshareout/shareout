@@ -1,13 +1,13 @@
 ---
 title: Mostrá a cada uno sus datos
-description: Una sola página, pero cada persona ve solo sus filas — su pedido, sus resultados, sus números. Sin armar logins separados.
+description: Un solo artefacto, pero cada persona ve solo sus filas — su pedido, sus resultados, sus números. Sin armar logins separados.
 ---
 
-A veces una página necesita mostrar **cosas distintas a personas distintas** — a cada cliente su pedido, a cada alumno sus resultados, a cada cliente su reporte. ShareOut puede hacer eso, en una sola página.
+A veces un artefacto necesita mostrar **cosas distintas a personas distintas** — a cada cliente su pedido, a cada alumno sus resultados, a cada cliente su reporte. ShareOut puede hacer eso, en un solo artefacto.
 
 ## La idea
 
-Armás **una** página con todos los datos atrás. Cuando alguien la abre, ve **solo sus propias filas** — no las de los demás. No armás páginas ni logins separados para cada persona; la página lo resuelve.
+Armás **un** artefacto con todos los datos atrás. Cuando alguien lo abre, ve **solo sus propias filas** — no las de los demás. No armás artefactos ni logins separados para cada persona; el artefacto lo resuelve.
 
 ## Para qué es genial
 
@@ -18,12 +18,12 @@ Armás **una** página con todos los datos atrás. Cuando alguien la abre, ve **
 
 ## Cómo funciona (en simple)
 
-Conectás una lista (digamos, pedidos) y le decís a la página **cómo emparejar a una persona con sus filas** — normalmente por su mail. Cuando María abre la página, ve los pedidos de María. Cuando Tomás la abre, ve los de Tomás. La misma página, una vista personal.
+Conectás una lista (digamos, pedidos) y le decís al artefacto **cómo emparejar a una persona con sus filas** — normalmente por su mail. Cuando María abre el artefacto, ve los pedidos de María. Cuando Tomás lo abre, ve los de Tomás. El mismo artefacto, una vista personal.
 
 Vos decidís quién entra — invitá a personas puntuales, y cada una recibe solo lo suyo.
 
 :::caution[Esta es un poco más avanzada]
-Configurar vistas por persona requiere pensarlo un poquito más que una página normal — conviene describir exactamente qué debería ver cada persona, o pedirle al asistente que te ayude a armar la regla de emparejado.
+Configurar vistas por persona requiere pensarlo un poquito más que un artefacto normal — conviene describir exactamente qué debería ver cada persona, o pedirle al asistente que te ayude a armar la regla de emparejado.
 :::
 
 ## Qué sigue

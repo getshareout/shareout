@@ -1,13 +1,13 @@
 ---
 title: Secrets proxy
-description: Llamá a APIs externas desde un artifact sin exponer claves de API en el navegador.
+description: Llamá a APIs externas desde un artefacto sin exponer claves de API en el navegador.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
 Proxy de requests HTTP a través del worker de ShareOut para que las claves de API nunca lleguen al navegador. Accedé vía `sdk.secrets`.
 
-Los secrets los crea el owner del artifact (vía dashboard o API) y se almacenan cifrados en el servidor. El navegador envía requests al worker; el worker inyecta la clave y las reenvía al host destino.
+Los secrets los crea el owner del artefacto (vía dashboard o API) y se almacenan cifrados en el servidor. El navegador envía requests al worker; el worker inyecta la clave y las reenvía al host destino.
 
 ## Métodos
 

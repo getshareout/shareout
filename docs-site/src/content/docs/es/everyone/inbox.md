@@ -1,21 +1,21 @@
 ---
 title: Recibí emails
-description: Dale a tu página su propia dirección de email — reenviá correos ahí y tu página reacciona. Guardá el mensaje, recibí un aviso o dispará una automatización.
+description: Dale a tu artefacto su propia dirección de email — reenviá correos ahí y tu artefacto reacciona. Guardá el mensaje, recibí un aviso o dispará una automatización.
 ---
 
-Tu página puede tener su **propia dirección de email**. Todo lo que mandes ahí aparece en tu página — y puede disparar una automatización. No hay casilla que conectar ni cuenta que vincular: la dirección es tuya, y funciona sin importar desde dónde te escriban.
+Tu artefacto puede tener su **propia dirección de email**. Todo lo que mandes ahí aparece en tu artefacto — y puede disparar una automatización. No hay casilla que conectar ni cuenta que vincular: la dirección es tuya, y funciona sin importar desde dónde te escriban.
 
-> *Reenviá las expensas del edificio a tu página → anota el monto y te recuerda 3 días antes del vencimiento.*
+> *Reenviá las expensas del edificio a tu artefacto → anota el monto y te recuerda 3 días antes del vencimiento.*
 
 ## Activala
 
-Abrí tu página en el **editor** y tocá el botón **Inbox** (el sobre en la barra). Apretá **Activar inbox** y vas a tener una dirección como:
+Abrí tu artefacto en el **editor** y tocá el botón **Inbox** (el sobre en la barra). Apretá **Activar inbox** y vas a tener una dirección como:
 
 ```
 tu-pagina@inbox.YOUR_DOMAIN
 ```
 
-La copiás con un clic. También podés activarla desde el panel de **Inicio** — abrí los detalles de una página y buscá la sección **Inbox**.
+La copiás con un clic. También podés activarla desde el panel de **Inicio** — abrí los detalles de un artefacto y buscá la sección **Inbox**.
 
 ## Hacé que lleguen mails
 
@@ -30,13 +30,13 @@ Dos formas fáciles:
 
 ## Mirá qué llega
 
-Cada mensaje aparece en tu página — en el panel **Inbox** del editor y en el cajón de detalles de Inicio. Tocá uno para leer el texto completo y **descargar los adjuntos** (la factura en PDF, la foto, lo que haya llegado).
+Cada mensaje aparece en tu artefacto — en el panel **Inbox** del editor y en el cajón de detalles de Inicio. Tocá uno para leer el texto completo y **descargar los adjuntos** (la factura en PDF, la foto, lo que haya llegado).
 
 ## Que *haga* algo
 
 Sola, la casilla solo junta correos. Combinala con una [**automatización**](/es/everyone/automations/) y cada mail nuevo puede:
 
-| Cuando llega un mail… | …tu página puede |
+| Cuando llega un mail… | …tu artefacto puede |
 | --- | --- |
 | Entra un comprobante | Guardar el monto en una lista |
 | Te escribe un proveedor | Avisarte por Telegram o Slack |
@@ -47,7 +47,7 @@ Configurás una vez la automatización "cuando llega un email" y corre siempre �
 
 ## Un ejemplo real
 
-1. Hacé una página **"Gastos"** y activá su inbox → `gastos@inbox.YOUR_DOMAIN`.
+1. Hacé un artefacto **"Gastos"** y activá su inbox → `gastos@inbox.YOUR_DOMAIN`.
 2. En Gmail, reenviá las facturas del edificio a esa dirección (un filtro).
 3. Agregá una automatización: *cuando llega un email, guardá el monto y recordame por Telegram 3 días antes del vencimiento.*
 
@@ -57,7 +57,7 @@ Ahora cada factura entra y se resuelve sola — vos no hacés nada.
 
 - **Remitentes permitidos** — dejala abierta a cualquiera, o limitala a ciertas personas o dominios (por ejemplo, solo `@tuempresa.com`). Los remitentes falsificados se rechazan automáticamente.
 - **Apagala** cuando quieras. Los mails nuevos se rechazan; todo lo que ya recibiste queda.
-- Es **por página y opcional** — nada recibe correo hasta que lo activás.
+- Es **por artefacto y opcional** — nada recibe correo hasta que lo activás.
 
 ## Qué sigue
 

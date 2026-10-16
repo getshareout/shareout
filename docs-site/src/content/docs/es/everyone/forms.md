@@ -3,7 +3,7 @@ title: Recibí respuestas (formularios)
 description: Agregá un formulario y la gente puede escribirte, confirmar, anotarse o pedir — y cada respuesta queda guardada para vos.
 ---
 
-Un formulario deja que la gente te mande algo — un mensaje, una confirmación, una inscripción, un pedido. Agregalo a cualquier página solo pidiéndolo.
+Un formulario deja que la gente te mande algo — un mensaje, una confirmación, una inscripción, un pedido. Agregalo a cualquier artefacto solo pidiéndolo.
 
 ## Agregá un formulario
 
@@ -15,7 +15,7 @@ Decile al asistente qué querés juntar:
 >
 > *"Agregá un formulario de pedido para mis velas con nombre, aroma y cantidad."*
 
-Arma el formulario, ahí mismo en tu página.
+Arma el formulario, ahí mismo en tu artefacto.
 
 ## Cada respuesta queda guardada
 
@@ -39,5 +39,5 @@ Podés pedir cosas como:
 
 ## Qué sigue
 
-- [**Listas y datos**](/es/everyone/your-data/) — mostrá en tu página una lista que podés actualizar.
-- [**Compartila**](/es/everyone/share-it/) — poné tu formulario frente a la gente.
+- [**Listas y datos**](/es/everyone/your-data/) — mostrá en tu artefacto una lista que podés actualizar.
+- [**Compartilo**](/es/everyone/share-it/) — poné tu formulario frente a la gente.

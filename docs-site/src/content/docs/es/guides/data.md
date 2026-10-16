@@ -1,14 +1,14 @@
 ---
 title: Almacenar datos
-description: JSON, tablas y file blobs para cada artifact.
+description: JSON, tablas y file blobs para cada artefacto.
 ---
 
-Cada artifact tiene su propio almacenamiento — sin una base de datos aparte que aprovisionar. Tres
+Cada artefacto tiene su propio almacenamiento — sin una base de datos aparte que aprovisionar. Tres
 formas, un mismo base path: `/v1/data/{artifactId}`.
 
 ## JSON store
 
-Un store **clave/valor** de documentos JSON por artifact. Cada clave guarda un valor
+Un store **clave/valor** de documentos JSON por artefacto. Cada clave guarda un valor
 JSON (objeto, array, string, número, …). Ideal para settings y estado chico.
 
 ```bash
@@ -26,12 +26,12 @@ curl -X PUT https://shareout.site/v1/data/art_abc123/json/prefs \
   -d '{ "theme": "dark", "views": 42 }'
 ```
 
-Límites por defecto: **1 MB por valor**, **1000 claves** por artifact.
+Límites por defecto: **1 MB por valor**, **1000 claves** por artefacto.
 
 ## Tablas
 
 Filas estructuradas para listas, submissions y registros. Listá las tablas de un
-artifact:
+artefacto:
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" \
@@ -54,10 +54,10 @@ curl -X POST https://shareout.site/v1/data/art_abc123/blobs \
 | Restricción | Valor |
 | --- | --- |
 | Por archivo | 50 MB |
-| Por artifact | 500 MB |
+| Por artefacto | 500 MB |
 | Máximo de blobs | 1000 |
 
 Tipos permitidos: PNG, JPEG, GIF, WebP, SVG; MP4, WebM; MP3, WAV, OGG; PDF, TXT,
 CSV, Markdown.
 
-Mirá los endpoints completos en la [referencia de la API](/api/operations/uploadblob/).
+Mirá los endpoints completos en la [referencia de la API](/api/operations/requestblobupload/).

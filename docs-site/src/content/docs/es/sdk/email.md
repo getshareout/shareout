@@ -1,13 +1,13 @@
 ---
 title: Email
-description: Enviá email de formulario de contacto al dueño del artifact.
+description: Enviá email de formulario de contacto al dueño del artefacto.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Email saliente desde tu artifact. Accedé vía `sdk.email`. El correo se envía del lado del
+Email saliente desde tu artefacto. Accedé vía `sdk.email`. El correo se envía del lado del
 servidor desde una dirección verificada de ShareOut; los visitantes solo pueden escribirle
-al **dueño** del artifact — nunca a destinatarios arbitrarios.
+al **dueño** del artefacto — nunca a destinatarios arbitrarios.
 
 ## Métodos
 
@@ -42,7 +42,7 @@ await sdk.email.notifyOwner({
 ```
 
 <Aside type="note" title="Límites">
-50 emails/día por cuenta · 10/día por artifact (SDK + jobs combinados).
+50 emails/día por cuenta · 10/día por artefacto (SDK + jobs combinados).
 </Aside>
 
 ## Email programado y masivo

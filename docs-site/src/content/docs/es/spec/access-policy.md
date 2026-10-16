@@ -3,13 +3,13 @@ title: Política de acceso (nivel de fila)
 description: Filtrado de filas por viewer aplicado en el servidor — cómo ShareOut resuelve un email verificado al slice exacto de datos que ese viewer puede ver.
 ---
 
-La política de acceso a nivel de fila te permite compartir **un** artifact externamente y que cada viewer vea **solo su propio slice** de los datos — cada cliente su `company_id`, cada prospecto su `pitch`, cada responsable de región su `region`. El filtrado se aplica del lado del servidor dentro del Cloudflare Worker, después de identificar al viewer y antes de devolver cualquier fila. El viewer no puede evitarlo ni ampliarlo.
+La política de acceso a nivel de fila te permite compartir **un** artefacto externamente y que cada viewer vea **solo su propio slice** de los datos — cada cliente su `company_id`, cada prospecto su `pitch`, cada responsable de región su `region`. El filtrado se aplica del lado del servidor dentro del Cloudflare Worker, después de identificar al viewer y antes de devolver cualquier fila. El viewer no puede evitarlo ni ampliarlo.
 
 Para una explicación no técnica sobre visibilidad y compartición, ver [Quién ve qué](/es/everyone/who-sees-what/).
 
 ## Por qué el enforcement tiene que ser server-side
 
-Un artifact de ShareOut corre en el browser del viewer y es completamente inspeccionable — puede leer el JS, abrir devtools y llamar directamente a los endpoints `/v1/data/…` con cualquier filtro que quiera. Un filtro escrito en el código de tu página (`sdk.table('sales').find({ company_id: 1 })`) es cosmético. La política de acceso corre dentro del Worker; el viewer no puede influir en ella.
+Un artefacto de ShareOut corre en el browser del viewer y es completamente inspeccionable — puede leer el JS, abrir devtools y llamar directamente a los endpoints `/v1/data/…` con cualquier filtro que quiera. Un filtro escrito en el código de tu artefacto (`sdk.table('sales').find({ company_id: 1 })`) es cosmético. La política de acceso corre dentro del Worker; el viewer no puede influir en ella.
 
 ## Cuándo usarla
 
@@ -26,11 +26,11 @@ Un artifact de ShareOut corre en el browser del viewer y es completamente inspec
 ```
 Autor                               Viewer
 ─────                               ──────
-1. Publica el artifact              3. Abre la URL privada del artifact
+1. Publica el artefacto             3. Abre la URL privada del artefacto
    visibility: private                 → se loguea con Google o código OTP
    auth_method: google                 → el Worker tiene el email VERIFICADO
    share_with: [emails]
-   access_policy: { … }            4. La página llama sdk.table('sales').find()
+   access_policy: { … }            4. El artefacto llama sdk.table('sales').find()
                                        → POST /v1/data/{id}/tables/sales/query
 2. Política guardada server-side    5. Worker resuelve email/dominio → scope
    (nunca leída del HTML)              ejecuta: WHERE <filtro cliente>
@@ -40,7 +40,7 @@ Autor                               Viewer
 
 Los owners y colaboradores con rol editor bypasean la política y ven todos los datos (para autoría y QA). La política aplica solo a colaboradores con rol viewer y sign-ins externos.
 
-Usá [`sdk.me()`](/es/sdk/overview/#identidad-del-viewer) en tu artifact para ramificar la
+Usá [`sdk.me()`](/es/sdk/overview/#identidad-del-viewer) en tu artefacto para ramificar la
 UI por rol del viewer (por ejemplo, panel admin para `canEdit`, vista cliente read-only
 para el resto). La aplicación server-side no cambia — nunca confíes solo en checks del
 cliente.
@@ -85,7 +85,7 @@ La política del ejemplo anterior:
 | anónimo | — | sin filas (`default: deny`) |
 | owner / editor | owner/editor | todas las filas (bypass de política) |
 
-El scope siempre se combina con **AND** con lo que consulta la página — solo estrecha, nunca amplía. Si la página envía `find({ company_id: 99 })` pero el scope del viewer es `[1, 2]`, el resultado es vacío.
+El scope siempre se combina con **AND** con lo que consulta el artefacto — solo estrecha, nunca amplía. Si el artefacto envía `find({ company_id: 99 })` pero el scope del viewer es `[1, 2]`, el resultado es vacío.
 
 ## Ejemplo completo
 
@@ -101,9 +101,9 @@ Un proveedor SaaS comparte un único dashboard de ventas. Dos clientes deben ver
 ]
 ```
 
-### HTML del artifact
+### HTML del artefacto
 
-La página consulta sin ningún filtro de tenant — el servidor estrecha automáticamente:
+El artefacto consulta sin ningún filtro de tenant — el servidor estrecha automáticamente:
 
 ```html
 <!doctype html>
@@ -161,7 +161,7 @@ python3 -c 'import json; print(json.dumps({
 
 ## Actualizar y eliminar la política
 
-**Actualizar sin re-publicar el HTML** — `PATCH` del artifact:
+**Actualizar sin re-publicar el HTML** — `PATCH` del artefacto:
 
 ```http
 PATCH /v1/artifacts/{artifact_id}
@@ -188,11 +188,11 @@ Las políticas inválidas se rechazan al escribir con `400 INVALID_ACCESS_POLICY
 
 ## Autenticación del viewer
 
-La política necesita una identidad verificada, así que el artifact debe requerir login:
+La política necesita una identidad verificada, así que el artefacto debe requerir login:
 
 - `visibility: "private"` — los visitantes anónimos no tienen identidad y, bajo `default: "deny"`, no obtienen datos.
 - `auth_method: "google"` — los viewers se loguean con Google OAuth o un código de 6 dígitos por email; el Worker recibe su email verificado.
-- `share_with: […]` — el gate de acceso (quién puede abrir el artifact). La `access_policy` es el filtro de filas (qué ve cada viewer permitido). Son dos capas independientes.
+- `share_with: […]` — el gate de acceso (quién puede abrir el artefacto). La `access_policy` es el filtro de filas (qué ve cada viewer permitido). Son dos capas independientes.
 
 Un viewer debe pasar ambos controles: estar en `share_with` (o pertenecer al workspace) **y** coincidir con una regla de la política para recibir filas.
 
@@ -260,15 +260,15 @@ curl -sS -X POST 'http://localhost:55162/v1/data/{artifact_id}/tables/sales/quer
 | Síntoma | Causa probable |
 |---------|----------------|
 | El viewer no ve filas | Ninguna regla coincide con su email/dominio y `default` es `deny`; o las filas no tienen el `field`; o el nombre de `field` en la política difiere de la key JSON en las filas. |
-| El viewer ve todas las filas | `default: "allow"`; o es owner/editor (bypass); o el artifact no es `private`. |
-| El cambio de política no tiene efecto | El metadata del artifact se cachea ~5 min. Publicar y PATCH limpian el cache automáticamente. |
+| El viewer ve todas las filas | `default: "allow"`; o es owner/editor (bypass); o el artefacto no es `private`. |
+| El cambio de política no tiene efecto | El metadata del artefacto se cachea ~5 min. Publicar y PATCH limpian el cache automáticamente. |
 | `400 INVALID_ACCESS_POLICY` al publicar | Política malformada — el mensaje indica el campo con error. |
 | Re-publicar "perdió" mi política | No la perdió. Omitir `access_policy` la preserva; enviá `access_policy: null` via PATCH para eliminarla. |
 
 ## Checklist
 
 - [ ] Cada fila tiene el campo de tenant (p. ej. `company_id` en todas las filas).
-- [ ] El artifact tiene `visibility: "private"`, `auth_method: "google"`.
+- [ ] El artefacto tiene `visibility: "private"`, `auth_method: "google"`.
 - [ ] `share_with` lista todos los emails de viewers (el gate de acceso).
 - [ ] `access_policy.field` coincide exactamente con la key JSON de las filas.
 - [ ] `default: "deny"` salvo que viewers sin coincidencia deban ver todo.

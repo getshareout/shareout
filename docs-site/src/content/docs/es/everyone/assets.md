@@ -1,9 +1,9 @@
 ---
 title: Archivos y entregas
-description: Guardá imágenes, video y cualquier archivo en un solo lugar, reutilizalos en tus páginas y enviá al cliente un link de descarga limpio.
+description: Guardá imágenes, video y cualquier archivo en un solo lugar, reutilizalos en tus artefactos y enviá al cliente un link de descarga limpio.
 ---
 
-La pestaña **Assets** en tu Home es un lugar para guardar archivos — imágenes, video, PDFs, hojas de cálculo, decks, zips, lo que sea — guardalos una vez, reutilizalos en tus páginas y entregale al cliente un link de descarga limpio.
+La pestaña **Assets** en tu Home es un lugar para guardar archivos — imágenes, video, PDFs, hojas de cálculo, decks, zips, lo que sea — guardalos una vez, reutilizalos en tus artefactos y entregale al cliente un link de descarga limpio.
 
 Abrilo desde el rail izquierdo de Home: **Assets**.
 
@@ -23,15 +23,15 @@ Los archivos también pueden entrar a tu biblioteca desde tres lugares más — 
 
 La dirección del inbox del workspace está en **Admin → Settings → File inbox** (copiá con un clic). Los admins reciben notificación en la campana y opcionalmente por Telegram cuando un miembro manda archivos por email. Hojas de cálculo (`.xlsx`, `.csv`), decks (`.pptx`), PDFs e imágenes son los casos típicos.
 
-:::note[No es lo mismo que el inbox de una página]
-El **inbox de una página** (`tu-pagina@inbox.YOUR_DOMAIN`) captura mail *dentro de un artifact* para automatizaciones — ver [Recibí emails](/es/everyone/inbox/). El **inbox de archivos del workspace** alimenta la biblioteca **Assets** compartida y al asistente con IA.
+:::note[No es lo mismo que el inbox de un artefacto]
+El **inbox de un artefacto** (`tu-pagina@inbox.YOUR_DOMAIN`) captura mail *dentro de un artefacto* para automatizaciones — ver [Recibí emails](/es/everyone/inbox/). El **inbox de archivos del workspace** alimenta la biblioteca **Assets** compartida y al asistente con IA.
 :::
 
 ## Organizar en carpetas
 
-Usá la **barra de carpetas** arriba en Assets para agrupar archivos — entregables de clientes, assets de marca, material en bruto, lo que te sirva. **New folder** crea una carpeta en el mismo árbol compartido que usan tus páginas; hacé clic en un archivo y elegí **Mover** para meterlo adentro.
+Usá la **barra de carpetas** arriba en Assets para agrupar archivos — entregables de clientes, assets de marca, material en bruto, lo que te sirva. **New folder** crea una carpeta en el mismo árbol compartido que usan tus artefactos; hacé clic en un archivo y elegí **Mover** para meterlo adentro.
 
-Compartir una **carpeta** con un cliente (Admin → Compartir) también comparte los **archivos** que hay dentro — carpetas y páginas comparten un solo árbol.
+Compartir una **carpeta** con un cliente (Admin → Compartir) también comparte los **archivos** que hay dentro — carpetas y artefactos comparten un solo árbol.
 
 ## Visibilidad
 
@@ -44,10 +44,10 @@ Cada archivo del espacio tiene una de tres opciones, que se ve como badge en su 
 Al subir, ShareOut te pregunta quién puede ver los archivos (viene marcado Solo el equipo). Para cambiarlo después, hacé clic en el archivo y elegí otra opción en **Quién lo puede ver**. Los archivos subidos antes de este cambio mantienen la opción que tenían.
 
 :::caution[Cualquiera con el enlace no verifica membresía]
-El id del link es un token aleatorio no adivinable, pero abrirlo **no** verifica que estés logueado ni que seas miembro del workspace — cualquiera que consiga la URL (un link filtrado, una captura de pantalla, el código fuente de una página compartida) puede abrir el archivo. Es distinto de una página con visibilidad `workspace`, que sí verifica membresía. No subas nada que necesite control de acceso real — usá **privado** más un permiso explícito.
+El id del link es un token aleatorio no adivinable, pero abrirlo **no** verifica que estés logueado ni que seas miembro del workspace — cualquiera que consiga la URL (un link filtrado, una captura de pantalla, el código fuente de un artefacto compartido) puede abrir el archivo. Es distinto de un artefacto con visibilidad `workspace`, que sí verifica membresía. No subas nada que necesite control de acceso real — usá **privado** más un permiso explícito.
 :::
 
-- Los archivos con **Cualquiera con el enlace** se pueden incrustar en cualquier página con una URL estable (`/v1/files/dlv_…/content`). Los de **Solo el equipo** y **Solo vos** necesitan a alguien con sesión iniciada, así que no cargan dentro de un artefacto publicado.
+- Los archivos con **Cualquiera con el enlace** se pueden incrustar en cualquier artefacto con una URL estable (`/v1/files/dlv_…/content`). Los de **Solo el equipo** y **Solo vos** necesitan a alguien con sesión iniciada, así que no cargan dentro de un artefacto publicado.
 - Los archivos **Solo vos** quedan ocultos para otros miembros y para links de entrega anónimos — compartilos a propósito con [compartir externo](/es/teams/external-sharing/) o **Compartir con una persona** (abajo).
 
 ## Versiones
@@ -58,7 +58,7 @@ El id del link es un token aleatorio no adivinable, pero abrirlo **no** verifica
 
 Hacé clic en un archivo y elegí **Comentarios** para dejar un hilo en ese archivo.
 
-- Mismo almacenamiento y notificaciones que los comentarios de páginas, pero **acotado solo a ese archivo**.
+- Mismo almacenamiento y notificaciones que los comentarios de artefactos, pero **acotado solo a ese archivo**.
 - Los miembros pueden comentar archivos **Solo el equipo** y **Cualquiera con el enlace** (y siempre los que son de su autoría).
 - Archivos **Solo vos**: solo el dueño (y a quienes se los compartió) ven el hilo.
 - Sharees externos necesitan grant **comment** para publicar; **view** alcanza para leer.
@@ -70,17 +70,17 @@ API (`contextId: "file:…"`): [SDK: Comments](/es/sdk/comments/).
 
 En una tarjeta, **Share with a person** manda un solo archivo a un email externo — sin crear una org de cliente. Elegí **View** o **Comment**; reciben invitación (si son nuevos) y el archivo aparece en su portal **`/shared`**. Devuelve `409` si ese email ya es miembro interno del workspace — usá una invitación de colaborador normal.
 
-En una **carpeta**, usá **Share folder** en la barra de carpetas — mismo flujo, otorga view o comment sobre toda la carpeta (páginas y archivos adentro). El modal lista **People you've shared with** para ese archivo o carpeta; revocá cualquier grant desde ahí.
+En una **carpeta**, usá **Share folder** en la barra de carpetas — mismo flujo, otorga view o comment sobre toda la carpeta (artefactos y archivos adentro). El modal lista **People you've shared with** para ese archivo o carpeta; revocá cualquier grant desde ahí.
 
 Los sharees externos con acceso **comment** pueden dejar hilos en archivos compartidos directamente en el portal **`/shared`** — ver [Compartir externo](/es/teams/external-sharing/).
 
 ## Reutilizar un archivo en varias páginas
 
-Cada asset tiene un link permanente. Hacé clic en **Copy link** en cualquier tarjeta y pegalo en una página (`<img>`, un botón, un link de descarga) — una sola fuente, usada en todos los artifacts que quieras. No tenés que tocar las páginas cuando cambiás el archivo; apuntan al mismo asset.
+Cada asset tiene un link permanente. Hacé clic en **Copy link** en cualquier tarjeta y pegalo en un artefacto (`<img>`, un botón, un link de descarga) — una sola fuente, usada en todos los artefactos que quieras. No tenés que tocar los artefactos cuando cambiás el archivo; apuntan al mismo asset.
 
-En HTML de artifact, preferí **`sdk.files.getUrl('dlv_…')`** para archivos del workspace — resuelve a la última versión y aplica visibilidad (los privados devuelven 403 a quien no esté autorizado). Ver [SDK: Archivos](/es/sdk/files/).
+En HTML de artefacto, preferí **`sdk.files.getUrl('dlv_…')`** para archivos del workspace — resuelve a la última versión y aplica visibilidad (los privados devuelven 403 a quien no esté autorizado). Ver [SDK: Archivos](/es/sdk/files/).
 
-¿Editás una página? La barra del editor visual tiene un botón **Insert asset** — abrilo, elegí un archivo de tu biblioteca y se inserta directo en la página. Sin copiar links a mano.
+¿Editás un artefacto? La barra del editor visual tiene un botón **Insert asset** — abrilo, elegí un archivo de tu biblioteca y se inserta directo en el artefacto. Sin copiar links a mano.
 
 ## Enviar una entrega a un cliente
 
@@ -92,13 +92,13 @@ Es el flujo estilo WeTransfer:
 4. Obtenés un **link** a una página de descarga limpia y con marca que lista cada archivo con un botón Download.
 5. **Copiá** el link para pegarlo donde quieras, o escribí el email del cliente y **Send** — recibe un mail ordenado con el link de descarga.
 
-Los links protegidos bloquean la **página de descarga y los bytes del archivo** — el destinatario tiene que pasar la contraseña o el chequeo de dominio antes de que se sirva cualquier archivo. Para una entrega protegida, compartí el link `/d/<token>`, no el **Copy link** por archivo de la biblioteca (esa URL estable es para incrustar un asset en tus páginas).
+Los links protegidos bloquean la **página de descarga y los bytes del archivo** — el destinatario tiene que pasar la contraseña o el chequeo de dominio antes de que se sirva cualquier archivo. Para una entrega protegida, compartí el link `/d/<token>`, no el **Copy link** por archivo de la biblioteca (esa URL estable es para incrustar un asset en tus artefactos).
 
 Como es un link (no un adjunto), el tamaño no importa — podés enviar una carpeta de renders 4K igual que un logo.
 
 ## Gestionar entregas enviadas
 
-Hacé clic en **Sent deliveries** arriba en Assets para ver cada link que creaste — nombre de la colección, cantidad de archivos, tipo de gate, vencimiento, conteo de aperturas y estado en vivo (activo, vencido o revocado). Desde ahí podés **copiar** un link de nuevo o **revocarlo**; un link revocado devuelve 404 tanto en la página como en las descargas.
+Hacé clic en **Sent deliveries** arriba en Assets para ver cada link que creaste — nombre de la colección, cantidad de archivos, tipo de gate, vencimiento, conteo de aperturas y estado en vivo (activo, vencido o revocado). Desde ahí podés **copiar** un link de nuevo o **revocarlo**; un link revocado devuelve 404 tanto en el artefacto como en las descargas.
 
 ## Notificaciones de apertura
 

@@ -90,7 +90,7 @@ The studio reads the artifact's HTML spec — it cannot infer structure. Without
 | Inspect behavior editors | `data-shareout-binding`, `data-shareout-action`, `data-shareout-if`, etc. |
 | Template add/remove | `data-shareout-template` |
 
-Verify compliance before publishing: [HTML spec overview](/spec/html-spec/).
+Verify compliance before publishing: [HTML spec overview](/spec/overview/).
 
 ## Autosave and draft lifecycle
 
@@ -149,7 +149,7 @@ These two layers are independent: changing visual styles in Inspect does not alt
 
 ## Slides and dashboards
 
-The visual studio described here covers **general HTML artifacts**. Slides and dashboards modules use their own editor/published artifact pair (`/a/` editor + `/p/` published viewer). See the [slides](/slides/) and [dashboards](/dashboards/) sections.
+The visual studio described here covers **general HTML artifacts**. Slides and dashboards modules use their own editor/published artifact pair (`/a/` editor + `/p/` published viewer). See the [slides](/slides/overview/) and [dashboards](/dashboards/overview/) sections.
 
 ## Related
 

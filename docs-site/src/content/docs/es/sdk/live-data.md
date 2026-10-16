@@ -1,22 +1,22 @@
 ---
 title: Live data
-description: Consultá conexiones de workspace desde HTML de artifact publicado sin errores de auth.
+description: Consultá conexiones de workspace desde HTML de artefacto publicado sin errores de auth.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Cómo consultar datos en vivo desde un artifact HTML publicado. Leé esto antes de
+Cómo consultar datos en vivo desde un artefacto HTML publicado. Leé esto antes de
 escribir cualquier `fetch('/v1/data/…')` o `new ShareOut()` — hacerlo mal produce
 `Authentication required`, gráficos vacíos o números silenciosamente incorrectos.
 
 ## Modelo de dos orígenes
 
-Los artifacts publicados corren en un **iframe en sandbox** en un host de contenido separado:
+Los artefactos publicados corren en un **iframe en sandbox** en un host de contenido separado:
 
 | Capa | Host | Rol |
 |------|------|-----|
 | Shell de confianza | `shareout.site` (o subdominio del workspace) | Chrome de la página, cookies de sesión, bridge padre↔iframe |
-| Contenido no confiable | `<hex>.shareoutcdn.site` | Tu HTML/JS del artifact — origen opaco |
+| Contenido no confiable | `<hex>.shareoutcdn.site` | Tu HTML/JS del artefacto — origen opaco |
 
 El shell padre genera un Bearer `sessionToken` de corta duración y se lo pasa al SDK
 vía `postMessage`. Las cookies **no** se envían desde el iframe.
@@ -60,7 +60,7 @@ const body = await sdk.connection('mixpanel').fetch('/query/events', {
 });
 ```
 
-Todas las llamadas a `/v1/data/{artifactId}/*` desde el JS del artifact deben ir por el SDK.
+Todas las llamadas a `/v1/data/{artifactId}/*` desde el JS del artefacto deben ir por el SDK.
 
 ## Conexiones REST genéricas (`sdk.connection`)
 

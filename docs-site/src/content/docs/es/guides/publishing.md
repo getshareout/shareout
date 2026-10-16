@@ -1,11 +1,11 @@
 ---
-title: Publicar artifacts
-description: Creá, actualizá, versioná y compartí artifacts.
+title: Publicar artefactos
+description: Creá, actualizá, versioná y compartí artefactos.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Un artifact es un bundle versionado de archivos servido en una URL en vivo. Publicar
+Un artefacto es un bundle versionado de archivos servido en una URL en vivo. Publicar
 el mismo `slug` de nuevo crea una nueva versión — las anteriores siguen accesibles.
 
 ## Publicar
@@ -33,12 +33,12 @@ La respuesta de publish incluye un objeto `deployment` con las URLs en vivo:
 
 | Campo | Uso |
 | --- | --- |
-| `deployment.subdomain_url` | **Link para compartir en artifacts de workspace** — `https://{workspace}.shareout.site/{slug}/` |
-| `deployment.url` | Link para artifacts **personales** (`https://shareout.site/a/{slug}/`); también la clave de routing interna para artifacts de workspace |
+| `deployment.subdomain_url` | **Link para compartir en artefactos de workspace** — `https://{workspace}.shareout.site/{slug}/` |
+| `deployment.url` | Link para artefactos **personales** (`https://shareout.site/a/{slug}/`); también la clave de routing interna para artefactos de workspace |
 | `deployment.slug` | Slug de routing globalmente único (puede diferir del slug humano que enviaste) |
 | `deployment.mobile_url` | Entrypoint mobile cuando hay `mobile_html` |
 
-Para artifacts de **workspace**, mostrá `deployment.subdomain_url` a los usuarios — no la
+Para artefactos de **workspace**, mostrá `deployment.subdomain_url` a los usuarios — no la
 URL apex `/a/{routing-slug}/`. El slug apex es una clave de routing interna que puede
 llevar sufijo hash si hay colisión entre workspaces; el subdominio y las URLs con
 namespace mantienen el slug humano limpio. Usá `deployment.url` solo para links de
@@ -47,8 +47,8 @@ máquina (embeds, manifests, KV).
 ## Editor readiness
 
 Las publicaciones HTML devuelven un perfil **advisory** `editor_readiness` — cuánto puede
-hacer el editor visual con el artifact. La publicación **nunca se bloquea** por gaps; la
-página queda en vivo igual.
+hacer el editor visual con el artefacto. La publicación **nunca se bloquea** por gaps; el
+artefacto queda en vivo igual.
 
 ```json
 {
@@ -71,7 +71,7 @@ página queda en vivo igual.
 ```
 
 El campo `disables` de cada finding nombra qué función del estudio cuesta ese gap. Ausente
-en artifacts no-HTML. Los findings pueden incluir una `category` — p. ej. `provenance`
+en artefactos no-HTML. Los findings pueden incluir una `category` — p. ej. `provenance`
 advierte cuando una fuente en vivo no tiene `query`/`description` o cuando los
 gráficos carecen de `data-shareout-source` / vínculos en `feeds`. Ver
 [Procedencia de datos](/es/guides/data-provenance/).
@@ -84,17 +84,17 @@ Mirá el [resumen de la spec](/es/spec/overview/) y el
 | Valor | Quién puede ver |
 | --- | --- |
 | `private` | Solo colaboradores con `viewer`+ |
-| `workspace` | Cualquier miembro del workspace del artifact |
+| `workspace` | Cualquier miembro del workspace del artefacto |
 | `public` | Cualquiera en internet con el enlace; descubrible |
 
 (`unlisted` es un alias legacy retirado, aún aceptado en la API y tratado como `public`.)
 
-### Artifacts públicos
+### Artefactos públicos
 
 La visibilidad `public` activa reglas adicionales:
 
 **Revisión de seguridad.** Al publicar o cambiar a visibilidad abierta, ShareOut
-ejecuta un control automático del HTML. Si no puede aprobar al instante, el artifact
+ejecuta un control automático del HTML. Si no puede aprobar al instante, el artefacto
 queda **privado** con `moderation_status: "pending"` y un objeto `moderation` al
 publicar (o `code: "MODERATION_HELD"` + `reason` en PATCH) — pero ShareOut **revisa
 los holds pendientes automáticamente** (cada hora) y restaura la visibilidad pública
@@ -102,33 +102,33 @@ solicitada cuando se libera; la mayoría de los casos se resuelven en una hora s
 
 Los owners ven badges **Under review** / **Blocked** en las tarjetas de Home y un banner
 en el inspector mientras dura el hold. Los visitantes que abren una URL pública en hold
-ven una página dedicada de revisión (no el contenido del artifact). Al liberarse el hold,
+ven una página dedicada de revisión (no el contenido del artefacto). Al liberarse el hold,
 el owner recibe notificación en la campana y por email.
 
-**Scripts y CDNs externos.** En artifacts `public` la Content-Security-Policy
+**Scripts y CDNs externos.** En artefactos `public` la Content-Security-Policy
 del sandbox permite scripts, estilos y fuentes desde una amplia lista de CDNs
 reputados — jsDelivr, unpkg, cdnjs, esm.sh, Skypack, librerías de Google, la Tailwind
 Play CDN (`cdn.tailwindcss.com`), jQuery, D3, Plotly, Highcharts, DataTables, Bootstrap
 y más — que cubre la mayoría de las librerías. Un CDN **fuera** de la lista queda
-bloqueado y su `<script>` no cargará. Si tu artifact carga un CDN no permitido, al
+bloqueado y su `<script>` no cargará. Si tu artefacto carga un CDN no permitido, al
 intentar hacerlo público se **rechaza**: queda privado y recibís un
 mensaje con el host problemático.
 
-**Los artifacts privados no tienen esa restricción.** Un artifact `private` puede
+**Los artefactos privados no tienen esa restricción.** Un artefacto `private` puede
 cargar scripts, estilos y fuentes desde **cualquier** origen HTTPS. Para un CDN de
-nicho o propio, dejá el artifact **privado** y agregá colaboradores uno a uno
+nicho o propio, dejá el artefacto **privado** y agregá colaboradores uno a uno
 (Configuración → Compartir): tienen acceso completo y vos conservás el uso libre de
-CDNs. Alternativa: alojá la librería como archivo dentro del artifact, o cambiá a un
+CDNs. Alternativa: alojá la librería como archivo dentro del artefacto, o cambiá a un
 CDN permitido.
 
-**Visitantes anónimos son de solo lectura por defecto.** En artifacts públicos, los
+**Visitantes anónimos son de solo lectura por defecto.** En artefactos públicos, los
 visitantes anónimos no pueden escribir en json/tablas/blobs/datasets, enviar email,
 usar el chat IA ni colaborar en tiempo real salvo que el dueño habilite cada
 capacidad con `allow_anon_write`, `allow_anon_email`, `allow_anon_agent` o
 `allow_anon_collab` (todos `false` por defecto).
 
 **Badge.** Apagado por defecto. Poné `ARTIFACT_BADGE=1` en el Worker para agregar
-un badge "Made with ShareOut" con enlace Report a los artifacts públicos.
+un badge "Made with ShareOut" con enlace Report a los artefactos públicos.
 
 **Cuota de almacenamiento.** Publicar verifica el total de bytes del dueño contra
 `STORAGE_QUOTA_BYTES`; superarlo devuelve `413 STORAGE_LIMIT_EXCEEDED`. Sin setear
@@ -139,14 +139,14 @@ La visibilidad abierta (pública) está activa salvo que la instancia setee
 `OPEN_VISIBILITY_DISABLED`. Donde está apagada, `POST /v1/publish` y
 `PATCH /v1/artifacts/{id}` devuelven un `notice` (publicar) o `VISIBILITY_HELD`
 (actualizar) en lugar de hacer downgrade silencioso.
-Ver [Política de artifacts públicos](/es/public-artifacts/overview/#quien-puede-publicar-publicamente).
+Ver [Política de artefactos públicos](/es/public-artifacts/overview/#quien-puede-publicar-publicamente).
 </Aside>
 
 ### Gobernanza de publicación del workspace
 
 Los owners/admins pueden controlar la visibilidad abierta con una política por
 workspace (`allow` / `prohibit` / `require_approval`). Por defecto es `allow`.
-Mirá [Política de artifacts públicos](/es/public-artifacts/overview/) para el
+Mirá [Política de artefactos públicos](/es/public-artifacts/overview/) para el
 contexto completo.
 
 **Configurar (admin/owner):**
@@ -225,7 +225,7 @@ curl -X POST https://shareout.site/v1/artifacts/art_abc123/collaborators \
 
 Configurá `og:title`, `og:description` y `og:image` en el `<head>` de tu entrypoint y
 ShareOut los sirve para los unfurls de Slack, WhatsApp e iMessage. Sobrescribilos por
-artifact con `PATCH /v1/artifacts/{id}` (`social_title`, `social_description`,
+artefacto con `PATCH /v1/artifacts/{id}` (`social_title`, `social_description`,
 `social_image_url`).
 
 <Aside type="tip">
@@ -247,12 +247,12 @@ Regenerá la miniatura del preview cuando quieras con
 Tras cada publish HTML exitoso, ShareOut corre un paso de IA en **background** sobre
 el entrypoint de producción. Escribe una **descripción** de 1–2 oraciones (solo si
 dejaste el campo vacío) y **3–6 tags** en la tabla `artifact_tags` existente. El
-publish nunca espera este job — si la IA no está disponible, la página igual queda
+publish nunca espera este job — si la IA no está disponible, el artefacto igual queda
 en vivo.
 
 Los auto-resúmenes alimentan subtítulos en tarjetas de Home, hits de búsqueda ⌘K,
 el [digest semanal del workspace](/es/everyone/your-workspace/#digest-semanal-del-workspace)
-y la entrada del learner de Knowledge. Las páginas viejas se rellenan con un drip
+y la entrada del learner de Knowledge. Los artefactos viejos se rellenan con un drip
 horario.
 
 Podés setear tu propia descripción o tags con `PATCH /v1/artifacts/{id}` — tus valores
@@ -305,10 +305,10 @@ curl -X POST https://shareout.site/v1/artifacts/art_abc123/restore \
 En la UI del home está en el menú de la cuenta → **Eliminados recientemente**. Al
 restaurar se asigna un slug nuevo si el original fue reclamado mientras tanto.
 
-### Janitor de páginas sin uso
+### Janitor de artefactos sin uso
 
-Una vez al mes (por workspace o cuenta personal), ShareOut marca **páginas publicadas
-con cero vistas en 90+ días** cuando hay al menos tres. Las páginas con estrella
+Una vez al mes (por workspace o cuenta personal), ShareOut marca **artefactos publicados
+con cero vistas en 90+ días** cuando hay al menos tres. Los artefactos con estrella
 siempre se conservan. La campana muestra una tarjeta **Unused pages** con títulos de
 muestra y **Archive all** — soft-delete de un clic a la misma papelera de 30 días
 (lotes de 100 por clic). Admins de workspace usan `POST /v1/workspaces/{id}/unused/archive`;
