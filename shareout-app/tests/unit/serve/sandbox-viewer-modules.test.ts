@@ -333,4 +333,29 @@ describe('sandbox-viewer modules', () => {
     expect(html).toContain("fetch('https://shareout.site/v1/artifacts/art_1/presence'");
     expect(html).toContain("safeCount + ' viewing now'");
   });
+
+  function guestCtx(commentsGuest: boolean, locale: 'en' | 'es' = 'en') {
+    return buildToolbarContext({
+      loggedIn: false, isFav: false, commentsEnabled: true, commentsIdentityMode: 'authenticated', commentsGuest,
+      commentCount: 0, hasMetrics: false, adminInfo: null, currentUser: null, hideToolbar: false,
+      baseUrl: 'https://shareout.site', slug: 'demo', artifactId: 'art_1', visualEditorEnabled: true, attachedSkills: [], locale,
+    })!;
+  }
+
+  it('offers "Comment as guest" (name, email, code) to a viewer with no account only when guests are on', () => {
+    const on = renderToolbar(guestCtx(true));
+    expect(on).toContain('data-guest="1"');
+    expect(on).toContain('Comment as guest');
+    expect(on).toContain('id="so-cmt-guest-email"');
+    expect(on).toContain('id="so-cmt-guest-code"');
+    expect(on).toContain("var gApi = cmtApi + '/_guest';");
+    expect(on).not.toContain('Log in to comment');
+
+    const off = renderToolbar(guestCtx(false));
+    expect(off).toContain('Log in to comment');
+    expect(off).not.toContain('so-cmt-guest-email');
+    expect(off).not.toContain('/_guest');
+
+    expect(renderToolbar(guestCtx(true, 'es'))).toContain('Comentá como invitado');
+  });
 });

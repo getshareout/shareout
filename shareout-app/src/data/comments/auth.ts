@@ -2,6 +2,7 @@ import { errorResponse, type DataContext } from '../middleware';
 import { verifySessionToken, extractTokenFromCookie } from '../../token';
 import { validateToken } from '../../api-auth';
 import type { CommentsConfig } from './types';
+import { guestCommentsOpen, resolveGuest, type GuestIdentity } from './guest';
 
 export interface CommentSession {
   userId: string;
@@ -39,49 +40,49 @@ export async function getSession(
   };
 }
 
-/** Map identityMode + optional display name to author fields for a new comment. */
+export interface CommentIdentity {
+  authorId: string | null;
+  authorName: string;
+  /** Set when the author is a verified guest (no account). */
+  guest?: GuestIdentity;
+}
+
+/**
+ * Map identityMode + optional display name to author fields for a new comment.
+ * A signed-in session always wins. With guest comments open on this artifact, a
+ * verified guest token is an identity in every mode, and it is REQUIRED of anyone
+ * without an account unless the mode is 'anonymous'.
+ */
 export async function validateIdentity(
   request: Request,
   ctx: DataContext,
   config: CommentsConfig,
   providedName?: string,
-): Promise<{ authorId: string | null; authorName: string } | Response> {
-  switch (config.identityMode) {
-    case 'anonymous': {
-      const session = await getSession(request, ctx);
-      if (session) {
-        return { authorId: session.userId, authorName: session.name || session.email };
-      }
-      return {
-        authorId: null,
-        authorName: providedName || 'Anonymous',
-      };
+): Promise<CommentIdentity | Response> {
+  const session = await getSession(request, ctx);
+  if (session) return { authorId: session.userId, authorName: session.name || session.email };
+
+  if (await guestCommentsOpen(request, ctx, config)) {
+    const guest = await resolveGuest(request, ctx);
+    if (guest) return { authorId: null, authorName: guest.name, guest };
+    if (config.identityMode !== 'anonymous') {
+      return errorResponse({ code: 'GUEST_VERIFICATION_REQUIRED', message: 'Confirm your email to comment as a guest', status: 401 });
     }
+  }
+
+  switch (config.identityMode) {
+    case 'anonymous':
+      return { authorId: null, authorName: providedName || 'Anonymous' };
 
     case 'named': {
-      const session = await getSession(request, ctx);
-      if (session) {
-        return { authorId: session.userId, authorName: session.name || session.email };
-      }
       if (!providedName || providedName.trim().length === 0) {
         return errorResponse({ code: 'NAME_REQUIRED', message: 'Author name is required', status: 400 });
       }
-      return {
-        authorId: null,
-        authorName: providedName.trim(),
-      };
+      return { authorId: null, authorName: providedName.trim() };
     }
 
-    case 'authenticated': {
-      const session = await getSession(request, ctx);
-      if (!session) {
-        return errorResponse({ code: 'AUTH_REQUIRED', message: 'Authentication required', status: 401 });
-      }
-      return {
-        authorId: session.userId,
-        authorName: session.name || session.email,
-      };
-    }
+    case 'authenticated':
+      return errorResponse({ code: 'AUTH_REQUIRED', message: 'Authentication required', status: 401 });
 
     default:
       return errorResponse({ code: 'INVALID_CONFIG', message: 'Invalid identity mode', status: 500 });

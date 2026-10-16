@@ -14,6 +14,7 @@
  * - `actions.ts` — resolve and assign (action items)
  * - `file-comments.ts` — per-file gate on asset-bucket artifacts
  * - `tool.ts` — programmatic create for Crew tools
+ * - `guest.ts` — guest comments (email code → artifact-bound cookie)
  */
 import { errorResponse, type DataContext } from '../middleware';
 import { COMMENT_ID_PATTERN } from './types';
@@ -31,6 +32,7 @@ import {
   deleteComment,
 } from './crud';
 import { resolveComment, assignComment } from './actions';
+import { handleGuest } from './guest';
 import { reactComment } from './reactions';
 
 export { createCommentForTool } from './tool';
@@ -73,6 +75,10 @@ export async function handleComments(
   const config = await getConfig(ctx);
   if (!config.enabled) {
     return errorResponse({ code: 'COMMENTS_DISABLED', message: 'Comments are disabled', status: 403 });
+  }
+
+  if (firstPart === '_guest') {
+    return handleGuest(request, ctx, config, secondPart);
   }
 
   if (!firstPart) {

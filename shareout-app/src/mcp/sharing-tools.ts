@@ -9,6 +9,8 @@ import { queryFolderAccess, type FolderAccess } from '../pages/home/queries/fold
 import { handleListFolderActivity } from '../sharees/activity';
 import { handleDeleteGrant, handleShareWithPerson } from '../sharees/grants';
 import { requireFolderManager } from '../folders';
+import { handleDataRequest } from '../data/router';
+import { setFolderGuestComments } from '../sharees/folder-guest-comments';
 import type { BotWorkspace } from '../chat-agent/access';
 import {
   NOT_MEMBER, ON_FAILURE, errorText, fail, invalid, ok, readJson, resolveFolder, resolveWorkspace, str, workspaceChoiceText,
@@ -192,4 +194,55 @@ const revokeShare: ToolDef = {
   },
 };
 
-export const SHARING_TOOLS: ToolDef[] = [folderAccess, folderActivity, shareWithPerson, revokeShare];
+const setGuestComments: ToolDef = {
+  name: 'set_guest_comments',
+  title: 'Let guests comment',
+  description: [
+    'Turns guest comments on or off. Guests are people with no account reviewing through a public link or a password link: they confirm their email with a code, then comment and reply under their name (they can never resolve, assign or approve).',
+    'Give artifact_id for one page (only its owner may change it; enabled null makes the page follow its folder again), or folder (+ workspace_id) for everything in a folder that has no setting of its own (admins and the folder\'s creator).',
+    'Guests only ever comment where they can already open the page. Confirm with the person first.', ON_FAILURE,
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      artifact_id: { type: 'string', description: 'The page id (from list_artifacts or get_artifact).' },
+      folder: FOLDER_ARG,
+      workspace_id: WORKSPACE_ARG,
+      enabled: { type: ['boolean', 'null'], description: 'Required. true to let guests comment, false to stop them; null (page only) to follow the folder.' },
+    },
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  async run(ctx, args) {
+    const enabled = args.enabled === null ? null : args.enabled === true ? true : args.enabled === false ? false : undefined;
+    if (enabled === undefined) return invalid('enabled must be true, false or null.');
+    const artifactId = str(args.artifact_id, 100);
+    if (artifactId) {
+      // Same route and owner gate as PUT /v1/data/{id}/comments/_config.
+      const res = await handleDataRequest(
+        call(ctx, `/v1/data/${encodeURIComponent(artifactId)}/comments/_config`, 'PUT', { guestComments: enabled }),
+        ctx.env, `/${encodeURIComponent(artifactId)}/comments/_config`,
+      );
+      const body = await readJson(res);
+      if (res.status === 403) return fail('Only the page\'s owner can change guest comments.', { status: 403, code: body.code });
+      if (!res.ok) return fail(`Guest comments were not changed: ${errorText(body, res.status)}`, { status: res.status, code: body.code });
+      const data = (body.data ?? {}) as { guestCommentsEffective?: boolean };
+      const on = data.guestCommentsEffective === true;
+      return ok(enabled === null
+        ? `The page follows its folder again: guests ${on ? 'can' : 'cannot'} comment.`
+        : `Guests ${on ? 'can now comment on' : 'can no longer comment on'} this page.`, { artifact_id: artifactId, guest_comments: enabled, effective: on });
+    }
+    if (enabled === null) return invalid('enabled null only applies to a page (artifact_id).');
+    const picked = await pickFolder(ctx, args, 'set_guest_comments');
+    if (isResult(picked)) return picked;
+    const res = await setFolderGuestComments(ctx.env, ctx.user, picked.w.id, picked.folderId, enabled);
+    const body = await readJson(res);
+    if (res.status === 403) return fail(`The person cannot change this folder: ${errorText(body, 403)}`, { status: 403, code: body.code });
+    if (!res.ok) return fail(`Guest comments were not changed: ${errorText(body, res.status)}`, { status: res.status, code: body.code });
+    return ok(enabled
+      ? 'Guests can now comment on the pages in this folder that have no setting of their own, wherever they can already open them.'
+      : 'Guests can no longer comment in this folder (pages with their own setting keep it).', { workspace_id: picked.w.id, folder_id: picked.folderId, guest_comments: enabled });
+  },
+};
+
+export const SHARING_TOOLS: ToolDef[] = [folderAccess, folderActivity, shareWithPerson, revokeShare, setGuestComments];

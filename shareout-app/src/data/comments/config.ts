@@ -1,6 +1,7 @@
 import { generateId } from '../../crypto-utils';
 import { successResponse, errorResponse, verifyOwner, type DataContext } from '../middleware';
 import { CONFIG_KEY, DEFAULT_CONFIG, type CommentsConfig } from './types';
+import { isGuestCommentsEnabled } from './guest';
 
 /** Load comments config from the per-artifact mini-store (ADR 28). */
 export async function getConfig(ctx: DataContext): Promise<CommentsConfig> {
@@ -21,7 +22,7 @@ export async function getConfig(ctx: DataContext): Promise<CommentsConfig> {
 export async function handleConfig(request: Request, ctx: DataContext): Promise<Response> {
   if (request.method === 'GET') {
     const config = await getConfig(ctx);
-    return successResponse(config);
+    return successResponse({ ...config, guestCommentsEffective: await isGuestCommentsEnabled(ctx, config) });
   }
 
   if (request.method === 'PUT') {
@@ -30,7 +31,7 @@ export async function handleConfig(request: Request, ctx: DataContext): Promise<
       return errorResponse({ code: 'FORBIDDEN', message: 'Only artifact owner can modify config', status: 403 });
     }
 
-    let body: Partial<CommentsConfig>;
+    let body: Partial<Omit<CommentsConfig, 'guestComments'>> & { guestComments?: boolean | null };
     try {
       body = await request.json();
     } catch {
@@ -45,6 +46,12 @@ export async function handleConfig(request: Request, ctx: DataContext): Promise<
       maxDepth: body.maxDepth ?? currentConfig.maxDepth,
       overlayEnabled: body.overlayEnabled ?? currentConfig.overlayEnabled,
     };
+    // true/false sets it on this artifact; null clears it so the folder setting applies.
+    const guest = body.guestComments === undefined ? currentConfig.guestComments : body.guestComments;
+    if (guest !== undefined && guest !== null && typeof guest !== 'boolean') {
+      return errorResponse({ code: 'INVALID_REQUEST', message: 'guestComments must be true, false or null', status: 400 });
+    }
+    if (typeof guest === 'boolean') newConfig.guestComments = guest;
 
     if (!['anonymous', 'named', 'authenticated'].includes(newConfig.identityMode)) {
       return errorResponse({ code: 'INVALID_REQUEST', message: 'Invalid identity mode', status: 400 });
@@ -74,7 +81,7 @@ export async function handleConfig(request: Request, ctx: DataContext): Promise<
       try { await ctx.env.SLUGS.delete(`cmtcfg:${ctx.artifactId}`); } catch {}
     }
 
-    return successResponse(newConfig);
+    return successResponse({ ...newConfig, guestCommentsEffective: await isGuestCommentsEnabled(ctx, newConfig) });
   }
 
   return errorResponse({ code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed', status: 405 });

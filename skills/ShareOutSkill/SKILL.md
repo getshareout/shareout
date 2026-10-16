@@ -390,7 +390,7 @@ of every fact — see [integrations/mcp-connector.md](integrations/mcp-connector
 [team/knowledge.md](team/knowledge.md). The connector also covers page history
 (`list_versions`, `restore_version`), review (`list_comments`, `resolve_comment`,
 `assign_comment`, `approve_version`), schedules (`list_jobs`) and folder sharing
-(`folder_access`, `share_with_person`, `revoke_share`, `folder_activity`).
+(`folder_access`, `share_with_person`, `revoke_share`, `folder_activity`, `set_guest_comments`).
 
 Building a multi-page site through the connector? Pass `files: [{ path, content, encoding? }]`
 (with `index.html` as the first page) to `publish_artifact` or `update_artifact` instead of

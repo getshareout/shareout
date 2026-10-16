@@ -14,6 +14,7 @@ import { rowToComment } from '../../../data/comments/mapping';
 import type { CommentRow } from '../../../data/comments/types';
 import type { DataContext } from '../../../data/middleware';
 import { generateId } from '../../../crypto-utils';
+import { notifyVersionApproved } from '../../../notify/review-notify';
 import { userCanAccessArtifact } from './comments';
 
 type User = { id: string; email: string | null; name?: string | null };
@@ -160,8 +161,10 @@ export async function setApproval(env: Env, user: User, artifactId: string, vers
     : await env.DB.prepare("SELECT version_id AS id FROM deployments WHERE artifact_id = ? AND channel = 'production'").bind(artifactId).first<{ id: string }>();
   if (!version?.id) return deny(404, 'VERSION_NOT_FOUND', 'Version not found');
   if (approved) {
-    await env.DB.prepare('INSERT OR IGNORE INTO artifact_approvals (id, artifact_id, version_id, user_id, created_at) VALUES (?, ?, ?, ?, ?)')
+    const ins = await env.DB.prepare('INSERT OR IGNORE INTO artifact_approvals (id, artifact_id, version_id, user_id, created_at) VALUES (?, ?, ?, ?, ?)')
       .bind(generateId('apv'), artifactId, version.id, user.id, new Date().toISOString()).run();
+    // Tell the owner (never the approver themself; once per approver per version).
+    if (ins.meta?.changes) await notifyVersionApproved(env, { artifactId, versionId: version.id, approverId: user.id, approverIds: vis.userIds });
   } else {
     await env.DB.prepare('DELETE FROM artifact_approvals WHERE artifact_id = ? AND version_id = ? AND user_id = ?')
       .bind(artifactId, version.id, user.id).run();

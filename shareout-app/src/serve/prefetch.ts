@@ -119,7 +119,7 @@ export async function detectCommentsState(
   user: SessionUser | null,
   env: Env,
   artifactId: string
-): Promise<{ loggedIn: boolean; enabled: boolean; count: number; identityMode: 'anonymous' | 'named' | 'authenticated' }> {
+): Promise<{ loggedIn: boolean; enabled: boolean; count: number; identityMode: 'anonymous' | 'named' | 'authenticated'; guest: boolean }> {
   try {
     const loggedIn = !!user;
 
@@ -135,9 +135,9 @@ export async function detectCommentsState(
       count = row?.n ?? 0;
     }
 
-    return { loggedIn, enabled, count, identityMode: viewer.identityMode };
+    return { loggedIn, enabled, count, identityMode: viewer.identityMode, guest: enabled && viewer.guest };
   } catch {
-    return { loggedIn: false, enabled: false, count: 0, identityMode: 'anonymous' };
+    return { loggedIn: false, enabled: false, count: 0, identityMode: 'anonymous', guest: false };
   }
 }
 

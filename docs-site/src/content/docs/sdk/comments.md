@@ -327,6 +327,28 @@ When comments are enabled, the sandbox viewer injects a comments overlay accordi
 Owners and collaborators can also manage threads from the **Comments** tab in the
 [workspace Inspector](/everyone/your-workspace/#inspector-right-rail).
 
+### Guest comments (no account)
+
+Clients reviewing through a link can comment without an account once the owner turns
+guests on: `PUT /v1/data/{artifactId}/comments/_config` with `{ "guestComments": true }`
+(`null` follows the folder), or for a folder `PUT /v1/workspaces/{wid}/folders/{fid}/guest-comments`
+`{ "enabled": true }` (admins and the folder's creator). MCP: `set_guest_comments`.
+
+- Only where the guest can already open the page without an account: **public**, or a
+  **password** page they unlocked. Private and workspace pages stay account-only.
+- The toolbar shows **Comment as guest** (name, email, 6-digit code). The code buys an
+  HttpOnly, SameSite=Strict cookie valid 12 hours for **that artifact only**.
+- Guest comments show a *guest* badge (`authorType: "guest"`). The email is stored only as a
+  keyed hash and never returned to anyone.
+- Guests comment and reply; they cannot resolve, assign, react, approve or @mention. The
+  owner can delete their comments.
+- With guests on, `named` and `authenticated` require the code from anyone without an
+  account; `anonymous` still allows anonymous posts.
+- Rate limits per IP and per guest; writes must come from a page on this instance.
+
+Endpoints: `GET|DELETE …/comments/_guest`, `POST …/comments/_guest/code`,
+`POST …/comments/_guest/verify` — see the [API reference](/api/).
+
 ### File UIs
 
 | Place | Behavior |
@@ -359,6 +381,11 @@ the reason it couldn't.
 | Reply to your comment | Email (+ Telegram if linked) |
 | Assigned action item | Email (+ Telegram if linked) |
 | Action item resolved | Email to requester |
+| Someone approves a version | Owner: Home feed, email (+ Telegram) — once per approver per version |
+| New versions published | Followers and collaborators: feed, email (+ Telegram) with each version's note; one notice per artifact once publishing is quiet for 10 minutes (hourly sweep) |
+
+None of these reach the person who acted. Email follows the **product** preference and its
+unsubscribe link; Telegram follows the same opt-out. A reply from a guest is marked *(guest)*.
 
 Only people already **on the artifact** — the owner, workspace members, and
 collaborators, the same set `/_people` returns — are notifiable. `mentions[]` is
@@ -373,6 +400,9 @@ a collaborator first if you want the mention to reach them.
 | `COMMENTS_DISABLED` | 403 | `_comments_config.enabled` is false |
 | `AUTH_REQUIRED` | 401 | Signed-in identity required for this action |
 | `NAME_REQUIRED` | 400 | `identityMode: named` without a display name |
+| `GUEST_VERIFICATION_REQUIRED` | 401 | Guests are on; confirm an email code first |
+| `GUEST_COMMENTS_DISABLED` | 403 | Guests are off here, or the page needs an account to open |
+| `INVALID_CODE` | 400 | Wrong, expired or used-up guest code |
 | `FILE_CONTEXT_REQUIRED` | 400 | Bucket list/post without `file:…` context |
 | `FILE_NOT_FOUND` | 404 | Context points at another bucket or missing file |
 | `FORBIDDEN` | 403 | No access to the file / not author-or-owner |

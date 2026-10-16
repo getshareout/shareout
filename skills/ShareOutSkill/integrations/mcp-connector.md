@@ -43,6 +43,7 @@ your ShareOut account"). Allow, and the app is connected.
 | `folder_activity` | What outside people opened in a folder's subtree (newest 100). Admins and the folder's creator |
 | `share_with_person` | Share a `folder` (or `file_id`) with one outside `email`: `capability` `view`/`comment`, optional `expires_in_days` or `expires_at`; returns the `/shared?folder=` portal link and the grant id. Admins and the folder's creator, when the workspace has external sharing |
 | `revoke_share` | Remove a grant by `grant_id` (from `folder_access`). Admins and the folder's creator, even with external sharing off |
+| `set_guest_comments` | Let people with no account comment (after an email code) where they can already open the page: `artifact_id` (owner only; `enabled: null` follows the folder) or `folder` (admins and the folder's creator), `enabled` true/false |
 | `invite_members` | Owners/admins: invite `emails` (list or comma/newline text) as `member`/`admin`; per-email result + join link |
 | `list_members` | People in a workspace + pending invites (admins) |
 | `resend_invite` / `revoke_invite` | Admins: resend or cancel a pending invite by `email` |
@@ -77,6 +78,8 @@ Rules the tools follow:
   `restore_version` run the `/v1/artifacts/{id}/versions*` handlers (viewer / editor);
   `list_comments`, `resolve_comment`, `assign_comment` and `approve_version` run the same
   comment-access checks as the Home review endpoints; `list_jobs` runs `GET /v1/jobs`;
+  `set_guest_comments` runs `PUT /v1/data/{id}/comments/_config` (owner) or the folder's
+  guest-comments switch (folder manager);
   `folder_activity`, `share_with_person` and `revoke_share` run the
   `/v1/workspaces/{id}/folders/{id}/activity`, `/share-person` and `/grants/{id}` handlers
   (admin, or the folder's manager). A refusal comes back as an error result and nothing changes.

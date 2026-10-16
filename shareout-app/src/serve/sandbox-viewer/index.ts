@@ -204,6 +204,7 @@ export async function serveSandboxedViewer(
         isFav: favInfo.isFavorite,
         commentsEnabled: commentsInfo.enabled,
         commentsIdentityMode: commentsInfo.identityMode,
+        commentsGuest: commentsInfo.guest,
         commentCount: commentsInfo.count,
         hasMetrics,
         adminInfo,

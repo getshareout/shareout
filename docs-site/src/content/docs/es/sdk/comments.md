@@ -281,6 +281,26 @@ Según `identityMode` en `_comments_config`:
 | `named` | Cualquiera — nombre obligatorio al publicar |
 | `authenticated` | Solo firmados (invitados ven *Log in to comment*) |
 
+### Comentarios de invitados (sin cuenta)
+
+Si el dueño los activa (`PUT /v1/data/{artifactId}/comments/_config` con
+`{ "guestComments": true }`, o para una carpeta `PUT /v1/workspaces/{wid}/folders/{fid}/guest-comments`
+con `{ "enabled": true }`; MCP: `set_guest_comments`), quien revisa por un link puede comentar sin
+crear una cuenta: la toolbar muestra **Comentá como invitado** (nombre, email y un código de 6
+dígitos).
+
+- Solo donde ya puede abrir el artefacto sin cuenta: **público**, o con **contraseña** ya
+  desbloqueada. Los privados y de workspace siguen pidiendo cuenta.
+- El código da una cookie HttpOnly y SameSite=Strict de 12 horas, válida **solo para ese
+  artefacto**. El email se guarda como hash con clave y nunca se devuelve.
+- Los invitados comentan y responden; no resuelven, asignan, reaccionan, aprueban ni
+  mencionan. El dueño puede borrar sus comentarios.
+
+Avisos: el dueño se entera cuando alguien aprueba una versión, y quienes siguen o colaboran en
+el artefacto, cuando hay versiones nuevas (un aviso por artefacto cuando se deja de publicar por
+10 minutos, con la nota de cada versión). Nunca le avisamos a quien hizo la acción; el mail
+respeta la preferencia de mails de **producto** y su link para darse de baja.
+
 En páginas **private** / **workspace** el WebSocket exige sesión. Los archivos usan
 `contextId=file:…` y no tienen realtime.
 

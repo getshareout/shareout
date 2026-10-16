@@ -16,6 +16,7 @@ import type { AudienceSegment } from './audience';
 import { escapeHtml } from './layout';
 import { colors, fonts, radius } from '../../packages/design-tokens/src/index';
 import type { Locale } from '../i18n';
+import { NOTIFY_EMAILS } from './catalog-notify';
 
 export type EmailAudienceTag = 'ANY' | 'EXTERNAL' | AudienceSegment;
 
@@ -66,7 +67,7 @@ export const inviteJoinUrl = (baseUrl: string, claimCode: string, folderId?: str
   `${baseUrl}/invite/${encodeURIComponent(claimCode)}${folderId ? `?folder=${encodeURIComponent(folderId)}` : ''}`;
 export const addedLandingUrl = (baseUrl: string, folderId?: string) =>
   folderId ? `${baseUrl}/shared?folder=${encodeURIComponent(folderId)}` : `${baseUrl}/home`;
-export interface CommentData { fromName: string; verb: string; title: string; snippet: string; url: string; reason?: 'mention' | 'reply' }
+export interface CommentData { fromName: string; verb: string; title: string; snippet: string; url: string; reason?: 'mention' | 'reply'; guest?: boolean }
 export interface ActionItemAssignedData { fromName: string; title: string; snippet: string; url: string; dueStr?: string | null; dueAt?: string | null }
 export interface ActionItemResolvedData { fromName: string; title: string; snippet: string; url: string }
 export interface PublishApprovalData { kind: 'request' | 'approved' | 'declined' }
@@ -398,7 +399,9 @@ export const EMAILS = {
     category: 'product',
     audiences: ['ANY', 'EXTERNAL'],
     trigger: 'notifyCommentTargets() — @mention or reply on an artifact comment.',
-    build: ({ fromName, verb, title, snippet, url }: CommentData) => ({
+    build: ({ fromName: name, verb, title, snippet, url, guest }: CommentData) => {
+      const fromName = guest ? `${name} (guest)` : name;
+      return {
       subject: `${fromName} ${verb} on ${title}`,
       preheader: `${fromName}: ${snippet}`,
       heading: `${fromName} ${verb}`,
@@ -407,7 +410,8 @@ export const EMAILS = {
         `<blockquote style="margin:0;border-left:3px solid ${colors.borderStrong};padding:2px 0 2px 14px;color:${colors.textSecondary}">${escapeHtml(snippet)}</blockquote>`,
       cta: { label: 'View the conversation', href: url },
       bodyText: `${fromName} ${verb} on "${title}":\n\n"${snippet}"`,
-    }),
+      };
+    },
   } satisfies EmailTemplate<CommentData>,
 
   action_item_assigned: {
@@ -749,6 +753,8 @@ export const EMAILS = {
       bodyText: 'Your ShareOut pages are still live and ready. Come build something new — it still takes one click.',
     }),
   } satisfies EmailTemplate,
+
+  ...NOTIFY_EMAILS,
 } satisfies Record<string, EmailTemplate<any>>;
 
 export type EmailType = keyof typeof EMAILS;

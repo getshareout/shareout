@@ -8,6 +8,7 @@ import { generateId } from '../crypto-utils';
 import { json } from '../workspaces/json-response';
 import { requireWorkspaceRole } from '../workspaces/roles';
 import { requireFolderManager } from '../folders';
+import { notifyFolderFirstOpen } from '../notify/review-notify';
 
 interface ViewEvent {
   workspaceId: string;
@@ -46,6 +47,10 @@ export async function recordShareeView(env: Env, ev: ViewEvent): Promise<void> {
 
     if (env.SLUGS) {
       try { await env.SLUGS.put(dedupeKey, '1', { expirationTtl: 3600 }); } catch { /* best-effort */ }
+    }
+    // The folder's sharer hears about this person once per folder per day.
+    if (ev.resourceType === 'artifact') {
+      await notifyFolderFirstOpen(env, { workspaceId: ev.workspaceId, userId: ev.userId, artifactId: ev.resourceId });
     }
   } catch { /* never break serving */ }
 }

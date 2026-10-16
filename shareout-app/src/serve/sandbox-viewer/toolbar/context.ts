@@ -8,6 +8,7 @@ interface BuildToolbarContextInput {
   isFav: boolean;
   commentsEnabled: boolean;
   commentsIdentityMode?: 'anonymous' | 'named' | 'authenticated';
+  commentsGuest?: boolean;
   commentCount: number;
   hasMetrics: boolean;
   adminInfo: AdminInfo | null;
@@ -28,6 +29,7 @@ export function buildToolbarContext(input: BuildToolbarContextInput): ToolbarRen
     isFav,
     commentsEnabled,
     commentsIdentityMode = 'anonymous',
+    commentsGuest = false,
     commentCount,
     hasMetrics,
     adminInfo,
@@ -66,6 +68,7 @@ export function buildToolbarContext(input: BuildToolbarContextInput): ToolbarRen
     isFav,
     commentsEnabled,
     commentsIdentityMode,
+    commentsGuest,
     commentCount,
     hasMetrics,
     adminInfo,

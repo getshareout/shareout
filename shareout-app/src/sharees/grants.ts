@@ -11,6 +11,7 @@ import { logAudit } from '../audit';
 import { requireExternalSharing, requireExternalSharingEnabled } from './guard';
 import { inviteOrAddMember } from '../workspaces/invite';
 import { requireFolderManager } from '../folders';
+import { notifyFolderShared } from '../notify/review-notify';
 
 // Phase 2 surface: view/comment (read) + create/edit (author-in-sandbox). The lattice
 // and table support the full set; we only let admins MINT what the access layer honors.
@@ -50,12 +51,18 @@ export function parseShareExpiry(
 // admin grant API and the share-with-a-person flow. `expiresAt` undefined keeps the
 // idempotent no-op on re-grant; a value (or null = never) makes the latest share's
 // expiry win, so re-sharing extends, shortens or revives an expired grant.
+// `notifyFolder`: a NEW grant on a folder emails the outside people it reaches who already
+// have an account (a share that just invited or added someone already sent them a link).
 async function insertGrant(
   env: Env, workspaceId: string, subjectType: string, subjectId: string,
   resourceType: string, resourceId: string, capability: string, grantedBy: string,
-  expiresAt?: string | null,
+  expiresAt?: string | null, notifyFolder = true,
 ): Promise<unknown> {
   const id = generateId('grt');
+  const existed = !!(await env.DB.prepare(
+    `SELECT 1 FROM grants WHERE workspace_id = ? AND subject_type = ? AND subject_id = ?
+       AND resource_type = ? AND resource_id = ? AND capability = ?`
+  ).bind(workspaceId, subjectType, subjectId, resourceType, resourceId, capability).first());
   if (expiresAt === undefined) {
     await env.DB.prepare(`
       INSERT OR IGNORE INTO grants
@@ -77,6 +84,9 @@ async function insertGrant(
     workspaceId, actorId: grantedBy, action: 'grant.create',
     targetType: resourceType, targetId: resourceId,
   }).catch(() => {});
+  if (!existed && notifyFolder && resourceType === 'folder') {
+    await notifyFolderShared(env, { workspaceId, folderId: resourceId, grantedBy, subjectType, subjectId });
+  }
 
   return env.DB.prepare(
     `SELECT * FROM grants WHERE workspace_id = ? AND subject_type = ? AND subject_id = ?
@@ -260,6 +270,7 @@ export async function handleShareWithPerson(
 
   const grant = await insertGrant(
     env, workspaceId, 'external_user', target.id, resourceType, resourceId, capability, user.id, expiry.expiresAt,
+    invite.status === 'updated',
   );
   return json({ grant, email }, 201);
 }

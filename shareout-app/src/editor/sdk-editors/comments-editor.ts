@@ -27,6 +27,7 @@ interface StoredConfig {
   allowReplies?: boolean;
   maxDepth?: number;
   requireApproval?: boolean;
+  guestComments?: boolean;
 }
 
 export const handleCommentsEditor: SDKEditorHandler = async (request, ctx, action) => {
@@ -69,7 +70,11 @@ export const handleCommentsEditor: SDKEditorHandler = async (request, ctx, actio
       }
 
       const enabled = body.enabled === true;
+      // Guest comments are set through the comments _config API; keep them across saves here.
+      const prev = await readJsonValue<StoredConfig>(db, artifactId, CONFIG_KEY);
+      const guestComments = typeof body.guestComments === 'boolean' ? body.guestComments : prev?.guestComments;
       await writeJsonValue(db, artifactId, CONFIG_KEY, {
+        ...(typeof guestComments === 'boolean' ? { guestComments } : {}),
         enabled,
         overlayEnabled: enabled,
         identityMode: body.identityMode || 'anonymous',

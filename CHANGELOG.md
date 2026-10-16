@@ -7,6 +7,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **Guest comments without an account:** owners turn guests on per artifact (`_config.guestComments`) or per folder (`PUT /v1/workspaces/{wid}/folders/{fid}/guest-comments`, MCP `set_guest_comments`); a viewer of a public or unlocked password page confirms an email code and comments or replies as a guest (artifact-bound HMAC cookie, keyed email hash only, Origin-checked writes, per-IP and per-guest limits, no resolve/assign/react/approve); viewer toolbar **Comment as guest** (en/es). Migration `0016`
+- **Review and sharing notifications** (feed + email + Telegram, under the product email preference, never to the actor): version approved → owner (once per approver per version); an outside person's first open in a shared folder → whoever shared it (once per person per folder per day); new versions → followers and collaborators with each version's note, debounced into one notice per artifact after 10 quiet minutes; a new folder shared with an existing external member → email linking `/shared?folder=<id>`
 - **API / skill / MCP parity for the 2026-10-16 releases (skill v2.57.0):**
   - OpenAPI: version list / source / restore, data-API comments (list, resolve, assign, `versionId`), `GET /v1/home/review` + `POST /v1/home/approvals`, `Grant.expires_at`, folder-manager grant rules, `/v1/jobs` visibility
   - Skill: multi-page sites, review mode, folder access / expiring shares / client portal, knowledge source links and reverse lookup, Server-Timing

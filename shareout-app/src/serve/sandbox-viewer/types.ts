@@ -17,6 +17,8 @@ export interface ToolbarRenderContext {
   commentsEnabled: boolean;
   /** Who may post without signing in. When `authenticated`, guests only see a login link. */
   commentsIdentityMode: 'anonymous' | 'named' | 'authenticated';
+  /** Guest comments are on: a viewer with no account can comment after an email code. */
+  commentsGuest: boolean;
   commentCount: number;
   hasMetrics: boolean;
   adminInfo: AdminInfo | null;

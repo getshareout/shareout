@@ -248,6 +248,15 @@ export const commentsOverlayStyles = `    #so-comments-overlay {
       outline: none;
     }
     .so-cmt-textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-light); }
+    .so-cmt-guest { margin-bottom: 10px; font-size: 13px; color: var(--color-text-secondary); }
+    .so-cmt-guest-title { font-weight: 600; color: var(--color-text); margin-bottom: 2px; }
+    .so-cmt-guest-intro { margin-bottom: 8px; }
+    .so-cmt-guest-input { min-height: 0; height: 36px; margin-bottom: 8px; resize: none; }
+    .so-cmt-guest-code { margin-top: 8px; }
+    .so-cmt-guest-msg { margin-top: 6px; min-height: 1em; }
+    .so-cmt-guest-msg.is-error { color: var(--color-error); }
+    .so-cmt-guest-msg.is-success { color: var(--color-success); }
+    .so-cmt-guest-signed button { background: none; border: none; color: var(--color-primary); cursor: pointer; font-size: 13px; }
     .so-cmt-composer-actions {
       display: flex;
       align-items: center;
