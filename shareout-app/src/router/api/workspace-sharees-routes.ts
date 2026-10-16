@@ -10,6 +10,7 @@ import {
   handleListExternalTokens, handleCreateExternalToken, handleRevokeExternalToken,
 } from '../../sharees/tokens';
 import { handleListShareeActivity, handleListFolderActivity } from '../../sharees/activity';
+import { handleFolderGuestComments } from '../../sharees/folder-guest-comments';
 import {
   handleListShareeContext, handleGetShareeContextFile,
   handlePutShareeContextFile, handleDeleteShareeContextFile,
@@ -62,6 +63,14 @@ export async function routeWorkspaceSharees(ctx: FetchContext): Promise<Response
     const user = await requireTokenOrSession(ctx);
     if (!isAuthUser(user)) return user;
     return addCORS(await handleListFolderActivity(env, user, workspaceId, decodeURIComponent(folderId)));
+  }
+
+  const folderGuestMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/folders\/([^/]+)\/guest-comments$/);
+  if (folderGuestMatch && (request.method === 'GET' || request.method === 'PUT')) {
+    const [, workspaceId, folderId] = folderGuestMatch;
+    const user = await requireTokenOrSession(ctx);
+    if (!isAuthUser(user)) return user;
+    return addCORS(await handleFolderGuestComments(request, env, user, workspaceId, decodeURIComponent(folderId)));
   }
 
   const wsActivityMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/sharee-activity$/);

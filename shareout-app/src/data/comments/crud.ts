@@ -10,6 +10,7 @@ import { attachReactions } from './reactions';
 import { broadcastEvent } from './broadcast';
 import { isAssetBucketArtifact, authorizeFileComment } from './file-comments';
 import { mentionsAi, runCommentAiEdit } from './ai-edit';
+import { guestCommentRateLimit } from './guest';
 
 /** GET `/` — list comments with optional filters. */
 export async function listComments(request: Request, ctx: DataContext): Promise<Response> {
@@ -126,6 +127,11 @@ export async function addComment(
 
   const identity = await validateIdentity(request, ctx, config, body.authorName);
   if (identity instanceof Response) return identity;
+  const guest = identity.guest ?? null;
+  if (guest) {
+    const limited = await guestCommentRateLimit(request, ctx, guest);
+    if (limited) return limited;
+  }
 
   let assigneeUserId: string | null = null;
   let assigneeEmail: string | null = null;
@@ -153,14 +159,16 @@ export async function addComment(
   const id = generateId('cmt');
   const now = new Date().toISOString();
 
-  const mentions = Array.isArray(body.mentions) ? body.mentions.filter((m) => typeof m === 'string') : [];
+  // A guest's @mentions are not stored: mentions notify people, and a guest is not on the page.
+  const mentions = !guest && Array.isArray(body.mentions) ? body.mentions.filter((m) => typeof m === 'string') : [];
+  const authorType = guest ? 'guest' : 'human';
   const positionJson = body.position != null ? JSON.stringify(body.position) : null;
   const stateJson = body.state != null ? JSON.stringify(body.state) : null;
   const mentionsJson = mentions.length ? JSON.stringify(mentions) : null;
 
   await ctx.env.DB.prepare(
-    `INSERT INTO artifact_comments (id, artifact_id, context_id, parent_id, author_id, author_name, content, created_at, updated_at, position, state, mentions, assignee_user_id, assignee_email, due_at, version_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT version_id FROM deployments WHERE artifact_id = ? AND channel = 'production'))`
+    `INSERT INTO artifact_comments (id, artifact_id, context_id, parent_id, author_id, author_name, content, created_at, updated_at, position, state, mentions, assignee_user_id, assignee_email, due_at, version_id, author_type, guest_email_hash)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT version_id FROM deployments WHERE artifact_id = ? AND channel = 'production'), ?, ?)`
   ).bind(
     id,
     ctx.artifactId,
@@ -178,6 +186,8 @@ export async function addComment(
     assigneeEmail,
     dueAt,
     ctx.artifactId,
+    authorType,
+    guest?.emailHash ?? null,
   ).run();
 
   const comment: Comment = {
@@ -195,7 +205,7 @@ export async function addComment(
     position: body.position ?? null,
     state: body.state ?? null,
     mentions,
-    authorType: 'human',
+    authorType,
     assigneeUserId,
     assigneeEmail,
     dueAt,
@@ -208,7 +218,7 @@ export async function addComment(
   emitJobEvent(ctx.env, ctx.artifactId, 'comment.added').catch(() => {});
 
   // "@AI …" asks the page editor to change the artifact; it answers in this thread.
-  if (mentionsAi(comment.content) && !(await isAssetBucketArtifact(ctx))) {
+  if (!guest && mentionsAi(comment.content) && !(await isAssetBucketArtifact(ctx))) {
     const edit = runCommentAiEdit(ctx, comment);
     if (ctx.waitUntil) ctx.waitUntil(edit);
     else await edit;

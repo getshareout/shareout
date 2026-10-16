@@ -16,6 +16,8 @@ export interface NotifyComment {
   mentions: string[];
   assigneeEmail?: string | null;
   dueAt?: string | null;
+  /** 'guest' marks the sender as a verified guest (no account) in the notice. */
+  authorType?: string;
 }
 
 interface Recipient {
@@ -134,6 +136,8 @@ export async function notifyCommentTargets(ctx: DataContext, comment: NotifyComm
   const { title, url, workspaceId } = await artifactMeta(ctx);
   const snippet = snippetOf(comment.content);
   const fromName = comment.authorName || 'Someone';
+  const guest = comment.authorType === 'guest';
+  const tgFrom = (locale: Locale) => (guest ? `${fromName} ${locale === 'es' ? '(invitado)' : '(guest)'}` : fromName);
   const dueStr = dueLabel(comment.dueAt, 'en');
   const dueAt = comment.dueAt ?? null;
 
@@ -170,7 +174,7 @@ export async function notifyCommentTargets(ctx: DataContext, comment: NotifyComm
         toUserId: r.userId ?? undefined,
         toEmail: r.email,
         workspaceId,
-        data: { fromName, verb, title, snippet, url, reason: r.reason === 'mention' ? 'mention' : 'reply' },
+        data: { fromName, verb, title, snippet, url, reason: r.reason === 'mention' ? 'mention' : 'reply', guest },
       }).catch(() => undefined),
     );
 
@@ -180,7 +184,7 @@ export async function notifyCommentTargets(ctx: DataContext, comment: NotifyComm
         const chatId = await getLinkedChatId(ctx.env, userId);
         if (chatId != null) {
           const locale = await localeForRecipient(ctx.env, { userId, workspaceId });
-          const line = r.reason === 'mention' ? t(locale, TG).mention(fromName, title) : t(locale, TG).reply(fromName, title);
+          const line = r.reason === 'mention' ? t(locale, TG).mention(tgFrom(locale), title) : t(locale, TG).reply(tgFrom(locale), title);
           await sendMessage(ctx.env, chatId, `${line}:\n\n"${snippet}"\n\n${url}`);
         }
       })().catch(() => undefined));

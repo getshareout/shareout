@@ -1,4 +1,5 @@
 import type { Env } from '../types';
+import { runVersionNoticeSweep } from '../notify/review-notify';
 import { getUserRole } from '../artifacts/roles';
 import { purgeSoftDeleted } from '../artifacts/crud';
 import { createJob, listJobs, listJobsForArtifact, deleteJob, updateJob, getJobLogs } from './jobs/crud';
@@ -281,6 +282,12 @@ export async function handleScheduledEvent(env: Env, scheduledTime?: number): Pr
   const watchResult = await runMetricWatchSweep(env).catch(() => ({ alerted: 0 }));
   if (watchResult.alerted > 0) {
     logger.info('metric watch sweep finished', { alerted: watchResult.alerted });
+  }
+  // New-version notices: one per artifact once publishing has been quiet for 10 minutes,
+  // to its followers and collaborators. Claims each version in email_log, so safe hourly.
+  const versionNotices = await runVersionNoticeSweep(env).catch(() => ({ notified: 0 }));
+  if (versionNotices.notified > 0) {
+    logger.info('version notice sweep finished', { notified: versionNotices.notified });
   }
   // Never-viewed janitor: flag workspaces with 3+ published pages nobody's opened in
   // 90+ days. Self-gated to at most once/30 days per workspace (last_janitor_at), so

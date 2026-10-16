@@ -37,7 +37,7 @@ export interface Comment {
   position: unknown | null;
   state: unknown | null;
   mentions: string[];
-  authorType: 'human' | 'agent';
+  authorType: 'human' | 'agent' | 'guest';
   assigneeUserId: string | null;
   assigneeEmail: string | null;
   dueAt: string | null;
@@ -67,6 +67,7 @@ export interface CommentRow {
   assignee_email?: string | null;
   due_at?: string | null;
   version_id?: string | null;
+  guest_email_hash?: string | null;
 }
 
 /** Per-artifact comments feature configuration. */
@@ -76,6 +77,8 @@ export interface CommentsConfig {
   allowReplies: boolean;
   maxDepth: number;
   overlayEnabled: boolean;
+  /** Guests (no account) may comment after an email code. Unset = inherit the folder setting. */
+  guestComments?: boolean;
 }
 
 /** WebSocket broadcast payload for comment lifecycle events. */

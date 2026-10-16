@@ -263,6 +263,35 @@ export async function queryNeedsYou(
       })));
   }
 
+  // Review and sharing notices addressed to you (src/notify/review-notify.ts): an approval
+  // of your version, an outside person opening a folder you shared, new versions of what
+  // you follow. One row each; the payload carries the line's parts.
+  const directed = (['version_approved', 'folder_first_open', 'version_published'] as const).filter(on);
+  if (directed.length) {
+    push(env.DB.prepare(`
+      SELECT e.id AS id, e.kind AS kind, e.subject_id AS artifact_id,
+             json_extract(e.payload, '$.artifact_name') AS artifact_name,
+             json_extract(e.payload, '$.slug') AS slug,
+             json_extract(e.payload, '$.actor') AS actor,
+             json_extract(e.payload, '$.version_no') AS version_no,
+             json_extract(e.payload, '$.note') AS note,
+             json_extract(e.payload, '$.folder_name') AS folder_name,
+             CAST(strftime('%s', e.created_at) AS INTEGER) AS ts
+      FROM notifications e
+      WHERE e.recipient_type = 'user' AND e.recipient_id IN (${idPh}) AND e.kind IN (${placeholders(directed.length)})
+        AND e.created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now', '-14 days')
+      ORDER BY e.created_at DESC LIMIT ?
+    `).bind(...vis.userIds, ...directed, limit),
+      (rows) => rows.map((r) => ({
+        kind: r.kind as ActivityKind, id: r.id, artifact_id: r.artifact_id, artifact_name: r.artifact_name,
+        slug: r.slug, actor: r.actor, actor_picture: null,
+        summary: r.kind === 'version_approved' ? `approved ${r.version_no ? `v${r.version_no}` : 'the live version'}`
+          : r.kind === 'folder_first_open' ? `opened it · ${r.folder_name ?? 'a shared folder'}`
+          : `published v${r.version_no}${r.note ? ` · ${trim140(r.note)}` : ''}`,
+        ts: r.ts,
+      })));
+  }
+
   // Failed / errored test runs.
   if (on('test')) {
     push(env.DB.prepare(`

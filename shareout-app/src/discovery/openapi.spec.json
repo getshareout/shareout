@@ -2445,6 +2445,297 @@
         }
       }
     },
+    "/v1/data/{artifactId}/comments/_config": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DataArtifactId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Comments settings",
+        "description": "The artifact's comment settings plus `guestCommentsEffective` (its own guest setting, or the nearest folder's when it has none).",
+        "operationId": "getCommentsConfig",
+        "responses": {
+          "200": {
+            "description": "Settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommentsConfig"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Change comments settings",
+        "description": "Artifact owner only. `guestComments: true` lets people with no account comment after an email code, wherever they can already open the page (public, or an unlocked password page); `false` turns it off; `null` follows the folder setting.",
+        "operationId": "setCommentsConfig",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "identityMode": {
+                    "type": "string",
+                    "enum": [
+                      "anonymous",
+                      "named",
+                      "authenticated"
+                    ]
+                  },
+                  "allowReplies": {
+                    "type": "boolean"
+                  },
+                  "maxDepth": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10
+                  },
+                  "overlayEnabled": {
+                    "type": "boolean"
+                  },
+                  "guestComments": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommentsConfig"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`INVALID_REQUEST`"
+          },
+          "403": {
+            "description": "`FORBIDDEN` — not the owner"
+          }
+        }
+      }
+    },
+    "/v1/data/{artifactId}/comments/_guest": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DataArtifactId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Guest comment status",
+        "description": "Whether guests may comment here for this requester, and the signed-in guest's own name (never an email).",
+        "operationId": "getGuestStatus",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "guest": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Sign the guest out",
+        "description": "Clears the guest cookie. Must come from a page on this instance (`Origin`).",
+        "operationId": "guestSignOut",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Signed out"
+          },
+          "403": {
+            "description": "`FORBIDDEN` — foreign or missing Origin"
+          }
+        }
+      }
+    },
+    "/v1/data/{artifactId}/comments/_guest/code": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DataArtifactId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Email a guest comment code",
+        "description": "Emails a 6-digit code (valid 10 minutes) so a person with no account can comment as a guest. Only when guest comments are on and the requester can already open the page without an account (public, or a password page whose access cookie the request carries). Must come from a page on this instance (`Origin`). Limits: 10 per hour per IP, 6 per hour per address, 30 s between sends.",
+        "operationId": "guestSendCode",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "email"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`{ success: true, data: { sent: true } }`"
+          },
+          "400": {
+            "description": "`VALIDATION_ERROR`"
+          },
+          "403": {
+            "description": "`GUEST_COMMENTS_DISABLED`, or `FORBIDDEN` (Origin)"
+          },
+          "429": {
+            "description": "`RATE_LIMIT_EXCEEDED`"
+          }
+        }
+      }
+    },
+    "/v1/data/{artifactId}/comments/_guest/verify": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DataArtifactId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Confirm a guest comment code",
+        "description": "Exchanges the code for `shareout_guest_{artifactId}`: an HttpOnly, SameSite=Strict cookie (12 h) holding an HMAC over the artifact id, the name and a keyed email hash, valid for this artifact only. Guests then post and reply through `POST …/comments` (`authorType: guest`); they cannot resolve, assign, react or approve. Five wrong tries burn a code.",
+        "operationId": "guestVerifyCode",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "email",
+                  "code"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "code": {
+                    "type": "string",
+                    "pattern": "^[0-9]{6}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`{ success: true, data: { guest: { name }, expiresIn } }` plus `Set-Cookie`"
+          },
+          "400": {
+            "description": "`INVALID_CODE` or `VALIDATION_ERROR`"
+          },
+          "403": {
+            "description": "`GUEST_COMMENTS_DISABLED`, or `FORBIDDEN` (Origin)"
+          },
+          "429": {
+            "description": "`RATE_LIMIT_EXCEEDED`"
+          }
+        }
+      }
+    },
     "/v1/data/{artifactId}/comments/{commentId}/resolve": {
       "parameters": [
         {
@@ -6171,6 +6462,88 @@
                 }
               }
             }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/folders/{folderId}/guest-comments": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        },
+        {
+          "name": "folderId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "External sharing"
+        ],
+        "summary": "Folder guest comments",
+        "description": "Whether people with no account may comment (after an email code) on the folder's pages that have no setting of their own. Internal members.",
+        "operationId": "getFolderGuestComments",
+        "responses": {
+          "200": {
+            "description": "Setting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderGuestComments"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "External sharing"
+        ],
+        "summary": "Turn folder guest comments on or off",
+        "description": "Admins, or the folder's creator while members manage their folders. Applies to every artifact in the folder and its subfolders that has no setting of its own; guests still comment only where they can open the page without an account.",
+        "operationId": "setFolderGuestComments",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "enabled"
+                ],
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderGuestComments"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`VALIDATION_ERROR`"
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
@@ -11803,6 +12176,50 @@
           }
         }
       },
+      "CommentsConfig": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "identityMode": {
+            "type": "string",
+            "enum": [
+              "anonymous",
+              "named",
+              "authenticated"
+            ]
+          },
+          "allowReplies": {
+            "type": "boolean"
+          },
+          "maxDepth": {
+            "type": "integer"
+          },
+          "overlayEnabled": {
+            "type": "boolean"
+          },
+          "guestComments": {
+            "type": "boolean",
+            "description": "The artifact's own guest setting; absent = follows its folder."
+          },
+          "guestCommentsEffective": {
+            "type": "boolean",
+            "description": "Whether guests may comment here (own setting, else the nearest folder's)."
+          }
+        }
+      },
+      "FolderGuestComments": {
+        "type": "object",
+        "properties": {
+          "folder_id": {
+            "type": "string"
+          },
+          "guest_comments": {
+            "type": "boolean"
+          }
+        }
+      },
       "Comment": {
         "type": "object",
         "properties": {
@@ -11871,8 +12288,10 @@
             "type": "string",
             "enum": [
               "human",
-              "agent"
-            ]
+              "agent",
+              "guest"
+            ],
+            "description": "`guest` = a verified guest with no account (their email is never returned)."
           },
           "assigneeUserId": {
             "type": [

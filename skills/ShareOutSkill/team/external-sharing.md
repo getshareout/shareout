@@ -126,6 +126,10 @@ External token scopes are limited to `artifacts:read`, `data:read`, `data:write`
 
 A receipt is logged when an external member opens a granted artifact (deduped per hour) — the renewal/upsell signal: "Acme opened the Q3 deck 9× this week."
 
+**Notifications.** The person who shared a folder hears (Home feed, email, Telegram) the first time each outside person opens something in it — **once per person per folder per day**, never once per view. An external member who already has an account gets an email when a **new** folder is shared with them, linking to `/shared?folder=<id>` (people who never signed in get the invite email, which carries the same link). Both follow the recipient's **product** email preference and unsubscribe.
+
+**Guest comments.** Clients without an account can comment on pages they reach through a public or password link once a folder's manager turns on guest comments for the folder (`PUT /v1/workspaces/{wid}/folders/{fid}/guest-comments` `{ "enabled": true }`, or MCP `set_guest_comments`). They confirm their email with a code first. See [../sdk/comments.md](../sdk/comments.md#guest-comments-no-account).
+
 ## The external member's experience
 
 1. Accept the invite → log in (Google or email-OTP, same as any ShareOut user).

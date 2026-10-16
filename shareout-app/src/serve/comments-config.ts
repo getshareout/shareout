@@ -1,5 +1,6 @@
 import type { Env } from '../types';
 import { createMiniDb } from '../data/minidb-client';
+import { folderGuestCommentsEnabled } from '../data/comments/guest';
 
 // Cache the comments-overlay flag in KV so both serve paths (raw HTML + sandbox
 // wrapper) stay cheap and cannot diverge.
@@ -11,11 +12,14 @@ export interface CommentsViewerConfig {
   /** Overlay + feature enabled (enabled && overlayEnabled). */
   enabled: boolean;
   identityMode: CommentsIdentityMode;
+  /** Guests (no account) may comment after an email code — own setting or a folder's. */
+  guest: boolean;
 }
 
 const DEFAULT_VIEWER: CommentsViewerConfig = {
   enabled: true,
   identityMode: 'anonymous',
+  guest: false,
 };
 
 function parseViewerConfig(raw: string | null): CommentsViewerConfig {
@@ -24,7 +28,7 @@ function parseViewerConfig(raw: string | null): CommentsViewerConfig {
   if (raw === '1') return { ...DEFAULT_VIEWER, enabled: true };
   if (raw === '0') return { ...DEFAULT_VIEWER, enabled: false };
   try {
-    const j = JSON.parse(raw) as { e?: number | boolean; m?: string; enabled?: boolean; identityMode?: string };
+    const j = JSON.parse(raw) as { e?: number | boolean; m?: string; g?: number; enabled?: boolean; identityMode?: string };
     const enabled = j.e === 1 || j.e === true || j.enabled === true
       ? true
       : j.e === 0 || j.e === false || j.enabled === false
@@ -35,7 +39,7 @@ function parseViewerConfig(raw: string | null): CommentsViewerConfig {
       mode === 'named' || mode === 'authenticated' || mode === 'anonymous'
         ? mode
         : 'anonymous';
-    return { enabled, identityMode };
+    return { enabled, identityMode, guest: j.g === 1 };
   } catch {
     return { ...DEFAULT_VIEWER };
   }
@@ -64,6 +68,7 @@ export async function getCommentsViewerConfig(env: Env, artifactId: string): Pro
         enabled?: boolean;
         overlayEnabled?: boolean;
         identityMode?: string;
+        guestComments?: boolean;
       };
       cfg = {
         enabled: parsed.enabled !== false && parsed.overlayEnabled !== false,
@@ -73,7 +78,10 @@ export async function getCommentsViewerConfig(env: Env, artifactId: string): Pro
           parsed.identityMode === 'anonymous'
             ? parsed.identityMode
             : 'anonymous',
+        guest: typeof parsed.guestComments === 'boolean' ? parsed.guestComments : await folderGuestCommentsEnabled(env, artifactId),
       };
+    } else {
+      cfg.guest = await folderGuestCommentsEnabled(env, artifactId);
     }
   } catch {
     cfg = { ...DEFAULT_VIEWER };
@@ -83,7 +91,7 @@ export async function getCommentsViewerConfig(env: Env, artifactId: string): Pro
     try {
       await env.SLUGS.put(
         key,
-        JSON.stringify({ e: cfg.enabled ? 1 : 0, m: cfg.identityMode }),
+        JSON.stringify({ e: cfg.enabled ? 1 : 0, m: cfg.identityMode, g: cfg.guest ? 1 : 0 }),
         { expirationTtl: COMMENTS_OVERLAY_TTL },
       );
     } catch { /* best effort */ }

@@ -26,6 +26,7 @@ import type {
   AssetDeliveryData,
 } from './catalog';
 import { escapeHtml } from './layout';
+import { NOTIFY_EMAILS_ES } from './catalog-notify';
 import { colors } from '../../packages/design-tokens/src/index';
 
 const quote = (title: string, snippet: string) =>
@@ -117,7 +118,8 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
     bodyText: `${memberName} ahora es parte de tu espacio ${workspaceName}.`,
   }),
 
-  comment_notify: ({ fromName, verb, title, snippet, url, reason }: CommentData) => {
+  comment_notify: ({ fromName: name, verb, title, snippet, url, reason, guest }: CommentData) => {
+    const fromName = guest ? `${name} (invitado)` : name;
     const accion = (reason ?? (/replied/.test(verb) ? 'reply' : 'mention')) === 'reply' ? 'respondió tu comentario' : 'te mencionó en un comentario';
     return {
       subject: `${fromName} ${accion} en ${title}`,
@@ -265,6 +267,8 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
       bodyText: `${who ? `${who} te mandó ` : 'Tenés '}${n} para descargar: ${downloadUrl}${until ? `\n\nDisponible hasta el ${until}.` : ''}`,
     };
   },
+
+  ...NOTIFY_EMAILS_ES,
 };
 
 /** Build an email in the recipient's language; English when there's no Spanish copy. */

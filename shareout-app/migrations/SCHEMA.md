@@ -91,7 +91,7 @@ erDiagram
 | `tokens` | Every bearer token. `principal_type` is `user` (a personal `so_` token) or `workspace` (a `sot_` agent token); `user_id` is always the identity it authenticates as. Only `token_hash` is stored — the plaintext is shown once at creation. `scopes` is NULL for personal tokens, a csv for workspace ones, and `subject_external_user_id` lets a token act on behalf of an external user. Revocable via `revoked_at`. |
 | `admin_sessions` | Short-lived elevated sessions for an artifact's admin surface, scoped to one `artifact_id` and expiring via `expires_at`. |
 | `device_auth` | OAuth device-code flow for CLI and agent logins: `device_code`/`user_code` pair, `status` progressing to approved, then `claimed_at`. |
-| `email_otp_codes` | One-time login codes. `code_hash` only, with `attempts` and `consumed_at` to stop replay and brute force. |
+| `email_otp_codes` | One-time login codes. `code_hash` only, with `attempts` and `consumed_at` to stop replay and brute force. Guest comment codes share the table under the key `guest:<artifact_id>:<email_hash>` in `email`, so they never match a sign-in code and store no address. |
 | `google_oauth_tokens` | Per-user Google tokens for Sheets access, encrypted (`access_token_encrypted` + `iv`). |
 | `artifact_passwords` | Per-artifact username/password for password-gated artifacts. |
 | `rate_limits` | Every rate limit in the product: one counter per (`principal_type`+`principal_id`, `action`, `window_start`). Principals are users and artifacts; the window string carries its own granularity (ISO day, ISO hour, `YYYY-MM-DD`, or `YYYY-MM-DDTHH:MM`). The ceilings live in code. Pruned nightly. |
@@ -135,7 +135,7 @@ The five paths: **membership** (`workspace_members`), **per-artifact invite**
 | `workspace_library` | Workspace- or user-scoped published modules, with `namespace`/`module_name` and install counters. |
 | `workspace_files` | The workspace's virtual filesystem, one row per file. `namespace` is the directory — `context` (markdown fed to agents, where `updated_by_kind` distinguishes human from agent edits), `catalog` (the data catalogue) and `knowledge` (the learned knowledge base). `scope_id` narrows a file to one sharee; `''` means workspace-wide. |
 | `workspace_storage_snapshots` | Daily storage usage per workspace against `max_bytes`, with `overage_bytes`. |
-| `folders` | Hierarchical grouping via self-referencing `parent_id`. Exists in both personal and workspace scope; `readme` holds folder-level docs. |
+| `folders` | Hierarchical grouping via self-referencing `parent_id`. Exists in both personal and workspace scope; `readme` holds folder-level docs. `guest_comments_enabled` lets people with no account comment on its artifacts (and its subfolders') that have no setting of their own. |
 | `collaborators` | Per-artifact invite by `email` with a `role`, resolved to a user on signup. |
 | `grants` | The general capability grant: *subject* (`subject_type`/`subject_id`) may do *capability* on *resource* (`resource_type`/`resource_id`), optionally until `expires_at`. |
 | `sharees` | A named external party (client, partner) a workspace shares with. Has its own `branding` and `properties`. |
@@ -254,7 +254,7 @@ erDiagram
 
 | Table | Holds |
 |---|---|
-| `artifact_comments` | Threaded via self-referencing `parent_id`. `position` anchors a comment to a spot in the page; `context_id` scopes it to a sub-view. Doubles as a task: `assignee_user_id`/`assignee_email`/`due_at`. `author_type` distinguishes human, agent, and anonymous authors. `version_id` is the version that was live when it was written (null on older comments). |
+| `artifact_comments` | Threaded via self-referencing `parent_id`. `position` anchors a comment to a spot in the page; `context_id` scopes it to a sub-view. Doubles as a task: `assignee_user_id`/`assignee_email`/`due_at`. `author_type` distinguishes human, agent, and guest authors; a `guest` (no account, verified by an email code) keeps only `guest_email_hash`, a keyed hash of their email, never the address. `version_id` is the version that was live when it was written (null on older comments). |
 | `artifact_approvals` | Who approved which version of an artifact (one row per version and user). A record, not a publish gate. |
 | `comment_reactions` | Emoji reactions. |
 | `comment_reads` | Per-user `last_read_at` for unread badges. |
@@ -409,7 +409,7 @@ Artifacts have real inboxes, and users get notified through email or a chat plat
 |---|---|
 | `artifact_emails` | An artifact's email identity (`email_prefix`) and inbound settings: `inbound_enabled`, `inbound_allowlist`, plus daily send/receive counters that reset on `last_reset_date`. |
 | `email_templates` | Reusable subject/HTML/text with a `variables_schema`. `is_system` marks built-ins. |
-| `email_log` | Deduplication ledger — `(type, key)` records that a given email was already sent. |
+| `email_log` | Deduplication ledger — `(type, key)` records that a given email was already sent. Also the claim ledger for review notices: `version_notice` per version, `version_approved` per version+approver, `folder_first_open` per folder+person+day. |
 | `email_preferences` | Per-user, per-category opt-in. |
 | `email_suppressions` | Hard suppression list from bounces, complaints and unsubscribes. |
 | `messaging_links` | Chat-platform DM ↔ user binding with a selected workspace, keyed by (`platform`, `session_key`). Telegram uses the chat id as the session key; Slack uses `{team_id}:{user_id}`. |

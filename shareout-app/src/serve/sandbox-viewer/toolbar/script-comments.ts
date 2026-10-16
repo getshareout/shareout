@@ -1,5 +1,6 @@
 import type { Locale } from '../../../i18n';
 import { TOOLBAR_COPY, js, type ToolbarCopy } from './copy';
+import { GUEST_COPY } from './copy-guest';
 
 /** Auto-extracted client script for the sandbox viewer toolbar. */
 export function renderToolbarScriptComments(baseUrl: string, artifactId: string, c: ToolbarCopy = TOOLBAR_COPY.en, locale: Locale = 'en'): string {
@@ -26,6 +27,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
     var cmtOverlay = document.getElementById('so-comments-overlay');
     var cmtLoggedIn = !!(cmtOverlay && cmtOverlay.getAttribute('data-logged-in') === '1');
     var cmtIdentityMode = (cmtOverlay && cmtOverlay.getAttribute('data-identity-mode')) || 'anonymous';
+    var cmtGuestMode = !!(cmtOverlay && cmtOverlay.getAttribute('data-guest') === '1');
 
     function isPanelOpen() {
       var ov = document.getElementById('so-comments-overlay');
@@ -66,9 +68,8 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
     window.openComments = function() {
       document.getElementById('so-comments-overlay').classList.add('open');
       loadComments();
-      loadPeople();
       ensureCmtWs();
-      markRead();
+      if (cmtLoggedIn) { loadPeople(); markRead(); }
       var ta = document.getElementById('so-cmt-input');
       if (ta) setTimeout(function() { ta.focus(); }, 50);
     };
@@ -147,7 +148,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
       var when = c.createdAt ? timeAgo(new Date(c.createdAt)) : '';
       var isActionItem = !isReply && !c.resolved && (c.assigneeEmail || c.assigneeUserId);
       var html = '<div class="so-cmt-card' + (c.resolved ? ' resolved' : '') + (isActionItem ? ' action-item' : '') + '" data-id="' + c.id + '">';
-      var agentBadge = c.authorType === 'agent' ? ' <span class="so-cmt-agent">${js(c.agent)}</span>' : '';
+      var agentBadge = c.authorType === 'agent' ? ' <span class="so-cmt-agent">${js(c.agent)}</span>' : c.authorType === 'guest' ? ' <span class="so-cmt-agent">${js(GUEST_COPY[locale].guestBadge)}</span>' : '';
       html += '<div class="so-cmt-head">' + avatar(c.authorName) +
         '<div><div class="so-cmt-author">' + escapeHtml(c.authorName) + agentBadge + '</div>' +
         '<div class="so-cmt-time">' + when + (c.resolved && c.resolvedBy ? '${js(c.resolvedSuffix)}' : '') + '</div></div></div>';
@@ -408,7 +409,10 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
       if (!content) return;
       var guestNameEl = document.getElementById('so-cmt-guest-name');
       var guestName = guestNameEl ? guestNameEl.value.trim() : '';
-      if (!cmtLoggedIn && cmtIdentityMode === 'named' && !guestName) {
+      if (cmtGuestMode) {
+        guestName = (window.soGuest && window.soGuest.name) || '';
+        if (!guestName && cmtIdentityMode !== 'anonymous') { window.soGuest.prompt(); return; }
+      } else if (!cmtLoggedIn && cmtIdentityMode === 'named' && !guestName) {
         alert('${js(c.enterName)}');
         if (guestNameEl) guestNameEl.focus();
         return;
@@ -418,7 +422,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
       var mentions = cmtLoggedIn ? collectMentions(content) : [];
       var replyTo = cmtReplyingTo;
       var payload = { content: content, parentId: replyTo, mentions: mentions };
-      if (!cmtLoggedIn && guestName) payload.authorName = guestName;
+      if (!cmtLoggedIn && guestName && !cmtGuestMode) payload.authorName = guestName;
       if (cmtPendingPosition && !replyTo) {
         payload.position = cmtPendingPosition;
         if (cmtPendingState !== undefined) payload.state = cmtPendingState;
@@ -468,6 +472,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
           updatePins(cmtRoots);
           ta.value = content;
           if (hadPin && !isPanelOpen()) window.openComments();
+          if (err.message === 'auth' && cmtGuestMode) { window.soGuest.expired(); return; }
           cmtToast(err.message === 'auth' ? '${js(c.loginComment)}' : '${js(c.postFail)}', 'error');
         });
     };
@@ -698,7 +703,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
       d.id = 'so-pin-draft';
       d.innerHTML = '<div class="so-pin"><span>+</span></div>'
         + '<div class="so-pin-pop" role="dialog" aria-label="${js(c.addCommentAria)}">'
-        + (cmtLoggedIn ? '' : '<input type="text" class="so-cmt-textarea so-pin-guest" id="so-pin-guest" maxlength="80" aria-label="${js(c.yourName)}" placeholder="' + (cmtIdentityMode === 'named' ? '${js(c.nameRequired)}' : '${js(c.nameOptional)}') + '">')
+        + (cmtLoggedIn || cmtGuestMode ? '' : '<input type="text" class="so-cmt-textarea so-pin-guest" id="so-pin-guest" maxlength="80" aria-label="${js(c.yourName)}" placeholder="' + (cmtIdentityMode === 'named' ? '${js(c.nameRequired)}' : '${js(c.nameOptional)}') + '">')
         + '<textarea class="so-cmt-textarea" id="so-pin-input" aria-label="${js(c.addCommentAria)}" placeholder="${js(c.addComment)}"></textarea>'
         + '<div class="so-pin-pop-actions"><button type="button" class="so-pin-pop-cancel" id="so-pin-cancel">${js(c.cancel)}</button>'
         + '<button type="button" class="so-cmt-submit" id="so-pin-submit">${js(c.comment)}</button></div></div>';
@@ -749,7 +754,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
       var pg = document.getElementById('so-pin-guest');
       var guest = document.getElementById('so-cmt-guest-name');
       if (pg && guest) guest.value = pg.value;
-      if (!cmtLoggedIn && cmtIdentityMode === 'named' && !(pg && pg.value.trim())) { if (pg) pg.focus(); return; }
+      if (!cmtLoggedIn && !cmtGuestMode && cmtIdentityMode === 'named' && !(pg && pg.value.trim())) { if (pg) pg.focus(); return; }
       // Post through the panel composer so pinned and plain comments share one path;
       // whatever the viewer had typed there is kept.
       var main = document.getElementById('so-cmt-input');
@@ -980,7 +985,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
     (function cmtBootstrap() {
       if (!document.getElementById('so-cmt-list')) return;
       loadComments();
-      loadUnread();
+      if (cmtLoggedIn) loadUnread();
       ensureCmtWs();
     })();`;
 }

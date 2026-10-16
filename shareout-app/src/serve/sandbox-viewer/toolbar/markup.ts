@@ -2,6 +2,8 @@ import { escapeHtml } from '../../utils';
 import { shareModalMarkup } from '../../../components/share-modal';
 import type { ToolbarRenderContext } from '../types';
 import { TOOLBAR_COPY } from './copy';
+import { GUEST_COPY } from './copy-guest';
+import { renderGuestPanel } from './script-guest';
 
 /** HTML for toolbar buttons, overlays, and comment panel shells. */
 export function renderToolbarMarkup(ctx: ToolbarRenderContext): string {
@@ -12,6 +14,7 @@ export function renderToolbarMarkup(ctx: ToolbarRenderContext): string {
     isFav,
     commentsEnabled,
     commentsIdentityMode,
+    commentsGuest,
     commentCount,
     hasMetrics,
     baseUrl,
@@ -26,6 +29,7 @@ export function renderToolbarMarkup(ctx: ToolbarRenderContext): string {
     locale,
   } = ctx;
   const c = TOOLBAR_COPY[locale];
+  const canPost = loggedIn || commentsIdentityMode !== 'authenticated' || commentsGuest;
 
   const editorBtn = adminInfo ? (visualEditorEnabled ? `
       <a href="${baseUrl}/a/${slug}/edit" class="so-toolbar-btn" title="${c.openStudio}">
@@ -118,7 +122,7 @@ export function renderToolbarMarkup(ctx: ToolbarRenderContext): string {
           <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
         </svg>
         ${c.followMetric}
-      </button>` : ''}${commentsEnabled ? ((loggedIn || commentsIdentityMode !== 'authenticated') ? `
+      </button>` : ''}${commentsEnabled ? (canPost ? `
       <button class="so-toolbar-btn" id="so-cmt-btn" onclick="openComments()" title="${c.comments}">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -196,9 +200,9 @@ export function renderToolbarMarkup(ctx: ToolbarRenderContext): string {
         <div class="so-stats-loading">${c.loadingDots}</div>
       </div>
     </div>
-  </div>` : ''}${(loggedIn || commentsIdentityMode !== 'authenticated') && commentsEnabled ? `
+  </div>` : ''}${canPost && commentsEnabled ? `
   <div id="so-pins-layer"></div>
-  <div id="so-comments-overlay" data-identity-mode="${commentsIdentityMode}" data-logged-in="${loggedIn ? '1' : '0'}">
+  <div id="so-comments-overlay" data-identity-mode="${commentsIdentityMode}" data-logged-in="${loggedIn ? '1' : '0'}" data-guest="${!loggedIn && commentsGuest ? '1' : '0'}">
     <div class="backdrop" onclick="closeComments()"></div>
     <div id="so-comments-panel">
       <div class="so-stats-header">
@@ -220,7 +224,7 @@ export function renderToolbarMarkup(ctx: ToolbarRenderContext): string {
       <div class="so-cmt-conn" id="so-cmt-conn" aria-live="polite"></div>
       <div class="so-cmt-composer">
         <div class="so-cmt-mentionbox" id="so-cmt-mentionbox"></div>
-        ${!loggedIn ? `<input type="text" class="so-cmt-textarea" id="so-cmt-guest-name" placeholder="${commentsIdentityMode === 'named' ? c.nameRequired : c.nameOptional}" aria-label="${c.yourName}" maxlength="80" style="min-height:0;height:36px;margin-bottom:8px;resize:none">` : ''}
+        ${!loggedIn && commentsGuest ? renderGuestPanel(GUEST_COPY[locale]) : ''}${!loggedIn && !commentsGuest ? `<input type="text" class="so-cmt-textarea" id="so-cmt-guest-name" placeholder="${commentsIdentityMode === 'named' ? c.nameRequired : c.nameOptional}" aria-label="${c.yourName}" maxlength="80" style="min-height:0;height:36px;margin-bottom:8px;resize:none">` : ''}
         <textarea class="so-cmt-textarea" id="so-cmt-input" placeholder="${c.addComment}${loggedIn ? c.useMention : ''}" aria-label="${c.addCommentAria}"></textarea>
         <div class="so-cmt-composer-actions">
           <button class="so-cmt-pinbtn" id="so-cmt-pinbtn" onclick="togglePinMode()" title="${c.pinTitle}">

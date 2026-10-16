@@ -29,7 +29,7 @@ export function rowToComment(row: CommentRow): Comment {
     position: safeParse(row.position),
     state: safeParse(row.state),
     mentions: Array.isArray(mentions) ? (mentions as string[]) : [],
-    authorType: row.author_type === 'agent' ? 'agent' : 'human',
+    authorType: row.author_type === 'agent' ? 'agent' : row.author_type === 'guest' ? 'guest' : 'human',
     assigneeUserId: row.assignee_user_id ?? null,
     assigneeEmail: row.assignee_email ?? null,
     dueAt: row.due_at ?? null,

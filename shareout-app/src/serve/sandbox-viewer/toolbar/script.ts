@@ -7,6 +7,8 @@ import { renderToolbarScriptAdmin } from './script-admin';
 import { renderToolbarScriptPresence } from './script-presence';
 import { shareModalScript } from '../../../components/share-modal';
 import { TOOLBAR_COPY } from './copy';
+import { GUEST_COPY } from './copy-guest';
+import { renderToolbarScriptGuest } from './script-guest';
 
 /** Assembles conditional client-side scripts for the viewer toolbar. */
 export function renderToolbarScript(ctx: ToolbarRenderContext): string {
@@ -16,7 +18,10 @@ export function renderToolbarScript(ctx: ToolbarRenderContext): string {
   if (loggedIn || adminInfo) sections.push(renderToolbarScriptAuth(baseUrl, artifactId, ctx.currentUser?.email || '', c));
   if (loggedIn) sections.push(shareModalScript({ baseUrl, locale }));
   if (loggedIn) sections.push(renderToolbarScriptPresence(baseUrl, artifactId, c));
-  if (loggedIn && commentsEnabled) sections.push(renderToolbarScriptComments(baseUrl, artifactId, c, locale));
+  // A viewer with no account gets the comments script only when guest comments are on.
+  const guest = !loggedIn && ctx.commentsGuest;
+  if (commentsEnabled && (loggedIn || guest)) sections.push(renderToolbarScriptComments(baseUrl, artifactId, c, locale));
+  if (commentsEnabled && guest) sections.push(renderToolbarScriptGuest(GUEST_COPY[locale]));
   if (adminInfo) sections.push(renderToolbarScriptAdmin(baseUrl, slug, artifactId, c));
 
   return `

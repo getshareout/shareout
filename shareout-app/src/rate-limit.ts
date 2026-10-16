@@ -26,6 +26,12 @@ const RATE_LIMITS = {
   // tighter than OTP verify — a password is guessable in a way a fresh 6-digit code
   // with a 10-minute life is not.
   passwordLogin: { limit: 20, windowSeconds: 900 },
+  // Guest comments (no account): codes per IP on top of the per-address DB caps, and
+  // comment ceilings per IP and per verified guest.
+  guestCodeStart: { limit: 10, windowSeconds: 3600 },
+  guestCodeVerify: { limit: 30, windowSeconds: 3600 },
+  guestCommentIp: { limit: 30, windowSeconds: 3600 },
+  guestCommentToken: { limit: 20, windowSeconds: 3600 },
   accessRequest: { limit: 30, windowSeconds: 3600 },
   adminBridgeAsk: { limit: 30, windowSeconds: 3600 },
   // "Ask an admin" from a refused action; per-reason dedupe sits in the handler.

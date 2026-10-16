@@ -15,8 +15,50 @@ interface CommentsConfig {
   identityMode: 'anonymous' | 'named' | 'authenticated';
   allowReplies: boolean;
   maxDepth: number;
+  /** Guests (no account) may comment after an email code. Unset = follow the folder. */
+  guestComments?: boolean;
 }
 ```
+
+## Guest comments (no account)
+
+Clients reviewing through a link can comment without creating an account. The owner turns
+it on per artifact — `PUT /v1/data/{artifactId}/comments/_config` with
+`{ "guestComments": true }` (`false` turns it off, `null` follows the folder) — or for a whole
+folder: `PUT /v1/workspaces/{wid}/folders/{fid}/guest-comments` `{ "enabled": true }` (admins
+and the folder's creator; `GET` reads it). An artifact without its own setting inherits the
+nearest folder that has it on. `GET …/_config` also returns `guestCommentsEffective`.
+MCP: `set_guest_comments`.
+
+Who can comment as a guest: only on artifacts they can already open without an account — a
+**public** page, or a **password / credentials** page they unlocked (the access cookie is the
+proof). Private and workspace pages stay account-only.
+
+Flow (the viewer toolbar shows it as **Comment as guest**: name, email, code):
+
+| Method | Path (`/v1/data/{artifactId}/comments`) | Body / result |
+|---|---|---|
+| `GET` | `/_guest` | `{ enabled, guest: { name } \| null }` — only your own name |
+| `POST` | `/_guest/code` | `{ name, email }` → emails a 6-digit code (10 min) |
+| `POST` | `/_guest/verify` | `{ name, email, code }` → sets `shareout_guest_{artifactId}` (HttpOnly, SameSite=Strict, 12 h) |
+| `DELETE` | `/_guest` | Signs the guest out |
+
+- The token is an HMAC over artifact id + name + a keyed email hash, **bound to one artifact**.
+- Guest comments carry `authorType: "guest"`; the email is stored only as a keyed hash and is
+  never returned — no reader (guest or member) can see a guest's address.
+- Guests comment and reply. They cannot resolve, assign, react, approve or `@mention`
+  (mentions are dropped), and `@AI` does nothing. The owner can delete any guest comment.
+- With guests on, `named` and `authenticated` modes require the guest code from anyone
+  without an account; `anonymous` keeps anonymous posting and names verified guests.
+- Writes with the guest cookie must come from a page on this instance (`Origin` check) —
+  `403` / `401` otherwise. Limits: 10 codes / hour per IP and 6 per address, 20 comments /
+  hour per guest and 30 per IP (`429 RATE_LIMIT_EXCEEDED`).
+
+| Code | Meaning |
+|---|---|
+| `401 GUEST_VERIFICATION_REQUIRED` | Guests are on but this request has no valid guest token for this artifact |
+| `403 GUEST_COMMENTS_DISABLED` | Guests are off here, or the requester cannot open the page without an account |
+| `400 INVALID_CODE` | Wrong, expired or used-up code (5 tries per code) |
 
 ## CRUD Methods
 
@@ -187,7 +229,9 @@ Content-Type: application/json
 { "artifactId": "art_…", "versionId": "ver_…", "approved": true }
 ```
 
-`versionId` defaults to the live version; `"approved": false` withdraws your approval. `GET /v1/home/review?artifactId=…` returns `{live_version_id, live_version_no, can_review, approvals, my_approvals}`. Needs comment access (`403 FORBIDDEN` otherwise). The MCP connector exposes the same actions ([integrations/mcp-connector.md](../integrations/mcp-connector.md)).
+`versionId` defaults to the live version; `"approved": false` withdraws your approval. The artifact's owner hears about each new approval (feed, email, Telegram — once per approver per version, never for their own).
+
+Followers (an `artifact` follow) and collaborators hear about new versions with each version's note (the author's, or the AI "what changed" line). Notices are debounced: an hourly sweep sends one per artifact once publishing has been quiet for 10 minutes, covering every version since the last notice. The publisher is never notified, nor anyone who can no longer open the page. Email follows the **product** email preference and its unsubscribe link; Telegram follows the same opt-out. `GET /v1/home/review?artifactId=…` returns `{live_version_id, live_version_no, can_review, approvals, my_approvals}`. Needs comment access (`403 FORBIDDEN` otherwise). The MCP connector exposes the same actions ([integrations/mcp-connector.md](../integrations/mcp-connector.md)).
 
 ## Ask the AI from a comment
 
@@ -255,7 +299,7 @@ interface Comment {
   resolvedBy?: string | null;
   resolvedAt?: string | null;
   mentions?: string[];
-  authorType?: 'human' | 'agent';
+  authorType?: 'human' | 'agent' | 'guest';
   reactions?: Record<string, { count: number; mine: boolean }>;
   assigneeUserId?: string | null;
   assigneeEmail?: string | null;
