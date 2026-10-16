@@ -12,6 +12,7 @@ import { createLogger } from '../logging';
 import { escapeHtml } from '../serve/utils';
 import { resolveLocale, type Locale } from '../i18n/locale';
 import { type LocaleCopy } from '../i18n';
+import { normalizeVisibility } from '../visibility-config';
 
 const CATEGORIES = ['phishing', 'malware', 'csam', 'spam', 'copyright', 'other'] as const;
 type Category = (typeof CATEGORIES)[number];
@@ -38,12 +39,17 @@ const REPORT_COPY: LocaleCopy<{
   },
 };
 
-/** The artifact's workspace language, else the visitor's browser. */
+/** The artifact's workspace language, else the visitor's browser. Only public artifacts
+ *  take anonymous reports; any other id answers as not found. */
 async function reportLocale(env: Env, request: Request, artifactId: string): Promise<{ exists: boolean; locale: Locale }> {
   const row = await env.DB.prepare(
-    'SELECT a.id, w.locale FROM artifacts a LEFT JOIN workspaces w ON w.id = a.workspace_id WHERE a.id = ?'
-  ).bind(artifactId).first<{ id: string; locale: string | null }>();
-  return { exists: !!row, locale: resolveLocale({ workspace: row?.locale, acceptLanguage: request.headers.get('Accept-Language') }) };
+    'SELECT a.id, a.visibility, w.locale FROM artifacts a LEFT JOIN workspaces w ON w.id = a.workspace_id WHERE a.id = ?'
+  ).bind(artifactId).first<{ id: string; visibility: string | null; locale: string | null }>();
+  const reportable = !!row && normalizeVisibility(row.visibility || 'public') === 'public';
+  return {
+    exists: reportable,
+    locale: resolveLocale({ workspace: reportable ? row?.locale : null, acceptLanguage: request.headers.get('Accept-Language') }),
+  };
 }
 
 export interface AbuseReportRow {
