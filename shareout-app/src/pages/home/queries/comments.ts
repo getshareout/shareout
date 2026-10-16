@@ -30,26 +30,32 @@ export interface InspectorComment {
 }
 
 /** Confirm the user can view the artifact (owner/collaborator across linked accounts,
- *  or the closed-artifact viewer rule used by the data API). */
+ *  or the closed-artifact viewer rule used by the data API).
+ *
+ *  Both branches run concurrently: the viewer rule only needs the artifact row, so it
+ *  does not wait for the linked-account scope. Same decision as checking them in turn. */
 async function userCanAccessArtifact(
   env: Env,
-  vis: VisibilityScope,
+  visP: VisibilityScope | Promise<VisibilityScope>,
   artifactId: string,
   user: { id: string; email: string | null },
 ): Promise<boolean> {
-  const idPh = placeholders(vis.userIds.length);
-  const emailPh = placeholders(vis.emails.length);
-  const access = await env.DB.prepare(`
+  const linked = Promise.resolve(visP).then((vis) => {
+    const idPh = placeholders(vis.userIds.length);
+    const emailPh = placeholders(vis.emails.length);
+    return env.DB.prepare(`
     SELECT 1 FROM artifacts a
     LEFT JOIN collaborators c ON c.artifact_id = a.id AND c.email IN (${emailPh})
     WHERE a.id = ? AND a.deleted_at IS NULL AND (a.owner_id IN (${idPh}) OR c.email IN (${emailPh}))
     LIMIT 1
   `).bind(...vis.emails, artifactId, ...vis.userIds, ...vis.emails).first();
-  if (access) return true;
-  const artifact = await env.DB.prepare(
+  });
+  const viewable = env.DB.prepare(
     'SELECT id, visibility, workspace_id, owner_id FROM artifacts WHERE id = ? AND deleted_at IS NULL'
-  ).bind(artifactId).first<{ id: string; visibility: string; workspace_id: string | null; owner_id: string | null }>();
-  return !!artifact && canViewArtifact(env, artifact, user.id, user.email);
+  ).bind(artifactId).first<{ id: string; visibility: string; workspace_id: string | null; owner_id: string | null }>()
+    .then((artifact) => !!artifact && canViewArtifact(env, artifact, user.id, user.email));
+  const [access, viewer] = await Promise.all([linked, viewable]);
+  return !!access || viewer;
 }
 
 /**
@@ -67,20 +73,28 @@ export async function queryArtifactComments(
   limit = 200,
   visArg?: VisibilityScope,
 ): Promise<InspectorComment[]> {
-  const vis = visArg ?? await getVisibilityScope(env, user);
-  if (!(await userCanAccessArtifact(env, vis, artifactId, user))) return [];
+  // Access, rows and the bucket probe are independent reads: issue them together so
+  // the tab costs one D1 round-trip wave, not one per query. Rows are discarded
+  // unless access is granted.
+  const visP = visArg ? Promise.resolve(visArg) : getVisibilityScope(env, user);
   const lim = Math.min(Math.max(limit, 1), 500);
-  const rows = await env.DB.prepare(`
+  const [canView, rows, isBucket] = await Promise.all([
+    userCanAccessArtifact(env, visP, artifactId, user),
+    env.DB.prepare(`
     SELECT id, parent_id, author_id, author_name, author_type, content, created_at, resolved, position, mentions, context_id
     FROM artifact_comments
     WHERE artifact_id = ?
     ORDER BY created_at ASC
     LIMIT ?
-  `).bind(artifactId, lim).all<InspectorComment>();
+  `).bind(artifactId, lim).all<InspectorComment>(),
+    isAssetBucketArtifactId(env, artifactId),
+  ]);
+  if (!canView) return [];
   const list = rows.results || [];
 
-  if (!(await isAssetBucketArtifactId(env, artifactId))) return list;
+  if (!isBucket) return list;
   if (!user.email) return [];
+  const vis = await visP;
 
   // Cache per context_id so a long thread does not re-hit grants for every row.
   const allowed = new Map<string, boolean>();

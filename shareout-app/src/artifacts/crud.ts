@@ -206,14 +206,23 @@ export async function handleGetArtifact(
   }
   artifactId = artifact.id;
 
-  const role = await getUserRole(env, artifactId, user.id);
-  if (!role && !(await canViewArtifact(env, artifact, user.id, user.email ?? null))) {
+  // Every read below depends only on the artifact row, so issue them as one wave
+  // instead of ~11 sequential D1 round-trips. The access decision is unchanged
+  // (role, else the closed-artifact viewer rule); the rest is discarded on 403.
+  const [role, viewable, collabRows, tagRows, wsRole] = await Promise.all([
+    getUserRole(env, artifactId, user.id),
+    canViewArtifact(env, artifact, user.id, user.email ?? null),
+    env.DB.prepare('SELECT email, role FROM collaborators WHERE artifact_id = ?')
+      .bind(artifactId).all<{ email: string; role: string }>(),
+    env.DB.prepare('SELECT label FROM artifact_tags WHERE artifact_id = ? ORDER BY label COLLATE NOCASE')
+      .bind(artifactId).all<{ label: string }>(),
+    artifact.workspace_id ? getInternalWorkspaceRole(env, artifact.workspace_id, user.id) : Promise.resolve(null),
+  ]);
+  if (!role && !viewable) {
     return json({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
   }
 
-  const collaborators = role ? await env.DB.prepare(
-    'SELECT email, role FROM collaborators WHERE artifact_id = ?'
-  ).bind(artifactId).all<{ email: string; role: string }>() : { results: [] };
+  const collaborators = role ? collabRows : { results: [] };
 
   const viewers = (collaborators.results || [])
     .filter(c => c.role === 'viewer')
@@ -264,12 +273,10 @@ export async function handleGetArtifact(
     is_favorite: artifact.is_favorite === 1,
   };
 
-  const tagRows = await env.DB.prepare(
-    'SELECT label FROM artifact_tags WHERE artifact_id = ? ORDER BY label COLLATE NOCASE'
-  ).bind(artifactId).all<{ label: string }>();
   const tags = (tagRows.results || []).map(t => t.label);
 
-  const canDelete = !(await requireOwnerOrWorkspaceAdmin(env, user, artifactId, artifact.workspace_id));
+  // Same rule as requireOwnerOrWorkspaceAdmin, from the role/wsRole already read.
+  const canDelete = role === 'owner' || (!!artifact.workspace_id && (wsRole === 'owner' || wsRole === 'admin'));
   // Surface a held-artifact moderation object — but only to the owner/workspace-admin,
   // never to a plain viewer/collaborator, and never on an approved artifact.
   let moderation: ArtifactDetail['moderation'];

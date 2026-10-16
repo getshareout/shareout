@@ -575,7 +575,14 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   function renderComments(art) {
     if (!art.id) {
       rbodyEl.innerHTML = '<div class="wsx-cm">' + i18nLoad() + '</div>';
-      fetchMeta(art, function (d) { if (activeArt !== art) return; if (d) renderComments(art); else railRetry('inspector.detailsFailed', function () { renderComments(art); }); });
+      // Fetch comments by slug alongside the meta lookup instead of after it.
+      var bySlug = art.slug ? fetch('/v1/home/comments?slug=' + encodeURIComponent(art.slug) + '&limit=200', { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }) : Promise.resolve(null);
+      fetchMeta(art, function (d) {
+        if (activeArt !== art) return;
+        if (!d) { railRetry('inspector.detailsFailed', function () { renderComments(art); }); return; }
+        bySlug.then(function (c) { if (activeArt !== art) return; if (c && c.comments && art.id && cmtCache[art.id] === undefined) cmtCache[art.id] = c.comments; renderComments(art); });
+      });
       return;
     }
     if (cmtCache[art.id] !== undefined) { paintComments(art, cmtCache[art.id]); return; }
