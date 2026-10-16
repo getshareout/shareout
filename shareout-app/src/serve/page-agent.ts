@@ -11,9 +11,15 @@
 //    are left to the browser. Click-time handling also covers JS-rendered nav menus.
 // 2. Page awareness. On every page show it tells the wrapper which file is shown, so
 //    the viewer/shell URL can reflect the sub-page (deep links, back/forward).
+// 3. Section deep links. The viewer opens `?section=<anchor>` as the frame's #fragment.
+//    A real id wins (the browser already jumped there); an `h-` anchor is a heading
+//    without an id, found by the same text slug the corpus chunker gave it
+//    (heading-anchors.ts). The target is scrolled to and briefly highlighted.
 //
 // The constants are per (artifact, version, path) — the raw HTML edge cache key is the
 // r2_key, which already encodes all three — so the cached body stays correct.
+import { headingAnchors } from './heading-anchors';
+
 export function buildPageAgent(slug: string, baseOrigin: string, pagePath: string, entrypoint: string): string {
   const j = (v: string) => JSON.stringify(v).replace(/</g, '\\u003c');
   return `(function(){try{
@@ -41,6 +47,20 @@ e.preventDefault();
 if(shell){var r=t.rest;try{r=decodeURIComponent(r);}catch(x){}post({type:'shareout:open-artifact',slug:t.slug,path:r});return;}
 window.open(B+'/a/'+encodeURIComponent(t.slug)+'/'+t.rest+t.tail,'_blank','noopener');
 });
+var A=${headingAnchors.toString()},cur=null;
+function target(h){var el=document.getElementById(h);if(el||!/^h-/.test(h))return el;
+var hs=document.querySelectorAll('h1,h2,h3,h4,h5,h6'),tx=[],i;for(i=0;i<hs.length;i++)tx.push(hs[i].textContent||'');
+var sl=A(tx),c=h.replace(/-/g,'');for(i=0;i<sl.length;i++)if(sl[i]===h)return hs[i];
+for(i=0;i<sl.length;i++)if(sl[i]&&sl[i].replace(/-/g,'')===c)return hs[i];return null;}
+function flash(el){var s=el.style,o=s.outline,oo=s.outlineOffset,b=s.backgroundColor,tr=s.transition;
+s.transition='outline-color .8s,background-color .8s';s.outline='3px solid rgba(250,204,21,.9)';s.outlineOffset='4px';s.backgroundColor='rgba(250,204,21,.18)';
+setTimeout(function(){s.outline=o;s.outlineOffset=oo;s.backgroundColor=b;setTimeout(function(){s.transition=tr;},900);},2200);}
+function go(first){var h=(location.hash||'').slice(1);try{h=decodeURIComponent(h);}catch(e){return;}
+if(!/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/.test(h)||(!first&&!/^h-/.test(h)))return;
+var el=target(h);if(!el)return;cur=el;try{el.scrollIntoView({block:'start'});}catch(e){}flash(el);}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){go(true);});else if(document.readyState)go(true);
+addEventListener('hashchange',function(){go(false);});
+addEventListener('load',function(){if(cur)try{cur.scrollIntoView({block:'start'});}catch(e){}});
 }catch(e){}})();`;
 }
 

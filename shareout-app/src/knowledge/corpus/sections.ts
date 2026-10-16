@@ -1,19 +1,23 @@
 // HTML page → titled sections, so a passage can be cited by its heading (often numbered,
-// e.g. "3.2 Waste classification") and deep-linked by the heading's id. Pure string work
+// e.g. "3.2 Waste classification") and deep-linked by the heading's id — or, when it has
+// none, by a slug of its text ("h-3-2-waste-classification") that the page agent resolves
+// in the browser (serve/heading-anchors.ts). Pure string work
 // (no AI call, no HTMLRewriter) — shared by corpus ingest and the agent's live page scan.
 import { extractTextFromHtml } from '../../serve/utils';
+import { headingAnchors } from '../../serve/heading-anchors';
 import type { Chunk } from './chunk';
 
 /**
  * Bump whenever chunking or section logic changes (here, chunk.ts or ingest.ts's page
  * walk): the nightly refresh (refresh.ts) re-learns every source chunked by an older one.
  * 1 = per-page section chunks with page + anchor.
+ * 2 = headings without an id get an `h-` text-slug anchor.
  */
-export const CHUNKER_VERSION = 1;
+export const CHUNKER_VERSION = 2;
 
 export interface Section {
   heading: string;
-  /** The heading's id (or its wrapping section's), when it has one. */
+  /** The heading's id (or its wrapping section's), else its `h-` text slug; null when neither. */
   anchor: string | null;
   text: string;
 }
@@ -34,6 +38,15 @@ function attrId(attrs: string): string | null {
 }
 
 const oneLine = (html: string) => extractTextFromHtml(html).replace(/\s+/g, ' ').trim();
+
+// The heading text as the browser shows it (its textContent), for the slug: named
+// accented-letter entities fold to their letter, other named entities don't count.
+function slugText(html: string): string {
+  return oneLine(html)
+    .replace(/&([a-zA-Z])(acute|grave|uml|circ|tilde|cedil|ring);/g, '$1')
+    .replace(/&#x([0-9a-f]{1,6});/gi, (_, h: string) => { const c = parseInt(h, 16); return c <= 0x10ffff ? String.fromCodePoint(c) : ' '; })
+    .replace(/&[a-zA-Z][a-zA-Z0-9]*;/g, ' ');
+}
 
 /** The nearest id an anchor link can target: the heading's own, else an opening tag just before it. */
 function nearbyId(body: string, at: number, attrs: string): string | null {
@@ -62,10 +75,13 @@ export function htmlSections(html: string): PageSections {
     const text = extractTextFromHtml(body.slice(from, end));
     if (text) sections.push({ heading, anchor, text });
   };
-  for (const m of body.matchAll(HEADING_RE)) {
+  const headings = [...body.matchAll(HEADING_RE)];
+  // Slugs are numbered across every heading on the page (id or not), as the page agent does.
+  const slugs = headingAnchors(headings.map((m) => slugText(m[3])));
+  for (const [i, m] of headings.entries()) {
     push(m.index!);
     heading = oneLine(m[3]).slice(0, 160);
-    anchor = nearbyId(body, m.index!, m[2]);
+    anchor = nearbyId(body, m.index!, m[2]) ?? (slugs[i] || null);
     if (!firstH1 && m[1] === '1') firstH1 = heading;
     from = m.index! + m[0].length;
   }

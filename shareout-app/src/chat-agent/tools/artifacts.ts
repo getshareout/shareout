@@ -2,6 +2,7 @@ import type { Env } from '../../types';
 import { createMiniDb, type MiniDb } from '../../data/minidb-client';
 import { extractTextFromHtml } from '../../serve/utils';
 import { toMarkdown } from '../../knowledge/corpus/ingest';
+import { DocReadError } from '../../data/files/parse-doc';
 import { buildScopeClause } from '../../data/tables/scope';
 import type { ViewerScope } from '../../data/access-policy';
 import {
@@ -214,7 +215,7 @@ export async function readReportText(env: Env, artifactId: string, page?: string
   const obj = await env.ARTIFACTS.get(asset.r2_key);
   if (!obj) return null;
   const raw = binary
-    ? await toMarkdown(env, path, asset.mime, await obj.arrayBuffer())
+    ? await toMarkdown(env, path, asset.mime, await obj.arrayBuffer()).catch((e) => { if (e instanceof DocReadError) return null; throw e; })
     : await obj.text();
   if (raw == null) return null;
   const text = asset.mime.includes('html') ? extractTextFromHtml(raw) : raw;

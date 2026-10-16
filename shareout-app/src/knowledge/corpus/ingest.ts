@@ -6,6 +6,7 @@ import type { Env, TypeMetadata } from '../../types';
 import { sha256 } from '../../crypto-utils';
 import { extractTextFromHtml } from '../../serve/utils';
 import { parsePptx } from '../../data/files/parse-pptx';
+import { DocReadError, docToMarkdown } from '../../data/files/parse-doc';
 import { isKnowledgeEnabled } from '../store';
 import { chunkMarkdown, MAX_CHUNKS, type Chunk } from './chunk';
 import { CHUNKER_VERSION, chunkSections, htmlSections } from './sections';
@@ -18,7 +19,7 @@ export const EMBED_BATCH = 50;
 // Same isolate-memory guard as assets/enrich.ts: never pull a huge blob into 128MB.
 const MAX_SOURCE_BYTES = 25_000_000;
 
-// Workers AI toMarkdown handles these; text and PPTX are read in-Worker.
+// Workers AI toMarkdown handles these; text, PPTX and legacy Word (.doc) are read in-Worker.
 const TO_MARKDOWN = /\.(pdf|docx|odt|xlsx|xlsm|xlsb|xls|ods|numbers|csv|html?|xml|jpe?g|png|webp|svg|gif|bmp)$/i;
 const PLAIN_TEXT = /\.(txt|md|markdown|json)$/i;
 
@@ -122,7 +123,10 @@ async function siteChunks(env: Env, loaded: Loaded): Promise<Chunk[]> {
   return chunks;
 }
 
-/** A source's text as markdown, or null when we can't read the format. */
+/**
+ * A source's text as markdown, or null when we can't read the format. Throws DocReadError
+ * (a reader-facing reason) when a .doc is damaged, protected or too old to read.
+ */
 export async function toMarkdown(env: Env, filename: string, mime: string, bytes: ArrayBuffer): Promise<string | null> {
   const lower = filename.toLowerCase();
   if (PLAIN_TEXT.test(lower) || mime.startsWith('text/plain') || mime === 'text/markdown' || mime === 'application/json') {
@@ -131,6 +135,7 @@ export async function toMarkdown(env: Env, filename: string, mime: string, bytes
   if (lower.endsWith('.pptx')) {
     return parsePptx(bytes).map((s) => `## Slide ${s.index}: ${s.title}\n\n${s.lines.join('\n')}`).join('\n\n');
   }
+  if (lower.endsWith('.doc') || mime === 'application/msword') return docToMarkdown(new Uint8Array(bytes));
   const isHtml = mime.includes('html') || /\.html?$/.test(lower);
   if (env.AI && TO_MARKDOWN.test(lower)) {
     const res = await env.AI.toMarkdown({ name: filename, blob: new Blob([bytes], { type: mime }) });
@@ -163,7 +168,14 @@ export async function extractStep(env: Env, p: IngestParams): Promise<ExtractRes
     );
     return { status: 'unsupported', chunkCount: 0, previousCount: 0 };
   }
-  const markdown = loaded.site ? '' : await toMarkdown(env, loaded.filename, loaded.mime, loaded.bytes);
+  let markdown: string | null;
+  try {
+    markdown = loaded.site ? '' : await toMarkdown(env, loaded.filename, loaded.mime, loaded.bytes);
+  } catch (e) {
+    if (!(e instanceof DocReadError)) throw e;
+    await store.setStatus(loaded.meta, 'unsupported', e.message, CHUNKER_VERSION);
+    return { status: 'unsupported', chunkCount: 0, previousCount: 0 };
+  }
   const chunks = loaded.site ? await siteChunks(env, loaded) : markdown ? chunkMarkdown(markdown) : [];
   if (!chunks.length) {
     await store.setStatus(loaded.meta, 'unsupported', markdown === null ? `Can't read ${loaded.mime} files yet` : 'No text found', CHUNKER_VERSION);

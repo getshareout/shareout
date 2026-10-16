@@ -5,6 +5,7 @@ import { ImportError, convertOfficeImport, docxToMarkdown, workbookToCsvSheets, 
 import { importArtifactType, importDestination } from '../../../src/pages/home/import-rules';
 import { parseMarkdown } from '../../../src/viewers/markdown-viewer';
 import { DOCX_MARKDOWN, PNG_1PX, docxFixture, toBase64, xlsxFixture } from '../helpers/office-fixtures';
+import { REAL_DOC, REAL_DOC_TEXT } from '../helpers/doc-fixtures';
 
 const env = {} as Env;
 
@@ -83,6 +84,15 @@ describe('convertOfficeImport', () => {
 
   it('.odt needs Workers AI; without it the error says what to do', async () => {
     await expect(convertOfficeImport(env, 'a.odt', 'odt', 'word', new Uint8Array([1]))).rejects.toMatchObject({ code: 'CONVERT_UNAVAILABLE' });
+  });
+
+  it('legacy Word .doc → Markdown paragraphs in-Worker, original kept', async () => {
+    expect(importArtifactType('old.doc')).toBe('markdown');
+    const out = await convertOfficeImport(env, 'Procedimiento.doc', 'doc', 'word', REAL_DOC());
+    expect(out.entrypoint).toBe('Procedimiento.md');
+    expect(out.files[0].content).toBe(REAL_DOC_TEXT);
+    expect(out.files.find((f) => f.path === 'original/Procedimiento.doc')).toMatchObject({ mime: 'application/msword', encoding: 'base64' });
+    await expect(convertOfficeImport(env, 'bad.doc', 'doc', 'word', new Uint8Array([1, 2, 3]))).rejects.toMatchObject({ code: 'CONVERT_FAILED', message: 'This .doc file could not be opened.' });
   });
 
   it('.odt converts through Workers AI toMarkdown when present', async () => {

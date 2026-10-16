@@ -5076,7 +5076,7 @@ paths:
       summary: Import a dropped or pasted file as an artifact
       description: >-
         One-step import from the Studio Home. Publishes a document (HTML, CSV, Markdown,
-        JSON, text, PDF, Word .docx/.odt, or a spreadsheet .xlsx/.xls/.ods), pasted HTML,
+        JSON, text, PDF, Word .docx/.doc/.odt, or a spreadsheet .xlsx/.xls/.ods), pasted HTML,
         or a Claude / ChatGPT / Gemini share link (best-effort fetch) as a private
         artifact in the current workspace and folder. Word files become Markdown and
         spreadsheets one CSV per sheet. Slide decks (.pptx/.ppt/.odp) become a PDF on

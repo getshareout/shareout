@@ -80,7 +80,7 @@ The **Knowledge** lens opens in a **tree** view by default — Overview, Topics,
 
 ## Search what the workspace knows (agents)
 
-Once Knowledge is on, every **File** in the workspace (Assets: PDF, DOCX, XLSX, PPTX, CSV, TXT/MD, images) and every **published page** is read in the background and split into cited passages. Nobody has to do anything — new uploads, new file versions and re-publishes are picked up automatically, and deleted files drop out.
+Once Knowledge is on, every **File** in the workspace (Assets: PDF, DOCX, legacy Word DOC, XLSX, PPTX, CSV, TXT/MD, images) and every **published page** is read in the background and split into cited passages. Nobody has to do anything — new uploads, new file versions and re-publishes are picked up automatically, and deleted files drop out.
 
 One call returns the passages that answer a question, each with a citation:
 
@@ -204,7 +204,18 @@ curl -sS "$ORIGIN/v1/workspaces/$WS/knowledge/status" -H "Authorization: Bearer 
 (`queued`, `ready`, `failed`, `unsupported`) and one row per source: `status`, the
 `version` indexed, its `chunker_version` and `outdated`, `chunks`, `chunks_with_page`
 (passages on a sub-page), `chunks_with_anchor` (passages that link to a section heading)
-and the last `error`. Owners, admins and instance admins see every source; members only
+and the last `error`.
+
+Section links (`?page=…&section=…`) use the heading's own `id` (or its wrapping
+section's) when it has one. A heading without an id gets a text slug instead —
+`h-` + the heading lowercased, accents folded, hyphenated, numbered `-2`, `-3` when it
+repeats on the page (`3.2 Clasificación` → `h-3-2-clasificacion`). The viewer resolves
+it in the page itself, scrolls there and briefly highlights the heading. Headings with
+no Latin letters or digits get no slug.
+
+Legacy Word `.doc` (97–2003) is read in-Worker: the main body text only (no headers,
+footnotes, images or heading styles), up to 8 MB. Word 6/95, password-protected or
+damaged files show `unsupported` with the reason in `error`. Owners, admins and instance admins see every source; members only
 those they may open. A reindexed source shows `queued` until it is learned again.
 
 ## For agents

@@ -95,7 +95,7 @@ The data-write tools go through the same handlers as the data API (row/key limit
 
 Every page link the bot sends is **absolute** on the instance apex (`$ORIGIN/a/{slug}/`), with
 `?page={path}` for a multi-page site's sub-page and `&section={heading-id}` to open the page
-scrolled to that heading. Tools return the `url`; the agent is told to paste it exactly and
+scrolled to that heading (its `id`, or an `h-…` text slug when the heading has none). Tools return the `url`; the agent is told to paste it exactly and
 never build one. Replies go out as plain text (no `parse_mode`), and stray Markdown
 (Markdown links, `**bold**`) is flattened so Telegram auto-links the bare URL.
 

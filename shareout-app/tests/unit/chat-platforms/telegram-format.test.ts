@@ -33,7 +33,7 @@ describe('htmlSections', () => {
   it('splits by heading, keeps numbered headings and their ids', () => {
     const p = htmlSections('<title>Waste</title><body><h1>Waste</h1><p>Intro.</p><section id="s3"><h2>3. Classification</h2><p>3.1 Classify it.</p></section></body>');
     expect(p.title).toBe('Waste');
-    expect(p.sections.map((s) => [s.heading, s.anchor])).toEqual([['Waste', null], ['3. Classification', 's3']]);
+    expect(p.sections.map((s) => [s.heading, s.anchor])).toEqual([['Waste', 'h-waste'], ['3. Classification', 's3']]);
     const chunks = chunkSections(p, { startOrd: 0, page: 'w.html', max: 10 });
     expect(chunks[1]).toMatchObject({ locator: 'Waste › 3. Classification', page: 'w.html', anchor: 's3' });
     expect(chunks[1].text).toContain('3. Classification');

@@ -13,11 +13,11 @@ export const IMPORT_ARTIFACT_EXTS: Record<string, ArtifactType> = {
   html: 'html', htm: 'html', csv: 'csv', md: 'markdown', markdown: 'markdown',
   json: 'json', txt: 'txt', pdf: 'pdf',
   // Office files are converted on import; the original is kept for download.
-  docx: 'markdown', odt: 'markdown', xlsx: 'csv', xls: 'csv', ods: 'csv',
+  docx: 'markdown', doc: 'markdown', odt: 'markdown', xlsx: 'csv', xls: 'csv', ods: 'csv',
 };
 /** Converted on import: Word-like → Markdown, spreadsheets → one CSV per sheet. */
 export const IMPORT_CONVERTED_EXTS: Record<string, 'word' | 'sheet'> = {
-  docx: 'word', odt: 'word', xlsx: 'sheet', xls: 'sheet', ods: 'sheet',
+  docx: 'word', doc: 'word', odt: 'word', xlsx: 'sheet', xls: 'sheet', ods: 'sheet',
 };
 /**
  * Slide decks become a PDF artifact (LibreOffice in a Container, import-slides.ts). Only
@@ -26,7 +26,7 @@ export const IMPORT_CONVERTED_EXTS: Record<string, 'word' | 'sheet'> = {
  */
 export const IMPORT_SLIDES_EXTS = ['pptx', 'ppt', 'odp'];
 /** Sent as base64 by the client (binary formats). */
-export const IMPORT_BINARY_EXTS = ['pdf', 'docx', 'odt', 'xlsx', 'xls', 'ods', ...IMPORT_SLIDES_EXTS];
+export const IMPORT_BINARY_EXTS = ['pdf', 'docx', 'doc', 'odt', 'xlsx', 'xls', 'ods', ...IMPORT_SLIDES_EXTS];
 export const IMPORT_MAX_BYTES = 25 * 1024 * 1024;
 /** Share links we try to fetch once (no per-vendor scraping). Subdomains match too. */
 export const IMPORT_SHARE_HOSTS = ['claude.ai', 'claude.site', 'chatgpt.com', 'chat.openai.com', 'gemini.google.com', 'g.co'];
