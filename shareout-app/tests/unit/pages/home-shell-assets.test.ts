@@ -2,7 +2,8 @@
 // inlining ~1.3 MB into every response.
 import { describe, expect, it } from 'vitest';
 import { handleUserHomePage } from '../../../src/pages/home/handler';
-import { HOME_SHELL_CSS, HOME_SHELL_JS, homeShellUrls, serveHomeShellAsset } from '../../../src/pages/home/shell-assets';
+import { HOME_SHELL_CSS, HOME_SHELL_JS, homeI18nUrl, homeShellUrls, serveHomeShellAsset } from '../../../src/pages/home/shell-assets';
+import { HOME_COPY } from '../../../src/pages/home/home-i18n/merge-copy';
 import { serveSharedBundle } from '../../../src/router/shared-bundles';
 import { WORKSPACE_CLIENT } from '../../../src/pages/home/render-workspace/client-script';
 import { WORKSPACE_STYLES } from '../../../src/pages/home/render-workspace/styles';
@@ -53,20 +54,61 @@ describe('home shell assets', () => {
     const res = await handleUserHomePage(new Request('https://x.test/home'), env, alice);
     const html = await res.text();
     const { js, css } = await homeShellUrls();
+    const en = await homeI18nUrl('en');
     expect(html).toContain(`<link rel="stylesheet" href="${css}">`);
     expect(html).toContain(`<link rel="preload" as="script" href="${js}">`);
-    // The shell script runs after the inline boot globals it reads.
-    expect(html.indexOf('window.WSX_LOCALE=')).toBeGreaterThan(0);
+    expect(html).toContain(`<link rel="preload" as="script" href="${en}">`);
+    // Copy file → inline boot globals → shell script, in document order.
+    const copyAt = html.indexOf(`<script src="${en}"></script>`);
+    expect(copyAt).toBeGreaterThan(0);
+    expect(html.indexOf('window.WSX_LOCALE=')).toBeGreaterThan(copyAt);
     expect(html.indexOf(`<script src="${js}"></script>`)).toBeGreaterThan(html.indexOf('window.WSX_LOCALE='));
+    expect(html).not.toContain(await homeI18nUrl('es'));
     expect(html).not.toContain(WORKSPACE_STYLES);
     // Perf budget: the document stays under 200 KB.
     expect(new TextEncoder().encode(html).length).toBeLessThan(200_000);
   });
 
-  it('perf budget: the boot shell script stays under 720 KB (1,001 KB inlined before the lens split)', async () => {
+  it('ships one locale: the browser language picks the preloaded + loaded copy file', async () => {
+    const res = await handleUserHomePage(new Request('https://x.test/home', { headers: { 'Accept-Language': 'es-AR,es;q=0.9' } }), env, alice);
+    const html = await res.text();
+    const es = await homeI18nUrl('es');
+    expect(html).toContain(`<link rel="preload" as="script" href="${es}">`);
+    expect(html).toContain(`<script src="${es}"></script>`);
+    expect(html).not.toContain(await homeI18nUrl('en'));
+  });
+
+  it('the boot shell carries no copy; each copy file carries exactly one locale', async () => {
+    const shell = await (await serveHomeShellAsset(HOME_SHELL_JS, null))!.text();
+    const probe = (l: 'en' | 'es') => JSON.stringify(HOME_COPY[l]['meta.title']);
+    expect(HOME_COPY.en['meta.title']).not.toBe(HOME_COPY.es['meta.title']);
+    expect(shell).not.toContain(probe('en'));
+    expect(shell).not.toContain(probe('es'));
+    const urls = JSON.parse(shell.match(/window\.WSX_I18N=(\{[^\n]*\});/)![1]) as Record<string, string>;
+    for (const [l, other] of [['en', 'es'], ['es', 'en']] as const) {
+      expect(urls[l]).toBe(await homeI18nUrl(l));
+      const u = new URL(urls[l], 'https://x.test');
+      const r = await (await serveSharedBundle(new Request(u), env, u.pathname))!;
+      expect(r.headers.get('Cache-Control')).toContain('immutable');
+      expect(r.headers.get('Content-Type')).toContain('javascript');
+      const body = await r.text();
+      expect(body).toContain(probe(l));
+      expect(body).not.toContain(probe(other));
+      const w = {} as { __SO_HOME_COPY?: Record<string, Record<string, string>> };
+      new Function('window', body)(w);
+      expect(w.__SO_HOME_COPY).toEqual({ [l]: HOME_COPY[l] });
+    }
+  });
+
+  it('perf budget: the boot shell script stays under 560 KB (510 KB measured; 718 KB with both locales inlined)', async () => {
     const { js } = await homeShellUrls();
     const text = await (await serveHomeShellAsset(HOME_SHELL_JS, new URL(js, 'https://x.test').searchParams.get('v')))!.text();
-    expect(new TextEncoder().encode(text).length).toBeLessThan(720_000);
+    expect(new TextEncoder().encode(text).length).toBeLessThan(560_000);
+    for (const l of ['en', 'es'] as const) {
+      const u = new URL(await homeI18nUrl(l), 'https://x.test');
+      const copy = await (await serveHomeShellAsset(u.pathname, u.searchParams.get('v')))!.text();
+      expect(new TextEncoder().encode(copy).length, l).toBeLessThan(120_000);
+    }
     for (const [name, c] of Object.entries(LAZY_CHUNKS)) expect(text.includes(c.src), `${name} is not in the boot shell`).toBe(false);
   });
 
