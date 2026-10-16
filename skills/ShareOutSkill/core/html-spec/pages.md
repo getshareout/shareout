@@ -40,6 +40,16 @@ data-shareout-page (Level 0)
 </main>
 ```
 
+### Multiple HTML files (sites)
+
+An artifact can ship several HTML files, e.g. a manual: `index.html` linking to
+`procedures/intake.html` and `procedures/billing.html`. Link between them with
+**relative** hrefs (`procedures/intake.html`, `../index.html`). Absolute links to the
+same artifact (`/a/{slug}/…`) are rerouted inside the frame when clicked, and links to
+another artifact open it in its own tab. The viewer URL tracks the page being shown
+(`/a/{slug}/?page=procedures/intake.html`, or `#a/{slug}/procedures/intake.html` in
+Home), and Home lists the pages under Details.
+
 ## Sections
 
 ```html

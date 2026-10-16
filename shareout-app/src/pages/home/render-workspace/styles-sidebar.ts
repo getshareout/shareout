@@ -132,6 +132,10 @@ export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspect
 .wsx-det__mpill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; background: var(--color-surface); font: 600 var(--text-xs) var(--font-body); color: var(--color-text-secondary); }
 .wsx-det__mpill .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 .wsx-det__mpill svg { flex: none; }
+.wsx-det__pages { display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow-y: auto; }
+.wsx-det__page { text-align: left; padding: 5px 8px; border: 0; border-radius: var(--radius-sm); background: none; font: 500 var(--text-sm) var(--font-body); color: var(--color-text-secondary); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wsx-det__page:hover { background: var(--color-surface); color: var(--color-text); }
+.wsx-det__page.is-on { background: var(--color-surface); color: var(--color-text); font-weight: 600; }
 .wsx-det__sharecard { flex-direction: column; align-items: stretch; gap: 8px; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px; box-shadow: var(--shadow-sm); }
 .wsx-share__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .wsx-share__count { font: 400 var(--text-xs) var(--font-body); color: var(--color-text-tertiary); }

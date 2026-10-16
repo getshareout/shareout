@@ -20,6 +20,7 @@ import { MODALS_COPY } from './copy/modals';
 import { NEW_MENU_COPY } from './copy/new-menu';
 import { NOTIF_COPY } from './copy/notifications';
 import { REVIEW_COPY } from './copy/review';
+import { PAGES_COPY } from './copy/pages';
 import { ONBOARDING_COPY } from './copy/onboarding';
 import { SHELL_COPY } from './copy/shell';
 import { STUDIO_COPY } from './copy/studio';
@@ -54,6 +55,7 @@ const COPY_MODULES: HomeLocaleCopy[] = [
   STUDIO_COPY,
   NEW_MENU_COPY,
   DROP_IMPORT_COPY,
+  PAGES_COPY,
   ERRORS_COPY,
   VERSION_CHANGELOG_COPY,
 ];

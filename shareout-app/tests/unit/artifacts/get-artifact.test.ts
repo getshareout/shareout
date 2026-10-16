@@ -229,5 +229,37 @@ describe('handleGetArtifact', () => {
     expect(response.status).toBe(200);
     expect((await jsonBody(response)).moderation).toBeUndefined();
   });
-});
 
+  describe('multi-page page list', () => {
+    const pageRows = [
+      { entrypoint: 'index.html', path: 'docs/a.html' },
+      { entrypoint: 'index.html', path: 'docs/b.html' },
+      { entrypoint: 'index.html', path: 'index.html' },
+    ];
+    const envWith = (rows: unknown[], first: (sql: string, ...a: unknown[]) => unknown = ownerRoleFirst) => ({
+      ...baseEnv,
+      DB: makeDbMock({ first, all: (sql) => (sql.includes("ast.mime = 'text/html'") ? { results: rows } : { results: [] }) }),
+    });
+    const get = (env: typeof baseEnv) => handleGetArtifact(new Request('https://shareout.example.com/v1/artifacts/art_1'), env, user, 'art_1');
+
+    it('lists HTML pages of the live version, entrypoint first, when there are 2+', async () => {
+      const body = await jsonBody(await get(envWith(pageRows)));
+      expect(body).toMatchObject({ entrypoint: 'index.html', pages: ['index.html', 'docs/a.html', 'docs/b.html'] });
+    });
+
+    it('omits the list for a single-page artifact', async () => {
+      const body = await jsonBody(await get(envWith([{ entrypoint: 'index.html', path: 'index.html' }])));
+      expect(body).not.toHaveProperty('pages');
+    });
+
+    it('never returns the page list to a caller without access', async () => {
+      const res = await get(envWith(pageRows, (sql) => {
+        if (sql.includes('owner_id FROM artifacts') && !sql.includes('description')) return { owner_id: 'usr_other' };
+        if (sql.includes('is_favorite')) return { ...artifactRow, owner_id: 'usr_other' };
+        return null;
+      }));
+      expect(res.status).toBe(403);
+      expect(await res.text()).not.toContain('docs/a.html');
+    });
+  });
+});

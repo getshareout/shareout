@@ -64,12 +64,12 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
   function stageSheet(rec) {
     try { var m = /[?&]sheet=(\\d+)/.exec(rec.iframe.contentWindow.location.search); return m ? '?sheet=' + m[1] : ''; } catch (e) { return ''; }
   }
-  function stageUrl(slug) { return '/a/' + encodeURIComponent(slug) + '/?wsx=1'; }
+  function stageUrl(slug, page) { return '/a/' + encodeURIComponent(slug) + '/?wsx=1' + (page ? '&page=' + encodeURIComponent(page) : ''); }
   function paintStage(rec) {
     rec.staged = true;
     if (STAGE_UNSANDBOXED[rec.art.type]) rec.iframe.removeAttribute('sandbox');
     else rec.iframe.setAttribute('sandbox', STAGE_SANDBOX);
-    rec.iframe.src = stageUrl(rec.art.slug);
+    rec.iframe.src = stageUrl(rec.art.slug, typeof takeStagePage === 'function' ? takeStagePage(rec) : '');
     syncTabMode();
   }
   // The sandbox is fixed at navigation time, so the type must be known before the first load:
