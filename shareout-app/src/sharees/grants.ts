@@ -10,6 +10,7 @@ import { invalidateGrants } from '../access/can-access';
 import { logAudit } from '../audit';
 import { requireExternalSharing } from './guard';
 import { inviteOrAddMember } from '../workspaces/invite';
+import { requireFolderManager } from '../folders';
 
 // Phase 2 surface: view/comment (read) + create/edit (author-in-sandbox). The lattice
 // and table support the full set; we only let admins MINT what the access layer honors.
@@ -48,16 +49,27 @@ async function insertGrant(
   ).bind(workspaceId, subjectType, subjectId, resourceType, resourceId, capability).first();
 }
 
+// Admins manage every grant; whoever may manage a Team Space folder (rename/delete
+// rights) also manages the grants on that one folder.
+async function requireGrantManager(
+  env: Env, workspaceId: string, user: AuthUser, resourceType: string | null, resourceId: string | null,
+): Promise<Response | null> {
+  if (resourceType === 'folder' && resourceId && !(await requireFolderManager(env, user, workspaceId, resourceId))) return null;
+  return requireExternalSharing(env, workspaceId, user.id);
+}
+
 export async function handleListGrants(
   request: Request, env: Env, user: AuthUser, workspaceId: string,
 ): Promise<Response> {
-  const forbidden = await requireWorkspaceRole(env, workspaceId, user.id, 'admin');
-  if (forbidden) return forbidden;
-
   const url = new URL(request.url);
   const subjectId = url.searchParams.get('subject_id');
   const resourceType = url.searchParams.get('resource_type');
   const resourceId = url.searchParams.get('resource_id');
+
+  const forbidden = resourceType === 'folder' && resourceId
+    ? await requireGrantManager(env, workspaceId, user, resourceType, resourceId)
+    : await requireWorkspaceRole(env, workspaceId, user.id, 'admin');
+  if (forbidden) return forbidden;
 
   const where: string[] = ['g.workspace_id = ?'];
   const binds: unknown[] = [workspaceId];
@@ -155,17 +167,20 @@ export async function handleCreateGrant(
 export async function handleShareWithPerson(
   request: Request, env: Env, user: AuthUser, workspaceId: string,
 ): Promise<Response> {
-  const forbidden = await requireExternalSharing(env, workspaceId, user.id);
-  if (forbidden) return forbidden;
-
   let body: { email?: string; resource_type?: string; resource_id?: string; capability?: string };
   try { body = await request.json(); }
-  catch { return json({ error: 'Invalid JSON', code: 'INVALID_JSON' }, 400); }
+  catch {
+    const forbidden = await requireExternalSharing(env, workspaceId, user.id);
+    return forbidden || json({ error: 'Invalid JSON', code: 'INVALID_JSON' }, 400);
+  }
 
   const email = (body.email ?? '').trim().toLowerCase();
   const resourceType = body.resource_type ?? '';
   const resourceId = body.resource_id ?? '';
   const capability = body.capability ?? 'view';
+
+  const forbidden = await requireGrantManager(env, workspaceId, user, resourceType, resourceId);
+  if (forbidden) return forbidden;
 
   if (!email || !email.includes('@'))
     return json({ error: 'A valid email is required', code: 'VALIDATION_ERROR' }, 400);
@@ -200,14 +215,13 @@ export async function handleShareWithPerson(
 export async function handleDeleteGrant(
   request: Request, env: Env, user: AuthUser, workspaceId: string, grantId: string,
 ): Promise<Response> {
-  const forbidden = await requireExternalSharing(env, workspaceId, user.id);
-  if (forbidden) return forbidden;
-
   // Hard DELETE (no soft-delete) so revocation is a real removal; cache busts on the
   // workspace generation. A KV outage may serve up to TTL(60s) stale — accepted.
   const row = await env.DB.prepare(
-    'SELECT subject_type, subject_id FROM grants WHERE id = ? AND workspace_id = ?'
-  ).bind(grantId, workspaceId).first<{ subject_type: string; subject_id: string }>();
+    'SELECT subject_type, subject_id, resource_type, resource_id FROM grants WHERE id = ? AND workspace_id = ?'
+  ).bind(grantId, workspaceId).first<{ subject_type: string; subject_id: string; resource_type: string; resource_id: string }>();
+  const forbidden = await requireGrantManager(env, workspaceId, user, row?.resource_type ?? null, row?.resource_id ?? null);
+  if (forbidden) return forbidden;
   if (!row) return json({ error: 'Not found', code: 'NOT_FOUND' }, 404);
 
   await env.DB.prepare('DELETE FROM grants WHERE id = ? AND workspace_id = ?')

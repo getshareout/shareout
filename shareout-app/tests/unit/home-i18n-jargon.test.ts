@@ -9,11 +9,12 @@ import { STUDIO_COPY } from '../../src/pages/home/home-i18n/copy/studio';
 import { WORKSPACE_COPY } from '../../src/pages/home/home-i18n/copy/workspace';
 import { CONNECT_COPY } from '../../src/pages/home/home-i18n/copy/connect';
 import { ASSETS_COPY } from '../../src/pages/home/home-i18n/copy/assets';
+import { FOLDER_ACCESS_COPY } from '../../src/pages/home/home-i18n/copy/folder-access';
 
 const JARGON = /\bcrews?\b|so\.workspace|\bAPI\b/i;
 
 describe('member-facing copy has no developer jargon', () => {
-  for (const [name, bag] of Object.entries({ SHELL_COPY, INSPECTOR_COPY, STUDIO_COPY, WORKSPACE_COPY, CONNECT_COPY, ASSETS_COPY })) {
+  for (const [name, bag] of Object.entries({ SHELL_COPY, INSPECTOR_COPY, STUDIO_COPY, WORKSPACE_COPY, CONNECT_COPY, ASSETS_COPY, FOLDER_ACCESS_COPY })) {
     for (const locale of ['en', 'es'] as const) {
       it(`${name}.${locale}`, () => {
         const hits = Object.entries(bag[locale] as Record<string, string>)

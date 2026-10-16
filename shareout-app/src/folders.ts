@@ -45,7 +45,7 @@ export function canManageTeamFolder(
 
 /** Loads a Team Space folder and checks the caller may change it. Returns the error
  *  response to send, or null when the change may go ahead. */
-async function requireFolderManager(
+export async function requireFolderManager(
   env: Env,
   user: AuthUser,
   workspaceId: string,

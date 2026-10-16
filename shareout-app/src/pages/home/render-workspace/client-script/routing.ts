@@ -8,6 +8,7 @@ export const workspace_client_routing_JS = `  // ===== deep-link routing (hash) 
     var on = ws.querySelector('[data-lens].is-active');
     var lens = on ? on.getAttribute('data-lens') : 'brief';
     if (lens === 'catalog' && typeof catCurrentId === 'string' && catCurrentId) return 'l/catalog/' + encodeURIComponent(catCurrentId);
+    if (lens === 'artifacts' && typeof curFolder === 'string' && curFolder) return 'l/artifacts/' + encodeURIComponent(curFolder);
     if (lens === 'knowledge' && typeof knCurrentPath === 'string' && knCurrentPath) return 'l/knowledge/' + encodeURIComponent(knCurrentPath);
     return 'l/' + lens;
   }
@@ -46,6 +47,7 @@ export const workspace_client_routing_JS = `  // ===== deep-link routing (hash) 
       if (!lb) { lens = 'brief'; sub = ''; }
       lenses.forEach(function (x) { x.classList.toggle('is-active', x.getAttribute('data-lens') === lens); });
       if (typeof exitCreate === 'function') exitCreate();
+      if (lens === 'artifacts' && typeof artRoute === 'function') artRoute(decodeURIComponent(sub));
       openView(lens);
       if (lens === 'catalog' && typeof catRoute === 'function') catRoute(decodeURIComponent(sub));
       if (lens === 'knowledge' && typeof knRoute === 'function') knRoute(decodeURIComponent(sub));
