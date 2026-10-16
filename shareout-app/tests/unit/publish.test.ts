@@ -222,6 +222,23 @@ describe('handlePublish auth and validation', () => {
     await expect(badToken.json()).resolves.toMatchObject({ code: 'UNAUTHORIZED', reason: 'invalid' });
   });
 
+  it('checks the token before replaying an idempotent result', async () => {
+    const env = await makePublishEnv();
+    const kv = new Map<string, string>();
+    (env as unknown as { RATE_LIMIT_KV: unknown }).RATE_LIMIT_KV = {
+      get: async (k: string, t?: string) => (kv.has(k) ? (t === 'json' ? JSON.parse(kv.get(k)!) : kv.get(k)) : null),
+      put: async (k: string, v: string) => { kv.set(k, v); },
+    };
+    for (const k of ['idem:same-key', `idem:${USER_ID}:`]) kv.set(k, JSON.stringify({ status: 201, body: '{"replayed":true}', headers: {} }));
+
+    const anon = await handlePublish(
+      new Request('https://shareout.example.com/v1/publish', { method: 'POST', headers: { 'Idempotency-Key': 'same-key' } }),
+      env,
+    );
+    expect(anon.status).toBe(401);
+    expect(anon.headers.get('X-Idempotent-Replayed')).toBeNull();
+  });
+
   it('returns 429 when publish rate limit is exceeded', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-30T14:30:00Z'));
