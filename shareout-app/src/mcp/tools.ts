@@ -323,6 +323,7 @@ const updateArtifact: ToolDef = {
     'Replaces the content of a page the person already has (keeps its link and who can see it) and saves it as a new version.',
     'title renames the page; folder moves it into a folder of its workspace (name or id).',
     'Send the whole new page, not a fragment. Find the artifact_id with list_artifacts; get_artifact with include_content gives the current source.',
+    'message: optional one-line note on what changed, shown in the page history.',
     'Afterwards give the person the link.',
     ON_FAILURE,
   ].join(' '),
@@ -334,6 +335,7 @@ const updateArtifact: ToolDef = {
       title: { type: 'string', description: 'New name, if it should change.' },
       format: { type: 'string', enum: ['html', 'markdown'] },
       folder: { type: 'string', description: 'Folder to move the page into: its name or id.' },
+      message: { type: 'string', description: 'A short note on what changed, shown in the version history. Omit it and one is written automatically.' },
     },
     required: ['artifact_id', 'content'],
     additionalProperties: false,
@@ -377,6 +379,7 @@ const updateArtifact: ToolDef = {
       workspace_id: row.workspace_id ?? undefined,
       visibility: row.visibility,
       ...(folder?.id ? { folder_id: folder.id } : {}),
+      ...(str(args.message, 500) ? { message: str(args.message, 500) } : {}),
     });
     if (status >= 400) return fail(`The page was not updated: ${errorText(body, status)}`, { status, code: body.code });
     // Publishing keeps the stored name; a rename goes through the same PATCH the REST API uses.

@@ -345,6 +345,19 @@ describe('handlePublish workspace and folder gates', () => {
 });
 
 describe('handlePublish success paths', () => {
+  it('stores the publisher message on the version as author-written, and rejects a non-string', async () => {
+    const captures: Array<{ sql: string; args: unknown[] }> = [];
+    const env = await makePublishEnv({ rateLimitCount: 0 }, { bindCaptures: captures });
+    const response = await handlePublish(publishRequest(validBody({ slug: 'noted', message: '  Added the totals row  ' })), env);
+    expect(response.status).toBe(201);
+    const insert = captures.find(c => c.sql.includes('INSERT INTO versions'));
+    expect(insert!.args.slice(-2)).toEqual(['Added the totals row', 'author']);
+
+    const bad = await handlePublish(publishRequest({ ...validBody(), message: 5 }), await makePublishEnv({ rateLimitCount: 0 }));
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toMatchObject({ code: 'VALIDATION_ERROR', param: 'message' });
+  });
+
   it('creates a new artifact and returns 201 with deployment URLs', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-30T14:30:00Z'));

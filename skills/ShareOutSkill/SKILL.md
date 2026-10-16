@@ -319,6 +319,9 @@ Minimal payload — publish into the user's team workspace so their team sees it
 }
 ```
 
+Re-publishing the same `slug` adds a new version. Add `"message": "one line on what changed"`
+so the page history says why; leave it out and ShareOut writes a short note itself.
+
 Full API: [api/overview.md](api/overview.md).
 
 ---

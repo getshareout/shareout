@@ -10,6 +10,7 @@ import { requireRole } from './roles';
 import { json } from './json-response';
 import { isTextMime } from './files';
 import { invalidateDeploymentCache } from '../serve/deployment-cache';
+import { normalizeVersionMessage } from './version-summary';
 
 /** How a version came to be: `versions.source`. Null on versions written before it existed. */
 export const VERSION_SOURCES = ['api', 'agent', 'editor', 'restore'] as const;
@@ -21,7 +22,6 @@ export function publishSource(user: AuthUser): VersionSource {
 }
 
 const SOURCE_MAX_BYTES = 512 * 1024;
-const MESSAGE_MAX = 500;
 
 export async function handleGetVersions(
   request: Request,
@@ -41,7 +41,7 @@ export async function handleGetVersions(
   if (forbidden) return forbidden;
 
   const versions = await env.DB.prepare(`
-    SELECT v.id, v.version_no, v.entrypoint, v.created_at, v.source, v.message,
+    SELECT v.id, v.version_no, v.entrypoint, v.created_at, v.source, v.message, v.message_source,
            u.email AS created_by_email, u.name AS created_by_name,
            rv.version_no AS restored_from_version_no,
            (SELECT a.size_bytes FROM assets a WHERE a.version_id = v.id AND a.path = v.entrypoint) AS size_bytes
@@ -131,8 +131,7 @@ export async function handleRestoreVersion(
   if (raw.trim()) {
     try { body = JSON.parse(raw); } catch { return json({ error: 'Invalid JSON', code: 'INVALID_JSON' }, 400); }
   }
-  const message = typeof body.message === 'string' && body.message.trim()
-    ? body.message.trim().slice(0, MESSAGE_MAX) : null;
+  const message = normalizeVersionMessage(body.message);
 
   const target = await env.DB.prepare(
     'SELECT id, version_no, entrypoint, mobile_entrypoint, manifest_json FROM versions WHERE artifact_id = ? AND version_no = ?'
@@ -153,10 +152,10 @@ export async function handleRestoreVersion(
   try {
     await env.DB.batch([
       env.DB.prepare(
-        `INSERT INTO versions (id, artifact_id, version_no, entrypoint, mobile_entrypoint, manifest_json, created_at, created_by, source, message, restored_from_version_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'restore', ?, ?)`
+        `INSERT INTO versions (id, artifact_id, version_no, entrypoint, mobile_entrypoint, manifest_json, created_at, created_by, source, message, message_source, restored_from_version_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'restore', ?, ?, ?)`
       ).bind(newId, artifactId, newNo, target.entrypoint, target.mobile_entrypoint, target.manifest_json ?? '{}',
-        new Date().toISOString(), user.id, message, target.id),
+        new Date().toISOString(), user.id, message, message ? 'author' : null, target.id),
       env.DB.prepare(
         `INSERT INTO assets (id, version_id, path, r2_key, mime, size_bytes, sha256)
          SELECT 'ast_' || lower(hex(randomblob(12))), ?, path, r2_key, mime, size_bytes, sha256
@@ -183,7 +182,26 @@ export async function handleRestoreVersion(
   }, 201);
 }
 
+/** RFC 9745 `Deprecation` date for the pointer-move rollback (2026-10-16). */
+const ROLLBACK_DEPRECATED_AT = '@1792108800';
+
+/**
+ * POST /v1/artifacts/:id/rollback — DEPRECATED pointer move, kept for old clients.
+ * Use POST /v1/artifacts/:id/versions/:no/restore, which keeps the history.
+ */
 export async function handleRollback(
+  request: Request,
+  env: Env,
+  user: AuthUser,
+  artifactId: string
+): Promise<Response> {
+  const res = await rollbackPointer(request, env, user, artifactId);
+  res.headers.set('Deprecation', ROLLBACK_DEPRECATED_AT);
+  res.headers.set('Link', `</v1/skill/api/artifacts.md#versions--restore>; rel="deprecation"`);
+  return res;
+}
+
+async function rollbackPointer(
   request: Request,
   env: Env,
   user: AuthUser,

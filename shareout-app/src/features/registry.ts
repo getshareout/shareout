@@ -40,6 +40,7 @@ export const FEATURES: FeatureDef[] = [
   { key: 'ai.slack_bot', label: 'Slack bot', description: 'Account-level Slack DM chat agent.', category: 'ai', defaultEnabled: false },
   { key: 'ai.create', label: 'AI Creator (/create)', description: 'Chat-first artifact builder at /create (plan, preview, publish).', category: 'ai', defaultEnabled: false },
   { key: 'ai.web_agent', label: 'Workspace home assistant', description: 'Workspace-scoped AI assistant on the home page (concierge + read-only data). On by default; turn it off per workspace under Admin → Features.', category: 'ai', defaultEnabled: true },
+  { key: 'ai.version_summaries', label: 'Version change notes', description: 'Writes a one-line "what changed" note for each new version published without a message, shown in History and Details.', category: 'ai', defaultEnabled: true },
 
   // --- Automation ---
   { key: 'automation.scheduled_jobs', label: 'Schedules & crons', description: 'Scheduled artifact jobs (cron-triggered delivery).', category: 'automation', defaultEnabled: true },

@@ -90,6 +90,8 @@ export interface PublishParams {
    * workspace, or an approved change request. See src/skills/policy.ts.
    */
   editGrant?: boolean;
+  /** The publisher's change note for this version; null/absent → maybe an AI summary. */
+  message?: string | null;
 }
 
 /** Result of workspace publish-governance checks applied during publish. */

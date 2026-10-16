@@ -23,6 +23,7 @@ import { ONBOARDING_COPY } from './copy/onboarding';
 import { SHELL_COPY } from './copy/shell';
 import { STUDIO_COPY } from './copy/studio';
 import { TIME_COPY } from './copy/time';
+import { VERSION_CHANGELOG_COPY } from './copy/version-changelog';
 import { WORKSPACE_COPY } from './copy/workspace';
 
 /** Domain modules in stable merge order (shell first for readability in diffs). */
@@ -52,6 +53,7 @@ const COPY_MODULES: HomeLocaleCopy[] = [
   NEW_MENU_COPY,
   DROP_IMPORT_COPY,
   ERRORS_COPY,
+  VERSION_CHANGELOG_COPY,
 ];
 
 function mergeLocale(locale: HomeLocale): Record<string, string> {

@@ -772,6 +772,55 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           description: Artifact has no version to restore
+  /v1/artifacts/{id}/rollback:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    post:
+      tags: [Artifacts]
+      summary: Re-point production at an older version (deprecated)
+      deprecated: true
+      description: >-
+        Deprecated: use `POST /v1/artifacts/{id}/versions/{no}/restore`, which creates a
+        new version with the old files and keeps the history. This endpoint only moves
+        the production pointer and creates no version. Responses carry a `Deprecation`
+        header. Editor or owner.
+      operationId: rollbackArtifact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version_no:
+                  type: integer
+                version_id:
+                  type: string
+      responses:
+        "200":
+          description: Production now serves that version
+          headers:
+            Deprecation:
+              description: RFC 9745 deprecation date.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  deployed_version:
+                    type: integer
+                  version_id:
+                    type: string
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: No production deployment to roll back
   /v1/artifacts/{id}/files:
     parameters:
       - $ref: "#/components/parameters/ArtifactId"
@@ -5827,6 +5876,14 @@ components:
           description: Row-level access policy for per-viewer data filtering.
         agent:
           $ref: "#/components/schemas/AgentConfig"
+        message:
+          type: string
+          maxLength: 500
+          description: >-
+            Optional change note for this version, shown in the version history. When a
+            new version is published without one, a short "what changed" note may be
+            generated in the background (`message_source: ai`), unless the workspace
+            turned off `ai.version_summaries`.
     PWAConfig:
       type: object
       properties:
@@ -6021,6 +6078,13 @@ components:
         current_version:
           type: integer
           description: version_no live on the production deployment (reflects rollback).
+        live_message:
+          type: [string, "null"]
+          description: Change note of the live version (detail endpoint only).
+        live_message_source:
+          type: [string, "null"]
+          enum: [author, ai, null]
+          description: "`author` when the publisher wrote live_message, `ai` when it was generated (detail endpoint only)."
         user_role:
           type: string
           description: Caller's role (list endpoint only).

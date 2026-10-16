@@ -7,6 +7,7 @@ import { invalidateDeploymentCache } from '../../serve/deployment-cache';
 import { generateTypeMetadata } from '../../validation';
 import { generateSourceEditorPage, type SourceEditableType } from './page';
 import { shouldBlockPublish, runPostPublishTests } from '../../tests/block-gate';
+import { normalizeVersionMessage, scheduleVersionSummary } from '../../artifacts/version-summary';
 
 export const SOURCE_EDITABLE_TYPES: ReadonlySet<ArtifactType> = new Set<ArtifactType>([
   'markdown',
@@ -124,7 +125,7 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
   const { artifactId, env } = ctx;
 
   try {
-    const body = await request.json() as { content?: string; path?: string };
+    const body = await request.json() as { content?: string; path?: string; message?: string };
     if (typeof body.content !== 'string') {
       return errorResponse('INVALID_REQUEST', 'content required', 400);
     }
@@ -166,6 +167,7 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
     const versionId = generateId('ver');
     const assetId = generateId('ast');
     const deploymentId = generateId('dep');
+    const message = normalizeVersionMessage(body.message);
 
     const bytes = new TextEncoder().encode(body.content);
     const hash = await sha256(bytes.buffer as ArrayBuffer);
@@ -184,9 +186,9 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
 
     await env.DB.batch([
       env.DB.prepare(
-        `INSERT INTO versions (id, artifact_id, version_no, entrypoint, manifest_json, created_at, created_by, source)
-         VALUES (?, ?, ?, ?, '{}', strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?, 'editor')`
-      ).bind(versionId, artifactId, newVersionNo, entrypoint, ctx.userId),
+        `INSERT INTO versions (id, artifact_id, version_no, entrypoint, manifest_json, created_at, created_by, source, message, message_source)
+         VALUES (?, ?, ?, ?, '{}', strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?, 'editor', ?, ?)`
+      ).bind(versionId, artifactId, newVersionNo, entrypoint, ctx.userId, message, message ? 'author' : null),
       env.DB.prepare(
         `INSERT INTO assets (id, version_id, path, r2_key, mime, size_bytes, sha256)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
@@ -222,6 +224,7 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
       env, artifactId, artifact.workspace_id ?? '', versionId, artifact.slug, blocking,
     ).catch(() => {});
     if (ctx.waitUntil) ctx.waitUntil(testRun); else await testRun;
+    scheduleVersionSummary(env, ctx.waitUntil, versionId, message);
 
     return new Response(JSON.stringify({
       success: true,

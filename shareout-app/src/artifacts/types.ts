@@ -26,6 +26,9 @@ export interface ArtifactSummary {
 export interface ArtifactDetail extends ArtifactSummary {
   /** Highest published version_no; differs from current_version after a rollback. */
   latest_version: number;
+  /** Change note of the live version: the publisher's, or a generated one ('ai'). */
+  live_message: string | null;
+  live_message_source: 'author' | 'ai' | null;
   workspace_id: string | null;
   description: string | null;
   social_title: string | null;

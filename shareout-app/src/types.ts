@@ -398,6 +398,9 @@ export interface PublishRequest {
   // Workspace Library (artifact_type='library'): module metadata supplied explicitly.
   // `main` is the served JS file (default 'index.js'); `version` is a required semver.
   library?: LibraryPublishConfig;
+  // Optional change note for this version (max 500 chars). Without one, a short
+  // "what changed" line may be generated in the background (versions.message_source='ai').
+  message?: string;
 }
 
 export interface LibraryPublishConfig {

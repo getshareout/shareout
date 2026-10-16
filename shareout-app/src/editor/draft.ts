@@ -6,6 +6,7 @@ import type { EditorContext } from './index';
 import { generateId, sha256 } from '../crypto-utils';
 import { invalidateDeploymentCache } from '../serve/deployment-cache';
 import { shouldBlockPublish, runPostPublishTests } from '../tests/block-gate';
+import { normalizeVersionMessage, scheduleVersionSummary } from '../artifacts/version-summary';
 
 export async function handleDraft(
   request: Request,
@@ -182,6 +183,7 @@ export async function handlePublish(
     const body = await request.json() as {
       html: string;
       commitMessage?: string;
+      message?: string;
       baseUpdatedAt?: string;
     };
 
@@ -232,6 +234,7 @@ export async function handlePublish(
     const versionId = generateId('ver');
     const assetId = generateId('ast');
     const deploymentId = generateId('dep');
+    const message = normalizeVersionMessage(body.message ?? body.commitMessage);
 
     // Store HTML in R2 with a real content hash (integrity/dedup parity with the
     // canonical publish path, src/publish.ts).
@@ -249,9 +252,9 @@ export async function handlePublish(
     // instead of corrupting state.
     await env.DB.batch([
       env.DB.prepare(
-        `INSERT INTO versions (id, artifact_id, version_no, entrypoint, manifest_json, created_at, created_by, source)
-         VALUES (?, ?, ?, 'index.html', '{}', strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?, 'editor')`
-      ).bind(versionId, artifactId, newVersionNo, userId),
+        `INSERT INTO versions (id, artifact_id, version_no, entrypoint, manifest_json, created_at, created_by, source, message, message_source)
+         VALUES (?, ?, ?, 'index.html', '{}', strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?, 'editor', ?, ?)`
+      ).bind(versionId, artifactId, newVersionNo, userId, message, message ? 'author' : null),
       env.DB.prepare(
         `INSERT INTO assets (id, version_id, path, r2_key, mime, size_bytes, sha256)
          VALUES (?, ?, 'index.html', ?, 'text/html', ?, ?)`
@@ -279,6 +282,7 @@ export async function handlePublish(
       env, artifactId, artifact.workspace_id ?? '', versionId, artifact.slug, blocking,
     ).catch(() => {});
     if (ctx.waitUntil) ctx.waitUntil(testRun); else await testRun;
+    scheduleVersionSummary(env, ctx.waitUntil, versionId, message);
 
     return new Response(JSON.stringify({
       success: true,

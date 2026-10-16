@@ -390,8 +390,8 @@ describe('handlePublish', () => {
     expect(body.tests).toEqual({ mode: 'block', pending: true });
     // Production pointer is untouched when staging a candidate → its cache stays.
     expect(slugs.delete).not.toHaveBeenCalled();
-    // Gate runs off the response, not inline.
-    expect(waitUntil).toHaveBeenCalledTimes(1);
+    // Gate and the change-note summary both run off the response, not inline.
+    expect(waitUntil).toHaveBeenCalledTimes(2);
   });
 
   it('returns 404 when artifact missing', async () => {
