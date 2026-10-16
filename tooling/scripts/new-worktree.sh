@@ -57,9 +57,9 @@ link_deps() {
 link_deps "worker" "$PRIMARY/shareout-app" "$DEST/shareout-app"
 [ -d "$PRIMARY/docs-site/node_modules" ] && link_deps "docs-site" "$PRIMARY/docs-site" "$DEST/docs-site"
 
-# Gitignored local config the checks need. Without customer-names.local the very first
-# `git push` fails on check:customer-names, which refuses to pass unconfigured.
-for f in tooling/customer-names.local shareout-app/.dev.vars shareout-app/.env; do
+# Gitignored local config. tooling/customer-names.local is not copied: check:customer-names
+# reads it from the main checkout.
+for f in shareout-app/.dev.vars shareout-app/.env; do
   if [ -f "$PRIMARY/$f" ] && [ ! -e "$DEST/$f" ]; then
     cp "$PRIMARY/$f" "$DEST/$f"
     echo "==> carried over $f"

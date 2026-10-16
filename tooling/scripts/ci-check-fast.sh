@@ -49,7 +49,7 @@ job() {
 }
 
 static_checks() {
-  for c in boundaries design-tokens ui domains customer-names skill-links migrations access-seams file-size; do
+  for c in boundaries design-tokens ui inline domains customer-names skill-links migrations access-seams file-size; do
     npm run -s "check:$c"
   done
 }

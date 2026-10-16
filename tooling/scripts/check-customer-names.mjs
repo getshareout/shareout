@@ -21,8 +21,9 @@
  *
  * Usage: node tooling/scripts/check-customer-names.mjs
  */
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repo = join(fileURLToPath(import.meta.url), '..', '..', '..');
@@ -39,9 +40,11 @@ const TEXT = /\.(ts|tsx|js|mjs|cjs|json|md|mdx|yaml|yml|html|css|toml|txt|sql|sh
  * the confidential thing this script exists to keep out. A public file enumerating every
  * client is the leak, not the guard.
  *
- * Supply it out-of-band, first match wins:
+ * Supply it out-of-band; every source found is combined:
  *   1. `CUSTOMER_NAMES` env var — comma-separated. CI sets this from a repository secret.
  *   2. `tooling/customer-names.local` — one entry per line, `#` comments. Gitignored.
+ *      Read from this checkout and, for a linked git worktree, from the main checkout
+ *      (a fresh worktree never has the gitignored file).
  *
  * Entries are regex source, matched case-insensitively, and match as SUBSTRINGS — that is
  * what catches `<name>_snowflake`, `svc_<name>`, `<name>solutions.co` and `<name>Artifact`,
@@ -53,20 +56,39 @@ const TEXT = /\.(ts|tsx|js|mjs|cjs|json|md|mdx|yaml|yml|html|css|toml|txt|sql|sh
  * `name.example.com` (`_` and `.` are not letters) while leaving `setAttribute` alone.
  * Use that shape, not `\b`: `\b` is exactly what let `wsp_<name>` through before.
  */
+function mainCheckout() {
+  try {
+    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
+      cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return common ? dirname(common) : null;
+  } catch {
+    return null;
+  }
+}
+
+function readLocalLists() {
+  const roots = new Set([repo, mainCheckout()].filter(Boolean));
+  return [...roots].flatMap((root) => {
+    try {
+      return readFileSync(join(root, 'tooling', 'customer-names.local'), 'utf8')
+        .split('\n').map((l) => l.replace(/#.*$/, ''));
+    } catch {
+      return [];
+    }
+  });
+}
+
 function loadNames() {
   const fromEnv = (process.env.CUSTOMER_NAMES || '').split(',');
-  const local = join(repo, 'tooling', 'customer-names.local');
-  let fromFile = [];
-  try {
-    fromFile = readFileSync(local, 'utf8').split('\n').map((l) => l.replace(/#.*$/, ''));
-  } catch { /* absent is fine — handled below */ }
-  return [...fromEnv, ...fromFile].map((s) => s.trim()).filter(Boolean);
+  return [...fromEnv, ...readLocalLists()].map((s) => s.trim()).filter(Boolean);
 }
 
 const NAMES = loadNames();
 if (!NAMES.length) {
   console.error('check:customer-names — no blocklist configured.');
-  console.error('Set CUSTOMER_NAMES (comma-separated) or create tooling/customer-names.local.');
+  console.error('Set CUSTOMER_NAMES (comma-separated) or create tooling/customer-names.local');
+  console.error('(in this checkout or, for a git worktree, in the main checkout).');
   console.error('This guard cannot pass vacuously: an unconfigured check is not a clean repo.');
   process.exit(1);
 }
