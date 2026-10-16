@@ -18,7 +18,7 @@ const TEXT_MIME_TYPES = [
   'image/svg+xml',
 ];
 
-function isTextMime(mime: string): boolean {
+export function isTextMime(mime: string): boolean {
   return TEXT_MIME_TYPES.some(t => mime.startsWith(t) || mime === t);
 }
 

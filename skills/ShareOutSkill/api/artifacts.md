@@ -195,7 +195,11 @@ Fetch all files for an artifact version.
 
 ## Versions & rollback
 
-`GET /v1/artifacts/{id}/versions` lists published versions (`id`, `version_no`, `entrypoint`, `created_at`, newest first).
+`GET /v1/artifacts/{id}/versions` lists the 50 newest published versions (`id`, `version_no`, `entrypoint`, `created_at`, `source` — `api`/`agent`/`editor`/`restore`, `message`, `created_by_email`, `created_by_name`, `restored_from_version_no`, `size_bytes` of the entrypoint) plus `live_version_id`. Viewer or above.
+
+`GET /v1/artifacts/{id}/versions/{no}/source` returns one version's entrypoint text: `{version_no, entrypoint, mime, size_bytes, content, truncated}` (content capped at 512 KB). `415 NOT_TEXT` for a binary entrypoint.
+
+`POST /v1/artifacts/{id}/versions/{no}/restore` (optional `{"message": "…"}`) is the non-destructive restore: it creates a **new** version (`latest_version + 1`) with the old version's files and makes it live (or stages it when blocking tests are on). Every earlier version stays. Editor or owner. Returns `201 {success, version_id, version_no, restored_from_version_no, staged}`; `404 VERSION_NOT_FOUND`, `409 CONFLICT` on a concurrent publish.
 
 `POST /v1/artifacts/{id}/rollback` with `{"version_no": 1}` (or `{"version_id": "ver_…"}`) re-points the production deployment at that version — no new version is created. Editor or owner. Returns `{success, deployed_version, version_id}`; `404 VERSION_NOT_FOUND`, `409 NOT_DEPLOYED`.
 

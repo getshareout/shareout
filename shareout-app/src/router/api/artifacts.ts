@@ -4,7 +4,7 @@ import { handleEditor } from '../../editor/index';
 import { handleListArtifacts, handleGetArtifact, handleUpdateArtifact, handleDeleteArtifact, handleListDeletedArtifacts, handleRestoreArtifact, handleRestoreAllDeleted } from '../../artifacts/crud';
 import { handleGetCollaborators, handleAddCollaborators, handleRemoveCollaborator, handleTransferOwnership } from '../../artifacts/collaborators';
 import { handleShareArtifact } from '../../artifacts/share';
-import { handleGetVersions, handleRollback } from '../../artifacts/versions';
+import { handleGetVersions, handleGetVersionSource, handleRestoreVersion, handleRollback } from '../../artifacts/versions';
 import { handleGetArtifactFiles } from '../../artifacts/files';
 import { handleAddFavorite, handleRemoveFavorite } from '../../artifacts/favorites';
 import { handleGetTags, handleAddTag, handleRemoveTag } from '../../artifacts/tags';
@@ -397,6 +397,23 @@ export async function routeArtifactApi(ctx: FetchContext): Promise<Response | nu
     const user = await requireAuthUser(ctx);
     if (!isAuthUser(user)) return user;
     return addCORS(await handleGetVersions(request, env, user, artifactId));
+  }
+
+  const versionSourceMatch = path.match(/^\/v1\/artifacts\/([^/]+)\/versions\/(\d+)\/source$/);
+  if (versionSourceMatch && request.method === 'GET') {
+    const [, artifactId, no] = versionSourceMatch;
+    const user = await requireAuthUser(ctx);
+    if (!isAuthUser(user)) return user;
+    return addCORS(await handleGetVersionSource(request, env, user, artifactId, Number(no)));
+  }
+
+  const versionRestoreMatch = path.match(/^\/v1\/artifacts\/([^/]+)\/versions\/(\d+)\/restore$/);
+  if (versionRestoreMatch && request.method === 'POST') {
+    const [, artifactId, no] = versionRestoreMatch;
+    const user = await requireAuthUser(ctx);
+    if (!isAuthUser(user)) return user;
+    const waitUntil = ctx.executionCtx?.waitUntil?.bind(ctx.executionCtx);
+    return addCORS(await handleRestoreVersion(request, env, user, artifactId, Number(no), waitUntil));
   }
 
   const filesMatch = path.match(/^\/v1\/artifacts\/([^/]+)\/files$/);
