@@ -57,7 +57,9 @@ export async function linkSlackDm(
 export async function getLinkedUserId(env: Env, teamId: string, slackUserId: string): Promise<string | null> {
   const sessionKey = slackSessionKey(teamId, slackUserId);
   const row = await env.DB.prepare(
-    `SELECT user_id FROM messaging_links WHERE platform = 'slack' AND session_key = ?`
+    `SELECT ml.user_id FROM messaging_links ml
+       JOIN users u ON u.id = ml.user_id AND COALESCE(u.disabled, 0) = 0
+      WHERE ml.platform = 'slack' AND ml.session_key = ?`
   ).bind(sessionKey).first<{ user_id: string }>();
   return row?.user_id ?? null;
 }
@@ -69,8 +71,10 @@ export async function getSlackLink(
 ): Promise<SlackLinkRow | null> {
   const sessionKey = slackSessionKey(teamId, slackUserId);
   const row = await env.DB.prepare(
-    `SELECT user_id, platform_user_id, team_id, connection_name, selected_workspace_id
-     FROM messaging_links WHERE platform = 'slack' AND session_key = ?`
+    `SELECT ml.user_id, ml.platform_user_id, ml.team_id, ml.connection_name, ml.selected_workspace_id
+     FROM messaging_links ml
+     JOIN users u ON u.id = ml.user_id AND COALESCE(u.disabled, 0) = 0
+     WHERE ml.platform = 'slack' AND ml.session_key = ?`
   ).bind(sessionKey).first<SlackLinkRow>();
   return row ?? null;
 }
