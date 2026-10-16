@@ -142,6 +142,17 @@ export async function handleListArtifacts(
   });
 }
 
+const MAX_LISTED_PAGES = 200;
+
+// Entrypoint first, then the rest by path; only when the artifact has 2+ HTML pages.
+export function listPages(rows: Array<{ entrypoint: string; path: string }>): { entrypoint: string; pages: string[] } | null {
+  if (rows.length < 2) return null;
+  const entrypoint = rows[0].entrypoint;
+  const paths = rows.map(r => r.path).slice(0, MAX_LISTED_PAGES);
+  const pages = paths.includes(entrypoint) ? [entrypoint, ...paths.filter(p => p !== entrypoint)] : paths;
+  return { entrypoint, pages };
+}
+
 export async function handleGetArtifact(
   request: Request,
   env: Env,
@@ -213,7 +224,7 @@ export async function handleGetArtifact(
   // Every read below depends only on the artifact row, so issue them as one wave
   // instead of ~11 sequential D1 round-trips. The access decision is unchanged
   // (role, else the closed-artifact viewer rule); the rest is discarded on 403.
-  const [role, viewable, collabRows, tagRows, wsRole] = await Promise.all([
+  const [role, viewable, collabRows, tagRows, wsRole, pageRows] = await Promise.all([
     getUserRole(env, artifactId, user.id),
     canViewArtifact(env, artifact, user.id, user.email ?? null),
     env.DB.prepare('SELECT email, role FROM collaborators WHERE artifact_id = ?')
@@ -221,6 +232,15 @@ export async function handleGetArtifact(
     env.DB.prepare('SELECT label FROM artifact_tags WHERE artifact_id = ? ORDER BY label COLLATE NOCASE')
       .bind(artifactId).all<{ label: string }>(),
     artifact.workspace_id ? getInternalWorkspaceRole(env, artifact.workspace_id, user.id) : Promise.resolve(null),
+    // HTML pages of the live version, for the multi-page switcher.
+    env.DB.prepare(`
+      SELECT v.entrypoint, ast.path FROM deployments d
+      JOIN versions v ON v.id = d.version_id
+      JOIN assets ast ON ast.version_id = d.version_id AND ast.mime = 'text/html'
+      WHERE d.artifact_id = ? AND d.channel = 'production'
+      ORDER BY ast.path LIMIT ${MAX_LISTED_PAGES + 1}
+    `).bind(artifactId).all<{ entrypoint: string; path: string }>()
+      .catch(() => ({ results: [] as Array<{ entrypoint: string; path: string }> })),
   ]);
   if (!role && !viewable) {
     return json({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
@@ -305,7 +325,9 @@ export async function handleGetArtifact(
   let original: string | undefined;
   try { original = (JSON.parse(artifact.type_metadata || '{}') as TypeMetadata).source?.original; } catch { /* no original */ }
 
-  return json({ ...detail, folder_id: artifact.folder_id, tags, ...permissions, ...(moderation ? { moderation } : {}), ...(original ? { original } : {}) });
+  const pages = listPages(pageRows.results || []);
+
+  return json({ ...detail, folder_id: artifact.folder_id, tags, ...permissions, ...(pages ? pages : {}), ...(moderation ? { moderation } : {}), ...(original ? { original } : {}) });
 }
 
 export async function handleUpdateArtifact(

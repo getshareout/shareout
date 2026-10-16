@@ -1,10 +1,10 @@
 /** URL deep-linking: reflect the active lens / artifact tab in location.hash so views
- *  are linkable and back/forward works. Hash scheme: #l/<lens> · #a/<slug>. */
+ *  are linkable and back/forward works. Hash scheme: #l/<lens> · #a/<slug>[/<page>]. */
 export const workspace_client_routing_JS = `  // ===== deep-link routing (hash) =====
   var routeApplying = false;     // true while applyHash drives state (suppresses writes)
   var routeLastHash = null;      // hash we wrote via fallback assignment (skip echo)
   function routeFromState() {
-    if (activeKey !== 'home' && panes[activeKey]) return 'a/' + encodeURIComponent(panes[activeKey].art.slug);
+    if (activeKey !== 'home' && panes[activeKey]) { var pr = panes[activeKey]; return 'a/' + encodeURIComponent(pr.art.slug) + (pr.page ? '/' + encPage(pr.page) : ''); }
     var on = ws.querySelector('[data-lens].is-active');
     var lens = on ? on.getAttribute('data-lens') : 'brief';
     if (lens === 'catalog' && typeof catCurrentId === 'string' && catCurrentId) return 'l/catalog/' + encodeURIComponent(catCurrentId);
@@ -24,7 +24,8 @@ export const workspace_client_routing_JS = `  // ===== deep-link routing (hash) 
     routeApplying = true;
     try {
       if (raw.indexOf('a/') === 0) {
-        var slug = decodeURIComponent(raw.slice(2));
+        var aRest = raw.slice(2), aCut = aRest.indexOf('/'), slug = '', page = '';
+        try { slug = decodeURIComponent(aCut >= 0 ? aRest.slice(0, aCut) : aRest); page = aCut >= 0 ? decodeURIComponent(aRest.slice(aCut + 1)) : ''; } catch (e) {}
         if (!slug) return;
         // A shared link lands on an artifact: the rail shows Artifacts, not Home.
         var onLens = ws.querySelector('[data-lens].is-active');
@@ -32,9 +33,7 @@ export const workspace_client_routing_JS = `  // ===== deep-link routing (hash) 
           lenses.forEach(function (x) { x.classList.toggle('is-active', x.getAttribute('data-lens') === 'artifacts'); });
           openView('artifacts');
         }
-        var key = null;
-        for (var i = 0; i < tabs.length; i++) { if (!tabs[i].home && panes[tabs[i].key] && panes[tabs[i].key].art.slug === slug) key = tabs[i].key; }
-        if (key) activateTab(key); else openArtifact(slug, null, '');
+        openArtifactPage(slug, page);
         return;
       }
       // lens route (or empty hash → Home/Brief). A lens may carry a sub-path,

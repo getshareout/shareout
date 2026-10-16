@@ -6094,6 +6094,14 @@ components:
         can_delete:
           type: boolean
           description: Caller may move the artifact to Trash (detail endpoint only).
+        pages:
+          type: array
+          items:
+            type: string
+          description: HTML pages of the live version, entrypoint first (detail endpoint only; present when there are 2+).
+        entrypoint:
+          type: string
+          description: The live version's entrypoint (detail endpoint only; present with `pages`).
         is_favorite:
           type: boolean
         created_at:

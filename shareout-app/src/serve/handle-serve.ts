@@ -16,6 +16,7 @@ import { injectPresenceBeacon } from './presence-beacon';
 import { badgeEnabled, injectBadge } from './badge';
 import { versionedBundlePath } from '../bundle-versions';
 import { localeForArtifactWorkspace } from '../i18n/locale';
+import { injectPageAgent, isSafePagePath } from './page-agent';
 
 function injectCommentsAgent(resp: Response, baseUrl: string): Response {
   const tag = `<script src="${baseUrl}${versionedBundlePath('/sdk/comments-agent.js')}" defer></script>`;
@@ -326,11 +327,20 @@ export async function handleServe(
     }
 
     if (asset.mime === 'text/html' && !assetPath && !isRawRequest) {
+      // ?page=<path> opens a multi-page artifact on one of its sibling HTML pages
+      // (deep links from the shell / a copied viewer URL). Must be an HTML asset of
+      // this deployed version; anything else falls back to the entrypoint.
+      let viewerPage = effectiveEntrypoint;
+      const pageParam = url.searchParams.get('page');
+      if (pageParam && pageParam !== effectiveEntrypoint && isSafePagePath(pageParam)) {
+        const row = await fetchAssetRow(env, result.version_id, pageParam);
+        if (row?.mime === 'text/html') viewerPage = pageParam;
+      }
       return serveSandboxedViewer(
         request,
         env,
         slug,
-        effectiveEntrypoint,
+        viewerPage,
         result.version_id,
         result.artifact_id,
         result.pwa_config,
@@ -341,8 +351,11 @@ export async function handleServe(
         result.workspace_id,
         socialPreview,
         opts.executionCtx,
+        effectiveEntrypoint,
       );
     }
+
+    const pageAgent = { slug, baseUrl, pagePath: resolvedPath, entrypoint: result.entrypoint };
 
     // Raw artifact HTML (the iframe entrypoint on the content domain — the product's
     // hottest path). Edge-cache it keyed by the immutable r2_key with a comments-
@@ -369,7 +382,7 @@ export async function handleServe(
         cacheHtml: true,
         cacheVariant: variant,
         transform: (resp) => {
-          let out = injectPerfBeacon(resp, artifactId, baseUrl);
+          let out = injectPageAgent(injectPerfBeacon(resp, artifactId, baseUrl), pageAgent);
           out = injectPresenceBeacon(out, artifactId, baseUrl);
           if (commentsEnabled) out = injectCommentsAgent(out, baseUrl);
           if (showBadge) out = injectBadge(out, artifactId, baseUrl);
@@ -378,7 +391,13 @@ export async function handleServe(
       });
     }
 
-    return serveAsset(request, env, asset, slug, isRawRequest, { noStore, relaxCsp: !isOpen });
+    // Same-zone mode: a sibling page reached by a relative link loses ?_raw but still
+    // renders in the content frame, so it carries the page agent too (not edge-cached).
+    return serveAsset(request, env, asset, slug, isRawRequest, {
+      noStore,
+      relaxCsp: !isOpen,
+      ...(asset.mime === 'text/html' && assetPath ? { transform: (resp: Response) => injectPageAgent(resp, pageAgent) } : {}),
+    });
   }
 
   // Fallback: try index.html if no asset found and not already looking for it

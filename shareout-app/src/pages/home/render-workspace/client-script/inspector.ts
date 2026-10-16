@@ -136,6 +136,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       + (meta && meta.can_delete ? iconBtn('trash', t('inspector.act.trash'), SVG_TRASH, 'is-danger') : '')
       + '</div>';
     h += '<div class="wsx-det__sec wsx-det__approval" id="wsxApprove" hidden></div>';
+    h += pagesHtml(meta, art);
 
     // Section bodies, keyed; rendered in the user's saved order.
     var secBody = {

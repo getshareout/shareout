@@ -32,6 +32,7 @@ import {
   renderDeferredBridgeDelivery,
 } from './bridge-script';
 import { renderLoadingHideScript } from './loading';
+import { renderPageBridge } from '../page-agent';
 import { buildToolbarContext } from './toolbar/context';
 import { renderToolbar } from './toolbar';
 import { getViewerConfig } from '../../data/viewer-config';
@@ -66,6 +67,8 @@ export async function serveSandboxedViewer(
   // Threaded from the serve path so per-view analytics writes run via waitUntil
   // instead of detached (which the runtime may cancel at response end).
   executionCtx?: ExecutionContext,
+  // The artifact's home page when `entrypoint` is a sibling page opened via ?page=.
+  homeEntrypoint: string = entrypoint,
 ): Promise<Response> {
   const baseUrl = env.SHAREOUT_BASE_URL.replace(/\/$/, '');
   // The home Studio loads the artifact in an iframe with ?wsx=1; the Studio's right
@@ -110,7 +113,8 @@ export async function serveSandboxedViewer(
   // the preload links still help, so the iframe stays after them (old behavior).
   const earlyLang = localeFromAcceptLanguage(request.headers.get('Accept-Language')) ?? 'en';
   writer.write(encoder.encode(
-    renderEarlyHead(pageTitle, socialTags, pwaTags, contentHost || undefined, !isOpen, earlyLang),
+    renderEarlyHead(pageTitle, socialTags, pwaTags, contentHost || undefined, !isOpen, earlyLang)
+      + `  ${renderPageBridge(slug, homeEntrypoint, studioEmbed)}\n`,
   ));
   if (contentHost) {
     // Bridge hook must land before prefetch so shareout:init can fire as soon as
