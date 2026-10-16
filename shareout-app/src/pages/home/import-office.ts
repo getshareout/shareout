@@ -49,7 +49,7 @@ export function base64ToBytes(b64: string): Uint8Array {
 
 /** A path segment that stays readable but never escapes its folder. */
 export function safeSegment(name: string, fallback: string): string {
-  const s = name.normalize('NFC').replace(/[^\p{L}\p{N}_. -]+/gu, '-').replace(/\s+/g, ' ').replace(/^[.\s-]+|[.\s-]+$/g, '').slice(0, 80);
+  const s = name.normalize('NFC').replace(/[^\p{L}\p{N}_. -]+/gu, '-').replace(/\s+/g, ' ').replace(/\.{2,}/g, '.').replace(/^[.\s-]+|[.\s-]+$/g, '').slice(0, 80);
   return s || fallback;
 }
 
@@ -172,7 +172,7 @@ function imageFor(ctx: DocxContext, runXml: string): string {
   const ext = zipPath.split('.').pop()!.toLowerCase();
   const bytes = ctx.files[zipPath];
   if (!bytes || !IMAGE_MIME[ext]) return ''; // EMF/WMF etc. don't render on the web
-  const path = `media/${zipPath.split('/').pop()}`;
+  const path = `media/${safeSegment(zipPath.split('/').pop()!, `image.${ext}`)}`;
   if (!ctx.media.has(path)) ctx.media.set(path, { path, content: bytesToBase64(bytes), mime: IMAGE_MIME[ext], encoding: 'base64' });
   const alt = (/<wp:docPr\b[^>]*\bdescr="([^"]*)"/.exec(runXml)?.[1] ?? '').replace(/[[\]\n]/g, ' ');
   return `![${xmlText(alt)}](${path})`;

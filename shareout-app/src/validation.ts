@@ -53,9 +53,26 @@ function isTraversalOrAbsolute(path: string): boolean {
  * Any other character REST accepts (`@ + , = ( )`, …) is allowed.
  */
 export function isSafeAssetPath(path: string): boolean {
-  if (!path || path.length > 512 || isTraversalOrAbsolute(path)) return false;
+  if (typeof path !== 'string' || !path || path.length > 512 || isTraversalOrAbsolute(path)) return false;
   if (path.includes('\\') || /[\u0000-\u001f\u007f]/.test(path)) return false;
   return !path.split('/').some((seg) => seg === '' || seg === '.');
+}
+
+export const SAFE_PATH_RULE = 'Use a relative path with "/" between folders, e.g. "img/logo@2x.png": no "..", no leading "/", no backslash, no empty or "." segments, no control characters, at most 512 characters.';
+
+/** The offending path as a short, printable JSON string (escapes control characters). */
+export function showPath(path: string): string {
+  return JSON.stringify(path.length > 80 ? `${path.slice(0, 80)}…` : path);
+}
+
+/** INVALID_PATH error for an unsafe file path, naming the path in the hint. */
+export function invalidPathError(path: string, param = 'files'): ApiError {
+  return {
+    error: `Invalid file path ${showPath(path)}`,
+    code: 'INVALID_PATH',
+    param,
+    hint: `${showPath(path)} is not a safe file path. ${SAFE_PATH_RULE}`,
+  };
 }
 
 const MIME_TO_TYPE: Record<string, ArtifactType> = {
@@ -150,8 +167,10 @@ export function validatePublishRequest(req: PublishRequest): ApiError | null {
   const entrypoint = resolveEntrypoint(req);
   const paths = new Set<string>();
   let totalSize = 0;
+  let badPath: string | undefined;
 
   for (const file of req.files || []) {
+    if (file.path && !isSafeAssetPath(file.path)) badPath ??= file.path;
     for (const msg of validateFile(file)) fail('files', msg);
 
     if (file.path) {
@@ -201,6 +220,10 @@ export function validatePublishRequest(req: PublishRequest): ApiError | null {
     }
   }
 
+  if (badPath !== undefined) {
+    return { ...invalidPathError(badPath), details: errors };
+  }
+
   if (errors.length > 0) {
     return {
       error: `Validation failed: ${errors[0]}`,
@@ -222,8 +245,8 @@ function validateFile(file: FileEntry): string[] {
     return errors;
   }
 
-  if (isTraversalOrAbsolute(file.path)) {
-    errors.push(`invalid path "${file.path}": must be relative, no traversal`);
+  if (!isSafeAssetPath(file.path)) {
+    errors.push(`invalid path ${showPath(file.path)}: ${SAFE_PATH_RULE}`);
   }
 
   if (!file.content && file.content !== '') {

@@ -3,7 +3,7 @@
  */
 import type { Env, FileEntry } from '../types';
 import type { AuthUser } from '../api-auth';
-import { generateSlug } from '../validation';
+import { generateSlug, invalidPathError, isSafeAssetPath } from '../validation';
 import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { createLogger, logError } from '../logging';
 import { libraryVersionExists } from '../workspace-library';
@@ -29,6 +29,7 @@ export async function handleCreateLibraryModule(
   if (!name) return json({ error: 'name is required', code: 'BAD_REQUEST' }, 400);
   if (!/^\d+\.\d+\.\d+([-+].+)?$/.test(version)) return json({ error: 'version must be semver (e.g. 1.0.0)', code: 'BAD_REQUEST' }, 400);
   if (!js.trim()) return json({ error: 'module code (js) is required', code: 'BAD_REQUEST' }, 400);
+  if (!isSafeAssetPath(main)) return json(invalidPathError(main, 'main'), 400);
 
   const scope = body.scope === 'workspace' ? 'workspace' : 'personal';
   let workspaceId: string | null = null;
