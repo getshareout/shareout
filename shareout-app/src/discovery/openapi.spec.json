@@ -3360,7 +3360,7 @@
           "Data"
         ],
         "summary": "Run a platform connector endpoint",
-        "description": "Runs a workspace platform connector server-side; credentials never reach the caller. Allowed for the artifact owner and workspace members. Under a row-level access policy, a scoped viewer's SQL must contain `:viewer_scope`. Connection ids: `GET /v1/workspaces/{workspaceId}/connections` (any member), or `GET /v1/data/{artifactId}/platform/connections` (artifact owner).",
+        "description": "Runs a workspace platform connector server-side; credentials never reach the caller. Allowed for the artifact owner and workspace members. Under a row-level access policy, a scoped viewer can only run a query declared in `access_policy.queries`, by `query` name; their `params` are ignored and the server binds their scope into the declared SQL (otherwise `403 SCOPE_REQUIRED`). Connection ids: `GET /v1/workspaces/{workspaceId}/connections` (any member), or `GET /v1/data/{artifactId}/platform/connections` (artifact owner).",
         "operationId": "executePlatformEndpoint",
         "requestBody": {
           "required": true,
@@ -3368,12 +3368,14 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "connectionId"
-                ],
                 "properties": {
                   "connectionId": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Required unless `query` names a declared query (which fixes the connection)."
+                  },
+                  "query": {
+                    "type": "string",
+                    "description": "Name of a query in the artifact's `access_policy.queries`."
                   },
                   "params": {
                     "type": "object",
@@ -11296,7 +11298,7 @@
           },
           "access_policy": {
             "type": "object",
-            "description": "Row-level access policy for per-viewer data filtering."
+            "description": "Row-level access policy for per-viewer data filtering: `{ version: 1, field, default, rules, queries? }`. `queries` maps a name to `{ connection, provider, endpoint, params }` — the Data Platform queries scoped viewers may run."
           },
           "agent": {
             "$ref": "#/components/schemas/AgentConfig"

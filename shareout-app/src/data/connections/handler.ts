@@ -40,6 +40,17 @@ export async function handleConnections(
   const [name, action] = parts;
   const method = request.method;
 
+  // Generic connections take caller-supplied queries and have no row-scope binding,
+  // so scoped viewers (non-owners under an access policy) cannot run them.
+  if (name && action && ctx.viewerScope) {
+    return errorResponse({
+      code: 'SCOPE_REQUIRED',
+      message: 'This artifact has a row-level access policy; its viewers cannot run connection queries',
+      status: 403,
+      hint: 'Serve per-viewer data through sdk.table() or a query declared in access_policy.queries.',
+    }, ctx.origin);
+  }
+
   if (!name && method === 'GET') {
     const isOwner = await verifyOwner(request, ctx);
     if (!isOwner) return errorResponse(DATA_ERRORS.FORBIDDEN);

@@ -978,7 +978,7 @@
           },
           "access_policy": {
             "type": "object",
-            "description": "Row-level access policy for per-viewer data filtering."
+            "description": "Row-level access policy for per-viewer data filtering: `{ version: 1, field, default, rules, queries? }`. `queries` maps a name to `{ connection, provider, endpoint, params }` — the Data Platform queries scoped viewers may run."
           },
           "agent": {
             "$ref": "#/components/schemas/AgentConfig"

@@ -1,6 +1,9 @@
 // Row-level access policy: resolves a server-verified viewer to the set of
 // values they may see for one field. Pure logic — SQL enforcement lives in the
 // data backends (e.g. tables.ts) which consume the normalized ViewerScope.
+import { validatePolicyQuerySql } from './platform/core/viewer-scope';
+
+export { viewerScopeSqlList } from './platform/core/viewer-scope';
 
 export type ScopeValue = string | number;
 
@@ -9,11 +12,47 @@ export interface AccessRule {
   values: ScopeValue[];
 }
 
+// A Data Platform query the author declares for scoped viewers. Viewers run it by
+// name; they never send SQL. `params` is the provider request body the page would
+// otherwise send, with the SQL at body.sql / body.query / body.statement.
+export interface PolicyQuery {
+  connection: string;
+  provider: string;
+  endpoint: string;
+  params: Record<string, unknown>;
+}
+
 export interface AccessPolicy {
   version: number;
   field: string;
   default: 'deny' | 'allow';
   rules: AccessRule[];
+  queries?: Record<string, PolicyQuery>;
+}
+
+const QUERY_NAME = /^[A-Za-z0-9_-]{1,64}$/;
+const MAX_QUERIES = 50;
+const MAX_QUERIES_BYTES = 64 * 1024;
+
+function validateQueries(raw: unknown, field: string): string | null {
+  if (raw === undefined) return null;
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return 'access_policy.queries must be an object of name → query';
+  const entries = Object.entries(raw as Record<string, unknown>);
+  if (entries.length > MAX_QUERIES) return `access_policy.queries allows at most ${MAX_QUERIES} queries`;
+  if (JSON.stringify(raw).length > MAX_QUERIES_BYTES) return 'access_policy.queries is too large (max 64 KB)';
+  for (const [name, q] of entries) {
+    const at = `access_policy.queries.${name}`;
+    if (!QUERY_NAME.test(name)) return `${at}: names use letters, digits, "_" or "-" (max 64)`;
+    if (typeof q !== 'object' || q === null || Array.isArray(q)) return `${at} must be an object`;
+    const o = q as Record<string, unknown>;
+    for (const k of ['connection', 'provider', 'endpoint'] as const) {
+      if (typeof o[k] !== 'string' || !(o[k] as string).trim()) return `${at}.${k} must be a non-empty string`;
+    }
+    if (typeof o.params !== 'object' || o.params === null || Array.isArray(o.params)) return `${at}.params must be an object`;
+    const sqlError = validatePolicyQuerySql(o.params as Record<string, unknown>, field);
+    if (sqlError) return `${at}: ${sqlError}`;
+  }
+  return null;
 }
 
 // Normalized result of resolving a policy against a viewer.
@@ -66,7 +105,7 @@ export function validateAccessPolicy(input: unknown): string | null {
       }
     }
   }
-  return null;
+  return validateQueries(p.queries, p.field);
 }
 
 // Safe parse for the stored policy column. Returns null on absent/invalid JSON.
@@ -112,17 +151,6 @@ export function resolveViewerScope(
   if (matched) return { field: policy.field, values: [...allowed] };
   if (policy.default === 'allow') return null;
   return { field: policy.field, values: [] };
-}
-
-// SQL list fragment for the `:viewer_scope` placeholder in Data Platform queries
-// (e.g. `WHERE company_id IN (:viewer_scope)`). Values come from the author's
-// policy (trusted), not the viewer; strings are still escaped defensively.
-// An empty scope yields `NULL`, so `IN (NULL)` matches nothing (deny all).
-export function viewerScopeSqlList(scope: ViewerScope): string {
-  if (scope.values.length === 0) return 'NULL';
-  return scope.values
-    .map((v) => (typeof v === 'number' ? String(v) : `'${String(v).replace(/'/g, "''")}'`))
-    .join(', ');
 }
 
 // Stable cache-key segment for a viewer scope, so per-viewer filtered results are

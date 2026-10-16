@@ -42,4 +42,14 @@ describe('handleConnections routing', () => {
     );
     expect(query.status).toBe(403);
   });
+
+  it('rejects query, materialize and test for a viewer scoped by an access policy', async () => {
+    vi.mocked(middleware.verifyOwner).mockResolvedValue(false);
+    const ctx = { ...makeCtx(makeEnv(createConnectionsDb())), viewerScope: { field: 'company_id', values: [1] } };
+    for (const action of ['query', 'materialize', 'test']) {
+      const res = await handleConnections(connRequest('POST', `my_api/${action}`, { query: '/items' }), ctx, `my_api/${action}`);
+      expect(res.status).toBe(403);
+      await expect(res.json()).resolves.toMatchObject({ code: 'SCOPE_REQUIRED' });
+    }
+  });
 });

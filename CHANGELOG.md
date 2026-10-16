@@ -48,6 +48,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Security
 
+- **Data Platform row-level scope is enforced structurally (skill v2.58.0):** under an `access_policy`, a scoped viewer can no longer send SQL to a platform connector. They run a query the author declares in the new `access_policy.queries` (`{ connection, provider, endpoint, params }`) by name (`execute(endpoint, { query: '<name>' })`); the server binds the viewer's values into `:viewer_scope` — counted only in SQL code, never in comments or quoted text — or, when the SQL has no placeholder, wraps it as `SELECT * FROM (<sql>) AS so_scoped WHERE so_scoped.<field> IN (…)`. Declared SQL must be one statement (checked when the policy is saved); anything that cannot be scoped returns `403 SCOPE_REQUIRED`. Scoped viewers are also refused on generic `sdk.connection()` query/materialize/test and on the chat `run_data_source` tool. **Breaking for authors:** pages whose viewers sent `:viewer_scope` SQL directly must declare those queries and call them by name.
+
 - Branch protection on `main`: required `Checks` + `Gitleaks`, strict up-to-date, require PR (documented in MAINTAINING.md)
 
 ### Security

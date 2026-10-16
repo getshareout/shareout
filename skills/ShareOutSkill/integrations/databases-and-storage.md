@@ -59,7 +59,7 @@ data.rows; // [{ region: 'EU', revenue: 1200.5 }, …]
 
 `sql.query` body: `sql` (required), `maxRows` (≤ 10 000), `timeoutMs` (Redshift, ≤ 120 000).
 Numerics come back as numbers. Row-level access policies apply as for Snowflake: a scoped
-viewer's SQL must contain `:viewer_scope` (see [../core/access-policy.md](../core/access-policy.md)).
+viewer can only run queries declared in `access_policy.queries` (see [../core/access-policy.md](../core/access-policy.md#data-platform-snowflake--bigquery)).
 
 ```javascript
 const s3 = sdk.platform.provider('s3');
