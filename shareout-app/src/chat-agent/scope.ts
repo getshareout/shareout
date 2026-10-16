@@ -29,7 +29,7 @@ export async function internalAgentRole(env: Env, userId: string, workspaceId: s
     `SELECT MAX(CASE wm.role WHEN 'owner' THEN 3 WHEN 'admin' THEN 2 ELSE 1 END) AS rank
        FROM workspace_members wm
       WHERE wm.workspace_id = ? AND wm.member_class = 'internal'
-        AND wm.user_id IN (SELECT id FROM users WHERE id = ? OR identity_id = (SELECT identity_id FROM users WHERE id = ?))`
+        AND wm.user_id IN (SELECT id FROM users WHERE id = ? OR (identity_id = (SELECT identity_id FROM users WHERE id = ?) AND COALESCE(disabled, 0) = 0))`
   ).bind(workspaceId, userId, userId).first<{ rank: number | null }>();
   return row?.rank ? ROLES[row.rank] ?? null : null;
 }

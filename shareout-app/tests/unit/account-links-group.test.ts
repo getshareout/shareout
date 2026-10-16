@@ -10,11 +10,14 @@ import { getBotVisibilityScope } from '../../src/chat-agent/access';
 const e = env as unknown as Env;
 
 beforeAll(async () => {
-  await e.DB.exec('CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT, name TEXT, picture TEXT, identity_id TEXT, created_at TEXT)');
+  await e.DB.exec('CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT, name TEXT, picture TEXT, identity_id TEXT, created_at TEXT, disabled INTEGER NOT NULL DEFAULT 0)');
   await e.DB.batch([
     // alice: two linked accounts (work one created first)
     e.DB.prepare('INSERT OR REPLACE INTO users (id, email, name, picture, identity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind('usr_alice', 'alice@example.com', 'Alice', null, 'idn_a', '2026-02-01T00:00:00.000Z'),
     e.DB.prepare('INSERT OR REPLACE INTO users (id, email, name, picture, identity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind('usr_alice_work', 'alice@acme.example.com', 'Alice W', null, 'idn_a', '2026-01-01T00:00:00.000Z'),
+    // dave: linked to a disabled account, which must lend no access
+    e.DB.prepare('INSERT OR REPLACE INTO users (id, email, name, picture, identity_id, created_at, disabled) VALUES (?, ?, ?, ?, ?, ?, ?)').bind('usr_dave', 'dave@example.com', 'Dave', null, 'idn_d', '2026-01-04T00:00:00.000Z', 0),
+    e.DB.prepare('INSERT OR REPLACE INTO users (id, email, name, picture, identity_id, created_at, disabled) VALUES (?, ?, ?, ?, ?, ?, ?)').bind('usr_dave_off', 'dave@off.example.com', 'Dave Off', null, 'idn_d', '2026-01-05T00:00:00.000Z', 1),
     // bob: no identity group; carol: unrelated NULL-identity user that must never join bob
     e.DB.prepare('INSERT OR REPLACE INTO users (id, email, name, picture, identity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind('usr_bob', 'bob@example.com', 'Bob', null, null, '2026-01-02T00:00:00.000Z'),
     e.DB.prepare('INSERT OR REPLACE INTO users (id, email, name, picture, identity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind('usr_carol', 'carol@example.com', 'Carol', null, null, '2026-01-03T00:00:00.000Z'),
@@ -32,6 +35,13 @@ describe('linked-account group lookups', () => {
     expect((await getLinkedAccounts(e, 'usr_bob')).map((a) => a.id)).toEqual(['usr_bob']);
     expect(await getLinkedUserIds(e, 'usr_bob')).toEqual(['usr_bob']);
     expect(await getBotVisibilityScope(e, 'usr_bob')).toEqual({ userIds: ['usr_bob'], emails: ['bob@example.com'] });
+  });
+
+  it('leaves a disabled linked account out of the group, but never the caller itself', async () => {
+    expect((await getLinkedAccounts(e, 'usr_dave')).map((a) => a.id)).toEqual(['usr_dave']);
+    expect(await getLinkedUserIds(e, 'usr_dave')).toEqual(['usr_dave']);
+    expect(await getBotVisibilityScope(e, 'usr_dave')).toEqual({ userIds: ['usr_dave'], emails: ['dave@example.com'] });
+    expect((await getLinkedUserIds(e, 'usr_dave_off')).sort()).toEqual(['usr_dave', 'usr_dave_off']);
   });
 
   it('an unknown user still resolves to itself', async () => {
