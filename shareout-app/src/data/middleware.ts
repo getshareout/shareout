@@ -291,12 +291,16 @@ async function checkDataAuth(
       const isOwner = payload.authType === 'owner' || payload.authType === 'editor' || payload.authType === 'owner_test';
       const isArtifactOwner = payload.authType === 'owner' || payload.authType === 'owner_test';
       const testRun = payload.authType === 'owner_test';
+      const externalSubjectUserId = payload.authType === 'viewer' && payload.email
+        ? await grantOnlyViewerId(env, artifact, payload.email)
+        : null;
       return {
         authorized: true,
         needsAuth: false,
         viewer: { email: payload.email ?? null, isOwner },
         isArtifactOwner,
         testRun,
+        ...(externalSubjectUserId ? { externalSubjectUserId } : {}),
       };
     }
     // Fall back to a ShareOut API token (so_...): proves ownership of own artifacts.
@@ -504,10 +508,29 @@ async function closedArtifactViewer(
       needsAuth: false,
       viewer: { email, isOwner: false },
       isArtifactOwner: false,
+      // Access came from a grant, so writes need an edit grant (checked in dataMiddleware).
+      externalSubjectUserId: userId,
     };
   }
 
   return null;
+}
+
+/** For a viewer token's email: the user's id when their access rests on a grant alone
+ *  (not the owner, not a collaborator, not an internal member), so writes go through
+ *  the edit-grant check. Null otherwise. */
+async function grantOnlyViewerId(
+  env: Env,
+  artifact: { id: string; owner_id: string | null; workspace_id: string | null },
+  email: string,
+): Promise<string | null> {
+  const user = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: string }>();
+  if (!user || user.id === artifact.owner_id) return null;
+  const collaborator = await env.DB.prepare('SELECT 1 FROM collaborators WHERE artifact_id = ? AND email = ?')
+    .bind(artifact.id, email).first();
+  if (collaborator) return null;
+  if (artifact.workspace_id && await getInternalWorkspaceRole(env, artifact.workspace_id, user.id)) return null;
+  return user.id;
 }
 
 /** Resolve the authenticated requester to a user id (API token, artifact access
