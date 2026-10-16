@@ -45,13 +45,15 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
     function cmtToast(message, tone) {
       var host = document.getElementById('so-comments-overlay');
       if (!host) return;
+      // A pinned comment is posted with the panel closed: toast over the page then.
+      if (!isPanelOpen()) host = document.body;
       var el = document.getElementById('so-cmt-toast');
       if (!el) {
         el = document.createElement('div');
         el.id = 'so-cmt-toast';
         el.className = 'so-cmt-toast';
-        host.appendChild(el);
       }
+      if (el.parentNode !== host) host.appendChild(el);
       el.className = 'so-cmt-toast' + (tone ? ' is-' + tone : '');
       el.textContent = message;
       el.classList.add('show');
@@ -465,6 +467,7 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
           cmtRoots = cmtRoots.filter(function(c) { return c.id !== tmpId; });
           updatePins(cmtRoots);
           ta.value = content;
+          if (hadPin && !isPanelOpen()) window.openComments();
           cmtToast(err.message === 'auth' ? '${js(c.loginComment)}' : '${js(c.postFail)}', 'error');
         });
     };
@@ -585,7 +588,6 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') {
         if (cmtAssignPicker) { closeAssignPicker(); return; }
-        if (cmtPinMode) { setPinMode(false); return; }
         var ov = document.getElementById('so-comments-overlay');
         if (ov && ov.classList.contains('open') && !document.getElementById('so-cmt-mentionbox').classList.contains('open')) closeComments();
       }
@@ -640,44 +642,139 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
       layer.innerHTML = html;
     }
 
-    window.togglePinMode = function() { setPinMode(!cmtPinMode); };
+    // Pin placement. Arming closes the panel (no backdrop, no blur: the page stays
+    // fully readable), shows a pin cursor over the artifact and a light hint. A click
+    // on the page drops the draft pin and opens an inline composer right there;
+    // another click moves it. Submit, Esc, Cancel, a click outside, an in-frame
+    // navigation and leaving the tab all end placement, so it can never outlive the
+    // page it started on.
+    window.togglePinMode = function() { if (cmtPinMode) cancelPinComment(); else startPinComment(); };
 
-    function setPinMode(on) {
-      cmtPinMode = on;
-      var btn = document.getElementById('so-cmt-pinbtn');
-      var label = document.getElementById('so-cmt-pinbtn-label');
-      if (on) {
-        btn.classList.add('armed');
-        btn.classList.remove('placed');
-        if (label) label.textContent = '${js(c.clickPage)}';
-        postToIframe({ type: 'shareout:comments:enterPinMode' });
-      } else {
-        btn.classList.remove('armed');
-        if (label) label.textContent = cmtPendingPosition ? '${js(c.pinned)}' : '${js(c.pinToPage)}';
-        if (cmtPendingPosition) btn.classList.add('placed');
-        postToIframe({ type: 'shareout:comments:exitPinMode' });
+    function startPinComment() {
+      cancelReply();
+      closeComments();
+      cmtPendingPosition = null;
+      cmtPendingState = undefined;
+      cmtPinMode = true;
+      setPinHint(true);
+      postToIframe({ type: 'shareout:comments:enterPinMode' });
+    }
+
+    function cancelPinComment() {
+      var was = cmtPinMode;
+      cmtPinMode = false;
+      cmtPendingPosition = null;
+      cmtPendingState = undefined;
+      setPinHint(false);
+      var d = document.getElementById('so-pin-draft');
+      if (d) d.remove();
+      if (was) postToIframe({ type: 'shareout:comments:exitPinMode' });
+    }
+    function clearPin() { cancelPinComment(); }
+
+    function setPinHint(on) {
+      var h = document.getElementById('so-pin-hint');
+      if (on && !h) {
+        h = document.createElement('div');
+        h.id = 'so-pin-hint';
+        h.setAttribute('role', 'status');
+        h.textContent = '${js(c.pinHint)}';
+        document.body.appendChild(h);
+      } else if (!on && h) {
+        h.remove();
       }
     }
 
-    function clearPin() {
-      cmtPendingPosition = null;
-      cmtPendingState = undefined;
-      cmtPinMode = false;
-      var btn = document.getElementById('so-cmt-pinbtn');
-      var label = document.getElementById('so-cmt-pinbtn-label');
-      if (btn) { btn.classList.remove('armed', 'placed'); }
-      if (label) label.textContent = '${js(c.pinToPage)}';
+    function iframeOffset() {
+      var f = document.querySelector('iframe');
+      var r = f ? f.getBoundingClientRect() : null;
+      return { x: r ? r.left : 0, y: r ? r.top : 0 };
     }
 
-    function onPinPlaced(position) {
+    function pinDraftEl() {
+      var d = document.getElementById('so-pin-draft');
+      if (d) return d;
+      d = document.createElement('div');
+      d.id = 'so-pin-draft';
+      d.innerHTML = '<div class="so-pin"><span>+</span></div>'
+        + '<div class="so-pin-pop" role="dialog" aria-label="${js(c.addCommentAria)}">'
+        + (cmtLoggedIn ? '' : '<input type="text" class="so-cmt-textarea so-pin-guest" id="so-pin-guest" maxlength="80" aria-label="${js(c.yourName)}" placeholder="' + (cmtIdentityMode === 'named' ? '${js(c.nameRequired)}' : '${js(c.nameOptional)}') + '">')
+        + '<textarea class="so-cmt-textarea" id="so-pin-input" aria-label="${js(c.addCommentAria)}" placeholder="${js(c.addComment)}"></textarea>'
+        + '<div class="so-pin-pop-actions"><button type="button" class="so-pin-pop-cancel" id="so-pin-cancel">${js(c.cancel)}</button>'
+        + '<button type="button" class="so-cmt-submit" id="so-pin-submit">${js(c.comment)}</button></div></div>';
+      document.body.appendChild(d);
+      var guest = document.getElementById('so-cmt-guest-name');
+      var pg = document.getElementById('so-pin-guest');
+      if (pg && guest) pg.value = guest.value;
+      document.getElementById('so-pin-cancel').addEventListener('click', cancelPinComment);
+      document.getElementById('so-pin-submit').addEventListener('click', submitPinComment);
+      document.getElementById('so-pin-input').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submitPinComment(); }
+      });
+      return d;
+    }
+
+    // x/y are the pin's viewport coords inside the artifact frame.
+    function placePinDraft(x, y) {
+      var d = pinDraftEl();
+      var o = iframeOffset();
+      var px = Math.round(o.x + x), py = Math.round(o.y + y);
+      d.style.left = px + 'px';
+      d.style.top = py + 'px';
+      var pop = d.querySelector('.so-pin-pop');
+      var w = pop.offsetWidth, h = pop.offsetHeight;
+      var left = px + 16 + w > window.innerWidth - 12 ? Math.max(12 - px, -w - 16) : 16;
+      var top = py + 8 + h > window.innerHeight - 12 ? Math.max(12 - py, -h - 34) : 8;
+      pop.style.left = left + 'px';
+      pop.style.top = top + 'px';
+    }
+
+    function onPinPlaced(position, x, y) {
+      if (!cmtPinMode) return;
       cmtPendingPosition = position;
-      setPinMode(false);
-      var ta = document.getElementById('so-cmt-input');
-      if (ta) ta.focus();
+      cmtPendingState = undefined;
+      setPinHint(false);
+      placePinDraft(x || 0, y || 0);
+      var ta = document.getElementById('so-pin-input');
+      if (ta) { try { ta.focus({ preventScroll: true }); } catch (e) { ta.focus(); } }
       requestState().then(function(state) {
-        cmtPendingState = (state != null ? state : undefined);
+        if (cmtPendingPosition === position) cmtPendingState = (state != null ? state : undefined);
       });
     }
+
+    function submitPinComment() {
+      var ta = document.getElementById('so-pin-input');
+      if (!ta || !cmtPendingPosition) return;
+      if (!ta.value.trim()) { ta.focus(); return; }
+      var pg = document.getElementById('so-pin-guest');
+      var guest = document.getElementById('so-cmt-guest-name');
+      if (pg && guest) guest.value = pg.value;
+      if (!cmtLoggedIn && cmtIdentityMode === 'named' && !(pg && pg.value.trim())) { if (pg) pg.focus(); return; }
+      // Post through the panel composer so pinned and plain comments share one path;
+      // whatever the viewer had typed there is kept.
+      var main = document.getElementById('so-cmt-input');
+      var kept = main.value;
+      main.value = ta.value;
+      submitComment();
+      if (!main.value) main.value = kept;
+    }
+
+    // Placement belongs to the page it started on: a navigation inside the frame
+    // loads a fresh document with no pin mode, and leaving the tab abandons it.
+    (function() {
+      var f = document.querySelector('iframe');
+      if (f) f.addEventListener('load', function() { if (cmtPinMode) cancelPinComment(); });
+      document.addEventListener('visibilitychange', function() { if (document.hidden && cmtPinMode) cancelPinComment(); });
+      document.addEventListener('mousedown', function(e) {
+        if (!cmtPinMode) return;
+        var t = e.target;
+        if (t && t.closest && t.closest('#so-pin-draft, #so-cmt-pinbtn')) return;
+        cancelPinComment();
+      });
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && cmtPinMode) { e.preventDefault(); e.stopImmediatePropagation(); cancelPinComment(); }
+      }, true);
+    })();
 
     function requestState() {
       return new Promise(function(resolve) {
@@ -708,9 +805,12 @@ export function renderToolbarScriptComments(baseUrl: string, artifactId: string,
       var data = e.data;
       if (!data || typeof data !== 'object' || typeof data.type !== 'string') return;
       if (data.type === 'shareout:comments:pinPlaced') {
-        onPinPlaced(data.position);
+        onPinPlaced(data.position, data.x, data.y);
       } else if (data.type === 'shareout:comments:pinPositions') {
         renderPinMarkers(data.pins || []);
+        if (cmtPinMode && data.draft && document.getElementById('so-pin-draft')) placePinDraft(data.draft.x, data.draft.y);
+      } else if (data.type === 'shareout:comments:pinCancel') {
+        cancelPinComment();
       } else if (data.type === 'shareout:comments:stateCaptured') {
         var fn = cmtStateResolvers[data.requestId];
         if (fn) { delete cmtStateResolvers[data.requestId]; fn(data.state); }

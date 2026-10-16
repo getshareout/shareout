@@ -393,5 +393,51 @@ export const commentsOverlayStyles = `    #so-comments-overlay {
     }
     @keyframes soCmtHighlight { 0%,100% { box-shadow: none; } 30% { box-shadow: 0 0 0 3px var(--color-primary); } }
     .so-cmt-card.so-cmt-highlight { animation: soCmtHighlight 1.8s ease; }
+    body > .so-cmt-toast { position: fixed; z-index: 10003; font-family: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif; }
+    /* Pin placement: no backdrop, no blur. The page stays readable; a light hint
+       says what to do and the composer opens right where the pin was dropped. */
+    #so-pin-hint {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10002;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-border);
+      box-shadow: var(--shadow-md);
+      color: var(--color-text-secondary);
+      font: 500 13px 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    #so-pin-draft { position: fixed; width: 0; height: 0; z-index: 10002; }
+    #so-pin-draft .so-pin { cursor: default; }
+    #so-pin-draft .so-pin:hover { transform: rotate(-45deg); }
+    .so-pin-pop {
+      position: absolute;
+      width: 300px;
+      max-width: calc(100vw - 24px);
+      padding: 10px;
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-border);
+      border-radius: 14px;
+      box-shadow: var(--shadow-xl);
+      font-family: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
+    }
+    .so-pin-pop .so-cmt-textarea { min-height: 72px; }
+    .so-pin-pop .so-pin-guest { min-height: 0; height: 36px; margin-bottom: 8px; resize: none; }
+    .so-pin-pop-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+    .so-pin-pop-cancel {
+      background: none;
+      border: 0;
+      border-radius: 12px;
+      padding: 9px 12px;
+      font-size: 14px;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+    }
+    .so-pin-pop-cancel:hover { color: var(--color-text); background: var(--color-surface); }
 
 `;
