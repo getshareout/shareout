@@ -67,7 +67,7 @@ export async function routeArtifactMcpApi(ctx: FetchContext): Promise<Response |
   }
 
   if (action === 'consent' && request.method === 'GET') {
-    return json({ connections: await consentState(env, page, user.id) });
+    return json({ workspaceId: page.workspaceId, connections: await consentState(env, page, user.id) });
   }
 
   if (action === 'consent' && request.method === 'POST') {

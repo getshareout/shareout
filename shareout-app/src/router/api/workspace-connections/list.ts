@@ -166,9 +166,26 @@ export async function handleWorkspaceConnectorsCatalog(
     connections: rows.results.filter((r) => r.provider === p.id).map(connView),
   }));
 
+  // Remote MCP servers: not a registry provider (OAuth is discovered per server), but
+  // listed like one so admins can add servers and members can connect their own account.
+  const mcpRows = rows.results.filter((r) => r.provider === 'mcp');
+  catalog.push({
+    id: 'mcp',
+    label: 'MCP server',
+    category: 'other',
+    tagline: '',
+    color: '#2E52C2',
+    iconSvg: '',
+    connectMethod: 'mcp',
+    docsUrl: '',
+    exampleSnippet: '',
+    testable: false,
+    connections: mcpRows.map((r) => ({ ...connView(r), auth: r.auth_type === 'none' ? 'none' : 'oauth' })),
+  });
+
   // Connections whose provider isn't a catalog provider (custom REST, Postgres, etc.).
   const otherConnections = rows.results
-    .filter((r) => !providerIds.has(r.provider))
+    .filter((r) => !providerIds.has(r.provider) && r.provider !== 'mcp')
     .map((r) => ({ ...connView(r), provider: r.provider }));
 
   return json({

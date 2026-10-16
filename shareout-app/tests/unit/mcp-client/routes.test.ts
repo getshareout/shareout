@@ -9,6 +9,7 @@ import {
   handleRefreshMcpTools,
 } from '../../../src/router/api/workspace-connections/mcp';
 import { loadMcpConnection } from '../../../src/mcp-client/connection';
+import { handleWorkspaceConnectorsCatalog } from '../../../src/router/api/workspace-connections/list';
 import { getMemberAccessToken } from '../../../src/mcp-client/oauth';
 import { encryptCredentials } from '../../../src/data/connections/credentials';
 import { installFakeServer, MCP_URL } from './fake-server';
@@ -131,6 +132,26 @@ describe('MCP connections', () => {
     const replay = await handleMcpOAuthCallback(req(`/v1/oauth/mcp/callback?code=${code}&state=${encodeURIComponent(state)}`), e, member.id);
     expect(replay.status).toBe(400);
     expect(fake.state.tokenCalls).toHaveLength(1);
+  });
+
+  it('lists MCP servers in the catalog with each member\'s own connection state', async () => {
+    const fake = installFakeServer();
+    const { body } = await create();
+    const { code, state } = await connect(fake, body.id);
+    await handleMcpOAuthCallback(req(`/v1/oauth/mcp/callback?code=${code}&state=${encodeURIComponent(state)}`), e, member.id);
+
+    const view = async (u: AuthUser) => {
+      const d = (await (await handleWorkspaceConnectorsCatalog(e, u, WS)).json()) as {
+        catalog: { id: string; connectMethod: string; connections: { name: string; hasMyCredentials?: boolean; auth?: string }[] }[];
+        otherConnections: { provider: string }[];
+      };
+      return { mcp: d.catalog.find((p) => p.id === 'mcp')!, other: d.otherConnections };
+    };
+    const asMember = await view(member);
+    expect(asMember.mcp.connectMethod).toBe('mcp');
+    expect(asMember.mcp.connections).toEqual([expect.objectContaining({ name: 'notion', hasMyCredentials: true, auth: 'oauth' })]);
+    expect(asMember.other.some((c) => c.provider === 'mcp')).toBe(false);
+    expect((await view(admin)).mcp.connections[0].hasMyCredentials).toBe(false);
   });
 
   it('refuses connect for non-members', async () => {

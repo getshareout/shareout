@@ -104,12 +104,13 @@ export async function serveSandboxedViewer(
   const socialTags = socialPreview ? renderSocialMetaTags(socialPreview) : '';
 
   const mcpPage = hasMcpCapability(manifestJson);
+  const mcpLang = localeFromAcceptLanguage(request.headers.get('Accept-Language')) ?? 'en';
   const iframeHtml = `<iframe
     src="${escapeHtml(rawUrl)}"
     sandbox="${mcpPage ? SANDBOX_PERMISSIONS_LOCKED : SANDBOX_PERMISSIONS}"
     allow="clipboard-write"
     loading="eager"
-  ></iframe>${mcpPage ? renderMcpHostBridge(artifactId) : ''}`;
+  ></iframe>${mcpPage ? renderMcpHostBridge(artifactId, mcpLang) : ''}`;
 
   // On the content domain the artifact loads cross-origin (its own subresources,
   // inlined CSS, and same-origin ?_raw preloads can't be warmed from this parent

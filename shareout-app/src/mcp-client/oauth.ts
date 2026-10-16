@@ -196,7 +196,9 @@ export async function getMemberAccessToken(
     if (fresh(tokens)) return tokens.accessToken;
     if (!tokens.refreshToken) throw new McpClientError('needs_auth', 'Access token expired');
 
-    const claim = new Date().toISOString();
+    // Strictly later than the value it replaces: a same-millisecond claim would leave
+    // updated_at unchanged and let a second caller win the swap too.
+    const claim = new Date(Math.max(Date.now(), Date.parse(row.updated_at) + 1)).toISOString();
     const claimed = await env.DB.prepare(
       'UPDATE connection_user_credentials SET updated_at = ? WHERE connection_id = ? AND user_id = ? AND updated_at = ?',
     ).bind(claim, connectionId, userId, row.updated_at).run();

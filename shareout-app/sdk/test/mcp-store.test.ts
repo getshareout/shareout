@@ -101,3 +101,89 @@ describe('sdk.mcp', () => {
     expect(err.code).toBe('mcp_not_available');
   });
 });
+
+describe('sdk.mcp.requestAccess', () => {
+  it('asks the parent and resolves with its answer, ignoring other windows', async () => {
+    const listeners = new Set<Listener>();
+    const parent = {
+      postMessage: vi.fn((msg: { type: string; requestId: string; connection: string }) => {
+        queueMicrotask(() => {
+          for (const l of [...listeners]) {
+            l({ source: {}, data: { type: 'shareout:mcp-access', requestId: msg.requestId, allowed: true, connected: true } } as unknown as MessageEvent);
+            l({ source: parent, data: { type: 'shareout:mcp-access', requestId: msg.requestId, allowed: false, connected: true, code: 'declined' } } as unknown as MessageEvent);
+          }
+        });
+      }),
+    };
+    vi.stubGlobal('window', {
+      parent,
+      addEventListener: (_t: string, l: Listener) => listeners.add(l),
+      removeEventListener: (_t: string, l: Listener) => listeners.delete(l),
+    });
+    const res = await new McpStore(sdk).requestAccess('notion');
+    expect(parent.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'shareout:mcp-access-request', connection: 'notion' }), '*');
+    expect(res).toEqual({ allowed: false, connected: true, code: 'declined' });
+  });
+});
+
+describe('sdk.mcp.watchTool', () => {
+  function docStub(state: { hidden: boolean }) {
+    const listeners = new Set<() => void>();
+    vi.stubGlobal('document', {
+      get visibilityState() { return state.hidden ? 'hidden' : 'visible'; },
+      addEventListener: (_t: string, l: () => void) => listeners.add(l),
+      removeEventListener: (_t: string, l: () => void) => listeners.delete(l),
+    });
+    return { show() { state.hidden = false; for (const l of [...listeners]) l(); } };
+  }
+
+  it('polls no faster than every 30 s and stops after unsubscribe', async () => {
+    vi.useFakeTimers();
+    frame(['mcpt.one']);
+    docStub({ hidden: false });
+    const fetchMock = vi.fn(async () => reply(200, { success: true, data: { content: [], structuredContent: { n: 1 } } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const events: string[] = [];
+    const stop = new McpStore(sdk).watchTool('notion', 'search', {}, (e) => events.push(e.type), { refetchInterval: 1000 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(29_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    stop();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(events).toEqual(['data', 'data']);
+  });
+
+  it('stops polling on errors only the viewer can fix', async () => {
+    vi.useFakeTimers();
+    frame(['mcpt.one']);
+    docStub({ hidden: false });
+    const fetchMock = vi.fn(async () => reply(403, { success: false, code: 'approval_required', error: 'Allow it', connection: 'notion' }));
+    vi.stubGlobal('fetch', fetchMock);
+    const codes: string[] = [];
+    new McpStore(sdk).watchTool('notion', 'search', {}, (e) => { if (e.type === 'error') codes.push(e.error.code); }, { refetchInterval: 30_000 });
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(codes).toEqual(['approval_required']);
+  });
+
+  it('waits while the page is hidden and catches up when it is shown', async () => {
+    vi.useFakeTimers();
+    frame(['mcpt.one']);
+    const state = { hidden: false };
+    const visibility = docStub(state);
+    const fetchMock = vi.fn(async () => reply(200, { success: true, data: { content: [] } }));
+    vi.stubGlobal('fetch', fetchMock);
+    new McpStore(sdk).watchTool('notion', 'search', {}, () => {}, { refetchInterval: 30_000 });
+    await vi.advanceTimersByTimeAsync(0);
+    state.hidden = true;
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    visibility.show();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});

@@ -98,6 +98,22 @@ function withPayload(result: McpToolResult): McpToolResult {
   }
 }
 
+export interface McpAccessResult {
+  allowed: boolean;
+  connected: boolean;
+  /** Why not: 'declined' (final for this page load), 'busy', 'not_in_manifest', … */
+  code?: string | null;
+}
+
+export type McpWatchEvent =
+  | { type: 'data'; result: McpToolResult; fetchedAt: number }
+  | { type: 'error'; error: McpError };
+
+const ACCESS_TIMEOUT_MS = 10 * 60_000;
+const WATCH_FLOOR_MS = 30_000;
+// Errors only the viewer can fix: polling stops until the page asks again.
+const STOP_POLLING = new Set(['approval_required', 'credentials_required', 'needs_reauth', 'not_allowed', 'not_in_manifest', 'not_read_only', 'mcp_not_available']);
+
 export class McpStore {
   constructor(private sdk: SdkClient) {}
 
@@ -114,6 +130,83 @@ export class McpStore {
       body: JSON.stringify({ connection, tool, input }),
     });
     return withPayload(result);
+  }
+
+  /**
+   * Ask the viewer to allow this page to use a connection (and connect their account
+   * if needed). The ShareOut page shows its own dialog; call this from a button the
+   * viewer clicked, after a call failed with approval_required or credentials_required.
+   */
+  requestAccess(connection: string): Promise<McpAccessResult> {
+    if (typeof window === 'undefined' || window.parent === window) {
+      return Promise.resolve({ allowed: false, connected: false, code: 'mcp_not_available' });
+    }
+    const requestId = `mcp-access-${nextRequestId++}`;
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        window.removeEventListener('message', onMessage);
+        resolve({ allowed: false, connected: false, code: 'timeout' });
+      }, ACCESS_TIMEOUT_MS);
+      function onMessage(e: MessageEvent) {
+        const d = e.data as ({ type?: string; requestId?: string } & McpAccessResult) | null;
+        if (e.source !== window.parent || d?.type !== 'shareout:mcp-access' || d.requestId !== requestId) return;
+        clearTimeout(timer);
+        window.removeEventListener('message', onMessage);
+        resolve({ allowed: !!d.allowed, connected: !!d.connected, code: d.code ?? null });
+      }
+      window.addEventListener('message', onMessage);
+      window.parent.postMessage({ type: 'shareout:mcp-access-request', requestId, connection }, '*');
+    });
+  }
+
+  /**
+   * Keep a read current: calls now, then every `refetchInterval` ms (at least 30 s),
+   * paused while the page is hidden. Stops polling on errors only the viewer can fix
+   * (call watchTool again after requestAccess). Returns an unsubscribe function.
+   */
+  watchTool(
+    connection: string,
+    tool: string,
+    input: Record<string, unknown>,
+    handler: (event: McpWatchEvent) => void,
+    options: { refetchInterval?: number } = {},
+  ): () => void {
+    const interval = options.refetchInterval ? Math.max(WATCH_FLOOR_MS, options.refetchInterval) : 0;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const doc = typeof document !== 'undefined' ? document : undefined;
+    const onVisible = () => {
+      if (doc?.visibilityState === 'visible') {
+        doc.removeEventListener('visibilitychange', onVisible);
+        void run();
+      }
+    };
+    const schedule = () => {
+      if (!interval || stopped) return;
+      timer = setTimeout(() => {
+        if (doc?.visibilityState === 'hidden') doc.addEventListener('visibilitychange', onVisible);
+        else void run();
+      }, interval);
+    };
+    const run = async () => {
+      if (stopped) return;
+      try {
+        const result = await this.callTool(connection, tool, input);
+        if (!stopped) handler({ type: 'data', result, fetchedAt: Date.now() });
+        schedule();
+      } catch (err) {
+        if (stopped) return;
+        const error = err instanceof McpError ? err : new McpError(String(err), 'upstream_error', 0);
+        handler({ type: 'error', error });
+        if (!STOP_POLLING.has(error.code)) schedule();
+      }
+    };
+    void run();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      doc?.removeEventListener('visibilitychange', onVisible);
+    };
   }
 
   private async request<T>(path: string, init: RequestInit, retried = false): Promise<T> {

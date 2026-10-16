@@ -36,6 +36,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Dashboard with data | [patterns/dashboards.md](patterns/dashboards.md) | [sdk/table.md](sdk/table.md), [sdk/json.md](sdk/json.md) (`modules/dashboards/` is an unshipped design spec — don't use `sdk.dashboards`) |
 | Editable spreadsheet grid in an artifact | [sdk/grid.md](sdk/grid.md) | [sdk/table.md](sdk/table.md), [integrations/google-sheets.md](integrations/google-sheets.md) |
 | Live Mixpanel / BigQuery / REST in HTML | [sdk/live-data.md](sdk/live-data.md) | [sdk/connections.md](sdk/connections.md), [integrations/overview.md](integrations/overview.md) |
+| Page reads each viewer's own Notion / Linear / any MCP server (members-only) | [sdk/mcp.md](sdk/mcp.md) | [team/workspace-connections.md](team/workspace-connections.md) |
 | Show viewers where data comes from / data sources drawer / how to replicate | [patterns/data-provenance.md](patterns/data-provenance.md) | [core/html-spec/manifest.md](core/html-spec/manifest.md#provenance-where-the-data-comes-from), [agents/crew.md](agents/crew.md) |
 | Data catalog / governance / lineage / glossary; ground the agent on real tables (catalog_search/catalog_get) | [team/catalog.md](team/catalog.md) | [team/workspace-connections.md](team/workspace-connections.md), [patterns/data-provenance.md](patterns/data-provenance.md) |
 | Presentation/slides | [modules/slides/overview.md](modules/slides/overview.md) | [modules/slides/sdk-api.md](modules/slides/sdk-api.md) |
@@ -178,6 +179,7 @@ ShareOutSkill/
 │   ├── comments.md             # sdk.comments - threaded discussions
 │   ├── python.md               # sdk.python - run Python in the browser
 │   ├── connections.md          # sdk.connection - REST + materialize
+│   ├── mcp.md                  # sdk.mcp - viewer's own MCP accounts (members-only)
 │   ├── live-data.md            # Mixpanel/BigQuery/live queries in artifacts (READ FIRST)
 │   ├── datasets.md             # sdk.dataset - read materialized extracts
 │   └── libraries.md            # so.lib - import workspace library modules

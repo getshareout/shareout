@@ -195,6 +195,7 @@ export default defineConfig({
 						{ label: 'Data sources', slug: 'sdk/sources', translations: { es: 'Fuentes de datos' } },
 						{ label: 'Datasets', slug: 'sdk/datasets', translations: { es: 'Datasets' } },
 						{ label: 'Live data', slug: 'sdk/live-data', translations: { es: 'Datos en vivo' } },
+						{ label: 'MCP connections', slug: 'sdk/mcp', translations: { es: 'Conexiones MCP' } },
 						{ label: 'Secrets', slug: 'sdk/secrets', translations: { es: 'Secrets' } },
 						{ label: 'AI agent', slug: 'sdk/agent', translations: { es: 'Agente IA' } },
 						{ label: 'Page Pilot', slug: 'sdk/pilot', translations: { es: 'Page Pilot' } },

@@ -104,7 +104,7 @@ describe('serving MCP pages', () => {
 
   it('emits a host bridge script that parses', () => {
     const html = renderMcpHostBridge('art_"x');
-    const js = html.replace(/^<script>/, '').replace(/<\/script>$/, '');
+    const js = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'));
     expect(() => new Function(js)).not.toThrow();
     expect(js).toContain(JSON.stringify('art_"x'));
   });
