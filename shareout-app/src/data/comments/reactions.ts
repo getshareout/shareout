@@ -3,6 +3,7 @@ import { successResponse, errorResponse, type DataContext } from '../middleware'
 import { MAX_EMOJI_LENGTH, type Comment, type CommentRow } from './types';
 import { getSession } from './auth';
 import { broadcastRaw } from './broadcast';
+import { JSON_IN, jsonList } from '../../sql-in';
 
 async function reactionSummary(
   ctx: DataContext,
@@ -12,14 +13,13 @@ async function reactionSummary(
   const out: Record<string, Record<string, { count: number; mine: boolean }>> = {};
   if (!commentIds.length) return out;
 
-  const placeholders = commentIds.map(() => '?').join(',');
   const rows = await ctx.env.DB.prepare(
     `SELECT comment_id, emoji, COUNT(*) AS count,
             SUM(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS mine
        FROM comment_reactions
-      WHERE comment_id IN (${placeholders})
+      WHERE comment_id IN ${JSON_IN}
       GROUP BY comment_id, emoji`
-  ).bind(viewerId ?? '', ...commentIds).all<{ comment_id: string; emoji: string; count: number; mine: number }>();
+  ).bind(viewerId ?? '', jsonList(commentIds)).all<{ comment_id: string; emoji: string; count: number; mine: number }>();
 
   for (const r of rows.results) {
     if (!out[r.comment_id]) out[r.comment_id] = {};

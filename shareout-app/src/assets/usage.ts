@@ -3,6 +3,7 @@
 // and `/v1/files/dlv_…/content` both leave the literal id in the source). Best-effort,
 // runs in waitUntil.
 import type { Env } from '../types';
+import { JSON_IN, jsonList } from '../sql-in';
 
 const DLV_RE = /dlv_[A-Za-z0-9]+/g;
 const MAX_ASSETS = 25;          // bound R2 fetches per publish
@@ -28,10 +29,9 @@ export async function scanFileUsage(env: Env, artifactId: string, versionId: str
   // Keep only ids that are real deliverables (drop coincidental matches).
   let real: string[] = [];
   if (ids.size) {
-    const arr = [...ids];
     const { results } = await env.DB.prepare(
-      `SELECT id FROM asset_deliverables WHERE id IN (${arr.map(() => '?').join(',')})`
-    ).bind(...arr).all<{ id: string }>();
+      `SELECT id FROM asset_deliverables WHERE id IN ${JSON_IN}`
+    ).bind(jsonList([...ids])).all<{ id: string }>();
     real = (results || []).map((r) => r.id);
   }
 

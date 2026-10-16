@@ -52,6 +52,7 @@ async function resolveGate(b: { gate?: string; password?: string; domains?: stri
 }
 import { dispatchLifecycleEmail } from '../../email/gateway';
 import { writeBlobOrigin } from '../../serve/share-target';
+import { JSON_IN, jsonList } from '../../sql-in';
 
 const FILE_VISIBILITIES = ['team', 'private', 'workspace'];
 const VISIBILITY_ERROR = 'visibility must be team, private or workspace';
@@ -159,8 +160,8 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
     // Only real deliverables in this bucket can be bundled — a loose-blob id silently
     // drops out of the share link's JOIN otherwise (getCollectionFiles → deliverables).
     const valid = await env.DB.prepare(
-      `SELECT id FROM asset_deliverables WHERE bucket_artifact_id = ? AND deleted_at IS NULL AND id IN (${ids.map(() => '?').join(',')})`,
-    ).bind(bucket.id, ...ids).all<{ id: string }>();
+      `SELECT id FROM asset_deliverables WHERE bucket_artifact_id = ? AND deleted_at IS NULL AND id IN ${JSON_IN}`,
+    ).bind(bucket.id, jsonList(ids)).all<{ id: string }>();
     const validIds = (valid.results || []).map((r) => r.id);
     if (!validIds.length) return json({ error: 'no valid files to bundle' }, 400);
     const c = await createCollection(env, bucket.id, workspaceId, user.id, (b.name || '').trim() || 'Untitled collection', validIds);

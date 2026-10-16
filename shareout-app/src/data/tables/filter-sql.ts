@@ -1,5 +1,6 @@
 import type { Filter, FilterOperator } from './types';
 import { escapeField } from './validation';
+import { JSON_IN, jsonList } from '../../sql-in';
 
 /**
  * Compile a Mongo-style filter into SQLite json_extract conditions.
@@ -46,17 +47,13 @@ export function filterToSql(filter: Filter): { sql: string; params: unknown[] } 
             params.push(bindValue(opVal));
             break;
           case '$in': {
-            const arr = opVal as unknown[];
-            const placeholders = arr.map(() => '?').join(', ');
-            conditions.push(`json_extract(data, '$.${escapedField}') IN (${placeholders})`);
-            params.push(...arr.map(bindValue));
+            conditions.push(`json_extract(data, '$.${escapedField}') IN ${JSON_IN}`);
+            params.push(jsonList((opVal as unknown[]).map(bindValue)));
             break;
           }
           case '$nin': {
-            const arr = opVal as unknown[];
-            const placeholders = arr.map(() => '?').join(', ');
-            conditions.push(`json_extract(data, '$.${escapedField}') NOT IN (${placeholders})`);
-            params.push(...arr.map(bindValue));
+            conditions.push(`json_extract(data, '$.${escapedField}') NOT IN ${JSON_IN}`);
+            params.push(jsonList((opVal as unknown[]).map(bindValue)));
             break;
           }
           case '$contains':

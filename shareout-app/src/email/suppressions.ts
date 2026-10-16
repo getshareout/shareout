@@ -1,4 +1,5 @@
 import type { Env } from '../types';
+import { JSON_IN, jsonList } from '../sql-in';
 
 export type SuppressionReason = 'bounce' | 'complaint' | 'unsubscribe';
 
@@ -20,8 +21,8 @@ export async function suppressedSet(env: Env, emails: string[]): Promise<Set<str
   const normed = emails.map(norm).filter(Boolean);
   if (!normed.length) return new Set();
   const rows = await env.DB.prepare(
-    `SELECT email FROM email_suppressions WHERE email IN (${normed.map(() => '?').join(',')})`,
-  ).bind(...normed).all<{ email: string }>();
+    `SELECT email FROM email_suppressions WHERE email IN ${JSON_IN}`,
+  ).bind(jsonList(normed)).all<{ email: string }>();
   return new Set((rows.results || []).map((r) => r.email));
 }
 

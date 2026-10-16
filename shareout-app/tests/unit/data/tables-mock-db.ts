@@ -346,16 +346,11 @@ function parseSqlFilter(sql: string, whereParams: unknown[]): Record<string, unk
       continue;
     }
 
-    if (op.startsWith('IN (')) {
-      const placeholders = (match[3].match(/\?/g) ?? []).length;
-      filter[field] = { $in: params.slice(paramIdx, paramIdx + placeholders) };
-      paramIdx += placeholders;
-      continue;
-    }
-
-    if (op.startsWith('NOT IN (')) {
-      const placeholders = (match[4].match(/\?/g) ?? []).length;
-      filter[field] = { $nin: params.slice(paramIdx, paramIdx + placeholders) };
+    if (op.startsWith('IN (') || op.startsWith('NOT IN (')) {
+      const list = op.startsWith('IN (') ? match[3] : match[4];
+      const placeholders = (list.match(/\?/g) ?? []).length;
+      const values = list.includes('json_each') ? JSON.parse(params[paramIdx] as string) : params.slice(paramIdx, paramIdx + placeholders);
+      filter[field] = op.startsWith('IN (') ? { $in: values } : { $nin: values };
       paramIdx += placeholders;
       continue;
     }

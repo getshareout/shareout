@@ -39,4 +39,15 @@ describe('fetchHistories (D1)', () => {
     const h = await fetchHistories(e, ['r1', 'r2'], 3);
     expect(h).toEqual({ r1: [3, 4, 5], r2: [42] });
   });
+
+  it('handles 150 rules in one call (D1 caps a statement at 100 bound params)', async () => {
+    const ids = Array.from({ length: 150 }, (_, i) => `r${i}`);
+    await e.DB.batch(ids.map((rule, i) =>
+      e.DB.prepare('INSERT INTO metric_alert_runs (id, rule_id, artifact_id, metric_id, evaluated_at, value) VALUES (?, ?, ?, ?, ?, ?)')
+        .bind(`x${i}`, rule, 'art_1', 'm', daysAgo(0, 1).toISOString(), i)));
+    const h = await fetchHistories(e, ids);
+    expect(Object.keys(h)).toHaveLength(150);
+    expect(h.r0).toEqual([0]);
+    expect(h.r149).toEqual([149]);
+  });
 });

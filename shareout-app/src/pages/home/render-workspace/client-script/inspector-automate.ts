@@ -41,16 +41,21 @@ export const workspace_client_inspector_automate_JS = `  // ----- Tests (artifac
     return '<div class="wsx-row"><div class="wsx-row__main"><div class="wsx-row__title">' + esc(a.name || a.metric_id || t('inspector.alertDefault')) + '</div><div class="wsx-row__sub">' + esc(a.schedule ? cronHuman(a.schedule) : '') + '</div></div>' + (a.enabled ? '<span class="wsx-row__badge ok">' + esc(t('admin.on')) + '</span>' : '<span class="wsx-row__badge">' + esc(t('admin.off')) + '</span>') + '</div>';
   }
   function renderAutomate(art) {
-    if (autoCache[art.id] !== undefined) { paintAutomate(art, autoCache[art.id]); return; }
     rbodyEl.innerHTML = '<div class="wsx-cm">' + i18nLoad() + '</div>';
-    Promise.all([
-      fetch('/v1/jobs' + (window.WSX_WS ? '?workspace_id=' + encodeURIComponent(window.WSX_WS) : ''),{ credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      fetch('/v1/metric-alerts' + (window.WSX_WS ? '?workspace_id=' + encodeURIComponent(window.WSX_WS) : ''), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
-    ]).then(function (res) {
-      var jobs = ((res[0] && (res[0].jobs || res[0].items)) || []).filter(function (j) { return !art.id || j.artifact_id === art.id; });
-      var alerts = ((res[1] && res[1].alerts) || []).filter(function (a) { return !art.id || a.artifact_id === art.id; });
-      autoCache[art.id] = { jobs: jobs, alerts: alerts };
-      paintAutomate(art, autoCache[art.id]);
+    if (!art.id) {
+      fetchMeta(art, function (d) {
+        if (activeArt !== art) return;
+        if (!d || !art.id) { railRetry('inspector.detailsFailed', function () { renderAutomate(art); }); return; }
+        renderAutomate(art);
+      });
+      return;
+    }
+    if (autoCache[art.id] !== undefined) { paintAutomate(art, autoCache[art.id]); return; }
+    var q = '?artifact_id=' + encodeURIComponent(art.id);
+    function get(path) { return fetch(path + q, { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }); }
+    Promise.all([get('/v1/jobs'), get('/v1/metric-alerts')]).then(function (res) {
+      autoCache[art.id] = { jobs: (res[0] && (res[0].jobs || res[0].items)) || [], alerts: (res[1] && res[1].alerts) || [] };
+      if (activeArt === art) paintAutomate(art, autoCache[art.id]);
     });
   }
   function autoTile(act, icon, title, sub) {
