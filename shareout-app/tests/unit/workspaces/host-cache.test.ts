@@ -1,8 +1,10 @@
 // Subdomain host resolution: workspace slug → id cached in KV (hit, negative hit),
 // invalidated by every writer that creates, renames or deletes a workspace.
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { hostWorkspaceId } from '../../../src/pages/home/host';
-import { invalidateWorkspaceSlug, workspaceIdBySlug, workspaceSlugCacheKey } from '../../../src/workspaces/host-cache';
+import {
+  clearWorkspaceSlugMisses, invalidateWorkspaceSlug, isWorkspaceSlugShape, workspaceIdBySlug, workspaceSlugCacheKey, workspaceSlugMissCount,
+} from '../../../src/workspaces/host-cache';
 import { createWorkspaceForUser, handleDeleteWorkspace, handleUpdateWorkspace } from '../../../src/workspaces/crud';
 import type { AuthUser } from '../../../src/api-auth';
 import type { Env } from '../../../src/types';
@@ -23,6 +25,9 @@ function fakeKv() {
 /** `slugs` maps slug → workspace id for `SELECT id FROM workspaces WHERE slug = ?`. */
 function makeEnv(slugs: Record<string, string>, extra: (sql: string, args: unknown[]) => unknown = () => null) {
   const { kv, store } = fakeKv();
+  const puts: string[] = [];
+  const put = kv.put.bind(kv);
+  (kv as unknown as { put: typeof put }).put = async (k, v, o) => { puts.push(k); return put(k, v, o); };
   const sqls: string[] = [];
   const DB = {
     prepare: (sql: string) => ({
@@ -38,10 +43,13 @@ function makeEnv(slugs: Record<string, string>, extra: (sql: string, args: unkno
     }),
   };
   const env = { DB, SLUGS: kv, SHAREOUT_BASE_URL: 'https://x.test' } as unknown as Env;
-  return { env, store, d1Lookups: () => sqls.filter((s) => s === 'SELECT id FROM workspaces WHERE slug = ?').length };
+  return { env, store, puts, d1Lookups: () => sqls.filter((s) => s === 'SELECT id FROM workspaces WHERE slug = ?').length };
 }
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
+
+beforeEach(() => clearWorkspaceSlugMisses());
+afterEach(() => vi.restoreAllMocks());
 
 describe('workspace slug → id cache', () => {
   it('a miss reads D1 once and fills KV; the next lookup is a KV hit', async () => {
@@ -53,13 +61,59 @@ describe('workspace slug → id cache', () => {
     expect(t.d1Lookups()).toBe(1);
   });
 
-  it('an unknown slug is cached as a short negative entry', async () => {
+  it('a miss writes nothing to KV; repeats are answered from the isolate', async () => {
     const t = makeEnv({});
     expect(await workspaceIdBySlug(t.env, 'nope')).toBeNull();
     await tick();
-    expect(t.store.get(workspaceSlugCacheKey('nope'))).toEqual({ value: '-', ttl: 60 });
+    expect(t.puts).toEqual([]);
+    expect(t.store.size).toBe(0);
     expect(await workspaceIdBySlug(t.env, 'nope')).toBeNull();
     expect(t.d1Lookups()).toBe(1);
+  });
+
+  it('a stale negative KV entry from an older build is not trusted', async () => {
+    const t = makeEnv({ acme: WS });
+    t.store.set(workspaceSlugCacheKey('acme'), { value: '-' });
+    expect(await workspaceIdBySlug(t.env, 'acme')).toBe(WS);
+  });
+
+  it('slugs no workspace can have skip D1 and KV entirely', async () => {
+    const t = makeEnv({});
+    for (const slug of ['-x', 'x-', 'a_b', 'a.b', 'ABC', '', 'a'.repeat(64)]) {
+      expect(isWorkspaceSlugShape(slug)).toBe(false);
+      expect(await workspaceIdBySlug(t.env, slug)).toBeNull();
+    }
+    await tick();
+    expect(t.d1Lookups()).toBe(0);
+    expect(t.puts).toEqual([]);
+    expect(workspaceSlugMissCount()).toBe(0);
+    expect(isWorkspaceSlugShape('a')).toBe(true);
+    expect(isWorkspaceSlugShape('a'.repeat(63))).toBe(true);
+  });
+
+  it('the isolate negative cache expires after 60s', async () => {
+    const t = makeEnv({});
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    await workspaceIdBySlug(t.env, 'later');
+    now.mockReturnValue(1_000_000 + 59_000);
+    await workspaceIdBySlug(t.env, 'later');
+    expect(t.d1Lookups()).toBe(1);
+    now.mockReturnValue(1_000_000 + 61_000);
+    await workspaceIdBySlug(t.env, 'later');
+    expect(t.d1Lookups()).toBe(2);
+  });
+
+  it('the isolate negative cache stays bounded, evicting the oldest', async () => {
+    const t = makeEnv({});
+    for (let i = 0; i < 1200; i++) await workspaceIdBySlug(t.env, `rnd${i}`);
+    expect(workspaceSlugMissCount()).toBe(1000);
+    expect(t.d1Lookups()).toBe(1200);
+    await workspaceIdBySlug(t.env, 'rnd1199');
+    expect(t.d1Lookups()).toBe(1200);
+    await workspaceIdBySlug(t.env, 'rnd0');
+    expect(t.d1Lookups()).toBe(1201);
+    await tick();
+    expect(t.puts).toEqual([]);
   });
 
   it('hostWorkspaceId resolves the subdomain through the cache, apex hosts skip it', async () => {
@@ -82,18 +136,21 @@ describe('workspace slug → id cache', () => {
   it('invalidateWorkspaceSlug drops each named slug and ignores empties', async () => {
     const t = makeEnv({});
     t.store.set(workspaceSlugCacheKey('a'), { value: 'wsp_a' });
-    t.store.set(workspaceSlugCacheKey('b'), { value: '-' });
+    t.store.set(workspaceSlugCacheKey('b'), { value: WS });
     await invalidateWorkspaceSlug(t.env, 'a', null, 'b', undefined);
     expect(t.store.size).toBe(0);
   });
 });
 
 describe('writers invalidate the slug cache', () => {
-  it('creating a workspace drops a negative entry for its slug', async () => {
-    const t = makeEnv({});
-    t.store.set(workspaceSlugCacheKey('fresh'), { value: '-' });
+  it('creating a workspace drops this isolate\'s negative entry for its slug', async () => {
+    const slugs: Record<string, string> = {};
+    const t = makeEnv(slugs);
+    expect(await workspaceIdBySlug(t.env, 'fresh')).toBeNull();
     await createWorkspaceForUser(t.env, owner, 'Fresh', { slug: 'fresh' });
-    expect(t.store.has(workspaceSlugCacheKey('fresh'))).toBe(false);
+    slugs.fresh = WS;
+    expect(await workspaceIdBySlug(t.env, 'fresh')).toBe(WS);
+    expect(t.d1Lookups()).toBe(2);
   });
 
   it('renaming drops both the old and the new slug', async () => {
@@ -103,7 +160,7 @@ describe('writers invalidate the slug cache', () => {
       return null;
     });
     t.store.set(workspaceSlugCacheKey('old'), { value: WS });
-    t.store.set(workspaceSlugCacheKey('new'), { value: '-' });
+    t.store.set(workspaceSlugCacheKey('new'), { value: 'wsp_other' });
     const res = await handleUpdateWorkspace(new Request(`https://x.test/v1/workspaces/${WS}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: 'new' }),
     }), t.env, owner, WS);
