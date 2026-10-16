@@ -59,15 +59,16 @@ export async function handleGetCollaborators(
   user: AuthUser,
   artifactId: string
 ): Promise<Response> {
-  const artifact = await env.DB.prepare(
-    'SELECT id FROM artifacts WHERE id = ?'
-  ).bind(artifactId).first<{ id: string }>();
+  // Existence and the role check are independent reads: one wave. A missing artifact
+  // still answers 404 before any 403.
+  const [artifact, forbidden] = await Promise.all([
+    env.DB.prepare('SELECT id FROM artifacts WHERE id = ?').bind(artifactId).first<{ id: string }>(),
+    requireSharingRole(env, artifactId, user.id, 'viewer'),
+  ]);
 
   if (!artifact) {
     return json({ error: 'Artifact not found', code: 'NOT_FOUND' }, 404);
   }
-
-  const forbidden = await requireSharingRole(env, artifactId, user.id, 'viewer');
   if (forbidden) return forbidden;
 
   const collaborators = await env.DB.prepare(

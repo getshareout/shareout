@@ -19,7 +19,7 @@ import { blockDisabledMarketingPages } from '../marketing-us-gate';
 import { asGetForHead, stripBodyForHead, wrongMethodOnKnownPath } from './method-policy';
 import { routeMcp } from '../mcp';
 import { simpleApiError } from '../http/api-error';
-import { scopeRequest, timePhase, withServerTiming } from '../http/request-scope';
+import { d1SessionStart, scopeRequest, timePhase, withD1Bookmark, withServerTiming } from '../http/request-scope';
 
 // HTML document navigations get the styled 404 page; /v1 gets the JSON error envelope;
 // other data/asset requests keep the lightweight plain-text body.
@@ -112,9 +112,16 @@ export async function handleFetch(request: Request, env: Env, executionCtx?: Exe
     return handleCdnContent(ctx.request, env, executionCtx);
   }
 
-  // Read requests get a per-request memo; the timed routes also meter D1/KV.
-  const scoped = scopeRequest(env, { memo: effectiveRequest.method === 'GET', timing: isTimedPath(ctx.path) });
-  return withServerTiming(scoped, await dispatch(request, { ...ctx, env: scoped }, executionCtx));
+  // Read requests get a per-request memo; the timed routes also meter D1/KV. With
+  // D1_READ_REPLICAS=1 the request reads through a D1 session, and a request that wrote
+  // hands its bookmark back so the caller's next read is at least that fresh.
+  const scoped = scopeRequest(env, {
+    memo: effectiveRequest.method === 'GET',
+    timing: isTimedPath(ctx.path),
+    d1: d1SessionStart(effectiveRequest, env),
+  });
+  const res = withServerTiming(scoped, await dispatch(request, { ...ctx, env: scoped }, executionCtx));
+  return withD1Bookmark(scoped, effectiveRequest, res);
 }
 
 async function dispatch(request: Request, ctx: FetchContext, executionCtx?: ExecutionContext): Promise<Response> {

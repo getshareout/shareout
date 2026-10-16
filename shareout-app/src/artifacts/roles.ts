@@ -16,15 +16,17 @@ export async function getUserRole(
   artifactId: string,
   userId: string
 ): Promise<CollaboratorRole | null> {
-  const artifact = await env.DB.prepare(
-    'SELECT owner_id FROM artifacts WHERE id = ?'
-  ).bind(artifactId).first<{ owner_id: string }>();
+  // Owner row and caller email are independent: one wave, then the collaborator row.
+  const [artifact, user] = await Promise.all([
+    env.DB.prepare(
+      'SELECT owner_id FROM artifacts WHERE id = ?'
+    ).bind(artifactId).first<{ owner_id: string }>(),
+    env.DB.prepare(
+      'SELECT email FROM users WHERE id = ?'
+    ).bind(userId).first<{ email: string }>(),
+  ]);
 
   if (artifact?.owner_id === userId) return 'owner';
-
-  const user = await env.DB.prepare(
-    'SELECT email FROM users WHERE id = ?'
-  ).bind(userId).first<{ email: string }>();
   if (!user?.email) return null;
 
   const collab = await env.DB.prepare(
@@ -87,7 +89,10 @@ export async function requireSharingRole(
   userId: string,
   minRole: CollaboratorRole
 ): Promise<Response | null> {
-  const forbidden = await requireRole(env, artifactId, userId, minRole);
-  if (!forbidden) return null;
-  return (await isArtifactSharingAdmin(env, artifactId, userId)) ? null : forbidden;
+  // Both checks are reads; running them together keeps the admin path to the same waves.
+  const [forbidden, admin] = await Promise.all([
+    requireRole(env, artifactId, userId, minRole),
+    isArtifactSharingAdmin(env, artifactId, userId),
+  ]);
+  return !forbidden || admin ? null : forbidden;
 }

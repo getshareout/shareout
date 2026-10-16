@@ -2,6 +2,7 @@ import type { Env } from '../types';
 import { purgeArtifact } from '../artifacts/crud';
 import { isSuperAdminEmail } from './recipients';
 import { invalidateUserDisabled } from '../auth/session';
+import { invalidateWorkspaceSlug } from '../workspaces/host-cache';
 
 export interface UserRow {
   id: string;
@@ -159,8 +160,8 @@ export async function deleteUser(
   // Owned workspaces and their children. Detach any remaining artifacts (owned by
   // other users) so they survive rather than being silently orphaned to a dead id.
   const workspaces = await env.DB.prepare(
-    'SELECT id FROM workspaces WHERE owner_id = ?'
-  ).bind(userId).all<{ id: string }>();
+    'SELECT id, slug FROM workspaces WHERE owner_id = ?'
+  ).bind(userId).all<{ id: string; slug: string }>();
   for (const w of workspaces.results || []) {
     await env.DB.batch([
       env.DB.prepare('UPDATE artifacts SET workspace_id = NULL WHERE workspace_id = ?').bind(w.id),
@@ -170,6 +171,7 @@ export async function deleteUser(
       env.DB.prepare('DELETE FROM workspace_llm_config WHERE workspace_id = ?').bind(w.id),
       env.DB.prepare('DELETE FROM workspaces WHERE id = ?').bind(w.id),
     ]);
+    await invalidateWorkspaceSlug(env, w.slug);
   }
 
   await env.DB.batch([

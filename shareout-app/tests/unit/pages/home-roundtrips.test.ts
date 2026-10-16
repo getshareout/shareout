@@ -76,11 +76,13 @@ function handler(opts: { isMember: boolean; role?: string; folders?: Row[] }): H
 const req = (path: string) => new Request(`https://acme.x.test${path}`);
 
 describe('GET /v1/home/* boot endpoints — D1 round-trip waves (workspace subdomain)', () => {
-  it('activity-feed: at most 4 waves (was 8: host, scope×2, member, scope×2, role/audiences, sources)', async () => {
+  it('activity-feed: at most 3 waves (was 8, then 4): host, scope + role + audiences, sources', async () => {
     const db = wavesDb(handler({ isMember: true, role: 'member' }));
     const { out, waves } = await db.settle(handleHomeActivityFeedApi(req('/v1/home/activity-feed?limit=50&window=7d'), db.env, alice));
     expect(out.status).toBe(200);
-    expect(waves).toBeLessThanOrEqual(4);
+    expect(waves).toBeLessThanOrEqual(3);
+    // Needs-you and Pulse sources each go out as one batch, not one call per source.
+    expect(db.calls.length).toBeLessThanOrEqual(8);
     // The visibility scope is resolved once per request, not once per helper.
     expect(db.calls.filter((s) => s.includes('identity_id')).length).toBe(1);
   });
@@ -128,6 +130,46 @@ describe('GET /v1/home/* boot endpoints — D1 round-trip waves (workspace subdo
     const db = wavesDb(handler({ isMember: true }));
     const { waves } = await db.settle(quickSearch(db.env, alice.id, { q: '', groups: ['artifacts', 'schedules'] }));
     expect(waves).toBeLessThanOrEqual(3);
+  });
+});
+
+// Prod steady state: the host mapping (and, for members, the internal role) are KV hits.
+describe('warm host cache (slug → id in KV)', () => {
+  const warm = (db: ReturnType<typeof wavesDb>, role?: string) => {
+    const kv = new Map([['wsslug:acme', WS], ...(role ? [[`wsintrole:${WS}:${alice.id}`, role] as [string, string]] : [])]);
+    (db.env as { SLUGS?: unknown }).SLUGS = {
+      get: async (k: string) => kv.get(k) ?? null,
+      put: async (k: string, v: string) => { kv.set(k, v); },
+      delete: async (k: string) => { kv.delete(k); },
+    };
+    return db;
+  };
+
+  for (const [name, fn, path, max] of [
+    ['activity-feed', handleHomeActivityFeedApi, '/v1/home/activity-feed?limit=50&window=7d', 2],
+    ['recent', handleHomeRecentApi, '/v1/home/recent?limit=8', 2],
+    ['for-you', handleHomeForYouApi, '/v1/home/for-you?limit=12', 2],
+  ] as const) {
+    it(`${name}: the host lookup costs no D1 wave (at most ${max})`, async () => {
+      const db = warm(wavesDb(handler({ isMember: true, role: 'member' })), 'member');
+      const { out, waves } = await db.settle(fn(req(path), db.env, alice));
+      expect(out.status).toBe(200);
+      expect(db.calls.some((s) => s.includes('FROM workspaces WHERE slug'))).toBe(false);
+      expect(waves).toBeLessThanOrEqual(max);
+    });
+  }
+
+  it('activity-feed: a linked-account member (no internal role for the session user) still gets in', async () => {
+    const db = warm(wavesDb(handler({ isMember: true })));
+    const { out } = await db.settle(handleHomeActivityFeedApi(req('/v1/home/activity-feed'), db.env, alice));
+    expect(out.status).toBe(200);
+    expect(db.calls.some((s) => s.includes('SELECT 1 FROM workspace_members'))).toBe(true);
+  });
+
+  it('activity-feed: an internal role skips the separate membership query', async () => {
+    const db = warm(wavesDb(handler({ isMember: true, role: 'member' })), 'member');
+    await db.settle(handleHomeActivityFeedApi(req('/v1/home/activity-feed'), db.env, alice));
+    expect(db.calls.some((s) => s.includes('SELECT 1 FROM workspace_members'))).toBe(false);
   });
 });
 
@@ -192,7 +234,7 @@ describe('perf budget: D1 waves per request through the router (workspace subdom
     return handleFetch(new Request(`https://acme.x.test${path}`, { headers: { Cookie: cookie } }), db.env);
   };
   for (const [path, max] of [
-    ['/v1/home/activity-feed?limit=50&window=7d', 5],
+    ['/v1/home/activity-feed?limit=50&window=7d', 4],
     ['/v1/home/for-you?limit=12', 4],
     ['/v1/home/recent?limit=8', 4],
     ['/v1/home/browser?sort=recent', 4],

@@ -94,7 +94,8 @@ export async function queryPulse(
   const ownWhere = `a.deleted_at IS NULL AND a.owner_id IN (${idPh}) AND ${workspaceId ? 'a.workspace_id = ?' : 'a.workspace_id IS NULL'}`;
   const ownParams = workspaceId ? [...vis.userIds, workspaceId] : [...vis.userIds];
 
-  const sources: Promise<{ results: any[] | null }>[] = [];
+  // Every source is independent: one D1 batch, one round trip.
+  const sources: D1PreparedStatement[] = [];
   const tag: Array<(rows: any[]) => PulseEvent[]> = [];
 
   /** Aggregate one artifact-scoped ambient kind: COUNT + MAX(ts), grouped by artifact. */
@@ -122,7 +123,7 @@ export async function queryPulse(
       ${scopeJoin}
       WHERE ${scopeWhere} AND ${tsExpr} >= ? ${extraWhere} ${own}
       GROUP BY a.id ORDER BY ts DESC LIMIT ?
-    `).bind(...vis.userIds, ...scopeParams, cutoff, ...ownP, PER).all());
+    `).bind(...vis.userIds, ...scopeParams, cutoff, ...ownP, PER));
     tag.push((rows) => rows.map((r) => ({
       kind, id: `${kind}:${r.artifact_id}`, artifact_id: r.artifact_id, artifact_name: r.artifact_name,
       slug: r.slug, count: r.count, summary: summarize(r.count), ts: r.ts, owned: !!r.owned,
@@ -164,7 +165,7 @@ export async function queryPulse(
       sources.push(env.DB.prepare(`
         SELECT COUNT(*) AS count, MAX(CAST(strftime('%s', created_at) AS INTEGER)) AS ts
         FROM workspace_members WHERE workspace_id = ? AND CAST(strftime('%s', created_at) AS INTEGER) >= ?
-      `).bind(workspaceId, cutoff).all());
+      `).bind(workspaceId, cutoff));
       tag.push((rows) => (rows[0]?.count ? [{
         kind: 'member', id: 'member:ws', artifact_id: null, artifact_name: null, slug: null,
         count: rows[0].count, summary: `${rows[0].count} ${rows[0].count === 1 ? 'person' : 'people'} joined`, ts: rows[0].ts,
@@ -177,7 +178,7 @@ export async function queryPulse(
         JOIN agent_threads t ON t.id = m.thread_id
         WHERE t.scope_type = 'workspace' AND t.scope_key = ? AND t.user_id IN (${idPh})
           AND m.role = 'assistant' AND CAST(strftime('%s', m.created_at) AS INTEGER) >= ?
-      `).bind(workspaceId, ...vis.userIds, cutoff).all());
+      `).bind(workspaceId, ...vis.userIds, cutoff));
       tag.push((rows) => (rows[0]?.count ? [{
         kind: 'agent', id: 'agent:ws', artifact_id: null, artifact_name: null, slug: null,
         count: rows[0].count, summary: `assistant ran ${rows[0].count} task${rows[0].count === 1 ? '' : 's'}`, ts: rows[0].ts,
@@ -185,7 +186,7 @@ export async function queryPulse(
     }
   }
 
-  const settled = await Promise.all(sources);
+  const settled = sources.length ? await env.DB.batch(sources) : [];
   const rows = settled.flatMap((res, i) => tag[i](res.results || [])) as Array<PulseEvent & { owned?: boolean }>;
   rows.sort((x, y) => (Number(!!y.owned) - Number(!!x.owned)) || (y.ts - x.ts));
   return rows.slice(0, limit).map(({ owned: _o, ...e }) => e);
@@ -201,11 +202,12 @@ export async function queryActivityFeed(
   user: { id: string; email: string | null },
   opts: ActivityFeedOpts = {},
   visArg?: VisibilityScope,
+  pre?: { role: WorkspaceRole | null; aud: AudienceMap },
 ): Promise<ActivityFeed> {
   const vis = visArg ?? await getVisibilityScope(env, user);
   const workspaceId = opts.workspaceId ?? null;
   const window = opts.window ?? '7d';
-  const [role, aud] = await Promise.all([
+  const [role, aud] = pre ? [pre.role, pre.aud] : await Promise.all([
     workspaceId ? getInternalWorkspaceRole(env, workspaceId, user.id) : Promise.resolve(null),
     resolveWorkspaceAudiences(env, workspaceId),
   ]);

@@ -33,9 +33,10 @@ export async function queryNeedsYou(
   const emailPh = placeholders(vis.emails.length);
   const on = (k: ActivityKind) => aud[k] !== 'off';
 
-  const sources: Promise<{ results: any[] | null }>[] = [];
+  // Every source is independent: one D1 batch, one round trip.
+  const sources: D1PreparedStatement[] = [];
   const tag: Array<(rows: any[]) => ActivityEvent[]> = [];
-  const push = (q: Promise<{ results: any[] | null }>, map: (rows: any[]) => ActivityEvent[]) => {
+  const push = (q: D1PreparedStatement, map: (rows: any[]) => ActivityEvent[]) => {
     sources.push(q); tag.push(map);
   };
 
@@ -66,7 +67,7 @@ export async function queryNeedsYou(
         AND (ac.assignee_user_id IS NULL OR ac.assignee_user_id NOT IN (${idPh}))
         AND (ac.assignee_email IS NULL${emailPh ? ` OR lower(ac.assignee_email) NOT IN (${emailPh})` : ''})
       GROUP BY ac.id ORDER BY ac.created_at DESC LIMIT ?
-    `).bind(...lowerEmails, ...base.joinParams, ...base.whereParams, ...vis.userIds, ...vis.userIds, ...lowerEmails, limit).all(),
+    `).bind(...lowerEmails, ...base.joinParams, ...base.whereParams, ...vis.userIds, ...vis.userIds, ...lowerEmails, limit),
       (rows) => rows.filter((r) => on(r.kind as ActivityKind)).map((r) => {
         const body = trim140(stripMentionTokens(r.content || ''));
         return {
@@ -89,7 +90,7 @@ export async function queryNeedsYou(
       WHERE sh.email IN (${emailPh}) AND a.deleted_at IS NULL AND a.owner_id NOT IN (${idPh})
         ${workspaceId ? 'AND a.workspace_id = ?' : ''}
       ORDER BY sh.added_at DESC LIMIT ?
-    `).bind(...vis.emails, ...vis.userIds, ...(workspaceId ? [workspaceId] : []), limit).all(),
+    `).bind(...vis.emails, ...vis.userIds, ...(workspaceId ? [workspaceId] : []), limit),
       (rows) => rows.map((r) => ({
         kind: 'share', id: r.id, artifact_id: r.artifact_id, artifact_name: r.artifact_name,
         slug: r.slug, actor: r.actor, actor_picture: r.actor_picture, summary: 'shared this with you', ts: r.ts,
@@ -107,7 +108,7 @@ export async function queryNeedsYou(
       WHERE ar.status = 'pending' AND a.deleted_at IS NULL AND a.owner_id IN (${idPh})
         ${workspaceId ? 'AND a.workspace_id = ?' : ''}
       ORDER BY ar.created_at DESC LIMIT ?
-    `).bind(...vis.userIds, ...(workspaceId ? [workspaceId] : []), limit).all(),
+    `).bind(...vis.userIds, ...(workspaceId ? [workspaceId] : []), limit),
       (rows) => rows.map((r) => ({
         kind: 'access', id: r.id, artifact_id: r.artifact_id, artifact_name: r.artifact_name,
         slug: r.slug, actor: r.actor, actor_picture: null, summary: `wants access · ${r.actor}`, ts: r.ts,
@@ -124,7 +125,7 @@ export async function queryNeedsYou(
       ${base.join}
       WHERE ${base.where} AND e.matched = 1
       GROUP BY e.id ORDER BY e.evaluated_at DESC LIMIT ?
-    `).bind(...base.joinParams, ...base.whereParams, limit).all(),
+    `).bind(...base.joinParams, ...base.whereParams, limit),
       (rows) => rows.map((r) => ({
         kind: 'alert', id: r.id, artifact_id: r.artifact_id, artifact_name: r.artifact_name,
         slug: r.slug, actor: null, actor_picture: null, summary: r.message || 'alert triggered', ts: r.ts,
@@ -141,7 +142,7 @@ export async function queryNeedsYou(
       ${base.join}
       WHERE ${base.where} AND e.recipient_type = 'artifact' AND e.kind = 'stale_data'
       GROUP BY e.id ORDER BY e.created_at DESC LIMIT ?
-    `).bind(...base.joinParams, ...base.whereParams, limit).all(),
+    `).bind(...base.joinParams, ...base.whereParams, limit),
       (rows) => rows.map((r) => ({
         kind: 'stale_data', id: r.id, artifact_id: r.artifact_id, artifact_name: r.artifact_name,
         slug: r.slug, actor: null, actor_picture: null, summary: r.message, ts: r.ts,
@@ -158,7 +159,7 @@ export async function queryNeedsYou(
       ${base.join}
       WHERE ${base.where} AND e.recipient_type = 'artifact' AND e.kind = 'metric_watch'
       GROUP BY e.id ORDER BY e.created_at DESC LIMIT ?
-    `).bind(...base.joinParams, ...base.whereParams, limit).all(),
+    `).bind(...base.joinParams, ...base.whereParams, limit),
       (rows) => rows.map((r) => ({
         kind: 'metric_watch', id: r.id, artifact_id: r.artifact_id, artifact_name: r.artifact_name,
         slug: r.slug, actor: null, actor_picture: null, summary: r.message, ts: r.ts,
@@ -189,7 +190,7 @@ export async function queryNeedsYou(
         WHERE e.recipient_type = 'workspace' AND e.recipient_id = ? AND e.kind = 'unused_artifacts'
           AND e.created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now', '-35 days')
         ORDER BY e.created_at DESC LIMIT ?
-      `).bind(workspaceId, limit).all(), mapUnused(workspaceId));
+      `).bind(workspaceId, limit), mapUnused(workspaceId));
     }
   } else if (janAud !== 'off' && !workspaceId) {
     // Personal scope: your own data, no role concept — visible whenever the kind is on.
@@ -200,7 +201,7 @@ export async function queryNeedsYou(
       WHERE e.recipient_type = 'user' AND e.recipient_id IN (${idPh}) AND e.kind = 'unused_artifacts'
         AND e.created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now', '-35 days')
       ORDER BY e.created_at DESC LIMIT ?
-    `).bind(...vis.userIds, limit).all(), mapUnused(null));
+    `).bind(...vis.userIds, limit), mapUnused(null));
   }
 
   // Moderation resolves on YOUR pages: a held page that passed review (links to the
@@ -217,7 +218,7 @@ export async function queryNeedsYou(
       WHERE e.recipient_type = 'user' AND e.recipient_id IN (${idPh}) AND e.kind = 'moderation'
         AND e.created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now', '-14 days')
       ORDER BY e.created_at DESC LIMIT ?
-    `).bind(...vis.userIds, limit).all(),
+    `).bind(...vis.userIds, limit),
       (rows) => rows.map((r) => ({
         kind: 'moderation' as const, id: r.id, artifact_id: r.artifact_id, artifact_name: r.artifact_name,
         slug: r.event === 'approved' ? r.slug : null, actor: null, actor_picture: null,
@@ -234,7 +235,7 @@ export async function queryNeedsYou(
       WHERE e.recipient_type = 'user' AND e.recipient_id IN (${idPh}) AND e.kind = 'support_reply'
         AND e.created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now', '-30 days')
       ORDER BY e.created_at DESC LIMIT ?
-    `).bind(...vis.userIds, limit).all(),
+    `).bind(...vis.userIds, limit),
       (rows) => rows.map((r) => ({
         kind: 'support_reply' as const, id: r.id, artifact_id: null, artifact_name: r.subject,
         slug: null, actor: null, actor_picture: null, summary: 'support replied to your request', ts: r.ts,
@@ -254,7 +255,7 @@ export async function queryNeedsYou(
         AND (? IS NULL OR e.subject_id = ?)
         AND e.created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now', '-14 days')
       ORDER BY e.created_at DESC LIMIT ?
-    `).bind(...vis.userIds, workspaceId, workspaceId, limit).all(),
+    `).bind(...vis.userIds, workspaceId, workspaceId, limit),
       (rows) => rows.map((r) => ({
         kind: 'admin_request' as const, id: r.id, artifact_id: null, artifact_name: r.reason || null,
         slug: null, actor: r.actor, actor_picture: null,
@@ -273,7 +274,7 @@ export async function queryNeedsYou(
       ${base.join}
       WHERE ${base.where} AND tr.status IN ('failed', 'errored')
       GROUP BY tr.id ORDER BY tr.started_at DESC LIMIT ?
-    `).bind(...base.joinParams, ...base.whereParams, limit).all(),
+    `).bind(...base.joinParams, ...base.whereParams, limit),
       (rows) => rows.map((r) => ({
         kind: 'test', id: r.id, artifact_id: r.artifact_id, artifact_name: r.artifact_name,
         slug: r.slug, actor: null, actor_picture: null,
@@ -291,7 +292,7 @@ export async function queryNeedsYou(
       JOIN asset_buckets ab ON ab.artifact_id = b.artifact_id
       WHERE ab.workspace_id = ? AND o.source = 'email'
       ORDER BY o.created_at DESC LIMIT ?
-    `).bind(workspaceId, limit).all(),
+    `).bind(workspaceId, limit),
       (rows) => rows.map((r) => ({
         kind: 'file' as const, id: r.id, artifact_id: null, artifact_name: r.filename,
         slug: null, actor: r.actor, actor_picture: null,
@@ -310,7 +311,7 @@ export async function queryNeedsYou(
       ${base.join}
       WHERE ${base.where} AND jl.status = 'failed'
       GROUP BY jl.id ORDER BY jl.created_at DESC LIMIT ?
-    `).bind(...base.joinParams, ...base.whereParams, limit).all(),
+    `).bind(...base.joinParams, ...base.whereParams, limit),
       (rows) => rows.map((r) => ({
         kind: 'run', id: r.id, artifact_id: r.artifact_id, artifact_name: r.artifact_name,
         slug: r.slug, actor: null, actor_picture: null,
@@ -321,7 +322,7 @@ export async function queryNeedsYou(
   // Every source above must yield `ts` as unix seconds (INTEGER). Returning a raw
   // TEXT timestamp makes `y.ts - x.ts` NaN, which the sort silently treats as "equal"
   // — the rows then come out in source order, not time order.
-  const settled = await Promise.all(sources);
+  const settled = sources.length ? await env.DB.batch(sources) : [];
   const events: ActivityEvent[] = settled.flatMap((res, i) => tag[i](res.results || []));
   events.sort((x, y) => y.ts - x.ts);
   return events.slice(0, limit);

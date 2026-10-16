@@ -42,6 +42,9 @@ export interface Env {
   /** debug | info | warn | error — controls server log verbosity in Workers Logs */
   LOG_LEVEL?: string;
   DB: D1Database;
+  /** `1` = request handlers read through a D1 Sessions API session (read replicas, with
+   *  read-your-writes bookmarks). Needs read replication enabled on the database. */
+  D1_READ_REPLICAS?: string;
   ARTIFACTS: R2Bucket;
   /** Cloudflare Email Service Workers binding */
   EMAIL?: SendEmail;

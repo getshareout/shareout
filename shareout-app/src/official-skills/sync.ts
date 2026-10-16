@@ -7,6 +7,7 @@ import type { Env } from '../types';
 import type { AuthUser } from '../api-auth';
 import { publishArtifact } from '../publish/publish-artifact';
 import { OFFICIAL_SKILLS } from './registry';
+import { invalidateWorkspaceSlug } from '../workspaces/host-cache';
 import { OFFICIAL_SKILL_CONTENT } from './content.generated';
 
 // Fixed ids so the system workspace/user are stable and referenceable across runs.
@@ -35,7 +36,7 @@ async function ensureSystemWorkspace(env: Env): Promise<boolean> {
     'INSERT OR IGNORE INTO users (id, email, name, is_service) VALUES (?, ?, ?, 1)'
   ).bind(OFFICIAL_SYSTEM_USER_ID, SYSTEM_USER.email, 'ShareOut Official').run();
 
-  await env.DB.prepare(
+  const created = await env.DB.prepare(
     `INSERT OR IGNORE INTO workspaces (id, name, slug, description, owner_id)
        VALUES (?, ?, ?, ?, ?)`
   ).bind(
@@ -45,6 +46,7 @@ async function ensureSystemWorkspace(env: Env): Promise<boolean> {
     'System workspace hosting official recommended skills.',
     OFFICIAL_SYSTEM_USER_ID,
   ).run();
+  if (created?.meta?.changes) await invalidateWorkspaceSlug(env, OFFICIAL_SYSTEM_WORKSPACE_SLUG);
 
   await env.DB.prepare(
     `INSERT OR IGNORE INTO workspace_members (id, workspace_id, user_id, role)

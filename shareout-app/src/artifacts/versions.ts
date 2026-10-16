@@ -29,37 +29,37 @@ export async function handleGetVersions(
   user: AuthUser,
   artifactId: string
 ): Promise<Response> {
-  const artifact = await env.DB.prepare(
-    'SELECT id FROM artifacts WHERE id = ?'
-  ).bind(artifactId).first<{ id: string }>();
+  // Existence and the role check are independent reads: one wave. A missing artifact
+  // still answers 404 before any 403.
+  const [artifact, forbidden] = await Promise.all([
+    env.DB.prepare('SELECT id FROM artifacts WHERE id = ?').bind(artifactId).first<{ id: string }>(),
+    requireRole(env, artifactId, user.id, 'viewer'),
+  ]);
 
   if (!artifact) {
     return json({ error: 'Artifact not found', code: 'NOT_FOUND' }, 404);
   }
-
-  const forbidden = await requireRole(env, artifactId, user.id, 'viewer');
   if (forbidden) return forbidden;
 
-  const versions = await env.DB.prepare(`
-    SELECT v.id, v.version_no, v.entrypoint, v.created_at, v.source, v.message, v.message_source,
-           u.email AS created_by_email, u.name AS created_by_name,
-           rv.version_no AS restored_from_version_no,
-           (SELECT a.size_bytes FROM assets a WHERE a.version_id = v.id AND a.path = v.entrypoint) AS size_bytes,
-           (SELECT COUNT(*) FROM artifact_comments ac WHERE ac.version_id = v.id AND ac.parent_id IS NULL) AS comment_count
-    FROM versions v
-    LEFT JOIN users u ON u.id = v.created_by
-    LEFT JOIN versions rv ON rv.id = v.restored_from_version_id
-    WHERE v.artifact_id = ?
-    ORDER BY v.version_no DESC
-    LIMIT 50
-  `).bind(artifactId).all<{
-    id: string;
-    version_no: number;
-    entrypoint: string;
-    created_at: string;
-  }>();
-
-  const [live, approvals] = await Promise.all([
+  const [versions, live, approvals] = await Promise.all([
+    env.DB.prepare(`
+      SELECT v.id, v.version_no, v.entrypoint, v.created_at, v.source, v.message, v.message_source,
+             u.email AS created_by_email, u.name AS created_by_name,
+             rv.version_no AS restored_from_version_no,
+             (SELECT a.size_bytes FROM assets a WHERE a.version_id = v.id AND a.path = v.entrypoint) AS size_bytes,
+             (SELECT COUNT(*) FROM artifact_comments ac WHERE ac.version_id = v.id AND ac.parent_id IS NULL) AS comment_count
+      FROM versions v
+      LEFT JOIN users u ON u.id = v.created_by
+      LEFT JOIN versions rv ON rv.id = v.restored_from_version_id
+      WHERE v.artifact_id = ?
+      ORDER BY v.version_no DESC
+      LIMIT 50
+    `).bind(artifactId).all<{
+      id: string;
+      version_no: number;
+      entrypoint: string;
+      created_at: string;
+    }>(),
     env.DB.prepare(
       "SELECT version_id FROM deployments WHERE artifact_id = ? AND channel = 'production'"
     ).bind(artifactId).first<{ version_id: string }>(),
