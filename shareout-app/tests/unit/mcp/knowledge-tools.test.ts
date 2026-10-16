@@ -22,7 +22,7 @@ vi.mock('../../../src/chat-agent/access', () => ({ listWorkspacesForUser }));
 
 import { callTool, listTools } from '../../../src/mcp/tools';
 import { queueKnowledgeSource } from '../../../src/knowledge/corpus/ingest';
-import { setKnowledgeEnabled } from '../../../src/knowledge';
+import { setKnowledgeEnabled, upsertKnowledgeFile } from '../../../src/knowledge';
 
 const base = env as unknown as Env;
 const run = Date.now();
@@ -106,9 +106,9 @@ beforeEach(() => {
 });
 
 describe('knowledge tools are listed', () => {
-  it('exposes all four as read-only, telling the model to cite and use the person\'s language', () => {
+  it('exposes all six as read-only, telling the model to cite and use the person\'s language', () => {
     const tools = listTools().filter((t) => t.name.startsWith('knowledge_'));
-    expect(tools.map((t) => t.name)).toEqual(['knowledge_search', 'knowledge_entity', 'knowledge_facts', 'knowledge_status']);
+    expect(tools.map((t) => t.name)).toEqual(['knowledge_search', 'knowledge_entity', 'knowledge_facts', 'knowledge_status', 'knowledge_get', 'knowledge_from_artifact']);
     for (const t of tools) {
       expect(t.annotations.readOnlyHint).toBe(true);
       expect(t.description).toMatch(/person's language/);
@@ -233,5 +233,53 @@ describe('workspace isolation', () => {
     // B's entity id, asked about inside A, resolves to nothing.
     expect((await callTool(ana, 'knowledge_entity', { name: contoso.id, workspace_id: WS_A }))!.structuredContent!.found).toBe(false);
     expect(text(await callTool(ana, 'knowledge_facts', { about: contoso.id, workspace_id: WS_A }))).not.toContain('70k');
+  });
+});
+
+describe('knowledge_get / knowledge_from_artifact', () => {
+  const note = (sources: string[]) => `---\nkind: topic\nid: topic.renewals\ntitle: Renewals\nsources: [${sources.join(', ')}]\n---\nAcme renews in March.`;
+
+  beforeAll(async () => {
+    for (const sql of [
+      `CREATE TABLE IF NOT EXISTS workspace_files (workspace_id TEXT NOT NULL, namespace TEXT NOT NULL, scope_id TEXT NOT NULL DEFAULT '', path TEXT NOT NULL, content TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'manual', updated_by TEXT, updated_by_kind TEXT NOT NULL DEFAULT 'user', created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), PRIMARY KEY (workspace_id, namespace, scope_id, path))`,
+      `CREATE TABLE IF NOT EXISTS knowledge_tombstones (workspace_id TEXT NOT NULL, path TEXT NOT NULL, forgotten_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (workspace_id, path))`,
+      `CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, name TEXT, slug TEXT, owner_id TEXT, visibility TEXT, workspace_id TEXT, deleted_at TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))`,
+      `CREATE TABLE IF NOT EXISTS artifact_moderation (artifact_id TEXT PRIMARY KEY, status TEXT)`,
+    ]) await e.DB.exec(sql);
+    await e.DB.prepare(`INSERT OR REPLACE INTO artifacts (id, name, slug, owner_id, visibility, workspace_id) VALUES
+      ('art_kmcp_open', 'Renewal plan', 'renewal-plan', 'usr_ana', 'workspace', ?),
+      ('art_kmcp_private', 'Bo private draft', 'bo-draft', 'usr_bo', 'private', ?),
+      ('art_kmcp_b', 'Contoso deck', 'contoso-deck', 'usr_bo', 'workspace', ?)`).bind(WS_A, WS_A, WS_B).run();
+    await upsertKnowledgeFile(e, WS_A, { path: 'topics/renewals.md', content: note(['art_kmcp_open', 'art_kmcp_private']) });
+    await upsertKnowledgeFile(e, WS_B, { path: 'topics/contoso.md', content: note(['art_kmcp_b']) });
+  });
+
+  it('knowledge_get names and links visible sources and hides the rest', async () => {
+    const r = await callTool(ana, 'knowledge_get', { path: 'topics/renewals.md', workspace_id: WS_A });
+    expect(r!.isError).toBeUndefined();
+    expect(text(r)).toContain('Acme renews in March.');
+    expect(text(r)).toMatch(/Renewal plan \(https?:\/\/[^)]+\/a\/renewal-plan\/\)/);
+    expect(text(r)).toContain('not visible to the person');
+    expect(text(r)).not.toContain('Bo private draft');
+  });
+
+  it('knowledge_get refuses a workspace the person is not in', async () => {
+    const r = await callTool(ana, 'knowledge_get', { path: 'topics/contoso.md', workspace_id: WS_B });
+    expect(r!.isError).toBe(true);
+    expect(text(r)).toMatch(/not a member of that workspace/);
+    expect(text(r)).not.toContain('Acme renews');
+  });
+
+  it('knowledge_from_artifact finds the notes learned from a page, in the page\'s own workspace', async () => {
+    const r = await callTool(ana, 'knowledge_from_artifact', { artifact_id: 'art_kmcp_open' });
+    expect(r!.structuredContent!.workspace_id).toBe(WS_A);
+    expect(r!.structuredContent!.notes).toEqual([expect.objectContaining({ path: 'topics/renewals.md', title: 'Renewals' })]);
+  });
+
+  it("knowledge_from_artifact returns nothing for a page the person cannot open, and refuses another workspace's page", async () => {
+    expect((await callTool(ana, 'knowledge_from_artifact', { artifact_id: 'art_kmcp_private' }))!.structuredContent!.notes).toEqual([]);
+    const other = await callTool(ana, 'knowledge_from_artifact', { artifact_id: 'art_kmcp_b' });
+    expect(other!.isError).toBe(true);
+    expect(text(other)).toMatch(/not a member of that workspace/);
   });
 });

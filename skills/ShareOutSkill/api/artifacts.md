@@ -125,6 +125,29 @@ Tell the user the page is private and why; don't call the link public and don't 
 
 See [agents/overview.md](../agents/overview.md) for the full agent guide and the live-data `chat({ context })` pattern.
 
+### Multi-page sites (several HTML files)
+
+Ship each page as its own file in `files[]` and keep `entrypoint` on the home page:
+
+```json
+{
+  "name": "Acme ops manual",
+  "entrypoint": "index.html",
+  "files": [
+    { "path": "index.html", "content": "<a href=\"procedures/intake.html\">Intake</a>…", "mime": "text/html" },
+    { "path": "procedures/intake.html", "content": "<a href=\"../index.html\">Home</a>…", "mime": "text/html" },
+    { "path": "procedures/billing.html", "content": "…", "mime": "text/html" }
+  ]
+}
+```
+
+- Link between pages with **relative** hrefs (`procedures/intake.html`, `../index.html`). Absolute links to the same artifact (`/a/{slug}/…`) also stay inside the viewer; links to another artifact open it in its own tab.
+- Deep link to a page with `?page=<path>`: `$ORIGIN/a/{slug}/?page=procedures/intake.html` (Home shows it as `#a/{slug}/procedures/intake.html`). The viewer URL follows the page being read.
+- `GET /v1/artifacts/{id}` returns `pages` (the live version's HTML files, entrypoint first) and `entrypoint` when there are 2 or more.
+- Every publish replaces the whole file set, so send all pages each time.
+
+See [core/html-spec/pages.md](../core/html-spec/pages.md#multiple-html-files-sites).
+
 ## Slugs: human vs routing
 
 ShareOut stores two slugs per artifact:
@@ -198,7 +221,9 @@ Fetch all files for an artifact version.
 
 ## Versions & restore
 
-`GET /v1/artifacts/{id}/versions` lists the 50 newest published versions (`id`, `version_no`, `entrypoint`, `created_at`, `source` — `api`/`agent`/`editor`/`restore`, `message`, `message_source` — `author` or `ai` (generated after publish, may appear a few seconds later), `created_by_email`, `created_by_name`, `restored_from_version_no`, `size_bytes` of the entrypoint) plus `live_version_id`. Viewer or above.
+`GET /v1/artifacts/{id}/versions` lists the 50 newest published versions (`id`, `version_no`, `entrypoint`, `created_at`, `source` — `api`/`agent`/`editor`/`restore`, `message`, `message_source` — `author` or `ai` (generated after publish, may appear a few seconds later), `created_by_email`, `created_by_name`, `restored_from_version_no`, `size_bytes` of the entrypoint, `comment_count` — comment threads written while it was live, `approvals` — `[{name, email, created_at}]`) plus `live_version_id`. Viewer or above.
+
+Each comment records the version that was live when it was written (`versionId` on the [comments API](../sdk/comments.md#review-mode)), and Home shows "on vN" for comments made on an older version. Approve a version (default: the live one) with `POST /v1/home/approvals {"artifactId", "versionId"?, "approved"?}`; `GET /v1/home/review?artifactId=` returns the live version, `can_review` and every approval. Approvals are a record, not a publish gate.
 
 `GET /v1/artifacts/{id}/versions/{no}/source` returns one version's entrypoint text: `{version_no, entrypoint, mime, size_bytes, content, truncated}` (content capped at 512 KB). `415 NOT_TEXT` for a binary entrypoint.
 

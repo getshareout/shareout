@@ -182,7 +182,7 @@ When Knowledge is on, the [workspace assistant](workspace-assistant.md) can cons
 | Tool | Purpose |
 | --- | --- |
 | `knowledge_search` | Search by topic, client, person or question; returns cited `passages` from uploaded Files and pages plus note summaries (`kind` filter = notes only) |
-| `knowledge_get` | Read one note in full, including sources; pass `path` or `id` from search |
+| `knowledge_get` | Read one note in full; its `sources` are `{ id, slug, title, url, available }` — cite the `url`; unavailable sources have no title or link |
 | `knowledge_entity` | One client, person, product or project: connections and quoted mentions |
 | `knowledge_facts` | Recorded facts about an entity, each with its source sentence; optional `filter` |
 | `knowledge_status` | What is learned, processing, unreadable; entity counts |
@@ -197,6 +197,8 @@ Claude, ChatGPT and Claude Code connected through the [MCP connector](../integra
 | `knowledge_entity` | `GET …/knowledge/entities?q=` + `…/entities/{id}` — one entity, its neighbours, sources and quotes |
 | `knowledge_facts` | facts from `…/entities/{id}`, each with the quoted evidence; optional `filter` |
 | `knowledge_status` | `GET …/knowledge/sources` + entity counts — what's learned, processing or unreadable |
+| `knowledge_get` | `GET …/knowledge/files/{path}` — one note in full with its `source_artifacts` (title + link) |
+| `knowledge_from_artifact` | `GET …/knowledge/from/{artifactId}` — the notes learned from one page |
 
 Pass `workspace_id` when the person has several workspaces (the tool asks otherwise).
 
@@ -209,7 +211,8 @@ All routes require workspace membership. When Knowledge is off, root `GET` retur
 | `GET` | `/v1/workspaces/{id}/knowledge` | Member+ | Settings + counts (`enabled`, `counts`, `lastUpdated`, `total`) |
 | `GET` | `/v1/workspaces/{id}/knowledge/status` | Member+ | Training progress (`queued`, `processed`, `total`, `running`, `lastProcessedAt`) — 24h window |
 | `GET` | `/v1/workspaces/{id}/knowledge/tree` | Member+ | All note summaries grouped by kind (no bodies) |
-| `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | One note — full markdown body + sources |
+| `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | One note — full markdown body, `sources` (artifact ids) and `source_artifacts` |
+| `GET` | `/v1/workspaces/{id}/knowledge/from/{artifactId}` | Member+ | Notes learned from one artifact (the reverse of `sources`) |
 | `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Replace markdown; marks hand-edited |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Delete; `forget=1` stops re-learn |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | Turn learning on/off |
@@ -234,6 +237,8 @@ Retention overview.
 ```
 
 A note that wouldn't parse (no frontmatter, missing `kind`/`id`/`title`, unknown `kind`) or a JSON body without a string `content` is rejected with `400 VALIDATION_ERROR` (`param: "content"` or `"path"`) — nothing is stored.
+
+**Sources ↔ notes.** `GET …/knowledge/files/{path}` returns `source_artifacts`, one per id in `sources`: `{ id, slug, title, url, available }`, where `url` is the absolute `$ORIGIN/a/{slug}/` link. When the artifact is deleted, held, in another workspace or private to someone else, it comes back `available: false` with no title, slug or url. The reverse, `GET …/knowledge/from/{artifactId}`, returns `{ enabled, notes: [{ path, kind, id, title }] }` (max 50) — empty when you may not open that artifact, `enabled: false` when Knowledge is off. Home shows these as "Knowledge from this artifact" in the Inspector's Details.
 
 ## Related
 

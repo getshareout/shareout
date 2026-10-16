@@ -35,6 +35,11 @@ On a 5xx, or when the same error repeats after following its `hint`, file a tick
 ([support.md](support.md)) with what the user wanted, what you tried, the `code`, the
 `request_id` and any `artifact_id`, then tell the user the team was notified.
 
+**Slow, not failing?** Authenticated responses from `/home`, `/v1/home/*` and `/v1/artifacts/*`
+carry a `Server-Timing` header (`auth`, `host`, `render`, `d1` calls/waves/ms, `kv`, `app` —
+phase names, counts and milliseconds only). Paste it with the `request_id` into the ticket.
+Anonymous requests don't get it.
+
 ## General Errors
 
 | Code | Status | Description |

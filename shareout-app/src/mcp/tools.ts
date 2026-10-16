@@ -18,12 +18,14 @@ import { openTicket } from '../support/intake';
 import { generateSlug } from '../validation';
 import { createLogger, logError } from '../logging';
 import {
-  NOT_MEMBER, ON_FAILURE, errorText, fail, getRequest, invalid, ok, readJson, resolveWorkspace, str, validateArgs, workspaceChoiceText,
+  NOT_MEMBER, ON_FAILURE, errorText, fail, getRequest, invalid, ok, readJson, resolveFolder, resolveWorkspace, str, validateArgs, workspaceChoiceText,
   type Args, type ToolContext, type ToolDef, type ToolResult,
 } from './tool-kit';
 import { MEMBER_TOOLS } from './member-tools';
 import { KNOWLEDGE_TOOLS } from './knowledge-tools';
 import { CONNECTOR_TOOLS } from './connector-tools';
+import { PAGE_TOOLS } from './page-tools';
+import { SHARING_TOOLS } from './sharing-tools';
 
 export type { ToolContext, ToolResult } from './tool-kit';
 
@@ -36,6 +38,9 @@ export const SERVER_INSTRUCTIONS = [
   'a warning), tell them plainly.',
   'To change a page they already have: find it with list_artifacts, then call update_artifact (it replaces the whole page).',
   'If they have several workspaces and did not say which one, ask them before publishing.',
+  'A page\'s history is list_versions; restore_version brings an old one back as a new version (confirm first).',
+  'For feedback use list_comments, then resolve_comment, assign_comment or approve_version.',
+  'To share a folder with someone outside the team: folder_access (who can see it), share_with_person, revoke_share, folder_activity (who opened what).',
   'Workspace owners and admins can invite people with invite_members: confirm the emails and the role with them first,',
   'then say who was invited, who already was a member and who was skipped.',
   'For questions about what the team knows (clients, projects, people, numbers, decisions), call knowledge_search first,',
@@ -132,19 +137,6 @@ function describePublish(
     notices: notes,
     visibility_downgraded: Boolean(result.visibility_downgraded),
   });
-}
-
-/** A folder of the workspace, named by id or by name. */
-async function resolveFolder(ctx: ToolContext, workspaceId: string | null, folder: string): Promise<{ id?: string; error?: string }> {
-  if (!workspaceId) return { error: 'Folders belong to a workspace; this page is in the personal space, so it cannot go in a folder.' };
-  const { results } = await ctx.env.DB.prepare(
-    'SELECT id, name FROM folders WHERE workspace_id = ? AND (id = ? OR name = ? COLLATE NOCASE) LIMIT 6'
-  ).bind(workspaceId, folder, folder).all<{ id: string; name: string }>();
-  const exact = results.find((f) => f.id === folder);
-  if (exact) return { id: exact.id };
-  if (results.length === 1) return { id: results[0].id };
-  if (!results.length) return { error: `There is no folder "${folder}" in that workspace. Ask the person for the exact folder name.` };
-  return { error: `Several folders are called "${folder}"; call again with one of these ids as folder: ${results.map((f) => f.id).join(', ')}.` };
 }
 
 async function mainFileText(ctx: ToolContext, artifactId: string): Promise<string | null> {
@@ -252,6 +244,10 @@ const getArtifact: ToolDef = {
     const text = [
       `"${String(body.name)}" — ${String(body.url)}`,
       `Visibility: ${String(body.visibility)}. Version ${String(body.current_version)}. Updated ${String(body.updated_at ?? body.created_at)}.`,
+      ...(typeof body.live_message === 'string' && body.live_message ? [`What changed in this version: ${body.live_message}`] : []),
+      ...(Array.isArray(body.pages) && body.pages.length > 1
+        ? [`Pages (${body.pages.length}): ${body.pages.map((p) => `${String(body.url)}?page=${encodeURIComponent(String(p)).replace(/%2F/g, '/')}`).join(', ')}`]
+        : []),
       ...(content !== null ? ['Content:', content] : []),
     ].join('\n');
     return ok(text, { artifact: body, ...(content !== null ? { content } : {}) });
@@ -267,6 +263,7 @@ const publishArtifact: ToolDef = {
     'workspace_id: needed when the person has more than one workspace — ask them which one.',
     'visibility: "workspace" (default: everyone in the workspace), "private" (only them) or "public" (anyone with the link).',
     'folder: optional, a folder of that workspace (its name or id) to file the page in.',
+    'message: optional one-line note for the version history.',
     'Afterwards give the person the link in their language, in plain words, and pass on any notice in the result.',
     ON_FAILURE,
   ].join(' '),
@@ -279,6 +276,7 @@ const publishArtifact: ToolDef = {
       workspace_id: { type: 'string' },
       visibility: { type: 'string', enum: ['workspace', 'private', 'public'] },
       folder: { type: 'string', description: 'Folder to file the page in: its name or id. Omit to leave it unfiled.' },
+      message: { type: 'string', description: 'A short note for the version history.' },
     },
     required: ['title', 'content'],
     additionalProperties: false,
@@ -310,6 +308,7 @@ const publishArtifact: ToolDef = {
       workspace_id: workspace?.id,
       visibility,
       ...(folder?.id ? { folder_id: folder.id } : {}),
+      ...(str(args.message, 500) ? { message: str(args.message, 500) } : {}),
     });
     if (status >= 400) return fail(`The page was not published: ${errorText(body, status)}`, { status, code: body.code });
     return describePublish('Published', title, body, workspace);
@@ -521,7 +520,7 @@ const fetchTool: ToolDef = {
 // Deterministic order (lets clients cache the list).
 export const TOOLS: ToolDef[] = [
   whoami, listWorkspaces, listArtifacts, getArtifact, publishArtifact, updateArtifact,
-  ...MEMBER_TOOLS, ...KNOWLEDGE_TOOLS, ...CONNECTOR_TOOLS, getHelp, reportProblem, search, fetchTool,
+  ...PAGE_TOOLS, ...SHARING_TOOLS, ...MEMBER_TOOLS, ...KNOWLEDGE_TOOLS, ...CONNECTOR_TOOLS, getHelp, reportProblem, search, fetchTool,
 ];
 
 export function listTools() {

@@ -7,6 +7,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **API / skill / MCP parity for the 2026-10-16 releases (skill v2.57.0):**
+  - OpenAPI: version list / source / restore, data-API comments (list, resolve, assign, `versionId`), `GET /v1/home/review` + `POST /v1/home/approvals`, `Grant.expires_at`, folder-manager grant rules, `/v1/jobs` visibility
+  - Skill: multi-page sites, review mode, folder access / expiring shares / client portal, knowledge source links and reverse lookup, Server-Timing
+  - MCP tools: `list_versions`, `get_version_source`, `restore_version`, `list_comments`, `resolve_comment`, `assign_comment`, `approve_version`, `list_jobs`, `folder_access`, `folder_activity`, `share_with_person`, `revoke_share`, `knowledge_get`, `knowledge_from_artifact`; `publish_artifact` takes `message`; `get_artifact` names the live change note and a site's pages
 - Agent **deploy skill** (`skills/ShareOutSkill/deploy/`) — install ShareOut on Cloudflare with success criteria, CLI + Deploy-button paths, and Cloudflare companion skill links
 - `skills/README.md` — single **source of truth** policy (monorepo skill tree vs `shareout-skill` mirror vs `$ORIGIN/v1/skill`)
 - `tooling/scripts/mirror-skill-repo.sh` — keep `getshareout/shareout-skill` on par

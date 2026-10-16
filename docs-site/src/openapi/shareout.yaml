@@ -821,6 +821,129 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           description: No production deployment to roll back
+  /v1/artifacts/{id}/versions:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    get:
+      tags: [Artifacts]
+      summary: List published versions
+      description: >-
+        The 50 newest published versions, newest first, with who published each one,
+        how (`source`), its change note (`message` / `message_source`), the size of its
+        entrypoint, how many comment threads were written on it and who approved it.
+        `live_version_id` is the version production serves. Viewer or above.
+      operationId: listArtifactVersions
+      responses:
+        "200":
+          description: Versions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VersionSummary"
+                  live_version_id:
+                    type: [string, "null"]
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/artifacts/{id}/versions/{versionNo}/source:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+      - name: versionNo
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Artifacts]
+      summary: Read one version's source
+      description: >-
+        The entrypoint text of one version, for a diff or a preview. `content` is capped
+        at 512 KB (`truncated: true` past that). Viewer or above.
+      operationId: getArtifactVersionSource
+      responses:
+        "200":
+          description: Version source
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version_no:
+                    type: integer
+                  entrypoint:
+                    type: string
+                  mime:
+                    type: string
+                  size_bytes:
+                    type: integer
+                  content:
+                    type: string
+                  truncated:
+                    type: boolean
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: "`VERSION_NOT_FOUND`, or `ASSET_NOT_FOUND` when its files are gone"
+        "415":
+          description: "`NOT_TEXT` — the entrypoint is binary"
+  /v1/artifacts/{id}/versions/{versionNo}/restore:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+      - name: versionNo
+        in: path
+        required: true
+        schema:
+          type: integer
+    post:
+      tags: [Artifacts]
+      summary: Restore an older version (non-destructive)
+      description: >-
+        Creates a new version (`latest_version + 1`, `source: restore`) with the files of
+        version `versionNo` and makes it live, or stages it when blocking tests are on.
+        Every earlier version stays in the history. Replaces the deprecated
+        `POST /v1/artifacts/{id}/rollback`. Editor or owner.
+      operationId: restoreArtifactVersion
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  maxLength: 500
+                  description: Change note for the new version.
+      responses:
+        "201":
+          description: Restored as a new version
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  version_id:
+                    type: string
+                  version_no:
+                    type: integer
+                  restored_from_version_no:
+                    type: integer
+                  staged:
+                    type: boolean
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: "Artifact not found, or `VERSION_NOT_FOUND`"
+        "409":
+          description: "`CONFLICT` (someone published at the same moment) or `ASSET_NOT_FOUND` (that version has no files)"
   /v1/artifacts/{id}/files:
     parameters:
       - $ref: "#/components/parameters/ArtifactId"
@@ -1333,6 +1456,160 @@ paths:
       responses:
         "200":
           description: Saved
+  /v1/data/{artifactId}/comments:
+    parameters:
+      - $ref: "#/components/parameters/DataArtifactId"
+    get:
+      tags: [Data]
+      summary: List comments
+      description: >-
+        Comments on the artifact, newest first. Session cookie or Bearer token; the
+        artifact's comment identity mode decides who may read. `403 COMMENTS_DISABLED`
+        when comments are off for the artifact.
+      operationId: listComments
+      parameters:
+        - name: contextId
+          in: query
+          schema:
+            type: string
+        - name: parentId
+          in: query
+          description: A comment id for its replies, or `null` for top-level threads only.
+          schema:
+            type: string
+        - name: resolved
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false"]
+        - name: assignee
+          in: query
+          description: "`me` or an email: only action items assigned to them."
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+            maximum: 1000
+        - name: skip
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Comments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      comments:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Comment"
+                      count:
+                        type: integer
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/data/{artifactId}/comments/{commentId}/resolve:
+    parameters:
+      - $ref: "#/components/parameters/DataArtifactId"
+      - name: commentId
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags: [Data]
+      summary: Resolve or reopen a comment
+      description: >-
+        Signed-in caller: the comment's author, the artifact owner, the assignee, or
+        anyone with comment access — owner or collaborator (across linked accounts), an
+        internal member of the artifact's workspace when it is workspace- or
+        public-visible, or a `comment` grant. A view-only grant does not qualify.
+      operationId: resolveComment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                resolved:
+                  type: boolean
+                  default: true
+                  description: "`false` reopens the thread."
+      responses:
+        "200":
+          description: The updated comment
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Comment"
+        "403":
+          description: "`FORBIDDEN` (no comment access) or `COMMENTS_DISABLED`"
+        "404":
+          description: "`COMMENT_NOT_FOUND`"
+  /v1/data/{artifactId}/comments/{commentId}/assign:
+    parameters:
+      - $ref: "#/components/parameters/DataArtifactId"
+      - name: commentId
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags: [Data]
+      summary: Assign a comment (action item)
+      description: >-
+        Turns a thread into an action item for a workspace member or collaborator, or
+        clears it with `assignee: null` (also clears `dueAt`). Same callers as resolve.
+        The assignee is notified.
+      operationId: assignComment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assignee:
+                  type: [string, "null"]
+                  description: Email of a workspace member or collaborator.
+                dueAt:
+                  type: [string, "null"]
+                  format: date-time
+      responses:
+        "200":
+          description: The updated comment
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Comment"
+        "400":
+          description: "`ASSIGNEE_NOT_FOUND` — not a workspace member or collaborator; `INVALID_REQUEST` for a bad dueAt"
+        "403":
+          description: "`FORBIDDEN` (no comment access) or `COMMENTS_DISABLED`"
+        "404":
+          description: "`COMMENT_NOT_FOUND`"
   /v1/data/{artifactId}/tables:
     parameters:
       - $ref: "#/components/parameters/DataArtifactId"
@@ -1960,7 +2237,16 @@ paths:
       parameters:
         - name: artifact_id
           in: query
-          description: Filter to a single artifact.
+          description: >-
+            Jobs on one artifact. Its owner and editors see the shared schedules plus
+            their own personal deliveries (Slack DM, own email, own linked Telegram);
+            other people's personal subscriptions stay hidden. Anyone else sees only
+            their own jobs on it.
+          schema:
+            type: string
+        - name: workspace_id
+          in: query
+          description: Without artifact_id, narrow your own jobs to one workspace.
           schema:
             type: string
       responses:
@@ -3233,6 +3519,10 @@ paths:
     get:
       tags: [External sharing]
       summary: List grants
+      description: >-
+        Workspace admins. A folder's manager (an admin, or the member who created it
+        while members manage their folders) may also list the grants on that one folder
+        with `resource_type=folder&resource_id=…`.
       operationId: listGrants
       parameters:
         - name: subject_id
@@ -3292,6 +3582,9 @@ paths:
     delete:
       tags: [External sharing]
       summary: Revoke a grant
+      description: >-
+        Hard delete, effective within about a minute. Workspace admins, or the folder's
+        manager for a grant on a folder.
       operationId: deleteGrant
       responses:
         "200":
@@ -3304,7 +3597,13 @@ paths:
     post:
       tags: [External sharing]
       summary: Share a file or folder with one person by email
-      description: Teams/Enterprise. Admin only. Invites an external user if needed and mints an `external_user` grant. Returns 409 if the email is already an internal member.
+      description: >-
+        Teams/Enterprise. Admin, or the folder's manager for a folder. Invites an
+        external user if needed and mints an `external_user` grant; re-sharing is
+        idempotent and replaces the expiry. For a folder, the invite email's join link
+        carries `?folder=<id>` through sign-in and lands on `/shared?folder=<id>` (that
+        folder's branded portal); an already-active person's email links there too.
+        Returns 409 if the email is already an internal member.
       operationId: shareWithPerson
       requestBody:
         required: true
@@ -3335,8 +3634,19 @@ paths:
                   type: string
                   description: ISO date-time (or YYYY-MM-DD = end of that day, UTC) when access ends. Omit both for no expiry; a re-share replaces the previous expiry.
       responses:
-        "200":
+        "201":
           description: Grant created (idempotent re-share)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  grant:
+                    $ref: "#/components/schemas/Grant"
+                  email:
+                    type: string
+        "400":
+          description: "`VALIDATION_ERROR` — bad email, resource, capability or expiry"
         "403":
           $ref: "#/components/responses/Forbidden"
         "409":
@@ -4102,6 +4412,74 @@ paths:
                     description: >-
                       Count of comments the signed-in user assigned to others that are
                       still open (unresolved).
+  /v1/home/review:
+    get:
+      tags: [Home]
+      summary: Review state of an artifact
+      description: >-
+        The live version, whether the caller may review (resolve, assign, approve) and
+        every approval. The Home shell's endpoint; accepts a session cookie or a Bearer
+        token. Comments themselves are read and resolved through the Data comments
+        endpoints.
+      operationId: getHomeReview
+      parameters:
+        - name: artifactId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Review state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewState"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          description: No access to this artifact
+  /v1/home/approvals:
+    post:
+      tags: [Home]
+      summary: Approve a version (or withdraw approval)
+      description: >-
+        Records that the caller approved a version — the live one unless `versionId` is
+        given. Approvals are a record shown in History and Details, not a publish gate.
+        Needs comment access (owner, collaborator, internal member of a workspace- or
+        public-visible artifact, or a `comment` grant). The only REST path for
+        approvals; session cookie or Bearer token.
+      operationId: setHomeApproval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [artifactId]
+              properties:
+                artifactId:
+                  type: string
+                versionId:
+                  type: string
+                  description: A version id (`ver_…`); defaults to the live version.
+                approved:
+                  type: boolean
+                  default: true
+                  description: "`false` withdraws the caller's approval."
+      responses:
+        "200":
+          description: Review state after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewState"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          description: "`FORBIDDEN` — you need comment access to approve"
+        "404":
+          description: "`NOT_FOUND` (artifact) or `VERSION_NOT_FOUND`"
   /v1/home/dismiss-event:
     post:
       tags: [Home]
@@ -6649,6 +7027,143 @@ components:
               type: string
             color:
               type: string
+    VersionSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        version_no:
+          type: integer
+        entrypoint:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        source:
+          type: [string, "null"]
+          enum: [api, agent, editor, restore, null]
+          description: How the version came to be; null on versions written before it was recorded.
+        message:
+          type: [string, "null"]
+          description: Change note.
+        message_source:
+          type: [string, "null"]
+          enum: [author, ai, null]
+          description: "`author` when the publisher wrote it, `ai` when generated after publish (may appear a few seconds later)."
+        created_by_email:
+          type: [string, "null"]
+        created_by_name:
+          type: [string, "null"]
+        restored_from_version_no:
+          type: [integer, "null"]
+        size_bytes:
+          type: [integer, "null"]
+          description: Size of the entrypoint file.
+        comment_count:
+          type: integer
+          description: Comment threads written while this version was live.
+        approvals:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: [string, "null"]
+              email:
+                type: [string, "null"]
+              created_at:
+                type: string
+                format: date-time
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          description: "`cmt_` + 24 hex characters."
+        contextId:
+          type: [string, "null"]
+        parentId:
+          type: [string, "null"]
+        authorId:
+          type: [string, "null"]
+        authorName:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        resolved:
+          type: boolean
+        resolvedBy:
+          type: [string, "null"]
+        resolvedAt:
+          type: [string, "null"]
+          format: date-time
+        position:
+          description: Pin position on the page, when the comment was placed as a pin.
+        mentions:
+          type: array
+          items:
+            type: string
+        authorType:
+          type: string
+          enum: [human, agent]
+        assigneeUserId:
+          type: [string, "null"]
+        assigneeEmail:
+          type: [string, "null"]
+        dueAt:
+          type: [string, "null"]
+          format: date-time
+        versionId:
+          type: [string, "null"]
+          description: Id of the version that was live when the comment was written; null on older comments.
+        reactions:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              count:
+                type: integer
+              mine:
+                type: boolean
+    ReviewState:
+      type: object
+      properties:
+        live_version_id:
+          type: [string, "null"]
+        live_version_no:
+          type: [integer, "null"]
+        can_review:
+          type: boolean
+          description: Caller may resolve, assign and approve.
+        approvals:
+          type: array
+          items:
+            type: object
+            properties:
+              version_id:
+                type: string
+              version_no:
+                type: integer
+              user_id:
+                type: string
+              name:
+                type: [string, "null"]
+              email:
+                type: [string, "null"]
+              created_at:
+                type: string
+                format: date-time
+        my_approvals:
+          type: array
+          description: Version ids the caller (any linked account) approved.
+          items:
+            type: string
     Grant:
       type: object
       properties:
@@ -6667,6 +7182,18 @@ components:
         capability:
           type: string
           enum: [view, comment, create, edit]
+        granted_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: [string, "null"]
+          format: date-time
+          description: When access ends (share-with-a-person expiry); null = never. A lapsed grant is denied at read time.
+        subject_label:
+          type: string
+          description: The person's email or the client's name (list endpoint).
     GrantCreate:
       type: object
       required: [subject_type, subject_id, resource_type, resource_id, capability]

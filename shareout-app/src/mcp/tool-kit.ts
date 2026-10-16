@@ -119,3 +119,16 @@ export function workspaceChoiceText(action: string, choices: BotWorkspace[]): st
   return `Nothing was done yet. The person has ${choices.length} workspaces; ask which one, then call ${action} again with its workspace_id:\n` +
     choices.map((w) => `- ${w.name} (id ${w.id})`).join('\n');
 }
+
+/** A folder of the workspace, named by id or by name. */
+export async function resolveFolder(ctx: ToolContext, workspaceId: string | null, folder: string): Promise<{ id?: string; error?: string }> {
+  if (!workspaceId) return { error: 'Folders belong to a workspace; this page is in the personal space, so it cannot go in a folder.' };
+  const { results } = await ctx.env.DB.prepare(
+    'SELECT id, name FROM folders WHERE workspace_id = ? AND (id = ? OR name = ? COLLATE NOCASE) LIMIT 6'
+  ).bind(workspaceId, folder, folder).all<{ id: string; name: string }>();
+  const exact = results.find((f) => f.id === folder);
+  if (exact) return { id: exact.id };
+  if (results.length === 1) return { id: results[0].id };
+  if (!results.length) return { error: `There is no folder "${folder}" in that workspace. Ask the person for the exact folder name.` };
+  return { error: `Several folders are called "${folder}"; call again with one of these ids as folder: ${results.map((f) => f.id).join(', ')}.` };
+}

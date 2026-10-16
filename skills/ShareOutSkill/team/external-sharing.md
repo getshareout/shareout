@@ -30,7 +30,9 @@ Home → **Admin** lens → **Sharing** tab (owners/admins only). The tab was re
 
 From there: see recent activity and mint API tokens — no API needed.
 
-**Share with a person (quick path):** from Assets, **Share with a person** on a file tile sends one outside email view/comment access without creating a Client org. Same capability via `POST …/share-person` (admin + Teams entitlement).
+**Share with a person (quick path):** from Assets, **Share with a person** on a file tile sends one outside email view/comment access without creating a Client org. Same capability via `POST …/share-person` (admin + Teams entitlement; for a folder, its manager may share it).
+
+**Folder access panel:** in Home, the who-can-see pill on an open Team Space folder opens **Who has access**: its grants (with "expires in N days"), **Share with a person** (with an expiry), **Who opened what**, and **Copy client portal link**. A folder's managers — admins, or the member who created it while members manage their folders — use it; see [folders.md](folders.md#who-can-see-a-folder).
 
 ## Share with one person (API)
 
@@ -43,11 +45,17 @@ Content-Type: application/json
   "email": "client@acme.com",
   "resource_type": "file",
   "resource_id": "dlv_…",
-  "capability": "view"
+  "capability": "view",
+  "expires_in_days": 30
 }
 ```
 
-`resource_type` may be `"file"` or `"folder"`. `capability` is `view` or `comment`. Invites the external user if needed; the resource appears on their `/shared` portal. Returns `409 ALREADY_MEMBER` if the email is already an internal workspace member.
+`resource_type` may be `"file"` or `"folder"`. `capability` is `view` or `comment`. Invites the external user if needed; the resource appears on their `/shared` portal. Returns `201 { grant, email }`, or `409 ALREADY_MEMBER` if the email is already an internal workspace member.
+
+- **Who:** workspace admins with the external-sharing entitlement. For a folder, its manager (an admin, or its creator while members manage their folders) may share it, list and revoke its grants.
+- **Expiry (optional):** `expires_in_days` (1–3650; the UI offers 7/30/90) or `expires_at` (ISO date-time, or `YYYY-MM-DD` = end of that day UTC). `expires_in_days` wins. Omit both for no expiry. A re-share replaces the previous expiry (extend, shorten, or revive a lapsed one). A lapsed grant is denied at read time.
+- **Folder invite → portal:** for a folder, the invite email's join link carries `?folder=<id>` through sign-in and lands on `/shared?folder=<id>`; a person who already has an account gets an email linking straight there.
+- **Revoke:** `DELETE /v1/workspaces/{wid}/grants/{gid}` (grant ids from `GET …/grants?resource_type=folder&resource_id=…`).
 
 ## API
 
@@ -75,9 +83,10 @@ All management endpoints require workspace `admin` + the entitlement.
 
 | Method | Endpoint | Body / notes |
 | --- | --- | --- |
-| `GET` | `/v1/workspaces/{wid}/grants` | Filter with `?subject_id=` / `?resource_type=` / `?resource_id=`. |
-| `POST` | `/v1/workspaces/{wid}/grants` | See below. |
-| `DELETE` | `/v1/workspaces/{wid}/grants/{gid}` | Hard revoke (effective within ~60s of cache). |
+| `GET` | `/v1/workspaces/{wid}/grants` | Filter with `?subject_id=` / `?resource_type=` / `?resource_id=`. Each grant carries `subject_label` (email or client name), `created_at`, `expires_at`. A folder's manager may list `?resource_type=folder&resource_id={fid}`. |
+| `POST` | `/v1/workspaces/{wid}/grants` | See below. Admin only. |
+| `DELETE` | `/v1/workspaces/{wid}/grants/{gid}` | Hard revoke (effective within ~60s of cache). Admins, or the folder's manager for a folder grant. |
+| `POST` | `/v1/workspaces/{wid}/share-person` | One outside email, file or folder, optional expiry — see above. |
 
 Grant body:
 
@@ -113,13 +122,14 @@ External token scopes are limited to `artifacts:read`, `data:read`, `data:write`
 | --- | --- | --- |
 | `GET` | `/v1/workspaces/{wid}/sharees/{sid}/activity` | Recent views for one Client. |
 | `GET` | `/v1/workspaces/{wid}/sharee-activity` | Recent views across all Clients. |
+| `GET` | `/v1/workspaces/{wid}/folders/{fid}/activity` | Who opened what in one folder: external views on the folder and everything in its subtree, newest first (max 100) — `{ activity: [{ user_email, resource_type, resource_id, resource_name, action, created_at }] }`. The folder's managers. |
 
 A receipt is logged when an external member opens a granted artifact (deduped per hour) — the renewal/upsell signal: "Acme opened the Q3 deck 9× this week."
 
 ## The external member's experience
 
 1. Accept the invite → log in (Google or email-OTP, same as any ShareOut user).
-2. Go to **`/shared`** → the portal listing every page and file granted to them, branded by their Client. First visit shows a short orientation card.
+2. Go to **`/shared`** → the portal listing every page and file granted to them, branded by their Client. First visit shows a short orientation card. **`/shared?folder=<id>`** is one folder's client portal: only that folder's subtree, under the person's client branding (the "Copy client portal link" in the folder's access panel).
 3. Open a page or download a file → access succeeds if they hold a `view` grant (direct or via an ancestor folder); otherwise access is denied.
 
 ## Client notes (AI memory about a client)

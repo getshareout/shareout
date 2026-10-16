@@ -10,6 +10,7 @@ vi.mock('../../../src/artifacts/crud', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   handleListArtifacts: vi.fn(),
   handleUpdateArtifact: vi.fn(),
+  handleGetArtifact: vi.fn(),
 }));
 vi.mock('../../../src/artifacts/roles', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -21,7 +22,7 @@ vi.mock('../../../src/chat-agent/access', () => ({ listWorkspacesForUser: vi.fn(
 import { callTool } from '../../../src/mcp/tools';
 import { NOT_MEMBER } from '../../../src/mcp/tool-kit';
 import { handlePublish } from '../../../src/publish/handle-publish';
-import { handleListArtifacts, handleUpdateArtifact } from '../../../src/artifacts/crud';
+import { handleGetArtifact, handleListArtifacts, handleUpdateArtifact } from '../../../src/artifacts/crud';
 import { quickSearch } from '../../../src/search/quick-search';
 import { listWorkspacesForUser } from '../../../src/chat-agent/access';
 import { createSchema, e, resetData } from './setup';
@@ -148,5 +149,22 @@ describe('folders on publish', () => {
     const twice = (await callTool(ctx, 'publish_artifact', { title: 'A', content: '# a', workspace_id: 'wsp_acme', folder: 'drafts' }))!;
     expect(twice.content[0].text).toMatch(/fld_2.*fld_3|fld_3.*fld_2/);
     expect(handlePublish).not.toHaveBeenCalled();
+  });
+});
+
+describe('publish note and site pages', () => {
+  it('publish_artifact passes the change note to the publish handler', async () => {
+    await callTool(ctx, 'publish_artifact', { title: 'A', content: '# a', workspace_id: 'wsp_acme', message: 'First cut' });
+    expect(await sentPublish()).toMatchObject({ message: 'First cut' });
+  });
+
+  it('get_artifact names the live change note and links every page of a multi-page site', async () => {
+    vi.mocked(handleGetArtifact).mockResolvedValue(json({
+      name: 'Manual', url: 'https://shareout.test/a/manual/', visibility: 'workspace', current_version: 3,
+      live_message: 'Added billing', entrypoint: 'index.html', pages: ['index.html', 'procedures/billing.html'],
+    }));
+    const r = (await callTool(ctx, 'get_artifact', { artifact_id: 'art_1' }))!;
+    expect(r.content[0].text).toContain('What changed in this version: Added billing');
+    expect(r.content[0].text).toContain('https://shareout.test/a/manual/?page=procedures/billing.html');
   });
 });

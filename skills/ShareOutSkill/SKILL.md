@@ -1,7 +1,7 @@
 ---
 name: "shareout-skill"
-version: "2.56.0"
-updated_at: "2026-10-12T19:00:00Z"
+version: "2.57.0"
+updated_at: "2026-10-16T18:00:00Z"
 description: "Publish, update, inspect, and manage ShareOut artifacts on a self-hosted instance. Use when the user wants to build or publish a web artifact (HTML apps, dashboards, forms, or CSV/Markdown/JSON/TXT), wire SDK data stores, live data, schedules, sharing, analytics, or in-artifact AI. If the user wants to INSTALL or DEPLOY ShareOut on Cloudflare first, load deploy/SKILL.md immediately."
 skill_endpoint: "/v1/skill"
 ---
@@ -94,7 +94,7 @@ load [deploy/SKILL.md](deploy/SKILL.md).
 
 ## Version check (against **their** origin)
 
-Frontmatter `version` is this file (`2.56.0`).
+Frontmatter `version` is this file (`2.57.0`).
 
 1. `GET $ORIGIN/v1/skill/version` → `{ "version", "updated_at" }`.
 2. If newer: download `GET $ORIGIN/v1/skill` (zip), replace local skill copy, continue.
@@ -321,6 +321,10 @@ Minimal payload — publish into the user's team workspace so their team sees it
 
 Re-publishing the same `slug` adds a new version. Add `"message": "one line on what changed"`
 so the page history says why; leave it out and ShareOut writes a short note itself.
+To go back to an older version, `POST /v1/artifacts/{id}/versions/{no}/restore` (a new
+version with the old files; `/rollback` is deprecated). Several pages? Ship one HTML file
+per page in `files[]` and link them with relative hrefs:
+[api/artifacts.md](api/artifacts.md#multi-page-sites-several-html-files).
 
 Full API: [api/overview.md](api/overview.md).
 
@@ -380,9 +384,13 @@ connector (`$ORIGIN/mcp`) instead of the REST API? Call its `report_problem` too
 same details.
 
 Answering questions about what a workspace knows (clients, projects, numbers) through the
-connector? Use its `knowledge_search`, `knowledge_entity`, `knowledge_facts` and
-`knowledge_status` tools and cite the source of every fact — see
-[integrations/mcp-connector.md](integrations/mcp-connector.md) and [team/knowledge.md](team/knowledge.md).
+connector? Use its `knowledge_search`, `knowledge_entity`, `knowledge_facts`,
+`knowledge_get`, `knowledge_from_artifact` and `knowledge_status` tools and cite the source
+of every fact — see [integrations/mcp-connector.md](integrations/mcp-connector.md) and
+[team/knowledge.md](team/knowledge.md). The connector also covers page history
+(`list_versions`, `restore_version`), review (`list_comments`, `resolve_comment`,
+`assign_comment`, `approve_version`), schedules (`list_jobs`) and folder sharing
+(`folder_access`, `share_with_person`, `revoke_share`, `folder_activity`).
 
 ---
 
