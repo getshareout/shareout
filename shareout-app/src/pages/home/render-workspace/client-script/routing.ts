@@ -7,9 +7,11 @@ export const workspace_client_routing_JS = `  // ===== deep-link routing (hash) 
     if (activeKey !== 'home' && panes[activeKey]) { var pr = panes[activeKey]; return 'a/' + encodeURIComponent(pr.art.slug) + (pr.page ? '/' + encPage(pr.page) : ''); }
     var on = ws.querySelector('[data-lens].is-active');
     var lens = on ? on.getAttribute('data-lens') : 'brief';
-    if (lens === 'catalog' && typeof catCurrentId === 'string' && catCurrentId) return 'l/catalog/' + encodeURIComponent(catCurrentId);
+    var catId = lens === 'catalog' && wsxChunkGet('catalog', 'catCurrentId');
+    if (catId) return 'l/catalog/' + encodeURIComponent(catId);
     if (lens === 'artifacts' && typeof curFolder === 'string' && curFolder) return 'l/artifacts/' + encodeURIComponent(curFolder);
-    if (lens === 'knowledge' && typeof knCurrentPath === 'string' && knCurrentPath) return 'l/knowledge/' + encodeURIComponent(knCurrentPath);
+    var knPath = lens === 'knowledge' && wsxChunkGet('knowledge', 'knCurrentPath');
+    if (knPath) return 'l/knowledge/' + encodeURIComponent(knPath);
     return 'l/' + lens;
   }
   function syncHash() {

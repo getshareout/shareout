@@ -1,5 +1,6 @@
 import type { Env } from './types';
 import { generateId } from './crypto-utils';
+import { requestMemo } from './http/request-scope';
 
 // Account linking groups multiple `users` rows under a shared `identity_id`, so one
 // login resolves to the whole set. Visibility queries (home, workspaces) union over
@@ -46,6 +47,10 @@ export async function getVisibilityScope(
   env: Env,
   user: { id: string; email: string | null },
 ): Promise<VisibilityScope> {
+  return requestMemo(env, `vis:${user.id}:${user.email ?? ''}`, () => loadVisibilityScope(env, user));
+}
+
+async function loadVisibilityScope(env: Env, user: { id: string; email: string | null }): Promise<VisibilityScope> {
   const accounts = await getLinkedAccounts(env, user.id);
   const userIds = accounts.length ? accounts.map(a => a.id) : [user.id];
   const emails = accounts.map(a => a.email).filter((e): e is string => !!e);

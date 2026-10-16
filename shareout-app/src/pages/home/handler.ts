@@ -24,6 +24,7 @@ import { CREATE_FEATURE } from '../create-gate';
 import { versionedBundlePath } from '../../bundle-versions';
 import { createLogger, logError } from '../../logging';
 import { getWorkspaceLocale, resolveLocale } from '../../i18n/locale';
+import { serverTimingValue, timeSync } from '../../http/request-scope';
 
 /** Head options for the streamed workspace home shell. The page + workspace styles and
  *  the static client script are cached files (shell-assets), linked from the head so they
@@ -205,12 +206,15 @@ async function buildHomeBody(
     locale: (userInfo?.locale || wsLocale) ? resolveLocale({ user: userInfo?.locale, workspace: wsLocale }) : null,
   };
 
-  const view = buildWorkspaceView(renderArgs);
+  const view = timeSync(env, 'render', () => buildWorkspaceView(renderArgs));
+  // The Server-Timing header went out before these queries ran; the full breakdown
+  // (body waves + render) closes the document as a comment.
+  const timing = serverTimingValue(env);
   // Shared streaming-chat reading engine for the agent dock (follow/anchor/jump/
   // unread/search/announce). Loaded as a global before the inline hydration script;
   // the dock degrades to its inline fallback if it fails to load.
   return {
-    body: `<script src="${versionedBundlePath('/sdk/chat-core.js')}"></script>${view.body}`,
+    body: `<script src="${versionedBundlePath('/sdk/chat-core.js')}"></script>${view.body}${timing ? `\n<!-- server-timing: ${timing.replace(/--/g, '')} -->` : ''}`,
     scripts: view.bootScript,
   };
 }

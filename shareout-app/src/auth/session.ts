@@ -7,6 +7,7 @@ import {
 import { COOKIE_NAME, SESSION_MAX_AGE } from './constants';
 import { buildSessionCookie } from './cookies';
 import { getPlatformHostname } from '../config/origins';
+import { markAuthenticated, requestMemo, timePhase } from '../http/request-scope';
 
 /**
  * Resolve the session `Max-Age` for a user. Takes the strictest
@@ -53,7 +54,12 @@ export async function getSessionUser(request: Request, env: Env): Promise<{ id: 
   const cookie = request.headers.get('Cookie');
   const token = extractTokenFromCookie(cookie, new RegExp(`${COOKIE_NAME}=([^;]+)`));
   if (!token) return null;
+  const user = await requestMemo(env, `session:${token}`, () => timePhase(env, 'auth', () => resolveSessionUser(token, env)));
+  if (user) markAuthenticated(env);
+  return user;
+}
 
+async function resolveSessionUser(token: string, env: Env): Promise<{ id: string; email: string } | null> {
   const payload = await verifySessionToken(token, env);
   if (!payload) return null;
 

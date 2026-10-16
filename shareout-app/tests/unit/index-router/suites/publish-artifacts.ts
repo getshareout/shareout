@@ -53,7 +53,8 @@ describe('index router — publish and artifacts', () => {
     expect(response.status).toBe(200);
     const body = await response.json() as { views: number };
     expect(body.views).toBe(42);
-    expect(handlers.getAnalytics).toHaveBeenCalledWith(env, 'art_1', 30);
+    // Handlers get a request-scoped copy of env (memo + Server-Timing meter), same bindings.
+    expect(handlers.getAnalytics).toHaveBeenCalledWith(expect.objectContaining({ SESSION_SECRET: env.SESSION_SECRET }), 'art_1', 30);
   });
 
   it('returns 404 analytics when artifact missing', async () => {

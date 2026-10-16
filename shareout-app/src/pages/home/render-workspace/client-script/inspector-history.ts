@@ -1,10 +1,8 @@
 /** Inspector History panel: version list, line diff, preview, restore. Shares the inspector IIFE scope. */
 export const workspace_client_inspector_history_JS = `  // ----- History (/v1/artifacts/:id/versions) -----
-  var histCache = {}, srcCache = {};
   function fmtBytes(n) { if (n == null) return ''; if (n < 1024) return n + ' B'; if (n < 1048576) return (n / 1024).toFixed(1) + ' KB'; return (n / 1048576).toFixed(1) + ' MB'; }
   function histWho(v) { return v.created_by_name || v.created_by_email || t('inspector.histUnknown'); }
   function histSource(s) { return s ? tOr('inspector.histSrc.' + s, s) : ''; }
-  function aiBadge(src) { return src === 'ai' ? '<span class="wsx-vh__ai" data-tip="' + esc(t('inspector.histAiTip')) + '">' + esc(t('inspector.histAi')) + '</span>' : ''; }
   function renderHistory(art) {
     // Paint the cached list at once, then refetch: a publish elsewhere adds versions.
     var had = histCache[art.id];
@@ -200,4 +198,10 @@ export const workspace_client_inspector_history_JS = `  // ----- History (/v1/ar
     });
   }
 
+`;
+
+/** History state + the AI badge: Details and review mode use them on every artifact, so they
+ *  stay in the boot shell; the History panel itself is the lazy `history` chunk. */
+export const workspace_client_inspector_history_core_JS = `  var histCache = {}, srcCache = {};
+  function aiBadge(src) { return src === 'ai' ? '<span class="wsx-vh__ai" data-tip="' + esc(t('inspector.histAiTip')) + '">' + esc(t('inspector.histAi')) + '</span>' : ''; }
 `;

@@ -49,24 +49,6 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
     var doc = rec.editframe.contentDocument; var el = doc && doc.querySelector('[data-wsx-id="' + id + '"]');
     if (el) setSel(rec, { type: el.tagName === 'IMG' ? 'img' : (el.tagName === 'A' ? 'link' : 'text'), el: el }); else setSel(rec, null);
   }
-  function setModeButtons(rec) {
-    syncTabMode();
-    rec.pane.classList.toggle('is-editing', rec.mode === 'edit');
-    rec.publishBtn.hidden = rec.mode !== 'edit';
-    rec.fullEdit.hidden = rec.mode !== 'edit';
-    rec.undoBtn.hidden = rec.mode !== 'edit';
-    rec.redoBtn.hidden = rec.mode !== 'edit';
-    rec.mobileBtn.hidden = rec.mode !== 'edit';
-    rec.discardBtn.hidden = rec.mode !== 'edit';
-    if (rec.mode === 'edit') updateUndoButtons(rec); else { rec.sel = null; }
-  }
-  function setSaveStatus(rec, text, cls) { rec.savestat.textContent = text || ''; rec.savestat.className = 'wsx__savestat js-savestat' + (cls ? ' ' + cls : ''); }
-  function setEditMode(rec, mode) {
-    if (rec.mode === mode) return;
-    rec.mode = mode; setModeButtons(rec);
-    if (mode === 'edit' && !rec.loaded) loadEditSource(rec);
-    if (panes[activeKey] === rec) paintRail();
-  }
   function loadEditSource(rec) {
     if (!rec.art.id) { rec.editframe.removeAttribute('srcdoc'); rec.editframe.srcdoc = '<div style="${EDIT_PLACEHOLDER_STYLE}">' + esc(t('edit.openFromLibrary')) + '</div>'; rec.publishBtn.hidden = true; return; }
     setSaveStatus(rec, t('common.loading'));
@@ -493,4 +475,26 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
     toastTimer = setTimeout(function () { toastEl.classList.remove('is-show'); }, 2600);
   }
 
+`;
+
+/** View/Edit mode switching and the save-status line: tabs + inspector call these on every
+ *  pane, so they stay in the boot shell; the rest of Edit-Lite is a lazy chunk. */
+export const workspace_client_edit_lite_core_JS = `  function setModeButtons(rec) {
+    syncTabMode();
+    rec.pane.classList.toggle('is-editing', rec.mode === 'edit');
+    rec.publishBtn.hidden = rec.mode !== 'edit';
+    rec.fullEdit.hidden = rec.mode !== 'edit';
+    rec.undoBtn.hidden = rec.mode !== 'edit';
+    rec.redoBtn.hidden = rec.mode !== 'edit';
+    rec.mobileBtn.hidden = rec.mode !== 'edit';
+    rec.discardBtn.hidden = rec.mode !== 'edit';
+    if (rec.mode === 'edit') updateUndoButtons(rec); else { rec.sel = null; }
+  }
+  function setSaveStatus(rec, text, cls) { rec.savestat.textContent = text || ''; rec.savestat.className = 'wsx__savestat js-savestat' + (cls ? ' ' + cls : ''); }
+  function setEditMode(rec, mode) {
+    if (rec.mode === mode) return;
+    rec.mode = mode; setModeButtons(rec);
+    if (mode === 'edit' && !rec.loaded) loadEditSource(rec);
+    if (panes[activeKey] === rec) paintRail();
+  }
 `;
