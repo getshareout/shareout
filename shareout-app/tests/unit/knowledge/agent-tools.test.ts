@@ -39,6 +39,8 @@ Retention overview.`;
 beforeAll(async () => {
   for (const sql of [
     `CREATE TABLE IF NOT EXISTS knowledge_settings (workspace_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0, last_consolidated_at TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now')))`,
+    `CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, name TEXT, slug TEXT, owner_id TEXT, visibility TEXT, workspace_id TEXT, deleted_at TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))`,
+    `CREATE TABLE IF NOT EXISTS artifact_moderation (artifact_id TEXT PRIMARY KEY, status TEXT)`,
     `CREATE TABLE IF NOT EXISTS workspace_files (workspace_id TEXT NOT NULL, namespace TEXT NOT NULL, scope_id TEXT NOT NULL DEFAULT '', path TEXT NOT NULL, content TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'manual', updated_by TEXT, updated_by_kind TEXT NOT NULL DEFAULT 'user', created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), PRIMARY KEY (workspace_id, namespace, scope_id, path))`,
   ]) {
     await e.DB.exec(sql);
@@ -48,6 +50,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   await e.DB.exec('DELETE FROM knowledge_settings');
   await e.DB.exec('DELETE FROM workspace_files');
+  await e.DB.exec('DELETE FROM artifacts');
 });
 
 async function seed() {
@@ -93,13 +96,24 @@ describe('knowledge_search tool', () => {
 });
 
 describe('knowledge_get tool', () => {
-  it('returns the full node body + sources by path', async () => {
+  it('returns the full node body + sources named by the artifact they came from', async () => {
     await seed();
+    await e.DB.prepare('INSERT INTO artifacts (id, name, slug, owner_id, visibility, workspace_id) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind('doc1', 'Weekly report', 'weekly-report', 'u1', 'workspace', WS).run();
     const r = (await knowledgeGetTool.execute(ctx(WS), { path: 'artifacts/doc1.md' })) as {
-      node: { body: string; sources: string[] };
+      node: { body: string; sources: unknown[] };
     };
     expect(r.node.body).toContain('Day-0 retention is 42%');
-    expect(r.node.sources).toContain('doc1');
+    expect(r.node.sources).toEqual([{ id: 'doc1', slug: 'weekly-report', title: 'Weekly report', available: true }]);
+  });
+
+  it("does not name someone else's private source", async () => {
+    await seed();
+    await e.DB.prepare('INSERT INTO artifacts (id, name, slug, owner_id, visibility, workspace_id) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind('doc1', 'Secret plan', 'secret-plan', 'u2', 'private', WS).run();
+    const r = (await knowledgeGetTool.execute(ctx(WS), { path: 'artifacts/doc1.md' })) as { node: { sources: unknown[] } };
+    expect(r.node.sources).toEqual([{ id: 'doc1', slug: null, title: null, available: false }]);
+    expect(JSON.stringify(r)).not.toContain('Secret plan');
   });
 
   it('resolves by id too', async () => {

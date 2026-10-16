@@ -2470,6 +2470,24 @@ paths:
       responses:
         "200":
           description: "`{ enabled, groups, count, issues }`"
+  /v1/workspaces/{workspaceId}/knowledge/from/{artifactId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: artifactId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Knowledge]
+      summary: Knowledge notes learned from one artifact
+      description: The reverse of a note's `sources`. Empty when the caller may not open the artifact (private to someone else, deleted, held, or in another workspace).
+      operationId: getKnowledgeFromArtifact
+      responses:
+        "200":
+          description: "`{ enabled, notes: [{ path, kind, id, title }] }`; `enabled: false` with no notes when Knowledge is off"
+        "403":
+          description: Not a member of the workspace
   /v1/workspaces/{workspaceId}/knowledge/files/{path}:
     parameters:
       - $ref: "#/components/parameters/WorkspaceId"

@@ -146,7 +146,8 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       folder: '<div id="wsxFolder"></div>',
       tests: '<div id="wsxTests"></div>',
       analytics: '<div id="wsxDetStats" class="wsx-det__stats"></div>',
-      watches: '<div id="wsxWatches"></div>'
+      watches: '<div id="wsxWatches"></div>',
+      knowledge: '<div id="wsxKnFrom"></div>'
     };
     var secMeta = {
       share: [t('inspector.sharedWith'), t('inspector.sharedWithHelp')],
@@ -157,9 +158,10 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       folder: [t('inspector.folder'), t('inspector.folderHelp')],
       tests: [t('inspector.tests'), t('inspector.testsHelp')],
       analytics: [t('inspector.analytics'), t('inspector.analyticsHelp')],
-      watches: [t('inspector.watches'), t('inspector.watchesHelp')]
+      watches: [t('inspector.watches'), t('inspector.watchesHelp')],
+      knowledge: [t('inspector.knowledgeFrom'), t('inspector.knowledgeFromHelp')]
     };
-    var order = editable ? loadSecOrder() : (desc ? ['description'] : []);
+    var order = editable ? loadSecOrder() : (desc ? ['description'] : []).concat(['knowledge']);
     h += '<div class="wsx-det__secs" id="wsxSecs">' + order.map(function (k) {
       if (!secBody[k]) return '';
       return sec(k, secMeta[k][0], secMeta[k][1], secBody[k], editable);
@@ -347,6 +349,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     if (editable) wireSecDnd(root); // drag-reorder sections; persisted per user
 
     renderShare(art, meta, editable);
+    renderKnowledgeFrom(art, meta);
     if (editable) { renderTags(art, (meta.tags || []).slice()); renderFolder(art, meta); renderTests(art); renderWatches(art); }
     var statsEl = root.querySelector('#wsxDetStats');
     if (art.id && statsEl) loadAnalytics(art.id, statsEl);

@@ -11,7 +11,8 @@ import { NODE_KINDS, type KnowledgeNode } from '../../knowledge/types';
 import { getAIProvider } from '../../data/agent/anthropic';
 import { corpusFor } from '../../knowledge/corpus/client';
 import { startIngest } from '../../knowledge/corpus/ingest';
-import { searchCorpus, searchResultMarkdown, visibleSources } from '../../knowledge/corpus/search';
+import { searchCorpus, searchResultMarkdown } from '../../knowledge/corpus/search';
+import { notesFromArtifact, sourceArtifacts } from '../../knowledge/source-links';
 import { knowledgeUsage } from '../../knowledge/corpus/usage';
 import { entityMarkdown, listVisibleEntities, visibleEntity, visibleGraph } from '../../knowledge/corpus/graph';
 
@@ -32,17 +33,6 @@ function summarize(node: KnowledgeNode, meta?: StoredKnowledgeFile) {
     source: meta?.source ?? null,
     updated_at: meta?.updatedAt ?? null,
   };
-}
-
-// A node's sources[] are artifact ids. Name and link only the ones this member may open
-// right now (same rule as search); the rest come back as unavailable with no title.
-async function sourceArtifacts(ctx: FetchContext, workspaceId: string, userId: string, ids: string[]) {
-  if (!ids.length) return [];
-  const { visible } = await visibleSources(ctx.env, workspaceId, userId, ids.map((refId) => ({ refId, kind: 'page' as const })));
-  return ids.map((id) => {
-    const v = visible.get(id);
-    return v ? { id, slug: v.slug ?? null, title: v.title, available: true } : { id, slug: null, title: null, available: false };
-  });
 }
 
 async function backfill(ctx: FetchContext, workspaceId: string): Promise<number> {
@@ -177,6 +167,15 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
     );
   }
 
+  // GET /from/{artifactId} — notes learned from this artifact (the reverse of a note's
+  // sources). Empty, not 404, when knowledge is off or the caller may not open the artifact.
+  if (sub.startsWith('from/')) {
+    if (method !== 'GET') return cors(jsonError('Method not allowed', 'METHOD_NOT_ALLOWED', 405));
+    if (!(await isKnowledgeEnabled(ctx.env, workspaceId))) return cors(jsonResponse({ enabled: false, notes: [] }));
+    const artifactId = decodeURIComponent(sub.slice('from/'.length));
+    return cors(jsonResponse({ enabled: true, notes: artifactId ? await notesFromArtifact(ctx.env, workspaceId, auth.id, artifactId) : [] }));
+  }
+
   // /files/{path+} — one node: GET (member), PUT (member, human edit wins),
   // DELETE (owner/admin, ?forget=1 tombstones so it isn't re-learned).
   if (sub === 'files' || sub.startsWith('files/')) {
@@ -240,7 +239,7 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
     return cors(
       jsonResponse({
         enabled: true,
-        node: { ...summarize(node, file), body: node.body, sources: node.sources, source_artifacts: await sourceArtifacts(ctx, workspaceId, auth.id, node.sources) },
+        node: { ...summarize(node, file), body: node.body, sources: node.sources, source_artifacts: await sourceArtifacts(ctx.env, workspaceId, auth.id, node.sources) },
       })
     );
   }
