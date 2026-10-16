@@ -25,7 +25,7 @@ const e = env as unknown as Env;
 
 beforeAll(async () => {
   const ddl = [
-    `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT, name TEXT, username TEXT, identity_id TEXT, is_service INTEGER DEFAULT 0, last_login_at TEXT, picture TEXT, created_at TEXT)`,
+    `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT, name TEXT, username TEXT, identity_id TEXT, is_service INTEGER DEFAULT 0, last_login_at TEXT, picture TEXT, created_at TEXT, disabled INTEGER NOT NULL DEFAULT 0)`,
     `CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, name TEXT, owner_id TEXT, slug TEXT)`,
     `CREATE TABLE IF NOT EXISTS workspace_members (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, role TEXT, member_class TEXT NOT NULL DEFAULT 'internal', invited_by TEXT, created_at TEXT DEFAULT (datetime('now')))`,
     `CREATE TABLE IF NOT EXISTS folders (id TEXT PRIMARY KEY, workspace_id TEXT, parent_id TEXT)`,

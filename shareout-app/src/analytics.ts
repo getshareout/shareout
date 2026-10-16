@@ -1,5 +1,11 @@
 import type { Env, ViewEventMessage } from './types';
 import { getViewerTracking, type ViewerTrackingEntry } from './view-tracking';
+import { RecentKeys } from './http/isolate-limits';
+
+// A refresh loop from one visitor counts once per window (per isolate). Distinct
+// visitors, pages, and anyone returning after the window still count.
+const VIEW_DEDUPE_MS = 30_000;
+const recentViews = new RecentKeys(VIEW_DEDUPE_MS);
 
 export interface AnalyticsSummary {
   totalViews: number;
@@ -36,6 +42,7 @@ export async function trackPageView(
     const ip = request.headers.get('cf-connecting-ip') || '';
     const userAgent = request.headers.get('user-agent') || '';
     const referrer = request.headers.get('referer') || '';
+    if (ip && recentViews.seen(`${ip}|${userAgent}|${artifactId}|${path || '/'}`)) return;
 
     // Resolve everything at view time: the visitor hash is date-dependent and the
     // consumer has no request, and the timestamp must reflect when the view happened

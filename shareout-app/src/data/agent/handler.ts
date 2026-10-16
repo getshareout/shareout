@@ -134,9 +134,11 @@ async function verifyAgentAdminAccess(request: Request, ctx: DataContext): Promi
   if (authHeader?.startsWith('Bearer ')) {
     const tokenHash = await hashToken(authHeader.slice(7));
     const tokenRow = await ctx.env.DB.prepare(`
-      SELECT user_id FROM tokens
-       WHERE token_hash = ? AND principal_type = 'user' AND revoked_at IS NULL
-         AND (expires_at IS NULL OR expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      SELECT t.user_id FROM tokens t
+        JOIN users u ON u.id = t.user_id
+       WHERE t.token_hash = ? AND t.principal_type = 'user' AND t.revoked_at IS NULL
+         AND COALESCE(u.disabled, 0) = 0
+         AND (t.expires_at IS NULL OR t.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now'))
     `).bind(tokenHash).first<{ user_id: string }>();
     if (tokenRow?.user_id) {
       return userCanAdminAgent(ctx, tokenRow.user_id);

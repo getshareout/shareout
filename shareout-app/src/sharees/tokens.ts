@@ -12,6 +12,7 @@ import { generateId } from '../crypto-utils';
 import { logAudit } from '../audit';
 import { requireExternalSharing } from './guard';
 import { requireWorkspaceRole } from '../workspaces/roles';
+import { evictReturnedTokens } from '../auth/token-cache';
 
 const EXTERNAL_SCOPES: ServiceScope[] = ['artifacts:read', 'data:read', 'data:write'];
 
@@ -100,7 +101,9 @@ export async function handleRevokeExternalToken(
   const result = await env.DB.prepare(`
     UPDATE tokens SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
      WHERE id = ? AND principal_type = 'workspace' AND principal_id = ? AND subject_external_user_id = ? AND revoked_at IS NULL
+     RETURNING token_hash
   `).bind(tokenId, workspaceId, memberUserId).run();
+  await evictReturnedTokens(env, result);
   if (!result.meta?.changes) return json({ error: 'Not found', code: 'NOT_FOUND' }, 404);
 
   await logAudit(env, {

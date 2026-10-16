@@ -1,5 +1,6 @@
 import { errorResponse, successResponse, verifyOwner, type DataContext } from '../middleware';
 import { generateId, sha256 } from '../../crypto-utils';
+import { RecentKeys, WindowLimiter } from '../../http/isolate-limits';
 
 // Slides B2B P0 — viewer analytics (DocSend wedge).
 // `beat` is the public capture endpoint hit by the read-only viewer; `getAnalytics`
@@ -42,6 +43,40 @@ async function hashIp(ip: string, presId: string): Promise<string> {
   return (await sha256(bytes.buffer as ArrayBuffer)).slice(0, 32);
 }
 
+// The beat endpoint is public and unauthenticated, so every write it can trigger is
+// bounded (per isolate; see isolate-limits.ts):
+//   - slideIndex must fall inside the deck → at most one slide_views row per real slide
+//     per session (UNIQUE(session_id, slide_index)).
+//   - New sessions: NEW_SESSIONS_PER_IP per IP per window. A legit viewer mints one per
+//     page load; a refresh loop or script without a sessionId is cut off.
+//   - Repeat beats for the same session+slide inside BEAT_DEDUPE_MS are acknowledged
+//     without writing. The viewer beats every ~10 s, so only near-simultaneous
+//     duplicates (e.g. a hide beacon right after a beat) are dropped.
+const NEW_SESSIONS_PER_IP = 60;
+const NEW_SESSION_WINDOW_MS = 10 * 60_000;
+const BEAT_DEDUPE_MS = 2_000;
+const SLIDE_COUNT_TTL_MS = 60_000;
+
+const newSessionsByIp = new WindowLimiter(NEW_SESSIONS_PER_IP, NEW_SESSION_WINDOW_MS);
+const recentBeats = new RecentKeys(BEAT_DEDUPE_MS);
+const slideCounts = new RecentKeys<number>(SLIDE_COUNT_TTL_MS, 1_000);
+
+async function countSlides(ctx: DataContext, presId: string, fresh = false): Promise<number> {
+  const cached = fresh ? undefined : slideCounts.get(presId);
+  if (cached !== undefined) return cached;
+  const row = await ctx.env.DB.prepare(`SELECT COUNT(*) AS n FROM slides WHERE presentation_id = ?`)
+    .bind(presId).first<{ n: number }>();
+  const n = row?.n ?? 0;
+  slideCounts.set(presId, n);
+  return n;
+}
+
+// The cached count can lag a just-added slide; re-read once before rejecting.
+async function slideInDeck(ctx: DataContext, presId: string, slideIndex: number): Promise<boolean> {
+  if (slideIndex < (await countSlides(ctx, presId))) return true;
+  return slideIndex < (await countSlides(ctx, presId, true));
+}
+
 // Public — any viewer (anonymous) posts heartbeats. Never trust the body for identity.
 async function recordBeat(request: Request, ctx: DataContext, presId: string): Promise<Response> {
   if (request.method !== 'POST') {
@@ -60,6 +95,10 @@ async function recordBeat(request: Request, ctx: DataContext, presId: string): P
     return errorResponse({ code: 'INVALID_SLIDE_INDEX', message: 'slideIndex must be >= 0', status: 400 });
   }
 
+  if (!(await slideInDeck(ctx, presId, slideIndex))) {
+    return errorResponse({ code: 'INVALID_SLIDE_INDEX', message: 'slideIndex is outside this deck', status: 400 });
+  }
+
   const now = new Date().toISOString();
   const dnt = request.headers.get('DNT') === '1';
   const slideDwellMs = Math.max(0, Math.floor(body.slideDwellMs ?? 0));
@@ -76,9 +115,16 @@ async function recordBeat(request: Request, ctx: DataContext, presId: string): P
     if (!owns) sessionId = null;
   }
 
+  if (sessionId && recentBeats.seen(`${sessionId}:${slideIndex}`)) {
+    return successResponse({ sessionId }, 200, ctx.origin);
+  }
+
   if (!sessionId) {
-    sessionId = generateId('ses');
     const rawIp = request.headers.get('CF-Connecting-IP') || '';
+    if (!newSessionsByIp.hit(rawIp || 'unknown')) {
+      return errorResponse({ code: 'RATE_LIMITED', message: 'Too many new view sessions from this network', status: 429 });
+    }
+    sessionId = generateId('ses');
     const ipHash = dnt || !rawIp ? null : await hashIp(rawIp, presId);
     const ua = dnt ? null : (request.headers.get('User-Agent') || '').slice(0, 400);
     const country = dnt ? null : ((request as { cf?: { country?: string } }).cf?.country ?? null);
@@ -88,6 +134,7 @@ async function recordBeat(request: Request, ctx: DataContext, presId: string): P
         started_at, last_seen_at, completed, duration_ms, slides_seen
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
     ).bind(sessionId, presId, ctx.artifactId, ipHash, ua, country, now, now, completed, sessionDurationMs).run();
+    recentBeats.set(`${sessionId}:${slideIndex}`, true);
   } else {
     await ctx.env.DB.prepare(
       `UPDATE view_sessions

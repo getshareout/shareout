@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetIsolateLimits } from '../../src/http/isolate-limits';
 import {
   aggregateDailyStats,
   cleanupOldEvents,
@@ -71,6 +72,10 @@ function makeRequest(overrides: {
     cf: overrides.country ? { country: overrides.country } : undefined,
   } as unknown as Request;
 }
+
+beforeEach(() => {
+  resetIsolateLimits();
+});
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -149,6 +154,24 @@ describe('trackPageView', () => {
       'XX',
       '/'
     );
+  });
+
+  it('counts a refresh loop from one visitor once per window, other visitors and pages still count', async () => {
+    const send = vi.fn(async () => {});
+    const env = { DB: { prepare: vi.fn() }, VIEWS_QUEUE: { send } } as unknown as Env;
+    const visitor = { ip: '1.2.3.4', userAgent: 'TestAgent/1.0' };
+
+    for (let i = 0; i < 5; i++) await trackPageView(env, makeRequest(visitor), ARTIFACT_ID, '/');
+    expect(send).toHaveBeenCalledTimes(1);
+
+    await trackPageView(env, makeRequest(visitor), ARTIFACT_ID, '/other');
+    await trackPageView(env, makeRequest(visitor), 'art_2', '/');
+    await trackPageView(env, makeRequest({ ip: '5.6.7.8', userAgent: 'TestAgent/1.0' }), ARTIFACT_ID, '/');
+    expect(send).toHaveBeenCalledTimes(4);
+
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 31_000);
+    await trackPageView(env, makeRequest(visitor), ARTIFACT_ID, '/');
+    expect(send).toHaveBeenCalledTimes(5);
   });
 
   it('silently fails when the write throws', async () => {

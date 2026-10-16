@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 
 // Owner gate is exercised separately; here we force it so the readout path is testable.
 vi.mock('../../../src/data/middleware', async (orig) => {
@@ -10,6 +10,7 @@ vi.mock('../../../src/data/middleware', async (orig) => {
 import { verifyOwner } from '../../../src/data/middleware';
 import { handleAnalyticsRoutes } from '../../../src/data/slides/analytics';
 import type { DataContext } from '../../../src/data/middleware';
+import { resetIsolateLimits } from '../../../src/http/isolate-limits';
 import type { Env } from '../../../src/types';
 
 const e = env as unknown as Env;
@@ -29,15 +30,29 @@ beforeAll(async () => {
       id TEXT PRIMARY KEY, session_id TEXT NOT NULL, presentation_id TEXT NOT NULL,
       slide_id TEXT, slide_index INTEGER NOT NULL, entered_at TEXT NOT NULL, dwell_ms INTEGER NOT NULL DEFAULT 0,
       UNIQUE(session_id, slide_index))`,
+    `CREATE TABLE IF NOT EXISTS slides (id TEXT PRIMARY KEY, presentation_id TEXT NOT NULL)`,
   ];
   for (const s of stmts) await e.DB.prepare(s).run();
+  for (let i = 0; i < 3; i++) {
+    await e.DB.prepare(`INSERT OR IGNORE INTO slides (id, presentation_id) VALUES (?, ?)`).bind(`slide_an_${i}`, PRES_ID).run();
+  }
 });
 
 beforeEach(async () => {
+  resetIsolateLimits();
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-16T12:00:00Z'));
   mockVerifyOwner.mockReset();
   await e.DB.prepare(`DELETE FROM view_sessions`).run();
   await e.DB.prepare(`DELETE FROM slide_views`).run();
 });
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+// Moves the clock past the same-slide dedupe window between beats.
+const later = () => vi.setSystemTime(Date.now() + 3_000);
 
 function makeCtx(): DataContext {
   return {
@@ -89,7 +104,9 @@ describe('slides analytics — beat capture', () => {
 
   it('accumulates dwell with MAX (idempotent re-beats)', async () => {
     const { sessionId } = await beat({ slideIndex: 0, slideDwellMs: 500, totalSlides: 2 });
+    later();
     await beat({ sessionId, slideIndex: 0, slideDwellMs: 1500, totalSlides: 2 });
+    later();
     await beat({ sessionId, slideIndex: 0, slideDwellMs: 800, totalSlides: 2 }); // lower → ignored
 
     const sv = await e.DB.prepare(`SELECT dwell_ms FROM slide_views WHERE session_id = ? AND slide_index = 0`).bind(sessionId).first<{ dwell_ms: number }>();
@@ -121,6 +138,38 @@ describe('slides analytics — beat capture', () => {
   it('rejects negative slideIndex', async () => {
     const res = await handleAnalyticsRoutes(beatReq({ slideIndex: -1 }), makeCtx(), PRES_ID, ['beat']);
     expect(res.status).toBe(400);
+  });
+
+  it('rejects a slideIndex past the end of the deck without writing', async () => {
+    const res = await handleAnalyticsRoutes(beatReq({ slideIndex: 3 }), makeCtx(), PRES_ID, ['beat']);
+    expect(res.status).toBe(400);
+    const huge = await handleAnalyticsRoutes(beatReq({ slideIndex: 1_000_000 }), makeCtx(), PRES_ID, ['beat']);
+    expect(huge.status).toBe(400);
+    const sessions = await e.DB.prepare(`SELECT COUNT(*) AS n FROM view_sessions`).first<{ n: number }>();
+    expect(sessions?.n).toBe(0);
+  });
+
+  it('dedupes a repeat beat for the same session + slide inside the window', async () => {
+    const { sessionId } = await beat({ slideIndex: 0, slideDwellMs: 500, totalSlides: 3 });
+    await beat({ sessionId, slideIndex: 0, slideDwellMs: 900, totalSlides: 3 }); // inside window → no write
+    const sv = await e.DB.prepare(`SELECT dwell_ms FROM slide_views WHERE session_id = ? AND slide_index = 0`).bind(sessionId).first<{ dwell_ms: number }>();
+    expect(sv?.dwell_ms).toBe(500);
+
+    await beat({ sessionId, slideIndex: 1, slideDwellMs: 100, totalSlides: 3 }); // other slide → recorded
+    later();
+    await beat({ sessionId, slideIndex: 0, slideDwellMs: 1200, totalSlides: 3 }); // after window → recorded
+    const rows = await e.DB.prepare(`SELECT slide_index, dwell_ms FROM slide_views WHERE session_id = ? ORDER BY slide_index`).bind(sessionId).all<{ slide_index: number; dwell_ms: number }>();
+    expect(rows.results).toEqual([{ slide_index: 0, dwell_ms: 1200 }, { slide_index: 1, dwell_ms: 100 }]);
+  });
+
+  it('rate-limits new sessions per IP', async () => {
+    for (let i = 0; i < 60; i++) await beat({ slideIndex: 0, totalSlides: 3 });
+    const res = await handleAnalyticsRoutes(beatReq({ slideIndex: 0 }), makeCtx(), PRES_ID, ['beat']);
+    expect(res.status).toBe(429);
+    await beat({ slideIndex: 0, totalSlides: 3 }, { 'CF-Connecting-IP': '5.6.7.8' }); // other IP unaffected
+
+    const sessions = await e.DB.prepare(`SELECT COUNT(*) AS n FROM view_sessions`).first<{ n: number }>();
+    expect(sessions?.n).toBe(61);
   });
 });
 

@@ -19,6 +19,7 @@ import { getSessionUser } from '../auth/session';
 import { signPayload, verifySignature } from '../token';
 import { checkKVRateLimit, rateLimitClientKey } from '../rate-limit';
 import { consentPage, oauthErrorPage, pickLang } from './consent-page';
+import { evictReturnedTokens } from '../auth/token-cache';
 
 export const MCP_SCOPE = 'shareout';
 const CODE_TTL_MS = 5 * 60_000;
@@ -529,7 +530,8 @@ async function refresh(env: Env, origin: string, client: ClientRow, body: Record
     return oauthError('invalid_grant', 'Refresh token was already used');
   }
   if (grant.access_token_id) {
-    await env.DB.prepare('DELETE FROM tokens WHERE id = ?').bind(grant.access_token_id).run();
+    const old = await env.DB.prepare('DELETE FROM tokens WHERE id = ? RETURNING token_hash').bind(grant.access_token_id).run();
+    await evictReturnedTokens(env, old);
   }
   return tokenResponse(access.token, refreshToken, grant.scope);
 }
@@ -547,18 +549,21 @@ export async function handleRevoke(request: Request, env: Env): Promise<Response
     'SELECT id, access_token_id FROM oauth_grants WHERE refresh_token_hash = ? AND client_id = ?'
   ).bind(hash, client.id).first<{ id: string; access_token_id: string | null }>();
   if (byRefresh) {
-    await env.DB.batch([
+    const results = await env.DB.batch([
       env.DB.prepare("UPDATE oauth_grants SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), access_token_id = NULL WHERE id = ?").bind(byRefresh.id),
-      env.DB.prepare('DELETE FROM tokens WHERE id = ?').bind(byRefresh.access_token_id ?? ''),
+      env.DB.prepare('DELETE FROM tokens WHERE id = ? RETURNING token_hash').bind(byRefresh.access_token_id ?? ''),
     ]);
+    await evictReturnedTokens(env, results?.[1]);
     return oauthJson({});
   }
 
   // An access token: only one this client was issued.
-  await env.DB.prepare(
+  const removed = await env.DB.prepare(
     `DELETE FROM tokens WHERE token_hash = ?
-       AND id IN (SELECT access_token_id FROM oauth_grants WHERE client_id = ?)`
+       AND id IN (SELECT access_token_id FROM oauth_grants WHERE client_id = ?)
+     RETURNING token_hash`
   ).bind(hash, client.id).run();
+  await evictReturnedTokens(env, removed);
   return oauthJson({});
 }
 

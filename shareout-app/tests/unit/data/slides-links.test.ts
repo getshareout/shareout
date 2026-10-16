@@ -14,6 +14,7 @@ import { verifyOwner } from '../../../src/data/middleware';
 import { dispatchLifecycleEmail } from '../../../src/email/gateway';
 import { handleLinksRoutes } from '../../../src/data/slides/links';
 import type { DataContext } from '../../../src/data/middleware';
+import { resetIsolateLimits } from '../../../src/http/isolate-limits';
 import type { Env } from '../../../src/types';
 
 const e = env as unknown as Env;
@@ -43,6 +44,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  resetIsolateLimits();
   mockVerifyOwner.mockReset();
   mockDispatch.mockClear();
   await e.DB.prepare(`DELETE FROM share_links`).run();
@@ -200,6 +202,22 @@ describe('slides tracked links — public access', () => {
     const { status, json } = await call('POST', [id, 'access'], {});
     expect(status).toBe(410);
     expect(json.code).toBe('LINK_EXPIRED');
+  });
+
+  it('counts a repeat open from the same IP once, but not other viewers', async () => {
+    const id = await createLink({ gate: 'email' });
+    const first = await call('POST', [id, 'access'], { email: 'jane@globex.com' });
+    const again = await call('POST', [id, 'access'], { email: 'jane@globex.com' });
+    expect(again.status).toBe(200);
+    expect(again.json.data.sessionId).toBe(first.json.data.sessionId);
+
+    const otherEmail = await call('POST', [id, 'access'], { email: 'bob@globex.com' });
+    const otherIp = await call('POST', [id, 'access'], { email: 'jane@globex.com' }, { 'CF-Connecting-IP': '5.6.7.8' });
+    expect(otherEmail.json.data.sessionId).not.toBe(first.json.data.sessionId);
+    expect(otherIp.json.data.sessionId).not.toBe(first.json.data.sessionId);
+
+    const n = await e.DB.prepare(`SELECT COUNT(*) AS n FROM view_sessions WHERE link_id = ?`).bind(id).first<{ n: number }>();
+    expect(n?.n).toBe(3);
   });
 
   it('enforces the view cap', async () => {

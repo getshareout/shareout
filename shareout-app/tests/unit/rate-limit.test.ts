@@ -75,10 +75,10 @@ describe('checkSlidingWindowRateLimit', () => {
     const now = 1_700_000_030;
     vi.spyOn(Date, 'now').mockReturnValue(now * 1000);
 
-    const windowStart = Math.floor(now / 60) * 60;
-    const prevWindowStart = windowStart - 60;
+    const windowStart = Math.floor(now / 3600) * 3600;
+    const prevWindowStart = windowStart - 3600;
     const store = new Map<string, string>([
-      [`rl:anonymous:user_3:${prevWindowStart}`, '80'],
+      [`rl:anonymous:user_3:${prevWindowStart}`, '16'],
     ]);
     const kv = {
       get: async (key: string) => store.get(key) ?? null,
@@ -87,7 +87,7 @@ describe('checkSlidingWindowRateLimit', () => {
 
     const result = await checkSlidingWindowRateLimit(kv, 'user_3', 'anonymous');
     expect(result.allowed).toBe(true);
-    expect(result.remaining).toBeLessThan(100);
+    expect(result.remaining).toBeLessThan(20);
   });
 });
 

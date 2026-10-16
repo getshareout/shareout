@@ -6,6 +6,7 @@ import { scheduleSeedStarterKit } from './starter-kit/schedule';
 import { isSuperAdminEmail } from './superadmin/recipients';
 import { jsonWithApiErrors } from './http/api-error';
 import { deferWork } from './kv-cache';
+import { evictUserTokens, isKnownBadToken, readCachedToken, rememberBadToken, writeCachedToken } from './auth/token-cache';
 
 const RATE_LIMIT_WINDOW = 60 * 60 * 24; // 24 hours in seconds
 export const RATE_LIMIT_MAX = 100; // publishes per day
@@ -160,6 +161,7 @@ export async function handleLinkEmail(
   await env.DB.prepare(
     'UPDATE users SET email = ? WHERE id = ?'
   ).bind(email, user.id).run();
+  await evictUserTokens(env, user.id);
 
   return json({ success: true, email });
 }
@@ -183,48 +185,74 @@ export async function validateToken(
   return pending;
 }
 
+// Every token type (personal, MCP OAuth access, Agent, external) resolves through one
+// of the two queries below, and both reject a token whose owning user (tokens.user_id:
+// the person, the Agent principal, or the external member) is disabled. Disable evicts
+// the cached entries (superadmin/users.ts), so the cache can't outlive the flag.
 async function resolveToken(request: Request, env: Env): Promise<AuthUser | null> {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) return null;
 
   const token = authHeader.slice(7);
-
   // Workspace Agent token → authenticate AS its service principal, carrying the
   // single-workspace boundary + scopes. ('sot_' does not match 'so_' below.)
-  if (token.startsWith('sot_')) return resolveServiceToken(token, env);
-
-  if (!token.startsWith('so_')) return null;
+  const service = token.startsWith('sot_');
+  if (!service && !token.startsWith('so_')) return null;
 
   const tokenHash = await hashToken(token);
+  if (isKnownBadToken(tokenHash)) return null;
 
+  const cached = await readCachedToken(env, tokenHash);
+  if (cached && !!cached.service === service) return cached;
+
+  const readStartedAt = Date.now();
+  const resolved = service ? await resolveServiceToken(tokenHash, env) : await resolveUserToken(tokenHash, env);
+  if (!resolved) {
+    rememberBadToken(tokenHash);
+    return null;
+  }
+
+  deferWork(() => Promise.all([
+    touchLastUsed(env, tokenHash, service ? 'sottokused' : 'tokused'),
+    writeCachedToken(env, tokenHash, resolved.user, resolved.expiresAt, readStartedAt),
+  ]));
+  return resolved.user;
+}
+
+interface ResolvedToken {
+  user: AuthUser;
+  expiresAt: string | null;
+}
+
+async function resolveUserToken(tokenHash: string, env: Env): Promise<ResolvedToken | null> {
   const result = await env.DB.prepare(`
-    SELECT t.user_id, u.email, u.username
+    SELECT t.user_id, t.expires_at, u.email, u.username
     FROM tokens t
     JOIN users u ON u.id = t.user_id
     WHERE t.token_hash = ?
     AND t.principal_type = 'user'
     AND t.revoked_at IS NULL
+    AND COALESCE(u.disabled, 0) = 0
     AND (t.expires_at IS NULL OR t.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-  `).bind(tokenHash).first<{ user_id: string; email: string | null; username: string | null }>();
+  `).bind(tokenHash).first<{ user_id: string; expires_at?: string | null; email: string | null; username: string | null }>();
 
   if (!result) return null;
-
-  deferWork(() => touchLastUsed(env, tokenHash));
-
-  return { id: result.user_id, email: result.email, username: result.username };
+  return {
+    user: { id: result.user_id, email: result.email, username: result.username },
+    expiresAt: result.expires_at ?? null,
+  };
 }
 
-async function resolveServiceToken(token: string, env: Env): Promise<AuthUser | null> {
-  const tokenHash = await hashToken(token);
-
+async function resolveServiceToken(tokenHash: string, env: Env): Promise<ResolvedToken | null> {
   const row = await env.DB.prepare(`
     SELECT t.id AS token_id, t.user_id AS principal_user_id, t.principal_id AS workspace_id, t.scopes,
-           t.subject_external_user_id, u.email, u.username
+           t.subject_external_user_id, t.expires_at, u.email, u.username
     FROM tokens t
     JOIN users u ON u.id = t.user_id
     WHERE t.token_hash = ?
       AND t.principal_type = 'workspace'
       AND t.revoked_at IS NULL
+      AND COALESCE(u.disabled, 0) = 0
       AND (t.expires_at IS NULL OR t.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now'))
   `).bind(tokenHash).first<{
     token_id: string;
@@ -232,13 +260,12 @@ async function resolveServiceToken(token: string, env: Env): Promise<AuthUser | 
     workspace_id: string;
     scopes: string;
     subject_external_user_id: string | null;
+    expires_at?: string | null;
     email: string | null;
     username: string | null;
   }>();
 
   if (!row) return null;
-
-  deferWork(() => touchLastUsed(env, tokenHash, 'sottokused'));
 
   const scopes = row.scopes
     .split(',')
@@ -246,15 +273,18 @@ async function resolveServiceToken(token: string, env: Env): Promise<AuthUser | 
     .filter((s): s is ServiceScope => (SERVICE_SCOPES as string[]).includes(s));
 
   return {
-    id: row.principal_user_id,
-    email: row.email,
-    username: row.username,
-    service: {
-      tokenId: row.token_id,
-      workspaceId: row.workspace_id,
-      scopes,
-      externalUserId: row.subject_external_user_id ?? null,
+    user: {
+      id: row.principal_user_id,
+      email: row.email,
+      username: row.username,
+      service: {
+        tokenId: row.token_id,
+        workspaceId: row.workspace_id,
+        scopes,
+        externalUserId: row.subject_external_user_id ?? null,
+      },
     },
+    expiresAt: row.expires_at ?? null,
   };
 }
 
@@ -364,6 +394,7 @@ export async function handleUpdateProfile(
   await env.DB.prepare(
     `UPDATE users SET ${updates.join(', ')} WHERE id = ?`
   ).bind(...values).run();
+  if (updates.some((u) => u.startsWith('username'))) await evictUserTokens(env, user.id);
 
   return handleGetProfile(request, env, user);
 }
