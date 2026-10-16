@@ -3,6 +3,7 @@ import type { AuthUser } from './api-auth';
 import { generateToken, hashToken } from './api-auth';
 import { generateId } from './crypto-utils';
 import { jsonWithApiErrors } from './http/api-error';
+import { evictReturnedTokens } from './auth/token-cache';
 
 function json(data: unknown, status = 200): Response {
   return jsonWithApiErrors(data, status);
@@ -33,7 +34,8 @@ export async function handleCreateMyToken(request: Request, env: Env, user: Auth
   }
 
   if (regenerate) {
-    await env.DB.prepare("DELETE FROM tokens WHERE principal_type = 'user' AND principal_id = ?").bind(user.id).run();
+    const removed = await env.DB.prepare("DELETE FROM tokens WHERE principal_type = 'user' AND principal_id = ? RETURNING token_hash").bind(user.id).run();
+    await evictReturnedTokens(env, removed);
   }
 
   const token = generateToken();
@@ -48,8 +50,9 @@ export async function handleCreateMyToken(request: Request, env: Env, user: Auth
 // Self-serve: revokes one of the signed-in user's own tokens. Scoped by principal so a
 // user can never delete someone else's token by guessing its id.
 export async function handleRevokeMyToken(env: Env, user: AuthUser, tokenId: string): Promise<Response> {
-  const res = await env.DB.prepare("DELETE FROM tokens WHERE id = ? AND principal_type = 'user' AND principal_id = ?")
+  const res = await env.DB.prepare("DELETE FROM tokens WHERE id = ? AND principal_type = 'user' AND principal_id = ? RETURNING token_hash")
     .bind(tokenId, user.id).run();
+  await evictReturnedTokens(env, res);
   if (!res.meta?.changes) return json({ ok: false, error: 'Token not found', code: 'NOT_FOUND' }, 404);
   return json({ ok: true });
 }

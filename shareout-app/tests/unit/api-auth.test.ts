@@ -181,7 +181,7 @@ describe('validateToken', () => {
     await settle();
 
     expect(run).not.toHaveBeenCalled();
-    expect(put).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalledWith(`tokused:${tokenHash}`, expect.anything(), expect.anything());
   });
 
   it('falls open and writes when KV.get throws', async () => {

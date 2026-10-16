@@ -4,6 +4,7 @@ import { generateToken, hashToken } from './api-auth';
 import { generateId } from './crypto-utils';
 import { getInternalWorkspaceRole } from './workspaces/roles';
 import { jsonWithApiErrors } from './http/api-error';
+import { evictReturnedTokens } from './auth/token-cache';
 
 function json(data: unknown, status = 200): Response {
   return jsonWithApiErrors(data, status);
@@ -33,7 +34,8 @@ export async function handleRevokeMemberTokens(
   const forbidden = await guard(env, workspaceId, user.id, targetUserId);
   if (forbidden) return forbidden;
 
-  const result = await env.DB.prepare("DELETE FROM tokens WHERE principal_type = 'user' AND principal_id = ?").bind(targetUserId).run();
+  const result = await env.DB.prepare("DELETE FROM tokens WHERE principal_type = 'user' AND principal_id = ? RETURNING token_hash").bind(targetUserId).run();
+  await evictReturnedTokens(env, result);
   return json({ success: true, revoked: result.meta?.changes ?? 0 });
 }
 

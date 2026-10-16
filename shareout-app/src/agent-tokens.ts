@@ -5,6 +5,7 @@ import { generateId } from './crypto-utils';
 import { getInternalWorkspaceRole, invalidateWorkspaceRole } from './workspaces/roles';
 import { logAudit } from './audit';
 import { jsonWithApiErrors } from './http/api-error';
+import { evictReturnedTokens } from './auth/token-cache';
 
 function json(data: unknown, status = 200): Response {
   return jsonWithApiErrors(data, status);
@@ -136,8 +137,9 @@ export async function handleRevokeAgentToken(
   if (forbidden) return forbidden;
 
   const result = await env.DB.prepare(
-    "UPDATE tokens SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND principal_type = 'workspace' AND principal_id = ? AND revoked_at IS NULL"
+    "UPDATE tokens SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND principal_type = 'workspace' AND principal_id = ? AND revoked_at IS NULL RETURNING token_hash"
   ).bind(tokenId, workspaceId).run();
+  await evictReturnedTokens(env, result);
 
   const revoked = result.meta?.changes ?? 0;
   if (!revoked) return json({ error: 'Token not found', code: 'NOT_FOUND' }, 404);

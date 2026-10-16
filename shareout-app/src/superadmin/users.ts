@@ -3,6 +3,7 @@ import { purgeArtifact } from '../artifacts/crud';
 import { isSuperAdminEmail } from './recipients';
 import { invalidateUserDisabled } from '../auth/session';
 import { invalidateWorkspaceSlug } from '../workspaces/host-cache';
+import { evictCachedTokens, tokenHashesForUser } from '../auth/token-cache';
 
 export interface UserRow {
   id: string;
@@ -127,9 +128,12 @@ export async function revokeUserAccess(
   userId: string,
   disabled: boolean
 ): Promise<void> {
+  const doomedTokens = disabled ? await tokenHashesForUser(env, userId) : [];
   if (disabled) {
     await env.DB.prepare("DELETE FROM tokens WHERE principal_type = 'user' AND principal_id = ?").bind(userId).run();
   }
+  // Disable also drops cached Agent/external tokens tied to the user (re-read from D1).
+  await evictCachedTokens(env, doomedTokens);
   await env.DB.prepare('UPDATE users SET disabled = ? WHERE id = ?')
     .bind(disabled ? 1 : 0, userId)
     .run();
@@ -174,6 +178,8 @@ export async function deleteUser(
     await invalidateWorkspaceSlug(env, w.slug);
   }
 
+  // Read before the batch: the user delete cascades to every token row it owns.
+  const doomedTokens = await tokenHashesForUser(env, userId);
   await env.DB.batch([
     env.DB.prepare('DELETE FROM scheduled_jobs WHERE owner_id = ?').bind(userId),
     env.DB.prepare("DELETE FROM tokens WHERE principal_type = 'user' AND principal_id = ?").bind(userId),
@@ -182,6 +188,7 @@ export async function deleteUser(
     env.DB.prepare('DELETE FROM favorites WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId),
   ]);
+  await evictCachedTokens(env, doomedTokens);
 
   return { ok: true };
 }

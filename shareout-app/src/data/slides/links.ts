@@ -2,6 +2,7 @@ import { errorResponse, successResponse, verifyOwner, type DataContext } from '.
 import { generateId, sha256 } from '../../crypto-utils';
 import { dispatchLifecycleEmail } from '../../email/gateway';
 import { hostArtifactLinks } from './presentations';
+import { RecentKeys } from '../../http/isolate-limits';
 
 // Slides B2B P1 — tracked & gated share links.
 // Owner CRUD for links + a public access endpoint that validates the gate,
@@ -155,6 +156,9 @@ async function revokeLink(request: Request, ctx: DataContext, presId: string, ln
 
 // --- Public access ------------------------------------------------------------
 
+const LINK_OPEN_DEDUPE_MS = 5 * 60_000;
+const recentOpens = new RecentKeys<string>(LINK_OPEN_DEDUPE_MS);
+
 async function loadLink(ctx: DataContext, presId: string, lnkId: string): Promise<ShareLinkRow | null> {
   return ctx.env.DB.prepare(
     `SELECT * FROM share_links WHERE id = ? AND presentation_id = ?`
@@ -221,9 +225,17 @@ async function accessLink(request: Request, ctx: DataContext, presId: string, ln
     }
   }
 
+  // Same IP re-opening the same link (refresh, retry) within the window gets its
+  // existing session back instead of a new row + owner email.
+  const rawIp = request.headers.get('CF-Connecting-IP') || '';
+  const openKey = rawIp ? `${rawIp}|${lnkId}|${viewerEmail ?? ''}` : null;
+  const reused = openKey ? recentOpens.get(openKey) : undefined;
+  if (reused) {
+    return successResponse({ sessionId: reused, granted: true, recipientLabel: link.recipient_label }, 200, ctx.origin);
+  }
+
   const sessionId = generateId('ses');
   const now = new Date().toISOString();
-  const rawIp = request.headers.get('CF-Connecting-IP') || '';
   const dnt = request.headers.get('DNT') === '1';
   const ipHash = dnt || !rawIp ? null : (await sha256(new TextEncoder().encode(`${rawIp}:${presId}`).buffer as ArrayBuffer)).slice(0, 32);
   const ua = dnt ? null : (request.headers.get('User-Agent') || '').slice(0, 400);
@@ -233,6 +245,7 @@ async function accessLink(request: Request, ctx: DataContext, presId: string, ln
     `INSERT INTO view_sessions (id, presentation_id, artifact_id, viewer_email, link_id, ip_hash, user_agent, country, started_at, last_seen_at, completed, duration_ms, slides_seen)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0)`
   ).bind(sessionId, presId, ctx.artifactId, viewerEmail, lnkId, ipHash, ua, country, now, now).run();
+  if (openKey) recentOpens.set(openKey, sessionId);
 
   await notifyOwnerOnOpen(ctx, presId, lnkId, sessionId, link.recipient_label, viewerEmail).catch(() => {});
 

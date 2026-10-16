@@ -14,7 +14,11 @@ const RATE_LIMITS = {
   aiChat: { limit: 100, windowSeconds: 3600 },
   createPreviewAnon: { limit: 8, windowSeconds: 3600 },
   datasetRefresh: { limit: 6, windowSeconds: 3600 },
-  anonymous: { limit: 100, windowSeconds: 60 },
+  // Shared anonymous bucket: emails sent from public artifacts by signed-out visitors
+  // (`email:<ip>`) and abuse reports (`report:<ip>`). Each allowed hit is one KV write,
+  // so 100/min allowed ~144k writes per IP per day; 20/hour caps it at 480 while
+  // leaving room for a busy contact form or several reports from one network.
+  anonymous: { limit: 20, windowSeconds: 3600 },
   // Workspace home assistant: aggregate turn ceiling per workspace, and a tighter
   // separate counter for ad-hoc connector queries (each can be expensive).
   webAgentWorkspace: { limit: 500, windowSeconds: 3600 },
