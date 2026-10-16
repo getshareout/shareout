@@ -278,7 +278,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
       if (can) {
         html += '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('artifacts.access.visibility')) + '</span><select class="wsx-field__in" id="fa_vis">'
           + ['inherit', 'workspace', 'public', 'private'].map(function (v) { return '<option value="' + v + '"' + (fa.visibility === v ? ' selected' : '') + '>' + esc(t('artifacts.access.opt.' + v)) + '</option>'; }).join('')
-          + '</select></label>';
+          + '</select></label>' + gcFolderHtml();
       }
       var gs = (fa.grants || []).filter(function (g) { return !pendingRevokes[g.id]; });
       html += '<div class="wsx-field__lbl">' + esc(t('artifacts.access.people')) + '</div>';
@@ -299,6 +299,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
       if (gs.length) html += '<div class="wsx-cform__foot"><button class="wsx-abtn" id="fa_portal" type="button">' + esc(t('folderPortal.copyLink')) + '</button></div>';
       if (can) html += '<div class="wsx-field__lbl">' + esc(t('folderPortal.activity')) + '</div><div id="fa_act">' + activityHtml() + '</div>';
       b.innerHTML = html;
+      if (can) wireGuestFolder(fid);
       var pl = document.getElementById('fa_portal');
       if (pl) pl.addEventListener('click', function () {
         var fail = function () { fToast(t('artifacts.couldNotCopy'), true); };

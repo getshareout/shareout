@@ -20,6 +20,7 @@ import { workspace_client_home_views_crew_JS } from './home-views/crew';
 import { workspace_client_home_views_library_JS } from './home-views/library';
 import { workspace_client_inspector_history_JS } from './inspector-history';
 import { workspace_client_edit_lite_JS } from './edit-lite';
+import { workspace_client_guest_comments_lazy_JS } from './guest-comments';
 
 interface ChunkDef { src: string; exports: string[]; soft?: string[]; vars?: string[] }
 
@@ -43,6 +44,7 @@ export const LAZY_CHUNKS: Record<string, ChunkDef> = {
     exports: ['loadEditSource', 'renderLive', 'renderEditPanel', 'autosaveDraft', 'publishEdit'],
     soft: ['editKeydown'],
   },
+  guest: { src: workspace_client_guest_comments_lazy_JS, exports: ['wireGuestFolder', 'wireGuestArt'] },
 };
 
 export const lazyChunkPath = (name: string): string => `/sdk/home-lens-${name}.js`;

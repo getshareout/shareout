@@ -334,6 +334,10 @@ guests on: `PUT /v1/data/{artifactId}/comments/_config` with `{ "guestComments":
 (`null` follows the folder), or for a folder `PUT /v1/workspaces/{wid}/folders/{fid}/guest-comments`
 `{ "enabled": true }` (admins and the folder's creator). MCP: `set_guest_comments`.
 
+In the app, a folder manager flips **Allow guest comments** in the folder's **Who has access**
+panel, and the owner picks **Follow folder / On / Off** in the artifact's **Comments** tab, which
+also shows whether guests can comment right now.
+
 - Only where the guest can already open the page without an account: **public**, or a
   **password** page they unlocked. Private and workspace pages stay account-only.
 - The toolbar shows **Comment as guest** (name, email, 6-digit code). The code buys an

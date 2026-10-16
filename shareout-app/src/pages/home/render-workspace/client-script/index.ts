@@ -9,6 +9,7 @@ import { workspace_client_tabs_JS } from './tabs';
 import { workspace_client_md_edit_JS } from './md-edit';
 import { workspace_client_edit_lite_core_JS } from './edit-lite';
 import { workspace_client_lazy_chunks_JS } from './lazy-chunks';
+import { workspace_client_guest_comments_JS } from './guest-comments';
 import { workspace_client_inspector_details_JS } from './inspector-details';
 import { workspace_client_inspector_activity_JS } from './inspector-activity';
 import { workspace_client_inspector_JS } from './inspector';
@@ -44,6 +45,7 @@ export const WORKSPACE_CLIENT = [
   workspace_client_tabs_JS,
   workspace_client_md_edit_JS,
   workspace_client_edit_lite_core_JS,
+  workspace_client_guest_comments_JS,
   workspace_client_inspector_details_JS,
   workspace_client_inspector_activity_JS,
   workspace_client_inspector_JS,
