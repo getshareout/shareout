@@ -87,11 +87,12 @@ describe('platform viewer-scope enforcement', () => {
     expect(body.code).toBe('FORBIDDEN');
   });
 
-  it('passes the scope gate when :viewer_scope IS present', async () => {
+  it('rejects raw SQL from a scoped viewer even when it contains :viewer_scope', async () => {
     const env = await snowflakeEnv();
     const ctx = scoped(env, { field: 'company_id', values: [1, 2] });
     const res = await handlePlatformRequest(execReq('SELECT * FROM sales WHERE company_id IN (:viewer_scope)'), ctx, path);
+    expect(res.status).toBe(403);
     const body = await parseJson<{ data: { error?: { code: string } } }>(res);
-    expect(body.data.error?.code).not.toBe('SCOPE_REQUIRED');
+    expect(body.data.error?.code).toBe('SCOPE_REQUIRED');
   });
 });

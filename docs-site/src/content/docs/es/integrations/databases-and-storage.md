@@ -82,8 +82,8 @@ const { data } = await sdk.platform.execute('supabase', 'sql.query', {
 // data → { columns: ['status', 'n'], rows: [{ status: 'paid', n: 31 }, …] }
 ```
 
-Pasá `maxRows` (hasta 10 000) para limitar el resultado. Los artefactos con política de
-acceso por fila tienen que usar `:viewer_scope` en el SQL, igual que con Snowflake.
+Pasá `maxRows` (hasta 10 000) para limitar el resultado. En los artefactos con política de
+acceso por fila, los viewers solo pueden correr queries declaradas en `access_policy.queries`, igual que con Snowflake.
 
 ## El asistente
 

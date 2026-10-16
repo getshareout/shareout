@@ -28,7 +28,13 @@ export interface PlatformEndpointInfo {
 
 /** Body for POST …/platform/{provider}/{endpoint}/execute */
 export interface PlatformExecuteOptions {
-  connectionId: string;
+  /** Optional with `query` (the declaration names the connection). */
+  connectionId?: string;
+  /**
+   * Name of a query declared in the artifact's `access_policy.queries`. Viewers under a
+   * row-level access policy can only run declared queries; `params` is then ignored.
+   */
+  query?: string;
   params?: {
     pathParams?: Record<string, string>;
     queryParams?: Record<string, string | number | boolean | undefined>;
@@ -84,8 +90,8 @@ export class PlatformProvider {
     endpointId: string,
     options: PlatformExecuteOptions,
   ): Promise<PlatformExecuteResult<T>> {
-    if (!options?.connectionId && !options?.proxyToken) {
-      throw new Error('platform.execute requires connectionId (or proxyToken)');
+    if (!options?.connectionId && !options?.proxyToken && !options?.query) {
+      throw new Error('platform.execute requires connectionId (or proxyToken, or a declared query)');
     }
     const path =
       `/platform/${encodeURIComponent(this.id)}/${endpointId.split('/').map(encodeURIComponent).join('/')}/execute`;
@@ -95,6 +101,7 @@ export class PlatformProvider {
         connectionId: options.connectionId,
         proxyToken: options.proxyToken,
         params: options.params,
+        query: options.query,
       }),
     });
   }

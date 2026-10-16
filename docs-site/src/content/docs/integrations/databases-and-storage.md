@@ -81,8 +81,8 @@ const { data } = await sdk.platform.execute('supabase', 'sql.query', {
 // data → { columns: ['status', 'n'], rows: [{ status: 'paid', n: 31 }, …] }
 ```
 
-Pass `maxRows` (up to 10 000) to cap the result. Pages with a row-level access policy
-must use `:viewer_scope` in the SQL, as with Snowflake.
+Pass `maxRows` (up to 10 000) to cap the result. On pages with a row-level access policy,
+viewers can only run queries declared in `access_policy.queries`, as with Snowflake.
 
 ## The assistant
 

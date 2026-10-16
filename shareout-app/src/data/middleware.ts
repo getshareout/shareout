@@ -34,6 +34,8 @@ export interface DataContext {
     allow_anon_email?: number;
     allow_anon_agent?: number;
     allow_anon_collab?: number;
+    // Stored row-level access policy JSON (HTTP router path only).
+    access_policy?: string | null;
   };
   // Per-artifact mini-store (json/tables), backed by a Durable Object (ADR 28).
   db: MiniDb;

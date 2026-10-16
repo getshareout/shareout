@@ -19,7 +19,8 @@ import {
 	type ResolvedConnection,
 } from './credentials';
 import { resolveExecutionMode } from '../execution/mode-resolver';
-import { viewerScopeSqlList, viewerScopeCacheKey, type ViewerScope } from '../../access-policy';
+import { viewerScopeCacheKey, type AccessPolicy, type ViewerScope } from '../../access-policy';
+import { bindPolicyQuery, findPolicyQuery } from './viewer-scope';
 
 export interface EngineContext {
 	artifactId: string;
@@ -33,36 +34,12 @@ export interface EngineContext {
 	// each member's query resolves (and caches under) their own credentials.
 	requesterUserId?: string | null;
 	// Row-level access scope for the current viewer (0042). When set (non-owner
-	// viewer under an access policy), queries must declare the `:viewer_scope`
-	// placeholder, which is bound to these values server-side; requests that don't
-	// fail closed. null/undefined = owner / no policy = unscoped.
+	// viewer under an access policy), the request must name a query declared in
+	// `accessPolicy.queries`; the viewer's params are ignored and the scope is bound
+	// into the declared SQL. Anything else fails closed. null/undefined = unscoped.
 	viewerScope?: ViewerScope | null;
-}
-
-const VIEWER_SCOPE_TOKEN = ':viewer_scope';
-
-// Replace the `:viewer_scope` placeholder in every string within the params with
-// the scope's SQL value list. Returns the rewritten params and whether the token
-// was present anywhere (used to fail closed when a scoped viewer omits it).
-function injectViewerScope(params: unknown, list: string): { params: unknown; found: boolean } {
-	let found = false;
-	const walk = (v: unknown): unknown => {
-		if (typeof v === 'string') {
-			if (v.includes(VIEWER_SCOPE_TOKEN)) {
-				found = true;
-				return v.split(VIEWER_SCOPE_TOKEN).join(list);
-			}
-			return v;
-		}
-		if (Array.isArray(v)) return v.map(walk);
-		if (v && typeof v === 'object') {
-			const out: Record<string, unknown> = {};
-			for (const [k, val] of Object.entries(v)) out[k] = walk(val);
-			return out;
-		}
-		return v;
-	};
-	return { params: walk(params), found };
+	// The artifact's access policy, source of the declared queries.
+	accessPolicy?: AccessPolicy | null;
 }
 
 export class PlatformEngine {
@@ -83,6 +60,24 @@ export class PlatformEngine {
 		const endpoint = provider.getEndpoint(request.endpoint);
 		if (!endpoint) {
 			return this.errorResponse(PLATFORM_ERRORS.ENDPOINT_NOT_FOUND, startTime);
+		}
+
+		// Declared queries: resolve before loading the connection, since the declaration
+		// fixes the connection and params.
+		if (request.policyQuery !== undefined || this.ctx.viewerScope) {
+			const policy = this.ctx.accessPolicy;
+			const query = policy && request.policyQuery !== undefined
+				? findPolicyQuery(policy, request.policyQuery, request.provider, request.endpoint, request.connectionId || undefined)
+				: null;
+			if (!policy || !query) {
+				return this.errorResponse(
+					this.ctx.viewerScope ? PLATFORM_ERRORS.SCOPE_REQUIRED : PLATFORM_ERRORS.QUERY_NOT_FOUND,
+					startTime
+				);
+			}
+			const bound = bindPolicyQuery(query, policy, this.ctx.viewerScope ?? null);
+			if (!bound.ok) return this.errorResponse(PLATFORM_ERRORS.SCOPE_REQUIRED, startTime);
+			request = { ...request, connectionId: query.connection, params: bound.params };
 		}
 
 		let connection: ResolvedConnection;
@@ -115,20 +110,11 @@ export class PlatformEngine {
 			userPreference: request.options?.executionMode,
 		});
 
-		// Row-level access policy: bind the viewer's scope into the query (fail closed
-		// if the query doesn't declare :viewer_scope) and segment the cache per scope.
-		// Per-user connections additionally segment the cache by user so one member's
+		// Segment the cache per viewer scope. Per-user connections additionally segment the cache by user so one member's
 		// cached rows are never served to another.
 		let scopeKey = viewerScopeCacheKey(this.ctx.viewerScope);
 		if (connection.credentialScope === 'per_user' && connection.requesterUserId) {
 			scopeKey = `${scopeKey}|u:${connection.requesterUserId}`;
-		}
-		if (this.ctx.viewerScope) {
-			const injected = injectViewerScope(request.params ?? {}, viewerScopeSqlList(this.ctx.viewerScope));
-			if (!injected.found) {
-				return this.errorResponse(PLATFORM_ERRORS.SCOPE_REQUIRED, startTime);
-			}
-			request = { ...request, params: injected.params as Record<string, unknown> };
 		}
 
 		const rateLimiter = getRateLimiter(provider.config.id, {

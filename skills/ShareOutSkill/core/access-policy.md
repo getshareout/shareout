@@ -37,7 +37,7 @@ Author (owner)                     Viewer (external customer)
 
 The owner/editor who builds the artifact **bypasses** the policy and sees all data (so you can author and QA). The policy applies only to **viewer-role** collaborators and external sign-ins.
 
-**Enforced** on `sdk.table()` (every read *and* write path), the Data Platform (Snowflake/BigQuery/… via the `:viewer_scope` placeholder — see [Data Platform](#data-platform-snowflake--bigquery)), and `sdk.json` (owner-only under a policy). See the [coverage table](#backend-coverage).
+**Enforced** on `sdk.table()` (every read *and* write path), the Data Platform (Snowflake/BigQuery/… through queries you declare in `access_policy.queries` — see [Data Platform](#data-platform-snowflake--bigquery)), and `sdk.json` (owner-only under a policy). See the [coverage table](#backend-coverage).
 
 ---
 
@@ -67,6 +67,7 @@ Attach an `access_policy` object to the artifact. Stored server-side; updatable 
 | `rules[].match.email` | string | Exact email match, case-insensitive. |
 | `rules[].match.domain` | string | Email-domain match, case-insensitive (`buyer@acme.com` → domain `acme.com`). A rule may set `email` or `domain` (at least one). |
 | `rules[].values` | array of string\|number | Allowed values of `field` for a matching viewer. Non-empty. |
+| `queries` | object (optional) | Data Platform queries viewers may run, by name. See [Data Platform](#data-platform-snowflake--bigquery). |
 
 ### Resolution semantics (truth table)
 
@@ -244,7 +245,7 @@ What the policy **guarantees**:
 
 - `sdk.table()` enforcement runs in the Worker on **every read and write path** — `query`/`find`, `count`, `distinct`, `findById`, and `update`/`delete` (by id or filter). No path returns or mutates rows outside the scope clause; a viewer cannot widen the scope, and `findById`/`updateById`/`deleteById` of an out-of-scope row 404s.
 - The scope is **AND-ed** with the client filter — it can only narrow.
-- Data Platform SQL queries are **fail-closed**: no `:viewer_scope` → `403`. Direct mode is blocked for scoped viewers, and the cache is segmented per scope.
+- Data Platform SQL is **fail-closed**: a scoped viewer can only run a query declared in `access_policy.queries` — never SQL of their own — and anything the server cannot scope → `403`. Direct mode is blocked for scoped viewers, and the cache is segmented per scope.
 - Owner/editor bypass is determined from the **server-verified** session/role, not from anything the client sends.
 
 What it does **not** protect — read these carefully:
@@ -257,35 +258,70 @@ What it does **not** protect — read these carefully:
 
 ## Data Platform (Snowflake / BigQuery)
 
-For warehouse-backed dashboards, the policy is enforced by binding the viewer's scope into the query. **The author must write the query with the `:viewer_scope` placeholder** — the server substitutes the viewer's allowed values into it before running the query:
+A scoped viewer **never sends SQL**. The author declares each warehouse query in the
+policy under `queries`, and the page runs it **by name**; the server binds the viewer's
+scope into the declared SQL. Any SQL or params the viewer sends are ignored.
 
-```sql
-SELECT month, revenue
-FROM sales
-WHERE company_id IN (:viewer_scope)   -- server replaces :viewer_scope with the viewer's values
+```json
+"access_policy": {
+  "version": 1, "field": "company_id", "default": "deny",
+  "rules": [ { "match": { "domain": "acme.com" }, "values": [1, 2] } ],
+  "queries": {
+    "revenue_by_month": {
+      "connection": "conn_…",
+      "provider": "snowflake",
+      "endpoint": "statements.execute",
+      "params": { "body": { "statement": "SELECT month, SUM(revenue) AS revenue FROM sales WHERE company_id IN (:viewer_scope) GROUP BY month" } }
+    },
+    "orders": {
+      "connection": "conn_…",
+      "provider": "snowflake",
+      "endpoint": "statements.execute",
+      "params": { "body": { "statement": "SELECT company_id, order_id, total FROM orders" } }
+    }
+  }
+}
 ```
 
-- A scoped (non-owner) viewer running a query that does **not** contain `:viewer_scope` is **rejected** with `403 SCOPE_REQUIRED` — fail-closed, so unfiltered tenant data can never escape.
-- The values come from the policy (author-defined, trusted); the server escapes them. A denied viewer's `:viewer_scope` becomes `NULL`, so `IN (:viewer_scope)` returns nothing.
-- **Direct execution mode is blocked** for scoped viewers (it would hand credentials to the browser, bypassing the server filter) — these queries run in proxy mode.
+```javascript
+const res = await sdk.platform.provider('snowflake').execute('statements.execute', { query: 'revenue_by_month' });
+```
+
+- `params` is the request the page would otherwise send; it must carry exactly **one** SQL
+  statement in `body.sql`, `body.query` or `body.statement` (checked when you save the policy).
+- **With `:viewer_scope`** in the SQL, the server replaces it with the viewer's values
+  (`IN (1, 2)`; a denied viewer gets `IN (NULL)` — no rows). Only a placeholder in the SQL
+  itself counts: one inside a comment or a quoted string is ignored.
+- **Without `:viewer_scope`**, the server wraps the query —
+  `SELECT * FROM (<your SQL>) AS so_scoped WHERE so_scoped.company_id IN (…)` — so the
+  result **must include the policy `field` as a column** (an aggregate without it errors
+  instead of returning rows).
+- A scoped viewer who sends raw SQL, an unknown name, or a name for a different
+  provider/endpoint/connection gets `403 SCOPE_REQUIRED` — fail-closed.
+- Owners/editors (and default-allow viewers) can send SQL as before. When they run a
+  declared query, `:viewer_scope` becomes **every value the policy names** and a query
+  without it runs unwrapped — so the same page code works for author preview.
+- **Direct execution mode is blocked** for scoped viewers (it would hand credentials to the browser).
 - The **platform cache is segmented per scope**, so one viewer's filtered result is never served to another.
-- Owners/editors are unscoped: their queries run as written (no `:viewer_scope` required).
 
-> Because enforcement is fail-closed, **every** platform query a scoped viewer makes must carry `:viewer_scope` — even queries over non-tenant reference data. If a query genuinely needs no filtering, it's still blocked for viewers; keep such calls owner-only or move the data into a public table.
+> Every platform call a scoped viewer makes must be a declared query — even over
+> non-tenant reference data. If a query needs no filtering, keep it owner-only or move
+> the data into a public table.
 
-Non-SQL providers (Google Sheets, Analytics, Shopify) have no `:viewer_scope` mechanism, so scoped viewers are blocked from them under a policy (see below).
+Non-SQL providers (Google Sheets, Analytics, Shopify, S3) cannot be scoped, so scoped viewers are blocked from them under a policy (see below). So are `sdk.connection()` queries (generic connections).
 
 ## Backend coverage
 
 | Backend | Under an access policy, a scoped viewer… |
 |---------|------------------------------------------|
 | `sdk.table()` | sees only in-scope rows (reads **and** writes filtered; out-of-scope `findById` → 404) |
-| Data Platform — SQL (Snowflake, BigQuery) | must use `:viewer_scope`; otherwise `403 SCOPE_REQUIRED` |
-| Data Platform — non-SQL (Sheets, GA, Shopify) | blocked (`403 SCOPE_REQUIRED`) — no scope mechanism |
+| Data Platform — SQL (Snowflake, BigQuery, Supabase, Redshift, Aurora) | may only run queries declared in `access_policy.queries`; otherwise `403 SCOPE_REQUIRED` |
+| Data Platform — non-SQL (Sheets, GA, Shopify, S3) | blocked (`403 SCOPE_REQUIRED`) — no scope mechanism |
+| `sdk.connection()` (generic connections) | blocked (`403 SCOPE_REQUIRED`) |
 | `sdk.json` | blocked (`403`) — key/value store is owner/editor-only under a policy |
 | `sdk.blobs`, `sdk.realtime`, `sdk.comments` | **not** scoped — don't place per-tenant secret data there |
 
-**Put per-viewer data in `sdk.table()` or a `:viewer_scope` SQL query** — those are the policy-enforced paths.
+**Put per-viewer data in `sdk.table()` or a declared query** — those are the policy-enforced paths.
 
 ---
 

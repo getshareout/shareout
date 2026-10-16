@@ -169,6 +169,8 @@ export interface PlatformRequest {
 	endpoint: string;
 	connectionId: string;
 	params?: RequestParams;
+	// Name of a query declared in the artifact's access_policy.queries.
+	policyQuery?: string;
 	options?: {
 		cache?: boolean;
 		cacheTtl?: number;
@@ -327,7 +329,12 @@ export const PLATFORM_ERRORS = {
 	},
 	SCOPE_REQUIRED: {
 		code: 'SCOPE_REQUIRED',
-		message: 'This artifact has a row-level access policy; the query must reference :viewer_scope (e.g. WHERE company_id IN (:viewer_scope)) so the server can enforce per-viewer filtering',
+		message: 'This artifact has a row-level access policy; viewers can only run queries declared in access_policy.queries (send { "query": "<name>" })',
 		httpStatus: 403,
+	},
+	QUERY_NOT_FOUND: {
+		code: 'QUERY_NOT_FOUND',
+		message: 'No query with that name is declared in access_policy.queries for this provider, endpoint and connection',
+		httpStatus: 404,
 	},
 } as const;

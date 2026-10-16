@@ -198,27 +198,39 @@ Un viewer debe pasar ambos controles: estar en `share_with` (o pertenecer al wor
 
 ## Data Platform (Snowflake / BigQuery)
 
-Para dashboards respaldados por warehouse, aplicá el scope escribiendo el placeholder `:viewer_scope` en la query. El servidor sustituye los valores permitidos del viewer antes de ejecutar:
+Los viewers con scope nunca mandan SQL. Declarás cada query de warehouse en la política,
+bajo `queries`; la página la corre por nombre y el servidor le aplica el scope del viewer:
 
-```sql
-SELECT month, revenue
-FROM sales
-WHERE company_id IN (:viewer_scope)
+```json
+"queries": {
+  "revenue_by_month": {
+    "connection": "conn_…", "provider": "snowflake", "endpoint": "statements.execute",
+    "params": { "body": { "statement": "SELECT month, SUM(revenue) AS revenue FROM sales WHERE company_id IN (:viewer_scope) GROUP BY month" } }
+  }
+}
 ```
 
-- Un viewer con scope cuya query omite `:viewer_scope` recibe `403 SCOPE_REQUIRED` — fail-closed.
-- Un scope vacío (viewer denegado) resuelve `:viewer_scope` a `NULL`, por lo que `IN (NULL)` no devuelve nada.
+```javascript
+await sdk.platform.provider('snowflake').execute('statements.execute', { query: 'revenue_by_month' });
+```
+
+- `params` tiene que llevar exactamente una sentencia SQL (`body.sql`, `body.query` o `body.statement`); se valida al guardar la política.
+- Con `:viewer_scope`, el servidor sustituye los valores del viewer; un scope vacío queda en `NULL`, así que `IN (NULL)` no devuelve nada. Un placeholder dentro de un comentario o de un string no cuenta.
+- Sin `:viewer_scope`, la query se envuelve como `SELECT * FROM (<sql>) AS so_scoped WHERE so_scoped.<field> IN (…)`, así que el resultado tiene que incluir el campo de la política.
+- SQL propio, nombres desconocidos o un nombre usado con otro proveedor/endpoint/conexión → `403 SCOPE_REQUIRED` — fail-closed.
+- Owners/editores pueden seguir mandando SQL. Al correr una query declarada, `:viewer_scope` toma todos los valores que nombra la política, y sin placeholder la query corre sin envolver.
 - El modo de ejecución directa está bloqueado para viewers con scope (le pasaría credenciales al browser).
 - El cache de plataforma está segmentado por scope — el resultado filtrado de un viewer nunca se sirve a otro.
-- Los proveedores no-SQL (Google Sheets, Analytics, Shopify) no tienen mecanismo de `:viewer_scope`; los viewers con scope quedan bloqueados.
+- Los proveedores no-SQL (Google Sheets, Analytics, Shopify, S3) y las queries de `sdk.connection()` no admiten scope; los viewers con scope quedan bloqueados.
 
 ## Cobertura de backends
 
 | Backend | Bajo una política de acceso, un viewer con scope… |
 |---------|---------------------------------------------------|
 | `sdk.table()` | ve solo filas en scope; lecturas y escrituras filtradas; `findById` fuera de scope → 404 |
-| Data Platform — SQL (Snowflake, BigQuery) | debe incluir `:viewer_scope`; si no, `403 SCOPE_REQUIRED` |
-| Data Platform — no-SQL (Sheets, GA, Shopify) | bloqueado (`403 SCOPE_REQUIRED`) |
+| Data Platform — SQL (Snowflake, BigQuery, Supabase, Redshift, Aurora) | solo queries declaradas en `access_policy.queries`; si no, `403 SCOPE_REQUIRED` |
+| Data Platform — no-SQL (Sheets, GA, Shopify, S3) | bloqueado (`403 SCOPE_REQUIRED`) |
+| `sdk.connection()` | bloqueado (`403 SCOPE_REQUIRED`) |
 | `sdk.json` | bloqueado (`403`) — solo owner/editor bajo una política |
 | `sdk.blobs`, `sdk.realtime`, `sdk.comments` | no tienen scope — no almacenés datos secretos por tenant ahí |
 
@@ -228,7 +240,7 @@ Lo que la política garantiza:
 
 - Todos los paths de lectura y escritura de `sdk.table()` están filtrados — `find`, `count`, `distinct`, `findById`, `update`, `delete`. Ningún path bypasea la cláusula de scope.
 - El scope se combina con AND con el filtro del cliente; solo puede estrechar.
-- El SQL de Data Platform es fail-closed: si falta `:viewer_scope` para un viewer con scope → `403`.
+- El SQL de Data Platform es fail-closed: un viewer con scope solo corre queries declaradas, nunca SQL propio → si no, `403`.
 - El bypass de owner/editor se determina a partir de la sesión verificada por el servidor, no de nada que el cliente envíe.
 
 Lo que **no** protege:

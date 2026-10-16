@@ -10,6 +10,8 @@ import {
 	verifyProxyToken,
 } from './core/credentials';
 import { PLATFORM_ERRORS } from './types';
+import { parseAccessPolicy } from '../access-policy';
+import { findPolicyQuery } from './core/viewer-scope';
 import { createLogger, logError } from '../../logging';
 import { renderPlatformConnectionCallbackPage } from './callback-page';
 import { mapPrepareFailure, platformOAuthDenialMessage, userFacingPlatformOAuthError } from './errors';
@@ -37,6 +39,15 @@ export * from './types';
 
 function platformError(err: { code: string; message: string; httpStatus: number }, hint?: string) {
 	return { code: err.code, message: err.message, status: err.httpStatus, hint };
+}
+
+function scopeRequired(provider: string, endpoint: string) {
+	const e = PLATFORM_ERRORS.SCOPE_REQUIRED;
+	return {
+		success: false,
+		error: { code: e.code, message: e.message, httpStatus: e.httpStatus, retryable: false },
+		meta: { provider, endpoint, executionMode: 'proxy', cached: false, executionTimeMs: 0 },
+	};
 }
 
 const METHOD_NOT_ALLOWED = { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed', status: 405 };
@@ -468,12 +479,31 @@ async function handleProviderRequest(
 				connectionId?: string;
 				proxyToken?: string;
 				params?: Record<string, unknown>;
+				query?: unknown;
 			};
 
-			let connectionId = body.connectionId;
+			// A named query declared in access_policy.queries. Scoped viewers may only run
+			// these; the engine ignores their params and binds the scope server-side.
+			const accessPolicy = parseAccessPolicy(ctx.artifact.access_policy);
+			const policyQuery = typeof body.query === 'string' ? body.query : undefined;
+			if (body.query !== undefined && policyQuery === undefined) {
+				return errorResponse({ code: 'INVALID_REQUEST', message: '"query" must be the name of a declared query', status: 400 });
+			}
+			if (ctx.viewerScope && policyQuery === undefined) {
+				return successResponse(scopeRequired(providerId, endpointId), 403);
+			}
+			const declared = policyQuery !== undefined
+				? findPolicyQuery(accessPolicy, policyQuery, providerId, endpointId, body.connectionId)
+				: null;
+			if (policyQuery !== undefined && !declared) {
+				if (ctx.viewerScope) return successResponse(scopeRequired(providerId, endpointId), 403);
+				return errorResponse(platformError(PLATFORM_ERRORS.QUERY_NOT_FOUND));
+			}
+
+			let connectionId = declared?.connection ?? body.connectionId;
 			let usedProxyToken = false;
 
-			if (body.proxyToken && !connectionId) {
+			if (!ctx.viewerScope && !declared && body.proxyToken && !connectionId) {
 				const tokenData = await verifyProxyToken(ctx.env, body.proxyToken);
 				if (!tokenData) {
 					return errorResponse({
@@ -494,6 +524,8 @@ async function handleProviderRequest(
 				});
 			}
 
+			// Scoped viewers skip the membership gate: they can only reach a declared
+			// query, whose connection and SQL the author chose.
 			const requesterUserId = await resolveRequesterUserId(request, ctx);
 			if (
 				!usedProxyToken &&
@@ -524,6 +556,7 @@ async function handleProviderRequest(
 				env: ctx.env,
 				requestOrigin: ctx.origin || undefined,
 				viewerScope: ctx.viewerScope,
+				accessPolicy,
 				requesterUserId,
 			});
 
@@ -531,7 +564,8 @@ async function handleProviderRequest(
 				provider: providerId,
 				endpoint: endpointId,
 				connectionId,
-				params: body.params,
+				params: declared ? undefined : body.params,
+				policyQuery,
 			});
 
 			return successResponse(result, result.success ? 200 : result.error?.httpStatus || 500);

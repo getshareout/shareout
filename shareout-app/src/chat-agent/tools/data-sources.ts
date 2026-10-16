@@ -92,6 +92,9 @@ export const runDataSourceTool: AccountTool = {
 
     const access = await resolveArtifactAccessForUser(ctx.env, artifactId, ctx.userId);
     if (!access) return { error: 'You don’t have access to that page (or it doesn’t exist).' };
+    if (access.viewerScope) {
+      return { error: 'This page has a row-level access policy, so its live data sources can’t be run over chat. You can still read its saved data.' };
+    }
     if (!access.canRunConnections) {
       return {
         error:

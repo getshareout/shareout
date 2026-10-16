@@ -197,27 +197,39 @@ A viewer must pass both checks: in `share_with` (or workspace membership) **and*
 
 ## Data Platform (Snowflake / BigQuery)
 
-For warehouse-backed dashboards, enforce the scope by writing the `:viewer_scope` placeholder in the query. The server substitutes the viewer's allowed values before execution:
+Scoped viewers never send SQL. Declare each warehouse query in the policy under
+`queries`; the page runs it by name and the server binds the viewer's scope into it:
 
-```sql
-SELECT month, revenue
-FROM sales
-WHERE company_id IN (:viewer_scope)
+```json
+"queries": {
+  "revenue_by_month": {
+    "connection": "conn_…", "provider": "snowflake", "endpoint": "statements.execute",
+    "params": { "body": { "statement": "SELECT month, SUM(revenue) AS revenue FROM sales WHERE company_id IN (:viewer_scope) GROUP BY month" } }
+  }
+}
 ```
 
-- A scoped viewer whose query omits `:viewer_scope` receives `403 SCOPE_REQUIRED` — fail-closed.
-- An empty scope (denied viewer) resolves `:viewer_scope` to `NULL`, so `IN (NULL)` returns nothing.
+```javascript
+await sdk.platform.provider('snowflake').execute('statements.execute', { query: 'revenue_by_month' });
+```
+
+- `params` must carry exactly one SQL statement (`body.sql`, `body.query` or `body.statement`); this is checked when the policy is saved.
+- With `:viewer_scope`, the server substitutes the viewer's values; an empty scope becomes `NULL`, so `IN (NULL)` returns nothing. A placeholder inside a comment or quoted string does not count.
+- Without `:viewer_scope`, the query is wrapped as `SELECT * FROM (<sql>) AS so_scoped WHERE so_scoped.<field> IN (…)`, so its result must include the policy field.
+- Raw SQL, unknown names, or a name used with another provider/endpoint/connection → `403 SCOPE_REQUIRED` — fail-closed.
+- Owners/editors may still send SQL. Running a declared query, they get every value the policy names for `:viewer_scope`, and the unwrapped query otherwise.
 - Direct execution mode is blocked for scoped viewers (it would hand credentials to the browser).
 - The platform cache is segmented per scope — one viewer's filtered result is never served to another.
-- Non-SQL providers (Google Sheets, Analytics, Shopify) have no `:viewer_scope` mechanism; scoped viewers are blocked from them.
+- Non-SQL providers (Google Sheets, Analytics, Shopify, S3) and `sdk.connection()` queries cannot be scoped; scoped viewers are blocked from them.
 
 ## Backend coverage
 
 | Backend | Under an access policy, a scoped viewer… |
 |---------|------------------------------------------|
 | `sdk.table()` | sees only in-scope rows; reads and writes filtered; out-of-scope `findById` → 404 |
-| Data Platform — SQL (Snowflake, BigQuery) | must include `:viewer_scope`; otherwise `403 SCOPE_REQUIRED` |
-| Data Platform — non-SQL (Sheets, GA, Shopify) | blocked (`403 SCOPE_REQUIRED`) |
+| Data Platform — SQL (Snowflake, BigQuery, Supabase, Redshift, Aurora) | only queries declared in `access_policy.queries`; otherwise `403 SCOPE_REQUIRED` |
+| Data Platform — non-SQL (Sheets, GA, Shopify, S3) | blocked (`403 SCOPE_REQUIRED`) |
+| `sdk.connection()` | blocked (`403 SCOPE_REQUIRED`) |
 | `sdk.json` | blocked (`403`) — owner/editor-only under a policy |
 | `sdk.blobs`, `sdk.realtime`, `sdk.comments` | not scoped — do not store per-tenant secret data there |
 
@@ -227,7 +239,7 @@ What the policy guarantees:
 
 - Every `sdk.table()` read and write path is filtered — `find`, `count`, `distinct`, `findById`, `update`, `delete`. No path bypasses the scope clause.
 - The scope AND-s with the client filter; it can only narrow.
-- Data Platform SQL is fail-closed: missing `:viewer_scope` for a scoped viewer → `403`.
+- Data Platform SQL is fail-closed: a scoped viewer can only run declared queries, never their own SQL → otherwise `403`.
 - Owner/editor bypass is determined from the server-verified session, not from anything the client sends.
 
 What it does **not** protect:
