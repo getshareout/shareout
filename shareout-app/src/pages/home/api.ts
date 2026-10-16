@@ -10,7 +10,7 @@ import { renderFolderReadme } from './folder-readme';
 import { parseHomeFilters, isLinkedWorkspaceMember } from './filters';
 import { queryHomeArtifacts, queryHomeArtifactCatalog, queryHomeCounts, queryForYou, queryRecentlyViewed, recordRecentView } from './queries/artifacts';
 import { queryHomeTags } from './queries/tags';
-import { queryPersonalFolders, queryTeamFolders, queryFoldersInParent, queryFolderPath, queryFolderReadme, queryFolderAccess, type FolderAccess } from './queries/folders';
+import { queryPersonalFolders, queryTeamFolders, queryFoldersInParent, queryFolderPath, queryFolderReadme, queryFolderAccess, queryPersonalFolderAccess } from './queries/folders';
 import { queryRecentActivity, queryRecentComments } from './queries/activity-panels';
 import { queryActivityFeed, dismissHomeEvents } from './queries/activity-feed';
 import { queryArtifactComments, addArtifactComment } from './queries/comments';
@@ -413,7 +413,7 @@ export async function handleHomeBrowserApi(
         .bind(folderId, hostWs).first<{ created_by: string | null }>()
       : null) : Promise.resolve(null),
     !folderId ? Promise.resolve(null)
-      : !hostWs ? Promise.resolve<FolderAccess>({ visibility: 'private', effective: 'private', inheritedFrom: null, access: 'private', grants: [] })
+      : !hostWs ? queryPersonalFolderAccess(env, vis.userIds, folderId)
       : roleP.then(r => r.role ? queryFolderAccess(env, hostWs, folderId) : null),
     queryFoldersInParent(env, user, { workspaceId, parentId: folderId || null }, vis),
   ]);
@@ -438,7 +438,9 @@ export async function handleHomeBrowserApi(
     folderScope,
     canManageFolders,
     canEditFolder,
-    folderAccess,
+    // Names of the items more open than the folder are for whoever can fix them;
+    // everyone else gets the truthful pill and counts only.
+    folderAccess: folderAccess && !canEditFolder ? { ...folderAccess, openItems: undefined } : folderAccess,
     hasMore: filters.page < totalPages,
     resultLabel: buildResultLabel(filters, total),
     total,

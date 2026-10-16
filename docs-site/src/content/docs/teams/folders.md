@@ -34,6 +34,14 @@ breadcrumbs, and back/forward work. **Copy link** in the folder header copies it
 client orgs that have access through this folder or one above it. A folder set to
 **Same as the parent folder** shows the access it inherits ("Inherited from …").
 
+The pill shows the folder's **real audience**, not just its setting. A folder's
+visibility is not enforced on what is inside it: every artifact and file keeps its own
+visibility. So when something inside is more open than the folder, the pill shows the
+wider audience with a note, for example **Folder is Private · 3 items inside are visible
+to the workspace**. Folder managers also see those items listed in **Who has access**,
+each linked, so they can change them. Other members see the pill and the counts, not the
+names. Personal folders get the same pill.
+
 **Manage access.** Click the pill to open **Who has access**. A folder manager can:
 
 - change **Visibility**: Same as the parent folder, Workspace, Public or Private;
@@ -49,8 +57,9 @@ Folder managers are workspace owners and admins, plus the folder's creator while
 [Client portals](/teams/client-portals/).
 
 <Aside type="caution">
-A folder's visibility is shown on the folder and drives the access pill. It does not
-override the visibility of each artifact inside it; set that per artifact.
+A folder's visibility is a label for the folder. It does not change who can open the
+artifacts and files inside it: each keeps its own visibility. To close a folder, change
+the visibility of the items the access panel lists as more open than the folder.
 </Aside>
 
 ## Endpoints
@@ -98,10 +107,13 @@ Content-Type: application/json
 
 | Value | Effect |
 | --- | --- |
-| `inherit` | Artifacts inherit the folder's workspace visibility. Default. |
-| `private` | Only explicit collaborators. |
-| `workspace` | All workspace members. |
-| `public` | Open web access. |
+| `inherit` | Same as the nearest parent folder that sets one; with none set, `workspace`. Default. |
+| `private` | The folder is labelled private. |
+| `workspace` | The folder is labelled visible to all workspace members. |
+| `public` | The folder is labelled open on the web. |
+
+The value labels the folder and is the floor of its access pill. It is not applied to
+the artifacts and files inside: each keeps its own visibility.
 
 Slugs are unique per parent level within the workspace.
 

@@ -5,9 +5,10 @@
  * POST …/share-person and DELETE …/grants/{id} (admin, or the folder's manager).
  */
 import { getInternalWorkspaceRole } from '../workspaces/roles';
-import { queryFolderAccess } from '../pages/home/queries/folders';
+import { queryFolderAccess, type FolderAccess } from '../pages/home/queries/folders';
 import { handleListFolderActivity } from '../sharees/activity';
 import { handleDeleteGrant, handleShareWithPerson } from '../sharees/grants';
+import { requireFolderManager } from '../folders';
 import type { BotWorkspace } from '../chat-agent/access';
 import {
   NOT_MEMBER, ON_FAILURE, errorText, fail, invalid, ok, readJson, resolveFolder, resolveWorkspace, str, workspaceChoiceText,
@@ -55,7 +56,7 @@ const AUDIENCE: Record<string, string> = {
 const folderAccess: ToolDef = {
   name: 'folder_access',
   title: 'Who can see a folder',
-  description: 'Says who can see a folder of a workspace: its visibility (set on it or inherited from a parent folder) and every outside person or client it is shared with, with the grant ids revoke_share takes. Any member of the workspace may ask.',
+  description: 'Says who can see a folder of a workspace: who can really open something in it, its own visibility (set on it or inherited from a parent folder), and every outside person or client it is shared with, with the grant ids revoke_share takes. A folder\'s visibility does not apply to what is inside: each page and file keeps its own, so the real audience is the most open of the folder and its contents. Any member of the workspace may ask; admins and the folder\'s creator also get the names of the items more open than the folder.',
   inputSchema: { type: 'object', properties: { folder: FOLDER_ARG, workspace_id: WORKSPACE_ARG }, required: ['folder'], additionalProperties: false },
   annotations: { readOnlyHint: true, openWorldHint: false },
   async run(ctx, args) {
@@ -63,11 +64,22 @@ const folderAccess: ToolDef = {
     if (isResult(picked)) return picked;
     // Same gate as the Home folder panel: internal members only (never an external edge).
     if (!(await getInternalWorkspaceRole(ctx.env, picked.w.id, ctx.user.id))) return fail(NOT_MEMBER);
-    const access = await queryFolderAccess(ctx.env, picked.w.id, picked.folderId);
-    if (!access) return invalid('That folder was not found.');
+    const found = await queryFolderAccess(ctx.env, picked.w.id, picked.folderId);
+    if (!found) return invalid('That folder was not found.');
+    // Item names are for whoever can fix them (same rule as the Home panel).
+    const manager = !(await requireFolderManager(ctx.env, ctx.user, picked.w.id, picked.folderId));
+    const { openItems: _names, ...withoutNames } = found;
+    const access: FolderAccess = manager ? found : withoutNames;
+    const { moreOpen } = access;
+    const more = [
+      moreOpen.public ? `${moreOpen.public} ${moreOpen.public === 1 ? 'item inside is' : 'items inside are'} public` : '',
+      moreOpen.workspace ? `${moreOpen.workspace} ${moreOpen.workspace === 1 ? 'item inside is' : 'items inside are'} visible to the whole workspace` : '',
+    ].filter(Boolean);
     const lines = [
       `Who can see it: ${AUDIENCE[access.access] ?? access.access}.`,
-      access.inheritedFrom ? `Its visibility comes from the parent folder "${access.inheritedFrom.name}".` : `Visibility: ${access.visibility}.`,
+      access.inheritedFrom ? `Its visibility (${access.effective}) comes from the parent folder "${access.inheritedFrom.name}".` : `Visibility: ${access.visibility}.`,
+      ...(more.length ? [`The folder is ${access.effective}, but ${more.join(' and ')}: each item keeps its own visibility.`] : []),
+      ...(access.openItems?.length ? access.openItems.map((i) => `- ${i.name} (${i.kind}, ${i.visibility}) ${i.kind === 'artifact' && i.slug ? `${ctx.origin}/a/${i.slug}/` : i.id}`) : []),
       ...(access.grants.length
         ? ['Shared with:', ...access.grants.map((g) => `- ${g.subject_label} (${g.subject_type === 'sharee' ? 'client' : 'person'}, can ${g.capability}${g.inherited ? `, through "${g.folder_name}"` : ''}) grant ${g.id}`)]
         : ['Not shared with anyone outside the workspace.']),

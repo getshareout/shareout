@@ -148,8 +148,10 @@ SDK: [`sdk.files.getUrl('dlv_…')`](/sdk/files/).
 
 Teams/Enterprise feature. Share folders and artifacts with client orgs outside your
 team — grouped portal, branded pages, scoped API tokens, read receipts, and
-private client notes. All routes require workspace `admin` plus the entitlement
-(`403 EXTERNAL_SHARING_NOT_ENTITLED` otherwise). See
+private client notes. Routes that create access require workspace `admin` plus the
+entitlement (`403 EXTERNAL_SHARING_NOT_ENTITLED` otherwise); listing and revoking need
+only `admin`, and a folder's manager may share, list and revoke on that folder (sharing
+still needs the entitlement). See
 [External sharing](/teams/external-sharing/).
 
 ### Clients
@@ -182,7 +184,7 @@ private client notes. All routes require workspace `admin` plus the entitlement
 
 | Method | Endpoint | Notes |
 | --- | --- | --- |
-| `POST` | `/v1/workspaces/{id}/share-person` | `{ email, resource_type: "file"\|"folder", resource_id, capability: "view"\|"comment" }` — admin + Teams entitlement; invites external user if needed. `409` if email is an internal member. |
+| `POST` | `/v1/workspaces/{id}/share-person` | `{ email, resource_type: "file"\|"folder", resource_id, capability: "view"\|"comment" }` — admin or the folder's manager, + Teams entitlement either way; invites external user if needed. `403 DOMAIN_NOT_ALLOWED` outside the workspace's allowed domains. `409` if email is an internal member. |
 
 Grant body (admin grants API):
 

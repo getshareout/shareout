@@ -118,18 +118,108 @@ export interface FolderAccessGrant {
   expires_at: string | null;
 }
 
+/** An item in a folder's subtree whose own visibility is more open than the folder. */
+export interface FolderOpenItem {
+  kind: 'artifact' | 'file';
+  id: string;
+  name: string;
+  slug: string | null;
+  visibility: 'public' | 'workspace';
+}
+
 export interface FolderAccess {
+  /** The folder's own setting (`inherit` until resolved). */
   visibility: string;
+  /** The folder's resolved setting. Not enforced on its contents. */
   effective: 'private' | 'workspace' | 'public';
   inheritedFrom: { id: string; name: string } | null;
+  /** Who can actually open something in this folder: the most open of the folder's
+   *  setting and the visibility of every non-deleted artifact and file in its subtree. */
+  audience: 'private' | 'workspace' | 'public';
+  /** The pill: `audience`, or `external` when it is not public and grants exist. */
   access: FolderAccessLabel;
+  /** Items in the subtree more open than `effective`, by their own visibility. */
+  moreOpen: { public: number; workspace: number };
+  /** Those items by name (up to OPEN_ITEMS_LIMIT). Folder managers only: callers drop it
+   *  for everyone else. */
+  openItems?: FolderOpenItem[];
   grants: FolderAccessGrant[];
 }
 
+const OPEN_ITEMS_LIMIT = 50;
+const RANK = { private: 0, workspace: 1, public: 2 } as const;
+type Audience = keyof typeof RANK;
+
+/** One pass over a folder's subtree: the artifacts and files anyone beyond their owner
+ *  and collaborators can open (public, or the whole workspace), public first, with total
+ *  counts by visibility. Deleted items are ignored. `workspace` only opens an item that
+ *  belongs to a workspace. Files never go public; a `team` or `private` file counts as
+ *  private. */
+async function queryOpenContents(
+  env: Env, folderId: string, scope: { workspaceId: string } | { ownerIds: string[] },
+): Promise<{ moreOpen: FolderAccess['moreOpen']; openItems: FolderOpenItem[] }> {
+  const seedSql = 'workspaceId' in scope ? 'workspace_id = ?' : `workspace_id IS NULL AND owner_id IN (${placeholders(scope.ownerIds.length)})`;
+  const seedParams = 'workspaceId' in scope ? [scope.workspaceId] : scope.ownerIds;
+  const rows = (await env.DB.prepare(`
+    WITH RECURSIVE sub(id) AS (
+      SELECT id FROM folders WHERE id = ? AND ${seedSql}
+      UNION
+      SELECT f.id FROM folders f JOIN sub s ON f.parent_id = s.id
+    ),
+    items(kind, id, name, slug, visibility) AS (
+      SELECT 'artifact', a.id, a.name, a.slug, CASE WHEN a.visibility = 'workspace' THEN 'workspace' ELSE 'public' END
+        FROM artifacts a
+       WHERE a.folder_id IN (SELECT id FROM sub) AND a.deleted_at IS NULL AND (a.visibility IN ('public', 'unlisted') OR (a.visibility = 'workspace' AND a.workspace_id IS NOT NULL))
+      UNION ALL
+      SELECT 'file', d.id, d.name, NULL, 'workspace'
+        FROM asset_deliverables d
+       WHERE d.folder_id IN (SELECT id FROM sub) AND d.deleted_at IS NULL AND d.visibility = 'workspace' AND d.workspace_id IS NOT NULL
+    )
+    SELECT kind, id, name, slug, visibility,
+           SUM(visibility = 'public') OVER () AS n_public,
+           SUM(visibility = 'workspace') OVER () AS n_workspace
+      FROM items
+     ORDER BY visibility = 'public' DESC, name
+     LIMIT ?
+  `).bind(folderId, ...seedParams, OPEN_ITEMS_LIMIT).all<FolderOpenItem & { n_public: number; n_workspace: number }>()).results || [];
+  if (!rows.length) return { moreOpen: { public: 0, workspace: 0 }, openItems: [] };
+  return {
+    moreOpen: { public: rows[0].n_public, workspace: rows[0].n_workspace },
+    openItems: rows.map(({ kind, id, name, slug, visibility }) => ({ kind, id, name, slug, visibility })),
+  };
+}
+
+/** `moreOpen` already holds only what beats `effective`. */
+function audienceOf(effective: Audience, moreOpen: FolderAccess['moreOpen']): Audience {
+  return moreOpen.public ? 'public' : moreOpen.workspace ? 'workspace' : effective;
+}
+
+/** A personal folder: private to its owner by setting, but each artifact in it keeps its
+ *  own visibility, so the audience is whatever its most open artifact allows. null if
+ *  the folder is not one of `ownerIds`'. */
+export async function queryPersonalFolderAccess(env: Env, ownerIds: string[], folderId: string): Promise<FolderAccess | null> {
+  if (!ownerIds.length) return null;
+  const { moreOpen, openItems } = await queryOpenContents(env, folderId, { ownerIds });
+  if (!openItems.length) {
+    const own = await env.DB.prepare(`SELECT 1 FROM folders WHERE id = ? AND workspace_id IS NULL AND owner_id IN (${placeholders(ownerIds.length)})`)
+      .bind(folderId, ...ownerIds).first();
+    if (!own) return null;
+  }
+  const audience = audienceOf('private', moreOpen);
+  return { visibility: 'private', effective: 'private', inheritedFrom: null, audience, access: audience, moreOpen, openItems, grants: [] };
+}
+
 /** Who can see a Team Space folder: its own visibility (`inherit` resolves from the
- *  nearest ancestor that sets one; none = workspace) plus the external grants on it and
- *  its ancestors, which canAccess inherits down the chain. null if not in this workspace. */
+ *  nearest ancestor that sets one; none = workspace), the external grants on it and its
+ *  ancestors (canAccess inherits them down the chain), and the artifacts and files inside
+ *  whose own visibility is more open than the folder, since a folder's setting is not
+ *  enforced on its contents. null if not in this workspace. `openItems` names those
+ *  items: callers keep it for folder managers only. */
 export async function queryFolderAccess(env: Env, workspaceId: string, folderId: string): Promise<FolderAccess | null> {
+  // The subtree scan does not depend on the chain, so both start together; it is
+  // narrowed to what is more open than the resolved setting below.
+  const contentsP = queryOpenContents(env, folderId, { workspaceId });
+  contentsP.catch(() => {});
   const chain = (await env.DB.prepare(`
     WITH RECURSIVE anc(id, name, visibility, parent_id, depth) AS (
       SELECT f.id, f.name, f.visibility, f.parent_id, 0 FROM folders f WHERE f.id = ? AND f.workspace_id = ?
@@ -170,11 +260,21 @@ export async function queryFolderAccess(env: Env, workspaceId: string, folderId:
     expires_at: g.expires_at ?? null,
   }));
   const own = chain[0].visibility || 'inherit';
+  const contents = await contentsP;
+  const openItems = contents.openItems.filter(i => RANK[i.visibility] > RANK[effective]);
+  const moreOpen = {
+    public: effective === 'public' ? 0 : contents.moreOpen.public,
+    workspace: effective === 'private' ? contents.moreOpen.workspace : 0,
+  };
+  const audience = audienceOf(effective, moreOpen);
   return {
     visibility: own === 'unlisted' ? 'public' : own,
     effective,
     inheritedFrom: own === 'inherit' && setBy ? { id: setBy.id, name: setBy.name } : null,
-    access: effective === 'public' ? 'public' : grants.length ? 'external' : effective,
+    audience,
+    access: audience === 'public' ? 'public' : grants.length ? 'external' : audience,
+    moreOpen,
+    openItems,
     grants,
   };
 }

@@ -37,6 +37,15 @@ avatares de las personas y orgs de clientes que tienen acceso por esta carpeta o
 superior. Una carpeta en **Igual que la carpeta superior** muestra el acceso que hereda
 ("Heredado de …").
 
+La etiqueta muestra la **audiencia real** de la carpeta, no solo su configuración. La
+visibilidad de una carpeta no se aplica a lo que contiene: cada artefacto y archivo tiene
+su propia visibilidad. Si algo adentro es más abierto que la carpeta, la etiqueta muestra
+la audiencia más amplia con una nota, por ejemplo **La carpeta es Privada · 3 elementos
+dentro son visibles para el espacio**. Quienes gestionan la carpeta ven además esos
+elementos en **Quién tiene acceso**, con enlace, para cambiarlos. El resto de los miembros
+ve la etiqueta y los conteos, no los nombres. Las carpetas personales tienen la misma
+etiqueta.
+
 **Gestioná el acceso.** Hacé clic en la etiqueta para abrir **Quién tiene acceso**. Quien
 gestiona la carpeta puede:
 
@@ -54,8 +63,10 @@ Gestionan la carpeta los owners y admins del workspace, y también quien la cre�
 lectura. Más en [Portales de clientes](/es/teams/client-portals/).
 
 <Aside type="caution">
-La visibilidad de una carpeta se muestra en la carpeta y define la etiqueta de acceso. No
-reemplaza la visibilidad de cada artefacto que contiene; esa se configura por artefacto.
+La visibilidad de una carpeta es una etiqueta de la carpeta. No cambia quién puede abrir
+los artefactos y archivos que contiene: cada uno tiene su propia visibilidad. Para cerrar
+una carpeta, cambiá la visibilidad de los elementos que el panel de acceso marca como más
+abiertos que la carpeta.
 </Aside>
 
 ## Endpoints
@@ -103,10 +114,13 @@ Opciones de `visibility`:
 
 | Valor | Efecto |
 | --- | --- |
-| `inherit` | Los artifacts heredan la visibilidad del workspace de la carpeta. Por defecto. |
-| `private` | Solo colaboradores explícitos. |
-| `workspace` | Todos los miembros del workspace. |
-| `public` | Acceso abierto en la web. |
+| `inherit` | Igual que la carpeta superior más cercana que tenga una; si ninguna, `workspace`. Por defecto. |
+| `private` | La carpeta se marca como privada. |
+| `workspace` | La carpeta se marca como visible para todos los miembros del workspace. |
+| `public` | La carpeta se marca como abierta en la web. |
+
+El valor es una etiqueta de la carpeta y el mínimo de su etiqueta de acceso. No se aplica
+a los artefactos y archivos que contiene: cada uno tiene su propia visibilidad.
 
 Los slugs son únicos por nivel de carpeta dentro del workspace.
 

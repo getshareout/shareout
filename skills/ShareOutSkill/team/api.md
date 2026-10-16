@@ -414,15 +414,15 @@ Share folders and artifacts **outside** the workspace with typed Client orgs (cl
 | `POST` | `/v1/workspaces/{id}/sharees` | Admin+ | Create Client `{ name, type }`. |
 | `GET/PATCH/DELETE` | `/v1/workspaces/{id}/sharees/{sid}` | Admin+ | Read/update/delete Client (branding, properties). |
 | `GET/POST/DELETE` | `/v1/workspaces/{id}/sharees/{sid}/members[/{uid}]` | Admin+ | Invite/remove external members. |
-| `GET/POST/DELETE` | `/v1/workspaces/{id}/grants[/{gid}]` | Admin+ | Folder/artifact/**file** grants (`view`/`comment`/`create`/`edit`). A folder's manager (its creator, while members manage their folders) may also `GET ?resource_type=folder&resource_id=…` and `DELETE` grants on that folder. |
-| `POST` | `/v1/workspaces/{id}/share-person` | Admin+ (or the folder's manager) | Share one file/folder with one outside email — `{ email, resource_type, resource_id, capability, expires_in_days?, expires_at? }`; re-share replaces the expiry. |
+| `GET/POST/DELETE` | `/v1/workspaces/{id}/grants[/{gid}]` | Admin+ | Folder/artifact/**file** grants (`view`/`comment`/`create`/`edit`). A folder's manager (its creator, while members manage their folders) may also `GET ?resource_type=folder&resource_id=…` and `DELETE` grants on that folder. `POST` needs the external-sharing entitlement; `GET` and `DELETE` do not. |
+| `POST` | `/v1/workspaces/{id}/share-person` | Admin+ (or the folder's manager) | Share one file/folder with one outside email — `{ email, resource_type, resource_id, capability, expires_in_days?, expires_at? }`; re-share replaces the expiry. Admins and managers alike need the entitlement (`403 EXTERNAL_SHARING_NOT_ENTITLED`) and an email the workspace's allowed domains accept (`403 DOMAIN_NOT_ALLOWED`). |
 | `GET/POST/DELETE` | `/v1/workspaces/{id}/sharees/{sid}/members/{uid}/tokens[/{tid}]` | Admin+ | Scoped external `sot_` tokens (never `artifacts:publish`). |
 | `GET` | `/v1/workspaces/{id}/sharees/{sid}/activity` | Admin+ | Read receipts for one Client. |
 | `GET` | `/v1/workspaces/{id}/sharee-activity` | Admin+ | Read receipts across all Clients. |
 | `GET` | `/v1/workspaces/{id}/folders/{fid}/activity` | Folder manager | Who opened what across one folder's subtree (max 100). |
 | `GET/PUT/DELETE` | `/v1/workspaces/{id}/sharees/{sid}/context[/{name}]` | Member read / admin write | Per-client private notes (AI memory). |
 
-External members browse granted pages and files at **`GET /shared`** (branded portal); **`/shared?folder=<id>`** is one folder's client portal, where a folder invite's join link lands. If create returns `403 EXTERNAL_SHARING_NOT_ENTITLED` on self-host, treat as feature/config — not a plan to buy.
+External members browse granted pages and files at **`GET /shared`** (branded portal); **`/shared?folder=<id>`** is one folder's client portal, where a folder invite's join link lands. If create returns `403 EXTERNAL_SHARING_NOT_ENTITLED` on self-host, treat as feature/config — not a plan to buy: the **External sharing** feature (`collab.external_sharing`) is off for that workspace.
 
 ## Workspace Library
 

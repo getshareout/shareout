@@ -53,7 +53,7 @@ Content-Type: application/json
 }
 ```
 
-- `visibility`: `inherit` (default), `private`, `workspace`, `public` — controls who sees artifacts filed here when artifact visibility inherits from folder.
+- `visibility`: `inherit` (default), `private`, `workspace`, `public` — a label for the folder and the floor of its access pill. It does **not** change who can open the artifacts and files filed here; each keeps its own visibility (see [Who can see a folder](#who-can-see-a-folder)).
 - Slugs are unique per parent level within the workspace.
 - Response: `201` with the folder object (same shape as `GET .../folders/{folderId}`). Admins/owners always; members while `members_can_create_folders` is on (`403 ADMIN_REQUIRED` otherwise).
 - `readme`: optional markdown **folder guide** — see below.
@@ -80,9 +80,9 @@ Content-Type: application/json
 
 ## Who can see a folder
 
-- **Visibility:** a folder's `visibility` of `inherit` takes the nearest ancestor that sets one; with none set it means the whole workspace. `private` / `workspace` / `public` apply to artifacts filed there that inherit from their folder.
+- **Visibility:** a folder's `visibility` of `inherit` takes the nearest ancestor that sets one; with none set it means the whole workspace. It is a label for the folder, **not enforced on its contents**: every artifact and file keeps its own visibility, so a `private` folder can hold pages the whole workspace, or anyone, can open. To close a folder, change the visibility of the items inside.
 - **External access:** grants on a folder (to a client org or one outside person) cover its whole subtree, and a grant on an ancestor reaches this folder too. Expired grants no longer count.
-- **In Home:** an open Team Space folder shows a who-can-see pill (Private / Workspace / Public / Shared externally). It opens **Who has access**: the visibility picker, the folder's grants and the ones it inherits, **Share with a person** (view/comment, optional 7/30/90-day expiry), **Who opened what**, and **Copy client portal link** (`/shared?folder=<id>`). The folder's managers (admins, or the member who created it while members manage their folders) share and revoke there.
+- **In Home:** an open folder shows a who-can-see pill (Private / Workspace / Public / Shared externally) for its **real audience**: the most open of the folder's setting, its grants, and every non-deleted artifact and file in its subtree. When the contents are more open than the setting, a note says so ("Folder is Private · 3 items inside are visible to the workspace"); folder managers also get the list of those items, linked, to fix them. Other members see the pill and the counts only. Personal folders get the same pill. It opens **Who has access**: the visibility picker, the folder's grants and the ones it inherits, **Share with a person** (view/comment, optional 7/30/90-day expiry), **Who opened what**, and **Copy client portal link** (`/shared?folder=<id>`). The folder's managers (admins, or the member who created it while members manage their folders) share and revoke there; sharing still needs the workspace's external-sharing entitlement and allowed email domains, revoking never does.
 - **API:** list a folder's grants with `GET /v1/workspaces/{workspaceId}/grants?resource_type=folder&resource_id={folderId}`, share with `POST …/share-person`, revoke with `DELETE …/grants/{grantId}`, and see who opened what with `GET /v1/workspaces/{workspaceId}/folders/{folderId}/activity` — see [external-sharing.md](external-sharing.md#share-with-one-person-api).
 - **MCP:** `folder_access`, `share_with_person`, `revoke_share` and `folder_activity` do the same from Claude or ChatGPT — see [../integrations/mcp-connector.md](../integrations/mcp-connector.md).
 

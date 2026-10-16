@@ -63,6 +63,7 @@ export const FEATURES: FeatureDef[] = [
 
   // --- Collaboration ---
   { key: 'collab.realtime', label: 'Realtime collaboration', description: 'Live multi-user editing (Y.js/WebSocket).', category: 'collaboration', defaultEnabled: true },
+  { key: 'collab.external_sharing', label: 'External sharing', description: 'Share folders, files and pages with people outside the workspace (Clients, grants, share with a person, external tokens). Turning it off stops new shares; existing ones keep working and can still be removed.', category: 'collaboration', defaultEnabled: true },
   { key: 'collab.comments', label: 'Comments', description: 'Threaded in-artifact comments.', category: 'collaboration', defaultEnabled: true },
 
   // --- Modules ---

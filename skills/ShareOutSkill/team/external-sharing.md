@@ -13,7 +13,7 @@ Load [SKILL.md](SKILL.md) first. External sharing is a **Teams / Enterprise** fe
 | **Grant** | A capability (`view`, `comment`, `create`, `edit`) on a **folder**, **artifact**, or **file**, given to a whole Client or one external user. A folder grant inherits to everything inside it (pages **and** files). |
 | **Portal** | `/shared` — the external member's "shared with me" page; only granted pages and downloadable files, branded by the Client. First-time visitors see a short orientation card. **Comment** grants on files open a per-file comment thread on the portal — the workspace team sees replies in Needs You. |
 
-**The paid boundary is the feature, not a head count.** External members never inflate the bill; Teams/Enterprise unlocks the formal system (Client orgs, folder grants, branding, scoped tokens, receipts). Creating a Client / member / grant / token requires the entitlement → otherwise `403 EXTERNAL_SHARING_NOT_ENTITLED`. Read access for already-granted externals keeps working even if the plan lapses (no dark-screening a live client deliverable).
+**The paid boundary is the feature, not a head count.** External members never inflate the bill; Teams/Enterprise unlocks the formal system (Client orgs, folder grants, branding, scoped tokens, receipts). Creating a Client / member / grant / token, or sharing with a person, requires the entitlement → otherwise `403 EXTERNAL_SHARING_NOT_ENTITLED`. On a self-hosted instance the entitlement is the **External sharing** feature (`collab.external_sharing`, on by default; an instance admin turns it off per workspace or for everyone under Features). Read access for already-granted externals keeps working even if the plan lapses or the feature is turned off (no dark-screening a live client deliverable), and listing and revoking stay open so access can always be removed.
 
 This sits **above** the free base sharing (N external emails on one artifact via collaborators + email-OTP), which stays uncapped. Grow into Clients when you want grouping, a portal, scoped API, and receipts.
 
@@ -30,7 +30,7 @@ Home → **Admin** lens → **Sharing** tab (owners/admins only). The tab was re
 
 From there: see recent activity and mint API tokens — no API needed.
 
-**Share with a person (quick path):** from Assets, **Share with a person** on a file tile sends one outside email view/comment access without creating a Client org. Same capability via `POST …/share-person` (admin + Teams entitlement; for a folder, its manager may share it).
+**Share with a person (quick path):** from Assets, **Share with a person** on a file tile sends one outside email view/comment access without creating a Client org. Same capability via `POST …/share-person` (admin, or for a folder its manager — plus the entitlement and the workspace's allowed email domains in both cases).
 
 **Folder access panel:** in Home, the who-can-see pill on an open Team Space folder opens **Who has access**: its grants (with "expires in N days"), **Share with a person** (with an expiry), **Who opened what**, and **Copy client portal link**. A folder's managers — admins, or the member who created it while members manage their folders — use it; see [folders.md](folders.md#who-can-see-a-folder).
 
@@ -52,14 +52,14 @@ Content-Type: application/json
 
 `resource_type` may be `"file"` or `"folder"`. `capability` is `view` or `comment`. Invites the external user if needed; the resource appears on their `/shared` portal. Returns `201 { grant, email }`, or `409 ALREADY_MEMBER` if the email is already an internal workspace member.
 
-- **Who:** workspace admins with the external-sharing entitlement. For a folder, its manager (an admin, or its creator while members manage their folders) may share it, list and revoke its grants.
+- **Who:** workspace admins; for a folder, also its manager (its creator while members manage their folders). Only the role is relaxed for a manager: every share still needs the external-sharing entitlement (`403 EXTERNAL_SHARING_NOT_ENTITLED`) and must pass the workspace's allowed email domains / emails (`403 DOMAIN_NOT_ALLOWED`). Listing and revoking a folder's grants need only the role, so a manager can always remove access.
 - **Expiry (optional):** `expires_in_days` (1–3650; the UI offers 7/30/90) or `expires_at` (ISO date-time, or `YYYY-MM-DD` = end of that day UTC). `expires_in_days` wins. Omit both for no expiry. A re-share replaces the previous expiry (extend, shorten, or revive a lapsed one). A lapsed grant is denied at read time.
 - **Folder invite → portal:** for a folder, the invite email's join link carries `?folder=<id>` through sign-in and lands on `/shared?folder=<id>`; a person who already has an account gets an email linking straight there.
 - **Revoke:** `DELETE /v1/workspaces/{wid}/grants/{gid}` (grant ids from `GET …/grants?resource_type=folder&resource_id=…`).
 
 ## API
 
-All management endpoints require workspace `admin` + the entitlement.
+Endpoints that create access (Clients, members, grants, tokens, share-person) require workspace `admin` + the entitlement. Listing, revoking a grant, removing a member, deleting a Client and revoking a token need only `admin`, so a workspace without the entitlement can still wind access down.
 
 ### Clients
 
@@ -157,6 +157,7 @@ External members are **$0 and uncapped**. `getBillableSeats` counts only interna
 
 | Code | Meaning |
 | --- | --- |
-| `403 EXTERNAL_SHARING_NOT_ENTITLED` | Workspace not on Teams/Enterprise — can't create Clients/members/grants/tokens. Read access for existing grants is unaffected. |
+| `403 EXTERNAL_SHARING_NOT_ENTITLED` | Workspace not entitled to external sharing (not on Teams/Enterprise, or the External sharing feature is off) — can't create Clients/members/grants/tokens or share with a person, whoever asks (admin or folder manager). Read, list and revoke are unaffected. |
+| `403 DOMAIN_NOT_ALLOWED` | `share-person` to an email outside the workspace's allowed email domains / emails. |
 | `403 FORBIDDEN` | Caller is not a workspace admin. |
 | `400 VALIDATION_ERROR` | Bad capability/resource (e.g. `create` on an artifact — it's folder-only), or unknown subject/resource for this workspace. |

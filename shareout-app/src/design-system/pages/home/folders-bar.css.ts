@@ -117,6 +117,8 @@ export const foldersBarStyles = `/* ── Folders bar ────────�
 .wsx-fav.is-org { border-radius: var(--radius-sm); }
 .wsx-fav.is-inherited { background: var(--color-surface); color: var(--color-text-tertiary); }
 .wsx-fav--more { background: var(--color-surface); color: var(--color-text-secondary); }
+.wsx-faccess__note { font-size: 0.78rem; color: var(--color-text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 36ch; }
+.wsx-faccess__open .wsx-faccess__who a { color: inherit; }
 .wsx-faccess__now { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; }
 .wsx-faccess__row { align-items: center; gap: var(--space-2); }
 .wsx-faccess__who { display: flex; flex-direction: column; flex: 1; min-width: 0; }

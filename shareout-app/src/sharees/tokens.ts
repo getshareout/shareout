@@ -11,6 +11,7 @@ import { json } from '../workspaces/json-response';
 import { generateId } from '../crypto-utils';
 import { logAudit } from '../audit';
 import { requireExternalSharing } from './guard';
+import { requireWorkspaceRole } from '../workspaces/roles';
 
 const EXTERNAL_SCOPES: ServiceScope[] = ['artifacts:read', 'data:read', 'data:write'];
 
@@ -38,7 +39,7 @@ export async function handleListExternalTokens(
   request: Request, env: Env, user: AuthUser,
   workspaceId: string, shareeId: string, memberUserId: string,
 ): Promise<Response> {
-  const forbidden = await requireExternalSharing(env, workspaceId, user.id);
+  const forbidden = await requireWorkspaceRole(env, workspaceId, user.id, 'admin');
   if (forbidden) return forbidden;
   if (!(await shareeMemberUserId(env, workspaceId, shareeId, memberUserId)))
     return json({ error: 'Not a member of this sharee', code: 'NOT_FOUND' }, 404);
@@ -92,7 +93,7 @@ export async function handleRevokeExternalToken(
   request: Request, env: Env, user: AuthUser,
   workspaceId: string, shareeId: string, memberUserId: string, tokenId: string,
 ): Promise<Response> {
-  const forbidden = await requireExternalSharing(env, workspaceId, user.id);
+  const forbidden = await requireWorkspaceRole(env, workspaceId, user.id, 'admin');
   if (forbidden) return forbidden;
 
   // Scope the revoke to a token that actually belongs to this external member.
