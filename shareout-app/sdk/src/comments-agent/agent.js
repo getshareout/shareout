@@ -3,7 +3,9 @@
  * worker's HTMLRewriter when the out-of-box comments overlay is enabled.
  *
  * Responsibilities (pinning only — state capture/restore is handled by the SDK):
- *  - enter "pin mode" and turn the next click into an element-anchored position
+ *  - enter "pin mode": a pin cursor over the whole page, and every click (links
+ *    included) places / moves the draft pin instead of acting on the page, until
+ *    the parent exits pin mode (submit, cancel, navigation)
  *  - keep parent-rendered pin markers aligned as the artifact scrolls/resizes
  *  - scroll a pin into view on request
  *
@@ -14,7 +16,25 @@
   window.__shareoutCommentsAgent = true;
 
   var pinMode = false;
+  var draft = null; // position of the pin being placed, while in pin mode
   var pins = []; // [{ id, position }]
+  var cursorStyle = null;
+  var PIN_CURSOR = 'url("data:image/svg+xml,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">'
+    + '<path d="M12 22s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 15.8 12 22 12 22z" fill="#2563eb" stroke="#fff" stroke-width="1.5"/>'
+    + '<circle cx="12" cy="10.5" r="2.5" fill="#fff"/></svg>'
+  ) + '") 12 22, crosshair';
+
+  function setPinCursor(on) {
+    if (on && !cursorStyle) {
+      cursorStyle = document.createElement('style');
+      cursorStyle.textContent = '*, *::before, *::after { cursor: ' + PIN_CURSOR + ' !important; }';
+      (document.head || document.documentElement).appendChild(cursorStyle);
+    } else if (!on && cursorStyle) {
+      cursorStyle.remove();
+      cursorStyle = null;
+    }
+  }
   var rafScheduled = false;
 
   function send(msg) {
@@ -107,7 +127,8 @@
       var r = resolvePosition(pins[i].position);
       if (r) out.push({ id: pins[i].id, x: r.x, y: r.y, visible: r.visible });
     }
-    send({ type: 'shareout:comments:pinPositions', pins: out });
+    var d = draft ? resolvePosition(draft) : null;
+    send({ type: 'shareout:comments:pinPositions', pins: out, draft: d });
   }
 
   function scheduleEmit() {
@@ -120,10 +141,8 @@
     if (!pinMode) return;
     e.preventDefault();
     e.stopPropagation();
-    pinMode = false;
-    document.documentElement.style.cursor = '';
-    var pos = computePosition(e.target, e.clientX, e.clientY);
-    send({ type: 'shareout:comments:pinPlaced', position: pos });
+    draft = computePosition(e.target, e.clientX, e.clientY);
+    send({ type: 'shareout:comments:pinPlaced', position: draft, x: Math.round(e.clientX), y: Math.round(e.clientY) });
   }
 
   window.addEventListener('message', function (e) {
@@ -134,10 +153,12 @@
 
     if (data.type === 'shareout:comments:enterPinMode') {
       pinMode = true;
-      document.documentElement.style.cursor = 'crosshair';
+      draft = null;
+      setPinCursor(true);
     } else if (data.type === 'shareout:comments:exitPinMode') {
       pinMode = false;
-      document.documentElement.style.cursor = '';
+      draft = null;
+      setPinCursor(false);
     } else if (data.type === 'shareout:comments:setPins') {
       pins = Array.isArray(data.pins) ? data.pins : [];
       scheduleEmit();
@@ -154,6 +175,10 @@
   });
 
   document.addEventListener('click', onClickCapture, true);
+  // Esc pressed while focus is inside the artifact still cancels placement.
+  document.addEventListener('keydown', function (e) {
+    if (pinMode && e.key === 'Escape') send({ type: 'shareout:comments:pinCancel' });
+  }, true);
   window.addEventListener('scroll', scheduleEmit, { passive: true });
   window.addEventListener('resize', scheduleEmit, { passive: true });
 

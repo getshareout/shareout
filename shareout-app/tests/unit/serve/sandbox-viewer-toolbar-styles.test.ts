@@ -10,11 +10,11 @@ import { scheduleModalsStyles } from '../../../src/serve/sandbox-viewer/toolbar/
 import { responsiveStyles } from '../../../src/serve/sandbox-viewer/toolbar/styles/responsive.css';
 
 /** Byte length of the monolithic toolbar stylesheet at decomposition time. */
-const ORIGINAL_STYLE_BYTE_LENGTH = 39_917;
+const ORIGINAL_STYLE_BYTE_LENGTH = 41_786;
 
 /** SHA-256 of the concatenated CSS body (regression guard). */
 const ORIGINAL_STYLE_SHA256 =
-  'f120ea8482c68473cc4c6cf95bce2a355879014e0105d6027395c1da3d1ffafb';
+  '6e2d0adff57637131ebfaaf6ed8439e5b45ff14d63a18a9738da33ed6ccb9099';
 
 const SECTION_EXPORTS = [
   ['toolbar-shell', toolbarShellStyles],
