@@ -64,7 +64,7 @@ async function serveCaptureView(
 
   // Owner-authorized headless render (thumbnail/PDF/test). Relax the CSP so a private
   // artifact that loads Tailwind Play CDN etc. renders styled in its own thumbnail.
-  const resp = await serveAsset(request, env, asset, slug, true, { relaxCsp: true });
+  const resp = await serveAsset(request, env, asset, slug, true, { relaxCsp: true, sandbox: false });
   return new HTMLRewriter().on('head', {
     element(e: { prepend: (c: string, o: { html: boolean }) => void }) {
       e.prepend(scriptTag, { html: true });
@@ -276,8 +276,8 @@ export async function handleServe(
     }
   }
 
-  // Gated bytes on the content domain must never enter a shared cache.
-  const noStore = contentOrigin && !isOpen;
+  // Gated bytes must never enter a browser or shared cache, on any origin.
+  const noStore = !isOpen;
 
   // Determine which entrypoint to use based on device detection
   const useMobile = !forceWeb && result.has_mobile && result.mobile_entrypoint &&
@@ -310,7 +310,7 @@ export async function handleServe(
     const filePath = original || result.entrypoint;
     const source = await fetchAssetRow(env, result.version_id, filePath);
     if (source) {
-      const resp = await serveAsset(request, env, source, slug, true, { noStore, relaxCsp: !isOpen });
+      const resp = await serveAsset(request, env, source, slug, true, { noStore, relaxCsp: !isOpen, sandbox: !contentOrigin });
       const out = new Response(resp.body, resp);
       let filename = filePath.split('/').pop()!;
       if (assetPath !== 'download') { try { filename = decodeURIComponent(assetPath); } catch { /* keep entrypoint name */ } }
@@ -380,6 +380,7 @@ export async function handleServe(
       return serveAsset(request, env, asset, slug, isRawRequest, {
         noStore,
         relaxCsp: !isOpen,
+        sandbox: !contentOrigin,
         cacheHtml: true,
         cacheVariant: variant,
         transform: (resp) => {
@@ -397,6 +398,7 @@ export async function handleServe(
     return serveAsset(request, env, asset, slug, isRawRequest, {
       noStore,
       relaxCsp: !isOpen,
+      sandbox: !contentOrigin,
       ...(asset.mime === 'text/html' && assetPath ? { transform: (resp: Response) => injectPageAgent(resp, pageAgent) } : {}),
     });
   }
@@ -409,7 +411,7 @@ export async function handleServe(
     `).bind(result.version_id).first<{ r2_key: string; mime: string; size_bytes: number }>();
 
     if (indexAsset) {
-      return serveAsset(request, env, indexAsset, slug, isRawRequest, { noStore, relaxCsp: !isOpen });
+      return serveAsset(request, env, indexAsset, slug, isRawRequest, { noStore, relaxCsp: !isOpen, sandbox: !contentOrigin });
     }
   }
 

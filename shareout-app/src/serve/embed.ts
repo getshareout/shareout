@@ -1,6 +1,6 @@
 import type { Env, TypeMetadata } from '../types';
 import type { EmbedArtifactInfo } from './types';
-import { SANDBOX_PERMISSIONS, getEmbedCSP, getEmbedSecurityHeaders } from './security';
+import { ARTIFACT_SANDBOX_CSP, SANDBOX_PERMISSIONS, getEmbedCSP, getEmbedSecurityHeaders, isScriptableDocumentMime } from './security';
 import { escapeHtml, notFound, pausedPage } from './utils';
 import { getCacheControl } from './assets';
 import { googleFontsPreconnect } from '../../packages/design-tokens/src/index';
@@ -203,13 +203,15 @@ async function serveEmbedAsset(
   headers.set('Cache-Control', getCacheControl(asset.mime));
   headers.set('Content-Length', String(asset.size_bytes));
 
-  if (asset.mime === 'text/html') {
-    headers.set('Content-Security-Policy', getEmbedCSP(allowedOrigins, env));
-  }
-
   Object.entries(getEmbedSecurityHeaders()).forEach(([k, v]) => {
     headers.set(k, v);
   });
+
+  if (asset.mime === 'text/html') {
+    headers.set('Content-Security-Policy', `${getEmbedCSP(allowedOrigins, env)}; ${ARTIFACT_SANDBOX_CSP}`);
+  } else if (isScriptableDocumentMime(asset.mime)) {
+    headers.set('Content-Security-Policy', 'sandbox');
+  }
 
   return new Response(obj.body, { status: 200, headers });
 }

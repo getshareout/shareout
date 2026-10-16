@@ -177,7 +177,7 @@ describe('handleServe', () => {
     // own sub-assets still load without 'self' matching.
     expect(csp).toContain(BASE_URL);
     // ETag carries the comments-overlay variant so a flip busts client revalidation.
-    expect(response.headers.get('ETag')).toBe('"artifacts/demo/index.html:raw"');
+    expect(response.headers.get('ETag')).toBe('"artifacts/demo/index.html:raw:sbx"');
     expect(await response.text()).toContain('<h1>Hello</h1>');
   });
 
@@ -186,7 +186,7 @@ describe('handleServe', () => {
     slugsStore.set(`cmtcfg:${ARTIFACT_ID}`, '0');
     const response = await handleServe(
       serveRequest('index.html?_raw', {
-        headers: { 'If-None-Match': '"artifacts/demo/index.html:raw"' },
+        headers: { 'If-None-Match': '"artifacts/demo/index.html:raw:sbx"' },
       }),
       env,
       SLUG,
@@ -194,7 +194,7 @@ describe('handleServe', () => {
     );
 
     expect(response.status).toBe(304);
-    expect(response.headers.get('ETag')).toBe('"artifacts/demo/index.html:raw"');
+    expect(response.headers.get('ETag')).toBe('"artifacts/demo/index.html:raw:sbx"');
   });
 
   it('edge-caches the public raw HTML entrypoint and serves repeat views from cache (007)', async () => {
@@ -208,7 +208,7 @@ describe('handleServe', () => {
     const r2CallsAfterFirst = r2.mock.calls.length;
     expect(r2CallsAfterFirst).toBeGreaterThan(0);
     // Cached under the immutable r2_key + comments variant, never the slug URL.
-    expect(cacheStore.has('https://artifact-cache.internal/artifacts/demo/index.html:raw')).toBe(true);
+    expect(cacheStore.has('https://artifact-cache.internal/artifacts/demo/index.html:raw:sbx')).toBe(true);
 
     const second = await handleServe(serveRequest('index.html?_raw'), env, SLUG, 'index.html');
     expect(second.status).toBe(200);
@@ -222,13 +222,13 @@ describe('handleServe', () => {
     slugsStore.set(`cmtcfg:${ARTIFACT_ID}`, '1');
     const response = await handleServe(serveRequest('index.html?_raw'), env, SLUG, 'index.html');
     expect(response.status).toBe(200);
-    expect(response.headers.get('ETag')).toBe('"artifacts/demo/index.html:cmt"');
+    expect(response.headers.get('ETag')).toBe('"artifacts/demo/index.html:cmt:sbx"');
     const html = await response.text();
     expect(html).toContain('<h1>Hello</h1>');
     expect(html).toContain('/sdk/comments-agent.js');
     // The overlay body is cached under its own key so it never collides with `:raw`.
-    expect(cacheStore.has('https://artifact-cache.internal/artifacts/demo/index.html:cmt')).toBe(true);
-    expect(cacheStore.has('https://artifact-cache.internal/artifacts/demo/index.html:raw')).toBe(false);
+    expect(cacheStore.has('https://artifact-cache.internal/artifacts/demo/index.html:cmt:sbx')).toBe(true);
+    expect(cacheStore.has('https://artifact-cache.internal/artifacts/demo/index.html:raw:sbx')).toBe(false);
   });
 
   it('keeps gated (private) raw HTML no-store on the wire while caching it colo-locally (007)', async () => {

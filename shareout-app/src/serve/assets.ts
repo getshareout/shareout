@@ -1,5 +1,5 @@
 import type { Env } from '../types';
-import { getSecurityHeaders, getSandboxedCSP, getArtifactCspOrigin } from './security';
+import { getSecurityHeaders, getSandboxedCSP, getArtifactCspOrigin, ARTIFACT_SANDBOX_CSP, isScriptableDocumentMime } from './security';
 import { notFound } from './utils';
 
 function isCacheableAsset(mime: string): boolean {
@@ -58,9 +58,9 @@ export async function serveAsset(
   asset: { r2_key: string; mime: string; size_bytes: number },
   _slug: string,
   _isRawRequest: boolean,
-  // noStore: private artifact bytes served on the content domain must never enter a
-  // shared cache (the edge cache is keyed by r2_key, not by the capability token), so
-  // skip the edge cache and mark the response `private, no-store` (ADR 30).
+  // noStore: private/workspace artifact bytes must never enter a browser or shared
+  // cache, so the response is marked `private, no-store` (ADR 30). They may still sit
+  // in this colo's internal Cache API entry, reached only after the access check.
   // cacheHtml: opt in to edge-caching text/html (excluded by isCacheableAsset by
   // default). cacheVariant distinguishes bodies that differ for the same r2_key (e.g.
   // the comments-overlay agent), and transform mutates the HTML body before it is
@@ -71,9 +71,12 @@ export async function serveAsset(
     cacheVariant?: string;
     transform?: (resp: Response) => Response;
     // relaxCsp: private/authed-only artifact — loosen the sandbox script/style/font-src
-    // to any https host (see getSandboxedCSP). Only ever set on non-cacheable (noStore)
-    // responses, so a relaxed CSP can't leak into the shared edge cache.
+    // to any https host (see getSandboxedCSP). It rides the cache variant below, so a
+    // relaxed body and a tight body for the same r2_key never share an entry.
     relaxCsp?: boolean;
+    // sandbox: add the CSP sandbox directive to HTML and script-capable documents.
+    // Default on; off only on the dedicated content domain and for owner captures.
+    sandbox?: boolean;
   } = {},
 ): Promise<Response> {
   const rangeHeader = request.headers.get('Range');
@@ -83,8 +86,9 @@ export async function serveAsset(
   const transform = opts.transform;
   // relaxCsp rides the variant so a relaxed (private) body and a tight (public) body
   // for the same r2_key never share a cache entry across a visibility flip.
+  const sandbox = opts.sandbox !== false;
   const variantSuffix =
-    (opts.cacheVariant ? `:${opts.cacheVariant}` : '') + (opts.relaxCsp ? ':relax' : '');
+    (opts.cacheVariant ? `:${opts.cacheVariant}` : '') + (opts.relaxCsp ? ':relax' : '') + (sandbox ? ':sbx' : '');
 
   // Edge-cache gate: assets always cacheable by mime, plus opt-in HTML. Ranged
   // responses are never cached.
@@ -150,9 +154,11 @@ export async function serveAsset(
 
   if (asset.mime === 'text/html') {
     Object.entries(getSecurityHeaders(true)).forEach(([k, v]) => headers.set(k, v));
-    headers.set('Content-Security-Policy', getSandboxedCSP(getArtifactCspOrigin(env, request), opts.relaxCsp === true, env));
+    const csp = getSandboxedCSP(getArtifactCspOrigin(env, request), opts.relaxCsp === true, env);
+    headers.set('Content-Security-Policy', sandbox ? `${csp}; ${ARTIFACT_SANDBOX_CSP}` : csp);
   } else {
     headers.set('X-Content-Type-Options', 'nosniff');
+    if (sandbox && isScriptableDocumentMime(asset.mime)) headers.set('Content-Security-Policy', 'sandbox');
   }
 
   headers.set('Accept-Ranges', 'bytes');
