@@ -3,10 +3,12 @@
  * Split out of styles.ts to stay under the per-module line cap; concatenated into
  * WORKSPACE_STYLES in the same cascade position so order is unchanged.
  */
-export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspector: Activity · Details · Comments · Automate) ---- */
+export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspector: Activity · Details · Comments · Automate · History) ---- */
 .wsx__activity { position: relative; margin: 12px 12px 12px 0; background: var(--glass-bg-strong); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-.wsx__rtabs { display: flex; gap: 2px; padding: 0 8px; flex: none; min-height: var(--wsx-headbar); box-sizing: border-box; align-items: stretch; }
-.wsx__rtab { flex: 1; padding: 0 8px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px; white-space: nowrap; }
+/* Four tabs fit the default 300px rail in en and es; a narrower (resized) rail scrolls the row instead of clipping a label. */
+.wsx__rtabs { display: flex; gap: 0; padding: 0 6px; flex: none; min-height: var(--wsx-headbar); box-sizing: border-box; align-items: stretch; overflow-x: auto; scrollbar-width: none; }
+.wsx__rtabs::-webkit-scrollbar { display: none; }
+.wsx__rtab { flex: 1 0 auto; padding: 0 6px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--color-text-secondary); font: 600 var(--text-xs) var(--font-body); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px; white-space: nowrap; }
 .wsx__rtab:hover { color: var(--color-text); }
 .wsx__rtab.is-active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
 .wsx__rtab .wsx__live-dot { width: 7px; height: 7px; }
@@ -255,4 +257,42 @@ export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspect
 .wsx-auto__chat:hover { border-color: var(--color-primary); color: var(--color-primary); }
 .wsx-auto__chat svg { width: 16px; height: 16px; flex: none; }
 
+/* version history (inspector-history.ts) */
+.wsx-vh { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.wsx-vh__cmp { display: flex; align-items: center; gap: 6px; }
+.wsx-vh__cmp select { flex: 1 1 0; min-width: 0; padding: 5px 8px; }
+.wsx-vh__cmp .wsx-abtn { flex: none; }
+.wsx-vh__list { display: flex; flex-direction: column; gap: 6px; }
+.wsx-vh__row { padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elevated); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wsx-vh__row.is-live { border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border)); }
+.wsx-vh__top { display: flex; align-items: center; gap: 8px; }
+.wsx-vh__no { font: 600 var(--text-sm) var(--font-mono); }
+.wsx-vh__size { margin-left: auto; font-size: var(--text-xs); color: var(--color-text-tertiary); font-variant-numeric: tabular-nums; }
+.wsx-vh__note { font-size: var(--text-xs); color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.wsx-vh__acts { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; }
+.wsx-vh__acts .wsx-link { font-size: var(--text-xs); }
+.wsx-vh__more { text-align: center; }
+.wsx-vd-overlay { z-index: 1200; }
+.wsx-vd { --soc-modal-width: min(980px, calc(100vw - 32px)); height: min(760px, calc(100vh - 48px)); }
+.wsx-vd__body { padding: 0; display: flex; flex-direction: column; }
+.wsx-vd__body.is-preview { overflow: hidden; }
+.wsx-vd__stats { padding: 8px 16px; font-size: var(--text-xs); color: var(--color-text-secondary); border-bottom: 1px solid var(--color-border); position: sticky; top: 0; background: var(--color-bg-elevated); z-index: 1; }
+.wsx-vd__stats .k-add, .wsx-vd__mk { font-weight: 600; }
+.wsx-vd__stats .k-add { color: var(--color-success); }
+.wsx-vd__stats .k-del { color: var(--color-error); font-weight: 600; }
+.wsx-vd__code { font: var(--text-xs)/1.55 var(--font-mono); padding: 4px 0 12px; }
+.wsx-vd__ln { display: grid; grid-template-columns: 44px 44px 18px 1fr; }
+.wsx-vd__ln code { font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; padding-right: 12px; }
+.wsx-vd__no { color: var(--color-text-tertiary); text-align: right; padding-right: 8px; user-select: none; }
+.wsx-vd__mk { text-align: center; user-select: none; }
+.wsx-vd__ln.k-add { background: var(--color-success-light); }
+.wsx-vd__ln.k-add .wsx-vd__mk { color: var(--color-success); }
+.wsx-vd__ln.k-del { background: var(--color-error-light); }
+.wsx-vd__ln.k-del .wsx-vd__mk { color: var(--color-error); }
+.wsx-vd__fold { display: block; width: 100%; border: 0; border-block: 1px dashed var(--color-border); background: var(--color-surface); color: var(--color-text-secondary); font: 600 var(--text-xs) var(--font-body); padding: 4px 0; cursor: pointer; }
+.wsx-vd__fold:hover { color: var(--color-primary); }
+.wsx-vd__hint { padding: 8px 16px; border-bottom: 1px solid var(--color-border); }
+.wsx-vd__frame { flex: 1; width: 100%; border: 0; background: var(--color-bg); }
+.wsx-vd__foot { justify-content: flex-end; }
+.wsx-vd__foot .so-c-btn { flex: none; }
 `;

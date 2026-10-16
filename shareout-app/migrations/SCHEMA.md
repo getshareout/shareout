@@ -186,7 +186,7 @@ here would silently drop artifacts from listings.
 | `artifacts` | See above. Soft-deleted via `deleted_at`; nearly every listing query filters `deleted_at IS NULL`. |
 | `artifact_presentation` | How the artifact looks when linked, embedded or installed: `social_*` for link previews, `thumbnail_*`, `pwa_config`, `has_mobile`, `embed_allowed`/`embed_origins`, `editor_readiness`, `auto_summary_hash`. Written through `setPresentation()`. |
 | `artifact_moderation` | Review state: `status`, `reason`, `checked_at`, `content_hash`, and `held_visibility` (the visibility to restore once a hold lifts). Most artifacts never get a row. Written through `setModeration()`. |
-| `versions` | Immutable snapshots. `version_no` increments per artifact; `manifest_json` describes the bundle; `entrypoint`/`mobile_entrypoint` name the HTML root. |
+| `versions` | Immutable snapshots. `version_no` increments per artifact; `manifest_json` describes the bundle; `entrypoint`/`mobile_entrypoint` name the HTML root. `created_by`, `source` (`api`/`agent`/`editor`/`restore`) and `message` say who made it and how; a restore copies an older version's assets into a new version and records it in `restored_from_version_id`. |
 | `deployments` | Points a `channel` at a `version_id` under a `slug` — `production` is what visitors resolve to, `candidate` stages the next one. This is the table serving reads. |
 | `assets` | Files inside a version: `path`, `r2_key`, `mime`, `size_bytes`, `sha256`. |
 | `artifact_tags` | Freeform labels. |

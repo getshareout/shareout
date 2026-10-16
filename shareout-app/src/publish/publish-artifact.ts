@@ -28,6 +28,7 @@ import { runPublishModeration } from './moderation';
 import { findExistingArtifacts, upsertArtifactRecord } from './artifact-upsert';
 import { applyWorkspaceVisibilityPolicy, buildTypeMetadata, resolveStoredArtifactType } from './type-metadata';
 import type { PublishParams } from './types';
+import { publishSource } from '../artifacts/versions';
 
 export async function publishArtifact(
   env: Env,
@@ -106,8 +107,8 @@ export async function publishArtifact(
   const actualMobileEntrypoint = hasMobile ? (mobileEntrypoint || 'mobile.html') : null;
 
   await env.DB.prepare(
-    'INSERT INTO versions (id, artifact_id, version_no, entrypoint, mobile_entrypoint, manifest_json) VALUES (?, ?, ?, ?, ?, ?)'
-  ).bind(versionId, artifactId, versionNo, entrypoint, actualMobileEntrypoint, '{}').run();
+    'INSERT INTO versions (id, artifact_id, version_no, entrypoint, mobile_entrypoint, manifest_json, created_by, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).bind(versionId, artifactId, versionNo, entrypoint, actualMobileEntrypoint, '{}', user.id, publishSource(user)).run();
 
   const assetMetadata = await storeVersionAssets(
     env, versionId, artifactId, versionNo, files, mobileHtml, actualMobileEntrypoint,

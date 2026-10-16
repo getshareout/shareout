@@ -184,9 +184,9 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
 
     await env.DB.batch([
       env.DB.prepare(
-        `INSERT INTO versions (id, artifact_id, version_no, entrypoint, manifest_json, created_at)
-         VALUES (?, ?, ?, ?, '{}', strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
-      ).bind(versionId, artifactId, newVersionNo, entrypoint),
+        `INSERT INTO versions (id, artifact_id, version_no, entrypoint, manifest_json, created_at, created_by, source)
+         VALUES (?, ?, ?, ?, '{}', strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?, 'editor')`
+      ).bind(versionId, artifactId, newVersionNo, entrypoint, ctx.userId),
       env.DB.prepare(
         `INSERT INTO assets (id, version_id, path, r2_key, mime, size_bytes, sha256)
          VALUES (?, ?, ?, ?, ?, ?, ?)`

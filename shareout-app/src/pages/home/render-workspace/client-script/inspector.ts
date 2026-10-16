@@ -1,5 +1,5 @@
 /** Right rail Inspector panels. */
-export const workspace_client_inspector_JS = `  // ===== right rail = the working Inspector (Activity on Home; Details/Comments/Automate on a doc) =====
+export const workspace_client_inspector_JS = `  // ===== right rail = the working Inspector (Activity on Home; Details/Comments/Automate/History on a doc) =====
   var needsEvents = [], pulseEvents = [], WSX_WIN = '7d';
   var GEAR_SVG = isvg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>');
   var rtabsEl = document.getElementById('wsxRtabs');
@@ -25,8 +25,9 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   // just before this module (split out for the client-script size cap).
   function renderRTabs(items) {
     rtabsEl.innerHTML = items.map(function (t) {
-      return '<button class="wsx__rtab' + (t.key === rActive ? ' is-active' : '') + '" data-rtab="' + t.key + '" type="button">' + (t.dot ? '<span class="wsx__live-dot"></span>' : '') + esc(t.label) + '</button>';
+      return '<button class="wsx__rtab' + (t.key === rActive ? ' is-active' : '') + '" data-rtab="' + t.key + '" type="button" title="' + esc(t.label) + '">' + (t.dot ? '<span class="wsx__live-dot"></span>' : '') + esc(t.label) + '</button>';
     }).join('');
+    var on = rtabsEl.querySelector('.is-active'); if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     rtabsEl.querySelectorAll('[data-rtab]').forEach(function (b) { b.addEventListener('click', function () { rActive = b.getAttribute('data-rtab'); paintRail(); }); });
   }
   function paintRail() {
@@ -41,10 +42,11 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       renderRTabs([{ key: 'edit', label: t('inspector.editing') }]);
       renderEditPanel(panes[activeKey]);
     } else {
-      if (['details', 'comments', 'automate'].indexOf(rActive) < 0) rActive = 'details';
-      renderRTabs([{ key: 'details', label: t('inspector.details') }, { key: 'comments', label: t('inspector.comments') }, { key: 'automate', label: t('inspector.automate') }]);
+      if (['details', 'comments', 'automate', 'history'].indexOf(rActive) < 0) rActive = 'details';
+      renderRTabs([{ key: 'details', label: t('inspector.details') }, { key: 'comments', label: t('inspector.comments') }, { key: 'automate', label: t('inspector.automate') }, { key: 'history', label: t('inspector.history') }]);
       if (rActive === 'comments') renderComments(activeArt);
       else if (rActive === 'automate') renderAutomate(activeArt);
+      else if (rActive === 'history') renderHistory(activeArt);
       else renderDetails(activeArt);
     }
   }

@@ -42,5 +42,5 @@ export {
   handleTransferOwnership,
 } from './collaborators';
 export { handleShareArtifact } from './share';
-export { handleGetVersions, handleRollback } from './versions';
+export { handleGetVersions, handleGetVersionSource, handleRestoreVersion, handleRollback } from './versions';
 export { handleGetArtifactFiles } from './files';

@@ -88,6 +88,7 @@ describe('handleGetVersions', () => {
         { id: 'ver_2', version_no: 2, entrypoint: 'index.html', created_at: '2024-02-01T00:00:00Z' },
         { id: 'ver_1', version_no: 1, entrypoint: 'index.html', created_at: '2024-01-01T00:00:00Z' },
       ],
+      live_version_id: null,
     });
   });
 });
