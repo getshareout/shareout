@@ -51,6 +51,30 @@ describe('routeEmail webhook', () => {
     expect(res?.status).toBe(401);
   });
 
+  it('is off (404) and suppresses nothing when no webhook secret is configured', async () => {
+    const saved = e.EMAIL_WEBHOOK_SECRET;
+    e.EMAIL_WEBHOOK_SECRET = undefined;
+    try {
+      const res = await routeEmail(ctx('/v1/webhooks/email-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([{ email: 'someone@x.com', type: 'bounce' }]),
+      }));
+      expect(res?.status).toBe(404);
+      const row = await e.DB.prepare('SELECT email FROM email_suppressions WHERE email = ?').bind('someone@x.com').first();
+      expect(row).toBeNull();
+    } finally {
+      e.EMAIL_WEBHOOK_SECRET = saved;
+    }
+  });
+
+  it('401s email-events without a secret header', async () => {
+    const res = await routeEmail(ctx('/v1/webhooks/email-events', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '[]',
+    }));
+    expect(res?.status).toBe(401);
+  });
+
   it('400s invalid JSON; suppresses bounce and complaint events', async () => {
     const bad = await routeEmail(ctx('/v1/webhooks/email-events', {
       method: 'POST',

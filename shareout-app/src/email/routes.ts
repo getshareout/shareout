@@ -30,15 +30,21 @@ function page(title: string, inner: string): string {
 </body></html>`;
 }
 
+function secretMatches(provided: string, expected: string): boolean {
+  if (provided.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < provided.length; i++) diff |= provided.charCodeAt(i) ^ expected.charCodeAt(i);
+  return diff === 0;
+}
+
 // POST /v1/webhooks/email-events — Cloudflare Email Sending delivery events.
-// Secured by a secret (header x-webhook-secret or ?secret=) when EMAIL_WEBHOOK_SECRET
-// is configured. Maps bounces/complaints onto the suppression list.
+// Secured by EMAIL_WEBHOOK_SECRET (header x-webhook-secret or ?secret=); without the
+// secret configured the endpoint is off. Maps bounces/complaints onto the suppression list.
 async function handleEmailEventWebhook(req: Request, env: Env, url: URL): Promise<Response> {
   const secret = env.EMAIL_WEBHOOK_SECRET;
-  if (secret) {
-    const provided = req.headers.get('x-webhook-secret') || url.searchParams.get('secret');
-    if (provided !== secret) return new Response('Unauthorized', { status: 401 });
-  }
+  if (!secret) return new Response('Not Found', { status: 404 });
+  const provided = req.headers.get('x-webhook-secret') || url.searchParams.get('secret') || '';
+  if (!secretMatches(provided, secret)) return new Response('Unauthorized', { status: 401 });
   let body: any;
   try {
     body = await req.json();
