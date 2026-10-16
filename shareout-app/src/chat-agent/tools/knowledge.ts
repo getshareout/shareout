@@ -157,7 +157,7 @@ export const knowledgeSearchTool: AccountTool = {
 export const knowledgeGetTool: AccountTool = {
   name: 'knowledge_get',
   description:
-    'Read one knowledge node in full — its distilled notes plus the pages it was learned from. Use after knowledge_search to get the detail behind a topic, client or fact. `sources` lists each page as { id, slug, title, available }: cite available ones by title (link /a/<slug>/); an unavailable one is gone or not visible to this person, so do not guess what it was.',
+    'Read one knowledge node in full — its distilled notes plus the pages it was learned from. Use after knowledge_search to get the detail behind a topic, client or fact. `sources` lists each page as { id, slug, title, url, available }: cite available ones by title, linking their absolute `url`; an unavailable one is gone or not visible to this person, so do not guess what it was.',
   input_schema: {
     type: 'object',
     properties: {

@@ -58,8 +58,14 @@ export function codeBlock(code: string): string {
 
 // ── data shapes per email ────────────────────────────────────────────────────
 export interface OtpData { code: string }
-export interface InviteData { workspaceName: string; inviterName: string; claimCode: string; claimTtlDays: number; personalMessage?: string | null }
-export interface AddedToWorkspaceData { workspaceName: string; inviterName: string }
+export interface InviteData { workspaceName: string; inviterName: string; claimCode: string; claimTtlDays: number; personalMessage?: string | null; folderId?: string }
+export interface AddedToWorkspaceData { workspaceName: string; inviterName: string; folderId?: string }
+
+/** Accepting carries the shared folder through, so the person lands on its portal. */
+export const inviteJoinUrl = (baseUrl: string, claimCode: string, folderId?: string) =>
+  `${baseUrl}/invite/${encodeURIComponent(claimCode)}${folderId ? `?folder=${encodeURIComponent(folderId)}` : ''}`;
+export const addedLandingUrl = (baseUrl: string, folderId?: string) =>
+  folderId ? `${baseUrl}/shared?folder=${encodeURIComponent(folderId)}` : `${baseUrl}/home`;
 export interface CommentData { fromName: string; verb: string; title: string; snippet: string; url: string; reason?: 'mention' | 'reply' }
 export interface ActionItemAssignedData { fromName: string; title: string; snippet: string; url: string; dueStr?: string | null; dueAt?: string | null }
 export interface ActionItemResolvedData { fromName: string; title: string; snippet: string; url: string }
@@ -246,8 +252,8 @@ export const EMAILS = {
     category: 'transactional',
     audiences: ['EXTERNAL', 'ANY'],
     trigger: 'sendInviteEmail() — workspace owner invites a member.',
-    build: ({ workspaceName, inviterName, claimCode, claimTtlDays, personalMessage }: InviteData, { baseUrl }) => {
-      const joinUrl = `${baseUrl}/invite/${encodeURIComponent(claimCode)}`;
+    build: ({ workspaceName, inviterName, claimCode, claimTtlDays, personalMessage, folderId }: InviteData, { baseUrl }) => {
+      const joinUrl = inviteJoinUrl(baseUrl, claimCode, folderId);
       const connectUrl = `${baseUrl}/home?view=connect`;
       const agentNote = inviteConnectNote('After you join, connect Claude or ChatGPT in 2 minutes', connectUrl);
       const note = invitePersonalNote(`${inviterName} added a note:`, personalMessage);
@@ -270,12 +276,12 @@ export const EMAILS = {
     category: 'transactional',
     audiences: ['ANY'],
     trigger: 'workspaces/invite.ts — an existing user is added to a workspace.',
-    build: ({ workspaceName, inviterName }: AddedToWorkspaceData, { baseUrl }) => ({
+    build: ({ workspaceName, inviterName, folderId }: AddedToWorkspaceData, { baseUrl }) => ({
       subject: `You've been added to ${workspaceName} on ShareOut`,
       preheader: `${inviterName} added you to ${workspaceName}.`,
       heading: `You've been added to ${workspaceName}`,
       bodyHtml: p(`${escapeHtml(inviterName)} added you to the <strong>${escapeHtml(workspaceName)}</strong> workspace on ShareOut. You can build and publish pages there now.`),
-      cta: { label: 'Open ShareOut', href: `${baseUrl}/home` },
+      cta: { label: 'Open ShareOut', href: addedLandingUrl(baseUrl, folderId) },
       bodyText: `${inviterName} added you to the ${workspaceName} workspace on ShareOut. You can build and publish pages there now.`,
     }),
   } satisfies EmailTemplate<AddedToWorkspaceData>,

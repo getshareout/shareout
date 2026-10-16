@@ -114,7 +114,8 @@ export async function handleInviteJoinPage(
 ): Promise<Response> {
   const lang = pageLocale(request);
   const c: Copy = COPY[lang];
-  const invitePath = `/invite/${encodeURIComponent(code)}`;
+  const folder = new URL(request.url).searchParams.get('folder');
+  const invitePath = `/invite/${encodeURIComponent(code)}${folder ? `?folder=${encodeURIComponent(folder)}` : ''}`;
   const peek = await peekInvite(env, code);
 
   if (!peek) return card(lang, c.notFoundTitle, escapeHtml(c.notFoundBody));
@@ -146,7 +147,7 @@ export async function handleInviteAcceptPage(
   if (result.ok) {
     await markClaimClaimed(env, result.claim.id);
     await notifyInviteAccepted(env, result.claim).catch(() => {});
-    const dest = await inviteLandingUrl(env, origin, result.claim);
+    const dest = await inviteLandingUrl(env, origin, result.claim, new URL(request.url).searchParams.get('folder'));
     return Response.redirect(dest, 302);
   }
 

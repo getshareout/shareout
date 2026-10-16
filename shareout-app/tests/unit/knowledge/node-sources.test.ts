@@ -15,6 +15,7 @@ vi.mock('../../../src/workspaces/roles', () => ({ getInternalWorkspaceRole }));
 import { routeKnowledgeApi } from '../../../src/router/api/knowledge';
 import { createFetchContext } from '../../../src/router/context';
 import { setKnowledgeEnabled, upsertKnowledgeFile } from '../../../src/knowledge';
+import { getPlatformOrigin } from '../../../src/config/origins';
 
 const e = env as unknown as Env;
 const WS = 'wsp_kn_sources';
@@ -72,7 +73,7 @@ describe('knowledge node sources', () => {
     await upsertKnowledgeFile(e, WS, { path: 'topics/retention.md', content: nodeWith(['art_one']) });
     const node = await getNode();
     expect(node.sources).toEqual(['art_one']);
-    expect(node.source_artifacts).toEqual([{ id: 'art_one', slug: 'weekly-report', title: 'Weekly report', available: true }]);
+    expect(node.source_artifacts).toEqual([{ id: 'art_one', slug: 'weekly-report', title: 'Weekly report', url: `${getPlatformOrigin(e)}/a/weekly-report/`, available: true }]);
   });
 
   it("does not leak the title of someone else's private artifact", async () => {
@@ -81,8 +82,8 @@ describe('knowledge node sources', () => {
     await upsertKnowledgeFile(e, WS, { path: 'topics/retention.md', content: nodeWith(['art_mine', 'art_theirs']) });
     const node = await getNode();
     expect(node.source_artifacts).toEqual([
-      { id: 'art_mine', slug: 'my-notes', title: 'My private notes', available: true },
-      { id: 'art_theirs', slug: null, title: null, available: false },
+      { id: 'art_mine', slug: 'my-notes', title: 'My private notes', url: `${getPlatformOrigin(e)}/a/my-notes/`, available: true },
+      { id: 'art_theirs', slug: null, title: null, url: null, available: false },
     ]);
     expect(JSON.stringify(node)).not.toContain('Secret plan');
     expect(JSON.stringify(node)).not.toContain('secret-plan');
@@ -94,9 +95,9 @@ describe('knowledge node sources', () => {
     await upsertKnowledgeFile(e, WS, { path: 'topics/retention.md', content: nodeWith(['art_gone', 'art_missing', 'art_other']) });
     const node = await getNode();
     expect(node.source_artifacts).toEqual([
-      { id: 'art_gone', slug: null, title: null, available: false },
-      { id: 'art_missing', slug: null, title: null, available: false },
-      { id: 'art_other', slug: null, title: null, available: false },
+      { id: 'art_gone', slug: null, title: null, url: null, available: false },
+      { id: 'art_missing', slug: null, title: null, url: null, available: false },
+      { id: 'art_other', slug: null, title: null, url: null, available: false },
     ]);
     expect(JSON.stringify(node)).not.toContain('Elsewhere');
   });

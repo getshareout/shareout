@@ -6,6 +6,7 @@ import type { ToolContext } from '../../../src/chat-agent/tools/types';
 vi.mock('../../../src/chat-agent/access', () => ({ getUserWorkspaceIds: async () => ['wsp_kn_tools'] }));
 import { knowledgeSearchTool, knowledgeGetTool } from '../../../src/chat-agent/tools/knowledge';
 import { setKnowledgeEnabled, upsertKnowledgeFile } from '../../../src/knowledge';
+import { getPlatformOrigin } from '../../../src/config/origins';
 
 const e = env as unknown as Env;
 const WS = 'wsp_kn_tools';
@@ -104,7 +105,7 @@ describe('knowledge_get tool', () => {
       node: { body: string; sources: unknown[] };
     };
     expect(r.node.body).toContain('Day-0 retention is 42%');
-    expect(r.node.sources).toEqual([{ id: 'doc1', slug: 'weekly-report', title: 'Weekly report', available: true }]);
+    expect(r.node.sources).toEqual([{ id: 'doc1', slug: 'weekly-report', title: 'Weekly report', url: `${getPlatformOrigin(e)}/a/weekly-report/`, available: true }]);
   });
 
   it("does not name someone else's private source", async () => {
@@ -112,7 +113,7 @@ describe('knowledge_get tool', () => {
     await e.DB.prepare('INSERT INTO artifacts (id, name, slug, owner_id, visibility, workspace_id) VALUES (?, ?, ?, ?, ?, ?)')
       .bind('doc1', 'Secret plan', 'secret-plan', 'u2', 'private', WS).run();
     const r = (await knowledgeGetTool.execute(ctx(WS), { path: 'artifacts/doc1.md' })) as { node: { sources: unknown[] } };
-    expect(r.node.sources).toEqual([{ id: 'doc1', slug: null, title: null, available: false }]);
+    expect(r.node.sources).toEqual([{ id: 'doc1', slug: null, title: null, url: null, available: false }]);
     expect(JSON.stringify(r)).not.toContain('Secret plan');
   });
 

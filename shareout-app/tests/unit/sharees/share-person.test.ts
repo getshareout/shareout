@@ -1,9 +1,13 @@
 // Share a file/folder with ONE person by email (work/042 P2b). Real Miniflare D1 so the
 // entitlement gate, the internal-member 409 guard, edge creation, and grant minting all run.
 import { env } from 'cloudflare:workers';
-import { beforeAll, beforeEach, describe, it, expect } from 'vitest';
+import { beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 import type { AuthUser } from '../../../src/api-auth';
+const dispatchMock = vi.hoisted(() => vi.fn(async () => ({ sent: true })));
+vi.mock('../../../src/email/gateway', () => ({ dispatchLifecycleEmail: dispatchMock }));
+
+import { buildEmail } from '../../../src/email/catalog-es';
 import { handleShareWithPerson, handleListGrants, handleDeleteGrant } from '../../../src/sharees/grants';
 import { listGrantedFiles } from '../../../src/sharees/portal';
 import { invalidateGrants } from '../../../src/access/can-access';
@@ -17,13 +21,13 @@ beforeAll(async () => {
     `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT, name TEXT, last_login_at TEXT, identity_id TEXT)`,
     `CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, name TEXT, owner_id TEXT, slug TEXT, allowed_email_domains TEXT, allowed_emails TEXT)`,
     `CREATE TABLE IF NOT EXISTS workspace_members (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, role TEXT, member_class TEXT NOT NULL DEFAULT 'internal', invited_by TEXT, created_at TEXT DEFAULT (datetime('now')))`,
-    `CREATE TABLE IF NOT EXISTS folders (id TEXT PRIMARY KEY, workspace_id TEXT, parent_id TEXT)`,
+    `CREATE TABLE IF NOT EXISTS folders (id TEXT PRIMARY KEY, workspace_id TEXT, parent_id TEXT, created_by TEXT)`,
     `CREATE TABLE IF NOT EXISTS sharees (id TEXT PRIMARY KEY, workspace_id TEXT, name TEXT, slug TEXT, type TEXT, created_by TEXT)`,
     `CREATE TABLE IF NOT EXISTS sharee_members (id TEXT PRIMARY KEY, sharee_id TEXT, user_id TEXT, email TEXT, status TEXT)`,
     `CREATE TABLE IF NOT EXISTS grants (id TEXT PRIMARY KEY, workspace_id TEXT, subject_type TEXT, subject_id TEXT, resource_type TEXT, resource_id TEXT, capability TEXT, granted_by TEXT, created_at TEXT DEFAULT (datetime('now')), expires_at TEXT, UNIQUE(subject_type, subject_id, resource_type, resource_id, capability))`,
     `CREATE TABLE IF NOT EXISTS subscriptions (id TEXT PRIMARY KEY, workspace_id TEXT, plan_id TEXT, status TEXT)`,
     `CREATE TABLE IF NOT EXISTS subscription_plans (id TEXT PRIMARY KEY, tier TEXT, name TEXT, interval TEXT, price_cents INTEGER, min_seats INTEGER, rebill_plan_id TEXT)`,
-    `CREATE TABLE IF NOT EXISTS workspace_invite_claims (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, email TEXT, code_hash TEXT, invited_by TEXT, expires_at TEXT)`,
+    `CREATE TABLE IF NOT EXISTS workspace_invite_claims (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, email TEXT, code_hash TEXT, invited_by TEXT, expires_at TEXT, claimed_at TEXT, email_status TEXT, email_sent_at TEXT, email_error TEXT)`,
     `CREATE TABLE IF NOT EXISTS asset_deliverables (id TEXT PRIMARY KEY, bucket_artifact_id TEXT, workspace_id TEXT, owner_id TEXT, name TEXT, folder_id TEXT, visibility TEXT NOT NULL DEFAULT 'workspace', deleted_at TEXT)`,
     `CREATE TABLE IF NOT EXISTS blobs (id TEXT PRIMARY KEY, artifact_id TEXT, deliverable_id TEXT, version_no INTEGER, filename TEXT, mime_type TEXT, size_bytes INTEGER)`,
   ];
@@ -32,6 +36,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await invalidateGrants(e, WS);
+  dispatchMock.mockClear();
   for (const t of ['users', 'workspaces', 'workspace_members', 'folders', 'sharees', 'sharee_members', 'grants', 'subscriptions', 'subscription_plans', 'workspace_invite_claims', 'asset_deliverables', 'blobs']) {
     await e.DB.exec(`DELETE FROM ${t}`);
   }
@@ -91,6 +96,33 @@ describe('share a file with a person (work/042 P2b)', () => {
     expect(del.status).toBe(200);
     const after = await (await handleListGrants(listReq, e, admin, WS)).json() as { grants: unknown[] };
     expect(after.grants.length).toBe(0);
+  });
+
+  const sentEmail = (type: string) => {
+    const call = (dispatchMock.mock.calls as unknown as [Env, { type: string; data: Record<string, unknown> }][]).find(([, i]) => i.type === type);
+    expect(call).toBeTruthy();
+    return buildEmail(call![1].type as never, call![1].data, { env: e, baseUrl: 'https://acme.example' })!;
+  };
+
+  it('a folder invite links through the claim to the folder portal', async () => {
+    await e.DB.exec(`INSERT INTO folders (id, workspace_id) VALUES ('fld_acme','${WS}')`);
+    const res = await share({ resource_type: 'folder', resource_id: 'fld_acme', email: 'alice@example.com', capability: 'view' });
+    expect(res.status).toBe(201);
+    const mail = sentEmail('workspace_invite');
+    expect(mail.cta?.href).toMatch(/^https:\/\/acme\.example\/invite\/[A-Z0-9-]+\?folder=fld_acme$/);
+    expect(mail.bodyText).toContain('?folder=fld_acme');
+  });
+
+  it('an already-active person shared a folder is emailed the folder portal link', async () => {
+    await e.DB.exec(`INSERT INTO folders (id, workspace_id) VALUES ('fld_acme','${WS}')`);
+    await e.DB.exec(`INSERT INTO users (id, email, last_login_at) VALUES ('usr_alice','alice@example.com','2026-01-01T00:00:00Z')`);
+    await share({ resource_type: 'folder', resource_id: 'fld_acme', email: 'alice@example.com', capability: 'view' });
+    expect(sentEmail('added_to_workspace').cta?.href).toBe('https://acme.example/shared?folder=fld_acme');
+  });
+
+  it('a file share keeps the plain invite link', async () => {
+    await share({ resource_type: 'file', resource_id: 'dW', email: 'alice@example.com', capability: 'view' });
+    expect(sentEmail('workspace_invite').cta?.href).not.toContain('folder=');
   });
 
   it('re-sharing with the same person is idempotent', async () => {
