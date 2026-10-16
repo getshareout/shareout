@@ -24,8 +24,11 @@ Historically the monorepo copy and `shareout-skill` drifted (different versions,
 missing folders). That confuses agents and humans. **Rule:**
 
 1. All skill markdown PRs land in **`getshareout/shareout`** under `skills/ShareOutSkill/`.
-2. After skill content changes, maintainers run `npm run sync:skill` (from `shareout-app/`) so
-   each instance’s `GET $ORIGIN/v1/skill` matches this tree after deploy/sync.
+2. After skill content changes, maintainers run `npm run sync:skill -- --bucket=<bucket>` (from
+   `shareout-app/`; or set `SKILL_R2_BUCKET`) so each instance’s `GET $ORIGIN/v1/skill` matches
+   this tree after deploy/sync. The bucket is the `bucket_name` of that instance's `ARTIFACTS`
+   binding. There is no default: the script exits non-zero without one and prints the target
+   before uploading.
 3. The skill ships **with the product**; agents use `$ORIGIN/v1/skill`
    after deploy, or read `skills/ShareOutSkill/` from the clone.
 4. The standalone repo is for “install this skill in my agent” UX (shallow clone,
@@ -73,5 +76,5 @@ Do not day-to-day edit in the skill repo.
 | Path | Role |
 |------|------|
 | `shareout-app/official-skills/shareout.md` | Short marketplace “Recommended by ShareOut” primer (not the full skill tree) |
-| `shareout-app/scripts/sync-skill-to-r2.mjs` | Uploads **this** tree to R2 for `/v1/skill` |
+| `shareout-app/scripts/sync-skill-to-r2.mjs` | Uploads **this** tree to R2 for `/v1/skill` (bucket via `--bucket=` / `SKILL_R2_BUCKET`, required) |
 | `docs-site/…/self-host/` | Human self-host docs (deploy skill is agent-first) |

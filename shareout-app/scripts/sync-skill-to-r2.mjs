@@ -2,10 +2,12 @@
 /**
  * Sync skills/ShareOutSkill/ directory to R2 bucket under skill/ prefix.
  *
- * Usage:
- *   npm run sync:skill              # upload all files (parallel)
- *   npm run sync:skill -- --changed # only files changed in last commit / push
- *   npm run sync:skill -- --concurrency=30
+ * Usage (the bucket is required; there is no default):
+ *   SKILL_R2_BUCKET=<bucket> npm run sync:skill        # upload all files (parallel)
+ *   npm run sync:skill -- --bucket=<bucket> --changed  # only files changed in last commit / push
+ *   npm run sync:skill -- --bucket=<bucket> --concurrency=30
+ *
+ * SKILL_R2_BUCKET may also live in shareout-app/.env; --bucket= wins over it.
  *
  * Reads CLOUDFLARE_API_TOKEN from .env (cloudfare_token) or env var.
  */
@@ -14,8 +16,8 @@ import { join, relative, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import { zipSync } from 'fflate';
+import { resolveSkillBucket } from './lib/r2-bucket.mjs';
 
-const BUCKET = 'shareout-artifacts';
 const R2_PREFIX = 'skill';
 const DEFAULT_CONCURRENCY = 20;
 
@@ -41,6 +43,14 @@ function loadEnv() {
 }
 
 loadEnv();
+
+let BUCKET;
+try {
+  BUCKET = resolveSkillBucket(process.argv.slice(2), process.env);
+} catch (err) {
+  console.error(`sync:skill: ${err.message}`);
+  process.exit(1);
+}
 
 const ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 if (!ACCOUNT_ID) {
@@ -189,6 +199,7 @@ async function main() {
   }
 
   const mode = changedOnly ? 'changed files' : 'all files';
+  console.log(`Target R2 bucket: ${BUCKET}`);
   console.log(`Syncing ${SKILL_DIR} → R2 ${BUCKET}/${R2_PREFIX}/ (${mode}, concurrency ${concurrency})`);
 
   let files = walkDir(SKILL_DIR);

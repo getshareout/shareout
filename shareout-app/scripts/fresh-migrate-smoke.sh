@@ -14,7 +14,7 @@ echo "==> Fresh D1 persist: $PERSIST"
 npx wrangler d1 migrations apply DB --local --persist-to "$PERSIST"
 
 echo "==> Smoke: users + artifacts tables exist"
-out="$(npx wrangler d1 execute shareout-db --local --persist-to "$PERSIST" --command \
+out="$(npx wrangler d1 execute DB --local --persist-to "$PERSIST" --command \
   "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('users','artifacts') ORDER BY name;" \
   --json)"
 echo "$out" | grep -q '"name": "artifacts"'

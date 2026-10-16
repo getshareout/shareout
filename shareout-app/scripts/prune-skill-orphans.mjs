@@ -4,12 +4,15 @@
  * Used to remove the accidentally-synced shareout-app/* internal
  * docs (which contained customer + super-admin mentions) from the
  * served skill. The normal sync uploads but never prunes.
+ *
+ * Usage: node scripts/prune-skill-orphans.mjs --bucket=<bucket> [--dry-run]
+ *        (or SKILL_R2_BUCKET=<bucket>; there is no default bucket)
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveSkillBucket } from './lib/r2-bucket.mjs';
 
-const BUCKET = 'shareout-artifacts';
 const PRUNE_PREFIX = 'skill/shareout-app/';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -20,6 +23,9 @@ if (existsSync(envPath)) {
     if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
   }
 }
+let BUCKET;
+try { BUCKET = resolveSkillBucket(process.argv.slice(2), process.env); } catch (err) { console.error(err.message); process.exit(1); }
+console.log(`Target R2 bucket: ${BUCKET}`);
 const ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 if (!ACCOUNT_ID) { console.error('CLOUDFLARE_ACCOUNT_ID is required'); process.exit(1); }
 const TOKEN = process.env.CLOUDFLARE_API_TOKEN || process.env.cloudfare_token;
