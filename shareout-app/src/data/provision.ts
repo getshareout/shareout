@@ -14,7 +14,7 @@ import type { DataContext } from './middleware';
 import { publishArtifact } from '../publish/publish-artifact';
 import { coerceVisibility } from '../visibility-config';
 import { json } from '../artifacts/json-response';
-import { generateSlug } from '../validation';
+import { generateSlug, invalidPathError, isSafeAssetPath } from '../validation';
 import { createLogger, logError } from '../logging';
 import type { FileEntry, Visibility } from '../types';
 
@@ -130,6 +130,8 @@ export async function handleProvision(request: Request, ctx: DataContext): Promi
   if (!Array.isArray(files) || files.length === 0) {
     return json({ error: 'files or fromArtifact required', code: 'MISSING_PARAM' }, 400);
   }
+  const badFile = files.find((f) => !isSafeAssetPath(f?.path));
+  if (badFile) return json(invalidPathError(String(badFile?.path ?? '')), 400);
 
   // New artifact is forced into the caller's workspace — no cross-tenant provisioning.
   const workspaceId = ctx.artifact.workspace_id ?? null;

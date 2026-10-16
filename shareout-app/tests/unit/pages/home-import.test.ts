@@ -18,7 +18,9 @@ vi.mock('../../../src/quota', () => ({ checkStorageQuota }));
 import { handleHomeImportApi } from '../../../src/pages/home/import';
 import { importArtifactType, isShareLink } from '../../../src/pages/home/import-rules';
 import { convertSlidesImport } from '../../../src/pages/home/import-slides';
-import { DOCX_MARKDOWN, docxFixture, toBase64, xlsxFixture } from '../helpers/office-fixtures';
+import { strToU8, unzipSync, zipSync } from 'fflate';
+import { isSafeAssetPath } from '../../../src/validation';
+import { DOCX_MARKDOWN, PNG_1PX, docxFixture, toBase64, xlsxFixture } from '../helpers/office-fixtures';
 
 let folderRow: unknown = { id: 'fld_1' };
 const folderBinds: unknown[][] = [];
@@ -192,6 +194,34 @@ describe('Word and spreadsheet import', () => {
     expect(j.code).toBe('SPREADSHEET_TOO_LARGE');
     expect(j.error).toMatch(/Recursos/);
     expect(publishArtifact).not.toHaveBeenCalled();
+  });
+
+  // Zip-slip: a crafted .docx whose image relationship points at an entry named with
+  // "..", a backslash or a control character must never become a stored file path.
+  it.each([
+    ['../../../evil.png'],
+    ['media/..\\..\\evil.png'],
+    ['media/a..b.png'],
+    ['media/\u0001evil.png'],
+  ])('a .docx image entry %j is stored under a safe media/ path', async (target) => {
+    const entries = unzipSync(docxFixture());
+    const rels = new TextDecoder().decode(entries['word/_rels/document.xml.rels']);
+    entries['word/_rels/document.xml.rels'] = strToU8(rels.replace('Target="media/image1.png"', `Target="${target}"`));
+    delete entries['word/media/image1.png'];
+    entries[`word/${target}`] = PNG_1PX;
+    const res = await post({ name: '../../Plan\\Q3.docx', content: toBase64(zipSync(entries)), encoding: 'base64' });
+    expect(res.status).toBe(200);
+    const paths: string[] = params().files.map((f: { path: string }) => f.path);
+    expect(paths.every(isSafeAssetPath)).toBe(true);
+    expect(paths.filter((p) => p.startsWith('media/'))).toHaveLength(1);
+    expect(paths.join('|')).not.toMatch(/\.\.|\\/);
+  });
+
+  it('a dropped file name with ".." or leading dots becomes a safe single-segment path', async () => {
+    const res = await post({ name: '..report..v2.csv', content: 'a,b' });
+    expect(res.status).toBe(200);
+    expect(params().files[0].path).toBe('report.v2.csv');
+    expect(params().entrypoint).toBe('report.v2.csv');
   });
 
   it('a damaged Word file gets a 422, and Office files must be base64', async () => {

@@ -14,7 +14,8 @@ import { checkStorageQuota } from '../../quota';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { publishArtifact } from '../../publish/publish-artifact';
 import { rateLimitExceededResponse, storageLimitExceededResponse } from '../../publish/limits';
-import { generateSlug } from '../../validation';
+import { generateSlug, invalidPathError, isSafeAssetPath } from '../../validation';
+import { jsonWithApiErrors } from '../../http/api-error';
 import { hostWorkspaceId } from './host';
 import { IMPORT_ARTIFACT_EXTS, IMPORT_CONVERTED_EXTS, IMPORT_MAX_BYTES, IMPORT_SLIDES_EXTS, importArtifactType, importExt, isShareLink } from './import-rules';
 import { ImportError, base64ToBytes, convertOfficeImport } from './import-office';
@@ -106,7 +107,7 @@ export async function handleHomeImportApi(
       }
     }
     file = {
-      path: type === 'html' ? 'index.html' : body.name.replace(/[^\w.-]+/g, '-'),
+      path: type === 'html' ? 'index.html' : body.name.replace(/[^\w.-]+/g, '-').replace(/\.{2,}/g, '.').replace(/^\.+/, ''),
       content: body.content,
       mime: TYPE_MIME[type]!,
       ...(base64 ? { encoding: 'base64' as const } : {}),
@@ -119,6 +120,8 @@ export async function handleHomeImportApi(
   if (!files && size > IMPORT_MAX_BYTES) return json({ error: `File is larger than ${IMPORT_MAX_BYTES / 1024 / 1024} MB`, code: 'FILE_TOO_LARGE' }, 413);
   files = files || [file];
   entrypoint = entrypoint || file.path;
+  const badFile = files.find((f) => !isSafeAssetPath(f.path));
+  if (badFile) return jsonWithApiErrors(invalidPathError(badFile.path, 'name'), 400);
 
   const rate = await checkRateLimit(env, user.id, 'publish', user.email);
   if (!rate.allowed) return rateLimitExceededResponse(rate.reset);

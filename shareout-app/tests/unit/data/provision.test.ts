@@ -49,6 +49,13 @@ describe('handleProvision', () => {
     expect(res.status).toBe(400);
   });
 
+  it.each([['a\\b.html'], ['a//b.html'], ['../x.html']])('rejects unsafe file path %j with INVALID_PATH', async (path) => {
+    const res = await handleProvision(req({ name: 'X', entrypoint: path, files: [{ path, content: 'h', mime: 'text/html' }] }), ctx());
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ success: false, code: 'INVALID_PATH' });
+    expect(publishMock).not.toHaveBeenCalled();
+  });
+
   it('requires files or fromArtifact', async () => {
     const res = await handleProvision(req({ name: 'X' }), ctx());
     expect(res.status).toBe(400);

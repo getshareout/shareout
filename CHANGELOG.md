@@ -19,6 +19,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - Self-host [Domain and DNS](docs-site/src/content/docs/self-host/domain.md) page
 - Origin-aware product skill entry (`$ORIGIN`, credentials `origin` field, self-host unlocked model)
 
+### Changed (API)
+
+- `POST /v1/publish` (and data-API provision, Studio Home import, library modules) apply the MCP `files` path rule: backslashes, empty or `.` segments (`a//b`, `./x`), control characters and paths over 512 characters are now refused with `400 INVALID_PATH` and a `hint` naming the path. Names like `img/logo@2x.png` and `a+b.css` still publish; files already stored keep serving. Imported Word images and file names are renamed to safe paths.
+
 ### Changed
 
 - **Skill OSS hygiene (v2.51.0):** workspace overlay is role-based; `team/billing.md` is a hosted-only stub (no checkout/upsell on self-host); plan language stripped from team entry, API, subdomain, admin portal, assistant docs

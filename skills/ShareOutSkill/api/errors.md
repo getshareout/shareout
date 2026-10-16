@@ -84,6 +84,7 @@ device-flow clients keep working, and adds `code` + `hint`:
 | `VERSION_NOT_FOUND` | 404 | Version doesn't exist |
 | `SLUG_TAKEN` | 409 | Slug already in use |
 | `INVALID_SLUG` | 400 | Slug format invalid |
+| `INVALID_PATH` | 400 | A file path in `files` is unsafe (`..`, leading `/`, backslash, empty or `.` segment, control character, over 512 characters). `hint` names the path; rename it and publish again |
 | `VISIBILITY_HELD` | 202 | `PATCH` accepted but public visibility was held by instance policy (`OPEN_VISIBILITY_DISABLED`, publisher not in the rollout) — no paid entitlement involved. Visibility falls back to `workspace` (approval-gated) or `private`; response includes `message` and, for `POST /v1/publish`, a `notice` string instead — see [Error recovery](#error-recovery) |
 | `MODERATION_HELD` | 202 | `PATCH` accepted but an automated content-safety check on the transition to `public` didn't clear instantly. Artifact stays `private`; response includes `message` and optional `reason`. Re-checked automatically within the hour and restored to `public` on its own — no re-publish needed. See [artifacts.md § Visibility](artifacts.md#patch-v1artifactsid) and [Error recovery](#error-recovery) |
 

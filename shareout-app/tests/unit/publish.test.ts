@@ -275,6 +275,35 @@ describe('handlePublish auth and validation', () => {
     expect(validation.status).toBe(400);
     await expect(validation.json()).resolves.toMatchObject({ code: 'VALIDATION_ERROR' });
   });
+
+  it.each([
+    ['css\\site.css'], ['a//b.css'], ['./x.css'], ['a\u0000b.css'], [`${'a'.repeat(513)}`],
+  ])('returns 400 INVALID_PATH for %j without storing anything', async (path) => {
+    const env = await makePublishEnv();
+    const res = await handlePublish(publishRequest(validBody({
+      files: [
+        { path: 'index.html', content: '<h1>Hello</h1>', mime: 'text/html' },
+        { path, content: 'body{}', mime: 'text/css' },
+      ],
+    })), env);
+    expect(res.status).toBe(400);
+    const body = await res.json() as { code: string; param: string; hint: string };
+    expect(body).toMatchObject({ code: 'INVALID_PATH', param: 'files' });
+    expect(body.hint).toContain(JSON.stringify(path.length > 80 ? `${path.slice(0, 80)}…` : path));
+    expect(env.ARTIFACTS.put).not.toHaveBeenCalled();
+  });
+
+  it('publishes asset names with @ and + in nested folders', async () => {
+    const env = await makePublishEnv();
+    const res = await handlePublish(publishRequest(validBody({
+      files: [
+        { path: 'index.html', content: '<h1>Hello</h1>', mime: 'text/html' },
+        { path: 'img/logo@2x.png', content: 'iVBORw0KGgo=', mime: 'image/png', encoding: 'base64' },
+        { path: 'css/a+b.css', content: 'body{}', mime: 'text/css' },
+      ],
+    })), env);
+    expect(res.status).toBe(201);
+  });
 });
 
 describe('handlePublish workspace and folder gates', () => {

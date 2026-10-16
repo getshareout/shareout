@@ -74,7 +74,10 @@ paths:
     post:
       tags: [Publish]
       summary: Publish an artifact
-      description: Create a new artifact or push a new version of an existing one.
+      description: >-
+        Create a new artifact or push a new version of an existing one. Every
+        `files[].path` must be a safe relative path (see `FileEntry.path`); an unsafe
+        one returns 400 `INVALID_PATH` with a `hint` naming it.
       operationId: publishArtifact
       requestBody:
         required: true
@@ -6229,6 +6232,13 @@ components:
       properties:
         path:
           type: string
+          maxLength: 512
+          example: img/logo@2x.png
+          description: >-
+            Relative path with "/" between folders. No "..", no leading "/", no backslash,
+            no empty or "." segments (e.g. "a//b", "./x"), no control characters, at most
+            512 characters. An unsafe path is rejected with 400 `INVALID_PATH`; the `hint`
+            names it.
         content:
           type: string
         mime:

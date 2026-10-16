@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectArtifactType, generateSlug, resolveEntrypoint, shortHash, validatePublishRequest } from '../../src/validation';
+import { SAFE_PATH_RULE, detectArtifactType, generateSlug, resolveEntrypoint, shortHash, validatePublishRequest } from '../../src/validation';
 import { jsonWithApiErrors } from '../../src/http/api-error';
 import type { PublishRequest, PWAConfig } from '../../src/types';
 
@@ -84,9 +84,43 @@ describe('validatePublishRequest', () => {
     expect(error?.details).toEqual(expect.arrayContaining([
       'slug must be lowercase alphanumeric with hyphens, cannot start/end with hyphen',
       'duplicate path: index.html',
-      'invalid path "../secret.txt": must be relative, no traversal',
+      `invalid path "../secret.txt": ${SAFE_PATH_RULE}`,
       'entrypoint "missing.html" not found in files',
     ]));
+  });
+
+  it.each([
+    ['backslash', 'css\\site.css'],
+    ['empty segment', 'a//b.css'],
+    ['dot segment', './x.css'],
+    ['trailing slash', 'css/'],
+    ['control character', 'a\u0007b.css'],
+    ['traversal', 'img/../../x.png'],
+    ['absolute', '/etc/x.css'],
+    ['over 512 characters', `${'a'.repeat(509)}.css`],
+  ])('rejects a %s path with INVALID_PATH naming the path', async (_label, path) => {
+    const error = validatePublishRequest(validRequest({
+      files: [
+        { path: 'index.html', content: '<h1>Hello</h1>', mime: 'text/html' },
+        { path, content: 'body{}', mime: 'text/css' },
+      ],
+    }));
+    expect(error).toMatchObject({ code: 'INVALID_PATH', param: 'files' });
+    const shown = JSON.stringify(path.length > 80 ? `${path.slice(0, 80)}…` : path);
+    expect(error?.hint).toContain(shown);
+    const body = await jsonWithApiErrors(error, 400).json() as Record<string, unknown>;
+    expect(body).toMatchObject({ success: false, code: 'INVALID_PATH', param: 'files' });
+    expect(body.hint).toContain(shown);
+  });
+
+  it('accepts ordinary asset names and nested folders', () => {
+    const paths = ['img/logo@2x.png', 'css/a+b.css', 'assets/fonts/v1/Inter (Bold).woff2', 'data/q3,final=1.json', `${'a'.repeat(508)}.css`];
+    expect(validatePublishRequest(validRequest({
+      files: [
+        { path: 'index.html', content: '<h1>Hello</h1>', mime: 'text/html' },
+        ...paths.map((path) => ({ path, content: 'x', mime: 'text/plain' })),
+      ],
+    }))).toBeNull();
   });
 
   it('names the offending field in param and surfaces the message', async () => {
@@ -182,7 +216,7 @@ describe('validatePublishRequest file rules', () => {
     }));
 
     expect(error?.details).toContain(
-      'invalid path "/etc/passwd": must be relative, no traversal'
+      `invalid path "/etc/passwd": ${SAFE_PATH_RULE}`
     );
   });
 

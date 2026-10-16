@@ -105,7 +105,7 @@ Tell the user the page is private and why; don't call the link public and don't 
 | `name` | string | Yes | Display name |
 | `slug` | string | No | Human-facing slug (auto-generated from `name` if omitted). Unique **per workspace** (or per owner for personal artifacts). Drives subdomain/namespaced URLs and publish dedup. |
 | `entrypoint` | string | No | Default: `index.html`, or the only file's path when `files` has a single file (e.g. a lone `data.csv`). Must name a path in `files` |
-| `files` | FileEntry[] | Yes | Files to publish |
+| `files` | FileEntry[] | Yes | Files to publish. Each `path` is relative with `/` between folders (`index.html`, `img/logo@2x.png`, `css/a+b.css`): no `..`, no leading `/`, no backslash, no empty or `.` segments (`a//b`, `./x`), no control characters, at most 512 characters. A bad path returns `400 INVALID_PATH` with a `hint` naming it |
 | `visibility` | string | No | Omitted → `public` when the instance and account allow it, otherwise `private` with `visibility_downgraded` (see above). `private` (owner + explicitly shared), `workspace` (all members of the artifact's workspace), `public` (anyone on the internet with the link; discoverable). (`unlisted` is a retired legacy alias, still accepted and treated as `public`.) |
 | `mobile_html` | string | No | Mobile-specific HTML |
 | `pwa` | PWAConfig | No | PWA configuration |
