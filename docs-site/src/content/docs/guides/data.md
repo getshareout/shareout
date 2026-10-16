@@ -91,7 +91,7 @@ curl -X POST https://shareout.site/v1/data/art_abc123/blobs \
 Allowed types: PNG, JPEG, GIF, WebP, SVG; MP4, WebM; MP3, WAV, OGG; PDF, TXT,
 CSV, Markdown.
 
-See the full endpoints in the [API reference](/api/operations/uploadblob/).
+See the full endpoints in the [API reference](/api/operations/requestblobupload/).
 
 ## Datasets & live sources
 

@@ -1,15 +1,15 @@
 ---
 title: Renderizado rápido
-description: First paint instantáneo para artifacts de ShareOut — esqueleto de carga, datos prefetch y ShareOut.ready().
+description: First paint instantáneo para artefactos de ShareOut — esqueleto de carga, datos prefetch y ShareOut.ready().
 ---
 
-Objetivo: el artifact muestra contenido — o al menos su estructura — de inmediato, nunca
+Objetivo: el artefacto muestra contenido — o al menos su estructura — de inmediato, nunca
 una pantalla en blanco, mientras los datos cargan en segundo plano.
 
 ## Lo que el viewer ya hace por vos
 
 - El wrapper del viewer streamea un **esqueleto de carga con la marca al instante** (gratis — sin código).
-- Tu HTML del artifact streamea desde el CDN, así que **el markup estático se pinta a medida que llega**.
+- Tu HTML del artefacto streamea desde el CDN, así que **el markup estático se pinta a medida que llega**.
 - El SDK publica `shareout:content-ready` **automáticamente** cuando tus llamadas de datos se estabilizan; el wrapper quita el esqueleto.
 
 No construyas un esqueleto vos mismo. Tu trabajo es hacer que el momento *después* del esqueleto sea rápido y correcto.

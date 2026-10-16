@@ -5,7 +5,7 @@ description: Cómo autenticar requests a la API de ShareOut.
 
 import { Aside } from '@astrojs/starlight/components';
 
-Los endpoints de escritura necesitan un token. El acceso de lectura a artifacts
+Los endpoints de escritura necesitan un token. El acceso de lectura a artefactos
 públicos no.
 
 ## Bearer token
@@ -108,9 +108,9 @@ Para llamadas server-to-server, preferí el bearer token.
 ## Cuentas vinculadas
 
 Podés vincular varios inicios de sesión de Google a una identidad de ShareOut
-(Configuración → Cuentas vinculadas). Después de vincular, los artifacts de
+(Configuración → Cuentas vinculadas). Después de vincular, los artefactos de
 cualquier identidad vinculada cuentan como **tuyos** para propiedad, visibilidad
-y acceso de edición — no necesitás invitación de colaborador aparte en páginas
+y acceso de edición — no necesitás invitación de colaborador aparte en artefactos
 que ya sos dueño con un mail vinculado.
 
 <Aside type="caution" title="Cloudflare protection">
@@ -124,8 +124,8 @@ el [Quickstart](/es/start/quickstart/).
 | Endpoint | Límite |
 | --- | --- |
 | Publish | 60 / hora por usuario |
-| Data API | 1000 / min por artifact |
-| Email | 50 / día por usuario, 10 / día por artifact |
-| CORS proxy | 100 / min por artifact |
+| Data API | 1000 / min por artefacto |
+| Email | 50 / día por usuario, 10 / día por artefacto |
+| CORS proxy | 100 / min por artefacto |
 
 Superar un límite devuelve `429` con código `RATE_LIMITED`.

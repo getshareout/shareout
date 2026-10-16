@@ -1,6 +1,6 @@
 ---
 title: Compartir con clientes (Clientes y socios)
-description: Compartí carpetas y artifacts con clientes, proveedores y socios fuera de tu equipo — con marca, alcance acotado y seguimiento.
+description: Compartí carpetas y artefactos con clientes, proveedores y socios fuera de tu equipo — con marca, alcance acotado y seguimiento.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -13,19 +13,19 @@ Compartí trabajo **fuera de tu equipo** — con un cliente, proveedor, socio o 
 
 1. **Creá un cliente.** Home → **Admin** → **Compartir** → **Agregar cliente o socio** — un formulario inline en la página (nombre de empresa + relación). Sin modal; el estado vacío guía los pasos y el mismo formulario aparece bajo el encabezado cuando ya hay clientes.
 2. **Invitá a su gente.** Agregá emails — reciben una invitación e inician sesión como cualquier usuario de ShareOut. Siguen siendo externos (nunca en tu lista de miembros, nunca facturados).
-3. **Compartí una carpeta o archivo.** Elegí una carpeta y un nivel — **Ver**, **Comentar**, **Puede crear** o **Puede editar**. Una carpeta comparte todo lo que hay adentro — **páginas y archivos**. Desde Assets también podés **Share with a person** en un solo archivo (email + view/comment, sin org de cliente).
-4. **Abren `/shared`.** Cada persona externa tiene una página "compartido con vos" con solo lo que les diste — páginas y archivos descargables — con la marca de su org de cliente cuando están agrupados. Los visitantes nuevos ven una tarjeta de orientación breve. Los **archivos** compartidos con acceso **comment** incluyen un hilo de comentarios inline en la tarjeta del portal; las páginas abren en el visor normal.
+3. **Compartí una carpeta o archivo.** Elegí una carpeta y un nivel — **Ver**, **Comentar**, **Puede crear** o **Puede editar**. Una carpeta comparte todo lo que hay adentro — **artefactos y archivos**. Desde Assets también podés **Share with a person** en un solo archivo (email + view/comment, sin org de cliente).
+4. **Abren `/shared`.** Cada persona externa tiene una página "compartido con vos" con solo lo que les diste — artefactos y archivos descargables — con la marca de su org de cliente cuando están agrupados. Los visitantes nuevos ven una tarjeta de orientación breve. Los **archivos** compartidos con acceso **comment** incluyen un hilo de comentarios inline en la tarjeta del portal; los artefactos abren en el visor normal.
 
 ## Niveles de acceso
 
 | Nivel | Pueden… |
 | --- | --- |
-| Ver | Abrir y leer los artifacts compartidos. |
+| Ver | Abrir y leer los artefactos compartidos. |
 | Comentar | Ver + dejar comentarios. |
-| Puede crear | Crear páginas nuevas **dentro** de la carpeta compartida (quedan privadas a esa carpeta). |
-| Puede editar | Editar los artifacts compartidos. |
+| Puede crear | Crear artefactos nuevos **dentro** de la carpeta compartida (quedan privados a esa carpeta). |
+| Puede editar | Editar los artefactos compartidos. |
 
-Un nivel más alto incluye los de abajo. Podés compartir una carpeta entera con un cliente, un solo artifact o un solo **archivo** desde Assets.
+Un nivel más alto incluye los de abajo. Podés compartir una carpeta entera con un cliente, un solo artefacto o un solo **archivo** desde Assets.
 
 ### Compartir con una persona (sin org de cliente)
 
@@ -55,4 +55,4 @@ Encontralas en **Admin → Compartir → [cliente] → Notes about this client**
 
 Las personas externas son **USD 0 e ilimitadas**. Tu factura cuenta solo miembros internos; la página de billing muestra a los externos en una línea aparte "incluidos". Si tu plan vence, los clientes siguen leyendo lo que ya compartiste — solo se pausa crear shares nuevos hasta que vuelvas a Teams.
 
-<Aside type="tip">¿Solo necesitás mandar una página a unos pocos emails externos? El flujo gratuito de [colaboradores](/es/everyone/collaborators/) sigue funcionando. Clientes agrega agrupación, un portal, marca, API acotada y recibos encima.</Aside>
+<Aside type="tip">¿Solo necesitás mandar un artefacto a unos pocos emails externos? El flujo gratuito de [colaboradores](/es/everyone/collaborators/) sigue funcionando. Clientes agrega agrupación, un portal, marca, API acotada y recibos encima.</Aside>

@@ -66,5 +66,5 @@ combinar las dos formas.
 
 ## Relacionado
 
-- [Publicar artifacts](/es/guides/publishing/)
+- [Publicar artefactos](/es/guides/publishing/)
 - [Historial de versiones y restauración](/es/everyone/version-history/)

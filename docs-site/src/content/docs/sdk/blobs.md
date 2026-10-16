@@ -68,4 +68,4 @@ PDF, TXT, CSV, Markdown.
 </script>
 ```
 
-REST equivalents: [Blobs API](/api/operations/uploadblob/).
+REST equivalents: [Blobs API](/api/operations/requestblobupload/).

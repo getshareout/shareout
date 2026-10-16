@@ -1,11 +1,11 @@
 ---
 title: Introducción a Crew
-description: Agentes de IA autónomos del lado del servidor asociados a artifacts — qué son, cuándo usarlos y cómo funcionan los runs.
+description: Agentes de IA autónomos del lado del servidor asociados a artefactos — qué son, cuándo usarlos y cómo funcionan los runs.
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-Cada artifact puede ejecutar un **crew** — un agente autónomo del lado del servidor con
+Cada artefacto puede ejecutar un **crew** — un agente autónomo del lado del servidor con
 tools para consultar datos, refrescar snapshots, escribir resúmenes JSON, entregar a
 Slack y más. Los crews se disparan por schedule, seguimiento de alerta (`on_trigger`),
 desde Telegram (`ask_crew`), o manualmente vía la API.
@@ -14,7 +14,7 @@ Feature: **`ai.crew`** (etiqueta *CrewAI agents* en el catálogo admin).
 
 <Aside type="caution">
 **No es el chat para visitantes.** [`sdk.agent`](/es/guides/ai-agent/) es un globo de
-chat en la página publicada. Crew corre **del lado del servidor** con **identidad del
+chat en el artefacto publicado. Crew corre **del lado del servidor** con **identidad del
 owner** y tools con scope de owner.
 </Aside>
 
@@ -22,7 +22,7 @@ owner** y tools con scope de owner.
 
 | Querés… | Usá |
 | --- | --- |
-| Responder visitantes en la página | [Agente de chat IA](/es/guides/ai-agent/) |
+| Responder visitantes en el artefacto | [Agente de chat IA](/es/guides/ai-agent/) |
 | SQL fijo en schedule (sin LLM) | [Job programado](/es/guides/jobs/) → `query_snapshot` |
 | Alerta por umbral | [Alertas de métricas](/es/guides/metric-alerts/) |
 | **Resumir, investigar o entregar en lenguaje natural** | **Crew** |
@@ -61,7 +61,7 @@ flowchart LR
 ## Requisitos
 
 1. **`ai.crew` habilitado** — `GET /v1/features?artifact_id=…`
-2. Sesión o token del **owner del artifact**
+2. Sesión o token del **owner del artefacto**
 3. Flags de destino (`dest.slack`, etc.) para entregas
 
 ## Inicio rápido

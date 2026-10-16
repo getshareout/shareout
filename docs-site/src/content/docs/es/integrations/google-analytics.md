@@ -3,7 +3,7 @@ title: Google Analytics
 description: Reportes y métricas de GA4 vía un conector del workspace y clave de cuenta de servicio.
 ---
 
-Consultá datos de reportes de GA4 desde un artifact mediante un **conector del
+Consultá datos de reportes de GA4 desde un artefacto mediante un **conector del
 workspace**. ShareOut genera tokens de corta duración en el servidor a partir de
 tu clave de cuenta de servicio — sin flujo OAuth de ShareOut.
 
@@ -15,7 +15,7 @@ tu clave de cuenta de servicio — sin flujo OAuth de ShareOut.
    la clave más el ID de propiedad GA4.
 4. Usá **Test** para verificar antes de guardar.
 
-## Consulta desde un artifact
+## Consulta desde un artefacto
 
 ```javascript
 const sdk = await ShareOut.create();

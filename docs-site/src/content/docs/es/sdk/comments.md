@@ -1,11 +1,11 @@
 ---
 title: Comments
-description: Comentarios anidados con actualizaciones en tiempo real para cualquier artifact.
+description: Comentarios anidados con actualizaciones en tiempo real para cualquier artefacto.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Comentarios anidados en tiempo real, asociados a un artifact o a cualquier contexto
+Comentarios anidados en tiempo real, asociados a un artefacto o a cualquier contexto
 dentro de él. Accedé vía `sdk.comments`.
 
 
@@ -21,7 +21,7 @@ Leé **`data.comments`**, no `comments` en la raíz.
 
 ## Comentarios en archivos
 
-Los hilos de un archivo viven en el artifact **bucket** del workspace, con
+Los hilos de un archivo viven en el artefacto **bucket** del workspace, con
 `contextId` **obligatorio** `file:<deliverableId>`. Sin ese contexto: `400 FILE_CONTEXT_REQUIRED`.
 No hay WebSocket en buckets (la UI recarga al abrir).
 
@@ -198,7 +198,7 @@ colaborador del workspace. El asignado recibe un email (y un mensaje de Telegram
 tiene la cuenta vinculada). Al resolver el comentario, el solicitante recibe una
 notificación y puede reabrirlo con un clic.
 
-**En el viewer del artifact:** abrí el panel de comentarios → botón **Assign** →
+**En el viewer del artefacto:** abrí el panel de comentarios → botón **Assign** →
 elegí una persona y, opcionalmente, una fecha límite.
 
 **Vía API:**
@@ -217,7 +217,7 @@ PATCH /v1/data/{artifactId}/comments/{id}/assign
 { "assignee": null }
 ```
 
-El `assignee` debe estar en el conjunto de personas del artifact (miembros del workspace
+El `assignee` debe estar en el conjunto de personas del artefacto (miembros del workspace
 + colaboradores); las direcciones desconocidas devuelven `400 ASSIGNEE_NOT_FOUND`.
 
 **Seguimiento:** todos ven sus action items abiertos en la **campana de notificaciones
@@ -235,7 +235,7 @@ GET /v1/data/{artifactId}/comments?assignee=alice@example.com
 
 ## Toolbar del viewer (UI integrada)
 
-Con comentarios habilitados en una página, los viewers logueados ven una toolbar flotante:
+Con comentarios habilitados en un artefacto, los viewers logueados ven una toolbar flotante:
 
 | Función | Notas |
 | --- | --- |
@@ -259,7 +259,7 @@ conexión se cierra automáticamente cuando todos los suscriptores se eliminan.
 ## Pedirle cambios a la IA desde un comentario
 
 Escribí `@IA` (también `@AI` o `@ShareOut`) en un comentario o respuesta, seguido del
-cambio: `@IA cambiá el gráfico a barras y agregá el total`. El editor de la página hace
+cambio: `@IA cambiá el gráfico a barras y agregá el total`. El editor del artefacto hace
 el cambio, lo publica como una **nueva versión** (se deshace desde el historial de
 versiones) y responde en el mismo hilo: un "Estoy en eso…" que pasa a ser el resumen de
 lo que cambió, o el motivo por el que no pudo.
@@ -268,7 +268,7 @@ lo que cambió, o el motivo por el que no pudo.
   anónimos o externos) recibe una respuesta avisando que necesita permiso de edición.
 - Cuenta contra los mismos límites que las otras publicaciones con IA: el límite de chat
   con IA por usuario, el límite diario de publicaciones y la cuota de almacenamiento del dueño.
-- Requiere un editor de IA configurado para la página (igual que la edición en Studio).
+- Requiere un editor de IA configurado para el artefacto (igual que la edición en Studio).
 - No disponible en comentarios de archivos.
 
 ## Overlay del viewer
@@ -305,7 +305,7 @@ el artefacto, cuando hay versiones nuevas (un aviso por artefacto cuando se deja
 10 minutos, con la nota de cada versión). Nunca le avisamos a quien hizo la acción; el mail
 respeta la preferencia de mails de **producto** y su link para darse de baja.
 
-En páginas **private** / **workspace** el WebSocket exige sesión. Los archivos usan
+En artefactos **private** / **workspace** el WebSocket exige sesión. Los archivos usan
 `contextId=file:…` y no tienen realtime.
 
 Guía completa (EN): [Comments](/sdk/comments/).

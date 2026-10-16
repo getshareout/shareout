@@ -15,7 +15,7 @@ de a un log.
 | Códigos de ingreso de un solo uso | Se escriben en el log del Worker. Sirve para quien opera solo, no para un equipo |
 | Invitaciones al espacio de trabajo | No se mandan por correo — usá **Copiar enlace** y pasá vos la URL ([abajo](#invitar-gente-sin-correo)) |
 | Resumen semanal, notificaciones | No se entregan |
-| Correo de páginas, entregas de agentes | No se entregan |
+| Correo de artefactos, entregas de agentes | No se entregan |
 | **Ingreso con contraseña** | **No se ve afectado.** Por eso una instancia es usable sin nada de correo |
 
 ## Enviar
@@ -61,8 +61,8 @@ de verdad: invitate a un espacio y mirá si llega.
 
 ## Recibir
 
-Las páginas y los espacios pueden aceptar correo entrante: una bandeja de archivos por
-espacio, y direcciones por página.
+Los artefactos y los espacios pueden aceptar correo entrante: una bandeja de archivos por
+espacio, y direcciones por artefacto.
 
 1. Activá **Email Routing** en tu dominio, en Cloudflare.
 2. Ruteá un catch-all a este Worker. El Worker exporta un handler `email()`; Cloudflare le

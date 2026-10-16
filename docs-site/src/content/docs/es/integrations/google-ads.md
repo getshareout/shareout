@@ -3,7 +3,7 @@ title: Google Ads
 description: Gasto, clics y conversiones vía conector del workspace y credenciales OAuth pegadas.
 ---
 
-Consultá datos de la Google Ads API desde un artifact mediante un **conector del
+Consultá datos de la Google Ads API desde un artefacto mediante un **conector del
 workspace**. Conectá con client ID/secret OAuth, refresh token, developer token
 e ID de cliente pegados — ShareOut genera access tokens en el servidor por consulta.
 
@@ -14,7 +14,7 @@ e ID de cliente pegados — ShareOut genera access tokens en el servidor por con
 3. En ShareOut → **Conectores**, elegí **Google Ads**, pegá los campos y usá
    **Test** antes de guardar.
 
-## Consulta desde un artifact
+## Consulta desde un artefacto
 
 ```javascript
 const sdk = await ShareOut.create();

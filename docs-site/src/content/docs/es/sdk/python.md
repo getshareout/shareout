@@ -1,11 +1,11 @@
 ---
 title: Python en el navegador
-description: Ejecutá Python dentro de un artifact con Pyodide.
+description: Ejecutá Python dentro de un artefacto con Pyodide.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Ejecutá Python real dentro de la página vía [Pyodide](https://pyodide.org), cargado bajo
+Ejecutá Python real dentro del artefacto vía [Pyodide](https://pyodide.org), cargado bajo
 demanda. Accedé vía `sdk.python`. Corre *cualquier* Python — `numpy`, `pandas`,
 tu propia lógica — y alcanza el mundo exterior únicamente a través de funciones JS que
 inyectás explícitamente.
@@ -56,11 +56,11 @@ for wk in weeks:
 
 <Aside type="tip">
 El runtime es un singleton perezoso — se carga en el primer `run()` (unos segundos)
-y se reutiliza. Llamá a `sdk.python.ready()` al abrir la página para esconder esa latencia,
+y se reutiliza. Llamá a `sdk.python.ready()` al abrir el artefacto para esconder esa latencia,
 y así `run()` queda tibio. Los globals inyectados se limpian después de cada llamada y no
 se filtran.
 </Aside>
 
-No hace falta manifest — `sdk.python` no almacena datos del artifact. Mantené los jobs
+No hace falta manifest — `sdk.python` no almacena datos del artefacto. Mantené los jobs
 largos divididos en chunks y transmití el progreso vía `onStdout`, ya que el cómputo
 pesado bloquea el hilo principal.

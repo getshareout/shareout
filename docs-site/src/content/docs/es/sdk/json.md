@@ -1,6 +1,6 @@
 ---
 title: JSON store (Nivel 1)
-description: Almacenamiento clave-valor para estado simple del artifact.
+description: Almacenamiento clave-valor para estado simple del artefacto.
 ---
 
 Almacenamiento clave-valor para estado simple — preferencias, flags, valores cacheados.

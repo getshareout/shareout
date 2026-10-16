@@ -3,17 +3,17 @@ title: Alertas de métricas
 description: Seguí un número de un dashboard y recibí un aviso cuando cruza un umbral.
 ---
 
-Una alerta de métrica vigila un número de un artifact y te avisa cuando cruza un
+Una alerta de métrica vigila un número de un artefacto y te avisa cuando cruza un
 umbral — "avisame cuando los ingresos bajen de 100k" — entregado a Slack, email,
-Discord o un webhook. Chequea los datos guardados del artifact según una
+Discord o un webhook. Chequea los datos guardados del artefacto según una
 programación, así el dashboard y la alerta siempre coinciden.
 
 ## Cómo funciona
 
-1. **Exponé una métrica seguible** en el artifact (lo hace un manager, una vez).
+1. **Exponé una métrica seguible** en el artefacto (lo hace un manager, una vez).
 2. **Suscribite a ella** con una condición, una programación y un destino.
 
-El evaluador lee los datos guardados, nunca la página renderizada — así que
+El evaluador lee los datos guardados, nunca el artefacto renderizado — así que
 escribí el KPI que se muestra en tu almacén JSON (o una tabla) y apuntá la
 métrica ahí.
 
@@ -69,11 +69,11 @@ por defecto) evita que una métrica que sigue pasada del umbral alerte en cada c
 
 ## Quién puede hacer qué
 
-- **Managers** (owner/editor del artifact, o owner/admin del workspace) definen
+- **Managers** (owner/editor del artefacto, o owner/admin del workspace) definen
   métricas y envían alertas a donde sea — canales de Slack del equipo, webhooks,
   cualquier email.
 - **Viewers** solo pueden suscribirse a sí mismos — un DM de Slack o un email a su
-  propia dirección. En una página publicada lo hacen desde el botón **Follow
+  propia dirección. En un artefacto publicado lo hacen desde el botón **Follow
   metric** de la barra de herramientas.
 
 ## Ejecutar, pausar, inspeccionar
@@ -86,12 +86,12 @@ por defecto) evita que una métrica que sigue pasada del umbral alerte en cada c
 
 Relacionado: [Programar jobs](/es/guides/jobs/) para entrega recurrente sin umbral.
 Para una **investigación** en lenguaje natural cuando se dispara una alerta, agregá
-`on_trigger.crew` — ver [Crew](/es/guides/crew/#investigación-al-disparar-una-alerta).
+`on_trigger.crew` — ver [Crew](/es/crew/patterns/#investigación-al-disparar-alerta).
 
 ## Metric watches
 
 Los **metric watches** son un hermano más liviano de las alertas de métricas — sin
-configurar destinos, solo campana. Desde el Inspector → **Watches** de una página
+configurar destinos, solo campana. Desde el Inspector → **Watches** de un artefacto
 abierta, elegí una tabla y un tipo de métrica:
 
 | Tipo | Vigila |

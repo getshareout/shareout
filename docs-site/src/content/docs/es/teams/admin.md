@@ -14,7 +14,7 @@ workspace con diez pestañas — sin app de admin separada:
 
 | Pestaña | Qué gestionás |
 | --- | --- |
-| **Overview** | Badge del plan, barra de seats, tiles de storage/vistas/visitantes, alertas accionables (invites pendientes, runs fallidos, páginas pausadas) con enlaces a otras pestañas |
+| **Overview** | Badge del plan, barra de seats, tiles de storage/vistas/visitantes, alertas accionables (invites pendientes, runs fallidos, artefactos pausados) con enlaces a otras pestañas |
 | **Artifacts** | Tabla de gobernanza ordenable — nombre, owner, fechas, vistas, visitantes, visibilidad, estado; filtro por visibilidad; pausar/reanudar, cambiar visibilidad, **reasignar owner** |
 | **Members** | Barra de utilización de seats, invitar/quitar, cambio de roles, invites pendientes, **cola de pedidos de acceso** (aprobar/denegar), métricas de actividad por miembro |
 | **Compartir** | Compartir con externos — crear orgs de clientes con un flujo guiado, invitar a su gente, compartir carpetas con un nivel de acceso, recibos de lectura, tokens API acotados, **notas sobre cada cliente** (intel privada que el asistente recuerda) |
@@ -27,7 +27,7 @@ workspace con diez pestañas — sin app de admin separada:
 Los enlaces rápidos desde Overview saltan a la pestaña que necesita atención.
 Schedules, Alerts y Crew AI también tienen sus propios lentes en Home.
 
-### API de gobernanza de artifacts
+### API de gobernanza de artefactos
 
 ```http
 GET  /v1/workspaces/{id}/admin/artifacts
@@ -36,7 +36,7 @@ POST /v1/workspaces/{id}/admin/artifacts/{artifactId}/visibility ← { "visibili
 POST /v1/workspaces/{id}/admin/artifacts/{artifactId}/transfer   ← { "new_owner_id": "usr_…" }
 ```
 
-`GET` devuelve hasta 200 artifacts del workspace con owner, vistas, visitantes,
+`GET` devuelve hasta 200 artefactos del workspace con owner, vistas, visitantes,
 tamaño y última actualización. Todas las rutas `POST` requieren `admin` u `owner`.
 
 ### Tickets de soporte
@@ -71,7 +71,7 @@ POST /v1/access-requests/{requestId}   ← { "action": "approve" | "deny" }
 ```
 
 La pestaña Members muestra ambas colas. Aprobar un pedido de acceso otorga
-membresía según tu [política de membresía](/es/teams/workspaces/#politica-de-membresia).
+membresía según tu [política de membresía](/es/teams/workspaces/#política-de-membresía).
 
 ### Run Inspector
 
@@ -89,7 +89,7 @@ Automation enlazan a los mismos datos.
 
 ## Schedules
 
-Administrá todos los jobs programados a lo largo de los artifacts del workspace:
+Administrá todos los jobs programados a lo largo de los artefactos del workspace:
 
 | Método | Endpoint | Descripción |
 | --- | --- | --- |
@@ -104,7 +104,7 @@ Los payloads de jobs (email, webhook, materialize) están documentados en la
 
 ## Automaciones
 
-Administrá automaciones de crew triggers en los artifacts:
+Administrá automaciones de crew triggers en los artefactos:
 
 | Método | Endpoint | Descripción |
 | --- | --- | --- |
@@ -121,8 +121,8 @@ cambia quién puede hacer qué:
 
 | Rol | Capacidad |
 | --- | --- |
-| `owner`/`editor` del artifact o `owner`/`admin` del workspace | Gestión completa de alertas sobre el artifact. |
-| `member` del workspace o `viewer` del artifact | Solo auto-suscribirse a destinos personales. |
+| `owner`/`editor` del artefacto o `owner`/`admin` del workspace | Gestión completa de alertas sobre el artefacto. |
+| `member` del workspace o `viewer` del artefacto | Solo auto-suscribirse a destinos personales. |
 
 Referencia completa: [Alertas de métricas](/es/guides/metric-alerts/).
 
@@ -161,7 +161,7 @@ DELETE /v1/workspaces/{workspaceId}/members/{userId}/tokens
 
 ## Política de publicación
 
-Controlá si los miembros del workspace pueden llevar un artifact a visibilidad
+Controlá si los miembros del workspace pueden llevar un artefacto a visibilidad
 `public`. La revisión de seguridad de la plataforma sigue
 corriendo encima — esto es una capa de gobernanza interna.
 
@@ -173,7 +173,7 @@ PATCH /v1/workspaces/{id}/publish-policy        ← { "policy": "require_approva
 | Política | Efecto |
 | --- | --- |
 | `allow` | Por defecto. Los miembros publican en abierto libremente. |
-| `prohibit` | Los miembros no pueden ir a abierto; los artifacts quedan en `workspace`. |
+| `prohibit` | Los miembros no pueden ir a abierto; los artefactos quedan en `workspace`. |
 | `require_approval` | Quedan en `workspace` hasta que N miembros nominados aprueben (1–10). |
 
 `GET` requiere membresía del workspace; `PATCH` requiere `admin` u `owner`.
@@ -184,8 +184,8 @@ Con `require_approval`, los miembros cuyo publish queda retenido reciben
 `POST …/publish-approval/{requestId}/decision`. Listá la cola con
 `GET /v1/workspaces/{id}/publish-approvals?status=pending`.
 
-Flujo completo: [Publicar artifacts](/es/guides/publishing/#gobernanza-de-publicacion-del-workspace)
-y [Política de artifacts públicos](/es/public-artifacts/overview/).
+Flujo completo: [Publicar artefactos](/es/guides/publishing/#gobernanza-de-publicación-del-workspace)
+y [Política de artefactos públicos](/es/public-artifacts/overview/).
 
 ## Visibilidad de actividad
 
@@ -204,7 +204,7 @@ Content-Type: application/json
 
 | Audiencia | Quién ve el tipo |
 | --- | --- |
-| `self` | Solo el actor (y owners del artifact para sus páginas) |
+| `self` | Solo el actor (y owners del artefacto para sus artefactos) |
 | `members` | Todos los miembros del workspace |
 | `admins` | Solo owners y admins del workspace |
 | `off` | Suprimido en este workspace |

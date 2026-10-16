@@ -1,12 +1,12 @@
 ---
 title: Resumen del SDK
-description: El SDK de navegador para artifacts de ShareOut — datos, archivos, realtime, email, IA.
+description: El SDK de navegador para artefactos de ShareOut — datos, archivos, realtime, email, IA.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Los artifacts publicados vienen con un SDK de navegador. Sumás una sola etiqueta de
-script y tu página obtiene almacenamiento, subida de archivos, colaboración en tiempo
+Los artefactos publicados vienen con un SDK de navegador. Sumás una sola etiqueta de
+script y tu artefacto obtiene almacenamiento, subida de archivos, colaboración en tiempo
 real, email, Python y un agente de chat con IA — sin ningún backend que cablear.
 
 ## Instalación
@@ -34,13 +34,13 @@ const sdk = await ShareOut.create();
 const sdk = new ShareOut();
 ```
 
-`artifactId` y `baseUrl` se autodetectan desde la URL. Los artifacts publicados corren
+`artifactId` y `baseUrl` se autodetectan desde la URL. Los artefactos publicados corren
 en un iframe sandboxeado; `create()` espera el token de vida corta que el frame padre
 inyecta.
 
 ## Listo para mostrar y carga
 
-El viewer muestra un **esqueleto de carga** con la marca mientras arranca tu artifact —
+El viewer muestra un **esqueleto de carga** con la marca mientras arranca tu artefacto —
 automáticamente, sin código. El SDK publica `shareout:content-ready` cuando tus llamadas
 de datos se estabilizan, y el viewer quita el esqueleto.
 
@@ -58,7 +58,7 @@ cero round-trip) y dejá `connection.query()` en vivo fuera del load path. Ver
 
 ## Identidad del viewer
 
-Usá `sdk.me()` para leer el rol e identidad del viewer actual dentro de un artifact.
+Usá `sdk.me()` para leer el rol e identidad del viewer actual dentro de un artefacto.
 Devuelve `{ role, isOwner, canEdit, email, name }`, desde datos que la plataforma
 inyecta al servir. Viewers anónimos resuelven a `role: 'viewer'`.
 
@@ -91,8 +91,8 @@ con `sdk.clearMockData()`.
 | API | Hace |
 | --- | --- |
 | [`sdk.blobs`](/es/sdk/blobs/) | Almacenamiento de archivos, servido directo desde R2 |
-| [`sdk.files`](/es/sdk/files/) | Incrustar Assets del workspace (`dlv_*`) entre artifacts |
-| [`sdk.email`](/es/sdk/email/) | Email de formulario de contacto al dueño del artifact |
+| [`sdk.files`](/es/sdk/files/) | Incrustar Assets del workspace (`dlv_*`) entre artefactos |
+| [`sdk.email`](/es/sdk/email/) | Email de formulario de contacto al dueño del artefacto |
 | [`sdk.python`](/es/sdk/python/) | Ejecutá Python en el navegador (Pyodide) |
 | [`sdk.agent`](/es/guides/ai-agent/) | Agente de chat para visitantes |
 | [`sdk.crew`](/es/crew/overview/) | Agente autónomo del servidor (solo owner) |

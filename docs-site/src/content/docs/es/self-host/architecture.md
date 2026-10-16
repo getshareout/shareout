@@ -3,7 +3,7 @@ title: Arquitectura self-host
 description: Tres planos, bindings de storage, y cómo se cablea una instancia self-hosted de ShareOut.
 ---
 
-ShareOut es un Cloudflare Worker que publica y sirve artifacts HTML interactivos.
+ShareOut es un Cloudflare Worker que publica y sirve artefactos HTML interactivos.
 Toda instalación es self-hosted en **tu** cuenta de Cloudflare — la configuración
 (orígenes, roster de admin, bindings opcionales) es el desvío.
 
@@ -12,7 +12,7 @@ Toda instalación es self-hosted en **tu** cuenta de Cloudflare — la configura
 1. **Control** — API REST, auth, admin de workspace (`/v1/*`, `/auth/*`, `/home`).
 2. **Storage** — D1 (metadata), R2 (HTML/assets), KV (slugs / rate limits),
    Durable Objects (tablas, realtime, MiniDB, chat, …).
-3. **Execution** — HTML del artifact sandboxed en el browser + SDK ShareOut
+3. **Execution** — HTML del artefacto sandboxed en el browser + SDK ShareOut
    (`json` → `table` → realtime).
 
 ## Orígenes

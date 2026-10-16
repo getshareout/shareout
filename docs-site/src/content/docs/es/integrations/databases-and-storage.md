@@ -1,10 +1,10 @@
 ---
 title: S3, Supabase, Redshift y Aurora
-description: Leé archivos de Amazon S3 y consultá Supabase, Amazon Redshift y Amazon Aurora desde tus páginas y el asistente.
+description: Leé archivos de Amazon S3 y consultá Supabase, Amazon Redshift y Amazon Aurora desde tus artefactos y el asistente.
 ---
 
 Cuatro conectores de workspace para los datos que la mayoría de los equipos ya tiene en
-AWS o Supabase. Agregalos una vez en **Conectores**, apretá **Test**, y cada página — y el
+AWS o Supabase. Agregalos una vez en **Conectores**, apretá **Test**, y cada artefacto — y el
 asistente, si lo habilitás — los usa por nombre. Las claves se guardan cifradas y nunca
 llegan al navegador.
 
@@ -82,7 +82,7 @@ const { data } = await sdk.platform.execute('supabase', 'sql.query', {
 // data → { columns: ['status', 'n'], rows: [{ status: 'paid', n: 31 }, …] }
 ```
 
-Pasá `maxRows` (hasta 10 000) para limitar el resultado. Las páginas con política de
+Pasá `maxRows` (hasta 10 000) para limitar el resultado. Los artefactos con política de
 acceso por fila tienen que usar `:viewer_scope` en el SQL, igual que con Snowflake.
 
 ## El asistente

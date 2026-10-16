@@ -1,13 +1,13 @@
 ---
 title: Cambiá lo que quieras
-description: Editá tu página de dos formas — hacé clic en una parte y cambiala, o simplemente pedíselo al asistente. Se guarda solo.
+description: Editá tu artefacto de dos formas — hacé clic en una parte y cambiala, o simplemente pedíselo al asistente. Se guarda solo.
 ---
 
-Una vez que tu página existe, nada queda grabado en piedra. Podés cambiar lo que quieras — los textos, los colores, las fotos, el orden de las cosas — de dos formas fáciles.
+Una vez que tu artefacto existe, nada queda grabado en piedra. Podés cambiar lo que quieras — los textos, los colores, las fotos, el orden de las cosas — de dos formas fáciles.
 
 ## Forma 1: Hacé clic y cambialo
 
-Abrí tu página desde [Home](/es/everyone/your-workspace/) y pasá a **Edit**, o abrí
+Abrí tu artefacto desde [Home](/es/everyone/your-workspace/) y pasá a **Edit**, o abrí
 el editor completo en `/a/{slug}/edit`. Hacé clic en la parte que querés cambiar — un
 título, un botón, una foto. Aparece un conjunto de opciones y podés:
 
@@ -35,7 +35,7 @@ No tenés que acordarte de guardar. Tus cambios quedan como **tu borrador person
 
 Algunas cosas útiles cuando trabajás con otras personas:
 
-- **Tu borrador es personal.** Si un compañero edita la misma página, cada uno tiene su propio borrador al recargar. Mientras los dos están en el editor completo, igual pueden ver cambios en vivo por la conexión de colaboración.
+- **Tu borrador es personal.** Si un compañero edita el mismo artefacto, cada uno tiene su propio borrador al recargar. Mientras los dos están en el editor completo, igual pueden ver cambios en vivo por la conexión de colaboración.
 - **Publicar lo hace live.** Cuando publicás, los viewers ven la versión de **tu** pantalla. Tu borrador se limpia; los demás conservan el suyo hasta que publiquen o lo descarten.
 - **Edit rápido en Home** es para textos cortos. Usá **Abrir editor completo** para datos, colaboración, historial de versiones y el agente de IA.
 
@@ -51,4 +51,4 @@ En una instancia self-hosted el agente solo funciona si el operador configuró u
 
 - [**Tu workspace (Home)**](/es/everyone/your-workspace/) — pestañas, Inspector, Edit rápido.
 - [**Sumá tus cosas**](/es/everyone/add-your-stuff/) — fotos, un formulario, tus datos.
-- [**Compartila**](/es/everyone/share-it/) — cuando esté lista, mandala.
+- [**Compartilo**](/es/everyone/share-it/) — cuando esté listo, mandalo.

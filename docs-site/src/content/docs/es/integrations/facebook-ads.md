@@ -3,7 +3,7 @@ title: Facebook Ads
 description: Gasto de campañas, alcance y ROAS vía conector del workspace y token de acceso pegado.
 ---
 
-Consultá datos de la Meta Marketing API desde un artifact mediante un **conector
+Consultá datos de la Meta Marketing API desde un artefacto mediante un **conector
 del workspace**. Conectá con un token de acceso de larga duración pegado más el
 ID de tu cuenta publicitaria.
 
@@ -15,7 +15,7 @@ ID de tu cuenta publicitaria.
 3. En ShareOut → **Conectores**, elegí **Facebook Ads**, pegá el token y el ID, y
    usá **Test** antes de guardar.
 
-## Consulta desde un artifact
+## Consulta desde un artefacto
 
 ```javascript
 const sdk = await ShareOut.create();

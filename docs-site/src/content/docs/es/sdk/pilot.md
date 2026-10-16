@@ -1,6 +1,6 @@
 ---
 title: Page Pilot
-description: Agente de IA que opera la interfaz de un artifact publicado en nombre del visitante, usando instrucciones en lenguaje natural.
+description: Agente de IA que opera la interfaz de un artefacto publicado en nombre del visitante, usando instrucciones en lenguaje natural.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -8,7 +8,7 @@ import { Aside } from '@astrojs/starlight/components';
 Agregá un agente de IA que *opera la página* — hace clic en botones, completa formularios, navega tablas — a partir de una tarea en lenguaje natural del visitante. Accedé vía `so.agent.pilot()`.
 
 <Aside type="caution">
-Page Pilot está **deshabilitado por defecto**. Habilitalo por artifact desde el endpoint de admin config (owner o editor).
+Page Pilot está **deshabilitado por defecto**. Habilitalo por artefacto desde el endpoint de admin config (owner o editor).
 </Aside>
 
 <Aside type="note">
@@ -19,7 +19,7 @@ Construido sobre la biblioteca open-source [`page-agent`](https://github.com/ali
 
 ## Habilitar Page Pilot
 
-Habilitalo por artifact desde el endpoint de admin config (owner o editor — sesión o API token):
+Habilitalo por artefacto desde el endpoint de admin config (owner o editor — sesión o API token):
 
 ```bash
 curl -X POST "https://shareout.site/v1/data/{artifactId}/agent/admin/config" \
@@ -35,7 +35,7 @@ GET /v1/data/{artifactId}/agent/config
 # La respuesta incluye: { "pilot_enabled": true }
 ```
 
-El booleano `pilot_enabled` en el GET público se puede leer desde el propio JS del artifact para mostrar u ocultar la UI de Pilot según corresponda.
+El booleano `pilot_enabled` en el GET público se puede leer desde el propio JS del artefacto para mostrar u ocultar la UI de Pilot según corresponda.
 
 Las actualizaciones parciales son seguras — `PUT /agent/admin/config` fusiona los campos omitidos con la configuración existente, así que podés activar `pilot_enabled` sin reenviar cada otra clave.
 
@@ -155,7 +155,7 @@ await so.agent.pilot(task, {
 |-------------|-------|
 | Pasos máximos por llamada | 20 (aplicado por el servidor) |
 | `maxSteps` por defecto | 15 |
-| Control de costos | Límites por artifact (default 10 req/min, 100k tokens/día) |
+| Control de costos | Límites por artefacto (default 10 req/min, 100k tokens/día) |
 | Modo de facturación | `'pilot'` en el ledger de uso de IA del workspace |
 | Saldo agotado | HTTP 402 |
 | Límite de rate superado | HTTP 429 |
@@ -231,7 +231,7 @@ Pilot comparte el saldo de IA del workspace con el chat de visitantes. Monitore�
 
 ## Seguridad
 
-- El agente actúa solo dentro del iframe del artifact con los permisos de sesión del **visitante** — no puede leer ni escribir otros artifacts.
+- El agente actúa solo dentro del iframe del artefacto con los permisos de sesión del **visitante** — no puede leer ni escribir otros artefactos.
 - El servidor rechaza las llamadas de herramientas que soliciten ejecución arbitraria de JS.
 - Las regiones con `data-so-private` se eliminan de la visión del agente antes de la llamada al LLM.
 - `maskContent: true` redacta automáticamente patrones comunes de PII (números de tarjeta, emails) en toda la página.

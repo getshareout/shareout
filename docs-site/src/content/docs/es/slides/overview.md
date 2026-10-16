@@ -3,7 +3,7 @@ title: Slides — introducción
 description: Presentaciones colaborativas con edición en tiempo real, modo presentador e historial de versiones, integradas en ShareOut.
 ---
 
-Slides es el módulo de presentaciones integrado en la infraestructura de ShareOut. Cada deck es un artifact vivo con dos URLs —una para editar, otra para compartir— respaldado por un documento Y.js CRDT.
+Slides es el módulo de presentaciones integrado en la infraestructura de ShareOut. Cada deck es un artefacto vivo con dos URLs —una para editar, otra para compartir— respaldado por un documento Y.js CRDT.
 
 ## Cuándo usar Slides
 
@@ -14,13 +14,13 @@ Slides es el módulo de presentaciones integrado en la infraestructura de ShareO
 | Capacitación o charlas | Notas del presentador, temporizador, puntero láser |
 | Contenido con datos | Canvas HTML libre — incorporá cualquier gráfico o widget |
 
-Para documentos estáticos sin datos interactivos, un [artifact publicado](/es/guides/publishing/) estándar puede ser más simple.
+Para documentos estáticos sin datos interactivos, un [artefacto publicado](/es/guides/publishing/) estándar puede ser más simple.
 
 ## Present this (deck con IA)
 
-Convertí cualquier página HTML publicada en un **deck de slides** hermano — la IA
+Convertí cualquier artefacto HTML publicado en un **deck de slides** hermano — la IA
 lee el HTML de producción, arma un outline reveal.js de 5–9 diapositivas y publica
-un **artifact nuevo privado** en el mismo workspace. Rate limit por usuario; requiere
+un **artefacto nuevo privado** en el mismo workspace. Rate limit por usuario; requiere
 IA configurada.
 
 ```http
@@ -30,11 +30,11 @@ Authorization: Bearer {token}
 
 Devuelve `{ "artifact_id", "url" }` del deck nuevo. El asistente del workspace
 también expone la herramienta `present_artifact`. Abrí el resultado en Home como
-cualquier otra página — editá en Slides o Edit rápido y publicá cuando esté listo.
+cualquier otro artefacto — editá en Slides o Edit rápido y publicá cuando esté listo.
 
 ## URL de edición vs publicada
 
-Cada presentación tiene dos artifacts creados al mismo tiempo:
+Cada presentación tiene dos artefactos creados al mismo tiempo:
 
 | Modo | URL | Acceso |
 | --- | --- | --- |
@@ -78,9 +78,9 @@ presentation.slides.setContent(slide.id, '<h1>Resultados Q4</h1>');
 presentation.slides.observe(slides => renderSlideList(slides));
 ```
 
-## Publicar un slides artifact
+## Publicar un slides artefacto
 
-`sdk.slides.create()` llama a `POST /v1/publish` internamente y devuelve los IDs de ambos artifacts. No publicás slides a través del endpoint de publicación estándar — usá `sdk.slides.create()`.
+`sdk.slides.create()` llama a `POST /v1/publish` internamente y devuelve los IDs de ambos artefactos. No publicás slides a través del endpoint de publicación estándar — usá `sdk.slides.create()`.
 
 La visibilidad se puede cambiar en cualquier momento:
 

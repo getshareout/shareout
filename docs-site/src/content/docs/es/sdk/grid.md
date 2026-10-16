@@ -5,7 +5,7 @@ description: Grilla tipo hoja de cálculo con la marca ShareOut, respaldada por 
 
 import { Aside } from '@astrojs/starlight/components';
 
-Una grilla editable con la estética de ShareOut para tu artifact. Accedé vía
+Una grilla editable con la estética de ShareOut para tu artefacto. Accedé vía
 `sdk.grid(name, options)`.
 
 Renderiza una tabla en vivo que los usuarios pueden editar en el lugar — respaldada
@@ -15,7 +15,7 @@ propios de grilla.
 
 <Aside>
 La UI de la grilla (Tabulator + tema, ~440 KB) se carga desde `/sdk/grid.js` solo
-cuando llamás a `render()`. Los artifacts que nunca renderizan una grilla no la
+cuando llamás a `render()`. Los artefactos que nunca renderizan una grilla no la
 descargan.
 </Aside>
 

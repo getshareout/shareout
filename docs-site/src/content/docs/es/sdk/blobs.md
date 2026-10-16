@@ -32,7 +32,7 @@ const { used, limit } = await sdk.blobs.storage();
 ```
 
 <Aside type="tip" title="Ruta de subida vs descarga">
-**Subidas desde el navegador** (dentro de un artifact publicado o el editor visual) pasan
+**Subidas desde el navegador** (dentro de un artefacto publicado o el editor visual) pasan
 por el proxy `_upload` del Worker — los iframes sandboxeados envían `Origin: null`, que
 R2 CORS no puede atender, así que el PUT presignado directo falla desde el browser. El
 Worker autentica y streamea los bytes a R2.
@@ -42,7 +42,7 @@ firmada de vida corta (~5 min). `<img>` y tags similares no necesitan CORS, así
 camino sigue siendo rápido.
 
 **Callers servidor/CLI** (sin header `Origin`) mantienen la subida presignada directa a
-R2. Los blobs son privados del artifact.
+R2. Los blobs son privados del artefacto.
 </Aside>
 
 ## Límites y tipos
@@ -50,7 +50,7 @@ R2. Los blobs son privados del artifact.
 | Restricción | Valor |
 | --- | --- |
 | Por archivo | 50 MB |
-| Por artifact | 500 MB |
+| Por artefacto | 500 MB |
 | Máximo de blobs | 1000 |
 | Almacenamiento total de la instancia | `STORAGE_QUOTA_BYTES` (0 / sin set = ilimitado) |
 
@@ -69,4 +69,4 @@ PDF, TXT, CSV, Markdown.
 </script>
 ```
 
-Equivalentes REST: [Blobs API](/api/operations/uploadblob/).
+Equivalentes REST: [Blobs API](/api/operations/requestblobupload/).

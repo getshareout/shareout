@@ -1,9 +1,9 @@
 ---
 title: Conectar Claude o ChatGPT
-description: Sumá ShareOut a Claude o ChatGPT con un solo link, entrá con tu cuenta y pedí una página. Te devuelve un link para compartir.
+description: Sumá ShareOut a Claude o ChatGPT con un solo link, entrá con tu cuenta y pedí un artefacto. Te devuelve un link para compartir.
 ---
 
-Podés usar ShareOut **directo desde Claude o ChatGPT**. Pedí una página — un reporte, un resumen, una lista para tu equipo — y la IA la publica en ShareOut y te pasa el link.
+Podés usar ShareOut **directo desde Claude o ChatGPT**. Pedí un artefacto — un reporte, un resumen, una lista para tu equipo — y la IA lo publica en ShareOut y te pasa el link.
 
 Sumás ShareOut una sola vez, con **un link**, y entrás con tu cuenta de ShareOut. No hay códigos ni claves para copiar.
 
@@ -40,7 +40,7 @@ En los planes Team o Enterprise, puede que un administrador tenga que sumar el c
 - "Actualizá la página del checklist de lanzamiento: marcá los tres primeros como hechos."
 - "Invitá a ana@empresa.com y leo@empresa.com a mi espacio de trabajo." (dueños y administradores)
 
-La IA te dice el link y quién puede ver la página. Las páginas van a tu espacio de trabajo por defecto, así tu equipo las puede abrir. Si querés otra cosa, pedila **privada** o **pública**.
+La IA te dice el link y quién puede ver el artefacto. Los artefactos van a tu espacio de trabajo por defecto, así tu equipo los puede abrir. Si querés otra cosa, pedilo **privado** o **público**.
 
 ## Si algo falla
 

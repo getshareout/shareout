@@ -1,9 +1,9 @@
 ---
 title: Editor visual (Live Studio)
-description: El estudio WYSIWYG con chat integrado para artifacts HTML — layout, modos, ciclo de vida del draft y qué puede y no puede inferir el editor de tu HTML.
+description: El estudio WYSIWYG con chat integrado para artefactos HTML — layout, modos, ciclo de vida del draft y qué puede y no puede inferir el editor de tu HTML.
 ---
 
-Todo artifact HTML tiene un **estudio WYSIWYG con chat integrado** en `/a/{slug}/edit`. Es separado del viewer en `/a/{slug}/`. Los artifacts no-HTML (Markdown, TXT, JSON, CSV) abren el [editor de fuente](/es/spec/source-editor/) en la misma URL.
+Todo artefacto HTML tiene un **estudio WYSIWYG con chat integrado** en `/a/{slug}/edit`. Es separado del viewer en `/a/{slug}/`. Los artefactos no-HTML (Markdown, TXT, JSON, CSV) abren el [editor de fuente](/es/spec/source-editor/) en la misma URL.
 
 Para una explicación en términos sencillos orientada a usuarios no técnicos, ver [El editor](/es/everyone/the-editor/).
 
@@ -12,8 +12,8 @@ Para una explicación en términos sencillos orientada a usuarios no técnicos, 
 | URL | Propósito | Acceso |
 |-----|-----------|--------|
 | `/a/{slug}/edit` | Estudio visual — rail Agent, Inspect, Data | Owner, colaborador **editor** nombrado, o **owner/admin** del workspace (sesión requerida) |
-| `/a/{slug}/` | Viewer en vivo — URL canónica de compartición | Según visibilidad del artifact |
-| `/p/{slug}/` | Alias del viewer (mismo path que `/a/`) | Según visibilidad del artifact |
+| `/a/{slug}/` | Viewer en vivo — URL canónica de compartición | Según visibilidad del artefacto |
+| `/p/{slug}/` | Alias del viewer (mismo path que `/a/`) | Según visibilidad del artefacto |
 
 Las requests no autenticadas a `/a/{slug}/edit` redirigen al login de Google con `redirect=/a/{slug}/edit`.
 
@@ -23,14 +23,14 @@ Live Studio está gated por el feature flag **`module.visual_editor`** por works
 (default activado). Cuando está desactivado, `/a/{slug}/edit` devuelve una página amigable
 de no disponible y los controles de edición en el home aparecen atenuados.
 
-**Quién puede editar:** el owner del artifact (incluyendo [cuentas vinculadas](/es/start/authentication/#cuentas-vinculadas)),
+**Quién puede editar:** el owner del artefacto (incluyendo [cuentas vinculadas](/es/start/authentication/#cuentas-vinculadas)),
 un colaborador con rol **editor** u **owner**, o un **owner** / **admin** del workspace
-del artifact. Los **members** del workspace siguen necesitando invitación explícita como
+del artefacto. Los **members** del workspace siguen necesitando invitación explícita como
 editor — la membresía sola no otorga acceso de edición.
 
 ## Layout del estudio
 
-El editor renderiza el HTML del artifact en un iframe canvas sandboxed junto a un **rail de estudio** de vidrio:
+El editor renderiza el HTML del artefacto en un iframe canvas sandboxed junto a un **rail de estudio** de vidrio:
 
 | Modo / panel | Qué hace |
 |-------------|----------|
@@ -48,8 +48,8 @@ El editor renderiza el HTML del artifact en un iframe canvas sandboxed junto a u
 | **Version history** | Navegá y revertí a publicaciones anteriores |
 | **Share** | Copiá link, código de embed |
 | **Connect** | Conectores de datos del workspace; agregá conexiones REST desde la UI |
-| **Metrics & alerts** | Métricas seguibles y reglas de umbral para este artifact |
-| **Inbox** | Email entrante capturado por este artifact |
+| **Metrics & alerts** | Métricas seguibles y reglas de umbral para este artefacto |
+| **Inbox** | Email entrante capturado por este artefacto |
 
 Las ediciones del canvas escriben atributos `data-shareout-*` reales. Los cambios fluyen por **undo/redo → autosave de draft → broadcast de colaboración**.
 
@@ -74,13 +74,13 @@ cuando necesitás herramientas del estudio.
 
 El editor visual resuelve **todas las lecturas del SDK desde valores `default` del
 manifest** — json, tablas y conectores live (`sources.connections.<name>.default`). No hay
-fetch de red ni query de warehouse en el estudio. Un artifact que encadena su UI detrás de
+fetch de red ni query de warehouse en el estudio. Un artefacto que encadena su UI detrás de
 `await sdk.table(...).exec()` o `sdk.connection(...).query()` igual renderiza y sigue siendo
 editable cuando hay defaults declarados; una source sin `default` hace preview vacío.
 
 ## Por qué importa el cumplimiento de la HTML spec
 
-El estudio lee la HTML spec del artifact — no puede inferir estructura. Sin cumplimiento, los owners ven los paneles Data y Outline vacíos y no hay autocompletado de bindings, aunque la página publicada funcione bien en el viewer.
+El estudio lee la HTML spec del artefacto — no puede inferir estructura. Sin cumplimiento, los owners ven los paneles Data y Outline vacíos y no hay autocompletado de bindings, aunque el artefacto publicado funcione bien en el viewer.
 
 | Funcionalidad del estudio | Declaración requerida |
 |--------------------------|----------------------|
@@ -90,7 +90,7 @@ El estudio lee la HTML spec del artifact — no puede inferir estructura. Sin cu
 | Editores de comportamiento en Inspect | `data-shareout-binding`, `data-shareout-action`, `data-shareout-if`, etc. |
 | Agregar/quitar templates | `data-shareout-template` |
 
-Verificá el cumplimiento antes de publicar: [HTML spec overview](/es/spec/html-spec/).
+Verificá el cumplimiento antes de publicar: [HTML spec overview](/es/spec/overview/).
 
 ## Autosave y ciclo de vida del draft
 
@@ -124,7 +124,7 @@ La vista previa del canvas usa solo **valores `default` del manifest** — nunca
 
 ## API REST del editor
 
-Los agentes normalmente crean o actualizan artifacts via `POST /v1/publish`. El estudio también expone rutas autenticadas bajo `/v1/artifacts/{id}/editor/*`:
+Los agentes normalmente crean o actualizan artefactos via `POST /v1/publish`. El estudio también expone rutas autenticadas bajo `/v1/artifacts/{id}/editor/*`:
 
 | Ruta | Propósito |
 |------|-----------|
@@ -149,7 +149,7 @@ Estas dos capas son independientes: cambiar estilos visuales en Inspect no alter
 
 ## Slides y dashboards
 
-El estudio visual descripto aquí cubre **artifacts HTML generales**. Los módulos de slides y dashboards usan su propio par editor/artifact publicado (editor `/a/` + viewer publicado `/p/`). Ver las secciones de [slides](/es/slides/) y [dashboards](/es/dashboards/).
+El estudio visual descripto aquí cubre **artefactos HTML generales**. Los módulos de slides y dashboards usan su propio par editor/artifact publicado (editor `/a/` + viewer publicado `/p/`). Ver las secciones de [slides](/es/slides/overview/) y [dashboards](/es/dashboards/overview/).
 
 ## Ver también
 

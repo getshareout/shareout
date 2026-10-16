@@ -122,7 +122,7 @@ interface CrewRunEvent {
 }
 ```
 
-## Write approvals {#write-approvals}
+## Write approvals
 
 ```javascript
 tools: {

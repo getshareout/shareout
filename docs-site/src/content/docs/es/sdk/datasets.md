@@ -30,7 +30,7 @@ stream(): Promise<ReadableStream<Uint8Array>>
 // Stream de bytes proxiado por el Worker (fallback).
 
 list(): Promise<{ name: string; format: string; sizeBytes: number; version: number; updatedAt: string }[]>
-// Todos los datasets de este artifact.
+// Todos los datasets de este artefacto.
 ```
 
 ```typescript
@@ -76,7 +76,7 @@ console.log(meta.rowCount, meta.sizeBytes);
 
 `get()` lee los bytes **directamente desde R2** (sin pasar por el Worker) y los parsea
 en el browser. La autenticación es aplicada por el Worker antes de firmar la URL — la URL
-es de corta duración y privada al artifact. Si el R2 directo está bloqueado (p. ej., mala
+es de corta duración y privada al artefacto. Si el R2 directo está bloqueado (p. ej., mala
 configuración de CORS), `get()` cae automáticamente en el stream del Worker.
 
 Usá `downloadUrl()` cuando necesités la URL cruda para un link de descarga. Usá `page()`
@@ -99,4 +99,4 @@ Los datasets se escriben materializando una consulta o enviando filas — ver
 Los límites se aplican al subir y al hacer `materialize()`. Un archivo que excede el límite
 devuelve `FILE_TOO_LARGE` (413); superar el almacenamiento total devuelve
 `STORAGE_QUOTA_EXCEEDED` (507). El almacenamiento se suma por workspace entre datasets
-subidos, datasets materializados, blobs y assets de artifacts.
+subidos, datasets materializados, blobs y assets de artefactos.

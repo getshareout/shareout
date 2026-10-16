@@ -1,10 +1,10 @@
 ---
 title: GitHub
-description: Exportá los archivos de tu artifact a un repositorio de GitHub para control de versiones.
+description: Exportá los archivos de tu artefacto a un repositorio de GitHub para control de versiones.
 ---
 
-Publicá los archivos publicados de tu artifact en un repositorio de GitHub. Los tokens se guardan
-por artifact. Accedé vía `sdk.github`.
+Publicá los archivos publicados de tu artefacto en un repositorio de GitHub. Los tokens se guardan
+por artefacto. Accedé vía `sdk.github`.
 
 ## Inicio rápido
 
@@ -45,7 +45,7 @@ export(options): Promise<ExportResult>
 | `newRepo.private` | No | Repo privado (por defecto: `false`) |
 | `branch` | No | Rama destino (por defecto: `main`) |
 | `commitMessage` | No | Mensaje de commit (por defecto: `"ShareOut export v{version}"`) |
-| `includeReadme` | No | Generar un README con info del artifact (por defecto: `true`) |
+| `includeReadme` | No | Generar un README con info del artefacto (por defecto: `true`) |
 | `pathPrefix` | No | Prefijo para todos los paths de archivos, ej. `"dist/"` |
 
 ## Endpoints REST
@@ -70,7 +70,7 @@ Estos endpoints también están disponibles directamente desde agentes o código
 
 ## Comportamiento
 
-- Los tokens se guardan por artifact, no por usuario de ShareOut.
+- Los tokens se guardan por artefacto, no por usuario de ShareOut.
 - Los tokens de GitHub no expiran a menos que se revoquen.
 - El scope de OAuth es `repo` (acceso completo al repositorio).
 - El OAuth retorna por `https://shareout.site/auth/callback`; ShareOut detecta los callbacks de GitHub desde el parámetro `state`.

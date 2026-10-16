@@ -1,16 +1,16 @@
 ---
 title: Agente de chat con IA
-description: Agregá un asistente de chat con Claude a tu artifact.
+description: Agregá un asistente de chat con Claude a tu artefacto.
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-Sumá un agente de chat con Claude a cualquier artifact. Puede responder a partir de
-los datos de tu artifact — `sdk.json`, tablas, o un snapshot en vivo que le pases.
+Sumá un agente de chat con Claude a cualquier artefacto. Puede responder a partir de
+los datos de tu artefacto — `sdk.json`, tablas, o un snapshot en vivo que le pases.
 
 ## Dos pasos (no te saltees el primero)
 
-El agente está **apagado por defecto**. Llamar a `sdk.agent.configure()` en la página *no*
+El agente está **apagado por defecto**. Llamar a `sdk.agent.configure()` en el artefacto *no*
 lo habilita — eso solo configura opciones del cliente y corre con la sesión del visitante.
 Un `403 "Agent not enabled"` significa que te salteaste el paso 1.
 
@@ -35,7 +35,7 @@ Un `403 "Agent not enabled"` significa que te salteaste el paso 1.
    O vía la API del owner: `PUT /v1/data/{artifactId}/agent/config` con
    `{ "visitor_enabled": true, "visitor_system_prompt": "…" }`.
 
-2. **Agregá el chat a la página.** Montá el widget prearmado, o construí tu propia UI con
+2. **Agregá el chat al artefacto.** Montá el widget prearmado, o construí tu propia UI con
    `sdk.agent.chat()`.
 
 </Steps>
@@ -100,18 +100,18 @@ await sdk.agent.conversations.delete(id);
 
 ## Límites
 
-10 requests/min y 100,000 tokens/día por artifact. Pasado el límite devuelve `429`
+10 requests/min y 100,000 tokens/día por artefacto. Pasado el límite devuelve `429`
 con un header `Retry-After`.
 
 Para **automatización del lado del servidor** (resúmenes programados, entrega a Slack,
 narrativas de warehouse), ver [Crew](/es/guides/crew/) — un agente separado que corre
 con tools de owner, no en el navegador del visitante.
 
-## Traé tus propias keys {#bring-your-own-keys}
+## Traé tus propias keys
 
 Para controlar la facturación o para features avanzadas (function calling, vision), pasá tu
 propia key de proveedor a través del proxy de secrets encriptado en vez del agente integrado.
-Creá un secret (solo el owner), después llamalo desde la página:
+Creá un secret (solo el owner), después llamalo desde el artefacto:
 
 ```javascript
 // Owner: register the key once

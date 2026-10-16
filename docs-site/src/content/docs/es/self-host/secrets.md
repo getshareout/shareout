@@ -39,8 +39,8 @@ provisiona nombres; reemplazá IDs placeholder después del create si hace falta
 | `ARTIFACT_ORIGIN` | var | Segundo origen para contenido no confiable; unset = same-zone. |
 | `TEAM_METRICS_ENABLED` | var | `0` en self-host (default del template OSS). |
 | `STORAGE_QUOTA_BYTES` / `STORAGE_MAX_FILE_BYTES` | var | Topes de almacenamiento por dueño. Sin setear o `0` = ilimitado, el default. |
-| `DAILY_BANDWIDTH_BYTES_PER_OWNER` | var | Pausa los artifacts públicos de un dueño que supere este egreso diario estimado. Sin setear o `0` = sin tope, el default. |
-| `ARTIFACT_BADGE` | var | `1` agrega un badge "Made with ShareOut" a los artifacts públicos. Apagado por defecto. |
+| `DAILY_BANDWIDTH_BYTES_PER_OWNER` | var | Pausa los artefactos públicos de un dueño que supere este egreso diario estimado. Sin setear o `0` = sin tope, el default. |
+| `ARTIFACT_BADGE` | var | `1` agrega un badge "Made with ShareOut" a los artefactos públicos. Apagado por defecto. |
 | `OPEN_VISIBILITY_DISABLED` | var | `1` mantiene todo privado; sin enlaces públicos. |
 | `ADMIN_BRIDGE_SECRET` | secret | **Dejalo unset** salvo que corras un bridge worker privado. Unset ⇒ `/internal/admin/*` deniega todo. |
 | Tokens Telegram / Slack | secret | Solo si usás esas integraciones. |

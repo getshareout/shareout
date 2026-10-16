@@ -20,7 +20,7 @@ advertencias como "terminá la historia de los datos."
 
 ## La regla única
 
-**Por cada dataset que lee un artifact, declará en el manifest: qué es, la query o
+**Por cada dataset que lee un artefacto, declará en el manifest: qué es, la query o
 script que lo produjo, las tablas que toca, cuándo se refresca y cómo reconstruirlo.**
 Después vinculá cada gráfico o tabla a su fuente.
 
@@ -151,6 +151,6 @@ más la query en una línea. Ver [Crew tools → notify_send](/es/crew/tools/#no
 
 - [Manifest](/es/spec/manifest/) — campos de procedencia y `feeds`
 - [SDK Sources](/es/sdk/sources/) — API de `sdk.sources`
-- [Publicar artifacts](/es/guides/publishing/) — hallazgos de provenance en `editor_readiness`
+- [Publicar artefactos](/es/guides/publishing/) — hallazgos de provenance en `editor_readiness`
 - [Conexiones](/es/sdk/connections/) — query en vivo + materialize
 - [Crew tools](/es/crew/tools/) — `notify_send` con `source`

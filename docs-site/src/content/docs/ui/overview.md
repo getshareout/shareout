@@ -38,7 +38,7 @@ The design system and the live editor are two separate layers on the same markup
 - **`.so-` classes** control how the artifact looks. The editor never strips external `<link>` or `<script>` tags, and classes survive every save round-trip.
 - **`data-shareout-*` attributes** tell the editor what it can see and edit. A beautifully styled page with no manifest or bindings opens with empty panels and no outline.
 
-Every artifact built with the design system must also follow the [HTML spec](/guides/html-spec/):
+Every artifact built with the design system must also follow the [HTML spec](/spec/overview/):
 
 - `<script type="shareout/manifest">` in `<head>` declaring every data source.
 - `data-shareout-page` on each page container.

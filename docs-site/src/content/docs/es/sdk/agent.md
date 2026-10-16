@@ -1,11 +1,11 @@
 ---
 title: Agent store
-description: Asistente de chat con IA dentro de un artifact, con respuestas en streaming y un widget pre-construido.
+description: Asistente de chat con IA dentro de un artefacto, con respuestas en streaming y un widget pre-construido.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Agregá un asistente de chat con Claude a cualquier artifact. Accedé vía `sdk.agent`.
+Agregá un asistente de chat con Claude a cualquier artefacto. Accedé vía `sdk.agent`.
 
 <Aside type="caution">
 El agente está **deshabilitado por defecto**. `configure()` corre con la sesión del visitante y no puede habilitarlo. Habilitalo a través del bloque `agent` al publicar, o con `PUT /v1/data/{artifactId}/agent/config` (token del owner).
@@ -158,7 +158,7 @@ for await (const chunk of sdk.agent.chat({
 
 | Límite | Por defecto |
 |--------|-------------|
-| Requests/min | 10 por artifact |
-| Tokens/día | 100.000 por artifact |
+| Requests/min | 10 por artefacto |
+| Tokens/día | 100.000 por artefacto |
 
 Si se supera, retorna HTTP 429 con header `Retry-After` y código `RATE_LIMIT_EXCEEDED`.

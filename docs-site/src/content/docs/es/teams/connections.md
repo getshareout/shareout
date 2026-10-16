@@ -6,7 +6,7 @@ description: Definí fuentes de datos reutilizables para el equipo — credencia
 import { Aside } from '@astrojs/starlight/components';
 
 Los conectores de workspace son fuentes de datos reutilizables definidas una
-sola vez a nivel workspace. Los artifacts las referencian **por nombre** — las
+sola vez a nivel workspace. Los artefactos las referencian **por nombre** — las
 credenciales nunca se copian en el HTML publicado.
 
 ## Alcance de credenciales
@@ -115,7 +115,7 @@ DELETE /v1/workspaces/{workspaceId}/connections/{connectionId}/my-credentials
 El listado `GET /connections` incluye `hasMyCredentials: true|false` en cada
 conector `per_user`.
 
-## Runtime en artifacts
+## Runtime en artefactos
 
 ```javascript
 const sdk = await ShareOut.create();
@@ -201,7 +201,7 @@ motor en Workers. Los conectores REST y OAuth de plataforma no cambian.
 | `POST` | `/v1/workspaces/{id}/connections` | Admin+ | Crear. |
 | `GET` | `/v1/workspaces/{id}/connections/{connectionId}` | Admin+ | Detalle. |
 | `DELETE` | `/v1/workspaces/{id}/connections/{connectionId}` | Admin+ | Eliminar; cascadea credenciales de miembros. |
-| `GET` | `/v1/workspaces/{id}/connections/{connectionId}/artifacts` | Member+ | Artifacts que usan este conector. |
+| `GET` | `/v1/workspaces/{id}/connections/{connectionId}/artifacts` | Member+ | Artefactos que usan este conector. |
 | `GET` | `/v1/workspaces/{id}/connections/{connectionId}/my-credentials` | Member+ | Estado per-user. |
 | `PUT` | `/v1/workspaces/{id}/connections/{connectionId}/my-credentials` | Member+ | Guardar token propio. |
 | `DELETE` | `/v1/workspaces/{id}/connections/{connectionId}/my-credentials` | Member+ | Eliminar token propio. |

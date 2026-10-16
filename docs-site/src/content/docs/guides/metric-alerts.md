@@ -84,7 +84,7 @@ day) stops a metric that stays past its threshold from alerting on every check.
 
 Related: [Scheduling jobs](/guides/jobs/) for recurring delivery without a threshold.
 For a natural-language **investigation** when an alert fires, add `on_trigger.crew` —
-see [Crew](/guides/crew/#metric-alert-investigation).
+see [Crew](/crew/patterns/#metric-alert-investigation).
 
 ## Metric watches
 

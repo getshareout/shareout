@@ -75,7 +75,7 @@ const statuses = await tasks.distinct('status');
 <Aside type="caution" title="El aislamiento por viewer es del lado del servidor">
 Para mostrarle a cada cliente solo sus propias filas (dashboards multi-tenant), usá una
 **access policy** definida al momento de publicar. Los filtros `find()` del lado del
-cliente **no** aseguran los datos — el código fuente de la página es visible para los
+cliente **no** aseguran los datos — el código fuente del artefacto es visible para los
 viewers. El filtrado tiene que aplicarse del lado del servidor a partir de la identidad
 del viewer logueado.
 </Aside>

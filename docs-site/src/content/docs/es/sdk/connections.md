@@ -8,12 +8,12 @@ import { Aside } from '@astrojs/starlight/components';
 Consultá fuentes de datos externas (REST APIs, conectores de workspace) y opcionalmente
 **materializá** el resultado en un [dataset](/es/sdk/datasets/) o
 [table](/es/sdk/tables/) duradero. Accedé vía `sdk.connection(name)`. Las conexiones se
-definen una vez con credenciales cifradas; el artifact las referencia por nombre.
+definen una vez con credenciales cifradas; el artefacto las referencia por nombre.
 
 <Aside type="caution" title="Auth en sandbox requerida">
 Llamá a `await ShareOut.create()` antes de usar cualquier método del SDK. El `fetch`
 directo a `/v1/data/…` con `credentials: 'include'` falla dentro del sandbox del
-artifact — las cookies no se envían a través del iframe. Ver [live-data](/es/sdk/live-data/)
+artefacto — las cookies no se envían a través del iframe. Ver [live-data](/es/sdk/live-data/)
 para el patrón completo de inicialización.
 </Aside>
 
@@ -155,6 +155,6 @@ refresh programado usa `query` (re-ejecución server-side), no `rows` inline:
   lectores usen [datasets](/es/sdk/datasets/) o [tables](/es/sdk/tables/).
 - Los conectores por usuario de workspace devuelven `403 CREDENTIALS_REQUIRED` hasta que
   el miembro guarde su propio token vía `PUT /v1/workspaces/{id}/connections/{id}/my-credentials`.
-- Las credenciales de conexión se cifran en reposo y son privadas al artifact o workspace.
+- Las credenciales de conexión se cifran en reposo y son privadas al artefacto o workspace.
 - El tamaño del extract está limitado al tope duro del dataset (500 MB), a los env opcionales de instancia `STORAGE_MAX_FILE_BYTES` / `STORAGE_QUOTA_BYTES`, o a los límites de filas de table. Un `materialize()` que excede el límite falla con `FILE_TOO_LARGE` / `STORAGE_QUOTA_EXCEEDED`.
 - Los `baseUrl` de `rest_api` deben ser URLs http(s) públicas — hosts privados, loopback y metadata de cloud están bloqueados (misma política SSRF que el secrets proxy).

@@ -1,12 +1,12 @@
 ---
 title: Asistente del workspace
-description: Concierge con IA en el home del workspace — orientación, creación de páginas, consultas a conectores, schedules e hilos de chat nombrados.
+description: Concierge con IA en el home del workspace — orientación, creación de artefactos, consultas a conectores, schedules e hilos de chat nombrados.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
 El **asistente del workspace** es un chat en la página de inicio del workspace.
-Los miembros autenticados pueden preguntar sobre sus páginas, conectores y equipo —
+Los miembros autenticados pueden preguntar sobre sus artefactos, conectores y equipo —
 y (cuando está habilitado) ejecutar consultas de **solo lectura** contra conectores
 de warehouse.
 
@@ -25,7 +25,7 @@ alternándolo por workspace vía la API de [Features](/es/teams/admin/#features)
 la UI de admin.
 
 Cuando está desactivado, el dock del agente en Home queda oculto y la API devuelve
-`404`. Cuando está activo pero el [crédito de IA](/es/teams/billing/#credito-de-ia-incluido)
+`404`. Cuando está activo pero el [crédito de IA](/es/teams/api/#llm-del-workspace-y-crédito-de-ia)
 mensual está agotado, las sesiones nuevas de chat devuelven HTTP **402**
 (`AI_CREDIT_EXHAUSTED`).
 
@@ -33,24 +33,24 @@ mensual está agotado, las sesiones nuevas de chat devuelven HTTP **402**
 
 | Capacidad | Notas |
 | --- | --- |
-| Orientación | Lista páginas, conectores y cantidad de miembros |
-| **Búsqueda en el workspace** | `search_workspace` — búsqueda fuzzy rankeada en páginas, carpetas, datasets, conectores, personas, schedules, crew y alertas (mismo motor que ⌘K) |
-| **Crear páginas** | `create_artifact` construye y publica una página nueva desde una descripción — requiere confirmación antes de publicar |
-| **Construir desde un archivo** | Pasá `source_file_id` en `create_artifact` después de `read_file` — hojas de cálculo, decks y CSV se convierten en páginas vivas |
-| **Biblioteca de archivos** | `list_files` / `read_file` — explorá uploads, adjuntos de chat, archivos por email y shares desde el teléfono; ves procedencia y artifacts previos hechos con el mismo archivo |
-| Editar páginas existentes | `edit_page` para cambios de texto/layout en una página que ya existe |
+| Orientación | Lista artefactos, conectores y cantidad de miembros |
+| **Búsqueda en el workspace** | `search_workspace` — búsqueda fuzzy rankeada en artefactos, carpetas, datasets, conectores, personas, schedules, crew y alertas (mismo motor que ⌘K) |
+| **Crear artefactos** | `create_artifact` construye y publica un artefacto nuevo desde una descripción — requiere confirmación antes de publicar |
+| **Construir desde un archivo** | Pasá `source_file_id` en `create_artifact` después de `read_file` — hojas de cálculo, decks y CSV se convierten en artefactos vivos |
+| **Biblioteca de archivos** | `list_files` / `read_file` — explorá uploads, adjuntos de chat, archivos por email y shares desde el teléfono; ves procedencia y artefactos previos hechos con el mismo archivo |
+| Editar artefactos existentes | `edit_page` para cambios de texto/layout en un artefacto que ya existe |
 | Consultas de solo lectura | `SELECT` ad-hoc en conectores con **consulta IA** habilitada |
-| Proponer schedules | Sugiere un cron (ej. enviar una página por email) — requiere confirmación |
+| Proponer schedules | Sugiere un cron (ej. enviar un artefacto por email) — requiere confirmación |
 | Hilos nombrados (web) | Drawer de historial estilo ChatGPT — crear, renombrar, eliminar hilos; título automático del primer mensaje |
-| Widgets inline (web) | Tarjetas ricas en el hilo (previews de artifacts, resultados de conectores) — no se envían a Telegram/Slack |
+| Widgets inline (web) | Tarjetas ricas en el hilo (previews de artefactos, resultados de conectores) — no se envían a Telegram/Slack |
 | Historial | Últimos 20 turnos por hilo, almacenados en el servidor |
 | Brief proactivo diario | Una vez por día al abrir Home — resumen corto con IA vía `GET /v1/home/agent/brief` |
-| **Present this** | `present_artifact` — generar un deck de slides desde una página publicada |
+| **Present this** | `present_artifact` — generar un deck de slides desde un artefacto publicado |
 | **Metric watch** | `watch_metric` — watch de tabla de un clic (alertas de anomalía solo en campana) |
 
 Las acciones destructivas o de escritura siempre pasan por un paso de
 **confirmación**. El asistente no puede mutar data stores arbitrarios ni ejecutar
-SQL distinto de `SELECT`, pero **sí puede publicar una página nueva** después de
+SQL distinto de `SELECT`, pero **sí puede publicar un artefacto nuevo** después de
 que confirmes una propuesta `create_artifact`.
 
 <Aside type="caution">
@@ -70,7 +70,7 @@ workspace queda visible detrás del overlay atenuado.
 
 El **modo respuesta de ⌘K** es un camino aparte y más liviano: escribí una pregunta
 que termine en `?` en la paleta de comandos para una respuesta de un turno con
-citas a páginas — sin hilo, sin herramientas, sin publish. Usá el dock cuando
+citas a artefactos — sin hilo, sin herramientas, sin publish. Usá el dock cuando
 necesites chat multi-turno, adjuntar archivos o `create_artifact`.
 
 ### Entrada por voz
@@ -96,8 +96,8 @@ instalada, Home abre con el archivo ya adjunto en el compositor — listo para p
 
 Los archivos enviados por email al inbox del workspace (`{slug}@inbox.shareout.site`)
 también aparecen en `list_files` con etiqueta de origen *emailed in*. Cuando un nombre
-de archivo ya construyó un artifact, el asistente se orienta a **actualizar** esa
-página en lugar de crear un duplicado.
+de archivo ya construyó un artefacto, el asistente se orienta a **actualizar** esa
+artefacto en lugar de crear un duplicado.
 
 El streaming usa scroll **reading-first** (compartido con el agente del editor,
 el builder de creación y los widgets de chat para visitantes):
@@ -169,4 +169,4 @@ consultas ad-hoc.
 
 - [Conexiones del workspace](/es/teams/connections/)
 - [Admin del workspace](/es/teams/admin/)
-- [Agente de chat IA](/es/guides/ai-agent/) — asistente para visitantes dentro de un artifact
+- [Agente de chat IA](/es/guides/ai-agent/) — asistente para visitantes dentro de un artefacto

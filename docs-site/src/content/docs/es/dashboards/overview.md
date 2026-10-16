@@ -3,7 +3,7 @@ title: Dashboards — introducción
 description: Dashboards colaborativos en tiempo real con datos en vivo, filtros interactivos y modo presentador.
 ---
 
-Los dashboards son artifacts colaborativos en tiempo real. Los construís en un
+Los dashboards son artefactos colaborativos en tiempo real. Los construís en un
 editor autenticado y compartís una URL de solo lectura separada — ambas se
 mantienen sincronizadas sobre un documento Y.js en vivo.
 
@@ -19,13 +19,13 @@ mantienen sincronizadas sobre un documento Y.js en vivo.
 | Pantallas de TV | Modo presentador, ciclo automático, pantalla completa |
 
 Usá dashboards cuando necesitás colaboración en tiempo real, filtros interactivos
-o modo presentador. Para reportes estáticos o embeds simples, un artifact
+o modo presentador. Para reportes estáticos o embeds simples, un artefacto
 convencional con el [JSON store](/es/sdk/json/) o [tables](/es/sdk/tables/) es
 más sencillo.
 
 ## Dos URLs, un documento
 
-Cada dashboard crea dos artifacts que comparten un único documento CRDT Y.js:
+Cada dashboard crea dos artefactos que comparten un único documento CRDT Y.js:
 
 | Modo | URL | Acceso |
 | --- | --- | --- |
@@ -55,7 +55,7 @@ console.log(result.editorUrl);    // shareout.site/a/sales-dashboard
 console.log(result.publishedUrl); // shareout.site/p/sales-dashboard
 ```
 
-Ambos artifacts se crean automáticamente. También se devuelven
+Ambos artefactos se crean automáticamente. También se devuelven
 `editorArtifactId` y `publishedArtifactId` por si los necesitás para llamadas
 a la API.
 
@@ -64,7 +64,7 @@ a la API.
 | Valor | Quién puede ver la URL publicada |
 | --- | --- |
 | `private` | Solo colaboradores; requiere autenticación |
-| `workspace` | Cualquier miembro del workspace del artifact (Teams) |
+| `workspace` | Cualquier miembro del workspace del artefacto (Teams) |
 | `public` | Cualquiera en internet con el enlace; aparece en la homepage del workspace (Teams) |
 
 Podés cambiar la visibilidad en cualquier momento:
@@ -94,7 +94,7 @@ Los dashboards públicos son embebibles por defecto:
 ></iframe>
 ```
 
-Restringí orígenes o deshabilitá el embed vía la API de artifacts (campos
+Restringí orígenes o deshabilitá el embed vía la API de artefactos (campos
 `embed_allowed` y `embed_origins` en `PATCH /v1/artifacts/{id}`).
 
 ## Integración con el SDK

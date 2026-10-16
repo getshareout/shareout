@@ -3,7 +3,7 @@ title: CORS Proxy
 description: Proxy del lado del servidor para APIs externas que no envían headers CORS.
 ---
 
-Hacé fetch de APIs externas desde el JavaScript de tu artifact sin errores CORS. ShareOut
+Hacé fetch de APIs externas desde el JavaScript de tu artefacto sin errores CORS. ShareOut
 hace el proxy de la solicitud del lado del servidor y reenvía la respuesta.
 
 ## Inicio rápido
@@ -11,7 +11,7 @@ hace el proxy de la solicitud del lado del servidor y reenvía la respuesta.
 ```javascript
 const sdk = await ShareOut.create();
 
-// Proxy por artifact (recomendado)
+// Proxy por artefacto (recomendado)
 const proxyUrl = `https://shareout.site/v1/data/${sdk.artifactId}/proxy`;
 const response = await fetch(`${proxyUrl}?url=${encodeURIComponent('https://api.weather.gov/points/39.7456,-104.9910')}`);
 const data = await response.json();
@@ -28,7 +28,7 @@ const data = await response.json();
 
 ## Endpoints
 
-**Proxy por artifact** (límites de tasa aislados, configurable):
+**Proxy por artefacto** (límites de tasa aislados, configurable):
 
 ```
 GET https://shareout.site/v1/data/{artifactId}/proxy?url=<url-codificada>
@@ -41,7 +41,7 @@ GET https://shareout.site/api/proxy?url=<url-codificada>
 ```
 
 ```javascript
-// Proxy global — más simple, no necesitás contexto de artifact
+// Proxy global — más simple, no necesitás contexto de artefacto
 const response = await fetch(
   `https://shareout.site/api/proxy?url=${encodeURIComponent('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')}`
 );
@@ -52,7 +52,7 @@ const response = await fetch(
 | Restricción | Valor |
 | --- | --- |
 | Método | Solo GET |
-| Límite de tasa | 100 solicitudes/min por artifact |
+| Límite de tasa | 100 solicitudes/min por artefacto |
 | Tamaño de respuesta | Máximo 10 MB |
 | Timeout | 10 segundos |
 | TTL de caché | 5 min por defecto |
@@ -86,7 +86,7 @@ await fetch(`/v1/data/${artifactId}/proxy/config`, {
 
 | Campo | Tipo | Por defecto | Descripción |
 | --- | --- | --- | --- |
-| `enabled` | boolean | `true` | Habilitar o deshabilitar el proxy para este artifact |
+| `enabled` | boolean | `true` | Habilitar o deshabilitar el proxy para este artefacto |
 | `allowed_hosts` | string[] | `null` | Lista de hosts permitidos — `null` significa cualquier host |
 | `blocked_hosts` | string[] | `null` | Lista de hosts bloqueados |
 | `cache_ttl` | number | `300` | TTL de caché en segundos (0–3600) |

@@ -1,9 +1,9 @@
 ---
 title: Google Sheets
-description: Leé datos de planillas dentro de tu artifact con OAuth.
+description: Leé datos de planillas dentro de tu artefacto con OAuth.
 ---
 
-Traé filas de un Google Sheet directo a tu página. Accedé vía `sdk.sheets`.
+Traé filas de un Google Sheet directo a tu artefacto. Accedé vía `sdk.sheets`.
 
 ## Inicio rápido
 
@@ -54,11 +54,11 @@ await sdk.json.set('sheetsData', { data, fetchedAt: Date.now() });
 
 ## Monitoreo de datos obsoletos
 
-Cuando una página usa una conexión de **Google Sheets**, ShareOut registra
+Cuando un artefacto usa una conexión de **Google Sheets**, ShareOut registra
 `last_synced_at` en cada sync. Un barrido horario marca conexiones sin sync en
 **7+ días** y deja una tarjeta **Stale data** en la campana (y las incluye en el
 [digest semanal del workspace](/es/everyone/your-workspace/#digest-semanal-del-workspace)).
-Re-notifica como máximo una vez por semana mientras siga obsoleta. Abrí la página y
+Re-notifica como máximo una vez por semana mientras siga obsoleta. Abrí el artefacto y
 re-sincronizá (o arreglá la conexión) para limpiar la condición.
 
 Otros conectores de Data Platform (Snowflake, GA, Shopify, etc.) son proxies de

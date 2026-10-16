@@ -1,12 +1,12 @@
 ---
 title: Carpetas del Team Space
-description: Organizá los artifacts del workspace en carpetas compartidas visibles para todos los miembros.
+description: Organizá los artefactos del workspace en carpetas compartidas visibles para todos los miembros.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
 Las **carpetas del Team Space** son carpetas compartidas dentro de un workspace
-de Teams. Todos los miembros pueden verlas y mover artifacts. `owner` y `admin`
+de Teams. Todos los miembros pueden verlas y mover artefactos. `owner` y `admin`
 crean, renombran y eliminan cualquier carpeta. Los miembros crean carpetas y
 renombran o eliminan las que crearon, salvo que un admin haya desactivado
 **Los miembros pueden crear carpetas** (Admin → Settings, o
@@ -124,9 +124,9 @@ a los artefactos y archivos que contiene: cada uno tiene su propia visibilidad.
 
 Los slugs son únicos por nivel de carpeta dentro del workspace.
 
-## Mover un artifact a una carpeta
+## Mover un artefacto a una carpeta
 
-Cualquier miembro del workspace puede archivar un artifact del workspace:
+Cualquier miembro del workspace puede archivar un artefacto del workspace:
 
 ```http
 POST /v1/workspaces/{workspaceId}/artifacts/{artifactId}/move
@@ -147,7 +147,7 @@ Los slugs de carpeta aparecen en las URLs de subdominio y con namespace:
 | `{ws}.shareout.site/{folder}/{artifact-slug}` | `acme.shareout.site/reportes-q1/ventas-dashboard` |
 | `shareout.site/@{ws}/{folder}/{artifact-slug}` | `shareout.site/@acme/reportes-q1/ventas-dashboard` |
 
-El slug en estas URLs es el human slug del artifact (`display_slug`), único
+El slug en estas URLs es el human slug del artefacto (`display_slug`), único
 por workspace.
 
 ## Errores

@@ -1,9 +1,9 @@
 ---
 title: Páginas, secciones y navegación
-description: Estructura de artifacts multi-página con data-shareout-page, secciones, tabs y enlaces de navegación.
+description: Estructura de artefactos multi-página con data-shareout-page, secciones, tabs y enlaces de navegación.
 ---
 
-Los artifacts de ShareOut pueden ser de una sola página o SPAs multi-página. La estructura
+Los artefactos de ShareOut pueden ser de una sola página o SPAs multi-página. La estructura
 se define con atributos `data-shareout-*` que el editor lee para construir su panel de
 esquema y el SDK lee para manejar la navegación.
 

@@ -87,7 +87,7 @@ export default defineConfig({
 					items: [
 						{ label: 'What is ShareOut?', slug: 'everyone/what-is-shareout', translations: { es: '¿Qué es ShareOut?' } },
 						{ label: 'What can you make?', slug: 'everyone/what-you-can-make', translations: { es: '¿Qué podés hacer?' } },
-						{ label: 'Make your first page', slug: 'everyone/make-your-first-page', translations: { es: 'Hacé tu primera página' } },
+						{ label: 'Make your first page', slug: 'everyone/make-your-first-page', translations: { es: 'Hacé tu primer artefacto' } },
 						{ label: 'Your workspace (Home)', slug: 'everyone/your-workspace', translations: { es: 'Tu workspace (Home)' } },
 						{ label: 'Folder guides', slug: 'everyone/folder-guides', translations: { es: 'Guías de carpeta' } },
 						{ label: 'Files & deliverables', slug: 'everyone/assets', translations: { es: 'Archivos y entregas' } },
@@ -95,7 +95,7 @@ export default defineConfig({
 				},
 				{
 					label: '🎨 Build your page',
-					translations: { es: '🎨 Armá tu página' },
+					translations: { es: '🎨 Armá tu artefacto' },
 					items: [
 						{ label: 'Change anything', slug: 'everyone/the-editor', translations: { es: 'Cambiá lo que quieras' } },
 						{ label: 'Photos & content', slug: 'everyone/add-your-stuff', translations: { es: 'Fotos y contenido' } },
@@ -126,13 +126,13 @@ export default defineConfig({
 					label: '🔗 Share & manage',
 					translations: { es: '🔗 Compartí y gestioná' },
 					items: [
-						{ label: 'Share it', slug: 'everyone/share-it', translations: { es: 'Compartila' } },
+						{ label: 'Share it', slug: 'everyone/share-it', translations: { es: 'Compartilo' } },
 						{ label: 'Work together', slug: 'everyone/collaborators', translations: { es: 'Trabajen juntos' } },
 						{ label: 'Review & approvals', slug: 'everyone/review', translations: { es: 'Revisión y aprobaciones' } },
 						{ label: 'Version history', slug: 'everyone/version-history', translations: { es: 'Historial de versiones' } },
 						{ label: 'Show people only their data', slug: 'everyone/who-sees-what', translations: { es: 'Mostrá a cada uno sus datos' } },
 						{ label: 'Get help', slug: 'everyone/get-help', translations: { es: 'Pedí ayuda' } },
-						{ label: 'Public artifacts (policy)', slug: 'public-artifacts/overview', translations: { es: 'Artifacts públicos (política)' } },
+						{ label: 'Public artifacts (policy)', slug: 'public-artifacts/overview', translations: { es: 'Artefactos públicos (política)' } },
 					],
 				},
 				{
@@ -162,7 +162,7 @@ export default defineConfig({
 					label: 'Guides',
 					translations: { es: 'Guías' },
 					items: [
-						{ label: 'Publishing artifacts', slug: 'guides/publishing', translations: { es: 'Publicar artifacts' } },
+						{ label: 'Publishing artifacts', slug: 'guides/publishing', translations: { es: 'Publicar artefactos' } },
 						{ label: 'Multi-page artifacts', slug: 'guides/multi-page', translations: { es: 'Artefactos de varias secciones' } },
 						{ label: 'Data provenance', slug: 'guides/data-provenance', translations: { es: 'Procedencia de datos' } },
 						{ label: 'Storing data', slug: 'guides/data', translations: { es: 'Guardar datos' } },
@@ -233,7 +233,7 @@ export default defineConfig({
 				},
 				{
 					label: 'Artifact spec',
-					translations: { es: 'Especificación de artifacts' },
+					translations: { es: 'Especificación de artefactos' },
 					items: [
 						{ label: 'Overview', slug: 'spec/overview', translations: { es: 'Introducción' } },
 						{ label: 'Manifest', slug: 'spec/manifest', translations: { es: 'Manifest' } },

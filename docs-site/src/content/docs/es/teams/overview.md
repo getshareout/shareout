@@ -5,8 +5,8 @@ description: Workspaces, roles, subdominios, conectores y herramientas de admin.
 
 import { Aside } from '@astrojs/starlight/components';
 
-Los workspaces se construyen sobre el sistema base de artifacts de ShareOut: todo
-lo que hacen los artifacts personales sigue funcionando, más membresía de
+Los workspaces se construyen sobre el sistema base de artefactos de ShareOut: todo
+lo que hacen los artefactos personales sigue funcionando, más membresía de
 workspace, visibilidad interna, subdominios personalizados, conectores de datos a
 nivel workspace y herramientas de administración.
 
@@ -38,14 +38,14 @@ tamaño del workspace:
 | Capacidad | Dónde |
 | --- | --- |
 | Membresía de workspace y roles | [Workspaces](/es/teams/workspaces/) |
-| Visibilidad `workspace` de artifacts | [Workspaces](/es/teams/workspaces/) |
+| Visibilidad `workspace` de artefactos | [Workspaces](/es/teams/workspaces/) |
 | Política de membresía (dominios/emails permitidos) | [Workspaces](/es/teams/workspaces/) |
 | Carpetas del Team Space | [Carpetas](/es/teams/folders/) |
 | Subdominio personalizado (`{workspace}.shareout.site`) | [Subdominios](/es/teams/subdomain/) |
 | Conectores de datos compartidos y por usuario | [Conexiones](/es/teams/connections/) |
 | Asistente del workspace (concierge + consultas de solo lectura) | [Asistente del workspace](/es/teams/workspace-assistant/) |
 | Skill Marketplace (skills markdown reutilizables para agentes) | [Skill Marketplace](/es/teams/skill-marketplace/) |
-| Gobernanza de publicación por workspace (aprobación antes de ir a público) | [Admin](/es/teams/admin/#politica-de-publicacion) |
+| Gobernanza de publicación por workspace (aprobación antes de ir a público) | [Admin](/es/teams/admin/#política-de-publicación) |
 | Archivos de contexto de workspace (estilo para agentes) | [Workspaces](/es/teams/workspaces/) |
 | Admin de workspace (schedules, automaciones, alertas) | [Admin](/es/teams/admin/) |
 | Compartir con externos (Clientes, portal, API acotada, recibos) | [Compartir con clientes](/es/teams/external-sharing/) |
@@ -57,20 +57,20 @@ tamaño del workspace:
 | --- | --- |
 | `owner` | Control total del workspace. |
 | `admin` | Gestionar miembros, política, subdominio, configuraciones, schedules, automaciones. |
-| `member` | Crear/editar sus propios artifacts; ver artifacts con visibilidad workspace. |
+| `member` | Crear/editar sus propios artefactos; ver artefactos con visibilidad workspace. |
 
 No confundas los roles de workspace (`owner`/`admin`/`member`) con los roles de
-colaborador de artifact (`owner`/`editor`/`viewer`).
+colaborador de artefacto (`owner`/`editor`/`viewer`).
 
-## Visibilidad de artifacts
+## Visibilidad de artefactos
 
 | Valor | Quién puede ver |
 | --- | --- |
 | `private` | El owner más colaboradores explícitos. Por defecto. |
-| `workspace` | Todos los miembros del workspace del artifact. |
+| `workspace` | Todos los miembros del workspace del artefacto. |
 | `public` | Cualquiera en internet con el enlace; descubrible. |
 
-Usá `visibility: "workspace"` solo cuando el artifact tenga `workspace_id` definido.
+Usá `visibility: "workspace"` solo cuando el artefacto tenga `workspace_id` definido.
 
 <Aside type="caution">
 Los endpoints exclusivos de Teams devuelven `402 TIER_REQUIRED` con

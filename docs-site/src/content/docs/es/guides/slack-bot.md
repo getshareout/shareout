@@ -1,19 +1,19 @@
 ---
 title: Bot de Slack
-description: Vinculá tu cuenta de ShareOut a DMs de Slack y manejá tus artifacts desde el chat — leé, sacá snapshots, escribí datos y recibí notificaciones.
+description: Vinculá tu cuenta de ShareOut a DMs de Slack y manejá tus artefactos desde el chat — leé, sacá snapshots, escribí datos y recibí notificaciones.
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-Chateá con tus páginas de ShareOut desde **DMs de Slack**. Una vez vinculada tu cuenta,
-un asistente de IA estrictamente acotado puede encontrar, leer y resumir tus artifacts,
+Chateá con tus artefactos de ShareOut desde **DMs de Slack**. Una vez vinculada tu cuenta,
+un asistente de IA estrictamente acotado puede encontrar, leer y resumir tus artefactos,
 ejecutar fuentes de datos REST en vivo, enviar snapshots/PDFs, y — con tu botón
-**Confirmar** explícito — pausar alertas, compartir páginas, correr un crew, publicar
-ediciones de contenido o escribir datos en una página.
+**Confirmar** explícito — pausar alertas, compartir artefactos, correr un crew, publicar
+ediciones de contenido o escribir datos en un artefacto.
 
 <Aside type="note">
 Esto es distinto de `sdk.agent`, el widget de chat para visitantes que se embebe dentro
-de un artifact publicado. El bot de Slack opera sobre todos los artifacts a los que podés
+de un artefacto publicado. El bot de Slack opera sobre todos los artefactos a los que podés
 acceder desde tu cuenta. También es distinto de la [entrega a Slack](/es/integrations/slack/) —
 publicaciones **salientes** one-shot y por cron a canales o DMs. Esta guía cubre el bot
 **conversacional** por DM (`/shareout` + texto libre).
@@ -39,12 +39,12 @@ Todos los comandos usan el slash `/shareout` (los subcomandos espejan Telegram d
 | Comando | Acción |
 | --- | --- |
 | `/shareout help` | Mostrar lista de comandos |
-| `/shareout artifacts` | Listar páginas en el scope actual (cards Block Kit) |
-| `/shareout search {text}` | Buscar páginas por nombre/slug |
+| `/shareout artifacts` | Listar artefactos en el scope actual (cards Block Kit) |
+| `/shareout search {text}` | Buscar artefactos por nombre/slug |
 | `/shareout workspaces` | Listar workspaces a los que tenés acceso |
 | `/shareout workspace {slug}` | Cambiar scope a un workspace |
-| `/shareout workspace all` | Buscar en todas las páginas accesibles |
-| `/shareout personal` | Solo páginas personales |
+| `/shareout workspace all` | Buscar en todos los artefactos accesibles |
+| `/shareout personal` | Solo artefactos personales |
 | `/shareout status` | Cuenta vinculada + scope actual |
 | `/shareout settings` | Link a settings de ShareOut |
 | `/shareout unlink` | Desconectar este DM |
@@ -58,18 +58,18 @@ Ver [Pedir ayuda](/es/everyone/get-help/) para el ciclo completo del ticket.
 
 ## Scope de workspace
 
-El scope persiste por DM de Slack vinculado. El default cubre **todas las páginas** a las que podés acceder — artifacts personales y de workspace combinados.
+El scope persiste por DM de Slack vinculado. El default cubre **todos los artefactos** a los que podés acceder — artefactos personales y de workspace combinados.
 
-## Cards de artifacts
+## Cards de artefactos
 
 `/shareout artifacts` y `/shareout search` devuelven **cards Block Kit** (hasta 10):
 
 | Botón | Qué hace |
 | --- | --- |
-| **Open Page** | Abre la URL live del artifact |
+| **Open Page** | Abre la URL live del artefacto |
 | **Snapshot** | Renderiza un PNG y lo envía en el chat |
 | **PDF** | Renderiza un PDF y lo envía en el chat |
-| **Ask AI** | Inicia un turno del agente sobre esa página |
+| **Ask AI** | Inicia un turno del agente sobre ese artefacto |
 
 Propuestas de escritura (share, edit, crew, writes a table/json) muestran botones **Confirmar / Cancelar**; nada corre hasta Confirmar.
 
@@ -89,7 +89,7 @@ Cuota de chat con IA por usuario (igual que el chat in-app). Gated por el featur
 
 - [Bot de Telegram](/es/guides/telegram-bot/) — referencia de paridad en Telegram
 - [Entrega a Slack](/es/integrations/slack/) — publicaciones salientes (jobs, alertas, share one-shot)
-- [Agente de chat con IA](/es/guides/ai-agent/) — widget de chat para visitantes dentro de un artifact publicado
-- [Crew](/es/guides/crew/) — agentes autónomos del servidor en un artifact
+- [Agente de chat con IA](/es/guides/ai-agent/) — widget de chat para visitantes dentro de un artefacto publicado
+- [Crew](/es/guides/crew/) — agentes autónomos del servidor en un artefacto
 - [Jobs programados](/es/guides/jobs/) — programá entregas, incluido `action: slack`
 - [Pedir ayuda](/es/everyone/get-help/) — abrir y seguir tickets de soporte desde cualquier canal

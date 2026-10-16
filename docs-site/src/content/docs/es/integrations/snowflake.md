@@ -1,10 +1,10 @@
 ---
 title: Snowflake
-description: Consultá tu warehouse de Snowflake desde una página, con autenticación por par de claves.
+description: Consultá tu warehouse de Snowflake desde un artefacto, con autenticación por par de claves.
 ---
 
-Consultá Snowflake desde una página. La conexión vive a nivel **espacio de trabajo** con
-tus propias credenciales; las páginas leen a través de ella y nunca ven la clave.
+Consultá Snowflake desde un artefacto. La conexión vive a nivel **espacio de trabajo** con
+tus propias credenciales; los artefactos leen a través de ella y nunca ven la clave.
 
 ## Conectar
 
@@ -40,7 +40,7 @@ Después completá el formulario del conector:
 Si la clave privada está en otro formato, el conector falla con `Invalid PKCS8 input` —
 regenerala con los flags `-topk8 -nocrypt` de arriba.
 
-## Consultar desde una página
+## Consultar desde un artefacto
 
 ```javascript
 const sdk = await ShareOut.create();
@@ -62,7 +62,7 @@ valores por defecto del usuario de Snowflake. El conector no los adivina.
 ## No consultes en cada visita
 
 Snowflake factura por tiempo de warehouse, así que un tablero que consulta en cada carga
-mantiene un warehouse despierto. Materializá en un horario y que la página lea el
+mantiene un warehouse despierto. Materializá en un horario y que el artefacto lea el
 resultado guardado:
 
 ```javascript

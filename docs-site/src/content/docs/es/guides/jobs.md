@@ -1,9 +1,9 @@
 ---
 title: Programar jobs
-description: Ejecutá tareas en un cron o en respuesta a eventos de un artifact.
+description: Ejecutá tareas en un cron o en respuesta a eventos de un artefacto.
 ---
 
-Un job ejecuta una tarea asociada a un artifact — con una programación, o cuando algo
+Un job ejecuta una tarea asociada a un artefacto — con una programación, o cuando algo
 pasa. Mandá un reporte semanal por email, posteá un snapshot a Slack, refrescá un dataset.
 
 ## Dos triggers
@@ -118,7 +118,7 @@ diario creciente en una hoja de cálculo.
 
 **Requisitos:**
 
-- El **dueño** del artifact debe tener **Google Sheets conectado** — sin token → el
+- El **dueño** del artefacto debe tener **Google Sheets conectado** — sin token → el
   job falla con *"Google Sheets not connected"*.
 - El dueño necesita **acceso de edición** a la hoja; la pestaña en `range` debe
   existir.
@@ -129,7 +129,7 @@ diario creciente en una hoja de cálculo.
 ### Evento `email.received`
 
 Combiná con cualquier acción para reaccionar cuando llega mail al
-[inbox del artifact](/es/everyone/inbox/):
+[inbox del artefacto](/es/everyone/inbox/):
 
 ```json
 {
