@@ -81,11 +81,12 @@ export async function isFeatureEnabled(
   // Unknown keys fail open — a stale check never blocks a real feature.
   if (!isKnownFeature(key)) return true;
 
-  if (workspaceId) {
-    const ws = await loadWorkspaceOverrides(env, workspaceId);
-    if (key in ws) return ws[key];
-  }
-  const global = await loadGlobalOverrides(env);
+  // Both override layers are read in one wave; the workspace layer still wins.
+  const [ws, global] = await Promise.all([
+    workspaceId ? loadWorkspaceOverrides(env, workspaceId) : Promise.resolve(null),
+    loadGlobalOverrides(env),
+  ]);
+  if (ws && key in ws) return ws[key];
   if (key in global) return global[key];
   if (workspaceId) {
   }

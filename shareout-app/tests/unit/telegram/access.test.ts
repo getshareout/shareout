@@ -9,7 +9,11 @@ function makeDb(first: FirstFn): Env['DB'] {
     prepare: vi.fn((sql: string) => ({
       bind: vi.fn((...binds: unknown[]) => ({
         first: vi.fn(async () => first(sql, ...binds) ?? null),
-        all: vi.fn(async () => ({ results: [] })),
+        // The identity-group lookup is one all() over users; the stub's user row is self.
+        all: vi.fn(async () => {
+          const row = sql.includes('FROM users') ? first(sql, ...binds) : null;
+          return { results: row ? [{ id: binds[0], ...(row as object) }] : [] };
+        }),
       })),
     })),
   } as unknown as Env['DB'];

@@ -8,11 +8,13 @@ function env(partial: Partial<Env> & { userCount?: number | 'error' } = {}): Env
     SHAREOUT_BASE_URL: 'https://example.com',
     SESSION_SECRET: 'x'.repeat(32),
     DB: {
-      prepare() {
+      prepare(sql: string) {
         const chain = {
           bind: () => chain,
           first: async () => {
             if (userCount === 'error') throw new Error('no such table');
+            // An existence probe (`... LIMIT 1`) gets a row only when a user exists.
+            if (sql.includes('LIMIT 1')) return userCount ? { n: 1 } : null;
             return { n: userCount };
           },
         };

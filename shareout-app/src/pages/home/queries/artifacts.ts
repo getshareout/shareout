@@ -141,17 +141,15 @@ export async function queryHomeArtifacts(
   else if (sort === 'views') orderBy = 'total_views DESC, a.created_at DESC';
   else if (sort === 'oldest') orderBy = 'a.created_at ASC';
 
-  const countResult = await env.DB.prepare(`
+  // The page and its total are independent reads: one wave, not two.
+  const [countResult, artifacts] = await Promise.all([
+    env.DB.prepare(`
     SELECT COUNT(DISTINCT a.id) as total
     FROM artifacts a
     ${base.join}
     WHERE ${base.where}${filterSql}
-  `).bind(...base.joinParams, ...base.whereParams, ...filterParams).first<{ total: number }>();
-
-  const total = countResult?.total || 0;
-  const totalPages = Math.ceil(total / HOME_PAGE_SIZE);
-
-  const artifacts = await env.DB.prepare(`
+  `).bind(...base.joinParams, ...base.whereParams, ...filterParams).first<{ total: number }>(),
+    env.DB.prepare(`
     SELECT ${artifactCardSelect(idPh)}
     FROM artifacts a
     ${ARTIFACT_CARD_JOINS}
@@ -161,7 +159,10 @@ export async function queryHomeArtifacts(
     ORDER BY ${orderBy}
     LIMIT ? OFFSET ?
   `).bind(...vis.userIds, ...vis.userIds, ...base.joinParams, ...base.whereParams, ...filterParams, HOME_PAGE_SIZE, offset)
-    .all<ArtifactRow>();
+    .all<ArtifactRow>(),
+  ]);
+  const total = countResult?.total || 0;
+  const totalPages = Math.ceil(total / HOME_PAGE_SIZE);
 
   return { artifacts: artifacts.results || [], total, totalPages };
 }

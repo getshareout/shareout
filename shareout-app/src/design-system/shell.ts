@@ -131,6 +131,8 @@ export interface StreamedHtmlPageOptions extends Omit<HtmlPageOptions, 'body' | 
   body: () => Promise<{ body: string; scripts?: string }>;
   /** Called when `body()` throws — use for structured logging before the branded fallback renders. */
   onStreamError?: (err: unknown) => void;
+  /** Raw HTML emitted after the inline scripts (e.g. an external script that depends on them). */
+  afterScripts?: string;
 }
 
 /**
@@ -154,6 +156,7 @@ export function renderHtmlPageStreamed(options: StreamedHtmlPageOptions): Respon
       await writer.write(enc.encode(`${body}
 <script>${componentScripts}</script>
 ${scripts ? `<script>${scripts}</script>` : ''}
+${options.afterScripts ?? ''}
 </body>
 </html>`));
     } catch (err) {

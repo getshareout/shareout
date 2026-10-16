@@ -14,10 +14,9 @@ import { queryHomeArtifactCatalog, queryHomeCounts } from './queries/artifacts';
 import { queryPersonalFolders, queryTeamFolders } from './queries/folders';
 import { queryHomeTags } from './queries/tags';
 import { buildWorkspaceView } from './render-workspace';
-import { WORKSPACE_STYLES } from './render-workspace/styles';
+import { homeShellUrls } from './shell-assets';
 import { renderHtmlPageStreamed } from '../../design-system/shell';
 import type { HtmlPageOptions } from '../../design-system/shell';
-import { homePageStyles } from '../../design-system/pages/home.css';
 import { listIncomingAccessRequests } from '../../artifacts/access-requests';
 import { isFeatureEnabled } from '../../features/flags';
 import { isVisualEditorEnabled } from '../../editor/visual-editor-gate';
@@ -26,14 +25,20 @@ import { versionedBundlePath } from '../../bundle-versions';
 import { createLogger, logError } from '../../logging';
 import { getWorkspaceLocale, resolveLocale } from '../../i18n/locale';
 
-/** Head options for the streamed workspace home shell. */
-const HOME_HEAD: Omit<HtmlPageOptions, 'body' | 'scripts'> = {
-  title: 'My Artifacts · ShareOut',
-  pageStyles: homePageStyles,
-  bodyClass: 'so-theme-glass',
-  cacheControl: 'private, no-cache',
-  extraHead: '<link rel="manifest" href="/manifest.webmanifest">',
-};
+/** Head options for the streamed workspace home shell. The page + workspace styles and
+ *  the static client script are cached files (shell-assets), linked from the head so they
+ *  download while the body's queries run. */
+function homeHead(shell: { js: string; css: string }): Omit<HtmlPageOptions, 'body' | 'scripts'> {
+  return {
+    title: 'My Artifacts · ShareOut',
+    pageStyles: '',
+    bodyClass: 'so-theme-glass',
+    cacheControl: 'private, no-cache',
+    extraHead: '<link rel="manifest" href="/manifest.webmanifest">'
+      + `<link rel="stylesheet" href="${shell.css}">`
+      + `<link rel="preload" as="script" href="${shell.js}">`,
+  };
+}
 
 export async function handleUserHomePage(
   request: Request,
@@ -41,19 +46,17 @@ export async function handleUserHomePage(
   user: { id: string; email: string | null }
 ): Promise<Response> {
   const filters = parseHomeFilters(new URL(request.url));
-  // On a workspace subdomain the host pins the whole surface to that workspace,
-  // regardless of (or missing) ?workspace=, so a linked account's personal
-  // artifacts never leak into a customer's workspace home.
-  const hostWs = await hostWorkspaceId(request, env);
-  if (hostWs) filters.workspace = hostWs;
 
   // Stream the shell at first byte, then run the per-view queries and stream the
-  // real body in underneath. First paint doesn't block on the catalog/sidebar reads.
+  // real body in underneath. First paint doesn't block on the catalog/sidebar reads
+  // (nor on the host lookup: the head does not depend on it).
   const homeLogger = createLogger(env, { scope: 'home.stream' });
+  const shell = await homeShellUrls();
   return renderHtmlPageStreamed({
-    ...HOME_HEAD,
+    ...homeHead(shell),
     earlyBody: '',
-    body: () => buildHomeBody(request, env, user, filters, hostWs),
+    body: () => buildHomeBody(request, env, user, filters),
+    afterScripts: `<script src="${shell.js}"></script>`,
     onStreamError: (err) => logError(homeLogger, 'home render failed', err),
   });
 }
@@ -63,22 +66,26 @@ async function buildHomeBody(
   env: Env,
   user: { id: string; email: string | null },
   filters: ReturnType<typeof parseHomeFilters>,
-  hostWs: string | null,
 ): Promise<{ body: string; scripts: string }> {
-  // On a workspace subdomain, the viewer's role gates the Connectors manager.
-  const workspaceRole = hostWs ? await getInternalWorkspaceRole(env, hostWs, user.id) : null;
+  // Resolve the linked-account visibility scope once and thread it into every
+  // helper below; otherwise each helper re-resolves it. The host lookup, the admin
+  // check and the scope are independent, so they share one wave.
+  const [hostWs, isInstanceAdmin, vis] = await Promise.all([
+    hostWorkspaceId(request, env),
+    isPlatformAdmin(env, user.email, user.id),
+    getVisibilityScope(env, user),
+  ]);
+  // On a workspace subdomain the host pins the whole surface to that workspace,
+  // regardless of (or missing) ?workspace=, so a linked account's personal
+  // artifacts never leak into a customer's workspace home.
+  if (hostWs) filters.workspace = hostWs;
   // No paid tiers in this build: Skill Marketplace and Knowledge are on wherever a
   // workspace is in play.
   const wsTeamsPlan = !!hostWs;
   const wsKnowledgePaid = !!hostWs;
   // The inbox address is only real when this instance can receive mail.
   const inboxDomain = env.EMAIL ? inboxEmailDomain(env) : '';
-  const isInstanceAdmin = await isPlatformAdmin(env, user.email, user.id);
   const { search, sort, type, scope, page } = filters;
-
-  // Resolve the linked-account visibility scope once and thread it into every
-  // helper below; otherwise each helper re-resolves it (2 D1 reads apiece).
-  const vis = await getVisibilityScope(env, user);
 
   const createContextWs = hostWs || filters.workspace || null;
   const catalogWs = createContextWs && filters.filesScope !== 'personal' ? createContextWs : null;
@@ -93,6 +100,7 @@ async function buildHomeBody(
     accessRequests,
     createEnabled,
     wsLocale,
+    workspaceRole,
   ] = await Promise.all([
     env.DB.prepare(
       'SELECT name, picture, locale FROM users WHERE id = ?'
@@ -129,6 +137,8 @@ async function buildHomeBody(
     // create context, known before the queries run.
     isFeatureEnabled(env, CREATE_FEATURE, createContextWs),
     getWorkspaceLocale(env, createContextWs),
+    // On a workspace subdomain, the viewer's role gates the Connectors manager.
+    hostWs ? getInternalWorkspaceRole(env, hostWs, user.id) : Promise.resolve(null),
   ]);
 
   const { allCount, favCount, sharedCount } = counts;
@@ -200,7 +210,7 @@ async function buildHomeBody(
   // unread/search/announce). Loaded as a global before the inline hydration script;
   // the dock degrades to its inline fallback if it fails to load.
   return {
-    body: `<style>${WORKSPACE_STYLES}</style><script src="${versionedBundlePath('/sdk/chat-core.js')}"></script>${view.body}`,
-    scripts: view.scripts,
+    body: `<script src="${versionedBundlePath('/sdk/chat-core.js')}"></script>${view.body}`,
+    scripts: view.bootScript,
   };
 }

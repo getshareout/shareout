@@ -9,11 +9,23 @@ import type { HomeLocale } from './types';
  * exposes `window.__SO_HOME_T` and friends, and applies `data-i18n*` attributes.
  */
 export function getHomeI18nScript(serverLocale: HomeLocale | null = null): string {
+  return homeI18nSource(JSON.stringify(serverLocale));
+}
+
+/**
+ * The same bootstrap with the locale read from `window.WSX_LOCALE` at run time, so the
+ * bytes are identical for every viewer and can be served as a cached file.
+ */
+export function getStaticHomeI18nScript(): string {
+  return homeI18nSource('window.WSX_LOCALE || null');
+}
+
+function homeI18nSource(serverLocaleExpr: string): string {
   const copyJson = JSON.stringify(HOME_COPY).replace(/</g, '\\u003c');
   return `(function(){
   var COPY = ${copyJson};
   var STORAGE_KEY = 'shareout_lang';
-  var SERVER_LOCALE = ${JSON.stringify(serverLocale)};
+  var SERVER_LOCALE = ${serverLocaleExpr};
 
   function detectLocale(){
     if (SERVER_LOCALE) return SERVER_LOCALE;

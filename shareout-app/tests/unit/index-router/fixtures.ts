@@ -17,7 +17,7 @@ function createDb(resolver: DbResolver = () => null) {
   // tests don't all redirect to /setup.
   const withSetupDone: DbResolver = (sql, args) => {
     const r = resolver(sql, args);
-    if (r == null && sql.includes('COUNT(*) AS n') && sql.includes('FROM users')) return { n: 1 };
+    if (r == null && sql.includes('AS n FROM users')) return { n: 1 };
     return r;
   };
   const statement = (sql: string, args: unknown[] = []) => ({

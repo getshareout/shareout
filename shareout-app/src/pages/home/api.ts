@@ -2,7 +2,7 @@
  * JSON API handlers for home page client-side refresh (/v1/home/*).
  */
 import type { Env } from '../../types';
-import { getVisibilityScope } from '../../account-links';
+import { getVisibilityScope, type VisibilityScope } from '../../account-links';
 import { quickSearch, type SearchGroup } from '../../search/quick-search';
 import { getAccountAnalytics } from '../../analytics';
 import { hostWorkspaceId } from './host';
@@ -43,6 +43,23 @@ async function resolveWorkspace(
   return jsonWithApiErrors({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
 }
 
+/**
+ * resolveWorkspace + the linked-account visibility scope, for handlers whose queries
+ * need it anyway. The host lookup and the scope run in one wave, and the scope is
+ * handed to the query instead of being re-resolved there. Same 403 rule.
+ */
+async function resolveWorkspaceScope(
+  request: Request,
+  env: Env,
+  user: { id: string; email: string | null },
+): Promise<{ workspaceId: string | null; vis: VisibilityScope } | Response> {
+  const [hostWs, vis] = await Promise.all([hostWorkspaceId(request, env), getVisibilityScope(env, user)]);
+  const ws = hostWs || new URL(request.url).searchParams.get('workspace')?.trim() || null;
+  if (!ws) return { workspaceId: null, vis };
+  if (await isLinkedWorkspaceMember(env, vis, ws)) return { workspaceId: ws, vis };
+  return jsonWithApiErrors({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
+}
+
 const PULSE_WINDOWS: PulseWindow[] = ['today', '7d', '30d'];
 
 /** GET /v1/home/activity-feed — two-surface feed: actionable Needs You + aggregated Pulse. */
@@ -52,12 +69,13 @@ export async function handleHomeActivityFeedApi(
   user: { id: string; email: string | null },
 ): Promise<Response> {
   const url = new URL(request.url);
-  const workspaceId = await resolveWorkspace(request, env, user);
-  if (workspaceId instanceof Response) return workspaceId;
+  const ctx = await resolveWorkspaceScope(request, env, user);
+  if (ctx instanceof Response) return ctx;
+  const { workspaceId, vis } = ctx;
   const limit = Number(url.searchParams.get('limit')) || 30;
   const w = url.searchParams.get('window');
   const window: PulseWindow = PULSE_WINDOWS.includes(w as PulseWindow) ? (w as PulseWindow) : '7d';
-  const feed = await queryActivityFeed(env, user, { workspaceId, limit, window });
+  const feed = await queryActivityFeed(env, user, { workspaceId, limit, window }, vis);
   return Response.json(feed);
 }
 
@@ -106,10 +124,11 @@ export async function handleHomeForYouApi(
   user: { id: string; email: string | null },
 ): Promise<Response> {
   const url = new URL(request.url);
-  const workspaceId = await resolveWorkspace(request, env, user);
-  if (workspaceId instanceof Response) return workspaceId;
+  const ctx = await resolveWorkspaceScope(request, env, user);
+  if (ctx instanceof Response) return ctx;
+  const { workspaceId, vis } = ctx;
   const limit = Number(url.searchParams.get('limit')) || 12;
-  const artifacts = await queryForYou(env, user, { workspaceId, limit });
+  const artifacts = await queryForYou(env, user, { workspaceId, limit }, vis);
   return Response.json({
     cardsHtml: artifacts.map((a) => renderArtifactCard(a, url.hostname, env)).join(''),
     rowsHtml: artifacts.map((a) => renderArtifactRow(a, url.hostname)).join(''),
@@ -125,9 +144,10 @@ export async function handleHomeRecentApi(
 ): Promise<Response> {
   const url = new URL(request.url);
   const limit = Number(url.searchParams.get('limit')) || 24;
-  const workspaceId = await resolveWorkspace(request, env, user);
-  if (workspaceId instanceof Response) return workspaceId;
-  const artifacts = await queryRecentlyViewed(env, user, { workspaceId, limit });
+  const ctx = await resolveWorkspaceScope(request, env, user);
+  if (ctx instanceof Response) return ctx;
+  const { workspaceId, vis } = ctx;
+  const artifacts = await queryRecentlyViewed(env, user, { workspaceId, limit }, vis);
   return Response.json({
     cardsHtml: artifacts.map((a) => renderArtifactCard(a, url.hostname, env)).join(''),
     rowsHtml: artifacts.map((a) => renderArtifactRow(a, url.hostname)).join(''),
@@ -299,10 +319,9 @@ export async function handleHomeAnalyticsApi(
 ): Promise<Response> {
   const raw = Number(new URL(request.url).searchParams.get('range'));
   const range = raw === 7 || raw === 90 ? raw : 30;
-  const workspaceId = await resolveWorkspace(request, env, user);
-  if (workspaceId instanceof Response) return workspaceId;
-  const scope = await getVisibilityScope(env, user);
-  const data = await getAccountAnalytics(env, scope.userIds, range, workspaceId || undefined);
+  const ctx = await resolveWorkspaceScope(request, env, user);
+  if (ctx instanceof Response) return ctx;
+  const data = await getAccountAnalytics(env, ctx.vis.userIds, range, ctx.workspaceId || undefined);
   return Response.json(data);
 }
 
@@ -359,13 +378,11 @@ export async function handleHomeBrowserApi(
   user: { id: string; email: string | null },
 ): Promise<Response> {
   const filters = parseHomeFilters(new URL(request.url));
-  const hostWs = await hostWorkspaceId(request, env);
+  // Host lookup and visibility scope are independent: one wave.
+  const [hostWs, vis] = await Promise.all([hostWorkspaceId(request, env), getVisibilityScope(env, user)]);
   if (hostWs) filters.workspace = hostWs;
   const hostname = new URL(request.url).hostname;
   const createContextWs = hostWs || filters.workspace || null;
-  const createEnabled = await isFeatureEnabled(env, CREATE_FEATURE, createContextWs);
-  const vis = await getVisibilityScope(env, user);
-  const { artifacts, total, totalPages } = await queryHomeArtifacts(env, user, filters, vis);
 
   // Folder context: return the level's folders + can-manage flags, plus (inside a folder)
   // the root-to-current breadcrumb trail. Nesting repeats the root behaviour at any depth
@@ -376,30 +393,37 @@ export async function handleHomeBrowserApi(
   // open folder (guide); each card carries its own rename/delete affordance.
   const folderScope: 'workspace' | 'personal' = hostWs ? 'workspace' : 'personal';
   const workspaceId = hostWs || null;
-  const role = hostWs ? await getInternalWorkspaceRole(env, hostWs, user.id) : null;
-  const memberCreates = !!hostWs && role === 'member' && await membersCanCreateFolders(env, hostWs);
+  const folderId = filters.folder;
+
+  // Every read below depends only on (hostWs, vis, filters), so they run as one wave;
+  // the role-gated reads chain off the role lookup instead of waiting for the rest.
+  const roleP = (async () => {
+    const role = hostWs ? await getInternalWorkspaceRole(env, hostWs, user.id) : null;
+    const memberCreates = !!hostWs && role === 'member' && await membersCanCreateFolders(env, hostWs);
+    return { role, memberCreates };
+  })();
+  const [createEnabled, page, { role, memberCreates }, folderPath, folderReadme, openFolder, folderAccess, folders] = await Promise.all([
+    isFeatureEnabled(env, CREATE_FEATURE, createContextWs),
+    queryHomeArtifacts(env, user, filters, vis),
+    roleP,
+    folderId ? queryFolderPath(env, user, { workspaceId, folderId }, vis) : Promise.resolve([] as { id: string; name: string }[]),
+    folderId ? queryFolderReadme(env, user, { workspaceId, folderId }, vis) : Promise.resolve(null),
+    folderId ? roleP.then(r => r.memberCreates
+      ? env.DB.prepare('SELECT created_by FROM folders WHERE id = ? AND workspace_id = ?')
+        .bind(folderId, hostWs).first<{ created_by: string | null }>()
+      : null) : Promise.resolve(null),
+    !folderId ? Promise.resolve(null)
+      : !hostWs ? Promise.resolve<FolderAccess>({ visibility: 'private', effective: 'private', inheritedFrom: null, access: 'private', grants: [] })
+      : roleP.then(r => r.role ? queryFolderAccess(env, hostWs, folderId) : null),
+    queryFoldersInParent(env, user, { workspaceId, parentId: folderId || null }, vis),
+  ]);
+  const { artifacts, total, totalPages } = page;
   const canManageFolders = !hostWs || role === 'owner' || role === 'admin' || memberCreates;
   const canManage = (createdBy: string | null | undefined) =>
     !hostWs || canManageTeamFolder(role, memberCreates, createdBy ?? null, user.id);
   let canEditFolder = canManageFolders && !memberCreates;
-  let folderName: string | null = null;
-  let folderPath: { id: string; name: string }[] = [];
-  let folderReadme: string | null = null;
-  let folderAccess: FolderAccess | null = null;
-  if (filters.folder) {
-    folderPath = await queryFolderPath(env, user, { workspaceId, folderId: filters.folder }, vis);
-    folderName = folderPath.length ? folderPath[folderPath.length - 1].name : null;
-    folderReadme = await queryFolderReadme(env, user, { workspaceId, folderId: filters.folder }, vis);
-    if (memberCreates) {
-      const open = await env.DB.prepare('SELECT created_by FROM folders WHERE id = ? AND workspace_id = ?')
-        .bind(filters.folder, hostWs).first<{ created_by: string | null }>();
-      canEditFolder = canManage(open?.created_by);
-    }
-    folderAccess = !hostWs
-      ? { visibility: 'private', effective: 'private', inheritedFrom: null, access: 'private', grants: [] }
-      : role ? await queryFolderAccess(env, hostWs, filters.folder) : null;
-  }
-  const folders = await queryFoldersInParent(env, user, { workspaceId, parentId: filters.folder || null }, vis);
+  if (folderId && memberCreates) canEditFolder = canManage(openFolder?.created_by);
+  const folderName: string | null = folderPath.length ? folderPath[folderPath.length - 1].name : null;
   const foldersHtml = folders.map(f => renderFolderCard(f, folderScope, canManage(f.created_by))).join('');
 
   return Response.json({

@@ -139,11 +139,15 @@ export const workspace_client_notifications_JS = `
       render();
     }
 
-    function load(showSpin) {
+    function load(showSpin, boot) {
       if (showSpin && !loaded) body.innerHTML = i18nSpin();
+      // Boot: reuse the activity feed's in-flight response (needs/actionItems/seen do not
+      // depend on the window) and keep the bell's 30-item cap. Opening the panel refetches.
+      var feed = boot && typeof feedBoot !== 'undefined' && feedBoot && typeof feedBoot.then === 'function'
+        ? feedBoot.then(function (d) { return d && d.needs ? { needs: d.needs.slice(0, 30), actionItems: d.actionItems, seen: d.seen } : d; })
+        : fetch('/v1/home/activity-feed?limit=30&window=30d' + wsq, { credentials: 'same-origin' }).then(function (r) { return r.json(); });
       var jobs = [
-        fetch('/v1/home/activity-feed?limit=30&window=30d' + wsq, { credentials: 'same-origin' })
-          .then(function (r) { return r.json(); })
+        feed
           .then(function (d) { needs = (d && d.needs) || []; actions = (d && d.actionItems) || []; seen = (d && d.seen) || []; })
           .catch(function () { needs = []; actions = []; seen = []; }),
       ];
@@ -295,7 +299,7 @@ export const workspace_client_notifications_JS = `
     });
 
     // Prime the badge on load so the count shows without opening the panel.
-    load(false);
+    load(false, true);
   })();
 
 `;

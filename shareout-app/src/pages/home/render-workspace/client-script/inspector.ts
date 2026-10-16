@@ -886,6 +886,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   });
   function activateTab(key) {
     activeKey = key;
+    if (panes[key]) loadStage(panes[key]);
     homePane.classList.toggle('is-active', key === 'home');
     Object.keys(panes).forEach(function (k) { panes[k].pane.classList.toggle('is-active', k === key); });
     activeArt = key === 'home' ? null : { key: key, id: panes[key].art.id, slug: panes[key].art.slug, name: panes[key].art.name, iframe: panes[key].iframe };

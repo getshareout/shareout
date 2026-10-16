@@ -120,18 +120,18 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     }
     return cb ? artPending[k].then(cb) : artPending[k];
   }
-  // After the root payload lands, prefetch each folder's contents during idle so
-  // drilling into a folder is instant (caps the fan-out to avoid a query storm).
-  function warmFolders() {
-    var d = artCache[artKey('recent', '')]; if (!d || !d.foldersHtml) return;
-    var tmp = document.createElement('div'); tmp.innerHTML = d.foldersHtml;
-    var els = tmp.querySelectorAll('[data-folder-id]'); var n = 0;
-    els.forEach(function (el) {
-      if (n >= 16) return;
-      var id = el.getAttribute('data-folder-id');
-      if (id && !artCache[artKey('recent', id)]) { n++; fetchArt('recent', null, id); }
-    });
+  // Prefetch a folder's contents when the pointer or focus reaches its card, so the
+  // drill-in is instant without a boot-time fan-out of one request per folder.
+  function warmFolder(e) {
+    var el = e.target && e.target.closest && e.target.closest('[data-folder-id]'); if (!el) return;
+    var id = el.getAttribute('data-folder-id');
+    if (id && !artCache[artKey(artFilter, id)]) fetchArt(artFilter, null, id);
   }
+  (function () {
+    var m = document.getElementById('wsxArtMount'); if (!m) return;
+    m.addEventListener('pointerover', warmFolder);
+    m.addEventListener('focusin', warmFolder);
+  })();
   function loadArtifacts() {
     if (typeof syncHash === 'function') syncHash();
     if (artCache[artKey(artFilter)]) { applyArt(artFilter); return; }
@@ -195,10 +195,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
   // Warm the default Artifacts payload during idle so the first rail click is instant
   // (a click before this lands coalesces onto the same in-flight fetch via artPending).
   (function () {
-    var warm = function () {
-      if (artCache[artKey('recent', '')]) { warmFolders(); return; }
-      fetchArt('recent', warmFolders);
-    };
+    var warm = function () { if (!artCache[artKey('recent', '')]) fetchArt('recent'); };
     if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 2500 }); else setTimeout(warm, 800);
   })();
   // ===== folder navigation + management (Drive-style drill-in) =====

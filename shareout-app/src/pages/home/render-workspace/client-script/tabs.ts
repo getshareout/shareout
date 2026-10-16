@@ -66,6 +66,7 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
   }
   function stageUrl(slug) { return '/a/' + encodeURIComponent(slug) + '/?wsx=1'; }
   function paintStage(rec) {
+    rec.staged = true;
     if (STAGE_UNSANDBOXED[rec.art.type]) rec.iframe.removeAttribute('sandbox');
     else rec.iframe.setAttribute('sandbox', STAGE_SANDBOX);
     rec.iframe.src = stageUrl(rec.art.slug);
@@ -73,7 +74,11 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
   }
   // The sandbox is fixed at navigation time, so the type must be known before the first load:
   // from the opener / saved tab, the meta cache, or one (shared, deduped) meta fetch.
+  // Stages load lazily on first activation (activateTab), so restored background tabs
+  // cost nothing at boot.
   function loadStage(rec) {
+    if (rec.staged) return;
+    rec.staged = true;
     var a = rec.art;
     if (!a.type && a.id && metaCache[a.id]) a.type = metaCache[a.id].artifact_type;
     if (a.type) { paintStage(rec); return; }
@@ -165,7 +170,7 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
     var editframe = pane.querySelector('.wsx__editframe');
     var rec = {
       pane: pane, iframe: iframe, editframe: editframe, art: art,
-      mode: 'view', loaded: false, dirty: false, baseUpdatedAt: null, saveTimer: 0,
+      mode: 'view', loaded: false, staged: false, dirty: false, baseUpdatedAt: null, saveTimer: 0,
       savestat: pane.querySelector('.js-savestat'),
       publishBtn: pane.querySelector('.js-publish'),
       fullEdit: pane.querySelector('.js-fulledit'),
@@ -181,7 +186,6 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
     rec.redoBtn.addEventListener('click', function () { redoEdit(rec); });
     rec.discardBtn.addEventListener('click', function () { discardDraft(rec); });
     rec.mobileBtn.addEventListener('click', function () { var on = !rec.pane.classList.contains('is-mobile'); rec.pane.classList.toggle('is-mobile', on); rec.mobileBtn.classList.toggle('is-on', on); syncTabMode(); });
-    loadStage(rec);
     return rec;
   }
   function discardDraft(rec) {
