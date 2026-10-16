@@ -5,3 +5,20 @@ src/sdk-mobile-serve.ts linguist-generated=true
 src/sdk-charts-serve.ts linguist-generated=true
 public/_bundles/*.js linguist-generated=true
 **/*.generated.ts linguist-generated=true
+
+# Committed generated outputs that PRs regenerate in parallel. `merge=generated` keeps one
+# side on rebase/merge instead of conflicting (driver set by tooling/scripts/install-hooks.sh;
+# without it git conflicts as before). check:bundles in pre-push then rebuilds them and
+# fails if the committed copy is stale — regenerate and commit, never hand-merge.
+# Only files check:bundles regenerates belong here (grid.*, page-pilot.js are not).
+public/_bundles/chat-core.js merge=generated
+public/_bundles/editor.js merge=generated
+public/_bundles/shareout-comments-agent.js merge=generated
+public/_bundles/shareout-mobile.js merge=generated
+public/_bundles/shareout-sdk.js merge=generated
+public/_bundles/versions.json merge=generated linguist-generated=true
+public/_bundles/skill-meta.json merge=generated linguist-generated=true
+public/_bundles/skill.zip -diff -text merge=generated linguist-generated=true
+src/discovery/openapi.*.json merge=generated linguist-generated=true
+src/discovery/*.generated.ts merge=generated
+src/official-skills/*.generated.ts merge=generated

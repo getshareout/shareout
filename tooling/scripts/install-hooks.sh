@@ -27,5 +27,11 @@ exec "$ROOT/tooling/scripts/ci-check-fast.sh"
 HOOK
 
 chmod +x "$HOOKS_DIR/pre-push"
+
+# Committed generated files (shareout-app/.gitattributes `merge=generated`): keep our side
+# on merge/rebase instead of conflicting; check:bundles in pre-push catches the stale result.
+git -C "$REPO_ROOT" config merge.generated.name "generated file: keep ours, regenerate before push"
+git -C "$REPO_ROOT" config merge.generated.driver true
 echo "✓ Installed pre-push hook → $HOOKS_DIR/pre-push"
+echo "✓ Configured merge driver 'generated' (keeps one side; check:bundles regenerates)"
 echo "  Full suite before a PR: ./tooling/scripts/ci-check.sh"

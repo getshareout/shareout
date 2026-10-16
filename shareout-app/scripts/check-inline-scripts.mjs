@@ -6,21 +6,22 @@
  * each tagged inline script and runs it through Node's parser (vm.compileFunction),
  * with ${...} interpolations replaced by a neutral placeholder.
  *
- * Targets: every `const <name> = ` + backtick template assigned to a *Script*-ish
- * var, plus explicit known scripts. We keep it simple: scan each target file for
- * template literals and check the ones that look like JS (contain `function ` or
- * `window.` or `var `).
+ * Scans each target file for template literals and checks the ones that look like
+ * JS (contain `function `, `window.`, `var `, …).
+ *
+ * The workspace home client is not listed: its fragments only parse once composed,
+ * and tests/unit/render-workspace-structure.test.ts compiles the composed script.
  */
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 const TARGETS = [
-  { file: 'src/pages/home/client-script/index.ts', marker: 'return preamble' },
-  // Toolbar client scripts (HTML wrappers live in toolbar/script.ts and bridge-script.ts)
-  { file: 'src/serve/sandbox-viewer/toolbar/script-core.ts', marker: null },
-  { file: 'src/serve/sandbox-viewer/toolbar/script-auth.ts', marker: null },
-  { file: 'src/serve/sandbox-viewer/toolbar/script-comments.ts', marker: null },
-  { file: 'src/serve/sandbox-viewer/toolbar/script-admin.ts', marker: null },
+  'src/serve/sandbox-viewer/toolbar/script-core.ts',
+  'src/serve/sandbox-viewer/toolbar/script-auth.ts',
+  'src/serve/sandbox-viewer/toolbar/script-comments.ts',
+  'src/serve/sandbox-viewer/toolbar/script-admin.ts',
+  'src/serve/sandbox-viewer/toolbar/script-drag.ts',
+  'src/serve/sandbox-viewer/toolbar/script-presence.ts',
 ];
 
 // Skip a JS string starting at quote char q (s[i] === q). Returns index after close.
@@ -79,29 +80,22 @@ function extractTemplate(s, start) {
   return { text: out, end: i };
 }
 
-function check(file, marker) {
+function check(file) {
   const src = readFileSync(file, 'utf8');
   const blocks = [];
-  if (marker) {
-    const at = src.indexOf(marker);
-    if (at < 0) throw new Error(`${file}: marker not found: ${marker}`);
-    blocks.push(extractTemplate(src, at + marker.length).text);
-  } else {
-    // Scan every backtick-opened template that looks like inline JS.
-    let i = 0;
-    while (i < src.length) {
-      const c = src[i];
-      if (c === '`') {
-        const { text, end } = extractTemplate(src, i + 1);
-        if (/\b(function|window\.|addEventListener|var |document\.)\b/.test(text)) {
-          blocks.push(text);
-        }
-        i = end;
-        continue;
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '`') {
+      const { text, end } = extractTemplate(src, i + 1);
+      if (/\b(function|window\.|addEventListener|var |document\.)\b/.test(text)) {
+        blocks.push(text);
       }
-      if (c === "'" || c === '"') { i = skipString(src, i, c); continue; }
-      i++;
+      i = end;
+      continue;
     }
+    if (c === "'" || c === '"') { i = skipString(src, i, c); continue; }
+    i++;
   }
 
   let errors = 0;
@@ -137,8 +131,8 @@ function check(file, marker) {
 }
 
 let total = 0;
-for (const t of TARGETS) {
-  total += check(t.file, t.marker);
+for (const file of TARGETS) {
+  total += check(file);
 }
 if (total > 0) {
   console.error(`\n${total} inline-script syntax error(s).`);

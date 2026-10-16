@@ -28,6 +28,7 @@ npm run check:customer-names
 npm run check:skill-links
 npm run check:migrations
 npm run check:ui
+npm run check:inline
 npm run check:access-seams
 npm run check:file-size
 npm run db:migrate:fresh

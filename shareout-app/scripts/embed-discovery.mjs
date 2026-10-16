@@ -9,10 +9,9 @@
  *   src/discovery/agent-skill.generated.ts
  */
 import { createHash } from 'node:crypto';
-import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { zipSync } from 'fflate';
 import { parse } from 'yaml';
 
 const appRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -23,30 +22,17 @@ const openapiPath = join(repoRoot, 'docs-site', 'src', 'openapi', 'shareout.yaml
 const skillDir = join(repoRoot, 'skills', 'ShareOutSkill');
 const skillPath = join(skillDir, 'SKILL.md');
 
-function walkMd(dir) {
-  const files = [];
-  for (const entry of readdirSync(dir)) {
-    const fullPath = join(dir, entry);
-    if (statSync(fullPath).isDirectory()) files.push(...walkMd(fullPath));
-    else if (entry.endsWith('.md')) files.push(fullPath);
-  }
-  return files;
-}
-
-function buildSkillZipBytes() {
-  const zipEntries = {};
-  for (const file of walkMd(skillDir)) {
-    zipEntries[relative(skillDir, file)] = readFileSync(file);
-  }
-  return zipSync(zipEntries);
-}
+// The archive digest must describe the bytes GET /v1/skill serves from Assets, which
+// stage-skill-bundle.mjs (build:skill, run first) writes reproducibly. Zipping here
+// again stamped the current time into every entry, so the digest changed on every run.
+const skillZipPath = join(appRoot, 'public', '_bundles', 'skill.zip');
 
 const openapiYaml = readFileSync(openapiPath, 'utf8');
 const openapiSpec = parse(openapiYaml);
 const skillMd = readFileSync(skillPath, 'utf8');
 
 const skillDigest = `sha256:${createHash('sha256').update(skillMd).digest('hex')}`;
-const archiveBytes = buildSkillZipBytes();
+const archiveBytes = readFileSync(skillZipPath);
 const archiveDigest = `sha256:${createHash('sha256').update(archiveBytes).digest('hex')}`;
 
 const descMatch = skillMd.match(/^description:\s*"([^"]+)"/m);
