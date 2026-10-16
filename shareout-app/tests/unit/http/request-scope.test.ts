@@ -101,7 +101,8 @@ describe('Server-Timing', () => {
     expect(v).toContain('d1;desc="4 calls, 3 waves";dur=');
     expect(v).toMatch(/app;dur=\d+$/);
     expect(v).not.toMatch(/SELECT|usr_|alice/);
-    expect(withServerTiming(scoped, new Response('ok')).headers.get('Server-Timing')).toBe(serverTimingValue(scoped));
+    const sansTotal = (s: string | null) => (s ?? '').replace(/app;dur=\d+$/, '');
+    expect(sansTotal(withServerTiming(scoped, new Response('ok')).headers.get('Server-Timing'))).toBe(sansTotal(serverTimingValue(scoped)));
     // Immutable headers (e.g. Response.redirect) are copied, not thrown on.
     expect(withServerTiming(scoped, Response.redirect('https://x.test/', 302)).headers.get('Server-Timing')).toContain('d1;');
   });
