@@ -147,7 +147,7 @@ array again, plus `mobile_html` / `pwa` if the new version should keep them.
 To force installed PWAs to drop old cached assets, change `pwa.offline.cacheName`
 (e.g. `my-app-v1` → `my-app-v2`) in the new publish.
 
-Versions and rollback: [api/artifacts.md](../../api/artifacts.md#versions--rollback).
+Versions and restore: [api/artifacts.md](../../api/artifacts.md#versions--restore).
 
 ---
 

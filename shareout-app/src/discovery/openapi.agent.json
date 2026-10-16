@@ -982,6 +982,11 @@
           },
           "agent": {
             "$ref": "#/components/schemas/AgentConfig"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Optional change note for this version, shown in the version history. When a new version is published without one, a short \"what changed\" note may be generated in the background (`message_source: ai`), unless the workspace turned off `ai.version_summaries`."
           }
         }
       },
@@ -1297,6 +1302,25 @@
           "current_version": {
             "type": "integer",
             "description": "version_no live on the production deployment (reflects rollback)."
+          },
+          "live_message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Change note of the live version (detail endpoint only)."
+          },
+          "live_message_source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "author",
+              "ai",
+              null
+            ],
+            "description": "`author` when the publisher wrote live_message, `ai` when it was generated (detail endpoint only)."
           },
           "user_role": {
             "type": "string",

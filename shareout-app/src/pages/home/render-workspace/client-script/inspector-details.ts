@@ -36,7 +36,12 @@ export const workspace_client_inspector_details_JS = `  // ===== Inspector Detai
       h += pill('<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>' + esc(authLabel));
     }
     if (meta.embed_allowed) h += pill(esc(t('inspector.embedsOn')));
-    return '<div class="wsx-det__meta">' + h + '</div>';
+    return '<div class="wsx-det__meta">' + h + '</div>' + liveChangeHtml(meta);
+  }
+  function liveChangeHtml(meta) {
+    if (!meta.live_message) return '';
+    var when = meta.updated_at ? adRelDate(meta.updated_at) : '';
+    return '<div class="wsx-det__change">' + esc(t('inspector.liveChange').replace('{d}', when)) + ' ' + aiBadge(meta.live_message_source) + esc(meta.live_message) + '</div>';
   }
 
   // Deliver → destination tiles + a per-destination body (recipient/send, or a Connect prompt).

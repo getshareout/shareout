@@ -161,9 +161,11 @@ export async function handleGetArtifact(
       w.slug as workspace_slug,
       COALESCE((SELECT version_no FROM versions WHERE id = d.version_id), (SELECT MAX(version_no) FROM versions WHERE artifact_id = a.id)) as current_version,
       (SELECT MAX(version_no) FROM versions WHERE artifact_id = a.id) as latest_version,
+      lv.message AS live_message, lv.message_source AS live_message_source,
       (SELECT COUNT(*) FROM favorites WHERE artifact_id = a.id AND user_id = ?) as is_favorite
     FROM artifacts a
     LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
+    LEFT JOIN versions lv ON lv.id = d.version_id
     LEFT JOIN workspaces w ON w.id = a.workspace_id
     LEFT JOIN artifact_presentation pres_a ON pres_a.artifact_id = a.id
     LEFT JOIN artifact_moderation mod_a ON mod_a.artifact_id = a.id
@@ -193,6 +195,8 @@ export async function handleGetArtifact(
     type_metadata: string | null;
     current_version: number;
     latest_version: number | null;
+    live_message: string | null;
+    live_message_source: string | null;
     embed_allowed: number;
     embed_origins: string | null;
     is_favorite: number;
@@ -254,6 +258,8 @@ export async function handleGetArtifact(
     updated_at: artifact.updated_at,
     current_version: artifact.current_version || 1,
     latest_version: artifact.latest_version || artifact.current_version || 1,
+    live_message: artifact.live_message ?? null,
+    live_message_source: (artifact.live_message_source as ArtifactDetail['live_message_source']) ?? null,
     description: artifact.description,
     social_title: artifact.social_title,
     social_description: artifact.social_description,

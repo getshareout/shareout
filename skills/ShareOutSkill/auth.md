@@ -348,7 +348,7 @@ Artifacts have role-based access control:
 | Role | Permissions |
 |------|-------------|
 | **owner** | Full control: view, edit, publish, manage collaborators, delete, transfer ownership |
-| **editor** | Edit metadata, publish new versions, rollback, add/remove editors and viewers |
+| **editor** | Edit metadata, publish new versions, restore versions, add/remove editors and viewers |
 | **viewer** | View private artifacts only |
 
 ### What's Protected by Role
@@ -364,7 +364,8 @@ Artifacts have role-based access control:
 | `DELETE /v1/artifacts/:id/collaborators/:email` | ✓ | ✓ | ✗ |
 | `POST /v1/artifacts/:id/transfer-ownership` | ✓ | ✗ | ✗ |
 | `GET /v1/artifacts/:id/versions` | ✓ | ✓ | ✓ |
-| `POST /v1/artifacts/:id/rollback` | ✓ | ✓ | ✗ |
+| `POST /v1/artifacts/:id/versions/:no/restore` | ✓ | ✓ | ✗ |
+| `POST /v1/artifacts/:id/rollback` (deprecated) | ✓ | ✓ | ✗ |
 
 ### What's Not Protected
 

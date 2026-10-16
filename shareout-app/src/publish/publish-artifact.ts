@@ -29,6 +29,7 @@ import { findExistingArtifacts, upsertArtifactRecord } from './artifact-upsert';
 import { applyWorkspaceVisibilityPolicy, buildTypeMetadata, resolveStoredArtifactType } from './type-metadata';
 import type { PublishParams } from './types';
 import { publishSource } from '../artifacts/versions';
+import { normalizeVersionMessage, scheduleVersionSummary } from '../artifacts/version-summary';
 
 export async function publishArtifact(
   env: Env,
@@ -104,11 +105,12 @@ export async function publishArtifact(
   }
 
   const versionId = generateId('ver');
+  const message = normalizeVersionMessage(params.message);
   const actualMobileEntrypoint = hasMobile ? (mobileEntrypoint || 'mobile.html') : null;
 
   await env.DB.prepare(
-    'INSERT INTO versions (id, artifact_id, version_no, entrypoint, mobile_entrypoint, manifest_json, created_by, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  ).bind(versionId, artifactId, versionNo, entrypoint, actualMobileEntrypoint, '{}', user.id, publishSource(user)).run();
+    'INSERT INTO versions (id, artifact_id, version_no, entrypoint, mobile_entrypoint, manifest_json, created_by, source, message, message_source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).bind(versionId, artifactId, versionNo, entrypoint, actualMobileEntrypoint, '{}', user.id, publishSource(user), message, message ? 'author' : null).run();
 
   const assetMetadata = await storeVersionAssets(
     env, versionId, artifactId, versionNo, files, mobileHtml, actualMobileEntrypoint,
@@ -136,6 +138,7 @@ export async function publishArtifact(
     artifactId, artifactType, versionId, workspaceId, routingSlug,
     blocking, firstPublish, name, publicUrl,
   });
+  if (versionNo > 1) scheduleVersionSummary(env, executionCtx?.waitUntil.bind(executionCtx), versionId, message);
 
   return assemblePublishResponse(env, {
     artifactId, artifactType, versionId, versionNo, routingSlug,

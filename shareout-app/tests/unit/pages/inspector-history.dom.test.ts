@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { WORKSPACE_CLIENT } from '../../../src/pages/home/render-workspace/client-script/index';
 import { workspace_client_inspector_history_JS as HISTORY } from '../../../src/pages/home/render-workspace/client-script/inspector-history';
+import { workspace_client_inspector_details_JS as DETAILS } from '../../../src/pages/home/render-workspace/client-script/inspector-details';
 
 type Op = [string, string];
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -49,5 +50,29 @@ describe('inspector history diff', () => {
     const ops = lib.lineDiff(a, b);
     expect(ops.filter((o) => o[0] === '-')).toHaveLength(2500);
     expect(ops.filter((o) => o[0] === '+')).toHaveLength(2500);
+  });
+});
+
+describe('version change notes', () => {
+  const tt = (k: string) => ({ 'inspector.histAi': 'AI', 'inspector.liveChange': 'Updated {d}:' } as Record<string, string>)[k] ?? k;
+  const notes = new Function('esc', 't', 'tOr', 'adRelDate', `${HISTORY}; ${DETAILS}; return { histRow, liveChangeHtml };`)(
+    esc, tt, (_k: string, d: string) => d, () => '2h ago',
+  ) as { histRow: (v: object, prev: unknown, live: boolean, editable: boolean) => string; liveChangeHtml: (meta: object) => string };
+
+  it('badges an AI note in History and escapes every message', () => {
+    const ai = notes.histRow({ version_no: 2, message: '<b>New chart</b>', message_source: 'ai' }, null, true, false);
+    expect(ai).toContain('wsx-vh__ai');
+    expect(ai).toContain('&lt;b&gt;New chart&lt;/b&gt;');
+    const own = notes.histRow({ version_no: 3, message: 'Mine', message_source: 'author' }, null, false, false);
+    expect(own).toContain('Mine');
+    expect(own).not.toContain('wsx-vh__ai');
+  });
+
+  it('shows the live change line in Details only when there is a note', () => {
+    const line = notes.liveChangeHtml({ live_message: 'Added totals', live_message_source: 'ai', updated_at: '2026-01-01T00:00:00.000Z' });
+    expect(line).toContain('Updated 2h ago:');
+    expect(line).toContain('wsx-vh__ai');
+    expect(line).toContain('Added totals');
+    expect(notes.liveChangeHtml({ live_message: null })).toBe('');
   });
 });

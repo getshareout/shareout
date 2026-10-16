@@ -4,6 +4,7 @@ export const workspace_client_inspector_history_JS = `  // ----- History (/v1/ar
   function fmtBytes(n) { if (n == null) return ''; if (n < 1024) return n + ' B'; if (n < 1048576) return (n / 1024).toFixed(1) + ' KB'; return (n / 1048576).toFixed(1) + ' MB'; }
   function histWho(v) { return v.created_by_name || v.created_by_email || t('inspector.histUnknown'); }
   function histSource(s) { return s ? tOr('inspector.histSrc.' + s, s) : ''; }
+  function aiBadge(src) { return src === 'ai' ? '<span class="wsx-vh__ai" data-tip="' + esc(t('inspector.histAiTip')) + '">' + esc(t('inspector.histAi')) + '</span>' : ''; }
   function renderHistory(art) {
     // Paint the cached list at once, then refetch: a publish elsewhere adds versions.
     var had = histCache[art.id];
@@ -25,15 +26,15 @@ export const workspace_client_inspector_history_JS = `  // ----- History (/v1/ar
   function histRow(v, prev, live, editable) {
     var delta = prev && v.size_bytes != null && prev.size_bytes != null ? v.size_bytes - prev.size_bytes : null;
     var sub = [esc(histWho(v)), esc(histSource(v.source)), esc(adRelDate(v.created_at))].filter(Boolean).join(' \\u00B7 ');
-    var note = v.restored_from_version_no ? t('inspector.histRestoredFrom').replace('{n}', String(v.restored_from_version_no)) : '';
-    if (v.message) note = note ? note + ' \\u2014 ' + v.message : v.message;
+    var note = v.restored_from_version_no ? esc(t('inspector.histRestoredFrom').replace('{n}', String(v.restored_from_version_no))) : '';
+    if (v.message) note = (note ? note + ' \\u2014 ' : '') + aiBadge(v.message_source) + esc(v.message);
     var size = v.size_bytes != null ? fmtBytes(v.size_bytes) + (delta ? ' (' + (delta > 0 ? '+' : '\\u2212') + fmtBytes(Math.abs(delta)) + ')' : '') : '';
     return '<div class="wsx-vh__row' + (live ? ' is-live' : '') + '" data-vno="' + v.version_no + '">'
       + '<div class="wsx-vh__top"><span class="wsx-vh__no">v' + v.version_no + '</span>'
       + (live ? '<span class="wsx-row__badge ok">' + esc(t('inspector.histLive')) + '</span>' : '')
       + '<span class="wsx-vh__size">' + esc(size) + '</span></div>'
       + '<div class="wsx-row__sub">' + sub + '</div>'
-      + (note ? '<div class="wsx-vh__note">' + esc(note) + '</div>' : '')
+      + (note ? '<div class="wsx-vh__note">' + note + '</div>' : '')
       + '<div class="wsx-vh__acts">'
       + (prev ? '<button class="wsx-link" type="button" data-vh="diff">' + esc(t('inspector.histChanges')) + '</button>' : '')
       + '<button class="wsx-link" type="button" data-vh="preview">' + esc(t('inspector.histPreview')) + '</button>'

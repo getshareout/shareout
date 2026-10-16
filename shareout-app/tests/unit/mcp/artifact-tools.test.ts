@@ -118,6 +118,14 @@ describe('update_artifact', () => {
     expect(handleUpdateArtifact).not.toHaveBeenCalled();
   });
 
+  it('passes a change note through as the publish message, and omits it when blank', async () => {
+    await callTool(ctx, 'update_artifact', { artifact_id: 'art_1', content: '# v2', message: 'Added the Q3 totals' });
+    expect(await sentPublish()).toMatchObject({ message: 'Added the Q3 totals' });
+    vi.mocked(handlePublish).mockClear();
+    await callTool(ctx, 'update_artifact', { artifact_id: 'art_1', content: '# v3', message: '  ' });
+    expect(await sentPublish()).not.toHaveProperty('message');
+  });
+
   it('moves the page into a folder by name', async () => {
     await callTool(ctx, 'update_artifact', { artifact_id: 'art_1', content: '# v2', folder: 'reports' });
     expect(await sentPublish()).toMatchObject({ folder_id: 'fld_1' });

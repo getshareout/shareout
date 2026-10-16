@@ -205,6 +205,7 @@ export async function handlePublish(
         artifactType,
         attachedSkillIds: body.attached_skill_ids,
         library: body.library,
+        message: body.message,
       }, executionCtx);
 
       await incrementRateLimit(env, user.id, 'publish', user.email);

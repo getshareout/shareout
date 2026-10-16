@@ -467,7 +467,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
     rec.publishBtn.disabled = true; setSaveStatus(rec, t('edit.publishing'));
     // Markdown publishes through the source endpoint so the file stays .md (never index.html).
     var path = rec.md ? '/editor/source/publish' : '/editor/publish';
-    var body = rec.md ? { content: html } : { html: html, commitMessage: 'Quick edit in Studio', baseUpdatedAt: rec.baseUpdatedAt || undefined };
+    var body = rec.md ? { content: html } : { html: html, baseUpdatedAt: rec.baseUpdatedAt || undefined };
     fetch('/v1/artifacts/' + encodeURIComponent(rec.art.id) + path, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(function (r) {
         if (r.status === 409) { rec.publishBtn.disabled = false; setSaveStatus(rec, t('edit.reloaded'), 'warn'); rec.loaded = false; loadEditSource(rec); return { __conflict: true }; }

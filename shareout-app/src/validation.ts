@@ -150,6 +150,10 @@ export function validatePublishRequest(req: PublishRequest): ApiError | null {
     fail('visibility', 'visibility must be one of: public, workspace, private');
   }
 
+  if (req.message !== undefined && req.message !== null && typeof req.message !== 'string') {
+    fail('message', 'message must be a string');
+  }
+
   if (req.pwa) {
     for (const msg of validatePWAConfig(req.pwa)) fail('pwa', msg);
   }

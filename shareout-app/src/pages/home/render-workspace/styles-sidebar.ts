@@ -269,6 +269,8 @@ export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspect
 .wsx-vh__no { font: 600 var(--text-sm) var(--font-mono); }
 .wsx-vh__size { margin-left: auto; font-size: var(--text-xs); color: var(--color-text-tertiary); font-variant-numeric: tabular-nums; }
 .wsx-vh__note { font-size: var(--text-xs); color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.wsx-vh__ai { display: inline-block; margin-right: 5px; padding: 0 6px; border-radius: 999px; background: var(--color-surface); color: var(--color-text-tertiary); font: 600 10px/16px var(--font-body); letter-spacing: 0.02em; vertical-align: 1px; }
+.wsx-det__change { margin-top: 8px; font-size: var(--text-xs); color: var(--color-text-secondary); overflow-wrap: anywhere; }
 .wsx-vh__acts { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; }
 .wsx-vh__acts .wsx-link { font-size: var(--text-xs); }
 .wsx-vh__more { text-align: center; }
