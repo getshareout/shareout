@@ -148,13 +148,16 @@ toggle flags.
 
 ## Member tokens
 
-Admins and owners can create or revoke API tokens for workspace members:
+Admins and owners can create API tokens for service-account members and revoke
+a member's personal tokens (and connected apps):
 
 ```http
 POST   /v1/workspaces/{workspaceId}/members/{userId}/tokens
 DELETE /v1/workspaces/{workspaceId}/members/{userId}/tokens
 ```
 
+People create their own tokens; an admin cannot mint one for a person. Revoking
+is refused for the workspace owner and for members with a higher role than yours.
 Useful for onboarding automation or revoking access for departed members.
 
 ## Publishing policy

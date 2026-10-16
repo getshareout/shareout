@@ -149,14 +149,16 @@ workspace no pueden cambiar los flags.
 
 ## Tokens de miembros
 
-Los admins y owners pueden crear o revocar tokens de API para miembros del
-workspace:
+Los admins y owners pueden crear tokens de API para miembros cuenta de servicio
+y revocar los tokens personales (y apps conectadas) de un miembro:
 
 ```http
 POST   /v1/workspaces/{workspaceId}/members/{userId}/tokens
 DELETE /v1/workspaces/{workspaceId}/members/{userId}/tokens
 ```
 
+Las personas crean sus propios tokens; un admin no puede crear uno para una
+persona. No se puede revocar al owner ni a miembros con un rol superior al tuyo.
 Útil para automatizar el onboarding o revocar acceso de miembros que se van.
 
 ## Política de publicación

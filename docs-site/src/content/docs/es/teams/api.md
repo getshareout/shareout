@@ -35,8 +35,8 @@ Algunas lecturas de workspace también aceptan una sesión de navegador logueada
 | `DELETE` | `/v1/workspaces/{id}/invites/{inviteId}` | Revocar invite pendiente. Admin+. |
 | `GET` | `/v1/workspaces/{id}/people` | Lista para selector de personas. |
 | `POST` | `/v1/workspaces/{id}/transfer-ownership` | Transferir a otro miembro. Solo owner. |
-| `POST` | `/v1/workspaces/{id}/members/{userId}/tokens` | Crear token de API para miembro. Admin+. |
-| `DELETE` | `/v1/workspaces/{id}/members/{userId}/tokens` | Revocar tokens de miembro. Admin+. |
+| `POST` | `/v1/workspaces/{id}/members/{userId}/tokens` | Crear token de API para un miembro cuenta de servicio (las personas crean el suyo). Admin+. |
+| `DELETE` | `/v1/workspaces/{id}/members/{userId}/tokens` | Revocar los tokens personales y apps conectadas de un miembro. Admin+; no para el owner ni un rol superior. |
 
 ## Tokens de Agente (cuentas de servicio)
 
