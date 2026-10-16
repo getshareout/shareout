@@ -30,6 +30,67 @@ function safeName(s: string): string {
   return (s.replace(/[/\\]+/g, '_').replace(/^\.+/, '_').trim() || 'unnamed').slice(0, 120);
 }
 
+// Zip entry names for stored asset paths. Paths written before `isSafeAssetPath` was
+// enforced can hold `\`, `..`, control characters or empty segments; written verbatim a
+// Windows unzip could land them outside its folder (zip-slip).
+const MAX_SEGMENT = 255;
+const MAX_PATH = 512;
+const WIN_RESERVED_NAME = /^(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³])(\.|$)/i;
+
+function clip(s: string, max: number): string {
+  const chars = Array.from(s);
+  if (chars.length <= max) return s;
+  const dot = s.lastIndexOf('.');
+  const ext = dot > 0 && s.length - dot <= 16 ? Array.from(s.slice(dot)) : [];
+  return chars.slice(0, max - ext.length).join('') + ext.join('');
+}
+
+function cleanSegments(path: string): string[] {
+  return path.split('/')
+    .map((seg) => clip(seg, MAX_SEGMENT).replace(/[. ]+$/, ''))
+    .filter((seg) => seg !== '' && seg !== '.' && seg !== '..')
+    .map((seg) => (WIN_RESERVED_NAME.test(seg) ? `_${seg}` : seg));
+}
+
+/** One stored path → a relative zip-safe path (safe paths come back unchanged). */
+export function exportPath(path: string): string {
+  const stripped = path.replace(/\\/g, '/').replace(/[\u0000-\u001f\u007f-\u009f<>:"|?*]/g, '');
+  let segs = cleanSegments(stripped);
+  if (segs.join('/').length > MAX_PATH) segs = cleanSegments(clip(segs.join('/'), MAX_PATH));
+  return segs.join('/') || 'unnamed';
+}
+
+/** Zip-safe, unique names for a version's paths, plus the renames (original → exported). */
+export function exportPaths(paths: string[]): { names: string[]; renamed: [string, string][] } {
+  const clean = paths.map(exportPath);
+  // Unchanged paths claim their names first, so a safe path is never the one renamed.
+  const used = new Set(paths.filter((p, i) => clean[i] === p));
+  const taken = new Set<string>();
+  const renamed: [string, string][] = [];
+  const names = paths.map((p, i) => {
+    const base = clean[i];
+    if (base === p && !taken.has(base)) { taken.add(base); return base; }
+    const dot = base.lastIndexOf('.');
+    const cut = dot > base.lastIndexOf('/') + 1 ? dot : base.length;
+    let name = base;
+    for (let n = 2; used.has(name) || taken.has(name); n++) name = `${base.slice(0, cut)}~${n}${base.slice(cut)}`;
+    used.add(name);
+    taken.add(name);
+    renamed.push([p, name]);
+    return name;
+  });
+  return { names, renamed };
+}
+
+function renamedManifest(renamed: [string, string][]): string {
+  return [
+    'Some stored file paths were not safe to unzip as-is and were renamed in source/:',
+    '',
+    ...renamed.map(([from, to]) => `${JSON.stringify(from)} → ${JSON.stringify(to)}`),
+    '',
+  ].join('\n');
+}
+
 /** RFC-4180-ish CSV cell: quote when it contains a comma, quote, or newline. */
 function csvCell(v: unknown): string {
   const s = v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
@@ -65,9 +126,9 @@ async function collectArtifact(env: Env, artifact: ArtifactRow, prefix = ''): Pr
   const entries: ZipEntries = {};
   const { versionNo, files } = await loadSourceFiles(env, artifact.id);
 
-  for (const f of files) {
-    entries[`${prefix}source/${f.path}`] = f.bytes;
-  }
+  const { names, renamed } = exportPaths(files.map((f) => f.path));
+  files.forEach((f, i) => { entries[`${prefix}source/${names[i]}`] = f.bytes; });
+  if (renamed.length) entries[`${prefix}RENAMED.txt`] = enc.encode(renamedManifest(renamed));
 
   const db = createMiniDb(env, artifact.id, artifact.workspace_id ?? '');
 

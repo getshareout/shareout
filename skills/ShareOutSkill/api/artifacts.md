@@ -534,7 +534,7 @@ Authorization: Bearer {token}
 
 Artifact **owner or workspace admin** only. The zip contains:
 
-- `source/…` — the published source files (HTML + assets) of the current production version, at their original paths.
+- `source/…` — the published source files (HTML + assets) of the current production version, at their original paths. A stored path that is not safe to unzip (backslashes, `..`, empty segments, control or Windows-reserved characters/names, over-long) is normalized, collisions get `~2`, `~3`…, and `RENAMED.txt` lists each original → exported name.
 - `data/json/{key}.json` — every JSON key stored via `so.json`.
 - `data/tables/{name}.csv` — every table stored via `so.table`, one CSV per table (column union across rows).
 - `manifest.json` — `{ id, title, slug, version, exported_at }`.

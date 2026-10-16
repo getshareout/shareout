@@ -1,6 +1,6 @@
 // Legacy Word (.doc) text extraction: a real Word 97 file plus synthetic piece tables.
 import { describe, expect, it } from 'vitest';
-import { DOC_MAX_INPUT_BYTES, DocReadError, docToMarkdown, docToText } from '../../../src/data/files/parse-doc';
+import { DOC_IMAGES_ONLY, DOC_MAX_INPUT_BYTES, DocReadError, docToMarkdown, docToText } from '../../../src/data/files/parse-doc';
 import { REAL_DOC, REAL_DOC_TEXT, buildDoc } from '../helpers/doc-fixtures';
 
 const fails = (bytes: Uint8Array, message: string) => {
@@ -36,6 +36,43 @@ describe('docToText / docToMarkdown', () => {
     fails(buildDoc([{ text: 'x\r', compressed: true }], { flags: 0x0300 }), 'password-protected');
     fails(buildDoc([{ text: 'x\r', compressed: true }], { nFib: 0x65 }), 'Word 6/95');
     fails(new Uint8Array(DOC_MAX_INPUT_BYTES + 1), 'up to 8 MB');
+  });
+});
+
+describe('docToText stories beyond the main body', () => {
+  const main = '\x08\x08\r'; // a body that only anchors two shapes
+  const hdd = 'Form A-1 rev. 2\r\r';
+  const txbx = 'Step one\rStep two\r';
+
+  it('reads text boxes and headers after the main story, blank-line separated', () => {
+    const doc = buildDoc([{ text: 'Intro\r' + hdd + txbx, compressed: true }], { stories: { hdd: hdd.length, txbx: txbx.length } });
+    expect(docToText(doc)).toBe('Intro\n\nForm A-1 rev. 2\n\nStep one\nStep two');
+  });
+
+  it('a body that is only shapes still yields the text-box and footnote text', () => {
+    const ftn = 'A note\r';
+    const doc = buildDoc([
+      { text: main + ftn, compressed: true },
+      { text: hdd + txbx, compressed: false },
+    ], { stories: { ftn: ftn.length, hdd: hdd.length, txbx: txbx.length } });
+    expect(docToMarkdown(doc)).toBe('A note\n\nForm A-1 rev. 2\n\nStep one\n\nStep two');
+  });
+
+  it('reads header text boxes and endnotes', () => {
+    const edn = 'End\r';
+    const hdrTxbx = 'Logo caption\r';
+    const doc = buildDoc([{ text: 'Body\r' + edn + hdrTxbx, compressed: true }], { stories: { edn: edn.length, hdrTxbx: hdrTxbx.length } });
+    expect(docToText(doc)).toBe('Body\n\nEnd\n\nLogo caption');
+  });
+
+  it('pictures or shapes with no text anywhere but headers → images/drawings only', () => {
+    fails(buildDoc([{ text: main + hdd, compressed: true }], { stories: { hdd: hdd.length } }), DOC_IMAGES_ONLY);
+    fails(buildDoc([{ text: '\x01\r', compressed: true }]), DOC_IMAGES_ONLY);
+  });
+
+  it('an empty document without pictures still returns empty text', () => {
+    expect(docToText(buildDoc([{ text: '\r', compressed: true }]))).toBe('');
+    expect(docToText(buildDoc([{ text: '\r' + hdd, compressed: true }], { stories: { hdd: hdd.length } }))).toBe('Form A-1 rev. 2');
   });
 });
 

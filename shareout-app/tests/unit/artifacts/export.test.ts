@@ -2,7 +2,7 @@
 import './setup';
 import { describe, expect, it, vi } from 'vitest';
 import { unzipSync, strFromU8 } from 'fflate';
-import { handleExportArtifact, handleExportWorkspace } from '../../../src/artifacts/export';
+import { exportPath, exportPaths, handleExportArtifact, handleExportWorkspace } from '../../../src/artifacts/export';
 import type { Env } from '../../../src/types';
 import type { AuthUser } from '../../../src/api-auth';
 
@@ -163,5 +163,113 @@ describe('handleExportWorkspace', () => {
     vi.mocked(getInternalWorkspaceRole).mockResolvedValue(null);
     const res = await handleExportWorkspace(wsEnv(), stranger, 'wsp_1');
     expect(res.status).toBe(403);
+  });
+});
+
+describe('export entry names (stored paths from before path validation)', () => {
+  function envWithPaths(paths: string[]): Env {
+    const env = baseArtifactEnv();
+    const map = Object.fromEntries(paths.map((path, i) => [`r2/${i}`, `file ${i}`]));
+    return {
+      ...env,
+      ARTIFACTS: r2(map),
+      DB: db({
+        first: (sql) => {
+          if (sql.includes('FROM artifacts WHERE id')) return artifactRow;
+          if (sql.includes('FROM deployments')) return { version_id: 'ver_1' };
+          if (sql.includes('FROM versions WHERE id')) return { version_no: 1 };
+          return null;
+        },
+        all: (sql) => (sql.includes('FROM assets') ? { results: paths.map((path, i) => ({ path, r2_key: `r2/${i}` })) } : { results: [] }),
+      }),
+    } as Env;
+  }
+
+  async function exported(paths: string[]): Promise<Record<string, string>> {
+    vi.mocked(getInternalWorkspaceRole).mockResolvedValue(null);
+    const res = await handleExportArtifact(envWithPaths(paths), owner, 'art_1');
+    const files = unzipSync(new Uint8Array(await res.arrayBuffer()));
+    return Object.fromEntries(Object.entries(files).map(([k, v]) => [k, strFromU8(v)]));
+  }
+
+  const BAD = [
+    '..\\..\\Windows\\evil.dll',
+    '../../etc/passwd',
+    'a/../../b.html',
+    '/abs/root.html',
+    '\\\\server\\share\\x.js',
+    'C:\\Users\\x.html',
+    'a//b.css',
+    './dot/./x.css',
+    'ctrl\u0000\u0007\u001f\u007fname.txt',
+    'win<>:"|?*.txt',
+    'CON',
+    'dir/aux.html',
+    'trailing. /x.js',
+    '...',
+    'x'.repeat(600) + '.html',
+  ];
+
+  it('sanitizes every unsafe class and no entry escapes source/', async () => {
+    const files = await exported(['index.html', ...BAD]);
+    const sources = Object.keys(files).filter((k) => k.startsWith('source/'));
+    expect(sources).toHaveLength(BAD.length + 1);
+    for (const name of sources) {
+      const rest = name.slice('source/'.length);
+      const segs = rest.split('/');
+      expect(rest).not.toMatch(/[\\\u0000-\u001f\u007f<>:"|?*]/);
+      expect(segs.every((seg) => seg && seg !== '.' && seg !== '..' && !/[. ]$/.test(seg))).toBe(true);
+      expect(segs.every((seg) => !/^(con|prn|aux|nul|com\d|lpt\d)(\.|$)/i.test(seg))).toBe(true);
+      expect(segs.every((seg) => Array.from(seg).length <= 255)).toBe(true);
+      expect(rest.length).toBeLessThanOrEqual(512);
+    }
+    expect(files['source/Windows/evil.dll']).toBe('file 1');
+    expect(files['source/etc/passwd']).toBe('file 2');
+    expect(files['source/a/b.html']).toBe('file 3'); // ".." is dropped, not resolved
+    expect(files['source/abs/root.html']).toBe('file 4');
+    expect(files['source/server/share/x.js']).toBe('file 5');
+    expect(files['source/C/Users/x.html']).toBe('file 6');
+    expect(files['source/a/b.css']).toBe('file 7');
+    expect(files['source/dot/x.css']).toBe('file 8');
+    expect(files['source/ctrlname.txt']).toBe('file 9');
+    expect(files['source/win.txt']).toBe('file 10');
+    expect(files['source/_CON']).toBe('file 11');
+    expect(files['source/dir/_aux.html']).toBe('file 12');
+    expect(files['source/trailing/x.js']).toBe('file 13');
+    expect(files['source/unnamed']).toBe('file 14');
+    expect(sources.find((k) => k.endsWith('.html') && k.length > 200)).toMatch(/^source\/x{250}\.html$/);
+  });
+
+  it('a safe export is byte-identical and has no RENAMED.txt', async () => {
+    const safe = ['index.html', 'img/logo@2x.png', 'a b/c-d_e (1).js', 'deep/er/still,ok=+.css', '.well-known/x', 'données/ñ.json'];
+    const files = await exported(safe);
+    expect(Object.keys(files).filter((k) => k.startsWith('source/')).sort()).toEqual(safe.map((p) => `source/${p}`).sort());
+    expect(files['RENAMED.txt']).toBeUndefined();
+    for (const p of safe) expect(exportPath(p)).toBe(p);
+  });
+
+  it('de-duplicates collisions with ~2, ~3 and never renames the safe path', async () => {
+    const files = await exported(['a/b.html', 'a\\b.html', 'a//b.html', '/a/b.html', 'noext', '/noext']);
+    expect(files['source/a/b.html']).toBe('file 0');
+    expect(files['source/a/b~2.html']).toBe('file 1');
+    expect(files['source/a/b~3.html']).toBe('file 2');
+    expect(files['source/a/b~4.html']).toBe('file 3');
+    expect(files['source/noext']).toBe('file 4');
+    expect(files['source/noext~2']).toBe('file 5');
+    // A safe path that comes later still keeps its name.
+    expect(exportPaths(['x\\y.js', 'x/y.js']).names).toEqual(['x/y~2.js', 'x/y.js']);
+  });
+
+  it('lists every rewritten name in RENAMED.txt, original → exported', async () => {
+    const files = await exported(['index.html', '../up.js', 'a\\b.css']);
+    const manifest = files['RENAMED.txt'];
+    expect(manifest).toContain('"../up.js" → "up.js"');
+    expect(manifest).toContain('"a\\\\b.css" → "a/b.css"');
+    expect(manifest).not.toContain('index.html');
+  });
+
+  it('reports no renames for safe paths and each rewrite otherwise', async () => {
+    expect(exportPaths(['ok.html']).renamed).toEqual([]);
+    expect(exportPaths(['ctrl\u0001.html']).renamed).toEqual([['ctrl\u0001.html', 'ctrl.html']]);
   });
 });

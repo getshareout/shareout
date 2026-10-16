@@ -5,6 +5,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Export zip-slip + `.doc` text boxes:** artifact/workspace export normalizes stored source paths (backslashes → `/`, no empty/`.`/`..` segments, no leading `/`, control or Windows-reserved characters/names, length caps; collisions `~2`, `~3`…) so no entry escapes `source/`; safe paths are byte-identical, and a `RENAMED.txt` lists any rewrite. The legacy `.doc` reader now reads every story in CP order (main, footnotes, headers/footers, annotations, endnotes, text boxes, header text boxes), so forms whose body is only shapes anchoring text boxes extract; a body that is only pictures/drawings fails with "Document has no extractable text (images/drawings only)" instead of "No text found".
+
 ### Added
 
 - **Section links for headings without ids + legacy Word `.doc`:** headings with no `id` now get a deterministic `h-` anchor (accent-folded, hyphenated text slug, `-2`/`-3` per page) at chunk time, and the injected page agent resolves it inside the content frame (real ids still win), scrolls there and briefly highlights it. `CHUNKER_VERSION` is 2, so the nightly pass re-learns existing sources. `.doc` (Word 97–2003, `application/msword`) is read in-Worker — SheetJS CFB + an own piece-table text reader, up to 8 MB, main body text only — for Knowledge and for Studio import (→ Markdown, original kept); Word 6/95, protected or damaged files are `unsupported` / `CONVERT_FAILED` with a clear reason.
