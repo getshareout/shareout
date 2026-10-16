@@ -22,6 +22,11 @@ Los comentarios sin resolver en tus páginas aparecen en **Needs You** en
 [Home](/es/everyone/your-workspace/). Podés responder desde el viewer o la pestaña
 **Comments** del Inspector sin abrir el editor completo.
 
+¿Revisando un borrador? Fijá comentarios en el lugar exacto, resolvelos y asignalos, y
+aprobá la versión que está lista: mirá [Revisión y aprobaciones](/es/everyone/review/).
+Cada publicación queda en el [Historial de versiones](/es/everyone/version-history/), así
+que el cambio de un editor siempre se puede deshacer.
+
 ## Solicitudes de acceso
 
 Cuando alguien abre tu página privada pero no está en la lista de invitados, puede

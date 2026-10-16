@@ -13,6 +13,11 @@ el job por vos — sin llamadas a la API. Los owners y editores pueden programar
 otras personas; los viewers pueden suscribirse para recibir la página en su propio mail de
 forma recurrente.
 
+La pestaña **Automate** del Inspector en Home lista solo los schedules del artefacto que
+estás mirando. Owners y editores ven los schedules compartidos y sus propios envíos
+personales; la suscripción personal de otra persona (un email o DM a sí misma) queda
+privada.
+
 ## Dos formas de arrancar
 
 **En un horario** — todas las mañanas, todos los lunes, el primero de cada mes:

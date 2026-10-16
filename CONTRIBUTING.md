@@ -87,6 +87,23 @@ tests your change touches):
 Tests there are the critical-path subset plus whatever your diff reaches through
 vitest's module graph. Force the whole suite with `SHAREOUT_FULL_TESTS=1`.
 
+### Hooks, worktrees and generated files
+
+`install-hooks.sh` runs once per machine. It installs the pre-push hook in the shared
+`.git` dir, so it covers every worktree, and it configures the `generated` merge driver.
+Skip one push with `git push --no-verify` or `SHAREOUT_SKIP_HOOK=1`.
+
+- **Generated files.** Committed build outputs (`public/_bundles/*`, `src/discovery/*`,
+  `src/official-skills/*.generated.ts`) are marked `merge=generated` in
+  `shareout-app/.gitattributes`. With the driver installed, a merge or rebase keeps one
+  side instead of conflicting. Don't hand-merge them: `npm run check:bundles` (last step
+  of the pre-push check) rebuilds them and fails if the committed copy is stale, so
+  regenerate and commit.
+- **Name guard in worktrees.** `check:customer-names` reads its blocklist from the
+  `CUSTOMER_NAMES` env var and from the gitignored `tooling/customer-names.local`. In a
+  linked worktree it also reads that file from the main checkout, so a fresh worktree
+  pushes without copying it.
+
 Or the individual worker commands:
 
 ```bash

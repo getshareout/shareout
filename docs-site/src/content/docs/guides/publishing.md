@@ -260,6 +260,28 @@ Older pages published before this feature shipped are backfilled on an hourly dr
 Set your own description or tags any time with `PATCH /v1/artifacts/{id}` — your
 values are kept; auto-summary only fills gaps.
 
+## Versions & change notes
+
+Every publish to an existing artifact adds a version; nothing is overwritten. Send an
+optional `message` with the publish to say what changed:
+
+```json
+{ "slug": "my-app", "message": "Add the Q3 column", "files": [ … ] }
+```
+
+When `message` is omitted, ShareOut writes a one-line AI note from the diff with the
+previous version (flag `ai.version_summaries`, on by default). Each version records who
+published it and how (`api`, `agent`, `editor` or `restore`).
+
+To bring an old version back, **restore** it: that publishes a new version with the old
+one's files and keeps the full history. `POST /v1/artifacts/{id}/rollback` still works
+but is deprecated in favour of restore. The UI, diffs and previews are covered in
+[Version history & restore](/everyone/version-history/); the endpoints are in the
+[API reference](/api/).
+
+To publish several HTML pages as one artifact, see
+[Multi-page artifacts](/guides/multi-page/).
+
 ## Deleting & restoring
 
 Deleting an artifact is a **soft delete** with a 30-day recovery window — not an

@@ -31,9 +31,13 @@ A higher level includes the ones below it. You can share a whole folder with a c
 
 `POST /v1/workspaces/{id}/share-person` invites one outside email and grants **view** or **comment** on a **file** or **folder**. Teams/Enterprise + admin required. The person appears on `/shared` without creating a client org. Returns `409 ALREADY_MEMBER` if the email is already an internal workspace member.
 
+Folder managers (not only admins) can also do this from a folder's **Who has access** panel, and pick when access ends: **In 7 days**, **In 30 days**, **In 90 days**, **On a date…** or **Never**. Access stops as soon as it lapses; sharing again replaces the end date. The invite email links straight to the folder's portal. See [Client portals](/teams/client-portals/).
+
 ## Read receipts
 
 Every time a client opens something you shared, it's logged. In the client's view you'll see recent activity — *"someone at Acme opened the Q3 deck."* A clear signal for renewals and follow-ups.
+
+For a single folder, **Who opened what** in the folder's access panel lists what outside people opened, commented on or downloaded there.
 
 ## API access for clients
 

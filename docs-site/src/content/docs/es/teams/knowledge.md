@@ -112,7 +112,11 @@ El lens **Knowledge** abre en vista **árbol** por defecto — ramas indentadas 
 
 - **Vista árbol** — escaneá jerarquía, badges de frescura y marcadores de fijado de un vistazo. Guidance vive en su propia rama.
 - **Vista tabla** — franja KPI (páginas aprendidas, temas, entidades, última actualización), búsqueda, filtro por kind y filas ordenables.
-- **Detalle de nota** — metadatos, cuerpo destilado y **Sources** (clic para abrir la página). Una línea de frescura ("Learned 3 days ago") muestra qué tan actual es.
+- **Detalle de nota** — metadatos, cuerpo destilado y **Sources**: cada fuente muestra el nombre del artefacto y lo abre en una pestaña. Una fuente que no podés abrir (borrada, retenida o el artefacto privado de otra persona) aparece como "artifact not available", sin enlace. Una línea de frescura ("Learned 3 days ago") muestra qué tan actual es.
+
+### De un artefacto a sus notas
+
+En la pestaña de un artefacto, **Detalles** del Inspector lista **Conocimiento de este artefacto** — las notas aprendidas de él — cuando hay alguna. Cada una abre la nota en Conocimiento (`#l/knowledge/<path>`).
 
 **Learn from existing pages** muestra una barra de progreso mientras corre el distill on-demand (`GET /knowledge/status` — `queued`, `processed`, `total`, `running`). Los backfills grandes pueden seguir en el cron horario después de que termine la barra.
 
@@ -134,7 +138,7 @@ conector MCP, más el lector de notas:
 - **`knowledge_search`** — buscar lo que el workspace sabe por tema, cliente, persona o pregunta.
   Devuelve **pasajes** citados de los Archivos subidos (PDFs, docs, planillas…) y páginas, más
   las notas que coinciden. El filtro `kind` lo limita a notas.
-- **`knowledge_get`** — leer una nota completa, con cuerpo destilado y páginas fuente.
+- **`knowledge_get`** — leer una nota completa, con cuerpo destilado y artefactos fuente. Cada fuente viene con su título y enlace (o marcada como no disponible), y el asistente cita esos enlaces en su respuesta.
 - **`knowledge_entity`** — un cliente, persona, producto o proyecto: con qué se conecta y los
   pasajes que lo mencionan.
 - **`knowledge_facts`** — datos registrados (montos, fechas, estados…) de una entidad, cada uno
@@ -155,7 +159,8 @@ las rutas requieren membresía del workspace.
 | `GET` | `/v1/workspaces/{id}/knowledge` | Member+ | Settings + counts |
 | `GET` | `/v1/workspaces/{id}/knowledge/status` | Member+ | Progreso de entrenamiento (ventana 24h) |
 | `GET` | `/v1/workspaces/{id}/knowledge/tree` | Member+ | Resúmenes agrupados por kind |
-| `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Una nota — cuerpo markdown + sources |
+| `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Una nota — cuerpo markdown + sources, con título, slug y enlace de cada artefacto fuente cuando lo podés abrir |
+| `GET` | `/v1/workspaces/{id}/knowledge/from/{artifactId}` | Member+ | Notas aprendidas de un artefacto; vacío si Conocimiento está apagado o no podés abrir el artefacto |
 | `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Reemplazar markdown; marca como editada a mano |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Eliminar nota; `forget=1` evita re-aprendizaje |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | Activar/desactivar (**plan pago** para activar) |

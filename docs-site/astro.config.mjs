@@ -128,6 +128,8 @@ export default defineConfig({
 					items: [
 						{ label: 'Share it', slug: 'everyone/share-it', translations: { es: 'Compartila' } },
 						{ label: 'Work together', slug: 'everyone/collaborators', translations: { es: 'Trabajen juntos' } },
+						{ label: 'Review & approvals', slug: 'everyone/review', translations: { es: 'Revisión y aprobaciones' } },
+						{ label: 'Version history', slug: 'everyone/version-history', translations: { es: 'Historial de versiones' } },
 						{ label: 'Show people only their data', slug: 'everyone/who-sees-what', translations: { es: 'Mostrá a cada uno sus datos' } },
 						{ label: 'Get help', slug: 'everyone/get-help', translations: { es: 'Pedí ayuda' } },
 						{ label: 'Public artifacts (policy)', slug: 'public-artifacts/overview', translations: { es: 'Artifacts públicos (política)' } },
@@ -161,6 +163,7 @@ export default defineConfig({
 					translations: { es: 'Guías' },
 					items: [
 						{ label: 'Publishing artifacts', slug: 'guides/publishing', translations: { es: 'Publicar artifacts' } },
+						{ label: 'Multi-page artifacts', slug: 'guides/multi-page', translations: { es: 'Artefactos de varias secciones' } },
 						{ label: 'Data provenance', slug: 'guides/data-provenance', translations: { es: 'Procedencia de datos' } },
 						{ label: 'Storing data', slug: 'guides/data', translations: { es: 'Guardar datos' } },
 						{ label: 'Scheduling jobs', slug: 'guides/jobs', translations: { es: 'Tareas programadas' } },
@@ -287,6 +290,7 @@ export default defineConfig({
 						{ label: 'Workspaces', slug: 'teams/workspaces', translations: { es: 'Espacios de trabajo' } },
 						{ label: 'Folders', slug: 'teams/folders', translations: { es: 'Carpetas' } },
 						{ label: 'External sharing', slug: 'teams/external-sharing', translations: { es: 'Compartir con clientes' } },
+						{ label: 'Client portals', slug: 'teams/client-portals', translations: { es: 'Portales de clientes' } },
 						{ label: 'Custom subdomain', slug: 'teams/subdomain', translations: { es: 'Subdominio propio' } },
 						{ label: 'Workspace connections', slug: 'teams/connections', translations: { es: 'Conexiones del espacio' } },
 						{ label: 'Workspace assistant', slug: 'teams/workspace-assistant', translations: { es: 'Asistente del workspace' } },

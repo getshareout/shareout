@@ -48,6 +48,14 @@ Only the first page is visible by default. Hide others with the `hidden` attribu
 
 The SDK manages visibility when a `data-shareout-link` navigates between pages.
 
+### Multiple HTML files (sites)
+
+`data-shareout-page` splits **one** HTML file into views. An artifact can also ship
+several HTML files — `index.html` plus `procedures/intake.html` and so on — linked with
+ordinary **relative** hrefs. Links to the same artifact stay inside it, each page gets
+its own URL (`?page=` in the viewer, `#a/{slug}/{page}` on Home), and Home lists the
+pages under Details. See [Multi-page artifacts](/guides/multi-page/).
+
 ## Sections
 
 Sections subdivide a page in the editor outline:
@@ -214,3 +222,4 @@ Sections can be bookmarked directly by adding `data-shareout-deeplink="true"`:
 - [Overview](/spec/overview/) — full attribute reference and compliance checklist
 - [Bindings](/spec/bindings/) — data bindings within pages and sections
 - [Templates](/spec/templates/) — repeating content and charts within pages
+- [Multi-page artifacts](/guides/multi-page/) — several HTML files in one artifact

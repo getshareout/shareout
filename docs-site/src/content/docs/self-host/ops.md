@@ -128,6 +128,39 @@ Test a restore on a staging worker before you need it.
 - In-product: Admin → Health (when signed in as admin), if enabled on your build
 - There is no super-admin notification channel — use `/admin?view=health` and Worker logs
 
+### Server-Timing
+
+Signed-in requests to `/home`, `/v1/home/*`, `/v1/artifacts` and `/v1/artifacts/*` answer
+with a `Server-Timing` header that breaks the request down by phase. Anonymous requests
+get no header. Values carry only phase names, counts and milliseconds — no ids or data.
+
+```http
+Server-Timing: auth;dur=12, host;dur=4, d1;desc="9 calls, 3 waves";dur=41, kv;desc="1 calls, 1 waves";dur=3, app;dur=63
+```
+
+| Entry | Meaning |
+| --- | --- |
+| `auth` | Resolving the session or API token |
+| `host` | Looking up the workspace for a subdomain |
+| `render` | Building the `/home` document |
+| `d1` | D1 statements: `calls`, `waves` (rounds of queries that ran one after another — the number that drives latency) and busy ms |
+| `kv` | KV reads, same format |
+| `app` | Total time in the Worker |
+
+To read it, open DevTools → **Network**, select the request, and open the **Timing**
+tab: Chrome and Edge list the entries under *Server Timing*. Or from a shell:
+
+```bash
+curl -sS -o /dev/null -D - "$ORIGIN/v1/home/activity-feed" -H "Cookie: $SESSION" | grep -i server-timing
+```
+
+`/home` streams its HTML, so its header only covers the work before the first byte. The
+full breakdown, including the page's own queries and render, is at the end of the document
+as an HTML comment: `<!-- server-timing: … -->` (view source and scroll to the bottom).
+
+Workers clocks only advance across I/O, so a CPU-only phase such as `render` can read
+close to 0 in production.
+
 ## Security basics (pre-public checklist)
 
 Before exposing an instance to the internet:

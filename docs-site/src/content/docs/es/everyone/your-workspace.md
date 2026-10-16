@@ -10,7 +10,7 @@ El **Home** de ShareOut es donde gestionás páginas, ves qué necesita atenció
 | **Rail izquierdo** | Marca, **Crear con IA**, lentes (Brief, Todos los artifacts, Assets, Schedules, Alerts, Analytics, Datasets, **Catálogo**, Crew AI, Library, Connectors), **Admin** (owners/admins), Following, menú de cuenta |
 | **Canvas** | Pestañas (Home + páginas abiertas); widgets del Brief y vistas de artifacts; **dock del agente** abajo |
 | **Barra superior** | Campana de **notificaciones** (a la izquierda del avatar), menú de cuenta, cambio de espacio |
-| **Rail derecho** | **Inspector** contextual — Activity en Home; Details / Deliver / Comments / Automate / Editing en pestañas de artifacts |
+| **Rail derecho** | **Inspector** contextual — Activity en Home; Details / Deliver / Comments / History / Automate / Editing en pestañas de artifacts |
 
 Los rails y paneles son redimensionables; los anchos se recuerdan en tu navegador.
 
@@ -160,11 +160,12 @@ En una pestaña de artifact, el Inspector es una pila de secciones colapsables
 
 | Sección | Propósito |
 | --- | --- |
-| **Details** | Estrella, título, visibilidad (control segmentado), árbol de carpetas, meta pills compactas, tarjeta **Shared with** (invitar inline + desglose por viewer), tags, tests |
+| **Details** | Estrella, título, visibilidad (control segmentado), árbol de carpetas, meta pills compactas, tarjeta **Shared with** (invitar inline + desglose por viewer), tags, tests. Además: la nota de cambios de la versión en vivo ("Actualizado …"), **Aprobar esta versión**, **Secciones (N)** en [artefactos de varias secciones](/es/guides/multi-page/) y **Conocimiento de este artefacto** cuando [Conocimiento](/es/teams/knowledge/) aprendió notas de él |
 | **Deliver** | Envío puntual a **email**, **Slack** o **Telegram** — corre al instante, sin turno del agente. Elegí un canal de Slack desde un picker buscable (sin pegar IDs). **Schedule** abre Automate para crear un job recurrente. Si Telegram o Slack no están conectados, **Connect** te guía; **Check again** refresca el estado tras OAuth. |
 | **Watches** | **Metric watches** de un clic sobre tablas de esta página — conteo de filas, suma de columna o último valor. Avisa en la campana cuando el valor se mueve ±20% respecto a la línea base (chequeo horario). Ver [Alertas de métricas → Watches](/es/guides/metric-alerts/#metric-watches). |
-| **Comments** | Hilo completo, respuestas, @menciones, compositor |
-| **Automate** | Schedules y triggers crew de esta página |
+| **Comments** | Hilo completo, respuestas, @menciones, compositor. Filtro **Abiertos / Todos**, **Resolver / Reabrir**, **Asignar** y la marca "en vN" para comentarios de versiones anteriores — mirá [Revisión y aprobaciones](/es/everyone/review/) |
+| **History** | Cada versión con quién, cómo y qué cambió; diferencias línea por línea, comparar dos cualquiera, vista previa y **Restaurar** sin borrar nada — mirá [Historial de versiones](/es/everyone/version-history/) |
+| **Automate** | Schedules y triggers crew de este artefacto solamente. Owners y editores ven los schedules compartidos y sus propios envíos personales; las suscripciones personales de otras personas quedan privadas |
 | **Editing** | Panel de propiedades con Edit activo (formato, bloques, IA) |
 
 En **Home**, el Inspector muestra **Activity** (Needs You + Pulse).

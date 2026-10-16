@@ -96,6 +96,40 @@ Probá un restore en un worker de staging antes de necesitarlo.
 - En producto: Admin → Health (si estás firmado como admin), si tu build lo tiene
 - No hay canal de notificación de super-admin — usá `/admin?view=health` y los logs del Worker
 
+### Server-Timing
+
+Los requests con sesión iniciada a `/home`, `/v1/home/*`, `/v1/artifacts` y
+`/v1/artifacts/*` responden con un header `Server-Timing` que desglosa el request por
+fase. Los requests anónimos no reciben el header. Los valores llevan solo nombres de
+fase, conteos y milisegundos — ni ids ni datos.
+
+```http
+Server-Timing: auth;dur=12, host;dur=4, d1;desc="9 calls, 3 waves";dur=41, kv;desc="1 calls, 1 waves";dur=3, app;dur=63
+```
+
+| Entrada | Significado |
+| --- | --- |
+| `auth` | Resolver la sesión o el token de API |
+| `host` | Buscar el workspace de un subdominio |
+| `render` | Armar el documento de `/home` |
+| `d1` | Sentencias D1: `calls`, `waves` (rondas de queries que corrieron una después de otra — el número que más pesa en la latencia) y ms ocupados |
+| `kv` | Lecturas de KV, mismo formato |
+| `app` | Tiempo total en el Worker |
+
+Para leerlo, abrí DevTools → **Network**, elegí el request y abrí la pestaña **Timing**:
+Chrome y Edge listan las entradas en *Server Timing*. O desde una terminal:
+
+```bash
+curl -sS -o /dev/null -D - "$ORIGIN/v1/home/activity-feed" -H "Cookie: $SESSION" | grep -i server-timing
+```
+
+`/home` hace streaming del HTML, así que su header cubre solo el trabajo previo al primer
+byte. El desglose completo, con las queries y el render del documento, va al final como
+comentario HTML: `<!-- server-timing: … -->` (mirá el código fuente y bajá hasta el final).
+
+Los relojes de Workers solo avanzan con I/O, así que una fase solo de CPU como `render`
+puede marcar cerca de 0 en producción.
+
 ## Seguridad básica (checklist pre-público)
 
 Antes de exponer una instancia a internet:
