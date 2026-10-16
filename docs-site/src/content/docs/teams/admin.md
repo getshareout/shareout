@@ -136,6 +136,7 @@ Notable flags:
 | Key | Default | Effect |
 | --- | --- | --- |
 | `ai.web_agent` | off | [Workspace assistant](/teams/workspace-assistant/) on the home page |
+| `ai.version_summaries` | on | **Version change notes** — a one-line AI "what changed" note for versions published without a message, shown in History and Details. See [Version history](/everyone/version-history/#change-notes) |
 
 ```http
 GET /v1/workspaces/{workspaceId}/features

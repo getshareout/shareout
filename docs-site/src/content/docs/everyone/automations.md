@@ -12,6 +12,11 @@ Pick email, Slack, or Telegram, choose how often, and ShareOut creates the job f
 no API calls needed. Owners and editors can schedule delivery to other people; viewers
 can subscribe to get the page sent to their own inbox on a recurring schedule.
 
+The **Automate** tab in the Inspector on Home lists only the schedules for the artifact
+you're looking at. Owners and editors see the shared schedules and their own personal
+deliveries; someone else's personal subscription (an email or DM to themselves) stays
+private to them.
+
 ## Two ways it kicks off
 
 **On a schedule** — every morning, every Monday, the first of the month:

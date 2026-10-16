@@ -258,6 +258,29 @@ horario.
 Podés setear tu propia descripción o tags con `PATCH /v1/artifacts/{id}` — tus valores
 se conservan; el auto-resumen solo llena huecos.
 
+## Versiones y notas de cambios
+
+Cada publicación sobre un artefacto existente agrega una versión; nunca se pisa nada.
+Mandá un `message` opcional con la publicación para contar qué cambió:
+
+```json
+{ "slug": "my-app", "message": "Agrego la columna de Q3", "files": [ … ] }
+```
+
+Si no mandás `message`, ShareOut escribe una nota de IA de una línea a partir de las
+diferencias con la versión anterior (flag `ai.version_summaries`, activado por defecto).
+Cada versión registra quién la publicó y cómo (`api`, `agent`, `editor` o `restore`).
+
+Para recuperar una versión anterior, **restaurala**: eso publica una versión nueva con los
+archivos de la vieja y conserva todo el historial. `POST /v1/artifacts/{id}/rollback`
+sigue funcionando pero está deprecado en favor de restaurar. La interfaz, las
+diferencias y las vistas previas están en
+[Historial de versiones y restauración](/es/everyone/version-history/); los endpoints, en
+la [referencia de la API](/api/).
+
+Para publicar varios archivos HTML como un solo artefacto, mirá
+[Artefactos de varias secciones](/es/guides/multi-page/).
+
 ## Eliminar y restaurar
 
 Eliminar un artefacto es un **borrado suave** con una ventana de recuperación de 30

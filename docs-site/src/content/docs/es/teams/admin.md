@@ -137,6 +137,7 @@ Flags destacados:
 | Clave | Por defecto | Efecto |
 | --- | --- | --- |
 | `ai.web_agent` | off | [Asistente del workspace](/es/teams/workspace-assistant/) en el home |
+| `ai.version_summaries` | on | **Version change notes** — una nota de IA de una línea sobre "qué cambió" para las versiones publicadas sin mensaje, en Historial y Detalles. Mirá [Historial de versiones](/es/everyone/version-history/#notas-de-cambios) |
 
 ```http
 GET /v1/workspaces/{workspaceId}/features

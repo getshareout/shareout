@@ -53,7 +53,7 @@ Base path: `/v1/data/{artifactId}/comments`
 | `PATCH` | `/{id}` | Edit content (author or artifact owner) |
 | `DELETE` | `/{id}` | Delete (author or artifact owner) |
 | `GET` | `/{id}/replies` | Direct replies |
-| `PATCH` | `/{id}/resolve` | `{ "resolved": true \| false }` — author, owner, or assignee |
+| `PATCH` | `/{id}/resolve` | `{ "resolved": true \| false }` — author, owner, assignee, or anyone with [review access](/everyone/review/#who-can-review) |
 | `PATCH` | `/{id}/assign` | `{ "assignee": "email" \| null, "dueAt"?: string \| null }` — signed in |
 | `POST` | `/{id}/reactions` | `{ "emoji": "👍" }` toggle — signed in |
 | `GET` / `PUT` | `/_config` | Per-artifact config (PUT owner-only) |

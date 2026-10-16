@@ -25,6 +25,11 @@ Unresolved comments on your pages appear in **Needs You** on [Home](/everyone/yo
 You can reply from the page viewer or the **Comments** tab in the Inspector without
 opening the full editor.
 
+Reviewing a draft? Pin comments to the exact spot, resolve and assign them, and approve
+the version that's ready — see [Review & approvals](/everyone/review/). Every publish is
+kept in [Version history](/everyone/version-history/), so an editor's change can always
+be undone.
+
 ## Access requests
 
 When someone opens your private page but isn't on the invite list, they can tap

@@ -10,7 +10,7 @@ ShareOut **Home** is where you manage pages, see what needs attention, and open 
 | **Left rail** | Brand, **Create with AI**, lenses (Brief, All Artifacts, Assets, Schedules, Alerts, Analytics, Datasets, **Catalog**, **Knowledge**, Crew AI, Library, Connectors), **Admin** (owners/admins), Following, account menu |
 | **Canvas** | Tab strip (Home + open pages); Brief widgets and artifact views; bottom **agent dock** |
 | **Top bar** | **Notifications** bell (left of avatar), account menu, space switcher |
-| **Right rail** | Context **Inspector** — Activity on Home; Details / Deliver / Comments / Automate / Editing on artifact tabs |
+| **Right rail** | Context **Inspector** — Activity on Home; Details / Deliver / Comments / History / Automate / Editing on artifact tabs |
 
 Rails and panes are resizable; widths are remembered in your browser.
 
@@ -159,11 +159,12 @@ reorder — your layout is remembered per browser):
 
 | Section | Purpose |
 | --- | --- |
-| **Details** | Star, title, visibility (segmented control), folder tree, compact meta pills, **Shared with** card (inline invite + per-viewer breakdown), tags, tests |
+| **Details** | Star, title, visibility (segmented control), folder tree, compact meta pills, **Shared with** card (inline invite + per-viewer breakdown), tags, tests. Also: the live version's change note ("Updated …"), **Approve this version**, **Pages (N)** for [multi-page artifacts](/guides/multi-page/), and **Knowledge from this artifact** when [Knowledge](/teams/knowledge/) learned notes from it |
 | **Deliver** | One-shot send to **email**, **Slack**, or **Telegram** — runs immediately, no agent turn. Pick a Slack channel from a searchable picker (no pasting channel IDs). **Schedule** opens Automate to create a recurring job. If Telegram or Slack is not connected yet, **Connect** walks you through linking; **Check again** refreshes status after OAuth. |
 | **Watches** | One-click **metric watches** on this page's tables — row count, column sum, or last value. Alerts in the bell when the value moves ±20% from its baseline (hourly check). See [Metric alerts → Watches](/guides/metric-alerts/#metric-watches). |
-| **Comments** | Full thread, replies, @mentions, composer |
-| **Automate** | Schedules and crew triggers for this page |
+| **Comments** | Full thread, replies, @mentions, composer. **Open / All** filter, **Resolve / Reopen**, **Assign**, and an "on vN" hint for comments on older versions — see [Review & approvals](/everyone/review/) |
+| **History** | Every version with who, how and what changed; line diff, compare any two, preview, and non-destructive **Restore** — see [Version history](/everyone/version-history/) |
+| **Automate** | Schedules and crew triggers for this artifact only. Owners and editors see the shared schedules plus their own personal deliveries; other people's personal subscriptions stay private to them |
 | **Editing** | Property panel when Edit mode is on (formatting, blocks, AI) |
 
 On **Home**, the Inspector shows **Activity** (Needs You + Pulse) instead.

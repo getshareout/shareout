@@ -132,7 +132,11 @@ The **Knowledge** lens opens in a **tree** view by default — indented branches
 
 - **Tree view** — scan hierarchy, freshness badges, and pinned markers at a glance. Guidance lives under its own branch.
 - **Table view** — KPI strip (pages learned, topics, entities, last updated), search, a filter for note kind, and sortable rows (title, kind, topics, source count, learned date).
-- **Note detail** — metadata, distilled body, and **Sources** (click to open the page). A freshness line ("Learned 3 days ago") shows how current the note is.
+- **Note detail** — metadata, distilled body, and **Sources**: each source shows the artifact's name and opens it in a tab. A source you can't open (deleted, held, or someone else's private artifact) shows as "artifact not available" with no link. A freshness line ("Learned 3 days ago") shows how current the note is.
+
+### From an artifact to its notes
+
+On an artifact tab, **Details** in the Inspector lists **Knowledge from this artifact** — the notes learned from it — when there are any. Each one opens the note in Knowledge (`#l/knowledge/<path>`).
 
 **Learn from existing pages** shows a progress bar while the on-demand distill run works (`GET /knowledge/status` — `queued`, `processed`, `total`, `running`). Large backfills may continue on the hourly cron after the bar finishes.
 
@@ -155,7 +159,8 @@ MCP connector, plus the notes reader:
   question. Returns cited **passages** from uploaded Files (PDFs, docs, sheets…) and pages,
   plus matching note summaries. A `kind` filter narrows it to notes only.
 - **`knowledge_get`** — read one note in full, including its distilled body and the pages it was
-  learned from. Pass the note's `path` or `id` from a search result.
+  learned from. Each source comes with its title and link (or marked unavailable), and the
+  assistant cites those links in its answer. Pass the note's `path` or `id` from a search result.
 - **`knowledge_entity`** — one client, person, product or project: what it connects to and the
   quoted passages that mention it.
 - **`knowledge_facts`** — recorded facts (amounts, dates, statuses…) about an entity, each with
@@ -178,7 +183,8 @@ the per-note routes return `404` — never an error.
 | `GET` | `/v1/workspaces/{id}/knowledge` | Member+ | Settings + counts (`enabled`, `counts`, `lastUpdated`, `total`) |
 | `GET` | `/v1/workspaces/{id}/knowledge/status` | Member+ | Training progress (`queued`, `processed`, `total`, `running`, `lastProcessedAt`) — 24h window |
 | `GET` | `/v1/workspaces/{id}/knowledge/tree` | Member+ | All note summaries grouped by kind (no bodies) |
-| `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | One note — full markdown body + sources |
+| `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | One note — full markdown body + sources, with each source artifact's title, slug and link when you can open it |
+| `GET` | `/v1/workspaces/{id}/knowledge/from/{artifactId}` | Member+ | Notes learned from one artifact; empty when Knowledge is off or you can't open the artifact |
 | `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Replace a note's markdown; marks it as hand-edited |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Delete a note; `forget=1` stops it being re-learned |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | Turn learning on or off (**paid plan** required to enable) |

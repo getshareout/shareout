@@ -31,9 +31,13 @@ Un nivel más alto incluye los de abajo. Podés compartir una carpeta entera con
 
 `POST /v1/workspaces/{id}/share-person` invita un email externo y otorga **view** o **comment** sobre un **archivo** o **carpeta**. Requiere Teams/Enterprise + admin. La persona aparece en `/shared` sin crear una org de cliente. Devuelve `409 ALREADY_MEMBER` si el email ya es miembro interno.
 
+Quienes gestionan una carpeta (no solo los admins) también pueden hacerlo desde el panel **Quién tiene acceso** de la carpeta, y elegir cuándo termina el acceso: **En 7 días**, **En 30 días**, **En 90 días**, **En una fecha…** o **Nunca**. El acceso se corta apenas vence; si volvés a compartir, la fecha nueva reemplaza a la anterior. El email de invitación lleva directo al portal de la carpeta. Mirá [Portales de clientes](/es/teams/client-portals/).
+
 ## Recibos de lectura
 
 Cada vez que un cliente abre algo que compartiste, queda registrado. En la vista del cliente vas a ver actividad reciente — *"alguien en Acme abrió el deck del Q3."* Una señal clara para renovaciones y seguimiento.
+
+Para una carpeta puntual, **Quién abrió qué** en el panel de acceso de la carpeta lista qué abrieron, comentaron o descargaron ahí las personas de afuera.
 
 ## Acceso API para clientes
 

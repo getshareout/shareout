@@ -23,6 +23,36 @@ covers workspace folders only.
 | Team Space | All workspace members | `owner` / `admin`; `member` unless turned off | `/v1/workspaces/{id}/folders` |
 | Personal | Owner (+ linked accounts) | Owner | `/v1/folders` |
 
+## Links and access
+
+**Share a folder link.** Opening a folder on Home puts it in the address bar as
+`#l/artifacts/<folderId>`, so a bookmark or a pasted link opens that folder with its
+breadcrumbs, and back/forward work. **Copy link** in the folder header copies it.
+
+**See who has access.** The folder header shows an access pill — **Private**,
+**Workspace**, **Public** or **Shared externally** — with avatars of the people and
+client orgs that have access through this folder or one above it. A folder set to
+**Same as the parent folder** shows the access it inherits ("Inherited from …").
+
+**Manage access.** Click the pill to open **Who has access**. A folder manager can:
+
+- change **Visibility**: Same as the parent folder, Workspace, Public or Private;
+- share with someone outside the workspace by email, at **View** or **Comment**, with an
+  optional end date (7, 30 or 90 days, or a date);
+- **Remove** a person;
+- see **Who opened what** — what people outside the workspace opened, commented on or
+  downloaded in this folder;
+- **Copy client portal link**.
+
+Folder managers are workspace owners and admins, plus the folder's creator while
+**Members can create folders** is on. Everyone else sees the panel read-only. More in
+[Client portals](/teams/client-portals/).
+
+<Aside type="caution">
+A folder's visibility is shown on the folder and drives the access pill. It does not
+override the visibility of each artifact inside it; set that per artifact.
+</Aside>
+
 ## Endpoints
 
 ```http

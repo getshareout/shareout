@@ -50,6 +50,14 @@ Solo la primera página es visible por defecto. Las demás se ocultan con el atr
 
 El SDK gestiona la visibilidad cuando un `data-shareout-link` navega entre páginas.
 
+### Varios archivos HTML (sitios)
+
+`data-shareout-page` divide **un** archivo HTML en vistas. Un artefacto también puede
+tener varios archivos HTML — `index.html` más `procedimientos/alta.html`, etc. —
+enlazados con hrefs **relativos** comunes. Los enlaces al mismo artefacto no salen de él,
+cada sección tiene su URL (`?page=` en el visor, `#a/{slug}/{sección}` en Home) y Home
+lista las secciones en Detalles. Mirá [Artefactos de varias secciones](/es/guides/multi-page/).
+
 ## Secciones
 
 Las secciones subdividen una página en el esquema del editor:
@@ -216,3 +224,4 @@ Las secciones pueden marcarse para compartirse directamente con `data-shareout-d
 - [Resumen](/es/spec/overview/) — referencia completa de atributos y checklist de cumplimiento
 - [Bindings](/es/spec/bindings/) — bindings de datos dentro de páginas y secciones
 - [Templates](/es/spec/templates/) — contenido repetitivo y gráficos dentro de páginas
+- [Artefactos de varias secciones](/es/guides/multi-page/) — varios archivos HTML en un artefacto
