@@ -86,7 +86,17 @@ async function proxySharedTable(
     }, ctx.origin);
   }
 
-  if (isWriteOp(request.method, tail) && grant.access !== 'readwrite') {
+  const write = isWriteOp(request.method, tail);
+  // Writes need the caller's own write capability (owner/member, or the owner's
+  // anonymous-write opt-in) and a token that carries data:write.
+  if (write && (ctx.canWrite !== true || ctx.readOnlyToken)) {
+    return errorResponse({
+      ...DATA_ERRORS.FORBIDDEN,
+      message: 'This caller cannot write to workspace shared tables.',
+    }, ctx.origin);
+  }
+
+  if (write && grant.access !== 'readwrite') {
     return errorResponse({
       ...DATA_ERRORS.FORBIDDEN,
       message: `Shared table "${sharedName}" is read-only.`,
@@ -103,6 +113,9 @@ async function proxySharedTable(
     artifactId: grant.owner_artifact_id,
     db: createMiniDb(ctx.env, grant.owner_artifact_id, ctx.workspaceId),
     viewerScope: null,
+    // Ownership of the calling artifact does not carry over to the source table.
+    isOwner: grant.owner_artifact_id === ctx.artifactId ? ctx.isOwner : false,
+    isArtifactOwner: grant.owner_artifact_id === ctx.artifactId ? ctx.isArtifactOwner : false,
   };
 
   const ownerPath = '/' + [grant.source_table_name, ...tail].join('/');
