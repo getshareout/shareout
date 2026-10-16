@@ -43,7 +43,7 @@ async function semanticKeys(env: Env, workspaceId: string, q: string): Promise<{
   }
 }
 
-export interface Visible { title: string; url: string | null }
+export interface Visible { title: string; url: string | null; slug?: string }
 
 /** Which sources this member may see right now: the source still exists in the workspace
  *  and is not someone else's private page/file. */
@@ -62,7 +62,7 @@ export async function visibleSources(env: Env, workspaceId: string, userId: stri
           AND a.id IN (${pages.map(() => '?').join(',')})`,
     ).bind(workspaceId, ...pages).all<{ id: string; name: string; slug: string; owner_id: string; visibility: string }>()).results || [];
     for (const r of rows) {
-      if (r.visibility !== 'private' || r.owner_id === userId) visible.set(r.id, { title: r.name, url: `${origin}/a/${r.slug}/` });
+      if (r.visibility !== 'private' || r.owner_id === userId) visible.set(r.id, { title: r.name, url: `${origin}/a/${r.slug}/`, slug: r.slug });
     }
     // Pages awaiting moderation stay in the corpus but out of results until approved.
     const live = new Set(((await env.DB.prepare(
