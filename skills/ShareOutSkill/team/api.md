@@ -415,13 +415,14 @@ Share folders and artifacts **outside** the workspace with typed Client orgs (cl
 | `GET/PATCH/DELETE` | `/v1/workspaces/{id}/sharees/{sid}` | Admin+ | Read/update/delete Client (branding, properties). |
 | `GET/POST/DELETE` | `/v1/workspaces/{id}/sharees/{sid}/members[/{uid}]` | Admin+ | Invite/remove external members. |
 | `GET/POST/DELETE` | `/v1/workspaces/{id}/grants[/{gid}]` | Admin+ | Folder/artifact/**file** grants (`view`/`comment`/`create`/`edit`). A folder's manager (its creator, while members manage their folders) may also `GET ?resource_type=folder&resource_id=…` and `DELETE` grants on that folder. |
-| `POST` | `/v1/workspaces/{id}/share-person` | Admin+ (or the folder's manager) | Share one file/folder with one outside email — `{ email, resource_type, resource_id, capability }`. |
+| `POST` | `/v1/workspaces/{id}/share-person` | Admin+ (or the folder's manager) | Share one file/folder with one outside email — `{ email, resource_type, resource_id, capability, expires_in_days?, expires_at? }`; re-share replaces the expiry. |
 | `GET/POST/DELETE` | `/v1/workspaces/{id}/sharees/{sid}/members/{uid}/tokens[/{tid}]` | Admin+ | Scoped external `sot_` tokens (never `artifacts:publish`). |
 | `GET` | `/v1/workspaces/{id}/sharees/{sid}/activity` | Admin+ | Read receipts for one Client. |
 | `GET` | `/v1/workspaces/{id}/sharee-activity` | Admin+ | Read receipts across all Clients. |
+| `GET` | `/v1/workspaces/{id}/folders/{fid}/activity` | Folder manager | Who opened what across one folder's subtree (max 100). |
 | `GET/PUT/DELETE` | `/v1/workspaces/{id}/sharees/{sid}/context[/{name}]` | Member read / admin write | Per-client private notes (AI memory). |
 
-External members browse granted pages and files at **`GET /shared`** (branded portal). If create returns `403 EXTERNAL_SHARING_NOT_ENTITLED` on self-host, treat as feature/config — not a plan to buy.
+External members browse granted pages and files at **`GET /shared`** (branded portal); **`/shared?folder=<id>`** is one folder's client portal, where a folder invite's join link lands. If create returns `403 EXTERNAL_SHARING_NOT_ENTITLED` on self-host, treat as feature/config — not a plan to buy.
 
 ## Workspace Library
 
@@ -515,7 +516,8 @@ Opt-in learned library. Full guide: [knowledge.md](knowledge.md). On self-host, 
 | `GET` | `/v1/workspaces/{id}/knowledge` | Member+ | Settings + counts. |
 | `GET` | `/v1/workspaces/{id}/knowledge/status` | Member+ | Training progress (24h window). |
 | `GET` | `/v1/workspaces/{id}/knowledge/tree` | Member+ | Note summaries by kind. |
-| `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | One note (full body). |
+| `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | One note (full body) + `source_artifacts` `[{ id, slug, title, url, available }]`. |
+| `GET` | `/v1/workspaces/{id}/knowledge/from/{artifactId}` | Member+ | Notes learned from one artifact `{ enabled, notes: [{ path, kind, id, title }] }`; empty when you can't open it. |
 | `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Upsert note markdown. |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Delete; `forget=1` stops re-learn. |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | `{ "enabled": true }`. |

@@ -269,4 +269,75 @@ const knowledgeStatus: ToolDef = {
   },
 };
 
-export const KNOWLEDGE_TOOLS: ToolDef[] = [knowledgeSearch, knowledgeEntity, knowledgeFacts, knowledgeStatus];
+interface SourceArtifact { id: string; slug: string | null; title: string | null; url: string | null; available: boolean }
+
+const knowledgeNote: ToolDef = {
+  name: 'knowledge_get',
+  title: 'Read one knowledge note',
+  description: [
+    'Reads one note the workspace has learned (a topic, client, project…) in full, by its path (from knowledge_from_artifact, e.g. topics/retention.md),',
+    'with the pages it was learned from. Cite available sources by title with their link; an unavailable source is gone or not visible to the person, so do not guess what it was.',
+    ANSWER, ON_FAILURE,
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: { path: { type: 'string', description: 'The note path, ending in .md.' }, workspace_id: WORKSPACE_ARG },
+    required: ['path'],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: true, openWorldHint: false },
+  async run(ctx, args) {
+    const path = str(args.path, 300);
+    if (!path) return fail('path is required.');
+    const w = await pickWorkspace(ctx, args, 'knowledge_get');
+    if (isResult(w)) return w;
+    const { status, body } = await knowledgeGet(ctx, w.id, `files/${path.split('/').map(encodeURIComponent).join('/')}`);
+    if (status === 404 && body.code === 'NOT_FOUND') return ok(`There is no note "${path}" in "${w.name}" (or Knowledge is off there).`, { found: false, workspace_id: w.id });
+    if (status !== 200) return notAnswered(w, status, body);
+    const node = body.node as { title?: string; kind?: string; body?: string; source_artifacts?: SourceArtifact[] };
+    const sources = node.source_artifacts ?? [];
+    const text = [
+      `${node.title ?? path} (${node.kind ?? 'note'}) in "${w.name}":`,
+      node.body ?? '',
+      ...(sources.length ? ['Learned from:', ...sources.map((s) => s.available ? `- ${s.title} (${s.url})` : '- a page that is gone or not visible to the person')] : []),
+      ANSWER,
+    ].join('\n');
+    return ok(text, { workspace_id: w.id, node });
+  },
+};
+
+const knowledgeFromArtifact: ToolDef = {
+  name: 'knowledge_from_artifact',
+  title: 'Notes learned from a page',
+  description: ['Lists the knowledge notes the workspace learned from one page (the reverse of a note\'s sources), with the paths knowledge_get takes. Empty when the person cannot open the page.', ANSWER].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: { artifact_id: { type: 'string', description: 'The page id.' }, workspace_id: WORKSPACE_ARG },
+    required: ['artifact_id'],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: true, openWorldHint: false },
+  async run(ctx, args) {
+    const artifactId = str(args.artifact_id, 100);
+    if (!artifactId) return fail('artifact_id is required.');
+    // Default to the page's own workspace. The route still checks membership and that the
+    // person may open the page, so reading this column decides nothing about access.
+    let wsArgs = args;
+    if (!str(args.workspace_id, 100)) {
+      const row = await ctx.env.DB.prepare('SELECT workspace_id FROM artifacts WHERE id = ?').bind(artifactId).first<{ workspace_id: string | null }>();
+      if (row?.workspace_id) wsArgs = { ...args, workspace_id: row.workspace_id };
+    }
+    const w = await pickWorkspace(ctx, wsArgs, 'knowledge_from_artifact');
+    if (isResult(w)) return w;
+    const { status, body } = await knowledgeGet(ctx, w.id, `from/${encodeURIComponent(artifactId)}`);
+    if (status !== 200) return notAnswered(w, status, body);
+    if (body.enabled === false) return notAnswered(w, 200, { code: 'KNOWLEDGE_DISABLED' });
+    const notes = (body.notes ?? []) as Array<{ path: string; kind: string; id: string; title: string }>;
+    const text = notes.length
+      ? [`${notes.length} notes in "${w.name}" were learned from this page:`, ...notes.map((n) => `- ${n.title} (${n.kind}) — path ${n.path}`)].join('\n')
+      : `No notes in "${w.name}" come from this page (or the person cannot open it).`;
+    return ok(text, { workspace_id: w.id, artifact_id: artifactId, notes });
+  },
+};
+
+export const KNOWLEDGE_TOOLS: ToolDef[] = [knowledgeSearch, knowledgeEntity, knowledgeFacts, knowledgeStatus, knowledgeNote, knowledgeFromArtifact];

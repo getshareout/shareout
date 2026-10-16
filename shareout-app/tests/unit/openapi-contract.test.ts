@@ -38,6 +38,7 @@ function openApiPathToUrl(path: string): string {
   return path
     .replace(/\{artifactId\}/g, 'art_openapi_contract')
     .replace(/\{id\}/g, 'art_openapi_contract')
+    .replace(/\{versionNo\}/g, '1')
     .replace(/\{email\}/g, 'user%40example.com');
 }
 

@@ -14,9 +14,11 @@ POST   /v1/jobs/{id}/run     # Manual trigger
 GET    /v1/jobs/{id}/logs    # Recent execution logs (status, error, duration)
 ```
 
-`GET /v1/jobs?artifact_id=…` is owner-aware: the artifact's owner/editor sees **every**
-schedule on it (including viewer DM subscriptions); anyone else sees only their own.
-A job's creator **or** the artifact owner may pause/delete/run it.
+`GET /v1/jobs?artifact_id=…` is owner-aware: the artifact's owner/editor sees its **shared**
+schedules plus their own personal deliveries; other people's personal subscriptions (a Slack DM,
+an email to their own address, their own linked Telegram) stay hidden. Anyone else sees only
+their own. Without `artifact_id` you get your own jobs, optionally narrowed with `?workspace_id=`.
+A job's creator **or** the artifact owner may pause/delete/run it by id.
 Viewers may only schedule delivery to themselves (their own email, their linked
 Telegram, or a Slack DM); anything else — or an artifact you can't access — is `403 FORBIDDEN`.
 Cron schedules run in **UTC**: convert the recipient's local time before sending.
@@ -290,9 +292,9 @@ the message then the snapshot.
 
 **Viewer self-subscription:** a non-owner with access to an artifact may schedule a
 Slack **DM to themselves** (`targetType: 'dm'` with their own `slackUserId`) or an
-email to their own account address — no other channels/recipients. The artifact's
-owner sees and can pause/delete every schedule on their artifact (see
-`GET /v1/jobs?artifact_id=…` below). Each run re-checks the creator still has access;
+email to their own account address — no other channels/recipients. Such a subscription is
+private to its creator: it does not appear in the owner's `GET /v1/jobs?artifact_id=…`
+list, though the artifact owner can still pause/delete it by id. Each run re-checks the creator still has access;
 if access was revoked the job auto-pauses.
 
 ### TelegramConfig

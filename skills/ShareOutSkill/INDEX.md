@@ -28,6 +28,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Email files to workspace / workspace file inbox / share from phone | [team/assets.md](team/assets.md#add-files-without-opening-assets) | [team/workspace-assistant.md](team/workspace-assistant.md#file-attachments), [team/admin-portal.md](team/admin-portal.md) |
 | Build a page from an uploaded/emailed file (assistant) | [team/workspace-assistant.md](team/workspace-assistant.md#file-attachments) | [team/assets.md](team/assets.md) |
 | Share folders/artifacts OUTSIDE the team (clients, partners, investors) | [team/external-sharing.md](team/external-sharing.md) | [team/SKILL.md](team/SKILL.md), [team/admin-portal.md](team/admin-portal.md) |
+| Share one folder with an outside person (expiry, client portal link, who opened what) | [team/external-sharing.md](team/external-sharing.md#share-with-one-person-api) | [team/folders.md](team/folders.md#who-can-see-a-folder) |
 | Scoped external API token (client reads only granted data) | [team/external-sharing.md](team/external-sharing.md#scoped-api-tokens) | [team/agent-tokens.md](team/agent-tokens.md) |
 | Private notes ABOUT a client (AI auto-reads + updates) | [team/external-sharing.md](team/external-sharing.md#client-notes-ai-memory-about-a-client) | [team/workspace-assistant.md](team/workspace-assistant.md) |
 | Style an artifact / make it on-brand | [modules/ui/overview.md](modules/ui/overview.md) | [modules/ui/classes.md](modules/ui/classes.md), [modules/ui/components.md](modules/ui/components.md) |
@@ -64,6 +65,9 @@ There is no public hosted default — resolve origin or deploy first.
 | Save simple state (theme, filters, flags) | [sdk/json.md](sdk/json.md) | [core/html-spec/manifest.md](core/html-spec/manifest.md) |
 | Add comments / threaded discussion | [sdk/comments.md](sdk/comments.md) | [modules/_shared/permissions.md](modules/_shared/permissions.md) |
 | Comment action items (assign to person, due date) | [sdk/comments.md](sdk/comments.md#action-items) | [team/activity-feed.md](team/activity-feed.md) |
+| Review a page: resolve/assign comments, approve a version | [sdk/comments.md](sdk/comments.md#review-mode) | [api/artifacts.md](api/artifacts.md#versions--restore) |
+| Version history, change notes, restore an older version | [api/artifacts.md](api/artifacts.md#versions--restore) | [integrations/mcp-connector.md](integrations/mcp-connector.md) |
+| Multi-page site (several HTML files linked together) | [api/artifacts.md](api/artifacts.md#multi-page-sites-several-html-files) | [core/html-spec/pages.md](core/html-spec/pages.md#multiple-html-files-sites) |
 | Real-time collaboration | [sdk/realtime.md](sdk/realtime.md) | [modules/_shared/permissions.md](modules/_shared/permissions.md) |
 | File uploads | [sdk/blobs.md](sdk/blobs.md) | [patterns/uploads.md](patterns/uploads.md) |
 | AI chat agent | [agents/overview.md](agents/overview.md) | [agents/context.md](agents/context.md) |
