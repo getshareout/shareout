@@ -119,14 +119,29 @@ describe('GET /v1/files/:id/content (work/042 P3)', () => {
 });
 
 describe('GET /v1/files/:id metadata (work/042 P4)', () => {
-  it('returns metadata + usage for a workspace file', async () => {
+  it('returns metadata + usage for a workspace file to its owner', async () => {
     await e.DB.exec(`INSERT INTO file_artifact_usage (deliverable_id, artifact_id) VALUES ('dW','art1')`);
-    const res = await handleFileMeta(req('dW'), e, 'dW');
+    const res = await handleFileMeta(req('dW', await cookieFor('usr_owner', 'owner@x.com')), e, 'dW');
     expect(res.status).toBe(200);
     const body = await res.json() as { name: string; contentUrl: string; usedIn: unknown[] };
     expect(body.name).toBe('Logo');
     expect(body.contentUrl).toBe('/v1/files/dW/content');
     expect(body.usedIn.length).toBe(1);
+  });
+
+  it('lists usage for internal members only; anonymous, outsiders and external members get none', async () => {
+    await e.DB.exec(`INSERT INTO file_artifact_usage (deliverable_id, artifact_id) VALUES ('dW','art1')`);
+    await e.DB.exec(`INSERT INTO users (id, email) VALUES ('usr_member','member@x.com')`);
+    await e.DB.exec(`INSERT INTO workspace_members (id, workspace_id, user_id, role, member_class) VALUES ('wm_m','${WS}','usr_member','member','internal'),('wm_x','${WS}','usr_ext','member','external')`);
+    const usedIn = async (cookie?: string) => {
+      const res = await handleFileMeta(req('dW', cookie), e, 'dW');
+      expect(res.status).toBe(200);
+      return ((await res.json()) as { usedIn: unknown[] }).usedIn.length;
+    };
+    expect(await usedIn()).toBe(0);
+    expect(await usedIn(await cookieFor('usr_other', 'other@x.com'))).toBe(0);
+    expect(await usedIn(await cookieFor('usr_ext', 'ext@client.com'))).toBe(0);
+    expect(await usedIn(await cookieFor('usr_member', 'member@x.com'))).toBe(1);
   });
 
   it("denies an anonymous viewer a private file's metadata", async () => {
