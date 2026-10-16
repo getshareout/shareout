@@ -19,6 +19,7 @@ import {
   type ActivityKind,
 } from './events';
 import type { PulseWindow } from './types';
+import type { WorkspaceRole } from '../../types';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { canManageTeamFolder, membersCanCreateFolders } from '../../folders';
 import { isFeatureEnabled } from '../../features/flags';
@@ -45,19 +46,30 @@ async function resolveWorkspace(
 
 /**
  * resolveWorkspace + the linked-account visibility scope, for handlers whose queries
- * need it anyway. The host lookup and the scope run in one wave, and the scope is
- * handed to the query instead of being re-resolved there. Same 403 rule.
+ * need it anyway. The host lookup (KV-cached), the scope, the session user's internal
+ * role and any `extra` per-workspace read (config, never artifact rows) run in one
+ * wave. An internal role already proves membership (user.id is always in
+ * vis.userIds), so only a viewer without one pays the linked-account membership query.
+ * Same 403 rule as resolveWorkspace.
  */
-async function resolveWorkspaceScope(
+async function resolveWorkspaceScope<T = undefined>(
   request: Request,
   env: Env,
   user: { id: string; email: string | null },
-): Promise<{ workspaceId: string | null; vis: VisibilityScope } | Response> {
-  const [hostWs, vis] = await Promise.all([hostWorkspaceId(request, env), getVisibilityScope(env, user)]);
-  const ws = hostWs || new URL(request.url).searchParams.get('workspace')?.trim() || null;
-  if (!ws) return { workspaceId: null, vis };
-  if (await isLinkedWorkspaceMember(env, vis, ws)) return { workspaceId: ws, vis };
-  return jsonWithApiErrors({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
+  extra?: (workspaceId: string | null) => Promise<T>,
+): Promise<{ workspaceId: string | null; vis: VisibilityScope; role: WorkspaceRole | null; extra: T } | Response> {
+  const param = new URL(request.url).searchParams.get('workspace')?.trim() || null;
+  const wsP = hostWorkspaceId(request, env).then((h) => h || param);
+  const [workspaceId, vis, role, more] = await Promise.all([
+    wsP,
+    getVisibilityScope(env, user),
+    wsP.then((ws) => (ws ? getInternalWorkspaceRole(env, ws, user.id) : null)),
+    extra ? wsP.then(extra) : (undefined as T),
+  ]);
+  if (workspaceId && !role && !(await isLinkedWorkspaceMember(env, vis, workspaceId))) {
+    return jsonWithApiErrors({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
+  }
+  return { workspaceId, vis, role, extra: more };
 }
 
 const PULSE_WINDOWS: PulseWindow[] = ['today', '7d', '30d'];
@@ -69,13 +81,13 @@ export async function handleHomeActivityFeedApi(
   user: { id: string; email: string | null },
 ): Promise<Response> {
   const url = new URL(request.url);
-  const ctx = await resolveWorkspaceScope(request, env, user);
+  const ctx = await resolveWorkspaceScope(request, env, user, (ws) => resolveWorkspaceAudiences(env, ws));
   if (ctx instanceof Response) return ctx;
-  const { workspaceId, vis } = ctx;
+  const { workspaceId, vis, role, extra: aud } = ctx;
   const limit = Number(url.searchParams.get('limit')) || 30;
   const w = url.searchParams.get('window');
   const window: PulseWindow = PULSE_WINDOWS.includes(w as PulseWindow) ? (w as PulseWindow) : '7d';
-  const feed = await queryActivityFeed(env, user, { workspaceId, limit, window }, vis);
+  const feed = await queryActivityFeed(env, user, { workspaceId, limit, window }, vis, { role, aud });
   return Response.json(feed);
 }
 

@@ -517,16 +517,25 @@ async function canWriteArtifact(env: Env, artifactId: string, user: AuthUser, ar
   return !!collab && (collab.role === 'owner' || collab.role === 'editor');
 }
 
-async function canReadArtifact(env: Env, artifactId: string, user: AuthUser, artifact: ArtifactAuthRow): Promise<boolean> {
-  if (artifact.owner_id === user.id) return true;
-  if (artifact.workspace_id && (await getInternalWorkspaceRole(env, artifact.workspace_id, user.id))) return true;
-  const collab = await env.DB.prepare(
-    'SELECT role FROM collaborators WHERE artifact_id = ? AND email = ?'
-  ).bind(artifactId, user.email).first<{ role: string }>();
-  if (collab) return true;
+/**
+ * Read gate for analytics/presence: owner, internal workspace member, collaborator or
+ * an external view grant. The artifact row and the collaborator row load in one wave;
+ * the role and grant checks run only when those do not already grant.
+ */
+async function requireArtifactRead(env: Env, artifactId: string, user: AuthUser): Promise<Response | null> {
+  const [artifact, collab] = await Promise.all([
+    loadArtifactForAuth(env, artifactId),
+    env.DB.prepare(
+      'SELECT role FROM collaborators WHERE artifact_id = ? AND email = ?'
+    ).bind(artifactId, user.email).first<{ role: string }>(),
+  ]);
+  if (!artifact) return jsonError('Not found', 'NOT_FOUND', 404);
+  if (artifact.owner_id === user.id || collab) return null;
+  if (artifact.workspace_id && (await getInternalWorkspaceRole(env, artifact.workspace_id, user.id))) return null;
   // External-sharing spine (work/030): an external identity with a view grant
   // (e.g. a scoped sot_ token) may read this artifact's metadata.
-  return canAccess(env, { userIds: [user.id], emails: user.email ? [user.email] : [] }, 'artifact', artifactId, 'view');
+  if (await canAccess(env, { userIds: [user.id], emails: user.email ? [user.email] : [] }, 'artifact', artifactId, 'view')) return null;
+  return jsonError('Access denied', 'FORBIDDEN', 403);
 }
 
 async function handleUploadThumbnail(ctx: FetchContext, artifactId: string): Promise<Response> {
@@ -605,15 +614,8 @@ async function handleArtifactAnalytics(ctx: FetchContext, artifactId: string): P
   const user = await requireTokenOrSession(ctx);
   if (!isAuthUser(user)) return user;
 
-  const artifact = await loadArtifactForAuth(env, artifactId);
-
-  if (!artifact) {
-    return jsonError('Not found', 'NOT_FOUND', 404);
-  }
-
-  if (!(await canReadArtifact(env, artifactId, user, artifact))) {
-    return jsonError('Access denied', 'FORBIDDEN', 403);
-  }
+  const denied = await requireArtifactRead(env, artifactId, user);
+  if (denied) return denied;
 
   const days = parseInt(url.searchParams.get('days') || '7', 10);
   const analytics = await getAnalytics(env, artifactId, Math.min(days, 30));
@@ -627,13 +629,8 @@ async function handleArtifactPresence(ctx: FetchContext, artifactId: string): Pr
   const user = await requireTokenOrSession(ctx);
   if (!isAuthUser(user)) return user;
 
-  const artifact = await loadArtifactForAuth(env, artifactId);
-  if (!artifact) {
-    return jsonError('Not found', 'NOT_FOUND', 404);
-  }
-  if (!(await canReadArtifact(env, artifactId, user, artifact))) {
-    return jsonError('Access denied', 'FORBIDDEN', 403);
-  }
+  const denied = await requireArtifactRead(env, artifactId, user);
+  if (denied) return denied;
 
   let count = 0;
   try {

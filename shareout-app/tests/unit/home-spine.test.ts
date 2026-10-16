@@ -28,6 +28,7 @@ function mkEnv(allFor: (sql: string) => unknown[]): { env: Env; prepared: string
         })),
       };
     }),
+    batch: vi.fn(async (stmts: Array<{ all: () => Promise<unknown> }>) => Promise.all(stmts.map((s) => s.all()))),
   };
   return { env: { DB } as unknown as Env, prepared };
 }

@@ -152,21 +152,52 @@ export async function getAnalytics(
   const startDateStr = startDate.toISOString().split('T')[0];
 
   try {
-    // Get aggregated daily stats
-    const dailyResult = await env.DB.prepare(`
-      SELECT date, views, unique_visitors, top_referrers, top_countries
-      FROM analytics_daily
-      WHERE artifact_id = ? AND date >= ?
-      ORDER BY date DESC
-    `).bind(artifactId, startDateStr).all<{
+    // Daily aggregates, today's live (not yet aggregated) events, viewer tracking and
+    // perf are independent: one D1 batch plus two parallel reads = one round trip.
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStart = Math.floor(new Date(todayStr).getTime() / 1000);
+
+    const [[dailyResult, todayTotalsResult, todayReferrersResult, todayCountriesResult], viewerTracking, perf] = await Promise.all([
+      env.DB.batch([
+        env.DB.prepare(`
+          SELECT date, views, unique_visitors, top_referrers, top_countries
+          FROM analytics_daily
+          WHERE artifact_id = ? AND date >= ?
+          ORDER BY date DESC
+        `).bind(artifactId, startDateStr),
+        env.DB.prepare(`
+          SELECT COUNT(*) as views, COUNT(DISTINCT visitor_hash) as unique_visitors
+          FROM analytics_events
+          WHERE artifact_id = ? AND created_at >= ?
+        `).bind(artifactId, todayStart),
+        env.DB.prepare(`
+          SELECT referrer, COUNT(*) as count
+          FROM analytics_events
+          WHERE artifact_id = ? AND created_at >= ? AND referrer != ''
+          GROUP BY referrer
+          ORDER BY count DESC
+          LIMIT 10
+        `).bind(artifactId, todayStart),
+        env.DB.prepare(`
+          SELECT country, COUNT(*) as count
+          FROM analytics_events
+          WHERE artifact_id = ? AND created_at >= ? AND country != 'XX'
+          GROUP BY country
+          ORDER BY count DESC
+          LIMIT 10
+        `).bind(artifactId, todayStart),
+      ]),
+      getViewerTracking(env, artifactId),
+      getArtifactPerf(env, artifactId),
+    ]);
+
+    const dailyStats = (dailyResult.results || []) as Array<{
       date: string;
       views: number;
       unique_visitors: number;
       top_referrers: string | null;
       top_countries: string | null;
-    }>();
-
-    const dailyStats = dailyResult.results || [];
+    }>;
 
     let totalViews = 0;
     let uniqueVisitors = 0;
@@ -196,33 +227,6 @@ export async function getAnalytics(
       }
     }
 
-    // Also include today's live events (not yet aggregated)
-    const todayStr = new Date().toISOString().split('T')[0];
-    const todayStart = Math.floor(new Date(todayStr).getTime() / 1000);
-
-    const [todayTotalsResult, todayReferrersResult, todayCountriesResult] = await env.DB.batch([
-      env.DB.prepare(`
-        SELECT COUNT(*) as views, COUNT(DISTINCT visitor_hash) as unique_visitors
-        FROM analytics_events
-        WHERE artifact_id = ? AND created_at >= ?
-      `).bind(artifactId, todayStart),
-      env.DB.prepare(`
-        SELECT referrer, COUNT(*) as count
-        FROM analytics_events
-        WHERE artifact_id = ? AND created_at >= ? AND referrer != ''
-        GROUP BY referrer
-        ORDER BY count DESC
-        LIMIT 10
-      `).bind(artifactId, todayStart),
-      env.DB.prepare(`
-        SELECT country, COUNT(*) as count
-        FROM analytics_events
-        WHERE artifact_id = ? AND created_at >= ? AND country != 'XX'
-        GROUP BY country
-        ORDER BY count DESC
-        LIMIT 10
-      `).bind(artifactId, todayStart),
-    ]);
 
     const todayEvents = todayTotalsResult.results?.[0] as
       | { views: number; unique_visitors: number }
@@ -255,9 +259,6 @@ export async function getAnalytics(
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
       .map(([name, count]) => ({ name, count }));
-
-    const viewerTracking = await getViewerTracking(env, artifactId);
-    const perf = await getArtifactPerf(env, artifactId);
 
     return {
       totalViews,

@@ -9,6 +9,7 @@ import { generateWorkspaceSlug, SLUG_REGEX } from './slug';
 import { handleGetWorkspace } from './read';
 import { scheduleSeedStarterKit } from '../starter-kit/schedule';
 import { logAudit } from '../audit';
+import { invalidateWorkspaceSlug } from './host-cache';
 
 export async function handleListWorkspaces(
   request: Request,
@@ -95,7 +96,7 @@ export async function createWorkspaceForUser(
     VALUES (?, ?, ?, 'owner')
   `).bind(memberId, workspaceId, user.id).run();
 
-  await invalidateWorkspaceRole(env, workspaceId, user.id);
+  await Promise.all([invalidateWorkspaceRole(env, workspaceId, user.id), invalidateWorkspaceSlug(env, slug)]);
 
   // A fresh workspace opens populated, not empty: seed the personal kit plus the
   // team-only examples into it, in the background.
@@ -171,13 +172,16 @@ export async function handleUpdateWorkspace(
     values.push(body.description || null);
   }
 
+  let previousSlug: string | null = null;
   if (body.slug !== undefined) {
     if (!SLUG_REGEX.test(body.slug)) {
       return json({ error: 'Invalid slug. Use lowercase letters, numbers, and hyphens, starting and ending with a letter or number.', code: 'INVALID_SLUG' }, 400);
     }
-    const existing = await env.DB.prepare(
-      'SELECT id FROM workspaces WHERE slug = ? AND id != ?'
-    ).bind(body.slug, workspaceId).first();
+    const [existing, current] = await Promise.all([
+      env.DB.prepare('SELECT id FROM workspaces WHERE slug = ? AND id != ?').bind(body.slug, workspaceId).first(),
+      env.DB.prepare('SELECT slug FROM workspaces WHERE id = ?').bind(workspaceId).first<{ slug: string }>(),
+    ]);
+    previousSlug = current?.slug ?? null;
     if (existing) {
       return json({ error: 'Workspace slug already taken', code: 'SLUG_TAKEN' }, 409);
     }
@@ -204,6 +208,7 @@ export async function handleUpdateWorkspace(
   await env.DB.prepare(
     `UPDATE workspaces SET ${updates.join(', ')} WHERE id = ?`
   ).bind(...values).run();
+  if (body.slug !== undefined) await invalidateWorkspaceSlug(env, previousSlug, body.slug);
 
   if (typeof membersCanCreateFolders === 'boolean') {
     await logAudit(env, {
@@ -236,9 +241,11 @@ export async function handleDeleteWorkspace(
     }, 400);
   }
 
+  const doomed = await env.DB.prepare('SELECT slug FROM workspaces WHERE id = ?').bind(workspaceId).first<{ slug: string }>();
   await env.DB.prepare('DELETE FROM folders WHERE workspace_id = ?').bind(workspaceId).run();
   await env.DB.prepare('DELETE FROM workspace_members WHERE workspace_id = ?').bind(workspaceId).run();
   await env.DB.prepare('DELETE FROM workspaces WHERE id = ?').bind(workspaceId).run();
+  await invalidateWorkspaceSlug(env, doomed?.slug);
 
   return json({ success: true, deleted: workspaceId });
 }

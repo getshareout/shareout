@@ -8,6 +8,7 @@ const NOT_WORKERS_FILES = [
   'tests/unit/chat-agent/session-do.test.ts',
   'tests/unit/openapi-contract.test.ts',
   'tests/unit/source-timestamps.test.ts',
+  'tests/unit/http/d1-session-sources.test.ts',
   'tests/unit/pages/home-views.test.ts',
   'tests/unit/bundle-versions.test.ts',
   'tests/unit/scripts/stage-skill-bundle.test.ts',
@@ -88,6 +89,7 @@ export default defineConfig({
           include: [
             'tests/unit/openapi-contract.test.ts',
             'tests/unit/source-timestamps.test.ts',
+            'tests/unit/http/d1-session-sources.test.ts',
             'tests/unit/pages/home-views.test.ts',
             'tests/unit/bundle-versions.test.ts',
             'tests/unit/scripts/stage-skill-bundle.test.ts',

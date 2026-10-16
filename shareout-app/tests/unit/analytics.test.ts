@@ -41,7 +41,7 @@ function makeDbMock(handlers: DbHandlers = {}): Env['DB'] {
           const row = handlers.first?.(sql, ...args);
           return { success: true, results: row ? [row] : [] };
         }
-        if (sql.includes('GROUP BY referrer') || sql.includes('GROUP BY country')) {
+        if (sql.includes('GROUP BY referrer') || sql.includes('GROUP BY country') || sql.includes('FROM analytics_daily')) {
           const all = handlers.all?.(sql, ...args) as { results?: unknown[] } | undefined;
           return { success: true, results: all?.results ?? [] };
         }
@@ -291,8 +291,9 @@ describe('getAnalytics', () => {
     expect(summary.viewerTracking).toHaveLength(1);
     expect(summary.viewerTracking[0].email).toBe('viewer@example.com');
     expect(todayStr).toBeTruthy();
+    // Daily aggregates + today's three live queries: one batch, one round trip.
     expect(db.batch).toHaveBeenCalledTimes(1);
-    expect(db.batch.mock.calls[0][0]).toHaveLength(3);
+    expect(db.batch.mock.calls[0][0]).toHaveLength(4);
   });
 
   it('ignores malformed JSON in daily referrer/country fields', async () => {
