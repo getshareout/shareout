@@ -14,6 +14,8 @@ import { startIngest } from '../../knowledge/corpus/ingest';
 import { searchCorpus, searchResultMarkdown } from '../../knowledge/corpus/search';
 import { notesFromArtifact, sourceArtifacts } from '../../knowledge/source-links';
 import { knowledgeUsage } from '../../knowledge/corpus/usage';
+import { corpusStatus, reindexWorkspace, REINDEX_MAX } from '../../knowledge/corpus/reindex';
+import { isPlatformAdmin } from '../../superadmin/auth';
 import { entityMarkdown, listVisibleEntities, visibleEntity, visibleGraph } from '../../knowledge/corpus/graph';
 
 const PREFIX_RE = /^\/v1\/workspaces\/([^/]+)\/knowledge(?:\/(.*))?$/;
@@ -108,8 +110,56 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
   if (!isAuthUser(auth)) return auth;
 
   const role = await getInternalWorkspaceRole(ctx.env, workspaceId, auth.id);
-  if (!role) return cors(jsonError('Forbidden', 'FORBIDDEN', 403));
-  const canManage = role === 'owner' || role === 'admin';
+  // Instance admins may reindex and read status of any workspace (support / migrations);
+  // a workspace agent (sot_) token never counts, as on /v1/admin/*.
+  const superadmin = !role && (sub === 'reindex' || sub === 'status') && !auth.service
+    && (await isPlatformAdmin(ctx.env, auth.email, auth.id));
+  if (!role && !superadmin) return cors(jsonError('Forbidden', 'FORBIDDEN', 403));
+  const canManage = superadmin || role === 'owner' || role === 'admin';
+
+  // POST /reindex — re-learn the corpus even at unchanged versions (owner/admin, or an
+  // instance admin). Body { artifactIds?: string[] }; once per workspace per 10 minutes.
+  if (sub === 'reindex') {
+    if (method !== 'POST') return cors(jsonError('Method not allowed', 'METHOD_NOT_ALLOWED', 405));
+    if (!canManage) return cors(jsonError('Forbidden', 'FORBIDDEN', 403));
+    if (!(await isKnowledgeEnabled(ctx.env, workspaceId))) {
+      return cors(apiErrorResponse({
+        message: 'Knowledge is off for this workspace',
+        code: 'KNOWLEDGE_DISABLED',
+        status: 409,
+        hint: `An owner or admin turns it on with POST /v1/workspaces/${workspaceId}/knowledge/enable`,
+      }));
+    }
+    if (!corpusFor(ctx.env, workspaceId)) return cors(jsonError('Knowledge search is not configured on this instance', 'NOT_CONFIGURED', 501));
+    const text = await request.text();
+    let ids: string[] | null = null;
+    if (text.trim()) {
+      let body: { artifactIds?: unknown } | null = null;
+      try { body = JSON.parse(text); } catch { /* handled below */ }
+      const list = body?.artifactIds;
+      const valid = Array.isArray(list) && list.length > 0 && list.length <= REINDEX_MAX
+        && list.every((id) => typeof id === 'string' && id.length > 0 && id.length <= 100);
+      if (!body || typeof body !== 'object' || (list !== undefined && !valid)) {
+        return cors(apiErrorResponse({
+          message: `Body must be {} or {"artifactIds": ["…"]} (1–${REINDEX_MAX} ids)`,
+          code: 'VALIDATION_ERROR',
+          status: 400,
+          param: 'artifactIds',
+        }));
+      }
+      ids = valid ? [...new Set(list as string[])] : null;
+    }
+    const r = await reindexWorkspace(ctx.env, ctx.executionCtx, workspaceId, ids);
+    if (!r.ok) {
+      return cors(apiErrorResponse({
+        message: 'A reindex already ran for this workspace in the last 10 minutes',
+        code: 'RATE_LIMITED',
+        status: 429,
+        hint: `Try again in ${r.retryAfterSec} seconds; GET /v1/workspaces/${workspaceId}/knowledge/status shows progress.`,
+      }, { headers: { 'Retry-After': String(r.retryAfterSec) } }));
+    }
+    return cors(jsonResponse({ queued: r.queued, remaining: r.remaining, skipped: r.skipped }, 202));
+  }
 
   // POST /enable — turn knowledge on/off (owner/admin).
   if (sub === 'enable') {
@@ -136,8 +186,9 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
     return cors(jsonResponse({ queued, kicked, corpus: corpus.queued, corpusRemaining: corpus.remaining }));
   }
 
-  // GET /status — training progress over a 24h window. Answers even when disabled
-  // (before the enabled-gate block) so the client can poll from any lens state.
+  // GET /status — training progress over a 24h window, plus `corpus`: per-source status
+  // (members: only sources they may open). Answers even when disabled (before the
+  // enabled-gate block) so the client can poll from any lens state.
   if (sub === 'status') {
     if (method !== 'GET') return cors(jsonError('Method not allowed', 'METHOD_NOT_ALLOWED', 405));
     if (!(await isKnowledgeEnabled(ctx.env, workspaceId))) {
@@ -163,6 +214,7 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
         total: row?.total ?? 0,
         running: queued > 0,
         lastProcessedAt: row?.last ?? null,
+        corpus: await corpusStatus(ctx.env, workspaceId, canManage ? null : auth.id).catch(() => null),
       })
     );
   }

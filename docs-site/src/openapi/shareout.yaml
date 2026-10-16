@@ -2949,6 +2949,90 @@ paths:
                     type: boolean
                   lastProcessedAt:
                     type: [string, "null"]
+                  corpus:
+                    description: >-
+                      Per-source corpus status (null when the corpus is not configured).
+                      Owners, admins and instance admins see every source; members only
+                      sources they may open.
+                    type: [object, "null"]
+                    properties:
+                      chunker_version:
+                        type: integer
+                        description: Current chunker; sources with a lower one are re-learned overnight.
+                      last_reindex_at:
+                        type: [string, "null"]
+                      counts:
+                        type: object
+                        properties:
+                          queued: { type: integer }
+                          ready: { type: integer }
+                          failed: { type: integer }
+                          unsupported: { type: integer }
+                      sources:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: string }
+                            kind: { type: string, enum: [page, asset] }
+                            title: { type: string }
+                            status: { type: string, enum: [queued, ready, failed, unsupported] }
+                            version: { type: string, description: Version (page) or blob (File) indexed }
+                            chunker_version: { type: integer }
+                            outdated: { type: boolean }
+                            chunks: { type: integer }
+                            chunks_with_page: { type: integer, description: Chunks on a sub-page of a multi-page site }
+                            chunks_with_anchor: { type: integer, description: Chunks that deep-link to a section heading }
+                            error: { type: [string, "null"] }
+                            updated_at: { type: string }
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/knowledge/reindex:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    post:
+      tags: [Knowledge]
+      summary: Re-learn the corpus, even at unchanged versions
+      description: >-
+        Owner/admin of the workspace, or an instance admin. Re-chunks every live,
+        non-held page and File (or only `artifactIds`) with the current chunker, through
+        the normal ingest path (metered the same way). Once per workspace per 10 minutes;
+        at most 300 sources per call (`remaining` says how many are left).
+      operationId: reindexKnowledge
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                artifactIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 300
+                  items: { type: string }
+      responses:
+        "202":
+          description: Queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queued: { type: integer }
+                  remaining: { type: integer }
+                  skipped:
+                    type: array
+                    description: Requested ids that are not live, eligible sources of this workspace
+                    items: { type: string }
+        "400":
+          description: Bad body (`VALIDATION_ERROR`)
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Knowledge is off (`KNOWLEDGE_DISABLED`)
+        "429":
+          $ref: "#/components/responses/RateLimited"
   /v1/workspaces/{workspaceId}/knowledge/backfill:
     parameters:
       - $ref: "#/components/parameters/WorkspaceId"

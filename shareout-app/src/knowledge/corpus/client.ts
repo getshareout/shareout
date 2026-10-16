@@ -22,6 +22,13 @@ export interface SourceRow extends SourceMeta {
   updatedAt: string;
 }
 
+export interface SourceStats extends SourceRow {
+  chunkerVersion: number;
+  failCount: number;
+  withPage: number;
+  withAnchor: number;
+}
+
 export interface ChunkHit {
   refId: string;
   kind: SourceKind;
