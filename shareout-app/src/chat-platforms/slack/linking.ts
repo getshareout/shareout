@@ -132,9 +132,9 @@ export interface SlackConnectionOption {
 /** Slack bot connections the user can link through (workspace member + slack provider). */
 export async function listSlackConnectionsForUser(env: Env, userId: string): Promise<SlackConnectionOption[]> {
   const rows = await env.DB.prepare(
-    `SELECT wc.scope_id AS workspace_id, wc.name AS connection_name, w.name AS workspace_name
+    `SELECT wc.scope_id AS workspaceId, wc.name AS connectionName, w.name AS workspaceName
      FROM connections wc
-     JOIN workspace_members wm ON wm.workspace_id = wc.scope_id AND wm.user_id = ?
+     JOIN workspace_members wm ON wm.workspace_id = wc.scope_id AND wm.user_id = ? AND wm.member_class = 'internal'
      JOIN workspaces w ON w.id = wc.scope_id
      WHERE wc.scope_type = 'workspace' AND wc.provider = 'slack'
      ORDER BY w.name, wc.name`
