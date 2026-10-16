@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  signPayload,
   createAccessToken,
   createSessionToken,
   extractTokenFromCookie,
@@ -31,6 +32,22 @@ describe('session tokens', () => {
     await expect(verifySessionToken(tampered, env)).resolves.toBeNull();
     await expect(verifySessionToken(token, env)).resolves.toBeNull();
     await expect(verifySessionToken(`${payload}.!!!`, env)).resolves.toBeNull();
+  });
+
+  it('rejects other tokens signed with the same secret', async () => {
+    const access = await createAccessToken('art_1', 'viewer', env, 3600, 'viewer@example.com');
+    await expect(verifySessionToken(access, env)).resolves.toBeNull();
+
+    const sign = async (obj: unknown) => {
+      const data = btoa(JSON.stringify(obj));
+      return `${data}.${await signPayload(data, env.SESSION_SECRET)}`;
+    };
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    await expect(verifySessionToken(await sign({ artifactId: 'art_1', userId: 'usr_1', exp }), env)).resolves.toBeNull();
+    await expect(verifySessionToken(await sign({ u: 'usr_1', c: 'digest' }), env)).resolves.toBeNull();
+    await expect(verifySessionToken(await sign({ email: 'a@example.com', exp }), env)).resolves.toBeNull();
+    await expect(verifySessionToken(await sign({ userId: '', email: 'a@example.com', exp }), env)).resolves.toBeNull();
+    await expect(verifySessionToken(await sign({ userId: 'usr_1', email: null, exp }), env)).resolves.toMatchObject({ userId: 'usr_1' });
   });
 });
 
