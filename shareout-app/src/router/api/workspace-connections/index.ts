@@ -9,6 +9,7 @@
  * - `my-credentials` — per-user credential storage for per_user scope
  * - `oauth` — platform OAuth auth-url/callback and token persistence
  * - `slack` — Slack install, fixed callback, and channel listing
+ * - `mcp` — remote MCP servers: admin add, member OAuth connect, tool refresh
  */
 export { summarizeCredentials, buildProbeCredentials } from './credentials';
 export {
@@ -45,3 +46,10 @@ export {
   handleSlackOAuthCallback,
   handleListSlackChannels,
 } from './slack';
+export {
+  handleCreateMcpConnection,
+  handleMcpClientMetadata,
+  handleMcpConnect,
+  handleMcpOAuthCallback,
+  handleRefreshMcpTools,
+} from './mcp';

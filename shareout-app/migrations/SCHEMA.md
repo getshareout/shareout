@@ -224,7 +224,7 @@ first. `kind` splits queryable data sources (`generic`) from OAuth app connectio
 
 | Table | Holds |
 |---|---|
-| `connections` | Every outside system this instance reaches, at either scope. `provider` + JSON `config` say what it is, `encrypted_credentials`/`iv` hold one credential blob, and `cache_ttl_seconds`/`rate_limit_rpm` bound its use. Workspace rows add `is_private` (hide from other members), `credential_scope` (shared vs per-user auth) and `agent_query_enabled`. Sheets and GitHub OAuth grants are rows here too. |
+| `connections` | Every outside system this instance reaches, at either scope. `provider` + JSON `config` say what it is, `encrypted_credentials`/`iv` hold one credential blob, and `cache_ttl_seconds`/`rate_limit_rpm` bound its use. Workspace rows add `is_private` (hide from other members), `credential_scope` (shared vs per-user auth) and `agent_query_enabled`. Sheets and GitHub OAuth grants are rows here too. Remote MCP servers are `kind='platform'`, `provider='mcp'`, `credential_scope='per_user'` rows: `config` holds the server URL, the discovered OAuth client and the last tool list; `encrypted_credentials` holds the client secret when dynamic registration issued one. |
 | `connection_cache` | Query results cached to R2, keyed by `query_hash`, expiring via `expires_at`. |
 | `datasets` | Uploaded static datasets (`format`, `r2_key`, `sha256`, `version`). |
 | `connection_user_credentials` | One member's own credentials, when `credential_scope` is `per_user`. |
