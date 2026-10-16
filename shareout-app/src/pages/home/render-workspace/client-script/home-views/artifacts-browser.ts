@@ -51,8 +51,43 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     var edit = canManage ? '<button type="button" class="wsx-fguide__edit" onclick="editFolderReadme()" title="' + escAttr(t('artifacts.editGuide')) + '" aria-label="' + escAttr(t('artifacts.editGuide')) + '">' + PENCIL_SVG + '</button>' : '';
     return '<section class="wsx-fguide"><div class="wsx-fguide__head">' + GUIDE_SVG + '<span class="wsx-fguide__label">' + esc(t('artifacts.guideLabel')) + '</span>' + edit + '</div><div class="wsx-fguide__body">' + html + '</div></section>';
   }
+  var ACCESS_SVG = {
+    private: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+    workspace: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    public: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+    external: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/>',
+  };
+  var LINK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
+  function accessIcon(a) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + (ACCESS_SVG[a] || ACCESS_SVG.workspace) + '</svg>'; }
+  function initials(s) { var b = String(s || '').split('@')[0].split(/[\\s._-]+/).filter(Boolean); return ((b[0] || '?').charAt(0) + (b[1] ? b[1].charAt(0) : '')).toUpperCase(); }
+  function inheritedNote(name) { return t('artifacts.access.inheritedFrom').replace('{name}', name || t('artifacts.folderDefault')); }
+  function grantPeople(fa) {
+    var seen = {}, out = [];
+    ((fa && fa.grants) || []).forEach(function (g) { var k = g.subject_type + ':' + g.subject_label; if (!seen[k]) { seen[k] = 1; out.push(g); } });
+    return out;
+  }
+  function personAvatar(g) {
+    var tip = g.subject_label + (g.inherited ? ' \\u00b7 ' + inheritedNote(g.folder_name) : '');
+    return '<span class="wsx-fav' + (g.inherited ? ' is-inherited' : '') + (g.subject_type === 'sharee' ? ' is-org' : '') + '" title="' + escAttr(tip) + '">' + esc(initials(g.subject_label)) + '</span>';
+  }
+  // Who can see the open folder: one pill (Private / Workspace / Public / Shared externally)
+  // plus the people and orgs holding a grant on it or an ancestor; opens the access panel.
+  function folderAccessBar(d) {
+    var fa = d && d.folderAccess;
+    var link = '<button type="button" class="wsx-fbar__btn" onclick="copyFolderLink()">' + LINK_SVG + '<span>' + esc(t('artifacts.copyLink')) + '</span></button>';
+    if (!fa) return '<div class="wsx-fbar__acts">' + link + '</div>';
+    var lbl = t('artifacts.access.' + fa.access);
+    var pill = '<span class="wsx-faccess__pill" data-access="' + escAttr(fa.access) + '">' + accessIcon(fa.access) + '<span>' + esc(lbl) + '</span></span>';
+    var ppl = grantPeople(fa);
+    var avs = ppl.length ? '<span class="wsx-favs">' + ppl.slice(0, 4).map(personAvatar).join('') + (ppl.length > 4 ? '<span class="wsx-fav wsx-fav--more">+' + (ppl.length - 4) + '</span>' : '') + '</span>' : '';
+    var tip = fa.inheritedFrom ? lbl + ' \\u00b7 ' + inheritedNote(fa.inheritedFrom.name) : lbl;
+    var ctl = d.folderScope === 'workspace'
+      ? '<button type="button" class="wsx-faccess" onclick="openFolderAccess()" title="' + escAttr(tip) + '" aria-label="' + escAttr(t('artifacts.access.title') + ': ' + lbl) + '">' + pill + avs + '</button>'
+      : '<span class="wsx-faccess is-static" title="' + escAttr(tip) + '">' + pill + '</span>';
+    return '<div class="wsx-fbar__acts">' + ctl + link + '</div>';
+  }
   function folderHead(d) {
-    var crumbs = folderCrumbs(d);
+    var crumbs = curFolder ? '<div class="wsx-fbar">' + folderCrumbs(d) + folderAccessBar(d) + '</div>' : '';
     var guide = folderGuide(d);
     // Subfolders render the same "Folders" section whether at root or drilled in;
     // nesting repeats root behaviour, so managers get New folder / rename / delete at any depth.
@@ -79,7 +114,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     var k = artKey(f, fld);
     if (!artPending[k]) {
       artPending[k] = fetch(artUrl(f, fld), { credentials: 'same-origin' }).then(function (r) { return r.json(); })
-        .then(function (d) { artCache[k] = { cardsHtml: d && d.cardsHtml, rowsHtml: d && d.rowsHtml, count: (d && d.cardsHtml) ? 1 : 0, foldersHtml: d && d.foldersHtml, folderName: d && d.folderName, folderPath: d && d.folderPath, canManageFolders: d && d.canManageFolders, canEditFolder: d && d.canEditFolder, folderReadme: d && d.folderReadme, folderReadmeHtml: d && d.folderReadmeHtml }; })
+        .then(function (d) { artCache[k] = { cardsHtml: d && d.cardsHtml, rowsHtml: d && d.rowsHtml, count: (d && d.cardsHtml) ? 1 : 0, foldersHtml: d && d.foldersHtml, folderName: d && d.folderName, folderPath: d && d.folderPath, canManageFolders: d && d.canManageFolders, canEditFolder: d && d.canEditFolder, folderScope: d && d.folderScope, folderAccess: d && d.folderAccess, folderReadme: d && d.folderReadme, folderReadmeHtml: d && d.folderReadmeHtml }; })
         .catch(function () {})
         .then(function () { delete artPending[k]; });
     }
@@ -98,6 +133,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     });
   }
   function loadArtifacts() {
+    if (typeof syncHash === 'function') syncHash();
     if (artCache[artKey(artFilter)]) { applyArt(artFilter); return; }
     var m = document.getElementById('wsxArtMount'); m.innerHTML = i18nLoad();
     fetchArt(artFilter, function () {
@@ -109,7 +145,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
   // Silent refresh after a folder mutation: refetch the active view and swap it
   // in place (no i18nLoad spinner), so creating/renaming/deleting a folder never
   // flashes the whole pane as if the page reloaded.
-  function reloadFolders() { artCache = {}; var k = artKey(artFilter); fetchArt(artFilter, function () { if (artCache[k]) applyArt(artFilter); }); }
+  function reloadFolders(cb) { artCache = {}; var k = artKey(artFilter); fetchArt(artFilter, function () { if (artCache[k]) applyArt(artFilter); if (cb) cb(); }); }
   ws.querySelectorAll('[data-art-filter]').forEach(function (c) {
     c.addEventListener('click', function () {
       ws.querySelectorAll('[data-art-filter]').forEach(function (x) { x.classList.remove('is-on'); });
@@ -168,6 +204,94 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
   // ===== folder navigation + management (Drive-style drill-in) =====
   window.enterFolder = function (id, name) { curFolder = id; curFolderName = name || ''; loadArtifacts(); };
   window.exitFolder = function () { curFolder = ''; curFolderName = ''; loadArtifacts(); };
+  // Hash router entry (#l/artifacts/<folderId>); runs before openView loads the grid.
+  function artRoute(id) { id = id || ''; if (id !== curFolder) { curFolder = id; curFolderName = ''; } }
+  function fToast(msg, isError) { if (typeof window.showToast === 'function') window.showToast(msg, isError ? 'error' : 'success'); }
+  window.copyFolderLink = function () {
+    if (!curFolder) return;
+    var url = location.origin + location.pathname + location.search + '#l/artifacts/' + encodeURIComponent(curFolder);
+    var fail = function () { fToast(t('artifacts.couldNotCopy'), true); };
+    try { navigator.clipboard.writeText(url).then(function () { fToast(t('artifacts.linkCopied')); }, fail); } catch (e) { fail(); }
+  };
+  // Access panel: managers (admins, or the folder's creator while members manage their
+  // folders) change visibility, share with a person by email and remove grants; everyone
+  // else sees the same list read-only. Re-renders from the silent reload after each change.
+  window.openFolderAccess = function () {
+    if (!curFolder) return;
+    var fid = curFolder;
+    var mo = wsxModal(t('artifacts.access.title'), '<div class="wsx-cform" id="fa_body"></div>');
+    var grantsBase = '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/grants';
+    var pendingRevokes = {};
+    function refresh() { reloadFolders(render); }
+    function render() {
+      var b = document.getElementById('fa_body'); if (!b) return;
+      var d = artCache[artKey(artFilter, fid)], fa = d && d.folderAccess;
+      if (!fa) { b.innerHTML = i18nEmpty('common.couldNotLoad'); return; }
+      var can = !!d.canEditFolder;
+      var lbl = t('artifacts.access.' + fa.access);
+      var html = '<p class="wsx-faccess__now"><span class="wsx-faccess__pill" data-access="' + escAttr(fa.access) + '">' + accessIcon(fa.access) + '<span>' + esc(lbl) + '</span></span>' + (fa.inheritedFrom ? '<span class="wsx-field__note">' + esc(inheritedNote(fa.inheritedFrom.name)) + '</span>' : '') + '</p>';
+      if (can) {
+        html += '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('artifacts.access.visibility')) + '</span><select class="wsx-field__in" id="fa_vis">'
+          + ['inherit', 'workspace', 'public', 'private'].map(function (v) { return '<option value="' + v + '"' + (fa.visibility === v ? ' selected' : '') + '>' + esc(t('artifacts.access.opt.' + v)) + '</option>'; }).join('')
+          + '</select></label>';
+      }
+      var gs = (fa.grants || []).filter(function (g) { return !pendingRevokes[g.id]; });
+      html += '<div class="wsx-field__lbl">' + esc(t('artifacts.access.people')) + '</div>';
+      html += gs.length ? gs.map(function (g) {
+        var meta = esc(g.capability === 'comment' ? t('assets.shareCapComment') : g.capability === 'view' ? t('assets.shareCapView') : g.capability) + (g.inherited ? ' \\u00b7 ' + esc(inheritedNote(g.folder_name)) : '');
+        var rm = can && !g.inherited ? '<button class="wsx-abtn" type="button" data-rv="' + escAttr(g.id) + '">' + esc(t('artifacts.access.remove')) + '</button>' : '';
+        return '<div class="wsx-share-send wsx-faccess__row">' + personAvatar(g) + '<span class="wsx-faccess__who"><b>' + esc(g.subject_label) + '</b><em>' + meta + '</em></span>' + rm + '</div>';
+      }).join('') : '<p class="wsx-field__note">' + esc(t('artifacts.access.nobody')) + '</p>';
+      if (can) {
+        html += fld(t('assets.shareEmail'), 'fa_email', 'alex@example.com', 'email')
+          + '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('assets.shareAccess')) + '</span><select class="wsx-field__in" id="fa_cap"><option value="view">' + esc(t('assets.shareCapView')) + '</option><option value="comment">' + esc(t('assets.shareCapComment')) + '</option></select></label>'
+          + '<div id="fa_msg" class="wsx-field__note"></div><div class="wsx-cform__foot"><button class="wsx-abtn wsx-abtn--primary" id="fa_go" type="button">' + esc(t('assets.shareSend')) + '</button></div>';
+      } else {
+        html += '<p class="wsx-field__note">' + esc(t('artifacts.access.readOnly')) + '</p>';
+      }
+      b.innerHTML = html;
+      var sel = document.getElementById('fa_vis');
+      if (sel) sel.addEventListener('change', function () {
+        var v = sel.value;
+        optimistic({
+          key: 'folder:vis:' + fid,
+          request: function () {
+            return fetch(folderApiBase() + '/' + encodeURIComponent(fid), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visibility: v }) });
+          },
+          rollback: function () { sel.value = fa.visibility; },
+          success: t('common.saved'),
+          error: t('artifacts.access.couldNotSave'),
+          done: refresh,
+        });
+      });
+      Array.prototype.forEach.call(b.querySelectorAll('[data-rv]'), function (btn) {
+        btn.addEventListener('click', function () {
+          var gid = btn.getAttribute('data-rv'), gone = null;
+          optimistic({
+            key: 'grant:del:' + gid,
+            undo: true,
+            apply: function () { pendingRevokes[gid] = true; gone = window.soOptimistic.leave(btn.closest('.wsx-share-send')); },
+            rollback: function () { delete pendingRevokes[gid]; if (gone) gone.restore(); },
+            request: function () { return fetch(grantsBase + '/' + encodeURIComponent(gid), { method: 'DELETE', credentials: 'same-origin', keepalive: true }); },
+            success: t('assets.toast.revoked'),
+            error: t('assets.toast.revokeFailed'),
+            done: function () { delete pendingRevokes[gid]; refresh(); },
+          });
+        });
+      });
+      var go = document.getElementById('fa_go');
+      if (go) go.addEventListener('click', function () {
+        var email = cv('fa_email'), msg = document.getElementById('fa_msg'); if (!email || go.disabled) return;
+        var label = go.textContent; go.disabled = true; go.textContent = t('assets.sending');
+        fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/share-person', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resource_type: 'folder', resource_id: fid, email: email, capability: cv('fa_cap') || 'view' }) })
+          .then(okOr)
+          .then(function () { fToast(t('artifacts.access.shared').replace('{email}', email)); refresh(); })
+          .catch(function (e) { go.disabled = false; go.textContent = label; if (msg) msg.textContent = errReason(e, '') || t('assets.shareErr'); });
+      });
+    }
+    render();
+    if (mo && !artCache[artKey(artFilter, fid)]) fetchArt(artFilter, render, fid);
+  };
   function folderNameModal(title, initial, action, go) {
     var mo = wsxModal(title, '<div class="wsx-cform">' + fld(t('artifacts.folderNameLabel'), 'fld_name', t('artifacts.folderNamePh')) + '<div class="wsx-cform__err" id="fld_err"></div><div class="wsx-cform__foot"><button class="wsx-abtn wsx-abtn--primary" id="fld_go" type="button">' + esc(action) + '</button></div></div>');
     var inp = document.getElementById('fld_name'); if (inp) { inp.value = initial || ''; inp.focus(); if (initial) inp.select(); }

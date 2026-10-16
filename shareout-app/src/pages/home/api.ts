@@ -10,7 +10,7 @@ import { renderFolderReadme } from './folder-readme';
 import { parseHomeFilters, isLinkedWorkspaceMember } from './filters';
 import { queryHomeArtifacts, queryHomeArtifactCatalog, queryHomeCounts, queryForYou, queryRecentlyViewed, recordRecentView } from './queries/artifacts';
 import { queryHomeTags } from './queries/tags';
-import { queryPersonalFolders, queryTeamFolders, queryFoldersInParent, queryFolderPath, queryFolderReadme } from './queries/folders';
+import { queryPersonalFolders, queryTeamFolders, queryFoldersInParent, queryFolderPath, queryFolderReadme, queryFolderAccess, type FolderAccess } from './queries/folders';
 import { queryRecentActivity, queryRecentComments } from './queries/activity-panels';
 import { queryActivityFeed, dismissHomeEvents } from './queries/activity-feed';
 import { queryArtifactComments, addArtifactComment } from './queries/comments';
@@ -375,6 +375,7 @@ export async function handleHomeBrowserApi(
   let folderName: string | null = null;
   let folderPath: { id: string; name: string }[] = [];
   let folderReadme: string | null = null;
+  let folderAccess: FolderAccess | null = null;
   if (filters.folder) {
     folderPath = await queryFolderPath(env, user, { workspaceId, folderId: filters.folder }, vis);
     folderName = folderPath.length ? folderPath[folderPath.length - 1].name : null;
@@ -384,6 +385,9 @@ export async function handleHomeBrowserApi(
         .bind(filters.folder, hostWs).first<{ created_by: string | null }>();
       canEditFolder = canManage(open?.created_by);
     }
+    folderAccess = !hostWs
+      ? { visibility: 'private', effective: 'private', inheritedFrom: null, access: 'private', grants: [] }
+      : role ? await queryFolderAccess(env, hostWs, filters.folder) : null;
   }
   const folders = await queryFoldersInParent(env, user, { workspaceId, parentId: filters.folder || null }, vis);
   const foldersHtml = folders.map(f => renderFolderCard(f, folderScope, canManage(f.created_by))).join('');
@@ -400,6 +404,7 @@ export async function handleHomeBrowserApi(
     folderScope,
     canManageFolders,
     canEditFolder,
+    folderAccess,
     hasMore: filters.page < totalPages,
     resultLabel: buildResultLabel(filters, total),
     total,

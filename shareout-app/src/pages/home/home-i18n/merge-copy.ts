@@ -9,6 +9,7 @@ import { COMPOSER_COPY } from './copy/composer';
 import { CONNECT_COPY } from './copy/connect';
 import { DROP_IMPORT_COPY } from './copy/drop-import';
 import { ERRORS_COPY } from './copy/errors';
+import { FOLDER_ACCESS_COPY } from './copy/folder-access';
 import { INSPECTOR_COPY } from './copy/inspector';
 import { INVITE_COPY } from './copy/invite';
 import { KNOWLEDGE_MAP_COPY } from './copy/knowledge-map';
@@ -30,6 +31,7 @@ const COPY_MODULES: HomeLocaleCopy[] = [
   CLIENTS_COPY,
   ASSETS_COPY,
   WORKSPACE_COPY,
+  FOLDER_ACCESS_COPY,
   AUTOMATION_COPY,
   KNOWLEDGE_MAP_COPY,
   LIBRARY_COPY,

@@ -21,6 +21,14 @@ describe('home views client script', () => {
     expect(homeViews).toContain('wsxModal');
   });
 
+  it('deep-links the open folder as #l/artifacts/<id> and offers its access panel', () => {
+    expect(WORKSPACE_CLIENT).toContain("return 'l/artifacts/' + encodeURIComponent(curFolder)");
+    expect(WORKSPACE_CLIENT).toContain("if (lens === 'artifacts' && typeof artRoute === 'function') artRoute(decodeURIComponent(sub));");
+    expect(WORKSPACE_CLIENT).toContain('window.openFolderAccess');
+    expect(WORKSPACE_CLIENT).toContain('window.copyFolderLink');
+    expect(() => new Function(WORKSPACE_CLIENT)).not.toThrow();
+  });
+
   it('handles workspace OAuth connection errors in the connect modal', () => {
     expect(modalsFormsTs).toContain('shareout:workspace:connection:error');
     expect(modalsFormsTs).toContain('shareout:platform:connection:error');

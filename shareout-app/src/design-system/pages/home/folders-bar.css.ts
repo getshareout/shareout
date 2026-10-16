@@ -98,6 +98,30 @@ export const foldersBarStyles = `/* ── Folders bar ────────�
 .wsx-sec-label { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--color-text-tertiary); }
 .wsx-sec-label--pages { display: block; margin: var(--space-2) 0 var(--space-3); }
 .wsx__view .folders-breadcrumb { margin: 0 0 var(--space-3); }
+.wsx-fbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); margin: 0 0 var(--space-3); }
+.wsx__view .wsx-fbar .folders-breadcrumb { margin: 0; min-width: 0; }
+.wsx-fbar__acts { display: inline-flex; align-items: center; gap: var(--space-2); }
+.wsx-fbar__btn { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elevated); color: var(--color-text-secondary); font: inherit; font-size: 0.8rem; cursor: pointer; }
+.wsx-fbar__btn:hover { border-color: var(--color-primary); color: var(--color-text); }
+.wsx-fbar__btn svg { width: 14px; height: 14px; }
+.wsx-faccess { display: inline-flex; align-items: center; gap: var(--space-2); padding: 0; border: none; background: none; font: inherit; cursor: pointer; }
+.wsx-faccess.is-static { cursor: default; }
+.wsx-faccess:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: var(--radius-md); }
+.wsx-faccess__pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text-tertiary); font-size: 0.8rem; font-weight: 500; white-space: nowrap; }
+.wsx-faccess__pill svg { width: 13px; height: 13px; }
+.wsx-faccess:not(.is-static):hover .wsx-faccess__pill { color: var(--color-text); }
+.wsx-faccess__pill[data-access="public"], .wsx-faccess__pill[data-access="external"] { background: var(--color-primary-light); color: var(--color-primary); }
+.wsx-favs { display: inline-flex; align-items: center; }
+.wsx-favs .wsx-fav + .wsx-fav { margin-left: -6px; }
+.wsx-fav { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--color-bg-elevated); background: var(--color-primary-light); color: var(--color-primary); font-size: 0.62rem; font-weight: 700; }
+.wsx-fav.is-org { border-radius: var(--radius-sm); }
+.wsx-fav.is-inherited { background: var(--color-surface); color: var(--color-text-tertiary); }
+.wsx-fav--more { background: var(--color-surface); color: var(--color-text-secondary); }
+.wsx-faccess__now { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; }
+.wsx-faccess__row { align-items: center; gap: var(--space-2); }
+.wsx-faccess__who { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.wsx-faccess__who b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wsx-faccess__who em { font-style: normal; font-size: 0.78rem; color: var(--color-text-tertiary); }
 /* Single row; scroll horizontally when the folders overflow (never wrap). */
 .wsx-folder-grid { display: flex; flex-wrap: nowrap; gap: var(--space-3); overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; scrollbar-width: thin; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
 .wsx-folder-grid > .wsx-folder-card { flex: 0 0 200px; scroll-snap-align: start; }

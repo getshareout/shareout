@@ -55,6 +55,12 @@ describe('work/026 — handleHomeBrowserApi renders nested folder navigation', (
     expect(body.canManageFolders).toBe(true);
   });
 
+  it('a personal folder reports Private access with no grants', async () => {
+    const res = await handleHomeBrowserApi(req('https://shareout.site/v1/home/browser?folder=fld_x'), mkEnv(), user);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.folderAccess).toMatchObject({ access: 'private', grants: [] });
+  });
+
   it('empty folder (no subfolders, no artifacts): emptyHtml renders instead of a broken grid', async () => {
     const res = await handleHomeBrowserApi(req('https://shareout.site/v1/home/browser?folder=fld_empty'), mkEnv(), user);
     const body = await res.json() as Record<string, unknown>;
