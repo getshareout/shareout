@@ -129,6 +129,8 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 /* list rows (schedules / alerts) */
 .wsx-list { display: flex; flex-direction: column; gap: 8px; }
 .wsx-row:not(.user):not(.bot) { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elevated); }
+a.wsx-row { color: inherit; text-decoration: none; }
+a.wsx-row:hover { border-color: var(--color-primary); }
 .wsx-row__main { flex: 1; min-width: 0; }
 .wsx-row__title { font: 600 var(--text-sm) var(--font-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wsx-row__sub { font-size: var(--text-xs); color: var(--color-text-tertiary); }

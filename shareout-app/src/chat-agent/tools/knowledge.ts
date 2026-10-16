@@ -7,6 +7,7 @@ import { corpusFor } from '../../knowledge/corpus/client';
 import { searchCorpus, visibleSources } from '../../knowledge/corpus/search';
 import { listVisibleEntities, visibleEntity } from '../../knowledge/corpus/graph';
 import { getUserWorkspaceIds } from '../access';
+import { sourceArtifacts } from '../../knowledge/source-links';
 
 const MAX_RESULTS = 20;
 const SEMANTIC_TOPK = 15;
@@ -156,7 +157,7 @@ export const knowledgeSearchTool: AccountTool = {
 export const knowledgeGetTool: AccountTool = {
   name: 'knowledge_get',
   description:
-    'Read one knowledge node in full — its distilled notes plus the pages it was learned from. Use after knowledge_search to get the detail behind a topic, client or fact.',
+    'Read one knowledge node in full — its distilled notes plus the pages it was learned from. Use after knowledge_search to get the detail behind a topic, client or fact. `sources` lists each page as { id, slug, title, available }: cite available ones by title (link /a/<slug>/); an unavailable one is gone or not visible to this person, so do not guess what it was.',
   input_schema: {
     type: 'object',
     properties: {
@@ -182,7 +183,7 @@ export const knowledgeGetTool: AccountTool = {
     if (!node) return { error: `Nothing learned under “${key}” yet.` };
     return {
       enabled: true,
-      node: { ...summarize(node), body: node.body, sources: node.sources },
+      node: { ...summarize(node), body: node.body, sources: await sourceArtifacts(ctx.env, wsId, ctx.userId, node.sources) },
     };
   },
 };

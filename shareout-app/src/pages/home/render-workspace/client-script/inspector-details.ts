@@ -6,7 +6,7 @@ export const workspace_client_inspector_details_JS = `  // ===== Inspector Detai
 
   // Section order is user-reorderable and persisted globally (all artifacts share one order).
   var SEC_ORDER_KEY = 'wsx.inspector.sections';
-  var DEFAULT_SEC_ORDER = ['share', 'deliver', 'about', 'description', 'tags', 'folder', 'tests', 'analytics', 'watches'];
+  var DEFAULT_SEC_ORDER = ['share', 'deliver', 'about', 'description', 'tags', 'folder', 'tests', 'analytics', 'watches', 'knowledge'];
   function loadSecOrder() {
     var saved = [];
     try { saved = JSON.parse(localStorage.getItem(SEC_ORDER_KEY) || '[]'); } catch (e) { saved = []; }
@@ -173,6 +173,26 @@ export const workspace_client_inspector_details_JS = `  // ===== Inspector Detai
     var box = rbodyEl.querySelector('#wsxWatches'); if (!box || !art.id) return;
     box.innerHTML = i18nLoad();
     loadWatches(art, box);
+  }
+
+  // ----- Knowledge from this artifact: notes whose sources include it. The route answers
+  // [] when knowledge is off or the viewer may not see it; the section stays hidden then. -----
+  function renderKnowledgeFrom(art, meta) {
+    var box = rbodyEl.querySelector('#wsxKnFrom'); if (!box) return;
+    var secEl = box.closest('.wsx-det__sec'); if (secEl) secEl.hidden = true;
+    var wsId = meta && meta.workspace_id;
+    if (!art.id || !wsId || wsId !== window.WSX_WS) return;
+    fetch('/v1/workspaces/' + encodeURIComponent(wsId) + '/knowledge/from/' + encodeURIComponent(art.id), { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var notes = (d && d.notes) || [];
+        if (!notes.length || !box.isConnected) return;
+        box.innerHTML = '<div class="wsx-list">' + notes.map(function (n) {
+          return '<a class="wsx-row" href="#l/knowledge/' + encodeURIComponent(n.path) + '"><div class="wsx-row__main"><div class="wsx-row__title">' + esc(n.title || n.path) + '</div><div class="wsx-row__sub">' + esc(n.path) + '</div></div></a>';
+        }).join('') + '</div>';
+        if (secEl) secEl.hidden = false;
+      })
+      .catch(function () {});
   }
 
   // ----- Artifact meta -----

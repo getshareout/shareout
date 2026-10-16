@@ -13,6 +13,7 @@ import { FOLDER_ACCESS_COPY } from './copy/folder-access';
 import { INSPECTOR_COPY } from './copy/inspector';
 import { INVITE_COPY } from './copy/invite';
 import { KNOWLEDGE_MAP_COPY } from './copy/knowledge-map';
+import { KNOWLEDGE_LINKS_COPY } from './copy/knowledge-links';
 import { LIBRARY_COPY } from './copy/library';
 import { MODALS_COPY } from './copy/modals';
 import { NEW_MENU_COPY } from './copy/new-menu';
@@ -34,6 +35,7 @@ const COPY_MODULES: HomeLocaleCopy[] = [
   FOLDER_ACCESS_COPY,
   AUTOMATION_COPY,
   KNOWLEDGE_MAP_COPY,
+  KNOWLEDGE_LINKS_COPY,
   LIBRARY_COPY,
   CONNECT_COPY,
   COMPOSER_COPY,
