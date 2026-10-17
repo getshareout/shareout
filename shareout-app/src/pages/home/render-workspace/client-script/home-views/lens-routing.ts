@@ -12,6 +12,7 @@ export const workspace_client_home_views_lensRouting_JS = `  var lenses = ws.que
     else if (key === 'datasets' && !loaded.datasets) { loaded.datasets = 1; loadDatasets(); }
     else if (key === 'crew' && !loaded.crew) { loaded.crew = 1; loadCrew(); }
     else if (key === 'library' && !loaded.library) { loaded.library = 1; loadLibrary(); }
+    else if (key === 'templates' && !loaded.templates) { loaded.templates = 1; loadTemplates(); }
     else if (key === 'connectors' && !loaded.connectors) { loaded.connectors = 1; loadConnectors(); }
     else if (key === 'connect') loadConnect();
     else if (key === 'catalog' && !loaded.catalog) { loaded.catalog = 1; loadCatalog(); }

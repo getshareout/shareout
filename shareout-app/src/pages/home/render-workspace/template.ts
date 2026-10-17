@@ -29,7 +29,7 @@ function buildNav(args: RenderArgs, canManage: boolean): NavGroup[] {
   const v = (key: string, label: string, icon: NavItem['icon']): NavItem => ({ key, label, i18n: `nav.${key}`, icon, kind: 'view' });
   const groups: NavGroup[] = [
     { items: [v('brief', 'Home', 'brief'), v('artifacts', 'Artifacts', 'browse')] },
-    { title: 'Library', i18n: 'nav.group.library', items: [v('assets', 'Assets', 'assets'), v('library', 'AI skills', 'library')] },
+    { title: 'Library', i18n: 'nav.group.library', items: [v('assets', 'Assets', 'assets'), v('templates', 'Templates', 'templates'), v('library', 'AI skills', 'library')] },
     { title: 'Automation', i18n: 'nav.group.automation', items: [v('schedules', 'Scheduled', 'recent'), v('alerts', 'Alerts', 'alert'), ...(ws && canManage ? [v('crew', 'AI tasks', 'crew')] : [])] },
     { title: 'Data', i18n: 'nav.group.data', items: ws ? [v('connectors', 'Data sources', 'plug'), v('datasets', 'Tables', 'datasets')] : [] },
     { title: 'Context', i18n: 'nav.group.context', items: ws ? [v('knowledge', 'Knowledge', 'knowledge'), v('catalog', 'Catalog', 'catalog')] : [] },
@@ -191,6 +191,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
           <div class="wsx__view" data-view="catalog">
             <h2 class="wsx__viewtitle" data-i18n="view.catalog">Catalog</h2>
             <p class="wsx-lens__intro" data-i18n="intro.catalog">Your workspace data map — sources, datasets, pipelines and terms, with lineage. Agents keep it current; search to trace where data comes from.</p>
+            <p class="wsx-lens__intro"><a class="wsx-link" href="#l/templates" data-i18n="catalog.templatesLink">Browse templates</a></p>
             <div id="wsxCatMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="knowledge">
@@ -202,6 +203,11 @@ export function buildWorkspaceBody(args: RenderArgs): string {
             <h2 class="wsx__viewtitle" data-i18n="view.crew">Crew AI</h2>
             <p class="wsx-lens__intro" data-i18n="intro.crew">Autonomous agents that run on a schedule or an event, read your workspace data, and deliver a result. Run one now, pause it, or check its history.</p>
             <div id="wsxCrewMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
+          </div>
+          <div class="wsx__view" data-view="templates">
+            <h2 class="wsx__viewtitle" data-i18n="view.templates">Templates</h2>
+            <p class="wsx-lens__intro" data-i18n="intro.templates">Ready-made pages and folders you can install here in one click. Nothing from the place a template was made comes along — you connect your own data.</p>
+            <div id="wsxTplMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="library">
             <h2 class="wsx__viewtitle" data-i18n="view.library">Library</h2>
