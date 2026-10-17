@@ -145,7 +145,7 @@ function makeEnv(registry: ReturnType<typeof makeRegistry>): Env {
   return { DB: registry, SESSION_SECRET } as unknown as Env;
 }
 
-function makeCtx(artifactId: string, env: Env, opts: { workspaceId?: string; db?: unknown; ownerId?: string | null } = {}): DataContext {
+function makeCtx(artifactId: string, env: Env, opts: { workspaceId?: string; db?: unknown; ownerId?: string | null; canWrite?: boolean; readOnlyToken?: boolean; isOwner?: boolean } = {}): DataContext {
   return {
     artifactId,
     workspaceId: opts.workspaceId ?? 'ws_1',
@@ -154,6 +154,10 @@ function makeCtx(artifactId: string, env: Env, opts: { workspaceId?: string; db?
     env,
     origin: null,
     viewerScope: undefined,
+    canWrite: opts.canWrite ?? true,
+    readOnlyToken: opts.readOnlyToken,
+    isOwner: opts.isOwner,
+    isArtifactOwner: opts.isOwner,
   };
 }
 
@@ -265,5 +269,24 @@ describe('workspace shared tables — access enforcement', () => {
     // The row landed in the OWNER artifact's store, not the caller's.
     expect(mini._state.rows).toHaveLength(1);
     expect(mini._state.rows[0].data).toMatchObject({ name: 'Bob' });
+  });
+  it('refuses writes from a caller without write capability or with a read-only token', async () => {
+    const mini = makeMiniDb({ tables: [{ id: 'tbl1', artifact_id: 'art_owner', name: 'leads', row_count: 0 }] });
+    miniRef.db = mini;
+    const rwGrant: Grant = { ...readGrant, access: 'readwrite' };
+    const env = makeEnv(makeRegistry({ grants: [rwGrant] }));
+    const post = () => wreq('art_reader', '/tables/leads', { method: 'POST', body: JSON.stringify({ name: 'Bob' }) });
+
+    const anon = await handleWorkspaceData(post(), makeCtx('art_reader', env, { canWrite: false }), '/tables/leads');
+    expect(anon.status).toBe(403);
+    const readOnly = await handleWorkspaceData(post(), makeCtx('art_reader', env, { readOnlyToken: true }), '/tables/leads');
+    expect(readOnly.status).toBe(403);
+    expect(mini._state.rows).toHaveLength(0);
+
+    const read = await handleWorkspaceData(
+      wreq('art_reader', '/tables/leads/query', { method: 'POST', body: '{}' }),
+      makeCtx('art_reader', env, { canWrite: false }), '/tables/leads/query',
+    );
+    expect(read.status).toBe(200);
   });
 });

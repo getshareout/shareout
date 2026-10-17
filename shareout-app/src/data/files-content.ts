@@ -120,7 +120,9 @@ export async function handleFileMeta(request: Request, env: Env, deliverableId: 
       if (e && e.blobId === row.blob_id) enrichment = e; // hide stale
     } catch { /* ignore */ }
   }
-  const usage = await listFileUsage(env, deliverableId);
+  // Which artifacts use the file is workspace-internal: only its owner or an internal
+  // member of its workspace sees it.
+  const usage = (await viewerIsInsider(request, env, row)) ? await listFileUsage(env, deliverableId) : [];
 
   return json({
     id: deliverableId, name: row.name, filename: row.filename, mimeType: row.mime_type,
@@ -152,6 +154,19 @@ async function viewerCanReadPrivate(
     if (roles.some((r) => !!r)) return true;
   }
   return canAccess(env, identity, 'file', deliverableId, 'view');
+}
+
+async function viewerIsInsider(
+  request: Request, env: Env, file: { owner_id: string | null; workspace_id: string | null },
+): Promise<boolean> {
+  const user = await getSessionUser(request, env);
+  if (!user) return false;
+  const identity = await getVisibilityScope(env, user);
+  if (file.owner_id && identity.userIds.includes(file.owner_id)) return true;
+  if (!file.workspace_id) return false;
+  const wsId = file.workspace_id;
+  const roles = await Promise.all(identity.userIds.map((id) => getInternalWorkspaceRole(env, wsId, id)));
+  return roles.some((r) => !!r);
 }
 
 function json(body: unknown, status: number, origin: string | null): Response {

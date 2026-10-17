@@ -64,9 +64,10 @@ export function homeScopeSql(scope: VisibilityScope, workspaceId: string | null)
   };
 }
 
+/** True when one of the caller's linked accounts is an internal member of the workspace. */
 export async function isLinkedWorkspaceMember(env: Env, scope: VisibilityScope, workspaceId: string): Promise<boolean> {
   const row = await env.DB.prepare(
-    `SELECT 1 FROM workspace_members WHERE workspace_id = ? AND user_id IN (${placeholders(scope.userIds.length)}) LIMIT 1`,
+    `SELECT 1 FROM workspace_members WHERE workspace_id = ? AND member_class = 'internal' AND user_id IN (${placeholders(scope.userIds.length)}) LIMIT 1`,
   ).bind(workspaceId, ...scope.userIds).first();
   return !!row;
 }

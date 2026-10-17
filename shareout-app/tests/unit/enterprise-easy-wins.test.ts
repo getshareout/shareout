@@ -109,7 +109,7 @@ describe('seat visibility', () => {
   const row = (members: number) => ({
     id: workspaceId, name: 'Acme', slug: 'acme', description: null,
     owner_id: 'usr_admin', created_at: 't', updated_at: null, role: 'owner',
-    artifact_count: 0, folder_count: 0, member_count: members,
+    artifact_count: 0, folder_count: 0, member_count: members, member_class: 'internal',
   });
 
   // The seat limit was only ever reported, never enforced on invite. Reporting a

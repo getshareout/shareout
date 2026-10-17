@@ -1,5 +1,6 @@
 import { errorResponse, type DataContext } from '../middleware';
-import { verifySessionToken, extractTokenFromCookie } from '../../token';
+import { extractTokenFromCookie } from '../../token';
+import { verifyLiveSessionToken } from '../../auth/session';
 import { validateToken } from '../../api-auth';
 import type { CommentsConfig } from './types';
 import { guestCommentsOpen, resolveGuest, type GuestIdentity } from './guest';
@@ -22,7 +23,7 @@ export async function getSession(
   } else {
     const token = extractTokenFromCookie(request.headers.get('Cookie'), /shareout_session=([^;]+)/);
     if (!token) return null;
-    payload = await verifySessionToken(token, ctx.env);
+    payload = await verifyLiveSessionToken(token, ctx.env);
   }
   if (!payload) return null;
 

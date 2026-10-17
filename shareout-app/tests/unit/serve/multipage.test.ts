@@ -35,7 +35,7 @@ describe('multi-page artifacts: page agent in served pages', () => {
     expect(html).toContain(`S="${SLUG}"`);
     expect(html).toContain(`B="${BASE_URL}"`);
     // Same cache variant as before (the agent is per r2_key, so it adds no key).
-    expect(res.headers.get('ETag')).toBe('"artifacts/demo/docs/step-1.html:raw"');
+    expect(res.headers.get('ETag')).toBe('"artifacts/demo/docs/step-1.html:raw:sbx"');
   });
 
   it('injects the agent into the raw entrypoint served at the content root', async () => {

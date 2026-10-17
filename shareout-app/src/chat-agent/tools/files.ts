@@ -26,6 +26,18 @@ async function resolveBuckets(ctx: ToolContext): Promise<AssetBucketRow[]> {
   return buckets;
 }
 
+/** True when the file is in the user's personal bucket or, when given, the bucket of a
+ *  workspace they are an internal member of (the caller checks that membership). */
+export async function fileInUserBuckets(env: ToolContext['env'], userId: string, workspaceId: string | null, fileId: string): Promise<boolean> {
+  const buckets = [await getOrCreateAssetBucket(env, userId, null)];
+  if (workspaceId) buckets.push(await getOrCreateAssetBucket(env, userId, workspaceId));
+  const ids = buckets.map((b) => b.id);
+  const row = await env.DB.prepare(
+    `SELECT 1 AS ok FROM blobs WHERE id = ? AND artifact_id IN (${ids.map(() => '?').join(', ')})`
+  ).bind(fileId, ...ids).first<{ ok: number }>();
+  return !!row;
+}
+
 function fileQuery(bucketIds: string[], extraWhere: string): string {
   const ph = bucketIds.map(() => '?').join(', ');
   return `
@@ -33,7 +45,8 @@ function fileQuery(bucketIds: string[], extraWhere: string): string {
            o.source, o.sender, o.subject, o.body_text,
            (SELECT group_concat(a.name || ' [' || a.id || ']')
               FROM blob_artifact_links l JOIN artifacts a ON a.id = l.artifact_id
-             WHERE l.blob_id = b.id AND a.deleted_at IS NULL) AS used_for
+             WHERE l.blob_id = b.id AND a.deleted_at IS NULL
+               AND (a.owner_id = ? OR a.visibility != 'private')) AS used_for
     FROM blobs b
     LEFT JOIN blob_origins o ON o.blob_id = b.id
     WHERE b.artifact_id IN (${ph}) ${extraWhere}
@@ -63,7 +76,7 @@ export const listFilesTool: AccountTool = {
     const sql = fileQuery(ids, query ? 'AND b.filename LIKE ? ' : '') +
       ' ORDER BY b.created_at DESC LIMIT 50';
     const binds = query ? [...ids, `%${query}%`] : ids;
-    const rows = (await ctx.env.DB.prepare(sql).bind(...binds).all<FileRow>()).results || [];
+    const rows = (await ctx.env.DB.prepare(sql).bind(ctx.userId, ...binds).all<FileRow>()).results || [];
 
     if (!rows.length) return { files: [], note: 'No files in the library yet.' };
     return {
@@ -101,7 +114,7 @@ export const readFileTool: AccountTool = {
     // Authorization: the blob must live in one of the caller's own buckets.
     const row = await ctx.env.DB.prepare(
       fileQuery(ids, 'AND b.id = ? ')
-    ).bind(...ids, fileId).first<FileRow & { r2_key?: string }>();
+    ).bind(ctx.userId, ...ids, fileId).first<FileRow & { r2_key?: string }>();
     if (!row) return { error: `No file "${fileId}" in your library.` };
 
     const meta = await ctx.env.DB.prepare(

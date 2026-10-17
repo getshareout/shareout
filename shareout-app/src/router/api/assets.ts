@@ -31,6 +31,7 @@ import { enrichDeliverable } from '../../assets/enrich';
 import { listFileUsage } from '../../assets/usage';
 import { queueKnowledgeSource } from '../../knowledge/corpus/ingest';
 import {
+  deliverableInBucket, collectionInBucket,
   createDeliverable, addDeliverableVersion, listDeliverables, listDeliverableVersions, setDeliverableFields,
   createCollection, createShareLink, listShareLinks, revokeShareLink, hashAssetLinkPassword, type LinkGate,
 } from '../../assets/deliverables';
@@ -117,6 +118,7 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
     const b = await body<{ blobId?: string }>();
     if (!b.blobId) return json({ error: 'blobId required' }, 400);
     const v = await addDeliverableVersion(env, bucket.id, dm[1], b.blobId);
+    if (v === null) return json({ error: 'file not found' }, 404);
     ctx.executionCtx?.waitUntil(enrichDeliverable(env, bucket.id, dm[1]).catch(() => {}));
     learn(dm[1], b.blobId);
     return json({ deliverableId: dm[1], versionNo: v });
@@ -127,6 +129,7 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
   }
   dm = sub.match(/^deliverables\/([^/]+)\/usage$/);
   if (dm && method === 'GET') {
+    if (!(await deliverableInBucket(env, bucket.id, dm[1]))) return json({ error: 'file not found' }, 404);
     return json({ usage: await listFileUsage(env, dm[1]) });
   }
   dm = sub.match(/^deliverables\/([^/]+)$/);
@@ -167,7 +170,11 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
     const c = await createCollection(env, bucket.id, workspaceId, user.id, (b.name || '').trim() || 'Untitled collection', validIds);
     return json({ id: c.id, fileCount: validIds.length }, 201);
   }
-  let cm = sub.match(/^collections\/([^/]+)\/share$/);
+  let cm = sub.match(/^collections\/([^/]+)\/(share|send)$/);
+  if (cm && method === 'POST' && !(await collectionInBucket(env, bucket.id, cm[1]))) {
+    return json({ error: 'collection not found' }, 404);
+  }
+  cm = sub.match(/^collections\/([^/]+)\/share$/);
   if (cm && method === 'POST') {
     const b = await body<{ expiresAt?: string; gate?: string; password?: string; domains?: string[] }>();
     const g = await resolveGate(b);

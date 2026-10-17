@@ -160,7 +160,8 @@ describe('dataMiddleware resolves user id from the signed token (no users lookup
     const result = await dataMiddleware(request, env, 'art_1');
 
     expect(result).toMatchObject({ artifactId: 'art_1', isOwner: true });
-    expect(calls.some((c) => c.sql.includes('FROM users'))).toBe(false);
+    // Only the disabled-flag read touches users; identity comes from the token.
+    expect(calls.some((c) => c.sql.includes('FROM users') && !c.sql.startsWith('SELECT disabled FROM users'))).toBe(false);
   });
 
   it('authorizes a workspace member via getWorkspaceRole(userId) without a users lookup', async () => {
@@ -180,7 +181,8 @@ describe('dataMiddleware resolves user id from the signed token (no users lookup
     const result = await dataMiddleware(request, env, 'art_1');
 
     expect(result).toMatchObject({ artifactId: 'art_1' });
-    expect(calls.some((c) => c.sql.includes('FROM users'))).toBe(false);
+    // Only the disabled-flag read touches users; identity comes from the token.
+    expect(calls.some((c) => c.sql.includes('FROM users') && !c.sql.startsWith('SELECT disabled FROM users'))).toBe(false);
     const wmCall = calls.find((c) => c.sql.includes('FROM workspace_members'));
     expect(wmCall?.args).toEqual(['wsp_1', 'usr_2']);
   });

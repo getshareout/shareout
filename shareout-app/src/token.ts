@@ -103,12 +103,27 @@ export async function verifySessionToken(
     if (!valid) return null;
 
     const data: SessionPayload = JSON.parse(atob(payload));
+    if (!isSessionPayload(data)) return null;
     if (data.exp < Date.now() / 1000) return null;
 
     return data;
   } catch {
     return null;
   }
+}
+
+const SESSION_KEYS = new Set(['userId', 'email', 'exp']);
+
+// Other tokens are signed with the same secret (artifact access, admin cookie), so a
+// valid signature alone does not make a session: the payload must have exactly the
+// shape createSessionToken writes.
+function isSessionPayload(data: unknown): data is SessionPayload {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  const d = data as Record<string, unknown>;
+  if (Object.keys(d).some((k) => !SESSION_KEYS.has(k))) return false;
+  return typeof d.userId === 'string' && d.userId.length > 0
+    && typeof d.exp === 'number'
+    && (typeof d.email === 'string' || d.email === null);
 }
 
 export function extractTokenFromCookie(cookie: string | null, pattern: RegExp): string | null {

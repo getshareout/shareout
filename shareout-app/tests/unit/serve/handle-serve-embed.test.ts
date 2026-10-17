@@ -109,6 +109,21 @@ describe('handleServeEmbed', () => {
     expect(html).toContain(`/embed/${SLUG}/index.html?_raw`);
   });
 
+  it('serves raw embed HTML in an opaque-origin sandbox', async () => {
+    const { env } = createServeEnv({ embedDeployment });
+    const response = await handleServeEmbed(
+      new Request(`${BASE_URL}/embed/${SLUG}/index.html?_raw`, { headers: { Origin: 'https://partner.example.com' } }),
+      env,
+      SLUG,
+      'index.html',
+    );
+    expect(response.status).toBe(200);
+    const csp = response.headers.get('Content-Security-Policy') ?? '';
+    const sandbox = csp.split(';').map((d) => d.trim()).find((d) => d.startsWith('sandbox'));
+    expect(sandbox).toContain('allow-scripts');
+    expect(sandbox).not.toContain('allow-same-origin');
+  });
+
   it('renders markdown embeds through the type viewer instead of raw text', async () => {
     const markdownEmbed = {
       ...embedDeployment,

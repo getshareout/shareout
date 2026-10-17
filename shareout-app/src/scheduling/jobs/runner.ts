@@ -31,7 +31,13 @@ export async function executeJobAction(
   triggeredVia: DeliveryContext['triggeredVia'] = 'cron',
   eventPayload?: EmailReceivedPayload,
 ): Promise<JobActionResult> {
-  const role = await getUserRole(env, artifactId, ownerId);
+  const [role, owner] = await Promise.all([
+    getUserRole(env, artifactId, ownerId),
+    env.DB.prepare('SELECT disabled FROM users WHERE id = ?').bind(ownerId).first<{ disabled: number | null }>(),
+  ]);
+  if (owner?.disabled) {
+    return { success: false, error: 'Job creator account is disabled', disable: true };
+  }
   if (!role) {
     return {
       success: false,

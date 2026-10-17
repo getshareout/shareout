@@ -112,7 +112,9 @@ export class PlatformEngine {
 
 		// Segment the cache per viewer scope. Per-user connections additionally segment the cache by user so one member's
 		// cached rows are never served to another.
-		let scopeKey = viewerScopeCacheKey(this.ctx.viewerScope);
+		// The connection (and workspace, for workspace-level calls) segments the cache too:
+		// workspace-level calls share one store, and two connections of one provider differ.
+		let scopeKey = `c:${connection.id}|w:${this.ctx.workspaceId ?? ''}|${viewerScopeCacheKey(this.ctx.viewerScope)}`;
 		if (connection.credentialScope === 'per_user' && connection.requesterUserId) {
 			scopeKey = `${scopeKey}|u:${connection.requesterUserId}`;
 		}
@@ -139,7 +141,7 @@ export class PlatformEngine {
 		const forceRefresh = request.options?.forceRefresh === true;
 
 		if (shouldCache && !forceRefresh) {
-			const cacheKey = PlatformCache.generateCacheKey(
+			const cacheKey = await PlatformCache.generateCacheKey(
 				request.provider,
 				request.endpoint,
 				request.params as Record<string, unknown>,
@@ -252,7 +254,7 @@ export class PlatformEngine {
 			}
 
 			if (shouldCache && response.data !== undefined) {
-				const cacheKey = PlatformCache.generateCacheKey(
+				const cacheKey = await PlatformCache.generateCacheKey(
 					request.provider,
 					request.endpoint,
 					request.params as Record<string, unknown>,

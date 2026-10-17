@@ -132,38 +132,18 @@ export async function handleCreateAccount(
   });
 }
 
+// Setting an account email needs proof the caller receives mail there: email identifies
+// people for shares, grants and workspace domain rules. The OTP pair below does that.
 export async function handleLinkEmail(
-  request: Request,
-  env: Env,
-  user: AuthUser
+  _request: Request,
+  _env: Env,
+  _user: AuthUser
 ): Promise<Response> {
-  let body: { email: string };
-  try {
-    body = await request.json();
-  } catch {
-    return json({ error: 'Invalid JSON', code: 'INVALID_JSON' }, 400);
-  }
-
-  if (!body.email || !isValidEmail(body.email)) {
-    return json({ error: 'Invalid email', code: 'INVALID_EMAIL' }, 400);
-  }
-
-  const email = body.email.toLowerCase().trim();
-
-  const existing = await env.DB.prepare(
-    'SELECT id FROM users WHERE email = ? AND id != ?'
-  ).bind(email, user.id).first();
-
-  if (existing) {
-    return json({ error: 'Email already in use', code: 'EMAIL_IN_USE' }, 409);
-  }
-
-  await env.DB.prepare(
-    'UPDATE users SET email = ? WHERE id = ?'
-  ).bind(email, user.id).run();
-  await evictUserTokens(env, user.id);
-
-  return json({ success: true, email });
+  return jsonWithApiErrors({
+    error: 'Linking an email requires a verification code',
+    code: 'EMAIL_VERIFICATION_REQUIRED',
+    hint: 'POST /v1/auth/link-email/start with { "email" }, then POST /v1/auth/link-email/verify with { "email", "code" }.',
+  }, 403);
 }
 
 const LAST_USED_THROTTLE_TTL = 300; // 5 min — last_used_at precision nobody can perceive
@@ -509,10 +489,6 @@ export async function incrementPresentLimit(
     VALUES ('user', ?, ?, ?, 1)
     ON CONFLICT(principal_type, principal_id, action, window_start) DO UPDATE SET count = count + 1
   `).bind(userId, PRESENT_LIMIT_ACTION, windowStart.toISOString()).run();
-}
-
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function json(data: unknown, status = 200): Response {

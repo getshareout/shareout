@@ -83,6 +83,22 @@ describe('Snowflake provider', () => {
     expect(typeof payload.exp).toBe('number');
   });
 
+  it('does not hand a cached JWT to a caller with a different private key', async () => {
+    const ids = { account: 'xy12345', user: 'svc_cache', publicKeyFingerprint: 'SHA256:cachefp' };
+    const pair = await crypto.subtle.generateKey(
+      { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+      true, ['sign', 'verify'],
+    ) as CryptoKeyPair;
+    const otherPem = await exportPkcs8Pem(pair.privateKey);
+    const first = await getSnowflakeJwt({ ...ids, privateKey: privateKeyPem });
+    expect(await getSnowflakeJwt({ ...ids, privateKey: privateKeyPem })).toBe(first);
+    const other = await getSnowflakeJwt({ ...ids, privateKey: otherPem });
+    expect(other.split('.')[2]).not.toBe(first.split('.')[2]);
+    const sig = Uint8Array.from(atob(other.split('.')[2].replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+    const signed = new TextEncoder().encode(other.split('.').slice(0, 2).join('.'));
+    expect(await crypto.subtle.verify('RSASSA-PKCS1-v1_5', pair.publicKey, sig, signed)).toBe(true);
+  });
+
   it('executes a statement against the SQL API with key-pair auth', async () => {
     const calls: { url: string; init: RequestInit }[] = [];
     vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo, init: RequestInit) => {

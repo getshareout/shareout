@@ -26,6 +26,12 @@ export async function checkViewerSelfDelivery(
     if (c.targetType !== 'dm' || !c.slackUserId) {
       return 'Viewers can only schedule a Slack DM to themselves (set targetType "dm" and your Slack member id)';
     }
+    const linked = await env.DB.prepare(
+      "SELECT 1 FROM messaging_links WHERE platform = 'slack' AND user_id = ? AND platform_user_id = ? LIMIT 1"
+    ).bind(userId, c.slackUserId).first();
+    if (!linked) {
+      return 'Viewers can only schedule a Slack DM to their own linked Slack account (link it in Settings → Slack)';
+    }
     return null;
   }
   if (action === 'email') {

@@ -17,7 +17,7 @@ function makeEnv(role: WorkspaceRole, enabled = 1) {
         async first() {
           if (sql.includes('SELECT role FROM workspace_members')) return { role };
           if (sql.includes('FROM workspaces w')) {
-            return { id: WS, name: 'Team', slug: 'team', role, member_count: 2, member_folders_enabled: enabled };
+            return { id: WS, name: 'Team', slug: 'team', role, member_class: 'internal', member_count: 2, member_folders_enabled: enabled };
           }
           return null;
         },

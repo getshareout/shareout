@@ -29,9 +29,9 @@ export async function handlePublish(
   env: Env,
   executionCtx?: ExecutionContext,
 ): Promise<Response> {
-  return withIdempotency(request, env, async () => {
-    const user = await validateToken(request, env);
-    if (!user) return unauthorizedFor(request, env);
+  const user = await validateToken(request, env);
+  if (!user) return unauthorizedFor(request, env);
+  return withIdempotency(request, env, `${user.id}:${user.service?.tokenId ?? ''}`, async () => {
     const docs = `${new URL(request.url).origin}/v1/skill/api/artifacts.md`;
 
     if (!hasScope(user, 'artifacts:publish')) {

@@ -913,6 +913,7 @@ describe('handleMoveArtifactToFolder', () => {
       DB: makeDbMock({
         first: roleFirst('member', (sql) => {
           if (sql.includes('FROM artifacts WHERE id = ? AND workspace_id = ?')) return { id: 'art_1' };
+          if (sql.includes('SELECT owner_id FROM artifacts')) return { owner_id: user.id };
           if (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?')) return null;
           return null;
         }),
@@ -940,6 +941,7 @@ describe('handleMoveArtifactToFolder', () => {
       DB: makeDbMock({
         first: roleFirst('member', (sql) => {
           if (sql.includes('FROM artifacts WHERE id = ? AND workspace_id = ?')) return { id: 'art_1' };
+          if (sql.includes('SELECT owner_id FROM artifacts')) return { owner_id: user.id };
           if (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?')) return { id: folderId, created_by: user.id };
           return null;
         }),
@@ -970,6 +972,7 @@ describe('handleMoveArtifactToFolder', () => {
       DB: makeDbMock({
         first: roleFirst('member', (sql) => {
           if (sql.includes('FROM artifacts WHERE id = ? AND workspace_id = ?')) return { id: 'art_1' };
+          if (sql.includes('SELECT owner_id FROM artifacts')) return { owner_id: user.id };
           return null;
         }),
         run: () => ({ success: true }),
@@ -1030,5 +1033,27 @@ describe('canManageTeamFolder', () => {
     expect(canManageTeamFolder('member', true, null, user.id)).toBe(false);
     expect(canManageTeamFolder('member', false, user.id, user.id)).toBe(false);
     expect(canManageTeamFolder(null, true, user.id, user.id)).toBe(false);
+  });
+});
+
+describe('handleMoveArtifactToFolder authority', () => {
+  const move = (role: WorkspaceRole, ownerId: string) => handleMoveArtifactToFolder(
+    new Request(`https://shareout.example.com/v1/workspaces/${workspaceId}/artifacts/art_1/move`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folder_id: null }),
+    }),
+    { ...baseEnv, DB: makeDbMock({ first: roleFirst(role, (sql) => {
+      if (sql.includes('FROM artifacts WHERE id = ? AND workspace_id = ?')) return { id: 'art_1' };
+      if (sql.includes('SELECT owner_id FROM artifacts')) return { owner_id: ownerId };
+      return null;
+    }) }) },
+    user, workspaceId, 'art_1',
+  );
+
+  it('refuses a member who does not own or edit the artifact', async () => {
+    expect((await move('member', 'usr_other')).status).toBe(403);
+  });
+
+  it('lets a workspace admin move a member\'s artifact', async () => {
+    expect((await move('admin', 'usr_other')).status).toBe(200);
   });
 });

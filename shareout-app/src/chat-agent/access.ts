@@ -52,9 +52,9 @@ function roleFromRank(rank: number | null | undefined): BotWorkspace['role'] {
 }
 
 export async function getBotVisibilityScope(env: Env, userId: string): Promise<VisibilityScope> {
-  // One round trip: the user's row plus every row sharing its non-NULL identity_id.
+  // One round trip: the user's row plus every enabled row sharing its non-NULL identity_id.
   const rows = (await env.DB.prepare(
-    'SELECT id, email FROM users WHERE id = ? OR identity_id = (SELECT identity_id FROM users WHERE id = ?)',
+    'SELECT id, email FROM users WHERE id = ? OR (identity_id = (SELECT identity_id FROM users WHERE id = ?) AND COALESCE(disabled, 0) = 0)',
   ).bind(userId, userId).all<{ id: string; email: string | null }>()).results || [];
   const self = rows.find((r) => r.id === userId);
   const userIds = rows.map((r) => r.id);

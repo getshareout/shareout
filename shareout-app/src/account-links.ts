@@ -24,10 +24,11 @@ export function placeholders(n: number): string {
   return n > 0 ? Array.from({ length: n }, () => '?').join(',') : 'NULL';
 }
 
-/** One round trip for the user's identity group: the row itself, plus every row sharing
- *  its non-NULL identity_id (a NULL identity_id makes the subquery NULL, so only self). */
+/** One round trip for the user's identity group: the row itself, plus every enabled row
+ *  sharing its non-NULL identity_id (a NULL identity_id makes the subquery NULL, so only
+ *  self). A disabled linked account lends no access to the rest of the group. */
 const LINKED_GROUP_SQL = (cols: string, order = '') =>
-  `SELECT ${cols} FROM users WHERE id = ? OR identity_id = (SELECT identity_id FROM users WHERE id = ?)${order}`;
+  `SELECT ${cols} FROM users WHERE id = ? OR (identity_id = (SELECT identity_id FROM users WHERE id = ?) AND COALESCE(disabled, 0) = 0)${order}`;
 
 export async function getLinkedUserIds(env: Env, userId: string): Promise<string[]> {
   const rows = await env.DB.prepare(LINKED_GROUP_SQL('id'))
