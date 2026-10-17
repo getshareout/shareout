@@ -2,6 +2,7 @@
  * Main request handler: loads home page data and renders the SSR response.
  */
 import type { Env } from '../../types';
+import { configuredProviders } from '../../file-imports/oauth';
 import { getVisibilityScope, placeholders } from '../../account-links';
 import { openVisibilityDisabled } from '../../visibility-config';
 import { inboxEmailDomain } from '../../scheduling/email';
@@ -202,6 +203,7 @@ async function buildHomeBody(
     inboxDomain,
     isInstanceAdmin,
     slidesImport: !!env.SLIDES_CONVERTER,
+    fileImportProviders: configuredProviders(env),
     platformOrigin: getPlatformOrigin(env),
     accessRequests,
     hostname: new URL(request.url).hostname,

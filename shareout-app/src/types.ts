@@ -142,6 +142,14 @@ export interface Env {
   MICROSOFT_CLIENT_SECRET?: string;
   /** `common` (default), `organizations`, `consumers`, or a directory (tenant) GUID. */
   MICROSOFT_TENANT?: string;
+  /** Folder import from Google Drive (src/file-imports): its own OAuth client, a read-only file consent separate from sign-in. Unset = Drive import hidden. */
+  GOOGLE_DRIVE_CLIENT_ID?: string;
+  GOOGLE_DRIVE_CLIENT_SECRET?: string;
+  /** Folder import from OneDrive / SharePoint (Microsoft Graph, delegated). Unset = hidden. May be the same Entra app as sign-in. */
+  MICROSOFT_FILES_CLIENT_ID?: string;
+  MICROSOFT_FILES_CLIENT_SECRET?: string;
+  /** Entra tenant for the file consent: `common` (default: work, school and personal OneDrive), `organizations`, or one tenant id. */
+  MICROSOFT_FILES_TENANT?: string;
   SHOPIFY_CLIENT_ID: string;
   SHOPIFY_CLIENT_SECRET: string;
   TIENDANUBE_CLIENT_ID: string;
@@ -176,6 +184,8 @@ export interface Env {
   SLIDES_CONVERTER?: DurableObjectNamespace<import('./pages/home/slides-converter-do').SlidesConverter>;
   /** Durable per-source ingest. Optional: ingest runs inline in waitUntil when absent. */
   KNOWLEDGE_INGEST?: Workflow<import('./knowledge/corpus/ingest').IngestParams>;
+  /** Durable folder import (src/file-imports). Optional: imports run inline in waitUntil when absent (small folders only). */
+  FILE_IMPORT?: Workflow<import('./file-imports/types').FileImportParams>;
   /** Vectorize index over knowledge chunks (namespace = workspace id). Optional: search degrades to keyword. */
   KNOWLEDGE_VECTORS?: VectorizeIndex;
   /** Workers AI model for knowledge-graph extraction (JSON mode). Defaults to @cf/meta/llama-3.3-70b-instruct-fp8-fast. */

@@ -290,6 +290,7 @@ export default defineConfig({
 						{ label: 'Overview', slug: 'teams/overview', translations: { es: 'Introducción' } },
 						{ label: 'Workspaces', slug: 'teams/workspaces', translations: { es: 'Espacios de trabajo' } },
 						{ label: 'Folders', slug: 'teams/folders', translations: { es: 'Carpetas' } },
+						{ label: 'Bring your files from Drive / SharePoint', slug: 'teams/drive-import', translations: { es: 'Traé tus archivos de Drive / SharePoint' } },
 						{ label: 'External sharing', slug: 'teams/external-sharing', translations: { es: 'Compartir con clientes' } },
 						{ label: 'Client portals', slug: 'teams/client-portals', translations: { es: 'Portales de clientes' } },
 						{ label: 'Custom subdomain', slug: 'teams/subdomain', translations: { es: 'Subdominio propio' } },

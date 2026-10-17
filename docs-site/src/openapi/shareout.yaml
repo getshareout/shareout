@@ -51,6 +51,11 @@ tags:
     description: Self-serve personal API tokens.
   - name: Assets
     description: Per-scope asset library — versioned deliverables, collections, and client download links.
+  - name: File imports
+    description: >-
+      Import folders from Google Drive and OneDrive / SharePoint into workspace files.
+      A separate read-only consent per member and workspace; workspace owners, admins and
+      (while members may create folders) members only. Tokens are never returned.
   - name: External sharing
     description: Client orgs, external members, folder grants, scoped tokens, read receipts, and client notes (Teams/Enterprise).
   - name: Metric alerts
@@ -3588,6 +3593,259 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/file-imports:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [File imports]
+      summary: Configured drives, my connections, and imported folders
+      operationId: getFileImports
+      responses:
+        "200":
+          description: Overview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  providers:
+                    type: array
+                    description: Only providers this instance has client ids for. Empty = feature hidden.
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, enum: [google_drive, microsoft] }
+                        connected: { type: boolean }
+                        accountEmail: { type: string, nullable: true }
+                  sources:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FileImportSource"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/file-imports/connect/{provider}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [google_drive, microsoft]
+    get:
+      tags: [File imports]
+      summary: Start the read-only file consent
+      description: >-
+        Redirects (302) to Google or Microsoft. The consent returns to
+        `GET /v1/file-imports/oauth/{provider}/callback`, which stores the encrypted
+        tokens for the signed-in member in this workspace and posts
+        `shareout:file-import:connected` to the opener window.
+      operationId: connectFileImport
+      responses:
+        "302":
+          description: Redirect to the provider's consent screen
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/file-imports/oauth/{provider}/callback:
+    parameters:
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [google_drive, microsoft]
+      - { name: code, in: query, schema: { type: string } }
+      - { name: state, in: query, schema: { type: string } }
+    get:
+      tags: [File imports]
+      summary: OAuth redirect URI (browser only)
+      description: Signed state + PKCE; the session user must be the user who started the flow. Returns an HTML page.
+      operationId: fileImportOAuthCallback
+      responses:
+        "200":
+          description: Connected (HTML)
+        "400":
+          description: Refused or expired (HTML)
+  /v1/workspaces/{workspaceId}/file-imports/connections/{provider}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [google_drive, microsoft]
+    delete:
+      tags: [File imports]
+      summary: Disconnect my drive
+      description: >-
+        Deletes my consent (and revokes it at Google). Every folder syncing through it
+        stops: running imports end with `CONNECTION_REVOKED`, daily sync turns off.
+        Imported files stay.
+      operationId: disconnectFileImport
+      responses:
+        "200":
+          description: Disconnected
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/file-imports/browse/{provider}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [google_drive, microsoft]
+      - name: ref
+        in: query
+        description: Opaque ref from a previous browse (`root` to start).
+        schema: { type: string, default: root }
+      - name: q
+        in: query
+        description: Search SharePoint sites (Microsoft, at `root`).
+        schema: { type: string }
+    get:
+      tags: [File imports]
+      summary: Browse my drive's folders
+      operationId: browseFileImport
+      responses:
+        "200":
+          description: One level of folders, drives or sites
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  searchable: { type: boolean }
+                  entries:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ref: { type: string }
+                        name: { type: string }
+                        kind: { type: string, enum: [folder, drive, site, group] }
+                        selectable: { type: boolean }
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/workspaces/{workspaceId}/file-imports/sources:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    post:
+      tags: [File imports]
+      summary: Import a folder
+      description: >-
+        Creates the import and starts its first run. The picked folder becomes a
+        ShareOut folder inside `targetFolderId` (or at the top level), mirroring
+        subfolders. Files take the target folder's visibility (private → private,
+        public → link-shareable, otherwise team); converted pages are never public.
+        At most 10 folders per workspace can sync daily.
+      operationId: createFileImportSource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, ref]
+              properties:
+                provider: { type: string, enum: [google_drive, microsoft] }
+                ref: { type: string, description: A selectable ref from browse. }
+                name: { type: string }
+                targetFolderId: { type: string, nullable: true }
+                convert: { type: boolean, default: true, description: Turn Word/Excel/PDF/Markdown/CSV (and slides, when the converter is bound) into pages. }
+                dailySync: { type: boolean, default: false }
+      responses:
+        "201":
+          description: Created and started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  source: { $ref: "#/components/schemas/FileImportSource" }
+                  run: { $ref: "#/components/schemas/FileImportRun" }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/workspaces/{workspaceId}/file-imports/sources/{sourceId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - { name: sourceId, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [File imports]
+      summary: Change daily sync or conversion
+      operationId: updateFileImportSource
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dailySync: { type: boolean }
+                convert: { type: boolean }
+      responses:
+        "200":
+          description: Updated
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [File imports]
+      summary: Stop syncing a folder
+      description: The creator or an admin. Imported files and pages stay.
+      operationId: deleteFileImportSource
+      responses:
+        "200":
+          description: Removed
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/file-imports/sources/{sourceId}/sync:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - { name: sourceId, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [File imports]
+      summary: Sync again
+      description: Fetches only new or changed files (Drive `modifiedTime`, Graph `cTag`). 409 `RUN_IN_PROGRESS` while one runs.
+      operationId: syncFileImportSource
+      responses:
+        "202":
+          description: Started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  run: { $ref: "#/components/schemas/FileImportRun" }
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/workspaces/{workspaceId}/file-imports/runs/{runId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - { name: runId, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [File imports]
+      summary: Run progress and per-file problems
+      operationId: getFileImportRun
+      responses:
+        "200":
+          description: Run
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  run: { $ref: "#/components/schemas/FileImportRun" }
+        "404":
+          $ref: "#/components/responses/NotFound"
   /v1/workspaces/{workspaceId}/assets:
     parameters:
       - $ref: "#/components/parameters/WorkspaceId"
@@ -6892,6 +7150,53 @@ components:
           items: { type: string }
         duration_ms:
           type: integer
+    FileImportRun:
+      type: object
+      properties:
+        id: { type: string }
+        sourceId: { type: string }
+        status: { type: string, enum: [queued, walking, importing, done, stopped, failed] }
+        trigger: { type: string, enum: [manual, resync, schedule] }
+        counts:
+          type: object
+          properties:
+            found: { type: integer }
+            imported: { type: integer }
+            converted: { type: integer }
+            skipped: { type: integer }
+            unchanged: { type: integer }
+            failed: { type: integer }
+        stopCode:
+          type: string
+          nullable: true
+          description: STORAGE_QUOTA_EXCEEDED, CONNECTION_REVOKED, RATE_LIMITED, WALK_LIMIT (warning on a done run), NOT_ALLOWED, SOURCE_DELETED, STALLED, FAILED.
+        stopMessage: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time, nullable: true }
+        errors:
+          type: array
+          description: Files that failed, were skipped, or imported with a warning (up to 200).
+          items:
+            type: object
+            properties:
+              path: { type: string }
+              status: { type: string }
+              code: { type: string }
+              message: { type: string }
+    FileImportSource:
+      type: object
+      properties:
+        id: { type: string }
+        provider: { type: string, enum: [google_drive, microsoft] }
+        remoteName: { type: string }
+        targetFolderId: { type: string, nullable: true }
+        targetFolderName: { type: string, nullable: true }
+        convert: { type: boolean }
+        dailySync: { type: boolean }
+        nextSyncAt: { type: string, nullable: true }
+        connected: { type: boolean, description: false after the connection was revoked. }
+        mine: { type: boolean }
+        lastRun: { $ref: "#/components/schemas/FileImportRun" }
     Visibility:
       type: string
       description: "'unlisted' was retired 2026-07 — still accepted as input and treated as 'public'."

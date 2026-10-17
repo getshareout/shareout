@@ -1,4 +1,5 @@
 import type { Env } from '../types';
+import { runDueFileImports } from '../file-imports/schedule';
 import { runVersionNoticeSweep } from '../notify/review-notify';
 import { getUserRole } from '../artifacts/roles';
 import { purgeSoftDeleted } from '../artifacts/crud';
@@ -265,6 +266,11 @@ export async function handleScheduledEvent(env: Env, scheduledTime?: number): Pr
 
   // User scheduled jobs: once per cron tick (hourly — wrangler.toml `crons`).
   const jobResult = await runScheduledJobs(env);
+
+  // Daily folder syncs from Google Drive / OneDrive / SharePoint (src/file-imports),
+  // capped per tick. Cheap no-op SELECT when nothing is due.
+  const fileImports = await runDueFileImports(env).catch(() => ({ started: 0 }));
+  if (fileImports.started > 0) logger.info('file import syncs started', { started: fileImports.started });
 
   // Dispatch due crew cron triggers (Phase 1). Hourly granularity.
   const crewResult = await runDueCrewTriggers(env);

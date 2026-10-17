@@ -31,6 +31,8 @@ button provisions names; replace placeholder IDs after create if needed.
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | secret | Enables Google on `/auth/login`. Callback: `{SHAREOUT_BASE_URL}/auth/callback`. |
 | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | secret | Enables **Sign in with Microsoft** (personal and work/school accounts) on `/auth/login` and private-page sign-in. Callback: `{SHAREOUT_BASE_URL}/auth/microsoft/callback`. See [below](#sign-in-with-microsoft). |
 | `MICROSOFT_TENANT` | var | Optional. `common` (default: personal + work/school), `organizations` (work/school only), `consumers` (personal only), or one directory's tenant GUID. Any other value hides the button. |
+| `GOOGLE_DRIVE_CLIENT_ID` / `GOOGLE_DRIVE_CLIENT_SECRET` | secret | Enables folder import from Google Drive (read-only `drive.readonly`, its own OAuth client — not the login one). Redirect: `{SHAREOUT_BASE_URL}/v1/file-imports/oauth/google_drive/callback`. Needs `CREDENTIALS_KEY`. |
+| `MICROSOFT_FILES_CLIENT_ID` / `MICROSOFT_FILES_CLIENT_SECRET` / `MICROSOFT_FILES_TENANT` | secret / var | Enables folder import from OneDrive / SharePoint (delegated `Files.Read.All`, `Sites.Read.All`, `User.Read`, `offline_access`). Tenant defaults to `common`. Redirect: `{SHAREOUT_BASE_URL}/v1/file-imports/oauth/microsoft/callback`. |
 | Email binding `EMAIL` | binding | Enables emailed one-time codes. Without it those codes only reach the worker log. |
 | `EMAIL_DEFAULT_FROM` | var | From-address when Email is bound. |
 

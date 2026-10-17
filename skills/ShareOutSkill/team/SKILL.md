@@ -173,6 +173,7 @@ One artifact owns a table and opts it into the workspace; others read/write with
 | Data catalog | [catalog.md](catalog.md) |
 | Shared tables | [workspace-tables.md](workspace-tables.md) |
 | External sharing | [external-sharing.md](external-sharing.md) |
+| Drive / SharePoint folder import | [file-imports.md](file-imports.md) |
 | Folders | [folders.md](folders.md) |
 
 Metric alerts: base skill [../api/metric-alerts.md](../api/metric-alerts.md).
