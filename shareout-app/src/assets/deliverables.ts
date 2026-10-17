@@ -81,8 +81,25 @@ export async function setDeliverableFields(
   return (res.meta?.changes ?? 0) > 0;
 }
 
-/** Attach a freshly-uploaded blob to a deliverable as its next version. */
-export async function addDeliverableVersion(env: Env, bucketId: string, deliverableId: string, blobId: string): Promise<number> {
+/** True when the deliverable is a live file of this bucket. */
+export async function deliverableInBucket(env: Env, bucketId: string, deliverableId: string): Promise<boolean> {
+  const row = await env.DB.prepare(
+    'SELECT 1 AS ok FROM asset_deliverables WHERE id = ? AND bucket_artifact_id = ? AND deleted_at IS NULL',
+  ).bind(deliverableId, bucketId).first<{ ok: number }>();
+  return !!row;
+}
+
+/** True when the collection belongs to this bucket. */
+export async function collectionInBucket(env: Env, bucketId: string, collectionId: string): Promise<boolean> {
+  const row = await env.DB.prepare('SELECT 1 AS ok FROM asset_collections WHERE id = ? AND bucket_artifact_id = ?')
+    .bind(collectionId, bucketId).first<{ ok: number }>();
+  return !!row;
+}
+
+/** Attach a freshly-uploaded blob to a deliverable of this bucket as its next version.
+ *  Null when the deliverable is not a live file of the bucket. */
+export async function addDeliverableVersion(env: Env, bucketId: string, deliverableId: string, blobId: string): Promise<number | null> {
+  if (!(await deliverableInBucket(env, bucketId, deliverableId))) return null;
   const row = await env.DB.prepare(
     'SELECT COALESCE(MAX(version_no), 0) AS n FROM blobs WHERE deliverable_id = ?',
   ).bind(deliverableId).first<{ n: number }>();
@@ -90,7 +107,7 @@ export async function addDeliverableVersion(env: Env, bucketId: string, delivera
   await env.DB.batch([
     env.DB.prepare('UPDATE blobs SET deliverable_id = ?, version_no = ? WHERE id = ? AND artifact_id = ?')
       .bind(deliverableId, next, blobId, bucketId),
-    env.DB.prepare("UPDATE asset_deliverables SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?").bind(deliverableId),
+    env.DB.prepare("UPDATE asset_deliverables SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND bucket_artifact_id = ?").bind(deliverableId, bucketId),
   ]);
   return next;
 }
