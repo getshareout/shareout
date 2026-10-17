@@ -10,6 +10,7 @@ import { handleGetWorkspace } from './read';
 import { scheduleSeedStarterKit } from '../starter-kit/schedule';
 import { logAudit } from '../audit';
 import { invalidateWorkspaceSlug } from './host-cache';
+import { invalidateDomainCaches, listDomains, releaseWorkspaceDomains } from './domains/store';
 
 export async function handleListWorkspaces(
   request: Request,
@@ -208,7 +209,12 @@ export async function handleUpdateWorkspace(
   await env.DB.prepare(
     `UPDATE workspaces SET ${updates.join(', ')} WHERE id = ?`
   ).bind(...values).run();
-  if (body.slug !== undefined) await invalidateWorkspaceSlug(env, previousSlug, body.slug);
+  if (body.slug !== undefined) {
+    await invalidateWorkspaceSlug(env, previousSlug, body.slug);
+    // Custom-host cache entries carry the slug; drop them so they re-read the new one.
+    const domains = await listDomains(env, workspaceId).catch(() => []);
+    if (domains.length) await invalidateDomainCaches(env, workspaceId, ...domains.map((d) => d.hostname));
+  }
 
   if (typeof membersCanCreateFolders === 'boolean') {
     await logAudit(env, {
@@ -242,6 +248,8 @@ export async function handleDeleteWorkspace(
   }
 
   const doomed = await env.DB.prepare('SELECT slug FROM workspaces WHERE id = ?').bind(workspaceId).first<{ slug: string }>();
+  // Take its custom hostnames off Cloudflare first, so none is left on the zone unowned.
+  await releaseWorkspaceDomains(env, workspaceId);
   await env.DB.prepare('DELETE FROM folders WHERE workspace_id = ?').bind(workspaceId).run();
   await env.DB.prepare('DELETE FROM workspace_members WHERE workspace_id = ?').bind(workspaceId).run();
   await env.DB.prepare('DELETE FROM workspaces WHERE id = ?').bind(workspaceId).run();

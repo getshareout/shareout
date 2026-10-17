@@ -238,6 +238,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
               <button class="wsx-chip" data-admin-tab="security" type="button" data-i18n="admin.security">Security</button>
               <button class="wsx-chip" data-admin-tab="support" type="button" data-i18n="admin.support">Support</button>
               <button class="wsx-chip" data-admin-tab="settings" type="button" data-i18n="admin.settings">Settings</button>
+              <button class="wsx-chip" data-admin-tab="domains" type="button" data-i18n="admin.cdTab">Custom domain</button>
             </div>
             <div id="wsxAdminMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>

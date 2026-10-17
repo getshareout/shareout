@@ -83,6 +83,77 @@ export async function invalidateWorkspaceSlug(env: Env, ...slugs: Array<string |
   for (const s of unique) misses.delete(s);
   const kv = env.SLUGS;
   if (!kv) return;
-  await Promise.all(unique.map((s) =>
-    kv.delete(workspaceSlugCacheKey(s)).catch(() => { /* best-effort */ })));
+  // `wsprimary:` is the workspace's primary custom domain (domains/links.ts): a slug that
+  // changes hands must not keep the old owner's hostname in links.
+  await Promise.all(unique.flatMap((s) => [
+    kv.delete(workspaceSlugCacheKey(s)).catch(() => { /* best-effort */ }),
+    kv.delete(`wsprimary:${s.toLowerCase()}`).catch(() => { /* best-effort */ }),
+  ]));
+}
+
+// ---- Custom domains: full hostname → workspace, same rules as the slug cache. ----
+// Only ACTIVE hostnames are ever cached, and only as hits; pending/failed/unknown hosts
+// re-read D1 at most once per MISS_TTL_MS per isolate. The KV value carries the slug
+// too, because the subdomain route it reuses is keyed by slug.
+
+export interface HostWorkspace {
+  id: string;
+  slug: string;
+}
+
+const hostMisses = new Map<string, number>();
+
+export function workspaceHostCacheKey(hostname: string): string {
+  return `wshost:${hostname.toLowerCase()}`;
+}
+
+function rememberHostMiss(host: string, now: number): void {
+  hostMisses.delete(host);
+  if (hostMisses.size >= MISS_MAX) hostMisses.delete(hostMisses.keys().next().value!);
+  hostMisses.set(host, now + MISS_TTL_MS);
+}
+
+/** Forget this isolate's custom-host negative cache (tests). */
+export function clearWorkspaceHostMisses(): void {
+  hostMisses.clear();
+}
+
+/** The workspace an ACTIVE custom hostname routes to, or null. `hostname` is normalized. */
+export async function workspaceByHostname(env: Env, hostname: string): Promise<HostWorkspace | null> {
+  const host = hostname.toLowerCase();
+  const now = Date.now();
+  const expires = hostMisses.get(host);
+  if (expires !== undefined) {
+    if (expires > now) return null;
+    hostMisses.delete(host);
+  }
+  const key = workspaceHostCacheKey(host);
+  const kv = env.SLUGS;
+  if (kv) {
+    try {
+      const cached = await kvCacheGet(kv, key);
+      const [id, slug] = (cached || '').split(' ');
+      if (id && slug) return { id, slug };
+    } catch { /* fail-open to D1 */ }
+  }
+  const row = await env.DB.prepare(
+    `SELECT w.id AS id, w.slug AS slug FROM workspace_domains d JOIN workspaces w ON w.id = d.workspace_id
+      WHERE d.hostname = ? AND d.status = 'active'`,
+  ).bind(host).first<HostWorkspace>();
+  if (!row?.id || !row.slug) {
+    rememberHostMiss(host, now);
+    return null;
+  }
+  if (kv) deferWork(() => kv.put(key, `${row.id} ${row.slug}`, { expirationTtl: HIT_TTL }));
+  return { id: row.id, slug: row.slug };
+}
+
+/** Drop cached mappings for these hostnames (status change, removal, workspace rename). */
+export async function invalidateWorkspaceHostnames(env: Env, ...hostnames: Array<string | null | undefined>): Promise<void> {
+  const unique = [...new Set(hostnames.filter((h): h is string => !!h).map((h) => h.toLowerCase()))];
+  for (const h of unique) hostMisses.delete(h);
+  const kv = env.SLUGS;
+  if (!kv) return;
+  await Promise.all(unique.map((h) =>
+    kv.delete(workspaceHostCacheKey(h)).catch(() => { /* best-effort */ })));
 }

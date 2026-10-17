@@ -17,6 +17,7 @@ import { badgeEnabled, injectBadge } from './badge';
 import { versionedBundlePath } from '../bundle-versions';
 import { localeForArtifactWorkspace } from '../i18n/locale';
 import { injectPageAgent, isSafePagePath, isSafeSectionId } from './page-agent';
+import { servingOrigin } from '../workspaces/domains/host-binding';
 
 function injectCommentsAgent(resp: Response, baseUrl: string): Response {
   const tag = `<script src="${baseUrl}${versionedBundlePath('/sdk/comments-agent.js')}" defer></script>`;
@@ -238,7 +239,7 @@ export async function handleServe(
       return new Response('Not Found', { status: 404 });
     }
     return serveCaptureView(
-      request, env, captureAsset, slug, result, env.SHAREOUT_BASE_URL.replace(/\/$/, ''), writableCapture,
+      request, env, captureAsset, slug, result, servingOrigin(env), writableCapture,
     );
   }
 
@@ -298,7 +299,7 @@ export async function handleServe(
     asset = { r2_key: result.r2_key, mime: result.mime, size_bytes: result.size_bytes };
   }
 
-  const baseUrl = env.SHAREOUT_BASE_URL.replace(/\/$/, '');
+  const baseUrl = servingOrigin(env);
   const socialPreview = resolveArtifactSocialPreview(result, baseUrl, slug);
 
   // The typed viewers' Download link targets /a/{slug}/download or /a/{slug}/{name}{ext}

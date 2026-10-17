@@ -14,6 +14,7 @@ import { notFound, runBackground, NOINDEX_ROBOTS } from './utils';
 import type { SocialPreview } from './social-meta';
 import { normalizeVisibility } from '../visibility-config';
 import { localeForArtifactWorkspace } from '../i18n/locale';
+import { servingOrigin } from '../workspaces/domains/host-binding';
 
 export async function serveTypeViewer(
   request: Request,
@@ -24,7 +25,7 @@ export async function serveTypeViewer(
   socialPreview: SocialPreview,
   executionCtx?: ExecutionContext,
 ): Promise<Response> {
-  const baseUrl = env.SHAREOUT_BASE_URL.replace(/\/$/, '');
+  const baseUrl = servingOrigin(env);
 
   // Parse type metadata
   let typeMetadata: TypeMetadata = {};

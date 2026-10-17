@@ -1,4 +1,5 @@
-import { getPlatformHostname } from '../config/origins';
+import { getPlatformOrigin } from '../config/origins';
+import { workspaceOrigin } from '../workspaces/domains/links';
 import PostalMime from 'postal-mime';
 import type { Env } from '../types';
 import { sha256 } from '../crypto-utils';
@@ -105,7 +106,7 @@ async function notifyWorkspaceFileReceived(
 ): Promise<void> {
   // This link is emailed to the workspace's own members. Hardcoded to the hosted
   // domain it sent a self-hoster's team to someone else's instance.
-  const homeUrl = `https://${workspace.slug}.${getPlatformHostname(env)}/home`;
+  const homeUrl = `${await workspaceOrigin(env, getPlatformOrigin(env), workspace.slug)}/home`;
   const fileList = files.map(f => f.filename).join(', ');
   const updateHint = files.find(f => f.priorArtifact);
   let text = `Received ${fileList} from ${sender} in ${workspace.name}.\n\nOpen chat: ${homeUrl}`;

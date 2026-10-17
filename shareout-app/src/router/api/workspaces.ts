@@ -9,6 +9,7 @@ import { routeWorkspaceMembers } from './workspace-members-routes';
 import { routeWorkspaceConnections } from './workspace-connections-routes';
 import { routeWorkspaceOps } from './workspace-ops-routes';
 import { routeWorkspaceAdminArtifacts } from './workspace-admin-artifacts-routes';
+import { routeWorkspaceDomainsApi } from '../../workspaces/domains';
 import type { FetchContext } from '../context';
 import { isAuthUser, requireToken, requireTokenOrSession } from '../helpers/auth-guard';
 
@@ -64,6 +65,14 @@ export async function routeWorkspaceApi(ctx: FetchContext): Promise<Response | n
     if (request.method === 'DELETE') {
       return addCORS(await handleDeleteWorkspace(request, env, user, workspaceId));
     }
+  }
+
+  const domainsMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/domains(\/.*)?$/);
+  if (domainsMatch) {
+    const user = await requireTokenOrSession(ctx);
+    if (!isAuthUser(user)) return user;
+    const res = await routeWorkspaceDomainsApi(request, env, user, decodeURIComponent(domainsMatch[1]!), domainsMatch[2] || '');
+    if (res) return addCORS(res);
   }
 
   const delegated =

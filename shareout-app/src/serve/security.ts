@@ -1,5 +1,6 @@
 import type { Env } from '../types';
 import { getCdnRegistrable, getPlatformHostname } from '../config/origins';
+import { servingOrigin } from '../workspaces/domains/host-binding';
 
 // allow-same-origin is deliberately NOT granted: combined with allow-scripts it lets
 // framed untrusted artifact code reach back into its own origin and remove the sandbox
@@ -118,7 +119,7 @@ export function artifactContentUrl(
     const prefix = ct ? `/c/${encodeURIComponent(ct)}` : '';
     return `https://${host}${prefix}/${cleanPath}`;
   }
-  const baseUrl = loopbackOrigin || env.SHAREOUT_BASE_URL.replace(/\/$/, '');
+  const baseUrl = loopbackOrigin || servingOrigin(env);
   return `${baseUrl}/a/${slug}/${cleanPath}?_raw`;
 }
 
@@ -129,7 +130,9 @@ export function getArtifactCspOrigin(env: Env, request?: Request): string {
   const loopbackOrigin = loopbackRequestOrigin(env, request);
   if (loopbackOrigin) return loopbackOrigin;
   const cdn = getCdnRegistrable(env);
-  return cdn && isCdnArtifactOrigin(env) ? `https://*.${cdn}` : getArtifactOrigin(env);
+  if (cdn && isCdnArtifactOrigin(env)) return `https://*.${cdn}`;
+  // Same-zone serving on a workspace custom domain loads the bytes from that domain.
+  return env.CUSTOM_HOST ? env.CUSTOM_HOST.origin : getArtifactOrigin(env);
 }
 
 

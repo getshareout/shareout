@@ -13,7 +13,7 @@ import { resolveAllowOpen, OPEN_VISIBILITY_PAYWALL_MESSAGE } from '../access/all
 import { classifyAndPersist, clearModerationHold, findBlockedCdnHosts } from '../moderation/check';
 import { MODERATION_PENDING_MESSAGE, MODERATION_BLOCKED_MESSAGE } from '../publish/deployment';
 import { canAddPublicArtifact } from '../quota';
-import { buildSubdomainUrl } from '../subdomain';
+import { workspaceArtifactUrl } from '../workspaces/domains/links';
 import { getWorkspacePublishPolicy, hasApprovedPublish, getArtifactContentHash } from '../publish-approval';
 import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { invalidateDeploymentCache, invalidateDeploymentCacheById, routeCacheKeys } from '../serve/deployment-cache';
@@ -290,7 +290,7 @@ export async function handleGetArtifact(
     // Prefer the workspace-subdomain share URL (acme.shareout.site/<display_slug>/)
     // when the artifact lives in a workspace with a subdomain; fall back to /a/ on apex.
     url: artifact.workspace_slug && artifact.display_slug
-      ? buildSubdomainUrl(baseUrl, artifact.workspace_slug, artifact.display_slug)
+      ? await workspaceArtifactUrl(env, baseUrl, artifact.workspace_slug, artifact.display_slug)
       : (artifact.deploy_slug ? `${baseUrl}/a/${artifact.deploy_slug}/` : ''),
     embed_url: artifact.deploy_slug ? `${baseUrl}/embed/${artifact.deploy_slug}/` : '',
     embed_allowed: artifact.embed_allowed === 1,
