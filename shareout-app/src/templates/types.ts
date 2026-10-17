@@ -1,6 +1,6 @@
 /**
  * Templates: a scrubbed, versioned snapshot of an artifact or a folder of artifacts
- * that installs into any workspace. See migrations/0020_artifact_templates.sql.
+ * that installs into any workspace. See migrations/0022_artifact_templates.sql.
  */
 import type { ArtifactType, ImportedSource } from '../types';
 
