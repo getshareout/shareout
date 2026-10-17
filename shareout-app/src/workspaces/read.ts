@@ -15,6 +15,7 @@ interface WorkspaceReadRow {
   folder_count: number;
   member_count: number;
   member_folders_enabled: number;
+  member_class: string | null;
 }
 
 interface Seats {
@@ -30,12 +31,16 @@ function seatsFor(row: Pick<WorkspaceReadRow, 'member_count'>): Seats {
   return { used: row.member_count, limit: null, remaining: null };
 }
 
-function present({ member_folders_enabled, ...row }: WorkspaceReadRow) {
+function present({ member_folders_enabled, member_class, ...row }: WorkspaceReadRow) {
+  // External members (clients, guests) see who the workspace is, not its settings.
+  if (member_class !== 'internal') {
+    return { id: row.id, name: row.name, slug: row.slug, role: row.role, member_class: 'external' };
+  }
   return { ...row, members_can_create_folders: !!member_folders_enabled, seats: seatsFor(row) };
 }
 
 const READ_SELECT = `
-    SELECT w.*, wm.role,
+    SELECT w.*, wm.role, wm.member_class,
       (SELECT COUNT(*) FROM artifacts WHERE workspace_id = w.id) as artifact_count,
       (SELECT COUNT(*) FROM folders WHERE workspace_id = w.id) as folder_count,
       (SELECT COUNT(*) FROM workspace_members WHERE workspace_id = w.id) as member_count

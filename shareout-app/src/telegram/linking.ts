@@ -40,7 +40,9 @@ export async function linkChat(env: Env, chatId: number, userId: string): Promis
 
 export async function getLinkedUserId(env: Env, chatId: number): Promise<string | null> {
   const row = await env.DB.prepare(
-    `SELECT user_id FROM messaging_links WHERE platform = 'telegram' AND session_key = ?`
+    `SELECT ml.user_id FROM messaging_links ml
+       JOIN users u ON u.id = ml.user_id AND COALESCE(u.disabled, 0) = 0
+      WHERE ml.platform = 'telegram' AND ml.session_key = ?`
   ).bind(String(chatId)).first<{ user_id: string }>();
   return row?.user_id ?? null;
 }

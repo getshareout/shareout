@@ -1,7 +1,7 @@
 import { DATA_ERRORS } from '../../types';
 import type { DataContext } from '../middleware';
 import { errorResponse, successResponse } from '../middleware';
-import { verifySessionToken } from '../../token';
+import { verifyLiveSessionToken } from '../../auth/session';
 import { handleVisitorChat, handleConversations, handleVisitorConfig, getAgentConfig } from './visitor-chat';
 import { handleAdminChat, handleAdminContext, handleApplyEdits, handlePublish } from './admin-chat';
 import { handlePilot } from './pilot';
@@ -45,6 +45,10 @@ async function handleUsageEndpoint(
 ): Promise<Response> {
   if (request.method !== 'GET') {
     return errorResponse({ ...DATA_ERRORS.INVALID_REQUEST, message: 'Method not allowed' }, ctx.origin);
+  }
+  // AI usage and cost are for the artifact's owner and editors, like the admin routes.
+  if (!await verifyAgentAdminAccess(request, ctx)) {
+    return errorResponse(DATA_ERRORS.FORBIDDEN, ctx.origin);
   }
 
   const url = new URL(request.url);
@@ -124,7 +128,7 @@ async function handleAdminConfig(request: Request, ctx: DataContext): Promise<Re
 async function verifyAgentAdminAccess(request: Request, ctx: DataContext): Promise<boolean> {
   const sessionToken = request.headers.get('Cookie')?.match(/shareout_session=([^;]+)/)?.[1];
   if (sessionToken) {
-    const payload = await verifySessionToken(sessionToken, ctx.env);
+    const payload = await verifyLiveSessionToken(sessionToken, ctx.env);
     if (payload?.userId) {
       return userCanAdminAgent(ctx, payload.userId);
     }

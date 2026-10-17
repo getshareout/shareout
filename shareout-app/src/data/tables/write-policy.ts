@@ -1,6 +1,7 @@
 // Per-table write roles (work/039 B4 / maturity). Policy comes from the published
-// artifact manifest: sources.tables.<name>.write = "owner" | "collaborator" | "any".
-// Default "any" preserves pre-policy behaviour for existing artifacts.
+// artifact manifest: sources.tables.<name>.write = "owner" | "collaborator" | "any",
+// declared in the entry page's <script type="shareout/manifest">. A table with no
+// declaration defaults to "any"; a declaration that cannot be read counts as "owner".
 import type { Env } from '../../types';
 import type { DataContext } from '../middleware';
 
@@ -41,20 +42,85 @@ export function mayWriteTable(
   return caps.isArtifactOwner;
 }
 
-/** Production-deployment manifest write role for one table (1 D1 read). */
+const STRICTNESS: Record<TableWriteRole, number> = { any: 0, collaborator: 1, owner: 2 };
+
+function stricter(a: TableWriteRole, b: TableWriteRole): TableWriteRole {
+  return STRICTNESS[a] >= STRICTNESS[b] ? a : b;
+}
+
+const MANIFEST_SCRIPT = /<script\b[^>]*\btype\s*=\s*["']?shareout\/manifest["']?[^>]*>([\s\S]*?)<\/script\s*>/gi;
+
+/**
+ * Pure: write role for one table from a page's HTML. No manifest or no entry for the
+ * table → "any". A manifest that does not parse, or an entry whose `write` is not one
+ * of the known roles, → "owner" (the author meant to restrict something).
+ */
+export function tableWriteRoleFromHtml(html: string | null | undefined, tableName: string): TableWriteRole {
+  if (!html) return 'any';
+  let role: TableWriteRole = 'any';
+  for (const m of html.matchAll(MANIFEST_SCRIPT)) {
+    let parsed: { sources?: { tables?: Record<string, { write?: unknown }> } };
+    try {
+      parsed = JSON.parse(m[1]);
+    } catch {
+      return 'owner';
+    }
+    const entry = parsed?.sources?.tables?.[tableName];
+    if (!entry || entry.write === undefined) continue;
+    role = stricter(role, typeof entry.write === 'string' && VALID.has(entry.write) ? entry.write as TableWriteRole : 'owner');
+  }
+  return role;
+}
+
+/** Thrown when the published page cannot be read, so the caller fails closed. */
+export class TablePolicyUnavailable extends Error {}
+
+// Version content is immutable, so a version's parsed HTML is safe to memo per isolate.
+const pageMemo = new Map<string, string[]>();
+const PAGE_MEMO_MAX = 200;
+
+async function versionPages(env: Env, versionId: string, entrypoints: string[]): Promise<string[]> {
+  const cached = pageMemo.get(versionId);
+  if (cached) return cached;
+  const pages: string[] = [];
+  for (const path of entrypoints) {
+    const asset = await env.DB.prepare('SELECT r2_key FROM assets WHERE version_id = ? AND path = ?')
+      .bind(versionId, path).first<{ r2_key: string }>();
+    if (!asset) continue;
+    const obj = await env.ARTIFACTS.get(asset.r2_key);
+    if (!obj) throw new TablePolicyUnavailable(`missing page ${path}`);
+    pages.push(await obj.text());
+  }
+  if (pageMemo.size >= PAGE_MEMO_MAX) pageMemo.clear();
+  pageMemo.set(versionId, pages);
+  return pages;
+}
+
+/** Production-deployment write role for one table. Throws TablePolicyUnavailable on a read failure. */
 export async function resolveTableWriteRole(
   env: Env,
   artifactId: string,
   tableName: string,
 ): Promise<TableWriteRole> {
   const row = await env.DB.prepare(
-    `SELECT v.manifest_json AS manifest_json
+    `SELECT v.id AS version_id, v.manifest_json AS manifest_json, v.entrypoint AS entrypoint,
+            v.mobile_entrypoint AS mobile_entrypoint
      FROM deployments d
      JOIN versions v ON v.id = d.version_id
      WHERE d.artifact_id = ? AND d.channel = 'production'
      LIMIT 1`,
-  ).bind(artifactId).first<{ manifest_json: string | null }>();
-  return tableWriteRoleFromManifest(row?.manifest_json, tableName);
+  ).bind(artifactId).first<{ version_id: string; manifest_json: string | null; entrypoint: string | null; mobile_entrypoint: string | null }>();
+  let role = tableWriteRoleFromManifest(row?.manifest_json, tableName);
+  if (!row?.version_id || !row.entrypoint || !/\.html?$/i.test(row.entrypoint)) return role;
+  const entrypoints = [row.entrypoint, row.mobile_entrypoint].filter((p): p is string => !!p && /\.html?$/i.test(p));
+  let pages: string[];
+  try {
+    pages = await versionPages(env, row.version_id, [...new Set(entrypoints)]);
+  } catch (err) {
+    throw err instanceof TablePolicyUnavailable ? err : new TablePolicyUnavailable(String(err));
+  }
+  for (const html of pages) role = stricter(role, tableWriteRoleFromHtml(html, tableName));
+  return role;
 }
 
 /** HTTP gate for table mutations — null when allowed, error payload when not. */
@@ -66,7 +132,13 @@ export async function denyTableWrite(
   // isArtifactOwner/isOwner may both be undefined — treat as system/owner path.
   if (ctx.isArtifactOwner === undefined && ctx.isOwner === undefined) return null;
 
-  const role = await resolveTableWriteRole(ctx.env, ctx.artifactId, tableName);
+  let role: TableWriteRole;
+  try {
+    role = await resolveTableWriteRole(ctx.env, ctx.artifactId, tableName);
+  } catch {
+    // The page that declares the policy could not be read: allow only the owner.
+    role = 'owner';
+  }
   if (mayWriteTable(role, {
     isOwner: !!ctx.isOwner,
     isArtifactOwner: !!ctx.isArtifactOwner,

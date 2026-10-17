@@ -17,7 +17,7 @@ interface WorkspaceRow {
   name: string;
 }
 
-/** Inbound mail to `{workspace-slug}@inbox.shareout.site`. Members only; attachments
+/** Inbound mail to `{workspace-slug}@inbox.shareout.site`. Enabled internal members only; attachments
  *  land in the sender's workspace asset bucket with blob_origins provenance. */
 export async function handleWorkspaceInbound(
   message: ForwardableEmailMessage,
@@ -37,6 +37,7 @@ export async function handleWorkspaceInbound(
     SELECT u.id FROM users u
     JOIN workspace_members wm ON wm.user_id = u.id
     WHERE wm.workspace_id = ? AND lower(u.email) = ?
+      AND wm.member_class = 'internal' AND COALESCE(u.disabled, 0) = 0
     LIMIT 1
   `).bind(workspace.id, senderEmail).first<{ id: string }>();
   if (!member) return;
@@ -97,7 +98,7 @@ export async function handleWorkspaceInbound(
   await notifyWorkspaceFileReceived(env, workspace, senderEmail, ingested);
 }
 
-async function notifyWorkspaceFileReceived(
+export async function notifyWorkspaceFileReceived(
   env: Env,
   workspace: WorkspaceRow,
   sender: string,
@@ -117,6 +118,7 @@ async function notifyWorkspaceFileReceived(
     SELECT u.id FROM workspace_members wm
     JOIN users u ON u.id = wm.user_id
     WHERE wm.workspace_id = ? AND wm.role IN ('owner', 'admin')
+      AND wm.member_class = 'internal' AND COALESCE(u.disabled, 0) = 0
   `).bind(workspace.id).all<{ id: string }>();
 
   await Promise.allSettled((admins.results || []).map(async (a) => {

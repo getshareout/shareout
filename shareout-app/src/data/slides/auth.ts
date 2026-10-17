@@ -1,6 +1,7 @@
 import type { DataContext } from '../middleware';
 import { verifyOwner } from '../middleware';
-import { extractTokenFromCookie, verifySessionToken } from '../../token';
+import { extractTokenFromCookie } from '../../token';
+import { verifyLiveSessionToken } from '../../auth/session';
 import type { DbSlide } from './db';
 
 export async function getSession(
@@ -11,7 +12,7 @@ export async function getSession(
   const token = extractTokenFromCookie(cookies, /shareout_session=([^;]+)/);
   if (!token) return null;
 
-  const payload = await verifySessionToken(token, ctx.env);
+  const payload = await verifyLiveSessionToken(token, ctx.env);
   if (!payload) return null;
 
   return {

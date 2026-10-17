@@ -141,6 +141,27 @@ describe('PlatformEngine.execute', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('keeps cached GET responses per connection', async () => {
+    vi.mocked(credentialsModule.loadConnection).mockImplementation(async (_env, _artifactId, connectionId) => ({
+      ...(await connectionWithToken('access-token', Date.now() + 3_600_000)),
+      id: connectionId,
+    }));
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ spreadsheetId: 'sheet-abc' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const eng = engine();
+    const call = (connectionId: string) => eng.execute({
+      provider: 'google-sheets',
+      endpoint: 'spreadsheets.get',
+      connectionId,
+      params: { pathParams: { spreadsheetId: 'sheet-abc' } },
+    });
+    expect((await call('conn_a')).meta?.cached).toBe(false);
+    expect((await call('conn_a')).meta?.cached).toBe(true);
+    expect((await call('conn_b')).meta?.cached).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('maps provider HTTP errors with retryable flags', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       error: { message: 'Quota exceeded' },

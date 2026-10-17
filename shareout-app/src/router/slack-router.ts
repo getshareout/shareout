@@ -129,7 +129,8 @@ async function handleSlashCommand(ctx: FetchContext): Promise<Response> {
   const params = new URLSearchParams(raw);
   const teamId = params.get('team_id') || '';
   const userId = params.get('user_id') || '';
-  const channelId = params.get('channel_id') || '';
+  // Replies go to the user's DM unless the command was typed in that DM.
+  const channelId = params.get('channel_name') === 'directmessage' ? params.get('channel_id') || '' : '';
   const text = (params.get('text') || '').trim();
   const triggerId = params.get('trigger_id') || teamId;
 

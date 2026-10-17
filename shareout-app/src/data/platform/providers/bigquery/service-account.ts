@@ -4,8 +4,9 @@ export interface ServiceAccountKey {
 	token_uri?: string;
 }
 
-// Cache minted tokens per service account within the isolate to avoid re-signing
-// a JWT on every query. Tokens live ~1h; we refresh once they're within 60s of expiry.
+// Cache minted tokens per service-account key + scope within the isolate to avoid
+// re-signing a JWT on every query. The key covers the private key, not just the
+// email, so a cached token is only returned to a caller holding the same key. Tokens live ~1h; we refresh once they're within 60s of expiry.
 const tokenCache = new Map<string, { token: string; exp: number }>();
 
 function base64url(input: ArrayBuffer | string): string {
@@ -27,12 +28,19 @@ function pemToDer(pem: string): ArrayBuffer {
 	return buf.buffer;
 }
 
+async function cacheKeyFor(sa: ServiceAccountKey, scope: string): Promise<string> {
+	const input = [sa.client_email, sa.private_key, sa.token_uri || '', scope].join('\n');
+	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+	return base64url(digest);
+}
+
 export async function getServiceAccountToken(
 	sa: ServiceAccountKey,
 	scope: string
 ): Promise<string> {
 	const now = Math.floor(Date.now() / 1000);
-	const cached = tokenCache.get(sa.client_email);
+	const cacheKey = await cacheKeyFor(sa, scope);
+	const cached = tokenCache.get(cacheKey);
 	if (cached && cached.exp > now + 60) return cached.token;
 
 	const tokenUri = sa.token_uri || 'https://oauth2.googleapis.com/token';
@@ -70,6 +78,6 @@ export async function getServiceAccountToken(
 	}
 
 	const data = (await res.json()) as { access_token: string; expires_in: number };
-	tokenCache.set(sa.client_email, { token: data.access_token, exp: now + data.expires_in });
+	tokenCache.set(cacheKey, { token: data.access_token, exp: now + data.expires_in });
 	return data.access_token;
 }

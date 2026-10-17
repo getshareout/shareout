@@ -59,6 +59,15 @@ export async function getSessionUser(request: Request, env: Env): Promise<{ id: 
   return user;
 }
 
+/**
+ * Verify a raw session cookie value the way getSessionUser does (signature, expiry,
+ * and the disabled flag). For callers that extract the cookie themselves.
+ */
+export async function verifyLiveSessionToken(token: string, env: Env): Promise<{ userId: string; email: string } | null> {
+  const user = await requestMemo(env, `session:${token}`, () => timePhase(env, 'auth', () => resolveSessionUser(token, env)));
+  return user ? { userId: user.id, email: user.email } : null;
+}
+
 async function resolveSessionUser(token: string, env: Env): Promise<{ id: string; email: string } | null> {
   const payload = await verifySessionToken(token, env);
   if (!payload) return null;

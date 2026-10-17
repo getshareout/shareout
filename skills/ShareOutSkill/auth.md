@@ -226,29 +226,26 @@ Content-Type: application/json
 
 ### Link Email (Optional)
 
-Optionally associate an email with the account.
+Associate an email with the account by proving you receive mail there: request a code,
+then submit it.
 
 ```http
-POST /v1/auth/link-email
+POST /v1/auth/link-email/start
 Authorization: Bearer so_xxx
 Content-Type: application/json
 
-{
-  "email": "user@example.com"
-}
+{ "email": "user@example.com" }
 ```
 
-**Response (200):**
-```json
-{
-  "success": true,
-  "email": "user@example.com"
-}
+```http
+POST /v1/auth/link-email/verify
+Authorization: Bearer so_xxx
+Content-Type: application/json
+
+{ "email": "user@example.com", "code": "123456" }
 ```
 
-**Error Codes:**
-- `INVALID_EMAIL` (400): Invalid email format
-- `EMAIL_IN_USE` (409): Email already linked to another account
+`POST /v1/auth/link-email` (without a code) returns `403 EMAIL_VERIFICATION_REQUIRED`.
 
 ---
 

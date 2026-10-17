@@ -5,6 +5,8 @@ import { generateId } from './crypto-utils';
 import { jsonWithApiErrors } from './http/api-error';
 import { evictReturnedTokens } from './auth/token-cache';
 
+const REVOKE_GRANT = "revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), access_token_id = NULL";
+
 function json(data: unknown, status = 200): Response {
   return jsonWithApiErrors(data, status);
 }
@@ -34,7 +36,12 @@ export async function handleCreateMyToken(request: Request, env: Env, user: Auth
   }
 
   if (regenerate) {
-    const removed = await env.DB.prepare("DELETE FROM tokens WHERE principal_type = 'user' AND principal_id = ? RETURNING token_hash").bind(user.id).run();
+    // Connected apps (MCP OAuth grants) hold refresh tokens that would mint a new access
+    // token after the delete, so they are revoked in the same batch.
+    const [, removed] = await env.DB.batch([
+      env.DB.prepare(`UPDATE oauth_grants SET ${REVOKE_GRANT} WHERE user_id = ? AND revoked_at IS NULL`).bind(user.id),
+      env.DB.prepare("DELETE FROM tokens WHERE principal_type = 'user' AND principal_id = ? RETURNING token_hash").bind(user.id),
+    ]);
     await evictReturnedTokens(env, removed);
   }
 
@@ -50,8 +57,12 @@ export async function handleCreateMyToken(request: Request, env: Env, user: Auth
 // Self-serve: revokes one of the signed-in user's own tokens. Scoped by principal so a
 // user can never delete someone else's token by guessing its id.
 export async function handleRevokeMyToken(env: Env, user: AuthUser, tokenId: string): Promise<Response> {
-  const res = await env.DB.prepare("DELETE FROM tokens WHERE id = ? AND principal_type = 'user' AND principal_id = ? RETURNING token_hash")
-    .bind(tokenId, user.id).run();
+  const [, res] = await env.DB.batch([
+    env.DB.prepare(`UPDATE oauth_grants SET ${REVOKE_GRANT} WHERE user_id = ? AND access_token_id = ? AND revoked_at IS NULL`)
+      .bind(user.id, tokenId),
+    env.DB.prepare("DELETE FROM tokens WHERE id = ? AND principal_type = 'user' AND principal_id = ? RETURNING token_hash")
+      .bind(tokenId, user.id),
+  ]);
   await evictReturnedTokens(env, res);
   if (!res.meta?.changes) return json({ ok: false, error: 'Token not found', code: 'NOT_FOUND' }, 404);
   return json({ ok: true });

@@ -6,6 +6,7 @@ vi.mock('../../../src/router/helpers/auth-guard', () => ({
   isAuthUser: (r: unknown) => !(r instanceof Response),
   getTokenOrSessionUser: async () => CURRENT_USER,
   requireTokenOrSession: async () => CURRENT_USER ?? new Response('no', { status: 401 }),
+  allowingAgentTokens: { requireTokenOrSession: async () => CURRENT_USER ?? new Response('no', { status: 401 }) },
 }));
 
 let SUPERADMINS = new Set<string>();

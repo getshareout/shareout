@@ -21,6 +21,7 @@ import type { Locale } from '../i18n';
 import { executeSaveSkill } from '../skills/agent-save';
 import { inviteMany, MAX_BULK_INVITES } from '../workspaces/invite';
 import { isWorkspaceAdmin } from './tools/members';
+import { fileInUserBuckets } from './tools/files';
 import { executeReviewAction } from './review-actions';
 
 export type PendingAction =
@@ -211,7 +212,7 @@ export async function executeBuildArtifact(
     const workspaceId = a.workspace_id && await getInternalWorkspaceRole(env, a.workspace_id, userId) ? a.workspace_id : null;
     const published = await publishGeneratedHtml(env, { id: userId, email: u.email }, { name: a.name, html, workspaceId, visibility: 'private' });
     await incrementRateLimit(env, userId, 'publish', u.email);
-    if (a.source_file_id) {
+    if (a.source_file_id && await fileInUserBuckets(env, userId, workspaceId, a.source_file_id)) {
       await env.DB.prepare(
         'INSERT INTO blob_artifact_links (blob_id, artifact_id, created_at) VALUES (?, ?, ?)'
       ).bind(a.source_file_id, published.artifact.id, new Date().toISOString()).run();

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 import { createFetchContext } from '../../../src/router/context';
 import { routeSlack } from '../../../src/router/slack-router';
+import { createSlackReplyPort } from '../../../src/chat-platforms/slack/reply-port';
 
 const getLinkedUserId = vi.hoisted(() => vi.fn(async () => null as string | null));
 const sendText = vi.hoisted(() => vi.fn());
@@ -151,5 +152,23 @@ describe('routeSlack slash commands', () => {
       'application/x-www-form-urlencoded',
     );
     expect(unlinkSlackDm).toHaveBeenCalledWith(ENV, 'T1', 'U1');
+  });
+
+  it('replies in the DM, not the channel the command was typed in', async () => {
+    const port = vi.mocked(createSlackReplyPort);
+    port.mockClear();
+    await signedPost(
+      '/slack/commands',
+      new URLSearchParams({ team_id: 'T1', user_id: 'U1', channel_id: 'C1', channel_name: 'general', text: 'help', trigger_id: 't5' }).toString(),
+      'application/x-www-form-urlencoded',
+    );
+    expect(port).toHaveBeenLastCalledWith(ENV, expect.objectContaining({ channelId: '' }));
+
+    await signedPost(
+      '/slack/commands',
+      new URLSearchParams({ team_id: 'T1', user_id: 'U1', channel_id: 'D1', channel_name: 'directmessage', text: 'help', trigger_id: 't6' }).toString(),
+      'application/x-www-form-urlencoded',
+    );
+    expect(port).toHaveBeenLastCalledWith(ENV, expect.objectContaining({ channelId: 'D1' }));
   });
 });

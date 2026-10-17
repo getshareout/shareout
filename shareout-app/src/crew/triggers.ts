@@ -22,6 +22,8 @@ export async function dispatchCrewRun(
   triggerId?: string
 ): Promise<boolean> {
   if (crew.status !== 'active') return false;
+  const owner = await env.DB.prepare('SELECT disabled FROM users WHERE id = ?').bind(crew.owner_id).first<{ disabled: number | null }>();
+  if (owner?.disabled) return false;
 
   const limits = await resolveCrewLimits(env, crew.owner_id);
   if ((await countActiveRuns(env, crew.owner_id)) >= limits.max_concurrent_runs) return false;

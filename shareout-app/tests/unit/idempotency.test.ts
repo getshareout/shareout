@@ -43,22 +43,31 @@ describe('getIdempotencyKey', () => {
 
 describe('checkIdempotencyKey', () => {
   it('returns null when key or KV is missing', async () => {
-    await expect(checkIdempotencyKey({} as Env, null)).resolves.toBeNull();
-    await expect(checkIdempotencyKey({} as Env, 'abc')).resolves.toBeNull();
+    await expect(checkIdempotencyKey({} as Env, 'usr_a:', null)).resolves.toBeNull();
+    await expect(checkIdempotencyKey({} as Env, 'usr_a:', 'abc')).resolves.toBeNull();
   });
 
-  it('returns cached results from KV', async () => {
-    const cached = { status: 201, body: '{"ok":true}', headers: { 'Content-Type': 'application/json' } };
-    const env = kvEnv(new Map([['idem:publish-1', JSON.stringify(cached)]]));
-    await expect(checkIdempotencyKey(env, 'publish-1')).resolves.toEqual(cached);
+  it('returns cached results from KV for the same caller only', async () => {
+    const env = kvEnv();
+    await storeIdempotencyResult(env, 'usr_a:', 'publish-1', new Response('{"ok":true}', { status: 201 }));
+    await expect(checkIdempotencyKey(env, 'usr_a:', 'publish-1')).resolves.toMatchObject({ status: 201, body: '{"ok":true}' });
+    await expect(checkIdempotencyKey(env, 'usr_b:', 'publish-1')).resolves.toBeNull();
+    await expect(checkIdempotencyKey(env, 'usr_a:tok_1', 'publish-1')).resolves.toBeNull();
+  });
+
+  it('does not store the client header verbatim in the key', async () => {
+    const store = new Map<string, string>();
+    await storeIdempotencyResult(kvEnv(store), 'usr_a:', 'publish-1', new Response('x'));
+    const [key] = [...store.keys()];
+    expect(key).toMatch(/^idem:usr_a::[0-9a-f]{64}$/);
   });
 });
 
 describe('storeIdempotencyResult', () => {
   it('no-ops when key or KV is missing', async () => {
     const response = new Response('ok', { status: 200 });
-    await expect(storeIdempotencyResult({} as Env, null, response)).resolves.toBeUndefined();
-    await expect(storeIdempotencyResult({} as Env, 'key', response)).resolves.toBeUndefined();
+    await expect(storeIdempotencyResult({} as Env, 'usr_a:', null, response)).resolves.toBeUndefined();
+    await expect(storeIdempotencyResult({} as Env, 'usr_a:', 'key', response)).resolves.toBeUndefined();
   });
 
   it('persists response body and strips cf-* headers', async () => {
@@ -72,9 +81,9 @@ describe('storeIdempotencyResult', () => {
       },
     });
 
-    await storeIdempotencyResult(env, 'publish-2', response);
+    await storeIdempotencyResult(env, 'usr_a:', 'publish-2', response);
 
-    const saved = JSON.parse(store.get('idem:publish-2')!);
+    const saved = JSON.parse([...store.values()][0]);
     expect(saved.status).toBe(201);
     expect(saved.body).toBe('{"id":"art_1"}');
     expect(saved.headers['content-type'] ?? saved.headers['Content-Type']).toBe('application/json');
@@ -99,27 +108,45 @@ describe('idempotencyResultToResponse', () => {
 describe('withIdempotency', () => {
   it('runs the handler when no idempotency key is present', async () => {
     const handler = vi.fn(async () => new Response('fresh', { status: 200 }));
-    const response = await withIdempotency(new Request('https://shareout.site/v1/publish'), kvEnv(), handler);
+    const response = await withIdempotency(new Request('https://shareout.site/v1/publish'), kvEnv(), 'usr_a:', handler);
 
     expect(handler).toHaveBeenCalledOnce();
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toBe('fresh');
   });
 
-  it('replays cached successful responses', async () => {
-    const cached = { status: 201, body: '{"replayed":true}', headers: {} };
-    const env = kvEnv(new Map([['idem:dup', JSON.stringify(cached)]]));
+  it('replays cached successful responses to the same caller', async () => {
+    const env = kvEnv();
+    await storeIdempotencyResult(env, 'usr_a:', 'dup', new Response('{"replayed":true}', { status: 201 }));
     const handler = vi.fn(async () => new Response('should-not-run'));
 
     const response = await withIdempotency(
       new Request('https://shareout.site/v1/publish', { headers: { 'X-Idempotency-Key': 'dup' } }),
       env,
+      'usr_a:',
       handler
     );
 
     expect(handler).not.toHaveBeenCalled();
     expect(response.headers.get('X-Idempotent-Replayed')).toBe('true');
     await expect(response.json()).resolves.toEqual({ replayed: true });
+  });
+
+  it('never replays another caller\'s response for the same key', async () => {
+    const env = kvEnv();
+    await storeIdempotencyResult(env, 'usr_a:', 'dup', new Response('{"owner":"a"}', { status: 201 }));
+    const handler = vi.fn(async () => new Response('{"owner":"b"}', { status: 201 }));
+
+    const response = await withIdempotency(
+      new Request('https://shareout.site/v1/publish', { headers: { 'X-Idempotency-Key': 'dup' } }),
+      env,
+      'usr_b:',
+      handler
+    );
+
+    expect(handler).toHaveBeenCalledOnce();
+    expect(response.headers.get('X-Idempotent-Replayed')).toBeNull();
+    await expect(response.json()).resolves.toEqual({ owner: 'b' });
   });
 
   it('does not cache non-2xx responses', async () => {
@@ -130,10 +157,11 @@ describe('withIdempotency', () => {
     await withIdempotency(
       new Request('https://shareout.site/v1/publish', { headers: { 'X-Idempotency-Key': 'fail' } }),
       env,
+      'usr_a:',
       handler
     );
 
-    expect(store.has('idem:fail')).toBe(false);
+    expect(store.size).toBe(0);
   });
 
   it('caches successful 2xx responses for replay', async () => {
@@ -147,11 +175,12 @@ describe('withIdempotency', () => {
     const response = await withIdempotency(
       new Request('https://shareout.site/v1/publish', { headers: { 'X-Idempotency-Key': 'new-key' } }),
       env,
+      'usr_a:',
       handler
     );
 
     expect(handler).toHaveBeenCalledOnce();
     expect(response.status).toBe(201);
-    expect(store.has('idem:new-key')).toBe(true);
+    expect(store.size).toBe(1);
   });
 });

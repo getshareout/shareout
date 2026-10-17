@@ -3,6 +3,7 @@ import type { ArtifactInfo } from './types';
 import { getCachedDeployment, cacheDeployment, buildCacheRecord, fetchAssetRow } from './deployment-cache';
 import { checkAccess } from './access';
 import { extractTextFromHtml } from './utils';
+import { normalizeVisibility } from '../visibility-config';
 
 export async function handleServeText(
   request: Request,
@@ -95,7 +96,7 @@ ${text}`;
     status: 200,
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'public, max-age=60',
+      'Cache-Control': normalizeVisibility(visibility) === 'public' ? 'public, max-age=60' : 'private, no-store',
       'X-Content-Type-Options': 'nosniff',
     },
   });

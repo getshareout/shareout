@@ -321,7 +321,7 @@ describe('getSkillWorkspaceContext', () => {
       DB: makeDbMock({
         first: (sql) => {
           if (sql.includes('id, name FROM workspaces')) return { id: workspaceId, name: 'Acme' };
-          if (sql.includes('FROM workspace_members')) return { 1: 1 };
+          if (sql.includes('FROM workspace_members')) return { role: 'member' };
           if (sql.includes('context_entry FROM workspaces')) return { context_entry: null };
           return null;
         },

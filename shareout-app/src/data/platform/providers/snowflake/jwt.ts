@@ -52,7 +52,10 @@ export async function getSnowflakeJwt(key: SnowflakeKeyPair): Promise<string> {
 	const fingerprint = normalizeFingerprint(key.publicKeyFingerprint);
 
 	const now = Math.floor(Date.now() / 1000);
-	const cacheKey = `${qualifiedUser}:${fingerprint}`;
+	// The private key is part of the key, so a cached JWT is only returned to a caller
+	// holding the same key (account, user and fingerprint are not secret).
+	const keyDigest = base64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key.privateKey)));
+	const cacheKey = `${qualifiedUser}:${fingerprint}:${keyDigest}`;
 	const cached = tokenCache.get(cacheKey);
 	if (cached && cached.exp > now + 60) return cached.token;
 

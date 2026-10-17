@@ -10,8 +10,8 @@ import type { WorkspaceSelection } from '../chat-platforms/types';
 
 export interface SqlPart { sql: string; binds: unknown[] }
 
-/** The user plus every account sharing its non-NULL identity_id. Binds: userId twice. */
-const LINKED_IDS = `(SELECT ? UNION SELECT id FROM users WHERE identity_id IS NOT NULL AND identity_id = (SELECT identity_id FROM users WHERE id = ?))`;
+/** The user plus every enabled account sharing its non-NULL identity_id. Binds: userId twice. */
+const LINKED_IDS = `(SELECT ? UNION SELECT id FROM users WHERE identity_id IS NOT NULL AND identity_id = (SELECT identity_id FROM users WHERE id = ?) AND COALESCE(disabled, 0) = 0)`;
 
 export function linkedIds(userId: string): SqlPart {
   return { sql: LINKED_IDS, binds: [userId, userId] };

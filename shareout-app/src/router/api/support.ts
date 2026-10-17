@@ -1,6 +1,6 @@
 import type { FetchContext } from '../context';
 import { jsonResponse, jsonError } from '../helpers/json-response';
-import { requireTokenOrSession, isAuthUser } from '../helpers/auth-guard';
+import { allowingAgentTokens, isAuthUser } from '../helpers/auth-guard';
 import type { AuthUser } from '../../api-auth';
 import { isPlatformAdmin } from '../../superadmin/auth';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
@@ -15,6 +15,10 @@ import { deliverReply } from '../../support/deliver';
 import { ingestSupportEmail } from '../../support/email-ingest';
 import { dispatchLifecycleEmail } from '../../email/gateway';
 import { alertOperator } from '../../support/alert';
+
+// Agent tokens may file and read their own tickets; workspace-scoped filing checks
+// `auth.service.workspaceId` below.
+const { requireTokenOrSession } = allowingAgentTokens;
 
 /** Constant-time-ish secret compare for the trusted email-gateway ingest. */
 function secretOk(provided: string | null, expected: string | undefined): boolean {

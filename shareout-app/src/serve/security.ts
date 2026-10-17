@@ -12,6 +12,15 @@ export const SANDBOX_PERMISSIONS =
 // Pages that call viewers' MCP connections: window.open would be an egress channel
 // for that data, so popups are not granted.
 export const SANDBOX_PERMISSIONS_LOCKED = 'allow-scripts allow-forms allow-modals allow-downloads';
+// Artifact bytes served from an app origin (apex, workspace subdomain) run in an opaque
+// origin even when opened top-level, the same as inside the sandboxed viewer iframe.
+export const ARTIFACT_SANDBOX_CSP = `sandbox ${SANDBOX_PERMISSIONS}`;
+
+/** Non-HTML types a browser can run script in when opened as a document. */
+export function isScriptableDocumentMime(mime: string): boolean {
+  const m = mime.split(';')[0].trim().toLowerCase();
+  return m === 'image/svg+xml' || m === 'application/xhtml+xml' || m === 'application/xml' || m === 'text/xml';
+}
 
 // Single configured artifact-serving origin so moving to a dedicated content domain
 // (shareoutcdn.site) is a config flip, not a refactor (ADR 30).

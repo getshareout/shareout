@@ -8,6 +8,7 @@ import {
   listSlackConnectionsForUser,
 } from '../chat-platforms/slack/linking';
 import { resolveSlackMemberId, resolveSlackToken } from '../chat-platforms/slack/client';
+import { getInternalWorkspaceRole } from '../workspaces/roles';
 
 interface SlackConnectUser {
   id: string;
@@ -128,10 +129,12 @@ export async function linkSlackAccount(
   if (!parsed) return { ok: false, error: 'Pick a Slack connection.' };
   if (!user.email) return { ok: false, error: 'Your ShareOut account needs an email to match your Slack profile.' };
 
+  const notFound = { ok: false as const, error: 'Slack connection not found or missing team id. Re-authorize the connection in workspace settings.' };
+  // Only an internal member of the connection's workspace may link through it.
+  if (!(await getInternalWorkspaceRole(env, parsed.workspaceId, user.id))) return notFound;
+
   const token = await resolveSlackToken(env, parsed.workspaceId, parsed.connectionName);
-  if (!token?.teamId) {
-    return { ok: false, error: 'Slack connection not found or missing team id. Re-authorize the connection in workspace settings.' };
-  }
+  if (!token?.teamId) return notFound;
 
   const member = await resolveSlackMemberId(token.token, user.email);
   if (!member.userId) {

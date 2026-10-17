@@ -3,6 +3,7 @@ import { generateId } from './crypto-utils';
 import { normalizeVisibility } from './visibility-config';
 import type { AuthUser } from './api-auth';
 import { getInternalWorkspaceRole } from './workspaces/roles';
+import { getUserRole } from './artifacts/roles';
 import { jsonWithApiErrors } from './http/api-error';
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
@@ -370,6 +371,15 @@ export async function handleMoveArtifactToFolder(
     return json({ error: 'Artifact not found in workspace', code: 'NOT_FOUND' }, 404);
   }
 
+  // Folder placement changes who can reach the artifact (folder grants), so it takes
+  // the same authority as sharing it: its owner or an editor, or a workspace admin.
+  if (!isWorkspaceAdmin(role)) {
+    const artifactRole = await getUserRole(env, artifactId, user.id);
+    if (artifactRole !== 'owner' && artifactRole !== 'editor') {
+      return json({ error: 'Only the artifact owner, an editor or a workspace admin can move it', code: 'FORBIDDEN' }, 403);
+    }
+  }
+
   if (body.folder_id) {
     const folder = await env.DB.prepare(
       'SELECT id FROM folders WHERE id = ? AND workspace_id = ?'
@@ -382,7 +392,7 @@ export async function handleMoveArtifactToFolder(
 
   await env.DB.prepare(
     'UPDATE artifacts SET folder_id = ? WHERE id = ?'
-  ).bind(body.folder_id, artifactId).run();
+  ).bind(body.folder_id ?? null, artifactId).run();
 
   return json({ success: true, artifact_id: artifactId, folder_id: body.folder_id });
 }

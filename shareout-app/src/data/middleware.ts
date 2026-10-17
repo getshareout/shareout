@@ -2,10 +2,10 @@ import type { Env, DataResponse } from '../types';
 import { DATA_ERRORS } from '../types';
 import {
   verifyAccessToken,
-  verifySessionToken,
   extractTokenFromCookie,
 } from '../token';
 import { validateToken, type ServiceScope } from '../api-auth';
+import { verifyLiveSessionToken } from '../auth/session';
 import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { canAccess } from '../access/can-access';
 import { normalizeVisibility } from '../visibility-config';
@@ -291,12 +291,16 @@ async function checkDataAuth(
       const isOwner = payload.authType === 'owner' || payload.authType === 'editor' || payload.authType === 'owner_test';
       const isArtifactOwner = payload.authType === 'owner' || payload.authType === 'owner_test';
       const testRun = payload.authType === 'owner_test';
+      const externalSubjectUserId = payload.authType === 'viewer' && payload.email
+        ? await grantOnlyViewerId(env, artifact, payload.email)
+        : null;
       return {
         authorized: true,
         needsAuth: false,
         viewer: { email: payload.email ?? null, isOwner },
         isArtifactOwner,
         testRun,
+        ...(externalSubjectUserId ? { externalSubjectUserId } : {}),
       };
     }
     // Fall back to a ShareOut API token (so_...): proves ownership of own artifacts.
@@ -378,7 +382,7 @@ async function checkDataAuth(
   if (artifact.owner_id) {
     const sessionToken = extractTokenFromCookie(cookies, /shareout_session=([^;]+)/);
     if (sessionToken) {
-      const payload = await verifySessionToken(sessionToken, env);
+      const payload = await verifyLiveSessionToken(sessionToken, env);
       // The signed token already carries userId; compare it to the owner id
       // directly instead of re-reading the users row.
       if (payload && payload.userId === artifact.owner_id) {
@@ -425,7 +429,7 @@ async function verifyGoogleSession(
   env: Env
 ): Promise<DataAuthResult> {
   const deny: DataAuthResult = { authorized: false, needsAuth: true, viewer: { email: null, isOwner: false } };
-  const payload = await verifySessionToken(token, env);
+  const payload = await verifyLiveSessionToken(token, env);
   if (!payload) return deny;
 
   // Session user is the artifact owner_id — full owner, not just an editor collab row.
@@ -504,10 +508,29 @@ async function closedArtifactViewer(
       needsAuth: false,
       viewer: { email, isOwner: false },
       isArtifactOwner: false,
+      // Access came from a grant, so writes need an edit grant (checked in dataMiddleware).
+      externalSubjectUserId: userId,
     };
   }
 
   return null;
+}
+
+/** For a viewer token's email: the user's id when their access rests on a grant alone
+ *  (not the owner, not a collaborator, not an internal member), so writes go through
+ *  the edit-grant check. Null otherwise. */
+async function grantOnlyViewerId(
+  env: Env,
+  artifact: { id: string; owner_id: string | null; workspace_id: string | null },
+  email: string,
+): Promise<string | null> {
+  const user = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: string }>();
+  if (!user || user.id === artifact.owner_id) return null;
+  const collaborator = await env.DB.prepare('SELECT 1 FROM collaborators WHERE artifact_id = ? AND email = ?')
+    .bind(artifact.id, email).first();
+  if (collaborator) return null;
+  if (artifact.workspace_id && await getInternalWorkspaceRole(env, artifact.workspace_id, user.id)) return null;
+  return user.id;
 }
 
 /** Resolve the authenticated requester to a user id (API token, artifact access
@@ -527,7 +550,7 @@ export async function resolveRequesterUserId(request: Request, ctx: DataContext)
   const cookies = request.headers.get('Cookie');
   const sessionToken = extractTokenFromCookie(cookies, /shareout_session=([^;]+)/);
   if (sessionToken) {
-    const payload = await verifySessionToken(sessionToken, ctx.env);
+    const payload = await verifyLiveSessionToken(sessionToken, ctx.env);
     // Session token carries the user id; no users lookup needed.
     if (payload?.userId) return payload.userId;
   }
@@ -689,7 +712,7 @@ export async function verifyOwner(
   const cookies = request.headers.get('Cookie');
   const sessionToken = extractTokenFromCookie(cookies, /shareout_session=([^;]+)/);
   if (sessionToken) {
-    const payload = await verifySessionToken(sessionToken, ctx.env);
+    const payload = await verifyLiveSessionToken(sessionToken, ctx.env);
     if (payload) {
       const owner = await ctx.env.DB.prepare(
         'SELECT id FROM users WHERE id = ? AND email = ?'

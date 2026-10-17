@@ -6,7 +6,12 @@ import {
   BASE_URL,
   makeDataContext,
   publicArtifactEnv,
+  PLATFORM_OWNER_ID,
 } from './helpers';
+import * as middleware from '../../../../src/data/middleware';
+import { createOAuthState } from '../../../../src/oauth-state';
+import { ARTIFACT_OAUTH_STATE_PURPOSE } from '../../../../src/data/platform';
+import type { Env } from '../../../../src/types';
 
 const logError = vi.hoisted(() => vi.fn());
 
@@ -21,13 +26,12 @@ afterEach(() => {
 });
 
 function validState(overrides: Partial<{ artifactId: string; connectionName: string; returnUrl: string }> = {}) {
-  return btoa(JSON.stringify({
+  return createOAuthState({ SESSION_SECRET: 'session-secret' } as Env, ARTIFACT_OAUTH_STATE_PURPOSE, PLATFORM_OWNER_ID, {
     artifactId: ARTIFACT_ID,
     connectionName: 'my-conn',
     returnUrl: '/done',
-    ts: Date.now(),
     ...overrides,
-  }));
+  });
 }
 
 function callbackReq(qs: string) {
@@ -36,6 +40,7 @@ function callbackReq(qs: string) {
 
 describe('platform OAuth callback error handling', () => {
   beforeEach(() => {
+    vi.spyOn(middleware, 'verifyOwner').mockResolvedValue(true);
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       access_token: 'tok',
       expires_in: 3600,
@@ -63,7 +68,7 @@ describe('platform OAuth callback error handling', () => {
     }), { status: 400 })));
 
     const res = await handlePlatformRequest(
-      callbackReq(`code=authcode&state=${encodeURIComponent(validState())}`),
+      callbackReq(`code=authcode&state=${encodeURIComponent(await validState())}`),
       makeDataContext(publicArtifactEnv()),
       ['google-sheets', 'callback'],
     );
@@ -77,7 +82,7 @@ describe('platform OAuth callback error handling', () => {
 
   it('returns HTML validation error for state artifact mismatch', async () => {
     const res = await handlePlatformRequest(
-      callbackReq(`code=c&state=${encodeURIComponent(validState({ artifactId: 'other' }))}`),
+      callbackReq(`code=c&state=${encodeURIComponent(await validState({ artifactId: 'other' }))}`),
       makeDataContext(publicArtifactEnv()),
       ['google-sheets', 'callback'],
     );
@@ -88,7 +93,7 @@ describe('platform OAuth callback error handling', () => {
 
   it('returns HTML success with connected postMessage', async () => {
     const res = await handlePlatformRequest(
-      callbackReq(`code=authcode&state=${encodeURIComponent(validState())}`),
+      callbackReq(`code=authcode&state=${encodeURIComponent(await validState())}`),
       makeDataContext(publicArtifactEnv({}, { run: () => ({ meta: { changes: 1 } }) })),
       ['google-sheets', 'callback'],
     );

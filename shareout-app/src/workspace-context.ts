@@ -1,7 +1,7 @@
 import type { Env } from './types';
 import type { AuthUser } from './api-auth';
 import { generateId } from './crypto-utils';
-import { requireWorkspaceRole } from './workspaces/roles';
+import { getInternalWorkspaceRole, requireWorkspaceRole } from './workspaces/roles';
 import { json } from './artifacts/json-response';
 import { knowledgeTrunkForContext } from './knowledge-context';
 
@@ -193,7 +193,7 @@ export async function buildWorkspaceContextDoc(
   return parts.join('\n');
 }
 
-// Resolve a workspace by slug or id, verify the caller is a member, and return
+// Resolve a workspace by slug or id, verify the caller is an internal member, and return
 // its context doc for /v1/skill injection. Returns '' when not a member, the
 // workspace is unknown, or it has no context files (caller stays unaware).
 export async function getSkillWorkspaceContext(
@@ -206,10 +206,7 @@ export async function getSkillWorkspaceContext(
   ).bind(workspaceParam, workspaceParam).first<{ id: string; name: string }>();
   if (!ws) return '';
 
-  const member = await env.DB.prepare(
-    'SELECT 1 FROM workspace_members WHERE workspace_id = ? AND user_id = ? LIMIT 1'
-  ).bind(ws.id, userId).first();
-  if (!member) return '';
+  if (!(await getInternalWorkspaceRole(env, ws.id, userId))) return '';
 
   return buildWorkspaceContextDoc(env, ws.id, ws.name);
 }

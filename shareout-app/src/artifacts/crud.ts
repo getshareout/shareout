@@ -632,7 +632,7 @@ export async function handleListDeletedArtifacts(
     FROM artifacts a
     WHERE a.deleted_at IS NOT NULL
       AND (a.owner_id = ? OR (a.workspace_id IS NOT NULL AND a.workspace_id IN (
-        SELECT workspace_id FROM workspace_members WHERE user_id = ? AND role IN ('owner', 'admin')
+        SELECT workspace_id FROM workspace_members WHERE user_id = ? AND role IN ('owner', 'admin') AND member_class = 'internal'
       )))
     ORDER BY a.deleted_at DESC
     LIMIT 200
@@ -745,7 +745,7 @@ export async function handleRestoreAllDeleted(
     FROM artifacts a
     WHERE a.deleted_at IS NOT NULL
       AND (a.owner_id = ? OR (a.workspace_id IS NOT NULL AND a.workspace_id IN (
-        SELECT workspace_id FROM workspace_members WHERE user_id = ? AND role IN ('owner', 'admin')
+        SELECT workspace_id FROM workspace_members WHERE user_id = ? AND role IN ('owner', 'admin') AND member_class = 'internal'
       )))
     ORDER BY a.deleted_at DESC
     LIMIT ?

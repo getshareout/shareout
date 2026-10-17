@@ -13,14 +13,14 @@ vi.mock('../../../src/superadmin/artifacts-admin', () => ({
 import { handleAbuseReport } from '../../../src/moderation/abuse-reports';
 
 // DB mock: artifact exists; distinct-IP COUNT is configurable.
-function makeEnv(distinctCount = 1, locale: string | null = null): Env {
+function makeEnv(distinctCount = 1, locale: string | null = null, visibility = 'public'): Env {
   return {
     DB: {
       prepare: (sql: string) => ({
         bind: () => ({
           first: async () => {
             if (sql.includes('COUNT(DISTINCT reporter_ip)')) return { n: distinctCount };
-            if (sql.includes('FROM artifacts a')) return { id: 'art_1', locale };
+            if (sql.includes('FROM artifacts a')) return { id: 'art_1', locale, visibility };
             return null;
           },
           run: async () => ({ success: true }),
@@ -85,5 +85,17 @@ describe('handleAbuseReport', () => {
   it('rejects unknown categories', async () => {
     const res = await handleAbuseReport(postReport('nonsense'), makeEnv(), 'art_1');
     expect(res.status).toBe(400);
+  });
+
+  it.each(['private', 'workspace'])('treats a %s artifact as not found and changes nothing', async (visibility) => {
+    const res = await handleAbuseReport(postReport('csam'), makeEnv(1, 'es', visibility), 'art_1');
+    expect(res.status).toBe(404);
+    expect(setArtifactPaused).not.toHaveBeenCalled();
+    expect(setArtifactModeration).not.toHaveBeenCalled();
+  });
+
+  it('does not reveal a closed artifact workspace language on the form', async () => {
+    const res = await handleAbuseReport(new Request('https://shareout.site/report/art_1'), makeEnv(1, 'es', 'private'), 'art_1');
+    expect(await res.text()).toContain('<html lang="en">');
   });
 });

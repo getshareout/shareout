@@ -9,13 +9,22 @@ interface IdempotentResult {
   headers: Record<string, string>;
 }
 
+// The stored response belongs to the caller that produced it, so the KV key carries the
+// caller (`scope`) as well as a hash of the client-supplied header.
+async function storageKey(scope: string, idempotencyKey: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(idempotencyKey));
+  const hex = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `${IDEMPOTENCY_PREFIX}${scope}:${hex}`;
+}
+
 export async function checkIdempotencyKey(
   env: Env,
+  scope: string,
   idempotencyKey: string | null
 ): Promise<IdempotentResult | null> {
   if (!idempotencyKey || !env.RATE_LIMIT_KV) return null;
 
-  const key = `${IDEMPOTENCY_PREFIX}${idempotencyKey}`;
+  const key = await storageKey(scope, idempotencyKey);
   const cached = await env.RATE_LIMIT_KV.get(key, 'json');
 
   if (cached) {
@@ -27,12 +36,13 @@ export async function checkIdempotencyKey(
 
 export async function storeIdempotencyResult(
   env: Env,
+  scope: string,
   idempotencyKey: string | null,
   response: Response
 ): Promise<void> {
   if (!idempotencyKey || !env.RATE_LIMIT_KV) return;
 
-  const key = `${IDEMPOTENCY_PREFIX}${idempotencyKey}`;
+  const key = await storageKey(scope, idempotencyKey);
   const body = await response.clone().text();
 
   const headers: Record<string, string> = {};
@@ -68,9 +78,12 @@ export function getIdempotencyKey(request: Request): string | null {
          request.headers.get('Idempotency-Key');
 }
 
+/** `scope` identifies the authenticated caller (e.g. user id + token id); replays only
+ *  ever return a response stored under the same scope. */
 export async function withIdempotency(
   request: Request,
   env: Env,
+  scope: string,
   handler: () => Promise<Response>
 ): Promise<Response> {
   const idempotencyKey = getIdempotencyKey(request);
@@ -80,7 +93,7 @@ export async function withIdempotency(
   }
 
   // Check for cached result
-  const cached = await checkIdempotencyKey(env, idempotencyKey);
+  const cached = await checkIdempotencyKey(env, scope, idempotencyKey);
   if (cached) {
     return idempotencyResultToResponse(cached);
   }
@@ -90,7 +103,7 @@ export async function withIdempotency(
 
   // Only cache successful responses (2xx status codes)
   if (response.status >= 200 && response.status < 300) {
-    await storeIdempotencyResult(env, idempotencyKey, response);
+    await storeIdempotencyResult(env, scope, idempotencyKey, response);
   }
 
   return response;

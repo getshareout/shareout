@@ -222,13 +222,31 @@ describe('member token actions', () => {
           if (sql.includes('SELECT role FROM workspace_members') && a[1] === 'usr_2') return { role: 'member' };
           return null;
         },
-        run: () => ({ success: true, meta: { changes: 2 } }),
+        batch: () => [{ success: true, meta: { changes: 1 } }, { success: true, meta: { changes: 2 } }],
       }),
     };
     const res = await handleRevokeMemberTokens(
       new Request('https://x', { method: 'DELETE' }), env, user, workspaceId, 'usr_2');
     expect(res.status).toBe(200);
     expect((await jsonBody(res)).revoked).toBe(2);
+  });
+
+  it('refuses to revoke tokens of the owner or of a higher role', async () => {
+    for (const targetRole of ['owner', 'admin']) {
+      const env = {
+        ...baseEnv,
+        DB: makeDbMock({
+          first: (sql, ...a) => {
+            if (sql.includes('SELECT role FROM workspace_members') && a[1] === user.id) return { role: targetRole === 'owner' ? 'admin' : 'member' };
+            if (sql.includes('SELECT role FROM workspace_members') && a[1] === 'usr_2') return { role: targetRole };
+            return null;
+          },
+        }),
+      };
+      const res = await handleRevokeMemberTokens(
+        new Request('https://x', { method: 'DELETE' }), env, user, workspaceId, 'usr_2');
+      expect(res.status).toBe(403);
+    }
   });
 
   it('rejects token actions on a non-member target', async () => {
@@ -247,13 +265,32 @@ describe('member token actions', () => {
     expect((await jsonBody(res)).code).toBe('NOT_A_MEMBER');
   });
 
-  it('mints a one-time token for a member as admin', async () => {
+  it('refuses to mint a personal token for a person', async () => {
     const env = {
       ...baseEnv,
       DB: makeDbMock({
         first: (sql, ...a) => {
           if (sql.includes('SELECT role FROM workspace_members') && a[1] === user.id) return { role: 'owner' };
           if (sql.includes('SELECT role FROM workspace_members') && a[1] === 'usr_2') return { role: 'member' };
+          if (sql.includes('SELECT is_service')) return { is_service: 0 };
+          return null;
+        },
+      }),
+    };
+    const res = await handleCreateMemberToken(
+      new Request('https://x', { method: 'POST' }), env, user, workspaceId, 'usr_2');
+    expect(res.status).toBe(403);
+    expect((await jsonBody(res)).token).toBeUndefined();
+  });
+
+  it('mints a one-time token for a service-account member as admin', async () => {
+    const env = {
+      ...baseEnv,
+      DB: makeDbMock({
+        first: (sql, ...a) => {
+          if (sql.includes('SELECT role FROM workspace_members') && a[1] === user.id) return { role: 'owner' };
+          if (sql.includes('SELECT role FROM workspace_members') && a[1] === 'usr_2') return { role: 'member' };
+          if (sql.includes('SELECT is_service')) return { is_service: 1 };
           return null;
         },
       }),

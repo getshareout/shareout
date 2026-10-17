@@ -251,54 +251,17 @@ describe('handleCreateAccount', () => {
 });
 
 describe('handleLinkEmail', () => {
-  it('rejects invalid JSON and invalid email addresses', async () => {
-    const env = { ...baseEnv, DB: makeDbMock() };
-
-    const badJson = await handleLinkEmail(
-      new Request('https://shareout.example.com/v1/auth/link-email', { method: 'POST', body: 'not-json' }),
-      env,
-      testUser,
-    );
-    expect(badJson.status).toBe(400);
-    await expect(badJson.json()).resolves.toMatchObject({ code: 'INVALID_JSON' });
-
-    for (const email of ['', 'not-an-email', 'missing@domain']) {
-      const response = await handleLinkEmail(jsonRequest({ email }), env, testUser);
-      expect(response.status).toBe(400);
-      await expect(response.json()).resolves.toMatchObject({ code: 'INVALID_EMAIL' });
-    }
-  });
-
-  it('rejects emails already linked to another user', async () => {
-    const env = {
-      ...baseEnv,
-      DB: makeDbMock({
-        first: () => ({ id: 'usr_other' }),
-      }),
-    };
-
-    const response = await handleLinkEmail(jsonRequest({ email: 'Taken@Example.com' }), env, testUser);
-
-    expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toMatchObject({ code: 'EMAIL_IN_USE' });
-  });
-
-  it('rejects missing email field', async () => {
-    const env = { ...baseEnv, DB: makeDbMock() };
-    const response = await handleLinkEmail(jsonRequest({}), env, testUser);
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({ code: 'INVALID_EMAIL' });
-  });
-
-  it('links a normalized email address', async () => {
+  it('refuses to set an email without a verification code, and writes nothing', async () => {
     const run = vi.fn(async () => ({ success: true }));
     const env = { ...baseEnv, DB: makeDbMock({ first: () => null, run }) };
 
-    const response = await handleLinkEmail(jsonRequest({ email: 'New@Example.com' }), env, testUser);
+    const response = await handleLinkEmail(jsonRequest({ email: 'someone-else@example.com' }), env, testUser);
 
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ success: true, email: 'new@example.com' });
-    expect(run).toHaveBeenCalled();
+    expect(response.status).toBe(403);
+    const body = await response.json() as { code: string; hint: string };
+    expect(body.code).toBe('EMAIL_VERIFICATION_REQUIRED');
+    expect(body.hint).toContain('/v1/auth/link-email/start');
+    expect(run).not.toHaveBeenCalled();
   });
 });
 

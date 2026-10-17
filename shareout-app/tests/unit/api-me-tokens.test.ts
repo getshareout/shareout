@@ -16,6 +16,11 @@ function makeDbMock(handlers: {
         run: vi.fn(async () => handlers.run?.(sql, ...args) ?? { success: true, meta: { changes: 0 } }),
       })),
     })),
+    batch: vi.fn(async (stmts: Array<{ run: () => Promise<unknown> }>) => {
+      const out: unknown[] = [];
+      for (const s of stmts) out.push(await s.run());
+      return out;
+    }),
   } as unknown as Env['DB'];
 }
 
@@ -95,7 +100,7 @@ describe('handleCreateMyToken', () => {
     const env = {
       DB: makeDbMock({
         run: (sql) => {
-          order.push(sql.startsWith('DELETE') ? 'delete' : 'insert');
+          order.push(sql.startsWith('DELETE') ? 'delete' : sql.startsWith('UPDATE oauth_grants') ? 'grants' : 'insert');
           return { success: true, meta: { changes: 2 } };
         },
       }),
@@ -110,7 +115,7 @@ describe('handleCreateMyToken', () => {
 
     expect(body.ok).toBe(true);
     expect(body.token).toMatch(/^so_/);
-    expect(order).toEqual(['delete', 'insert']);
+    expect(order).toEqual(['grants', 'delete', 'insert']);
   });
 
   it('tolerates an empty body (plain generate)', async () => {
@@ -155,6 +160,14 @@ describe('handleRevokeMyToken', () => {
     const res = await handleRevokeMyToken(env, user, 'tok_9');
     expect(res.status).toBe(200);
     expect(bound).toEqual(['tok_9', 'usr_1']);
+  });
+
+  it('revokes the connected-app grant that holds the deleted token', async () => {
+    const calls: Array<{ sql: string; args: unknown[] }> = [];
+    const env = { DB: makeDbMock({ run: (sql, ...args) => { calls.push({ sql, args }); return { success: true, meta: { changes: 1 } }; } }) } as unknown as Env;
+    await handleRevokeMyToken(env, user, 'tok_9');
+    expect(calls[0].sql).toContain('UPDATE oauth_grants');
+    expect(calls[0].args).toEqual(['usr_1', 'tok_9']);
   });
 
   it('404s when the token is not the caller\'s', async () => {

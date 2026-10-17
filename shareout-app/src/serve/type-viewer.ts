@@ -106,11 +106,13 @@ export async function serveTypeViewer(
 
   if (!html) {
     // Fallback to serving raw asset if no viewer available
+    const open = normalizeVisibility(artifact.visibility) === 'public';
     return new Response(content, {
       status: 200,
       headers: {
         'Content-Type': asset.mime,
-        'Cache-Control': 'public, max-age=0, must-revalidate',
+        'Cache-Control': open ? 'public, max-age=0, must-revalidate' : 'private, no-store',
+        'X-Content-Type-Options': 'nosniff',
       },
     });
   }
