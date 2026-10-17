@@ -76,8 +76,15 @@ interface GrantContext {
 
 const GRANTS_TTL = 60; // tighter than role cache (300s) — revocation sensitivity.
 
-function identityKey(identity: AccessIdentity): string {
-  return [...identity.userIds].sort().join(',');
+// The grant lookup matches sharee members by user id or invite email, so both are part
+// of the key, exactly as the lookup binds them. Emails are hashed to keep the KV key short.
+async function identityKey(identity: AccessIdentity): Promise<string> {
+  const ids = [...identity.userIds].sort().join(',');
+  const emails = [...new Set(identity.emails)].sort().join(',');
+  if (!emails) return ids;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(emails));
+  const hex = Array.from(new Uint8Array(digest).slice(0, 16)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `${ids}|${hex}`;
 }
 
 // Per-workspace generation token. invalidateGrants bumps it, which orphans every
@@ -109,7 +116,7 @@ async function loadGrantContext(
   identity: AccessIdentity,
 ): Promise<GrantContext> {
   const gen = await grantsGeneration(env, workspaceId);
-  const cacheKey = `grants2:${workspaceId}:${gen}:${identityKey(identity)}`;
+  const cacheKey = `grants2:${workspaceId}:${gen}:${await identityKey(identity)}`;
 
   if (env.SLUGS) {
     try {
