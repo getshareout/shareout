@@ -694,6 +694,7 @@ describe('runScheduledJobs', () => {
     const env = dbEnv([
       { method: 'all', results: [emailJobRow] },
       { method: 'run' }, // claim
+      { method: 'first', result: { disabled: 0 } }, // owner enabled
       { method: 'run' },
       { method: 'run' },
       { method: 'run' },
@@ -715,6 +716,7 @@ describe('runScheduledJobs', () => {
     const env = dbEnv([
       { method: 'all', results: [emailJobRow] },
       { method: 'run' }, // claim
+      { method: 'first', result: { disabled: 0 } }, // owner enabled
       { method: 'run' },
       { method: 'run' },
       { method: 'run' },
@@ -732,6 +734,7 @@ describe('runScheduledJobs', () => {
     const env = dbEnv([
       { method: 'all', results: [{ ...emailJobRow, retry_count: 0, max_attempts: 2 }] },
       { method: 'run' }, // claim
+      { method: 'first', result: { disabled: 0 } }, // owner enabled
       { method: 'run' },
       { method: 'run' },
       { method: 'run' },
@@ -746,6 +749,7 @@ describe('runScheduledJobs', () => {
     const env = dbEnv([
       { method: 'all', results: [{ ...emailJobRow, retry_count: 1 }] },
       { method: 'run' }, // claim
+      { method: 'first', result: { disabled: 0 } }, // owner enabled
       { method: 'run' },
       { method: 'run' },
       { method: 'run' },
@@ -760,6 +764,7 @@ describe('runScheduledJobs', () => {
     const env = dbEnv([
       { method: 'all', results: [emailJobRow] },
       { method: 'run' }, // claim
+      { method: 'first', result: { disabled: 0 } }, // owner enabled
       { method: 'run' },
       { method: 'run' },
       { method: 'run' },
@@ -775,6 +780,7 @@ describe('runScheduledJobs', () => {
     const env = dbEnv([
       { method: 'all', results: [webhookJobRow] },
       { method: 'run' }, // claim
+      { method: 'first', result: { disabled: 0 } }, // owner enabled
       { method: 'first', result: artifact },
       { method: 'run' },
       { method: 'run' },
@@ -816,8 +822,10 @@ describe('runScheduledJobs', () => {
     const env = dbEnv([
       { method: 'all', results: [jobWithData] },
       { method: 'run' }, // claim
+      { method: 'first', result: { disabled: 0 } }, // owner enabled
       { method: 'first', result: artifact },
       { method: 'run' }, // claim
+      { method: 'first', result: { disabled: 0 } }, // owner enabled
       { method: 'run' },
       { method: 'run' },
       { method: 'run' },
@@ -849,6 +857,7 @@ describe('runScheduledJobs', () => {
     const missingArtifact = dbEnv([
       { method: 'all', results: [webhookJobRow] },
       { method: 'run' }, // claim
+      { method: 'first', result: { disabled: 0 } }, // owner enabled
       { method: 'first', result: null },
       { method: 'run' },
       { method: 'run' },
@@ -859,6 +868,7 @@ describe('runScheduledJobs', () => {
     const badResponse = dbEnv([
       { method: 'all', results: [webhookJobRow] },
       { method: 'run' }, // claim
+      { method: 'first', result: { disabled: 0 } }, // owner enabled
       { method: 'first', result: artifact },
       { method: 'run' },
       { method: 'run' },
@@ -874,6 +884,7 @@ describe('runScheduledJobs', () => {
     const env = dbEnv([
       { method: 'all', results: [webhookJobRow] },
       { method: 'run' }, // claim
+      { method: 'first', result: { disabled: 0 } }, // owner enabled
       { method: 'first', result: artifact },
       { method: 'run' },
       { method: 'run' },
@@ -907,6 +918,7 @@ describe('runScheduledJobs claim + failure notice', () => {
     const run = (row: typeof emailJobRow) => runScheduledJobs(dbEnv([
       { method: 'all', results: [row] },
       { method: 'run' },
+      { method: 'first', result: { disabled: 0 } }, // owner enabled
       { method: 'run' },
       { method: 'run' },
       { method: 'run' },
@@ -924,6 +936,7 @@ describe('runScheduledJobs claim + failure notice', () => {
     await runScheduledJobs(dbEnv([
       { method: 'all', results: [emailJobRow] },
       { method: 'run' },
+      { method: 'first', result: { disabled: 0 } }, // owner enabled
       { method: 'run' },
       { method: 'run' },
       { method: 'run' },
