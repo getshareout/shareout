@@ -9,7 +9,6 @@ import {
   handleLinkEmail,
   handleGetProfile,
   handleUpdateProfile,
-  validateToken,
   handleCreateAdminSession,
 } from '../api-auth';
 import { unauthorizedFor } from '../auth/unauthorized';
@@ -46,7 +45,7 @@ import { createLogger, logError } from '../logging';
 import { isSheetsAuthCallback, isGitHubAuthCallback } from '../oauth-callback';
 import type { FetchContext } from './context';
 import { isLocalRequest } from './helpers/is-local-request';
-import { getTokenOrSessionUser } from './helpers/auth-guard';
+import { getTokenOrSessionUser, isAuthUser, requireToken } from './helpers/auth-guard';
 import { jsonError, jsonResponse } from './helpers/json-response';
 import { googleOAuthConfigured } from '../config/auth-providers';
 import { appLoginPage } from '../auth/pages';
@@ -134,26 +133,26 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
   }
 
   if (path === '/v1/auth/link-email' && request.method === 'POST') {
-    const user = await validateToken(request, env);
-    if (!user) return addCORS(await unauthorizedFor(request, env));
+    const user = await requireToken(ctx);
+    if (!isAuthUser(user)) return user;
     return addCORS(await handleLinkEmail(request, env, user));
   }
 
   if (path === '/v1/auth/profile' && request.method === 'GET') {
-    const user = await validateToken(request, env);
-    if (!user) return addCORS(await unauthorizedFor(request, env));
+    const user = await requireToken(ctx);
+    if (!isAuthUser(user)) return user;
     return addCORS(await handleGetProfile(request, env, user));
   }
 
   if (path === '/v1/auth/profile' && (request.method === 'PUT' || request.method === 'PATCH')) {
-    const user = await validateToken(request, env);
-    if (!user) return addCORS(await unauthorizedFor(request, env));
+    const user = await requireToken(ctx);
+    if (!isAuthUser(user)) return user;
     return addCORS(await handleUpdateProfile(request, env, user));
   }
 
   if (path === '/v1/auth/admin-session' && request.method === 'POST') {
-    const user = await validateToken(request, env);
-    if (!user) return addCORS(await unauthorizedFor(request, env));
+    const user = await requireToken(ctx);
+    if (!isAuthUser(user)) return user;
     return addCORS(await handleCreateAdminSession(request, env, user));
   }
 

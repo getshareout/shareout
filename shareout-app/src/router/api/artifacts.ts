@@ -37,7 +37,7 @@ import type { Env } from '../../types';
 import type { AuthUser } from '../../api-auth';
 import { validateToken, hasScope } from '../../api-auth';
 import type { FetchContext } from '../context';
-import { isAuthUser, requireAuthUser, requireToken, requireTokenOrSession } from '../helpers/auth-guard';
+import { allowingAgentTokens, isAuthUser } from '../helpers/auth-guard';
 import { handleCreatePublishApproval, handleDecidePublishApproval } from '../../publish-approval';
 import { resolveArtifactEditorAccess } from '../helpers/editor-access';
 import { isVisualEditorRoute, requireVisualEditorEnabled } from '../../editor/visual-editor-gate';
@@ -49,6 +49,9 @@ import { presentArtifact } from '../../present/present-artifact';
 import { handleExportArtifact } from '../../artifacts/export';
 import { setPresentation } from '../../artifacts/satellites';
 import { createLogger } from '../../logging';
+
+// Agent tokens reach these routes; the scope gate at the top of routeArtifactApi bounds them.
+const { requireAuthUser, requireToken, requireTokenOrSession } = allowingAgentTokens;
 
 export async function routeArtifactApi(ctx: FetchContext): Promise<Response | null> {
   const { request, env, path, url, addCORS } = ctx;
