@@ -329,6 +329,7 @@ const publishArtifact: ToolDef = {
     'visibility: "workspace" (default: everyone in the workspace), "private" (only them) or "public" (anyone with the link).',
     'folder: optional, a folder of that workspace (its name or id) to file the page in.',
     'message: optional one-line note for the version history.',
+    'mcp_connections: optional, lets the page call the VIEWER\'s own account on workspace MCP connections (by connection name) — only the listed read-only tools; members-only pages (visibility workspace or private) only.',
     'Afterwards give the person the link in their language, in plain words, and pass on any notice in the result.',
     ON_FAILURE,
   ].join(' '),
@@ -343,6 +344,16 @@ const publishArtifact: ToolDef = {
       visibility: { type: 'string', enum: ['workspace', 'private', 'public'] },
       folder: { type: 'string', description: 'Folder to file the page in: its name or id. Omit to leave it unfiled.' },
       message: { type: 'string', description: 'A short note for the version history.' },
+      mcp_connections: {
+        type: 'array',
+        description: 'Workspace MCP connections the page may call as its viewer, each with the exact tools it uses.',
+        items: {
+          type: 'object',
+          properties: { name: { type: 'string' }, tools: { type: 'array', items: { type: 'string' } } },
+          required: ['name', 'tools'],
+          additionalProperties: false,
+        },
+      },
     },
     required: ['title'],
     additionalProperties: false,
@@ -375,6 +386,7 @@ const publishArtifact: ToolDef = {
       visibility,
       ...(folder?.id ? { folder_id: folder.id } : {}),
       ...(str(args.message, 500) ? { message: str(args.message, 500) } : {}),
+      ...(Array.isArray(args.mcp_connections) ? { capabilities: { mcp: { connections: args.mcp_connections } } } : {}),
     });
     if (status >= 400) return fail(`The page was not published: ${errorText(body, status)}`, { status, code: body.code });
     return describePublish('Published', title, body, workspace, sitePages(payload.files));

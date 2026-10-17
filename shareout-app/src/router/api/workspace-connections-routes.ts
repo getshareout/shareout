@@ -3,6 +3,7 @@ import { handleTestWorkspaceConnection, handleGetWorkspaceConnection, handleCrea
 import { handleGetMyConnectionCredentials, handlePutMyConnectionCredentials, handleDeleteMyConnectionCredentials } from './workspace-connections/my-credentials';
 import { handleWorkspaceOAuthUrl, handleWorkspaceOAuthCallback } from './workspace-connections/oauth';
 import { handleSlackInstall, handleSlackOAuthCallback, handleListSlackChannels } from './workspace-connections/slack';
+import { handleCreateMcpConnection, handleMcpClientMetadata, handleMcpConnect, handleMcpOAuthCallback, handleRefreshMcpTools } from './workspace-connections/mcp';
 import {
   handleGetWorkspaceLlm,
   handleSetWorkspaceByoKey,
@@ -23,6 +24,35 @@ export async function routeWorkspaceConnections(ctx: FetchContext): Promise<Resp
   if (path === '/v1/oauth/slack/callback' && request.method === 'GET') {
     const sessionUser = await getTokenOrSessionUser(ctx);
     return addCORS(await handleSlackOAuthCallback(request, env, sessionUser?.id ?? null));
+  }
+
+  if (path === '/oauth/mcp-client.json' && request.method === 'GET') {
+    return handleMcpClientMetadata(env);
+  }
+
+  if (path === '/v1/oauth/mcp/callback' && request.method === 'GET') {
+    const sessionUser = await getTokenOrSessionUser(ctx);
+    return addCORS(await handleMcpOAuthCallback(request, env, sessionUser?.id ?? null));
+  }
+
+  const mcpCreateMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/mcp-connections$/);
+  if (mcpCreateMatch && request.method === 'POST') {
+    const user = await requireTokenOrSession(ctx);
+    if (!isAuthUser(user)) return user;
+    return addCORS(await handleCreateMcpConnection(request, env, user, mcpCreateMatch[1]));
+  }
+
+  const mcpConnMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/connections\/([^/]+)\/mcp\/(connect|tools)$/);
+  if (mcpConnMatch) {
+    const [, workspaceId, connectionId, action] = mcpConnMatch;
+    const user = await requireTokenOrSession(ctx);
+    if (!isAuthUser(user)) return user;
+    if (action === 'connect' && request.method === 'GET') {
+      return addCORS(await handleMcpConnect(request, env, user, workspaceId, connectionId));
+    }
+    if (action === 'tools' && request.method === 'POST') {
+      return addCORS(await handleRefreshMcpTools(env, user, workspaceId, connectionId));
+    }
   }
 
   const connOAuthCallbackMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/connections\/([^/]+)\/callback$/);

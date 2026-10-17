@@ -88,6 +88,7 @@ export const workspace_client_home_views_modalsForms_JS = `  // ===== Modal + na
   }
   function openConnectModal(pid) {
     var meta = connCatMap[pid] || { label: pid, connectMethod: 'token', testable: false, docsUrl: '' };
+    if (meta.connectMethod === 'mcp') { openMcpServerModal(); return; }
     var oauth = meta.connectMethod === 'oauth' || meta.connectMethod === 'oauth_shop';
     var body = '<div class="wsx-cform">' + fld(t('modal.connectionName'), 'cf_name', 'my-' + pid)
       + (meta.docsUrl ? '<a class="wsx-field__doc" href="' + esc(meta.docsUrl) + '" target="_blank" rel="noopener">' + esc(t('modal.docsLink')) + '</a>' : '')
@@ -129,6 +130,28 @@ export const workspace_client_home_views_modalsForms_JS = `  // ===== Modal + na
         .then(function (d) { if (d && d.ok) { st.className = 'wsx-cform__test ok'; st.textContent = '\\u2713 ' + (d.message || t('modal.verified')); } else { st.className = 'wsx-cform__test bad'; st.textContent = '\\u2717 ' + ((d && d.message) || t('modal.testFailed')); } })
         .catch(function () { st.className = 'wsx-cform__test bad'; st.textContent = '\\u2717 ' + t('modal.testRequestFailed'); })
         .then(function () { tb.disabled = false; });
+    });
+  }
+  // Admin adds a remote MCP server: the server discovers its OAuth setup and registers
+  // ShareOut as a client before saving, so the button holds until that answer.
+  function openMcpServerModal() {
+    var body = '<div class="wsx-cform">' + fld(t('modal.connectionName'), 'cf_name', 'notion')
+      + fld(t('mcp.serverUrl'), 'cf_mcp_url', t('mcp.serverUrlPh'))
+      + '<p class="wsx-field__note">' + esc(t('mcp.note')) + '</p>'
+      + '<div class="wsx-cform__err" id="cf_err"></div>'
+      + '<div class="wsx-cform__foot"><button class="wsx-abtn wsx-abtn--primary" id="cf_submit" type="button">' + esc(t('mcp.add')) + '</button></div></div>';
+    var modal = wsxModal(t('mcp.add'), body);
+    document.getElementById('cf_submit').addEventListener('click', function () {
+      var sub = this, name = cv('cf_name'), url = cv('cf_mcp_url'), err = document.getElementById('cf_err'); err.textContent = '';
+      if (!name) { err.textContent = t('modal.enterName'); return; }
+      if (!/^[a-zA-Z0-9_-]+$/.test(name)) { err.textContent = t('modal.nameInvalid'); return; }
+      if (url.indexOf('https://') !== 0) { err.textContent = t('mcp.errUrl'); return; }
+      var label = sub.textContent; sub.disabled = true; sub.textContent = t('common.saving');
+      function idle() { sub.disabled = false; sub.textContent = label; }
+      fetch(wsUrl('/mcp-connections'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, serverUrl: url }) })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (res) { idle(); if (!res.ok) { err.textContent = (res.d && res.d.error) || t('modal.failedAdd'); return; } modal.close(); loaded.connectors = 0; loadConnectors(); })
+        .catch(function () { idle(); err.textContent = t('modal.networkError'); });
     });
   }
   function openModuleModal() {

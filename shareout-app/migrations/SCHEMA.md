@@ -224,7 +224,7 @@ first. `kind` splits queryable data sources (`generic`) from OAuth app connectio
 
 | Table | Holds |
 |---|---|
-| `connections` | Every outside system this instance reaches, at either scope. `provider` + JSON `config` say what it is, `encrypted_credentials`/`iv` hold one credential blob, and `cache_ttl_seconds`/`rate_limit_rpm` bound its use. Workspace rows add `is_private` (hide from other members), `credential_scope` (shared vs per-user auth) and `agent_query_enabled`. Sheets and GitHub OAuth grants are rows here too. |
+| `connections` | Every outside system this instance reaches, at either scope. `provider` + JSON `config` say what it is, `encrypted_credentials`/`iv` hold one credential blob, and `cache_ttl_seconds`/`rate_limit_rpm` bound its use. Workspace rows add `is_private` (hide from other members), `credential_scope` (shared vs per-user auth) and `agent_query_enabled`. Sheets and GitHub OAuth grants are rows here too. Remote MCP servers are `kind='platform'`, `provider='mcp'`, `credential_scope='per_user'` rows: `config` holds the server URL, the discovered OAuth client and the last tool list; `encrypted_credentials` holds the client secret when dynamic registration issued one. |
 | `connection_cache` | Query results cached to R2, keyed by `query_hash`, expiring via `expires_at`. |
 | `datasets` | Uploaded static datasets (`format`, `r2_key`, `sha256`, `version`). |
 | `connection_user_credentials` | One member's own credentials, when `credential_scope` is `per_user`. |
@@ -232,6 +232,7 @@ first. `kind` splits queryable data sources (`generic`) from OAuth app connectio
 | `workspace_shared_tables` | Exposes one artifact's table to the workspace under `shared_name` with an `access` level. |
 | `sheet_syncs` | Sheet binding: spreadsheet, sheet, target table, sync direction and schedule. Holds no credentials — the artifact's Sheets row in `connections` does. |
 | `sheets_sync_log` | Per-sync outcome: direction, status, rows affected, error. |
+| `artifact_mcp_consents` | A member's allow for one page to call one workspace MCP connection as them, bound to `capability_hash` (the page's declared connections + tools); a changed declaration asks again. |
 | `artifact_secrets` | Secret-proxy rule: which `allowed_hosts`/`allowed_methods`/`allowed_paths` a browser call may reach, and how the credential is injected. |
 | `artifact_secret_credentials` | The encrypted credential a proxy rule injects. |
 | `secret_audit_log` | Every proxied call: method, host, path, status, duration. |

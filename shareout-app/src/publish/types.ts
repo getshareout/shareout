@@ -5,6 +5,7 @@
  * D1 rows (artifact, version, assets), R2 blobs, deployment pointer, and an
  * enhanced manifest that classifies critical vs lazy assets for the runtime.
  */
+import type { McpCapability, VersionCapabilities } from '../mcp-broker/capabilities';
 import type {
   AgentPublishConfig,
   ArtifactType,
@@ -49,6 +50,7 @@ export interface EnhancedManifest {
   };
   sdk?: ArtifactSdkPin;
   capabilityContract?: CapabilityContract;
+  capabilities?: VersionCapabilities;
 }
 
 /**
@@ -78,6 +80,8 @@ export interface PublishParams {
   };
   accessPolicy?: unknown;
   agent?: AgentPublishConfig;
+  /** Omitted: the new version inherits the live version's capabilities. `mcp: null` clears them. */
+  capabilities?: { mcp?: McpCapability | null };
   artifactType: ArtifactType;
   /** Imported Office file: original + sheet list, stored on type_metadata.source. */
   source?: ImportedSource;

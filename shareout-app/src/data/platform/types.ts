@@ -75,7 +75,8 @@ export interface ProviderConfig {
 	display?: ProviderDisplay;
 }
 
-export type ConnectMethod = 'oauth' | 'oauth_shop' | 'token' | 'key_pair' | 'service_account';
+// 'mcp': a remote MCP server (admin adds the URL; each member signs in with their own account).
+export type ConnectMethod = 'oauth' | 'oauth_shop' | 'token' | 'key_pair' | 'service_account' | 'mcp';
 
 export interface ProviderDisplay {
 	// Short label shown on the card (falls back to ProviderConfig.name).

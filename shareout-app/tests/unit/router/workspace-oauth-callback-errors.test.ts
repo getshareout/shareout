@@ -30,6 +30,7 @@ import {
   handleWorkspaceOAuthCallback,
 } from '../../../src/router/api/workspace-connections/oauth';
 import { handleSlackOAuthCallback } from '../../../src/router/api/workspace-connections/slack';
+import { createOAuthState } from '../../../src/oauth-state';
 
 const e = env as unknown as Env;
 const WS = 'wsp_oauth';
@@ -44,7 +45,8 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await e.DB.exec('DELETE FROM connections');
+  for (const t of ['connections', 'workspace_members']) await e.DB.exec(`DELETE FROM ${t}`);
+  await e.DB.exec(`INSERT INTO workspace_members (id, workspace_id, user_id, role, member_class) VALUES ('m1','${WS}','usr_admin','admin','internal')`);
   logError.mockReset();
   hasProvider.mockReset().mockReturnValue(true);
   handleCallback.mockReset().mockResolvedValue({ accessToken: 'at', refreshToken: 'rt', expiresAt: null });
@@ -65,13 +67,15 @@ function slackCallbackReq(qs: string) {
   return new Request(`https://shareout.site/v1/oauth/slack/callback?${qs}`);
 }
 
-function validState(overrides: Partial<{ workspaceId: string; connectionName: string; returnUrl: string }> = {}) {
-  return btoa(JSON.stringify({
-    workspaceId: WS,
-    connectionName: 'main',
-    returnUrl: '',
-    ...overrides,
-  }));
+let signedState = '';
+let otherWorkspaceState = '';
+beforeAll(async () => {
+  signedState = await createOAuthState(e, 'workspace-connection', 'usr_admin', { workspaceId: WS, connectionName: 'main', returnUrl: '' });
+  otherWorkspaceState = await createOAuthState(e, 'workspace-connection', 'usr_admin', { workspaceId: 'other', connectionName: 'main', returnUrl: '' });
+});
+
+function validState(overrides: { workspaceId?: string } = {}) {
+  return overrides.workspaceId === 'other' ? otherWorkspaceState : signedState;
 }
 
 describe('handleWorkspaceOAuthCallback error handling', () => {
@@ -172,5 +176,16 @@ describe('handleSlackOAuthCallback error handling', () => {
     const html = await res.text();
     expect(html).toMatch(/shareout:workspace:connection:connected/);
     expect(html).toMatch(/Slack connected successfully/);
+  });
+
+  it('rejects a forged unsigned state without calling Slack', async () => {
+    const forged = btoa(JSON.stringify({ workspaceId: WS, connectionName: 'slack', returnUrl: '' }));
+    const res = await handleSlackOAuthCallback(
+      slackCallbackReq(`code=attacker&state=${encodeURIComponent(forged)}`),
+      e,
+      'usr_admin',
+    );
+    expect(res.status).toBe(400);
+    expect(handleCallback).not.toHaveBeenCalled();
   });
 });

@@ -30,6 +30,26 @@ import { applyWorkspaceVisibilityPolicy, buildTypeMetadata, resolveStoredArtifac
 import type { PublishParams } from './types';
 import { publishSource } from '../artifacts/versions';
 import { normalizeVersionMessage, scheduleVersionSummary } from '../artifacts/version-summary';
+import { carriedCapabilities, type VersionCapabilities } from '../mcp-broker/capabilities';
+import { normalizeVisibility } from '../visibility-config';
+
+/** Explicit declaration wins; omitted inherits the live version's. MCP only on members-only workspace artifacts. */
+async function resolveVersionCapabilities(
+  env: Env,
+  artifactId: string,
+  requested: PublishParams['capabilities'],
+  visibility: string,
+  workspaceId: string | null,
+  warnings: string[],
+): Promise<VersionCapabilities | undefined> {
+  const mcp = requested?.mcp === undefined ? (await carriedCapabilities(env, artifactId))?.mcp : (requested.mcp ?? undefined);
+  if (!mcp) return undefined;
+  if (!workspaceId || normalizeVisibility(visibility) === 'public') {
+    warnings.push('MCP connections were dropped: they only work on members-only workspace artifacts.');
+    return undefined;
+  }
+  return { mcp };
+}
 
 export async function publishArtifact(
   env: Env,
@@ -116,7 +136,11 @@ export async function publishArtifact(
     env, versionId, artifactId, versionNo, files, mobileHtml, actualMobileEntrypoint,
   );
 
-  const manifest = buildEnhancedManifest(entrypoint, assetMetadata, actualMobileEntrypoint);
+  const capabilities = await resolveVersionCapabilities(env, artifactId, params.capabilities, effectiveVisibility, workspaceId, warnings);
+  const manifest = {
+    ...buildEnhancedManifest(entrypoint, assetMetadata, actualMobileEntrypoint),
+    ...(capabilities ? { capabilities } : {}),
+  };
   await env.DB.prepare('UPDATE versions SET manifest_json = ? WHERE id = ?')
     .bind(JSON.stringify(manifest), versionId).run();
 

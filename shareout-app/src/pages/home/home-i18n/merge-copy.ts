@@ -18,6 +18,7 @@ import { INVITE_COPY } from './copy/invite';
 import { KNOWLEDGE_MAP_COPY } from './copy/knowledge-map';
 import { KNOWLEDGE_LINKS_COPY } from './copy/knowledge-links';
 import { LIBRARY_COPY } from './copy/library';
+import { MCP_CONNECTORS_COPY } from './copy/mcp-connectors';
 import { MODALS_COPY } from './copy/modals';
 import { NEW_MENU_COPY } from './copy/new-menu';
 import { NOTIF_COPY } from './copy/notifications';
@@ -49,6 +50,7 @@ const COPY_MODULES: HomeLocaleCopy[] = [
   KNOWLEDGE_LINKS_COPY,
   LIBRARY_COPY,
   CONNECT_COPY,
+  MCP_CONNECTORS_COPY,
   COMPOSER_COPY,
   ACCOUNT_COPY,
   INSPECTOR_COPY,

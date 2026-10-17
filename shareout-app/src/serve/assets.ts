@@ -74,6 +74,8 @@ export async function serveAsset(
     // to any https host (see getSandboxedCSP). Only ever set on non-cacheable (noStore)
     // responses, so a relaxed CSP can't leak into the shared edge cache.
     relaxCsp?: boolean;
+    // lockCsp: the page declares MCP connections — egress limited to its own origin + platform.
+    lockCsp?: boolean;
   } = {},
 ): Promise<Response> {
   const rangeHeader = request.headers.get('Range');
@@ -84,7 +86,7 @@ export async function serveAsset(
   // relaxCsp rides the variant so a relaxed (private) body and a tight (public) body
   // for the same r2_key never share a cache entry across a visibility flip.
   const variantSuffix =
-    (opts.cacheVariant ? `:${opts.cacheVariant}` : '') + (opts.relaxCsp ? ':relax' : '');
+    (opts.cacheVariant ? `:${opts.cacheVariant}` : '') + (opts.relaxCsp ? ':relax' : '') + (opts.lockCsp ? ':lock' : '');
 
   // Edge-cache gate: assets always cacheable by mime, plus opt-in HTML. Ranged
   // responses are never cached.
@@ -150,7 +152,7 @@ export async function serveAsset(
 
   if (asset.mime === 'text/html') {
     Object.entries(getSecurityHeaders(true)).forEach(([k, v]) => headers.set(k, v));
-    headers.set('Content-Security-Policy', getSandboxedCSP(getArtifactCspOrigin(env, request), opts.relaxCsp === true, env));
+    headers.set('Content-Security-Policy', getSandboxedCSP(getArtifactCspOrigin(env, request), opts.relaxCsp === true, env, opts.lockCsp === true));
   } else {
     headers.set('X-Content-Type-Options', 'nosniff');
   }
