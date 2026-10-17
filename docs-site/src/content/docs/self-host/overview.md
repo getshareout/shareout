@@ -96,6 +96,7 @@ repo as primary — it is a publish mirror. After deploy, agents load
 |------|------------|
 | Custom domain | [Domain and DNS](/self-host/domain/) — update `SHAREOUT_BASE_URL` |
 | Google sign-in | `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`; callback `{origin}/auth/callback` |
+| Microsoft sign-in | `MICROSOFT_CLIENT_ID` + `MICROSOFT_CLIENT_SECRET` (optional `MICROSOFT_TENANT`); callback `{origin}/auth/microsoft/callback` — [setup](/self-host/secrets/#sign-in-with-microsoft) |
 | Email one-time codes | Configure the `EMAIL` binding + from-address vars |
 | Workspace subdomains | Wildcard DNS → worker; see [Domain and DNS](/self-host/domain/) |
 | Split content CDN | Set `ARTIFACT_ORIGIN` to a second zone (optional hardening) |

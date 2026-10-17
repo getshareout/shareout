@@ -399,9 +399,9 @@ For **private artifacts**, viewers authenticate differently:
 
 For artifacts with `share_with` emails and `auth_method: "google"` (the default for email-gated private pages):
 
-- Viewers open the artifact login page and choose **Sign in with Google** **or** enter their email for a **6-digit one-time code**.
+- Viewers open the artifact login page and choose **Sign in with Google**, **Sign in with Microsoft** (when the instance sets `MICROSOFT_CLIENT_ID` / `SECRET`; personal and work/school accounts) **or** enter their email for a **6-digit one-time code**.
 - The email must match the artifact's collaborator list (populated from `share_with` at publish time).
-- Both paths mint a `shareout_session` cookie; the Worker resolves the verified email the same way for row-level `access_policy`.
+- Every path mints a `shareout_session` cookie; the Worker resolves the verified email the same way for row-level `access_policy`.
 
 **Email OTP flow (browser or API):**
 

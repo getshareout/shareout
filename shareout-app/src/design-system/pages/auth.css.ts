@@ -123,6 +123,10 @@ p strong { color: var(--color-text); }
   height: 20px;
 }
 
+.btn-google + .btn-google {
+  margin-top: var(--space-3);
+}
+
 .auth-divider {
   display: flex;
   align-items: center;

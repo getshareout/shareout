@@ -47,8 +47,9 @@ import type { FetchContext } from './context';
 import { isLocalRequest } from './helpers/is-local-request';
 import { getTokenOrSessionUser, isAuthUser, requireToken } from './helpers/auth-guard';
 import { jsonError, jsonResponse } from './helpers/json-response';
-import { googleOAuthConfigured } from '../config/auth-providers';
-import { appLoginPage } from '../auth/pages';
+import { googleOAuthConfigured, microsoftOAuthConfigured } from '../config/auth-providers';
+import { handleMicrosoftLogin, handleMicrosoftCallback } from '../auth/microsoft-oauth';
+import { appLoginPage, errorPage } from '../auth/pages';
 import { pageLocale } from '../i18n/accept-language';
 import { loadLoginBrand } from '../workspaces/branding';
 import { handleSsoStart, handleSsoCallback } from '../auth/oidc';
@@ -248,6 +249,7 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
       redirect,
       turnstileSiteKey: env.TURNSTILE_CLOUDFLARE_SITEKEY,
       googleEnabled: googleOAuthConfigured(env),
+      microsoftEnabled: microsoftOAuthConfigured(env),
       loginHint,
       emailConfigured: Boolean(env.EMAIL),
       sso: sso ? { label: sso.buttonLabel, href: ssoStartPath(sso.workspaceSlug, redirect, loginHint), enforced: sso.enforced } : null,
@@ -280,6 +282,19 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
       return Response.redirect(new URL(`/auth/login?redirect=${encodeURIComponent(redirect)}`, url.origin).toString(), 302);
     }
     return handleGoogleLogin(request, env);
+  }
+
+  if (path === '/auth/microsoft' && request.method === 'GET') {
+    if (!microsoftOAuthConfigured(env)) {
+      const redirect = url.searchParams.get('redirect') || '/home';
+      return Response.redirect(new URL(`/auth/login?redirect=${encodeURIComponent(redirect)}`, url.origin).toString(), 302);
+    }
+    return handleMicrosoftLogin(request, env);
+  }
+
+  if (path === '/auth/microsoft/callback' && request.method === 'GET') {
+    if (!microsoftOAuthConfigured(env)) return errorPage('Microsoft sign-in is not configured.', '/auth/login');
+    return handleMicrosoftCallback(request, env, ctx.executionCtx);
   }
 
   if (path === OPEN_PATH && request.method === 'GET') {

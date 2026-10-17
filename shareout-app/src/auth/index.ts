@@ -8,6 +8,8 @@
  * - `google-oauth` — redirect-based Google sign-in and callback
  * - `google-one-tap` — Sign in with Google (ID-token flow)
  * - `google-id-token` — JWT verification against Google JWKS
+ * - `microsoft-oauth` — Sign in with Microsoft (identity platform v2.0, personal + work/school)
+ * - `oidc` / `sso-config` — per-workspace OIDC SSO (Okta, Entra ID, …)
  * - `dev-login` — localhost-only session helper (`/auth/dev`)
  * - `logout` — clear session cookie
  * - `pages` — HTML login, access-denied, password/credentials forms
@@ -27,6 +29,7 @@ export {
   handleGoogleCallback,
 } from './google-oauth';
 export { handleGoogleOneTap } from './google-one-tap';
+export { handleMicrosoftLogin, handleMicrosoftCallback } from './microsoft-oauth';
 export { handleDevLogin } from './dev-login';
 export { handleLogout } from './logout';
 export {

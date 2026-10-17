@@ -155,3 +155,58 @@ export async function linkGoogleToUser(
 
   return { success: true };
 }
+
+export const ACCOUNT_DISABLED_MSG = 'This account has been disabled. Contact your administrator.';
+
+/**
+ * Find-or-create a user from a verified Microsoft sign-in. `microsoftId` is `tid:oid`,
+ * the identifier Microsoft documents as stable; the email only links an existing account
+ * the first time, and only after the caller has proved the address is verified.
+ */
+export async function upsertMicrosoftUser(
+  env: Env,
+  info: { microsoftId: string; email: string; name?: string | null },
+): Promise<{ id: string; email: string; isNew: boolean; firstActivation: boolean }> {
+  const email = info.email.toLowerCase().trim();
+  const name = info.name?.trim() || null;
+
+  const known = await env.DB.prepare(
+    'SELECT id, email, disabled FROM users WHERE microsoft_id = ?'
+  ).bind(info.microsoftId).first<{ id: string; email: string; disabled: number | null }>();
+  if (known) {
+    if (known.disabled) throw new Error(ACCOUNT_DISABLED_MSG);
+    await env.DB.prepare(
+      `UPDATE users SET name = COALESCE(name, ?), last_login_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`
+    ).bind(name, known.id).run();
+    return { id: known.id, email: known.email, isNew: false, firstActivation: false };
+  }
+
+  const byEmail = await env.DB.prepare(
+    'SELECT id, microsoft_id, disabled, last_login_at FROM users WHERE email = ?'
+  ).bind(email).first<{ id: string; microsoft_id: string | null; disabled: number | null; last_login_at: string | null }>();
+  if (byEmail) {
+    if (byEmail.disabled) throw new Error(ACCOUNT_DISABLED_MSG);
+    // The address was reassigned, or another tenant claims it: never merge two identities.
+    if (byEmail.microsoft_id && byEmail.microsoft_id !== info.microsoftId) {
+      throw new Error('This email is already linked to a different Microsoft account');
+    }
+    await env.DB.prepare(
+      `UPDATE users SET microsoft_id = ?, name = COALESCE(name, ?), last_login_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`
+    ).bind(info.microsoftId, name, byEmail.id).run();
+    return { id: byEmail.id, email, isNew: false, firstActivation: !byEmail.last_login_at };
+  }
+
+  if (
+    signupsPaused(env)
+    && !(await hasExplicitArtifactInvite(env, email))
+    && !(await hasWorkspaceSignupAllowlist(env, email))
+  ) {
+    throw new Error(SIGNUPS_PAUSED_MSG);
+  }
+
+  const id = generateId('usr');
+  await env.DB.prepare(
+    `INSERT INTO users (id, email, name, microsoft_id, last_login_at) VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
+  ).bind(id, email, name || email.split('@')[0] || 'there', info.microsoftId).run();
+  return { id, email, isNew: true, firstActivation: true };
+}
