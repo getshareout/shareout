@@ -367,3 +367,32 @@ describe('preview page', () => {
     expect((await routeTemplatesApi(createFetchContext(new Request(`https://shareout.test${forged}`), e)))!.status).toBe(404);
   });
 });
+
+describe('MCP tools reuse the same authz', () => {
+  const tctx = (token: string) => ({ env: e, user: USERS[token], origin: 'https://shareout.test', authorization: `Bearer ${token}` });
+  it('list_templates, install_template and save_as_template', async () => {
+    const { callTool } = await import('../../../src/mcp/tools');
+    const listed = await callTool(tctx('so_bob'), 'list_templates', { workspace_id: WS_B });
+    expect(listed!.isError).toBeFalsy();
+    expect(JSON.stringify(listed!.structuredContent)).toContain(templateId);
+
+    const notMine = await callTool(tctx('so_bob'), 'list_templates', { workspace_id: WS_A });
+    expect(notMine!.isError).toBe(true);
+
+    const inst = await callTool(tctx('so_bob'), 'install_template', { template_id: templateId, workspace_id: WS_B });
+    expect(inst!.isError).toBeFalsy();
+    expect(inst!.content[0].text).toContain('Finish setup');
+
+    const pii = await publishArtifact(e, alice, {
+      name: 'Contact', slug: 'contact', entrypoint: 'index.html',
+      files: [{ path: 'index.html', content: '<p>Write to maria.lopez@cliente.com</p>', mime: 'text/html' }],
+      visibility: 'workspace', authMethod: 'google', shareWith: [], credentials: [], workspaceId: WS_A, folderId: null, artifactType: 'html',
+    });
+    const review = await callTool(tctx('so_alice'), 'save_as_template', { artifact_id: pii.artifact.id });
+    expect(review!.structuredContent).toMatchObject({ review_required: true });
+    const denied = await callTool(tctx('so_alice'), 'save_as_template', { artifact_id: hubId, scope: 'instance', acknowledge_findings: true });
+    expect(denied!.isError).toBe(true);
+    const stranger = await callTool(tctx('so_bob'), 'save_as_template', { artifact_id: hubId, acknowledge_findings: true });
+    expect(stranger!.isError).toBe(true);
+  }, 60_000);
+});

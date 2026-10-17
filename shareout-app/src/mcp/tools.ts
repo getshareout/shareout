@@ -24,6 +24,7 @@ import {
 } from './tool-kit';
 import { MEMBER_TOOLS } from './member-tools';
 import { KNOWLEDGE_TOOLS } from './knowledge-tools';
+import { TEMPLATE_TOOLS } from './template-tools';
 import { CONNECTOR_TOOLS } from './connector-tools';
 import { PAGE_TOOLS } from './page-tools';
 import { SHARING_TOOLS } from './sharing-tools';
@@ -588,7 +589,7 @@ const fetchTool: ToolDef = {
 // Deterministic order (lets clients cache the list).
 export const TOOLS: ToolDef[] = [
   whoami, listWorkspaces, listArtifacts, getArtifact, publishArtifact, updateArtifact,
-  ...PAGE_TOOLS, ...SHARING_TOOLS, ...MEMBER_TOOLS, ...KNOWLEDGE_TOOLS, ...CONNECTOR_TOOLS, getHelp, reportProblem, search, fetchTool,
+  ...PAGE_TOOLS, ...SHARING_TOOLS, ...MEMBER_TOOLS, ...KNOWLEDGE_TOOLS, ...CONNECTOR_TOOLS, ...TEMPLATE_TOOLS, getHelp, reportProblem, search, fetchTool,
 ];
 
 export function listTools() {
