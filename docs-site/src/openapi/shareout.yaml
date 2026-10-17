@@ -3868,7 +3868,12 @@ paths:
         idempotent and replaces the expiry. For a folder, the invite email's join link
         carries `?folder=<id>` through sign-in and lands on `/shared?folder=<id>` (that
         folder's branded portal); an already-active person's email links there too.
-        Returns 409 if the email is already an internal member.
+        Returns 409 if the email is already an internal member. With `guest: true`
+        (folders only) no account is created: a `guest` grant whose subject is the email
+        itself, and an emailed link that opens the folder in a space-guest session. The
+        guest can also open it from `/shared?folder=<id>` with an email code. They see that
+        folder's subtree only, up to the capability; revoking or expiring the grant ends
+        their session on the next request.
       operationId: shareWithPerson
       requestBody:
         required: true
@@ -3898,6 +3903,10 @@ paths:
                 expires_at:
                   type: string
                   description: ISO date-time (or YYYY-MM-DD = end of that day, UTC) when access ends. Omit both for no expiry; a re-share replaces the previous expiry.
+                guest:
+                  type: boolean
+                  default: false
+                  description: Folders only. Share as a guest with no account (subject_type `guest`); the person gets an emailed link instead of an invite.
       responses:
         "201":
           description: Grant created (idempotent re-share)
@@ -3910,6 +3919,12 @@ paths:
                     $ref: "#/components/schemas/Grant"
                   email:
                     type: string
+                  guest:
+                    type: boolean
+                    description: Present and true for a guest share.
+                  email_sent:
+                    type: boolean
+                    description: Guest shares only — whether the link email went out.
         "400":
           description: "`VALIDATION_ERROR` — bad email, resource, capability or expiry"
         "403":
@@ -7756,9 +7771,10 @@ components:
           type: string
         subject_type:
           type: string
-          enum: [sharee, external_user]
+          enum: [sharee, external_user, guest]
         subject_id:
           type: string
+          description: Sharee id, users.id, or for a `guest` grant the guest's email.
         resource_type:
           type: string
           enum: [folder, artifact, file]

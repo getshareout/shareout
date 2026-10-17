@@ -33,6 +33,12 @@ A higher level includes the ones below it. You can share a whole folder with a c
 
 Folder managers (not only admins) can also do this from a folder's **Who has access** panel. Only the admin role is relaxed: the workspace still needs external sharing, and the email must pass the workspace's allowed domains. Removing someone never needs the entitlement. Managers pick when access ends: **In 7 days**, **In 30 days**, **In 90 days**, **On a date…** or **Never**. Access stops as soon as it lapses; sharing again replaces the end date. The invite email links straight to the folder's portal. See [Client portals](/teams/client-portals/).
 
+### Guest access (no account)
+
+For a folder, tick **Guest access — no account needed** when you share. The person gets an email with a link that opens the folder; nothing asks them to create an account, remember a password or pick a workspace. On another device they open the portal link, enter their email and type the 6-digit code we send.
+
+A guest sees only that folder and what is inside it, up to the access you picked (**Can view** or **Can comment**). They have no home page, search, members list or assistant. Removing them, the end date passing or deleting the folder closes their access on their next click. API: `share-person` with `"guest": true`. See [Client portals](/teams/client-portals/#guests-without-an-account).
+
 ## Read receipts
 
 Every time a client opens something you shared, it's logged. In the client's view you'll see recent activity — *"someone at Acme opened the Q3 deck."* A clear signal for renewals and follow-ups.

@@ -12,6 +12,10 @@ import { normalizeVisibility } from '../visibility-config';
 import { apiErrorResponse } from '../http/api-error';
 import { createMiniDb, type MiniDb } from './minidb-client';
 import { parseAccessPolicy, resolveViewerScope, type ViewerScope, type Viewer } from './access-policy';
+import {
+  SPACE_GUEST_AUTH_PREFIX, isTrustedInstanceOrigin, spaceGuestCovers, spaceGuestFor, spaceGuestFromGrant, spaceGuestTokenName,
+  type SpaceGuest,
+} from '../sharees/space-guest';
 
 export interface DataContext {
   artifactId: string;
@@ -70,6 +74,9 @@ export interface DataContext {
   // Defer background work past the response (Workers ExecutionContext.waitUntil),
   // when available. Used to dispatch event-triggered crew runs without blocking.
   waitUntil?: (promise: Promise<unknown>) => void;
+  // A space guest (no account) whose live grant reaches this artifact. Read-only on the
+  // artifact's stores; comments only with a 'comment' grant. See sharees/space-guest.ts.
+  spaceGuest?: SpaceGuest;
   // True when this context targets a workspace/personal asset bucket: lifts the
   // per-file/storage/count blob caps to library-scale (see blob limits).
   assetBucket?: boolean;
@@ -224,6 +231,11 @@ export async function dataMiddleware(
     canWrite = false;
     canWriteCollab = false;
   }
+  // A space guest never writes the artifact's own stores or joins realtime editing.
+  if (authResult.spaceGuest) {
+    canWrite = false;
+    canWriteCollab = false;
+  }
   // External-sharing spine (work/030) Phase 3: an external identity (token or personal)
   // may only WRITE where it holds an 'edit' grant. A 'view'-only external is read-only.
   if (authResult.externalSubjectUserId && (canWrite || canWriteCollab)) {
@@ -249,6 +261,7 @@ export async function dataMiddleware(
     canWriteCollab,
     readOnlyToken,
     testRun,
+    ...(authResult.spaceGuest ? { spaceGuest: authResult.spaceGuest } : {}),
   };
 }
 
@@ -269,6 +282,7 @@ type DataAuthResult = {
   testRun?: boolean;
   serviceScopes?: ServiceScope[];
   externalSubjectUserId?: string;
+  spaceGuest?: SpaceGuest;
 };
 
 async function checkDataAuth(
@@ -282,6 +296,13 @@ async function checkDataAuth(
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
     const payload = await verifyAccessToken(token, artifact.id, env);
+    // A space guest's page token names its grant: re-check the grant on every call, so a
+    // revoke, an expiry or a deleted folder stops the page's data at once.
+    if (payload?.authType.startsWith(SPACE_GUEST_AUTH_PREFIX)) {
+      const guest = await spaceGuestFromGrant(env, payload.authType.slice(SPACE_GUEST_AUTH_PREFIX.length), spaceGuestTokenName(payload));
+      if (!guest || !(await spaceGuestCovers(env, guest, 'artifact', artifact.id))) return deny;
+      return { authorized: true, needsAuth: false, viewer: { email: null, isOwner: false }, isArtifactOwner: false, spaceGuest: guest };
+    }
     // 'content' tokens authorize loading static artifact bytes on the content domain
     // ONLY (ADR 30) — they carry no viewer identity and must never grant data access.
     if (payload && payload.authType !== 'content') {
@@ -412,12 +433,24 @@ async function checkDataAuth(
   if (artifact.auth_method === 'google') {
     const token = extractTokenFromCookie(cookies, /shareout_session=([^;]+)/);
     if (token) {
-      return verifyGoogleSession(token, artifact, env);
+      const session = await verifyGoogleSession(token, artifact, env);
+      if (session.authorized) return session;
     }
+  }
+
+  // A space-guest cookie whose grant reaches this artifact. Never on a password or
+  // credentials page (the password is that page's only way in). A cookie-authenticated
+  // write must come from this instance (CSRF).
+  if (artifact.auth_method !== 'password' && artifact.auth_method !== 'credentials' &&
+      (!MUTATING.has(request.method.toUpperCase()) || isTrustedInstanceOrigin(request, env))) {
+    const guest = await spaceGuestFor(request, env, 'artifact', artifact.id, 'view');
+    if (guest) return { authorized: true, needsAuth: false, viewer: { email: null, isOwner: false }, isArtifactOwner: false, spaceGuest: guest };
   }
 
   return deny;
 }
+
+const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 async function verifyGoogleSession(
   token: string,

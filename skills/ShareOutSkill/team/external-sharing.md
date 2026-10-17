@@ -57,6 +57,22 @@ Content-Type: application/json
 - **Folder invite → portal:** for a folder, the invite email's join link carries `?folder=<id>` through sign-in and lands on `/shared?folder=<id>`; a person who already has an account gets an email linking straight there.
 - **Revoke:** `DELETE /v1/workspaces/{wid}/grants/{gid}` (grant ids from `GET …/grants?resource_type=folder&resource_id=…`).
 
+### Guest access — no account (folders)
+
+Add `"guest": true` (folders only) to share with someone who should **not** get an account:
+
+```http
+POST /v1/workspaces/{wid}/share-person
+{ "email": "client@acme.com", "resource_type": "folder", "resource_id": "fld_…", "capability": "comment", "guest": true, "expires_in_days": 30 }
+```
+
+- Mints a grant with `subject_type: "guest"`, `subject_id: <email>`. No user row, no workspace membership. Returns `201 { grant, email, guest: true, email_sent }`.
+- The guest gets an email link (`/shared/guest/accept?t=…`, 14 days or until the grant ends) that signs them in on that browser. On another device they open `/shared?folder=<id>`, enter their email and the 6-digit code.
+- The session is an HMAC token bound to workspace + grant + folder + email hash, in an HttpOnly, Secure, SameSite=Lax cookie (up to 7 days). Every request re-reads the grant, so `DELETE …/grants/{gid}`, the expiry or deleting the folder ends it at once.
+- Reach: that folder's subtree only (pages, non-private files, their comments), up to `view` or `comment`. No `/home`, search, members, the workspace assistant, MCP, or the data API's agent/crew/workspace/secrets/email tiers. Password-protected pages stay behind their password.
+- Same role, entitlement and allowed-domain rules as any share; `409 ALREADY_MEMBER` for internal members; `400` for files.
+- Guests show in the folder's access panel (marked guest) and in `GET …/folders/{fid}/activity` (`guest: 1`).
+
 ## API
 
 Endpoints that create access (Clients, members, grants, tokens, share-person) require workspace `admin` + the entitlement. Listing, revoking a grant, removing a member, deleting a Client and revoking a token need only `admin`, so a workspace without the entitlement can still wind access down.

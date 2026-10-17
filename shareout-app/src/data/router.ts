@@ -67,6 +67,20 @@ export function isReadOnlyPost(tier: string, method: string, subPath: string): b
   return tier === 'tables' && method.toUpperCase() === 'POST' && /^\/[^/]+\/(query|count|distinct)\/?$/.test(subPath);
 }
 
+// A space guest (no account) reaches only what a viewer of the page needs: reads of the
+// artifact's own stores, live connection queries, and comments (gated by capability in the
+// comments handler). Never the agent, crew, workspace data, secrets, email, provisioning,
+// sheets/GitHub, the proxy or realtime editing.
+const SPACE_GUEST_READ_TIERS = new Set(['json', 'tables', 'datasets', 'blobs', 'slides', 'connections']);
+export function spaceGuestTierAllowed(tier: string, method: string, subPath: string): boolean {
+  const m = method.toUpperCase();
+  if (tier === 'comments') return true;
+  if (tier === 'batch') return m === 'POST';
+  if (!SPACE_GUEST_READ_TIERS.has(tier)) return false;
+  if (m === 'GET' || m === 'HEAD') return true;
+  return isReadOnlyPost(tier, m, subPath) || (tier === 'connections' && m === 'POST' && /^\/[^/]+\/query\/?$/.test(subPath));
+}
+
 // Read-only-default gate: block anonymous mutations to the artifact's private
 // stores unless the owner opted in. Returns an error Response to send, or null.
 function anonWriteDenied(tier: string, method: string, ctx: DataContext, origin: string | null, subPath: string): Response | null {
@@ -290,6 +304,10 @@ async function handleDataRequestInner(
       message: 'This is a read-only test run — writes, emails, and provisioning are disabled.',
       hint: 'Artifact Tests execute flows against a read-only view; mutations are intentionally blocked.',
     }, origin);
+  }
+
+  if (ctx.spaceGuest && !spaceGuestTierAllowed(tier, request.method, subPath)) {
+    return errorResponse({ ...DATA_ERRORS.FORBIDDEN, message: 'Guests can view this page, not use this part of it.' }, origin);
   }
 
   // Feature-flag gate: most data tiers map 1:1 to a toggle-able feature. The

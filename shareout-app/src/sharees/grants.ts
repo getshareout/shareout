@@ -12,6 +12,9 @@ import { requireExternalSharing, requireExternalSharingEnabled } from './guard';
 import { inviteOrAddMember } from '../workspaces/invite';
 import { requireFolderManager } from '../folders';
 import { notifyFolderShared } from '../notify/review-notify';
+import { getWorkspaceAccessPolicy, isEmailAllowedByPolicy } from '../workspaces/access-policy';
+import { normalizeGuestEmail } from '../data/comments/guest';
+import { sendSpaceGuestInvite } from './space-guest';
 
 // Phase 2 surface: view/comment (read) + create/edit (author-in-sandbox). The lattice
 // and table support the full set; we only let admins MINT what the access layer honors.
@@ -215,7 +218,7 @@ export async function handleShareWithPerson(
 ): Promise<Response> {
   let body: {
     email?: string; resource_type?: string; resource_id?: string; capability?: string;
-    expires_at?: unknown; expires_in_days?: unknown;
+    expires_at?: unknown; expires_in_days?: unknown; guest?: unknown;
   };
   try { body = await request.json(); }
   catch {
@@ -242,6 +245,10 @@ export async function handleShareWithPerson(
   if ('error' in expiry) return json({ error: expiry.error, code: 'VALIDATION_ERROR' }, 400);
   if (!(await resourceInWorkspace(env, workspaceId, resourceType, resourceId)))
     return json({ error: 'Resource not in this workspace', code: 'VALIDATION_ERROR' }, 400);
+
+  if (body.guest === true) {
+    return shareFolderWithGuest(env, user, workspaceId, email, resourceType, resourceId, capability, expiry.expiresAt);
+  }
 
   // Refuse an existing INTERNAL member: we won't create a conflicting external edge, and
   // internal members aren't granted a peer's file by design (files aren't membership
@@ -273,6 +280,36 @@ export async function handleShareWithPerson(
     invite.status === 'updated',
   );
   return json({ grant, email }, 201);
+}
+
+// Guest access (no account): a 'guest' grant whose subject is the email itself — no user
+// row, no workspace membership. The person opens the folder from the emailed link or with
+// an email code on its portal; see space-guest.ts. Folders only: a guest's whole world is
+// one space. The workspace's allowed-domains policy applies exactly as for invites.
+async function shareFolderWithGuest(
+  env: Env, user: AuthUser, workspaceId: string, rawEmail: string,
+  resourceType: string, resourceId: string, capability: string, expiresAt: string | null,
+): Promise<Response> {
+  const email = normalizeGuestEmail(rawEmail);
+  if (!email) return json({ error: 'A valid email is required', code: 'VALIDATION_ERROR' }, 400);
+  if (resourceType !== 'folder') {
+    return json({ error: 'Guest access applies to folders only', code: 'VALIDATION_ERROR' }, 400);
+  }
+  const member = await env.DB.prepare(
+    `SELECT 1 FROM users u JOIN workspace_members wm ON wm.user_id = u.id
+      WHERE u.email = ? AND wm.workspace_id = ? AND wm.member_class != 'external'`
+  ).bind(email, workspaceId).first();
+  if (member) return json({ error: 'That person is already a member of this workspace.', code: 'ALREADY_MEMBER' }, 409);
+  const policy = await getWorkspaceAccessPolicy(env, workspaceId);
+  if (policy && !isEmailAllowedByPolicy(policy, email)) {
+    return json({ error: 'This workspace only shares with people at its allowed email domains.', code: 'DOMAIN_NOT_ALLOWED' }, 403);
+  }
+  const grant = await insertGrant(
+    env, workspaceId, 'guest', email, resourceType, resourceId, capability, user.id, expiresAt, false,
+  ) as { id: string } | null;
+  if (!grant) return json({ error: 'Could not share', code: 'INTERNAL_ERROR' }, 500);
+  const emailSent = await sendSpaceGuestInvite(env, grant.id, user).catch(() => false);
+  return json({ grant, email, guest: true, email_sent: emailSent }, 201);
 }
 
 export async function handleDeleteGrant(

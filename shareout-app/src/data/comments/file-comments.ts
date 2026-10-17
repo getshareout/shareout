@@ -12,6 +12,8 @@ import { getSession } from './auth';
 import { getVisibilityScope, type VisibilityScope } from '../../account-links';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { canAccess, type Capability } from '../../access/can-access';
+import { spaceGuestFor } from '../../sharees/space-guest';
+import { isTrustedGuestOrigin } from './guest';
 
 /** Is this comments request targeting an asset-bucket artifact? Memoized per request. */
 export async function isAssetBucketArtifact(ctx: DataContext): Promise<boolean> {
@@ -100,6 +102,15 @@ export async function authorizeFileComment(
       capability,
     );
     if (ok) return null;
+  }
+  // A space guest whose folder holds this (non-private) file; a cookie write must come
+  // from this instance. The verified guest then comments as itself (validateIdentity).
+  if (request.method === 'GET' || isTrustedGuestOrigin(request, ctx)) {
+    const guest = await spaceGuestFor(request, ctx.env, 'file', dlv, capability);
+    if (guest) {
+      ctx.spaceGuest = guest;
+      return null;
+    }
   }
   return errorResponse({ code: 'FORBIDDEN', message: 'You do not have access to this file.', status: 403 });
 }
