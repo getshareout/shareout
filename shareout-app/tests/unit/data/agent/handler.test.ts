@@ -91,14 +91,26 @@ describe('handleAgent routing', () => {
     expect(handleVisitorConfig).toHaveBeenCalledWith(req, ctx);
   });
 
-  it('returns usage for GET /usage', async () => {
-    const req = new Request(`${BASE_URL}/usage?period=2026-05`, { method: 'GET' });
-    const res = await handleAgent(req, ctx, 'usage');
+  it('returns usage for GET /usage to the owner', async () => {
+    const ownerCtx = makeCtx(makeEnv(ownerDb()));
+    const req = new Request(`${BASE_URL}/usage?period=2026-05`, {
+      method: 'GET',
+      headers: { Cookie: `shareout_session=${sessionCookie(USER_ID)}` },
+    });
+    const res = await handleAgent(req, ownerCtx, 'usage');
     const body = await res.json() as { success: boolean; data: { period: string; usage: unknown } };
 
-    expect(getUsage).toHaveBeenCalledWith(ctx.env, ARTIFACT_ID, '2026-05');
+    expect(getUsage).toHaveBeenCalledWith(ownerCtx.env, ARTIFACT_ID, '2026-05');
     expect(body.success).toBe(true);
     expect(body.data.period).toBe('2026-05');
+  });
+
+  it('refuses usage to a visitor without owner or editor access', async () => {
+    const visitorCtx = makeCtx(makeEnv({ first: () => null }));
+    vi.mocked(getUsage).mockClear();
+    const res = await handleAgent(new Request(`${BASE_URL}/usage`, { method: 'GET' }), visitorCtx, 'usage');
+    expect(res.status).toBe(403);
+    expect(getUsage).not.toHaveBeenCalled();
   });
 
   it('rejects non-GET on usage endpoint', async () => {
@@ -298,8 +310,8 @@ describe('handleAgent admin config (pilot_enabled)', () => {
 // Ensure usage default period when not specified
 describe('handleAgent usage defaults', () => {
   it('uses current month when period param omitted', async () => {
-    const ctx = makeCtx(makeEnv());
-    const req = new Request(`${BASE_URL}/usage`, { method: 'GET' });
+    const ctx = makeCtx(makeEnv(ownerDb()));
+    const req = new Request(`${BASE_URL}/usage`, { method: 'GET', headers: { Cookie: `shareout_session=${sessionCookie(USER_ID)}` } });
     const res = await handleAgent(req, ctx, 'usage');
     const body = await res.json() as { data: { period: string } };
     expect(body.data.period).toMatch(/^\d{4}-\d{2}$/);

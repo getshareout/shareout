@@ -46,6 +46,10 @@ async function handleUsageEndpoint(
   if (request.method !== 'GET') {
     return errorResponse({ ...DATA_ERRORS.INVALID_REQUEST, message: 'Method not allowed' }, ctx.origin);
   }
+  // AI usage and cost are for the artifact's owner and editors, like the admin routes.
+  if (!await verifyAgentAdminAccess(request, ctx)) {
+    return errorResponse(DATA_ERRORS.FORBIDDEN, ctx.origin);
+  }
 
   const url = new URL(request.url);
   const period = url.searchParams.get('period') || undefined;
