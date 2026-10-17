@@ -7,7 +7,7 @@ Mail is sent server-side from verified ShareOut domains (e.g. `slug@artifacts.ex
 ## Prerequisites
 
 1. **Cloudflare:** Onboard `$ORIGIN_HOST` under Email Sending
-2. **Owner:** Link account email (`POST /v1/auth/link-email`)
+2. **Owner:** Link account email (`POST /v1/auth/link-email/start`, then `/verify` with the emailed code)
 3. **Owner (recommended):** Create artifact sender address (`POST /v1/artifacts/{id}/email`)
 4. **Artifact HTML:** Call `sdk.email.notifyOwner()` from submit handler
 
