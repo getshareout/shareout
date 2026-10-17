@@ -456,7 +456,7 @@ async function getEffectiveVisibility(env: Env, folderId: string): Promise<Visib
   return 'public';
 }
 
-function generateFolderSlug(name: string): string {
+export function generateFolderSlug(name: string): string {
   return name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')

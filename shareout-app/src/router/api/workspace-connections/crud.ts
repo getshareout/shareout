@@ -149,27 +149,45 @@ export async function handleCreateWorkspaceConnection(
   if (!(await requireAdmin(env, workspaceId, user.id))) {
     return json({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
   }
-  if (!env.CREDENTIALS_KEY) {
-    return json({ error: 'CREDENTIALS_KEY not configured', code: 'CONFIG_ERROR' }, 500);
-  }
-
-  let body: {
-    name: string;
-    kind?: string;
-    type: string;
-    provider?: string;
-    config?: Record<string, unknown>;
-    credentials?: { type: string; data?: Record<string, unknown> };
-    authType?: string;
-    credentialScope?: string;
-    preferredMode?: string;
-    cacheTtl?: number;
-    rateLimit?: number;
-  };
+  let body: WorkspaceConnectionInput;
   try {
     body = await request.json();
   } catch {
     return json({ error: 'Invalid JSON body', code: 'INVALID_JSON' }, 400);
+  }
+  return createWorkspaceConnection(env, workspaceId, user, body, executionCtx);
+}
+
+/** Body of `POST /v1/workspaces/{id}/connections`. */
+export interface WorkspaceConnectionInput {
+  name: string;
+  kind?: string;
+  type: string;
+  provider?: string;
+  config?: Record<string, unknown>;
+  credentials?: { type: string; data?: Record<string, unknown> };
+  authType?: string;
+  credentialScope?: string;
+  preferredMode?: string;
+  cacheTtl?: number;
+  rateLimit?: number;
+}
+
+/**
+ * Validate, encrypt and store one workspace connector. The caller has already decided
+ * `actor` may (workspace admin, or an instance admin provisioning the workspace). The
+ * response never carries a credential value.
+ */
+export async function createWorkspaceConnection(
+  env: Env,
+  workspaceId: string,
+  actor: { id: string; email?: string | null },
+  body: WorkspaceConnectionInput,
+  executionCtx?: ExecutionContext
+): Promise<Response> {
+  const user = actor;
+  if (!env.CREDENTIALS_KEY) {
+    return json({ error: 'CREDENTIALS_KEY not configured', code: 'CONFIG_ERROR' }, 500);
   }
 
   const nameError = validateName(body.name);

@@ -10,8 +10,26 @@ export interface WorkspaceBranding {
   hide_footer: boolean;
 }
 
-const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
-const LOGO_MAX_BYTES = 512 * 1024;
+export const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
+export const LOGO_MAX_BYTES = 512 * 1024;
+
+/** File extension for an accepted logo type, or '' when the type is not one. */
+export function logoExtFor(contentType: string): string {
+  if (!contentType.startsWith('image/')) return '';
+  return contentType.includes('svg') ? 'svg'
+    : contentType.includes('webp') ? 'webp'
+    : contentType.includes('png') ? 'png'
+    : contentType.includes('jpeg') || contentType.includes('jpg') ? 'jpg'
+    : '';
+}
+
+/** Why these logo bytes cannot be used, or null when they can. */
+export function logoProblem(contentType: string, byteLength: number): { error: string; code: string } | null {
+  if (!logoExtFor(contentType)) return { error: 'Logo must be a PNG, JPG, WEBP, or SVG image', code: 'INVALID_CONTENT_TYPE' };
+  if (byteLength === 0) return { error: 'Empty file', code: 'EMPTY_FILE' };
+  if (byteLength > LOGO_MAX_BYTES) return { error: 'Logo too large (max 512KB)', code: 'TOO_LARGE' };
+  return null;
+}
 
 const EMPTY_BRANDING: WorkspaceBranding = { logo_ext: null, accent_color: null, hide_footer: false };
 
@@ -44,19 +62,19 @@ export async function loadLoginBrand(env: Env, slug: string): Promise<{
   };
 }
 
-async function loadBranding(env: Env, workspaceId: string): Promise<WorkspaceBranding | null> {
+export async function loadBranding(env: Env, workspaceId: string): Promise<WorkspaceBranding | null> {
   const row = await env.DB.prepare('SELECT branding FROM workspaces WHERE id = ?')
     .bind(workspaceId).first<{ branding: string | null }>();
   if (!row) return null;
   return parseBranding(row.branding);
 }
 
-async function saveBranding(env: Env, workspaceId: string, branding: WorkspaceBranding): Promise<void> {
+export async function saveBranding(env: Env, workspaceId: string, branding: WorkspaceBranding): Promise<void> {
   await env.DB.prepare("UPDATE workspaces SET branding = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
     .bind(JSON.stringify(branding), workspaceId).run();
 }
 
-function brandingResponse(workspaceId: string, b: WorkspaceBranding) {
+export function brandingResponse(workspaceId: string, b: WorkspaceBranding) {
   return {
     accent_color: b.accent_color,
     hide_footer: b.hide_footer,
@@ -127,35 +145,39 @@ export async function handleUploadWorkspaceLogo(
   if (!current) return json({ error: 'Workspace not found', code: 'NOT_FOUND' }, 404);
 
   const contentType = request.headers.get('Content-Type') || '';
-  const ext = contentType.includes('svg') ? 'svg'
-    : contentType.includes('webp') ? 'webp'
-    : contentType.includes('png') ? 'png'
-    : contentType.includes('jpeg') || contentType.includes('jpg') ? 'jpg'
-    : '';
-  if (!contentType.startsWith('image/') || !ext) {
+  if (!logoExtFor(contentType)) {
     return json({ error: 'Logo must be a PNG, JPG, WEBP, or SVG image', code: 'INVALID_CONTENT_TYPE' }, 400);
   }
 
   const body = await request.arrayBuffer();
-  if (body.byteLength === 0) {
-    return json({ error: 'Empty file', code: 'EMPTY_FILE' }, 400);
-  }
-  if (body.byteLength > LOGO_MAX_BYTES) {
-    return json({ error: 'Logo too large (max 512KB)', code: 'TOO_LARGE' }, 400);
-  }
+  const problem = logoProblem(contentType, body.byteLength);
+  if (problem) return json(problem, 400);
 
+  await storeWorkspaceLogo(env, workspaceId, current, body, contentType);
+  return json(brandingResponse(workspaceId, current));
+}
+
+/**
+ * Write logo bytes already checked with {@link logoProblem} and point the workspace at
+ * them. Mutates and saves `current`.
+ */
+export async function storeWorkspaceLogo(
+  env: Env,
+  workspaceId: string,
+  current: WorkspaceBranding,
+  body: ArrayBuffer | Uint8Array,
+  contentType: string,
+): Promise<void> {
+  const ext = logoExtFor(contentType);
   // Remove a prior logo with a different extension so stale bytes aren't served.
   if (current.logo_ext && current.logo_ext !== ext) {
     await env.ARTIFACTS.delete(`workspace-logos/${workspaceId}.${current.logo_ext}`);
   }
-
   await env.ARTIFACTS.put(`workspace-logos/${workspaceId}.${ext}`, body, {
     httpMetadata: { contentType, cacheControl: 'public, max-age=86400' },
   });
-
   current.logo_ext = ext;
   await saveBranding(env, workspaceId, current);
-  return json(brandingResponse(workspaceId, current));
 }
 
 export async function handleDeleteWorkspaceLogo(

@@ -136,16 +136,33 @@ export function instanceBody(cfg: InstanceConfig): string {
       kv('SETUP_ADMIN_EMAIL set', yesNo(cfg.admins.setup_admin_email)),
   );
 
-  // Both forms POST to endpoints that already existed with no caller.
+  // One step for a new customer: POST /v1/admin/workspaces/provision. Safe to re-run
+  // with the same slug — it fills in what is missing and duplicates nothing.
+  const check = (id: string, label: string, on: boolean) =>
+    `<label style="display:inline-flex;gap:var(--space-1);align-items:center"><input id="${id}" type="checkbox"${on ? ' checked' : ''}> ${label}</label>`;
   const createWorkspace = card(
-    'Create a workspace',
-    `<p class="sa-muted" style="margin-bottom:var(--space-3)">The owner does not have to exist yet — they land in it on first sign-in.</p>
-     <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;align-items:center">
+    'Provision a workspace',
+    `<p class="sa-muted" style="margin-bottom:var(--space-3)">Creates the workspace, applies branding and policy, adds starter folders and invites the admins in one step. The first admin owns it; nobody has to have signed in yet. Re-running with the same slug only fills in what is missing.</p>
+     <div style="display:grid;gap:var(--space-2);grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
        <input id="sa-ws-name" class="so-c-input" type="text" placeholder="Workspace name" autocomplete="off">
-       <input id="sa-ws-owner" class="so-c-input" type="email" placeholder="Owner email" autocomplete="off">
-       <input id="sa-ws-slug" class="so-c-input" type="text" placeholder="Slug (optional)" autocomplete="off">
-       <button id="sa-ws-create" class="so-c-btn so-c-btn--primary so-c-btn--sm" type="button">Create</button>
+       <input id="sa-ws-slug" class="so-c-input" type="text" placeholder="Slug / subdomain (e.g. acme)" autocomplete="off">
+       <select id="sa-ws-locale" class="so-c-select"><option value="es">Español</option><option value="en">English</option></select>
+       <input id="sa-ws-admins" class="so-c-input" type="text" placeholder="Admin emails, comma-separated" autocomplete="off">
+       <input id="sa-ws-domains" class="so-c-input" type="text" placeholder="Allowed email domains (optional)" autocomplete="off">
+       <input id="sa-ws-folders" class="so-c-input" type="text" placeholder="Starter folders, comma-separated" autocomplete="off">
+       <input id="sa-ws-accent" class="so-c-input" type="text" placeholder="Accent colour #RRGGBB (optional)" autocomplete="off">
+       <input id="sa-ws-logo" class="so-c-input" type="url" placeholder="Logo https:// URL (optional)" autocomplete="off">
      </div>
+     <div style="display:flex;gap:var(--space-3);flex-wrap:wrap;margin-top:var(--space-2)">
+       ${check('sa-ws-subdomain', 'Subdomain', true)}
+       ${check('sa-ws-external', 'External sharing', true)}
+       ${check('sa-ws-guest', 'Guest comments on starter folders', false)}
+       ${check('sa-ws-knowledge', 'Knowledge', false)}
+     </div>
+     <details style="margin-top:var(--space-2)"><summary class="sa-muted">Advanced: connectors, feature flags, hooks (JSON merged into the spec)</summary>
+       <textarea id="sa-ws-advanced" class="so-c-textarea" rows="5" style="width:100%;margin-top:var(--space-2)" placeholder='{"connectors":[…],"policy":{"features":{"ai.crew":false}},"templates":"…","custom_domain":"…"}'></textarea>
+     </details>
+     <div style="margin-top:var(--space-2)"><button id="sa-ws-create" class="so-c-btn so-c-btn--primary so-c-btn--sm" type="button">Provision</button></div>
      <div id="sa-ws-result" class="sa-muted" style="margin-top:var(--space-2)"></div>`,
   );
 

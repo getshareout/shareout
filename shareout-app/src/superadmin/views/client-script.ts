@@ -199,19 +199,36 @@ function initInstance() {
 
   const createBtn = document.getElementById('sa-ws-create');
   if (createBtn) createBtn.onclick = async () => {
-    const name = document.getElementById('sa-ws-name').value.trim();
-    const owner = document.getElementById('sa-ws-owner').value.trim();
-    const slug = document.getElementById('sa-ws-slug').value.trim();
+    const val = (id) => document.getElementById(id).value.trim();
+    const on = (id) => document.getElementById(id).checked;
+    const list = (id) => val(id).split(/[,;\n]+/).map((x) => x.trim()).filter(Boolean);
     const out = document.getElementById('sa-ws-result');
-    if (!name || !owner) { out.textContent = 'Name and owner email are both required.'; return; }
-    createBtn.disabled = true; out.textContent = 'Creating…';
+    const spec = {
+      name: val('sa-ws-name'), slug: val('sa-ws-slug'), locale: val('sa-ws-locale'),
+      admins: list('sa-ws-admins'), folders: list('sa-ws-folders'), subdomain: on('sa-ws-subdomain'),
+      policy: { external_sharing: on('sa-ws-external'), guest_comments: on('sa-ws-guest'), knowledge: on('sa-ws-knowledge') },
+    };
+    if (list('sa-ws-domains').length) spec.policy.allowed_domains = list('sa-ws-domains');
+    const branding = {};
+    if (val('sa-ws-accent')) branding.accent_color = val('sa-ws-accent');
+    if (val('sa-ws-logo')) branding.logo = { url: val('sa-ws-logo') };
+    if (Object.keys(branding).length) spec.branding = branding;
+    if (val('sa-ws-advanced')) {
+      let extra;
+      try { extra = JSON.parse(val('sa-ws-advanced')); } catch (e) { out.textContent = 'Advanced JSON does not parse: ' + e.message; return; }
+      Object.assign(spec, extra, { policy: Object.assign(spec.policy, extra.policy || {}) });
+    }
+    if (!spec.name || !spec.slug || !spec.admins.length) { out.textContent = 'Name, slug and at least one admin email are required.'; return; }
+    createBtn.disabled = true; out.textContent = 'Provisioning…';
     try {
-      const w = await api('POST', '/v1/admin/workspaces', slug ? { name, owner_email: owner, slug } : { name, owner_email: owner });
-      const at = w.slug ? ' at /@' + esc(w.slug) : '';
-      out.innerHTML = 'Created <strong>' + esc(w.name || name) + '</strong>' + at + ', owned by ' + esc(owner) + '.';
-      document.getElementById('sa-ws-name').value = '';
-      document.getElementById('sa-ws-owner').value = '';
-      document.getElementById('sa-ws-slug').value = '';
+      const r = await api('POST', '/v1/admin/workspaces/provision', spec);
+      const steps = r.steps.map((s) => '<li>' + esc(s.step) + ': <strong>' + esc(s.status) + '</strong>' + (s.error ? ' — ' + esc(s.error) : '') + '</li>').join('');
+      const admins = r.admins.map((a) => '<li>' + esc(a.email) + ' (' + esc(a.role) + '): ' + esc(a.status) + (a.email_sent === false ? ' — email not sent' : '') + '</li>').join('');
+      const next = r.next_steps.map((n) => '<li>' + esc(n) + '</li>').join('');
+      out.innerHTML = (r.created ? 'Created ' : 'Updated ') + '<strong>' + esc(r.workspace.name) + '</strong> in ' + esc(String(r.duration_ms)) + ' ms — ' +
+        '<a href="' + esc(r.links.home) + '" style="color:var(--color-primary)">open</a>' +
+        (r.links.subdomain ? ' · <a href="' + esc(r.links.subdomain) + '" style="color:var(--color-primary)">' + esc(r.links.subdomain) + '</a>' : '') +
+        '<ul>' + steps + '</ul><div>Admins</div><ul>' + admins + '</ul><div>Next steps</div><ul>' + next + '</ul>';
     } catch (e) { out.textContent = e.message; }
     createBtn.disabled = false;
   };
