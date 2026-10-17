@@ -27,6 +27,7 @@ language.
 | Home lenses | [../core/workspace-home.md](../core/workspace-home.md#workspace-lenses) | [SKILL.md](SKILL.md#workspace-admin-surfaces) |
 | Workspace Knowledge | [knowledge.md](knowledge.md) | [workspace-context.md](workspace-context.md) |
 | Asset library / deliverables | [assets.md](assets.md) | [../sdk/files.md](../sdk/files.md) |
+| Import folders from Google Drive / OneDrive / SharePoint | [file-imports.md](file-imports.md) | [assets.md](assets.md) |
 | Workspace file inbox | [assets.md](assets.md#add-files-without-opening-assets) | [workspace-assistant.md](workspace-assistant.md#file-attachments) |
 | Build a page from an uploaded file | [workspace-assistant.md](workspace-assistant.md#file-attachments) | [assets.md](assets.md) |
 | Home activity feed | [activity-feed.md](activity-feed.md) | [../core/workspace-home.md](../core/workspace-home.md) |
@@ -65,6 +66,7 @@ ShareOutSkill/team/
 ├── knowledge.md
 ├── agent-tokens.md
 ├── workspace-tables.md
+├── file-imports.md
 ├── folders.md
 └── external-sharing.md
 ```

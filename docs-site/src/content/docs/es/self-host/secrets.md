@@ -28,6 +28,8 @@ provisiona nombres; reemplazá IDs placeholder después del create si hace falta
 | Nombre | Tipo | Notas |
 |--------|------|--------|
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | secret | Habilita Google en `/auth/login`. Callback: `{SHAREOUT_BASE_URL}/auth/callback`. |
+| `GOOGLE_DRIVE_CLIENT_ID` / `GOOGLE_DRIVE_CLIENT_SECRET` | secret | Activa la importación de carpetas de Google Drive (solo lectura, `drive.readonly`, con su propio cliente OAuth, no el del login). Redirección: `{SHAREOUT_BASE_URL}/v1/file-imports/oauth/google_drive/callback`. Requiere `CREDENTIALS_KEY`. |
+| `MICROSOFT_FILES_CLIENT_ID` / `MICROSOFT_FILES_CLIENT_SECRET` / `MICROSOFT_FILES_TENANT` | secret / var | Activa la importación de OneDrive / SharePoint (delegados `Files.Read.All`, `Sites.Read.All`, `User.Read`, `offline_access`). Tenant por defecto `common`. Redirección: `{SHAREOUT_BASE_URL}/v1/file-imports/oauth/microsoft/callback`. |
 | — | — | **El login con contraseña no necesita configuración.** Está siempre disponible y es como `/setup` crea el primer admin. |
 | Binding `EMAIL` | binding | Habilita los códigos de un solo uso por email. Sin él, esos códigos solo llegan al log del worker. |
 | `EMAIL_DEFAULT_FROM` | var | From cuando Email está bound. |
