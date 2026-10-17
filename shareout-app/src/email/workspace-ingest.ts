@@ -98,7 +98,7 @@ export async function handleWorkspaceInbound(
   await notifyWorkspaceFileReceived(env, workspace, senderEmail, ingested);
 }
 
-async function notifyWorkspaceFileReceived(
+export async function notifyWorkspaceFileReceived(
   env: Env,
   workspace: WorkspaceRow,
   sender: string,
@@ -118,6 +118,7 @@ async function notifyWorkspaceFileReceived(
     SELECT u.id FROM workspace_members wm
     JOIN users u ON u.id = wm.user_id
     WHERE wm.workspace_id = ? AND wm.role IN ('owner', 'admin')
+      AND wm.member_class = 'internal' AND COALESCE(u.disabled, 0) = 0
   `).bind(workspace.id).all<{ id: string }>();
 
   await Promise.allSettled((admins.results || []).map(async (a) => {
