@@ -292,6 +292,7 @@ describe('createJob', () => {
     getUserRole.mockResolvedValueOnce('viewer');
     const env = dbEnv([
       { method: 'first', result: { id: artifactId } },
+      { method: 'first', result: { 1: 1 } }, // own linked Slack id
       { method: 'first', result: { count: 0 } },
       { method: 'first', result: { found: 1 } },
       { method: 'run' },
