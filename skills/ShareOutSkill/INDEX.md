@@ -67,6 +67,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Comment action items (assign to person, due date) | [sdk/comments.md](sdk/comments.md#action-items) | [team/activity-feed.md](team/activity-feed.md) |
 | Review a page: resolve/assign comments, approve a version | [sdk/comments.md](sdk/comments.md#review-mode) | [api/artifacts.md](api/artifacts.md#versions--restore) |
 | Version history, change notes, restore an older version | [api/artifacts.md](api/artifacts.md#versions--restore) | [integrations/mcp-connector.md](integrations/mcp-connector.md) |
+| Reuse a page or folder in another workspace (save as template, install, update) | [api/artifact-templates.md](api/artifact-templates.md) | [integrations/mcp-connector.md](integrations/mcp-connector.md) |
 | Multi-page site (several HTML files linked together) | [api/artifacts.md](api/artifacts.md#multi-page-sites-several-html-files) | [core/html-spec/pages.md](core/html-spec/pages.md#multiple-html-files-sites) |
 | Real-time collaboration | [sdk/realtime.md](sdk/realtime.md) | [modules/_shared/permissions.md](modules/_shared/permissions.md) |
 | File uploads | [sdk/blobs.md](sdk/blobs.md) | [patterns/uploads.md](patterns/uploads.md) |

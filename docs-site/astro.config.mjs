@@ -298,6 +298,7 @@ export default defineConfig({
 						{ label: 'Data catalog', slug: 'teams/catalog', translations: { es: 'Catálogo de datos' } },
 						{ label: 'Workspace Knowledge', slug: 'teams/knowledge', translations: { es: 'Conocimiento del workspace' } },
 						{ label: 'Workspace Library', slug: 'teams/libraries', translations: { es: 'Librería del workspace' } },
+						{ label: 'Templates', slug: 'teams/templates', translations: { es: 'Plantillas' } },
 						{ label: 'Homepage', slug: 'teams/homepage', translations: { es: 'Página de inicio' } },
 						{ label: 'Admin', slug: 'teams/admin', translations: { es: 'Administración' } },
 						{ label: 'Security & governance by plan', slug: 'teams/security-governance', translations: { es: 'Seguridad y gobernanza por plan' } },
