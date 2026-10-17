@@ -49,7 +49,8 @@ El spec (YAML o JSON):
 | `policy` | `allowed_domains`, `allowed_emails`, `external_sharing`, `guest_comments` (en las carpetas iniciales), `knowledge`, `features` (cualquier clave de `GET /v1/admin/features`). |
 | `folders` | Carpetas iniciales, p. ej. `[Clientes, Proveedores, Reportes]`. |
 | `connectors` | El mismo body que `POST /v1/workspaces/{id}/connections`. Escribí los secretos como `${ENV_VAR}`; la CLI los completa desde el entorno, así nunca quedan en el archivo. |
-| `templates`, `custom_domain` | Hooks. Salen como `pending` con el próximo paso hasta que la instancia tenga esas funciones; volvé a correr el spec cuando estén. |
+| `templates` | Instala una vez cada plantilla de la biblioteca de la instancia con esa etiqueta (al volver a correr, saltea las que el workspace ya tiene). `pending` si ninguna la lleva. |
+| `custom_domain` | Asocia el dominio al workspace y lo deja como principal cuando está activo. `pending` con los registros DNS hasta que se verifique, o mientras la instancia no tenga dominios propios activados; volvé a correr el spec para chequear. |
 | `if_exists` | `match` (default) adopta un slug existente solo si coincide el nombre; `update` lo adopta y renombra; `fail` lo rechaza. |
 
 **Se puede volver a correr.** La corrida se identifica por el slug: completa lo que

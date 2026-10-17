@@ -1,11 +1,10 @@
 /**
  * Extension points for provisioning steps whose features ship on their own.
  *
- * Template sets and custom domains are built separately. When either lands, its module
- * calls `registerProvisionHook('templates' | 'custom_domain', fn)` once at import time
- * (and is imported from the Worker graph), and every provisioning run from then on
- * installs it. Until then the step reports `pending` with the manual next step, so the
- * spec field can already be written and kept in the operator's spec file.
+ * Template sets and custom domains ship as built-in hooks (builtin-hooks.ts), used when
+ * nothing is registered here. `registerProvisionHook('templates' | 'custom_domain', fn)`
+ * overrides one (tests, or an instance that seeds workspaces differently). A hook that
+ * cannot act yet reports `pending` with the manual next step.
  *
  * A hook must be idempotent: provisioning re-runs the whole spec on every call.
  */

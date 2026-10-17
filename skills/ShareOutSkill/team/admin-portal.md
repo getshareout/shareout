@@ -53,8 +53,9 @@ Prefer `provision` for any new customer account. Minimal body:
   overwrites a stored connector credential.
 - Read `steps[]` (`created` / `updated` / `unchanged` / `skipped` / `pending` /
   `failed`), `admins[]` (`invite_url` appears only when the email did not go out) and
-  `next_steps[]`. `templates` and `custom_domain` stay `pending` until the instance has
-  those features.
+  `next_steps[]`. `templates` installs every instance-library template carrying that tag
+  (`pending` when none does); `custom_domain` attaches the hostname and stays `pending`
+  until its DNS records verify, or while custom domains are off on the instance.
 - Never put credential values in chat output or files you write; the response never
   echoes them. Operators can use `scripts/provision-workspace.mjs` with a YAML spec and
   `${ENV_VAR}` placeholders for secrets.

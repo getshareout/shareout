@@ -474,6 +474,8 @@ export async function installInfo(env: Env, artifactId: string) {
 export interface TemplateSetResult {
   installed: InstallResult[];
   failed: Array<{ template_id: string; error: string; code: string }>;
+  /** Already installed in the workspace (only with `skipInstalled`). */
+  skipped: string[];
 }
 
 /**
@@ -485,7 +487,7 @@ export interface TemplateSetResult {
 export async function installTemplateSet(
   env: Env,
   actor: AuthUser,
-  opts: { workspaceId: string; templateIds?: string[]; tag?: string; folderId?: string | null },
+  opts: { workspaceId: string; templateIds?: string[]; tag?: string; folderId?: string | null; skipInstalled?: boolean },
 ): Promise<TemplateSetResult> {
   let ids = [...new Set(opts.templateIds ?? [])];
   if (opts.tag) {
@@ -493,7 +495,15 @@ export async function installTemplateSet(
       .bind(`%${JSON.stringify(opts.tag.toLowerCase())}%`).all<{ id: string }>();
     ids = [...new Set([...ids, ...(rows.results || []).map((r) => r.id)])];
   }
-  const out: TemplateSetResult = { installed: [], failed: [] };
+  const out: TemplateSetResult = { installed: [], failed: [], skipped: [] };
+  // Re-runs (provisioning) leave templates the workspace already has alone.
+  if (opts.skipInstalled && ids.length) {
+    const have = await env.DB.prepare(`SELECT DISTINCT template_id FROM template_installs WHERE workspace_id = ? AND template_id IN (${ids.map(() => '?').join(',')})`)
+      .bind(opts.workspaceId, ...ids).all<{ template_id: string }>();
+    const already = new Set((have.results || []).map((r) => r.template_id));
+    out.skipped = ids.filter((id) => already.has(id));
+    ids = ids.filter((id) => !already.has(id));
+  }
   for (const id of ids) {
     try {
       out.installed.push(await installTemplate(env, actor, id, { workspaceId: opts.workspaceId, folderId: opts.folderId ?? null }, { trusted: true }));

@@ -28,6 +28,7 @@ import { fetchCheckingRedirects, isBlockedDestination } from '../../data/secrets
 import { getPlatformHostname, getPlatformOrigin } from '../../config/origins';
 import type { ProvisionSpec } from './spec';
 import { getProvisionHook, type ProvisionHookName } from './hooks';
+import { BUILTIN_PROVISION_HOOKS } from './builtin-hooks';
 
 export type StepStatus = 'created' | 'updated' | 'unchanged' | 'skipped' | 'pending' | 'failed';
 
@@ -360,15 +361,9 @@ async function stepConnectors(env: Env, ws: WorkspaceRow, actor: Actor, spec: Pr
   return out;
 }
 
-const HOOK_NEXT_STEP: Record<ProvisionHookName, (value: string) => string> = {
-  templates: (v) => `Install the "${v}" template set once templates are available on this instance (re-run this spec to apply it).`,
-  custom_domain: (v) => `Point ${v} at this instance and attach it to the workspace once custom domains are available (re-run this spec to apply it).`,
-};
-
 async function stepHook(name: ProvisionHookName, value: string | null, env: Env, ws: WorkspaceRow, actor: Actor, executionCtx?: ExecutionContext): Promise<StepResult | null> {
   if (value === null) return null;
-  const hook = getProvisionHook(name);
-  if (!hook) return { step: name, status: 'pending', detail: { value }, next_step: HOOK_NEXT_STEP[name](value) };
+  const hook = getProvisionHook(name) ?? BUILTIN_PROVISION_HOOKS[name];
   const r = await hook({ env, workspace: { id: ws.id, slug: ws.slug, name: ws.name }, actor, executionCtx }, value);
   return { step: name, status: r.status, detail: { value, ...(r.detail ?? {}) }, ...(r.next_step ? { next_step: r.next_step } : {}) };
 }

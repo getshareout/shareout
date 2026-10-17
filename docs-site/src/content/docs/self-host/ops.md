@@ -48,7 +48,8 @@ The spec (YAML or JSON):
 | `policy` | `allowed_domains`, `allowed_emails`, `external_sharing`, `guest_comments` (on the starter folders), `knowledge`, `features` (any key from `GET /v1/admin/features`). |
 | `folders` | Starter folders, e.g. `[Clientes, Proveedores, Reportes]`. |
 | `connectors` | Same body as `POST /v1/workspaces/{id}/connections`. Write secrets as `${ENV_VAR}`; the CLI fills them in from the environment so they never live in the file. |
-| `templates`, `custom_domain` | Hooks. Reported as `pending` with a next step until the instance has those features; re-run the spec once it does. |
+| `templates` | Installs every instance-library template tagged with this name, once (a re-run skips templates the workspace already has). `pending` when no template carries the tag. |
+| `custom_domain` | Attaches the hostname to the workspace and makes it primary once live. `pending` with the DNS records until it verifies, or while custom domains are off on the instance; re-run the spec to check again. |
 | `if_exists` | `match` (default) adopts an existing slug only if its name matches; `update` adopts and renames; `fail` refuses. |
 
 **Safe to re-run.** The run is keyed by slug: it fills in what is missing and reports

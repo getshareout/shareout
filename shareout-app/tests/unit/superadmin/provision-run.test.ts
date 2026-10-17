@@ -51,14 +51,14 @@ function spec(slug: string, extra: Record<string, unknown> = {}) {
   };
 }
 
-async function provision(body: unknown, as: { id: string; email: string } | null = OPS) {
+async function provision(body: unknown, as: { id: string; email: string } | null = OPS, on: Env = env) {
   h.session = as;
   const req = new Request('https://shareout.test/v1/admin/workspaces/provision', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
-  const res = (await routeAdminApi(createFetchContext(req, env)))!;
+  const res = (await routeAdminApi(createFetchContext(req, on)))!;
   const text = await res.text();
   return { status: res.status, text, body: JSON.parse(text) as Record<string, any> };
 }
@@ -226,6 +226,18 @@ describe('re-running the same spec', () => {
     const r = await provision(spec('hooked', { templates: 'starter' }));
     expect(hook).toHaveBeenCalledWith(expect.objectContaining({ workspace: expect.objectContaining({ slug: 'hooked' }) }), 'starter');
     expect((r.body.steps as any[]).find((s) => s.step === 'templates')).toMatchObject({ status: 'created', detail: { installed: 2 } });
+  });
+});
+
+describe('built-in hooks', () => {
+  it('attaches the custom domain once, pending until its DNS verifies', async () => {
+    const on = { ...env, CUSTOM_DOMAINS_CNAME_TARGET: 'customers.shareout.test' } as Env;
+    const first = await provision(spec('domained', { custom_domain: 'reports.domained.example.com' }), OPS, on);
+    const step = (first.body.steps as any[]).find((s) => s.step === 'custom_domain');
+    expect(step).toMatchObject({ status: 'pending', detail: { status: 'pending' } });
+    expect(step.detail.dns).toContainEqual(expect.objectContaining({ type: 'CNAME', value: 'customers.shareout.test' }));
+    await provision(spec('domained', { custom_domain: 'reports.domained.example.com' }), OPS, on);
+    expect(await count('SELECT COUNT(*) AS n FROM workspace_domains WHERE workspace_id = ?', await wsId('domained'))).toBe(1);
   });
 });
 
