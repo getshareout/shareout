@@ -12,6 +12,7 @@ import { oauthDenialMessage, userFacingWorkspaceOAuthError } from './errors';
 import { json, requireAdmin, requireMember, validateName } from './shared';
 import { persistWorkspaceOAuthConnection } from './oauth';
 import { getPlatformOrigin } from '../../../config/origins';
+import { readOAuthState, signOAuthState } from '../../helpers/oauth-state';
 
 /** Fixed Slack OAuth redirect path (workspaceId travels in state). */
 const SLACK_REDIRECT_PATH = '/v1/oauth/slack/callback';
@@ -43,7 +44,7 @@ export async function handleSlackInstall(
   }
   const returnUrl = url.searchParams.get('returnUrl') || '';
 
-  const state = btoa(JSON.stringify({ workspaceId, connectionName, returnUrl, ts: Date.now() }));
+  const state = await signOAuthState(env, user.id, { workspaceId, connectionName, returnUrl });
   const callbackUrl = slackCallbackUrl(env);
   const provider = getProvider('slack')!;
   const authUrl = await provider.getAuthUrl({
@@ -72,13 +73,8 @@ export async function handleSlackOAuthCallback(
     return renderWorkspaceConnectionCallbackPage(false, 'slack', 'Missing code or state');
   }
 
-  let state: { workspaceId: string; connectionName: string; returnUrl: string };
-  try {
-    state = JSON.parse(atob(stateParam));
-  } catch {
-    return renderWorkspaceConnectionCallbackPage(false, 'slack', 'Invalid state');
-  }
-  if (!state.workspaceId || !state.connectionName) {
+  const state = await readOAuthState<{ workspaceId: string; connectionName: string; returnUrl: string }>(env, stateParam, createdBy);
+  if (!state?.workspaceId || !state.connectionName || !createdBy || !(await requireAdmin(env, state.workspaceId, createdBy))) {
     return renderWorkspaceConnectionCallbackPage(false, 'slack', 'Invalid state');
   }
 

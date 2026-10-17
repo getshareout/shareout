@@ -30,6 +30,7 @@ import {
   handleWorkspaceOAuthCallback,
 } from '../../../src/router/api/workspace-connections/oauth';
 import { handleSlackOAuthCallback } from '../../../src/router/api/workspace-connections/slack';
+import { signOAuthState } from '../../../src/router/helpers/oauth-state';
 
 const e = env as unknown as Env;
 const WS = 'wsp_oauth';
@@ -45,6 +46,9 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await e.DB.exec('DELETE FROM connections');
+  await e.DB.exec('DELETE FROM workspace_members');
+  await e.DB.exec(`INSERT INTO workspace_members (id, workspace_id, user_id, role, member_class) VALUES ('m1','${WS}','usr_admin','admin','internal')`);
+  (e as { SESSION_SECRET?: string }).SESSION_SECRET = 'test-session-secret';
   logError.mockReset();
   hasProvider.mockReset().mockReturnValue(true);
   handleCallback.mockReset().mockResolvedValue({ accessToken: 'at', refreshToken: 'rt', expiresAt: null });
@@ -66,12 +70,12 @@ function slackCallbackReq(qs: string) {
 }
 
 function validState(overrides: Partial<{ workspaceId: string; connectionName: string; returnUrl: string }> = {}) {
-  return btoa(JSON.stringify({
+  return signOAuthState(e, 'usr_admin', {
     workspaceId: WS,
     connectionName: 'main',
     returnUrl: '',
     ...overrides,
-  }));
+  });
 }
 
 describe('handleWorkspaceOAuthCallback error handling', () => {
@@ -94,7 +98,7 @@ describe('handleWorkspaceOAuthCallback error handling', () => {
   it('returns HTML error when handleCallback throws — no internal leak', async () => {
     handleCallback.mockRejectedValueOnce(new Error('invalid_grant: Token has been expired or revoked'));
     const res = await handleWorkspaceOAuthCallback(
-      workspaceCallbackReq(`code=authcode&state=${encodeURIComponent(validState())}`),
+      workspaceCallbackReq(`code=authcode&state=${encodeURIComponent(await validState())}`),
       e,
       WS,
       'google-sheets',
@@ -111,7 +115,7 @@ describe('handleWorkspaceOAuthCallback error handling', () => {
   it('returns HTML error when credential persistence throws — no D1 leak', async () => {
     encryptCredentials.mockRejectedValueOnce(new Error('D1_ERROR: no such table: workspace_connections'));
     const res = await handleWorkspaceOAuthCallback(
-      workspaceCallbackReq(`code=authcode&state=${encodeURIComponent(validState())}`),
+      workspaceCallbackReq(`code=authcode&state=${encodeURIComponent(await validState())}`),
       e,
       WS,
       'google-sheets',
@@ -127,7 +131,7 @@ describe('handleWorkspaceOAuthCallback error handling', () => {
 
   it('returns HTML validation error for state workspace mismatch', async () => {
     const res = await handleWorkspaceOAuthCallback(
-      workspaceCallbackReq(`code=c&state=${encodeURIComponent(validState({ workspaceId: 'other' }))}`),
+      workspaceCallbackReq(`code=c&state=${encodeURIComponent(await validState({ workspaceId: 'other' }))}`),
       e,
       WS,
       'google-sheets',
@@ -151,7 +155,7 @@ describe('handleSlackOAuthCallback error handling', () => {
   it('returns HTML error when handleCallback throws — no Slack internals leak', async () => {
     handleCallback.mockRejectedValueOnce(new Error('Slack token exchange failed: invalid_code'));
     const res = await handleSlackOAuthCallback(
-      slackCallbackReq(`code=authcode&state=${encodeURIComponent(validState())}`),
+      slackCallbackReq(`code=authcode&state=${encodeURIComponent(await validState())}`),
       e,
       'usr_admin',
     );
@@ -164,7 +168,7 @@ describe('handleSlackOAuthCallback error handling', () => {
 
   it('returns HTML success with connected postMessage', async () => {
     const res = await handleSlackOAuthCallback(
-      slackCallbackReq(`code=authcode&state=${encodeURIComponent(validState())}`),
+      slackCallbackReq(`code=authcode&state=${encodeURIComponent(await validState())}`),
       e,
       'usr_admin',
     );

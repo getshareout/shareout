@@ -24,6 +24,8 @@ import {
   handleWorkspaceOAuthUrl,
   handleWorkspaceOAuthCallback,
 } from '../../../src/router/api/workspace-connections/oauth';
+import { handleSlackOAuthCallback } from '../../../src/router/api/workspace-connections/slack';
+import { signOAuthState } from '../../../src/router/helpers/oauth-state';
 
 const e = env as unknown as Env;
 const admin: AuthUser = { id: 'usr_admin', email: 'a@x.com', username: null };
@@ -47,6 +49,7 @@ beforeEach(async () => {
   await e.DB.exec(`INSERT INTO workspaces (id, name, owner_id, slug) VALUES ('${WS}','W','usr_admin','w')`);
   await e.DB.exec(`INSERT INTO workspace_members (id, workspace_id, user_id, role, member_class) VALUES ('m1','${WS}','usr_admin','admin','internal'),('m2','${WS}','usr_member','member','internal')`);
 
+  (e as { SESSION_SECRET?: string }).SESSION_SECRET = 'test-session-secret';
   hasProvider.mockReset().mockReturnValue(true);
   listProviders.mockReset().mockReturnValue([{ id: 'google-sheets' }]);
   getAuthUrl.mockReset().mockResolvedValue('https://accounts.google.com/o/oauth2/v2/auth?x=1');
@@ -106,7 +109,7 @@ describe('handleWorkspaceOAuthCallback', () => {
   });
 
   it('400s state workspace mismatch', async () => {
-    const state = btoa(JSON.stringify({ workspaceId: 'other', connectionName: 'main', returnUrl: '' }));
+    const state = await signOAuthState(e, 'usr_admin', { workspaceId: 'other', connectionName: 'main', returnUrl: '' });
     const res = await handleWorkspaceOAuthCallback(
       callbackReq(`code=c&state=${encodeURIComponent(state)}`),
       e,
@@ -120,7 +123,7 @@ describe('handleWorkspaceOAuthCallback', () => {
   });
 
   it('exchanges code and returns connected HTML', async () => {
-    const state = btoa(JSON.stringify({ workspaceId: WS, connectionName: 'main', returnUrl: '' }));
+    const state = await signOAuthState(e, 'usr_admin', { workspaceId: WS, connectionName: 'main', returnUrl: '' });
     const res = await handleWorkspaceOAuthCallback(
       callbackReq(`code=authcode&state=${encodeURIComponent(state)}`),
       e,
@@ -133,5 +136,46 @@ describe('handleWorkspaceOAuthCallback', () => {
     expect(handleCallback).toHaveBeenCalled();
     const html = await res.text();
     expect(html).toMatch(/Connected|opener|postMessage/i);
+  });
+});
+
+describe('connector OAuth state binding', () => {
+  const connections = async () => (await e.DB.prepare('SELECT COUNT(*) AS n FROM connections').first<{ n: number }>())?.n ?? 0;
+  const unsigned = (workspaceId: string) => btoa(JSON.stringify({ workspaceId, connectionName: 'main', returnUrl: '' }));
+
+  it('refuses an unsigned state on the provider callback', async () => {
+    (e as { CREDENTIALS_KEY?: string }).CREDENTIALS_KEY = 'test-key-32-chars-long-enough!!';
+    const res = await handleWorkspaceOAuthCallback(callbackReq(`code=c&state=${encodeURIComponent(unsigned(WS))}`), e, WS, 'google-sheets', 'usr_admin');
+    expect(res.status).toBe(400);
+    expect(handleCallback).not.toHaveBeenCalled();
+    expect(await connections()).toBe(0);
+  });
+
+  it('refuses a state issued to another user, and a signed-out callback', async () => {
+    const state = await signOAuthState(e, 'usr_admin', { workspaceId: WS, connectionName: 'main', returnUrl: '' });
+    for (const who of ['usr_member', null]) {
+      const res = await handleWorkspaceOAuthCallback(callbackReq(`code=c&state=${encodeURIComponent(state)}`), e, WS, 'google-sheets', who);
+      expect(res.status).toBe(400);
+    }
+    expect(handleCallback).not.toHaveBeenCalled();
+  });
+
+  it('refuses a state for a workspace the caller does not administer', async () => {
+    const state = await signOAuthState(e, 'usr_member', { workspaceId: WS, connectionName: 'main', returnUrl: '' });
+    const res = await handleWorkspaceOAuthCallback(callbackReq(`code=c&state=${encodeURIComponent(state)}`), e, WS, 'google-sheets', 'usr_member');
+    expect(res.status).toBe(400);
+    expect(handleCallback).not.toHaveBeenCalled();
+  });
+
+  it('Slack callback: refuses an unsigned state and a non-admin, accepts the issuing admin', async () => {
+    (e as { CREDENTIALS_KEY?: string }).CREDENTIALS_KEY = 'test-key-32-chars-long-enough!!';
+    const slack = (qs: string) => new Request(`https://shareout.site/v1/oauth/slack/callback?${qs}`);
+    expect((await handleSlackOAuthCallback(slack(`code=c&state=${encodeURIComponent(unsigned(WS))}`), e, 'usr_admin')).status).toBe(400);
+    const memberState = await signOAuthState(e, 'usr_member', { workspaceId: WS, connectionName: 'slack', returnUrl: '' });
+    expect((await handleSlackOAuthCallback(slack(`code=c&state=${encodeURIComponent(memberState)}`), e, 'usr_member')).status).toBe(400);
+    expect(handleCallback).not.toHaveBeenCalled();
+    const adminState = await signOAuthState(e, 'usr_admin', { workspaceId: WS, connectionName: 'slack', returnUrl: '' });
+    await handleSlackOAuthCallback(slack(`code=c&state=${encodeURIComponent(adminState)}`), e, 'usr_admin');
+    expect(handleCallback).toHaveBeenCalledTimes(1);
   });
 });

@@ -12,6 +12,7 @@ import { createLogger, logError } from '../../../logging';
 import { renderWorkspaceConnectionCallbackPage } from './callback-page';
 import { oauthDenialMessage, userFacingWorkspaceOAuthError } from './errors';
 import { json, requireAdmin, validateName } from './shared';
+import { readOAuthState, signOAuthState } from '../../helpers/oauth-state';
 
 // GET /v1/workspaces/{id}/connections/{provider}/auth-url — start OAuth
 export async function handleWorkspaceOAuthUrl(
@@ -39,7 +40,7 @@ export async function handleWorkspaceOAuthUrl(
   }
   const returnUrl = url.searchParams.get('returnUrl') || '';
 
-  const state = btoa(JSON.stringify({ workspaceId, connectionName, returnUrl, ts: Date.now() }));
+  const state = await signOAuthState(env, user.id, { workspaceId, connectionName, returnUrl });
   const callbackUrl = `${url.origin}/v1/workspaces/${workspaceId}/connections/${providerId}/callback`;
 
   const provider = getProvider(providerId)!;
@@ -79,10 +80,8 @@ export async function handleWorkspaceOAuthCallback(
     return renderWorkspaceConnectionCallbackPage(false, providerId, 'Missing code or state');
   }
 
-  let state: { workspaceId: string; connectionName: string; returnUrl: string };
-  try {
-    state = JSON.parse(atob(stateParam));
-  } catch {
+  const state = await readOAuthState<{ workspaceId: string; connectionName: string; returnUrl: string }>(env, stateParam, createdBy);
+  if (!state || !createdBy || !(await requireAdmin(env, workspaceId, createdBy))) {
     return renderWorkspaceConnectionCallbackPage(false, providerId, 'Invalid state');
   }
 

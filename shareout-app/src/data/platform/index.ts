@@ -1,4 +1,5 @@
 import type { DataContext } from '../middleware';
+import { readOAuthState, signOAuthState } from '../../router/helpers/oauth-state';
 import { successResponse, errorResponse, verifyOwner, verifyWorkspaceConnectionAccess, verifyPerUserPlatformConnectionQuery, resolveRequesterUserId } from '../middleware';
 import { PlatformEngine } from './core/engine';
 import { getProvider, listProviders, hasProvider } from './registry';
@@ -256,6 +257,8 @@ async function handleUsageRequest(request: Request, ctx: DataContext): Promise<R
 	return successResponse({ recorded: true });
 }
 
+const OWNER_ONLY = { code: 'FORBIDDEN', message: 'Only the artifact owner can connect a provider', status: 403 };
+
 async function handleProviderRequest(
 	request: Request,
 	ctx: DataContext,
@@ -277,15 +280,15 @@ async function handleProviderRequest(
 
 	if (path[0] === 'auth-url') {
 		if (method === 'GET') {
+			if (!ctx.artifact.owner_id || !(await verifyOwner(request, ctx))) return errorResponse(OWNER_ONLY);
 			const url = new URL(request.url);
 			const connectionName = url.searchParams.get('connection');
 			const returnUrl = url.searchParams.get('returnUrl') || '';
 
-			const state = JSON.stringify({
+			const state = await signOAuthState(ctx.env, ctx.artifact.owner_id, {
 				artifactId: ctx.artifactId,
 				connectionName,
 				returnUrl,
-				ts: Date.now(),
 			});
 
 			const callbackUrl = `${url.origin}/v1/data/${ctx.artifactId}/platform/${providerId}/callback`;
@@ -294,7 +297,7 @@ async function handleProviderRequest(
 				artifactId: ctx.artifactId,
 				connectionId: '',
 				callbackUrl,
-				state: btoa(state),
+				state,
 				params: Object.fromEntries(url.searchParams),
 				env: ctx.env,
 			});
@@ -319,10 +322,9 @@ async function handleProviderRequest(
 				return renderPlatformConnectionCallbackPage(false, providerId, 'Missing code or state');
 			}
 
-			let state: { artifactId: string; connectionName: string; returnUrl: string };
-			try {
-				state = JSON.parse(atob(stateParam));
-			} catch {
+			const ownerId = ctx.artifact.owner_id && (await verifyOwner(request, ctx)) ? ctx.artifact.owner_id : null;
+			const state = await readOAuthState<{ artifactId: string; connectionName: string; returnUrl: string }>(ctx.env, stateParam, ownerId);
+			if (!state) {
 				return renderPlatformConnectionCallbackPage(false, providerId, 'Invalid state');
 			}
 
