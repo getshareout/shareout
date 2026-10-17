@@ -13,7 +13,9 @@ import {
   mockPlatformDb,
   parseJson,
   publicArtifactEnv,
+  PLATFORM_OWNER_ID,
 } from './helpers';
+import { signOAuthState } from '../../../../src/router/helpers/oauth-state';
 import * as middleware from '../../../../src/data/middleware';
 
 // Connection mutations are owner-gated; authenticate as owner for lifecycle tests.
@@ -248,6 +250,8 @@ describe('handlePlatformRequest', () => {
     }), { status: 200 })));
 
     const ctx = makeDataContext(publicArtifactEnv({}, { run: () => ({ meta: { changes: 1 } }) }));
+    asOwner();
+    (ctx.env as { SESSION_SECRET?: string }).SESSION_SECRET = 'test-session-secret';
     const authUrl = await handlePlatformRequest(
       new Request(`${BASE_URL}/google-sheets/auth-url?connection=my-conn&returnUrl=/done`, { method: 'GET' }),
       ctx,
@@ -255,12 +259,7 @@ describe('handlePlatformRequest', () => {
     );
     expect((await parseJson(authUrl)).data.authUrl).toContain('accounts.google.com');
 
-    const state = btoa(JSON.stringify({
-      artifactId: ARTIFACT_ID,
-      connectionName: 'my-conn',
-      returnUrl: '/done',
-      ts: Date.now(),
-    }));
+    const state = await signOAuthState(ctx.env, PLATFORM_OWNER_ID, { artifactId: ARTIFACT_ID, connectionName: 'my-conn', returnUrl: '/done' });
 
     const callback = await handlePlatformRequest(
       new Request(`${BASE_URL}/google-sheets/callback?code=abc&state=${encodeURIComponent(state)}`, {
@@ -471,12 +470,9 @@ describe('handlePlatformRequest', () => {
       },
     });
 
-    const state = btoa(JSON.stringify({
-      artifactId: ARTIFACT_ID,
-      connectionName: 'shop-conn',
-      returnUrl: '/',
-      ts: Date.now(),
-    }));
+    asOwner();
+    (env as { SESSION_SECRET?: string }).SESSION_SECRET = 'test-session-secret';
+    const state = await signOAuthState(env, PLATFORM_OWNER_ID, { artifactId: ARTIFACT_ID, connectionName: 'shop-conn', returnUrl: '/' });
 
     const response = await handlePlatformRequest(
       new Request(`${BASE_URL}/shopify/callback?code=abc&state=${encodeURIComponent(state)}&shop=demo.myshopify.com`, {
@@ -497,5 +493,19 @@ describe('handlePlatformRequest', () => {
       ['google-sheets', 'unknown-path'],
     );
     expect(response.status).toBe(404);
+  });
+});
+
+describe('platform OAuth owner binding', () => {
+  it('refuses auth-url and callback for a caller who is not the owner', async () => {
+    vi.spyOn(middleware, 'verifyOwner').mockResolvedValue(false);
+    const env = publicArtifactEnv({}, { run: () => ({ meta: { changes: 1 } }) });
+    (env as { SESSION_SECRET?: string }).SESSION_SECRET = 'test-session-secret';
+    const ctx = makeDataContext(env);
+    const authUrl = await handlePlatformRequest(new Request(`${BASE_URL}/google-sheets/auth-url?connection=c`), ctx, ['google-sheets', 'auth-url']);
+    expect(authUrl.status).toBe(403);
+    const state = await signOAuthState(env, PLATFORM_OWNER_ID, { artifactId: ARTIFACT_ID, connectionName: 'c', returnUrl: '' });
+    const cb = await handlePlatformRequest(new Request(`${BASE_URL}/google-sheets/callback?code=x&state=${encodeURIComponent(state)}`), ctx, ['google-sheets', 'callback']);
+    expect(await cb.text()).toContain('Invalid state');
   });
 });

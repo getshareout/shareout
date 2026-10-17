@@ -29,6 +29,11 @@ function makeEnv(tokens: TokenRow[], disabledUsers = new Set<string>()) {
   const live = (t: TokenRow) => !t.revoked && (!t.expires_at || t.expires_at > new Date().toISOString());
   const type = (t: TokenRow) => t.principal_type ?? 'user';
   const db = {
+    batch: async (stmts: Array<{ run: () => Promise<unknown> }>) => {
+      const out: unknown[] = [];
+      for (const st of stmts) out.push(await st.run());
+      return out;
+    },
     prepare: vi.fn((sql: string) => ({
       bind: (...args: unknown[]) => ({
         first: async () => {

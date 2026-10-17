@@ -95,6 +95,8 @@ export function publicArtifactEnv(
   } as Env;
 }
 
+export const PLATFORM_OWNER_ID = 'usr_platform_owner';
+
 export function makeDataContext(env: Env, origin: string | null = 'https://app.example.com'): DataContext {
   return {
     artifactId: ARTIFACT_ID,
@@ -103,6 +105,7 @@ export function makeDataContext(env: Env, origin: string | null = 'https://app.e
       name: 'Platform Test Artifact',
       visibility: 'public',
       auth_method: null,
+      owner_id: PLATFORM_OWNER_ID,
     },
     env,
     origin,

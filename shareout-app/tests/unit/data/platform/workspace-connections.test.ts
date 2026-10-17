@@ -537,6 +537,7 @@ describe('summarizeCredentials', () => {
       ...makeEnv({ role: 'owner' }),
       SLACK_CLIENT_ID: 'cid',
       SHAREOUT_BASE_URL: 'https://shareout.site',
+      SESSION_SECRET: 'test-session-secret',
     } as unknown as Env;
     // Install initiated from a workspace subdomain — request origin is NOT the apex.
     const req = new Request('https://acme.shareout.site/v1/workspaces/wsp_team/connections/slack/install?connection=slack');
