@@ -7,7 +7,7 @@ import { getSessionUser } from '../auth/session';
 import { getVisibilityScope } from '../account-links';
 import { renderHtmlPage } from '../design-system/shell';
 import { escapeHtml } from '../html/utils';
-import { listGrantedArtifacts, listGrantedFiles, resolvePortalBranding, resolvePortalFolder } from './portal';
+import { listGrantedArtifacts, listGrantedFiles, resolvePortalBranding, resolvePortalFolder, type GrantedArtifact, type GrantedFile } from './portal';
 
 const PORTAL_STYLES = `
   .pt-wrap { max-width: 880px; margin: 0 auto; padding: var(--space-12) var(--space-6); }
@@ -60,14 +60,45 @@ export async function handleSharedPortal(request: Request, env: Env): Promise<Re
   const inFolder = (fid: string | null) => !folder || (!!fid && folder.subtree.has(fid));
   const artifacts = allArtifacts.filter(a => inFolder(a.folder_id));
   const files = allFiles.filter(f => inFolder(f.folderId));
-  const total = artifacts.length + files.length;
 
-  const accent = branding?.color;
-  const scopeTitle = folder?.name || 'Shared with you';
-  const headerTitle = branding?.shareeName ? `${branding.shareeName} · ${scopeTitle}` : scopeTitle;
   const back = folder ? '<a class="pt-back" href="/shared">&larr; Shared with you</a>' : '';
-  const logo = branding?.logo
-    ? `<img class="pt-logo" src="${escapeHtml(branding.logo)}" alt="${escapeHtml(branding.shareeName ?? '')}">`
+  const scopeTitle = folder?.name || 'Shared with you';
+  return renderPortal({
+    title: branding?.shareeName ? `${branding.shareeName} · ${scopeTitle}` : scopeTitle,
+    accent: branding?.color ?? null,
+    logo: branding?.logo ?? null,
+    logoAlt: branding?.shareeName ?? '',
+    back,
+    artifacts,
+    files,
+  });
+}
+
+export interface PortalView {
+  title: string;
+  accent: string | null;
+  logo: string | null;
+  logoAlt: string;
+  back: string;
+  artifacts: Array<Pick<GrantedArtifact, 'slug' | 'name' | 'workspace_name'>>;
+  files: Array<Pick<GrantedFile, 'id' | 'name' | 'filename' | 'workspace_name' | 'contentPath' | 'bucketId'>>;
+  /** Trusted extra HTML under the header (the guest's sign-out line). */
+  note?: string;
+  /** Hide the per-file comment box (a view-only guest). */
+  readOnly?: boolean;
+  /** Extra page styles. */
+  styles?: string;
+}
+
+/** The portal page itself, shared by signed-in externals and space guests. */
+export function renderPortal(v: PortalView): Response {
+  const { artifacts, files } = v;
+  const total = artifacts.length + files.length;
+  const accent = v.accent;
+  const headerTitle = v.title;
+  const back = v.back;
+  const logo = v.logo
+    ? `<img class="pt-logo" src="${escapeHtml(v.logo)}" alt="${escapeHtml(v.logoAlt)}">`
     : '';
 
   const artifactCards = artifacts.map(a => `
@@ -106,6 +137,7 @@ export async function handleSharedPortal(request: Request, env: Env): Promise<Re
   // Lazy-loaded on toggle; only emitted when files are present.
   const fileScript = files.length ? `
       <script>(function(){
+        var RO=${v.readOnly ? 'true' : 'false'};
         function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
         function base(c){return '/v1/data/'+encodeURIComponent(c.getAttribute('data-bucket'))+'/comments';}
         function ctx(c){return 'file:'+c.getAttribute('data-dlv');}
@@ -131,7 +163,8 @@ export async function handleSharedPortal(request: Request, env: Env): Promise<Re
               if(!res.ok){th.innerHTML='<div class="pt-cmt-empty">'+esc(errMsg(res.j))+'</div>';return;}
               var cs=commentsOf(res.j);
               var list=cs.length?cs.map(function(c){return '<div class="pt-cmt"><span class="pt-cmt-author">'+esc(c.authorName)+'</span> '+esc(c.content)+'</div>';}).join(''):'<div class="pt-cmt-empty">No comments yet.</div>';
-              th.innerHTML=list+'<div class="pt-cmt-box"><textarea class="pt-cmt-in" rows="2" placeholder="Add a comment…"></textarea><button class="so-c-btn so-c-btn--primary so-c-btn--sm" type="button">Send</button><div class="pt-cmt-msg"></div></div>';
+              th.innerHTML=list+(RO?'':'<div class="pt-cmt-box"><textarea class="pt-cmt-in" rows="2" placeholder="Add a comment…"></textarea><button class="so-c-btn so-c-btn--primary so-c-btn--sm" type="button">Send</button><div class="pt-cmt-msg"></div></div>');
+              if(RO)return;
               var send=th.querySelector('.pt-cmt-box .so-c-btn'),inp=th.querySelector('.pt-cmt-in'),msg=th.querySelector('.pt-cmt-msg');
               send.addEventListener('click',function(){
                 var v=inp.value.trim();if(!v)return;
@@ -161,6 +194,7 @@ export async function handleSharedPortal(request: Request, env: Env): Promise<Re
           <p class="pt-sub">${total} item${total === 1 ? '' : 's'} shared with you</p>
         </div>
       </div>
+      ${v.note ?? ''}
       ${welcome}
       ${cards}
     </div>${fileScript}`;
@@ -168,7 +202,7 @@ export async function handleSharedPortal(request: Request, env: Env): Promise<Re
   return renderHtmlPage({
     title: headerTitle,
     description: 'Resources shared with you on ShareOut.',
-    pageStyles: PORTAL_STYLES,
+    pageStyles: PORTAL_STYLES + (v.styles ?? ''),
     body,
     cacheControl: 'no-store',
   });

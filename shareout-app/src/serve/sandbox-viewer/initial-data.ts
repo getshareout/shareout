@@ -3,6 +3,7 @@ import { createAccessToken } from '../../token';
 import type { AdminInfo, InitialJsonData, InitialTableData } from '../types';
 import type { ViewerUser } from './types';
 import { serializeForInlineScript } from './serialize';
+import { mintSpaceGuestAccessToken, type SpaceGuest } from '../../sharees/space-guest';
 
 export interface InitialViewerData {
   payload: Record<string, unknown>;
@@ -26,6 +27,9 @@ export async function buildInitialViewerData(
   // Prefetched alongside the rest of the per-view batch so it no longer adds a
   // sequential D1 round-trip here.
   profile: { name: string | null; picture: string | null } | null,
+  // A space guest (no account): gets a grant-bound token instead of a viewer token, so
+  // every data call the page makes re-checks the grant.
+  spaceGuest: SpaceGuest | null = null,
 ): Promise<InitialViewerData> {
   const initialData: Record<string, unknown> = {
     artifactId,
@@ -69,6 +73,8 @@ export async function buildInitialViewerData(
       name: currentUser.name,
       picture: currentUser.picture,
     };
+  } else if (spaceGuest) {
+    initialData.sessionToken = await mintSpaceGuestAccessToken(env, artifactId, spaceGuest);
   }
 
   const serialized = serializeForInlineScript(initialData);

@@ -21,6 +21,8 @@ import {
 } from '../pages/integrations-discovery';
 import { handleUserHomePage } from '../pages/home/handler';
 import { handleSharedPortal } from '../sharees/portal-page';
+import { handleSpaceGuestPortal, renderSpaceGuestSignIn } from '../sharees/space-guest-page';
+import { handleSpaceGuestAccept, handleSpaceGuestCode, handleSpaceGuestSignOut, handleSpaceGuestVerify } from '../sharees/space-guest';
 import { handleInviteAcceptPage, handleInviteJoinPage } from '../workspaces/invite-accept-page';
 import { renderTelegramConnectPage, telegramDeepLinkRedirect } from '../pages/telegram-connect';
 import { handleSlackConnectPost, renderSlackConnectPage } from '../pages/slack-connect';
@@ -274,8 +276,25 @@ export async function routeServe(ctx: FetchContext): Promise<Response | null> {
 
   // External-sharing spine (work/030) Phase 4: the external member's "shared with me"
   // portal — only the artifacts they were granted, branded by their Sharee.
+  // Space guests (no account): a live guest session for this folder wins; anyone without
+  // a session gets the neutral guest sign-in card for a folder link (same page for every id).
+  if (path.startsWith('/shared/guest/')) {
+    const sub = path.slice('/shared/guest/'.length);
+    if (sub === 'accept' && request.method === 'GET') return handleSpaceGuestAccept(request, env);
+    if (request.method === 'POST') {
+      if (sub === 'code') return handleSpaceGuestCode(request, env);
+      if (sub === 'verify') return handleSpaceGuestVerify(request, env);
+      if (sub === 'signout') return handleSpaceGuestSignOut(request, env);
+    }
+  }
   if (path === '/shared' && request.method === 'GET') {
+    const folderParam = url.searchParams.get('folder');
+    if (folderParam) {
+      const guestPortal = await handleSpaceGuestPortal(request, env, folderParam);
+      if (guestPortal) return guestPortal;
+    }
     const sessionUser = await getSessionUser(request, env);
+    if (!sessionUser && folderParam) return renderSpaceGuestSignIn(request, folderParam);
     if (!sessionUser) {
       return Response.redirect(new URL('/auth/login?redirect=' + (url.search ? encodeURIComponent('/shared' + url.search) : '/shared'), url.origin).toString(), 302);
     }

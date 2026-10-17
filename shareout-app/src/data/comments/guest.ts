@@ -88,10 +88,10 @@ export async function verifyGuestToken(secret: string, token: string, artifactId
   }
 }
 
-/** CSRF gate for cookie-authenticated guest writes: the request must come from a page on
- *  this instance (same origin, the platform origin, or one of its subdomains). A missing
+/** CSRF gate for cookie-authenticated guest writes (comment guests and space guests): the
+ *  request must come from a page on this instance (same origin, the platform origin, or one of its subdomains). A missing
  *  or opaque ("null") Origin — a sandboxed artifact, another site — fails. */
-export function isTrustedGuestOrigin(request: Request, ctx: DataContext): boolean {
+export function isTrustedGuestOrigin(request: Request, ctx: Pick<DataContext, 'env'>): boolean {
   const origin = request.headers.get('Origin');
   if (!origin || origin === 'null') return false;
   try {
@@ -190,6 +190,11 @@ async function artifactTitle(ctx: DataContext): Promise<string> {
 /** `/_guest` — GET status, POST `code` (send a code), POST `verify` (code → cookie), DELETE (sign out). */
 export async function handleGuest(request: Request, ctx: DataContext, config: CommentsConfig, sub: string | undefined): Promise<Response> {
   const method = request.method.toUpperCase();
+
+  // A space guest with a comment grant is already verified for every page in its space.
+  if (!sub && method === 'GET' && ctx.spaceGuest?.capability === 'comment') {
+    return successResponse({ enabled: true, guest: { name: ctx.spaceGuest.name }, space: true });
+  }
 
   if (!sub && method === 'GET') {
     const enabled = await guestCommentsOpen(request, ctx, config);

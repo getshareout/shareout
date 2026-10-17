@@ -63,6 +63,16 @@ export async function validateIdentity(
   const session = await getSession(request, ctx);
   if (session) return { authorId: session.userId, authorName: session.name || session.email };
 
+  // A space guest comments as the identity it already verified for the space — no second
+  // email code — but only with a 'comment' grant.
+  const sg = ctx.spaceGuest;
+  if (sg) {
+    if (sg.capability !== 'comment') {
+      return errorResponse({ code: 'FORBIDDEN', message: 'You can view this space but not comment on it', status: 403 });
+    }
+    return { authorId: null, authorName: sg.name, guest: { name: sg.name, emailHash: sg.emailHash, key: `${ctx.artifactId}:${sg.emailHash}` } };
+  }
+
   if (await guestCommentsOpen(request, ctx, config)) {
     const guest = await resolveGuest(request, ctx);
     if (guest) return { authorId: null, authorName: guest.name, guest };

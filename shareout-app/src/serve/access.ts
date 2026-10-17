@@ -7,6 +7,7 @@ import { getVisibilityScope, placeholders } from '../account-links';
 import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { canAccess } from '../access/can-access';
 import { recordShareeView } from '../sharees/activity';
+import { recordSpaceGuestView, spaceGuestFor } from '../sharees/space-guest';
 import { getPendingAccessRequest } from '../artifacts/access-requests';
 import type { ArtifactInfo } from './types';
 
@@ -78,6 +79,7 @@ export async function checkAccess(
   const user = await getSessionUser(request, env);
 
   if (!user) {
+    if (await spaceGuestAllowed(request, env, artifact)) return null;
     const sharedBy = await resolveSharedBy(env, artifact);
     return loginPage(
       slug,
@@ -141,6 +143,9 @@ export async function checkAccess(
     return null;
   }
 
+  // A signed-in person who also holds a space-guest session for this artifact's space.
+  if (await spaceGuestAllowed(request, env, artifact)) return null;
+
   const pendingRequest = user
     ? await getPendingAccessRequest(env, artifact.artifact_id, user.id)
     : null;
@@ -150,6 +155,14 @@ export async function checkAccess(
     userEmail: user?.email,
     requestPending: !!pendingRequest,
   });
+}
+
+/** A live space-guest session whose granted folder holds this artifact (logs the view). */
+async function spaceGuestAllowed(request: Request, env: Env, artifact: ArtifactInfo): Promise<boolean> {
+  const guest = await spaceGuestFor(request, env, 'artifact', artifact.artifact_id, 'view');
+  if (!guest) return false;
+  await recordSpaceGuestView(env, guest, 'artifact', artifact.artifact_id);
+  return true;
 }
 
 /** The gated URL itself (path + query), so sign-in lands back on the exact page — only for the artifact's own viewer path. */
