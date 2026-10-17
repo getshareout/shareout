@@ -483,6 +483,10 @@ erDiagram
 | `knowledge_ingest` | Queue of artifacts awaiting knowledge extraction, deduped by `content_hash`. |
 | `knowledge_settings` | Per-workspace enable flag and `last_consolidated_at`. |
 | `knowledge_tombstones` | Paths deliberately forgotten, so re-ingestion does not resurrect them. |
+| `file_import_connections` | One member's read-only consent to a cloud drive (`provider` Google Drive or Microsoft) inside one workspace — separate from signing in. Tokens are one AES-GCM blob in `encrypted_credentials` + `iv`; never returned to clients. |
+| `file_import_sources` | A remote folder mirrored into the workspace: where it lives (`remote_drive_id`, `remote_folder_id`), the ShareOut `target_folder_id`, `convert_enabled`, and the optional daily sync (`daily_sync_enabled`, `next_sync_at`). `connection_id` goes NULL on disconnect, which stops syncing. |
+| `file_import_runs` | One pass over a source: `status`, the progress counts (found, imported, converted, skipped, unchanged, failed) and why it stopped (`stop_code`). |
+| `file_import_items` | The idempotency ledger: each remote folder/file (`remote_id`) and what it became here (`folder_id`, `deliverable_id`, `artifact_id`). A re-run imports a file only when `remote_version` differs from `synced_version`. |
 
 ## 14 Moderation, support & tests
 

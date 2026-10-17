@@ -310,29 +310,35 @@ export interface DirectIngestResult {
   mimeType?: string;
   sizeBytes?: number;
   error?: string;
+  /** Why it failed: INVALID_FILE, FILE_TOO_LARGE (this file only), or a full store —
+   *  BUCKET_FULL / STORAGE_QUOTA_EXCEEDED — where every later file would fail too. */
+  code?: 'INVALID_FILE' | 'FILE_TOO_LARGE' | 'BUCKET_FULL' | 'STORAGE_QUOTA_EXCEEDED' | 'WRITE_FAILED';
 }
 
 /**
  * Server-side blob creation into an asset bucket — no upload token, bytes in hand.
- * Used by email-in ingestion and the PWA share_target handler. Enforces the same
- * filename/MIME validation, bucket limits, and workspace quota as the upload path.
+ * Used by email-in ingestion, the PWA share_target handler and cloud-drive imports.
+ * Enforces the same filename/MIME validation, bucket limits, and workspace quota as
+ * the upload path. `stream` + `size` writes a large file to R2 without buffering it;
+ * the stream must deliver exactly `size` bytes.
  */
 export async function ingestBlobDirect(
   env: Env,
   artifactId: string,
-  file: { filename: string; mimeType?: string; bytes: ArrayBuffer }
+  file: { filename: string; mimeType?: string; bytes?: ArrayBuffer; stream?: ReadableStream<Uint8Array>; size?: number }
 ): Promise<DirectIngestResult> {
   const filenameError = validateFilename(file.filename);
-  if (filenameError) return { ok: false, error: filenameError };
+  if (filenameError) return { ok: false, error: filenameError, code: 'INVALID_FILE' };
 
   let mimeType = file.mimeType || '';
   if (!mimeType || mimeType === 'application/octet-stream' || !isAllowedMimeType(mimeType, true)) {
     mimeType = mimeFromFilename(file.filename);
   }
 
-  const size = file.bytes.byteLength;
+  const size = file.bytes ? file.bytes.byteLength : (file.size ?? -1);
+  if (size < 0 || (!file.bytes && !file.stream)) return { ok: false, error: 'File size unknown', code: 'INVALID_FILE' };
   if (size > BUCKET_FILE_SIZE) {
-    return { ok: false, error: `File too large (max ${BUCKET_FILE_SIZE / 1_000_000}MB)` };
+    return { ok: false, error: `File too large (max ${BUCKET_FILE_SIZE / 1_000_000}MB)`, code: 'FILE_TOO_LARGE' };
   }
 
   const storage = await env.DB.prepare(
@@ -340,17 +346,29 @@ export async function ingestBlobDirect(
   ).bind(artifactId).first<StorageRow>()
     ?? { artifact_id: artifactId, used_bytes: 0, blob_count: 0 };
 
-  if (storage.blob_count >= BUCKET_BLOBS) return { ok: false, error: 'Bucket blob limit reached' };
-  if (storage.used_bytes + size > BUCKET_STORAGE) return { ok: false, error: 'Bucket storage limit reached' };
+  if (storage.blob_count >= BUCKET_BLOBS) return { ok: false, error: 'Bucket blob limit reached', code: 'BUCKET_FULL' };
+  if (storage.used_bytes + size > BUCKET_STORAGE) return { ok: false, error: 'Bucket storage limit reached', code: 'BUCKET_FULL' };
 
   const wsQuota = await checkStorageQuota(env, artifactId, size);
-  if (!wsQuota.allowed) return { ok: false, error: storageQuotaError(wsQuota).message };
+  if (!wsQuota.allowed) {
+    return { ok: false, error: storageQuotaError(wsQuota).message, code: wsQuota.reason === 'file_too_large' ? 'FILE_TOO_LARGE' : 'STORAGE_QUOTA_EXCEEDED' };
+  }
 
   const now = new Date().toISOString();
   const blobId = generateId('blob');
   const r2Key = `${artifactId}/blobs/${blobId}/${file.filename}`;
 
-  await env.ARTIFACTS.put(r2Key, file.bytes, { httpMetadata: { contentType: mimeType } });
+  let body: ArrayBuffer | ReadableStream = file.bytes as ArrayBuffer;
+  if (!file.bytes) {
+    const fixed = new FixedLengthStream(size);
+    file.stream!.pipeTo(fixed.writable).catch(() => {});
+    body = fixed.readable;
+  }
+  try {
+    await env.ARTIFACTS.put(r2Key, body, { httpMetadata: { contentType: mimeType } });
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message.slice(0, 200) : 'Storage write failed', code: 'WRITE_FAILED' };
+  }
 
   await env.DB.batch([
     env.DB.prepare(`
