@@ -26,7 +26,7 @@ create folders (*Settings → members can create folders*). External members can
    site → library → folder.
 4. **Choose where it goes** — the top level of Files, or inside a Team Space folder.
    The picked folder becomes a ShareOut folder there, with the same subfolders.
-5. Leave **Turn documents into readable pages** on to get a page next to each Word,
+5. Leave **Also turn documents into artifacts you can read here** on to get a page next to each Word,
    Excel, PDF, Markdown or CSV file (and slide decks, when the instance has the
    slides converter). The original file is always kept.
 6. **Start import** and watch the progress: found, imported, pages, unchanged,

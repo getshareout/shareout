@@ -1,6 +1,6 @@
 ---
 title: Traé tus archivos de Drive / SharePoint
-description: Importá carpetas enteras de Google Drive, OneDrive o SharePoint a los archivos del workspace, mantenelas sincronizadas y convertí documentos en páginas.
+description: Importá carpetas enteras de Google Drive, OneDrive o SharePoint a los archivos del workspace, mantenelas sincronizadas y convertí documentos en artefactos.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -27,10 +27,10 @@ miembros externos no.
    sitio de SharePoint → biblioteca → carpeta.
 4. **Elegí dónde va**: el nivel principal de Archivos o dentro de una carpeta del Team
    Space. La carpeta elegida se crea ahí, con las mismas subcarpetas.
-5. Dejá activado **Convertir documentos en páginas legibles** para tener una página al
+5. Dejá activado **Convertir también los documentos en artefactos para leer acá** para tener un artefacto al
    lado de cada Word, Excel, PDF, Markdown o CSV (y presentaciones, si la instancia tiene
    el conversor). El archivo original siempre queda.
-6. **Empezá la importación** y seguí el progreso: encontrados, importados, páginas, sin
+6. **Empezá la importación** y seguí el progreso: encontrados, importados, artefactos, sin
    cambios, omitidos y con error, más los archivos para revisar y por qué.
 
 ## Qué pasa con cada archivo
@@ -46,7 +46,7 @@ miembros externos no.
 
 - Los archivos toman la **visibilidad de la carpeta de destino**: los de una carpeta
   privada quedan privados, los de una carpeta pública tienen link para compartir, y si
-  no los ve el equipo. Las páginas creadas desde documentos nunca son públicas.
+  no los ve el equipo. Los artefactos creados desde documentos nunca son públicos.
 - Con [Conocimiento](/es/teams/knowledge/) activado, los archivos importados se aprenden
   como cualquier subida.
 - Los nombres con acentos o símbolos se guardan con un nombre de archivo seguro; el
@@ -56,8 +56,8 @@ miembros externos no.
 
 **Sincronizar de nuevo** vuelve a leer la carpeta y trae solo lo que cambió (la fecha de
 modificación de Drive, la etiqueta de contenido de Microsoft). Un archivo que cambió pasa a
-ser una **nueva versión** del mismo archivo, y su página una nueva versión de la misma
-página. Los archivos movidos entre subcarpetas se mueven acá también. Los que se borran del
+ser una **nueva versión** del mismo archivo, y su artefacto una nueva versión del mismo
+artefacto. Los archivos movidos entre subcarpetas se mueven acá también. Los que se borran del
 drive **se conservan** acá.
 
 Marcá **Sincronizar todos los días** para hacerlo una vez por día (hasta 10 carpetas por
@@ -72,7 +72,7 @@ workspace).
   copió; liberá espacio y sincronizá de nuevo para seguir.
 - Google exporta documentos de hasta 10 MB; los más grandes se informan para que los
   descargues de Drive vos.
-- Como máximo 300 documentos por corrida se convierten en páginas; el resto igual se
+- Como máximo 300 documentos por corrida se convierten en artefactos; el resto igual se
   importa como archivo.
 - Si el drive limita la velocidad, ShareOut espera y reintenta solo.
 
