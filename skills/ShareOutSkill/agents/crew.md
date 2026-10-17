@@ -86,6 +86,51 @@ Post a comment on the artifact. Requires comments enabled and owner/editor ident
 
 Create or list **action items** — comments assigned to a workspace member or collaborator with an optional due date. The assignee is notified by email and Telegram. See [../sdk/comments.md](../sdk/comments.md#action-items).
 
+## Workspace reporting
+
+### `workspace_metrics_digest` (read)
+
+One call returns a compact weekly picture of the artifact's **workspace** (never any other):
+artifacts created / updated / deleted / live and the new ones with links; views (top pages,
+member viewers, internal vs external, deck sessions); people (active creators and viewers,
+new members, per-member activity and AI tokens); AI usage and cost by mode, kind, person and
+artifact; scheduled job runs and failures, crew runs; storage now and per day; and usefulness
+signals — comments and resolutions, action items (done / open / overdue), approvals, shares,
+returning viewers, pages viewed by someone other than their creator, dormant pages, median
+views per page, RUM p75. Includes the previous period with `deltas`, the workspace `admins`
+(name + email) and `notes` explaining anything a source could not answer.
+
+Only works when the crew **owner** is an owner/admin of the workspace (or an instance
+super-admin); anyone else gets `{ "error": … }`.
+
+```jsonc
+{ "period": "previous_week", "tz_offset_minutes": -180 }   // last full Mon→Mon week in UTC-3
+{ "period": "last_days", "days": 14, "compare": false }    // last 14 days ending now
+```
+
+`period` is `last_days` (default; `days` 1–31, default 7) or `previous_week`; `compare`
+defaults to `true`. The exact UTC bounds used come back in `period.from` / `period.to`.
+
+### Recipe: weekly workspace report
+
+A crew on any artifact in the workspace, owned by a workspace admin, mails the admins every
+Monday morning:
+
+```jsonc
+// POST /v1/data/{id}/crew/define — omit "model" to use the default crew model
+{
+  "name": "Weekly workspace report",
+  "instructions": "Call workspace_metrics_digest with period \"previous_week\" and tz_offset_minutes -180. Write a short, plain HTML email: what was published, what people actually used (views, returning viewers, comments, action items), what is dormant, AI and job health, and the biggest changes vs the week before. Use only numbers from the tool and respect its notes. Send it with email_send to every address in admins.",
+  "tools": {
+    "read": ["workspace_metrics_digest"],
+    "write": ["email_send"],
+    "approval": { "email_send": "never" }
+  }
+}
+// POST /v1/data/{id}/crew/triggers — Monday 11:00 UTC (08:00 in UTC-3)
+{ "kind": "cron", "cron": "0 11 * * 1" }
+```
+
 ## REST API
 
 All routes live under the artifact's data API and are **artifact-owner only** (owner's
@@ -123,7 +168,7 @@ envelope `{ "success": true, "data": … }`. One crew per artifact.
 ```
 
 Tool names — read: `table_query`, `table_schema`, `json_get`, `file_list`, `file_read`,
-`web_search`, `connection_query`, `action_item_list`. Write: `json_set`, `table_insert`,
+`web_search`, `connection_query`, `action_item_list`, `workspace_metrics_digest`. Write: `json_set`, `table_insert`,
 `table_update`, `comment_create`, `action_item_create`, `email_send`, `materialize_query`,
 `scheduled_job_create`, `notify_send`, `pilot_verify`. Unknown names, or a name listed under
 the wrong mode, are ignored silently — check `grants` in `GET /crew` after defining.

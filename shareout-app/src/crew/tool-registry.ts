@@ -20,6 +20,7 @@ import { notifySendTool } from './tools/notify-send';
 import { platformMetricsDigestTool } from './tools/platform-metrics-digest';
 import { platformMetricsInvestigateTool } from './tools/platform-metrics-investigate';
 import { pilotVerifyTool } from './tools/pilot-verify';
+import { workspaceMetricsDigestTool } from './tools/workspace-metrics-digest';
 
 /** Every tool the Crew runtime knows about. */
 export const CREW_TOOLS: Record<string, CrewTool> = {
@@ -35,6 +36,8 @@ export const CREW_TOOLS: Record<string, CrewTool> = {
   [connectionQueryTool.name]: connectionQueryTool,
   // read (action items)
   [actionItemListTool.name]: actionItemListTool,
+  // read (workspace owners/admins only)
+  [workspaceMetricsDigestTool.name]: workspaceMetricsDigestTool,
   // write (Phase 2)
   [commentCreateTool.name]: commentCreateTool,
   [actionItemCreateTool.name]: actionItemCreateTool,
