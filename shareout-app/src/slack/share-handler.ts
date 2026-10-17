@@ -59,6 +59,13 @@ export async function handleShareToSlack(
       code: 'VALIDATION_ERROR',
     }, 400);
   }
+  // A viewer's DM goes only to a Slack account they have linked to ShareOut themselves.
+  if (targetType === 'dm' && role !== 'owner' && role !== 'editor') {
+    const own = await env.DB.prepare(
+      "SELECT 1 AS ok FROM messaging_links WHERE platform = 'slack' AND user_id = ? AND platform_user_id = ? LIMIT 1",
+    ).bind(user.id, body.slackUserId).first<{ ok: number }>();
+    if (!own) return json({ error: 'Viewers can only send a DM to their own linked Slack account', code: 'FORBIDDEN' }, 403);
+  }
   if (body.mode && !MODES.includes(body.mode as SlackDeliveryMode)) {
     return json({ error: `mode must be one of: ${MODES.join(', ')}`, code: 'VALIDATION_ERROR' }, 400);
   }

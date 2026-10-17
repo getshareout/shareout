@@ -8,6 +8,7 @@ import { executeJobAction } from '../../scheduling/jobs/runner';
 import { checkViewerSelfDelivery } from '../../scheduling/jobs/permissions';
 import type { JobAction, JobConfig } from '../../scheduling/jobs/types';
 import { getUserRole } from '../../artifacts/roles';
+import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { getLinkedChatId } from '../../telegram/linking';
 import { resolveSlackTokenForArtifact } from '../../chat-platforms/slack/delivery';
 import { listSlackChannels } from '../../chat-platforms/slack/client';
@@ -40,6 +41,10 @@ export async function handleDeliverSlackChannels(
   if (!role) return jsonError('Forbidden', 'FORBIDDEN', 403);
   const wsId = await artifactWorkspaceId(env, artifactId);
   if (!wsId) return jsonResponse({ channels: [] });
+  // The channel list is the workspace's; a viewer collaborator sees it only as a member.
+  if (role === 'viewer' && !(await getInternalWorkspaceRole(env, wsId, user.id))) {
+    return jsonError('Forbidden', 'FORBIDDEN', 403);
+  }
   const name = await firstSlackConnection(env, wsId);
   if (!name) return jsonResponse({ channels: [] });
   const resolved = await resolveSlackTokenForArtifact(env, artifactId, name);
