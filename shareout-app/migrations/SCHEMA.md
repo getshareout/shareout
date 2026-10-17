@@ -1,6 +1,6 @@
 # ShareOut database schema
 
-What every one of the **137 tables** is for, grouped the way
+What every one of the **141 tables** is for, grouped the way
 [`0000_init.sql`](0000_init.sql) groups them. Rules for *new* tables live in
 [CONVENTIONS.md](CONVENTIONS.md); this document describes what exists today.
 
@@ -200,6 +200,10 @@ here would silently drop artifacts from listings.
 | `user_recent_views` | Most-recent-view index powering "jump back in". |
 | `user_recent_searches` | *(0017)* The last queries a person ran in the search palette, per `scope_key` (the workspace id, or `''` for personal / all pages). `query_key` is the accent- and case-folded query, so re-running one moves it to the top instead of adding a row; the app keeps 20 per user and scope. |
 | `share_links` | Tokenised links to a presentation or artifact, gated by `gate`/`gate_value`, with `expires_at`, `max_views`, `revoked`. |
+| `templates` | *(0020)* A reusable, scrubbed snapshot of an artifact or folder that installs into other workspaces. `scope` is `private` (home workspace; creator only when `workspace_id` is NULL), `shared` (plus `template_shares`) or `instance` (every workspace; platform admins only). `source_kind`/`source_id` say where new versions are snapshotted from; `preview_r2_key` is an optional image. See `src/templates/`. |
+| `template_versions` | *(0020)* Immutable versions: `version_label` (semver), `manifest_json` (items, folder tree, table/dataset schemas, connector placeholders, setup steps). Files live in R2 under `templates/<id>/<version_no>/…`, already link-tokenized and secret-redacted. Never holds source data, credentials, comments, Knowledge or analytics. |
+| `template_shares` | *(0020)* Extra workspaces a `shared` template reaches. |
+| `template_installs` | *(0020)* Which artifact came from which template item at which `version_no`; `install_group` ties one install together so an update keeps links consistent. Drives "update available". |
 
 ## 04 Data connections
 

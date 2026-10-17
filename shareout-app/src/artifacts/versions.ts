@@ -13,7 +13,7 @@ import { invalidateDeploymentCache } from '../serve/deployment-cache';
 import { normalizeVersionMessage } from './version-summary';
 
 /** How a version came to be: `versions.source`. Null on versions written before it existed. */
-export const VERSION_SOURCES = ['api', 'agent', 'editor', 'restore'] as const;
+export const VERSION_SOURCES = ['api', 'agent', 'editor', 'restore', 'template'] as const;
 export type VersionSource = (typeof VERSION_SOURCES)[number];
 
 /** `agent` for a service-account token, `api` for a person's token or session. */
