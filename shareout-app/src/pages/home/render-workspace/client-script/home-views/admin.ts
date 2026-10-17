@@ -970,5 +970,5 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
         + adTableSection('admin.autoCrewAutomations', 'admin.autoCrewIntro', ['admin.colCrew', 'admin.colTrigger', 'admin.colModel', 'admin.colLastRun', 'admin.lblStatus'], crewRows, 'admin.noAutomations');
     }, run);
   }
-  function loadAdmin() { if (adminTab === 'intelligence') { location.hash = '#l/knowledge'; return; } var fn = { overview: adOverview, artifacts: adArtifacts, members: adMembers, clients: adClients, automation: adAutomation, ai: adAI, security: adSecurity, support: adSupport, settings: adSettings }[adminTab]; if (fn) fn(); }
+  function loadAdmin() { if (adminTab === 'intelligence') { location.hash = '#l/knowledge'; return; } var fn = { overview: adOverview, artifacts: adArtifacts, members: adMembers, clients: adClients, automation: adAutomation, ai: adAI, security: adSecurity, support: adSupport, settings: adSettings, domains: adDomains }[adminTab]; if (fn) fn(); }
 `;

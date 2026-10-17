@@ -43,6 +43,7 @@ import { isVisualEditorEnabled } from '../../editor/visual-editor-gate';
 import { localeForArtifactWorkspace, localeFromAcceptLanguage } from '../../i18n/locale';
 import { spaceGuestFor } from '../../sharees/space-guest';
 import { capabilitySatisfies } from '../../access/can-access';
+import { servingOrigin } from '../../workspaces/domains/host-binding';
 
 /**
  * Stream a sandboxed HTML wrapper around an artifact iframe.
@@ -77,7 +78,7 @@ export async function serveSandboxedViewer(
   // `?section=<heading id>`: open the page scrolled to that heading (validated by the caller).
   section?: string,
 ): Promise<Response> {
-  const baseUrl = env.SHAREOUT_BASE_URL.replace(/\/$/, '');
+  const baseUrl = servingOrigin(env);
   // The home Studio loads the artifact in an iframe with ?wsx=1; the Studio's right
   // rail already provides share/comments/details, so suppress the in-artifact toolbar.
   const studioEmbed = new URL(request.url).searchParams.has('wsx');

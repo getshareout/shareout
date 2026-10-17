@@ -5,7 +5,7 @@ import type { Env, PublishResponse, PWAConfig, ArtifactType } from '../types';
 import type { AuthUser } from '../api-auth';
 import { generateId } from '../crypto-utils';
 import { dispatchLifecycleEmail } from '../email/gateway';
-import { buildSubdomainUrl } from '../subdomain';
+import { workspaceArtifactUrl } from '../workspaces/domains/links';
 import { invalidateDeploymentCache } from '../serve/deployment-cache';
 import { indexArtifactVector } from '../search/semantic';
 import { scanFileUsage } from '../assets/usage';
@@ -64,7 +64,7 @@ export async function buildWorkspaceUrls(
   const humanPath = folderPath ? `${folderPath}/${humanSlug}` : humanSlug;
   return {
     namespacedUrl: `${baseUrl}/@${workspace.slug}/${humanPath}/`,
-    subdomainUrl: buildSubdomainUrl(baseUrl, workspace.slug, humanPath),
+    subdomainUrl: await workspaceArtifactUrl(env, baseUrl, workspace.slug, humanPath),
   };
 }
 

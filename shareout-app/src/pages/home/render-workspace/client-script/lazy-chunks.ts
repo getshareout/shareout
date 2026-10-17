@@ -12,6 +12,7 @@
  */
 import { workspace_client_home_views_admin_JS } from './home-views/admin';
 import { workspace_client_home_views_adminSupport_JS } from './home-views/admin-support';
+import { workspace_client_home_views_adminDomains_JS } from './home-views/admin-domains';
 import { workspace_client_home_views_clients_JS } from './home-views/clients';
 import { workspace_client_home_views_knowledge_JS } from './home-views/knowledge';
 import { workspace_client_home_views_knowledgeMap_JS } from './home-views/knowledge-map';
@@ -26,7 +27,7 @@ interface ChunkDef { src: string; exports: string[]; soft?: string[]; vars?: str
 
 export const LAZY_CHUNKS: Record<string, ChunkDef> = {
   admin: {
-    src: workspace_client_home_views_admin_JS + workspace_client_home_views_adminSupport_JS + workspace_client_home_views_clients_JS,
+    src: workspace_client_home_views_admin_JS + workspace_client_home_views_adminSupport_JS + workspace_client_home_views_adminDomains_JS + workspace_client_home_views_clients_JS,
     exports: ['loadAdmin'],
   },
   knowledge: {

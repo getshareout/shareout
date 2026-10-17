@@ -8,7 +8,7 @@ import { dispatchLifecycleEmail } from '../email/gateway';
 import { addCollaboratorEmails } from './collaborators';
 import { requireSharingRole } from './roles';
 import { json } from './json-response';
-import { buildSubdomainUrl } from '../subdomain';
+import { workspaceArtifactUrl } from '../workspaces/domains/links';
 
 type ShareRole = 'none' | 'viewer' | 'editor';
 
@@ -106,7 +106,7 @@ export async function handleShareArtifact(
   const slug = artifact.prod_slug || artifact.slug;
   // Workspace artifacts share their clean subdomain URL, not the apex /a/ routing key.
   const viewUrl = artifact.workspace_slug
-    ? buildSubdomainUrl(env.SHAREOUT_BASE_URL, artifact.workspace_slug, artifact.display_slug || slug)
+    ? await workspaceArtifactUrl(env, env.SHAREOUT_BASE_URL, artifact.workspace_slug, artifact.display_slug || slug)
     : `${env.SHAREOUT_BASE_URL}/a/${slug}/`;
   const shareData = {
     artifactName: artifact.name,

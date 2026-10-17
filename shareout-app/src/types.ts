@@ -73,6 +73,18 @@ export interface Env {
    *  Unset (self-host default) = no marketing site: anonymous `/` goes to the login
    *  page and other unclaimed apex paths get the worker's 404. */
   MARKETING_ORIGIN?: string;
+  /** Cloudflare API token for Cloudflare for SaaS custom hostnames (Zone → SSL and
+   *  Certificates: Edit on the SaaS zone). With CF_CUSTOM_HOSTNAMES_ZONE_ID set, workspace
+   *  custom domains are provisioned on the zone; unset = manual mode (DNS TXT check). */
+  CF_CUSTOM_HOSTNAMES_TOKEN?: string;
+  /** Zone id of the SaaS zone (the platform apex) custom hostnames are added to. */
+  CF_CUSTOM_HOSTNAMES_ZONE_ID?: string;
+  /** Hostname customers CNAME their custom domain to (e.g. customers.example.com).
+   *  Setting it (or the Cloudflare pair above) turns custom domains on for this instance. */
+  CUSTOM_DOMAINS_CNAME_TARGET?: string;
+  /** Per-request only: set by the dispatcher when the request arrived on an active
+   *  workspace custom domain. Never configure it. */
+  CUSTOM_HOST?: import('./workspaces/domains/host-binding').CustomHostBinding;
   /** Optional docs host served by this worker's route (e.g. docs.example.com). Requires DOCS_ORIGIN. */
   DOCS_HOST?: string;
   /** Optional hostname the docs site is deployed to (e.g. my-docs.pages.dev). Requires DOCS_HOST.

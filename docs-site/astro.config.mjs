@@ -294,6 +294,7 @@ export default defineConfig({
 						{ label: 'Client portals', slug: 'teams/client-portals', translations: { es: 'Portales de clientes' } },
 						{ label: 'Custom subdomain', slug: 'teams/subdomain', translations: { es: 'Subdominio propio' } },
 						{ label: 'Workspace SSO', slug: 'teams/sso', translations: { es: 'SSO del workspace' } },
+						{ label: 'Custom domain', slug: 'teams/custom-domain', translations: { es: 'Dominio propio' } },
 						{ label: 'Workspace connections', slug: 'teams/connections', translations: { es: 'Conexiones del espacio' } },
 						{ label: 'Workspace assistant', slug: 'teams/workspace-assistant', translations: { es: 'Asistente del workspace' } },
 						{ label: 'Skill Marketplace', slug: 'teams/skill-marketplace', translations: { es: 'Skill Marketplace' } },

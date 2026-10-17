@@ -130,6 +130,45 @@ Product behavior: [../team/subdomain.md](../team/subdomain.md).
 
 ---
 
+## Workspace custom domains (Cloudflare for SaaS)
+
+Lets a workspace serve on a hostname its customer owns (`portal.acme.example`).
+Product behavior: [../team/custom-domain.md](../team/custom-domain.md).
+
+**Cloudflare for SaaS mode** (Cloudflare verifies ownership and issues certificates):
+
+1. Zone of `SHAREOUT_BASE_URL` → **SSL/TLS → Custom Hostnames** → enable Cloudflare for SaaS.
+2. Add an originless proxied record for the fallback origin, e.g.
+   `fallback.shareout.company.com AAAA 100::`, and set it as the **Fallback Origin**.
+3. Add a proxied CNAME `customers.shareout.company.com → fallback.shareout.company.com`
+   — the CNAME target customers use.
+4. Workers Routes: route `*/*` to the ShareOut Worker (custom hostnames reach it on that
+   route).
+5. Token: **Zone → SSL and Certificates → Edit** on that zone only.
+6. Configure:
+
+   ```bash
+   npx wrangler secret put CF_CUSTOM_HOSTNAMES_TOKEN
+   ```
+
+   ```toml
+   CF_CUSTOM_HOSTNAMES_ZONE_ID = "<zone id>"
+   CUSTOM_DOMAINS_CNAME_TARGET = "customers.shareout.company.com"
+   ```
+
+Docs: https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/start/getting-started/ ·
+https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/start/advanced-settings/worker-as-origin/ ·
+pricing https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/plans/
+(100 hostnames included on every plan, then $0.10/hostname/month).
+
+**Manual mode** (no Cloudflare for SaaS): set only `CUSTOM_DOMAINS_CNAME_TARGET`. ShareOut
+verifies a `_shareout-verify.<host>` TXT record; after a hostname shows **Live**, add it
+yourself as a Workers custom domain or route.
+
+With neither set, custom domains are off and unknown hostnames behave as before.
+
+---
+
 ## Optional Email (OTP that isn't in logs)
 
 Without Email:

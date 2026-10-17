@@ -113,6 +113,7 @@ erDiagram
     workspaces ||--o{ grants            : "authorises"
     workspaces ||--o{ sharees           : "shares with"
     workspaces ||--o{ tokens            : "issues"
+    workspaces ||--o{ workspace_domains : "serves on"
     sharees    ||--o{ sharee_members    : "contains"
     sharees    ||--o{ sharee_activity   : "logs"
     artifacts  ||--o{ collaborators     : "invites"
@@ -131,6 +132,8 @@ The five paths: **membership** (`workspace_members`), **per-artifact invite**
 | `workspace_invite_claims` | Pending invites. `code_hash` only; `expires_at` and `claimed_at` make each single-use. `email_status` (`sent`/`failed`/`skipped`/`link_only`) with `email_sent_at` and `email_error` record whether the invite mail actually went out — null on rows minted before that was tracked. |
 | `workspace_llm_config` | Per-workspace AI settings: bring-your-own provider credentials (encrypted), `balance_micro_usd`, `markup_multiplier`, monthly budget, `gateway_model` override. |
 | `workspace_sso_config` | The workspace's own OIDC sign-in (Okta, Entra ID, …): `issuer`, `client_id`, the client secret encrypted with `CREDENTIALS_KEY`, and `email_domains` — the only addresses this IdP may sign in, each claimed by at most one workspace. `is_enforced` makes it the only sign-in method for those domains. Written by the instance owner only. |
+| `workspace_domains` | Customer-owned hostnames a workspace serves on (`portal.acme.example`), besides `<slug>.<apex>`. `hostname` is normalized (lowercase, punycode) and globally unique. Only `status = 'active'` routes; it takes a verified ownership check — `provider = 'cloudflare'` (a Cloudflare for SaaS custom hostname, `provider_id` its id, `ssl_status` its certificate) or `'manual'` (a DNS TXT record `verification_name` = `verification_token`). `is_primary` marks the one hostname links and emails use. |
+| `workspace_domain_handoffs` | One-time sign-in codes that carry an apex login to a custom hostname (whose cookie cannot be the apex's). `code_hash` only; bound to one `hostname`, `expires_at` a minute out, spent by `used_at`. |
 | `workspace_event_visibility` | Which member audience sees which activity-feed event kind. |
 | `workspace_library` | Workspace- or user-scoped published modules, with `namespace`/`module_name` and install counters. |
 | `workspace_files` | The workspace's virtual filesystem, one row per file. `namespace` is the directory — `context` (markdown fed to agents, where `updated_by_kind` distinguishes human from agent edits), `catalog` (the data catalogue) and `knowledge` (the learned knowledge base). `scope_id` narrows a file to one sharee; `''` means workspace-wide. |

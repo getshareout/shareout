@@ -16,6 +16,7 @@ language.
 | Allow domains/emails into a workspace | [api.md](api.md#workspace-membership-policy) | [SKILL.md](SKILL.md#workspace-membership-policy) |
 | Custom workspace subdomain | [subdomain.md](subdomain.md) | [../deploy/cloudflare.md](../deploy/cloudflare.md) |
 | Okta / Entra ID / OIDC single sign-on | [sso.md](sso.md) | [admin-portal.md](admin-portal.md) |
+| Workspace custom domain (customer hostname) | [custom-domain.md](custom-domain.md) | [../deploy/cloudflare.md](../deploy/cloudflare.md#workspace-custom-domains-cloudflare-for-saas) |
 | Workspace house style for agents | [workspace-context.md](workspace-context.md) | [SKILL.md](SKILL.md#workspace-context-files) |
 | Workspace schedules / automations | [api.md](api.md#workspace-schedules-and-automations) | [../api/jobs.md](../api/jobs.md) |
 | Team-wide metric alert management | [../api/metric-alerts.md](../api/metric-alerts.md) | [api.md](api.md#metric-alerts-in-workspaces) |
@@ -53,6 +54,7 @@ ShareOutSkill/team/
 ├── INDEX.md                  # This router
 ├── api.md                    # Workspace REST endpoints
 ├── subdomain.md              # Workspace subdomain behavior
+├── custom-domain.md          # Customer-owned hostnames per workspace
 ├── workspace-context.md
 ├── workspace-connections.md
 ├── workspace-assistant.md

@@ -3,6 +3,7 @@ import { purgeArtifact } from '../artifacts/crud';
 import { isSuperAdminEmail } from './recipients';
 import { invalidateUserDisabled } from '../auth/session';
 import { invalidateWorkspaceSlug } from '../workspaces/host-cache';
+import { releaseWorkspaceDomains } from '../workspaces/domains/store';
 import { evictCachedTokens, tokenHashesForUser } from '../auth/token-cache';
 
 export interface UserRow {
@@ -167,6 +168,7 @@ export async function deleteUser(
     'SELECT id, slug FROM workspaces WHERE owner_id = ?'
   ).bind(userId).all<{ id: string; slug: string }>();
   for (const w of workspaces.results || []) {
+    await releaseWorkspaceDomains(env, w.id);
     await env.DB.batch([
       env.DB.prepare('UPDATE artifacts SET workspace_id = NULL WHERE workspace_id = ?').bind(w.id),
       env.DB.prepare('DELETE FROM workspace_members WHERE workspace_id = ?').bind(w.id),
