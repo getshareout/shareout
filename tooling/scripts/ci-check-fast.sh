@@ -6,6 +6,11 @@
 # Tests run as critical-path + whatever the change actually touches (vitest module
 # graph). Force the whole suite with SHAREOUT_FULL_TESTS=1.
 #
+# SHAREOUT_CHECK_MODE=light skips every test run (static, typecheck, secrets, bundles
+# only). The pre-push hook uses it for feature branches: parallel agents each running
+# suites on one machine starve each other into timeouts. Tests run once, on the
+# integrated result, via tooling/scripts/integrate.sh before anything reaches main.
+#
 # Independent checks run in parallel; each one's output is printed only if it fails.
 # check:bundles runs last, alone: it rewrites public/_bundles/ (as does the
 # stage-skill-bundle test), so it must not race the test run.
@@ -78,15 +83,24 @@ secrets() {
   fi
 }
 
-echo "==> Fast CI checks (parallel)"
+LIGHT=0
+[ "${SHAREOUT_CHECK_MODE:-}" = "light" ] && LIGHT=1
+
+if [ "$LIGHT" = "1" ]; then
+  echo "==> Light checks (no tests; integrate.sh runs the suite once on the integrated branch)"
+else
+  echo "==> Fast CI checks (parallel)"
+fi
 START=$SECONDS
 job static static_checks
 job typecheck npm run typecheck
-job tests app_tests
-job chat-core workspace chat-core
-job sdk workspace sdk
-job editor workspace editor-client
 job secrets secrets
+if [ "$LIGHT" = "0" ]; then
+  job tests app_tests
+  job chat-core workspace chat-core
+  job sdk workspace sdk
+  job editor workspace editor-client
+fi
 
 FAILED=()
 for i in "${!PIDS[@]}"; do

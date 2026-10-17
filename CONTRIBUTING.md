@@ -93,6 +93,20 @@ vitest's module graph. Force the whole suite with `SHAREOUT_FULL_TESTS=1`.
 `.git` dir, so it covers every worktree, and it configures the `generated` merge driver.
 Skip one push with `git push --no-verify` or `SHAREOUT_SKIP_HOOK=1`.
 
+- **Feature branches push light; the suite runs once on the integration.** Pushing a
+  feature branch runs static checks, typecheck, secret scan and bundle checks, but no
+  tests (`SHAREOUT_CHECK_MODE=light`). Many worktrees each running the suite on one
+  machine starve each other into timeout failures. Before landing, combine the branches
+  and run everything once:
+
+  ```bash
+  ./tooling/scripts/integrate.sh -n <name> <branch-a> <branch-b> …
+  ```
+
+  It merges them onto `origin/main` in a throwaway worktree on `integration/<name>`,
+  regenerates bundles, and runs the full suite. Fix failures there, push it (pushes to
+  `main` and `integration/*` run the tests), and land it as one PR.
+
 - **Generated files.** Committed build outputs (`public/_bundles/*`, `src/discovery/*`,
   `src/official-skills/*.generated.ts`) are marked `merge=generated` in
   `shareout-app/.gitattributes`. With the driver installed, a merge or rebase keeps one
