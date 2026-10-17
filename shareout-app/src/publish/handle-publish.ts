@@ -21,6 +21,7 @@ import { libraryVersionExists } from '../workspace-library';
 import { json } from './http';
 import { resolveAuthMethod, resolveVisibility } from './request-auth';
 import { publishArtifact } from './publish-artifact';
+import { resolveRequestedCapabilities } from './capabilities';
 import { rateLimitExceededResponse, storageLimitExceededResponse, publicLimitNotice } from './limits';
 
 export async function handlePublish(
@@ -183,6 +184,9 @@ export async function handlePublish(
       }
     }
 
+    const requested = await resolveRequestedCapabilities(env, body, workspaceId, visibility);
+    if (requested instanceof Response) return requested;
+
     try {
       const result = await publishArtifact(env, user, {
         name: body.name,
@@ -206,6 +210,7 @@ export async function handlePublish(
         attachedSkillIds: body.attached_skill_ids,
         library: body.library,
         message: body.message,
+        capabilities: requested,
       }, executionCtx);
 
       await incrementRateLimit(env, user.id, 'publish', user.email);

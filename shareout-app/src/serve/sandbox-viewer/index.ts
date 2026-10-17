@@ -6,6 +6,7 @@ import { maybeEmitViewEvent } from '../../scheduling/events';
 import { createAccessToken } from '../../token';
 import {
   SANDBOX_PERMISSIONS,
+  SANDBOX_PERMISSIONS_LOCKED,
   getSecurityHeaders,
   artifactContentUrl,
   artifactContentHost,
@@ -26,10 +27,12 @@ import { resolvePwa } from './pwa-tags';
 import { renderEarlyHead } from './early-head';
 import { resolveManifestPreload, renderInlinedStyleBlock } from './manifest-preload';
 import { buildInitialViewerData } from './initial-data';
+import { hasMcpCapability } from '../../mcp-broker/capabilities';
 import {
   renderBridgeScript,
   renderEarlyCdnBridgeHook,
   renderDeferredBridgeDelivery,
+  renderMcpHostBridge,
 } from './bridge-script';
 import { renderLoadingHideScript } from './loading';
 import { renderPageBridge } from '../page-agent';
@@ -100,12 +103,14 @@ export async function serveSandboxedViewer(
   const pageTitle = escapeHtml(socialPreview?.title || slug);
   const socialTags = socialPreview ? renderSocialMetaTags(socialPreview) : '';
 
+  const mcpPage = hasMcpCapability(manifestJson);
+  const mcpLang = localeFromAcceptLanguage(request.headers.get('Accept-Language')) ?? 'en';
   const iframeHtml = `<iframe
     src="${escapeHtml(rawUrl)}"
-    sandbox="${SANDBOX_PERMISSIONS}"
+    sandbox="${mcpPage ? SANDBOX_PERMISSIONS_LOCKED : SANDBOX_PERMISSIONS}"
     allow="clipboard-write"
     loading="eager"
-  ></iframe>`;
+  ></iframe>${mcpPage ? renderMcpHostBridge(artifactId, mcpLang) : ''}`;
 
   // On the content domain the artifact loads cross-origin (its own subresources,
   // inlined CSS, and same-origin ?_raw preloads can't be warmed from this parent

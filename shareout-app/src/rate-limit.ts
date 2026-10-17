@@ -46,6 +46,9 @@ const RATE_LIMITS = {
   oauthRegister: { limit: 600, windowSeconds: 3600 },
   oauthToken: { limit: 120, windowSeconds: 3600 },
   mcp: { limit: 600, windowSeconds: 3600 },
+  // A page calling the viewer's MCP connections, per viewer + page. Sized for a
+  // dashboard of several sections each refreshing about every 30 s.
+  mcpBroker: { limit: 1200, windowSeconds: 3600 },
 } as const;
 
 type RateLimitAction = keyof typeof RATE_LIMITS;

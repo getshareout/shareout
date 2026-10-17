@@ -10,7 +10,8 @@ import { resolveSlackToken, listSlackChannels, isSlackAuthError } from '../../..
 import { renderWorkspaceConnectionCallbackPage } from './callback-page';
 import { oauthDenialMessage, userFacingWorkspaceOAuthError } from './errors';
 import { json, requireAdmin, requireMember, validateName } from './shared';
-import { persistWorkspaceOAuthConnection } from './oauth';
+import { OAUTH_STATE_PURPOSE, persistWorkspaceOAuthConnection, type WorkspaceOAuthState } from './oauth';
+import { createOAuthState, sameOriginReturnUrl, verifyOAuthState } from '../../../oauth-state';
 import { getPlatformOrigin } from '../../../config/origins';
 
 /** Fixed Slack OAuth redirect path (workspaceId travels in state). */
@@ -41,9 +42,13 @@ export async function handleSlackInstall(
   if (validateName(connectionName)) {
     return json({ error: 'Invalid connection name', code: 'VALIDATION_ERROR' }, 400);
   }
-  const returnUrl = url.searchParams.get('returnUrl') || '';
+  const returnUrl = sameOriginReturnUrl(url.searchParams.get('returnUrl'), url.origin);
 
-  const state = btoa(JSON.stringify({ workspaceId, connectionName, returnUrl, ts: Date.now() }));
+  const state = await createOAuthState<WorkspaceOAuthState>(env, OAUTH_STATE_PURPOSE, user.id, {
+    workspaceId,
+    connectionName,
+    returnUrl,
+  });
   const callbackUrl = slackCallbackUrl(env);
   const provider = getProvider('slack')!;
   const authUrl = await provider.getAuthUrl({
@@ -72,14 +77,12 @@ export async function handleSlackOAuthCallback(
     return renderWorkspaceConnectionCallbackPage(false, 'slack', 'Missing code or state');
   }
 
-  let state: { workspaceId: string; connectionName: string; returnUrl: string };
-  try {
-    state = JSON.parse(atob(stateParam));
-  } catch {
-    return renderWorkspaceConnectionCallbackPage(false, 'slack', 'Invalid state');
+  const state = await verifyOAuthState<WorkspaceOAuthState>(env, stateParam, OAUTH_STATE_PURPOSE, createdBy);
+  if (!state?.workspaceId || !state.connectionName) {
+    return renderWorkspaceConnectionCallbackPage(false, 'slack', 'Invalid or expired state. Start the connection again.');
   }
-  if (!state.workspaceId || !state.connectionName) {
-    return renderWorkspaceConnectionCallbackPage(false, 'slack', 'Invalid state');
+  if (!createdBy || !(await requireAdmin(env, state.workspaceId, createdBy))) {
+    return renderWorkspaceConnectionCallbackPage(false, 'slack', 'Only workspace admins can connect Slack');
   }
 
   const callbackUrl = slackCallbackUrl(env);
@@ -106,7 +109,7 @@ export async function handleSlackOAuthCallback(
       true,
       'slack',
       'Slack connected successfully. You can close this window.',
-      state.returnUrl || undefined,
+      sameOriginReturnUrl(state.returnUrl, url.origin) || undefined,
     );
   } catch (err) {
     logError(

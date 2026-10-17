@@ -78,6 +78,7 @@ describe('SDK open is decoupled from late shareout:init', () => {
     expect(fetchMock).not.toHaveBeenCalled();
 
     (win as { dispatch: (t: string, ev: unknown) => void }).dispatch('message', {
+      source: win.parent,
       data: {
         type: 'shareout:init',
         data: {

@@ -9,9 +9,18 @@ import { generateId } from '../../../crypto-utils';
 import { encryptCredentials } from '../../../data/connections/credentials';
 import { getProvider, hasProvider, listProviders } from '../../../data/platform';
 import { createLogger, logError } from '../../../logging';
+import { createOAuthState, sameOriginReturnUrl, verifyOAuthState } from '../../../oauth-state';
 import { renderWorkspaceConnectionCallbackPage } from './callback-page';
 import { oauthDenialMessage, userFacingWorkspaceOAuthError } from './errors';
 import { json, requireAdmin, validateName } from './shared';
+
+export const OAUTH_STATE_PURPOSE = 'workspace-connection';
+
+export interface WorkspaceOAuthState {
+  workspaceId: string;
+  connectionName: string;
+  returnUrl: string;
+}
 
 // GET /v1/workspaces/{id}/connections/{provider}/auth-url — start OAuth
 export async function handleWorkspaceOAuthUrl(
@@ -37,9 +46,13 @@ export async function handleWorkspaceOAuthUrl(
   if (!connectionName || validateName(connectionName)) {
     return json({ error: 'Valid connection name required', code: 'VALIDATION_ERROR' }, 400);
   }
-  const returnUrl = url.searchParams.get('returnUrl') || '';
+  const returnUrl = sameOriginReturnUrl(url.searchParams.get('returnUrl'), url.origin);
 
-  const state = btoa(JSON.stringify({ workspaceId, connectionName, returnUrl, ts: Date.now() }));
+  const state = await createOAuthState<WorkspaceOAuthState>(env, OAUTH_STATE_PURPOSE, user.id, {
+    workspaceId,
+    connectionName,
+    returnUrl,
+  });
   const callbackUrl = `${url.origin}/v1/workspaces/${workspaceId}/connections/${providerId}/callback`;
 
   const provider = getProvider(providerId)!;
@@ -79,15 +92,17 @@ export async function handleWorkspaceOAuthCallback(
     return renderWorkspaceConnectionCallbackPage(false, providerId, 'Missing code or state');
   }
 
-  let state: { workspaceId: string; connectionName: string; returnUrl: string };
-  try {
-    state = JSON.parse(atob(stateParam));
-  } catch {
-    return renderWorkspaceConnectionCallbackPage(false, providerId, 'Invalid state');
+  const state = await verifyOAuthState<WorkspaceOAuthState>(env, stateParam, OAUTH_STATE_PURPOSE, createdBy);
+  if (!state) {
+    return renderWorkspaceConnectionCallbackPage(false, providerId, 'Invalid or expired state. Start the connection again.');
   }
 
   if (state.workspaceId !== workspaceId) {
     return renderWorkspaceConnectionCallbackPage(false, providerId, 'State mismatch');
+  }
+
+  if (!createdBy || !(await requireAdmin(env, workspaceId, createdBy))) {
+    return renderWorkspaceConnectionCallbackPage(false, providerId, 'Only workspace admins can connect this provider');
   }
 
   const callbackUrl = `${url.origin}/v1/workspaces/${workspaceId}/connections/${providerId}/callback`;
@@ -125,7 +140,7 @@ export async function handleWorkspaceOAuthCallback(
       true,
       providerId,
       'Connected successfully. You can close this window.',
-      state.returnUrl || undefined,
+      sameOriginReturnUrl(state.returnUrl, url.origin) || undefined,
     );
   } catch (err) {
     logError(

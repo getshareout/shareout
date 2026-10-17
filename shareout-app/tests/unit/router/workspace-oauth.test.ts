@@ -24,6 +24,7 @@ import {
   handleWorkspaceOAuthUrl,
   handleWorkspaceOAuthCallback,
 } from '../../../src/router/api/workspace-connections/oauth';
+import { createOAuthState } from '../../../src/oauth-state';
 
 const e = env as unknown as Env;
 const admin: AuthUser = { id: 'usr_admin', email: 'a@x.com', username: null };
@@ -105,8 +106,11 @@ describe('handleWorkspaceOAuthCallback', () => {
     expect((await handleWorkspaceOAuthCallback(callbackReq('code=c&state=!!!'), e, WS, 'google-sheets', 'usr_admin')).status).toBe(400);
   });
 
+  const signState = (userId: string, data: { workspaceId: string; connectionName: string; returnUrl: string }) =>
+    createOAuthState(e, 'workspace-connection', userId, data);
+
   it('400s state workspace mismatch', async () => {
-    const state = btoa(JSON.stringify({ workspaceId: 'other', connectionName: 'main', returnUrl: '' }));
+    const state = await signState('usr_admin', { workspaceId: 'other', connectionName: 'main', returnUrl: '' });
     const res = await handleWorkspaceOAuthCallback(
       callbackReq(`code=c&state=${encodeURIComponent(state)}`),
       e,
@@ -119,8 +123,57 @@ describe('handleWorkspaceOAuthCallback', () => {
     expect(await res.text()).toMatch(/mismatch/i);
   });
 
+  it('rejects an unsigned (forged) state without calling the provider', async () => {
+    const forged = btoa(JSON.stringify({ workspaceId: WS, connectionName: 'main', returnUrl: '' }));
+    const res = await handleWorkspaceOAuthCallback(
+      callbackReq(`code=attacker&state=${encodeURIComponent(forged)}`), e, WS, 'google-sheets', 'usr_admin',
+    );
+    expect(res.status).toBe(400);
+    expect(handleCallback).not.toHaveBeenCalled();
+  });
+
+  it('rejects a state minted for another user', async () => {
+    const state = await signState('usr_admin', { workspaceId: WS, connectionName: 'main', returnUrl: '' });
+    const res = await handleWorkspaceOAuthCallback(
+      callbackReq(`code=c&state=${encodeURIComponent(state)}`), e, WS, 'google-sheets', 'usr_member',
+    );
+    expect(res.status).toBe(400);
+    expect(handleCallback).not.toHaveBeenCalled();
+  });
+
+  it('rejects a callback with no signed-in user', async () => {
+    const state = await signState('usr_admin', { workspaceId: WS, connectionName: 'main', returnUrl: '' });
+    const res = await handleWorkspaceOAuthCallback(
+      callbackReq(`code=c&state=${encodeURIComponent(state)}`), e, WS, 'google-sheets', null,
+    );
+    expect(res.status).toBe(400);
+    expect(handleCallback).not.toHaveBeenCalled();
+  });
+
+  it('rejects a user who is no longer a workspace admin', async () => {
+    const state = await signState('usr_member', { workspaceId: WS, connectionName: 'main', returnUrl: '' });
+    const res = await handleWorkspaceOAuthCallback(
+      callbackReq(`code=c&state=${encodeURIComponent(state)}`), e, WS, 'google-sheets', 'usr_member',
+    );
+    expect(res.status).toBe(400);
+    expect(await res.text()).toMatch(/admins/);
+    expect(handleCallback).not.toHaveBeenCalled();
+  });
+
+  it('drops a cross-origin or javascript: returnUrl', async () => {
+    for (const bad of ['javascript:alert(1)', 'https://evil.example/x']) {
+      const state = await signState('usr_admin', { workspaceId: WS, connectionName: 'main', returnUrl: bad });
+      const res = await handleWorkspaceOAuthCallback(
+        callbackReq(`code=c&state=${encodeURIComponent(state)}`), e, WS, 'google-sheets', 'usr_admin',
+      );
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      expect(html).not.toContain(bad);
+    }
+  });
+
   it('exchanges code and returns connected HTML', async () => {
-    const state = btoa(JSON.stringify({ workspaceId: WS, connectionName: 'main', returnUrl: '' }));
+    const state = await signState('usr_admin', { workspaceId: WS, connectionName: 'main', returnUrl: '' });
     const res = await handleWorkspaceOAuthCallback(
       callbackReq(`code=authcode&state=${encodeURIComponent(state)}`),
       e,

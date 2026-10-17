@@ -406,6 +406,9 @@ export interface PublishRequest {
   // Optional change note for this version (max 500 chars). Without one, a short
   // "what changed" line may be generated in the background (versions.message_source='ai').
   message?: string;
+  // Runtime capabilities. `mcp` lists the workspace MCP connections (and their tools)
+  // the page may call as its viewer; null clears; omitted keeps the live version's.
+  capabilities?: { mcp?: unknown };
 }
 
 export interface LibraryPublishConfig {

@@ -8,6 +8,7 @@ import { generateTypeMetadata } from '../../validation';
 import { generateSourceEditorPage, type SourceEditableType } from './page';
 import { shouldBlockPublish, runPostPublishTests } from '../../tests/block-gate';
 import { normalizeVersionMessage, scheduleVersionSummary } from '../../artifacts/version-summary';
+import { carriedManifestJson } from '../../mcp-broker/capabilities';
 
 export const SOURCE_EDITABLE_TYPES: ReadonlySet<ArtifactType> = new Set<ArtifactType>([
   'markdown',
@@ -184,11 +185,13 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
       ? { ...generateTypeMetadata(type, body.content, mime), ...(prevMeta.source ? { source: prevMeta.source } : {}) }
       : prevMeta);
 
+    // Editor saves keep the live version's runtime capabilities (MCP grants).
+    const manifestJson = await carriedManifestJson(env, artifactId);
     await env.DB.batch([
       env.DB.prepare(
         `INSERT INTO versions (id, artifact_id, version_no, entrypoint, manifest_json, created_at, created_by, source, message, message_source)
-         VALUES (?, ?, ?, ?, '{}', strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?, 'editor', ?, ?)`
-      ).bind(versionId, artifactId, newVersionNo, entrypoint, ctx.userId, message, message ? 'author' : null),
+         VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?, 'editor', ?, ?)`
+      ).bind(versionId, artifactId, newVersionNo, entrypoint, manifestJson, ctx.userId, message, message ? 'author' : null),
       env.DB.prepare(
         `INSERT INTO assets (id, version_id, path, r2_key, mime, size_bytes, sha256)
          VALUES (?, ?, ?, ?, ?, ?, ?)`

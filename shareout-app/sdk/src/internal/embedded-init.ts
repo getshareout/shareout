@@ -30,6 +30,12 @@ export function setPostMessageData(data: EmbeddedInitialData): void {
 // sandboxed artifact may need several seconds for shareout:init (ADR 30).
 export const POST_MESSAGE_INIT_TIMEOUT_MS = 10_000;
 
+// Only the framing page may seed init data: a nested frame or a popup the artifact
+// opened can also post into this window, and the payload carries the data token.
+function isParentInit(e: MessageEvent): boolean {
+  return e.source === window.parent && e.data?.type === 'shareout:init' && !!e.data.data;
+}
+
 export async function waitForPostMessageInit(timeoutMs: number = POST_MESSAGE_INIT_TIMEOUT_MS): Promise<void> {
   if (typeof window === 'undefined') return;
   if (window.parent === window) return;
@@ -38,7 +44,7 @@ export async function waitForPostMessageInit(timeoutMs: number = POST_MESSAGE_IN
   await new Promise<void>((resolve) => {
     const timeout = setTimeout(resolve, timeoutMs);
     const handler = (e: MessageEvent) => {
-      if (e.data?.type === 'shareout:init' && e.data.data) {
+      if (isParentInit(e)) {
         postMessageData = e.data.data as EmbeddedInitialData;
         clearTimeout(timeout);
         window.removeEventListener('message', handler);
@@ -54,7 +60,7 @@ export async function waitForPostMessageInit(timeoutMs: number = POST_MESSAGE_IN
 // Set up listener early to catch init message from parent frame
 if (typeof window !== 'undefined') {
   window.addEventListener('message', (e) => {
-    if (e.data?.type === 'shareout:init' && e.data.data) {
+    if (isParentInit(e)) {
       postMessageData = e.data.data as EmbeddedInitialData;
     }
   });
