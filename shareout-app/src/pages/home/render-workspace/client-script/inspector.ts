@@ -133,9 +133,11 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       // A PDF has no viewer shell, so a converted deck's "Download original" lives here.
       + (meta && meta.original && type === 'pdf' ? iconBtn('original', t('inspector.act.original'), SVG_DOWNLOAD) : '')
       + (canMoveToAssets(meta) ? iconBtn('toassets', t('move.toAssets'), SVG_TO_ASSETS) : '')
+      + (editable && art.id ? iconBtn('tpl', t('tpl.saveAs'), '<rect x="3" y="3" width="18" height="6" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="14" y="13" width="7" height="8" rx="1.5"/>') : '')
       + (meta && meta.can_delete ? iconBtn('trash', t('inspector.act.trash'), SVG_TRASH, 'is-danger') : '')
       + '</div>';
     h += '<div class="wsx-det__sec wsx-det__approval" id="wsxApprove" hidden></div>';
+    h += '<div class="wsx-det__sec" id="wsxTplNote" hidden></div>';
     h += pagesHtml(meta, art);
 
     // Section bodies, keyed; rendered in the user's saved order.
@@ -172,6 +174,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     rbodyEl.innerHTML = h;
     var root = rbodyEl.querySelector('.wsx__details');
     paintApprovals(art);
+    if (editable && art.id) tplInspect(art.id, rbodyEl.querySelector('#wsxTplNote'));
 
     // inline edits — click to type, Enter to save, blur to autosave
     var enterSaves = function (el) { el.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); } }); };
@@ -214,6 +217,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
         else if (act === 'fav') { toggleFav(art.id, b); var ft = b.classList.contains('is-on') ? t('inspector.favRemove') : t('inspector.favAdd'); b.setAttribute('data-tip', ft); b.setAttribute('aria-label', ft); }
         else if (act === 'trash') { trashArtifact(art); }
         else if (act === 'toassets') { moveToAssets(art, meta); }
+        else if (act === 'tpl') { saveAsTemplate({ artifact_id: art.id, name: name }); }
         else if (act === 'original') { var dl = document.createElement('a'); dl.href = '/a/' + encodeURIComponent(slug) + '/download'; dl.download = ''; document.body.appendChild(dl); dl.click(); dl.remove(); }
       });
     });

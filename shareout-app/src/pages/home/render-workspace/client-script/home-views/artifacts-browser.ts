@@ -110,7 +110,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     return '<div class="wsx-fbar__acts">' + ctl + link + '</div>';
   }
   function folderHead(d) {
-    var crumbs = curFolder ? '<div class="wsx-fbar">' + folderCrumbs(d) + folderAccessBar(d) + '</div>' : '';
+    var crumbs = curFolder ? '<div class="wsx-fbar">' + folderCrumbs(d) + folderAccessBar(d) + '<button type="button" class="wsx-abtn" onclick="saveFolderAsTemplate()">' + esc(t('tpl.saveAs')) + '</button></div>' : '';
     var guide = folderGuide(d);
     // Subfolders render the same "Folders" section whether at root or drilled in;
     // nesting repeats root behaviour, so managers get New folder / rename / delete at any depth.
@@ -223,6 +223,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
   })();
   // ===== folder navigation + management (Drive-style drill-in) =====
   window.enterFolder = function (id, name) { curFolder = id; curFolderName = name || ''; loadArtifacts(); };
+  window.saveFolderAsTemplate = function () { if (curFolder) saveAsTemplate({ folder_id: curFolder, name: curFolderName }); };
   window.exitFolder = function () { curFolder = ''; curFolderName = ''; loadArtifacts(); };
   // Hash router entry (#l/artifacts/<folderId>); runs before openView loads the grid.
   function artRoute(id) { id = id || ''; if (id !== curFolder) { curFolder = id; curFolderName = ''; } }

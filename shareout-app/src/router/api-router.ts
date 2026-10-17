@@ -23,6 +23,7 @@ import { routeAccessRequestsApi } from './api/access-requests';
 import { routeSupportApi } from './api/support';
 import { routeCatalogApi } from './api/catalog';
 import { routeKnowledgeApi } from './api/knowledge';
+import { routeTemplatesApi } from './api/templates';
 import { routeDemoApi } from './api/demo';
 import { jsonError } from './helpers/json-response';
 import { routeArtifactMcpApi } from './api/artifact-mcp';
@@ -54,6 +55,7 @@ export async function routeApi(ctx: FetchContext): Promise<Response | null> {
       (await routeSupportApi(ctx)) ??
       (await routeCatalogApi(ctx)) ??
       (await routeKnowledgeApi(ctx)) ??
+      (await routeTemplatesApi(ctx)) ??
       (await routeDemoApi(ctx))
     );
   } catch (err) {

@@ -157,7 +157,7 @@ const TABLE_OWNERS = {
   presentations: 'src/present', rate: 'src/api-auth.ts', scheduled: 'src/scheduling', secret: 'src/data/secrets',
   share: 'src/present', sharee: 'src/sharees', sharees: 'src/sharees', sheet: 'src/data/sheets',
   sheets: 'src/data/sheets', skill: 'src/skill-marketplace.ts', slide: 'src/present', slides: 'src/present',
-  ticket: 'src/support', tickets: 'src/support', tokens: 'src/api-auth.ts', upload: 'src/data/datasets',
+  template: 'src/templates', templates: 'src/templates', ticket: 'src/support', tickets: 'src/support', tokens: 'src/api-auth.ts', upload: 'src/data/datasets',
   user: 'src/users', users: 'src/users', versions: 'src/publish', view: 'src/analytics.ts',
   vendor: 'src/vendor-cdn', viewer: 'src/viewers', webhook: 'src/observability', workspace: 'src/workspaces',
   workspaces: 'src/workspaces',

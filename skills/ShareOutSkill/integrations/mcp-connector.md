@@ -56,6 +56,9 @@ your ShareOut account"). Allow, and the app is connected.
 | `list_connections` | The workspace's data connectors; `queryable` (SQL) / `files` (S3) only when an admin switched AI on for that connector |
 | `query_connection` | One read-only `SELECT` on a warehouse connector (Snowflake, BigQuery, Redshift, Aurora, Supabase); `connection`, `sql`, optional `project_id` (BigQuery); ≤ 1000 rows |
 | `browse_storage` | Amazon S3 connector: `action: "list"` (+ `prefix`) or `"read"` (+ `key`); CSV → rows, JSON → data, text → text |
+| `list_templates` | Templates installable in a workspace (`workspace_id`; omit for the personal space): its own, shared with it, and the instance library; optional `query` / `tag` |
+| `install_template` | Install `template_id` into `workspace_id` (optional `folder`): returns the new pages' links and the finish-setup steps (data sources to connect, tables to fill) |
+| `save_as_template` | Save a page (`artifact_id`) or folder (`folder_id`) as a template; may answer `review_required` with findings to show the person before repeating with `acknowledge_findings: true`. `scope: instance` is instance-admin only |
 | `get_help` | Short how-to and links |
 | `report_problem` | Opens a support ticket for the ShareOut team |
 | `search` / `fetch` | Read-only, ChatGPT deep-research shape. `search` covers all the person's workspaces unless `workspace_id` (id or slug) narrows it; `fetch` is by id |
