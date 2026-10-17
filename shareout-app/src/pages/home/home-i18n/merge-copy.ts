@@ -10,6 +10,7 @@ import { COMPOSER_COPY } from './copy/composer';
 import { CONNECT_COPY } from './copy/connect';
 import { DROP_IMPORT_COPY } from './copy/drop-import';
 import { ERRORS_COPY } from './copy/errors';
+import { FILE_IMPORT_COPY } from './copy/file-import';
 import { FOLDER_ACCESS_COPY } from './copy/folder-access';
 import { FOLDER_CONTENTS_COPY } from './copy/folder-contents';
 import { GUEST_COMMENTS_COPY } from './copy/guest-comments';
@@ -61,6 +62,7 @@ const COPY_MODULES: HomeLocaleCopy[] = [
   STUDIO_COPY,
   NEW_MENU_COPY,
   DROP_IMPORT_COPY,
+  FILE_IMPORT_COPY,
   PAGES_COPY,
   ERRORS_COPY,
   VERSION_CHANGELOG_COPY,
