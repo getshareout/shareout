@@ -33,6 +33,12 @@ Un nivel más alto incluye los de abajo. Podés compartir una carpeta entera con
 
 Quienes gestionan una carpeta (no solo los admins) también pueden hacerlo desde el panel **Quién tiene acceso** de la carpeta. Solo se relaja el rol de admin: el workspace igual necesita compartir con externos activado, y el email tiene que pasar los dominios permitidos del workspace. Quitar a alguien nunca necesita el entitlement. Pueden elegir cuándo termina el acceso: **En 7 días**, **En 30 días**, **En 90 días**, **En una fecha…** o **Nunca**. El acceso se corta apenas vence; si volvés a compartir, la fecha nueva reemplaza a la anterior. El email de invitación lleva directo al portal de la carpeta. Mirá [Portales de clientes](/es/teams/client-portals/).
 
+### Acceso de invitado (sin cuenta)
+
+Para una carpeta, marcá **Acceso de invitado: sin cuenta** al compartir. La persona recibe un mail con un enlace que abre la carpeta; nada le pide crear una cuenta, recordar una contraseña ni elegir un workspace. En otro dispositivo abre el enlace del portal, escribe su mail e ingresa el código de 6 dígitos que le mandamos.
+
+Un invitado ve solo esa carpeta y lo que tiene adentro, hasta el acceso que elegiste (**Puede ver** o **Puede comentar**). No tiene página de inicio, búsqueda, lista de miembros ni asistente. Si lo quitás, si pasa la fecha de fin o si borrás la carpeta, pierde el acceso en su próximo clic. API: `share-person` con `"guest": true`. Mirá [Portales de clientes](/es/teams/client-portals/#invitados-sin-cuenta).
+
 ## Recibos de lectura
 
 Cada vez que un cliente abre algo que compartiste, queda registrado. En la vista del cliente vas a ver actividad reciente — *"alguien en Acme abrió el deck del Q3."* Una señal clara para renovaciones y seguimiento.

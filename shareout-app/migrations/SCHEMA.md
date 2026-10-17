@@ -1,6 +1,6 @@
 # ShareOut database schema
 
-What every one of the **137 tables** is for, grouped the way
+What every one of the **141 tables** is for, grouped the way
 [`0000_init.sql`](0000_init.sql) groups them. Rules for *new* tables live in
 [CONVENTIONS.md](CONVENTIONS.md); this document describes what exists today.
 
@@ -85,7 +85,7 @@ erDiagram
 
 | Table | Holds |
 |---|---|
-| `users` | The account. `tier` drives quota lookups, `disabled` soft-bans, `is_service` marks non-human accounts, `identity_id` links merged identities, `last_janitor_at` tracks background cleanup. `locale` (`en`/`es`) is the person's own language; NULL follows the workspace. |
+| `users` | The account. `google_id` and `microsoft_id` (`<tid>:<oid>`, 0019) key the social sign-ins. `tier` drives quota lookups, `disabled` soft-bans, `is_service` marks non-human accounts, `identity_id` links merged identities, `last_janitor_at` tracks background cleanup. `locale` (`en`/`es`) is the person's own language; NULL follows the workspace. |
 | `user_passwords` | PBKDF2 digest, `salt`, and the `iterations` used, stored per row so the cost can be raised later without invalidating existing credentials. Deliberately **not** columns on `users`, so no ordinary `SELECT` on `users` carries a password hash. It is the credential a fresh instance can issue with no EMAIL binding and no OAuth client. |
 | `user_profiles` | Optional public profile: freeform `profile_md` and a `follows` list. |
 | `tokens` | Every bearer token. `principal_type` is `user` (a personal `so_` token) or `workspace` (a `sot_` agent token); `user_id` is always the identity it authenticates as. Only `token_hash` is stored — the plaintext is shown once at creation. `scopes` is NULL for personal tokens, a csv for workspace ones, and `subject_external_user_id` lets a token act on behalf of an external user. Revocable via `revoked_at`. |
@@ -113,6 +113,7 @@ erDiagram
     workspaces ||--o{ grants            : "authorises"
     workspaces ||--o{ sharees           : "shares with"
     workspaces ||--o{ tokens            : "issues"
+    workspaces ||--o{ workspace_domains : "serves on"
     sharees    ||--o{ sharee_members    : "contains"
     sharees    ||--o{ sharee_activity   : "logs"
     artifacts  ||--o{ collaborators     : "invites"
@@ -131,6 +132,8 @@ The five paths: **membership** (`workspace_members`), **per-artifact invite**
 | `workspace_invite_claims` | Pending invites. `code_hash` only; `expires_at` and `claimed_at` make each single-use. `email_status` (`sent`/`failed`/`skipped`/`link_only`) with `email_sent_at` and `email_error` record whether the invite mail actually went out — null on rows minted before that was tracked. |
 | `workspace_llm_config` | Per-workspace AI settings: bring-your-own provider credentials (encrypted), `balance_micro_usd`, `markup_multiplier`, monthly budget, `gateway_model` override. |
 | `workspace_sso_config` | The workspace's own OIDC sign-in (Okta, Entra ID, …): `issuer`, `client_id`, the client secret encrypted with `CREDENTIALS_KEY`, and `email_domains` — the only addresses this IdP may sign in, each claimed by at most one workspace. `is_enforced` makes it the only sign-in method for those domains. Written by the instance owner only. |
+| `workspace_domains` | *(0020)* Customer-owned hostnames a workspace serves on (`portal.acme.example`), besides `<slug>.<apex>`. `hostname` is normalized (lowercase, punycode) and globally unique. Only `status = 'active'` routes; it takes a verified ownership check — `provider = 'cloudflare'` (a Cloudflare for SaaS custom hostname, `provider_id` its id, `ssl_status` its certificate) or `'manual'` (a DNS TXT record `verification_name` = `verification_token`). `is_primary` marks the one hostname links and emails use. |
+| `workspace_domain_handoffs` | *(0020)* One-time sign-in codes that carry an apex login to a custom hostname (whose cookie cannot be the apex's). `code_hash` only; bound to one `hostname`, `expires_at` a minute out, spent by `used_at`. |
 | `workspace_event_visibility` | Which member audience sees which activity-feed event kind. |
 | `workspace_library` | Workspace- or user-scoped published modules, with `namespace`/`module_name` and install counters. |
 | `workspace_files` | The workspace's virtual filesystem, one row per file. `namespace` is the directory — `context` (markdown fed to agents, where `updated_by_kind` distinguishes human from agent edits), `catalog` (the data catalogue) and `knowledge` (the learned knowledge base). `scope_id` narrows a file to one sharee; `''` means workspace-wide. |
@@ -200,6 +203,10 @@ here would silently drop artifacts from listings.
 | `user_recent_views` | Most-recent-view index powering "jump back in". |
 | `user_recent_searches` | *(0017)* The last queries a person ran in the search palette, per `scope_key` (the workspace id, or `''` for personal / all pages). `query_key` is the accent- and case-folded query, so re-running one moves it to the top instead of adding a row; the app keeps 20 per user and scope. |
 | `share_links` | Tokenised links to a presentation or artifact, gated by `gate`/`gate_value`, with `expires_at`, `max_views`, `revoked`. |
+| `templates` | *(0022)* A reusable, scrubbed snapshot of an artifact or folder that installs into other workspaces. `scope` is `private` (home workspace; creator only when `workspace_id` is NULL), `shared` (plus `template_shares`) or `instance` (every workspace; platform admins only). `source_kind`/`source_id` say where new versions are snapshotted from; `preview_r2_key` is an optional image. See `src/templates/`. |
+| `template_versions` | *(0022)* Immutable versions: `version_label` (semver), `manifest_json` (items, folder tree, table/dataset schemas, connector placeholders, setup steps). Files live in R2 under `templates/<id>/<version_no>/…`, already link-tokenized and secret-redacted. Never holds source data, credentials, comments, Knowledge or analytics. |
+| `template_shares` | *(0022)* Extra workspaces a `shared` template reaches. |
+| `template_installs` | *(0022)* Which artifact came from which template item at which `version_no`; `install_group` ties one install together so an update keeps links consistent. Drives "update available". |
 
 ## 04 Data connections
 
@@ -484,6 +491,10 @@ erDiagram
 | `knowledge_ingest` | Queue of artifacts awaiting knowledge extraction, deduped by `content_hash`. |
 | `knowledge_settings` | Per-workspace enable flag and `last_consolidated_at`. |
 | `knowledge_tombstones` | Paths deliberately forgotten, so re-ingestion does not resurrect them. |
+| `file_import_connections` | *(0021)* One member's read-only consent to a cloud drive (`provider` Google Drive or Microsoft) inside one workspace — separate from signing in. Tokens are one AES-GCM blob in `encrypted_credentials` + `iv`; never returned to clients. |
+| `file_import_sources` | *(0021)* A remote folder mirrored into the workspace: where it lives (`remote_drive_id`, `remote_folder_id`), the ShareOut `target_folder_id`, `convert_enabled`, and the optional daily sync (`daily_sync_enabled`, `next_sync_at`). `connection_id` goes NULL on disconnect, which stops syncing. |
+| `file_import_runs` | *(0021)* One pass over a source: `status`, the progress counts (found, imported, converted, skipped, unchanged, failed) and why it stopped (`stop_code`). |
+| `file_import_items` | *(0021)* The idempotency ledger: each remote folder/file (`remote_id`) and what it became here (`folder_id`, `deliverable_id`, `artifact_id`). A re-run imports a file only when `remote_version` differs from `synced_version`. |
 
 ## 14 Moderation, support & tests
 

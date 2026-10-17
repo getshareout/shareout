@@ -10,6 +10,7 @@ import { COMPOSER_COPY } from './copy/composer';
 import { CONNECT_COPY } from './copy/connect';
 import { DROP_IMPORT_COPY } from './copy/drop-import';
 import { ERRORS_COPY } from './copy/errors';
+import { FILE_IMPORT_COPY } from './copy/file-import';
 import { FOLDER_ACCESS_COPY } from './copy/folder-access';
 import { FOLDER_CONTENTS_COPY } from './copy/folder-contents';
 import { GUEST_COMMENTS_COPY } from './copy/guest-comments';
@@ -28,6 +29,7 @@ import { ONBOARDING_COPY } from './copy/onboarding';
 import { SEARCH_COPY } from './copy/search';
 import { SHELL_COPY } from './copy/shell';
 import { STUDIO_COPY } from './copy/studio';
+import { TEMPLATES_COPY } from './copy/templates';
 import { TIME_COPY } from './copy/time';
 import { VERSION_CHANGELOG_COPY } from './copy/version-changelog';
 import { WORKSPACE_COPY } from './copy/workspace';
@@ -63,9 +65,11 @@ const COPY_MODULES: HomeLocaleCopy[] = [
   STUDIO_COPY,
   NEW_MENU_COPY,
   DROP_IMPORT_COPY,
+  FILE_IMPORT_COPY,
   PAGES_COPY,
   ERRORS_COPY,
   VERSION_CHANGELOG_COPY,
+  TEMPLATES_COPY,
 ];
 
 function mergeLocale(locale: HomeLocale): Record<string, string> {

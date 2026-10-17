@@ -111,6 +111,9 @@ Requirements:
 
 On self-host, if `eligible` is false, fix DNS/`SHAREOUT_BASE_URL` — do not suggest a paid plan.
 
+A workspace can also serve on a hostname the customer owns (`portal.acme.example`):
+`GET/POST $ORIGIN/v1/workspaces/{id}/domains`. See [custom-domain.md](custom-domain.md).
+
 ## Workspace context files
 
 Optional house rules for agents: style, voice, structure, data notes.
@@ -170,6 +173,7 @@ One artifact owns a table and opts it into the workspace; others read/write with
 | Data catalog | [catalog.md](catalog.md) |
 | Shared tables | [workspace-tables.md](workspace-tables.md) |
 | External sharing | [external-sharing.md](external-sharing.md) |
+| Drive / SharePoint folder import | [file-imports.md](file-imports.md) |
 | Folders | [folders.md](folders.md) |
 
 Metric alerts: base skill [../api/metric-alerts.md](../api/metric-alerts.md).
@@ -181,6 +185,7 @@ Metric alerts: base skill [../api/metric-alerts.md](../api/metric-alerts.md).
 - [api.md](api.md) — workspace REST details (skip billing section on self-host)  
 - [admin-portal.md](admin-portal.md)  
 - [subdomain.md](subdomain.md)  
+- [custom-domain.md](custom-domain.md)  
 - [workspace-context.md](workspace-context.md)  
 - [workspace-connections.md](workspace-connections.md)  
 - [workspace-tables.md](workspace-tables.md)  

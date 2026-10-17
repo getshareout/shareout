@@ -47,13 +47,19 @@ import type { FetchContext } from './context';
 import { isLocalRequest } from './helpers/is-local-request';
 import { getTokenOrSessionUser, isAuthUser, requireToken } from './helpers/auth-guard';
 import { jsonError, jsonResponse } from './helpers/json-response';
-import { googleOAuthConfigured } from '../config/auth-providers';
-import { appLoginPage } from '../auth/pages';
+import { googleOAuthConfigured, microsoftOAuthConfigured } from '../config/auth-providers';
+import { handleMicrosoftLogin, handleMicrosoftCallback } from '../auth/microsoft-oauth';
+import { appLoginPage, errorPage } from '../auth/pages';
 import { pageLocale } from '../i18n/accept-language';
 import { loadLoginBrand } from '../workspaces/branding';
 import { handleSsoStart, handleSsoCallback } from '../auth/oidc';
 import { getSsoConfigBySlug, getSsoConfigForEmail, ssoStartPath } from '../auth/sso-config';
 import { parseSubdomainFromEnv } from '../subdomain';
+import {
+  HANDOFF_CALLBACK_PATH, HANDOFF_START_PATH, handleHandoffCallback, handleHandoffStart, handoffStartUrl,
+} from '../workspaces/domains/handoff';
+import { workspaceByHostname } from '../workspaces/host-cache';
+import { normalizeHostname } from '../workspaces/domains/hostname';
 
 export async function routeAuth(ctx: FetchContext): Promise<Response | null> {
   try {
@@ -71,6 +77,18 @@ export async function routeAuth(ctx: FetchContext): Promise<Response | null> {
 
 async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
   const { request, env, path, url, hostname, addCORS } = ctx;
+
+  // Custom domains: the apex session cookie never reaches them and OAuth/SSO callbacks
+  // live on the apex, so every sign-in start goes through the apex handoff.
+  if (env.CUSTOM_HOST && request.method === 'GET') {
+    if (path === '/auth/login' || path === '/auth/google' || path === '/auth/microsoft' || path === '/auth/sso') {
+      return Response.redirect(handoffStartUrl(env, env.CUSTOM_HOST.hostname, url.searchParams.get('redirect')), 302);
+    }
+    if (path === HANDOFF_CALLBACK_PATH) return handleHandoffCallback(request, env);
+  }
+  if (path === HANDOFF_START_PATH && request.method === 'GET' && !env.CUSTOM_HOST) {
+    return handleHandoffStart(request, env);
+  }
 
   if (path === '/v1/auth/email/start' && request.method === 'POST') {
     return addCORS(await handleEmailOtpStart(ctx));
@@ -241,13 +259,14 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
   if (path === '/auth/login' && request.method === 'GET') {
     const redirect = url.searchParams.get('redirect') || '/home';
     const loginHint = url.searchParams.get('login_hint');
-    const slug = parseSubdomainFromEnv(url.hostname, env).workspaceSlug;
+    const slug = parseSubdomainFromEnv(url.hostname, env).workspaceSlug || await handoffWorkspaceSlug(env, redirect);
     const sso = slug ? await getSsoConfigBySlug(env, slug) : null;
     const ws = slug ? await loadLoginBrand(env, slug) : null;
     return appLoginPage({
       redirect,
       turnstileSiteKey: env.TURNSTILE_CLOUDFLARE_SITEKEY,
       googleEnabled: googleOAuthConfigured(env),
+      microsoftEnabled: microsoftOAuthConfigured(env),
       loginHint,
       emailConfigured: Boolean(env.EMAIL),
       sso: sso ? { label: sso.buttonLabel, href: ssoStartPath(sso.workspaceSlug, redirect, loginHint), enforced: sso.enforced } : null,
@@ -282,6 +301,19 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
     return handleGoogleLogin(request, env);
   }
 
+  if (path === '/auth/microsoft' && request.method === 'GET') {
+    if (!microsoftOAuthConfigured(env)) {
+      const redirect = url.searchParams.get('redirect') || '/home';
+      return Response.redirect(new URL(`/auth/login?redirect=${encodeURIComponent(redirect)}`, url.origin).toString(), 302);
+    }
+    return handleMicrosoftLogin(request, env);
+  }
+
+  if (path === '/auth/microsoft/callback' && request.method === 'GET') {
+    if (!microsoftOAuthConfigured(env)) return errorPage('Microsoft sign-in is not configured.', '/auth/login');
+    return handleMicrosoftCallback(request, env, ctx.executionCtx);
+  }
+
   if (path === OPEN_PATH && request.method === 'GET') {
     return handleTelegramOpen(request, env);
   }
@@ -313,4 +345,13 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
   }
 
   return null;
+}
+
+// Sign-in started on a custom domain: brand the apex login page (and offer its SSO)
+// as that workspace's, as its own subdomain would.
+async function handoffWorkspaceSlug(env: FetchContext['env'], redirect: string): Promise<string | null> {
+  if (!redirect.startsWith(`${HANDOFF_START_PATH}?`)) return null;
+  const host = normalizeHostname(new URLSearchParams(redirect.slice(HANDOFF_START_PATH.length + 1)).get('host'));
+  if (!host) return null;
+  return (await workspaceByHostname(env, host).catch(() => null))?.slug ?? null;
 }

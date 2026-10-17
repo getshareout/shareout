@@ -100,6 +100,8 @@ export interface RenderArgs {
   isInstanceAdmin: boolean;
   /** Instance has the slides converter (SLIDES_CONVERTER) → .pptx/.ppt/.odp import as PDF, not Assets. */
   slidesImport?: boolean;
+  /** Cloud drives this instance can import folders from (src/file-imports); empty hides the entry point. */
+  fileImportProviders?: string[];
   /** Public origin of this instance — the Connect view's MCP / skill URLs point here. */
   platformOrigin?: string;
   hostname: string;

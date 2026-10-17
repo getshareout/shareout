@@ -149,6 +149,19 @@ export function normalizeIssuer(raw: string): string | null {
   }
 }
 
+const ENTRA_TENANT_ISSUER = /^https:\/\/login\.microsoftonline\.com\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/v2\.0$/i;
+
+/**
+ * Entra ID issuers must name one tenant by its GUID. `common` / `organizations` /
+ * `consumers` would let any Microsoft tenant assert addresses on this workspace's
+ * domains, and a domain-name tenant publishes a GUID issuer that never matches.
+ */
+export function entraIssuerProblem(issuer: string): string | null {
+  if (new URL(issuer).hostname !== 'login.microsoftonline.com') return null;
+  if (ENTRA_TENANT_ISSUER.test(issuer)) return null;
+  return 'For Microsoft Entra ID use the tenant-specific v2.0 issuer, https://login.microsoftonline.com/<directory-tenant-id>/v2.0 (not common, organizations, consumers or a domain name).';
+}
+
 /** Create or replace a workspace's SSO config. `client_secret` may be omitted on update. */
 export async function upsertSsoConfig(
   env: Env,
@@ -164,6 +177,8 @@ export async function upsertSsoConfig(
 
   const issuer = normalizeIssuer(input.issuer || '');
   if (!issuer) return invalid('issuer must be an https URL, e.g. https://acme.okta.com/oauth2/default');
+  const entraProblem = entraIssuerProblem(issuer);
+  if (entraProblem) return invalid(entraProblem);
   const clientId = (input.client_id || '').trim();
   if (!clientId) return invalid('client_id is required');
 

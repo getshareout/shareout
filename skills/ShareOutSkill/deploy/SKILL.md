@@ -421,6 +421,7 @@ Do these only if the user asked — order of value:
 | Company domain | Custom domain on Worker + update `SHAREOUT_BASE_URL` | [cloudflare.md](cloudflare.md#custom-domain) |
 | Workspace subdomains | Wildcard DNS `*.company.com` → Worker | [cloudflare.md](cloudflare.md#workspace-subdomains) |
 | Google login | `GOOGLE_CLIENT_ID` / `SECRET`; callback `$ORIGIN/auth/callback` | secrets (`docs-site/src/content/docs/self-host/secrets.md` in the `getshareout/shareout` repo) |
+| Microsoft login | `MICROSOFT_CLIENT_ID` / `SECRET` (+ optional `MICROSOFT_TENANT`); callback `$ORIGIN/auth/microsoft/callback` | [cloudflare.md](cloudflare.md#sign-in-with-microsoft) |
 | Emailed one-time codes | Email binding / Email Routing | skill **cloudflare-email-service** |
 | Split artifact CDN | Second host + `ARTIFACT_ORIGIN` | optional hardening |
 | Docs site | Deploy `docs-site/` separately; set `DOCS_HOST` + `DOCS_ORIGIN` | optional |

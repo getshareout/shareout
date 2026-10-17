@@ -41,6 +41,9 @@ import { renderToolbar } from './toolbar';
 import { getViewerConfig } from '../../data/viewer-config';
 import { isVisualEditorEnabled } from '../../editor/visual-editor-gate';
 import { localeForArtifactWorkspace, localeFromAcceptLanguage } from '../../i18n/locale';
+import { spaceGuestFor } from '../../sharees/space-guest';
+import { capabilitySatisfies } from '../../access/can-access';
+import { servingOrigin } from '../../workspaces/domains/host-binding';
 
 /**
  * Stream a sandboxed HTML wrapper around an artifact iframe.
@@ -75,7 +78,7 @@ export async function serveSandboxedViewer(
   // `?section=<heading id>`: open the page scrolled to that heading (validated by the caller).
   section?: string,
 ): Promise<Response> {
-  const baseUrl = env.SHAREOUT_BASE_URL.replace(/\/$/, '');
+  const baseUrl = servingOrigin(env);
   // The home Studio loads the artifact in an iframe with ?wsx=1; the Studio's right
   // rail already provides share/comments/details, so suppress the in-artifact toolbar.
   const studioEmbed = new URL(request.url).searchParams.has('wsx');
@@ -146,6 +149,8 @@ export async function serveSandboxedViewer(
       const viewerConfigPromise = getViewerConfig(env, artifactId);
 
       const user = await sessionUserPromise;
+      // No account, but a space-guest session reaching this artifact (checkAccess let it in).
+      const spaceGuest = user ? null : await spaceGuestFor(request, env, 'artifact', artifactId, 'view');
 
       const [initialJsonData, initialTableData, adminInfo, favInfo, commentsInfo, hasMetrics, viewerConfig, visualEditorEnabled, attachedSkills, profile, locale] = await Promise.all([
         initialJsonPromise,
@@ -198,6 +203,7 @@ export async function serveSandboxedViewer(
         initialTableData,
         adminInfo,
         profile,
+        spaceGuest,
       );
 
       const bridgeScript = contentHost
@@ -212,7 +218,7 @@ export async function serveSandboxedViewer(
         isFav: favInfo.isFavorite,
         commentsEnabled: commentsInfo.enabled,
         commentsIdentityMode: commentsInfo.identityMode,
-        commentsGuest: commentsInfo.guest,
+        commentsGuest: commentsInfo.guest || (commentsInfo.enabled && !!spaceGuest && capabilitySatisfies(spaceGuest.capability, 'comment')),
         commentCount: commentsInfo.count,
         hasMetrics,
         adminInfo,

@@ -35,6 +35,27 @@ en tu workspace. **← Shared with you** vuelve a todo lo que se compartió con 
 Si la carpeta no existe o no se compartió con esa persona, el enlace abre su página
 completa de **Shared with you**, sin decir por qué.
 
+## Invitados sin cuenta
+
+Compartí la carpeta con **Acceso de invitado: sin cuenta** marcado y la persona puede abrir
+el portal sin registrarse:
+
+- **Desde el mail:** el enlace la deja entrar en ese navegador y abre el portal. Sirve por
+  14 días (o hasta que termine el acceso, si es antes).
+- **En cualquier dispositivo:** el enlace del portal muestra una tarjeta "Abrí un espacio
+  compartido". Escribe su mail, recibe un código de 6 dígitos (vale 10 minutos) y entra.
+  La tarjeta es igual para cualquier enlace, así que nunca revela si una carpeta existe.
+  **Iniciar sesión**, en la misma tarjeta, es para quien sí tiene cuenta en ShareOut.
+
+El portal de un invitado lleva la marca de tu **workspace** (logo, color y nombre). Puede
+abrir cada página y archivo de la carpeta y sus subcarpetas. Con **Puede comentar** comenta
+como la persona que verificó, sin un segundo código. Nunca ve nada más del workspace.
+
+El acceso se revisa en cada pedido: si quitás al invitado, si pasa la fecha de fin o si
+borrás la carpeta, se corta en el momento. Un invitado queda con la sesión abierta hasta 7
+días y después pide un código nuevo. Los invitados aparecen en **Quién tiene acceso**
+marcados como *invitado*, y en **Quién abrió qué**.
+
 ## Acceso con vencimiento
 
 Cuando compartís con una persona, **El acceso termina** puede ser:

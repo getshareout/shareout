@@ -15,7 +15,8 @@ language.
 | Members, roles, invites | [api.md](api.md#members-and-roles) | [SKILL.md](SKILL.md#workspace-roles) |
 | Allow domains/emails into a workspace | [api.md](api.md#workspace-membership-policy) | [SKILL.md](SKILL.md#workspace-membership-policy) |
 | Custom workspace subdomain | [subdomain.md](subdomain.md) | [../deploy/cloudflare.md](../deploy/cloudflare.md) |
-| Okta / OIDC single sign-on | [sso.md](sso.md) | [admin-portal.md](admin-portal.md) |
+| Okta / Entra ID / OIDC single sign-on | [sso.md](sso.md) | [admin-portal.md](admin-portal.md) |
+| Workspace custom domain (customer hostname) | [custom-domain.md](custom-domain.md) | [../deploy/cloudflare.md](../deploy/cloudflare.md#workspace-custom-domains-cloudflare-for-saas) |
 | Workspace house style for agents | [workspace-context.md](workspace-context.md) | [SKILL.md](SKILL.md#workspace-context-files) |
 | Workspace schedules / automations | [api.md](api.md#workspace-schedules-and-automations) | [../api/jobs.md](../api/jobs.md) |
 | Team-wide metric alert management | [../api/metric-alerts.md](../api/metric-alerts.md) | [api.md](api.md#metric-alerts-in-workspaces) |
@@ -27,6 +28,7 @@ language.
 | Home lenses | [../core/workspace-home.md](../core/workspace-home.md#workspace-lenses) | [SKILL.md](SKILL.md#workspace-admin-surfaces) |
 | Workspace Knowledge | [knowledge.md](knowledge.md) | [workspace-context.md](workspace-context.md) |
 | Asset library / deliverables | [assets.md](assets.md) | [../sdk/files.md](../sdk/files.md) |
+| Import folders from Google Drive / OneDrive / SharePoint | [file-imports.md](file-imports.md) | [assets.md](assets.md) |
 | Workspace file inbox | [assets.md](assets.md#add-files-without-opening-assets) | [workspace-assistant.md](workspace-assistant.md#file-attachments) |
 | Build a page from an uploaded file | [workspace-assistant.md](workspace-assistant.md#file-attachments) | [assets.md](assets.md) |
 | Home activity feed | [activity-feed.md](activity-feed.md) | [../core/workspace-home.md](../core/workspace-home.md) |
@@ -53,6 +55,7 @@ ShareOutSkill/team/
 ├── INDEX.md                  # This router
 ├── api.md                    # Workspace REST endpoints
 ├── subdomain.md              # Workspace subdomain behavior
+├── custom-domain.md          # Customer-owned hostnames per workspace
 ├── workspace-context.md
 ├── workspace-connections.md
 ├── workspace-assistant.md
@@ -65,6 +68,7 @@ ShareOutSkill/team/
 ├── knowledge.md
 ├── agent-tokens.md
 ├── workspace-tables.md
+├── file-imports.md
 ├── folders.md
 └── external-sharing.md
 ```

@@ -105,7 +105,8 @@ After the worker works on `*.workers.dev`:
 4. Redeploy (or update var in dashboard and trigger a new deployment).
 5. Re-run smoke with `SHAREOUT_ORIGIN=https://shareout.company.com`.
 6. If Google OAuth is enabled, update the OAuth client's authorized redirect URI to
-   `https://shareout.company.com/auth/callback`.
+   `https://shareout.company.com/auth/callback`. If Sign in with Microsoft is enabled, add
+   `https://shareout.company.com/auth/microsoft/callback` (Web) to the Entra app registration.
 
 Docs: https://developers.cloudflare.com/workers/configuration/routing/custom-domains/
 
@@ -126,6 +127,45 @@ Workspaces can publish under `https://{workspace-slug}.{your-apex}/…` when DNS
 If you skip wildcards, use path-style URLs only (`$ORIGIN/a/{slug}/`) — still fully valid.
 
 Product behavior: [../team/subdomain.md](../team/subdomain.md).
+
+---
+
+## Workspace custom domains (Cloudflare for SaaS)
+
+Lets a workspace serve on a hostname its customer owns (`portal.acme.example`).
+Product behavior: [../team/custom-domain.md](../team/custom-domain.md).
+
+**Cloudflare for SaaS mode** (Cloudflare verifies ownership and issues certificates):
+
+1. Zone of `SHAREOUT_BASE_URL` → **SSL/TLS → Custom Hostnames** → enable Cloudflare for SaaS.
+2. Add an originless proxied record for the fallback origin, e.g.
+   `fallback.shareout.company.com AAAA 100::`, and set it as the **Fallback Origin**.
+3. Add a proxied CNAME `customers.shareout.company.com → fallback.shareout.company.com`
+   — the CNAME target customers use.
+4. Workers Routes: route `*/*` to the ShareOut Worker (custom hostnames reach it on that
+   route).
+5. Token: **Zone → SSL and Certificates → Edit** on that zone only.
+6. Configure:
+
+   ```bash
+   npx wrangler secret put CF_CUSTOM_HOSTNAMES_TOKEN
+   ```
+
+   ```toml
+   CF_CUSTOM_HOSTNAMES_ZONE_ID = "<zone id>"
+   CUSTOM_DOMAINS_CNAME_TARGET = "customers.shareout.company.com"
+   ```
+
+Docs: https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/start/getting-started/ ·
+https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/start/advanced-settings/worker-as-origin/ ·
+pricing https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/plans/
+(100 hostnames included on every plan, then $0.10/hostname/month).
+
+**Manual mode** (no Cloudflare for SaaS): set only `CUSTOM_DOMAINS_CNAME_TARGET`. ShareOut
+verifies a `_shareout-verify.<host>` TXT record; after a hostname shows **Live**, add it
+yourself as a Workers custom domain or route.
+
+With neither set, custom domains are off and unknown hostnames behave as before.
 
 ---
 
@@ -167,7 +207,12 @@ openssl rand -hex 32 | npx wrangler secret put SESSION_SECRET
 npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put GOOGLE_CLIENT_SECRET
 
-# Workspace SSO (Okta / OIDC) — also encrypts connector credentials
+# Optional Sign in with Microsoft (personal + work/school accounts) — see below
+npx wrangler secret put MICROSOFT_CLIENT_ID
+npx wrangler secret put MICROSOFT_CLIENT_SECRET
+# MICROSOFT_TENANT (var, optional): common (default) | organizations | consumers | <tenant GUID>
+
+# Workspace SSO (Okta / Entra ID / OIDC) — also encrypts connector credentials
 openssl rand -hex 32 | npx wrangler secret put CREDENTIALS_KEY   # then team/sso.md
 
 # Vars (dashboard or wrangler.toml [vars])
@@ -177,6 +222,34 @@ openssl rand -hex 32 | npx wrangler secret put CREDENTIALS_KEY   # then team/sso
 ```
 
 Full table: self-host secrets (`docs-site/src/content/docs/self-host/secrets.md` in the `getshareout/shareout` repo).
+
+## Sign in with Microsoft
+
+One app registration for the whole instance; the button appears on `/auth/login` and on
+private-page sign-in once both secrets are set. In the
+[Microsoft Entra admin center](https://entra.microsoft.com) (your own tenant):
+
+1. **Entra ID → App registrations → New registration.** Name: what people see on
+   Microsoft's consent screen. **Supported account types: Any Entra ID Tenant + Personal
+   Microsoft accounts** (pair with `MICROSOFT_TENANT=common`, the default). Work accounts
+   only → **Multiple Entra ID tenants** + `organizations`; one company →
+   **Single tenant** + that **Directory (tenant) ID**.
+2. **Authentication → Add Redirect URI → Web:** `$SHAREOUT_BASE_URL/auth/microsoft/callback`.
+3. **Certificates & secrets → New client secret** → copy the **Value** →
+   `wrangler secret put MICROSOFT_CLIENT_SECRET`. **Overview → Application (client) ID** →
+   `wrangler secret put MICROSOFT_CLIENT_ID`.
+4. **Token configuration → Add optional claim → ID:** `email` and `xms_edov` (accept the
+   Graph `email` permission prompt). Without `xms_edov`, work/school accounts are refused:
+   Microsoft does not verify `email`, and ShareOut links accounts by email.
+5. Recommended: drop unverified emails at the source —
+   `PATCH https://graph.microsoft.com/v1.0/applications/{object-id}/authenticationBehaviors`
+   `{"removeUnverifiedEmailClaim": true}` (Graph Explorer, `Application.ReadWrite.All`).
+6. Multi-tenant: complete **Branding & properties → Publisher verification**, or many
+   organizations' consent policies block an unverified app.
+
+Personal accounts are trusted as Microsoft verifies their address; work/school accounts
+need `xms_edov` = true. Accounts are keyed by `tid:oid`, so a reassigned address never
+merges into someone else's account. Enforced workspace SSO domains are sent to their IdP.
 
 ---
 

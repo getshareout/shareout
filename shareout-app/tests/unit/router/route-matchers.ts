@@ -53,6 +53,16 @@ export function sampleUrlFor(matcher: string, kind: MatcherKind): string {
 }
 
 function fillGroup(body: string): string {
+  const simple = simpleFill(body);
+  // A group mixing literals and character classes (`tpl_[a-f0-9]+`, `[0-9]+\.[A-Za-z0-9_-]+`):
+  // build one char per class when the simple fill would not match.
+  if (!body.includes('[') || new RegExp(`^(?:${body})$`).test(simple)) return simple;
+  return body
+    .replace(/\[(\^?)((?:\\.|[^\]\\])*)\][+*]?/g, (_c, neg: string, cls: string) => (neg ? 'p' : cls.replace(/^\\/, '').charAt(0)))
+    .replace(/\\(.)/g, '$1');
+}
+
+function simpleFill(body: string): string {
   if (body === '\\d+') return '1';
   if (/^\[.*\][+*]$/.test(body) || body === '.+' || body === '.*') return 'probe';
   if (/^[a-z0-9]/i.test(body)) return body.replace(/\\(.)/g, '$1');

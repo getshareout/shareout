@@ -18,6 +18,9 @@ export const CLIENT_PORTAL_COPY: HomeLocaleCopy = {
     'folderPortal.action.view': 'opened',
     'folderPortal.action.comment': 'commented on',
     'folderPortal.action.download': 'downloaded',
+    'folderPortal.guestLabel': 'Guest access — no account needed',
+    'folderPortal.guestHint': 'They open this folder from the emailed link or with an email code, and see only this folder.',
+    'folderPortal.guestTag': 'guest',
   },
   es: {
     'folderPortal.expiry': 'El acceso termina',
@@ -35,5 +38,8 @@ export const CLIENT_PORTAL_COPY: HomeLocaleCopy = {
     'folderPortal.action.view': 'abrió',
     'folderPortal.action.comment': 'comentó en',
     'folderPortal.action.download': 'descargó',
+    'folderPortal.guestLabel': 'Acceso de invitado: sin cuenta',
+    'folderPortal.guestHint': 'Abre esta carpeta desde el enlace del mail o con un código por mail, y ve solo esta carpeta.',
+    'folderPortal.guestTag': 'invitado',
   },
 };

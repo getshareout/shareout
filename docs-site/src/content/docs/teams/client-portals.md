@@ -34,6 +34,27 @@ the [client org](/teams/external-sharing/#how-it-works) they belong to in your w
 If the folder doesn't exist or wasn't shared with them, the link opens their full
 **Shared with you** page instead, without saying why.
 
+## Guests without an account
+
+Share the folder with **Guest access — no account needed** ticked and the person can open
+the portal without signing up:
+
+- **From the email:** the link signs them in on that browser and opens the portal. It
+  works for 14 days (or until access ends, if sooner).
+- **On any device:** the portal link shows a short "Open a shared space" card. They enter
+  their email, get a 6-digit code (valid 10 minutes) and are in. The card looks the same
+  for every link, so it never reveals whether a folder exists. **Sign in** on the same card
+  is for people who do have a ShareOut account.
+
+A guest's portal carries your **workspace** branding (logo, accent color and name). They
+can open every page and file in the folder and its subfolders. With **Can comment** they
+comment as the person they verified, without a second code. They never see anything else
+in the workspace.
+
+Access is checked on every request: removing the guest, the end date passing or deleting
+the folder ends it immediately. A guest stays signed in for up to 7 days, then asks for a
+new code. Guests appear in **Who has access** marked *guest*, and in **Who opened what**.
+
 ## Expiring access
 
 When you share with a person, **Access ends** can be:

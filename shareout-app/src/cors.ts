@@ -56,6 +56,9 @@ function instanceOrigins(env: Env): { origins: string[]; patterns: RegExp[] } {
     }
   }
 
+  // Serving on a workspace custom domain: its own pages are this instance too.
+  if (env.CUSTOM_HOST) origins.push(env.CUSTOM_HOST.origin);
+
   return { origins, patterns };
 }
 

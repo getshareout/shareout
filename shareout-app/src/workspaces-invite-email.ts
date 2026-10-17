@@ -6,6 +6,7 @@ import { dispatchLifecycleEmail } from './email/gateway';
 import type { DispatchResult } from './email/gateway';
 import { createLogger } from './logging';
 import { jsonWithApiErrors } from './http/api-error';
+import { workspacePrimaryHost } from './workspaces/domains/links';
 
 const CLAIM_TTL_DAYS = 7;
 // Human-friendly alphabet: no 0/O/1/I/L to avoid transcription errors.
@@ -265,6 +266,8 @@ export async function inviteLandingUrl(
   }
 
   const slug = row?.slug?.trim();
+  const custom = slug ? await workspacePrimaryHost(env, slug) : null;
+  if (custom) return `https://${custom}/home`;
   try {
     const u = new URL(origin);
     const host = u.hostname;

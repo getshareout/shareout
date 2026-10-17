@@ -92,6 +92,13 @@ name = "shareout-knowledge-ingest"
 binding = "KNOWLEDGE_INGEST"
 class_name = "KnowledgeIngestWorkflow"
 
+# Durable folder import from Google Drive / OneDrive / SharePoint (src/file-imports).
+# Optional: without it imports run inline in waitUntil, which suits small folders only.
+[[workflows]]
+name = "shareout-file-import"
+binding = "FILE_IMPORT"
+class_name = "FileImportWorkflow"
+
 [[kv_namespaces]]
 binding = "SLUGS"
 id = "00000000000000000000000000000001"

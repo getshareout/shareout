@@ -16,6 +16,67 @@ description: Upgrades, backups y health checks para un Worker ShareOut self-host
 Mientras *nada* nombre un admin, el usuario más antiguo cuenta como tal para que una
 instancia nueva nunca quede bloqueada. Nombrar a alguien termina ese fallback.
 
+### Dar de alta el workspace de un cliente
+
+Toda cuenta nueva de cliente pasa por una sola llamada. Crea el workspace con su slug
+(que también es su subdominio) y su idioma, aplica branding y políticas por defecto,
+crea carpetas iniciales, invita a los primeros admins con el email de invitación de
+siempre y guarda los conectores de datos que le pases — en un paso, típicamente
+bastante menos de un minuto de trabajo una vez escrito el spec.
+
+En el portal: **`/admin` → Instance → Provision a workspace**. Desde un archivo, con el
+token personal de un admin de instancia (`so_`; los tokens de Agente `sot_` se
+rechazan):
+
+```bash
+cd shareout-app
+cp scripts/provision-workspace.example.yaml acme.yaml   # editalo
+SHAREOUT_ORIGIN=https://shareout.example.com \
+SHAREOUT_ADMIN_TOKEN=so_... \
+ACME_API_KEY=... \
+node scripts/provision-workspace.mjs acme.yaml
+```
+
+El spec (YAML o JSON):
+
+| Campo | Qué es |
+|-------|--------|
+| `name`, `slug` | Obligatorios. El slug es el subdominio: 2–63 minúsculas, dígitos y guiones; los nombres reservados (`www`, `api`, `admin`, `app`, …) se rechazan. |
+| `locale` | `es` o `en` — el idioma de invitaciones, emails y workspace. |
+| `admins` | Obligatorio. El primero es el dueño (o usá `owner_email`). Nadie necesita haber entrado todavía. |
+| `subdomain` | `true` prende `<slug>.<tu instancia>`. |
+| `branding` | `accent_color` (`#RRGGBB`), `hide_footer`, `logo` (`{ url }` bajado por https, o `logo_file` al lado del spec). PNG/JPG/WEBP/SVG, máx. 512 KB. |
+| `policy` | `allowed_domains`, `allowed_emails`, `external_sharing`, `guest_comments` (en las carpetas iniciales), `knowledge`, `features` (cualquier clave de `GET /v1/admin/features`). |
+| `folders` | Carpetas iniciales, p. ej. `[Clientes, Proveedores, Reportes]`. |
+| `connectors` | El mismo body que `POST /v1/workspaces/{id}/connections`. Escribí los secretos como `${ENV_VAR}`; la CLI los completa desde el entorno, así nunca quedan en el archivo. |
+| `templates` | Instala una vez cada plantilla de la biblioteca de la instancia con esa etiqueta (al volver a correr, saltea las que el workspace ya tiene). `pending` si ninguna la lleva. |
+| `custom_domain` | Asocia el dominio al workspace y lo deja como principal cuando está activo. `pending` con los registros DNS hasta que se verifique, o mientras la instancia no tenga dominios propios activados; volvé a correr el spec para chequear. |
+| `if_exists` | `match` (default) adopta un slug existente solo si coincide el nombre; `update` lo adopta y renombra; `fail` lo rechaza. |
+
+**Se puede volver a correr.** La corrida se identifica por el slug: completa lo que
+falta y marca el resto `unchanged`. Nunca crea un segundo workspace, carpeta,
+membresía o conector, nunca reenvía una invitación vigente (pasá
+`resend_invites: true` para hacerlo) y nunca pisa una credencial guardada — esas se
+rotan en el workspace.
+
+**Cómo leer el resultado.** La CLI imprime, y la API devuelve, los links del workspace,
+el estado de la invitación de cada admin (`invited`, `already_invited`, `active`,
+`failed`; con el link de ingreso cuando el email no salió), una línea por paso
+(`created`, `updated`, `unchanged`, `skipped`, `pending`, `failed`) y los próximos
+pasos. Si un paso falla — una URL de logo que da 404, un conector que el proveedor
+rechaza — los demás igual corren, la API responde `207` y la CLI sale con `2`.
+Corregí el spec y corrélo de nuevo.
+
+Los errores de validación vuelven antes de escribir nada, en el formato estándar
+(`code`, `param`, `hint`): `INVALID_SLUG`, `SLUG_RESERVED`, `SLUG_TAKEN` (409, otro
+workspace ya tiene ese slug), `INVALID_EMAIL`, `ADMIN_OUTSIDE_POLICY`,
+`PUBLIC_EMAIL_DOMAIN`, `INVALID_FEATURE`, `INVALID_COLOR`, `INVALID_LOGO`,
+`LOGO_TOO_LARGE`, `LOGO_INVALID_CONTENT_TYPE`.
+
+Cada paso deja una fila en el audit log (`workspace.provision.<paso>`, más una
+`workspace.provision` por la corrida) con el email del admin que actuó. Los valores de
+las credenciales nunca se devuelven, ni se loguean, ni se auditan.
+
 ### Crear un workspace para un equipo
 
 El dueño no necesita haber entrado todavía — cae adentro en su primer login.

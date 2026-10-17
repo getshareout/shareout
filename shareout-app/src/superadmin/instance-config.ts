@@ -11,7 +11,7 @@
  */
 import type { Env } from '../types';
 import { getPlatformOrigin } from '../config/origins';
-import { googleOAuthConfigured } from '../config/auth-providers';
+import { googleOAuthConfigured, microsoftOAuthConfigured } from '../config/auth-providers';
 import { schemaReady } from '../pages/setup';
 import { getAIProviderChain, DEFAULT_GATEWAY_MODEL } from '../data/agent/anthropic';
 import { getInstanceDefaultGatewayModel } from '../data/agent/ai-config';
@@ -33,6 +33,7 @@ export interface InstanceConfig {
   auth: {
     password: true;
     google: boolean;
+    microsoft: boolean;
     email_otp_delivery: 'email' | 'worker_log';
   };
   ai: {
@@ -143,6 +144,7 @@ export async function buildInstanceConfig(env: Env): Promise<InstanceConfig> {
     auth: {
       password: true,
       google: googleOAuthConfigured(env),
+      microsoft: microsoftOAuthConfigured(env),
       email_otp_delivery: env.EMAIL ? 'email' : 'worker_log',
     },
     ai: {

@@ -17,6 +17,8 @@ export interface VersionPublishedData {
   versions: Array<{ no: number; note: string | null }>;
 }
 export interface FolderSharedData { sharerName: string; folderName: string; workspaceName: string; url: string }
+export interface SpaceGuestInviteData { sharerName: string; folderName: string; workspaceName: string; url: string }
+export interface SpaceGuestCodeData { code: string; folderName: string; workspaceName: string }
 
 const p = (s: string) => `<p style="margin:0 0 14px">${s}</p>`;
 const strong = (s: string) => `<strong>${escapeHtml(s)}</strong>`;
@@ -115,6 +117,37 @@ export const NOTIFY_EMAILS = {
       bodyText: `${sharerName} shared the folder "${folderName}" from ${workspaceName} with you.`,
     }),
   } satisfies EmailTemplate<FolderSharedData>,
+
+  space_guest_invite: {
+    category: 'transactional',
+    audiences: ['ANY', 'EXTERNAL'],
+    trigger: 'POST /v1/workspaces/{ws}/share-person with guest: true — a folder is shared with someone as a guest (no account).',
+    build: ({ sharerName, folderName, workspaceName, url }: SpaceGuestInviteData) => ({
+      subject: `${sharerName} shared ${folderName} with you`,
+      preheader: `Open ${folderName} without creating an account.`,
+      heading: `${folderName} is shared with you`,
+      bodyHtml:
+        p(`${strong(sharerName)} from ${strong(workspaceName)} shared ${strong(folderName)} with you. Open it with the button below — no account or password needed.`) +
+        p('The link signs you in on this browser. On another device, open the space and ask for a code by email.'),
+      cta: { label: 'Open the space', href: url },
+      footerNote: 'Only you should use this link. If you did not expect it, you can ignore this email.',
+      bodyText: `${sharerName} from ${workspaceName} shared "${folderName}" with you. Open it here, no account needed:\n${url}\n\nOnly you should use this link.`,
+    }),
+  } satisfies EmailTemplate<SpaceGuestInviteData>,
+
+  space_guest_code: {
+    category: 'transactional',
+    audiences: ['ANY', 'EXTERNAL'],
+    trigger: 'POST /shared/guest/code — a guest asks for a code to open a space shared with them.',
+    build: ({ code: c, folderName, workspaceName }: SpaceGuestCodeData) => ({
+      subject: `${c} is your code to open ${folderName}`,
+      preheader: 'Your code to open a shared space (expires in 10 minutes).',
+      heading: 'Your code to open the space',
+      bodyHtml: p(`Enter this code to open ${strong(folderName)} from ${strong(workspaceName)}. It expires in 10 minutes.`) + code(c),
+      footerNote: 'If you did not ask for it, you can ignore this email.',
+      bodyText: `Your code to open "${folderName}" from ${workspaceName} is ${c}. It expires in 10 minutes.\n\nIf you did not ask for it, you can ignore this email.`,
+    }),
+  } satisfies EmailTemplate<SpaceGuestCodeData>,
 } as const;
 
 type Builder = (data: any, ctx: EmailContext) => BuiltEmail;
@@ -176,5 +209,26 @@ export const NOTIFY_EMAILS_ES: Record<keyof typeof NOTIFY_EMAILS, Builder> = {
     bodyHtml: p(`${strong(sharerName)} compartió con vos la carpeta ${strong(folderName)} de ${strong(workspaceName)}. Todo lo que tiene está en tu página de compartidos.`),
     cta: { label: 'Abrir la carpeta', href: url },
     bodyText: `${sharerName} compartió con vos la carpeta "${folderName}" de ${workspaceName}.`,
+  }),
+
+  space_guest_invite: ({ sharerName, folderName, workspaceName, url }: SpaceGuestInviteData) => ({
+    subject: `${sharerName} compartió ${folderName} con vos`,
+    preheader: `Abrí ${folderName} sin crear una cuenta.`,
+    heading: `Te compartieron ${folderName}`,
+    bodyHtml:
+      p(`${strong(sharerName)} de ${strong(workspaceName)} compartió ${strong(folderName)} con vos. Abrilo con el botón de abajo: no necesitás cuenta ni contraseña.`) +
+      p('El enlace te deja entrar desde este navegador. En otro dispositivo, abrí el espacio y pedí un código por mail.'),
+    cta: { label: 'Abrir el espacio', href: url },
+    footerNote: 'Este enlace es solo para vos. Si no lo esperabas, podés ignorar este mail.',
+    bodyText: `${sharerName} de ${workspaceName} compartió "${folderName}" con vos. Abrilo acá, sin cuenta:\n${url}\n\nEste enlace es solo para vos.`,
+  }),
+
+  space_guest_code: ({ code: c, folderName, workspaceName }: SpaceGuestCodeData) => ({
+    subject: `${c} es tu código para abrir ${folderName}`,
+    preheader: 'Tu código para abrir un espacio compartido (vence en 10 minutos).',
+    heading: 'Tu código para abrir el espacio',
+    bodyHtml: p(`Ingresá este código para abrir ${strong(folderName)} de ${strong(workspaceName)}. Vence en 10 minutos.`) + code(c),
+    footerNote: 'Si no lo pediste vos, podés ignorar este mail.',
+    bodyText: `Tu código para abrir "${folderName}" de ${workspaceName} es ${c}. Vence en 10 minutos.\n\nSi no lo pediste vos, podés ignorar este mail.`,
   }),
 };

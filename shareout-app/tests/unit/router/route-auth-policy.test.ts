@@ -10,7 +10,7 @@ import { hashToken } from '../../../src/api-auth';
 import { extractRouteMatchers, sampleUrlFor, type RouteMatcher } from './route-matchers';
 import { AGENT_TOKEN_ROUTERS, OPEN_ROUTES } from './route-policies';
 
-const sources = import.meta.glob(['../../../src/router/**/*.ts', '../../../src/mcp/index.ts', '../../../src/email/routes.ts'], {
+const sources = import.meta.glob(['../../../src/router/**/*.ts', '../../../src/mcp/index.ts', '../../../src/email/routes.ts', '../../../src/file-imports/routes.ts'], {
   query: '?raw', import: 'default', eager: true,
 }) as Record<string, string>;
 

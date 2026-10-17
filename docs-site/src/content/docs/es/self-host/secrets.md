@@ -28,9 +28,51 @@ provisiona nombres; reemplazá IDs placeholder después del create si hace falta
 | Nombre | Tipo | Notas |
 |--------|------|--------|
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | secret | Habilita Google en `/auth/login`. Callback: `{SHAREOUT_BASE_URL}/auth/callback`. |
+| `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | secret | Habilita **Entrar con Microsoft** (cuentas personales y de trabajo o escuela) en `/auth/login` y en el login de páginas privadas. Callback: `{SHAREOUT_BASE_URL}/auth/microsoft/callback`. Ver [abajo](#entrar-con-microsoft). |
+| `MICROSOFT_TENANT` | var | Opcional. `common` (default: personales + trabajo/escuela), `organizations` (solo trabajo/escuela), `consumers` (solo personales) o el GUID de un tenant. Cualquier otro valor oculta el botón. |
+| `GOOGLE_DRIVE_CLIENT_ID` / `GOOGLE_DRIVE_CLIENT_SECRET` | secret | Activa la importación de carpetas de Google Drive (solo lectura, `drive.readonly`, con su propio cliente OAuth, no el del login). Redirección: `{SHAREOUT_BASE_URL}/v1/file-imports/oauth/google_drive/callback`. Requiere `CREDENTIALS_KEY`. |
+| `MICROSOFT_FILES_CLIENT_ID` / `MICROSOFT_FILES_CLIENT_SECRET` / `MICROSOFT_FILES_TENANT` | secret / var | Activa la importación de OneDrive / SharePoint (delegados `Files.Read.All`, `Sites.Read.All`, `User.Read`, `offline_access`). Tenant por defecto `common`. Redirección: `{SHAREOUT_BASE_URL}/v1/file-imports/oauth/microsoft/callback`. |
 | — | — | **El login con contraseña no necesita configuración.** Está siempre disponible y es como `/setup` crea el primer admin. |
 | Binding `EMAIL` | binding | Habilita los códigos de un solo uso por email. Sin él, esos códigos solo llegan al log del worker. |
 | `EMAIL_DEFAULT_FROM` | var | From cuando Email está bound. |
+
+## Entrar con Microsoft
+
+Un solo registro de app en Microsoft Entra sirve para toda la instancia. En el
+[centro de administración de Microsoft Entra](https://entra.microsoft.com), en tu propio tenant:
+
+1. **Entra ID → App registrations → New registration.** El nombre es lo que la gente ve en
+   la pantalla de consentimiento de Microsoft. **Supported account types:**
+   - **Any Entra ID Tenant + Personal Microsoft accounts** con `MICROSOFT_TENANT` sin
+     definir (`common`);
+   - **Multiple Entra ID tenants** con `MICROSOFT_TENANT=organizations`;
+   - **Single tenant only** con `MICROSOFT_TENANT=<Directory (tenant) ID>`.
+2. **Authentication → Add Redirect URI → Web:** `{SHAREOUT_BASE_URL}/auth/microsoft/callback`.
+3. **Certificates & secrets → Client secrets → New client secret.** Copiá el **Value**
+   (se muestra una sola vez) en `MICROSOFT_CLIENT_SECRET`, y **Overview → Application
+   (client) ID** en `MICROSOFT_CLIENT_ID`. Microsoft recomienda secrets que venzan en menos
+   de 12 meses; rotalo antes del vencimiento.
+4. **Token configuration → Add optional claim → ID:** `email` y `xms_edov` (aceptá el aviso
+   que agrega el permiso `email` de Microsoft Graph).
+5. Recomendado: que Entra saque de los tokens las direcciones sin verificar —
+   `PATCH https://graph.microsoft.com/v1.0/applications/{object-id}/authenticationBehaviors`
+   con `{"removeUnverifiedEmailClaim": true}`.
+6. Apps multi-tenant: completá la **verificación del publisher** (Branding & properties);
+   si no, las organizaciones que solo permiten consentir apps verificadas bloquean el login.
+
+**Cómo se confía en el email.** Microsoft documenta el claim `email` como no verificado y
+mutable, y ShareOut vincula una cuenta existente por email. Por eso: las cuentas personales
+de Microsoft (tenant `9188040d-6c67-4c5b-b112-36a304b66dad`) usan su `email`, o un
+`preferred_username` con forma de email; las de trabajo o escuela se aceptan solo con
+`xms_edov` en true (el dueño del dominio verificó la dirección), nunca desde
+`preferred_username`. Después la cuenta queda atada al `tid:oid` del token: si esa dirección
+aparece más adelante con otra identidad de Microsoft, se rechaza en vez de fusionarse. Los
+usuarios deshabilitados se rechazan, y las direcciones de un dominio con
+[SSO del workspace obligatorio](/es/teams/sso/) se mandan a ese IdP.
+
+Los tokens se validan contra las claves de Microsoft (`/discovery/v2.0/keys`): firma, el
+issuer `{tenantid}` resuelto con el `tid` (un GUID) del token, el issuer de la propia clave,
+audiencia (el client ID), vencimiento y el nonce de la cookie de estado firmada (con PKCE).
 
 ## Features de producto opcionales
 

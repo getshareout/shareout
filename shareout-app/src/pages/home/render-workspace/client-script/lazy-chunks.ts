@@ -12,21 +12,24 @@
  */
 import { workspace_client_home_views_admin_JS } from './home-views/admin';
 import { workspace_client_home_views_adminSupport_JS } from './home-views/admin-support';
+import { workspace_client_home_views_adminDomains_JS } from './home-views/admin-domains';
 import { workspace_client_home_views_clients_JS } from './home-views/clients';
 import { workspace_client_home_views_knowledge_JS } from './home-views/knowledge';
 import { workspace_client_home_views_knowledgeMap_JS } from './home-views/knowledge-map';
 import { workspace_client_home_views_catalog_JS } from './home-views/catalog';
 import { workspace_client_home_views_crew_JS } from './home-views/crew';
 import { workspace_client_home_views_library_JS } from './home-views/library';
+import { workspace_client_home_views_templates_JS } from './home-views/templates';
 import { workspace_client_inspector_history_JS } from './inspector-history';
 import { workspace_client_edit_lite_JS } from './edit-lite';
 import { workspace_client_guest_comments_lazy_JS } from './guest-comments';
+import { workspace_client_home_views_fileImport_JS } from './home-views/file-import';
 
 interface ChunkDef { src: string; exports: string[]; soft?: string[]; vars?: string[] }
 
 export const LAZY_CHUNKS: Record<string, ChunkDef> = {
   admin: {
-    src: workspace_client_home_views_admin_JS + workspace_client_home_views_adminSupport_JS + workspace_client_home_views_clients_JS,
+    src: workspace_client_home_views_admin_JS + workspace_client_home_views_adminSupport_JS + workspace_client_home_views_adminDomains_JS + workspace_client_home_views_clients_JS,
     exports: ['loadAdmin'],
   },
   knowledge: {
@@ -38,6 +41,7 @@ export const LAZY_CHUNKS: Record<string, ChunkDef> = {
   catalog: { src: workspace_client_home_views_catalog_JS, exports: ['loadCatalog', 'catRoute'], vars: ['catCurrentId'] },
   crew: { src: workspace_client_home_views_crew_JS, exports: ['loadCrew'] },
   library: { src: workspace_client_home_views_library_JS, exports: ['loadLibrary'] },
+  templates: { src: workspace_client_home_views_templates_JS, exports: ['loadTemplates', 'saveAsTemplate', 'tplInspect'] },
   history: { src: workspace_client_inspector_history_JS, exports: ['renderHistory'] },
   edit: {
     src: workspace_client_edit_lite_JS,
@@ -45,6 +49,7 @@ export const LAZY_CHUNKS: Record<string, ChunkDef> = {
     soft: ['editKeydown'],
   },
   guest: { src: workspace_client_guest_comments_lazy_JS, exports: ['wireGuestFolder', 'wireGuestArt'] },
+  drives: { src: workspace_client_home_views_fileImport_JS, exports: ['openFileImport'] },
 };
 
 export const lazyChunkPath = (name: string): string => `/sdk/home-lens-${name}.js`;

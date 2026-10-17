@@ -43,8 +43,14 @@ export function parseSubdomain(hostname: string, platformHost: string): Subdomai
   return { isSubdomain: false, workspaceSlug: null };
 }
 
-/** Convenience: parse using env.SHAREOUT_BASE_URL. */
+/**
+ * Convenience: parse using env.SHAREOUT_BASE_URL. A request on an active workspace
+ * custom domain (env.CUSTOM_HOST, set by the dispatcher) reads as that workspace's
+ * subdomain, so every subdomain-aware path serves it the same way.
+ */
 export function parseSubdomainFromEnv(hostname: string, env: Env): SubdomainContext {
+  const custom = env.CUSTOM_HOST;
+  if (custom && custom.hostname === hostname.toLowerCase()) return { isSubdomain: true, workspaceSlug: custom.slug };
   return parseSubdomain(hostname, getPlatformHostname(env));
 }
 

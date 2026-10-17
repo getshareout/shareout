@@ -73,6 +73,18 @@ export interface Env {
    *  Unset (self-host default) = no marketing site: anonymous `/` goes to the login
    *  page and other unclaimed apex paths get the worker's 404. */
   MARKETING_ORIGIN?: string;
+  /** Cloudflare API token for Cloudflare for SaaS custom hostnames (Zone → SSL and
+   *  Certificates: Edit on the SaaS zone). With CF_CUSTOM_HOSTNAMES_ZONE_ID set, workspace
+   *  custom domains are provisioned on the zone; unset = manual mode (DNS TXT check). */
+  CF_CUSTOM_HOSTNAMES_TOKEN?: string;
+  /** Zone id of the SaaS zone (the platform apex) custom hostnames are added to. */
+  CF_CUSTOM_HOSTNAMES_ZONE_ID?: string;
+  /** Hostname customers CNAME their custom domain to (e.g. customers.example.com).
+   *  Setting it (or the Cloudflare pair above) turns custom domains on for this instance. */
+  CUSTOM_DOMAINS_CNAME_TARGET?: string;
+  /** Per-request only: set by the dispatcher when the request arrived on an active
+   *  workspace custom domain. Never configure it. */
+  CUSTOM_HOST?: import('./workspaces/domains/host-binding').CustomHostBinding;
   /** Optional docs host served by this worker's route (e.g. docs.example.com). Requires DOCS_ORIGIN. */
   DOCS_HOST?: string;
   /** Optional hostname the docs site is deployed to (e.g. my-docs.pages.dev). Requires DOCS_HOST.
@@ -125,6 +137,19 @@ export interface Env {
   PUBLIC_ABUSE_AUTOKILL_PER_DAY?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  /** Sign in with Microsoft (identity platform v2.0). Button shows only when both are set. */
+  MICROSOFT_CLIENT_ID?: string;
+  MICROSOFT_CLIENT_SECRET?: string;
+  /** `common` (default), `organizations`, `consumers`, or a directory (tenant) GUID. */
+  MICROSOFT_TENANT?: string;
+  /** Folder import from Google Drive (src/file-imports): its own OAuth client, a read-only file consent separate from sign-in. Unset = Drive import hidden. */
+  GOOGLE_DRIVE_CLIENT_ID?: string;
+  GOOGLE_DRIVE_CLIENT_SECRET?: string;
+  /** Folder import from OneDrive / SharePoint (Microsoft Graph, delegated). Unset = hidden. May be the same Entra app as sign-in. */
+  MICROSOFT_FILES_CLIENT_ID?: string;
+  MICROSOFT_FILES_CLIENT_SECRET?: string;
+  /** Entra tenant for the file consent: `common` (default: work, school and personal OneDrive), `organizations`, or one tenant id. */
+  MICROSOFT_FILES_TENANT?: string;
   SHOPIFY_CLIENT_ID: string;
   SHOPIFY_CLIENT_SECRET: string;
   TIENDANUBE_CLIENT_ID: string;
@@ -159,6 +184,8 @@ export interface Env {
   SLIDES_CONVERTER?: DurableObjectNamespace<import('./pages/home/slides-converter-do').SlidesConverter>;
   /** Durable per-source ingest. Optional: ingest runs inline in waitUntil when absent. */
   KNOWLEDGE_INGEST?: Workflow<import('./knowledge/corpus/ingest').IngestParams>;
+  /** Durable folder import (src/file-imports). Optional: imports run inline in waitUntil when absent (small folders only). */
+  FILE_IMPORT?: Workflow<import('./file-imports/types').FileImportParams>;
   /** Vectorize index over knowledge chunks (namespace = workspace id). Optional: search degrades to keyword. */
   KNOWLEDGE_VECTORS?: VectorizeIndex;
   /** Workers AI model for knowledge-graph extraction (JSON mode). Defaults to @cf/meta/llama-3.3-70b-instruct-fp8-fast. */

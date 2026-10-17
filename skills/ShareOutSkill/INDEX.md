@@ -68,6 +68,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Comment action items (assign to person, due date) | [sdk/comments.md](sdk/comments.md#action-items) | [team/activity-feed.md](team/activity-feed.md) |
 | Review a page: resolve/assign comments, approve a version | [sdk/comments.md](sdk/comments.md#review-mode) | [api/artifacts.md](api/artifacts.md#versions--restore) |
 | Version history, change notes, restore an older version | [api/artifacts.md](api/artifacts.md#versions--restore) | [integrations/mcp-connector.md](integrations/mcp-connector.md) |
+| Reuse a page or folder in another workspace (save as template, install, update) | [api/artifact-templates.md](api/artifact-templates.md) | [integrations/mcp-connector.md](integrations/mcp-connector.md) |
 | Multi-page site (several HTML files linked together) | [api/artifacts.md](api/artifacts.md#multi-page-sites-several-html-files) | [core/html-spec/pages.md](core/html-spec/pages.md#multiple-html-files-sites) |
 | Real-time collaboration | [sdk/realtime.md](sdk/realtime.md) | [modules/_shared/permissions.md](modules/_shared/permissions.md) |
 | File uploads | [sdk/blobs.md](sdk/blobs.md) | [patterns/uploads.md](patterns/uploads.md) |
@@ -93,7 +94,8 @@ There is no public hosted default — resolve origin or deploy first.
 | Internal workspace visibility | [team/SKILL.md](team/SKILL.md#workspace-visibility) | [modules/_shared/permissions.md](modules/_shared/permissions.md) |
 | Workspace membership policy | [team/api.md](team/api.md#workspace-membership-policy) | [team/SKILL.md](team/SKILL.md#workspace-membership-policy) |
 | Workspace subdomain | [team/subdomain.md](team/subdomain.md) | [deploy/cloudflare.md](deploy/cloudflare.md) |
-| Workspace SSO (Okta / OIDC) | [team/sso.md](team/sso.md) | [deploy/cloudflare.md](deploy/cloudflare.md) |
+| Workspace SSO (Okta / Entra ID / OIDC) | [team/sso.md](team/sso.md) | [deploy/cloudflare.md](deploy/cloudflare.md) |
+| Workspace custom domain (portal.acme.example) | [team/custom-domain.md](team/custom-domain.md) | [deploy/cloudflare.md](deploy/cloudflare.md) |
 | Workspace house style/context | [team/workspace-context.md](team/workspace-context.md) | [team/SKILL.md](team/SKILL.md#workspace-context-files) |
 | Workspace connectors (shared / per-user tokens) | [team/workspace-connections.md](team/workspace-connections.md) | [team/api.md](team/api.md#workspace-connections) |
 | Deliver to multiple destinations | [api/destinations.md](api/destinations.md) | [api/jobs.md](api/jobs.md) |
@@ -136,7 +138,7 @@ ShareOutSkill/
 │   ├── SKILL.md                # Workspace entry point (no plan gates on self-host)
 │   ├── INDEX.md                # Workspace intent router
 │   ├── api.md                  # Workspace REST endpoints
-│   ├── sso.md                  # Workspace SSO (Okta / OIDC)
+│   ├── sso.md                  # Workspace SSO (Okta / Entra ID / OIDC)
 │   ├── subdomain.md            # Workspace subdomain behavior
 │   ├── workspace-context.md    # Workspace house-style context files
 │   ├── workspace-connections.md  # Shared vs per-user workspace connectors

@@ -83,7 +83,7 @@ const folderAccess: ToolDef = {
       ...(more.length ? [`The folder is ${access.effective}, but ${more.join(' and ')}: each item keeps its own visibility.`] : []),
       ...(access.openItems?.length ? access.openItems.map((i) => `- ${i.name} (${i.kind}, ${i.visibility}) ${i.kind === 'artifact' && i.slug ? `${ctx.origin}/a/${i.slug}/` : i.id}`) : []),
       ...(access.grants.length
-        ? ['Shared with:', ...access.grants.map((g) => `- ${g.subject_label} (${g.subject_type === 'sharee' ? 'client' : 'person'}, can ${g.capability}${g.inherited ? `, through "${g.folder_name}"` : ''}) grant ${g.id}`)]
+        ? ['Shared with:', ...access.grants.map((g) => `- ${g.subject_label} (${g.subject_type === 'sharee' ? 'client' : g.subject_type === 'guest' ? 'guest, no account' : 'person'}, can ${g.capability}${g.inherited ? `, through "${g.folder_name}"` : ''}) grant ${g.id}`)]
         : ['Not shared with anyone outside the workspace.']),
     ];
     return ok(lines.join('\n'), { workspace_id: picked.w.id, folder_id: picked.folderId, ...access });

@@ -3,7 +3,10 @@ import { handleDataRequest } from '../data/router';
 import { handleFileContent, handleFileMeta } from '../data/files-content';
 import { handleCORS } from '../cors';
 import { parseSubdomainFromEnv, resolveSubdomainRoute } from '../subdomain';
-import { getCdnRegistrable } from '../config/origins';
+import { getCdnRegistrable, getPlatformHostname } from '../config/origins';
+import { cnameTarget, customDomainsEnabled, isForeignHost } from '../workspaces/domains/hostname';
+import { bindCustomHost } from '../workspaces/domains/host-binding';
+import { workspaceByHostname } from '../workspaces/host-cache';
 import { handleCdnContent } from './cdn-content';
 import { createFetchContext, type FetchContext } from './context';
 import { routeAuth } from './auth-router';
@@ -96,8 +99,9 @@ function isTimedPath(path: string): boolean {
   return path === '/home' || path.startsWith('/v1/home/') || path === '/v1/artifacts' || path.startsWith('/v1/artifacts/');
 }
 
-export async function handleFetch(request: Request, env: Env, executionCtx?: ExecutionContext): Promise<Response> {
+export async function handleFetch(request: Request, baseEnv: Env, executionCtx?: ExecutionContext): Promise<Response> {
   const effectiveRequest = asGetForHead(request);
+  let env = baseEnv;
   let ctx = createFetchContext(effectiveRequest, env, executionCtx);
 
   if (env.DOCS_HOST && env.DOCS_ORIGIN && ctx.hostname === env.DOCS_HOST) {
@@ -110,6 +114,23 @@ export async function handleFetch(request: Request, env: Env, executionCtx?: Exe
   const cdnHost = getCdnRegistrable(env);
   if (cdnHost && (ctx.hostname === cdnHost || ctx.hostname.endsWith(`.${cdnHost}`))) {
     return handleCdnContent(ctx.request, env, executionCtx);
+  }
+
+  // Workspace custom domains (portal.acme.example). Only on instances that turned the
+  // feature on. A host that is not ours resolves through the ACTIVE-hostname cache to
+  // exactly one workspace, and from then on the request is served as that workspace's
+  // subdomain (env.CUSTOM_HOST). Anything else — pending, failed, removed, unknown —
+  // gets the 404 and never falls back to the apex or another workspace.
+  if (customDomainsEnabled(env)) {
+    const host = ctx.hostname.toLowerCase();
+    const target = cnameTarget(env);
+    if (host === target && target !== getPlatformHostname(env)) return stripBodyForHead(request, notFound(effectiveRequest, ctx.path));
+    if (isForeignHost(env, host)) {
+      const ws = await workspaceByHostname(env, host).catch(() => null);
+      if (!ws) return stripBodyForHead(request, notFound(effectiveRequest, ctx.path));
+      env = bindCustomHost(env, { hostname: host, workspaceId: ws.id, slug: ws.slug });
+      ctx = createFetchContext(effectiveRequest, env, executionCtx);
+    }
   }
 
   // Read requests get a per-request memo; the timed routes also meter D1/KV. With

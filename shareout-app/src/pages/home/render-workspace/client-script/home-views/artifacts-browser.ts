@@ -110,7 +110,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     return '<div class="wsx-fbar__acts">' + ctl + link + '</div>';
   }
   function folderHead(d) {
-    var crumbs = curFolder ? '<div class="wsx-fbar">' + folderCrumbs(d) + folderAccessBar(d) + '</div>' : '';
+    var crumbs = curFolder ? '<div class="wsx-fbar">' + folderCrumbs(d) + folderAccessBar(d) + '<button type="button" class="wsx-abtn" onclick="saveFolderAsTemplate()">' + esc(t('tpl.saveAs')) + '</button></div>' : '';
     var guide = folderGuide(d);
     // Subfolders render the same "Folders" section whether at root or drilled in;
     // nesting repeats root behaviour, so managers get New folder / rename / delete at any depth.
@@ -223,6 +223,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
   })();
   // ===== folder navigation + management (Drive-style drill-in) =====
   window.enterFolder = function (id, name) { curFolder = id; curFolderName = name || ''; loadArtifacts(); };
+  window.saveFolderAsTemplate = function () { if (curFolder) saveAsTemplate({ folder_id: curFolder, name: curFolderName }); };
   window.exitFolder = function () { curFolder = ''; curFolderName = ''; loadArtifacts(); };
   // Hash router entry (#l/artifacts/<folderId>); runs before openView loads the grid.
   function artRoute(id) { id = id || ''; if (id !== curFolder) { curFolder = id; curFolderName = ''; } }
@@ -254,7 +255,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
       if (!activity.rows.length) return '<p class="wsx-field__note">' + esc(t('folderPortal.noActivity')) + '</p>';
       return activity.rows.slice(0, 20).map(function (a) {
         var verb = t('folderPortal.action.' + a.action) || a.action;
-        return '<div class="wsx-faccess__row wsx-faccess__act"><span class="wsx-faccess__who"><b>' + esc(a.user_email || '?') + '</b><em>' + esc(verb + ' ' + (a.resource_name || a.resource_id)) + ' \u00b7 ' + esc(adRelDate(a.created_at)) + '</em></span></div>';
+        return '<div class="wsx-faccess__row wsx-faccess__act"><span class="wsx-faccess__who"><b>' + esc(a.user_email || '?') + (a.guest ? ' \\u00b7 ' + esc(t('folderPortal.guestTag')) : '') + '</b><em>' + esc(verb + ' ' + (a.resource_name || a.resource_id)) + ' \u00b7 ' + esc(adRelDate(a.created_at)) + '</em></span></div>';
       }).join('');
     }
     function loadActivity() {
@@ -283,7 +284,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
       var gs = (fa.grants || []).filter(function (g) { return !pendingRevokes[g.id]; });
       html += '<div class="wsx-field__lbl">' + esc(t('artifacts.access.people')) + '</div>';
       html += gs.length ? gs.map(function (g) {
-        var meta = esc(g.capability === 'comment' ? t('assets.shareCapComment') : g.capability === 'view' ? t('assets.shareCapView') : g.capability) + (g.inherited ? ' \\u00b7 ' + esc(inheritedNote(g.folder_name)) : '') + (g.expires_at ? ' \\u00b7 ' + esc(expiryNote(g.expires_at)) : '');
+        var meta = (g.subject_type === 'guest' ? esc(t('folderPortal.guestTag')) + ' \\u00b7 ' : '') + esc(g.capability === 'comment' ? t('assets.shareCapComment') : g.capability === 'view' ? t('assets.shareCapView') : g.capability) + (g.inherited ? ' \\u00b7 ' + esc(inheritedNote(g.folder_name)) : '') + (g.expires_at ? ' \\u00b7 ' + esc(expiryNote(g.expires_at)) : '');
         var rm = can && !g.inherited ? '<button class="wsx-abtn" type="button" data-rv="' + escAttr(g.id) + '">' + esc(t('artifacts.access.remove')) + '</button>' : '';
         return '<div class="wsx-share-send wsx-faccess__row">' + personAvatar(g) + '<span class="wsx-faccess__who"><b>' + esc(g.subject_label) + '</b><em>' + meta + '</em></span>' + rm + '</div>';
       }).join('') : '<p class="wsx-field__note">' + esc(t('artifacts.access.nobody')) + '</p>';
@@ -292,6 +293,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
           + '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('assets.shareAccess')) + '</span><select class="wsx-field__in" id="fa_cap"><option value="view">' + esc(t('assets.shareCapView')) + '</option><option value="comment">' + esc(t('assets.shareCapComment')) + '</option></select></label>'
           + '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('folderPortal.expiry')) + '</span><select class="wsx-field__in" id="fa_exp">' + ['', '7', '30', '90', 'date'].map(function (v) { return '<option value="' + v + '">' + esc(t('folderPortal.expiry.' + (v || 'never'))) + '</option>'; }).join('') + '</select></label>'
           + '<input class="wsx-field__in" id="fa_exp_date" type="date" hidden>'
+          + '<div class="wsx-field"><label class="wsx-admin__check"><input type="checkbox" id="fa_guest_access"> ' + esc(t('folderPortal.guestLabel')) + '</label><span class="wsx-field__note">' + esc(t('folderPortal.guestHint')) + '</span></div>'
           + '<div id="fa_msg" class="wsx-field__note"></div><div class="wsx-cform__foot"><button class="wsx-abtn wsx-abtn--primary" id="fa_go" type="button">' + esc(t('assets.shareSend')) + '</button></div>';
       } else {
         html += '<p class="wsx-field__note">' + esc(t('artifacts.access.readOnly')) + '</p>';
@@ -340,6 +342,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
       if (go) go.addEventListener('click', function () {
         var email = cv('fa_email'), msg = document.getElementById('fa_msg'); if (!email || go.disabled) return;
         var payload = { resource_type: 'folder', resource_id: fid, email: email, capability: cv('fa_cap') || 'view' };
+        var gEl = document.getElementById('fa_guest_access'); if (gEl && gEl.checked) payload.guest = true;
         var ev = cv('fa_exp');
         if (ev === 'date') {
           var dv = cv('fa_exp_date'), end = dv ? new Date(dv + 'T23:59:59') : null;

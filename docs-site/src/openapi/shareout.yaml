@@ -51,12 +51,19 @@ tags:
     description: Self-serve personal API tokens.
   - name: Assets
     description: Per-scope asset library — versioned deliverables, collections, and client download links.
+  - name: File imports
+    description: >-
+      Import folders from Google Drive and OneDrive / SharePoint into workspace files.
+      A separate read-only consent per member and workspace; workspace owners, admins and
+      (while members may create folders) members only. Tokens are never returned.
   - name: External sharing
     description: Client orgs, external members, folder grants, scoped tokens, read receipts, and client notes (Teams/Enterprise).
   - name: Metric alerts
     description: Followable metrics and threshold alert rules.
   - name: Templates
     description: Reusable email templates with variables.
+  - name: Artifact templates
+    description: Save artifacts or folders as reusable templates and install them in any workspace they reach.
   - name: Account
     description: Plan tier, upgrades, and feature introspection.
   - name: Auth
@@ -69,6 +76,8 @@ tags:
     description: Teams workspaces, members, subdomains, connectors, and data catalog.
   - name: Catalog
     description: Optional per-workspace data map — sources, lineage, glossary.
+  - name: Instance admin
+    description: Instance-owner operations (`INSTANCE_ADMIN_EMAILS`) across every workspace.
 paths:
   /v1/publish:
     post:
@@ -3586,6 +3595,259 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/file-imports:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [File imports]
+      summary: Configured drives, my connections, and imported folders
+      operationId: getFileImports
+      responses:
+        "200":
+          description: Overview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  providers:
+                    type: array
+                    description: Only providers this instance has client ids for. Empty = feature hidden.
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, enum: [google_drive, microsoft] }
+                        connected: { type: boolean }
+                        accountEmail: { type: string, nullable: true }
+                  sources:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FileImportSource"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/file-imports/connect/{provider}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [google_drive, microsoft]
+    get:
+      tags: [File imports]
+      summary: Start the read-only file consent
+      description: >-
+        Redirects (302) to Google or Microsoft. The consent returns to
+        `GET /v1/file-imports/oauth/{provider}/callback`, which stores the encrypted
+        tokens for the signed-in member in this workspace and posts
+        `shareout:file-import:connected` to the opener window.
+      operationId: connectFileImport
+      responses:
+        "302":
+          description: Redirect to the provider's consent screen
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/file-imports/oauth/{provider}/callback:
+    parameters:
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [google_drive, microsoft]
+      - { name: code, in: query, schema: { type: string } }
+      - { name: state, in: query, schema: { type: string } }
+    get:
+      tags: [File imports]
+      summary: OAuth redirect URI (browser only)
+      description: Signed state + PKCE; the session user must be the user who started the flow. Returns an HTML page.
+      operationId: fileImportOAuthCallback
+      responses:
+        "200":
+          description: Connected (HTML)
+        "400":
+          description: Refused or expired (HTML)
+  /v1/workspaces/{workspaceId}/file-imports/connections/{provider}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [google_drive, microsoft]
+    delete:
+      tags: [File imports]
+      summary: Disconnect my drive
+      description: >-
+        Deletes my consent (and revokes it at Google). Every folder syncing through it
+        stops: running imports end with `CONNECTION_REVOKED`, daily sync turns off.
+        Imported files stay.
+      operationId: disconnectFileImport
+      responses:
+        "200":
+          description: Disconnected
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/file-imports/browse/{provider}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [google_drive, microsoft]
+      - name: ref
+        in: query
+        description: Opaque ref from a previous browse (`root` to start).
+        schema: { type: string, default: root }
+      - name: q
+        in: query
+        description: Search SharePoint sites (Microsoft, at `root`).
+        schema: { type: string }
+    get:
+      tags: [File imports]
+      summary: Browse my drive's folders
+      operationId: browseFileImport
+      responses:
+        "200":
+          description: One level of folders, drives or sites
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  searchable: { type: boolean }
+                  entries:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ref: { type: string }
+                        name: { type: string }
+                        kind: { type: string, enum: [folder, drive, site, group] }
+                        selectable: { type: boolean }
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/workspaces/{workspaceId}/file-imports/sources:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    post:
+      tags: [File imports]
+      summary: Import a folder
+      description: >-
+        Creates the import and starts its first run. The picked folder becomes a
+        ShareOut folder inside `targetFolderId` (or at the top level), mirroring
+        subfolders. Files take the target folder's visibility (private → private,
+        public → link-shareable, otherwise team); converted pages are never public.
+        At most 10 folders per workspace can sync daily.
+      operationId: createFileImportSource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, ref]
+              properties:
+                provider: { type: string, enum: [google_drive, microsoft] }
+                ref: { type: string, description: A selectable ref from browse. }
+                name: { type: string }
+                targetFolderId: { type: string, nullable: true }
+                convert: { type: boolean, default: true, description: Turn Word/Excel/PDF/Markdown/CSV (and slides, when the converter is bound) into pages. }
+                dailySync: { type: boolean, default: false }
+      responses:
+        "201":
+          description: Created and started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  source: { $ref: "#/components/schemas/FileImportSource" }
+                  run: { $ref: "#/components/schemas/FileImportRun" }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/workspaces/{workspaceId}/file-imports/sources/{sourceId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - { name: sourceId, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [File imports]
+      summary: Change daily sync or conversion
+      operationId: updateFileImportSource
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dailySync: { type: boolean }
+                convert: { type: boolean }
+      responses:
+        "200":
+          description: Updated
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [File imports]
+      summary: Stop syncing a folder
+      description: The creator or an admin. Imported files and pages stay.
+      operationId: deleteFileImportSource
+      responses:
+        "200":
+          description: Removed
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/file-imports/sources/{sourceId}/sync:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - { name: sourceId, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [File imports]
+      summary: Sync again
+      description: Fetches only new or changed files (Drive `modifiedTime`, Graph `cTag`). 409 `RUN_IN_PROGRESS` while one runs.
+      operationId: syncFileImportSource
+      responses:
+        "202":
+          description: Started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  run: { $ref: "#/components/schemas/FileImportRun" }
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/workspaces/{workspaceId}/file-imports/runs/{runId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - { name: runId, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [File imports]
+      summary: Run progress and per-file problems
+      operationId: getFileImportRun
+      responses:
+        "200":
+          description: Run
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  run: { $ref: "#/components/schemas/FileImportRun" }
+        "404":
+          $ref: "#/components/responses/NotFound"
   /v1/workspaces/{workspaceId}/assets:
     parameters:
       - $ref: "#/components/parameters/WorkspaceId"
@@ -3868,7 +4130,12 @@ paths:
         idempotent and replaces the expiry. For a folder, the invite email's join link
         carries `?folder=<id>` through sign-in and lands on `/shared?folder=<id>` (that
         folder's branded portal); an already-active person's email links there too.
-        Returns 409 if the email is already an internal member.
+        Returns 409 if the email is already an internal member. With `guest: true`
+        (folders only) no account is created: a `guest` grant whose subject is the email
+        itself, and an emailed link that opens the folder in a space-guest session. The
+        guest can also open it from `/shared?folder=<id>` with an email code. They see that
+        folder's subtree only, up to the capability; revoking or expiring the grant ends
+        their session on the next request.
       operationId: shareWithPerson
       requestBody:
         required: true
@@ -3898,6 +4165,10 @@ paths:
                 expires_at:
                   type: string
                   description: ISO date-time (or YYYY-MM-DD = end of that day, UTC) when access ends. Omit both for no expiry; a re-share replaces the previous expiry.
+                guest:
+                  type: boolean
+                  default: false
+                  description: Folders only. Share as a guest with no account (subject_type `guest`); the person gets an emailed link instead of an invite.
       responses:
         "201":
           description: Grant created (idempotent re-share)
@@ -3910,6 +4181,12 @@ paths:
                     $ref: "#/components/schemas/Grant"
                   email:
                     type: string
+                  guest:
+                    type: boolean
+                    description: Present and true for a guest share.
+                  email_sent:
+                    type: boolean
+                    description: Guest shares only — whether the link email went out.
         "400":
           description: "`VALIDATION_ERROR` — bad email, resource, capability or expiry"
         "403":
@@ -5441,6 +5718,152 @@ paths:
                     type: string
         "422":
           description: Transcription failed
+  /v1/admin/workspaces/provision:
+    post:
+      tags: [Instance admin]
+      summary: Provision a customer workspace in one step
+      description: >-
+        Instance admins only (session, or a personal `so_` token — workspace Agent `sot_`
+        tokens are refused; a workspace owner/admin gets 403). Creates the workspace (or
+        adopts the one on `slug`), applies branding, policy defaults and feature flags,
+        creates starter folders, invites the admins with the normal invite email, and
+        stores connectors through the normal encrypted connector path. Idempotent by
+        `slug`: a re-run fills in what is missing and reports the rest `unchanged` — no
+        second workspace, folder, membership or connector, no resent live invite, no
+        overwritten credential. A failing step is reported in `steps` and the run
+        continues (HTTP 207). Credential values are never returned or audited. Every
+        step writes a `workspace.provision.*` audit row.
+      operationId: provisionWorkspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, slug, admins]
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                slug:
+                  type: string
+                  description: Also the subdomain. 2–63 lowercase letters, digits, hyphens; reserved names (www, api, admin, …) refused.
+                locale:
+                  type: string
+                  enum: [en, es]
+                  default: en
+                description:
+                  type: string
+                owner_email:
+                  type: string
+                  description: Owner of a new workspace. Defaults to the first of `admins`; ignored when the workspace exists.
+                admins:
+                  type: array
+                  maxItems: 20
+                  items:
+                    type: string
+                    format: email
+                if_exists:
+                  type: string
+                  enum: [match, update, fail]
+                  default: match
+                  description: "`match` adopts an existing slug only when its name matches; `update` adopts it and renames; `fail` refuses."
+                subdomain:
+                  type: boolean
+                branding:
+                  type: object
+                  properties:
+                    accent_color:
+                      type: string
+                      pattern: "^#[0-9a-fA-F]{6}$"
+                    hide_footer:
+                      type: boolean
+                    logo:
+                      description: An https URL (fetched by the instance), or bytes. PNG/JPG/WEBP/SVG, max 512 KB.
+                      oneOf:
+                        - type: string
+                          format: uri
+                        - type: object
+                          properties:
+                            url:
+                              type: string
+                              format: uri
+                        - type: object
+                          required: [data_base64, content_type]
+                          properties:
+                            data_base64:
+                              type: string
+                            content_type:
+                              type: string
+                policy:
+                  type: object
+                  properties:
+                    allowed_domains:
+                      type: array
+                      items:
+                        type: string
+                    allowed_emails:
+                      type: array
+                      items:
+                        type: string
+                    external_sharing:
+                      type: boolean
+                      description: The `collab.external_sharing` flag.
+                    guest_comments:
+                      type: boolean
+                      description: Guest comments on the folders this run creates.
+                    knowledge:
+                      type: boolean
+                    features:
+                      type: object
+                      additionalProperties:
+                        type: boolean
+                      description: Feature-flag overrides, keys from the feature registry.
+                folders:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: string
+                connectors:
+                  type: array
+                  maxItems: 20
+                  description: Same body as `POST /v1/workspaces/{workspaceId}/connections`. An existing connector with the name is left untouched.
+                  items:
+                    type: object
+                resend_invites:
+                  type: boolean
+                  default: false
+                templates:
+                  type: string
+                  description: Template set to install. `pending` until the instance has templates.
+                custom_domain:
+                  type: string
+                  description: Hostname to attach. `pending` until the instance has custom domains.
+      responses:
+        "200":
+          description: Existing workspace, nothing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvisionSummary"
+        "201":
+          description: Workspace created, nothing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvisionSummary"
+        "207":
+          description: Workspace exists; at least one step failed (see `steps` and `next_steps`). Fix and re-run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvisionSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /v1/workspaces:
     get:
       tags: [Workspaces]
@@ -6589,6 +7012,126 @@ paths:
       responses:
         "200":
           description: Attached
+  /v1/artifact-templates:
+    get:
+      tags: [Artifact templates]
+      summary: List templates installable in a workspace (or your personal space)
+      description: The workspace's own templates, ones shared with it, and the instance library. Omit `workspace` for your personal space.
+      operationId: listArtifactTemplates
+      parameters:
+        - { name: workspace, in: query, schema: { type: string }, description: Workspace id you are a member of. }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: scope, in: query, schema: { type: string, enum: [private, shared, instance] } }
+      responses:
+        "200": { description: "`{ templates: TemplateSummary[] }`", content: { application/json: { schema: { type: object, properties: { templates: { type: array, items: { $ref: "#/components/schemas/ArtifactTemplateSummary" } } } } } } }
+        "403": { description: Not a member of that workspace }
+    post:
+      tags: [Artifact templates]
+      summary: Save an artifact or a folder as a template
+      description: >-
+        Snapshots the live version's files, folder tree, table/dataset schemas and connector names
+        (never data, credentials, comments, Knowledge or analytics). Credentials found in the code are
+        redacted. If the content looks personal or workspace-specific the call answers 409
+        `REVIEW_REQUIRED` with `findings`; repeat with `acknowledge_findings: true`. `scope: instance`
+        is for instance admins only.
+      operationId: createArtifactTemplate
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ArtifactTemplateCreate" } } }
+      responses:
+        "201": { description: Saved }
+        "403": { description: Cannot edit the source, or instance scope without admin }
+        "409": { description: "REVIEW_REQUIRED — `findings` and `preview` attached" }
+  /v1/artifact-templates/preview:
+    post:
+      tags: [Artifact templates]
+      summary: Preview what a template would include and leave behind
+      operationId: previewArtifactTemplate
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ArtifactTemplateCreate" } } }
+      responses:
+        "200": { description: "Items, files, schemas, setup steps, excluded counts, findings, redactions" }
+  /v1/artifact-templates/installed:
+    get:
+      tags: [Artifact templates]
+      summary: Which template an artifact was installed from, and whether an update is available
+      operationId: getTemplateInstall
+      parameters:
+        - { name: artifact_id, in: query, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "`{ installed: null | { template_id, version_no, latest_version_no, update_available, setup } }`" }
+  /v1/artifact-templates/installed/update:
+    post:
+      tags: [Artifact templates]
+      summary: Update an installed copy to the template's latest version
+      description: Without `confirm` returns the plan (files that change per artifact). With `confirm true` each artifact of the install gets a new version (source `template`); earlier versions stay in history and data is not touched.
+      operationId: updateTemplateInstall
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [artifact_id], properties: { artifact_id: { type: string }, confirm: { type: boolean } } } } }
+      responses:
+        "200": { description: "`{ applied: false, plan }` or `{ applied: true, updated, added, version_no, setup }`" }
+        "403": { description: Needs edit access to every artifact of the install }
+  /v1/artifact-templates/{templateId}:
+    parameters:
+      - { name: templateId, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Artifact templates]
+      summary: Get a template (items, schemas, setup steps, versions)
+      operationId: getArtifactTemplate
+      responses:
+        "200": { description: Template }
+        "404": { description: Missing or not visible to you }
+    patch:
+      tags: [Artifact templates]
+      summary: Change name, description, tags, scope, shares or preview image
+      operationId: updateArtifactTemplate
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { name: { type: string }, description: { type: string }, tags: { type: array, items: { type: string } }, scope: { type: string, enum: [private, shared, instance] }, shared_workspace_ids: { type: array, items: { type: string } }, preview_image: { type: string, description: PNG/JPEG/WebP data URL, up to 1 MB } } } } }
+      responses:
+        "200": { description: Updated }
+        "403": { description: Not a manager, or instance scope without admin, or sharing into a workspace you are not in }
+    delete:
+      tags: [Artifact templates]
+      summary: Delete a template (installed copies stay)
+      operationId: deleteArtifactTemplate
+      responses:
+        "200": { description: Deleted }
+  /v1/artifact-templates/{templateId}/versions:
+    parameters:
+      - { name: templateId, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Artifact templates]
+      summary: Publish a new version from the template's source (or another artifact_id / folder_id)
+      operationId: createArtifactTemplateVersion
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { version: { type: string, example: 1.1.0 }, notes: { type: string }, artifact_id: { type: string }, folder_id: { type: string }, include_sample_rows: { type: boolean }, acknowledge_findings: { type: boolean }, preview: { type: boolean } } } } }
+      responses:
+        "201": { description: New version; installed copies show update available }
+  /v1/artifact-templates/{templateId}/install:
+    parameters:
+      - { name: templateId, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Artifact templates]
+      summary: Install a template into a workspace (or your personal space)
+      description: Creates the folders and artifacts, rewrites links between them, creates empty tables/datasets from the schema, and returns the finish-setup steps.
+      operationId: installArtifactTemplate
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { workspace_id: { type: string, nullable: true }, folder_id: { type: string } } } } }
+      responses:
+        "201": { description: "`{ install_group, folder_id, artifacts: [{ artifact_id, slug, url }], setup: [{ step, done }] }`" }
+        "404": { description: Missing, or its scope does not reach that workspace }
+  /v1/artifact-templates/{templateId}/image:
+    parameters:
+      - { name: templateId, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Artifact templates]
+      summary: The template's preview image
+      operationId: getArtifactTemplateImage
+      responses:
+        "200": { description: Image }
 components:
   securitySchemes:
     bearerAuth:
@@ -6682,6 +7225,130 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
   schemas:
+    ProvisionSummary:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        created:
+          type: boolean
+        workspace:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
+            slug: { type: string }
+            locale: { type: string }
+        links:
+          type: object
+          properties:
+            home: { type: string }
+            admin: { type: string }
+            subdomain: { type: [string, "null"] }
+            instance_admin: { type: string }
+        admins:
+          type: array
+          items:
+            type: object
+            properties:
+              email: { type: string }
+              role: { type: string, enum: [owner, admin, member] }
+              status: { type: string, enum: [invited, already_invited, active, added, failed] }
+              email_sent: { type: boolean }
+              invite_url: { type: string, description: Only when the invite email did not go out. }
+              error: { type: string }
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              step: { type: string, description: "workspace, branding, policy, folders, admins, connector:<name>, templates, custom_domain" }
+              status: { type: string, enum: [created, updated, unchanged, skipped, pending, failed] }
+              detail: { type: object }
+              error: { type: string }
+              next_step: { type: string }
+        next_steps:
+          type: array
+          items: { type: string }
+        duration_ms:
+          type: integer
+    FileImportRun:
+      type: object
+      properties:
+        id: { type: string }
+        sourceId: { type: string }
+        status: { type: string, enum: [queued, walking, importing, done, stopped, failed] }
+        trigger: { type: string, enum: [manual, resync, schedule] }
+        counts:
+          type: object
+          properties:
+            found: { type: integer }
+            imported: { type: integer }
+            converted: { type: integer }
+            skipped: { type: integer }
+            unchanged: { type: integer }
+            failed: { type: integer }
+        stopCode:
+          type: string
+          nullable: true
+          description: STORAGE_QUOTA_EXCEEDED, CONNECTION_REVOKED, RATE_LIMITED, WALK_LIMIT (warning on a done run), NOT_ALLOWED, SOURCE_DELETED, STALLED, FAILED.
+        stopMessage: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time, nullable: true }
+        errors:
+          type: array
+          description: Files that failed, were skipped, or imported with a warning (up to 200).
+          items:
+            type: object
+            properties:
+              path: { type: string }
+              status: { type: string }
+              code: { type: string }
+              message: { type: string }
+    FileImportSource:
+      type: object
+      properties:
+        id: { type: string }
+        provider: { type: string, enum: [google_drive, microsoft] }
+        remoteName: { type: string }
+        targetFolderId: { type: string, nullable: true }
+        targetFolderName: { type: string, nullable: true }
+        convert: { type: boolean }
+        dailySync: { type: boolean }
+        nextSyncAt: { type: string, nullable: true }
+        connected: { type: boolean, description: false after the connection was revoked. }
+        mine: { type: boolean }
+        lastRun: { $ref: "#/components/schemas/FileImportRun" }
+    ArtifactTemplateSummary:
+      type: object
+      properties:
+        id: { type: string, example: tpl_0123456789abcdef01234567 }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        tags: { type: array, items: { type: string } }
+        scope: { type: string, enum: [private, shared, instance] }
+        version: { type: string, example: 1.0.0 }
+        version_no: { type: integer }
+        item_count: { type: integer }
+        preview_url: { type: string, nullable: true, description: Signed, sandboxed live preview }
+        setup: { type: array, items: { type: object } }
+        can_manage: { type: boolean }
+    ArtifactTemplateCreate:
+      type: object
+      properties:
+        artifact_id: { type: string }
+        folder_id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        tags: { type: array, items: { type: string } }
+        scope: { type: string, enum: [private, shared, instance], default: private }
+        shared_workspace_ids: { type: array, items: { type: string } }
+        version: { type: string, example: 1.0.0 }
+        notes: { type: string }
+        readme: { type: string }
+        include_sample_rows: { type: boolean, default: false }
+        preview_image: { type: string }
+        acknowledge_findings: { type: boolean }
     Visibility:
       type: string
       description: "'unlisted' was retired 2026-07 — still accepted as input and treated as 'public'."
@@ -7756,9 +8423,10 @@ components:
           type: string
         subject_type:
           type: string
-          enum: [sharee, external_user]
+          enum: [sharee, external_user, guest]
         subject_id:
           type: string
+          description: Sharee id, users.id, or for a `guest` grant the guest's email.
         resource_type:
           type: string
           enum: [folder, artifact, file]
