@@ -35,3 +35,18 @@ describe('home workspace scope and external members', () => {
     }
   });
 });
+
+describe('folder breadcrumb and guide', () => {
+  it('are returned only to internal members of the folder\'s workspace', async () => {
+    const { queryFolderPath, queryFolderReadme } = await import('../../../src/pages/home/queries/folders');
+    await e.DB.prepare("INSERT INTO folders (id, workspace_id, owner_id, name, slug, readme) VALUES ('fld_hx', ?, ?, 'Plans', 'plans', 'Internal guide')")
+      .bind(WS, INTERNAL.id).run();
+    const opts = { workspaceId: WS, folderId: 'fld_hx' };
+    for (const outsider of [EXTERNAL, { id: 'usr_hx_none', email: 'none@example.com' }]) {
+      expect(await queryFolderPath(e, outsider, opts, { userIds: [outsider.id], emails: [] })).toEqual([]);
+      expect(await queryFolderReadme(e, outsider, opts, { userIds: [outsider.id], emails: [] })).toBeNull();
+    }
+    expect((await queryFolderPath(e, INTERNAL, opts, { userIds: [INTERNAL.id], emails: [] })).map((f) => f.name)).toEqual(['Plans']);
+    expect(await queryFolderReadme(e, INTERNAL, opts, { userIds: [INTERNAL.id], emails: [] })).toBe('Internal guide');
+  });
+});

@@ -72,6 +72,7 @@ export async function queryFolderReadme(
   visArg?: VisibilityScope,
 ): Promise<string | null> {
   const vis = visArg ?? await getVisibilityScope(env, user);
+  if (opts.workspaceId && !(await isLinkedWorkspaceMember(env, vis, opts.workspaceId))) return null;
   const scopeSql = opts.workspaceId ? 'workspace_id = ?' : `workspace_id IS NULL AND owner_id IN (${placeholders(vis.userIds.length)})`;
   const scopeParams = opts.workspaceId ? [opts.workspaceId] : vis.userIds;
   const row = await env.DB.prepare(
@@ -90,6 +91,7 @@ export async function queryFolderPath(
   visArg?: VisibilityScope,
 ): Promise<{ id: string; name: string }[]> {
   const vis = visArg ?? await getVisibilityScope(env, user);
+  if (opts.workspaceId && !(await isLinkedWorkspaceMember(env, vis, opts.workspaceId))) return [];
   const scopeSql = opts.workspaceId ? 'f.workspace_id = ?' : `f.workspace_id IS NULL AND f.owner_id IN (${placeholders(vis.userIds.length)})`;
   const scopeParams = opts.workspaceId ? [opts.workspaceId] : vis.userIds;
   const rows = await env.DB.prepare(`
