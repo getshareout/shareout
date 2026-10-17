@@ -3,6 +3,7 @@ import type { DataContext } from '../data/middleware';
 import { errorResponse, successResponse, verifyOwner, corsHeaders } from '../data/middleware';
 import {
   defineCrew,
+  resolveCrewModel,
   getCrew,
   createRun,
   listRuns,
@@ -151,7 +152,11 @@ async function handleDefine(request: Request, ctx: DataContext): Promise<Respons
   } catch {
     return errorResponse(DATA_ERRORS.INVALID_JSON, ctx.origin);
   }
-  const crew = await defineCrew(ctx.env, ctx.artifactId, ctx.workspaceId, body);
+  const resolved = await resolveCrewModel(body.model);
+  if ('error' in resolved) {
+    return errorResponse({ ...DATA_ERRORS.INVALID_REQUEST, message: resolved.error, hint: 'model must be a gateway id (provider/model), a Claude id, or omitted.' }, ctx.origin);
+  }
+  const crew = await defineCrew(ctx.env, ctx.artifactId, ctx.workspaceId, { ...body, model: resolved.model });
   return successResponse({ crew }, 200, ctx.origin);
 }
 

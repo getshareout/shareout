@@ -52,11 +52,16 @@ const NEXT_RUN_MAX_HOURS = 720;
 // of the iteration/budget allotment on a stuck loop.
 const MAX_NO_PROGRESS_ITERS = 3;
 
-/** The model a crew's owner chose. The default model is not a choice — those crews
- *  follow the workspace/instance gateway model like every other agent. */
-export function crewPinnedModel(model: string | null | undefined) {
+/** The model a crew's owner chose: `gateway` is the Vercel AI Gateway slug, `id` the
+ *  native Anthropic id (null for non-Claude models, so the Anthropic fallback entry
+ *  keeps its own Claude model). The default model given as a bare Claude id is not a
+ *  choice — those crews follow the workspace/instance gateway model like every other
+ *  agent; given as a gateway slug it is an explicit pin. */
+export function crewPinnedModel(model: string | null | undefined): { gateway: string; id: string | null } | null {
+  if (!model) return null;
   const m = claudeModelById(model);
-  return m && m.id !== DEFAULT_CLAUDE_MODEL.id ? m : null;
+  if (m) return model.includes('/') || m.id !== DEFAULT_CLAUDE_MODEL.id ? { gateway: m.gateway, id: m.id } : null;
+  return model.includes('/') ? { gateway: model, id: null } : null;
 }
 
 function buildSystemPrompt(crew: CrewRow, locale: Locale | null): string {

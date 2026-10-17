@@ -117,9 +117,10 @@ A crew on any artifact in the workspace, owned by a workspace admin, mails the a
 Monday morning:
 
 ```jsonc
-// POST /v1/data/{id}/crew/define — omit "model" to use the default crew model
+// POST /v1/data/{id}/crew/define — Sonnet 5.5 by default; any gateway model works
 {
   "name": "Weekly workspace report",
+  "model": "anthropic/claude-sonnet-5.5",
   "instructions": "Call workspace_metrics_digest with period \"previous_week\" and tz_offset_minutes -180. Write a short, plain HTML email: what was published, what people actually used (views, returning viewers, comments, action items), what is dormant, AI and job health, and the biggest changes vs the week before. Use only numbers from the tool and respect its notes. Send it with email_send to every address in admins.",
   "tools": {
     "read": ["workspace_metrics_digest"],
@@ -155,7 +156,7 @@ envelope `{ "success": true, "data": … }`. One crew per artifact.
 {
   "name": "Daily narrator",
   "instructions": "Read json key `snapshot`, write a 3-line summary to `summary`, then notify Slack.",
-  "model": "<optional; unsupported values fall back to the default>",
+  "model": "anthropic/claude-sonnet-5.5",   // optional — see "Model" below
   "maxIterations": 8,                 // clamped to the plan cap
   "runBudgetMicroUsd": 200000,        // optional
   "tools": {
@@ -166,6 +167,16 @@ envelope `{ "success": true, "data": … }`. One crew per artifact.
   }
 }
 ```
+
+**Model.** `model` takes any tool-capable [Vercel AI Gateway](https://vercel.com/ai-gateway/models)
+model id (`provider/model`, e.g. `anthropic/claude-sonnet-5.5`, `openai/gpt-5`,
+`deepseek/deepseek-v4.1-flash`), or a Claude id (`claude-haiku-4-5`). Omit it to follow the
+workspace's gateway model (admin LLM settings), else the instance default. Anything else is a
+`400 INVALID_REQUEST` — nothing silently runs on a different model. A gateway id is checked
+against the live gateway catalog; if the catalog is unreachable, a well-formed
+`provider/model` id is accepted. `GET /crew` returns the stored `model`. On instances
+without a gateway key, a non-Claude model falls back to the native Anthropic entry's own
+Claude model.
 
 Tool names — read: `table_query`, `table_schema`, `json_get`, `file_list`, `file_read`,
 `web_search`, `connection_query`, `action_item_list`, `workspace_metrics_digest`. Write: `json_set`, `table_insert`,

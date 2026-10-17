@@ -5,15 +5,59 @@ import { CREW_TOOLS } from './tool-registry';
 import { resolveCrewLimits } from './limits';
 import { validateConditionConfig } from './condition';
 import type { CrewRow, CrewRunRow, CrewTriggerRow, ToolLimits } from './types';
-import { CLAUDE_HAIKU, DEFAULT_CLAUDE_MODEL, claudeModelById } from '../data/agent/models';
+import { DEFAULT_CLAUDE_MODEL, claudeModelById } from '../data/agent/models';
+import { fetchGatewayModels } from '../data/agent/gateway-catalog';
 
 // Event types a crew can subscribe to in Phase 1. Only table.row.inserted is
 // wired for dispatch this phase; others are added as their emit sites gain the
 // crew-event hook.
 const CREW_EVENT_TYPES = new Set(['table.row.inserted']);
 
-const ALLOWED_MODELS = new Set<string>([DEFAULT_CLAUDE_MODEL.id, CLAUDE_HAIKU.id]);
 const DEFAULT_MODEL = DEFAULT_CLAUDE_MODEL.id;
+
+/** A Vercel AI Gateway model id: `provider/model`. */
+const GATEWAY_SLUG = /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._:-]*$/i;
+
+/** What a crew may be told to run on, as stored in `crews.model`:
+ *  - omitted → the default model, which follows the workspace/instance gateway model;
+ *  - a Claude id ShareOut serves (`claude-haiku-4-5`) → that Claude model;
+ *  - any gateway slug (`openai/gpt-5`, `anthropic/claude-sonnet-5.5`) → pinned to it.
+ *  Shape-only; `resolveCrewModel` adds the catalog check. Null = not a model we can run. */
+export function normalizeCrewModel(model: unknown): string | null {
+  if (model == null || model === '') return DEFAULT_MODEL;
+  if (typeof model !== 'string') return null;
+  const m = model.trim();
+  if (GATEWAY_SLUG.test(m)) return m;
+  // The SDK's `crew.define({ model })` type still names the undated Sonnet alias.
+  if (m === 'claude-sonnet-5') return DEFAULT_MODEL;
+  return claudeModelById(m)?.id ?? null;
+}
+
+/** Validate a requested crew model. A gateway slug must be in the live gateway catalog
+ *  (tool-capable language models); when the catalog can't be reached the slug's shape is
+ *  enough, so an outage never blocks saving a crew. */
+export async function resolveCrewModel(
+  model: unknown,
+  catalog: () => Promise<Array<{ id: string }>> = fetchGatewayModels,
+): Promise<{ model: string } | { error: string }> {
+  const normalized = normalizeCrewModel(model);
+  if (!normalized) {
+    return {
+      error: `Unknown model ${JSON.stringify(model)}. Use a Vercel AI Gateway id like "anthropic/claude-sonnet-5.5" or "openai/gpt-5", a Claude id like "claude-haiku-4-5", or omit it for the workspace default.`,
+    };
+  }
+  if (!normalized.includes('/') || claudeModelById(normalized)) return { model: normalized };
+  let ids: Set<string> | null = null;
+  try {
+    ids = new Set((await catalog()).map((m) => m.id));
+  } catch {
+    ids = null;
+  }
+  if (ids && ids.size && !ids.has(normalized)) {
+    return { error: `Model "${normalized}" is not a tool-capable model in the Vercel AI Gateway catalog.` };
+  }
+  return { model: normalized };
+}
 
 export interface DefineCrewBody {
   name?: string;
@@ -51,8 +95,9 @@ export async function defineCrew(
     .first<{ owner_id: string | null }>();
   const ownerId = ownerRow?.owner_id ?? '';
 
-  const chosen = claudeModelById(body.model)?.id;
-  const model = chosen && ALLOWED_MODELS.has(chosen) ? chosen : DEFAULT_MODEL;
+  // Callers validate with resolveCrewModel first (POST /crew/define answers 400);
+  // anything that still isn't a model we can run is stored as the default.
+  const model = normalizeCrewModel(body.model) ?? DEFAULT_MODEL;
   const existing = await getCrew(env, artifactId);
   const crewId = existing?.id ?? generateId('crew');
 

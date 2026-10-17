@@ -60,6 +60,19 @@ describe('crew model', () => {
     await env.DB.prepare(`UPDATE workspace_llm_config SET gateway_model = 'anthropic/claude-sonnet-5.5' WHERE workspace_id = 'wsp_cm'`).run();
   });
 
+  it('runs a gateway-model crew on that model through the gateway, over the workspace gateway model', async () => {
+    expect(await modelSent('openai/gpt-5', { VERCEL_AI_GATEWAY: 'vk' })).toBe('openai/gpt-5');
+  });
+
+  it('a non-Claude crew model leaves the native Anthropic entry on its own Claude model', async () => {
+    expect(await modelSent('openai/gpt-5', { ANTHROPIC_API_KEY: 'sk-ant' })).toBe('claude-sonnet-5-5');
+  });
+
+  it('pins any gateway slug; a Claude slug pins both ids', () => {
+    expect(crewPinnedModel('openai/gpt-5')).toEqual({ gateway: 'openai/gpt-5', id: null });
+    expect(crewPinnedModel('anthropic/claude-sonnet-5.5')).toEqual({ gateway: 'anthropic/claude-sonnet-5.5', id: 'claude-sonnet-5-5' });
+  });
+
   it('pins only models ShareOut serves, and accepts the undated alias', () => {
     expect(crewPinnedModel('claude-haiku-4-5')?.gateway).toBe('anthropic/claude-haiku-4.5');
     expect(crewPinnedModel('claude-sonnet-5-5')).toBeNull();
