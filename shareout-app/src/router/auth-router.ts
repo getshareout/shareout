@@ -81,7 +81,7 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
   // Custom domains: the apex session cookie never reaches them and OAuth/SSO callbacks
   // live on the apex, so every sign-in start goes through the apex handoff.
   if (env.CUSTOM_HOST && request.method === 'GET') {
-    if (path === '/auth/login' || path === '/auth/google' || path === '/auth/sso') {
+    if (path === '/auth/login' || path === '/auth/google' || path === '/auth/microsoft' || path === '/auth/sso') {
       return Response.redirect(handoffStartUrl(env, env.CUSTOM_HOST.hostname, url.searchParams.get('redirect')), 302);
     }
     if (path === HANDOFF_CALLBACK_PATH) return handleHandoffCallback(request, env);
