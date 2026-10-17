@@ -22,8 +22,21 @@ if [ "${SHAREOUT_SKIP_HOOK:-}" = "1" ]; then
 fi
 
 ROOT="$(git rev-parse --show-toplevel)"
-echo "pre-push: running fast CI checks (skip: git push --no-verify)"
-exec "$ROOT/tooling/scripts/ci-check-fast.sh"
+
+# Feature branches get the light checks (no tests). Pushing main, or an integration/*
+# branch, runs the tests. stdin: <local ref> <local sha> <remote ref> <remote sha>.
+MODE=light
+while read -r _ _ remote_ref _; do
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/integration/*) MODE=full ;;
+  esac
+done
+if [ "$MODE" = "full" ]; then
+  echo "pre-push: main/integration push — running checks with tests"
+  exec "$ROOT/tooling/scripts/ci-check-fast.sh"
+fi
+echo "pre-push: feature branch — light checks (tests run once in tooling/scripts/integrate.sh)"
+SHAREOUT_CHECK_MODE=light exec "$ROOT/tooling/scripts/ci-check-fast.sh"
 HOOK
 
 chmod +x "$HOOKS_DIR/pre-push"
@@ -34,4 +47,5 @@ git -C "$REPO_ROOT" config merge.generated.name "generated file: keep ours, rege
 git -C "$REPO_ROOT" config merge.generated.driver true
 echo "✓ Installed pre-push hook → $HOOKS_DIR/pre-push"
 echo "✓ Configured merge driver 'generated' (keeps one side; check:bundles regenerates)"
-echo "  Full suite before a PR: ./tooling/scripts/ci-check.sh"
+echo "  Feature-branch pushes run light checks; integrate before main:"
+echo "  ./tooling/scripts/integrate.sh <branch> [<branch>…]"
