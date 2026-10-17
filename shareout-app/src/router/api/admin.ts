@@ -21,6 +21,9 @@ import { userRow, artifactRow } from '../../superadmin/views/rows';
 import { renderAdminFragment } from '../../superadmin/page';
 import { searchWorkspaces } from '../../superadmin/workspaces-admin';
 import { provisionWorkspace, setWorkspaceMemberRole } from '../../superadmin/workspaces-provision';
+import { parseProvisionSpec } from '../../superadmin/provision/spec';
+import { runProvisioning } from '../../superadmin/provision/run';
+import { apiErrorResponse } from '../../http/api-error';
 import { buildInstanceConfig } from '../../superadmin/instance-config';
 import { getWorkspaceSso, putWorkspaceSso, deleteWorkspaceSso } from '../../superadmin/workspace-sso';
 import { getInstanceDefaultGatewayModel } from '../../data/agent/ai-config';
@@ -141,6 +144,23 @@ export async function routeAdminApi(ctx: FetchContext): Promise<Response | null>
         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
     `).bind(model).run();
     return jsonResponse({ ok: true, defaultGatewayModel: model });
+  }
+
+  // POST /v1/admin/workspaces/provision — one-step customer workspace: create (or adopt by
+  // slug), branding, policy, starter folders, first admins, connectors, template/domain
+  // hooks. Idempotent; 201 created, 200 re-run, 207 when a step failed (see `steps`).
+  if (path === '/v1/admin/workspaces/provision' && request.method === 'POST') {
+    let raw: unknown;
+    try {
+      raw = await request.json();
+    } catch {
+      return apiErrorResponse({ code: 'INVALID_JSON', message: 'Body must be JSON', status: 400 });
+    }
+    const parsed = parseProvisionSpec(raw);
+    if (!parsed.ok) return apiErrorResponse({ ...parsed.error, status: 400, docs: 'https://docs.shareout.site/self-host/ops/#provision-a-customer-workspace' });
+    const outcome = await runProvisioning(env, admin, parsed.spec, ctx.executionCtx);
+    if (!outcome.ok) return apiErrorResponse({ code: outcome.code, message: outcome.message, hint: outcome.hint, status: outcome.status, param: 'slug' });
+    return jsonResponse(outcome.summary, outcome.status);
   }
 
   // POST /v1/admin/workspaces {name, owner_email, slug?, description?}

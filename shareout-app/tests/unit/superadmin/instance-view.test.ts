@@ -67,7 +67,7 @@ describe('instance view', () => {
   // Both endpoints shipped in #47 with no caller; these are the controls that call them.
   it('offers the workspace and role controls the write API needs', () => {
     const html = instanceBody(base);
-    for (const id of ['sa-ws-name', 'sa-ws-owner', 'sa-ws-create', 'sa-appoint-email', 'sa-appoint-role', 'sa-appoint-btn']) {
+    for (const id of ['sa-ws-name', 'sa-ws-slug', 'sa-ws-admins', 'sa-ws-locale', 'sa-ws-folders', 'sa-ws-create', 'sa-appoint-email', 'sa-appoint-role', 'sa-appoint-btn']) {
       expect(html).toContain(id);
     }
   });

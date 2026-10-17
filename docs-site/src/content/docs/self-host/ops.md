@@ -16,6 +16,63 @@ description: Upgrades, backups, and health checks for a self-hosted ShareOut Wor
 While *nothing* names an admin, the earliest user is treated as one so a fresh
 instance is never locked out. Naming anyone ends that fallback.
 
+### Provision a customer workspace
+
+Every new customer account goes through one call. It creates the workspace with its
+slug (also its subdomain) and language, applies branding and policy defaults, creates
+starter folders, invites the first admins with the normal invite email, and stores
+any data connectors you give it — in one step, typically well under a minute of
+operator time once the spec is written.
+
+In the portal: **`/admin` → Instance → Provision a workspace**. From a file, with an
+instance admin's personal token (`so_`; workspace Agent `sot_` tokens are refused):
+
+```bash
+cd shareout-app
+cp scripts/provision-workspace.example.yaml acme.yaml   # edit it
+SHAREOUT_ORIGIN=https://shareout.example.com \
+SHAREOUT_ADMIN_TOKEN=so_... \
+ACME_API_KEY=... \
+node scripts/provision-workspace.mjs acme.yaml
+```
+
+The spec (YAML or JSON):
+
+| Field | Meaning |
+|-------|---------|
+| `name`, `slug` | Required. The slug is the subdomain: 2–63 lowercase letters, digits, hyphens; reserved names (`www`, `api`, `admin`, `app`, …) are refused. |
+| `locale` | `es` or `en` — invites, emails and the workspace speak it. |
+| `admins` | Required. The first one owns the workspace (or set `owner_email`). Nobody has to have signed in yet. |
+| `subdomain` | `true` turns on `<slug>.<your instance>`. |
+| `branding` | `accent_color` (`#RRGGBB`), `hide_footer`, `logo` (`{ url }` fetched over https, or `logo_file` next to the spec). PNG/JPG/WEBP/SVG, max 512 KB. |
+| `policy` | `allowed_domains`, `allowed_emails`, `external_sharing`, `guest_comments` (on the starter folders), `knowledge`, `features` (any key from `GET /v1/admin/features`). |
+| `folders` | Starter folders, e.g. `[Clientes, Proveedores, Reportes]`. |
+| `connectors` | Same body as `POST /v1/workspaces/{id}/connections`. Write secrets as `${ENV_VAR}`; the CLI fills them in from the environment so they never live in the file. |
+| `templates`, `custom_domain` | Hooks. Reported as `pending` with a next step until the instance has those features; re-run the spec once it does. |
+| `if_exists` | `match` (default) adopts an existing slug only if its name matches; `update` adopts and renames; `fail` refuses. |
+
+**Safe to re-run.** The run is keyed by slug: it fills in what is missing and reports
+the rest `unchanged`. It never creates a second workspace, folder, membership or
+connector, never resends a live invite (pass `resend_invites: true` to do it), and
+never overwrites a stored connector credential — rotate those in the workspace.
+
+**Reading the result.** The CLI prints, and the API returns, the workspace links, each
+admin's invite status (`invited`, `already_invited`, `active`, `failed`; with the join
+link when the email did not go out), one line per step (`created`, `updated`,
+`unchanged`, `skipped`, `pending`, `failed`) and the next steps. If a step fails — a
+logo URL that 404s, a connector the provider refuses — the others still run, the API
+answers `207` and the CLI exits `2`. Fix the spec and run it again.
+
+Validation errors come back before anything is written, in the standard envelope
+(`code`, `param`, `hint`): `INVALID_SLUG`, `SLUG_RESERVED`, `SLUG_TAKEN` (409, a
+different workspace already has the slug), `INVALID_EMAIL`, `ADMIN_OUTSIDE_POLICY`,
+`PUBLIC_EMAIL_DOMAIN`, `INVALID_FEATURE`, `INVALID_COLOR`, `INVALID_LOGO`,
+`LOGO_TOO_LARGE`, `LOGO_INVALID_CONTENT_TYPE`.
+
+Every step writes an audit row (`workspace.provision.<step>`, plus one
+`workspace.provision` for the run) with the acting admin's email. Credential values are
+never returned, logged or audited.
+
 ### Stand up a workspace for a team
 
 The owner does not have to have signed in yet — they land in it on first sign-in.

@@ -113,6 +113,10 @@
     {
       "name": "Catalog",
       "description": "Optional per-workspace data map — sources, lineage, glossary."
+    },
+    {
+      "name": "Instance admin",
+      "description": "Instance-owner operations (`INSTANCE_ADMIN_EMAILS`) across every workspace."
     }
   ],
   "paths": {
@@ -8945,6 +8949,225 @@
         }
       }
     },
+    "/v1/admin/workspaces/provision": {
+      "post": {
+        "tags": [
+          "Instance admin"
+        ],
+        "summary": "Provision a customer workspace in one step",
+        "description": "Instance admins only (session, or a personal `so_` token — workspace Agent `sot_` tokens are refused; a workspace owner/admin gets 403). Creates the workspace (or adopts the one on `slug`), applies branding, policy defaults and feature flags, creates starter folders, invites the admins with the normal invite email, and stores connectors through the normal encrypted connector path. Idempotent by `slug`: a re-run fills in what is missing and reports the rest `unchanged` — no second workspace, folder, membership or connector, no resent live invite, no overwritten credential. A failing step is reported in `steps` and the run continues (HTTP 207). Credential values are never returned or audited. Every step writes a `workspace.provision.*` audit row.",
+        "operationId": "provisionWorkspace",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "slug",
+                  "admins"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "slug": {
+                    "type": "string",
+                    "description": "Also the subdomain. 2–63 lowercase letters, digits, hyphens; reserved names (www, api, admin, …) refused."
+                  },
+                  "locale": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "es"
+                    ],
+                    "default": "en"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "owner_email": {
+                    "type": "string",
+                    "description": "Owner of a new workspace. Defaults to the first of `admins`; ignored when the workspace exists."
+                  },
+                  "admins": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                      "type": "string",
+                      "format": "email"
+                    }
+                  },
+                  "if_exists": {
+                    "type": "string",
+                    "enum": [
+                      "match",
+                      "update",
+                      "fail"
+                    ],
+                    "default": "match",
+                    "description": "`match` adopts an existing slug only when its name matches; `update` adopts it and renames; `fail` refuses."
+                  },
+                  "subdomain": {
+                    "type": "boolean"
+                  },
+                  "branding": {
+                    "type": "object",
+                    "properties": {
+                      "accent_color": {
+                        "type": "string",
+                        "pattern": "^#[0-9a-fA-F]{6}$"
+                      },
+                      "hide_footer": {
+                        "type": "boolean"
+                      },
+                      "logo": {
+                        "description": "An https URL (fetched by the instance), or bytes. PNG/JPG/WEBP/SVG, max 512 KB.",
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "url": {
+                                "type": "string",
+                                "format": "uri"
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "data_base64",
+                              "content_type"
+                            ],
+                            "properties": {
+                              "data_base64": {
+                                "type": "string"
+                              },
+                              "content_type": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "policy": {
+                    "type": "object",
+                    "properties": {
+                      "allowed_domains": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "allowed_emails": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "external_sharing": {
+                        "type": "boolean",
+                        "description": "The `collab.external_sharing` flag."
+                      },
+                      "guest_comments": {
+                        "type": "boolean",
+                        "description": "Guest comments on the folders this run creates."
+                      },
+                      "knowledge": {
+                        "type": "boolean"
+                      },
+                      "features": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "boolean"
+                        },
+                        "description": "Feature-flag overrides, keys from the feature registry."
+                      }
+                    }
+                  },
+                  "folders": {
+                    "type": "array",
+                    "maxItems": 50,
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "connectors": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "description": "Same body as `POST /v1/workspaces/{workspaceId}/connections`. An existing connector with the name is left untouched.",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "resend_invites": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "templates": {
+                    "type": "string",
+                    "description": "Template set to install. `pending` until the instance has templates."
+                  },
+                  "custom_domain": {
+                    "type": "string",
+                    "description": "Hostname to attach. `pending` until the instance has custom domains."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Existing workspace, nothing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisionSummary"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Workspace created, nothing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisionSummary"
+                }
+              }
+            }
+          },
+          "207": {
+            "description": "Workspace exists; at least one step failed (see `steps` and `next_steps`). Fix and re-run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisionSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
     "/v1/workspaces": {
       "get": {
         "tags": [
@@ -11096,6 +11319,134 @@
       }
     },
     "schemas": {
+      "ProvisionSummary": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "created": {
+            "type": "boolean"
+          },
+          "workspace": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "locale": {
+                "type": "string"
+              }
+            }
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "home": {
+                "type": "string"
+              },
+              "admin": {
+                "type": "string"
+              },
+              "subdomain": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "instance_admin": {
+                "type": "string"
+              }
+            }
+          },
+          "admins": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "owner",
+                    "admin",
+                    "member"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "invited",
+                    "already_invited",
+                    "active",
+                    "added",
+                    "failed"
+                  ]
+                },
+                "email_sent": {
+                  "type": "boolean"
+                },
+                "invite_url": {
+                  "type": "string",
+                  "description": "Only when the invite email did not go out."
+                },
+                "error": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "step": {
+                  "type": "string",
+                  "description": "workspace, branding, policy, folders, admins, connector:<name>, templates, custom_domain"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "created",
+                    "updated",
+                    "unchanged",
+                    "skipped",
+                    "pending",
+                    "failed"
+                  ]
+                },
+                "detail": {
+                  "type": "object"
+                },
+                "error": {
+                  "type": "string"
+                },
+                "next_step": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "next_steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "duration_ms": {
+            "type": "integer"
+          }
+        }
+      },
       "Visibility": {
         "type": "string",
         "description": "'unlisted' was retired 2026-07 — still accepted as input and treated as 'public'.",

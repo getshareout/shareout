@@ -8,3 +8,18 @@ export function generateWorkspaceSlug(name: string): string {
     .replace(/^-|-$/g, '')
     .slice(0, 30) || 'workspace';
 }
+
+/**
+ * Slugs a workspace may not take, because the slug is also its subdomain and these
+ * hosts or paths already mean something on the instance.
+ */
+export const RESERVED_WORKSPACE_SLUGS: readonly string[] = [
+  'www', 'api', 'app', 'admin', 'cdn', 'static', 'mail', 'assets', 'docs', 'staging',
+  'support', 'help', 'status', 'auth', 'login', 'signup', 'home', 'settings', 'billing',
+  'sdk', 'embed', 'mcp', 'oauth', 'vendor', 'inbox', 'email', 'smtp', 'ftp', 'root',
+  'system', 'internal', 'shareout',
+];
+
+export function isReservedWorkspaceSlug(slug: string): boolean {
+  return RESERVED_WORKSPACE_SLUGS.includes(slug.toLowerCase());
+}

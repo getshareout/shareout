@@ -1,0 +1,49 @@
+# Example spec for scripts/provision-workspace.mjs — copy it, change the values, run:
+#   SHAREOUT_ORIGIN=https://shareout.example.com SHAREOUT_ADMIN_TOKEN=so_... \
+#   ACME_API_KEY=... node scripts/provision-workspace.mjs my-customer.yaml
+# Re-running the same file is safe: it fills in what is missing and duplicates nothing.
+
+name: Acme
+slug: acme                 # also the subdomain: acme.<your instance>
+locale: es                 # es | en — invites, emails and the workspace speak it
+description: Acme's reporting workspace
+subdomain: true
+
+# The first admin owns the workspace. Nobody has to have signed in yet.
+admins:
+  - ana@acme.example.com
+  - beto@acme.example.com
+
+branding:
+  accent_color: "#1a73e8"
+  # logo: { url: https://cdn.acme.example.com/logo.png }   # fetched by the instance
+  # logo_file: acme-logo.png   # or read next to this file (PNG/JPG/WEBP/SVG, max 512 KB)
+
+policy:
+  allowed_domains: [acme.example.com]
+  external_sharing: true
+  guest_comments: false    # applied to the starter folders below
+  knowledge: true
+  features:                # any key from GET /v1/admin/features
+    ai.crew: false
+
+folders:
+  - Clientes
+  - Proveedores
+  - Reportes
+
+# Same body as POST /v1/workspaces/{id}/connections. ${NAME} reads an environment
+# variable, so secrets never live in this file. Existing connectors are left alone.
+connectors:
+  - name: acme_api
+    type: rest_api
+    config:
+      base_url: https://api.acme.example.com
+    credentials:
+      type: api_key
+      data:
+        api_key: ${ACME_API_KEY}
+
+# Hooks for features that ship separately; reported as "pending" until available.
+# templates: agency-starter
+# custom_domain: reports.acme.example.com

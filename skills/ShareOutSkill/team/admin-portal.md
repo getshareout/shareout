@@ -21,12 +21,43 @@ instance owner acts across every workspace without being a member of any:
 
 | Method | Endpoint | Does |
 | --- | --- | --- |
-| `POST` | `/v1/admin/workspaces` | Create a workspace: `{name, owner_email, slug?, description?}`. The owner need not have signed in yet. |
+| `POST` | `/v1/admin/workspaces/provision` | **New customer in one step** — workspace + slug/subdomain + locale, branding, policy and feature flags, starter folders, admin invites, connectors. Idempotent by `slug`; `207` when a step failed. See below. |
+| `POST` | `/v1/admin/workspaces` | Create a bare workspace: `{name, owner_email, slug?, description?}`. The owner need not have signed in yet. |
 | `POST` | `/v1/admin/workspaces/{id}/members` | Set a role: `{email, role}` where role is `owner`/`admin`/`member`. |
 
-Both write to the workspace audit log with the acting admin's email. Use these when
-the task is "stand up a workspace for a team and hand it over" — not the
+All of them write to the workspace audit log with the acting admin's email. Use these
+when the task is "stand up a workspace for a team and hand it over" — not the
 workspace-scoped member endpoints, which require you to already be in it.
+
+### Provisioning a customer workspace
+
+Prefer `provision` for any new customer account. Minimal body:
+
+```json
+{
+  "name": "Acme", "slug": "acme", "locale": "es",
+  "admins": ["ana@acme.example.com"],
+  "subdomain": true,
+  "branding": { "accent_color": "#1a73e8", "logo": { "url": "https://cdn.acme.example.com/logo.png" } },
+  "policy": { "allowed_domains": ["acme.example.com"], "external_sharing": true, "guest_comments": false, "knowledge": true, "features": { "ai.crew": false } },
+  "folders": ["Clientes", "Proveedores", "Reportes"],
+  "connectors": [{ "name": "acme_api", "type": "rest_api", "config": { "base_url": "https://api.acme.example.com" }, "credentials": { "type": "api_key", "data": { "api_key": "<from the operator>" } } }]
+}
+```
+
+- The first admin owns the workspace. `slug` is required (it is the subdomain) and
+  reserved names are refused. A slug held by a differently named workspace is `409
+  SLUG_TAKEN` unless `if_exists: "update"`.
+- Re-running is the fix for anything: it fills in what is missing, reports the rest
+  `unchanged`, never resends a live invite (`resend_invites: true` does), and never
+  overwrites a stored connector credential.
+- Read `steps[]` (`created` / `updated` / `unchanged` / `skipped` / `pending` /
+  `failed`), `admins[]` (`invite_url` appears only when the email did not go out) and
+  `next_steps[]`. `templates` and `custom_domain` stay `pending` until the instance has
+  those features.
+- Never put credential values in chat output or files you write; the response never
+  echoes them. Operators can use `scripts/provision-workspace.mjs` with a YAML spec and
+  `${ENV_VAR}` placeholders for secrets.
 
 ## Tabs
 
