@@ -36,7 +36,7 @@ const err = (error: string, code: string, status: number, extra: Record<string, 
 
 export async function routeFileImportApi(ctx: FetchContext): Promise<Response | null> {
   const { path } = ctx;
-  const cb = path.match(/^\/v1\/file-imports\/oauth\/([a-z_]+)\/callback$/);
+  const cb = path.match(/^\/v1\/file-imports\/oauth\/([^/]+)\/callback$/);
   if (cb && ctx.request.method === 'GET') return handleCallback(ctx, cb[1]);
   const m = path.match(/^\/v1\/workspaces\/([^/]+)\/file-imports(\/.*)?$/);
   if (!m) return null;
@@ -239,7 +239,7 @@ function callbackPage(ok: boolean, provider: string, message: string): Response 
 <body><div class="card"><div class="icon ${ok ? 'success' : 'error'}">${ok ? '✓' : '✕'}</div>
 <h1>${ok ? 'Connected' : 'Connection failed'}</h1><p>${escapeHtml(message)}</p>
 <p class="close-hint">You can close this window.</p></div>
-<script>if (window.opener) { window.opener.postMessage({ type: 'shareout:file-import:connected', ok: ${ok ? 'true' : 'false'}, provider: ${JSON.stringify(provider)} }, '*'); window.close(); }</script>
+<script>if (window.opener) { window.opener.postMessage({ type: 'shareout:file-import:connected', ok: ${ok ? 'true' : 'false'}, provider: ${JSON.stringify(isFileImportProvider(provider) ? provider : '')} }, '*'); window.close(); }</script>
 </body></html>`;
   return new Response(html, { status: ok ? 200 : 400, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
 }
