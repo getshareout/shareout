@@ -98,30 +98,30 @@ export async function resolveSkillEditGrant(
   skill: SkillGovernance,
 ): Promise<SkillEditGrant> {
   if (skill.official) return null;
+  if (!(await getInternalWorkspaceRole(env, skill.workspaceId, userId))) return null;
   const role = await getUserRole(env, skill.artifactId, userId);
   if (role === 'owner' || role === 'editor') return { kind: 'artifact' };
-  if (skill.editPolicy === 'workspace') {
-    const wsRole = await getInternalWorkspaceRole(env, skill.workspaceId, userId);
-    if (wsRole) return { kind: 'workspace' };
-  }
+  if (skill.editPolicy === 'workspace') return { kind: 'workspace' };
   return null;
 }
 
 /** May this user merge or reject other people's proposed changes? */
 export async function canReviewSkillChanges(env: Env, userId: string, skill: SkillGovernance): Promise<boolean> {
   if (skill.official) return false;
+  const wsRole = await getInternalWorkspaceRole(env, skill.workspaceId, userId);
+  if (!wsRole) return false;
   const role = await getUserRole(env, skill.artifactId, userId);
   if (role === 'owner' || role === 'editor') return true;
-  const wsRole = await getInternalWorkspaceRole(env, skill.workspaceId, userId);
   return wsRole === 'owner' || wsRole === 'admin';
 }
 
 /** May this user change the skill's own edit policy? Owner, or a workspace admin. */
 export async function canSetSkillPolicy(env: Env, userId: string, skill: SkillGovernance): Promise<boolean> {
   if (skill.official) return false;
+  const wsRole = await getInternalWorkspaceRole(env, skill.workspaceId, userId);
+  if (!wsRole) return false;
   const role = await getUserRole(env, skill.artifactId, userId);
   if (role === 'owner') return true;
-  const wsRole = await getInternalWorkspaceRole(env, skill.workspaceId, userId);
   return wsRole === 'owner' || wsRole === 'admin';
 }
 

@@ -14,7 +14,7 @@ vi.mock('../../../src/starter-kit/schedule', () => ({ scheduleSeedStarterKit: vi
 import { applyMigrations, e as baseEnv } from '../helpers/migrated-db';
 import { handleGoogleCallback } from '../../../src/auth/google-oauth';
 import { COOKIE_NAME } from '../../../src/auth/constants';
-import { verifySessionToken } from '../../../src/token';
+import { createSessionToken, verifySessionToken } from '../../../src/token';
 
 const e = {
   ...baseEnv,
@@ -52,19 +52,27 @@ beforeEach(async () => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+const withCookie = (state: Record<string, unknown>, token: string) =>
+  new Request(`https://shareout.test/auth/callback?code=x&state=${encodeURIComponent(btoa(JSON.stringify(state)))}`, {
+    headers: { Cookie: `${COOKIE_NAME}=${token}` },
+  });
+
 describe('f12 unsigned Google link state', () => {
-  it('CONFIRMS: forged state linkUserId rewrites victim google_id and later Google login yields victim session', async () => {
-    const res = await handleGoogleCallback(cb({ redirect: '/', linkUserId: 'usr_v', linkAction: 'google' }), e);
+  it('blocks: forged state linkUserId without a matching session does not link', async () => {
+    const anon = await handleGoogleCallback(cb({ redirect: '/', linkUserId: 'usr_v', linkAction: 'google' }), e);
+    expect(anon.status).toBe(400);
+    const other = await createSessionToken('usr_other', 'other@x.test', e);
+    const mismatched = await handleGoogleCallback(withCookie({ redirect: '/', linkUserId: 'usr_v', linkAction: 'google' }, other), e);
+    expect(mismatched.status).toBe(400);
+    const row = await e.DB.prepare("SELECT google_id FROM users WHERE id='usr_v'").first<{ google_id: string | null }>();
+    expect(row?.google_id).toBeNull();
+  });
+
+  it('still links when the session user matches linkUserId', async () => {
+    const own = await createSessionToken('usr_v', 'victim@corp.test', e);
+    const res = await handleGoogleCallback(withCookie({ redirect: '/', linkUserId: 'usr_v', linkAction: 'google' }, own), e);
+    expect(res.status).toBe(200);
     const row = await e.DB.prepare("SELECT google_id FROM users WHERE id='usr_v'").first<{ google_id: string }>();
     expect(row?.google_id).toBe('G_ATTACKER');
-    expect(cookieOf(res)).toBeUndefined();
-
-    const login = await handleGoogleCallback(cb({ redirect: '/' }), e);
-    expect(login.status).toBe(302);
-    const sess: any = await sessionUser(login);
-    console.log('session payload', JSON.stringify(sess));
-    expect(JSON.stringify(sess)).toContain('usr_v');
-    const n = await e.DB.prepare("SELECT COUNT(*) c FROM users").first<{ c: number }>();
-    expect(n?.c).toBe(1);
   });
 });

@@ -2,11 +2,12 @@ import type { Env } from '../types';
 import { COOKIE_NAME } from './constants';
 import { cookieDomainAttr, cookieSecureAttr } from './cookies';
 import { getPlatformHostname } from '../config/origins';
+import { safeRedirect } from './pages';
 
 /** Clear the zone-wide session cookie and redirect. */
 export async function handleLogout(request: Request, env?: Env): Promise<Response> {
   const url = new URL(request.url);
-  const redirectTo = url.searchParams.get('redirect') || '/';
+  const redirectTo = safeRedirect(url.searchParams.get('redirect'), '/');
 
   const headers = new Headers({ Location: redirectTo });
   const base = `${COOKIE_NAME}=; Path=/; HttpOnly;${cookieSecureAttr(url)} SameSite=Lax;`;

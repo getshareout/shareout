@@ -97,6 +97,9 @@ export function findSheetConnection(state: SheetsDbState, artifactId: string, na
 }
 
 function dbFirst(sql: string, args: unknown[], state: SheetsDbState): unknown {
+  if (sql.includes('SELECT id, owner_id FROM artifacts')) {
+    return args[0] === SHEETS_TEST_ARTIFACT_ID ? { id: SHEETS_TEST_ARTIFACT_ID, owner_id: state.ownerId ?? null } : null;
+  }
   if (sql.includes('owner_id FROM artifacts')) {
     return state.ownerId ? { owner_id: state.ownerId } : { owner_id: null };
   }

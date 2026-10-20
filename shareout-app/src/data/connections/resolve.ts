@@ -13,6 +13,7 @@ import {
   verifyPerUserWorkspaceConnectionQuery,
   type DataContext,
 } from '../middleware';
+import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { decryptCredentials } from './credentials';
 import { loadUserConnectionCredentials } from './user-credentials';
 import type { ResolvedGenericConnection } from './types';
@@ -82,7 +83,15 @@ export async function authorizeConnectionAction(
   ctx: DataContext,
   connectionName: string,
 ): Promise<Response | null> {
-  if (await verifyOwner(request, ctx)) return null;
+  if (await verifyOwner(request, ctx)) {
+    const conn = await resolveGenericConnection(ctx.env, ctx.artifactId, connectionName);
+    if (conn?.scope !== 'workspace' || !conn.workspace_id) return null;
+    const role = ctx.artifact.owner_id
+      ? await getInternalWorkspaceRole(ctx.env, conn.workspace_id, ctx.artifact.owner_id)
+      : null;
+    if (role) return null;
+    return errorResponse(DATA_ERRORS.FORBIDDEN, ctx.origin);
+  }
 
   const access = await verifyPerUserWorkspaceConnectionQuery(request, ctx, connectionName);
   if (access === 'allowed') return null;

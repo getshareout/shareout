@@ -14,6 +14,7 @@ import {
   parseJson,
   publicArtifactEnv,
   PLATFORM_OWNER_ID,
+  shopifyHmac,
 } from './helpers';
 import { createOAuthState } from '../../../../src/oauth-state';
 import { ARTIFACT_OAUTH_STATE_PURPOSE } from '../../../../src/data/platform';
@@ -475,8 +476,10 @@ describe('handlePlatformRequest', () => {
     (env as { SESSION_SECRET?: string }).SESSION_SECRET = 'test-session-secret';
     const state = await createOAuthState(env, ARTIFACT_OAUTH_STATE_PURPOSE, PLATFORM_OWNER_ID, { artifactId: ARTIFACT_ID, connectionName: 'shop-conn', returnUrl: '/' });
 
+    const q = { code: 'abc', state, shop: 'demo.myshopify.com' };
+    const hmac = await shopifyHmac(q, (env as { SHOPIFY_CLIENT_SECRET: string }).SHOPIFY_CLIENT_SECRET);
     const response = await handlePlatformRequest(
-      new Request(`${BASE_URL}/shopify/callback?code=abc&state=${encodeURIComponent(state)}&shop=demo.myshopify.com`, {
+      new Request(`${BASE_URL}/shopify/callback?${new URLSearchParams({ ...q, hmac })}`, {
         method: 'GET',
       }),
       makeDataContext(env),

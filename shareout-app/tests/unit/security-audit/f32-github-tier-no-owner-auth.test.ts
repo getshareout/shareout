@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { handleDataRequest } from '../../../src/data/router';
 import { storeArtifactToken } from '../../../src/data/github/github-auth';
+import { createSessionToken } from '../../../src/token';
 import { applyMigrations, e } from '../helpers/migrated-db';
 
 const ART = 'art_f32_public';
@@ -41,38 +42,28 @@ function stubGitHub() {
 }
 
 describe('f32 github tier', () => {
-  it('CONFIRMS: anonymous visitor of a public artifact lists owner private repos with the owner token', async () => {
-    const calls = stubGitHub();
-    const res = await handleDataRequest(new Request(`https://so.test/v1/data/${ART}/github/repos`), e, `${ART}/github/repos`);
-    const body = await res.json() as any;
-    console.log('REPOS', res.status, JSON.stringify(body), JSON.stringify(calls.map(c => [c.url, c.auth])));
-    expect(res.status).toBe(200);
-    expect(JSON.stringify(body)).toContain('secret-repo');
-    expect(calls.some((c) => c.url.includes('api.github.com') && c.auth === `Bearer ${OWNER_TOKEN}`)).toBe(true);
-  });
+  const run = (path: string, method = 'GET') =>
+    handleDataRequest(new Request(`https://so.test/v1/data/${ART}/github/${path}`, { method }), e, `${ART}/github/${path}`);
 
-  it('CONFIRMS: anonymous visitor can push files to a caller-chosen repo with the owner token', async () => {
+  it('blocks: anonymous visitor cannot use the owner token on any github route', async () => {
     const calls = stubGitHub();
-    const res = await handleDataRequest(
-      new Request(`https://so.test/v1/data/${ART}/github/export`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo: 'victim/repo', branch: 'main', pathPrefix: 'pwn' }),
-      }), e, `${ART}/github/export`);
-    const text = await res.text();
-    console.log('EXPORT', res.status, text, JSON.stringify(calls.map(c => [c.method, c.url, c.auth])));
-    expect(res.status).toBeLessThan(300);
-    expect(calls.some((c) => c.method === 'PUT' && c.url.includes('/repos/victim/repo/contents/') && c.auth === `Bearer ${OWNER_TOKEN}`)).toBe(true);
-  });
-
-  it('CONFIRMS: anonymous visitor can read status and disconnect the owner GitHub grant', async () => {
-    stubGitHub();
-    const st = await handleDataRequest(new Request(`https://so.test/v1/data/${ART}/github/token-status`), e, `${ART}/github/token-status`);
-    expect(st.status).toBe(200);
-    expect(JSON.stringify(await st.json())).toContain('owner-gh');
-    const del = await handleDataRequest(new Request(`https://so.test/v1/data/${ART}/github/disconnect`, { method: 'POST' }), e, `${ART}/github/disconnect`);
-    console.log('DISCONNECT', del.status);
-    expect(del.status).toBe(200);
+    for (const [path, method] of [['repos', 'GET'], ['export', 'POST'], ['token-status', 'GET'], ['disconnect', 'POST']] as const) {
+      const res = await run(path, method);
+      expect([401, 403]).toContain(res.status);
+    }
+    expect(calls).toEqual([]);
     const row = await e.DB.prepare("SELECT id FROM connections WHERE scope_id = ? AND provider = 'github'").bind(ART).first();
-    expect(row).toBeNull();
+    expect(row).not.toBeNull();
+  });
+
+  it('the owner can still list repos', async () => {
+    const calls = stubGitHub();
+    const token = await createSessionToken('usr_f32_owner', 'f32owner@x.test', e);
+    const res = await handleDataRequest(
+      new Request(`https://so.test/v1/data/${ART}/github/repos`, { headers: { Cookie: `shareout_session=${token}` } }),
+      e, `${ART}/github/repos`);
+    expect(res.status).toBe(200);
+    expect(JSON.stringify(await res.json())).toContain('secret-repo');
+    expect(calls.some((c) => c.auth === `Bearer ${OWNER_TOKEN}`)).toBe(true);
   });
 });

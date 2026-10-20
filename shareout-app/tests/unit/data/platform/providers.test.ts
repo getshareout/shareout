@@ -5,7 +5,7 @@ import { googleAnalyticsProvider } from '../../../../src/data/platform/providers
 import { shopifyProvider } from '../../../../src/data/platform/providers/shopify';
 import { tiendanubeProvider } from '../../../../src/data/platform/providers/tiendanube';
 import type { AuthContext, ExecutionContext } from '../../../../src/data/platform/types';
-import { ARTIFACT_ID, publicArtifactEnv } from './helpers';
+import { ARTIFACT_ID, publicArtifactEnv, shopifyHmac } from './helpers';
 
 const authCtx = (params: Record<string, string> = {}): AuthContext => ({
   artifactId: ARTIFACT_ID,
@@ -277,7 +277,7 @@ describe('Google Analytics provider', () => {
 
 describe('Shopify provider', () => {
   it('requires shop for OAuth and rejects refresh/direct modes', async () => {
-    await expect(shopifyProvider.getAuthUrl(authCtx())).rejects.toThrow('Shop name is required');
+    await expect(shopifyProvider.getAuthUrl(authCtx())).rejects.toThrow('Invalid Shopify shop');
     await expect(shopifyProvider.refreshToken(authCtx(), 'x')).rejects.toThrow('cannot be refreshed');
     await expect(shopifyProvider.prepareDirectCredentials(authCtx(), { access_token: 'x' }))
       .rejects.toThrow('does not support direct mode');
@@ -298,7 +298,9 @@ describe('Shopify provider', () => {
       });
     }));
 
-    const tokens = await shopifyProvider.handleCallback(authCtx({ shop: 'demo' }), 'code');
+    const signed = { shop: 'demo', code: 'code' };
+    const hmac = await shopifyHmac(signed, publicArtifactEnv().SHOPIFY_CLIENT_SECRET);
+    const tokens = await shopifyProvider.handleCallback(authCtx({ ...signed, hmac }), 'code');
     expect(tokens.extra?.shop).toBe('demo');
 
     const ctx: ExecutionContext = {

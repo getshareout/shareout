@@ -111,6 +111,10 @@ function renderAuthPage(title: string, body: string, status = 200, opts?: { noin
   });
 }
 
+export function safeRedirect(raw: string | null | undefined, fallback = '/home'): string {
+  return raw && /^\/(?![/\\])/.test(raw) && !/[\x00-\x1f]/.test(raw) ? raw : fallback;
+}
+
 export function linkSuccessPage(email: string, redirectTo: string): Response {
   return renderAuthPage('Account Linked - ShareOut', `
   <div class="card">
@@ -187,7 +191,7 @@ export function appLoginPage(opts: {
   /** Workspace subdomain: its name, logo and accent color on the card. */
   brand?: { name: string; logoUrl: string | null; accent: string | null } | null;
 }): Response {
-  const redirect = opts.redirect && opts.redirect.startsWith('/') ? opts.redirect : '/home';
+  const redirect = safeRedirect(opts.redirect);
   const googleEnabled = opts.googleEnabled === true;
   const microsoftEnabled = opts.microsoftEnabled === true;
   const socialEnabled = googleEnabled || microsoftEnabled;
@@ -298,7 +302,7 @@ function passwordFormHtml(c: SignInCopy = EN, canReset = false): string {
 }
 
 function passwordLoginScript(redirectAfter: string, c: SignInCopy = EN): string {
-  const dest = JSON.stringify(redirectAfter);
+  const dest = JSON.stringify(redirectAfter).replace(/</g, '\\u003c');
   const msg = (s: string) => JSON.stringify(s).replace(/</g, '\\u003c');
   return `<script>
 (function () {

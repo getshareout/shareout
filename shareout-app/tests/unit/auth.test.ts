@@ -776,7 +776,7 @@ describe('handleGoogleCallback', () => {
         return new Response(JSON.stringify({ access_token: 'at', id_token: 'id' }), { status: 200 });
       }
       return new Response(JSON.stringify({
-        id: 'google_new', email: 'linked@example.com', name: 'Linked User', picture: 'https://example.com/p.png',
+        id: 'google_new', email: 'linked@example.com', verified_email: true, name: 'Linked User', picture: 'https://example.com/p.png',
       }), { status: 200 });
     }));
 
@@ -891,7 +891,9 @@ describe('handleGoogleCallback', () => {
       linkAction: 'google',
     }));
     const response = await handleGoogleCallback(
-      new Request(`https://shareout.example.com/auth/callback?code=abc&state=${encodeURIComponent(state)}`),
+      new Request(`https://shareout.example.com/auth/callback?code=abc&state=${encodeURIComponent(state)}`, {
+        headers: { Cookie: `shareout_session=${await createSessionToken('usr_link', 'linked@example.com', baseEnv)}` },
+      }),
       env,
     );
 

@@ -186,17 +186,26 @@ export async function approveDeviceCode(
   return { ok: true, token, warn };
 }
 
-// GET /auth/device[?code=USER-CODE] — browser landing. With a code + session, approve
-// the CLI login (works for email OTP and post-Google redirect). Otherwise send the
-// user through /auth/login, then back here.
+// GET /auth/device[?code=USER-CODE] — browser landing. With a code + session, shows a
+// confirmation page; the approval itself is a same-origin POST. Otherwise send the user
+// through /auth/login, then back here.
 export async function handleDevicePage(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
-  const rawCode = url.searchParams.get('code') || '';
+  const post = request.method === 'POST';
+  let rawCode = url.searchParams.get('code') || '';
+  if (post) {
+    const sameSite = request.headers.get('Sec-Fetch-Site');
+    const sameOrigin = sameSite ? sameSite === 'same-origin' : request.headers.get('Origin') === url.origin;
+    if (!sameOrigin) return errorPage('That request did not come from ShareOut.', '/');
+    const form = await request.formData().catch(() => null);
+    rawCode = String(form?.get('code') || '');
+  }
   const code = rawCode ? normalizeUserCode(rawCode) : '';
 
   if (code) {
     const session = await getSessionUser(request, env);
     if (session) {
+      if (!post) return deviceConfirmPage(code, session.email, pageLocale(request));
       const result = await approveDeviceCode(env, code, session.id, session.email);
       if (!result.ok) return errorPage(result.error, '/');
       return deviceDonePage(session.email, result.warn, result.token, request);
@@ -215,7 +224,7 @@ export async function handleDevicePage(request: Request, env: Env): Promise<Resp
   return devicePage(code, loginHint, pageLocale(request));
 }
 
-/** OTP/Google redirect target — same approve path as /auth/device?code= when sessioned. */
+/** OTP/Google redirect target — same confirmation page as /auth/device?code= when sessioned. */
 export async function handleDeviceDone(request: Request, env: Env): Promise<Response> {
   return handleDevicePage(request, env);
 }
@@ -243,6 +252,8 @@ const DEVICE_COPY = {
     enterCode: 'Enter the code your app showed you',
     continue: 'Continue',
     approve: 'Sign in to approve',
+    confirm: 'Approve',
+    signedInAs: 'Signed in as {email}',
     doneTitle: 'Connected - ShareOut',
     doneHeading: 'Done — you’re connected',
     doneBody: 'Connected as {email}. Go back to Claude, ChatGPT or your terminal — you can keep going.',
@@ -258,6 +269,8 @@ const DEVICE_COPY = {
     enterCode: 'Escribí el código que te mostró la app',
     continue: 'Continuar',
     approve: 'Iniciar sesión para aprobar',
+    confirm: 'Aprobar',
+    signedInAs: 'Sesión iniciada como {email}',
     doneTitle: 'Conectado - ShareOut',
     doneHeading: 'Listo, ya estás conectado',
     doneBody: 'Conectado como {email}. Volvé a Claude, ChatGPT o tu terminal: ya podés seguir.',
@@ -269,7 +282,7 @@ const DEVICE_COPY = {
 
 function devicePage(code: string, loginHint: string | null | undefined, lang: PageLocale): Response {
   const c = DEVICE_COPY[lang];
-  // After sign-in, land back on /auth/device?code= so handleDevicePage can approve
+  // After sign-in, land back on /auth/device?code= so handleDevicePage can confirm
   // (email OTP and Google both work). login_hint only helps Google account pick.
   const hintParam = loginHint ? `&login_hint=${encodeURIComponent(loginHint)}` : '';
   const signInHref = `/auth/login?redirect=${encodeURIComponent(`/auth/device?code=${code}`)}${hintParam}&lang=${lang}`;
@@ -297,6 +310,29 @@ function devicePage(code: string, loginHint: string | null | undefined, lang: Pa
       <p>${escapeHtml(c.body)}</p>
       ${codeField}
       ${continueButton}
+      <div class="footer">Powered by <a href="/">ShareOut</a></div>
+    </div>`,
+  });
+}
+
+function deviceConfirmPage(code: string, email: string, lang: PageLocale): Response {
+  const c = DEVICE_COPY[lang];
+  return renderHtmlPage({
+    title: c.title,
+    lang,
+    pageStyles: authPageStyles,
+    cacheControl: 'no-store',
+    body: `
+    <div class="card">
+      <div class="icon icon-primary">🔑</div>
+      <h1>${escapeHtml(c.heading)}</h1>
+      <p>${escapeHtml(c.body)}</p>
+      <p class="auth-help">${escapeHtml(c.codeIs)} <span class="email">${escapeHtml(code)}</span></p>
+      <p class="auth-help">${escapeHtml(c.signedInAs).replace('{email}', `<span class="email">${escapeHtml(email)}</span>`)}</p>
+      <form method="POST" action="/auth/device">
+        <input type="hidden" name="code" value="${escapeHtml(code)}">
+        <button type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(c.confirm)}</button>
+      </form>
       <div class="footer">Powered by <a href="/">ShareOut</a></div>
     </div>`,
   });

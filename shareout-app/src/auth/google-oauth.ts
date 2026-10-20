@@ -5,13 +5,12 @@ import { linkIdentity } from '../account-links';
 import { COOKIE_NAME } from './constants';
 import { cookieDomainAttr, isShareoutOrigin } from './cookies';
 import { getPlatformHostname } from '../config/origins';
-import { errorPage, linkSuccessPage } from './pages';
-import { resolveSessionMaxAge } from './session';
+import { errorPage, linkSuccessPage, safeRedirect } from './pages';
+import { getSessionUser, resolveSessionMaxAge } from './session';
 import { linkGoogleToUser, upsertUser } from './users';
 import { ssoRequiredFor, ssoStartPath } from './sso-config';
 import { scheduleSeedStarterKit } from '../starter-kit/schedule';
 import { scheduleWelcomeEmail, scheduleWorkspaceWelcome } from '../onboarding/welcome-email';
-import { approveDeviceCode, deviceDonePage } from './device-auth';
 
 interface GoogleTokens {
   access_token: string;
@@ -37,7 +36,7 @@ export async function handleGoogleLogin(request: Request, env: Env): Promise<Res
     return Response.redirect(new URL(`/auth/login?redirect=${encodeURIComponent(redirectTo)}`, url.origin).toString(), 302);
   }
   const url = new URL(request.url);
-  const redirectTo = url.searchParams.get('redirect') || '/';
+  const redirectTo = safeRedirect(url.searchParams.get('redirect'), '/');
   const loginHint = url.searchParams.get('login_hint');
   const platformHost = getPlatformHostname(env);
   const apex = platformHost.replace(/^www\./, '');
@@ -132,7 +131,7 @@ export async function handleGoogleCallback(request: Request, env: Env, execution
   if (state) {
     try {
       const parsed = JSON.parse(atob(state));
-      redirectTo = parsed.redirect || '/';
+      redirectTo = safeRedirect(parsed.redirect, '/');
       returnOrigin = parsed.returnOrigin || null;
       linkUserId = parsed.linkUserId || null;
       linkAction = parsed.linkAction || null;
@@ -146,6 +145,13 @@ export async function handleGoogleCallback(request: Request, env: Env, execution
     isShareoutOrigin(returnOrigin, platformHost) && redirectTo.startsWith('/')
       ? returnOrigin + redirectTo
       : redirectTo;
+
+  if (linkUserId && (linkAction === 'google' || linkAction === 'identity')) {
+    const session = await getSessionUser(request, env);
+    if (!session || session.id !== linkUserId) {
+      return errorPage('Sign in to the account you want to link, then try again.', redirectTo);
+    }
+  }
 
   try {
     const tokens = await exchangeCodeForTokens(code, env);
@@ -192,19 +198,6 @@ export async function handleGoogleCallback(request: Request, env: Env, execution
     const maxAge = await resolveSessionMaxAge(env, user.id);
     const sessionToken = await createSessionToken(user.id, user.email, env, maxAge);
     const sessionCookie = `${COOKIE_NAME}=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Lax;${cookieDomainAttr(url.hostname, platformHost)} Max-Age=${maxAge}`;
-
-    // Device-authorization (CLI) login: the browser was sent here from /auth/device with
-    // the CLI's user_code carried in the redirect. We now have the authenticated user, so
-    // mint + bind the `so_` token here, then show the "return to your terminal" page.
-    const deviceMatch = redirectTo.match(/^\/auth\/device\/done\?code=([^&]+)/);
-    if (deviceMatch) {
-      const userCode = decodeURIComponent(deviceMatch[1]);
-      const result = await approveDeviceCode(env, userCode, user.id, user.email);
-      if (!result.ok) return errorPage(result.error, '/');
-      const page = deviceDonePage(user.email, result.warn, result.token, request);
-      page.headers.set('Set-Cookie', sessionCookie);
-      return page;
-    }
 
     return new Response(null, {
       status: 302,

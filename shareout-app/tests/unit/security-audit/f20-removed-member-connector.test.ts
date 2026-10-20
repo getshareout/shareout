@@ -38,7 +38,7 @@ beforeAll(async () => {
 });
 
 describe('f20 removed member + shared connector via owned artifact', () => {
-  it('CONFIRMS: removed member still runs queries with the shared connector credential', async () => {
+  it('blocks: removed member cannot run queries with the shared connector credential', async () => {
     const mk = await call(`/v1/workspaces/${WS}/connections`, {
       method: 'POST', token: A_TOKEN,
       body: JSON.stringify({
@@ -64,11 +64,10 @@ describe('f20 removed member + shared connector via owned artifact', () => {
     const m = await e.DB.prepare("SELECT COUNT(*) AS n FROM workspace_members WHERE user_id = 'usr_f20_b'").first<{ n: number }>();
     expect(m!.n).toBe(0);
 
+    expect(seen).toHaveLength(1);
     seen.length = 0;
     const after = await q();
-    const body = await after.text();
-    console.log('f20 after-removal query:', after.status, body, JSON.stringify(seen));
-    expect(after.status).toBe(200);
-    expect(seen).toEqual([{ url: 'https://api.upstream.test/customers', auth: `Bearer ${DUMMY_KEY}` }]);
+    expect(after.status).toBe(403);
+    expect(seen).toEqual([]);
   });
 });

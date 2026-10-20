@@ -115,3 +115,10 @@ export function makeDataContext(env: Env, origin: string | null = 'https://app.e
 export async function parseJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
+
+export async function shopifyHmac(params: Record<string, string>, secret: string): Promise<string> {
+  const msg = Object.keys(params).sort().map((k) => `${k}=${params[k]}`).join('&');
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg)));
+  return Array.from(sig).map((b) => b.toString(16).padStart(2, '0')).join('');
+}

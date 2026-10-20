@@ -24,6 +24,32 @@ interface ShopifyConnectionConfig {
 	shop?: string;
 }
 
+const SHOP_RE = /^([a-z0-9][a-z0-9-]*)(\.myshopify\.com)?$/i;
+
+function parseShop(shop: string | undefined): string {
+	const name = shop?.match(SHOP_RE)?.[1];
+	if (!name) throw new Error('Invalid Shopify shop domain');
+	return name;
+}
+
+async function verifyShopifyHmac(params: Record<string, string>, secret: string): Promise<boolean> {
+	const { hmac, signature: _signature, ...rest } = params;
+	if (!hmac || !secret) return false;
+	const message = Object.keys(rest)
+		.sort()
+		.map((k) => `${k}=${rest[k]}`)
+		.join('&');
+	const enc = new TextEncoder();
+	const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+	const expected = new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(message)));
+	const given = new Uint8Array(hmac.length / 2);
+	if (!/^[0-9a-f]+$/i.test(hmac) || hmac.length !== expected.length * 2) return false;
+	for (let i = 0; i < given.length; i++) given[i] = parseInt(hmac.slice(i * 2, i * 2 + 2), 16);
+	let diff = 0;
+	for (let i = 0; i < expected.length; i++) diff |= expected[i] ^ given[i];
+	return diff === 0;
+}
+
 class ShopifyProvider extends BaseProvider {
 	readonly config = SHOPIFY_CONFIG;
 
@@ -195,10 +221,7 @@ class ShopifyProvider extends BaseProvider {
 	]);
 
 	async getAuthUrl(ctx: AuthContext): Promise<string> {
-		const { shop } = ctx.params;
-		if (!shop) {
-			throw new Error('Shop name is required for Shopify OAuth');
-		}
+		const shop = parseShop(ctx.params.shop);
 
 		const config = this.config.auth.oauth!;
 		const params = new URLSearchParams({
@@ -212,9 +235,9 @@ class ShopifyProvider extends BaseProvider {
 	}
 
 	async handleCallback(ctx: AuthContext, code: string): Promise<TokenResult> {
-		const { shop } = ctx.params;
-		if (!shop) {
-			throw new Error('Shop name is required for token exchange');
+		const shop = parseShop(ctx.params.shop);
+		if (!(await verifyShopifyHmac(ctx.params, ctx.env.SHOPIFY_CLIENT_SECRET))) {
+			throw new Error('Invalid Shopify callback signature');
 		}
 
 		const response = await fetch(

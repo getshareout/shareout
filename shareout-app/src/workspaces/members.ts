@@ -6,6 +6,7 @@ import { invalidateGrants } from '../access/can-access';
 import { getWorkspaceInviteContext, inviteMany, inviteOrAddMember, MAX_BULK_INVITES } from './invite';
 import { parseEmails } from './parse-emails';
 import { logAudit } from '../audit';
+import { evictReturnedTokens } from '../auth/token-cache';
 
 export async function handleListWorkspaceMembers(
   request: Request,
@@ -254,7 +255,7 @@ export async function handleRemoveWorkspaceMember(
   // Removing the membership edge alone does NOT revoke an external's access: grants
   // resolve through `sharee_members` + `grants`, neither of which references the edge.
   // Drop both, or a removed client keeps every deliverable they were ever granted.
-  await env.DB.batch([
+  const [, , , revoked] = await env.DB.batch([
     env.DB.prepare('DELETE FROM workspace_members WHERE workspace_id = ? AND user_id = ?')
       .bind(workspaceId, userId),
     env.DB.prepare(
@@ -264,8 +265,14 @@ export async function handleRemoveWorkspaceMember(
     env.DB.prepare(
       "DELETE FROM grants WHERE workspace_id = ? AND subject_type = 'external_user' AND subject_id = ?"
     ).bind(workspaceId, userId),
+    env.DB.prepare(
+      `UPDATE tokens SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+        WHERE principal_type = 'workspace' AND principal_id = ? AND user_id = ? AND revoked_at IS NULL
+        RETURNING token_hash`
+    ).bind(workspaceId, userId),
   ]);
 
+  await evictReturnedTokens(env, revoked);
   await invalidateWorkspaceRole(env, workspaceId, userId);
   await invalidateGrants(env, workspaceId, userId);
 

@@ -43,6 +43,7 @@ export async function handleGoogleOneTap(request: Request, env: Env): Promise<Re
     email: claims.email,
     name: claims.name || claims.email.split('@')[0],
     picture: claims.picture || '',
+    verified_email: true,
   });
   await autoJoinWorkspacesByDomain(env, user.id, user.email);
   const maxAge = await resolveSessionMaxAge(env, user.id);

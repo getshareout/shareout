@@ -3,10 +3,12 @@ import { DATA_ERRORS } from '../../types';
 import { googleFontsPreconnect } from '../../../packages/design-tokens/src/index';
 import { standalonePageStyles } from '../../design-system/standalone-page';
 import { colors } from '../../../packages/design-tokens/src/index';
+import { escapeHtml } from '../../html/utils';
 import { createLogger, logError } from '../../logging';
 import {
   successResponse,
   errorResponse,
+  verifyOwner,
   type DataContext,
 } from '../middleware';
 import {
@@ -40,6 +42,10 @@ export async function handleGitHub(
   const parts = path.split('/').filter(Boolean);
   const [action] = parts;
   const method = request.method;
+
+  if (!(await verifyOwner(request, ctx))) {
+    return errorResponse(DATA_ERRORS.FORBIDDEN);
+  }
 
   if (action === 'auth-url' && method === 'GET') {
     return getAuthUrl(request, ctx);
@@ -155,7 +161,8 @@ async function handleAuthCallback(
 
 export async function handleGitHubOAuthCallback(
   request: Request,
-  env: Env
+  env: Env,
+  userId: string | null
 ): Promise<Response> {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
@@ -179,11 +186,15 @@ export async function handleGitHubOAuthCallback(
   }
 
   const artifact = await env.DB.prepare(
-    'SELECT id FROM artifacts WHERE id = ?'
-  ).bind(state.artifactId).first<{ id: string }>();
+    'SELECT id, owner_id FROM artifacts WHERE id = ?'
+  ).bind(state.artifactId).first<{ id: string; owner_id: string | null }>();
 
   if (!artifact) {
     return renderCallbackPage(false, 'Artifact not found', env.SHAREOUT_BASE_URL);
+  }
+
+  if (!userId || artifact.owner_id !== userId) {
+    return renderCallbackPage(false, 'Sign in as the artifact owner to connect GitHub', env.SHAREOUT_BASE_URL);
   }
 
   try {
@@ -511,6 +522,7 @@ function renderCallbackPage(
   username?: string,
   redirectUrl?: string | null
 ): Response {
+  const j = (v: string) => JSON.stringify(v).replace(/</g, '\\u003c');
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -531,12 +543,12 @@ function renderCallbackPage(
     </svg>
     <div class="icon ${success ? 'success' : 'error'}">${success ? '&#10003;' : '&#10005;'}</div>
     <h1>${success ? 'GitHub Connected!' : 'Connection Failed'}</h1>
-    <p>${success && username ? `Signed in as <span class="username">@${username}</span>` : message}</p>
+    <p>${success && username ? `Signed in as <span class="username">@${escapeHtml(username)}</span>` : escapeHtml(message)}</p>
     <p class="close-hint">${success ? 'You can close this window and return to your app.' : 'Please try again.'}</p>
   </div>
   <script>
-    ${redirectUrl ? `setTimeout(() => window.location.href = '${redirectUrl}', 2000);` : ''}
-    window.opener?.postMessage({ type: 'shareout_github_${success ? 'connected' : 'error'}', message: '${message}'${success && username ? `, username: '${username}'` : ''} }, '*');
+    ${redirectUrl ? `setTimeout(() => window.location.href = ${j(redirectUrl)}, 2000);` : ''}
+    window.opener?.postMessage({ type: 'shareout_github_${success ? 'connected' : 'error'}', message: ${j(message)}${success && username ? `, username: ${j(username)}` : ''} }, '*');
   </script>
 </body>
 </html>`;

@@ -20,6 +20,7 @@ import { slackProvider } from '../../../../src/data/platform/providers/slack';
 import { snowflakeProvider } from '../../../../src/data/platform/providers/snowflake';
 import { tiendanubeProvider } from '../../../../src/data/platform/providers/tiendanube';
 import type { Env } from '../../../../src/types';
+import { shopifyHmac } from './helpers';
 import type { ExecutionContext } from '../../../../src/data/platform/types';
 
 afterEach(() => vi.restoreAllMocks());
@@ -478,6 +479,7 @@ describe('Shopify provider error sanitization', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response('{"error":"invalid_client","error_description":"The client credentials are invalid"}', { status: 401 }),
     );
+    const signed = { shop: 'demo', state: 's' };
     await expect(
       shopifyProvider.handleCallback(
         {
@@ -485,7 +487,7 @@ describe('Shopify provider error sanitization', () => {
           connectionId: '',
           callbackUrl: 'https://shareout.site/cb',
           state: 's',
-          params: { shop: 'demo' },
+          params: { ...signed, hmac: await shopifyHmac(signed, 'sec') },
           env: { SHOPIFY_CLIENT_ID: 'id', SHOPIFY_CLIENT_SECRET: 'sec' } as Env,
         },
         'code',

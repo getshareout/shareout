@@ -185,7 +185,7 @@ describe('simplified auth-url flow', () => {
     expect(errorPage.headers.get('Content-Type')).toBe('text/html');
 
     const success = await handleSheets(
-      sheetsRequest('auth-callback', { method: 'GET' }, `?code=abc&state=${state}`),
+      sheetsRequest('auth-callback', { method: 'GET', headers: await ownerAuthHeaders(env) }, `?code=abc&state=${state}`),
       ctx,
       'auth-callback',
     );
@@ -218,6 +218,7 @@ describe('handleSheetsOAuthCallback', () => {
     const missingArtifact = await handleSheetsOAuthCallback(
       new Request(`${BASE_URL}/auth/callback?code=abc&state=${badArtifactState}`),
       missingArtifactEnv,
+      'usr_owner',
     );
     expect(missingArtifact.status).toBe(400);
     expect(await missingArtifact.text()).toContain('Artifact not found');
@@ -228,6 +229,7 @@ describe('handleSheetsOAuthCallback', () => {
     const failed = await handleSheetsOAuthCallback(
       new Request(`${BASE_URL}/auth/callback?code=abc&state=${state}`),
       env,
+      'usr_owner',
     );
     expect(failed.status).toBe(400);
     const failedHtml = await failed.text();
@@ -238,6 +240,7 @@ describe('handleSheetsOAuthCallback', () => {
     const success = await handleSheetsOAuthCallback(
       new Request(`${BASE_URL}/auth/callback?code=abc&state=${state}`),
       env,
+      'usr_owner',
     );
     expect(success.status).toBe(200);
     expect(await success.text()).toContain('Connected!');
@@ -249,12 +252,14 @@ describe('handleSheetsOAuthCallback', () => {
     const missing = await handleSheetsOAuthCallback(
       new Request(`${BASE_URL}/auth/callback`),
       env,
+      'usr_owner',
     );
     expect(missing.status).toBe(400);
 
     const invalidState = await handleSheetsOAuthCallback(
       new Request(`${BASE_URL}/auth/callback?code=abc&state=!!!`),
       env,
+      'usr_owner',
     );
     expect(invalidState.status).toBe(400);
   });
@@ -266,7 +271,7 @@ describe('handleSheetsOAuthCallback', () => {
     const state = btoa(JSON.stringify({ artifactId: ARTIFACT_ID, returnUrl: '/home' }));
 
     const response = await handleSheets(
-      sheetsRequest('auth-callback', { method: 'GET' }, `?code=abc&state=${state}`),
+      sheetsRequest('auth-callback', { method: 'GET', headers: await ownerAuthHeaders(env) }, `?code=abc&state=${state}`),
       ctx,
       'auth-callback',
     );

@@ -26,7 +26,6 @@ import { upsertMicrosoftUser } from './users';
 import { ssoRequiredFor, ssoStartPath } from './sso-config';
 import { scheduleSeedStarterKit } from '../starter-kit/schedule';
 import { scheduleWelcomeEmail, scheduleWorkspaceWelcome } from '../onboarding/welcome-email';
-import { approveDeviceCode, deviceDonePage } from './device-auth';
 import {
   claimFlag,
   decodeState,
@@ -241,17 +240,6 @@ export async function handleMicrosoftCallback(request: Request, env: Env, execut
   const token = await createSessionToken(user.id, user.email, env, maxAge);
   const platformHost = getPlatformHostname(env);
   const sessionCookie = buildSessionCookie(url, token, maxAge, platformHost);
-
-  // CLI device login carries its user_code in the redirect, same as the Google callback.
-  const deviceMatch = saved.redirect.match(/^\/auth\/device\/done\?code=([^&]+)/);
-  if (deviceMatch) {
-    const result = await approveDeviceCode(env, decodeURIComponent(deviceMatch[1]), user.id, user.email);
-    if (!result.ok) return fail(result.error);
-    const page = deviceDonePage(user.email, result.warn, result.token, request);
-    page.headers.append('Set-Cookie', sessionCookie);
-    page.headers.append('Set-Cookie', clearState);
-    return page;
-  }
 
   const location = isShareoutOrigin(saved.returnOrigin, platformHost) ? saved.returnOrigin + saved.redirect : saved.redirect;
   const headers = new Headers({ Location: location });

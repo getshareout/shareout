@@ -10,14 +10,17 @@ const login = async (redirect: string) => {
 };
 
 describe('f14 protocol-relative redirect on /auth/login', () => {
-  it('CONFIRMS: //evil.example is kept as redirectAfter and used for window.location.href after OTP verify', async () => {
+  it('blocks: //evil.example falls back to /home', async () => {
     const html = await login('//evil.example');
-    expect(html).toContain('var redirectAfter = "//evil.example";');
-    expect(html).toContain("window.location.href = redirectAfter || '/home';");
-    expect(html).not.toContain('var redirectAfter = "/home"');
+    expect(html).not.toContain('evil.example');
+    expect(html).toContain('var redirectAfter = "/home";');
   });
-  it('CONFIRMS: backslash variant /\\evil.example is also kept', async () => {
+  it('blocks: backslash variant /\\evil.example falls back to /home', async () => {
     const html = await login('/\\evil.example');
-    expect(html).toContain('var redirectAfter = "/\\\\evil.example";');
+    expect(html).not.toContain('evil.example');
+    expect(html).toContain('var redirectAfter = "/home";');
+  });
+  it('keeps a legitimate same-origin path', async () => {
+    expect(await login('/a/my-page/?x=1')).toContain('var redirectAfter = "/a/my-page/?x=1";');
   });
 });

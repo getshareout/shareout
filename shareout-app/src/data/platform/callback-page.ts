@@ -16,7 +16,7 @@ export function renderPlatformConnectionCallbackPage(
 		: 'shareout:platform:connection:error';
 	const safeMessage = escapeHtml(message);
 	const redirect = returnUrl
-		? `else { window.location.href = ${JSON.stringify(returnUrl)}; }`
+		? `else { window.location.href = ${JSON.stringify(returnUrl).replace(/</g, '\\u003c')}; }`
 		: '';
 
 	const html = `<!DOCTYPE html>
@@ -38,9 +38,9 @@ export function renderPlatformConnectionCallbackPage(
   <script>
     if (window.opener) {
       window.opener.postMessage({
-        type: ${JSON.stringify(eventType)},
-        provider: ${JSON.stringify(providerId)},
-        message: ${JSON.stringify(message)},
+        type: ${JSON.stringify(eventType).replace(/</g, '\\u003c')},
+        provider: ${JSON.stringify(providerId).replace(/</g, '\\u003c')},
+        message: ${JSON.stringify(message).replace(/</g, '\\u003c')},
       }, '*');
       window.close();
     } ${redirect}

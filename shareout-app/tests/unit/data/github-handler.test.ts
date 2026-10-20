@@ -8,6 +8,7 @@ import {
 } from '../../../src/data/github/handler';
 
 const ARTIFACT_ID = 'art_test';
+const OWNER_ID = 'usr_owner';
 const BASE_URL = 'https://shareout.example.com';
 const ORIGIN = 'https://app.example.com';
 
@@ -69,6 +70,10 @@ const githubApi = vi.hoisted(() => ({
   }),
 }));
 
+vi.mock('../../../src/data/middleware', async (orig) => ({
+  ...(await orig<typeof import('../../../src/data/middleware')>()),
+  verifyOwner: vi.fn(async () => true),
+}));
 vi.mock('../../../src/data/github/github-auth', () => githubAuth);
 vi.mock('../../../src/data/github/github-api', () => githubApi);
 
@@ -91,7 +96,7 @@ function makeGithubEnv(
       bind: vi.fn((...args: unknown[]) => ({
         first: vi.fn(async () => {
           if (sql.includes('FROM artifacts WHERE id = ?')) {
-            return scenario.artifact === undefined ? { id: ARTIFACT_ID, name: 'Demo Site' } : scenario.artifact;
+            return scenario.artifact === undefined ? { id: ARTIFACT_ID, name: 'Demo Site', owner_id: OWNER_ID } : scenario.artifact && { owner_id: OWNER_ID, ...scenario.artifact };
           }
           if (sql.includes('FROM deployments d')) {
             return scenario.deployment ?? null;
@@ -292,6 +297,7 @@ describe('handleGitHubOAuthCallback', () => {
     const response = await handleGitHubOAuthCallback(
       new Request(`${BASE_URL}/auth/callback?code=oauth_code&state=${encodeURIComponent(state)}`),
       env,
+      OWNER_ID,
     );
 
     expect(response.status).toBe(400);
@@ -304,6 +310,7 @@ describe('handleGitHubOAuthCallback', () => {
     const response = await handleGitHubOAuthCallback(
       new Request(`${BASE_URL}/auth/callback?code=oauth_code&state=${encodeURIComponent(state)}`),
       env,
+      OWNER_ID,
     );
 
     expect(response.status).toBe(200);
@@ -316,6 +323,7 @@ describe('handleGitHubOAuthCallback', () => {
     const response = await handleGitHubOAuthCallback(
       new Request(`${BASE_URL}/auth/callback?error=bad_verification_code`),
       env,
+      OWNER_ID,
     );
 
     expect(response.status).toBe(400);
@@ -327,6 +335,7 @@ describe('handleGitHubOAuthCallback', () => {
     const response = await handleGitHubOAuthCallback(
       new Request(`${BASE_URL}/auth/callback?code=only-code`),
       env,
+      OWNER_ID,
     );
 
     expect(response.status).toBe(400);
@@ -338,6 +347,7 @@ describe('handleGitHubOAuthCallback', () => {
     const response = await handleGitHubOAuthCallback(
       new Request(`${BASE_URL}/auth/callback?code=oauth_code&state=not-valid-base64`),
       env,
+      OWNER_ID,
     );
 
     expect(response.status).toBe(400);
@@ -351,6 +361,7 @@ describe('handleGitHubOAuthCallback', () => {
     const response = await handleGitHubOAuthCallback(
       new Request(`${BASE_URL}/auth/callback?code=oauth_code&state=${encodeURIComponent(state)}`),
       env,
+      OWNER_ID,
     );
 
     expect(response.status).toBe(400);
@@ -364,6 +375,7 @@ describe('handleGitHubOAuthCallback', () => {
     const response = await handleGitHubOAuthCallback(
       new Request(`${BASE_URL}/auth/callback?code=oauth_code&state=${encodeURIComponent(state)}`),
       env,
+      OWNER_ID,
     );
 
     expect(response.status).toBe(400);

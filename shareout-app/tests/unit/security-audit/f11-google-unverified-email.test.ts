@@ -38,15 +38,27 @@ beforeEach(async () => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-describe('f11 verified_email ignored', () => {
-  it('CONFIRMS: verified_email=false Google profile adopts existing account by email and gets a session', async () => {
+describe('f11 verified_email enforced', () => {
+  it('blocks: verified_email=false Google profile cannot adopt an existing account by email', async () => {
+    const res = await handleGoogleCallback(new Request('https://shareout.test/auth/callback?code=x'), e);
+    expect(res.status).toBe(400);
+    expect(res.headers.getSetCookie().find((x) => x.startsWith(`${COOKIE_NAME}=`))).toBeUndefined();
+    const row = await e.DB.prepare("SELECT google_id FROM users WHERE id='usr_v'").first<{ google_id: string | null }>();
+    expect(row?.google_id).toBeNull();
+  });
+
+  it('still adopts when verified_email=true, and keeps the google_id match path', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: any) => {
+      const u = String(typeof input === 'string' ? input : input.url);
+      if (u.includes('oauth2.googleapis.com/token')) return Response.json({ access_token: 'at', id_token: 'it' });
+      return Response.json({ id: 'G_X', email: 'victim@corp.test', verified_email: true, name: 'X', picture: null });
+    }));
     const res = await handleGoogleCallback(new Request('https://shareout.test/auth/callback?code=x'), e);
     expect(res.status).toBe(302);
     const c = res.headers.getSetCookie().find((x) => x.startsWith(`${COOKIE_NAME}=`))!;
-    expect(c).toBeTruthy();
     const sess = await verifySessionToken(c.slice(COOKIE_NAME.length + 1).split(';')[0], e as any);
     expect(JSON.stringify(sess)).toContain('usr_v');
-    const row = await e.DB.prepare("SELECT google_id FROM users WHERE id='usr_v'").first<{ google_id: string }>();
-    expect(row?.google_id).toBe('G_X');
+    const again = await handleGoogleCallback(new Request('https://shareout.test/auth/callback?code=x'), e);
+    expect(again.status).toBe(302);
   });
 });

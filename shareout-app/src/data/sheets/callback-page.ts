@@ -1,5 +1,6 @@
 import { googleFontsPreconnect } from '../../../packages/design-tokens/src/index';
 import { standalonePageStyles } from '../../design-system/standalone-page';
+import { escapeHtml } from '../../html/utils';
 
 export function renderCallbackPage(
   success: boolean,
@@ -7,6 +8,7 @@ export function renderCallbackPage(
   baseUrl: string,
   redirectUrl?: string | null
 ): Response {
+  const j = (v: string) => JSON.stringify(v).replace(/</g, '\\u003c');
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -20,12 +22,12 @@ export function renderCallbackPage(
   <div class="card">
     <div class="icon ${success ? 'success' : 'error'}">${success ? '✓' : '✕'}</div>
     <h1>${success ? 'Connected!' : 'Connection Failed'}</h1>
-    <p>${message}</p>
+    <p>${escapeHtml(message)}</p>
     <p class="close-hint">${success ? 'You can close this window and return to your app.' : 'Please try again.'}</p>
   </div>
   <script>
-    ${redirectUrl ? `setTimeout(() => window.location.href = '${redirectUrl}', 2000);` : ''}
-    window.opener?.postMessage({ type: 'shareout_sheets_${success ? 'connected' : 'error'}', message: '${message}' }, '*');
+    ${redirectUrl ? `setTimeout(() => window.location.href = ${j(redirectUrl)}, 2000);` : ''}
+    window.opener?.postMessage({ type: 'shareout_sheets_${success ? 'connected' : 'error'}', message: ${j(message)} }, '*');
   </script>
 </body>
 </html>`;

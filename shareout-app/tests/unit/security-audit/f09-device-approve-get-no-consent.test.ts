@@ -43,28 +43,40 @@ function makeEnv() {
 const call = (env: Env, path: string, init: RequestInit = {}) =>
   routeAuth(createFetchContext(new Request(`https://shareout.site${path}`, init), env));
 
+import { handleDevicePage } from '../../../src/auth/device-auth';
+
 describe('f09 device approval via GET', () => {
-  it('CONFIRMS: a bare GET /auth/device?code= with the victim cookie approves the attacker device and the poller gets a victim so_ token', async () => {
+  it('blocks: GET /auth/device?code= with the victim cookie only shows a confirmation, the attacker poll stays pending', async () => {
     const { env, tokens } = makeEnv();
-
-    // attacker (unauthenticated) starts a device flow
     const start = await (await call(env, '/v1/auth/device/start', { method: 'POST', body: '{}' }))!.json() as any;
-
-    // victim's browser follows a link: top-level GET, ambient cookie only, no confirmation
     const session = await createSessionToken('usr_victim', 'victim@victim.test', env);
-    const res = (await call(env, `/auth/device?code=${encodeURIComponent(start.user_code)}`, {
-      headers: { Cookie: `shareout_session=${session}` },
-    }))!;
-    expect(res.status).toBe(200);
-    expect(await res.text()).toContain('victim@victim.test');
+    const cookie = `shareout_session=${session}`;
 
-    // attacker polls with the device_code it already holds
+    const res = (await call(env, `/auth/device?code=${encodeURIComponent(start.user_code)}`, { headers: { Cookie: cookie } }))!;
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('victim@victim.test');
+    expect(html).toContain('method="POST"');
+
     const poll = await (await call(env, '/v1/auth/device/token', { method: 'POST', body: JSON.stringify({ device_code: start.device_code }) }))!.json() as any;
-    expect(poll.status).toBe('approved');
-    expect(poll.user_id).toBe('usr_victim');
-    expect(poll.token).toMatch(/^so_/);
-    // minted as a permanent user-principal token for the victim: (id, principal_id, user_id, hash, name)
-    expect(tokens[0][1]).toBe('usr_victim');
-    expect(tokens[0][2]).toBe('usr_victim');
+    expect(poll.status).toBe('pending');
+    expect(poll.token).toBeUndefined();
+    expect(tokens).toHaveLength(0);
+
+    const post = (origin: string | null, site?: string) => handleDevicePage(new Request('https://shareout.site/auth/device', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/x-www-form-urlencoded', ...(origin ? { Origin: origin } : {}), ...(site ? { 'Sec-Fetch-Site': site } : {}) },
+      body: new URLSearchParams({ code: start.user_code }),
+    }), env);
+
+    expect((await post('https://evil.example', 'cross-site')).status).toBe(400);
+    expect((await post('https://evil.example')).status).toBe(400);
+    expect(tokens).toHaveLength(0);
+
+    expect((await post('https://shareout.site', 'same-origin')).status).toBe(200);
+    const approved = await (await call(env, '/v1/auth/device/token', { method: 'POST', body: JSON.stringify({ device_code: start.device_code }) }))!.json() as any;
+    expect(approved.status).toBe('approved');
+    expect(approved.user_id).toBe('usr_victim');
+    expect(approved.token).toMatch(/^so_/);
   });
 });

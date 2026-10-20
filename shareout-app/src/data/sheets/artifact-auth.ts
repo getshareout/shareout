@@ -111,6 +111,10 @@ export async function handleAuthCallback(
     return renderCallbackPage(false, 'Invalid state', ctx.env.SHAREOUT_BASE_URL);
   }
 
+  if (!(await verifyOwner(request, ctx))) {
+    return renderCallbackPage(false, 'Only the artifact owner can connect Google Sheets', ctx.env.SHAREOUT_BASE_URL);
+  }
+
   return completeArtifactOAuth(
     ctx.env,
     ctx.artifactId,
@@ -122,7 +126,8 @@ export async function handleAuthCallback(
 
 export async function handleSheetsOAuthCallback(
   request: Request,
-  env: Env
+  env: Env,
+  userId: string | null
 ): Promise<Response> {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
@@ -143,11 +148,15 @@ export async function handleSheetsOAuthCallback(
   }
 
   const artifact = await env.DB.prepare(
-    'SELECT id FROM artifacts WHERE id = ?'
-  ).bind(state.artifactId).first<{ id: string }>();
+    'SELECT id, owner_id FROM artifacts WHERE id = ?'
+  ).bind(state.artifactId).first<{ id: string; owner_id: string | null }>();
 
   if (!artifact) {
     return renderCallbackPage(false, 'Artifact not found', env.SHAREOUT_BASE_URL);
+  }
+
+  if (!userId || artifact.owner_id !== userId) {
+    return renderCallbackPage(false, 'Sign in as the artifact owner to connect Google Sheets', env.SHAREOUT_BASE_URL);
   }
 
   return completeArtifactOAuth(env, state.artifactId, code, '/auth/callback', state.returnUrl);

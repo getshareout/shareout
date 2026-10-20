@@ -8,6 +8,7 @@ export interface GoogleUserInfo {
   email: string;
   name: string;
   picture: string;
+  verified_email?: boolean;
 }
 
 async function hasExplicitArtifactInvite(env: Env, email: string): Promise<boolean> {
@@ -94,6 +95,9 @@ export async function upsertUser(env: Env, info: GoogleUserInfo): Promise<{ id: 
   ).bind(email).first<{ id: string; google_id: string | null; last_login_at: string | null }>();
 
   if (byEmail) {
+    if (info.verified_email !== true) {
+      throw new Error('Google has not verified this email address');
+    }
     if (byEmail.google_id && byEmail.google_id !== info.id) {
       throw new Error('This email is already linked to a different Google account');
     }

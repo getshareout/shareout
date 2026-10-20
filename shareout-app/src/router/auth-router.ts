@@ -248,7 +248,7 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
     return addCORS(await handleDevicePoll(request, env));
   }
 
-  if (path === '/auth/device' && request.method === 'GET') {
+  if (path === '/auth/device' && (request.method === 'GET' || request.method === 'POST')) {
     return await handleDevicePage(request, env);
   }
 
@@ -324,10 +324,10 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
 
   if (path === '/auth/callback') {
     if (isSheetsAuthCallback(request)) {
-      return handleSheetsOAuthCallback(request, env);
+      return handleSheetsOAuthCallback(request, env, (await getTokenOrSessionUser(ctx))?.id ?? null);
     }
     if (isGitHubAuthCallback(request)) {
-      return handleGitHubOAuthCallback(request, env);
+      return handleGitHubOAuthCallback(request, env, (await getTokenOrSessionUser(ctx))?.id ?? null);
     }
     return handleGoogleCallback(request, env, ctx.executionCtx);
   }

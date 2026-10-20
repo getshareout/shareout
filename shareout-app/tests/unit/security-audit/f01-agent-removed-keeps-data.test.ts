@@ -34,7 +34,7 @@ beforeAll(async () => {
 });
 
 describe('f01 removing an Agent principal from Members', () => {
-  it('CONFIRMS: sot_ token keeps reading workspace-visibility artifact data after DELETE members/:principal', async () => {
+  it('blocks: sot_ token is revoked and loses data access after DELETE members/:principal', async () => {
     const mint = await call(`/v1/workspaces/${WS}/agent-tokens`, {
       method: 'POST', token: OWNER_TOKEN,
       body: JSON.stringify({ name: 'bot', scopes: ['data:read', 'data:write'] }),
@@ -56,19 +56,15 @@ describe('f01 removing an Agent principal from Members', () => {
     const m = await e.DB.prepare('SELECT COUNT(*) AS n FROM workspace_members WHERE workspace_id = ? AND user_id = ?').bind(WS, principal).first<{ n: number }>();
     expect(m!.n).toBe(0);
     const tok = await e.DB.prepare('SELECT revoked_at FROM tokens WHERE user_id = ? AND principal_type = ?').bind(principal, 'workspace').first<{ revoked_at: string | null }>();
-    expect(tok!.revoked_at).toBeNull();
+    expect(tok!.revoked_at).not.toBeNull();
 
     const after = await call(`/v1/data/${ART_WS}/json/secret`, { method: 'GET', token: sot });
-    const afterBody = await after.text();
-    console.log('f01 after-removal read:', after.status, afterBody);
-    expect(after.status).toBe(200);
-    expect(afterBody).toContain('workspace-data');
+    expect(after.status).toBe(401);
 
     const write = await call(`/v1/data/${ART_WS}/json/planted`, { method: 'PUT', token: sot, body: JSON.stringify({ value: 'x' }) });
-    console.log('f01 after-removal write:', write.status);
-    expect(write.status).toBeLessThan(300);
+    expect(write.status).toBe(401);
 
-    const priv = await call(`/v1/data/${ART_PRIV}/json/secret`, { method: 'GET', token: sot });
-    console.log('f01 after-removal private read:', priv.status);
+    const owner = await call(`/v1/data/${ART_WS}/json/secret`, { method: 'GET', token: OWNER_TOKEN });
+    expect(owner.status).toBe(200);
   });
 });
