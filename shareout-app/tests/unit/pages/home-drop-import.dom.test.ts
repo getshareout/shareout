@@ -75,11 +75,11 @@ beforeEach(() => {
 });
 
 describe('drop routing', () => {
-  it('sends documents to /v1/home/import and building material to Assets', () => {
+  it('sends documents, images and video to /v1/home/import and refuses the rest', () => {
     const { dropItems } = load();
     const names = ['v.csv', 'p.HTML', 'd.pdf', 'x.xlsx', 'w.docx', 'o.odt', 'c.ods', 'n.md', 'logo.png', 'logo.svg', 'clip.mp4', 'font.woff2', 'deck.pptx'];
     const kinds = dropItems(names.map((n) => new File(['a'], n)));
-    expect(kinds.map((k) => k.kind)).toEqual(['file', 'file', 'file', 'file', 'file', 'file', 'file', 'file', 'asset', 'asset', 'asset', 'asset', 'asset']);
+    expect(kinds.map((k) => k.kind)).toEqual(['file', 'file', 'file', 'file', 'file', 'file', 'file', 'file', 'file', 'file', 'file', 'unsupported', 'unsupported']);
   });
 
   it('sends Word and spreadsheet files as base64', async () => {
@@ -92,7 +92,7 @@ describe('drop routing', () => {
   });
 
   it('sends slide decks to import as base64 only where the instance converts them', async () => {
-    expect(load().dropItems([new File(['a'], 'deck.pptx'), new File(['a'], 'old.ppt'), new File(['a'], 'o.odp')]).map((k) => k.kind)).toEqual(['asset', 'asset', 'asset']);
+    expect(load().dropItems([new File(['a'], 'deck.pptx'), new File(['a'], 'old.ppt'), new File(['a'], 'o.odp')]).map((k) => k.kind)).toEqual(['unsupported', 'unsupported', 'unsupported']);
     slidesOn = true;
     const { importDropped, dropItems } = load();
     expect(dropItems([new File(['a'], 'deck.pptx'), new File(['a'], 'old.ppt'), new File(['a'], 'o.odp')]).map((k) => k.kind)).toEqual(['file', 'file', 'file']);
@@ -122,16 +122,16 @@ describe('drop routing', () => {
     fetchMock
       .mockResolvedValueOnce(okJson({ ok: true, slug: 's1', name: 'ventas', artifactId: 'art_1', type: 'csv' }))
       .mockResolvedValueOnce(okJson({ error: 'Daily publish limit reached', code: 'RATE_LIMIT_EXCEEDED' }, 429));
-    await importDropped(dropItems([new File(['a,b'], 'ventas.csv'), new File(['<p>'], 'page.html'), new File(['x'], 'logo.png')]));
+    await importDropped(dropItems([new File(['a,b'], 'ventas.csv'), new File(['<p>'], 'page.html'), new File(['x'], 'song.mp3')]));
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('/v1/home/import?workspace=wsp_1');
     expect(JSON.parse(String(init.body))).toMatchObject({ name: 'ventas.csv', content: 'a,b', folder: 'fld_1' });
     expect(rows()).toEqual([
       ['ventas.csv', 'ok', t('drop.done')],
       ['page.html', 'err', t('drop.err.limit')],
-      ['logo.png', 'ok', t('drop.toAssets')],
+      ['song.mp3', 'err', t('drop.err.type')],
     ]);
-    expect(uploads).toEqual(['logo.png']);
+    expect(uploads).toEqual([]);
     expect(reloaded).toBe(1);
     expect(opened).toEqual([]); // several items: nothing auto-opens
   });

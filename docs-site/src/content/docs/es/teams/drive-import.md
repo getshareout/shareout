@@ -27,9 +27,9 @@ miembros externos no.
    sitio de SharePoint → biblioteca → carpeta.
 4. **Elegí dónde va**: el nivel principal de Archivos o dentro de una carpeta del Team
    Space. La carpeta elegida se crea ahí, con las mismas subcarpetas.
-5. Dejá activado **Convertir también los documentos en artefactos para leer acá** para tener un artefacto al
-   lado de cada Word, Excel, PDF, Markdown o CSV (y presentaciones, si la instancia tiene
-   el conversor). El archivo original siempre queda.
+5. Cada Word, Excel, PDF, Markdown, CSV, imagen y video se convierte en un artefacto (y las
+   presentaciones, si la instancia tiene el conversor). El original queda adentro para
+   descargarlo.
 6. **Empezá la importación** y seguí el progreso: encontrados, importados, artefactos, sin
    cambios, omitidos y con error, más los archivos para revisar y por qué.
 

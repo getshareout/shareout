@@ -4,6 +4,7 @@ import { chatComplete, getAIProvider } from '../data/agent/anthropic';
 import { recordAiUsage } from '../data/ai-usage';
 import { upsertLearnedFile, isTombstoned, loadKnowledge, getKnowledgeFile } from './store';
 import { artifactDigestPath, INDEX_PATH } from './types';
+import { toMarkdown } from './corpus/ingest';
 
 const MAX_PER_RUN = 20;
 const MAX_PER_WORKSPACE = 5;
@@ -121,6 +122,11 @@ async function readArtifactText(env: Env, artifactId: string): Promise<string> {
   if (!asset) return '';
   const obj = await env.ARTIFACTS.get(asset.r2_key);
   if (!obj) return '';
+  // A PDF or image page is binary: read it the way the corpus does, never as UTF-8.
+  if (!/^text\/|json|xml/.test(asset.mime)) {
+    const md = await toMarkdown(env, ver.entrypoint, asset.mime, await obj.arrayBuffer()).catch(() => null);
+    return (md || '').slice(0, ARTIFACT_TEXT_CAP);
+  }
   const raw = await obj.text();
   const text = asset.mime.includes('html') ? extractTextFromHtml(raw) : raw;
   return text.slice(0, ARTIFACT_TEXT_CAP);

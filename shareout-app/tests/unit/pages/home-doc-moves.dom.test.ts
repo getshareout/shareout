@@ -48,10 +48,8 @@ function load(extra: Record<string, unknown> = {}) {
     },
     set: (target, prop, value) => { target[prop as string] = value; return true; },
   });
-  return new Function('scope', `with (scope) {\n${dropJs}\n${movesJs}\n; return { moveToAssets, publishFromAssets, canMoveToAssets, canPublishAsset }; }`)(scope) as {
-    moveToAssets: (art: unknown, meta: unknown) => void;
+  return new Function('scope', `with (scope) {\n${dropJs}\n${movesJs}\n; return { publishFromAssets, canPublishAsset }; }`)(scope) as {
     publishFromAssets: (a: unknown) => void;
-    canMoveToAssets: (meta: unknown) => boolean;
     canPublishAsset: (a: unknown) => boolean;
   };
 }
@@ -84,49 +82,14 @@ describe('New → Upload uses the same rule as drag & drop', () => {
   });
 });
 
-describe('Move to Recursos (artifact → asset)', () => {
-  const meta = { slug: 'plan', name: 'Plan', artifact_type: 'markdown', can_delete: true };
-
-  it('is offered for document artifacts the viewer can delete, never for HTML pages', () => {
-    const { canMoveToAssets } = load();
-    expect(canMoveToAssets(meta)).toBe(true);
-    expect(canMoveToAssets({ ...meta, artifact_type: 'pdf' })).toBe(true);
-    expect(canMoveToAssets({ ...meta, artifact_type: 'html' })).toBe(false);
-    expect(canMoveToAssets({ ...meta, can_delete: false })).toBe(false);
-  });
-
-  it('uploads the file (original for an imported doc) to Assets, then deletes the artifact', async () => {
-    const { moveToAssets } = load();
-    fetchMock
-      .mockResolvedValueOnce(ok(new Blob(['PK'], { type: 'application/zip' }), { headers: { 'Content-Disposition': "attachment; filename*=UTF-8''Plan%20Q3.docx" } }))
-      .mockResolvedValueOnce(ok({ success: true }));
-    moveToAssets({ id: 'art_1', key: 'art_1', slug: 'plan' }, meta);
-    await settle();
-    expect(fetchMock.mock.calls[0][0]).toBe('/a/plan/download');
-    expect(uploads.map((f) => f.name)).toEqual(['Plan Q3.docx']);
-    expect(fetchMock.mock.calls[1]).toEqual(['/v1/artifacts/art_1', { method: 'DELETE', credentials: 'same-origin' }]);
-    expect(closed).toEqual(['art_1']);
-    expect(toasts.at(-1)).toEqual([t('move.toAssetsDone'), 'success']);
-  });
-
-  it('keeps the artifact when the upload fails', async () => {
-    const { moveToAssets } = load({ uploadOne: (_f: File, _d: unknown, cb: (ok: boolean) => void) => cb(false) });
-    fetchMock.mockResolvedValueOnce(ok('a,b'));
-    moveToAssets({ id: 'art_1', key: 'art_1', slug: 'plan' }, meta);
-    await settle();
-    expect(fetchMock).toHaveBeenCalledOnce();
-    expect(closed).toEqual([]);
-    expect(toasts.at(-1)).toEqual([t('move.failed'), 'error']);
-  });
-});
-
 describe('Publish as artifact (asset → artifact)', () => {
   const asset = { id: 'dlv_1', type: 'deliverable', name: 'Budget', filename: 'Budget.xlsx', canDelete: true };
 
-  it('is offered for document files only', () => {
+  it('is offered for every file type with a viewer', () => {
     const { canPublishAsset } = load();
     expect(canPublishAsset(asset)).toBe(true);
-    expect(canPublishAsset({ ...asset, filename: 'logo.png' })).toBe(false);
+    expect(canPublishAsset({ ...asset, filename: 'logo.png' })).toBe(true);
+    expect(canPublishAsset({ ...asset, filename: 'song.mp3' })).toBe(false);
     expect(canPublishAsset({ ...asset, type: 'loose' })).toBe(false);
   });
 

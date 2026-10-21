@@ -146,10 +146,8 @@ async function importOne(c: BatchCtx, item: FileItem): Promise<Outcome> {
     deliverableId = (await createDeliverable(env, bucketId, source.workspace_id, c.owner.id, item.name.slice(0, 200), stored.blobId,
       { folderId, visibility: fileVisibility(c.audience) })).id;
   }
-  await queueKnowledgeSource(env, undefined, { workspaceId: source.workspace_id, kind: 'asset', refId: deliverableId }, stored.blobId).catch(() => false);
-
   const outcome: Outcome = { kind: 'imported', deliverableId };
-  if (source.convert_enabled && bytes && isConvertible(env, filename, bytes.byteLength)) {
+  if (bytes && isConvertible(env, filename, bytes.byteLength)) {
     if (c.conversionsLeft <= 0) {
       outcome.warning = { code: 'CONVERT_LIMIT', message: `Kept as a file: one import turns at most ${MAX_CONVERSIONS_PER_RUN} documents into pages.` };
     } else {
@@ -163,6 +161,8 @@ async function importOne(c: BatchCtx, item: FileItem): Promise<Outcome> {
       else if (page.code !== 'NOT_CONVERTIBLE') outcome.warning = { code: page.code, message: `Imported as a file; the page was not created: ${page.message}` };
     }
   }
+  // The page is learned when it publishes; only a file that has no page is learned as a file.
+  if (!outcome.artifact) await queueKnowledgeSource(env, undefined, { workspaceId: source.workspace_id, kind: 'asset', refId: deliverableId }, stored.blobId).catch(() => false);
   return outcome;
 }
 

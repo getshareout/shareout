@@ -132,7 +132,6 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       + iconBtn('copy', t('inspector.act.copy'), SVG_COPY)
       // A PDF has no viewer shell, so a converted deck's "Download original" lives here.
       + (meta && meta.original && type === 'pdf' ? iconBtn('original', t('inspector.act.original'), SVG_DOWNLOAD) : '')
-      + (canMoveToAssets(meta) ? iconBtn('toassets', t('move.toAssets'), SVG_TO_ASSETS) : '')
       + (meta && meta.can_delete ? iconBtn('trash', t('inspector.act.trash'), SVG_TRASH, 'is-danger') : '')
       + '</div>';
     h += '<div class="wsx-det__sec wsx-det__approval" id="wsxApprove" hidden></div>';
@@ -213,7 +212,6 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
         else if (act === 'copy') { copyText(fullUrl, b); }
         else if (act === 'fav') { toggleFav(art.id, b); var ft = b.classList.contains('is-on') ? t('inspector.favRemove') : t('inspector.favAdd'); b.setAttribute('data-tip', ft); b.setAttribute('aria-label', ft); }
         else if (act === 'trash') { trashArtifact(art); }
-        else if (act === 'toassets') { moveToAssets(art, meta); }
         else if (act === 'original') { var dl = document.createElement('a'); dl.href = '/a/' + encodeURIComponent(slug) + '/download'; dl.download = ''; document.body.appendChild(dl); dl.click(); dl.remove(); }
       });
     });

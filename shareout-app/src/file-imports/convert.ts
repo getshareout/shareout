@@ -1,15 +1,15 @@
 /**
  * Imported documents → live pages, with the same converters the Studio drop-import uses
  * (pages/home/import-office.ts, import-slides.ts) and the same publish pipeline
- * (moderation, storage quota). The original file is always kept as a workspace file;
- * this only adds a readable page next to it. Re-publishing under the stored slug makes
+ * (moderation, storage quota). The page is what people see; the workspace file underneath
+ * only tracks the drive item for sync. Re-publishing under the stored slug makes
  * a changed file a new version of the same page instead of a second page.
  */
 import type { ArtifactType, Env, FileEntry, ImportedSource, Visibility } from '../types';
 import { checkStorageQuota } from '../quota';
 import { publishArtifact } from '../publish/publish-artifact';
 import { generateSlug } from '../validation';
-import { IMPORT_CONVERTED_EXTS, IMPORT_MAX_BYTES, IMPORT_SLIDES_EXTS, importExt } from '../pages/home/import-rules';
+import { IMPORT_CONVERTED_EXTS, IMPORT_MAX_BYTES, IMPORT_MEDIA_MIME, IMPORT_SLIDES_EXTS, importExt } from '../pages/home/import-rules';
 import { ImportError, bytesToBase64, convertOfficeImport } from '../pages/home/import-office';
 import { convertSlidesImport } from '../pages/home/import-slides';
 
@@ -21,6 +21,7 @@ const DIRECT: Record<string, { type: ArtifactType; mime: string; binary: boolean
   markdown: { type: 'markdown', mime: 'text/markdown', binary: false },
   csv: { type: 'csv', mime: 'text/csv', binary: false },
   txt: { type: 'txt', mime: 'text/plain', binary: false },
+  ...Object.fromEntries(Object.entries(IMPORT_MEDIA_MIME).map(([ext, mime]) => [ext, { type: (mime.startsWith('video/') ? 'video' : 'image') as ArtifactType, mime, binary: ext !== 'svg' }])),
 };
 
 /** Whether this file would become a page on this instance. */

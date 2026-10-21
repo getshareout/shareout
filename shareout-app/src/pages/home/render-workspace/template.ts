@@ -29,7 +29,7 @@ function buildNav(args: RenderArgs, canManage: boolean): NavGroup[] {
   const v = (key: string, label: string, icon: NavItem['icon']): NavItem => ({ key, label, i18n: `nav.${key}`, icon, kind: 'view' });
   const groups: NavGroup[] = [
     { items: [v('brief', 'Home', 'brief'), v('artifacts', 'Artifacts', 'browse')] },
-    { title: 'Library', i18n: 'nav.group.library', items: [v('assets', 'Assets', 'assets'), v('library', 'AI skills', 'library')] },
+    { title: 'Library', i18n: 'nav.group.library', items: [v('library', 'AI skills', 'library')] },
     { title: 'Automation', i18n: 'nav.group.automation', items: [v('schedules', 'Scheduled', 'recent'), v('alerts', 'Alerts', 'alert'), ...(ws && canManage ? [v('crew', 'AI tasks', 'crew')] : [])] },
     { title: 'Data', i18n: 'nav.group.data', items: ws ? [v('connectors', 'Data sources', 'plug'), v('datasets', 'Tables', 'datasets')] : [] },
     { title: 'Context', i18n: 'nav.group.context', items: ws ? [v('knowledge', 'Knowledge', 'knowledge'), v('catalog', 'Catalog', 'catalog')] : [] },
@@ -39,7 +39,7 @@ function buildNav(args: RenderArgs, canManage: boolean): NavGroup[] {
 }
 
 /** Lenses kept out of the rail but still reachable (account menu, ⌘K, onboarding, ?view=). */
-const HIDDEN_LENSES = ['connect', 'analytics'];
+const HIDDEN_LENSES = ['connect', 'analytics', 'assets'];
 
 function railHtml(groups: NavGroup[]): string {
   return groups.map((g, gi) => {
