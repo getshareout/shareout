@@ -136,7 +136,7 @@ async function handleAdminConfig(request: Request, ctx: DataContext): Promise<Re
 async function verifyAgentAdminAccess(request: Request, ctx: DataContext): Promise<boolean> {
   const sessionToken = request.headers.get('Cookie')?.match(/shareout_session=([^;]+)/)?.[1];
   if (sessionToken) {
-    const payload = await verifyLiveSessionToken(sessionToken, ctx.env);
+    const payload = await verifyLiveSessionToken(sessionToken, ctx.env, request);
     if (payload?.userId) {
       return userCanAdminAgent(ctx, payload.userId);
     }

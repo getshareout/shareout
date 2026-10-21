@@ -403,7 +403,7 @@ async function checkDataAuth(
   if (artifact.owner_id) {
     const sessionToken = extractTokenFromCookie(cookies, /shareout_session=([^;]+)/);
     if (sessionToken) {
-      const payload = await verifyLiveSessionToken(sessionToken, env);
+      const payload = await verifyLiveSessionToken(sessionToken, env, request);
       // The signed token already carries userId; compare it to the owner id
       // directly instead of re-reading the users row.
       if (payload && payload.userId === artifact.owner_id) {
@@ -437,7 +437,7 @@ async function checkDataAuth(
   if (artifact.auth_method === 'google') {
     const token = extractTokenFromCookie(cookies, /shareout_session=([^;]+)/);
     if (token) {
-      const session = await verifyGoogleSession(token, artifact, env);
+      const session = await verifyGoogleSession(token, artifact, env, request);
       if (session.authorized) return session;
     }
   }
@@ -459,10 +459,11 @@ const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 async function verifyGoogleSession(
   token: string,
   artifact: { id: string; owner_id: string | null; visibility: string; workspace_id: string | null },
-  env: Env
+  env: Env,
+  request: Request
 ): Promise<DataAuthResult> {
   const deny: DataAuthResult = { authorized: false, needsAuth: true, viewer: { email: null, isOwner: false } };
-  const payload = await verifyLiveSessionToken(token, env);
+  const payload = await verifyLiveSessionToken(token, env, request);
   if (!payload) return deny;
 
   // Session user is the artifact owner_id — full owner, not just an editor collab row.
@@ -583,7 +584,7 @@ export async function resolveRequesterUserId(request: Request, ctx: DataContext)
   const cookies = request.headers.get('Cookie');
   const sessionToken = extractTokenFromCookie(cookies, /shareout_session=([^;]+)/);
   if (sessionToken) {
-    const payload = await verifyLiveSessionToken(sessionToken, ctx.env);
+    const payload = await verifyLiveSessionToken(sessionToken, ctx.env, request);
     // Session token carries the user id; no users lookup needed.
     if (payload?.userId) return payload.userId;
   }
@@ -745,7 +746,7 @@ export async function verifyOwner(
   const cookies = request.headers.get('Cookie');
   const sessionToken = extractTokenFromCookie(cookies, /shareout_session=([^;]+)/);
   if (sessionToken) {
-    const payload = await verifyLiveSessionToken(sessionToken, ctx.env);
+    const payload = await verifyLiveSessionToken(sessionToken, ctx.env, request);
     if (payload) {
       const owner = await ctx.env.DB.prepare(
         'SELECT id FROM users WHERE id = ? AND email = ?'

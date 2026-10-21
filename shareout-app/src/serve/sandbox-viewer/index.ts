@@ -1,4 +1,5 @@
 import type { Env } from '../../types';
+import type { AdminInfo } from '../types';
 import { trackPageView } from '../../analytics';
 import { trackViewerView } from '../../view-tracking';
 import { getSessionUser } from '../../auth/session';
@@ -190,6 +191,13 @@ export async function serveSandboxedViewer(
         inlinedStyleBlock = renderInlinedStyleBlock(inlinedCSS);
       }
 
+      let tokenRole: AdminInfo['role'] | undefined;
+      if (adminInfo?.role === 'owner' && ownerId) {
+        const author = await env.DB.prepare('SELECT created_by FROM versions WHERE id = ?')
+          .bind(versionId).first<{ created_by: string | null }>();
+        if (author?.created_by && author.created_by !== ownerId) tokenRole = 'editor';
+      }
+
       const {
         serialized: serializedInitialData,
         scriptTag: initialDataScript,
@@ -204,6 +212,7 @@ export async function serveSandboxedViewer(
         adminInfo,
         profile,
         spaceGuest,
+        tokenRole,
       );
 
       const bridgeScript = contentHost

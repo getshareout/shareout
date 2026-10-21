@@ -33,6 +33,9 @@ export interface ServiceContext {
   externalUserId?: string | null;
 }
 
+export const MCP_TOKEN_NAME_PREFIX = 'mcp:';
+export const MCP_TOKEN_SCOPE = 'mcp';
+
 export interface AuthUser {
   id: string;
   email: string | null;
@@ -40,6 +43,8 @@ export interface AuthUser {
   // Set iff this is a service-account (Agent) token. Human/personal tokens omit it,
   // so every existing caller that reads id/email/username is unaffected.
   service?: ServiceContext | null;
+  // Set for MCP OAuth access tokens: valid on /mcp only (enforced in handle-fetch).
+  mcpOnly?: boolean;
 }
 
 // True when the caller may perform `scope`. Humans and personal `so_` tokens have no
@@ -206,7 +211,7 @@ interface ResolvedToken {
 
 async function resolveUserToken(tokenHash: string, env: Env): Promise<ResolvedToken | null> {
   const result = await env.DB.prepare(`
-    SELECT t.user_id, t.expires_at, u.email, u.username
+    SELECT t.user_id, t.expires_at, t.scopes, t.name, u.email, u.username
     FROM tokens t
     JOIN users u ON u.id = t.user_id
     WHERE t.token_hash = ?
@@ -214,11 +219,12 @@ async function resolveUserToken(tokenHash: string, env: Env): Promise<ResolvedTo
     AND t.revoked_at IS NULL
     AND COALESCE(u.disabled, 0) = 0
     AND (t.expires_at IS NULL OR t.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-  `).bind(tokenHash).first<{ user_id: string; expires_at?: string | null; email: string | null; username: string | null }>();
+  `).bind(tokenHash).first<{ user_id: string; expires_at?: string | null; scopes: string | null; name: string | null; email: string | null; username: string | null }>();
 
   if (!result) return null;
+  const mcpOnly = !!result.scopes?.split(',').includes(MCP_TOKEN_SCOPE) || !!result.name?.startsWith(MCP_TOKEN_NAME_PREFIX);
   return {
-    user: { id: result.user_id, email: result.email, username: result.username },
+    user: { id: result.user_id, email: result.email, username: result.username, ...(mcpOnly && { mcpOnly }) },
     expiresAt: result.expires_at ?? null,
   };
 }

@@ -33,6 +33,8 @@ export async function handleWorkspaceInbound(
     return;
   }
 
+  if (auth.dmarc !== 'pass') return;
+
   const senderEmail = bareEmail(message.from);
   const member = await env.DB.prepare(`
     SELECT u.id FROM users u

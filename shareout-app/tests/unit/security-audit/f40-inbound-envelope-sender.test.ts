@@ -27,11 +27,28 @@ beforeEach(() => {
   });
 });
 
-describe('f40 allowlist trusts the envelope sender (NEEDS DECISION)', () => {
-  it('reproduces: envelope sender in allowlist is accepted although SPF failed and DKIM signed for another domain', async () => {
-    const raw = 'From: attacker@attacker.test\r\nSubject: x\r\nMessage-ID: <m@a>\r\nContent-Type: text/plain\r\n\r\nhi\r\n';
-    const headers = new Headers({ 'authentication-results': 'mx.example; spf=fail; dkim=pass header.d=attacker.test; dmarc=pass' });
-    const msg = { to: 'a@inbox.example.test', from: 'boss@example.test', headers, rawSize: raw.length, raw: new Response(raw).body!, setReject: vi.fn() };
+const mail = (envFrom: string, headerFrom: string, auth: string) => {
+  const raw = `From: ${headerFrom}\r\nSubject: x\r\nMessage-ID: <m@a>\r\nContent-Type: text/plain\r\n\r\nhi\r\n`;
+  return { to: 'a@inbox.example.test', from: envFrom, headers: new Headers({ 'authentication-results': auth }), rawSize: raw.length, raw: new Response(raw).body!, setReject: vi.fn() };
+};
+
+describe('f40 allowlist authenticates the header From', () => {
+  it('blocks: allowlisted envelope sender, attacker header From with dmarc=pass', async () => {
+    const msg = mail('boss@example.test', 'attacker@attacker.test', 'mx; spf=fail; dkim=pass header.d=attacker.test; dmarc=pass');
+    await handleInboundEmail(msg as never, env, {} as ExecutionContext);
+    expect(msg.setReject).toHaveBeenCalledWith('Sender not permitted');
+    expect(emitJobEvent).not.toHaveBeenCalled();
+  });
+
+  it('blocks: allowlisted header From without dmarc=pass', async () => {
+    const msg = mail('boss@example.test', 'boss@example.test', 'mx; spf=pass; dkim=pass; dmarc=none');
+    await handleInboundEmail(msg as never, env, {} as ExecutionContext);
+    expect(msg.setReject).toHaveBeenCalledWith('Sender not permitted');
+    expect(emitJobEvent).not.toHaveBeenCalled();
+  });
+
+  it('allows: ESP-style envelope with allowlisted header From and dmarc=pass', async () => {
+    const msg = mail('bounce-123@sendgrid.test', 'Boss <boss@example.test>', 'mx; spf=pass; dkim=pass; dmarc=pass');
     await handleInboundEmail(msg as never, env, {} as ExecutionContext);
     expect(msg.setReject).not.toHaveBeenCalled();
     expect(emitJobEvent).toHaveBeenCalledTimes(1);

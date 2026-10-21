@@ -48,7 +48,6 @@ import type { FetchContext } from './context';
 import { isLocalRequest } from './helpers/is-local-request';
 import { getTokenOrSessionUser, isAuthUser, requireToken } from './helpers/auth-guard';
 import { jsonError, jsonResponse } from './helpers/json-response';
-import { MCP_TOKEN_NAME_PREFIX } from '../mcp/oauth';
 import { googleOAuthConfigured, microsoftOAuthConfigured } from '../config/auth-providers';
 import { handleMicrosoftLogin, handleMicrosoftCallback } from '../auth/microsoft-oauth';
 import { appLoginPage, errorPage } from '../auth/pages';
@@ -196,7 +195,6 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
   if (path === '/v1/me/tokens' && request.method === 'POST') {
     const user = await getTokenOrSessionUser(ctx);
     if (!user) return addCORS(await unauthorizedFor(request, env));
-    if (await isMcpBearer(request, env)) return addCORS(jsonError('AI-app tokens cannot create API tokens', 'FORBIDDEN', 403));
     return addCORS(await handleCreateMyToken(request, env, user));
   }
 
@@ -359,9 +357,3 @@ async function handoffWorkspaceSlug(env: FetchContext['env'], redirect: string):
   return (await workspaceByHostname(env, host).catch(() => null))?.slug ?? null;
 }
 
-async function isMcpBearer(request: Request, env: FetchContext['env']): Promise<boolean> {
-  const token = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
-  if (!token) return false;
-  const row = await env.DB.prepare('SELECT name FROM tokens WHERE token_hash = ?').bind(await hashToken(token)).first<{ name: string }>();
-  return !!row?.name?.startsWith(MCP_TOKEN_NAME_PREFIX);
-}

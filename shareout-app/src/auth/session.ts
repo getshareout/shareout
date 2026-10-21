@@ -54,7 +54,7 @@ export async function getSessionUser(request: Request, env: Env): Promise<{ id: 
   const cookie = request.headers.get('Cookie');
   const token = extractTokenFromCookie(cookie, new RegExp(`${COOKIE_NAME}=([^;]+)`));
   if (!token) return null;
-  const user = await requestMemo(env, `session:${token}`, () => timePhase(env, 'auth', () => resolveSessionUser(token, env)));
+  const user = await requestMemo(env, `session:${token}`, () => timePhase(env, 'auth', () => resolveSessionUser(token, env, hostOf(request))));
   if (user) markAuthenticated(env);
   return user;
 }
@@ -63,13 +63,15 @@ export async function getSessionUser(request: Request, env: Env): Promise<{ id: 
  * Verify a raw session cookie value the way getSessionUser does (signature, expiry,
  * and the disabled flag). For callers that extract the cookie themselves.
  */
-export async function verifyLiveSessionToken(token: string, env: Env): Promise<{ userId: string; email: string } | null> {
-  const user = await requestMemo(env, `session:${token}`, () => timePhase(env, 'auth', () => resolveSessionUser(token, env)));
+export async function verifyLiveSessionToken(token: string, env: Env, request: Request): Promise<{ userId: string; email: string } | null> {
+  const user = await requestMemo(env, `session:${token}`, () => timePhase(env, 'auth', () => resolveSessionUser(token, env, hostOf(request))));
   return user ? { userId: user.id, email: user.email } : null;
 }
 
-async function resolveSessionUser(token: string, env: Env): Promise<{ id: string; email: string } | null> {
-  const payload = await verifySessionToken(token, env);
+const hostOf = (request: Request) => new URL(request.url).hostname;
+
+async function resolveSessionUser(token: string, env: Env, host: string): Promise<{ id: string; email: string } | null> {
+  const payload = await verifySessionToken(token, env, host);
   if (!payload) return null;
 
   // Honor the super-admin disable flag: a disabled account's session is dead even
@@ -109,9 +111,10 @@ export async function createSessionCookieForUser(
   env: Env,
   url: URL,
   userId: string,
-  email: string
+  email: string,
+  aud?: string
 ): Promise<string> {
   const maxAge = await resolveSessionMaxAge(env, userId);
-  const token = await createSessionToken(userId, email, env, maxAge);
+  const token = await createSessionToken(userId, email, env, maxAge, aud);
   return buildSessionCookie(url, token, maxAge, getPlatformHostname(env));
 }

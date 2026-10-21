@@ -21,6 +21,7 @@ import { renderNotFoundPage } from '../pages/not-found';
 import { blockDisabledMarketingPages } from '../marketing-us-gate';
 import { asGetForHead, stripBodyForHead, wrongMethodOnKnownPath } from './method-policy';
 import { routeMcp } from '../mcp';
+import { validateToken } from '../api-auth';
 import { simpleApiError } from '../http/api-error';
 import { d1SessionStart, scopeRequest, timePhase, withD1Bookmark, withServerTiming } from '../http/request-scope';
 
@@ -147,6 +148,11 @@ export async function handleFetch(request: Request, baseEnv: Env, executionCtx?:
 
 async function dispatch(request: Request, ctx: FetchContext, executionCtx?: ExecutionContext): Promise<Response> {
   const env = ctx.env;
+  if (ctx.path !== '/mcp' && ctx.path !== '/mcp/' && request.headers.get('Authorization')?.startsWith('Bearer so_')) {
+    if ((await validateToken(request, env))?.mcpOnly) {
+      return simpleApiError('AI-app (MCP) tokens are only valid on the /mcp connector endpoint', 'FORBIDDEN', 403);
+    }
+  }
   const subCtx = parseSubdomainFromEnv(ctx.hostname, env);
   if (subCtx.isSubdomain && subCtx.workspaceSlug) {
     const slug = subCtx.workspaceSlug;

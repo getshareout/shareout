@@ -23,7 +23,7 @@ export async function getSession(
   } else {
     const token = extractTokenFromCookie(request.headers.get('Cookie'), /shareout_session=([^;]+)/);
     if (!token) return null;
-    payload = await verifyLiveSessionToken(token, ctx.env);
+    payload = await verifyLiveSessionToken(token, ctx.env, request);
   }
   if (!payload) return null;
 

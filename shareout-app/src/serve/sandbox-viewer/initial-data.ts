@@ -30,6 +30,8 @@ export async function buildInitialViewerData(
   // A space guest (no account): gets a grant-bound token instead of a viewer token, so
   // every data call the page makes re-checks the grant.
   spaceGuest: SpaceGuest | null = null,
+  // Caps the role embedded in the token (owner -> editor when an editor authored the live version).
+  tokenRole?: AdminInfo['role'],
 ): Promise<InitialViewerData> {
   const initialData: Record<string, unknown> = {
     artifactId,
@@ -53,7 +55,7 @@ export async function buildInitialViewerData(
   let currentUser: ViewerUser | null = null;
 
   if (sessionUser) {
-    const authType = adminInfo?.role ?? 'viewer';
+    const authType = tokenRole ?? adminInfo?.role ?? 'viewer';
     initialData.sessionToken = await createAccessToken(
       artifactId,
       authType,

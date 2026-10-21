@@ -13,7 +13,7 @@
  * do not use the ShareOut API envelope.
  */
 import type { Env } from '../types';
-import { generateToken, hashToken } from '../api-auth';
+import { generateToken, hashToken, MCP_TOKEN_NAME_PREFIX, MCP_TOKEN_SCOPE } from '../api-auth';
 import { generateId } from '../crypto-utils';
 import { getSessionUser } from '../auth/session';
 import { signPayload, verifySignature } from '../token';
@@ -29,7 +29,7 @@ const CONSENT_TTL_MS = 15 * 60_000;
 const MAX_REDIRECT_URIS = 10;
 // Prefix on the `tokens.name` of every access token this server mints — lets the
 // cleanup sweep and the token list tell them apart from hand-made API tokens.
-export const MCP_TOKEN_NAME_PREFIX = 'mcp:';
+export { MCP_TOKEN_NAME_PREFIX };
 
 const NO_STORE = { 'Cache-Control': 'no-store', Pragma: 'no-cache' };
 const PUBLIC_CORS = {
@@ -416,10 +416,10 @@ async function mintAccessToken(env: Env, userId: string, clientName: string): Pr
   const token = generateToken();
   const id = generateId('tok');
   const stmt = env.DB.prepare(
-    "INSERT INTO tokens (id, principal_type, principal_id, user_id, token_hash, name, expires_at) VALUES (?, 'user', ?, ?, ?, ?, ?)"
+    "INSERT INTO tokens (id, principal_type, principal_id, user_id, token_hash, name, expires_at, scopes) VALUES (?, 'user', ?, ?, ?, ?, ?, ?)"
   ).bind(
     id, userId, userId, await hashToken(token), `${MCP_TOKEN_NAME_PREFIX}${clientName}`.slice(0, 80),
-    new Date(Date.now() + ACCESS_TOKEN_TTL_SEC * 1000).toISOString(),
+    new Date(Date.now() + ACCESS_TOKEN_TTL_SEC * 1000).toISOString(), MCP_TOKEN_SCOPE,
   );
   return { token, id, stmt };
 }

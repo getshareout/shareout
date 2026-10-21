@@ -30,16 +30,33 @@ beforeEach(() => clearWorkspaceHostMisses());
 afterAll(() => setCustomHostnameProviderForTests(null));
 
 describe('f24 handoff', () => {
-  it('CONFIRMED: a non-member visitor is handed a code for any active custom host, and the redeemed cookie is a plain apex session', async () => {
+  const handoffCookie = async () => {
     const cookie = `shareout_session=${await createSessionToken(victim.id, victim.email, env)}`;
     const minted = await req(`https://shareout.test/auth/handoff?host=${HOST}&redirect=/`, cookie);
     expect(minted.status).toBe(302);
     const cb = new URL(minted.headers.get('Location')!);
     expect(cb.origin).toBe(`https://${HOST}`);
-
     const done = await req(cb.toString());
-    const token = done.headers.get('Set-Cookie')!.split(';')[0];
+    return done.headers.get('Set-Cookie')!.split(';')[0];
+  };
+
+  it('blocks: the session redeemed on a custom host is not accepted on the apex', async () => {
+    const token = await handoffCookie();
     const apex = await getSessionUser(new Request('https://shareout.test/home', { headers: { Cookie: token } }), env);
-    expect(apex?.id).toBe(victim.id);
+    expect(apex).toBeNull();
+  });
+
+  it('still signs in on the custom host it was minted for', async () => {
+    const token = await handoffCookie();
+    const user = await getSessionUser(new Request(`https://${HOST}/`, { headers: { Cookie: token } }), env);
+    expect(user?.id).toBe(victim.id);
+  });
+
+  it('legacy tokens without an audience keep working on any host', async () => {
+    const token = `shareout_session=${await createSessionToken(victim.id, victim.email, env)}`;
+    for (const host of ['shareout.test', HOST]) {
+      const user = await getSessionUser(new Request(`https://${host}/`, { headers: { Cookie: token } }), env);
+      expect(user?.id).toBe(victim.id);
+    }
   });
 });

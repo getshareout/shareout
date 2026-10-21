@@ -106,13 +106,6 @@ export async function handleInboundEmail(
   }
 
   const auth = parseAuthResults(message.headers);
-  const allowed = senderAllowed(message.from, res.allowlist);
-  // Bounce spoofed senders unless explicitly allowlisted. A failing DMARC *and*
-  // DKIM is the strong signal; allowlisted senders bypass (they opted in).
-  if (!allowed) {
-    message.setReject('Sender not permitted');
-    return;
-  }
   if (auth.dmarc === 'fail' && auth.dkim === 'fail' && !res.allowlist) {
     message.setReject('Failed authentication');
     return;
@@ -125,6 +118,12 @@ export async function handleInboundEmail(
 
   const rawBuffer = await new Response(message.raw).arrayBuffer();
   const email = await PostalMime.parse(rawBuffer);
+
+  // DMARC authenticates the header From, so that (not the envelope) is what the allowlist matches.
+  if (res.allowlist && !(auth.dmarc === 'pass' && senderAllowed(email.from?.address ?? '', res.allowlist))) {
+    message.setReject('Sender not permitted');
+    return;
+  }
 
   const rawMessageId = email.messageId || message.headers.get('message-id') || null;
   const rfcMessageId = rawMessageId ? rawMessageId.replace(/^<|>$/g, '') : null;
@@ -212,5 +211,6 @@ async function handleSupportInbound(message: ForwardableEmailMessage, env: Env):
     from: bareEmail(message.from),
     subject: email.subject,
     body: email.text,
+    thread: auth.dmarc === 'pass',
   });
 }

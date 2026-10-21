@@ -6,6 +6,7 @@ export interface IngestEmailInput {
   from: string;
   subject?: string | null;
   body?: string | null;
+  thread?: boolean;
 }
 
 export interface IngestResult {
@@ -24,7 +25,7 @@ export async function ingestSupportEmail(env: Env, input: IngestEmailInput): Pro
   const subject = subjectRaw.length > 120 ? subjectRaw.slice(0, 117) + '…' : subjectRaw;
   const body = (input.body || '').trim() || '(no message body)';
 
-  const existing = await findLatestOpenTicketByEmail(env, from);
+  const existing = input.thread === false ? null : await findLatestOpenTicketByEmail(env, from);
   if (existing) {
     await appendMessage(env, existing.id, 'customer', body);
     return { ticketId: existing.id, threaded: true };

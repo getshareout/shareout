@@ -39,4 +39,12 @@ describe('ingestSupportEmail', () => {
     expect(t.subject).toBe('Support request');
     expect((await getThread(e, r.ticketId))[0].body).toBe('(no message body)');
   });
+
+  it('opens a new ticket instead of threading when thread is false', async () => {
+    const first = await ingestSupportEmail(e, { from: 'user@co.com', subject: 'Help', body: 'a' });
+    const second = await ingestSupportEmail(e, { from: 'user@co.com', subject: 'Help', body: 'b', thread: false });
+    expect(second.threaded).toBe(false);
+    expect(second.ticketId).not.toBe(first.ticketId);
+    expect(await getThread(e, first.ticketId)).toHaveLength(1);
+  });
 });

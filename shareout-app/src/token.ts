@@ -11,6 +11,7 @@ export interface SessionPayload {
   userId: string;
   email: string;
   exp: number;
+  aud?: string;
 }
 
 async function getHmacKey(secret: string, usage: 'sign' | 'verify'): Promise<CryptoKey> {
@@ -79,12 +80,14 @@ export async function createSessionToken(
   userId: string,
   email: string,
   env: Env,
-  maxAge = 60 * 60 * 24 * 30
+  maxAge = 60 * 60 * 24 * 30,
+  aud?: string
 ): Promise<string> {
   const payload: SessionPayload = {
     userId,
     email,
     exp: Math.floor(Date.now() / 1000) + maxAge,
+    ...(aud ? { aud: aud.toLowerCase() } : {}),
   };
   const data = btoa(JSON.stringify(payload));
   const sig = await signPayload(data, env.SESSION_SECRET);
@@ -93,7 +96,8 @@ export async function createSessionToken(
 
 export async function verifySessionToken(
   token: string,
-  env: Env
+  env: Env,
+  host?: string
 ): Promise<SessionPayload | null> {
   try {
     const [payload, signature] = token.split('.');
@@ -105,6 +109,7 @@ export async function verifySessionToken(
     const data: SessionPayload = JSON.parse(atob(payload));
     if (!isSessionPayload(data)) return null;
     if (data.exp < Date.now() / 1000) return null;
+    if (data.aud && data.aud !== host?.toLowerCase()) return null;
 
     return data;
   } catch {
@@ -112,7 +117,7 @@ export async function verifySessionToken(
   }
 }
 
-const SESSION_KEYS = new Set(['userId', 'email', 'exp']);
+const SESSION_KEYS = new Set(['userId', 'email', 'exp', 'aud']);
 
 // Other tokens are signed with the same secret (artifact access, admin cookie), so a
 // valid signature alone does not make a session: the payload must have exactly the
@@ -123,7 +128,8 @@ function isSessionPayload(data: unknown): data is SessionPayload {
   if (Object.keys(d).some((k) => !SESSION_KEYS.has(k))) return false;
   return typeof d.userId === 'string' && d.userId.length > 0
     && typeof d.exp === 'number'
-    && (typeof d.email === 'string' || d.email === null);
+    && (typeof d.email === 'string' || d.email === null)
+    && (d.aud === undefined || typeof d.aud === 'string');
 }
 
 export function extractTokenFromCookie(cookie: string | null, pattern: RegExp): string | null {

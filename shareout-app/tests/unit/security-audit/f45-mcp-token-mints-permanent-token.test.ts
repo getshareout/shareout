@@ -35,6 +35,23 @@ describe('f45 MCP OAuth access token', () => {
     expect(after?.c).toBe(before?.c);
   });
 
+  it('blocks: an mcp-scoped token is rejected on other REST routes', async () => {
+    expect((await call('/v1/artifacts', 'GET', MCP_TOKEN)).status).toBe(403);
+    expect((await call('/v1/publish', 'POST', MCP_TOKEN, { title: 'x' })).status).toBe(403);
+  });
+
+  it('blocks: a scopes=mcp token with a non-mcp name is also rejected', async () => {
+    const T = 'so_f45_scoped_token';
+    await e.DB.prepare("INSERT INTO tokens (id, principal_type, principal_id, user_id, token_hash, name, scopes) VALUES ('tok_f45_sc', 'user', 'usr_f45', 'usr_f45', ?, 'renamed', 'mcp')")
+      .bind(await hashToken(T)).run();
+    expect((await call('/v1/me/tokens', 'GET', T)).status).toBe(403);
+  });
+
+  it('allows: the mcp token on /mcp', async () => {
+    const res = await call('/mcp', 'POST', MCP_TOKEN, { jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    expect(res.status).toBe(200);
+  });
+
   it('still lets a personal token mint API tokens', async () => {
     const PERSONAL = 'so_f45_personal_token';
     await e.DB.prepare("INSERT INTO tokens (id, principal_type, principal_id, user_id, token_hash, name) VALUES ('tok_f45_personal', 'user', 'usr_f45', 'usr_f45', ?, 'cli')")

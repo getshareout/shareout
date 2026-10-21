@@ -23,21 +23,21 @@ beforeAll(async () => {
 describe('data-plane session verification', () => {
   it('accepts an active user session', async () => {
     const token = await createSessionToken(ACTIVE, 'active@example.com', env);
-    expect(await verifyLiveSessionToken(token, env)).toEqual({ userId: ACTIVE, email: 'active@example.com' });
+    expect(await verifyLiveSessionToken(token, env, new Request('https://shareout.test/'))).toEqual({ userId: ACTIVE, email: 'active@example.com' });
     expect(await resolveRequesterUserId(req(token), ctx)).toBe(ACTIVE);
     expect(await getSession(req(token), ctx)).toMatchObject({ userId: ACTIVE });
   });
 
   it('refuses a disabled user session', async () => {
     const token = await createSessionToken(DISABLED, 'disabled@example.com', env);
-    expect(await verifyLiveSessionToken(token, env)).toBeNull();
+    expect(await verifyLiveSessionToken(token, env, new Request('https://shareout.test/'))).toBeNull();
     expect(await resolveRequesterUserId(req(token), ctx)).toBeNull();
     expect(await getSession(req(token), ctx)).toBeNull();
   });
 
   it('refuses an artifact access token presented as a session cookie', async () => {
     const token = await createAccessToken('art_dsess', 'viewer', env, 3600, 'active@example.com');
-    expect(await verifyLiveSessionToken(token, env)).toBeNull();
+    expect(await verifyLiveSessionToken(token, env, new Request('https://shareout.test/'))).toBeNull();
     expect(await getSession(req(token), ctx)).toBeNull();
   });
 });

@@ -114,7 +114,7 @@ export async function handleHandoffCallback(request: Request, env: Env): Promise
   const user = await env.DB.prepare('SELECT email, disabled FROM users WHERE id = ?')
     .bind(spent.userId).first<{ email: string | null; disabled: number | null }>();
   if (!user || user.disabled) return errorPage('This account cannot sign in.', '/auth/login');
-  const cookie = await createSessionCookieForUser(env, url, spent.userId, user.email || '');
+  const cookie = await createSessionCookieForUser(env, url, spent.userId, user.email || '', host);
   return new Response(null, {
     status: 302,
     headers: { Location: spent.redirectPath, 'Set-Cookie': cookie, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' },
