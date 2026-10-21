@@ -12,8 +12,9 @@ import { runPublishModeration } from '../publish/moderation';
 import { applyWorkspaceVisibilityPolicy } from '../publish/type-metadata';
 import type { ExistingArtifactRow } from '../publish/types';
 import { storageLimitExceededResponse } from '../publish/limits';
-import { checkStorageQuota, getOwnerStorageBytes } from '../quota';
-import { storageQuotaBytes } from '../storage-quota';
+import { checkStorageQuota } from '../quota';
+import { carryMedia, planMedia, writeMedia } from './bundle-media';
+import { ingestBlobDirect } from '../data/blobs/handler';
 import { checkRateLimit, incrementRateLimit } from '../api-auth';
 import { rateLimitExceededResponse } from '../publish/limits';
 
@@ -23,11 +24,14 @@ export async function enforcePublishGates(
   ctx: EditorContext,
   artifact: { id: string; slug: string; owner_id?: string | null; workspace_id: string | null; visibility?: string | null },
   content: string,
+  extraBytes = 0,
 ): Promise<Response | null> {
   const { env } = ctx;
   if (artifact.owner_id) {
     const quota = await checkStorageQuota(env, artifact.owner_id, [{ path: 'index', content, mime: 'text/plain' }]);
-    if (!quota.allowed) return storageLimitExceededResponse(quota);
+    if (!quota.allowed || (quota.max > 0 && quota.used + quota.incoming + extraBytes > quota.max)) {
+      return storageLimitExceededResponse({ ...quota, allowed: false });
+    }
   }
   if (artifact.visibility !== 'public') return null;
 
@@ -264,7 +268,10 @@ export async function handlePublish(
       return errorResponse('NOT_HTML_ARTIFACT', 'Only HTML artifacts publish through this endpoint.', 409);
     }
 
-    const gated = await enforcePublishGates(ctx, artifact, body.html);
+    const media = await planMedia(env, artifactId, 'index.html', body.html);
+    const html = media.content;
+
+    const gated = await enforcePublishGates(ctx, artifact, html, media.bytes);
     if (gated) return gated;
 
     // Artifact Tests BLOCK gate: when tests are set to block and a passing baseline
@@ -287,10 +294,10 @@ export async function handlePublish(
 
     // Store HTML in R2 with a real content hash (integrity/dedup parity with the
     // canonical publish path, src/publish.ts).
-    const bytes = new TextEncoder().encode(body.html);
+    const bytes = new TextEncoder().encode(html);
     const hash = await sha256(bytes.buffer as ArrayBuffer);
     const r2Key = `${artifactId}/${versionId}/index.html`;
-    await env.ARTIFACTS.put(r2Key, body.html, {
+    await env.ARTIFACTS.put(r2Key, html, {
       httpMetadata: { contentType: 'text/html' },
       customMetadata: { sha256: hash },
     });
@@ -300,6 +307,7 @@ export async function handlePublish(
     // concurrent publish at the same version_no fails the whole batch (UNIQUE)
     // instead of corrupting state.
     // Editor saves keep the live version's runtime capabilities (MCP grants).
+    const mediaStmts = await writeMedia(env, artifactId, versionId, media.items);
     const manifestJson = await carriedManifestJson(env, artifactId);
     await env.DB.batch([
       env.DB.prepare(
@@ -310,6 +318,8 @@ export async function handlePublish(
         `INSERT INTO assets (id, version_id, path, r2_key, mime, size_bytes, sha256)
          VALUES (?, ?, 'index.html', ?, 'text/html', ?, ?)`
       ).bind(assetId, versionId, r2Key, bytes.length, hash),
+      ...mediaStmts,
+      carryMedia(env, versionId, artifactId, media.items),
       env.DB.prepare(
         `INSERT INTO deployments (id, artifact_id, version_id, channel, slug, updated_at)
          VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
@@ -396,6 +406,11 @@ export async function handleHistory(
   }
 }
 
+const UPLOAD_EXT: Record<string, string> = {
+  'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif',
+  'image/svg+xml': 'svg', 'image/webp': 'webp', 'application/pdf': 'pdf',
+};
+
 export async function handleUpload(
   request: Request,
   ctx: EditorContext
@@ -410,13 +425,7 @@ export async function handleUpload(
       return errorResponse('INVALID_REQUEST', 'No file provided', 400);
     }
 
-    // Validate file type
-    const allowedTypes = [
-      'image/png', 'image/jpeg', 'image/gif', 'image/svg+xml', 'image/webp',
-      'application/pdf',
-    ];
-
-    if (!allowedTypes.includes(file.type)) {
+    if (!Object.hasOwn(UPLOAD_EXT, file.type)) {
       return errorResponse('INVALID_FILE_TYPE', 'File type not allowed', 400);
     }
 
@@ -425,30 +434,23 @@ export async function handleUpload(
       return errorResponse('FILE_TOO_LARGE', 'File too large (max 10MB)', 400);
     }
 
-    const owner = await env.DB.prepare('SELECT owner_id FROM artifacts WHERE id = ?')
-      .bind(artifactId).first<{ owner_id: string | null }>();
-    const max = storageQuotaBytes(env);
-    if (owner?.owner_id && max > 0) {
-      const used = await getOwnerStorageBytes(env, owner.owner_id);
-      if (used + file.size > max) {
-        return storageLimitExceededResponse({ allowed: false, used, incoming: file.size, max });
+    const assetId = generateId('upl');
+    const ext = UPLOAD_EXT[file.type];
+    const stored = await ingestBlobDirect(env, artifactId, {
+      filename: `${assetId}.${ext}`,
+      mimeType: file.type,
+      bytes: await file.arrayBuffer(),
+    });
+    if (!stored.ok) {
+      if (stored.code === 'STORAGE_QUOTA_EXCEEDED' || stored.code === 'FILE_TOO_LARGE' || stored.code === 'BUCKET_FULL') {
+        return errorResponse('STORAGE_LIMIT_EXCEEDED', stored.error ?? 'Storage limit reached', 413);
       }
+      return errorResponse('INTERNAL_ERROR', 'Failed to upload', 500);
     }
 
-    const assetId = generateId('upl');
-    const ext = file.name.split('.').pop() || 'bin';
-    const r2Key = `uploads/${artifactId}/${assetId}.${ext}`;
-
-    // Upload to R2
-    await env.ARTIFACTS.put(r2Key, await file.arrayBuffer(), {
-      httpMetadata: { contentType: file.type },
-    });
-
-    // This URL is embedded into the artifact HTML by the editor. Hardcoded, every
-    // image uploaded on a self-hosted instance pointed at a host that does not have
-    // the file — the bytes were just PUT into *this* instance's R2 — so the images
-    // silently broke.
-    const url = `${getPlatformOrigin(env)}/uploads/${artifactId}/${assetId}.${ext}`;
+    // Embedded into the artifact HTML by the editor, so it must name this instance and
+    // resolve through the blob content route (public artifacts load it as a bare <img>).
+    const url = `${getPlatformOrigin(env)}/v1/data/${artifactId}/blobs/${stored.blobId}/content`;
 
     return new Response(JSON.stringify({
       success: true,

@@ -9,6 +9,7 @@ import { generateSourceEditorPage, type SourceEditableType } from './page';
 import { shouldBlockPublish, runPostPublishTests } from '../../tests/block-gate';
 import { normalizeVersionMessage, scheduleVersionSummary } from '../../artifacts/version-summary';
 import { carriedManifestJson } from '../../mcp-broker/capabilities';
+import { planMedia, writeMedia } from '../bundle-media';
 import { checkEditorPublishRate, enforcePublishGates } from '../draft';
 import { incrementRateLimit } from '../../api-auth';
 
@@ -152,9 +153,6 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
       }
     }
 
-    const gated = await enforcePublishGates(ctx, artifact, body.content);
-    if (gated) return gated;
-
     // Artifact Tests BLOCK gate (see specs §3, §11): stage as a candidate when tests
     // block and a passing baseline exists; otherwise publish live. Never goes dark.
     const blocking = await shouldBlockPublish(env, artifactId);
@@ -168,6 +166,10 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
     const file = current.file;
     const mime = current.mime;
 
+    const media = await planMedia(env, artifactId, file, body.content);
+    const gated = await enforcePublishGates(ctx, artifact, media.content, media.bytes);
+    if (gated) return gated;
+
     const currentVersion = await env.DB.prepare(
       `SELECT MAX(version_no) as max_version FROM versions WHERE artifact_id = ?`
     ).bind(artifactId).first<{ max_version: number | null }>();
@@ -178,10 +180,10 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
     const deploymentId = generateId('dep');
     const message = normalizeVersionMessage(body.message);
 
-    const bytes = new TextEncoder().encode(body.content);
+    const bytes = new TextEncoder().encode(media.content);
     const hash = await sha256(bytes.buffer as ArrayBuffer);
     const r2Key = `${artifactId}/${versionId}/${file}`;
-    await env.ARTIFACTS.put(r2Key, body.content, {
+    await env.ARTIFACTS.put(r2Key, media.content, {
       httpMetadata: { contentType: mime },
       customMetadata: { sha256: hash },
     });
@@ -190,10 +192,11 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
     let prevMeta: TypeMetadata = {};
     try { prevMeta = JSON.parse(artifact.type_metadata || '{}') as TypeMetadata; } catch { /* rebuilt below */ }
     const typeMetadata = JSON.stringify(file === entrypoint
-      ? { ...generateTypeMetadata(type, body.content, mime), ...(prevMeta.source ? { source: prevMeta.source } : {}) }
+      ? { ...generateTypeMetadata(type, media.content, mime), ...(prevMeta.source ? { source: prevMeta.source } : {}) }
       : prevMeta);
 
     // Editor saves keep the live version's runtime capabilities (MCP grants).
+    const mediaStmts = await writeMedia(env, artifactId, versionId, media.items);
     const manifestJson = await carriedManifestJson(env, artifactId);
     await env.DB.batch([
       env.DB.prepare(
@@ -209,8 +212,9 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
       env.DB.prepare(
         `INSERT INTO assets (id, version_id, path, r2_key, mime, size_bytes, sha256)
          SELECT 'ast_' || lower(hex(randomblob(12))), ?, path, r2_key, mime, size_bytes, sha256
-           FROM assets WHERE version_id = ? AND path != ?`
-      ).bind(versionId, current.versionId ?? '', file),
+           FROM assets WHERE version_id = ? AND path != ? AND path NOT IN (${media.items.length ? media.items.map(() => '?').join(',') : "''"})`
+      ).bind(versionId, current.versionId ?? '', file, ...media.items.map((m) => m.path)),
+      ...mediaStmts,
       env.DB.prepare(
         `INSERT INTO deployments (id, artifact_id, version_id, channel, slug, updated_at)
          VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
