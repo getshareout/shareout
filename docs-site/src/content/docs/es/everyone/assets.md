@@ -3,10 +3,10 @@ title: Archivos y entregas
 description: Guardá imágenes, video y cualquier archivo en un solo lugar, reutilizalos en tus artefactos y enviá al cliente un link de descarga limpio.
 ---
 
-:::note[Sale de la barra lateral]
-Todo lo que subís ahora se convierte en un artefacto (documentos, imágenes, video), con el
-original adentro. **Recursos** ya no está en la barra lateral; los archivos existentes
-mantienen sus links, y **Publicar como artefacto** convierte uno en artefacto.
+:::note[Lo que subís se vuelve artefacto]
+Todo lo que subís en Studio ahora se convierte en un artefacto (documentos, imágenes,
+video), con el original adentro. **Recursos** sigue en la barra lateral para tus archivos
+existentes, que mantienen sus links; **Publicar como artefacto** convierte uno en artefacto.
 :::
 
 La pestaña **Assets** en tu Home es un lugar para guardar archivos — imágenes, video, PDFs, hojas de cálculo, decks, zips, lo que sea — guardalos una vez, reutilizalos en tus artefactos y entregale al cliente un link de descarga limpio.
