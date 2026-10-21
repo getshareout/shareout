@@ -103,6 +103,19 @@ describe('knowledge node sources', () => {
     expect(JSON.stringify(node)).not.toContain('Elsewhere');
   });
 
+  it('returns the raw file so pin/edit can PUT it back with its frontmatter', async () => {
+    await upsertKnowledgeFile(e, WS, { path: 'topics/retention.md', content: nodeWith([]) });
+    const raw = ((await getNode()) as unknown as { content: string }).content;
+    expect(raw).toBe(nodeWith([]));
+    const put = await routeKnowledgeApi(createFetchContext(
+      new Request(`https://shareout.site/v1/workspaces/${WS}/knowledge/files/topics/retention.md`, {
+        method: 'PUT', headers: { Cookie: 'shareout_session=x', 'Content-Type': 'text/markdown' }, body: raw.replace(/^---\n/, '---\npinned: true\n'),
+      }), e, execCtx,
+    ));
+    expect(put?.status).toBe(200);
+    expect(((await getNode()) as unknown as { pinned: boolean }).pinned).toBe(true);
+  });
+
   it('returns an empty list for a node with no sources', async () => {
     await upsertKnowledgeFile(e, WS, { path: 'topics/retention.md', content: nodeWith([]) });
     expect((await getNode()).source_artifacts).toEqual([]);

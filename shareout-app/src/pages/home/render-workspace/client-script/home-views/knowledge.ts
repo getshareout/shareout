@@ -651,13 +651,15 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     var next = !node.pinned;
     function paint(v) {
       node.pinned = v; if (knState.byPath[node.path]) knState.byPath[node.path].pinned = v;
-      var btn = document.getElementById('knPin'); if (btn) btn.textContent = t(v ? 'knowledge.unpin' : 'knowledge.pin');
+      if (node.content) node.content = knSetPinnedLine(node.content, v);
+      var btn = document.getElementById('knPin'), lbl = t(v ? 'knowledge.unpin' : 'knowledge.pin');
+      if (btn) { btn.classList.toggle('is-on', v); btn.setAttribute('data-tip', lbl); btn.setAttribute('aria-label', lbl); }
     }
     optimistic({
       key: 'kn:pin:' + node.path,
       apply: function () { paint(next); },
       rollback: function () { paint(!next); },
-      request: function () { return knPut(node, knSetPinnedLine(knRaw(node), next)); },
+      request: function () { return knPut(node, knRaw(node)); },
       error: t('knowledge.updateError'),
       done: function () { if (knCurrentPath === node.path) knReopen(node.path); },
     });
