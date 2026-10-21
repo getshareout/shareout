@@ -29,8 +29,9 @@ it on.
 Once it is on, the lens is empty until pages are learned. You have two ways to fill it:
 
 - **Learn from existing pages** — an owner or admin can queue your recent pages for learning in
-  one click. This picks up to the **200 most recent** live pages; a progress bar tracks the
-  bounded on-demand run and the rest drains on the hourly cron. Returns `{ "queued": 0 }` when
+  one click. This picks up to the **200 most recent** live pages and learns them all in the
+  background (where the instance runs Workflows; otherwise one short pass now and the rest on
+  the hourly cron), with a progress bar. Returns `{ "queued": 0 }` when
   everything is already up to date.
 - **Let it grow** — every page you publish from now on is learned automatically.
 
@@ -138,7 +139,7 @@ The **Knowledge** lens opens in a **tree** view by default — indented branches
 
 On an artifact tab, **Details** in the Inspector lists **Knowledge from this artifact** — the notes learned from it — when there are any. Each one opens the note in Knowledge (`#l/knowledge/<path>`).
 
-**Learn from existing pages** shows a progress bar while the on-demand distill run works (`GET /knowledge/status` — `queued`, `processed`, `total`, `running`). Large backfills may continue on the hourly cron after the bar finishes.
+**Learn from existing pages** shows a progress bar while the on-demand distill run works (`GET /knowledge/status` — `queued`, `processed`, `total`, `running`). On instances without Workflows, large backfills continue on the hourly cron after the bar finishes. `running` means pages are still queued.
 
 ### Deep links
 

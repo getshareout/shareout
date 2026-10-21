@@ -143,6 +143,19 @@ describe('knowledge routes', () => {
     expect(rows?.n).toBe(2);
   });
 
+  it('backfill starts a durable drain of the whole queue where Workflows exist', async () => {
+    const create = vi.fn(async () => ({}));
+    Object.assign(e, { KNOWLEDGE_INGEST: { create } });
+    try {
+      const res = await call('POST', '/backfill');
+      expect(res?.status).toBe(200);
+      expect((await res!.json()).kicked).toBe(true);
+      expect(create).toHaveBeenCalledWith({ id: expect.stringMatching(/^distill-/), params: { kind: 'distill', workspaceId: WS } });
+    } finally {
+      delete (e as { KNOWLEDGE_INGEST?: unknown }).KNOWLEDGE_INGEST;
+    }
+  });
+
   it('backfill reports kicked=false when no AI provider is configured', async () => {
     getAIProvider.mockReturnValue(null);
     const res = await call('POST', '/backfill');

@@ -29,8 +29,9 @@ admin lo active.
 Una vez activo, el lens está vacío hasta que se aprendan artefactos. Tenés dos formas de llenarlo:
 
 - **Learn from existing pages** — un owner o admin puede encolar tus artefactos recientes en un
-  clic. Toma hasta los **200 artefactos live más recientes**; una barra de progreso sigue la
-  corrida acotada on-demand y el resto drena en el cron horario. Devuelve `{ "queued": 0 }`
+  clic. Toma hasta los **200 artefactos live más recientes** y los aprende todos en segundo
+  plano (donde la instancia corre Workflows; si no, una pasada corta ahora y el resto en el
+  cron horario), con una barra de progreso. Devuelve `{ "queued": 0 }`
   cuando todo ya está al día.
 - **Let it grow** — cada artefacto que publiques de ahora en adelante se aprende automáticamente.
 
@@ -118,7 +119,7 @@ El lens **Knowledge** abre en vista **árbol** por defecto — ramas indentadas 
 
 En la pestaña de un artefacto, **Detalles** del Inspector lista **Conocimiento de este artefacto** — las notas aprendidas de él — cuando hay alguna. Cada una abre la nota en Conocimiento (`#l/knowledge/<path>`).
 
-**Learn from existing pages** muestra una barra de progreso mientras corre el distill on-demand (`GET /knowledge/status` — `queued`, `processed`, `total`, `running`). Los backfills grandes pueden seguir en el cron horario después de que termine la barra.
+**Learn from existing pages** muestra una barra de progreso mientras corre el distill on-demand (`GET /knowledge/status` — `queued`, `processed`, `total`, `running`). Donde la instancia corre Workflows se aprenden todos en segundo plano; si no, los backfills grandes siguen en el cron horario después de que termine la barra. `running` indica que todavía quedan artefactos en cola.
 
 ### Deep links
 
