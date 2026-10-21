@@ -1,7 +1,7 @@
 /**
  * Turn a workspace's Files into artifacts in place — one document, one artifact, the
  * original kept inside it. Each convertible file is published as a page by its owner, in
- * its folder, then the file is soft-deleted with the artifact id recorded on it. A file
+ * its folder (the top level when that folder is gone), then the file is soft-deleted with the artifact id recorded on it. A file
  * that a page embeds (/v1/files/{id}) is left alone so no link breaks; one that cannot be
  * converted is marked and skipped until a call with `retry` clears the marks. Bounded per call: callers repeat until
  * `remaining` is 0 (a scan's transcription can take tens of seconds).
@@ -28,7 +28,7 @@ export interface ToArtifactsPlan {
 
 function selectSql(limit: string): string {
   return `
-    SELECT d.id, d.name, d.owner_id, u.email, d.folder_id, d.visibility, b.r2_key, b.filename, b.size_bytes,
+    SELECT d.id, d.name, d.owner_id, u.email, (SELECT f.id FROM folders f WHERE f.id = d.folder_id) AS folder_id, d.visibility, b.r2_key, b.filename, b.size_bytes,
            (SELECT COUNT(*) FROM file_artifact_usage f WHERE f.deliverable_id = d.id) AS uses
       FROM asset_deliverables d
       JOIN blobs b ON b.deliverable_id = d.id AND b.version_no = (SELECT MAX(version_no) FROM blobs WHERE deliverable_id = d.id)
@@ -78,7 +78,9 @@ export async function filesToArtifacts(env: Env, workspaceId: string, opts: { li
     const page = await convertToPage(env, {
       user: { id: r.owner_id, email: r.email }, workspaceId, folderId: r.folder_id,
       visibility: r.visibility === 'private' ? 'private' : 'workspace',
-      filename: r.filename, displayName: r.name, bytes: new Uint8Array(await obj.arrayBuffer()), slug: null,
+      // The page name is the file's name; convertToPage strips an extension, so give it one
+      // (else "PG-05 Rev.8" loses ".8").
+      filename: r.filename, displayName: `${r.name}.${r.filename.split('.').pop()}`, bytes: new Uint8Array(await obj.arrayBuffer()), slug: null,
     });
     if (!page.ok) { await keep(r, page.code, page.message); continue; }
     await mark(env, r.id, JSON.stringify(page.artifactId), true);
