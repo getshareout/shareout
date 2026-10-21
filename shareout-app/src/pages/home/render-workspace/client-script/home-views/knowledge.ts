@@ -210,7 +210,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
       + '</div>';
   }
   function knHowBtn() {
-    return '<button class="wsx-kn2__how" id="knHow" type="button"><span class="wsx-kn2__q">?</span>' + esc(t('knowledge.howBtn')) + '</button>';
+    return '<button class="wsx-kn2__how wsx-kn2__how--icon" id="knHow" type="button" data-tip="' + esc(t('knowledge.howBtn')) + '" aria-label="' + esc(t('knowledge.howBtn')) + '"><span class="wsx-kn2__q">?</span></button>';
   }
   function knHowP(key) {
     var s = t(key), i = s.indexOf('. ');
