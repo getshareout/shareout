@@ -123,6 +123,8 @@ export async function handleServe(
   opts: { contentOrigin?: boolean; ct?: string | null; executionCtx?: ExecutionContext; cached?: CachedDeployment } = {},
 ): Promise<Response> {
   const url = new URL(request.url);
+  // Paths arrive percent-encoded; assets are stored decoded ("original/Plan Q3.docx").
+  if (assetPath.includes('%')) { try { assetPath = decodeURIComponent(assetPath); } catch { /* malformed escape: stays a miss */ } }
   const isRawRequest = url.searchParams.has('_raw');
   const captureToken = url.searchParams.get('_capture');
   const contentOrigin = opts.contentOrigin === true;
