@@ -2,7 +2,7 @@
  * One-step workspace provisioning for a new customer account.
  *
  * Runs a validated {@link ProvisionSpec} as a sequence of steps — workspace, branding,
- * policy, folders, admins, connectors, then the template and custom-domain hooks. Every
+ * policy, folders, admins, connectors, then the custom-domain hook. Every
  * step is idempotent and keyed by the workspace slug: a re-run fills in what is missing
  * and reports the rest as `unchanged`; it never creates a second workspace, folder,
  * membership or connector, never resends a live invite (unless asked), and never
@@ -424,7 +424,6 @@ export async function runProvisioning(
   const invites = await stepAdmins(env, row, actor, spec);
   push(invites.step);
   for (const s of await stepConnectors(env, row, actor, spec, executionCtx).catch((err) => [{ step: 'connectors', status: 'failed' as const, error: errorMessage(err) }])) push(s);
-  push(await guarded('templates', () => stepHook('templates', spec.templates, env, row, actor, executionCtx)));
   push(await guarded('custom_domain', () => stepHook('custom_domain', spec.custom_domain, env, row, actor, executionCtx)));
 
   await Promise.all(steps.map((s) => auditStep(env, row, actor, s)));

@@ -16,7 +16,7 @@ export const workspace_client_new_menu_JS = `  // ===== New menu: upload a file 
     newMenu.innerHTML = page === 'tpl'
       ? '<button class="wsx-newmenu__back" type="button" data-new="back">' + esc(t('new.back')) + '</button>'
         + NEW_TPLS.map(function (k) { return newItem('tpl:' + k, t('new.tpl.' + k), t('new.tplHint.' + k)); }).join('')
-      : newItem('upload', t('new.upload'), t('new.uploadHint')) + (window.WSX_WS && (window.WSX_FILE_IMPORT || []).length ? newItem('drive', t('fimp.menu'), t('fimp.menuHint')) : '') + newItem('blank', t('new.blank'), t('new.blankHint')) + newItem('tpl', t('new.template'), t('new.templateHint')) + newItem('templates', t('new.templates'), t('new.templatesHint'));
+      : newItem('upload', t('new.upload'), t('new.uploadHint')) + (window.WSX_WS && (window.WSX_FILE_IMPORT || []).length ? newItem('drive', t('fimp.menu'), t('fimp.menuHint')) : '') + newItem('blank', t('new.blank'), t('new.blankHint')) + newItem('tpl', t('new.template'), t('new.templateHint'));
     var first = newMenu.querySelector('[role="menuitem"]'); if (first) first.focus();
   }
   function openNewMenu() {
@@ -67,7 +67,6 @@ export const workspace_client_new_menu_JS = `  // ===== New menu: upload a file 
       else if (act === 'drive') { newPicked(); openFileImport(); }
       else if (act === 'blank') newDoc('blank');
       else if (act === 'tpl') paintNewMenu('tpl');
-      else if (act === 'templates') { newPicked(); var tl = ws.querySelector('[data-lens="templates"]'); if (tl) tl.click(); }
       else if (act === 'back') paintNewMenu('main');
       else if (act.indexOf('tpl:') === 0) newDoc(act.slice(4));
     });

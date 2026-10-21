@@ -1,27 +1,11 @@
 /**
- * The template and custom-domain steps as shipped: provisioning falls back to these when
- * no hook is registered (hooks.ts stays the override seam). Both are idempotent, and each
- * reports `pending` with a next step when this instance cannot act on it yet.
+ * The custom-domain step as shipped: provisioning falls back to it when no hook is
+ * registered (hooks.ts stays the override seam). It is idempotent, and reports `pending`
+ * with a next step when this instance cannot act on it yet.
  */
-import { installTemplateSet } from '../../templates';
 import { DomainError, provisionWorkspaceDomain } from '../../workspaces/domains';
 import type { ProvisionHook, ProvisionHookName } from './hooks';
 
-const templates: ProvisionHook = async ({ env, workspace, actor }, tag) => {
-  const res = await installTemplateSet(env, { id: actor.id, email: actor.email, username: null }, {
-    workspaceId: workspace.id, tag, skipInstalled: true,
-  });
-  if (res.failed.length) {
-    throw new Error(`Template set "${tag}": ${res.failed.map((f) => `${f.template_id} ${f.code}`).join(', ')}`);
-  }
-  const detail = { installed: res.installed.map((r) => r.template_id), already_installed: res.skipped };
-  if (res.installed.length) return { status: 'created', detail };
-  if (res.skipped.length) return { status: 'unchanged', detail };
-  return {
-    status: 'pending', detail,
-    next_step: `No instance-library template is tagged "${tag}". Publish one with that tag, then re-run this spec.`,
-  };
-};
 
 const customDomain: ProvisionHook = async ({ env, workspace, actor }, hostname) => {
   try {
@@ -38,6 +22,5 @@ const customDomain: ProvisionHook = async ({ env, workspace, actor }, hostname) 
 };
 
 export const BUILTIN_PROVISION_HOOKS: Record<ProvisionHookName, ProvisionHook> = {
-  templates,
   custom_domain: customDomain,
 };
