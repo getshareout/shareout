@@ -35,24 +35,23 @@ export const WORKSPACE_KNOWLEDGE_STYLES = `
 @keyframes wsxKnFade { from { opacity: 0; } to { opacity: 1; } }
 
 /* ---- Controls bar: stats line + search + view toggle + How-it-works ---- */
-/* Header = 2 rows: title + one-line intro, then stats + controls. */
-.wsx-kn2__titlerow { display: flex; align-items: baseline; gap: 16px; min-width: 0; margin-bottom: 12px; }
+/* Header = 2 rows: title + quiet stats, then search/filter + actions. Intro lives in the ? modal. */
+.wsx-kn2__titlerow { display: flex; align-items: center; gap: 16px; min-width: 0; margin-bottom: 12px; }
 .wsx-kn2__titlerow .wsx__viewtitle { margin: 0; flex: none; }
-.wsx-kn2__titlerow .wsx-lens__intro { margin: 0; max-width: none; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#knStats { flex: 1; min-width: 0; }
+#knHow { cursor: pointer; }
 .wsx-kn2__stats.wsx-cat__kpis { display: block; flex: 1 1 auto; margin: 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wsx-kn2__stat { font-size: var(--text-sm); color: var(--color-text-tertiary); margin-right: 14px; }
-.wsx-kn2__bar .wsx-qsearch input { width: 180px; }
+.wsx-kn2__bar .wsx-qsearch input { width: 240px; }
+.wsx-kn2__kind { width: auto; }
+.wsx-kn2__treewrap .wsx-qsearch, .wsx-kn2__treewrap .wsx-qsearch input { width: 100%; box-sizing: border-box; }
 .wsx-kn2__bar .wsx-cat__count { margin-left: 0; }
-.wsx-kn2__how--icon { padding: 6px; width: 34px; justify-content: center; }
 @media (min-width: 1100px) {
   .wsx-kn2__bar { flex-wrap: nowrap; }
   .wsx-kn2__bar > :not(.wsx-kn2__stats) { flex: none; }
 }
 .wsx-kn2__stat b { font-weight: 700; color: var(--color-text); font-variant-numeric: tabular-nums; }
 .wsx-kn2__ctlright { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
-.wsx-kn2__how { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); border-radius: var(--radius-md); padding: 6px 12px; cursor: pointer; transition: color var(--duration-fast), border-color var(--duration-fast); }
-.wsx-kn2__how:hover { color: var(--color-text); border-color: var(--color-border-strong); }
-.wsx-kn2__q { display: inline-grid; place-items: center; width: 15px; height: 15px; border-radius: 999px; border: 1.5px solid currentColor; font-size: 10px; font-weight: 700; line-height: 1; }
 .wsx-kn2__how-body p { margin: 0 0 12px; font-size: var(--text-sm); line-height: 1.6; color: var(--color-text); }
 .wsx-kn2__how-body p:last-child { margin-bottom: 0; }
 .wsx-kn2__how-body strong { color: var(--color-text); }

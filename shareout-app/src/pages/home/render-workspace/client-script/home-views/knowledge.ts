@@ -106,6 +106,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
   }
 
   function knRenderOnboard(m, mode) {
+    ['knStats', 'knActions'].forEach(function (id) { var el = document.getElementById(id); if (el) el.innerHTML = ''; });
     var admin = !!window.WSX_ADMIN;
     var paid = !!window.WSX_KNOWLEDGE_PAID;
     var msg = mode === 'off' ? t('knowledge.offTitle') : t('knowledge.emptyTitle');
@@ -209,9 +210,6 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
       + '<button class="' + (knState.view === 'map' ? 'is-on' : '') + '" data-kn-view="map" type="button">' + esc(t('knowledge.viewMap')) + '</button>'
       + '</div>';
   }
-  function knHowBtn() {
-    return '<button class="wsx-kn2__how wsx-kn2__how--icon" id="knHow" type="button" data-tip="' + esc(t('knowledge.howBtn')) + '" aria-label="' + esc(t('knowledge.howBtn')) + '"><span class="wsx-kn2__q">?</span></button>';
-  }
   function knHowP(key) {
     var s = t(key), i = s.indexOf('. ');
     if (i < 0) return '<p>' + esc(s) + '</p>';
@@ -219,17 +217,16 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
   }
   function knHowModal() {
     wsxModal(t('knowledge.howTitle'), '<div class="wsx-kn2__how-body">'
-      + knHowP('knowledge.howLearn') + knHowP('knowledge.howDream') + knHowP('knowledge.howAgents') + knHowP('knowledge.howControl') + '</div>');
+      + '<p>' + esc(t('intro.knowledge')) + '</p>' + knHowP('knowledge.howLearn') + knHowP('knowledge.howDream') + knHowP('knowledge.howAgents') + knHowP('knowledge.howControl') + '</div>');
   }
 
   // ---- Table view (the alternate, kept intact behind the toggle) ----
   var KN_SEGS = [['topic', 'knowledge.segTopics'], ['entity', 'knowledge.segEntities'], ['artifact-digest', 'knowledge.segPages'], ['decision', 'knowledge.segDecisions']];
   function knSeg() {
-    var btns = '<button class="' + (knState.kind === '' ? 'is-on' : '') + '" data-kn-kind-seg="" type="button">' + esc(t('knowledge.segAll')) + '</button>';
-    btns += KN_SEGS.map(function (s) {
-      return '<button class="' + (knState.kind === s[0] ? 'is-on' : '') + '" data-kn-kind-seg="' + s[0] + '" type="button">' + esc(t(s[1])) + '</button>';
+    var opts = [['', 'knowledge.segAll']].concat(KN_SEGS).map(function (s) {
+      return '<option value="' + s[0] + '"' + (knState.kind === s[0] ? ' selected' : '') + '>' + esc(t(s[1])) + '</option>';
     }).join('');
-    return '<div class="wsx__modetog wsx-cat__seg">' + btns + '</div>';
+    return '<select class="so-c-select wsx-kn2__kind" id="knKind" aria-label="' + esc(t('knowledge.colKind')) + '">' + opts + '</select>';
   }
 
   var KN_COLS = [['title', 'knowledge.colTitle', 1], ['kind', 'knowledge.colKind', 1], ['topics', 'knowledge.colTopics', 0], ['sources', 'knowledge.colSources', 0], ['learned', 'knowledge.colLearned', 1]];
@@ -287,9 +284,8 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
   }
 
   function knBindTable(m) {
-    m.querySelectorAll('[data-kn-kind-seg]').forEach(function (b) {
-      b.addEventListener('click', function () { knState.kind = b.getAttribute('data-kn-kind-seg'); knRenderShell(m); });
-    });
+    var kind = document.getElementById('knKind');
+    if (kind) kind.addEventListener('change', function () { knState.kind = kind.value; knApplyFilter(); });
     m.querySelectorAll('th[data-knsort]').forEach(function (th) {
       th.addEventListener('click', function () {
         var k = th.getAttribute('data-knsort');
@@ -440,15 +436,16 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
   function knRenderShell(m) {
     var byPath = knState.byPath || {};
     if (knCurrentPath && byPath[knCurrentPath] && (knState.view === 'table' || knNarrow())) { knFullDetail(m, knCurrentPath); return; }
-    var trainBtn = window.WSX_ADMIN ? '<button class="so-c-btn so-c-btn--primary wsx-kn2__train" id="knTrain" type="button" data-tip="' + esc(t('knowledge.tipTrain')) + '">' + esc(t('knowledge.train')) + '</button>' : '';
+    var trainBtn = window.WSX_ADMIN ? '<button class="so-c-btn so-c-btn--secondary wsx-kn2__train" id="knTrain" type="button" data-tip="' + esc(t('knowledge.tipTrain')) + '">' + esc(t('knowledge.train')) + '</button>' : '';
     var prog = '<div class="wsx-kn2__prog" id="knProg" hidden><div class="wsx-kn2__progtrack"><div class="wsx-kn2__progfill" id="knProgFill"></div></div><span class="wsx-kn2__proglabel" id="knProgLabel"></span></div>';
-    // Search sits where the Artifacts lens has it: right side, before the view toggle.
+    // Lens-level (stats, train, view) live in the title row; search/filter live with what they filter.
     var search = knState.view === 'map' ? '' : '<div class="wsx-qsearch">' + isvg('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>')
       + '<input id="knSearch" type="search" placeholder="' + esc(t('knowledge.searchPlaceholder')) + '" aria-label="' + esc(t('knowledge.searchPlaceholder')) + '" autocomplete="off" spellcheck="false"></div>';
-    var top = '<div class="wsx-cat__controls"><div class="wsx-cat__bar wsx-kn2__bar">' + knKpiTiles()
-      + (knState.view === 'table' ? knSeg() + '<span class="wsx-cat__count" id="knCount"></span>' : '')
-      + '<div class="wsx-kn2__ctlright">' + search + trainBtn + knHowBtn() + knToggle() + '</div>'
-      + '</div>' + prog + '</div>';
+    var stats = document.getElementById('knStats'); if (stats) stats.innerHTML = knKpiTiles();
+    var acts = document.getElementById('knActions'); if (acts) acts.innerHTML = trainBtn + knToggle();
+    var top = knState.view === 'table'
+      ? '<div class="wsx-cat__controls wsx-ttool"><div class="wsx-cat__bar wsx-kn2__bar">' + search + knSeg() + '<span class="wsx-cat__count" id="knCount"></span></div>' + prog + '</div>'
+      : prog;
     if (knState.view === 'map') { kmRender(m, top); return; }
     if (knState.view === 'table') {
       m.innerHTML = top + knTableBody();
@@ -456,7 +453,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     } else {
       m.innerHTML = top
         + '<div class="wsx-kn2">'
-        + '<div class="wsx-kn2__pane wsx-kn2__treewrap">'
+        + '<div class="wsx-kn2__pane wsx-kn2__treewrap">' + search
         + '<div class="wsx-kn2__tree" id="knTree">' + knTreeHtml() + '</div>'
         + '<div class="wsx-empty" id="knNone" style="display:none">' + esc(t('knowledge.noMatch')) + '</div>'
         + '</div>'
@@ -475,7 +472,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
 
   function knBindShell(m) {
     if (knPollTimer && knLastProg) { knShowProg(true); knSetProg(knLastProg.done, knLastProg.total); }
-    m.querySelectorAll('[data-kn-view]').forEach(function (b) {
+    document.querySelectorAll('#knActions [data-kn-view]').forEach(function (b) {
       b.addEventListener('click', function () {
         var v = b.getAttribute('data-kn-view'); if (v === knState.view) return;
         kmOnViewSwitch(knState.view, v);
@@ -483,7 +480,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
         knRenderShell(m);
       });
     });
-    var how = document.getElementById('knHow'); if (how) how.addEventListener('click', knHowModal);
+    var how = document.getElementById('knHow'); if (how) how.onclick = knHowModal;
     var tr = document.getElementById('knTrain'); if (tr) tr.addEventListener('click', function () { knStartTrain(tr); });
     var s = document.getElementById('knSearch');
     if (s) { s.value = knState.q; s.addEventListener('input', function () { knState.q = s.value.trim().toLowerCase(); if (knState.view === 'tree') knApplyTreeFilter(); else knApplyFilter(); }); }

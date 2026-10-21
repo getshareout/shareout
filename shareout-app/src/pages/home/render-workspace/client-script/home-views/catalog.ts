@@ -145,7 +145,7 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
       return '<th class="' + (catState.sort === c[0] ? 'is-sort' : '') + '" data-asort="' + c[0] + '">' + esc(t(c[1])) + catArrow(c[0]) + '</th>';
     }).join('');
     m.innerHTML = catKpiTiles()
-      + '<div class="wsx-cat__controls"><div class="wsx-cat__bar">'
+      + '<div class="wsx-cat__controls wsx-ttool"><div class="wsx-cat__bar">'
       + '<input class="wsx-cat__search" id="catSearch" type="search" placeholder="' + esc(t('catalog.searchPlaceholder')) + '" autocomplete="off">'
       + catSeg(f.kind) + catSelect('catDom', 'catalog.filterDomain', 'domain', f.domain) + catSelect('catStat', 'catalog.filterStatus', 'status', f.status)
       + '<span class="wsx-cat__count" id="catCount"></span>'
