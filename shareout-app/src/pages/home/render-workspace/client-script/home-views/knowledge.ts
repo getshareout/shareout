@@ -436,7 +436,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
   function knRenderShell(m) {
     var byPath = knState.byPath || {};
     if (knCurrentPath && byPath[knCurrentPath] && (knState.view === 'table' || knNarrow())) { knFullDetail(m, knCurrentPath); return; }
-    var trainBtn = window.WSX_ADMIN ? '<button class="so-c-btn so-c-btn--secondary wsx-kn2__train" id="knTrain" type="button" data-tip="' + esc(t('knowledge.tipTrain')) + '">' + esc(t('knowledge.train')) + '</button>' : '';
+    var trainBtn = window.WSX_ADMIN ? '<button class="so-c-btn so-c-btn--primary wsx-kn2__train" id="knTrain" type="button" data-tip="' + esc(t('knowledge.tipTrain')) + '">' + esc(t('knowledge.train')) + '</button>' : '';
     var prog = '<div class="wsx-kn2__prog" id="knProg" hidden><div class="wsx-kn2__progtrack"><div class="wsx-kn2__progfill" id="knProgFill"></div></div><span class="wsx-kn2__proglabel" id="knProgLabel"></span></div>';
     // Lens-level (stats, train, view) live in the title row; search/filter live with what they filter.
     var search = knState.view === 'map' ? '' : '<div class="wsx-qsearch">' + isvg('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>')
@@ -546,6 +546,29 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
         + isvg(KND_ICO.doc) + '<span class="wsx-knd__srct">' + esc(label) + '</span><span class="wsx-knd__srcgo">' + isvg(KND_ICO.go) + '</span></a></li>';
     }).join('') + '</ul>';
   }
+  // Related = other notes sharing topics/entities, plus the topic/entity notes this one names.
+  function knRelated(node) {
+    var ts = (node.topics || []).map(knSlug), es = (node.entities || []).map(knSlug);
+    function hits(xs, ys) { return xs.filter(function (x) { return ys.indexOf(knSlug(x)) >= 0; }).length; }
+    return knState.nodes.filter(function (n) { return n.path !== node.path && n.kind !== 'overview' && n.kind !== 'guidance'; })
+      .map(function (n) {
+        var score = 2 * hits(n.topics || [], ts) + 2 * hits(n.entities || [], es);
+        if (n.kind === 'topic' && ts.indexOf(knSlug(n.id || n.title)) >= 0) score += 3;
+        if (n.kind === 'entity' && es.indexOf(knSlug(n.id || n.title)) >= 0) score += 3;
+        return { n: n, score: score };
+      })
+      .filter(function (x) { return x.score > 0; })
+      .sort(function (a, b) { return b.score - a.score; })
+      .slice(0, 6).map(function (x) { return x.n; });
+  }
+  function knRelatedSec(node) {
+    var rel = knRelated(node); if (!rel.length) return '';
+    return '<section class="wsx-knd__sec"><div class="wsx-knd__sechead"><h4>' + esc(t('knowledge.related')) + '</h4><span class="wsx-knd__count">' + rel.length + '</span></div>'
+      + '<ul class="wsx-knd__srcs">' + rel.map(function (n) {
+        return '<li><button class="wsx-knd__src wsx-knd__rel" type="button" data-kn-go="' + esc(n.path) + '"><span class="wsx-kn2__ico">' + knIcon(n.kind) + '</span>'
+          + '<span class="wsx-knd__srct">' + esc(n.title || n.path) + '</span><span class="wsx-knd__relkind">' + esc(knKindLabel(n.kind)) + '</span></button></li>';
+      }).join('') + '</ul></section>';
+  }
   // Topic/entity chips open their note when it's in the tree.
   function knSlug(x) { return String(x).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
   function knChip(kind, x) {
@@ -565,6 +588,12 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     return content;
   }
 
+  // Back = an arrow inline with the title, not its own row.
+  function knBackBtn() {
+    var lbl = esc(t('knowledge.back').replace('\\u2190', '').trim());
+    return '<button class="wsx-knd__back" id="knBack" type="button" aria-label="' + lbl + '" data-tip="' + lbl + '">' + isvg('<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>') + '</button>';
+  }
+
   function knPaintDetail(host, node, back) {
     var topics = node.topics || [], entities = node.entities || [];
     var sources = node.source_artifacts || node.sources || [];
@@ -572,7 +601,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     if (node.updated_at && node.updated_at !== node.learned_at) meta.push(t('knowledge.freshUpdated') + ' ' + adRelDate(node.updated_at));
     if (node.confidence) meta.push(t('knowledge.metaConfidence') + ': ' + node.confidence);
     var title = node.kind === 'overview' ? t('knowledge.overviewTitle') : (node.title || node.path);
-    var backBtn = back ? '<button class="wsx-cat__back" id="knBack" type="button">' + esc(t('knowledge.back')) + '</button>' : '';
+    var backBtn = back ? knBackBtn() : '';
     // Actions sit with the title they act on, as icons; Forget is admin-only.
     var acts = '<div class="wsx-knd__acts">'
       + knIconBtn('knPin', t(node.pinned ? 'knowledge.unpin' : 'knowledge.pin'), 'pin', node.pinned ? ' is-on' : '')
@@ -584,16 +613,17 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     }
     var facets = facet('knowledge.metaTopics', 'topic', topics) + facet('knowledge.metaEntities', 'entity', entities);
     // Head stays put while the rest scrolls (desktop tree pane; plain blocks elsewhere).
-    host.innerHTML = '<div class="wsx-kn2__dtop wsx-knd__head">' + backBtn
+    host.innerHTML = '<div class="wsx-kn2__dtop wsx-knd__head">'
       + '<div class="wsx-knd__top"><div class="wsx-knd__titles">'
       + '<div class="wsx-knd__eyebrow"><span class="wsx-knd__kind">' + esc(knKindLabel(node.kind)) + '</span>' + knBadge(node) + '</div>'
-      + '<h3 class="wsx-knd__title" title="' + esc(node.path) + '">' + esc(title) + '</h3>'
+      + '<div class="wsx-knd__trow">' + backBtn + '<h3 class="wsx-knd__title" title="' + esc(node.path) + '">' + esc(title) + '</h3></div>'
       + '<div class="wsx-knd__meta">' + esc(meta.join(' \\u00B7 ')) + '</div>'
       + '</div>' + acts + '</div></div>'
       + '<div class="wsx-kn2__scroll">'
       + (facets ? '<div class="wsx-knd__facets">' + facets + '</div>' : '')
       + '<div id="knBody">' + (node.kind === 'overview' ? knOverviewChrome(node.body) : (node.body ? '<div class="wsx-cat__body wsx-knd__body">' + knWikiLinks(mdToHtml(node.body)) + '</div>' : '')) + '</div>'
       + '<section class="wsx-knd__sec"><div class="wsx-knd__sechead"><h4 data-tip="' + esc(t('knowledge.tipSources')) + '">' + esc(t('knowledge.srcHeader')) + '</h4><span class="wsx-knd__count">' + sources.length + '</span><span class="wsx-knd__hint">' + esc(t('knowledge.srcHint')) + '</span></div>' + knSrcRows(sources) + '</section>'
+      + knRelatedSec(node)
       + '</div>';
     if (back) { var bk = document.getElementById('knBack'); if (bk) bk.addEventListener('click', back); }
     knBindWikiLinks(host);
@@ -743,9 +773,8 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     if (node.is_entry) badges += '<span class="so-c-badge wsx-kn__bdg" data-tip="' + esc(t('knowledge.tipEntry')) + '">' + esc(t('knowledge.badgeEntry')) + '</span>';
     badges += '<span class="so-c-badge wsx-kn__bdg">' + esc(t('knowledge.badgeManual')) + '</span>';
     var fresh = node.updated_at ? (t('knowledge.freshUpdated') + ' ' + adRelDate(node.updated_at)) : '';
-    var backBtn = back ? '<button class="wsx-cat__back" id="knBack" type="button">' + esc(t('knowledge.back')) + '</button>' : '';
-    host.innerHTML = backBtn
-      + '<div class="wsx-cat__dhead"><span class="wsx-atbl__type">' + esc(t('knowledge.branchGuidance')) + '</span><h3>' + esc(node.name) + '</h3>' + badges + '</div>'
+    var backBtn = back ? knBackBtn() : '';
+    host.innerHTML = '<div class="wsx-cat__dhead">' + backBtn + '<span class="wsx-atbl__type">' + esc(t('knowledge.branchGuidance')) + '</span><h3>' + esc(node.name) + '</h3>' + badges + '</div>'
       + '<div class="wsx-sched__meta">' + esc(node.path) + '</div>'
       + '<div id="knBody"><div class="wsx-cat__body">' + knWikiLinks(mdToHtml(node.body || '')) + '</div></div>'
       + (fresh ? '<div class="wsx-kn__fresh">' + esc(fresh) + '</div>' : '')

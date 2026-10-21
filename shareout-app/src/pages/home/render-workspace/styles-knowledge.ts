@@ -40,6 +40,13 @@ export const WORKSPACE_KNOWLEDGE_STYLES = `
 .wsx-kn2__titlerow .wsx__viewtitle { margin: 0; flex: none; }
 #knStats { flex: 1; min-width: 0; }
 #knHow { cursor: pointer; }
+.wsx-knd__trow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.wsx-knd__back { display: inline-grid; place-items: center; flex: none; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); cursor: pointer; transition: background var(--duration-fast), color var(--duration-fast); }
+.wsx-knd__back:hover { background: var(--color-surface); color: var(--color-text); }
+.wsx-knd__back svg { width: 18px; height: 18px; }
+.wsx-knd__rel { width: 100%; font: inherit; text-align: left; cursor: pointer; }
+.wsx-knd__rel:hover { border-color: var(--color-primary); }
+.wsx-knd__relkind { flex: none; margin-left: auto; font-size: var(--text-xs); color: var(--color-text-tertiary); }
 .wsx-kn2__stats.wsx-cat__kpis { display: block; flex: 1 1 auto; margin: 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wsx-kn2__stat { font-size: var(--text-sm); color: var(--color-text-tertiary); margin-right: 14px; }
 .wsx-kn2__bar .wsx-qsearch input { width: 240px; }

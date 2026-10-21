@@ -244,7 +244,7 @@ describe('knowledge map — evidence panel', () => {
 });
 
 describe('knowledge map — finder and shell', () => {
-  it('boots on a list (nothing picked for the person), then draws what they pick and syncs the hash', async () => {
+  it('boots focused on the most-mentioned entity, draws it and syncs the hash', async () => {
     const lens = loadLens();
     fetchMock.mockImplementation(async (url: string) => {
       if (/\/entities\?limit=40$/.test(url)) return { ok: true, json: async () => ({ types: [{ type: 'Organization', count: 2 }, { type: 'Product', count: 2 }, { type: 'Project', count: 1 }, { type: 'Metric', count: 2 }], entities: GRAPH.nodes.slice(0, 5) }) };
@@ -256,12 +256,8 @@ describe('knowledge map — finder and shell', () => {
     document.body.innerHTML = '<div id="wsxKnMount"></div>';
     lens.kmRender(document.getElementById('wsxKnMount')!, '<div id="top"></div>');
     await new Promise((r) => setTimeout(r, 0));
-    expect(lens.kmState.focus).toBe('');
-    expect(document.getElementById('kmCanvas')!.textContent).toBe('Pick something on the left to see how it connects.');
+    await new Promise((r) => setTimeout(r, 0));
     expect(fetchMock.mock.calls.some((c) => /\/graph\?limit=80$/.test(String(c[0])))).toBe(false);
-    (document.querySelector('[data-km-go="org"]') as HTMLButtonElement).click();
-    await new Promise((r) => setTimeout(r, 0));
-    await new Promise((r) => setTimeout(r, 0));
     expect(lens.kmState.focus).toBe('org');
     expect(hash).toBe('map/org');
     // chips are alphabetical with counts; the list marks the focus
