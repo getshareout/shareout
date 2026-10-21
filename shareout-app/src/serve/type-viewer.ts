@@ -16,6 +16,17 @@ import { normalizeVisibility } from '../visibility-config';
 import { localeForArtifactWorkspace } from '../i18n/locale';
 import { servingOrigin } from '../workspaces/domains/host-binding';
 
+/** A PDF original can be shown inline (?show=original); other originals only download. */
+function pdfTabs(href: string, original: string): ViewerSource['pdfTabs'] {
+  if (!/\.pdf$/i.test(original)) return undefined;
+  const q = new URL(href).searchParams;
+  const showOriginal = q.get('show') === 'original';
+  q.delete('show');
+  const text = q.toString();
+  q.set('show', 'original');
+  return { showOriginal, textHref: '?' + text, originalHref: '?' + q.toString() };
+}
+
 export async function serveTypeViewer(
   request: Request,
   env: Env,
@@ -57,7 +68,7 @@ export async function serveTypeViewer(
   const content = await obj.text();
   if (file !== asset) typeMetadata = { ...typeMetadata, ...generateTypeMetadata(artifact.artifact_type, content, file.mime) };
   const source: ViewerSource | undefined = imported?.original
-    ? { original: imported.original, sheets: imported.sheets?.map((x) => x.name), activeSheet: file !== asset ? sheetNo - 1 : 0 }
+    ? { original: imported.original, sheets: imported.sheets?.map((x) => x.name), activeSheet: file !== asset ? sheetNo - 1 : 0, pdfTabs: pdfTabs(request.url, imported.original) }
     : undefined;
 
   // Resolve the session once, then check admin + favorite state.

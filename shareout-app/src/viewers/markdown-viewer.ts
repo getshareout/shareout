@@ -27,14 +27,28 @@ export function renderMarkdownViewer(ctx: ViewerContext): string {
     </nav>
   ` : '';
 
-  const bodyContent = `
-    <div class="markdown-viewer">
-      <div class="layout">
+  // Converted PDF: Text | Original tabs; Original shows the PDF itself (served inline, same site).
+  const tabs = ctx.source?.pdfTabs;
+  const c = viewerCopy(ctx.locale);
+  const tabsHtml = tabs ? `
+    <nav class="doc-tabs" aria-label="${c.docViews}">
+      <a class="doc-tab${tabs.showOriginal ? '' : ' is-on'}" href="${escapeHtml(tabs.textHref)}"${tabs.showOriginal ? '' : ' aria-current="page"'}>${c.typeText}</a>
+      <a class="doc-tab${tabs.showOriginal ? ' is-on' : ''}" href="${escapeHtml(tabs.originalHref)}"${tabs.showOriginal ? ' aria-current="page"' : ''}>${c.tabOriginal}</a>
+    </nav>` : '';
+  const originalSrc = ctx.source ? `/a/${ctx.slug}/${ctx.source.original.split('/').map(encodeURIComponent).join('/')}` : '';
+  const main = tabs?.showOriginal
+    ? `<iframe class="original-pdf" src="${escapeHtml(originalSrc)}" title="${escapeHtml(ctx.source!.original.split('/').pop()!)}"></iframe>`
+    : `<div class="layout">
         ${tocHtml}
         <article class="content">
           ${html}
         </article>
-      </div>
+      </div>`;
+
+  const bodyContent = `
+    <div class="markdown-viewer">
+      ${tabsHtml}
+      ${main}
     </div>
   `;
 
@@ -47,6 +61,11 @@ export const MARKDOWN_VIEWER_STYLES = `
     .markdown-viewer {
       height: 100%;
     }
+    .doc-tabs { display: flex; gap: 4px; max-width: 1200px; margin: 0 auto 16px; border-bottom: 1px solid var(--border); }
+    .doc-tab { padding: 8px 12px; font-size: 13px; color: var(--text-muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .doc-tab:hover { color: var(--text); }
+    .doc-tab.is-on { color: var(--text); font-weight: 600; border-bottom-color: var(--primary); }
+    .original-pdf { display: block; width: 100%; max-width: 1200px; margin: 0 auto; height: calc(100vh - 160px); min-height: 480px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
     .layout {
       display: flex;
       gap: 32px;
