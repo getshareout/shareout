@@ -5,6 +5,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Removed
+
+- **Artifact templates:** the Templates lens, "Save as template", `/v1/artifact-templates`, the `list_templates` / `install_template` / `save_as_template` MCP tools and the provisioning `templates` step are gone. Migration 0022's tables stay (additive-only schema) and are no longer read or written.
+
 ### Security
 
 - **Tenant isolation hardening:** workspace Agent and external (`sot_`) tokens are accepted only by the artifact, publish, data and support routes that enforce their workspace and scopes (`403 INSUFFICIENT_SCOPE` elsewhere); session cookies accept only session-shaped tokens and honour the disabled flag on the data plane too; admin-issued member tokens are limited to service accounts, and revoking tokens also revokes connected-app (MCP) grants; `POST /v1/auth/link-email` now requires the verification-code flow; connector OAuth `state` is signed and bound to the installing admin (artifact-level installs to the owner); per-table write roles in the page's `shareout/manifest` are enforced (an unreadable declaration allows only the owner); external members, disabled and disabled-linked accounts no longer count as internal on home, search, skill context, trash, inbox, Telegram/Slack links, scheduled jobs and crew runs; file, collection and deliverable actions are scoped to the caller's bucket; moving an artifact needs its owner, an editor or a workspace admin; viewers' Slack DMs go only to their own linked account; caches for connector results, service-account tokens, Snowflake JWTs, grants and idempotent publishes are keyed per tenant and caller; closed artifact bytes are `private, no-store` on every origin and artifact documents served on the app origin are sandboxed; anonymous abuse reports apply only to public artifacts; the email-events webhook requires its secret. New guard tests require every route and MCP tool to refuse anonymous/foreign callers or carry an explicit public reason.

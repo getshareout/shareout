@@ -125,7 +125,6 @@ export const OPEN_ROUTES: Record<string, string> = {
   [String.raw`^\/v1\/files\/([^/]+)$`]: CONTENT,
   [String.raw`^\/v1\/files\/([^/]+)\/content$`]: CONTENT,
   '/v1/data/': 'artifact data API: data middleware decides per artifact and tier',
-  [String.raw`^\/v1\/artifact-templates\/(tpl_[a-f0-9]+)\/view\/([0-9]+\.[A-Za-z0-9_-]+)\/([a-z0-9]+)\/(.*)$`]: 'template preview: the signed, short-lived path segment is the credential; served sandboxed',
 
   // Dispatch prefixes
   '/v1/': PREFIX,
@@ -188,7 +187,4 @@ export const MCP_TOOL_POLICIES: Record<string, McpToolPolicy> = {
   approve_version: 'artifact',
   list_jobs: 'artifact',
   knowledge_from_artifact: 'artifact',
-  list_templates: 'workspace',
-  install_template: 'workspace',
-  save_as_template: 'artifact',
 };

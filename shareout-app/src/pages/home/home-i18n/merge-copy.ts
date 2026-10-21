@@ -29,7 +29,6 @@ import { ONBOARDING_COPY } from './copy/onboarding';
 import { SEARCH_COPY } from './copy/search';
 import { SHELL_COPY } from './copy/shell';
 import { STUDIO_COPY } from './copy/studio';
-import { TEMPLATES_COPY } from './copy/templates';
 import { TIME_COPY } from './copy/time';
 import { VERSION_CHANGELOG_COPY } from './copy/version-changelog';
 import { WORKSPACE_COPY } from './copy/workspace';
@@ -69,7 +68,6 @@ const COPY_MODULES: HomeLocaleCopy[] = [
   PAGES_COPY,
   ERRORS_COPY,
   VERSION_CHANGELOG_COPY,
-  TEMPLATES_COPY,
 ];
 
 function mergeLocale(locale: HomeLocale): Record<string, string> {

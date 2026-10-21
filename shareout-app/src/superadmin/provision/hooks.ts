@@ -1,16 +1,15 @@
 /**
  * Extension points for provisioning steps whose features ship on their own.
  *
- * Template sets and custom domains ship as built-in hooks (builtin-hooks.ts), used when
- * nothing is registered here. `registerProvisionHook('templates' | 'custom_domain', fn)`
- * overrides one (tests, or an instance that seeds workspaces differently). A hook that
+ * Custom domains ship as a built-in hook (builtin-hooks.ts), used when nothing is
+ * registered here. `registerProvisionHook('custom_domain', fn)` overrides it (tests, or an instance that seeds workspaces differently). A hook that
  * cannot act yet reports `pending` with the manual next step.
  *
  * A hook must be idempotent: provisioning re-runs the whole spec on every call.
  */
 import type { Env } from '../../types';
 
-export type ProvisionHookName = 'templates' | 'custom_domain';
+export type ProvisionHookName = 'custom_domain';
 
 export interface ProvisionHookContext {
   env: Env;

@@ -62,8 +62,6 @@ tags:
     description: Followable metrics and threshold alert rules.
   - name: Templates
     description: Reusable email templates with variables.
-  - name: Artifact templates
-    description: Save artifacts or folders as reusable templates and install them in any workspace they reach.
   - name: Account
     description: Plan tier, upgrades, and feature introspection.
   - name: Auth
@@ -7012,126 +7010,6 @@ paths:
       responses:
         "200":
           description: Attached
-  /v1/artifact-templates:
-    get:
-      tags: [Artifact templates]
-      summary: List templates installable in a workspace (or your personal space)
-      description: The workspace's own templates, ones shared with it, and the instance library. Omit `workspace` for your personal space.
-      operationId: listArtifactTemplates
-      parameters:
-        - { name: workspace, in: query, schema: { type: string }, description: Workspace id you are a member of. }
-        - { name: q, in: query, schema: { type: string } }
-        - { name: tag, in: query, schema: { type: string } }
-        - { name: scope, in: query, schema: { type: string, enum: [private, shared, instance] } }
-      responses:
-        "200": { description: "`{ templates: TemplateSummary[] }`", content: { application/json: { schema: { type: object, properties: { templates: { type: array, items: { $ref: "#/components/schemas/ArtifactTemplateSummary" } } } } } } }
-        "403": { description: Not a member of that workspace }
-    post:
-      tags: [Artifact templates]
-      summary: Save an artifact or a folder as a template
-      description: >-
-        Snapshots the live version's files, folder tree, table/dataset schemas and connector names
-        (never data, credentials, comments, Knowledge or analytics). Credentials found in the code are
-        redacted. If the content looks personal or workspace-specific the call answers 409
-        `REVIEW_REQUIRED` with `findings`; repeat with `acknowledge_findings: true`. `scope: instance`
-        is for instance admins only.
-      operationId: createArtifactTemplate
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: "#/components/schemas/ArtifactTemplateCreate" } } }
-      responses:
-        "201": { description: Saved }
-        "403": { description: Cannot edit the source, or instance scope without admin }
-        "409": { description: "REVIEW_REQUIRED — `findings` and `preview` attached" }
-  /v1/artifact-templates/preview:
-    post:
-      tags: [Artifact templates]
-      summary: Preview what a template would include and leave behind
-      operationId: previewArtifactTemplate
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: "#/components/schemas/ArtifactTemplateCreate" } } }
-      responses:
-        "200": { description: "Items, files, schemas, setup steps, excluded counts, findings, redactions" }
-  /v1/artifact-templates/installed:
-    get:
-      tags: [Artifact templates]
-      summary: Which template an artifact was installed from, and whether an update is available
-      operationId: getTemplateInstall
-      parameters:
-        - { name: artifact_id, in: query, required: true, schema: { type: string } }
-      responses:
-        "200": { description: "`{ installed: null | { template_id, version_no, latest_version_no, update_available, setup } }`" }
-  /v1/artifact-templates/installed/update:
-    post:
-      tags: [Artifact templates]
-      summary: Update an installed copy to the template's latest version
-      description: Without `confirm` returns the plan (files that change per artifact). With `confirm true` each artifact of the install gets a new version (source `template`); earlier versions stay in history and data is not touched.
-      operationId: updateTemplateInstall
-      requestBody:
-        required: true
-        content: { application/json: { schema: { type: object, required: [artifact_id], properties: { artifact_id: { type: string }, confirm: { type: boolean } } } } }
-      responses:
-        "200": { description: "`{ applied: false, plan }` or `{ applied: true, updated, added, version_no, setup }`" }
-        "403": { description: Needs edit access to every artifact of the install }
-  /v1/artifact-templates/{templateId}:
-    parameters:
-      - { name: templateId, in: path, required: true, schema: { type: string } }
-    get:
-      tags: [Artifact templates]
-      summary: Get a template (items, schemas, setup steps, versions)
-      operationId: getArtifactTemplate
-      responses:
-        "200": { description: Template }
-        "404": { description: Missing or not visible to you }
-    patch:
-      tags: [Artifact templates]
-      summary: Change name, description, tags, scope, shares or preview image
-      operationId: updateArtifactTemplate
-      requestBody:
-        content: { application/json: { schema: { type: object, properties: { name: { type: string }, description: { type: string }, tags: { type: array, items: { type: string } }, scope: { type: string, enum: [private, shared, instance] }, shared_workspace_ids: { type: array, items: { type: string } }, preview_image: { type: string, description: PNG/JPEG/WebP data URL, up to 1 MB } } } } }
-      responses:
-        "200": { description: Updated }
-        "403": { description: Not a manager, or instance scope without admin, or sharing into a workspace you are not in }
-    delete:
-      tags: [Artifact templates]
-      summary: Delete a template (installed copies stay)
-      operationId: deleteArtifactTemplate
-      responses:
-        "200": { description: Deleted }
-  /v1/artifact-templates/{templateId}/versions:
-    parameters:
-      - { name: templateId, in: path, required: true, schema: { type: string } }
-    post:
-      tags: [Artifact templates]
-      summary: Publish a new version from the template's source (or another artifact_id / folder_id)
-      operationId: createArtifactTemplateVersion
-      requestBody:
-        content: { application/json: { schema: { type: object, properties: { version: { type: string, example: 1.1.0 }, notes: { type: string }, artifact_id: { type: string }, folder_id: { type: string }, include_sample_rows: { type: boolean }, acknowledge_findings: { type: boolean }, preview: { type: boolean } } } } }
-      responses:
-        "201": { description: New version; installed copies show update available }
-  /v1/artifact-templates/{templateId}/install:
-    parameters:
-      - { name: templateId, in: path, required: true, schema: { type: string } }
-    post:
-      tags: [Artifact templates]
-      summary: Install a template into a workspace (or your personal space)
-      description: Creates the folders and artifacts, rewrites links between them, creates empty tables/datasets from the schema, and returns the finish-setup steps.
-      operationId: installArtifactTemplate
-      requestBody:
-        content: { application/json: { schema: { type: object, properties: { workspace_id: { type: string, nullable: true }, folder_id: { type: string } } } } }
-      responses:
-        "201": { description: "`{ install_group, folder_id, artifacts: [{ artifact_id, slug, url }], setup: [{ step, done }] }`" }
-        "404": { description: Missing, or its scope does not reach that workspace }
-  /v1/artifact-templates/{templateId}/image:
-    parameters:
-      - { name: templateId, in: path, required: true, schema: { type: string } }
-    get:
-      tags: [Artifact templates]
-      summary: The template's preview image
-      operationId: getArtifactTemplateImage
-      responses:
-        "200": { description: Image }
 components:
   securitySchemes:
     bearerAuth:
@@ -7319,36 +7197,6 @@ components:
         connected: { type: boolean, description: false after the connection was revoked. }
         mine: { type: boolean }
         lastRun: { $ref: "#/components/schemas/FileImportRun" }
-    ArtifactTemplateSummary:
-      type: object
-      properties:
-        id: { type: string, example: tpl_0123456789abcdef01234567 }
-        name: { type: string }
-        description: { type: string, nullable: true }
-        tags: { type: array, items: { type: string } }
-        scope: { type: string, enum: [private, shared, instance] }
-        version: { type: string, example: 1.0.0 }
-        version_no: { type: integer }
-        item_count: { type: integer }
-        preview_url: { type: string, nullable: true, description: Signed, sandboxed live preview }
-        setup: { type: array, items: { type: object } }
-        can_manage: { type: boolean }
-    ArtifactTemplateCreate:
-      type: object
-      properties:
-        artifact_id: { type: string }
-        folder_id: { type: string }
-        name: { type: string }
-        description: { type: string }
-        tags: { type: array, items: { type: string } }
-        scope: { type: string, enum: [private, shared, instance], default: private }
-        shared_workspace_ids: { type: array, items: { type: string } }
-        version: { type: string, example: 1.0.0 }
-        notes: { type: string }
-        readme: { type: string }
-        include_sample_rows: { type: boolean, default: false }
-        preview_image: { type: string }
-        acknowledge_findings: { type: boolean }
     Visibility:
       type: string
       description: "'unlisted' was retired 2026-07 — still accepted as input and treated as 'public'."

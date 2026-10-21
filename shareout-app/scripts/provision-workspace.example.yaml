@@ -44,6 +44,5 @@ connectors:
       data:
         api_key: ${ACME_API_KEY}
 
-# templates: instance-library templates with this tag. custom_domain: "pending" until DNS verifies.
-# templates: agency-starter
+# custom_domain: "pending" until DNS verifies.
 # custom_domain: reports.acme.example.com

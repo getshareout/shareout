@@ -85,7 +85,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  clearProvisionHook('templates');
+  clearProvisionHook('custom_domain');
 });
 
 describe('who may provision', () => {
@@ -172,12 +172,11 @@ describe('a first run', () => {
     }
   });
 
-  it('leaves the template and custom-domain hooks pending with a next step', async () => {
-    const again = await provision(spec('acme', { templates: 'agency-starter', custom_domain: 'reports.acme.example.com' }));
+  it('leaves the custom-domain hook pending with a next step', async () => {
+    const again = await provision(spec('acme', { custom_domain: 'reports.acme.example.com' }));
     const steps = again.body.steps as any[];
-    expect(steps.find((s) => s.step === 'templates')).toMatchObject({ status: 'pending' });
     expect(steps.find((s) => s.step === 'custom_domain')).toMatchObject({ status: 'pending' });
-    expect(again.body.next_steps.join(' ')).toContain('agency-starter');
+    expect(again.body.next_steps.join(' ')).toContain('reports.acme.example.com');
   });
 });
 
@@ -220,12 +219,12 @@ describe('re-running the same spec', () => {
     expect(adopt.body.workspace.name).toBe('Globex');
   });
 
-  it('runs a registered template hook instead of leaving it pending', async () => {
-    const hook = vi.fn(async () => ({ status: 'created' as const, detail: { installed: 2 } }));
-    registerProvisionHook('templates', hook);
-    const r = await provision(spec('hooked', { templates: 'starter' }));
-    expect(hook).toHaveBeenCalledWith(expect.objectContaining({ workspace: expect.objectContaining({ slug: 'hooked' }) }), 'starter');
-    expect((r.body.steps as any[]).find((s) => s.step === 'templates')).toMatchObject({ status: 'created', detail: { installed: 2 } });
+  it('runs a registered hook instead of the built-in one', async () => {
+    const hook = vi.fn(async () => ({ status: 'created' as const, detail: { attached: true } }));
+    registerProvisionHook('custom_domain', hook);
+    const r = await provision(spec('hooked', { custom_domain: 'reports.hooked.example.com' }));
+    expect(hook).toHaveBeenCalledWith(expect.objectContaining({ workspace: expect.objectContaining({ slug: 'hooked' }) }), 'reports.hooked.example.com');
+    expect((r.body.steps as any[]).find((s) => s.step === 'custom_domain')).toMatchObject({ status: 'created', detail: { attached: true } });
   });
 });
 

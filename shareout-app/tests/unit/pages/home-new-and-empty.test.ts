@@ -99,7 +99,7 @@ describe('New menu', () => {
     setup();
     (document.getElementById('wsxNewBtn') as HTMLButtonElement).click();
     expect(document.getElementById('wsxNewMenu')!.hidden).toBe(false);
-    expect(items()).toEqual(['Subir archivos', 'Documento en blanco', 'Desde una plantilla', 'Ver plantillas']);
+    expect(items()).toEqual(['Subir archivos', 'Documento en blanco', 'Desde una plantilla']);
     (document.querySelector('[data-new="tpl"]') as HTMLButtonElement).click();
     expect(items()).toEqual(['Informe', 'Minuta de reunión', 'Propuesta']);
   });

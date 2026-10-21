@@ -56,7 +56,6 @@ export interface ProvisionSpec {
   connectors: WorkspaceConnectionInput[];
   resend_invites: boolean;
   /** Hooks for features that ship separately; see hooks.ts. */
-  templates: string | null;
   custom_domain: string | null;
 }
 
@@ -254,10 +253,6 @@ export function parseProvisionSpec(input: unknown): SpecResult {
 
   if (!optBool(input.resend_invites)) return fail('VALIDATION_ERROR', 'resend_invites must be true or false', 'resend_invites');
 
-  const templates = input.templates ?? null;
-  if (templates !== null && (typeof templates !== 'string' || !templates.trim())) {
-    return fail('VALIDATION_ERROR', 'templates must be the name of a template set', 'templates');
-  }
   const customDomain = typeof input.custom_domain === 'string' ? input.custom_domain.trim().toLowerCase() : input.custom_domain ?? null;
   if (customDomain !== null && (typeof customDomain !== 'string' || !HOSTNAME_REGEX.test(customDomain))) {
     return fail('INVALID_DOMAIN', 'custom_domain must be a hostname like reports.example.com', 'custom_domain');
@@ -279,7 +274,6 @@ export function parseProvisionSpec(input: unknown): SpecResult {
       folders: [...new Set(folders)],
       connectors: conn.connectors,
       resend_invites: input.resend_invites === true,
-      templates: templates as string | null,
       custom_domain: customDomain as string | null,
     },
   };
