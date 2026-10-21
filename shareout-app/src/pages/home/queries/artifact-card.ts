@@ -27,7 +27,12 @@ export function artifactCardSelect(idPh: string): string {
            (SELECT CASE WHEN visitor_enabled = 1 OR admin_enabled = 1 THEN 1 ELSE 0 END FROM artifact_agent_config WHERE artifact_id = a.id) as f_agent,
            (SELECT EXISTS(SELECT 1 FROM artifact_tests WHERE artifact_id = a.id AND enabled = 1)) as f_tests,
            (SELECT EXISTS(SELECT 1 FROM artifact_skills WHERE artifact_id = a.id)) as f_skills,
-           (SELECT GROUP_CONCAT(label, char(10)) FROM artifact_tags WHERE artifact_id = a.id) as tags`;
+           (SELECT GROUP_CONCAT(label, char(10)) FROM artifact_tags WHERE artifact_id = a.id) as tags,
+           c.role as my_collab_role,
+           (SELECT COUNT(*) FROM collaborators WHERE artifact_id = a.id AND role != 'owner') as shared_count,
+           (SELECT GROUP_CONCAT(x, char(30)) FROM (SELECT COALESCE(NULLIF(cu.name, ''), sc.email) || char(31) || COALESCE(cu.picture, '') AS x
+              FROM collaborators sc LEFT JOIN users cu ON cu.email = sc.email
+             WHERE sc.artifact_id = a.id AND sc.role != 'owner' ORDER BY sc.added_at LIMIT 4)) as shared_raw`;
 }
 
 /** Companion 1:1 joins for artifactCardSelect (users once, production deployment, view

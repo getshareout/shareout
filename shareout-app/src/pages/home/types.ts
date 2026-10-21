@@ -32,6 +32,12 @@ export interface ArtifactRow {
   is_example: number;
   moderation_status: string | null;
   moderation_held_visibility: string | null;
+  /** The viewer's own collaborator role (null when they only see it via the workspace). */
+  my_collab_role?: string | null;
+  /** First 4 collaborators as name\x1fpicture joined by \x1e, and the total. Rendered only
+   *  for the owner or a collaborator — same rule as GET /v1/artifacts/{id}/collaborators. */
+  shared_raw?: string | null;
+  shared_count?: number;
 }
 
 export interface HomeFolder {
