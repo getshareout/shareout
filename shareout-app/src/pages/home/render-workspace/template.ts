@@ -124,6 +124,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
           <div class="wsx__view is-active" data-view="brief">
             <p class="wsx__narration" id="wsxNarration"><span class="muted" data-i18n="narration.reading">Reading your workspace…</span></p>
             <div class="wsx__brief">
+              ${widget('wsxForYou', 'widget.forYou', 'For you', 'foryou', true, true)}
               ${widget('wsxRecentW', 'widget.recentlyViewed', 'Recently viewed', 'recent', true, true)}
               ${widget('wsxNeedsYou', 'widget.needsYou', 'Needs you', 'shared')}
               ${widget('wsxRuns', 'widget.runs', 'Runs', 'recent')}
@@ -132,7 +133,6 @@ export function buildWorkspaceBody(args: RenderArgs): string {
                 <div class="wsx-widget__body" id="wsxActBody"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
                 <span class="wsx-widget__rz" aria-hidden="true"></span>
               </section>
-              ${widget('wsxForYou', 'widget.forYou', 'For you', 'foryou', true, true)}
             </div>
           </div>
           <div class="wsx__view" data-view="artifacts">
@@ -163,10 +163,10 @@ export function buildWorkspaceBody(args: RenderArgs): string {
             </div>
             <p class="wsx-lens__intro" data-i18n="intro.assets">Keep images, video, and files for your team in one place. New files are visible to the team only; open a public link when you want to show one in an artifact or send it to a customer. Any file type.</p>
             <div class="wsx__chips" id="wsxAssetChips">
-              <button class="wsx-chip is-on" data-asset-filter="all" type="button" data-i18n="filter.all">All</button>
-              <button class="wsx-chip" data-asset-filter="image" type="button" data-i18n="filter.images">Images</button>
-              <button class="wsx-chip" data-asset-filter="video" type="button" data-i18n="filter.video">Video</button>
-              <button class="wsx-chip" data-asset-filter="doc" type="button" data-i18n="filter.docs">Docs</button>
+              <button class="wsx-chip is-on" data-asset-filter="all" type="button"><span data-i18n="filter.all">All</span><span class="wsx-chip__n"></span></button>
+              <button class="wsx-chip" data-asset-filter="image" type="button"><span data-i18n="filter.images">Images</span><span class="wsx-chip__n"></span></button>
+              <button class="wsx-chip" data-asset-filter="video" type="button"><span data-i18n="filter.video">Video</span><span class="wsx-chip__n"></span></button>
+              <button class="wsx-chip" data-asset-filter="doc" type="button"><span data-i18n="filter.docs">Docs</span><span class="wsx-chip__n"></span></button>
               ${viewSeg('wsxAssetMount')}
             </div>
             <input type="file" id="wsxAssetFile" multiple hidden>
