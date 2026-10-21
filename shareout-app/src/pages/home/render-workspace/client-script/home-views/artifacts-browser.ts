@@ -123,9 +123,9 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
   function applyArt(f) {
     var d = artCache[artKey(f)]; if (!d) return;
     var empty = curFolder ? t('artifacts.folderEmpty') : t('artifacts.nothingHere');
-    // Folders first, then artifacts, in one grid/table (All only).
+    // Folders first (All only): own compact grid in tile view, first rows in the table.
     var fc = f === 'all' ? (d.foldersHtml || '') : '', fr = f === 'all' ? (d.folderRowsHtml || '') : '';
-    ART_DATA['wsxArtMount'] = { cardsHtml: fc + (d.cardsHtml || ''), rowsHtml: fr + (d.rowsHtml || ''), count: (fc || d.count) ? 1 : 0, empty: empty, folderHead: folderHead(d, f) };
+    ART_DATA['wsxArtMount'] = { foldersHtml: fc, cardsHtml: d.cardsHtml || '', rowsHtml: fr + (d.rowsHtml || ''), count: (fc || d.count) ? 1 : 0, empty: empty, folderHead: folderHead(d, f) };
     renderArtView('wsxArtMount');
     hidePendingFolders();
     artChipCounts();
@@ -423,11 +423,11 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
         key: 'folder:new:' + parent + ':' + nm,
         apply: function () {
           // Assets keeps a folder strip; Artifacts lists folders first inside its grid.
-          var grid = row.parentNode && (row.parentNode.querySelector('.wsx-folder-grid') || row.parentNode.querySelector('.artifacts-grid')); if (!grid) return;
+          var grid = row.parentNode && (row.parentNode.querySelector('.wsx-folder-grid') || row.parentNode.querySelector('.wsx-art-folders') || row.parentNode.querySelector('.artifacts-grid')); if (!grid) return;
           ph = document.createElement('article'); ph.className = 'wsx-folder-card'; ph.setAttribute('aria-busy', 'true');
           ph.innerHTML = '<span class="wsx-folder-card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span><span class="wsx-folder-card__txt"><span class="wsx-folder-card__name"></span></span>';
           ph.querySelector('.wsx-folder-card__name').textContent = nm;
-          if (grid.classList.contains('artifacts-grid')) grid.insertBefore(ph, grid.firstChild); else grid.appendChild(ph);
+          if (grid.classList.contains('wsx-folder-grid')) grid.appendChild(ph); else grid.insertBefore(ph, grid.firstChild);
         },
         rollback: function () { if (ph && ph.parentNode) ph.remove(); },
         request: function () {

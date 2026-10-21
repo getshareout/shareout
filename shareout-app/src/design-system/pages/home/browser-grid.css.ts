@@ -10,6 +10,13 @@ export const browserGridStyles = `/* ── Browser: grid ───────�
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: var(--space-5);
 }
+/* Folders get their own compact grid so short tiles never share a row with tall cards. */
+.wsx-art-folders {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
 /* Client-side filter (search box + tag filter) hides non-matches via [hidden]. */
 .artifact-card[hidden], .wsx-tr[hidden] { display: none !important; }
 

@@ -98,7 +98,8 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
       ? '<div class="wsx-empty">' + esc(d.empty || t('common.nothingHere')) + '</div>'
       : (widgetView(id) === 'table'
         ? '<div class="wsx-tbl">' + TBL_HEAD + (d.rowsHtml || '') + '</div>'
-        : '<div class="artifacts-grid">' + (d.cardsHtml || '') + '</div>');
+        : (d.foldersHtml ? '<div class="wsx-art-folders">' + d.foldersHtml + '</div>' : '')
+          + (d.cardsHtml ? '<div class="artifacts-grid">' + d.cardsHtml + '</div>' : ''));
     el.innerHTML = head + body;
     localizeFragment(el);
     hidePendingArts(el);
