@@ -3,7 +3,8 @@
 // files are kept and skipped; batches report what is left.
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../src/knowledge/corpus/ingest', () => ({ queueKnowledgeSource: vi.fn(async () => true) }));
+const queueKnowledgeSource = vi.hoisted(() => vi.fn(async () => true));
+vi.mock('../../../src/knowledge/corpus/ingest', () => ({ queueKnowledgeSource }));
 
 import { applyMigrations, e } from '../helpers/migrated-db';
 import { getOrCreateAssetBucket } from '../../../src/assets/bucket';
@@ -64,6 +65,8 @@ describe('files → artifacts', () => {
     expect(await e.DB.prepare('SELECT name FROM artifacts WHERE id = ?').bind(first.converted[0].artifactId).first('name')).toBe('PG-05 Revision Rev.8');
     expect(await art(first.converted[0].artifactId)).toMatchObject({ owner_id: M, workspace_id: WS, folder_id: FLD, visibility: 'workspace', artifact_type: 'markdown' });
     expect(await art(first.converted[1].artifactId)).toMatchObject({ visibility: 'private', artifact_type: 'txt' });
+    // Each new page is learned like any publish (post-publish tasks run without a request context).
+    expect(queueKnowledgeSource).toHaveBeenCalledWith(e, expect.anything(), expect.objectContaining({ workspaceId: WS, kind: 'page', refId: first.converted[0].artifactId }), expect.any(String));
     const done = (await state(a))!;
     expect(done.deleted_at).not.toBeNull();
     expect(JSON.parse(done.type_metadata!).toArtifact).toBe(first.converted[0].artifactId);
