@@ -129,7 +129,7 @@ class S3Provider extends StaticCredentialsProvider {
 			cache: { ttlSeconds: 300 },
 		}],
 		['objects.presign', {
-			id: 'objects.presign', method: 'POST', path: '/{key}',
+			id: 'objects.presign', method: 'POST', path: '/{key}', readOnly: true,
 			description: 'Mint a short-lived download URL for one object (large or binary files). body: key, expiresIn (seconds, ≤3600)',
 		}],
 	]);

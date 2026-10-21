@@ -41,7 +41,7 @@ export async function handleVersionsRoutes(
 
   switch (request.method) {
     case 'GET':
-      return getVersion(ctx, presId, versionId);
+      return getVersion(request, ctx, presId, versionId);
     case 'DELETE':
       return deleteVersion(request, ctx, presId, versionId);
     default:
@@ -209,7 +209,7 @@ async function createVersion(request: Request, ctx: DataContext, presId: string)
   );
 }
 
-async function getVersion(ctx: DataContext, presId: string, versionId: string): Promise<Response> {
+async function getVersion(request: Request, ctx: DataContext, presId: string, versionId: string): Promise<Response> {
   const version = await ctx.env.DB.prepare(`SELECT * FROM presentation_versions WHERE presentation_id = ? AND id = ?`)
     .bind(presId, versionId)
     .first<{
@@ -229,6 +229,8 @@ async function getVersion(ctx: DataContext, presId: string, versionId: string): 
     return errorResponse({ code: 'VERSION_NOT_FOUND', message: 'Version not found', status: 404 });
   }
 
+  const canEdit = await canEditPresentation(request, ctx, presId);
+
   return successResponse({
     id: version.id,
     presentationId: version.presentation_id,
@@ -239,7 +241,9 @@ async function getVersion(ctx: DataContext, presId: string, versionId: string): 
     createdByName: version.created_by_name,
     isAutoSave: version.is_auto_save === 1,
     createdAt: version.created_at,
-    snapshot: JSON.parse(version.snapshot),
+    snapshot: canEdit
+      ? JSON.parse(version.snapshot)
+      : (JSON.parse(version.snapshot) as Array<Record<string, unknown>>).map(({ notes: _notes, ...slide }) => slide),
   });
 }
 

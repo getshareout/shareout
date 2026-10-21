@@ -31,6 +31,7 @@ class GoogleAdsProvider extends BaseProvider {
 			{
 				id: 'search',
 				method: 'POST',
+				readOnly: true,
 				path: '/customers/{customerId}/googleAds:searchStream',
 				description: 'Run a GAQL query against the Google Ads account',
 				cache: { ttlSeconds: 300 },

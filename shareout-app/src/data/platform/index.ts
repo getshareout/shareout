@@ -63,6 +63,18 @@ function sqlStatementsIn(value: unknown, key = '', depth = 0): string[] {
 	return Object.entries(value as Record<string, unknown>).flatMap(([k, v]) => sqlStatementsIn(v, k, depth + 1));
 }
 
+function readsOnly(providerId: string, endpointId: string): boolean {
+	if (SQL_PROVIDERS.has(providerId)) return true;
+	const endpoint = getProvider(providerId)?.getEndpoint(endpointId);
+	return !!endpoint && (endpoint.method === 'GET' || endpoint.readOnly === true);
+}
+
+const READ_ONLY_FORBIDDEN = {
+	code: 'FORBIDDEN',
+	message: "Your own connector credentials can only run read endpoints from someone else's page",
+	status: 403,
+};
+
 export async function handlePlatformRequest(
 	request: Request,
 	ctx: DataContext,
@@ -448,6 +460,7 @@ async function handleProviderRequest(
 						status: 403,
 					});
 				}
+				if (!readsOnly(providerId, body.endpoint)) return errorResponse(READ_ONLY_FORBIDDEN);
 			}
 
 			const engine = new PlatformEngine({
@@ -563,6 +576,7 @@ async function handleProviderRequest(
 						status: 403,
 					});
 				}
+				if (!readsOnly(providerId, endpointId)) return errorResponse(READ_ONLY_FORBIDDEN);
 				const statements = SQL_PROVIDERS.has(providerId) ? sqlStatementsIn(body.params) : [];
 				const unsafe = statements.find((sql) => !validateReadOnlySql(sql).ok);
 				if (unsafe !== undefined) {

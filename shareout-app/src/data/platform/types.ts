@@ -107,6 +107,8 @@ export interface ProviderEndpoint {
 	method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 	path: string;
 	description?: string;
+	// POST endpoints that only read data (reports, searches); GET is always read-only.
+	readOnly?: boolean;
 
 	execution?: {
 		mode?: ExecutionMode;

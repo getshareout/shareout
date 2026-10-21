@@ -12,7 +12,10 @@ import { runPublishModeration } from '../publish/moderation';
 import { applyWorkspaceVisibilityPolicy } from '../publish/type-metadata';
 import type { ExistingArtifactRow } from '../publish/types';
 import { storageLimitExceededResponse } from '../publish/limits';
-import { checkStorageQuota } from '../quota';
+import { checkStorageQuota, getOwnerStorageBytes } from '../quota';
+import { storageQuotaBytes } from '../storage-quota';
+import { checkRateLimit, incrementRateLimit } from '../api-auth';
+import { rateLimitExceededResponse } from '../publish/limits';
 
 /** The checks the canonical publish path applies to new content: owner storage cap,
  *  workspace approval policy, and the safety classifier for public pages. */
@@ -41,6 +44,11 @@ export async function enforcePublishGates(
     await invalidateDeploymentCache(env, artifact.slug, artifact.id);
   }
   return null;
+}
+
+export async function checkEditorPublishRate(ctx: EditorContext): Promise<Response | null> {
+  const rate = await checkRateLimit(ctx.env, ctx.userId, 'publish');
+  return rate.allowed ? null : rateLimitExceededResponse(rate.reset);
 }
 
 export async function handleDraft(
@@ -215,6 +223,9 @@ export async function handlePublish(
   const { artifactId, userId, env } = ctx;
 
   try {
+    const limited = await checkEditorPublishRate(ctx);
+    if (limited) return limited;
+
     const body = await request.json() as {
       html: string;
       commitMessage?: string;
@@ -310,6 +321,8 @@ export async function handlePublish(
         `DELETE FROM artifact_drafts WHERE artifact_id = ? AND user_id = ?`
       ).bind(artifactId, userId),
     ]);
+
+    await incrementRateLimit(env, userId, 'publish');
 
     // Only the production pointer is cached; a candidate stage leaves it untouched.
     if (!blocking) {
@@ -410,6 +423,16 @@ export async function handleUpload(
     // Max 10MB
     if (file.size > 10 * 1024 * 1024) {
       return errorResponse('FILE_TOO_LARGE', 'File too large (max 10MB)', 400);
+    }
+
+    const owner = await env.DB.prepare('SELECT owner_id FROM artifacts WHERE id = ?')
+      .bind(artifactId).first<{ owner_id: string | null }>();
+    const max = storageQuotaBytes(env);
+    if (owner?.owner_id && max > 0) {
+      const used = await getOwnerStorageBytes(env, owner.owner_id);
+      if (used + file.size > max) {
+        return storageLimitExceededResponse({ allowed: false, used, incoming: file.size, max });
+      }
     }
 
     const assetId = generateId('upl');

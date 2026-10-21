@@ -67,7 +67,7 @@ export async function handleSlidesRoutes(
 
   switch (request.method) {
     case 'GET':
-      return getSlide(ctx, presId, slideId);
+      return getSlide(request, ctx, presId, slideId);
     case 'PATCH':
       return updateSlide(request, ctx, presId, slideId);
     case 'DELETE':
@@ -166,7 +166,7 @@ async function addSlide(request: Request, ctx: DataContext, presId: string): Pro
   return successResponse(mapSlide(slide!), 201);
 }
 
-async function getSlide(ctx: DataContext, presId: string, slideId: string): Promise<Response> {
+async function getSlide(request: Request, ctx: DataContext, presId: string, slideId: string): Promise<Response> {
   const slide = await ctx.env.DB.prepare(
     `SELECT s.* FROM slides s
      JOIN presentations p ON s.presentation_id = p.id
@@ -177,6 +177,10 @@ async function getSlide(ctx: DataContext, presId: string, slideId: string): Prom
 
   if (!slide) {
     return errorResponse({ code: 'SLIDE_NOT_FOUND', message: 'Slide not found', status: 404 });
+  }
+
+  if (!(await canEditPresentation(request, ctx, presId))) {
+    return successResponse(mapSlide(slide));
   }
 
   const notes = await ctx.env.DB.prepare(`SELECT content FROM slide_notes WHERE slide_id = ?`)
@@ -595,9 +599,20 @@ async function handleNotesRoutes(
   slideId: string
 ): Promise<Response> {
   const canEdit = await canEditPresentation(request, ctx, presId);
+  if (canEdit) {
+    const inPres = await ctx.env.DB.prepare(`SELECT * FROM slides WHERE presentation_id = ? AND id = ?`)
+      .bind(presId, slideId)
+      .first();
+    if (!inPres) {
+      return errorResponse({ code: 'SLIDE_NOT_FOUND', message: 'Slide not found', status: 404 });
+    }
+  }
 
   switch (request.method) {
     case 'GET': {
+      if (!canEdit) {
+        return errorResponse({ code: 'FORBIDDEN', message: 'Cannot read notes', status: 403 });
+      }
       const notes = await ctx.env.DB.prepare(`SELECT content FROM slide_notes WHERE slide_id = ?`)
         .bind(slideId)
         .first<{ content: string }>();

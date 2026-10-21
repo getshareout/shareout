@@ -11,6 +11,7 @@ import { json } from './json-response';
 import { isTextMime } from './files';
 import { invalidateDeploymentCache } from '../serve/deployment-cache';
 import { normalizeVersionMessage } from './version-summary';
+import { enforcePublishGates } from '../editor/draft';
 
 /** How a version came to be: `versions.source`. Null on versions written before it existed. */
 export const VERSION_SOURCES = ['api', 'agent', 'editor', 'restore', 'template'] as const;
@@ -131,11 +132,11 @@ export async function handleRestoreVersion(
   waitUntil?: (p: Promise<unknown>) => void
 ): Promise<Response> {
   const artifact = await env.DB.prepare(`
-    SELECT a.id, a.workspace_id, COALESCE(d.slug, a.slug) AS slug
+    SELECT a.id, a.workspace_id, a.owner_id, a.visibility, COALESCE(d.slug, a.slug) AS slug
     FROM artifacts a
     LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
     WHERE a.id = ? AND a.deleted_at IS NULL
-  `).bind(artifactId).first<{ id: string; workspace_id: string | null; slug: string }>();
+  `).bind(artifactId).first<{ id: string; workspace_id: string | null; owner_id: string | null; visibility: string | null; slug: string }>();
   if (!artifact) return json({ error: 'Artifact not found', code: 'NOT_FOUND' }, 404);
 
   const forbidden = await requireRole(env, artifactId, user.id, 'editor');
@@ -154,9 +155,17 @@ export async function handleRestoreVersion(
     id: string; version_no: number; entrypoint: string; mobile_entrypoint: string | null; manifest_json: string | null;
   }>();
   if (!target) return json({ error: 'Version not found', code: 'VERSION_NOT_FOUND' }, 404);
-  const entry = await env.DB.prepare('SELECT 1 FROM assets WHERE version_id = ? AND path = ?')
-    .bind(target.id, target.entrypoint).first();
+  const entry = await env.DB.prepare('SELECT r2_key, mime FROM assets WHERE version_id = ? AND path = ?')
+    .bind(target.id, target.entrypoint).first<{ r2_key: string; mime: string }>();
   if (!entry) return json({ error: 'That version has no files to restore', code: 'ASSET_NOT_FOUND' }, 409);
+
+  const entryObj = isTextMime(entry.mime) ? await env.ARTIFACTS.get(entry.r2_key) : null;
+  const gated = await enforcePublishGates(
+    { artifactId, userId: user.id, userName: '', role: 'editor', env, waitUntil },
+    { ...artifact, visibility: artifact.visibility },
+    entryObj ? await entryObj.text() : '',
+  );
+  if (gated) return gated;
 
   const head = await env.DB.prepare(
     'SELECT MAX(version_no) AS max_no FROM versions WHERE artifact_id = ?'

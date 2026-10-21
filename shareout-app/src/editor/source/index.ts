@@ -9,7 +9,8 @@ import { generateSourceEditorPage, type SourceEditableType } from './page';
 import { shouldBlockPublish, runPostPublishTests } from '../../tests/block-gate';
 import { normalizeVersionMessage, scheduleVersionSummary } from '../../artifacts/version-summary';
 import { carriedManifestJson } from '../../mcp-broker/capabilities';
-import { enforcePublishGates } from '../draft';
+import { checkEditorPublishRate, enforcePublishGates } from '../draft';
+import { incrementRateLimit } from '../../api-auth';
 
 export const SOURCE_EDITABLE_TYPES: ReadonlySet<ArtifactType> = new Set<ArtifactType>([
   'markdown',
@@ -127,6 +128,9 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
   const { artifactId, env } = ctx;
 
   try {
+    const limited = await checkEditorPublishRate(ctx);
+    if (limited) return limited;
+
     const body = await request.json() as { content?: string; path?: string; message?: string };
     if (typeof body.content !== 'string') {
       return errorResponse('INVALID_REQUEST', 'content required', 400);
@@ -221,6 +225,8 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
         `DELETE FROM artifact_drafts WHERE artifact_id = ? AND user_id = ?`
       ).bind(artifactId, ctx.userId),
     ]);
+
+    await incrementRateLimit(env, ctx.userId, 'publish');
 
     // A candidate stage leaves the live production pointer (and its cache) untouched.
     if (!blocking) {

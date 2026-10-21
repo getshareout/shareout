@@ -39,6 +39,7 @@ class GoogleAnalyticsProvider extends BaseProvider {
 			{
 				id: 'reports.run',
 				method: 'POST',
+				readOnly: true,
 				path: '/{propertyId}:runReport',
 				description: 'Run a report with dimensions and metrics',
 				cache: { ttlSeconds: 300 },
@@ -49,6 +50,7 @@ class GoogleAnalyticsProvider extends BaseProvider {
 			{
 				id: 'reports.batchRun',
 				method: 'POST',
+				readOnly: true,
 				path: '/{propertyId}:batchRunReports',
 				description: 'Run multiple reports in a single request',
 				cache: { ttlSeconds: 300 },
@@ -59,6 +61,7 @@ class GoogleAnalyticsProvider extends BaseProvider {
 			{
 				id: 'reports.realtime',
 				method: 'POST',
+				readOnly: true,
 				path: '/{propertyId}:runRealtimeReport',
 				description: 'Run a realtime report',
 				cache: { ttlSeconds: 30 },
@@ -79,6 +82,7 @@ class GoogleAnalyticsProvider extends BaseProvider {
 			{
 				id: 'reports.pivot',
 				method: 'POST',
+				readOnly: true,
 				path: '/{propertyId}:runPivotReport',
 				description: 'Run a pivot report',
 				cache: { ttlSeconds: 300 },
@@ -89,6 +93,7 @@ class GoogleAnalyticsProvider extends BaseProvider {
 			{
 				id: 'reports.funnel',
 				method: 'POST',
+				readOnly: true,
 				path: '/{propertyId}:runFunnelReport',
 				description: 'Run a funnel report',
 				cache: { ttlSeconds: 300 },
