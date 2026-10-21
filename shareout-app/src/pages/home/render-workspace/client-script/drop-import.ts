@@ -7,9 +7,9 @@
 import { IMPORT_ARTIFACT_EXTS, IMPORT_BINARY_EXTS, IMPORT_MAX_BYTES, IMPORT_SHARE_HOSTS, IMPORT_SLIDES_EXTS } from '../../import-rules';
 
 export const workspace_client_drop_import_JS = `  // ===== One-step import: drop or paste on the Home → artifact =====
-  // Slide decks become a PDF only where the instance has the converter; elsewhere they are refused.
+  // Slide decks become a PDF where the instance has the converter; elsewhere a .pptx becomes a page of its slide text.
   var DROP_SLIDES = ${JSON.stringify(IMPORT_SLIDES_EXTS)};
-  var DROP_EXTS = ${JSON.stringify(Object.keys(IMPORT_ARTIFACT_EXTS))}.concat(window.WSX_SLIDES ? DROP_SLIDES : []);
+  var DROP_EXTS = ${JSON.stringify(Object.keys(IMPORT_ARTIFACT_EXTS))}.concat(window.WSX_SLIDES ? DROP_SLIDES : ['pptx']);
   var DROP_BINARY = ${JSON.stringify(IMPORT_BINARY_EXTS)};
   var DROP_HOSTS = ${JSON.stringify(IMPORT_SHARE_HOSTS)};
   var DROP_MAX = ${IMPORT_MAX_BYTES};

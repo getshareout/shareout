@@ -25,6 +25,19 @@ describe('transcribePdf', () => {
     expect(msg.content[0]).toEqual(part);
   });
 
+  it('asks the model to carry on when a long scan hits the output cap', async () => {
+    const cut = 'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Página 1"}}\n\ndata: {"type":"message_delta","delta":{"stop_reason":"max_tokens"}}\n\ndata: {"type":"message_stop"}\n\n';
+    const rest = 'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Página 2"}}\n\ndata: {"type":"message_stop"}\n\n';
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(cut, { headers: { 'Content-Type': 'text/event-stream' } }))
+      .mockResolvedValueOnce(new Response(rest, { headers: { 'Content-Type': 'text/event-stream' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await transcribePdf({ ANTHROPIC_API_KEY: 'k', AI_PROVIDER_ORDER: 'anthropic' } as unknown as Env, 'JVBER')).toBe('Página 1\nPágina 2');
+    const second = JSON.parse(String((fetchMock.mock.calls[1] as unknown as [string, RequestInit])[1].body));
+    expect(second.messages.map((m: { role: string }) => m.role)).toEqual(['user', 'assistant', 'user']);
+    expect(second.messages[1].content).toBe('Página 1');
+  });
+
   it('skips without a provider or past the size cap', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
