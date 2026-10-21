@@ -35,8 +35,19 @@ export const WORKSPACE_KNOWLEDGE_STYLES = `
 @keyframes wsxKnFade { from { opacity: 0; } to { opacity: 1; } }
 
 /* ---- Controls bar: stats line + search + view toggle + How-it-works ---- */
-.wsx-kn2__stats.wsx-cat__kpis { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: 0; min-width: 0; }
-.wsx-kn2__stat { font-size: var(--text-sm); color: var(--color-text-tertiary); white-space: nowrap; }
+/* Header = 2 rows: title + one-line intro, then stats + controls. */
+.wsx-kn2__titlerow { display: flex; align-items: baseline; gap: 16px; min-width: 0; margin-bottom: 12px; }
+.wsx-kn2__titlerow .wsx__viewtitle { margin: 0; flex: none; }
+.wsx-kn2__titlerow .wsx-lens__intro { margin: 0; max-width: none; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wsx-kn2__stats.wsx-cat__kpis { display: block; flex: 1 1 auto; margin: 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wsx-kn2__stat { font-size: var(--text-sm); color: var(--color-text-tertiary); margin-right: 14px; }
+.wsx-kn2__bar .wsx-qsearch input { width: 180px; }
+.wsx-kn2__bar .wsx-cat__count { margin-left: 0; }
+.wsx-kn2__how--icon { padding: 6px; width: 34px; justify-content: center; }
+@media (min-width: 1100px) {
+  .wsx-kn2__bar { flex-wrap: nowrap; }
+  .wsx-kn2__bar > :not(.wsx-kn2__stats) { flex: none; }
+}
 .wsx-kn2__stat b { font-weight: 700; color: var(--color-text); font-variant-numeric: tabular-nums; }
 .wsx-kn2__ctlright { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
 .wsx-kn2__how { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); border-radius: var(--radius-md); padding: 6px 12px; cursor: pointer; transition: color var(--duration-fast), border-color var(--duration-fast); }
@@ -68,11 +79,14 @@ button.wsx-kn2__chip:hover { border-color: var(--color-primary); background: var
 .wsx-kn2__gname { width: 100%; margin: 8px 0; }
 .wsx-kn2__ginvalid { color: var(--color-error); font-size: var(--text-xs); margin: 6px 0; }
 
-/* Desktop tree: the lens fills the pane, so the title, KPIs and controls never scroll;
+/* Desktop tree + table: the lens fills the pane, so the title, stats and controls never scroll;
    only the tree and the note body do (the note's title block stays on top). */
 @media (min-width: 861px) {
-  .wsx__view[data-view="knowledge"].is-active:has(.wsx-kn2) { display: flex; flex-direction: column; height: 100%; }
-  .wsx__view[data-view="knowledge"]:has(.wsx-kn2) #wsxKnMount { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .wsx__view[data-view="knowledge"].is-active:has(#wsxKnMount > .wsx-kn2, #wsxKnMount > .wsx-atbl__wrap) { display: flex; flex-direction: column; height: 100%; }
+  .wsx__view[data-view="knowledge"]:has(#wsxKnMount > .wsx-kn2, #wsxKnMount > .wsx-atbl__wrap) #wsxKnMount { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  /* Table: same frame — only the rows scroll, column headers stay on top. */
+  #wsxKnMount > .wsx-atbl__wrap { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+  #wsxKnMount > .wsx-atbl__wrap thead th { position: sticky; top: 0; z-index: 1; background: var(--color-bg-elevated); }
   #wsxKnMount > .wsx-kn2 { flex: 1; min-height: 320px; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
   #wsxKnMount > .wsx-kn2 .wsx-kn2__treewrap { position: static; min-height: 0; }
   #wsxKnMount > .wsx-kn2 .wsx-kn2__tree { max-height: none; flex: 1; min-height: 0; }

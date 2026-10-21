@@ -195,8 +195,8 @@ export function buildWorkspaceBody(args: RenderArgs): string {
             <div id="wsxCatMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="knowledge">
-            <h2 class="wsx__viewtitle" data-i18n="view.knowledge">Knowledge</h2>
-            <p class="wsx-lens__intro" data-i18n="intro.knowledge">What your workspace has learned from its pages — topics, clients and facts, kept up to date as you publish. Search it, or open a page to see where a fact came from.</p>
+            <div class="wsx-kn2__titlerow"><h2 class="wsx__viewtitle" data-i18n="view.knowledge">Knowledge</h2>
+            <p class="wsx-lens__intro" data-i18n="intro.knowledge" data-i18n-title="intro.knowledge">What your workspace has learned from its pages — topics, clients and facts, kept up to date as you publish. Search it, or open a page to see where a fact came from.</p></div>
             <div id="wsxKnMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="crew">
