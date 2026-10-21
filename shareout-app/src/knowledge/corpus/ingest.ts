@@ -226,7 +226,8 @@ export async function finishStep(env: Env, p: IngestParams, r: ExtractResult): P
   if (env.KNOWLEDGE_VECTORS && r.previousCount > r.chunkCount) {
     const stale = [];
     for (let ord = r.chunkCount; ord < r.previousCount; ord++) stale.push(vectorId(p.refId, ord));
-    for (let i = 0; i < stale.length; i += 1000) await env.KNOWLEDGE_VECTORS.deleteByIds(stale.slice(i, i + 1000));
+    // Vectorize takes at most 100 ids per delete (error 40007 past that).
+    for (let i = 0; i < stale.length; i += 100) await env.KNOWLEDGE_VECTORS.deleteByIds(stale.slice(i, i + 100));
   }
   const steps = ingestSteps(env, r.status === 'chunked' ? r.chunkCount : 0);
   await meterKnowledge(env, p.workspaceId, 'knowledge_ingest', env.KNOWLEDGE_INGEST
