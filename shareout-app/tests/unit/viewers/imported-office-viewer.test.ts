@@ -76,3 +76,29 @@ describe('imported Word viewer', () => {
     expect(html).toContain('href="/a/book/original/Plan%20Q3.docx" download="Plan Q3.docx"');
   });
 });
+
+describe('imported PDF viewer: Text | Original tabs', () => {
+  const pdf = { source: { original: 'original/Informe Rev.1.pdf' } };
+  const md = { key: 'k/plan', path: 'Informe Rev.1.md', mime: 'text/markdown' };
+
+  it('shows the text by default, with a tab to the original PDF', async () => {
+    const html = await view('https://shareout.test/a/book/?wsx=1', 'markdown', pdf, md);
+    expect(html).toContain('<h1');
+    expect(html).not.toContain('<iframe class="original-pdf"');
+    expect(html).toMatch(/class="doc-tab is-on" href="\?wsx=1"[^>]*>Text</);
+    expect(html).toContain('href="?wsx=1&amp;show=original"');
+  });
+
+  it('?show=original shows the PDF inline instead of the text', async () => {
+    const html = await view('https://shareout.test/a/book/?show=original', 'markdown', pdf, md);
+    expect(html).toContain('<iframe class="original-pdf" src="/a/book/original/Informe%20Rev.1.pdf"');
+    expect(html).not.toContain('<article class="content">');
+    expect(html).toMatch(/class="doc-tab is-on" href="\?show=original"[^>]*>Original</);
+  });
+
+  it('a Word original gets no tabs (the browser cannot show it)', async () => {
+    const html = await view('https://shareout.test/a/book/?show=original', 'markdown', { source: { original: 'original/Plan Q3.docx' } }, md);
+    expect(html).not.toContain('<nav class="doc-tabs"');
+    expect(html).not.toContain('<iframe class="original-pdf"');
+  });
+});

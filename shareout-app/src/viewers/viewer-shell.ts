@@ -14,6 +14,8 @@ export interface ViewerSource {
   sheets?: string[];
   /** 0-based index of the sheet being shown. */
   activeSheet?: number;
+  /** PDF original: Text | Original tabs (hrefs keep the page's other query params). */
+  pdfTabs?: { showOriginal: boolean; textHref: string; originalHref: string };
 }
 
 export interface ViewerContext {
