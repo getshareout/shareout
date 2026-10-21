@@ -9,7 +9,7 @@ import type { AgentMode } from './types';
 import { generateId } from '../../crypto-utils';
 import { decryptCredentials } from '../connections/credentials';
 import { getAIProvider, buildAIConfig, type AIConfig, type AIProvider } from './anthropic';
-import { computeBaseCostMicroUsd } from './model-costs';
+import { priceCall } from './model-costs';
 
 export interface WorkspaceLlmConfigRow {
   workspace_id: string;
@@ -148,7 +148,7 @@ export async function recordAgentUsage(
     toolName?: string | null;
   }
 ): Promise<void> {
-  const cost = computeBaseCostMicroUsd(params.model, params.inputTokens, params.outputTokens);
+  const cost = (await priceCall(env, params.model, params.inputTokens, params.outputTokens)).microUsd;
 
   await env.DB.prepare(`
     INSERT INTO agent_usage_events (

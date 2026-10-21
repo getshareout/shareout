@@ -122,6 +122,7 @@ Respond with ONLY compact JSON: {"verdict":"clean|suspicious|malicious","reason"
 const ALLOWED_SCRIPT_HOST_SET = new Set<string>(ALLOWED_ARTIFACT_SCRIPT_HOSTS);
 
 interface OpenAIChatResponse {
+  id?: string;
   choices?: Array<{ message?: { content?: string } }>;
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
@@ -224,7 +225,7 @@ export async function runPublishSafetyCheck(
           .first<{ workspace_id: string | null; owner_id: string | null }>();
       } catch { /* unmetered owner: the row still records the call */ }
       await meterAiCall(env, { workspaceId: art?.workspace_id ?? null, userId: art?.owner_id ?? null, kind: 'publish_moderation', source: opts.artifactId },
-        provider.model, data.usage?.prompt_tokens ?? 0, data.usage?.completion_tokens ?? 0);
+        provider.model, data.usage?.prompt_tokens ?? 0, data.usage?.completion_tokens ?? 0, provider.provider === 'vercel-gateway' ? data.id : null);
       const parsed = parseVerdict(data.choices?.[0]?.message?.content ?? '');
       if (!parsed) {
         // A well-formed response we can't parse won't parse from another provider either.

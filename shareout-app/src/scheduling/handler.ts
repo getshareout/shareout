@@ -22,6 +22,7 @@ import { cleanupObservability } from '../observability/store';
 import { cleanupAuditLog } from '../audit';
 import { createLogger } from '../logging';
 import { runStorageSnapshots } from '../storage-snapshots';
+import { reconcileAiUsage } from '../data/ai-usage-reconcile';
 import { rollupWorkspaceUsage, utcDay } from '../workspaces/usage-ledger';
 import { runLifecycleEmails } from '../email/lifecycle-cron';
 import { runWeeklyWorkspaceDigest } from '../email/weekly-digest';
@@ -295,6 +296,12 @@ export async function handleScheduledEvent(env: Env, scheduledTime?: number): Pr
   const versionNotices = await runVersionNoticeSweep(env).catch(() => ({ notified: 0 }));
   if (versionNotices.notified > 0) {
     logger.info('version notice sweep finished', { notified: versionNotices.notified });
+  }
+  // AI spend: replace call-time estimates with the gateway's debited cost, reprice rows
+  // whose model wasn't priced yet, and log an error to /admin health when credit runs low.
+  const aiUsage = await reconcileAiUsage(env).catch((err) => { logger.error('AI usage reconcile failed', { error: String(err) }); return null; });
+  if (aiUsage && aiUsage.actual + aiUsage.repriced > 0) {
+    logger.info('AI usage reconciled', aiUsage);
   }
   // Never-viewed janitor: flag workspaces with 3+ published pages nobody's opened in
   // 90+ days. Self-gated to at most once/30 days per workspace (last_janitor_at), so

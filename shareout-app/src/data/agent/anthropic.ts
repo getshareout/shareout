@@ -77,6 +77,8 @@ export interface StreamChatOptions {
 }
 
 interface StreamEvent {
+  /** The AI Gateway generation id (`gen_…`) on OpenAI-compatible chunks; used to fetch the real cost. */
+  id?: string;
   choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }>;
   usage?: { prompt_tokens?: number; completion_tokens?: number; input_tokens?: number; output_tokens?: number };
   type?: string;
@@ -311,6 +313,7 @@ export async function* streamChat(
           const decoder = new TextDecoder();
           let buffer = '';
           let inputTokens = 0;
+          let providerRef: string | null = null;
           let outputTokens = 0;
           let truncated = false;
 
@@ -339,6 +342,7 @@ export async function* streamChat(
                   failure = { error: `AI API error: ${event.error?.message ?? 'stream error'}`, retryable: true };
                   break;
                 }
+                if (!providerRef && cfg.provider === 'vercel-gateway' && typeof event.id === 'string') providerRef = event.id;
 
                 const content = event.choices?.[0]?.delta?.content
                   ?? (event.delta?.type === 'text_delta' ? event.delta.text : undefined);
@@ -364,7 +368,7 @@ export async function* streamChat(
           }
 
           if (!failure) {
-            await meterAiCall(env, meter, cfg.model, inputTokens, outputTokens);
+            await meterAiCall(env, meter, cfg.model, inputTokens, outputTokens, providerRef);
             yield {
               type: 'done',
               usage: { input_tokens: inputTokens, output_tokens: outputTokens },
@@ -436,11 +440,13 @@ export async function chat(
   }
 
   const result = await response.json() as {
+    id?: string;
     choices: Array<{ message: { content: string } }>;
     usage: { prompt_tokens: number; completion_tokens: number };
   };
 
-  await meterAiCall(env, meter, aiConfig.model, result.usage.prompt_tokens, result.usage.completion_tokens);
+  await meterAiCall(env, meter, aiConfig.model, result.usage.prompt_tokens, result.usage.completion_tokens,
+    aiConfig.provider === 'vercel-gateway' ? result.id : null);
   return {
     content: result.choices[0]?.message?.content || '',
     usage: {

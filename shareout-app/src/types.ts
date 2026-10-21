@@ -202,6 +202,8 @@ export interface Env {
   ANTHROPIC_API_KEY?: string;
   OPENAI_API_KEY?: string;
   VERCEL_AI_GATEWAY?: string;
+  /** Gateway credit (USD) below which the hourly reconcile logs an error to /admin health. Default 20. */
+  AI_CREDIT_ALERT_USD?: string;
   /** Comma-separated failover order over configured AI providers (`vercel-gateway`, `anthropic`, `openai`). Unlisted configured providers follow in the default order. */
   AI_PROVIDER_ORDER?: string;
   /** Model for the build agent and chat agent. Gateway slug (`anthropic/claude-sonnet-5`) or first-party id. Defaults to Claude Sonnet 5. */
