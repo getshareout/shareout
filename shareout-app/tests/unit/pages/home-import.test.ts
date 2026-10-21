@@ -44,15 +44,16 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe('import routing by file type', () => {
-  it('publishes viewer types as artifacts and leaves everything else to Assets', () => {
+  it('publishes every type with a viewer as an artifact and refuses the rest', () => {
     expect(importArtifactType('page.HTML')).toBe('html');
     expect(importArtifactType('ventas.csv')).toBe('csv');
     expect(importArtifactType('notes.md')).toBe('markdown');
     expect(importArtifactType('data.json')).toBe('json');
     expect(importArtifactType('readme.txt')).toBe('txt');
     expect(importArtifactType('deck.pdf')).toBe('pdf');
-    expect(importArtifactType('photo.png')).toBeNull();
-    expect(importArtifactType('clip.mp4')).toBeNull();
+    expect(importArtifactType('photo.png')).toBe('image');
+    expect(importArtifactType('clip.mp4')).toBe('video');
+    expect(importArtifactType('song.mp3')).toBeNull();
     expect(importArtifactType('book.xlsx')).toBe('csv');
     expect(importArtifactType('plan.docx')).toBe('markdown');
     expect(importArtifactType('slides.pptx')).toBeNull();
@@ -63,6 +64,9 @@ describe('import routing by file type', () => {
     ['notes.md', '# Hi', undefined, 'markdown', 'text/markdown'],
     ['deck.pdf', 'JVBERi0x', 'base64', 'pdf', 'application/pdf'],
     ['page.html', '<html><title>Q3</title></html>', undefined, 'html', 'text/html'],
+    ['logo.png', 'iVBORw0K', 'base64', 'image', 'image/png'],
+    ['clip.mov', 'AAAAIGZ0', 'base64', 'video', 'video/quicktime'],
+    ['mark.svg', '<svg/>', undefined, 'image', 'image/svg+xml'],
   ])('%s → %s artifact, private, in the current workspace and folder', async (name, content, encoding, type, mime) => {
     const res = await post({ name, content, encoding, folder: 'fld_1' }, '?workspace=wsp_1');
     expect(res.status).toBe(200);
@@ -74,8 +78,8 @@ describe('import routing by file type', () => {
     expect(incrementRateLimit).toHaveBeenCalledOnce();
   });
 
-  it('refuses a type that belongs in Assets (415) without publishing', async () => {
-    const res = await post({ name: 'photo.png', content: 'x' });
+  it('refuses a type with no viewer (415) without publishing', async () => {
+    const res = await post({ name: 'song.mp3', content: 'x' });
     expect(res.status).toBe(415);
     expect((await res.json()).code).toBe('UNSUPPORTED_TYPE');
     expect(publishArtifact).not.toHaveBeenCalled();

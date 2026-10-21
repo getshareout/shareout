@@ -3,6 +3,12 @@ title: Files & deliverables
 description: Store images, video, and any file in one place, reuse them across pages, and send a client a clean download link.
 ---
 
+:::note[Leaving the rail]
+Everything you upload now becomes an artifact (documents, images, video), with the
+original kept inside it. **Assets** is no longer in the left rail; existing files keep
+their links, and **Publish as artifact** turns one into an artifact.
+:::
+
 The **Assets** tab in your Home is a place to keep files — images, video, PDFs, spreadsheets, decks, zips, anything — store them once, reuse them across your pages, and hand a client a clean download link.
 
 Open it from the left rail in your Home: **Assets**.

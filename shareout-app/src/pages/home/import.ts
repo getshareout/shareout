@@ -5,8 +5,8 @@
  * membership, the daily publish count, the storage cap; moderation runs inside
  * publishArtifact. Word and spreadsheet files are converted (import-office.ts), slide decks
  * become a PDF when the instance has the converter (import-slides.ts); both keep their
- * original for download. Images, video and other files are not artifacts here —
- * the client sends them to the Assets library (upload + AI enrichment) instead.
+ * original for download. Images and video become image/video artifacts served as-is;
+ * types with no viewer (audio, fonts, archives) are refused.
  */
 import type { ArtifactType, Env, FileEntry, ImportedSource } from '../../types';
 import { checkRateLimit, incrementRateLimit } from '../../api-auth';
@@ -17,7 +17,7 @@ import { rateLimitExceededResponse, storageLimitExceededResponse } from '../../p
 import { generateSlug, invalidPathError, isSafeAssetPath } from '../../validation';
 import { jsonWithApiErrors } from '../../http/api-error';
 import { hostWorkspaceId } from './host';
-import { IMPORT_ARTIFACT_EXTS, IMPORT_CONVERTED_EXTS, IMPORT_MAX_BYTES, IMPORT_SLIDES_EXTS, importArtifactType, importExt, isShareLink } from './import-rules';
+import { IMPORT_ARTIFACT_EXTS, IMPORT_CONVERTED_EXTS, IMPORT_MEDIA_MIME, IMPORT_MAX_BYTES, IMPORT_SLIDES_EXTS, importArtifactType, importExt, isShareLink } from './import-rules';
 import { ImportError, base64ToBytes, convertOfficeImport } from './import-office';
 import { convertSlidesImport } from './import-slides';
 
@@ -91,7 +91,7 @@ export async function handleHomeImportApi(
     const ext = importExt(body.name);
     const slides = IMPORT_SLIDES_EXTS.includes(ext);
     const t = slides ? 'pdf' : importArtifactType(body.name);
-    if (!t) return json({ error: 'This file type is stored in Assets, not published as an artifact', code: 'UNSUPPORTED_TYPE', allowed: Object.keys(IMPORT_ARTIFACT_EXTS) }, 415);
+    if (!t) return json({ error: 'This file type cannot become an artifact', code: 'UNSUPPORTED_TYPE', allowed: Object.keys(IMPORT_ARTIFACT_EXTS) }, 415);
     type = t;
     name = body.name.replace(/\.[^.]+$/, '').trim().slice(0, 120) || body.name;
     const base64 = body.encoding === 'base64';
@@ -115,7 +115,7 @@ export async function handleHomeImportApi(
     file = {
       path: type === 'html' ? 'index.html' : body.name.replace(/[^\w.-]+/g, '-').replace(/\.{2,}/g, '.').replace(/^\.+/, ''),
       content: body.content,
-      mime: TYPE_MIME[type]!,
+      mime: IMPORT_MEDIA_MIME[ext] || TYPE_MIME[type]!,
       ...(base64 ? { encoding: 'base64' as const } : {}),
     };
   } else {

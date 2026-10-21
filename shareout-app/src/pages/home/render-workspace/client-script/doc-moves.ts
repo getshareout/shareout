@@ -1,35 +1,11 @@
 /**
- * One-click switch between an artifact and Recursos for documents (the import rule in
- * import-rules.ts, applied after the fact). Both directions reuse existing endpoints:
- * the bytes travel through /a/{slug}/download or /v1/files/{dlv}/content, land via the
- * Assets upload or POST /v1/home/import, and only then is the old copy deleted (artifact
- * → Recently deleted; asset → removed). A failure before that leaves the original as is.
+ * One-click "Publish as artifact" for a file still in Recursos (the import rule in
+ * import-rules.ts, applied after the fact): the bytes travel through
+ * /v1/files/{dlv}/content into POST /v1/home/import, and only then is the file removed.
+ * A failure before that leaves the file as is.
  */
-export const workspace_client_doc_moves_JS = `  // ===== Move a document: artifact ⇄ Recursos =====
-  var MOVE_DOC_TYPES = { pdf: 1, markdown: 1, csv: 1, txt: 1, json: 1 };
-  var SVG_TO_ASSETS = '<path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/>';
-  function canMoveToAssets(meta) { return !!(meta && meta.can_delete && MOVE_DOC_TYPES[meta.artifact_type]); }
+export const workspace_client_doc_moves_JS = `  // ===== Publish a Recursos file as an artifact =====
   function canPublishAsset(a) { return a.type === 'deliverable' && !!a.canDelete && DROP_EXTS.indexOf(dropExt(a.filename || a.name)) >= 0; }
-  function moveFilename(r, fallback) {
-    var m = /filename\\*=UTF-8''([^;]+)/i.exec(r.headers.get('Content-Disposition') || '');
-    try { return m ? decodeURIComponent(m[1]) : fallback; } catch (e) { return fallback; }
-  }
-  function moveToAssets(art, meta) {
-    showToast(t('move.moving'), 'info');
-    fetch('/a/' + encodeURIComponent(meta.slug || art.slug) + '/download', { credentials: 'same-origin' })
-      .then(okOr)
-      .then(function (r) { return r.blob().then(function (b) { return new File([b], moveFilename(r, meta.name || 'file'), { type: b.type }); }); })
-      .then(function (f) { return new Promise(function (ok, no) { uploadOne(f, null, function (done, err) { if (done === false) no(err); else ok(); }, 'private'); }); })
-      .then(function () { return fetch('/v1/artifacts/' + encodeURIComponent(art.id), { method: 'DELETE', credentials: 'same-origin' }); })
-      .then(okOr)
-      .then(function () {
-        if (panes[art.key]) closeTab(art.key);
-        if (typeof reloadFolders === 'function') reloadFolders();
-        if (document.getElementById('wsxAssetMount')) fetchAssets();
-        showToast(t('move.toAssetsDone'), 'success');
-      })
-      .catch(function (e) { failToast(e, t('move.failed')); });
-  }
   function publishFromAssets(a) {
     showToast(t('move.moving'), 'info');
     fetch('/v1/files/' + encodeURIComponent(a.id) + '/content', { credentials: 'same-origin' })
