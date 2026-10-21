@@ -10,13 +10,12 @@ import { checkStorageQuota } from '../quota';
 import { publishArtifact } from '../publish/publish-artifact';
 import { generateSlug } from '../validation';
 import { IMPORT_CONVERTED_EXTS, IMPORT_MAX_BYTES, IMPORT_MEDIA_MIME, IMPORT_SLIDES_EXTS, importExt } from '../pages/home/import-rules';
-import { ImportError, bytesToBase64, convertOfficeImport } from '../pages/home/import-office';
+import { ImportError, bytesToBase64, convertOfficeImport, convertPdfImport } from '../pages/home/import-office';
 import { convertSlidesImport } from '../pages/home/import-slides';
 
 /** Plain document types that become a page as-is. HTML is deliberately absent: a page
  *  from someone's drive should not run their scripts on our origin. */
 const DIRECT: Record<string, { type: ArtifactType; mime: string; binary: boolean }> = {
-  pdf: { type: 'pdf', mime: 'application/pdf', binary: true },
   md: { type: 'markdown', mime: 'text/markdown', binary: false },
   markdown: { type: 'markdown', mime: 'text/markdown', binary: false },
   csv: { type: 'csv', mime: 'text/csv', binary: false },
@@ -28,7 +27,7 @@ const DIRECT: Record<string, { type: ArtifactType; mime: string; binary: boolean
 export function isConvertible(env: Env, filename: string, size: number | null): boolean {
   if (size !== null && size > IMPORT_MAX_BYTES) return false;
   const ext = importExt(filename);
-  return !!IMPORT_CONVERTED_EXTS[ext] || !!DIRECT[ext] || (IMPORT_SLIDES_EXTS.includes(ext) && !!env.SLIDES_CONVERTER);
+  return ext === 'pdf' || !!IMPORT_CONVERTED_EXTS[ext] || !!DIRECT[ext] || (IMPORT_SLIDES_EXTS.includes(ext) && !!env.SLIDES_CONVERTER);
 }
 
 export interface PageInput {
@@ -53,7 +52,11 @@ export async function convertToPage(env: Env, input: PageInput): Promise<PageRes
   let type: ArtifactType;
   try {
     const kind = IMPORT_CONVERTED_EXTS[ext];
-    if (kind) {
+    if (ext === 'pdf') {
+      const out = await convertPdfImport(env, input.filename, input.bytes);
+      ({ files, entrypoint, source } = out);
+      type = out.type!;
+    } else if (kind) {
       ({ files, entrypoint, source } = await convertOfficeImport(env, input.filename, ext, kind, input.bytes));
       type = kind === 'sheet' ? 'csv' : 'markdown';
     } else if (IMPORT_SLIDES_EXTS.includes(ext)) {

@@ -10,9 +10,10 @@
  */
 import { ZipTooLargeError, assertZipWithinBounds, unzipBounded } from '../../data/files/unzip-bounded';
 import * as XLSX from 'xlsx';
-import type { Env, FileEntry, ImportedSource } from '../../types';
+import type { ArtifactType, Env, FileEntry, ImportedSource } from '../../types';
 import { XLSX_MAX_INPUT_BYTES } from '../../data/files/parse-xlsx';
 import { DocReadError, docToMarkdown } from '../../data/files/parse-doc';
+import { transcribePdf } from '../../data/files/transcribe-pdf';
 
 export class ImportError extends Error {
   constructor(public code: string, message: string, public status = 422) { super(message); }
@@ -21,7 +22,9 @@ export class ImportError extends Error {
 export interface ConvertedImport {
   entrypoint: string;
   files: FileEntry[];
-  source: ImportedSource;
+  source?: ImportedSource;
+  /** Set when the result type depends on the file (a PDF with no readable text stays a PDF). */
+  type?: ArtifactType;
 }
 
 /** Each sheet becomes a CSV: past this many rows a workbook is too big to view here. */
@@ -338,4 +341,38 @@ export async function convertOfficeImport(
   if (!markdown.trim()) throw new ImportError('CONVERT_FAILED', 'This document has no text.');
   const entrypoint = `${base}.md`;
   return { entrypoint, files: [{ path: entrypoint, content: markdown, mime: 'text/markdown' }, ...media, original], source: { original: original.path } };
+}
+
+// toMarkdown on a scan returns little more than page markers and stray bullets: below
+// this many letters, transcribe.
+const PDF_MIN_LETTERS = 200;
+
+/** toMarkdown's PDF output minus its `# file` / `## Metadata` header and `### Page N` markers. */
+export function pdfMarkdownBody(md: string): string {
+  const i = md.indexOf('## Contents');
+  const body = i >= 0 ? md.slice(i + '## Contents'.length) : md;
+  return body.replace(/^#{1,3} Page \d+\s*$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
+ * PDF → an editable Markdown page with the original kept for download: Workers AI
+ * toMarkdown for a PDF with a text layer, a vision-model transcription for a scan. When
+ * neither yields text (no AI configured, too big, model failed) it stays a PDF artifact,
+ * so an upload is never lost.
+ */
+export async function convertPdfImport(env: Env, filename: string, bytes: Uint8Array): Promise<ConvertedImport> {
+  const base64 = bytesToBase64(bytes);
+  let markdown = '';
+  if (env.AI) {
+    const res = await env.AI.toMarkdown({ name: filename, blob: new Blob([bytes], { type: 'application/pdf' }) }).catch(() => null);
+    if (res?.format === 'markdown') markdown = pdfMarkdownBody(res.data);
+  }
+  if ((markdown.match(/\p{L}/gu) || []).length < PDF_MIN_LETTERS) markdown = (await transcribePdf(env, base64)) || markdown;
+  const original: FileEntry = { path: `original/${safeSegment(filename, 'original.pdf')}`, content: base64, mime: 'application/pdf', encoding: 'base64' };
+  if (!markdown.trim()) {
+    const path = safeSegment(filename, 'document.pdf');
+    return { entrypoint: path, files: [{ ...original, path }], type: 'pdf' };
+  }
+  const entrypoint = `${safeSegment(filename.replace(/\.[^.]+$/, ''), 'document')}.md`;
+  return { entrypoint, files: [{ path: entrypoint, content: markdown, mime: 'text/markdown' }, original], source: { original: original.path }, type: 'markdown' };
 }
