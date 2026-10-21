@@ -74,14 +74,16 @@ describe('Recursos lens', () => {
     expect(document.querySelector('.wsx-asset__actions, [data-asset-act]')).toBeNull();
   });
 
-  it('clicking a file opens a preview with labeled text actions', () => {
+  // Download stays a labelled button; the rest are icon buttons, each with an accessible name + tooltip.
+  it('clicking a file opens a preview with a labelled Download and named icon actions', () => {
     const lens = load('wsp_1');
     lens.setState({ deliverables: [dlv('t', 'team', 'image/png')], loose: [] });
     lens.renderAssets();
     document.querySelector<HTMLElement>('.wsx-asset')!.click();
     const modal = document.querySelector('.wsx-modal')!;
     expect(modal.querySelector('.wsx-asset-pv__media img')).not.toBeNull();
-    const labels = [...modal.querySelectorAll('.wsx-asset-pv__acts a, .wsx-asset-pv__acts button')].map((b) => b.textContent!.trim());
+    const labels = [...modal.querySelectorAll('.wsx-asset-pv__acts a, .wsx-asset-pv__acts button')].map((b) => b.textContent!.trim() || b.getAttribute('aria-label'));
+    for (const b of modal.querySelectorAll('.wsx-asset-pv__ibtn')) expect(b.getAttribute('data-tip')).toBe(b.getAttribute('aria-label'));
     for (const l of ['Descargar', 'Copiar enlace', 'Compartir', 'Mover', 'Eliminar']) expect(labels).toContain(l);
     expect((modal.querySelector('#pv_vis') as HTMLSelectElement).value).toBe('team');
   });

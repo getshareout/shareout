@@ -394,7 +394,11 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
   if (sub === '') {
     const counts: Record<string, number> = {};
     for (const n of nodes) counts[n.kind] = (counts[n.kind] ?? 0) + 1;
-    return cors(jsonResponse({ enabled: true, counts, lastUpdated, total: nodes.length }));
+    // Training leaves unchanged notes untouched; its last processed item counts as an update too.
+    const trained = (await ctx.env.DB.prepare('SELECT MAX(processed_at) AS last FROM knowledge_ingest WHERE workspace_id = ?')
+      .bind(workspaceId).first<{ last: string | null }>())?.last ?? null;
+    const latest = trained && (!lastUpdated || trained > lastUpdated) ? trained : lastUpdated;
+    return cors(jsonResponse({ enabled: true, counts, lastUpdated: latest, total: nodes.length }));
   }
 
   return cors(jsonError('Not found', 'NOT_FOUND', 404));

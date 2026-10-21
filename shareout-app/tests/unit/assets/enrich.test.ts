@@ -22,6 +22,8 @@ beforeAll(async () => {
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS ai_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, kind TEXT, model TEXT, units INTEGER, unit_kind TEXT, base_cost_micro_usd INTEGER, source TEXT, created_at TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, locale TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS file_artifact_usage (deliverable_id TEXT, artifact_id TEXT, created_at TEXT, PRIMARY KEY (deliverable_id, artifact_id))`);
+  await e.DB.exec(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT, name TEXT)`);
+  await e.DB.exec(`CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, name TEXT, slug TEXT, display_slug TEXT, deleted_at TEXT)`);
 });
 
 async function seedFile(dlv: string, blob: string, opts: { mime?: string; size?: number; text?: string; version?: number; typeMeta?: string; filename?: string } = {}) {

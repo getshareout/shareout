@@ -34,9 +34,25 @@ export const assetGalleryStyles = `/* ── Assets lens ───────�
 .wsx-asset-pv__media { display: flex; align-items: center; justify-content: center; min-height: 140px; max-height: 50vh; border-radius: var(--radius-md); background: rgba(0,0,0,0.04); overflow: hidden; }
 .wsx-asset-pv__media img, .wsx-asset-pv__media video { max-width: 100%; max-height: 50vh; display: block; }
 .wsx-asset-pv__media .wsx-asset__thumb--file { display: flex; align-items: center; padding: var(--space-4); }
+.wsx-asset-pv__media--doc { max-height: none; background: var(--color-surface); }
+.wsx-asset-pv__pdf { display: block; width: 100%; height: 60vh; border: 0; }
+.wsx-asset-pv__media audio { width: 100%; margin: var(--space-4); }
 .wsx-asset-pv__acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: var(--space-3); }
 .wsx-asset-pv__acts a.wsx-abtn { text-decoration: none; }
 .wsx-asset-pv__acts svg { width: 15px; height: 15px; }
+.wsx-asset-pv__acts { align-items: center; }
+.wsx-asset-pv__icons { display: inline-flex; flex-wrap: wrap; gap: 2px; }
+.wsx-asset-pv__ibtn svg { width: 18px; height: 18px; }
+.wsx-asset-pv__ibtn.is-on { color: var(--color-primary); }
+.wsx-asset-pv__ibtn--danger:not(:disabled):hover { color: var(--color-error); background: var(--color-error-light); }
+.wsx-asset-pv__meta { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: var(--space-3) 0; font-size: var(--text-sm); }
+.wsx-asset-pv__meta dt { color: var(--color-text-tertiary); }
+.wsx-asset-pv__meta dd { margin: 0; color: var(--color-text); min-width: 0; overflow-wrap: anywhere; }
+.wsx-asset-pv__meta dd .wsx-asset__tags { margin-top: 0; }
+.wsx-asset-pv__muted { color: var(--color-text-tertiary); font-size: var(--text-xs); }
+.wsx-asset-total { margin-right: auto; font-size: var(--text-sm); color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
+.wsx-chip__n { margin-left: 6px; font-size: 0.72em; font-weight: 700; font-variant-numeric: tabular-nums; opacity: 0.7; }
+.wsx-chip__n:empty { display: none; }
 /* upload: who can see these files */
 .wsx-vis-opts { display: flex; flex-direction: column; gap: 8px; }
 .wsx-vis-opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1.5px solid var(--color-border); border-radius: var(--radius-md); cursor: pointer; }
@@ -61,7 +77,37 @@ export const assetGalleryStyles = `/* ── Assets lens ───────�
 .wsx-share-send + .wsx-share-send { margin-top: 6px; }
 /* sent deliveries (manage + revoke) */
 .wsx-assets__headr { display: flex; gap: 8px; align-items: center; }
-.wsx-asset-folders { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 var(--space-3); }
+.wsx-asset-tbl { margin-top: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg-elevated); padding: 0; }
+.wsx-asset-row { cursor: pointer; }
+.wsx-asset-row.is-sel { background: var(--color-primary-light); }
+.wsx-asset-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.wsx-asset__check--row { position: relative; top: auto; left: auto; border-color: var(--color-border); background: var(--color-bg-elevated); box-shadow: none; }
+.wsx-asset__ver--row { position: static; margin-left: 6px; }
+.wsx-asset__by { font-size: 0.74rem; color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wsx-asset__badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.wsx-asset__badges:empty { display: none; }
+.wsx-asset__badges .wsx-asset__vis { margin-top: 4px; }
+.wsx-asset__flags { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; }
+.wsx-asset__flag { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 999px; color: var(--color-text-tertiary); background: var(--color-surface); }
+.wsx-asset__flag.is-on { color: var(--color-primary); background: var(--color-primary-light); }
+.wsx-asset__flag svg { width: 12px; height: 12px; }
+.wsx-asset__tag--ent { background: transparent; border: 1px dashed var(--color-border); }
+.wsx-asset__tag--more { color: var(--color-text-tertiary); }
+/* table view: name+tags | uploaded by | updated | access | flags */
+.wsx-asset-tbl__head, .wsx-asset-row { grid-template-columns: 22px minmax(0, 1fr) 150px 96px 112px 56px; }
+.wsx-asset-row { align-items: start; }
+.wsx-asset-row > .wsx-tr__icon, .wsx-asset-row > .wsx-asset__check { margin-top: 1px; }
+.wsx-asset-row__main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.wsx-asset-row__main .wsx-asset__tags { margin-top: 2px; }
+.wsx-asset-row__sub { font-size: var(--text-xs); color: var(--color-text-tertiary); }
+.wsx-asset-row__by, .wsx-asset-row__vis { font-size: var(--text-xs); color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wsx-asset-row__flags { display: flex; justify-content: flex-end; }
+.wsx-asset-row__flags .wsx-asset__flags { margin-top: 0; }
+@media (max-width: 720px) {
+  .wsx-asset-tbl__head, .wsx-asset-row { grid-template-columns: 22px minmax(0, 1fr) 56px; }
+  .wsx-asset-tbl__head span:nth-child(3), .wsx-asset-tbl__head span:nth-child(4), .wsx-asset-tbl__head span:nth-child(5),
+  .wsx-asset-row__by, .wsx-asset-row > .wsx-tr__date, .wsx-asset-row__vis { display: none; }
+}
 .wsx-deliv { display: flex; flex-direction: column; gap: 8px; }
 .wsx-deliv__row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elevated); }
 .wsx-deliv__main { flex: 1; min-width: 0; }

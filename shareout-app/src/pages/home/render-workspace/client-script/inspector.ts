@@ -409,7 +409,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
         : '';
       var chips = list.map(function (c) {
         var ini = (c.email[0] || '?').toUpperCase();
-        return '<span class="wsx-det__who"><span class="av">' + esc(ini) + '</span>' + esc(c.email) + ' <span class="role">' + esc(c.role || t('inspector.viewer')) + '</span>' + (editable ? '<button data-rm="' + esc(c.email) + '" title="' + esc(t('common.delete')) + '" type="button">\\u00D7</button>' : '') + '</span>';
+        return '<span class="wsx-det__who" title="' + esc(c.email) + '"><span class="av">' + esc(ini) + '</span><span class="em">' + esc(c.email) + '</span> <span class="role">' + esc(c.role || t('inspector.viewer')) + '</span>' + (editable ? '<button data-rm="' + esc(c.email) + '" title="' + esc(t('common.delete')) + '" type="button">\\u00D7</button>' : '') + '</span>';
       }).join('');
       if (!count && !editable) chips = '<span class="wsx-share__note">' + esc(t('inspector.privateToYou')) + '</span>';
       var chipWrap = chips ? '<div class="wsx-share__chips">' + chips + '</div>' : '';

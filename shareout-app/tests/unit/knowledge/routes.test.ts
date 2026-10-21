@@ -109,6 +109,18 @@ describe('knowledge routes', () => {
     expect(body.groups.topic[0].sourcesCount).toBe(0);
   });
 
+  // Training re-reads pages but leaves unchanged notes untouched, so "last updated"
+  // must also move when a training run processes something.
+  it('lastUpdated reflects the latest processed training run', async () => {
+    await setKnowledgeEnabled(e, WS, true);
+    await upsertKnowledgeFile(e, WS, { path: 'topics/retention.md', content: NODE });
+    const later = '2999-01-01T00:00:00.000Z';
+    await e.DB.prepare(`INSERT INTO knowledge_ingest (workspace_id, artifact_id, reason, processed_at) VALUES (?, 'art_x', 'backfill', ?)`).bind(WS, later).run();
+    await e.DB.prepare(`INSERT INTO knowledge_ingest (workspace_id, artifact_id, reason, processed_at) VALUES ('wsp_other', 'art_y', 'backfill', '3999-01-01T00:00:00.000Z')`).run();
+    const res = await call('GET');
+    expect(((await res!.json()) as { lastUpdated: string }).lastUpdated).toBe(later);
+  });
+
   it('files GET 404s when knowledge is disabled', async () => {
     await upsertKnowledgeFile(e, WS, { path: 'topics/retention.md', content: NODE });
     const res = await call('GET', '/files/topics/retention.md');
