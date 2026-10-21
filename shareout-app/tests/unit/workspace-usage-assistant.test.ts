@@ -13,7 +13,7 @@ beforeAll(async () => {
        output_tokens INTEGER NOT NULL DEFAULT 0, base_cost_micro_usd INTEGER NOT NULL DEFAULT 0, billed_cost_micro_usd INTEGER NOT NULL DEFAULT 0,
        byo INTEGER NOT NULL DEFAULT 0, crew_id TEXT, run_id TEXT, trigger_kind TEXT, tool_name TEXT, created_at TEXT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS ai_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, kind TEXT NOT NULL, model TEXT NOT NULL,
-       units REAL NOT NULL DEFAULT 0, unit_kind TEXT NOT NULL, base_cost_micro_usd INTEGER NOT NULL DEFAULT 0, source TEXT, created_at TEXT NOT NULL)`,
+       units REAL NOT NULL DEFAULT 0, unit_kind TEXT NOT NULL, base_cost_micro_usd INTEGER NOT NULL DEFAULT 0, source TEXT, input_tokens INTEGER, output_tokens INTEGER, cost_source TEXT, provider_ref TEXT, created_at TEXT NOT NULL)`,
   ];
   for (const s of stmts) await env.DB.prepare(s).run();
   await env.DB.batch([
@@ -21,9 +21,9 @@ beforeAll(async () => {
     env.DB.prepare(`INSERT INTO artifacts VALUES ('art_u', 'Dash')`),
     env.DB.prepare(`INSERT INTO agent_usage_events (id, workspace_id, artifact_id, mode, provider, model, input_tokens, output_tokens, base_cost_micro_usd, created_at)
       VALUES ('aue_1', 'wsp_u', 'art_u', 'crew', 'vercel-gateway', 'anthropic/claude-haiku-4.5', 1383, 90, 1833, '2026-10-12T10:00:00.000Z')`),
-    env.DB.prepare(`INSERT INTO ai_usage_events VALUES ('aiu_1', 'wsp_u', 'usr_u', 'assistant_chat', 'anthropic/claude-sonnet-5.5', 1208, 'tokens', 2480, 'web', '2026-10-12T11:00:00.000Z')`),
-    env.DB.prepare(`INSERT INTO ai_usage_events VALUES ('aiu_2', 'wsp_u', 'usr_u', 'ask_workspace', 'anthropic/claude-sonnet-5.5', 2000, 'tokens', 4000, 'web', '2026-10-12T12:00:00.000Z')`),
-    env.DB.prepare(`INSERT INTO ai_usage_events VALUES ('aiu_3', 'wsp_u', 'usr_u', 'whisper_transcribe', '@cf/whisper', 12, 'audio_seconds', 90, 'web', '2026-10-12T13:00:00.000Z')`),
+    env.DB.prepare(`INSERT INTO ai_usage_events VALUES ('aiu_1', 'wsp_u', 'usr_u', 'assistant_chat', 'anthropic/claude-sonnet-5.5', 1208, 'tokens', 2480, 'web', NULL, NULL, NULL, NULL, '2026-10-12T11:00:00.000Z')`),
+    env.DB.prepare(`INSERT INTO ai_usage_events VALUES ('aiu_2', 'wsp_u', 'usr_u', 'ask_workspace', 'anthropic/claude-sonnet-5.5', 2000, 'tokens', 4000, 'web', NULL, NULL, NULL, NULL, '2026-10-12T12:00:00.000Z')`),
+    env.DB.prepare(`INSERT INTO ai_usage_events VALUES ('aiu_3', 'wsp_u', 'usr_u', 'whisper_transcribe', '@cf/whisper', 12, 'audio_seconds', 90, 'web', NULL, NULL, NULL, NULL, '2026-10-12T13:00:00.000Z')`),
   ]);
 });
 

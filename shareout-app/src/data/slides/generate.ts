@@ -109,6 +109,7 @@ export async function handleGenerateRoute(request: Request, ctx: DataContext): P
   try {
     const result = await chat(
       ctx.env,
+      { workspaceId: ctx.artifact.workspace_id, userId: null, kind: 'slides_generate', source: ctx.artifactId },
       [{ role: 'user', content: prompt }],
       buildSystemPrompt(length),
       '',

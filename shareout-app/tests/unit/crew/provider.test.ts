@@ -39,6 +39,7 @@ const cfg = { provider: 'anthropic' as const, apiKey: 'sk-ant', baseUrl: 'https:
 const env = {} as Env;
 
 const args: ProviderTurnArgs = {
+  meter: { workspaceId: null, userId: null, kind: 'test', source: null },
   system: 'sys',
   maxTokens: 500,
   tools: [{ name: 'list_artifacts', description: 'List', input_schema: { type: 'object', properties: {} } }],

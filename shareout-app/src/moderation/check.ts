@@ -11,6 +11,7 @@
 // on "Being reviewed".
 
 import { getPlatformHostname } from '../config/origins';
+import { meterAiCall } from '../data/ai-usage';
 import type { Env } from '../types';
 import { getAIProviderChain, alertProviderFailure } from '../data/agent/anthropic';
 import { fetchWithTimeout } from '../fetch-utils';
@@ -121,7 +122,9 @@ Respond with ONLY compact JSON: {"verdict":"clean|suspicious|malicious","reason"
 const ALLOWED_SCRIPT_HOST_SET = new Set<string>(ALLOWED_ARTIFACT_SCRIPT_HOSTS);
 
 interface OpenAIChatResponse {
+  id?: string;
   choices?: Array<{ message?: { content?: string } }>;
+  usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
 function parseVerdict(content: string): { verdict: ModerationVerdict; reason: string } | null {
@@ -142,7 +145,7 @@ function parseVerdict(content: string): { verdict: ModerationVerdict; reason: st
 export async function runPublishSafetyCheck(
   env: Env,
   html: string,
-  opts: { budgetMs?: number; artifactId?: string } = {},
+  opts: { budgetMs?: number; artifactId: string },
 ): Promise<SafetyCheckResult> {
   const hash = await contentHash(html);
   const signals = extractSignals(html);
@@ -214,6 +217,15 @@ export async function runPublishSafetyCheck(
         continue;
       }
       const data = (await res.json()) as OpenAIChatResponse;
+      // Metered to the page's workspace and owner, like any other model call.
+      // Never let the lookup change the verdict.
+      let art: { workspace_id: string | null; owner_id: string | null } | null = null;
+      try {
+        art = await env.DB.prepare('SELECT workspace_id, owner_id FROM artifacts WHERE id = ?').bind(opts.artifactId)
+          .first<{ workspace_id: string | null; owner_id: string | null }>();
+      } catch { /* unmetered owner: the row still records the call */ }
+      await meterAiCall(env, { workspaceId: art?.workspace_id ?? null, userId: art?.owner_id ?? null, kind: 'publish_moderation', source: opts.artifactId },
+        provider.model, data.usage?.prompt_tokens ?? 0, data.usage?.completion_tokens ?? 0, provider.provider === 'vercel-gateway' ? data.id : null);
       const parsed = parseVerdict(data.choices?.[0]?.message?.content ?? '');
       if (!parsed) {
         // A well-formed response we can't parse won't parse from another provider either.

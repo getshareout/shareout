@@ -2,7 +2,7 @@ import type { Env } from '../types';
 import type { DataContext } from '../data/middleware';
 import { generateId } from '../crypto-utils';
 import { resolveAgentAiConfig, resolveGatewayModel, recordAgentUsage } from '../data/agent/ai-config';
-import { computeBaseCostMicroUsd } from '../data/agent/model-costs';
+import { priceCall } from '../data/agent/model-costs';
 import { claudeModelById, DEFAULT_CLAUDE_MODEL } from '../data/agent/models';
 import type { CrewRow, CrewRunRow, CrewSseEvent, TerminationReason, RunCaps } from './types';
 import { buildCrewDataContext, buildCrewPrincipal, redact } from './principal';
@@ -236,6 +236,7 @@ export async function executeCrewRun(
         system,
         transcript,
         tools,
+        meter: { workspaceId: ownerCtx.workspaceId || null, userId: crew.owner_id, kind: 'crew_run', source: run.id },
         maxTokens: caps.maxTokensPerCall,
       })) {
         if (ev.type === 'text_delta') {
@@ -255,7 +256,7 @@ export async function executeCrewRun(
       // Cost accounting for the turn (every model call is costed and attributed).
       tokenInput += turnIn;
       tokenOutput += turnOut;
-      const base = computeBaseCostMicroUsd(model, turnIn, turnOut);
+      const base = (await priceCall(env, model, turnIn, turnOut)).microUsd;
       spent += base;
       await recordAgentUsage(env, {
         workspaceId: ai.workspaceId,

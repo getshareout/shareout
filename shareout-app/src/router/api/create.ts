@@ -1,5 +1,6 @@
 import type { FetchContext } from '../context';
 import { getSessionUser } from '../../auth/session';
+import type { AiMeter } from '../../data/ai-usage';
 import { chat, streamChat, getAgentChatModel, getBuildConfig } from '../../data/agent/anthropic';
 import { BUILD_MAX_TOKENS, buildSystemPrompt, extractHtml, deriveName } from '../../data/agent/build-page';
 import { getPackDirective } from '../../pages/themes';
@@ -127,6 +128,8 @@ export async function routeCreateApi(ctx: FetchContext): Promise<Response | null
   if (blocked) return addCORS(blocked);
 
   const user = await getSessionUser(request, env);
+  // Page building is metered to the host workspace (if any) and the signed-in user (if any).
+  const meter = (kind: string): AiMeter => ({ workspaceId: hostWs ?? null, userId: user?.id ?? null, kind, source: 'create' });
 
   let body: { phase?: string; prompt?: string; slug?: string; html?: string; theme?: string };
   try {
@@ -146,7 +149,7 @@ export async function routeCreateApi(ctx: FetchContext): Promise<Response | null
   if (body.phase === 'plan') {
     const rl = await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, user ? `plan:${user.id}` : getClientIp(request), 'createPlanAnon');
     if (!rl.allowed) return addCORS(json({ ok: false, error: 'Too many requests. Try again in a while.', code: 'RATE_LIMITED' }, 429));
-    return addCORS(await handlePlan(env, prompt, !!previousHtml));
+    return addCORS(await handlePlan(env, prompt, !!previousHtml, meter('page_build_plan')));
   }
 
   // Preview generates the page WITHOUT publishing — the CRO "watch it build"
@@ -167,7 +170,7 @@ export async function routeCreateApi(ctx: FetchContext): Promise<Response | null
       const rl = await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, user.id, 'createPreviewUser');
       if (!rl.allowed) return addCORS(json({ ok: false, error: 'Too many previews this hour. Try again in a while.', code: 'PREVIEW_LIMIT' }, 429));
     }
-    return addCORS(streamGenerate({ env, prompt, previousHtml, theme }));
+    return addCORS(streamGenerate({ env, prompt, previousHtml, theme, meter: meter('page_build') }));
   }
 
   // Publishing (build / publish) writes to the account — requires auth.
@@ -187,7 +190,7 @@ export async function routeCreateApi(ctx: FetchContext): Promise<Response | null
     return addCORS(await handlePublish(env, user, prompt, previousHtml, slug));
   }
 
-  return addCORS(streamGenerate({ env, prompt, previousHtml, theme, publish: { user, slug } }));
+  return addCORS(streamGenerate({ env, prompt, previousHtml, theme, publish: { user, slug }, meter: meter('page_build') }));
 }
 
 function sseLine(obj: unknown): string {
@@ -203,6 +206,7 @@ function streamGenerate(opts: {
   previousHtml: string;
   theme?: string;
   publish?: { user: SessionUser; slug?: string };
+  meter: AiMeter;
 }): Response {
   const { env, prompt, previousHtml, theme, publish } = opts;
   const encoder = new TextEncoder();
@@ -221,7 +225,7 @@ function streamGenerate(opts: {
 
         const systemPrompt = await buildSystemPrompt(env);
         let full = '';
-        for await (const chunk of streamChat(env, messages, systemPrompt, '', BUILD_MAX_TOKENS, getBuildConfig(env))) {
+        for await (const chunk of streamChat(env, opts.meter, messages, systemPrompt, '', BUILD_MAX_TOKENS, getBuildConfig(env))) {
           if (chunk.type === 'content' && chunk.content) {
             full += chunk.content;
             send({ type: 'delta', text: chunk.content });
@@ -333,11 +337,11 @@ function publishedFields(published: PublishResponse) {
 }
 
 // Phase 1: route the request to a reply, a confirmation, or a build.
-async function handlePlan(env: Env, prompt: string, hasPage: boolean): Promise<Response> {
+async function handlePlan(env: Env, prompt: string, hasPage: boolean, meter: AiMeter): Promise<Response> {
   const context = (hasPage ? 'The user already has a published page. ' : 'No page exists yet. ') + `Request: ${prompt}`;
   let raw = '';
   try {
-    const res = await chat(env, [{ role: 'user', content: context }], PLANNER_SYSTEM_PROMPT, getAgentChatModel(env), 500);
+    const res = await chat(env, meter, [{ role: 'user', content: context }], PLANNER_SYSTEM_PROMPT, getAgentChatModel(env), 500);
     raw = res.content;
   } catch {
     // Planner unavailable — don't block; fall straight to building.

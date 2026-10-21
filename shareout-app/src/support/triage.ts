@@ -50,7 +50,7 @@ export async function triageTicket(env: Env, ticketId: string): Promise<Triage |
 
   let text = '';
   try {
-    for await (const ev of provider.streamTurn({ system: TRIAGE_SYSTEM, transcript, tools: [], maxTokens: 800 })) {
+    for await (const ev of provider.streamTurn({ system: TRIAGE_SYSTEM, transcript, tools: [], maxTokens: 800, meter: { workspaceId: ticket.workspace_id, userId: ticket.requester_user_id, kind: 'support_triage', source: ticketId } })) {
       if (ev.type === 'text_delta') text += ev.text;
       else if (ev.type === 'error') return null;
     }

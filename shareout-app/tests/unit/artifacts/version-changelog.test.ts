@@ -79,10 +79,10 @@ describe('summarizeVersion', () => {
     const { ids } = await seedArtifact({ workspaceId: 'wsp_vc_on', versions: [{ html: '<h1>One</h1>' }, { html: '<h1>One</h1>\n<canvas id="q3"></canvas>' }] });
     await summarizeVersion(e, ids[1]);
     expect(chatComplete).toHaveBeenCalledTimes(1);
-    expect((chatComplete.mock.calls[0][1] as Array<{ content: string }>)[0].content).toBe('+ <canvas id="q3"></canvas>\n');
+    expect((chatComplete.mock.calls[0][2] as Array<{ content: string }>)[0].content).toBe('+ <canvas id="q3"></canvas>\n');
     expect(await messageOf(ids[1])).toEqual({ message: 'Added a Q3 revenue chart', message_source: 'ai' });
-    const usage = await e.DB.prepare("SELECT COUNT(*) AS n FROM ai_usage_events WHERE kind = 'version_summary'").first<{ n: number }>();
-    expect(usage?.n).toBe(1);
+    // Metered by chatComplete itself (mocked here): the call carries whom it is for.
+    expect(chatComplete.mock.calls[0][1]).toMatchObject({ kind: 'version_summary' });
   });
 
   it('never overwrites an author message, and skips first versions and restores', async () => {

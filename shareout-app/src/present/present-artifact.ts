@@ -9,7 +9,6 @@ import type { AuthUser } from '../api-auth';
 import { checkPresentLimit, incrementPresentLimit } from '../api-auth';
 import { getArtifactRef, resolveAlertRole } from '../metric-alerts/access';
 import { chatComplete, getAIProvider } from '../data/agent/anthropic';
-import { recordAiUsage } from '../data/ai-usage';
 import { publishArtifact } from '../publish/publish-artifact';
 import { generateSlug } from '../validation';
 import { renderDeckHtml, type Deck, type DeckSlide } from './deck-template';
@@ -131,7 +130,7 @@ export async function presentArtifact(
 
   let out: string;
   try {
-    out = await chatComplete(env, [{ role: 'user', content: userMsg }], SYSTEM, 1500);
+    out = await chatComplete(env, { workspaceId: src.workspace_id, userId, kind: 'present_this', source: artifactId }, [{ role: 'user', content: userMsg }], SYSTEM, 1500);
   } catch {
     return { ok: false, error: 'Could not generate the deck (AI request failed). No deck was created.', status: 502 };
   }
@@ -141,13 +140,6 @@ export async function presentArtifact(
     return { ok: false, error: 'Could not generate the deck (unusable AI output). No deck was created.', status: 502 };
   }
 
-  await recordAiUsage(env, {
-    workspaceId: src.workspace_id, userId,
-    kind: 'present_this', model: MODEL_LABEL,
-    units: Math.ceil((userMsg.length + out.length) / 4), unitKind: 'tokens',
-    baseCostMicroUsd: Math.round((userMsg.length / 4) * 0.0025 + (out.length / 4) * 0.01),
-    source: artifactId,
-  }).catch(() => {});
 
   const title = `${src.name} — deck`;
   const res = await publishArtifact(env, user, {

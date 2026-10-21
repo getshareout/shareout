@@ -12,7 +12,6 @@
 import type { Env } from '../types';
 import { summarizeFile } from '../data/files';
 import { chatComplete, getAIProvider } from '../data/agent/anthropic';
-import { recordAiUsage } from '../data/ai-usage';
 import { localeForContent, summaryLanguageRule, type Locale } from '../i18n';
 
 // Memory guard is the important one: parseXlsx/arrayBuffer run in the request isolate
@@ -92,19 +91,12 @@ export async function enrichDeliverable(env: Env, bucketId: string, deliverableI
   let meta: EnrichmentMeta;
   try {
     const locale = await localeForContent(env, row.workspace_id, row.owner_id).catch((): Locale => 'en');
-    const out = await chatComplete(env, [{ role: 'user', content: text }], enrichSystemPrompt(locale), 400);
+    const out = await chatComplete(env, { workspaceId: row.workspace_id, userId: row.owner_id, kind: 'file_enrichment', source: deliverableId }, [{ role: 'user', content: text }], enrichSystemPrompt(locale), 400);
     const parsed = parseModelJson(out);
     meta = parsed
       ? { status: 'ok', summary: parsed.summary, tags: parsed.tags, blobId: row.blob_id, model: ENRICH_MODEL_LABEL, at: now }
       : { status: 'failed', blobId: row.blob_id, at: now };
     // Tracking-only ledger (never debits) — rough token estimate from char counts.
-    await recordAiUsage(env, {
-      workspaceId: row.workspace_id, userId: row.owner_id,
-      kind: 'file_enrichment', model: ENRICH_MODEL_LABEL,
-      units: Math.ceil((text.length + out.length) / 4), unitKind: 'tokens',
-      baseCostMicroUsd: Math.round((text.length / 4) * 0.0025 + (out.length / 4) * 0.01),
-      source: deliverableId,
-    }).catch(() => {});
   } catch {
     meta = { status: 'failed', blobId: row.blob_id, at: now };
   }

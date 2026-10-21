@@ -1,4 +1,5 @@
 import type { Env } from '../../types';
+import { meterAiCall } from '../ai-usage';
 import { DATA_ERRORS } from '../../types';
 import type { DataContext } from '../middleware';
 import { errorResponse, corsHeaders } from '../middleware';
@@ -168,6 +169,11 @@ function parseUsage(text: string): UpstreamUsage {
 }
 
 /** Current step count for a task; null = no KV (cap disabled). */
+/** The AI Gateway generation id on a chat completion (its `id`), for the real-cost reconcile. */
+function parseGenerationId(text: string): string | null {
+  try { const id = (JSON.parse(text) as { id?: unknown }).id; return typeof id === 'string' ? id : null; } catch { return null; }
+}
+
 async function readStepCount(env: Env, artifactId: string, taskId: string): Promise<number | null> {
   const kv = env.RATE_LIMIT_KV;
   if (!kv) return null;
@@ -320,6 +326,8 @@ export async function handlePilot(request: Request, ctx: DataContext): Promise<R
     const inputTokens = usage.prompt_tokens ?? 0;
     const outputTokens = usage.completion_tokens ?? 0;
     await recordUsage(env, artifactId, 'pilot', inputTokens, outputTokens).catch(() => {});
+    await meterAiCall(env, { workspaceId: ai.workspaceId, userId: null, kind: 'page_pilot', source: artifactId }, env.PILOT_MODEL ?? aiConfig.model, inputTokens, outputTokens,
+      aiConfig.provider === 'vercel-gateway' ? parseGenerationId(upstreamText) : null);
     await incrementRateLimit(env, artifactId, inputTokens + outputTokens).catch(() => {});
     await recordAgentUsage(env, {
       workspaceId: ai.workspaceId,
@@ -404,6 +412,7 @@ export async function handlePilotSpike(request: Request, env: Env, origin: strin
   if (upstream.ok) {
     const usage = parseUsage(upstreamText);
     console.log(`[pilot] usage prompt=${usage.prompt_tokens ?? 0} completion=${usage.completion_tokens ?? 0} model=${model}`);
+    await meterAiCall(env, { workspaceId: null, userId: null, kind: 'page_pilot_spike', source: 'spike' }, model, usage.prompt_tokens ?? 0, usage.completion_tokens ?? 0);
     return new Response(upstreamText, {
       status: upstream.status,
       headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },

@@ -25,7 +25,7 @@ beforeAll(async () => {
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS assets (id TEXT PRIMARY KEY, version_id TEXT, path TEXT, r2_key TEXT, mime TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS artifact_tags (id TEXT PRIMARY KEY, artifact_id TEXT, label TEXT, UNIQUE(artifact_id, label))`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, locale TEXT)`);
-  await e.DB.exec(`CREATE TABLE IF NOT EXISTS ai_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, kind TEXT, model TEXT, units INTEGER, unit_kind TEXT, base_cost_micro_usd INTEGER, source TEXT, created_at TEXT)`);
+  await e.DB.exec(`CREATE TABLE IF NOT EXISTS ai_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, kind TEXT, model TEXT, units INTEGER, unit_kind TEXT, base_cost_micro_usd INTEGER, source TEXT, input_tokens INTEGER, output_tokens INTEGER, cost_source TEXT, provider_ref TEXT, created_at TEXT)`);
 });
 
 async function seedArtifact(id: string, opts: { html?: string; description?: string | null } = {}) {
@@ -72,8 +72,8 @@ describe('generateArtifactSummary (post-publish, background)', () => {
     expect(row!.auto_summary_hash).toBeTruthy();
     expect(await tagsOf('a1')).toEqual(['dashboard', 'q3', 'revenue']); // lowercased, sorted
 
-    const usage = await e.DB.prepare(`SELECT COUNT(*) AS n FROM ai_usage_events WHERE kind='artifact_summary'`).first<{ n: number }>();
-    expect(usage!.n).toBe(1);
+    // Metered by chatComplete itself (mocked here): the call carries whom it is for.
+    expect(chatComplete.mock.calls[0][1]).toMatchObject({ kind: 'artifact_summary' });
   });
 
   it('does not clobber a user-set description', async () => {
@@ -116,13 +116,13 @@ describe('summary language follows the workspace', () => {
     await e.DB.prepare(`INSERT INTO workspaces (id, locale) VALUES ('wsp', 'es')`).run();
     await seedArtifact('a5');
     await generateArtifactSummary(e, 'a5');
-    expect(chatComplete.mock.calls[0][2]).toBe(summarySystemPrompt('es'));
+    expect(chatComplete.mock.calls[0][3]).toBe(summarySystemPrompt('es'));
   });
 
   it('passes the English prompt when the workspace has no Spanish locale', async () => {
     await e.DB.prepare(`INSERT INTO workspaces (id, locale) VALUES ('wsp', 'en')`).run();
     await seedArtifact('a6');
     await generateArtifactSummary(e, 'a6');
-    expect(chatComplete.mock.calls[0][2]).toBe(summarySystemPrompt('en'));
+    expect(chatComplete.mock.calls[0][3]).toBe(summarySystemPrompt('en'));
   });
 });

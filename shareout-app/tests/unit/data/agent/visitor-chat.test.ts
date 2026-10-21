@@ -208,7 +208,7 @@ describe('handleVisitorChat', () => {
     await readSSE(res);
 
     // Model sees the live data block. streamChat(env, messages, ...)
-    const messagesArg = mockStreamChat.mock.calls[0][1] as Array<{ role: string; content: string }>;
+    const messagesArg = mockStreamChat.mock.calls[0][2] as Array<{ role: string; content: string }>;
     const lastUser = messagesArg[messagesArg.length - 1];
     expect(lastUser.role).toBe('user');
     expect(lastUser.content).toContain('Why did revenue change?');
@@ -230,7 +230,7 @@ describe('handleVisitorChat', () => {
       jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'plain question' }),
       ctx,
     ));
-    const messagesArg = mockStreamChat.mock.calls[0][1] as Array<{ role: string; content: string }>;
+    const messagesArg = mockStreamChat.mock.calls[0][2] as Array<{ role: string; content: string }>;
     expect(messagesArg[messagesArg.length - 1].content).toBe('plain question');
   });
 
@@ -257,6 +257,7 @@ describe('handleVisitorChat', () => {
     await readSSE(res);
     expect(mockStreamChat).toHaveBeenCalledWith(
       env,
+      expect.objectContaining({ kind: 'artifact_visitor_chat' }),
       expect.arrayContaining([
         { role: 'assistant', content: 'Welcome' },
         { role: 'user', content: 'Thanks' },
@@ -513,7 +514,7 @@ describe('visitor model + temperature settings', () => {
     const ctx = makeCtx(makeEnv(configDb(agentConfigRow({ visitor_model: 'openai/gpt-5', visitor_temperature: 0.3 }))));
     const res = await handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx);
     await readSSE(res);
-    const [, , , , , cfg, opts] = mockStreamChat.mock.calls[0];
+    const [, , , , , , cfg, opts] = mockStreamChat.mock.calls[0];
     expect(cfg).toMatchObject({ provider: 'vercel-gateway', model: 'openai/gpt-5' });
     expect(opts).toEqual({ temperature: 0.3 });
   });
@@ -522,6 +523,6 @@ describe('visitor model + temperature settings', () => {
     mockResolveAgentAiConfig.mockResolvedValue({ workspaceId: null, aiConfig: gw, byo: false });
     const ctx = makeCtx(makeEnv(configDb(agentConfigRow({ visitor_model: 'gpt-4o' }))));
     await readSSE(await handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx));
-    expect(mockStreamChat.mock.calls[0][5]).toBe(gw);
+    expect(mockStreamChat.mock.calls[0][6]).toBe(gw);
   });
 });

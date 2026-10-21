@@ -195,6 +195,7 @@ export async function handleVisitorChat(
       try {
         for await (const chunk of streamChat(
           ctx.env,
+          { workspaceId: ctx.artifact.workspace_id, userId: null, kind: 'artifact_visitor_chat', source: ctx.artifactId },
           messages,
           systemPrompt,
           chatModel,

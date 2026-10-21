@@ -75,14 +75,14 @@ describe('verdictToStatus', () => {
 describe('runPublishSafetyCheck', () => {
   it('approves clean content', async () => {
     mockFetch.mockResolvedValue(aiResponse('clean'));
-    const r = await runPublishSafetyCheck(ENV, '<p>my dashboard</p>');
+    const r = await runPublishSafetyCheck(ENV, '<p>my dashboard</p>', { artifactId: 'art_t' });
     expect(r.status).toBe('approved');
     expect(r.contentHash).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('blocks malicious content', async () => {
     mockFetch.mockResolvedValue(aiResponse('malicious', 'phishing'));
-    const r = await runPublishSafetyCheck(ENV, '<form>login to your bank</form>');
+    const r = await runPublishSafetyCheck(ENV, '<form>login to your bank</form>', { artifactId: 'art_t' });
     expect(r.status).toBe('blocked');
   });
 
@@ -103,7 +103,7 @@ describe('runPublishSafetyCheck', () => {
 
   it('fails open when every provider is rate-limited or down (429/5xx)', async () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 503 }).mockResolvedValueOnce({ ok: false, status: 429 });
-    const r = await runPublishSafetyCheck(BOTH_ENV, '<p>x</p>');
+    const r = await runPublishSafetyCheck(BOTH_ENV, '<p>x</p>', { artifactId: 'art_t' });
     expect(r.status).toBe('approved');
     expect(r.reason).toBe('provider_error_fail_open: classifier http 429 (all providers)');
     expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -111,14 +111,14 @@ describe('runPublishSafetyCheck', () => {
 
   it('holds (fails safe) when any provider failure is not transient', async () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 429 }).mockResolvedValueOnce({ ok: false, status: 401 });
-    const r = await runPublishSafetyCheck(BOTH_ENV, '<p>x</p>');
+    const r = await runPublishSafetyCheck(BOTH_ENV, '<p>x</p>', { artifactId: 'art_t' });
     expect(r.status).toBe('pending');
     expect(r.contentHash).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('holds on unparseable classifier output (not a provider outage)', async () => {
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({ choices: [{ message: { content: 'sure!' } }] }) });
-    const r = await runPublishSafetyCheck(ENV, '<p>x</p>');
+    const r = await runPublishSafetyCheck(ENV, '<p>x</p>', { artifactId: 'art_t' });
     expect(r.status).toBe('pending');
   });
 
@@ -127,7 +127,7 @@ describe('runPublishSafetyCheck', () => {
     const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
     mockFetch.mockImplementationOnce(async () => { now += 3000; throw new Error('timeout'); });
 
-    const r = await runPublishSafetyCheck(BOTH_ENV, '<p>x</p>', { budgetMs: 3000 });
+    const r = await runPublishSafetyCheck(BOTH_ENV, '<p>x</p>', { budgetMs: 3000, artifactId: 'art_t' });
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockFetch.mock.calls[0][2]).toBe(3000);
@@ -142,7 +142,7 @@ describe('runPublishSafetyCheck', () => {
       .mockImplementationOnce(async () => { now += 1200; return { ok: false, status: 429 }; })
       .mockResolvedValueOnce(aiResponse('clean'));
 
-    const r = await runPublishSafetyCheck(BOTH_ENV, '<p>x</p>', { budgetMs: 3000 });
+    const r = await runPublishSafetyCheck(BOTH_ENV, '<p>x</p>', { budgetMs: 3000, artifactId: 'art_t' });
 
     expect(mockFetch.mock.calls[1][2]).toBe(1800);
     expect(r.status).toBe('approved');
@@ -154,7 +154,7 @@ describe('runPublishSafetyCheck', () => {
       .mockResolvedValueOnce({ ok: false, status: 402 }) // gateway out of credits
       .mockResolvedValueOnce(aiResponse('clean'));         // openai succeeds
 
-    const r = await runPublishSafetyCheck(BOTH_ENV, '<p>my dashboard</p>');
+    const r = await runPublishSafetyCheck(BOTH_ENV, '<p>my dashboard</p>', { artifactId: 'art_t' });
 
     expect(r.status).toBe('approved');
     expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -167,7 +167,7 @@ describe('runPublishSafetyCheck', () => {
   it('fails safe to pending when every provider fails, naming the last failure', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 402 });
 
-    const r = await runPublishSafetyCheck(BOTH_ENV, '<p>x</p>');
+    const r = await runPublishSafetyCheck(BOTH_ENV, '<p>x</p>', { artifactId: 'art_t' });
 
     expect(r.status).toBe('pending');
     expect(r.verdict).toBe('error');
@@ -177,7 +177,7 @@ describe('runPublishSafetyCheck', () => {
 
   it('approves when no AI provider is configured (self-host without a classifier)', async () => {
     mockFetch.mockResolvedValue(aiResponse('clean'));
-    const r = await runPublishSafetyCheck({} as Env, '<p>x</p>');
+    const r = await runPublishSafetyCheck({} as Env, '<p>x</p>', { artifactId: 'art_t' });
     expect(r.status).toBe('approved');
     expect(r.reason).toMatch(/not configured/i);
     expect(mockFetch).not.toHaveBeenCalled();
@@ -186,7 +186,7 @@ describe('runPublishSafetyCheck', () => {
   it('escalates clean-but-obfuscated content to suspicious/pending', async () => {
     mockFetch.mockResolvedValue(aiResponse('clean'));
     const obf = `<script>eval(atob("${'QQ'.repeat(20)}"));var s="\\x41\\x42";document.write(s);${'x'.repeat(2100)}</script>`;
-    const r = await runPublishSafetyCheck(ENV, obf);
+    const r = await runPublishSafetyCheck(ENV, obf, { artifactId: 'art_t' });
     expect(r.verdict).toBe('suspicious');
     expect(r.status).toBe('pending');
   });
@@ -197,7 +197,7 @@ describe('runPublishSafetyCheck', () => {
   it('gives the classifier platform-domain context in the system prompt', async () => {
     mockFetch.mockResolvedValue(aiResponse('clean'));
     const hosted = { ...ENV, SHAREOUT_BASE_URL: 'https://shareout.site', ARTIFACT_ORIGIN: 'https://shareoutcdn.site' } as Env;
-    await runPublishSafetyCheck(hosted, '<p>x</p>');
+    await runPublishSafetyCheck(hosted, '<p>x</p>', { artifactId: 'art_t' });
     const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
     expect(body.messages[0].content).toContain('ShareOut');
     expect(body.messages[0].content).toContain('shareout.site');
@@ -209,7 +209,7 @@ describe('runPublishSafetyCheck', () => {
   // impersonation, while links to a domain they do not own were vouched for.
   it('names this instance domains, not the hosted ones', async () => {
     mockFetch.mockResolvedValue(aiResponse('clean'));
-    await runPublishSafetyCheck({ ...ENV, SHAREOUT_BASE_URL: 'https://acme.com' } as Env, '<p>x</p>');
+    await runPublishSafetyCheck({ ...ENV, SHAREOUT_BASE_URL: 'https://acme.com' } as Env, '<p>x</p>', { artifactId: 'art_t' });
     const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
     expect(body.messages[0].content).toContain('acme.com and *.acme.com');
     expect(body.messages[0].content).not.toContain('shareout.site');
@@ -218,7 +218,7 @@ describe('runPublishSafetyCheck', () => {
   it('names a separate content origin alongside the app host', async () => {
     mockFetch.mockResolvedValue(aiResponse('clean'));
     const env = { ...ENV, SHAREOUT_BASE_URL: 'https://acme.com', ARTIFACT_ORIGIN: 'https://sandbox.acme.net' } as Env;
-    await runPublishSafetyCheck(env, '<p>x</p>');
+    await runPublishSafetyCheck(env, '<p>x</p>', { artifactId: 'art_t' });
     const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
     expect(body.messages[0].content).toContain('acme.com');
     expect(body.messages[0].content).toContain('sandbox.acme.net');
@@ -227,7 +227,7 @@ describe('runPublishSafetyCheck', () => {
   it('samples head + tail so end-of-file scripts survive truncation', async () => {
     mockFetch.mockResolvedValue(aiResponse('clean'));
     const big = '<!--HEAD_MARKER-->' + 'a'.repeat(80_000) + '<script>/*TAIL_MARKER*/</script>';
-    await runPublishSafetyCheck(ENV, big);
+    await runPublishSafetyCheck(ENV, big, { artifactId: 'art_t' });
     const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
     const sent = body.messages[1].content as string;
     expect(sent).toContain('HEAD_MARKER');

@@ -1,5 +1,6 @@
 import type { Env } from '../../types';
 import type { ChatChunk, MessageRole } from './types';
+import { meterAiCall, type AiMeter } from '../ai-usage';
 import { fetchWithTimeout, FetchTimeoutError } from '../../fetch-utils';
 import { createLogger } from '../../logging';
 import { DEFAULT_CLAUDE_MODEL, OPENAI_CHAT_MODEL, gatewayReasoningParams, temperatureParams, thinkingOffParams } from './models';
@@ -76,6 +77,8 @@ export interface StreamChatOptions {
 }
 
 interface StreamEvent {
+  /** The AI Gateway generation id (`gen_…`) on OpenAI-compatible chunks; used to fetch the real cost. */
+  id?: string;
   choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }>;
   usage?: { prompt_tokens?: number; completion_tokens?: number; input_tokens?: number; output_tokens?: number };
   type?: string;
@@ -249,21 +252,24 @@ function filterMessages(messages: InputMessage[]): ChatMessage[] {
  */
 export async function chatComplete(
   env: Env,
+  meter: AiMeter,
   messages: InputMessage[],
   systemPrompt: string,
   maxTokens: number,
   configOverride?: AIConfig | null
 ): Promise<string> {
   let out = '';
-  for await (const chunk of streamChat(env, messages, systemPrompt, '', maxTokens, configOverride)) {
+  for await (const chunk of streamChat(env, meter, messages, systemPrompt, '', maxTokens, configOverride)) {
     if (chunk.type === 'content' && chunk.content) out += chunk.content;
     else if (chunk.type === 'error') throw new Error(chunk.error || 'AI stream error');
   }
   return out;
 }
 
+/** Every call is metered into ai_usage_events (`meter` says for whom) with the real token usage. */
 export async function* streamChat(
   env: Env,
+  meter: AiMeter,
   messages: InputMessage[],
   systemPrompt: string,
   _model: string,
@@ -307,6 +313,7 @@ export async function* streamChat(
           const decoder = new TextDecoder();
           let buffer = '';
           let inputTokens = 0;
+          let providerRef: string | null = null;
           let outputTokens = 0;
           let truncated = false;
 
@@ -335,6 +342,7 @@ export async function* streamChat(
                   failure = { error: `AI API error: ${event.error?.message ?? 'stream error'}`, retryable: true };
                   break;
                 }
+                if (!providerRef && cfg.provider === 'vercel-gateway' && typeof event.id === 'string') providerRef = event.id;
 
                 const content = event.choices?.[0]?.delta?.content
                   ?? (event.delta?.type === 'text_delta' ? event.delta.text : undefined);
@@ -360,6 +368,7 @@ export async function* streamChat(
           }
 
           if (!failure) {
+            await meterAiCall(env, meter, cfg.model, inputTokens, outputTokens, providerRef);
             yield {
               type: 'done',
               usage: { input_tokens: inputTokens, output_tokens: outputTokens },
@@ -393,6 +402,7 @@ export async function* streamChat(
 
 export async function chat(
   env: Env,
+  meter: AiMeter,
   messages: Array<{ role: MessageRole; content: string }>,
   systemPrompt: string,
   _model: string,
@@ -422,6 +432,7 @@ export async function chat(
       content: Array<{ type: string; text?: string }>;
       usage: { input_tokens: number; output_tokens: number };
     };
+    await meterAiCall(env, meter, aiConfig.model, result.usage.input_tokens, result.usage.output_tokens);
     return {
       content: result.content.filter(b => b.type === 'text').map(b => b.text ?? '').join(''),
       usage: { input_tokens: result.usage.input_tokens, output_tokens: result.usage.output_tokens },
@@ -429,10 +440,13 @@ export async function chat(
   }
 
   const result = await response.json() as {
+    id?: string;
     choices: Array<{ message: { content: string } }>;
     usage: { prompt_tokens: number; completion_tokens: number };
   };
 
+  await meterAiCall(env, meter, aiConfig.model, result.usage.prompt_tokens, result.usage.completion_tokens,
+    aiConfig.provider === 'vercel-gateway' ? result.id : null);
   return {
     content: result.choices[0]?.message?.content || '',
     usage: {

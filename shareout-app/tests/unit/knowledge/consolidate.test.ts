@@ -22,7 +22,7 @@ beforeAll(async () => {
     `CREATE TABLE IF NOT EXISTS knowledge_tombstones (workspace_id TEXT NOT NULL, path TEXT NOT NULL, forgotten_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (workspace_id, path))`,
     `CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, name TEXT, description TEXT, workspace_id TEXT, deleted_at TEXT)`,
     `CREATE TABLE IF NOT EXISTS artifact_moderation (artifact_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'approved', reason TEXT, checked_at TEXT, content_hash TEXT, held_visibility TEXT)`,
-    `CREATE TABLE IF NOT EXISTS ai_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, kind TEXT, model TEXT, units INTEGER, unit_kind TEXT, base_cost_micro_usd INTEGER, source TEXT, created_at TEXT)`,
+    `CREATE TABLE IF NOT EXISTS ai_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, kind TEXT, model TEXT, units INTEGER, unit_kind TEXT, base_cost_micro_usd INTEGER, source TEXT, input_tokens INTEGER, output_tokens INTEGER, cost_source TEXT, provider_ref TEXT, created_at TEXT)`,
   ]) {
     await e.DB.exec(sql);
   }
@@ -411,22 +411,20 @@ describe('timeline', () => {
 });
 
 describe('overview + ledger', () => {
-  it('writes the trunk with a ## Top topics section and records ai_usage_events', async () => {
+  it('writes the trunk with a ## Top topics section, metering each call to its workspace', async () => {
     await seedDigest(WS, { id: 'a1', title: 'D1', topics: ['retention'] });
     const fake = makeFake({ overview: () => 'Acme retention intelligence workspace.' });
-    await runKnowledgeConsolidate(e, { complete: fake.complete });
+    const seenWorkspaces: string[] = [];
+    await runKnowledgeConsolidate(e, { complete: (s, u, ws) => { if (ws) seenWorkspaces.push(ws); return fake.complete(s, u); } });
     const idx = await getKnowledgeFile(e, WS, 'index.md');
     expect(idx?.source).toBe('consolidated');
     expect(idx?.content).toContain('Acme retention intelligence workspace.');
     expect(idx?.content).toContain('## Top topics');
     expect(idx?.content).toContain('[[topic.retention]]');
 
-    const usage = await e.DB.prepare(
-      "SELECT COUNT(*) AS n FROM ai_usage_events WHERE workspace_id = ? AND kind = 'knowledge_consolidate'"
-    )
-      .bind(WS)
-      .first<{ n: number }>();
-    expect((usage?.n ?? 0)).toBeGreaterThan(0);
+    // The injected model fn is told which workspace each call is for (chatComplete meters it).
+    expect(seenWorkspaces.length).toBeGreaterThan(0);
+    expect(new Set(seenWorkspaces)).toEqual(new Set([WS]));
   });
 
   it('never overwrites a manual index and does not call the overview LLM', async () => {

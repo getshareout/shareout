@@ -86,6 +86,7 @@ export async function handleSlideAiRoute(
   try {
     const result = await chat(
       ctx.env,
+      { workspaceId: ctx.artifact.workspace_id, userId: null, kind: 'slides_ai_edit', source: ctx.artifactId },
       [{ role: 'user', content: userMsg }],
       systemPrompt(action),
       '',

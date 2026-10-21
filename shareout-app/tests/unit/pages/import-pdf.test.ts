@@ -21,6 +21,7 @@ const { DOC_IMAGES_ONLY, DocReadError } = await import('../../../src/data/files/
 const { zipSync, strToU8 } = await import('fflate');
 
 const BYTES = new TextEncoder().encode('%PDF-1.4 x');
+const METER = { workspaceId: 'wsp_1', userId: 'usr_1', kind: 'document_transcription', source: 'x.pdf' };
 const PROSE = 'El presente procedimiento establece la metodología para la gestión de residuos generados en obra, incluyendo su clasificación, almacenamiento temporal, transporte y disposición final conforme a la normativa vigente. '.repeat(2);
 const TO_MD = (body: string) => `# PA-02.pdf\n## Metadata\n- PDFFormatVersion=1.4\n- IsLinearized=false\n## Contents\n### Page 1\n${body}\n### Page 2\nFin.`;
 const envWith = (data: string | null) => ({ AI: { toMarkdown: async () => (data === null ? { format: 'error' } : { format: 'markdown', data }) } }) as unknown as Env;
@@ -38,7 +39,7 @@ describe('pdfMarkdownBody', () => {
 
 describe('convertPdfImport', () => {
   it('turns a PDF with text into an editable Markdown page and keeps the original', async () => {
-    const out = await convertPdfImport(envWith(TO_MD(PROSE)), 'PA-02 Residuos.pdf', BYTES);
+    const out = await convertPdfImport(envWith(TO_MD(PROSE)), 'PA-02 Residuos.pdf', BYTES, METER);
     expect(out.type).toBe('markdown');
     expect(out.entrypoint).toBe('PA-02 Residuos.md');
     expect(out.files[0].content).toContain('gestión de residuos');
@@ -50,20 +51,20 @@ describe('convertPdfImport', () => {
 
   it('transcribes a scan (only page markers and stray bullets come back)', async () => {
     transcribePdf.mockResolvedValue('# Matriz de riesgos\n\n| Tarea | Riesgo |\n|---|---|\n| Izaje | Alto |');
-    const out = await convertPdfImport(envWith(TO_MD('-\n\n- •\n\n- •')), 'RS-01-02 Matriz.pdf', BYTES);
-    expect(transcribePdf).toHaveBeenCalledOnce();
+    const out = await convertPdfImport(envWith(TO_MD('-\n\n- •\n\n- •')), 'RS-01-02 Matriz.pdf', BYTES, METER);
+    expect(transcribePdf).toHaveBeenCalledWith(expect.anything(), METER, expect.any(String));
     expect(out.type).toBe('markdown');
     expect(out.files[0].content).toContain('| Izaje | Alto |');
   });
 
   it('keeps the little text it found when transcription is unavailable', async () => {
-    const out = await convertPdfImport(envWith(TO_MD('Plano general.')), 'plano.pdf', BYTES);
+    const out = await convertPdfImport(envWith(TO_MD('Plano general.')), 'plano.pdf', BYTES, METER);
     expect(out.type).toBe('markdown');
     expect(out.files[0].content).toContain('Plano general.');
   });
 
   it('stays a PDF artifact when nothing can be read, so the upload is never lost', async () => {
-    const out = await convertPdfImport({} as Env, 'scan.pdf', BYTES);
+    const out = await convertPdfImport({} as Env, 'scan.pdf', BYTES, METER);
     expect(out.type).toBe('pdf');
     expect(out.files).toEqual([{ path: 'scan.pdf', content: 'JVBERi0xLjQgeA==', mime: 'application/pdf', encoding: 'base64' }]);
     expect(out.entrypoint).toBe('scan.pdf');
@@ -83,8 +84,8 @@ describe('Word files that are only pictures', () => {
   it('transcribes the pictures of an image-only .doc', async () => {
     docToMarkdown.mockImplementation(() => { throw new DocReadError(DOC_IMAGES_ONLY); });
     transcribeDocument.mockResolvedValue('| Severidad | A |\n|---|---|\n| V | 4 |');
-    const out = await convertOfficeImport({} as Env, 'RS-01-02 Matriz.doc', 'doc', 'word', new Uint8Array(png(12_000)));
-    expect(transcribeDocument).toHaveBeenCalledWith({}, [expect.objectContaining({ mediaType: 'image/png' })]);
+    const out = await convertOfficeImport({} as Env, 'RS-01-02 Matriz.doc', 'doc', 'word', new Uint8Array(png(12_000)), METER);
+    expect(transcribeDocument).toHaveBeenCalledWith({}, METER, [expect.objectContaining({ mediaType: 'image/png' })]);
     expect(out.files[0].content).toContain('| V | 4 |');
   });
 

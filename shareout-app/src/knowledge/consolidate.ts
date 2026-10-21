@@ -1,6 +1,5 @@
 import type { Env } from '../types';
 import { chatComplete, getBuildConfig } from '../data/agent/anthropic';
-import { recordAiUsage } from '../data/ai-usage';
 import {
   upsertLearnedFile,
   deleteKnowledgeFile,
@@ -77,7 +76,8 @@ workspace is about, for a teammate or agent seeing it for the first time.
 Mention the main topics, clients/products, and anything with hard numbers.
 Respond with the prose only.`;
 
-export type ConsolidateComplete = (system: string, user: string) => Promise<string>;
+/** `workspaceId` says whom the call is metered to. */
+export type ConsolidateComplete = (system: string, user: string, workspaceId?: string) => Promise<string>;
 
 export interface ConsolidateResult {
   workspaces: number;
@@ -183,18 +183,8 @@ function budgetOk(ctx: RunCtx): boolean {
 }
 
 async function llm(ctx: RunCtx, ws: string, system: string, user: string): Promise<string> {
-  const out = await ctx.complete(system, user);
+  const out = await ctx.complete(system, user, ws);
   ctx.llmCalls++;
-  await recordAiUsage(ctx.env, {
-    workspaceId: ws,
-    userId: null,
-    kind: 'knowledge_consolidate',
-    model: ctx.model,
-    units: Math.ceil(out.length / 4),
-    unitKind: 'tokens_out',
-    baseCostMicroUsd: 0,
-    source: 'knowledge',
-  }).catch(() => {});
   return out;
 }
 
@@ -937,9 +927,10 @@ export async function runKnowledgeConsolidate(
   const complete: ConsolidateComplete | null =
     opts?.complete ??
     (config
-      ? (system, user) =>
+      ? (system, user, workspaceId) =>
           chatComplete(
             env,
+            { workspaceId: workspaceId ?? null, userId: null, kind: 'knowledge_consolidate', source: 'knowledge' },
             [{ role: 'user', content: user }],
             system,
             system.startsWith('You canonicalize')

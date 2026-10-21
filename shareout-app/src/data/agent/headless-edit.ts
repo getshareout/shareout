@@ -94,7 +94,7 @@ export async function proposeEdit(env: Env, artifactId: string, instruction: str
   let content = '';
   let inputTokens = 0;
   let outputTokens = 0;
-  for await (const chunk of streamChat(env, [{ role: 'user', content: instruction }], systemPrompt, model, 8192, aiConfig)) {
+  for await (const chunk of streamChat(env, { workspaceId: ctx.artifact.workspace_id, userId: null, kind: 'artifact_ai_edit', source: artifactId }, [{ role: 'user', content: instruction }], systemPrompt, model, 8192, aiConfig)) {
     if (chunk.type === 'content' && chunk.content) content += chunk.content;
     else if (chunk.type === 'done' && chunk.usage) {
       inputTokens = chunk.usage.input_tokens;

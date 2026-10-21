@@ -182,6 +182,7 @@ describe('handleAdminChat', () => {
     await readSSE(res);
     expect(mockStreamChat).toHaveBeenCalledWith(
       ctx.env,
+      expect.objectContaining({ kind: 'artifact_admin_chat', source: ARTIFACT_ID }),
       expect.arrayContaining([
         { role: 'user', content: 'prior' },
         { role: 'user', content: 'follow up' },

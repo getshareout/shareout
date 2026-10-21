@@ -4,6 +4,7 @@
  * assistant's create_artifact tool (whole-page generate-then-publish).
  */
 import { rewriteSkillOrigin } from '../../skill-origin';
+import type { AiMeter } from '../ai-usage';
 import type { Env } from '../../types';
 import { getSkillDocs } from './context';
 import { chatComplete, getBuildConfig } from './anthropic';
@@ -90,10 +91,11 @@ export function deriveName(prompt: string): string {
  * Whole-page (non-streaming) — used where there's no live stream to the client
  * (the chat assistant's create_artifact confirm step).
  */
-export async function generateArtifactHtml(env: Env, prompt: string): Promise<string> {
+export async function generateArtifactHtml(env: Env, prompt: string, meter: AiMeter): Promise<string> {
   const system = await buildSystemPrompt(env);
   const full = await chatComplete(
     env,
+    meter,
     [{ role: 'user', content: prompt }],
     system,
     BUILD_MAX_TOKENS,
