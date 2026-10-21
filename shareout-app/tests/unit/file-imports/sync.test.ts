@@ -115,7 +115,8 @@ describe('import run', () => {
     expect(r.counts).toMatchObject({ found: 6, imported: 4, skipped: 2, failed: 0 });
     expect(log.downloads).toContain('export:D:application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     expect(log.downloads).not.toContain('media:Q');
-    expect(r.errors.map((x) => x.code).sort()).toEqual(['BLOCKED_TYPE', 'NOT_EXPORTABLE']);
+    // The fake Doc export is not a real .docx, so its page fails; the file is still imported.
+    expect(r.errors.map((x) => x.code).sort()).toEqual(['BLOCKED_TYPE', 'CONVERT_FAILED', 'NOT_EXPORTABLE']);
 
     const names = (await e.DB.prepare(`SELECT d.name, f.name AS folder FROM asset_deliverables d JOIN folders f ON f.id = d.folder_id WHERE d.workspace_id = ? AND d.folder_id IN
       (SELECT folder_id FROM file_import_items WHERE source_id = ?) `).bind(WS, s.id).all<{ name: string; folder: string }>()).results.sort((x, y) => x.name.localeCompare(y.name));
@@ -151,12 +152,14 @@ describe('import run', () => {
     expect(log.downloads).toEqual([]);
   });
 
-  it('turns documents into pages and updates the same page when the file changes', async () => {
+  it('turns documents and images into pages and updates the same page when the file changes', async () => {
     const files = [gFile('M', 'Guide.md', 'F0', 'text/markdown', '# Guide\n\nv1'), gFile('P', 'photo.png', 'F0', 'image/png')];
     vi.stubGlobal('fetch', fakeGoogle(files, log));
-    const s = await source(await connect(), { convert_enabled: 1 } as Partial<SourceRow>);
+    const s = await source(await connect());
     const r = await run(s);
-    expect(r.counts).toMatchObject({ imported: 2, converted: 1 });
+    expect(r.counts).toMatchObject({ imported: 2, converted: 2 });
+    const photo = await e.DB.prepare("SELECT a.artifact_type FROM file_import_items i JOIN artifacts a ON a.id = i.artifact_id WHERE i.source_id = ? AND i.remote_id = 'P'").bind(s.id).first<{ artifact_type: string }>();
+    expect(photo?.artifact_type).toBe('image');
     const item = await e.DB.prepare("SELECT artifact_id, artifact_slug FROM file_import_items WHERE source_id = ? AND remote_id = 'M'").bind(s.id).first<{ artifact_id: string; artifact_slug: string }>();
     const art = await e.DB.prepare('SELECT workspace_id, visibility, folder_id FROM artifacts WHERE id = ?').bind(item!.artifact_id).first<{ workspace_id: string; visibility: string; folder_id: string }>();
     expect(art).toMatchObject({ workspace_id: WS, visibility: 'workspace' });
@@ -169,10 +172,14 @@ describe('import run', () => {
     expect(versions!.n).toBe(2);
   });
 
-  it('feeds Knowledge with each imported file', async () => {
-    vi.stubGlobal('fetch', fakeGoogle([gFile('K', 'k.txt', 'F0', 'text/plain')], log));
-    await run(await source(await connect()));
-    expect(queueKnowledgeSource).toHaveBeenCalledWith(e, undefined, expect.objectContaining({ workspaceId: WS, kind: 'asset' }), expect.any(String));
+  it('feeds Knowledge a file only when it has no page (the page is learned on publish)', async () => {
+    vi.stubGlobal('fetch', fakeGoogle([gFile('K', 'k.txt', 'F0', 'text/plain'), gFile('A', 'a.mp3', 'F0', 'audio/mpeg')], log));
+    const s = await source(await connect());
+    await run(s);
+    const ids = (await e.DB.prepare('SELECT remote_id, deliverable_id FROM file_import_items WHERE source_id = ?').bind(s.id).all<{ remote_id: string; deliverable_id: string }>()).results;
+    const dlv = (id: string) => ids.find((x) => x.remote_id === id)!.deliverable_id;
+    expect(queueKnowledgeSource).toHaveBeenCalledWith(e, undefined, expect.objectContaining({ workspaceId: WS, kind: 'asset', refId: dlv('A') }), expect.any(String));
+    expect(queueKnowledgeSource).not.toHaveBeenCalledWith(e, undefined, expect.objectContaining({ refId: dlv('K') }), expect.any(String));
   });
 
   it('honours depth and count bounds', async () => {

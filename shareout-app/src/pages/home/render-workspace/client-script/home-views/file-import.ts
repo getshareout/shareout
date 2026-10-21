@@ -132,7 +132,6 @@ export const workspace_client_home_views_fileImport_JS = `  // ===== Import from
         var opts = '<option value="">' + esc(t('fimp.targetRoot')) + '</option>' + (d.folders || []).map(function (f) { return '<option value="' + esc(f.id) + '">' + esc(f.name) + '</option>'; }).join('');
         var b = fiBody('<div class="wsx-sched__title">' + esc(entry.name) + '</div>'
           + '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('fimp.target')) + '</span><select class="wsx-field__in" id="fiTgt">' + opts + '</select></label>'
-          + '<label class="wsx-field__note"><input type="checkbox" id="fiConv" checked> ' + esc(t('fimp.convert')) + '</label><br>'
           + '<label class="wsx-field__note"><input type="checkbox" id="fiDaily"> ' + esc(t('fimp.daily')) + '</label>'
           + '<p class="wsx-cform__err" id="fiErr"></p>'
           + '<div class="wsx-cform__foot">' + fiBtn('data-fi-back="1"', t('fimp.back'), false) + ' ' + fiBtn('id="fiGo"', t('fimp.start'), true) + '</div>');
@@ -142,7 +141,7 @@ export const workspace_client_home_views_fileImport_JS = `  // ===== Import from
           var go = this; go.disabled = true; go.textContent = t('fimp.starting');
           fiJson('POST', '/sources', {
             provider: provider, ref: entry.ref, name: entry.name, targetFolderId: cv('fiTgt') || null,
-            convert: document.getElementById('fiConv').checked, dailySync: document.getElementById('fiDaily').checked,
+            dailySync: document.getElementById('fiDaily').checked,
           }).then(function (r) { fiProgress(r.run.id); }, function (err) { go.disabled = false; go.textContent = t('fimp.start'); fiErr(err); });
         });
       });

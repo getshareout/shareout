@@ -56,7 +56,7 @@ export function providerOrder(env: Env): AIProvider[] {
   return [...new Set([...listed, ...DEFAULT_PROVIDER_ORDER])];
 }
 
-/** Optional inline image (base64, no data: prefix) sent before the message text. */
+/** Optional inline image or PDF (base64, no data: prefix) sent before the message text. */
 export interface ChatImage {
   mediaType: string;
   data: string;
@@ -105,7 +105,9 @@ function completionRequest(
           ? {
             role: m.role,
             content: [
-              { type: 'image', source: { type: 'base64', media_type: m.image.mediaType, data: m.image.data } },
+              m.image.mediaType === 'application/pdf'
+                ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: m.image.data } }
+                : { type: 'image', source: { type: 'base64', media_type: m.image.mediaType, data: m.image.data } },
               { type: 'text', text: m.content },
             ],
           }
@@ -127,7 +129,9 @@ function completionRequest(
           ? {
             role: m.role,
             content: [
-              { type: 'image_url', image_url: { url: `data:${m.image.mediaType};base64,${m.image.data}` } },
+              m.image.mediaType === 'application/pdf'
+                ? { type: 'file', file: { filename: 'document.pdf', file_data: `data:application/pdf;base64,${m.image.data}` } }
+                : { type: 'image_url', image_url: { url: `data:${m.image.mediaType};base64,${m.image.data}` } },
               { type: 'text', text: m.content },
             ],
           }
@@ -245,7 +249,7 @@ function filterMessages(messages: InputMessage[]): ChatMessage[] {
  */
 export async function chatComplete(
   env: Env,
-  messages: Array<{ role: MessageRole; content: string }>,
+  messages: InputMessage[],
   systemPrompt: string,
   maxTokens: number,
   configOverride?: AIConfig | null

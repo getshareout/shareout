@@ -129,6 +129,23 @@ describe('runKnowledgeDistill', () => {
     expect(index?.body).toContain('## Top topics');
   });
 
+  it('reads a PDF page through toMarkdown, never as raw bytes', async () => {
+    await seedArtifact('art_pdf', WS);
+    await e.DB.prepare("UPDATE versions SET entrypoint = 'manual.pdf' WHERE id = 'ver_art_pdf'").run();
+    await e.DB.prepare("UPDATE assets SET path = 'manual.pdf', mime = 'application/pdf' WHERE version_id = 'ver_art_pdf'").run();
+    await enqueue(WS, 'art_pdf');
+    const bytes = new TextEncoder().encode('%PDF-1.7 binary');
+    const penv = {
+      ...denv,
+      ARTIFACTS: { get: async () => ({ arrayBuffer: async () => bytes.buffer, text: async () => '%PDF-1.7 binary' }) },
+      AI: { toMarkdown: async () => ({ format: 'markdown', data: 'Procedimiento de gestión de residuos.' }) },
+    } as unknown as Env;
+    let prompt = '';
+    await runKnowledgeDistill(penv, { complete: async (_s, u) => { prompt = u; return RESPONSE; } });
+    expect(prompt).toContain('Procedimiento de gestión de residuos.');
+    expect(prompt).not.toContain('%PDF');
+  });
+
   it('bootstraps index.md only when absent — leaves an existing (consolidated) trunk untouched', async () => {
     // A consolidation run wrote a Sonnet trunk; the hourly distill must not clobber it.
     await e.DB.prepare(

@@ -5,8 +5,9 @@
  * membership, the daily publish count, the storage cap; moderation runs inside
  * publishArtifact. Word and spreadsheet files are converted (import-office.ts), slide decks
  * become a PDF when the instance has the converter (import-slides.ts); both keep their
- * original for download. Images, video and other files are not artifacts here —
- * the client sends them to the Assets library (upload + AI enrichment) instead.
+ * original for download. A PDF becomes an editable Markdown page (transcribed when it is a
+ * scan), or stays a PDF when no text can be read. Images and video become image/video artifacts served as-is;
+ * types with no viewer (audio, fonts, archives) are refused.
  */
 import type { ArtifactType, Env, FileEntry, ImportedSource } from '../../types';
 import { checkRateLimit, incrementRateLimit } from '../../api-auth';
@@ -17,8 +18,8 @@ import { rateLimitExceededResponse, storageLimitExceededResponse } from '../../p
 import { generateSlug, invalidPathError, isSafeAssetPath } from '../../validation';
 import { jsonWithApiErrors } from '../../http/api-error';
 import { hostWorkspaceId } from './host';
-import { IMPORT_ARTIFACT_EXTS, IMPORT_CONVERTED_EXTS, IMPORT_MAX_BYTES, IMPORT_SLIDES_EXTS, importArtifactType, importExt, isShareLink } from './import-rules';
-import { ImportError, base64ToBytes, convertOfficeImport } from './import-office';
+import { IMPORT_ARTIFACT_EXTS, IMPORT_CONVERTED_EXTS, IMPORT_MEDIA_MIME, IMPORT_MAX_BYTES, IMPORT_SLIDES_EXTS, importArtifactType, importExt, isShareLink } from './import-rules';
+import { ImportError, base64ToBytes, convertOfficeImport, convertPdfImport } from './import-office';
 import { convertSlidesImport } from './import-slides';
 
 const TYPE_MIME: Partial<Record<ArtifactType, string>> = {
@@ -91,12 +92,13 @@ export async function handleHomeImportApi(
     const ext = importExt(body.name);
     const slides = IMPORT_SLIDES_EXTS.includes(ext);
     const t = slides ? 'pdf' : importArtifactType(body.name);
-    if (!t) return json({ error: 'This file type is stored in Assets, not published as an artifact', code: 'UNSUPPORTED_TYPE', allowed: Object.keys(IMPORT_ARTIFACT_EXTS) }, 415);
+    if (!t) return json({ error: 'This file type cannot become an artifact', code: 'UNSUPPORTED_TYPE', allowed: Object.keys(IMPORT_ARTIFACT_EXTS) }, 415);
     type = t;
     name = body.name.replace(/\.[^.]+$/, '').trim().slice(0, 120) || body.name;
     const base64 = body.encoding === 'base64';
     const convert = IMPORT_CONVERTED_EXTS[ext];
-    if (convert || slides) {
+    const pdf = ext === 'pdf';
+    if (convert || slides || pdf) {
       if (!base64) return json({ error: 'Send Office files base64-encoded', code: 'VALIDATION_ERROR' }, 400);
       if (Math.floor((body.content.length * 3) / 4) > IMPORT_MAX_BYTES) return json({ error: `File is larger than ${IMPORT_MAX_BYTES / 1024 / 1024} MB`, code: 'FILE_TOO_LARGE' }, 413);
       let bytes: Uint8Array;
@@ -104,8 +106,10 @@ export async function handleHomeImportApi(
       const early = await checkRateLimit(env, user.id, 'publish', user.email);
       if (!early.allowed) return rateLimitExceededResponse(early.reset);
       try {
-        const out = convert ? await convertOfficeImport(env, body.name, ext, convert, bytes) : await convertSlidesImport(env, body.name, ext, bytes);
+        const out = pdf ? await convertPdfImport(env, body.name, bytes)
+          : convert ? await convertOfficeImport(env, body.name, ext, convert, bytes) : await convertSlidesImport(env, body.name, ext, bytes);
         ({ files, entrypoint, source } = out);
+        if (out.type) type = out.type;
       } catch (e) {
         if (!(e instanceof ImportError && NOT_COUNTED.has(e.code))) await incrementRateLimit(env, user.id, 'publish', user.email);
         if (e instanceof ImportError) return json({ error: e.message, code: e.code }, e.status);
@@ -115,7 +119,7 @@ export async function handleHomeImportApi(
     file = {
       path: type === 'html' ? 'index.html' : body.name.replace(/[^\w.-]+/g, '-').replace(/\.{2,}/g, '.').replace(/^\.+/, ''),
       content: body.content,
-      mime: TYPE_MIME[type]!,
+      mime: IMPORT_MEDIA_MIME[ext] || TYPE_MIME[type]!,
       ...(base64 ? { encoding: 'base64' as const } : {}),
     };
   } else {

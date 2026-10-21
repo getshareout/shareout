@@ -1,15 +1,13 @@
 /**
  * One-step import on the Home: drop files (or paste files, HTML, or a Claude/ChatGPT/
- * Gemini share link), or pick them with New → Upload. Documents become a private
- * artifact in the current workspace and folder (POST /v1/home/import); building
- * material — images, video, fonts, anything else — goes to Recursos via the Assets
- * upload (uploadOne, which also triggers AI enrichment). import-rules.ts decides, for
- * the server too. Only wired where the New button renders (template.ts canCreateHere).
+ * Gemini share link), or pick them with New → Upload. Documents, images and video become
+ * a private artifact in the current workspace and folder (POST /v1/home/import); types
+ * with no viewer are refused. import-rules.ts decides, for the server too. Only wired where the New button renders (template.ts canCreateHere).
  */
 import { IMPORT_ARTIFACT_EXTS, IMPORT_BINARY_EXTS, IMPORT_MAX_BYTES, IMPORT_SHARE_HOSTS, IMPORT_SLIDES_EXTS } from '../../import-rules';
 
-export const workspace_client_drop_import_JS = `  // ===== One-step import: drop or paste on the Home → artifact (or Assets) =====
-  // Slide decks become a PDF only where the instance has the converter; elsewhere they stay Assets.
+export const workspace_client_drop_import_JS = `  // ===== One-step import: drop or paste on the Home → artifact =====
+  // Slide decks become a PDF only where the instance has the converter; elsewhere they are refused.
   var DROP_SLIDES = ${JSON.stringify(IMPORT_SLIDES_EXTS)};
   var DROP_EXTS = ${JSON.stringify(Object.keys(IMPORT_ARTIFACT_EXTS))}.concat(window.WSX_SLIDES ? DROP_SLIDES : []);
   var DROP_BINARY = ${JSON.stringify(IMPORT_BINARY_EXTS)};
@@ -26,7 +24,7 @@ export const workspace_client_drop_import_JS = `  // ===== One-step import: drop
   function dropOnHome() { return typeof activeKey !== 'string' || activeKey === 'home'; }
   function dropEditable(el) { return !!(el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))); }
   function dropItems(list) {
-    return Array.prototype.map.call(list || [], function (f) { return { kind: DROP_EXTS.indexOf(dropExt(f.name)) >= 0 ? 'file' : 'asset', file: f, label: f.name }; });
+    return Array.prototype.map.call(list || [], function (f) { return { kind: DROP_EXTS.indexOf(dropExt(f.name)) >= 0 ? 'file' : 'unsupported', file: f, label: f.name }; });
   }
   function dropRow(label) {
     if (!dropPanel) {
@@ -78,12 +76,7 @@ export const workspace_client_drop_import_JS = `  // ===== One-step import: drop
   }
   function dropOne(item, out) {
     var li = dropRow(item.label);
-    if (item.kind === 'asset') {
-      dropSet(li, 'busy', t('drop.uploading'));
-      return new Promise(function (done) {
-        uploadOne(item.file, null, function (ok, msg) { if (ok === false) dropSet(li, 'err', msg || t('drop.err.generic')); else { dropSet(li, 'ok', t('drop.toAssets')); out.assets = true; } done(); }, 'private');
-      });
-    }
+    if (item.kind === 'unsupported') { dropSet(li, 'err', dropErr({ code: 'UNSUPPORTED_TYPE' })); return Promise.resolve(); }
     if (item.file && item.file.size > DROP_MAX) { dropSet(li, 'err', dropErr({ code: 'FILE_TOO_LARGE' })); return Promise.resolve(); }
     var p = item.kind === 'file' ? dropRead(item.file).then(dropPost) : dropPost(item.kind === 'url' ? { url: item.value } : { html: item.value });
     return p.then(function (d) { dropDone(li, d); out.published.push(d); }, function (e) { dropSet(li, 'err', dropErr(e, item.label)); });
@@ -91,10 +84,9 @@ export const workspace_client_drop_import_JS = `  // ===== One-step import: drop
   // Sequential, so per-file rows settle in order and a 429 shows on each remaining file.
   function importDropped(items) {
     if (!items.length) return Promise.resolve();
-    var out = { published: [], assets: false };
+    var out = { published: [] };
     return items.reduce(function (p, it) { return p.then(function () { return dropOne(it, out); }); }, Promise.resolve()).then(function () {
       if (out.published.length && typeof reloadFolders === 'function') reloadFolders();
-      if (out.assets && typeof fetchAssets === 'function' && document.getElementById('wsxAssetMount')) fetchAssets();
       if (items.length === 1 && out.published.length === 1) { var d = out.published[0]; openArtifact(d.slug, d.name, d.artifactId, d.type); }
     });
   }

@@ -39,6 +39,9 @@ export interface DeliverableRow {
   enrichment: FileEnrichment | null;
   // How many artifacts reference this file (usage graph, work/042 P4).
   usageCount: number;
+  // Uploader's display name, and the newest artifact using the file (same exposure as /usage).
+  ownerName: string | null;
+  usedIn: { name: string | null; slug: string | null } | null;
 }
 
 /** Create a named deliverable in a bucket and link an existing blob as v1. */
@@ -129,16 +132,21 @@ export async function listDeliverables(env: Env, bucketId: string): Promise<Deli
     SELECT d.id, d.name, d.owner_id, d.visibility, d.folder_id, d.updated_at, d.type_metadata,
            (SELECT COUNT(*) FROM blobs WHERE deliverable_id = d.id) AS version_count,
            (SELECT COUNT(*) FROM file_artifact_usage WHERE deliverable_id = d.id) AS usage_count,
+           (SELECT COALESCE(a.name, '') || char(31) || COALESCE(a.display_slug, a.slug) FROM file_artifact_usage fu
+              JOIN artifacts a ON a.id = fu.artifact_id AND a.deleted_at IS NULL
+             WHERE fu.deliverable_id = d.id ORDER BY fu.created_at DESC LIMIT 1) AS used_in,
+           COALESCE(NULLIF(u.name, ''), u.email) AS owner_name,
            b.id AS blob_id, b.filename, b.mime_type, b.size_bytes, b.version_no
     FROM asset_deliverables d
     JOIN blobs b ON b.deliverable_id = d.id
+    LEFT JOIN users u ON u.id = d.owner_id
     WHERE d.bucket_artifact_id = ? AND d.deleted_at IS NULL
       AND b.version_no = (SELECT MAX(version_no) FROM blobs WHERE deliverable_id = d.id)
     ORDER BY d.updated_at DESC
   `).bind(bucketId).all<{
     id: string; name: string; owner_id: string; visibility: string; folder_id: string | null; updated_at: string;
     type_metadata: string | null;
-    version_count: number; usage_count: number; blob_id: string; filename: string; mime_type: string; size_bytes: number; version_no: number;
+    version_count: number; usage_count: number; used_in: string | null; owner_name: string | null; blob_id: string; filename: string; mime_type: string; size_bytes: number; version_no: number;
   }>();
   return (rows.results || []).map((r) => ({
     id: r.id, name: r.name, ownerId: r.owner_id, visibility: r.visibility || 'workspace', folderId: r.folder_id,
@@ -147,6 +155,8 @@ export async function listDeliverables(env: Env, bucketId: string): Promise<Deli
     // Only surface enrichment that matches the current version (stale = hidden).
     enrichment: freshEnrichment(r.type_metadata, r.blob_id),
     usageCount: r.usage_count,
+    ownerName: r.owner_name,
+    usedIn: r.used_in ? { name: r.used_in.split('\u001f')[0] || null, slug: r.used_in.split('\u001f')[1] || null } : null,
   }));
 }
 

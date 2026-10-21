@@ -34,7 +34,10 @@ export const WORKSPACE_KNOWLEDGE_STYLES = `
 .wsx-kn2__kids.is-collapsed { display: none; }
 @keyframes wsxKnFade { from { opacity: 0; } to { opacity: 1; } }
 
-/* ---- Controls bar: view toggle + How-it-works ---- */
+/* ---- Controls bar: stats line + search + view toggle + How-it-works ---- */
+.wsx-kn2__stats.wsx-cat__kpis { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: 0; min-width: 0; }
+.wsx-kn2__stat { font-size: var(--text-sm); color: var(--color-text-tertiary); white-space: nowrap; }
+.wsx-kn2__stat b { font-weight: 700; color: var(--color-text); font-variant-numeric: tabular-nums; }
 .wsx-kn2__ctlright { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
 .wsx-kn2__how { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); border-radius: var(--radius-md); padding: 6px 12px; cursor: pointer; transition: color var(--duration-fast), border-color var(--duration-fast); }
 .wsx-kn2__how:hover { color: var(--color-text); border-color: var(--color-border-strong); }
@@ -54,10 +57,30 @@ export const WORKSPACE_KNOWLEDGE_STYLES = `
 .wsx-kn2__gq { display: inline-grid; place-items: center; flex: none; width: 14px; height: 14px; border-radius: 999px; border: 1px solid currentColor; font-size: 9px; font-weight: 700; line-height: 1; color: var(--color-text-tertiary); margin-left: 4px; }
 .wsx-kn2__gnew { color: var(--color-text-secondary); }
 .wsx-kn2__toptopics { font: 700 var(--text-sm) var(--font-body); color: var(--color-text); margin: 16px 0 6px; }
+.wsx-kn2__chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.wsx-kn2__chip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); font: 500 var(--text-sm) var(--font-body); border-radius: 999px; padding: 5px 6px 5px 12px; }
+button.wsx-kn2__chip { cursor: pointer; transition: border-color var(--duration-fast), background var(--duration-fast); }
+button.wsx-kn2__chip:hover { border-color: var(--color-primary); background: var(--color-bg-elevated); }
+.wsx-kn2__chipl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wsx-kn2__chipn { flex: none; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--color-bg-elevated); color: var(--color-text-secondary); font-size: var(--text-xs); font-variant-numeric: tabular-nums; text-align: center; }
+.wsx-kn2__wl { border: 0; background: none; padding: 0; font: inherit; color: var(--color-primary); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .wsx-kn2__empty p { margin: 0 0 10px; }
 .wsx-kn2__gname { width: 100%; margin: 8px 0; }
 .wsx-kn2__ginvalid { color: var(--color-error); font-size: var(--text-xs); margin: 6px 0; }
 
+/* Desktop tree: the lens fills the pane, so the title, KPIs and controls never scroll;
+   only the tree and the note body do (the note's title block stays on top). */
+@media (min-width: 861px) {
+  .wsx__view[data-view="knowledge"].is-active:has(.wsx-kn2) { display: flex; flex-direction: column; height: 100%; }
+  .wsx__view[data-view="knowledge"]:has(.wsx-kn2) #wsxKnMount { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #wsxKnMount > .wsx-kn2 { flex: 1; min-height: 320px; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+  #wsxKnMount > .wsx-kn2 .wsx-kn2__treewrap { position: static; min-height: 0; }
+  #wsxKnMount > .wsx-kn2 .wsx-kn2__tree { max-height: none; flex: 1; min-height: 0; }
+  #wsxKnMount > .wsx-kn2 .wsx-kn2__detail { min-height: 0; overflow-y: auto; }
+  #wsxKnMount > .wsx-kn2 .wsx-kn2__detail:has(> .wsx-kn2__scroll) { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+  .wsx-kn2__detail > .wsx-kn2__dtop { flex: none; padding: 14px 14px 10px; border-bottom: 1px solid var(--color-border); }
+  .wsx-kn2__detail > .wsx-kn2__scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 14px 14px; }
+}
 @media (max-width: 860px) {
   .wsx-kn2 { grid-template-columns: 1fr; }
   .wsx-kn2__treewrap { position: static; }

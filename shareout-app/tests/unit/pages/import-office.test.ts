@@ -9,13 +9,13 @@ import { REAL_DOC, REAL_DOC_TEXT } from '../helpers/doc-fixtures';
 
 const env = {} as Env;
 
-describe('import classifier: read it → artifact, build with it → Recursos', () => {
+describe('import classifier: everything with a viewer → artifact, the rest refused', () => {
   it.each([
     ['page.html', 'artifact'], ['page.HTM', 'artifact'], ['ventas.csv', 'artifact'], ['notes.md', 'artifact'],
     ['notes.markdown', 'artifact'], ['data.json', 'artifact'], ['readme.txt', 'artifact'], ['deck.pdf', 'artifact'],
     ['plan.docx', 'artifact'], ['plan.odt', 'artifact'], ['book.xlsx', 'artifact'], ['old.xls', 'artifact'], ['calc.ods', 'artifact'],
-    ['photo.png', 'assets'], ['photo.JPG', 'assets'], ['logo.svg', 'assets'], ['clip.mp4', 'assets'], ['song.mp3', 'assets'],
-    ['font.woff2', 'assets'], ['slides.pptx', 'assets'], ['archive.zip', 'assets'], ['noext', 'assets'], ['x.constructor', 'assets'],
+    ['photo.png', 'artifact'], ['photo.JPG', 'artifact'], ['logo.svg', 'artifact'], ['clip.mp4', 'artifact'], ['song.mp3', 'unsupported'],
+    ['font.woff2', 'unsupported'], ['slides.pptx', 'unsupported'], ['archive.zip', 'unsupported'], ['noext', 'unsupported'], ['x.constructor', 'unsupported'],
   ])('%s → %s', (name, dest) => {
     expect(importDestination(name)).toBe(dest);
   });
@@ -23,6 +23,8 @@ describe('import classifier: read it → artifact, build with it → Recursos', 
   it('maps Office files onto viewer types', () => {
     expect(importArtifactType('plan.docx')).toBe('markdown');
     expect(importArtifactType('book.xlsx')).toBe('csv');
+    expect(importArtifactType('logo.png')).toBe('image');
+    expect(importArtifactType('clip.mov')).toBe('video');
   });
 });
 

@@ -26,9 +26,9 @@ create folders (*Settings → members can create folders*). External members can
    site → library → folder.
 4. **Choose where it goes** — the top level of Files, or inside a Team Space folder.
    The picked folder becomes a ShareOut folder there, with the same subfolders.
-5. Leave **Also turn documents into artifacts you can read here** on to get a page next to each Word,
-   Excel, PDF, Markdown or CSV file (and slide decks, when the instance has the
-   slides converter). The original file is always kept.
+5. Every Word, Excel, PDF, Markdown, CSV, image and video file becomes an artifact (and
+   slide decks, when the instance has the slides converter). The original is kept
+   inside it for download.
 6. **Start import** and watch the progress: found, imported, pages, unchanged,
    skipped and failed, plus the files that need a look and why.
 
@@ -46,7 +46,7 @@ create folders (*Settings → members can create folders*). External members can
 - Files take the **visibility of the target folder**: a private folder's files stay
   private, a public folder's files get a shareable link, otherwise they are visible
   to the team. Pages created from documents are never public.
-- With [Knowledge](/teams/knowledge/) on, imported files are learned like any upload.
+- With [Knowledge](/teams/knowledge/) on, each artifact is learned like any page.
 - File names with accents or symbols are stored with a safe file name; the display
   name keeps the original.
 

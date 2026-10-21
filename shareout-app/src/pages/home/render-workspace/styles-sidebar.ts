@@ -107,8 +107,9 @@ export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspect
 .wsx-det__star:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 3.5px var(--color-primary); }
 @keyframes wsx-star-pop { 0% { transform: scale(0.7); } 55% { transform: scale(1.15); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .wsx-det__star.is-on svg { animation: none; } }
-.wsx-det__actions2 { display: flex; gap: 6px; align-items: stretch; }
-.wsx-det__act { flex: 1; justify-content: center; gap: 6px; }
+.wsx-det__actions2 { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; }
+.wsx-det__act { flex: 1 1 96px; min-width: 0; justify-content: center; gap: 6px; }
+.wsx-det__actions2 .wsx-det__icon { flex: none; }
 .wsx-det__act svg { width: 16px; height: 16px; }
 .wsx-vis-seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1.5px solid var(--color-border); border-radius: 999px; overflow: hidden; background: var(--color-surface); }
 .wsx-vis-seg button { border: 0; background: transparent; padding: 5px 4px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font: 600 var(--text-xs) var(--font-body); color: var(--color-text-secondary); cursor: pointer; transition: background var(--duration-fast), color var(--duration-fast); }
@@ -137,7 +138,13 @@ export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspect
 .wsx-det__page:hover { background: var(--color-surface); color: var(--color-text); }
 .wsx-det__page.is-on { background: var(--color-surface); color: var(--color-text); font-weight: 600; }
 .wsx-det__sharecard { flex-direction: column; align-items: stretch; gap: 8px; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px; box-shadow: var(--shadow-sm); }
-.wsx-share__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wsx-det__sharecard { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.wsx-det__sharecard > * { min-width: 0; max-width: 100%; }
+.wsx-share__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.wsx-share__roletog { flex: none; }
+.wsx-share__chips .wsx-det__who { max-width: 100%; min-width: 0; box-sizing: border-box; }
+.wsx-det__who .em { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wsx-det__who .role, .wsx-det__who button { flex: none; }
 .wsx-share__count { font: 400 var(--text-xs) var(--font-body); color: var(--color-text-tertiary); }
 .wsx-share__empty { display: flex; align-items: flex-start; gap: 9px; }
 .wsx-share__emptyic { color: var(--color-text-tertiary); flex: none; margin-top: 1px; }

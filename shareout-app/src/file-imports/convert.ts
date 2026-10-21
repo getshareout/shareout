@@ -1,33 +1,33 @@
 /**
  * Imported documents → live pages, with the same converters the Studio drop-import uses
  * (pages/home/import-office.ts, import-slides.ts) and the same publish pipeline
- * (moderation, storage quota). The original file is always kept as a workspace file;
- * this only adds a readable page next to it. Re-publishing under the stored slug makes
+ * (moderation, storage quota). The page is what people see; the workspace file underneath
+ * only tracks the drive item for sync. Re-publishing under the stored slug makes
  * a changed file a new version of the same page instead of a second page.
  */
 import type { ArtifactType, Env, FileEntry, ImportedSource, Visibility } from '../types';
 import { checkStorageQuota } from '../quota';
 import { publishArtifact } from '../publish/publish-artifact';
 import { generateSlug } from '../validation';
-import { IMPORT_CONVERTED_EXTS, IMPORT_MAX_BYTES, IMPORT_SLIDES_EXTS, importExt } from '../pages/home/import-rules';
-import { ImportError, bytesToBase64, convertOfficeImport } from '../pages/home/import-office';
+import { IMPORT_CONVERTED_EXTS, IMPORT_MAX_BYTES, IMPORT_MEDIA_MIME, IMPORT_SLIDES_EXTS, importExt } from '../pages/home/import-rules';
+import { ImportError, bytesToBase64, convertOfficeImport, convertPdfImport } from '../pages/home/import-office';
 import { convertSlidesImport } from '../pages/home/import-slides';
 
 /** Plain document types that become a page as-is. HTML is deliberately absent: a page
  *  from someone's drive should not run their scripts on our origin. */
 const DIRECT: Record<string, { type: ArtifactType; mime: string; binary: boolean }> = {
-  pdf: { type: 'pdf', mime: 'application/pdf', binary: true },
   md: { type: 'markdown', mime: 'text/markdown', binary: false },
   markdown: { type: 'markdown', mime: 'text/markdown', binary: false },
   csv: { type: 'csv', mime: 'text/csv', binary: false },
   txt: { type: 'txt', mime: 'text/plain', binary: false },
+  ...Object.fromEntries(Object.entries(IMPORT_MEDIA_MIME).map(([ext, mime]) => [ext, { type: (mime.startsWith('video/') ? 'video' : 'image') as ArtifactType, mime, binary: ext !== 'svg' }])),
 };
 
 /** Whether this file would become a page on this instance. */
 export function isConvertible(env: Env, filename: string, size: number | null): boolean {
   if (size !== null && size > IMPORT_MAX_BYTES) return false;
   const ext = importExt(filename);
-  return !!IMPORT_CONVERTED_EXTS[ext] || !!DIRECT[ext] || (IMPORT_SLIDES_EXTS.includes(ext) && !!env.SLIDES_CONVERTER);
+  return ext === 'pdf' || !!IMPORT_CONVERTED_EXTS[ext] || !!DIRECT[ext] || (IMPORT_SLIDES_EXTS.includes(ext) && !!env.SLIDES_CONVERTER);
 }
 
 export interface PageInput {
@@ -52,7 +52,11 @@ export async function convertToPage(env: Env, input: PageInput): Promise<PageRes
   let type: ArtifactType;
   try {
     const kind = IMPORT_CONVERTED_EXTS[ext];
-    if (kind) {
+    if (ext === 'pdf') {
+      const out = await convertPdfImport(env, input.filename, input.bytes);
+      ({ files, entrypoint, source } = out);
+      type = out.type!;
+    } else if (kind) {
       ({ files, entrypoint, source } = await convertOfficeImport(env, input.filename, ext, kind, input.bytes));
       type = kind === 'sheet' ? 'csv' : 'markdown';
     } else if (IMPORT_SLIDES_EXTS.includes(ext)) {
