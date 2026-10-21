@@ -24,7 +24,7 @@ import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { canManageTeamFolder, membersCanCreateFolders } from '../../folders';
 import { isFeatureEnabled } from '../../features/flags';
 import { CREATE_FEATURE } from '../create-gate';
-import { renderArtifactCard, renderArtifactRow, renderHomeEmptyState, renderRecentActivity, renderRecentComments, renderFolderCard } from './render-cards';
+import { renderArtifactCard, renderArtifactRow, renderHomeEmptyState, renderRecentActivity, renderRecentComments, renderFolderCard, renderFolderRow } from './render-cards';
 import { buildResultLabel } from './utils';
 import { jsonWithApiErrors } from '../../http/api-error';
 import { getUserProfile, setUserProfile, addFollow, removeFollow, type Follow, type FollowKind } from '../../users/user-profile';
@@ -443,6 +443,7 @@ export async function handleHomeBrowserApi(
     rowsHtml: artifacts.map(a => renderArtifactRow(a, hostname)).join(''),
     emptyHtml: artifacts.length === 0 ? renderHomeEmptyState(filters, createEnabled) : '',
     foldersHtml,
+    folderRowsHtml: folders.map(renderFolderRow).join(''),
     folderName,
     folderPath,
     folderReadme,

@@ -235,6 +235,19 @@ export function renderArtifactRow(a: ArtifactRow, _hostname: string): string {
 
 const FOLDER_SVG = '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>';
 
+/** A folder as a row of the All Artifacts table, in the artifact rows' columns. */
+export function renderFolderRow(f: HomeFolder): string {
+  const nm = escapeHtml(f.name);
+  const id = escapeHtml(f.id);
+  return `<div class="wsx-tr wsx-tr--folder" role="button" tabindex="0" data-folder-id="${id}" data-folder-name="${nm}" data-name="${nm}" onclick="enterFolder('${id}',this.getAttribute('data-folder-name'))" onkeydown="if(event.key==='Enter'){enterFolder('${id}',this.getAttribute('data-folder-name'))}">
+    <span class="wsx-tr__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${FOLDER_SVG}</svg></span>
+    <span class="wsx-tr__name">${nm}</span>
+    <span class="wsx-tr__type" data-i18n="artifacts.folderType">Folder</span>
+    <span class="wsx-tr__views wsx-folder-card__count" data-count="${f.artifact_count}">${f.artifact_count}</span>
+    <span class="wsx-tr__date"></span>
+  </div>`;
+}
+
 /** Drive-style folder tile for the All Artifacts grid. Click drills in; the
  *  hover actions (rename/delete) only render for users who can manage folders. */
 export function renderFolderCard(f: HomeFolder, scope: 'workspace' | 'personal', canManage: boolean): string {

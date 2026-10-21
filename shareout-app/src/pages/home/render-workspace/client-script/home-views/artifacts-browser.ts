@@ -1,17 +1,21 @@
 /** Rail navigation, artifact browser filters, and folder drill-in. */
+import { HOME_PAGE_SIZE } from '../../../constants';
 export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail nav → Home pane views =====
   var views = homePane.querySelectorAll('.wsx__view');
   function show(view) { views.forEach(function (v) { v.classList.toggle('is-active', v.getAttribute('data-view') === view); }); }
   var wsq = window.WSX_WS ? '&workspace=' + encodeURIComponent(window.WSX_WS) : '';
 
-  // All Artifacts: filterable grid (Recent / Favorites / Shared with me / Mine).
+  // All Artifacts, Drive-style. "All" browses one level: its folders first, then its
+  // artifacts, in the same grid/table; a folder opens on click. Recent / Favorites /
+  // Shared with me / Mine list every artifact flat, whatever folder it sits in. Each chip
+  // shows its workspace-wide total; pages of HOME_PAGE_SIZE load on demand (Load more).
   // Cache each filter's payload on first fetch so re-selecting is instant (no reload);
   // prefetch the rest in the background after the first paint.
   var artFilter = 'recent';
   var curFolder = '';        // '' = root; otherwise the open folder id
   var curFolderName = '';
   var artSearch = '';        // '' = no filter; otherwise a client-side substring filter over the loaded cards/rows (name + tags)
-  var ART_URL = { recent: '/v1/home/browser?sort=recent', favorites: '/v1/home/browser?scope=favorites', shared: '/v1/home/browser?scope=shared', mine: '/v1/home/browser?scope=owned' };
+  var ART_URL = { recent: '/v1/home/browser?sort=recent', all: '/v1/home/browser?sort=name&level=1', favorites: '/v1/home/browser?scope=favorites', shared: '/v1/home/browser?scope=shared', mine: '/v1/home/browser?scope=owned' };
   var artCache = {};
   var artPending = {};
   function artKey(f, fld) { return f + '|' + (fld == null ? curFolder : fld); }
@@ -109,25 +113,48 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
       : '<span class="wsx-faccess is-static" title="' + escAttr(tip) + '">' + pill + note + '</span>';
     return '<div class="wsx-fbar__acts">' + ctl + link + '</div>';
   }
-  function folderHead(d) {
+  // Breadcrumb + access bar + guide; folders themselves render inline with the artifacts
+  // (see applyArt), so managers only get the New folder button here, at any depth.
+  function folderHead(d, f) {
     var crumbs = curFolder ? '<div class="wsx-fbar">' + folderCrumbs(d) + folderAccessBar(d) + '</div>' : '';
-    var guide = folderGuide(d);
-    // Subfolders render the same "Folders" section whether at root or drilled in;
-    // nesting repeats root behaviour, so managers get New folder / rename / delete at any depth.
-    var hasFolders = !!(d && d.foldersHtml);
-    var canManage = !!(d && d.canManageFolders);
-    if (!hasFolders && !canManage) return crumbs + guide;
-    var head = crumbs + guide + '<section class="wsx-folders-sec"><div class="wsx-sec-row"><span class="wsx-sec-label">' + esc(t('artifacts.foldersLabel')) + '</span>' + (canManage ? newFolderBtn() : '') + '</div>';
-    head += '<div class="wsx-folder-grid">' + ((d && d.foldersHtml) || '') + '</div></section>';
-    if (hasFolders) head += '<div class="wsx-sec-label wsx-sec-label--pages">' + esc(t('artifacts.pagesLabel')) + '</div>';
-    return head;
+    var newBtn = f === 'all' && d && d.canManageFolders ? '<div class="wsx-sec-row">' + newFolderBtn() + '</div>' : '';
+    return crumbs + folderGuide(d) + newBtn;
   }
   function applyArt(f) {
     var d = artCache[artKey(f)]; if (!d) return;
     var empty = curFolder ? t('artifacts.folderEmpty') : t('artifacts.nothingHere');
-    ART_DATA['wsxArtMount'] = { cardsHtml: d.cardsHtml, rowsHtml: d.rowsHtml, count: d.count, empty: empty, folderHead: folderHead(d) };
+    // Folders first, then artifacts, in one grid/table (All only).
+    var fc = f === 'all' ? (d.foldersHtml || '') : '', fr = f === 'all' ? (d.folderRowsHtml || '') : '';
+    ART_DATA['wsxArtMount'] = { cardsHtml: fc + (d.cardsHtml || ''), rowsHtml: fr + (d.rowsHtml || ''), count: (fc || d.count) ? 1 : 0, empty: empty, folderHead: folderHead(d, f) };
     renderArtView('wsxArtMount');
     hidePendingFolders();
+    artChipCounts();
+    if (d.hasMore) {
+      var more = document.createElement('div'); more.className = 'wsx-art-more';
+      more.innerHTML = '<button type="button" class="wsx-abtn">' + esc(t('artifacts.loadMore').replace('{n}', String(d.total - d.page * ART_PAGE))) + '</button>';
+      more.firstChild.addEventListener('click', function () { this.disabled = true; loadMoreArt(f); });
+      document.getElementById('wsxArtMount').appendChild(more);
+    }
+  }
+  var ART_PAGE = ${HOME_PAGE_SIZE};
+  // Next page of the open filter + folder, appended to the cached grid.
+  function loadMoreArt(f) {
+    var k = artKey(f), d = artCache[k]; if (!d || !d.hasMore) return;
+    fetch(artUrl(f) + '&page=' + (d.page + 1), { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (n) {
+      if (artCache[k] !== d) return;
+      d.cardsHtml = (d.cardsHtml || '') + ((n && n.cardsHtml) || ''); d.rowsHtml = (d.rowsHtml || '') + ((n && n.rowsHtml) || '');
+      d.page = (n && n.page) || d.page + 1; d.hasMore = !!(n && n.hasMore);
+      if (k === artKey(artFilter)) applyArt(f);
+    }).catch(function () { if (typeof window.showToast === 'function') window.showToast(t('common.couldNotLoad'), 'error'); applyArt(f); });
+  }
+  // Each chip's workspace-wide total (root, flat), once fetched; All counts every artifact
+  // like Recent, not just the open level.
+  function artChipCounts() {
+    ws.querySelectorAll('[data-art-filter] .wsx-chip__n').forEach(function (el) {
+      var f = el.parentNode.getAttribute('data-art-filter');
+      var c = artCache[artKey(f === 'all' ? 'recent' : f, '')];
+      el.textContent = c ? String(c.total) : '';
+    });
   }
   // Folders deleted optimistically whose DELETE hasn't landed (undo window / in flight).
   var pendingFolderDeletes = {};
@@ -137,7 +164,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     var k = artKey(f, fld);
     if (!artPending[k]) {
       artPending[k] = fetch(artUrl(f, fld), { credentials: 'same-origin' }).then(function (r) { return r.json(); })
-        .then(function (d) { artCache[k] = { cardsHtml: d && d.cardsHtml, rowsHtml: d && d.rowsHtml, count: (d && d.cardsHtml) ? 1 : 0, foldersHtml: d && d.foldersHtml, folderName: d && d.folderName, folderPath: d && d.folderPath, canManageFolders: d && d.canManageFolders, canEditFolder: d && d.canEditFolder, folderScope: d && d.folderScope, folderAccess: d && d.folderAccess, folderReadme: d && d.folderReadme, folderReadmeHtml: d && d.folderReadmeHtml }; })
+        .then(function (d) { artCache[k] = { total: (d && d.total) || 0, page: (d && d.page) || 1, hasMore: !!(d && d.hasMore), cardsHtml: d && d.cardsHtml, rowsHtml: d && d.rowsHtml, count: (d && d.cardsHtml) ? 1 : 0, foldersHtml: d && d.foldersHtml, folderRowsHtml: d && d.folderRowsHtml, folderName: d && d.folderName, folderPath: d && d.folderPath, canManageFolders: d && d.canManageFolders, canEditFolder: d && d.canEditFolder, folderScope: d && d.folderScope, folderAccess: d && d.folderAccess, folderReadme: d && d.folderReadme, folderReadmeHtml: d && d.folderReadmeHtml }; })
         .catch(function () {})
         .then(function () { delete artPending[k]; });
     }
@@ -162,7 +189,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     fetchArt(artFilter, function () {
       if (artCache[artKey(artFilter)]) applyArt(artFilter); else m.innerHTML = i18nEmpty('common.couldNotLoad');
       // warm the other root filters once so chip switches are instant (skip while searching)
-      if (!curFolder) ['recent', 'favorites', 'shared', 'mine'].forEach(function (f) { if (!artCache[artKey(f)]) fetchArt(f); });
+      ['recent', 'all', 'favorites', 'shared', 'mine'].forEach(function (f) { if (!artCache[artKey(f, '')]) fetchArt(f, artChipCounts, ''); });
     });
   }
   // Silent refresh after a folder mutation: refetch the active view and swap it
@@ -222,10 +249,12 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 2500 }); else setTimeout(warm, 800);
   })();
   // ===== folder navigation + management (Drive-style drill-in) =====
-  window.enterFolder = function (id, name) { curFolder = id; curFolderName = name || ''; loadArtifacts(); };
+  // Folders live in the All view; opening one switches to it.
+  function artSelectChip(f) { artFilter = f; ws.querySelectorAll('[data-art-filter]').forEach(function (x) { x.classList.toggle('is-on', x.getAttribute('data-art-filter') === f); }); }
+  window.enterFolder = function (id, name) { artSelectChip('all'); curFolder = id; curFolderName = name || ''; loadArtifacts(); };
   window.exitFolder = function () { curFolder = ''; curFolderName = ''; loadArtifacts(); };
   // Hash router entry (#l/artifacts/<folderId>); runs before openView loads the grid.
-  function artRoute(id) { id = id || ''; if (id !== curFolder) { curFolder = id; curFolderName = ''; } }
+  function artRoute(id) { id = id || ''; if (id) artSelectChip('all'); if (id !== curFolder) { curFolder = id; curFolderName = ''; } }
   function fToast(msg, isError) { if (typeof window.showToast === 'function') window.showToast(msg, isError ? 'error' : 'success'); }
   window.copyFolderLink = function () {
     if (!curFolder) return;
@@ -393,11 +422,12 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
       optimistic({
         key: 'folder:new:' + parent + ':' + nm,
         apply: function () {
-          var grid = row.parentNode && row.parentNode.querySelector('.wsx-folder-grid'); if (!grid) return;
+          // Assets keeps a folder strip; Artifacts lists folders first inside its grid.
+          var grid = row.parentNode && (row.parentNode.querySelector('.wsx-folder-grid') || row.parentNode.querySelector('.artifacts-grid')); if (!grid) return;
           ph = document.createElement('article'); ph.className = 'wsx-folder-card'; ph.setAttribute('aria-busy', 'true');
           ph.innerHTML = '<span class="wsx-folder-card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span><span class="wsx-folder-card__txt"><span class="wsx-folder-card__name"></span></span>';
           ph.querySelector('.wsx-folder-card__name').textContent = nm;
-          grid.appendChild(ph);
+          if (grid.classList.contains('artifacts-grid')) grid.insertBefore(ph, grid.firstChild); else grid.appendChild(ph);
         },
         rollback: function () { if (ph && ph.parentNode) ph.remove(); },
         request: function () {
