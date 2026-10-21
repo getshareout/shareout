@@ -20,6 +20,7 @@
  *   POST   /v1/assets/collections/{id}/share       { expiresAt? } → { url }
  *   POST   /v1/assets/collections/{id}/send        { to, expiresAt? } → email the link
  *   ...same under /v1/workspaces/{ws}/assets (any member; deleting another member's file needs owner/admin).
+ *   POST   /v1/workspaces/{ws}/assets/to-artifacts  { dryRun?, limit?, retry? } → Files become artifacts (owner/admin)
  */
 import type { FetchContext } from '../context';
 import type { Env } from '../../types';
@@ -29,6 +30,7 @@ import { handleBlobs, handleBlobUpload } from '../../data/blobs/handler';
 import { getOrCreateAssetBucket, buildAssetBucketContext, type AssetBucketRow } from '../../assets/bucket';
 import { enrichDeliverable } from '../../assets/enrich';
 import { listFileUsage } from '../../assets/usage';
+import { filesToArtifacts, planFilesToArtifacts } from '../../assets/to-artifacts';
 import { queueKnowledgeSource } from '../../knowledge/corpus/ingest';
 import {
   collectionInBucket,
@@ -100,6 +102,12 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
       queueKnowledgeSource(env, ctx.executionCtx, { workspaceId, kind: 'asset', refId }, version).catch(() => {}),
     );
   };
+
+  if (sub === 'to-artifacts' && method === 'POST' && workspaceId) {
+    if (!isWsAdmin) return forbidden();
+    const b = await body<{ dryRun?: boolean; limit?: number; retry?: boolean }>();
+    return json(b.dryRun ? await planFilesToArtifacts(env, workspaceId) : await filesToArtifacts(env, workspaceId, { limit: b.limit, retry: b.retry }));
+  }
 
   if ((rest === '' || rest === '/') && method === 'GET') {
     return addCORS(await listAssets(request, env, bucket, user.id, isWsAdmin));

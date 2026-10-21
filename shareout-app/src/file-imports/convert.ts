@@ -27,7 +27,7 @@ const DIRECT: Record<string, { type: ArtifactType; mime: string; binary: boolean
 export function isConvertible(env: Env, filename: string, size: number | null): boolean {
   if (size !== null && size > IMPORT_MAX_BYTES) return false;
   const ext = importExt(filename);
-  return ext === 'pdf' || !!IMPORT_CONVERTED_EXTS[ext] || !!DIRECT[ext] || (IMPORT_SLIDES_EXTS.includes(ext) && !!env.SLIDES_CONVERTER);
+  return ext === 'pdf' || !!IMPORT_CONVERTED_EXTS[ext] || !!DIRECT[ext] || (IMPORT_SLIDES_EXTS.includes(ext) && (ext === 'pptx' || !!env.SLIDES_CONVERTER));
 }
 
 export interface PageInput {
@@ -60,8 +60,9 @@ export async function convertToPage(env: Env, input: PageInput): Promise<PageRes
       ({ files, entrypoint, source } = await convertOfficeImport(env, input.filename, ext, kind, input.bytes));
       type = kind === 'sheet' ? 'csv' : 'markdown';
     } else if (IMPORT_SLIDES_EXTS.includes(ext)) {
-      ({ files, entrypoint, source } = await convertSlidesImport(env, input.filename, ext, input.bytes));
-      type = 'pdf';
+      const out = await convertSlidesImport(env, input.filename, ext, input.bytes);
+      ({ files, entrypoint, source } = out);
+      type = out.type ?? 'pdf';
     } else if (DIRECT[ext]) {
       const d = DIRECT[ext];
       const path = input.filename.replace(/[^\w.-]+/g, '-').replace(/\.{2,}/g, '.').replace(/^\.+/, '') || `file.${ext}`;

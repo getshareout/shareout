@@ -2,8 +2,10 @@
  * Slide decks (.pptx/.ppt/.odp) → a PDF artifact on import (POST /v1/home/import).
  * LibreOffice runs in the optional SLIDES_CONVERTER container (slides-converter-do.ts);
  * the original deck is kept next to the PDF for download, like Word/Excel imports.
+ * Without the converter a .pptx becomes a Markdown page of its slide text instead.
  */
 import type { Env } from '../../types';
+import { parsePptx } from '../../data/files/parse-pptx';
 import { type ConvertedImport, ImportError, bytesToBase64, originalFile, safeSegment } from './import-office';
 
 /** Worker-side ceiling; the container kills LibreOffice a bit earlier (server.py). */
@@ -12,6 +14,7 @@ export const SLIDES_TIMEOUT_MS = 90_000;
 const RETRY = 'Export it as PDF from PowerPoint, Keynote or Google Slides and drop that instead.';
 
 export async function convertSlidesImport(env: Env, filename: string, ext: string, bytes: Uint8Array, timeoutMs = SLIDES_TIMEOUT_MS): Promise<ConvertedImport> {
+  if (!env.SLIDES_CONVERTER && ext === 'pptx') return pptxTextImport(filename, bytes);
   if (!env.SLIDES_CONVERTER) throw new ImportError('CONVERT_UNAVAILABLE', `This server can’t convert slide decks. ${RETRY}`);
   const stub = env.SLIDES_CONVERTER.get(env.SLIDES_CONVERTER.idFromName('slides'));
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -43,5 +46,23 @@ export async function convertSlidesImport(env: Env, filename: string, ext: strin
     entrypoint,
     files: [{ path: entrypoint, content: bytesToBase64(pdf), mime: 'application/pdf', encoding: 'base64' }, original],
     source: { original: original.path },
+  };
+}
+
+/** A .pptx as Markdown, one section per slide, with the deck kept for download. */
+export function pptxTextImport(filename: string, bytes: Uint8Array): ConvertedImport {
+  let slides: ReturnType<typeof parsePptx>;
+  try { slides = parsePptx(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer); } catch {
+    throw new ImportError('CONVERT_FAILED', 'This deck could not be read. Is it damaged?');
+  }
+  const markdown = slides.map((s) => `## ${s.index}. ${s.title}\n\n${s.lines.join('\n\n')}`.trim()).join('\n\n');
+  if (!markdown.trim()) throw new ImportError('CONVERT_FAILED', `This deck has no text. ${RETRY}`);
+  const original = originalFile(filename, 'pptx', bytes);
+  const entrypoint = `${safeSegment(filename.replace(/\.[^.]+$/, ''), 'slides')}.md`;
+  return {
+    entrypoint,
+    files: [{ path: entrypoint, content: markdown, mime: 'text/markdown' }, original],
+    source: { original: original.path },
+    type: 'markdown',
   };
 }

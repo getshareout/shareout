@@ -79,7 +79,7 @@ describe('drop routing', () => {
     const { dropItems } = load();
     const names = ['v.csv', 'p.HTML', 'd.pdf', 'x.xlsx', 'w.docx', 'o.odt', 'c.ods', 'n.md', 'logo.png', 'logo.svg', 'clip.mp4', 'font.woff2', 'deck.pptx'];
     const kinds = dropItems(names.map((n) => new File(['a'], n)));
-    expect(kinds.map((k) => k.kind)).toEqual(['file', 'file', 'file', 'file', 'file', 'file', 'file', 'file', 'file', 'file', 'file', 'unsupported', 'unsupported']);
+    expect(kinds.map((k) => k.kind)).toEqual(['file', 'file', 'file', 'file', 'file', 'file', 'file', 'file', 'file', 'file', 'file', 'unsupported', 'file']);
   });
 
   it('sends Word and spreadsheet files as base64', async () => {
@@ -92,7 +92,7 @@ describe('drop routing', () => {
   });
 
   it('sends slide decks to import as base64 only where the instance converts them', async () => {
-    expect(load().dropItems([new File(['a'], 'deck.pptx'), new File(['a'], 'old.ppt'), new File(['a'], 'o.odp')]).map((k) => k.kind)).toEqual(['unsupported', 'unsupported', 'unsupported']);
+    expect(load().dropItems([new File(['a'], 'deck.pptx'), new File(['a'], 'old.ppt'), new File(['a'], 'o.odp')]).map((k) => k.kind)).toEqual(['file', 'unsupported', 'unsupported']);
     slidesOn = true;
     const { importDropped, dropItems } = load();
     expect(dropItems([new File(['a'], 'deck.pptx'), new File(['a'], 'old.ppt'), new File(['a'], 'o.odp')]).map((k) => k.kind)).toEqual(['file', 'file', 'file']);

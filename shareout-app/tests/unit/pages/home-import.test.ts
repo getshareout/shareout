@@ -271,8 +271,15 @@ describe('slide deck import (LibreOffice container)', () => {
     expect(convert.mock.calls.map((c) => new Headers((c as [string, RequestInit])[1].headers).get('x-ext'))).toEqual(['ppt', 'odp']);
   });
 
-  it('without the converter binding: 422 CONVERT_UNAVAILABLE, nothing published', async () => {
-    const res = await post({ name: 'deck.pptx', content: toBase64(DECK), encoding: 'base64' });
+  it('without the converter binding a .pptx becomes a page of its slide text', async () => {
+    const deck = zipSync({ 'ppt/slides/slide1.xml': strToU8('<p:sld><p:txBody><a:p><a:t>Plan</a:t></a:p></p:txBody></p:sld>') });
+    const res = await post({ name: 'deck.pptx', content: toBase64(deck), encoding: 'base64' });
+    expect(res.status).toBe(200);
+    expect(params()).toMatchObject({ artifactType: 'markdown', entrypoint: 'deck.md' });
+  });
+
+  it('without the converter binding a .ppt: 422 CONVERT_UNAVAILABLE, nothing published', async () => {
+    const res = await post({ name: 'deck.ppt', content: toBase64(DECK), encoding: 'base64' });
     expect(res.status).toBe(422);
     const j = await res.json();
     expect(j.code).toBe('CONVERT_UNAVAILABLE');

@@ -12,8 +12,8 @@ import { ZipTooLargeError, assertZipWithinBounds, unzipBounded } from '../../dat
 import * as XLSX from 'xlsx';
 import type { ArtifactType, Env, FileEntry, ImportedSource } from '../../types';
 import { XLSX_MAX_INPUT_BYTES } from '../../data/files/parse-xlsx';
-import { DocReadError, docToMarkdown } from '../../data/files/parse-doc';
-import { transcribePdf } from '../../data/files/transcribe-pdf';
+import { DOC_IMAGES_ONLY, DocReadError, docToMarkdown } from '../../data/files/parse-doc';
+import { transcribeDocument, transcribePdf } from '../../data/files/transcribe-pdf';
 
 export class ImportError extends Error {
   constructor(public code: string, message: string, public status = 422) { super(message); }
@@ -325,11 +325,19 @@ export async function convertOfficeImport(
   }
   let markdown: string;
   let media: FileEntry[] = [];
-  if (ext === 'docx') ({ markdown, media } = docxToMarkdown(bytes));
+  if (ext === 'docx') {
+    ({ markdown, media } = docxToMarkdown(bytes));
+    // A Word file that is only pictures (a pasted scan or table screenshot): read the pictures.
+    if (letterCount(markdown) < 20 && media.length) {
+      markdown = (await transcribeDocument(env, media.map((m) => ({ mediaType: m.mime, data: m.content })))) || markdown;
+    }
+  }
   else if (ext === 'doc') {
     try { markdown = docToMarkdown(bytes); } catch (e) {
-      if (e instanceof DocReadError) throw new ImportError('CONVERT_FAILED', e.message);
-      throw e;
+      if (!(e instanceof DocReadError)) throw e;
+      const read = e.message === DOC_IMAGES_ONLY ? await transcribeDocument(env, embeddedImages(bytes)) : null;
+      if (!read) throw new ImportError('CONVERT_FAILED', e.message);
+      markdown = read;
     }
   }
   else {
@@ -341,6 +349,36 @@ export async function convertOfficeImport(
   if (!markdown.trim()) throw new ImportError('CONVERT_FAILED', 'This document has no text.');
   const entrypoint = `${base}.md`;
   return { entrypoint, files: [{ path: entrypoint, content: markdown, mime: 'text/markdown' }, ...media, original], source: { original: original.path } };
+}
+
+function letterCount(s: string): number {
+  return (s.match(/\p{L}/gu) || []).length;
+}
+
+/** PNG and JPEG pictures embedded in a binary file (a .doc keeps them whole in its streams). */
+export function embeddedImages(bytes: Uint8Array): Array<{ mediaType: string; data: string }> {
+  const out: Array<{ mediaType: string; data: string }> = [];
+  const find = (sig: number[], from: number) => {
+    outer: for (let i = from; i <= bytes.length - sig.length; i++) {
+      for (let k = 0; k < sig.length; k++) if (bytes[i + k] !== sig[k]) continue outer;
+      return i;
+    }
+    return -1;
+  };
+  for (const [mediaType, start, end, tail] of [
+    ['image/png', [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], [0x49, 0x45, 0x4e, 0x44], 8],
+    ['image/jpeg', [0xff, 0xd8, 0xff], [0xff, 0xd9], 2],
+  ] as const) {
+    for (let i = find([...start], 0); i >= 0; i = find([...start], i + 1)) {
+      const j = find([...end], i + start.length);
+      if (j < 0) break;
+      const img = bytes.subarray(i, j + tail);
+      // Bullets, icons and spacer pixels are not worth a model call.
+      if (img.length >= 10_000) out.push({ mediaType, data: bytesToBase64(img) });
+      i = j;
+    }
+  }
+  return out;
 }
 
 // toMarkdown on a scan returns little more than page markers and stray bullets: below
@@ -367,7 +405,7 @@ export async function convertPdfImport(env: Env, filename: string, bytes: Uint8A
     const res = await env.AI.toMarkdown({ name: filename, blob: new Blob([bytes], { type: 'application/pdf' }) }).catch(() => null);
     if (res?.format === 'markdown') markdown = pdfMarkdownBody(res.data);
   }
-  if ((markdown.match(/\p{L}/gu) || []).length < PDF_MIN_LETTERS) markdown = (await transcribePdf(env, base64)) || markdown;
+  if (letterCount(markdown) < PDF_MIN_LETTERS) markdown = (await transcribePdf(env, base64)) || markdown;
   const original: FileEntry = { path: `original/${safeSegment(filename, 'original.pdf')}`, content: base64, mime: 'application/pdf', encoding: 'base64' };
   if (!markdown.trim()) {
     const path = safeSegment(filename, 'document.pdf');
