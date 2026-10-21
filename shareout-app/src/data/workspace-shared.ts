@@ -1,6 +1,7 @@
 import { generateId } from '../crypto-utils';
 import { DATA_ERRORS } from '../types';
-import { successResponse, errorResponse, verifyOwner, type DataContext } from './middleware';
+import { successResponse, errorResponse, verifyOwner, resolveRequesterUserId, type DataContext } from './middleware';
+import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { createMiniDb } from './minidb-client';
 import { handleTables } from './tables/handler';
 
@@ -43,6 +44,16 @@ export async function handleWorkspaceData(
 
   const parts = path.split('/').filter(Boolean);
   const [head, ...rest] = parts;
+
+  if (head === '_shares' || head === 'tables') {
+    const userId = await resolveRequesterUserId(request, ctx);
+    if (!userId || !(await getInternalWorkspaceRole(ctx.env, ctx.workspaceId, userId))) {
+      return errorResponse({
+        ...DATA_ERRORS.FORBIDDEN,
+        message: 'Workspace shared tables are available to workspace members only.',
+      }, ctx.origin);
+    }
+  }
 
   if (head === '_shares') {
     return listShares(ctx);

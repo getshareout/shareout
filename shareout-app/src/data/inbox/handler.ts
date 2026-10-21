@@ -13,9 +13,8 @@ import {
   type StoredAttachment,
 } from '../../email/inbox-store';
 
-// Authenticated management surface for an artifact's inbound inbox. Read/list is
-// allowed for any authorized viewer of the artifact (dataMiddleware already gated
-// access); enable/disable/allowlist mutations require owner/editor (verifyOwner).
+// Management surface for an artifact's inbound inbox. Every route, reads included,
+// requires owner/editor (verifyOwner): messages hold third-party mail and attachments.
 
 function serializeMessage(row: InboxMessageRow, full: boolean) {
   let attachments: { filename: string; contentType: string; size: number; index: number }[] = [];
@@ -56,12 +55,13 @@ export async function handleInbox(
 ): Promise<Response> {
   const path = subPath.replace(/\/$/, '') || '/';
 
+  if (!(await verifyOwner(request, ctx))) return errorResponse(DATA_ERRORS.FORBIDDEN, ctx.origin);
+
   if (path === '/status' && request.method === 'GET') {
     return successResponse(await getInboxStatus(ctx.env, ctx.artifactId), 200, ctx.origin);
   }
 
   if (path === '/enable' && request.method === 'POST') {
-    if (!(await verifyOwner(request, ctx))) return errorResponse(DATA_ERRORS.FORBIDDEN, ctx.origin);
     let allowlist: string[] | undefined;
     try {
       const body = await request.json() as { allowlist?: string[] };
@@ -74,13 +74,11 @@ export async function handleInbox(
   }
 
   if (path === '/disable' && request.method === 'POST') {
-    if (!(await verifyOwner(request, ctx))) return errorResponse(DATA_ERRORS.FORBIDDEN, ctx.origin);
     await disableInbound(ctx.env, ctx.artifactId);
     return successResponse({ enabled: false }, 200, ctx.origin);
   }
 
   if (path === '/allowlist' && request.method === 'PUT') {
-    if (!(await verifyOwner(request, ctx))) return errorResponse(DATA_ERRORS.FORBIDDEN, ctx.origin);
     let allowlist: string[] | null = null;
     try {
       const body = await request.json() as { allowlist?: string[] | null };

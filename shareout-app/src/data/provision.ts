@@ -10,7 +10,7 @@
 // Body: { name, slug?, entrypoint?, visibility?, agent?,
 //         files?: FileEntry[],                       // raw files, OR
 //         fromArtifact?: string, replace?: {k:v} }   // clone+stamp a template
-import type { DataContext } from './middleware';
+import { canViewArtifact, type DataContext } from './middleware';
 import { publishArtifact } from '../publish/publish-artifact';
 import { coerceVisibility } from '../visibility-config';
 import { json } from '../artifacts/json-response';
@@ -42,14 +42,17 @@ const TEXT_RE = /^text\/|application\/(json|javascript|xml|.*\+xml|.*\+json)$|im
 
 async function loadArtifactFiles(ctx: DataContext, artifactId: string): Promise<FileEntry[]> {
   const env = ctx.env;
-  // Only allow cloning a template the caller may read: same owner OR same workspace.
+  // Only allow cloning a template the caller may read: same owner OR same workspace, and view access.
   const art = await env.DB.prepare(
-    'SELECT owner_id, workspace_id FROM artifacts WHERE id = ? AND deleted_at IS NULL'
-  ).bind(artifactId).first<{ owner_id: string | null; workspace_id: string | null }>();
+    'SELECT id, visibility, owner_id, workspace_id FROM artifacts WHERE id = ? AND deleted_at IS NULL'
+  ).bind(artifactId).first<{ id: string; visibility: string; owner_id: string | null; workspace_id: string | null }>();
   if (!art) throw new Error('template artifact not found');
   const sameOwner = art.owner_id && art.owner_id === ctx.artifact.owner_id;
   const sameWorkspace = art.workspace_id && art.workspace_id === ctx.artifact.workspace_id;
   if (!sameOwner && !sameWorkspace) throw new Error('template not accessible');
+  const email = ctx.viewer?.email ?? null;
+  const caller = email ? await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: string }>() : null;
+  if (!caller || !(await canViewArtifact(env, art, caller.id, email))) throw new Error('template not accessible');
 
   const dep = await env.DB.prepare(
     "SELECT version_id FROM deployments WHERE artifact_id = ? AND channel = 'production'"

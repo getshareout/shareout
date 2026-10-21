@@ -90,6 +90,8 @@ async function serveCachedR2Image(
     headers: {
       'Content-Type': contentType,
       'Cache-Control': isPrivate ? 'private, no-store' : 'public, max-age=86400',
+      'Content-Security-Policy': "sandbox; default-src 'none'",
+      'X-Content-Type-Options': 'nosniff',
       ...(isPrivate ? { 'X-Robots-Tag': 'noindex, nofollow, noarchive' } : {}),
     },
   });

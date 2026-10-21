@@ -53,6 +53,14 @@ export async function handleSheets(
   }
 
   if (action === 'fetch' && method === 'POST') {
+    if (ctx.viewerScope) {
+      return errorResponse({
+        code: 'SCOPE_REQUIRED',
+        message: 'This artifact has a row-level access policy; its viewers cannot fetch Google Sheets',
+        status: 403,
+        hint: 'Serve per-viewer data through sdk.table() or a query declared in access_policy.queries.',
+      }, ctx.origin);
+    }
     return fetchSheetData(request, ctx);
   }
 

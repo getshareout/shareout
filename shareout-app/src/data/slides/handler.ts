@@ -51,6 +51,12 @@ export async function handleSlides(
   const presId = firstPart;
   const secondPart = parts[1];
 
+  const owned = await ctx.env.DB.prepare('SELECT id FROM presentations WHERE artifact_id = ? AND id = ?')
+    .bind(ctx.artifactId, presId).first();
+  if (!owned) {
+    return errorResponse({ code: 'PRESENTATION_NOT_FOUND', message: 'Presentation not found', status: 404 });
+  }
+
   if (!secondPart) {
     switch (request.method) {
       case 'GET':

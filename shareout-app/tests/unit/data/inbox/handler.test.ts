@@ -42,16 +42,22 @@ function req(method: string, body?: unknown): Request {
   });
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => { vi.clearAllMocks(); verifyOwner.mockResolvedValue(true); });
 
 describe('handleInbox', () => {
-  it('returns status without auth', async () => {
+  it('returns status to the owner', async () => {
     getInboxStatus.mockResolvedValue({ enabled: true, address: 'expensas@inbox.shareout.site', allowlist: null, receivedToday: 2 });
     const res = await handleInbox(req('GET'), makeCtx(), '/status');
     expect(res.status).toBe(200);
     const json = await res.json() as { data: { enabled: boolean; address: string } };
     expect(json.data.enabled).toBe(true);
     expect(json.data.address).toBe('expensas@inbox.shareout.site');
+  });
+
+  it('forbids reads for non-owner', async () => {
+    verifyOwner.mockResolvedValue(false);
+    expect((await handleInbox(req('GET'), makeCtx(), '/status')).status).toBe(403);
+    expect((await handleInbox(req('GET'), makeCtx(), '/messages')).status).toBe(403);
   });
 
   it('enables inbound for an owner', async () => {

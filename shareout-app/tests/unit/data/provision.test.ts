@@ -16,6 +16,7 @@ function ctx(over: Partial<DataContext> & { artifact?: Partial<DataContext['arti
     artifactId: 'art_hub',
     workspaceId: 'wsp_studio',
     isOwner: over.isOwner ?? true,
+    viewer: over.viewer,
     artifact: {
       id: 'art_hub', name: 'Hub', visibility: 'workspace', auth_method: 'google',
       workspace_id: 'wsp_studio', owner_id: 'usr_studio',
@@ -78,7 +79,8 @@ describe('handleProvision', () => {
         prepare: (sql: string) => ({
           bind: () => ({
             first: async () => {
-              if (sql.includes('FROM artifacts')) return { owner_id: 'usr_studio', workspace_id: 'wsp_studio' };
+              if (sql.includes('FROM artifacts')) return { id: 'art_tpl', visibility: 'private', owner_id: 'usr_studio', workspace_id: 'wsp_studio' };
+              if (sql.includes('FROM users')) return { id: 'usr_studio' };
               if (sql.includes('FROM deployments')) return { version_id: 'ver_tpl' };
               return null;
             },
@@ -91,7 +93,7 @@ describe('handleProvision', () => {
 
     const res = await handleProvision(
       req({ name: 'Lumen', fromArtifact: 'art_tpl', replace: { '{{CLIENT_NAME}}': 'Lumen', '{{ROOM_SLUG}}': 'aprobaciones-lumen' } }),
-      ctx({ env }),
+      ctx({ env, viewer: { email: 'studio@example.test', isOwner: true } }),
     );
     expect(res.status).toBe(200);
     const [, , params] = publishMock.mock.calls[0] as any[];

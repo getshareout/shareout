@@ -1,6 +1,7 @@
 import type { Env } from '../types';
 import type { AuthUser } from '../api-auth';
 import { getUserRole } from '../artifacts/roles';
+import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { createLogger, logError } from '../logging';
 import { invalidSlackBlocks, sendArtifactToSlack, type SlackDeliveryMode } from '../chat-platforms/slack/delivery';
 import { userFacingSlackDeliveryError } from '../chat-platforms/slack/client';
@@ -52,6 +53,14 @@ export async function handleShareToSlack(
   // Channel posts require owner/editor; any viewer with access may DM themselves.
   if (targetType !== 'dm' && role !== 'owner' && role !== 'editor') {
     return json({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
+  }
+  // The bot token is the workspace's: an editor added by email must also be a member to use it.
+  if (role === 'editor') {
+    const art = await env.DB.prepare('SELECT workspace_id FROM artifacts WHERE id = ?')
+      .bind(artifactId).first<{ workspace_id: string | null }>();
+    if (art?.workspace_id && !(await getInternalWorkspaceRole(env, art.workspace_id, user.id))) {
+      return json({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
+    }
   }
   if (targetType === 'dm' ? !body.slackUserId : !body.channelId) {
     return json({

@@ -1,13 +1,16 @@
 import type { DiscordConfig } from '../../scheduling/jobs';
 import type { Destination } from '../types';
+import { destinationRefusal, safeFetch } from '../safe-fetch';
 
 export const discordDestination: Destination<DiscordConfig> = {
   kind: 'discord',
 
-  async validate(_env, _ctx, config) {
+  async validate(env, _ctx, config) {
     if (!config.webhookUrl) return 'Discord webhookUrl required';
     try {
       if (new URL(config.webhookUrl).protocol !== 'https:') return 'Discord webhook URL must use HTTPS';
+      const refusal = destinationRefusal(env, config.webhookUrl);
+      if (refusal) return `Discord webhook URL not allowed: ${refusal}`;
     } catch {
       return 'Invalid Discord webhook URL';
     }
@@ -40,7 +43,7 @@ export const discordDestination: Destination<DiscordConfig> = {
     }
 
     try {
-      const response = await fetch(config.webhookUrl, {
+      const response = await safeFetch(env, config.webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

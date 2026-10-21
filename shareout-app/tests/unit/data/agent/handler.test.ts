@@ -80,15 +80,23 @@ describe('handleAgent routing', () => {
   });
 
   it('routes conversations with id', async () => {
-    const req = new Request(`${BASE_URL}/conversations/conv_1`, { method: 'GET' });
-    await handleAgent(req, ctx, 'conversations/conv_1');
-    expect(handleConversations).toHaveBeenCalledWith(req, ctx, 'conv_1', undefined);
+    const ownerCtx = makeCtx(makeEnv(ownerDb()));
+    const req = new Request(`${BASE_URL}/conversations/conv_1`, {
+      method: 'GET',
+      headers: { Cookie: `shareout_session=${sessionCookie(USER_ID)}` },
+    });
+    await handleAgent(req, ownerCtx, 'conversations/conv_1');
+    expect(handleConversations).toHaveBeenCalledWith(req, ownerCtx, 'conv_1', undefined);
   });
 
   it('routes config', async () => {
-    const req = new Request(`${BASE_URL}/config`, { method: 'GET' });
-    await handleAgent(req, ctx, 'config');
-    expect(handleVisitorConfig).toHaveBeenCalledWith(req, ctx);
+    const ownerCtx = makeCtx(makeEnv(ownerDb()));
+    const req = new Request(`${BASE_URL}/config`, {
+      method: 'GET',
+      headers: { Cookie: `shareout_session=${sessionCookie(USER_ID)}` },
+    });
+    await handleAgent(req, ownerCtx, 'config');
+    expect(handleVisitorConfig).toHaveBeenCalledWith(req, ownerCtx);
   });
 
   it('returns usage for GET /usage to the owner', async () => {

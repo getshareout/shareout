@@ -1,7 +1,8 @@
 // @vitest-environment node
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleShareToSlack } from '../../../src/slack/share-handler';
 import * as artifacts from '../../../src/artifacts/roles';
+import * as wsRoles from '../../../src/workspaces/roles';
 import * as slackSend from '../../../src/chat-platforms/slack/delivery';
 import * as unfurl from '../../../src/chat-platforms/slack/unfurl';
 import type { Env } from '../../../src/types';
@@ -11,6 +12,7 @@ const ARTIFACT_ID = 'art_demo';
 const USER: AuthUser = { id: 'usr_editor', email: 'e@example.com', username: null };
 
 afterEach(() => vi.restoreAllMocks());
+beforeEach(() => { vi.spyOn(wsRoles, 'getInternalWorkspaceRole').mockResolvedValue('member'); });
 
 function makeRequest(body: Record<string, unknown>): Request {
   return new Request('https://shareout.site/v1/artifacts/art_demo/share/slack', {
@@ -21,7 +23,8 @@ function makeRequest(body: Record<string, unknown>): Request {
 }
 
 function makeEnv(): Env {
-  return {} as Env;
+  const first = async () => ({ workspace_id: 'wsp_demo' });
+  return { DB: { prepare: () => ({ bind: () => ({ first }) }) } } as unknown as Env;
 }
 
 describe('handleShareToSlack', () => {

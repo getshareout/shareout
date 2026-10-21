@@ -1,22 +1,25 @@
 import type { HttpGetConfig } from '../../scheduling/jobs';
 import type { Destination } from '../types';
+import { destinationRefusal, safeFetch } from '../safe-fetch';
 
 export const httpGetDestination: Destination<HttpGetConfig> = {
   kind: 'http_get',
 
-  async validate(_env, _ctx, config) {
+  async validate(env, _ctx, config) {
     if (!config.url) return 'HTTP GET url required';
     try {
       if (new URL(config.url).protocol !== 'https:') return 'HTTP GET URL must use HTTPS';
+      const refusal = destinationRefusal(env, config.url);
+      if (refusal) return `HTTP GET URL not allowed: ${refusal}`;
     } catch {
       return 'Invalid HTTP GET URL';
     }
     return null;
   },
 
-  async deliver(_env, _ctx, config) {
+  async deliver(env, _ctx, config) {
     try {
-      const response = await fetch(config.url, {
+      const response = await safeFetch(env, config.url, {
         method: 'GET',
         headers: { 'User-Agent': 'ShareOut-Trigger/1.0', ...config.headers },
       });

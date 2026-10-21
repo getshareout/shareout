@@ -2,11 +2,12 @@ import type { Env } from '../../types';
 import type { SlackConfig } from '../../scheduling/jobs';
 import { invalidSlackBlocks, sendArtifactToSlack } from '../../chat-platforms/slack/delivery';
 import type { Destination, DeliveryContext, DeliveryResult } from '../types';
+import { destinationRefusal, safeFetch } from '../safe-fetch';
 
 export const slackDestination: Destination<SlackConfig> = {
   kind: 'slack',
 
-  async validate(_env, _ctx, config) {
+  async validate(env, _ctx, config) {
     // Bot-token (OAuth app) delivery.
     if (config.connection) {
       if (config.blocks !== undefined) {
@@ -24,6 +25,8 @@ export const slackDestination: Destination<SlackConfig> = {
     if (!config.webhookUrl) return 'Slack config requires either webhookUrl or connection';
     try {
       if (new URL(config.webhookUrl).protocol !== 'https:') return 'Slack webhook URL must use HTTPS';
+      const refusal = destinationRefusal(env, config.webhookUrl);
+      if (refusal) return `Slack webhook URL not allowed: ${refusal}`;
     } catch {
       return 'Invalid Slack webhook URL';
     }
@@ -75,7 +78,7 @@ async function deliverViaWebhook(env: Env, ctx: DeliveryContext, config: SlackCo
   }
 
   try {
-    const response = await fetch(config.webhookUrl as string, {
+    const response = await safeFetch(env, config.webhookUrl as string, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

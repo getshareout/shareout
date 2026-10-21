@@ -1,14 +1,17 @@
 import { createMiniDb } from '../../data/minidb-client';
 import type { WebhookConfig } from '../../scheduling/jobs';
 import type { Destination } from '../types';
+import { destinationRefusal, safeFetch } from '../safe-fetch';
 
 export const webhookDestination: Destination<WebhookConfig> = {
   kind: 'webhook',
 
-  async validate(_env, _ctx, config) {
+  async validate(env, _ctx, config) {
     if (!config.url) return 'Webhook URL required';
     try {
       if (new URL(config.url).protocol !== 'https:') return 'Webhook URL must use HTTPS';
+      const refusal = destinationRefusal(env, config.url);
+      if (refusal) return `Webhook URL not allowed: ${refusal}`;
     } catch {
       return 'Invalid webhook URL';
     }
@@ -53,7 +56,7 @@ export const webhookDestination: Destination<WebhookConfig> = {
         headers['Content-Type'] = 'application/json';
         fetchOptions.body = JSON.stringify(payload);
       }
-      const response = await fetch(config.url, fetchOptions);
+      const response = await safeFetch(env, config.url, fetchOptions);
       return response.ok ? { success: true } : { success: false, error: `Webhook returned ${response.status}` };
     } catch (err) {
       return { success: false, error: `Webhook failed: ${err}` };

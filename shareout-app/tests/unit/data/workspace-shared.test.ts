@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DataContext } from '../../../src/data/middleware';
 import type { Env } from '../../../src/types';
-import { createAccessToken } from '../../../src/token';
+import { createAccessToken, createSessionToken } from '../../../src/token';
 
 let idSeq = 0;
 vi.mock('../../../src/crypto-utils', () => ({
@@ -95,6 +95,9 @@ function makeRegistry(seed: { grants?: Grant[]; owners?: Record<string, string> 
       const stmt = {
         bind(...a: unknown[]) { binds = a; return stmt; },
         async first() {
+          if (sql.includes('FROM workspace_members WHERE workspace_id = ? AND user_id = ?')) {
+            return binds[1] === 'usr_member' ? { role: 'member' } : null;
+          }
           if (sql.includes('SELECT owner_id FROM artifacts WHERE id = ?')) {
             const o = owners[binds[0] as string];
             return o ? { owner_id: o } : null;
@@ -161,11 +164,19 @@ function makeCtx(artifactId: string, env: Env, opts: { workspaceId?: string; db?
   };
 }
 
+let memberCookie = '';
+
 function wreq(artifactId: string, subPath: string, init: RequestInit = {}): Request {
-  return new Request(`https://example.com/v1/data/${artifactId}/workspace${subPath}`, init);
+  const headers = new Headers(init.headers);
+  if (memberCookie && !headers.has('Cookie')) headers.set('Cookie', memberCookie);
+  return new Request(`https://example.com/v1/data/${artifactId}/workspace${subPath}`, { ...init, headers });
 }
 
-beforeEach(() => { idSeq = 0; miniRef.db = makeMiniDb(); });
+beforeEach(async () => {
+  idSeq = 0;
+  miniRef.db = makeMiniDb();
+  memberCookie = `shareout_session=${await createSessionToken('usr_member', 'member@example.com', { SESSION_SECRET } as Env)}`;
+});
 afterEach(() => { vi.restoreAllMocks(); });
 
 describe('workspace shared tables — guards', () => {
@@ -224,6 +235,21 @@ describe('workspace shared tables — sharing (owner-gated)', () => {
       ctx, '/_share'
     );
     expect(res.status).toBe(409);
+  });
+});
+
+describe('workspace shared tables — membership', () => {
+  it('refuses callers who are not internal workspace members', async () => {
+    const grant: Grant = { workspace_id: 'ws_1', shared_name: 'leads', owner_artifact_id: 'art_owner', source_table_name: 'leads', access: 'read' };
+    const ctx = makeCtx('art_reader', makeEnv(makeRegistry({ grants: [grant] })));
+    const anon = new Request('https://example.com/v1/data/art_reader/workspace/tables/leads/query', { method: 'POST', body: '{}' });
+    expect((await handleWorkspaceData(anon, ctx, '/tables/leads/query')).status).toBe(403);
+    expect((await handleWorkspaceData(new Request('https://example.com/x'), ctx, '/_shares')).status).toBe(403);
+    const stranger = await createSessionToken('usr_stranger', 'stranger@example.com', { SESSION_SECRET } as Env);
+    const res = await handleWorkspaceData(
+      new Request('https://example.com/x', { method: 'POST', body: '{}', headers: { Cookie: `shareout_session=${stranger}` } }),
+      ctx, '/tables/leads/query');
+    expect(res.status).toBe(403);
   });
 });
 

@@ -57,7 +57,7 @@ export function isBlockedDestination(url: string): { blocked: boolean; reason?: 
 
   // URL.hostname keeps IPv6 in brackets ([::1]); strip them so set/pattern
   // checks see the bare address.
-  const rawHost = parsed.hostname.toLowerCase();
+  const rawHost = parsed.hostname.toLowerCase().replace(/\.+$/, '');
   const hostname = rawHost.startsWith('[') && rawHost.endsWith(']') ? rawHost.slice(1, -1) : rawHost;
 
   if (BLOCKED_HOSTS.has(hostname)) {

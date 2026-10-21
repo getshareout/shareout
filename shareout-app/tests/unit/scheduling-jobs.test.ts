@@ -775,7 +775,7 @@ describe('runScheduledJobs', () => {
   });
 
   it('executes a successful webhook with artifact payload', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, headers: new Headers() });
     vi.stubGlobal('fetch', fetchMock);
 
     const env = dbEnv([
@@ -808,7 +808,7 @@ describe('runScheduledJobs', () => {
   });
 
   it('includes artifact JSON data when configured', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, headers: new Headers() });
     vi.stubGlobal('fetch', fetchMock);
 
     const jobWithData = {

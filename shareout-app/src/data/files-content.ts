@@ -79,7 +79,8 @@ export async function handleFileContent(request: Request, env: Env, deliverableI
       'Content-Type': row.mime_type,
       'Content-Length': String(row.size_bytes),
       'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${row.filename}"`,
-      ...(inline ? {} : { 'X-Content-Type-Options': 'nosniff' }),
+      'X-Content-Type-Options': 'nosniff',
+      ...(row.mime_type.split(';')[0].trim().toLowerCase() === 'application/pdf' ? {} : { 'Content-Security-Policy': "sandbox; default-src 'none'" }),
       // URL is dlv-keyed (stable across versions), so it must NOT be immutable-cached:
       // a new version reuses the same URL. Private bytes are never cached (per-viewer).
       'Cache-Control': isGatedVisibility(row.visibility) ? 'no-store' : 'private, max-age=300',

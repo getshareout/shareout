@@ -1,5 +1,6 @@
 import { DATA_ERRORS, type Env } from '../../types';
 import { generateId } from '../../crypto-utils';
+import { isScriptableDocumentMime } from '../../serve/security';
 import {
   successResponse,
   errorResponse,
@@ -66,8 +67,9 @@ function blobLimits(ctx: DataContext): { maxFile: number; maxStorage: number; ma
 /** Inline in the browser only for safe, displayable media; everything else
  *  downloads (attachment + nosniff) so a doc/archive can never be sniffed into
  *  active content on the serving domain. SVG is treated as non-inline (script). */
-export function isInlineType(mime: string): boolean {
-  if (mime === 'image/svg+xml') return false;
+export function isInlineType(rawMime: string): boolean {
+  if (isScriptableDocumentMime(rawMime)) return false;
+  const mime = rawMime.split(';')[0].trim().toLowerCase();
   return mime.startsWith('image/') || mime.startsWith('video/') || mime.startsWith('audio/') || mime === 'application/pdf';
 }
 
@@ -510,7 +512,8 @@ async function getBlobContent(ctx: DataContext, id: string): Promise<Response> {
       // download, with nosniff so the browser can't reinterpret them as active
       // content on the serving domain.
       'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${blob.filename}"`,
-      ...(inline ? {} : { 'X-Content-Type-Options': 'nosniff' }),
+      'X-Content-Type-Options': 'nosniff',
+      ...(blob.mime_type.split(';')[0].trim().toLowerCase() === 'application/pdf' ? {} : { 'Content-Security-Policy': "sandbox; default-src 'none'" }),
       'Cache-Control': isPublic
         ? 'public, max-age=31536000, immutable, s-maxage=300'
         : 'public, max-age=31536000, immutable',

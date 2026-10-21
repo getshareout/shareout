@@ -6,6 +6,7 @@ import { createLogger, logError } from './logging';
 import { getClientIp } from './rate-limit';
 import { BlockedRedirectError, fetchCheckingRedirects, isBlockedDestination } from './data/secrets/blocklist';
 import { isOwnHost } from './config/origins';
+import { isScriptableDocumentMime } from './serve/security';
 
 const MAX_RESPONSE_SIZE = 10 * 1024 * 1024; // 10 MB
 const DEFAULT_TIMEOUT = 10000; // 10 seconds
@@ -70,6 +71,19 @@ function sanitizeHeaders(headers: Headers): Headers {
     }
   }
   return sanitized;
+}
+
+function relayHeaders(init: Record<string, string>): Headers {
+  const headers = new Headers(init);
+  lockDownRelay(headers);
+  return headers;
+}
+
+function lockDownRelay(headers: Headers): void {
+  headers.set('Content-Security-Policy', "sandbox; default-src 'none'");
+  headers.set('X-Content-Type-Options', 'nosniff');
+  const type = (headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
+  if (type === 'text/html' || isScriptableDocumentMime(type)) headers.set('Content-Disposition', 'attachment');
 }
 
 async function checkProxyRateLimit(
@@ -223,12 +237,12 @@ export async function handleProxy(
       const meta = await ctx.env.PROXY_CACHE.get<{ contentType: string; status: number }>(metaKey, 'json');
       return new Response(cached, {
         status: meta?.status || 200,
-        headers: {
+        headers: relayHeaders({
           'Content-Type': meta?.contentType || 'application/octet-stream',
           'X-Proxy-Cache': 'HIT',
           'X-RateLimit-Remaining': String(rateLimit.remaining),
           'Access-Control-Allow-Origin': ctx.origin || '*',
-        },
+        }),
       });
     }
   }
@@ -284,6 +298,7 @@ export async function handleProxy(
     responseHeaders.set('Access-Control-Allow-Origin', ctx.origin || '*');
     responseHeaders.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
     responseHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    lockDownRelay(responseHeaders);
 
     return new Response(body, {
       status: proxyResponse.status,
@@ -378,11 +393,11 @@ export async function handleGlobalProxy(
       const meta = await env.PROXY_CACHE.get<{ contentType: string; status: number }>(cacheKey + ':meta', 'json');
       return new Response(cached, {
         status: meta?.status || 200,
-        headers: {
+        headers: relayHeaders({
           'Content-Type': meta?.contentType || 'application/octet-stream',
           'X-Proxy-Cache': 'HIT',
           'Access-Control-Allow-Origin': '*',
-        },
+        }),
       });
     }
   }
@@ -435,6 +450,7 @@ export async function handleGlobalProxy(
     const responseHeaders = sanitizeHeaders(proxyResponse.headers);
     responseHeaders.set('X-Proxy-Cache', 'MISS');
     responseHeaders.set('Access-Control-Allow-Origin', '*');
+    lockDownRelay(responseHeaders);
 
     return new Response(body, {
       status: proxyResponse.status,

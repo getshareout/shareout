@@ -20,9 +20,17 @@ export async function handleAgent(
       return handleVisitorChat(request, ctx);
 
     case 'conversations':
+      if (!await verifyAgentAdminAccess(request, ctx)) {
+        return errorResponse(DATA_ERRORS.FORBIDDEN, ctx.origin);
+      }
       return handleConversations(request, ctx, id, subAction);
 
     case 'config':
+      if (!await verifyAgentAdminAccess(request, ctx)) {
+        if (request.method !== 'GET') return errorResponse(DATA_ERRORS.FORBIDDEN, ctx.origin);
+        const config = await getAgentConfig(ctx);
+        return successResponse({ pilot_enabled: !!config?.pilot_enabled }, 200, ctx.origin);
+      }
       return handleVisitorConfig(request, ctx);
 
     case 'pilot':

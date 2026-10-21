@@ -105,7 +105,7 @@ async function verifiedUser(env: Env, params: URLSearchParams, to: string, now: 
   if (await ssoRequiredFor(env, row.email)) return null;
   // Single use is required: without the store to record it, refuse rather than allow replays.
   if (!env.RATE_LIMIT_KV) return null;
-  const used = USED_PREFIX + params.get('hash');
+  const used = USED_PREFIX + params.get('hash')!.toLowerCase();
   if (await env.RATE_LIMIT_KV.get(used)) return null;
   await env.RATE_LIMIT_KV.put(used, '1', { expirationTtl: TAP_TTL_S * 2 });
   return { id: row.id, email: row.email };
