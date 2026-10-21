@@ -84,11 +84,17 @@ export async function convertToPage(env: Env, input: PageInput): Promise<PageRes
 
   const name = input.displayName.replace(/\.[^.]+$/, '').trim().slice(0, 120) || input.displayName;
   const slug = input.slug || `${generateSlug(name.normalize('NFD').replace(/[̀-ͯ]/g, ''))}-${crypto.randomUUID().slice(0, 6)}`;
+  // Bulk paths (Drive import workflow, Files → artifacts) have no request context, and
+  // publishArtifact skips every post-publish task without one: Knowledge, search index,
+  // file-usage graph. Collect them here and wait for them, nested ones included.
+  const pending: Promise<unknown>[] = [];
+  const ctx = { waitUntil: (p: Promise<unknown>) => { pending.push(p); }, passThroughOnException: () => {} } as unknown as ExecutionContext;
   try {
     const published = await publishArtifact(env, { id: input.user.id, email: input.user.email || '', username: null }, {
       name, slug, entrypoint, files, visibility: input.visibility, authMethod: 'google',
       shareWith: [], credentials: [], workspaceId: input.workspaceId, folderId: input.folderId, artifactType: type, source,
-    });
+    }, ctx);
+    while (pending.length) await Promise.allSettled(pending.splice(0));
     return { ok: true, artifactId: published.artifact.id, slug };
   } catch (e) {
     return { ok: false, code: 'PUBLISH_FAILED', message: e instanceof Error ? e.message.slice(0, 200) : 'Could not create the page.' };
