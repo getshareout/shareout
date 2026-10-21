@@ -46,7 +46,7 @@ beforeAll(async () => {
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS versions (id TEXT PRIMARY KEY, artifact_id TEXT, entrypoint TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS assets (id TEXT PRIMARY KEY, version_id TEXT, path TEXT, r2_key TEXT, mime TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT, username TEXT)`);
-  await e.DB.exec(`CREATE TABLE IF NOT EXISTS ai_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, kind TEXT, model TEXT, units INTEGER, unit_kind TEXT, base_cost_micro_usd INTEGER, source TEXT, created_at TEXT)`);
+  await e.DB.exec(`CREATE TABLE IF NOT EXISTS ai_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, kind TEXT, model TEXT, units INTEGER, unit_kind TEXT, base_cost_micro_usd INTEGER, source TEXT, input_tokens INTEGER, output_tokens INTEGER, created_at TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS rate_limits (principal_type TEXT NOT NULL, principal_id TEXT NOT NULL, action TEXT NOT NULL, window_start TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (principal_type, principal_id, action, window_start))`);
 });
 
@@ -111,8 +111,8 @@ describe('presentArtifact', () => {
     expect(files[0].content).toContain('reveal.js@5');
     expect(files[0].content).toContain('Headline');
 
-    const usage = await e.DB.prepare(`SELECT COUNT(*) AS n FROM ai_usage_events WHERE kind='present_this'`).first<{ n: number }>();
-    expect(usage!.n).toBe(1);
+    // Metered by chatComplete itself (mocked here): the call carries whom it is for.
+    expect(chatComplete.mock.calls[0][1]).toMatchObject({ kind: 'present_this' });
   });
 
   it('404 when the artifact does not exist — no publish', async () => {

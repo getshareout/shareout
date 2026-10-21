@@ -6,7 +6,6 @@
  */
 import type { Env } from '../types';
 import { chatComplete, getAIProvider } from '../data/agent/anthropic';
-import { recordAiUsage } from '../data/ai-usage';
 import { isFeatureEnabled } from '../features/flags';
 import { localeForContent, type Locale } from '../i18n';
 import { isTextMime } from './files';
@@ -122,14 +121,7 @@ export async function summarizeVersion(env: Env, versionId: string): Promise<voi
   if (!diff.trim()) return;
 
   const locale = await localeForContent(env, v.workspace_id, v.owner_id).catch((): Locale => 'en');
-  const out = await chatComplete(env, [{ role: 'user', content: diff }], systemPrompt(locale), 80);
-  await recordAiUsage(env, {
-    workspaceId: v.workspace_id, userId: v.owner_id,
-    kind: 'version_summary', model: MODEL_LABEL,
-    units: Math.ceil((diff.length + out.length) / 4), unitKind: 'tokens',
-    baseCostMicroUsd: Math.round((diff.length / 4) * 0.0025 + (out.length / 4) * 0.01),
-    source: v.artifact_id,
-  }).catch(() => {});
+  const out = await chatComplete(env, { workspaceId: v.workspace_id, userId: v.owner_id, kind: 'version_summary', source: v.artifact_id }, [{ role: 'user', content: diff }], systemPrompt(locale), 80);
 
   const summary = cleanSummary(out);
   if (!summary) return;

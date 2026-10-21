@@ -20,7 +20,7 @@ vi.mock('../../../src/crew/provider', async (orig) => ({
   getCrewProvider: h.getCrewProvider,
 }));
 vi.mock('../../../src/data/agent/ai-config', () => ({ resolveWorkspaceAi: h.resolveWorkspaceAi }));
-vi.mock('../../../src/data/ai-usage', () => ({ recordAiUsage: h.recordAiUsage }));
+vi.mock('../../../src/data/ai-usage', () => ({ recordAiUsage: h.recordAiUsage, meterAiCall: vi.fn(async () => {}) }));
 vi.mock('../../../src/features/flags', () => ({ isFeatureEnabled: async () => true, webAgentBlockedMessage: async () => 'off' }));
 vi.mock('../../../src/skill-marketplace', () => ({ buildAgentSkillsDoc: async () => 'SKILLS-DOC' }));
 vi.mock('../../../src/chat-agent/access', () => ({ getUserWorkspaceIds: async () => ['wsp_first'] }));
@@ -124,11 +124,10 @@ describe('runAgentTurn', () => {
       extraTools: [echo], usageKind: 'ask_workspace',
     });
 
-    expect(h.recordAiUsage).toHaveBeenCalledTimes(1);
-    expect(h.recordAiUsage).toHaveBeenCalledWith(env, {
-      workspaceId: 'wsp_1', userId: 'u1', kind: 'ask_workspace', model: 'anthropic/claude-sonnet-5.5',
-      units: 2150, unitKind: 'tokens', baseCostMicroUsd: 4700, source: 'web',
-    });
+    // Each model turn carries the meter; the provider records its real usage per turn.
+    expect(h.calls.length).toBe(2);
+    for (const c of h.calls) expect(c.meter).toEqual({ workspaceId: 'wsp_1', userId: 'u1', kind: 'ask_workspace', source: 'web' });
+    expect(h.recordAiUsage).not.toHaveBeenCalled();
   });
 
   it('logs one chat.timing line with the pre-LLM phases, TTFT, rounds and total', async () => {

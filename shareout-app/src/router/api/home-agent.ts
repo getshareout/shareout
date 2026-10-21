@@ -176,7 +176,7 @@ async function handleBrief(ctx: FetchContext, ws: string | null, user: AuthUser)
 
   let text = '';
   try {
-    for await (const ev of provider.streamTurn({ system, transcript: [{ role: 'user', text: userMsg }], tools: [], maxTokens: 400 })) {
+    for await (const ev of provider.streamTurn({ system, transcript: [{ role: 'user', text: userMsg }], tools: [], maxTokens: 400, meter: { workspaceId: ws, userId: user.id, kind: 'home_brief', source: 'home' } })) {
       if (ev.type === 'text_delta') text += ev.text;
       else if (ev.type === 'message_stop' || ev.type === 'error') break;
     }

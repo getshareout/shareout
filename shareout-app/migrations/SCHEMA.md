@@ -445,7 +445,7 @@ erDiagram
 
 | Table | Holds |
 |---|---|
-| `ai_usage_events` | Metered AI usage: `kind`, `model`, `units`, `unit_kind`, `base_cost_micro_usd`, `source`. |
+| `ai_usage_events` | Metered AI usage, one row per model call (every LLM call is metered at the provider layer): `kind`, `model`, `units`, `unit_kind`, `input_tokens`, `output_tokens`, `base_cost_micro_usd`, `source`. |
 | `agent_usage_events` | Per-call cost ledger for agent and crew work — documented under [07 Agents](#07-agents-crews--skills). |
 | `workspace_llm_config` | Provider credentials, balance, markup and monthly budget — documented under [02 Workspaces](#02-workspaces--access-control), where it sits in the baseline. |
 | `workspace_usage_daily` | What each workspace cost per UTC `day`, one row per `metric` (storage measured from R2, serving, jobs, AI, email, browser) with `quantity` and `cost_micro_usd` at list price. The history behind the admin Usage ledger and its CSV. |

@@ -151,6 +151,7 @@ export async function handleAdminChat(
       try {
         for await (const chunk of streamChat(
           ctx.env,
+          { workspaceId: ctx.artifact.workspace_id, userId: null, kind: 'artifact_admin_chat', source: ctx.artifactId },
           messages,
           systemPrompt,
           model,

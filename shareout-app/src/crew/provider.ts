@@ -1,4 +1,5 @@
 import type { Env } from '../types';
+import { meterAiCall, type AiMeter } from '../data/ai-usage';
 import { getBuildChain, isProviderLevelStatus, providerHeaders, type AIConfig } from '../data/agent/anthropic';
 import { logCrewProviderFailure, userFacingCrewProviderError } from './errors';
 import { GATEWAY_CACHING_PARAMS, gatewayReasoningParams, thinkingOffParams } from '../data/agent/models';
@@ -30,6 +31,8 @@ export interface ProviderTurnArgs {
   transcript: NeutralTurn[];
   tools: ProviderTool[];
   maxTokens: number;
+  /** Whom each model turn is metered to (ai_usage_events). */
+  meter: AiMeter;
 }
 
 export type ProviderEvent =
@@ -208,6 +211,7 @@ export class OpenAICompatCrewProvider implements CrewProvider {
       yield { type: 'tool_use', id: acc.id || acc.name, name: acc.name, input: parseToolInput(acc.args) };
     }
 
+    await meterAiCall(this.env, args.meter, this.model, inputTokens, outputTokens);
     yield {
       type: 'message_stop',
       stopReason: stopReason === 'tool_calls' || sawTool ? 'tool_use' : 'end_turn',
@@ -302,6 +306,7 @@ export class AnthropicCrewProvider implements CrewProvider {
       yield { type: 'tool_use', id: acc.id, name: acc.name, input: parseToolInput(acc.json) };
     }
 
+    await meterAiCall(this.env, args.meter, this.model, inputTokens, outputTokens);
     yield {
       type: 'message_stop',
       stopReason: stopReason === 'tool_use' ? 'tool_use' : 'end_turn',

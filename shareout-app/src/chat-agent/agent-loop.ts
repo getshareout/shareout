@@ -1,8 +1,6 @@
 import type { Env } from '../types';
 import { crewProviderFor, getCrewProvider, type NeutralTurn, type NeutralToolCall, type ProviderTool } from '../crew/provider';
 import { resolveWorkspaceAi } from '../data/agent/ai-config';
-import { recordAiUsage } from '../data/ai-usage';
-import { computeBaseCostMicroUsd } from '../data/agent/model-costs';
 import type { ChatReplyPort, PlatformId, WorkspaceSelection } from '../chat-platforms/types';
 import { PERSONAL_SCOPE } from '../chat-platforms/types';
 import { selectTools, defaultCapabilities, type Capabilities } from './tools/index';
@@ -295,18 +293,6 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
       total_ms: totalMs + (input.timing ? Object.values(input.timing).reduce((a, b) => a + b, 0) : 0),
       turn_ms: totalMs,
     });
-    if (inputTokens + outputTokens > 0) {
-      await recordAiUsage(env, {
-        workspaceId: selectedWs,
-        userId: input.userId,
-        kind: input.usageKind ?? 'assistant_chat',
-        model: provider.model,
-        units: inputTokens + outputTokens,
-        unitKind: 'tokens',
-        baseCostMicroUsd: computeBaseCostMicroUsd(provider.model, inputTokens, outputTokens),
-        source: platform,
-      }).catch(() => {});
-    }
     const toolNotes = notes.join('\n').slice(0, MAX_NOTES_CHARS);
     return toolNotes ? { ...r, toolNotes } : r;
   };
@@ -318,7 +304,7 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
     const toolCalls: NeutralToolCall[] = [];
     let stopReason = 'end_turn';
     let errored = false;
-    for await (const ev of provider.streamTurn({ system, transcript, tools: callTools, maxTokens: MAX_TOKENS })) {
+    for await (const ev of provider.streamTurn({ system, transcript, tools: callTools, maxTokens: MAX_TOKENS, meter: { workspaceId: selectedWs, userId: input.userId, kind: input.usageKind ?? 'assistant_chat', source: platform } })) {
       if (firstTokenMs === null && ev.type !== 'error') firstTokenMs = Date.now() - callAt;
       if (ev.type === 'text_delta') { text += ev.text; await input.reply?.sendTextDelta?.(ev.text); }
       else if (ev.type === 'tool_use') toolCalls.push({ id: ev.id, name: ev.name, input: ev.input });

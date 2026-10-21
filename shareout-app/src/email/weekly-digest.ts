@@ -3,7 +3,6 @@ import { dispatchLifecycleEmail } from './gateway';
 import { claimEmailSend } from './email-log';
 import { lifecycleEmailsDisabled, nurtureEmailsEnabled } from './flags';
 import { chatComplete, getAIProvider } from '../data/agent/anthropic';
-import { recordAiUsage } from '../data/ai-usage';
 import type { WorkspaceDigestData } from './catalog';
 import { getPlatformOrigin } from '../config/origins';
 
@@ -104,20 +103,11 @@ async function narrate(env: Env, workspaceId: string, d: WorkspaceDigestData): P
   try {
     const text = await chatComplete(
       env,
+      { workspaceId, userId: null, kind: 'weekly_digest', source: 'weekly_digest' },
       [{ role: 'user', content: `Workspace "${d.workspaceName}" this week: ${facts}.` }],
       'Write a warm, plain 2-3 sentence summary of a team\'s week in their workspace. No greeting, no sign-off, no exclamation marks, no hype words. Just what happened, concretely.',
       200,
     );
-    await recordAiUsage(env, {
-      workspaceId,
-      userId: null,
-      kind: 'weekly_digest',
-      model: provider.model,
-      units: 1,
-      unitKind: 'completion',
-      baseCostMicroUsd: 0,
-      source: 'weekly_digest',
-    }).catch(() => {});
     return text.trim() || null;
   } catch {
     return null;

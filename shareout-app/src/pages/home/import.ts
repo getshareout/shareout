@@ -106,8 +106,9 @@ export async function handleHomeImportApi(
       const early = await checkRateLimit(env, user.id, 'publish', user.email);
       if (!early.allowed) return rateLimitExceededResponse(early.reset);
       try {
-        const out = pdf ? await convertPdfImport(env, body.name, bytes)
-          : convert ? await convertOfficeImport(env, body.name, ext, convert, bytes) : await convertSlidesImport(env, body.name, ext, bytes);
+        const meter = { workspaceId, userId: user.id, kind: 'document_transcription', source: body.name };
+        const out = pdf ? await convertPdfImport(env, body.name, bytes, meter)
+          : convert ? await convertOfficeImport(env, body.name, ext, convert, bytes, meter) : await convertSlidesImport(env, body.name, ext, bytes);
         ({ files, entrypoint, source } = out);
         if (out.type) type = out.type;
       } catch (e) {

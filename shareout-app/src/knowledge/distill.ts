@@ -1,7 +1,6 @@
 import type { Env } from '../types';
 import { extractTextFromHtml } from '../serve/utils';
 import { chatComplete, getAIProvider } from '../data/agent/anthropic';
-import { recordAiUsage } from '../data/ai-usage';
 import { upsertLearnedFile, isTombstoned, loadKnowledge, getKnowledgeFile } from './store';
 import { artifactDigestPath, INDEX_PATH } from './types';
 import { toMarkdown } from './corpus/ingest';
@@ -19,7 +18,8 @@ const TOP_TOPICS = 15;
 const STALE_INGEST_WINDOW = '-7 days';
 const EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
 
-export type DistillComplete = (system: string, user: string) => Promise<string>;
+/** `workspaceId` (+ `source`) say whom the call is metered to. */
+export type DistillComplete = (system: string, user: string, workspaceId?: string, source?: string) => Promise<string>;
 
 export interface DistillResult {
   processed: number;
@@ -221,8 +221,9 @@ export async function runKnowledgeDistill(
   const complete: DistillComplete | null =
     opts?.complete ??
     (provider
-      ? (system, user) =>
-          chatComplete(env, [{ role: 'user', content: user }], system, DISTILL_MAX_TOKENS, provider)
+      ? (system, user, workspaceId, source) =>
+          chatComplete(env, { workspaceId: workspaceId ?? null, userId: null, kind: 'knowledge_distill', source: source ?? null },
+            [{ role: 'user', content: user }], system, DISTILL_MAX_TOKENS, provider)
       : null);
   if (!complete) return { processed: 0, skipped: 0 };
 
@@ -308,7 +309,7 @@ export async function runKnowledgeDistill(
 
     let response: string;
     try {
-      response = await complete(SYSTEM_PROMPT, userPrompt);
+      response = await complete(SYSTEM_PROMPT, userPrompt, ws, row.artifact_id);
     } catch {
       // leave unprocessed; retried next sweep until the stale window drops it
       skipped++;
@@ -331,16 +332,6 @@ export async function runKnowledgeDistill(
       'artifact-digest',
       [digest.title, digest.topics.join(' '), digest.body].join('\n')
     );
-    await recordAiUsage(env, {
-      workspaceId: ws,
-      userId: null,
-      kind: 'knowledge_distill',
-      model: provider?.model ?? 'injected',
-      units: Math.ceil(digest.body.length / 4),
-      unitKind: 'tokens_out',
-      baseCostMicroUsd: 0,
-      source: 'knowledge',
-    }).catch(() => {});
 
     await markProcessed(env, ws, row.artifact_id);
     touched.add(ws);

@@ -106,8 +106,10 @@ function streamEditorTurn(
         });
 
         let fullContent = '';
+        const art = await env.DB.prepare('SELECT workspace_id FROM artifacts WHERE id = ?').bind(options.artifactId).first<{ workspace_id: string | null }>();
+        const meter = { workspaceId: art?.workspace_id ?? null, userId: options.userId, kind: `editor_ai_${options.mode}`, source: options.artifactId };
         for await (const chunk of streamChat(
-          env, options.messages, options.systemPrompt, '', EDITOR_MAX_TOKENS, ai.aiConfig
+          env, meter, options.messages, options.systemPrompt, '', EDITOR_MAX_TOKENS, ai.aiConfig
         )) {
           if (chunk.type === 'content' && chunk.content) {
             fullContent += chunk.content;

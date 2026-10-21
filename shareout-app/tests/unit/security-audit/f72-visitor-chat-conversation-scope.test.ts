@@ -7,7 +7,7 @@ import { applyMigrations, e } from '../helpers/migrated-db';
 const h = vi.hoisted(() => ({ seen: [] as string[] }));
 vi.mock('../../../src/data/agent/anthropic', async (orig) => ({
   ...(await orig<typeof import('../../../src/data/agent/anthropic')>()),
-  streamChat: async function* (_env: unknown, messages: Array<{ content: string }>) {
+  streamChat: async function* (_env: unknown, _meter: unknown, messages: Array<{ content: string }>) {
     h.seen.push(messages.map((m) => m.content).join('\n'));
     yield { type: 'content', content: 'ok' };
     yield { type: 'done', usage: { input_tokens: 1, output_tokens: 1 } };

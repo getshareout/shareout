@@ -19,7 +19,7 @@ const BK = 'bk';
 beforeAll(async () => {
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS asset_deliverables (id TEXT PRIMARY KEY, bucket_artifact_id TEXT, workspace_id TEXT, owner_id TEXT, name TEXT, folder_id TEXT, visibility TEXT NOT NULL DEFAULT 'workspace', deleted_at TEXT, type_metadata TEXT, updated_at TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS blobs (id TEXT PRIMARY KEY, artifact_id TEXT, deliverable_id TEXT, version_no INTEGER, filename TEXT, mime_type TEXT, size_bytes INTEGER, r2_key TEXT)`);
-  await e.DB.exec(`CREATE TABLE IF NOT EXISTS ai_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, kind TEXT, model TEXT, units INTEGER, unit_kind TEXT, base_cost_micro_usd INTEGER, source TEXT, created_at TEXT)`);
+  await e.DB.exec(`CREATE TABLE IF NOT EXISTS ai_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, kind TEXT, model TEXT, units INTEGER, unit_kind TEXT, base_cost_micro_usd INTEGER, source TEXT, input_tokens INTEGER, output_tokens INTEGER, created_at TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, locale TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS file_artifact_usage (deliverable_id TEXT, artifact_id TEXT, created_at TEXT, PRIMARY KEY (deliverable_id, artifact_id))`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT, name TEXT)`);
@@ -55,8 +55,8 @@ describe('enrichDeliverable (work/042 P4)', () => {
     expect(enr.summary).toContain('budget');
     expect(enr.tags).toEqual(['budget', 'q3', 'finance']); // lowercased
     expect(enr.blobId).toBe('b1');
-    const usage = await e.DB.prepare(`SELECT COUNT(*) AS n FROM ai_usage_events WHERE kind='file_enrichment'`).first<{ n: number }>();
-    expect(usage!.n).toBe(1);
+    // Metered by chatComplete itself (mocked here): the call carries whom it is for.
+    expect(chatComplete.mock.calls[0][1]).toMatchObject({ kind: 'file_enrichment' });
   });
 
   it('marks a binary/unreadable file unsupported without calling the LLM', async () => {
@@ -100,6 +100,6 @@ describe('file summary language follows the workspace', () => {
     await e.DB.prepare(`INSERT INTO workspaces (id, locale) VALUES ('wsp', 'es')`).run();
     await seedFile('dl1', 'bl1');
     await enrichDeliverable(e, BK, 'dl1');
-    expect(chatComplete.mock.calls[0][2]).toBe(enrichSystemPrompt('es'));
+    expect(chatComplete.mock.calls[0][3]).toBe(enrichSystemPrompt('es'));
   });
 });

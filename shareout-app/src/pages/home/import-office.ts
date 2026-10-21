@@ -14,6 +14,7 @@ import type { ArtifactType, Env, FileEntry, ImportedSource } from '../../types';
 import { XLSX_MAX_INPUT_BYTES } from '../../data/files/parse-xlsx';
 import { DOC_IMAGES_ONLY, DocReadError, docToMarkdown } from '../../data/files/parse-doc';
 import { transcribeDocument, transcribePdf } from '../../data/files/transcribe-pdf';
+import type { AiMeter } from '../../data/ai-usage';
 
 export class ImportError extends Error {
   constructor(public code: string, message: string, public status = 422) { super(message); }
@@ -307,6 +308,8 @@ export async function convertOfficeImport(
   ext: string,
   kind: 'word' | 'sheet',
   bytes: Uint8Array,
+  /** Whom a transcription (image-only Word) is metered to. */
+  meter: AiMeter,
 ): Promise<ConvertedImport> {
   const original = originalFile(filename, ext, bytes);
   const base = safeSegment(filename.replace(/\.[^.]+$/, ''), 'document');
@@ -329,13 +332,13 @@ export async function convertOfficeImport(
     ({ markdown, media } = docxToMarkdown(bytes));
     // A Word file that is only pictures (a pasted scan or table screenshot): read the pictures.
     if (letterCount(markdown) < 20 && media.length) {
-      markdown = (await transcribeDocument(env, media.map((m) => ({ mediaType: m.mime, data: m.content })))) || markdown;
+      markdown = (await transcribeDocument(env, meter, media.map((m) => ({ mediaType: m.mime, data: m.content })))) || markdown;
     }
   }
   else if (ext === 'doc') {
     try { markdown = docToMarkdown(bytes); } catch (e) {
       if (!(e instanceof DocReadError)) throw e;
-      const read = e.message === DOC_IMAGES_ONLY ? await transcribeDocument(env, embeddedImages(bytes)) : null;
+      const read = e.message === DOC_IMAGES_ONLY ? await transcribeDocument(env, meter, embeddedImages(bytes)) : null;
       if (!read) throw new ImportError('CONVERT_FAILED', e.message);
       markdown = read;
     }
@@ -398,14 +401,14 @@ export function pdfMarkdownBody(md: string): string {
  * neither yields text (no AI configured, too big, model failed) it stays a PDF artifact,
  * so an upload is never lost.
  */
-export async function convertPdfImport(env: Env, filename: string, bytes: Uint8Array): Promise<ConvertedImport> {
+export async function convertPdfImport(env: Env, filename: string, bytes: Uint8Array, meter: AiMeter): Promise<ConvertedImport> {
   const base64 = bytesToBase64(bytes);
   let markdown = '';
   if (env.AI) {
     const res = await env.AI.toMarkdown({ name: filename, blob: new Blob([bytes], { type: 'application/pdf' }) }).catch(() => null);
     if (res?.format === 'markdown') markdown = pdfMarkdownBody(res.data);
   }
-  if (letterCount(markdown) < PDF_MIN_LETTERS) markdown = (await transcribePdf(env, base64)) || markdown;
+  if (letterCount(markdown) < PDF_MIN_LETTERS) markdown = (await transcribePdf(env, meter, base64)) || markdown;
   const original: FileEntry = { path: `original/${safeSegment(filename, 'original.pdf')}`, content: base64, mime: 'application/pdf', encoding: 'base64' };
   if (!markdown.trim()) {
     const path = safeSegment(filename, 'document.pdf');

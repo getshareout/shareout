@@ -7,7 +7,7 @@ import { applyMigrations, e } from '../helpers/migrated-db';
 const h = vi.hoisted(() => ({ prompts: [] as string[] }));
 vi.mock('../../../src/data/agent/anthropic', async (orig) => ({
   ...(await orig<typeof import('../../../src/data/agent/anthropic')>()),
-  streamChat: async function* (_env: unknown, _m: unknown, system: string) {
+  streamChat: async function* (_env: unknown, _meter: unknown, _m: unknown, system: string) {
     h.prompts.push(system);
     yield { type: 'content', content: 'ok' };
     yield { type: 'done', usage: { input_tokens: 1, output_tokens: 1 } };

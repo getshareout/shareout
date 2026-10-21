@@ -19,6 +19,9 @@ import {
   streamChat,
 } from '../../../../src/data/agent/anthropic';
 import type { Env } from '../../../../src/types';
+import type { AiMeter } from '../../../../src/data/ai-usage';
+
+const METER: AiMeter = { workspaceId: null, userId: null, kind: 'test', source: null };
 import { anthropicStreamBody, openAIStreamBody } from './helpers';
 
 afterEach(() => {
@@ -52,7 +55,7 @@ async function collectStream(
   messages: Array<{ role: 'user' | 'assistant'; content: string }> = [{ role: 'user', content: 'Hi' }],
 ) {
   const chunks = [];
-  for await (const chunk of streamChat(env, messages, 'system prompt', 'gpt-4o', 100)) {
+  for await (const chunk of streamChat(env, METER, messages, 'system prompt', 'gpt-4o', 100)) {
     chunks.push(chunk);
   }
   return chunks;
@@ -374,7 +377,7 @@ describe('streamChat failover', () => {
     const byo = { provider: 'openai' as const, apiKey: 'sk-user-byo', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o' };
 
     const chunks = [];
-    for await (const chunk of streamChat(bothEnv(), [{ role: 'user', content: 'Hi' }], 'sys', 'gpt-4o', 100, byo)) {
+    for await (const chunk of streamChat(bothEnv(), METER, [{ role: 'user', content: 'Hi' }], 'sys', 'gpt-4o', 100, byo)) {
       chunks.push(chunk);
     }
 
@@ -386,7 +389,7 @@ describe('streamChat failover', () => {
 
 describe('chat', () => {
   it('throws when no provider configured', async () => {
-    await expect(chat({} as Env, [{ role: 'user', content: 'Hi' }], 'sys', 'gpt-4o')).rejects.toThrow(
+    await expect(chat({} as Env, METER, [{ role: 'user', content: 'Hi' }], 'sys', 'gpt-4o')).rejects.toThrow(
       'AI provider not configured',
     );
   });
@@ -399,7 +402,7 @@ describe('chat', () => {
       }), { status: 200 }),
     );
 
-    const result = await chat(openaiEnv(), [{ role: 'user', content: 'Q' }], 'sys', 'gpt-4o', 512);
+    const result = await chat(openaiEnv(), METER, [{ role: 'user', content: 'Q' }], 'sys', 'gpt-4o', 512);
 
     expect(result).toEqual({
       content: 'Answer',
@@ -415,7 +418,7 @@ describe('chat', () => {
       }), { status: 200 }),
     );
 
-    const result = await chat(anthropicEnv(), [{ role: 'user', content: 'Q' }], 'sys', '', 512);
+    const result = await chat(anthropicEnv(), METER, [{ role: 'user', content: 'Q' }], 'sys', '', 512);
 
     expect(fetchMock.mock.calls[0][0]).toBe('https://api.anthropic.com/v1/messages');
     expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string).stream).toBeUndefined();
@@ -427,7 +430,7 @@ describe('chat', () => {
       new Response('bad request', { status: 400 }),
     );
 
-    await expect(chat(openaiEnv(), [{ role: 'user', content: 'Q' }], 'sys', 'gpt-4o')).rejects.toThrow(
+    await expect(chat(openaiEnv(), METER, [{ role: 'user', content: 'Q' }], 'sys', 'gpt-4o')).rejects.toThrow(
       'AI API error: 400',
     );
   });
@@ -440,7 +443,7 @@ describe('chat', () => {
       }), { status: 200 }),
     );
 
-    const result = await chat(openaiEnv(), [{ role: 'user', content: 'Q' }], 'sys', 'gpt-4o');
+    const result = await chat(openaiEnv(), METER, [{ role: 'user', content: 'Q' }], 'sys', 'gpt-4o');
 
     expect(result.content).toBe('');
   });
@@ -462,7 +465,7 @@ describe('streamChat request options', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(openAIStreamBody(['ok'], { prompt_tokens: 1, completion_tokens: 1 }), { status: 200 }),
     );
-    for await (const _ of streamChat(env, messages, 'sys', '', 100, null, opts)) { /* drain */ }
+    for await (const _ of streamChat(env, METER, messages, 'sys', '', 100, null, opts)) { /* drain */ }
     return JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
   }
 

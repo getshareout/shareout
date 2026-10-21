@@ -223,7 +223,7 @@ export async function executeBuildArtifact(
   onProgress?.('Designing your page…');
   let html: string;
   try {
-    html = await generateArtifactHtml(env, a.prompt);
+    html = await generateArtifactHtml(env, a.prompt, { workspaceId: a.workspace_id ?? null, userId, kind: 'page_build', source: 'assistant' });
   } catch {
     return { text: 'The builder hit a snag generating that page. Try again?', name: a.name };
   }

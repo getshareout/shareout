@@ -64,6 +64,7 @@ export async function routeInternalAdmin(request: Request, env: Env, path: strin
       const ctx = await getAnalystContext(env);
       const answer = await chatComplete(
         env,
+        { workspaceId: null, userId: null, kind: 'admin_analyst', source: 'internal_admin' },
         [{ role: 'user', content: `Question: ${question}\n\nSnapshot JSON:\n${JSON.stringify(ctx)}` }],
         ANALYST_SYSTEM,
         500,

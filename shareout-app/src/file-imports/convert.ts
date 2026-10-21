@@ -50,14 +50,16 @@ export async function convertToPage(env: Env, input: PageInput): Promise<PageRes
   let entrypoint: string;
   let source: ImportedSource | undefined;
   let type: ArtifactType;
+  // A transcription during conversion is metered to the page's owner and workspace.
+  const meter = { workspaceId: input.workspaceId, userId: input.user.id, kind: 'document_transcription', source: input.filename };
   try {
     const kind = IMPORT_CONVERTED_EXTS[ext];
     if (ext === 'pdf') {
-      const out = await convertPdfImport(env, input.filename, input.bytes);
+      const out = await convertPdfImport(env, input.filename, input.bytes, meter);
       ({ files, entrypoint, source } = out);
       type = out.type!;
     } else if (kind) {
-      ({ files, entrypoint, source } = await convertOfficeImport(env, input.filename, ext, kind, input.bytes));
+      ({ files, entrypoint, source } = await convertOfficeImport(env, input.filename, ext, kind, input.bytes, meter));
       type = kind === 'sheet' ? 'csv' : 'markdown';
     } else if (IMPORT_SLIDES_EXTS.includes(ext)) {
       const out = await convertSlidesImport(env, input.filename, ext, input.bytes);

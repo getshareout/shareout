@@ -236,6 +236,7 @@ export async function executeCrewRun(
         system,
         transcript,
         tools,
+        meter: { workspaceId: ownerCtx.workspaceId || null, userId: crew.owner_id, kind: 'crew_run', source: run.id },
         maxTokens: caps.maxTokensPerCall,
       })) {
         if (ev.type === 'text_delta') {

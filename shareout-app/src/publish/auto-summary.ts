@@ -10,7 +10,6 @@ import { generateId } from '../crypto-utils';
 import { chatComplete, getAIProvider } from '../data/agent/anthropic';
 import { contentHash } from '../moderation/check';
 import { parseModelJson } from '../assets/enrich';
-import { recordAiUsage } from '../data/ai-usage';
 import { setPresentation } from '../artifacts/satellites';
 import { localeForContent, summaryLanguageRule, type Locale } from '../i18n';
 
@@ -59,19 +58,12 @@ export async function generateArtifactSummary(env: Env, artifactId: string): Pro
   let out: string;
   try {
     const locale = await localeForContent(env, row.workspace_id, row.owner_id).catch((): Locale => 'en');
-    out = await chatComplete(env, [{ role: 'user', content: html }], summarySystemPrompt(locale), 200);
+    out = await chatComplete(env, { workspaceId: row.workspace_id, userId: row.owner_id, kind: 'artifact_summary', source: artifactId }, [{ role: 'user', content: html }], summarySystemPrompt(locale), 200);
   } catch {
     return; // silent — hash not written, so an unchanged re-publish retries later
   }
 
   const parsed = parseModelJson(out);
-  await recordAiUsage(env, {
-    workspaceId: row.workspace_id, userId: row.owner_id,
-    kind: 'artifact_summary', model: MODEL_LABEL,
-    units: Math.ceil((html.length + out.length) / 4), unitKind: 'tokens',
-    baseCostMicroUsd: Math.round((html.length / 4) * 0.0025 + (out.length / 4) * 0.01),
-    source: artifactId,
-  }).catch(() => {});
 
   if (!parsed) {
     // Model gave unparseable output — mark the hash so we don't hot-loop on the same
