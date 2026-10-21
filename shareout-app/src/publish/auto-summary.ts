@@ -11,13 +11,14 @@ import { chatComplete, getAIProvider } from '../data/agent/anthropic';
 import { contentHash } from '../moderation/check';
 import { parseModelJson } from '../assets/enrich';
 import { setPresentation } from '../artifacts/satellites';
+import { SUMMARY_MIMES_SQL } from './summary-scope';
 import { localeForContent, summaryLanguageRule, type Locale } from '../i18n';
 
 const MAX_HTML_CHARS = 20_000; // keep the prompt bounded + cheap
 const MODEL_LABEL = 'artifact-summary';
 
 const SYSTEM = `You describe a published web page for a workspace's search index.
-Given its HTML, respond with STRICT JSON only:
+Given its content (HTML, Markdown or CSV), respond with STRICT JSON only:
 {"summary": string, "tags": string[]}
 - summary: 1-2 sentences, <= 300 characters, plain language, what the page IS and shows.
 - tags: 3-6 short lowercase keywords (topic, purpose, data type). No # prefix.
@@ -45,7 +46,7 @@ export async function generateArtifactSummary(env: Env, artifactId: string): Pro
       JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
       JOIN versions v ON v.id = d.version_id
       JOIN assets ast ON ast.version_id = v.id AND ast.path = v.entrypoint
-     WHERE a.id = ? AND ast.mime = 'text/html'
+     WHERE a.id = ? AND ast.mime IN ${SUMMARY_MIMES_SQL}
   `).bind(artifactId).first<Row>();
   if (!row) return;
 

@@ -53,12 +53,19 @@ async function seedArtifact(id: string, opts: {
 }
 
 describe('runSummaryBackfill', () => {
-  it('processes only html artifacts with empty description and null hash', async () => {
+  it('picks up converted markdown and csv documents', async () => {
+    await seedArtifact('md_doc', { mime: 'text/markdown' });
+    await seedArtifact('csv_doc', { mime: 'text/csv' });
+    await runSummaryBackfill(e);
+    expect(generateArtifactSummary.mock.calls.map((c) => c[1]).sort()).toEqual(['csv_doc', 'md_doc']);
+  });
+
+  it('processes only summarizable artifacts with empty description and null hash', async () => {
     await seedArtifact('needs_summary');
     await seedArtifact('has_description', { description: 'Already set' });
     await seedArtifact('has_hash', { hash: 'abc123' });
     await seedArtifact('deleted', { deletedAt: '2026-01-01' });
-    await seedArtifact('not_html', { mime: 'text/csv' });
+    await seedArtifact('not_summarizable', { mime: 'application/json' });
 
     const result = await runSummaryBackfill(e);
 

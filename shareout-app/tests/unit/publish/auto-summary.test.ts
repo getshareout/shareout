@@ -28,15 +28,15 @@ beforeAll(async () => {
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS ai_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, kind TEXT, model TEXT, units INTEGER, unit_kind TEXT, base_cost_micro_usd INTEGER, source TEXT, input_tokens INTEGER, output_tokens INTEGER, cost_source TEXT, provider_ref TEXT, created_at TEXT)`);
 });
 
-async function seedArtifact(id: string, opts: { html?: string; description?: string | null } = {}) {
+async function seedArtifact(id: string, opts: { html?: string; description?: string | null; mime?: string } = {}) {
   await e.DB.prepare(`INSERT INTO artifacts (id, workspace_id, owner_id, description) VALUES (?, 'wsp', 'usr', ?)`)
     .bind(id, opts.description ?? null).run();
   await e.DB.prepare(`INSERT INTO deployments (id, artifact_id, version_id, channel) VALUES (?, ?, ?, 'production')`)
     .bind('dep_' + id, id, 'ver_' + id).run();
   await e.DB.prepare(`INSERT INTO versions (id, artifact_id, entrypoint) VALUES (?, ?, 'index.html')`)
     .bind('ver_' + id, id).run();
-  await e.DB.prepare(`INSERT INTO assets (id, version_id, path, r2_key, mime) VALUES (?, ?, 'index.html', ?, 'text/html')`)
-    .bind('ast_' + id, 'ver_' + id, 'k/' + id).run();
+  await e.DB.prepare(`INSERT INTO assets (id, version_id, path, r2_key, mime) VALUES (?, ?, 'index.html', ?, ?)`)
+    .bind('ast_' + id, 'ver_' + id, 'k/' + id, opts.mime ?? 'text/html').run();
   await e.ARTIFACTS.put('k/' + id, new TextEncoder().encode(opts.html ?? '<html><body>Revenue dashboard</body></html>'));
 }
 
@@ -74,6 +74,19 @@ describe('generateArtifactSummary (post-publish, background)', () => {
 
     // Metered by chatComplete itself (mocked here): the call carries whom it is for.
     expect(chatComplete.mock.calls[0][1]).toMatchObject({ kind: 'artifact_summary' });
+  });
+
+  it('summarizes a converted markdown document', async () => {
+    await seedArtifact('md1', { mime: 'text/markdown', html: '# Procedimiento de seguridad\n\nPasos para trabajo en altura.' });
+    await generateArtifactSummary(e, 'md1');
+    expect(chatComplete.mock.calls[0][2]).toEqual([{ role: 'user', content: '# Procedimiento de seguridad\n\nPasos para trabajo en altura.' }]);
+    expect((await artifactOf('md1'))!.description).toBe('A dashboard of quarterly revenue.');
+  });
+
+  it('skips artifacts whose entrypoint is not html, markdown or csv', async () => {
+    await seedArtifact('js1', { mime: 'application/json', html: '{}' });
+    await generateArtifactSummary(e, 'js1');
+    expect(chatComplete).not.toHaveBeenCalled();
   });
 
   it('does not clobber a user-set description', async () => {

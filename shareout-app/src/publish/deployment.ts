@@ -12,6 +12,7 @@ import { scanFileUsage } from '../assets/usage';
 import { emitJobEvent } from '../scheduling/events';
 import { generateArtifactThumbnail } from '../screenshots';
 import { generateArtifactSummary } from './auto-summary';
+import { SUMMARY_ARTIFACT_TYPES } from './summary-scope';
 import { shouldBlockPublish, stageCandidate, runBlockGate } from '../tests/block-gate';
 import type { ModerationStatus } from '../moderation/check';
 import type { ReadinessProfile } from '../../shared/editor-readiness/model';
@@ -243,7 +244,7 @@ export function schedulePostPublishTasks(
     executionCtx.waitUntil(generateArtifactThumbnail(env, opts.artifactId).catch(() => false));
   }
 
-  if (opts.artifactType === 'html') {
+  if (SUMMARY_ARTIFACT_TYPES.includes(opts.artifactType)) {
     executionCtx.waitUntil(generateArtifactSummary(env, opts.artifactId).catch(() => {}));
   }
 
