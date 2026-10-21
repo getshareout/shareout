@@ -27,10 +27,18 @@ export const workspace_client_home_views_cardActions_JS = `  // ===== artifact c
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
       var svg = btn.querySelector('svg'); if (svg) svg.setAttribute('fill', on ? 'currentColor' : 'none');
     });
+    // Table rows: same state on the row and its inline star.
+    document.querySelectorAll('.wsx-tr[data-id="' + CSS.escape(id) + '"]').forEach(function (row) {
+      row.setAttribute('data-favorite', on ? '1' : '0');
+      var st = row.querySelector('.wsx-tr__star'); if (!st) return;
+      var label = on ? t('inspector.favRemove') : t('inspector.favAdd');
+      st.classList.toggle('is-on', on); st.title = label; st.setAttribute('aria-label', label); st.setAttribute('aria-pressed', on ? 'true' : 'false');
+      var svg = st.querySelector('svg'); if (svg) svg.setAttribute('fill', on ? 'currentColor' : 'none');
+    });
   }
   window.toggleFavorite = function (id, silent) {
-    var card = cardEls(id)[0]; if (!card) return;
-    var on = card.dataset.favorite !== '1';
+    var card = artEls(id)[0]; if (!card) return;
+    var on = card.getAttribute('data-favorite') !== '1';
     optimistic({
       key: 'fav:' + id,
       apply: function () { applyFavoriteDom(id, on); },
@@ -64,10 +72,17 @@ export const workspace_client_home_views_cardActions_JS = `  // ===== artifact c
         }
       });
     });
+    // Table rows: Access cell + the attribute the context menu reads.
+    document.querySelectorAll('.wsx-tr[data-id="' + CSS.escape(id) + '"]').forEach(function (row) {
+      row.setAttribute('data-visibility', vis);
+      var cell = row.querySelector('.wsx-tr__vis'); if (!cell) return;
+      cell.classList.toggle('is-ws', isWs);
+      cell.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' + icon + '</svg><span>' + esc(label) + '</span>';
+    });
   }
   window.toggleVisibility = function (id, newVis) {
-    var card = cardEls(id)[0]; if (!card) return;
-    var prevVis = card.dataset.visibility;
+    var card = artEls(id)[0]; if (!card) return;
+    var prevVis = card.getAttribute('data-visibility');
     optimistic({
       key: 'vis:' + id,
       apply: function () { applyVisibilityDom(id, newVis); },
@@ -133,8 +148,8 @@ export const workspace_client_home_views_cardActions_JS = `  // ===== artifact c
       rollback: function (err) { (err && err.failed ? err.failed : ids).forEach(back); },
       request: function () {
         return Promise.all(ids.map(function (id) {
-          var card = cardEls(id)[0];
-          var wsId = card ? (card.dataset.workspace || '') : '';
+          var card = artEls(id)[0];
+          var wsId = card ? (card.getAttribute('data-workspace') || '') : '';
           var url = wsId ? '/v1/workspaces/' + encodeURIComponent(wsId) + '/artifacts/' + encodeURIComponent(id) + '/move' : '/v1/artifacts/' + encodeURIComponent(id) + '/folder';
           return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ folder_id: folderId }) })
             .then(function (r) { return r.ok; }).catch(function () { return false; });
@@ -201,8 +216,8 @@ export const workspace_client_home_views_cardActions_JS = `  // ===== artifact c
     });
   }
   window.confirmDelete = function (id) {
-    var card = cardEls(id)[0];
-    var titleEl = card && card.querySelector('.card-title');
+    var card = artEls(id)[0];
+    var titleEl = card && card.querySelector('.card-title, .wsx-tr__nm');
     var name = titleEl ? titleEl.textContent : t('cards.thisPage');
     deleteArtifactsFlow([id], t('cards.deleteTitle').replace('{name}', name));
   };
@@ -226,7 +241,7 @@ export const workspace_client_home_views_cardActions_JS = `  // ===== artifact c
     document.getElementById('cmdbarFav').addEventListener('click', function () {
       var ids = Array.from(selectedIds); if (!ids.length) return;
       var n = 0;
-      ids.forEach(function (id) { var card = cardEls(id)[0]; if (card && card.dataset.favorite !== '1') { window.toggleFavorite(id, true); n++; } });
+      ids.forEach(function (id) { var el = artEls(id)[0]; if (el && el.getAttribute('data-favorite') !== '1') { window.toggleFavorite(id, true); n++; } });
       clearSelection();
       showToast(n ? t('cards.favAddedN').replace('{n}', n) : t('cards.favAlready'), 'success');
     });
@@ -243,15 +258,40 @@ export const workspace_client_home_views_cardActions_JS = `  // ===== artifact c
     if (n > 0) { bar.hidden = false; requestAnimationFrame(function () { bar.classList.add('show'); }); }
     else { bar.classList.remove('show'); bar.hidden = true; }
   }
-  window.toggleSelect = function (id) {
-    if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
-    cardEls(id).forEach(function (c) { c.classList.toggle('is-selected', selectedIds.has(id)); });
+  // Grid cards and table rows share one selection. Shift+click selects the range from the
+  // last pick (in on-screen order); Cmd/Ctrl+click, or any click while selecting, toggles.
+  var lastSelId = '';
+  function setSel(id, on) {
+    if (on) selectedIds.add(id); else selectedIds.delete(id);
+    artEls(id).forEach(function (c) { c.classList.toggle('is-selected', on); });
+  }
+  function visibleArtIds() {
+    var seen = {}, out = [];
+    document.querySelectorAll('.artifact-card[data-id], .wsx-tr[data-id]').forEach(function (el) {
+      var id = el.getAttribute('data-id'); if (!id || seen[id] || !el.offsetParent) return; seen[id] = 1; out.push(id);
+    });
+    return out;
+  }
+  window.toggleSelect = function (id, ev) {
+    var ids = ev && ev.shiftKey && lastSelId ? visibleArtIds() : null;
+    var a = ids ? ids.indexOf(lastSelId) : -1, b = ids ? ids.indexOf(id) : -1;
+    if (a >= 0 && b >= 0) ids.slice(Math.min(a, b), Math.max(a, b) + 1).forEach(function (x) { setSel(x, true); });
+    else setSel(id, !selectedIds.has(id));
+    lastSelId = id;
     updateCmdbar();
   };
   function clearSelection() {
-    selectedIds.forEach(function (id) { cardEls(id).forEach(function (c) { c.classList.remove('is-selected'); }); });
-    selectedIds.clear(); updateCmdbar();
+    selectedIds.forEach(function (id) { artEls(id).forEach(function (c) { c.classList.remove('is-selected'); }); });
+    selectedIds.clear(); lastSelId = ''; updateCmdbar();
   }
+  // Capture phase: beats the open-as-tab link handler. Buttons inside keep their own clicks.
+  document.addEventListener('click', function (e) {
+    if (!(e.metaKey || e.ctrlKey || e.shiftKey || selectedIds.size)) return;
+    var el = e.target.closest && e.target.closest('.artifact-card[data-id], .wsx-tr[data-id]'); if (!el) return;
+    if (e.target.closest('button') || e.target.closest('.card-actions')) return;
+    e.preventDefault(); e.stopPropagation();
+    window.toggleSelect(el.getAttribute('data-id'), e);
+  }, true);
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && selectedIds.size) clearSelection(); });
 
 `;

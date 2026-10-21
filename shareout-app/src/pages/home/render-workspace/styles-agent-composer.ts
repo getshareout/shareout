@@ -309,6 +309,20 @@ export const WORKSPACE_AGENT_COMPOSER_STYLES = `/* ---- agent dock (inside canva
 .wsx-tbl--art .feature { width: 22px; height: 22px; }
 .wsx-tbl--art .feature svg { width: 13px; height: 13px; }
 .wsx-tr__none { color: var(--color-text-tertiary); font-size: var(--text-xs); }
+/* Row select (over the type icon, Drive-style) + inline favorite star. */
+.wsx-tr__icon { position: relative; }
+.wsx-tr__sel { position: absolute; inset: 0; display: none; place-items: center; padding: 0; border: 1.5px solid var(--color-border-strong); border-radius: 5px; background: var(--color-bg-elevated); color: transparent; cursor: pointer; }
+.wsx-tr__sel svg { width: 13px; height: 13px; }
+.wsx-tr:hover .wsx-tr__sel, body.selecting .wsx-tr__sel, .wsx-tr.is-selected .wsx-tr__sel { display: grid; }
+.wsx-tr.is-selected .wsx-tr__sel { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-text-inverse); }
+.wsx-tr.is-selected { background: var(--color-primary-light); }
+.wsx-tr__name { display: flex; align-items: center; gap: 6px; }
+.wsx-tr__nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wsx-tr__star { flex: none; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text-tertiary); cursor: pointer; opacity: 0; transition: opacity var(--duration-fast), color var(--duration-fast); }
+.wsx-tr__star svg { width: 14px; height: 14px; }
+.wsx-tr:hover .wsx-tr__star, .wsx-tr__star:focus-visible, .wsx-tr__star.is-on { opacity: 1; }
+.wsx-tr__star:hover { color: var(--color-text); background: var(--color-surface); }
+.wsx-tr__star.is-on { color: var(--color-warning); }
 .wsx-tr__stack { display: inline-flex; align-items: center; }
 .wsx-tr__stack .owner-avatar { box-shadow: 0 0 0 2px var(--color-bg-elevated); }
 .wsx-tr__stack .owner-avatar + .owner-avatar { margin-left: -6px; }

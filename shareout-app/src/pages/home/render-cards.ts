@@ -153,7 +153,6 @@ export function renderArtifactCard(a: ArtifactRow, hostname: string, env?: Env):
       data-shared="${a.user_role !== 'owner' ? '1' : '0'}"
       data-favorite="${a.is_favorite ? '1' : '0'}"
       data-type-group="${artifactTypeGroup(a.artifact_type)}"
-      data-type="${escapeHtml(a.artifact_type)}"
       data-url="${escapeHtml(pageUrl)}"
       data-name="${escapeHtml(a.name.toLowerCase())}"
       data-tags="${escapeHtml(tagList.join('\n').toLowerCase())}"
@@ -166,7 +165,7 @@ export function renderArtifactCard(a: ArtifactRow, hostname: string, env?: Env):
       data-views="${a.total_views}"
       data-updated="${escapeHtml(a.updated_at || a.created_at)}"
       data-created="${escapeHtml(a.created_at)}">
-      <button type="button" class="card-select" onclick="event.stopPropagation();event.preventDefault();toggleSelect('${escapeHtml(a.id)}')" aria-label="Select" title="Select" data-i18n-aria="assets.select" data-i18n-title="assets.select">
+      <button type="button" class="card-select" onclick="event.stopPropagation();event.preventDefault();toggleSelect('${escapeHtml(a.id)}',event)" aria-label="Select" title="Select" data-i18n-aria="assets.select" data-i18n-title="assets.select">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </button>
       <div class="card-preview-wrap">
@@ -271,8 +270,8 @@ export function renderArtifactRow(a: ArtifactRow, hostname: string, env?: Env): 
   const date = a.updated_at || a.created_at;
   const pageUrl = buildArtifactShareUrl(hostname, a.slug, a.display_slug, undefined, undefined, env);
   return `<a class="wsx-tr" href="/a/${escapeHtml(a.slug)}/" data-id="${escapeHtml(a.id)}" data-slug="${escapeHtml(a.slug)}" data-name="${escapeHtml(a.name)}" data-type="${escapeHtml(a.artifact_type)}" data-url="${escapeHtml(pageUrl)}" data-role="${escapeHtml(a.user_role)}" data-favorite="${a.is_favorite ? '1' : '0'}" data-visibility="${escapeHtml(a.visibility)}" data-workspace="${escapeHtml(a.workspace_id || '')}">
-    <span class="wsx-tr__icon" style="--type-color:${tm.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${tm.svg}</svg></span>
-    <span class="wsx-tr__name">${escapeHtml(a.name)}</span>
+    <span class="wsx-tr__icon" style="--type-color:${tm.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${tm.svg}</svg><button type="button" class="wsx-tr__sel" onclick="event.stopPropagation();event.preventDefault();toggleSelect('${escapeHtml(a.id)}',event)" aria-label="Select" title="Select" data-i18n-aria="assets.select" data-i18n-title="assets.select"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button></span>
+    <span class="wsx-tr__name"><span class="wsx-tr__nm">${escapeHtml(a.name)}</span><button type="button" class="wsx-tr__star${a.is_favorite ? ' is-on' : ''}" onclick="event.stopPropagation();event.preventDefault();toggleFavorite('${escapeHtml(a.id)}')" aria-pressed="${a.is_favorite ? 'true' : 'false'}" aria-label="${a.is_favorite ? 'Remove from favorites' : 'Add to favorites'}" title="${a.is_favorite ? 'Remove from favorites' : 'Add to favorites'}" data-i18n-aria="${a.is_favorite ? 'inspector.favRemove' : 'inspector.favAdd'}" data-i18n-title="${a.is_favorite ? 'inspector.favRemove' : 'inspector.favAdd'}"><svg viewBox="0 0 24 24" fill="${a.is_favorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></button></span>
     <span class="wsx-tr__owner">${renderOwnerAvatar(a)}</span>
     <span class="wsx-tr__shared">${renderSharedCell(a)}</span>
     <span class="wsx-tr__access">${renderAccessCell(a)}</span>
