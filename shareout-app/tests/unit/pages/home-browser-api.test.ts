@@ -16,7 +16,7 @@ function mkEnv(): Env {
           return null;
         },
         all: async () => {
-          if (sql.includes('WITH RECURSIVE')) {
+          if (sql.includes('WITH RECURSIVE') && !sql.includes('sub(root')) {
             return { results: [{ id: 'fld_root', name: 'Root' }, { id: 'fld_x', name: 'Marketing' }] };
           }
           if (sql.includes('FROM folders f') && sql.includes('f.parent_id = ?')) {

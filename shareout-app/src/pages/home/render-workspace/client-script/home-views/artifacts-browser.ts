@@ -224,7 +224,9 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
   function localizeFolderCounts(root) {
     (root || document).querySelectorAll('.wsx-folder-card__count[data-count]').forEach(function (el) {
       var n = parseInt(el.getAttribute('data-count'), 10) || 0;
-      el.textContent = (n === 1 ? t('artifacts.folderCountOne') : t('artifacts.folderCountMany')).replace('{n}', n);
+      var subs = parseInt(el.getAttribute('data-folders'), 10) || 0;
+      el.textContent = (subs ? (subs === 1 ? t('artifacts.subfolderCountOne') : t('artifacts.subfolderCountMany')).replace('{n}', subs) + ' · ' : '')
+        + (n === 1 ? t('artifacts.folderCountOne') : t('artifacts.folderCountMany')).replace('{n}', n);
     });
   }
   (function () {

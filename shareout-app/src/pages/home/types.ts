@@ -43,7 +43,9 @@ export interface ArtifactRow {
 export interface HomeFolder {
   id: string;
   name: string;
+  /** Artifacts in this folder and every sub-folder below it. */
   artifact_count: number;
+  subfolder_count?: number;
   created_by?: string | null;
 }
 
