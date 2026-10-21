@@ -15,7 +15,12 @@ describe('parseHomeFilters', () => {
       folder: '',
       filesScope: 'team',
       folderKind: '',
+      level: false,
     });
+  });
+
+  it('reads the Drive-style level view flag', () => {
+    expect(parseHomeFilters(new URL('https://shareout.site/home?level=1')).level).toBe(true);
   });
 
   it('parses query params', () => {

@@ -25,6 +25,7 @@ export function parseHomeFilters(url: URL): HomeFilters {
     filesScope: url.searchParams.get('files') === 'personal' ? 'personal' : 'team',
     folderKind: url.searchParams.get('folderKind') === 'personal' ? 'personal'
       : url.searchParams.get('folderKind') === 'team' ? 'team' : '',
+    level: url.searchParams.get('level') === '1',
   };
 }
 

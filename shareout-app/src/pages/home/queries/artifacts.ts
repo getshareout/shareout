@@ -94,7 +94,7 @@ export async function queryHomeArtifacts(
   filters: HomeFilters,
   visArg?: VisibilityScope,
 ): Promise<{ artifacts: ArtifactRow[]; total: number; totalPages: number }> {
-  const { page, search, sort, type, scope, workspace, folder, filesScope } = filters;
+  const { page, search, sort, type, scope, workspace, folder, filesScope, level } = filters;
   const offset = (page - 1) * HOME_PAGE_SIZE;
 
   const vis = visArg ?? await getVisibilityScope(env, user);
@@ -124,6 +124,8 @@ export async function queryHomeArtifacts(
   if (folder) {
     filterSql += ' AND a.folder_id = ?';
     filterParams.push(folder);
+  } else if (level) {
+    filterSql += ' AND a.folder_id IS NULL';
   }
   if (scope === 'shared') {
     filterSql += ` AND a.owner_id NOT IN (${idPh})`;

@@ -131,6 +131,9 @@ export const foldersBarStyles = `/* ── Folders bar ────────�
 .wsx-folder-grid::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 999px; }
 .wsx-folder-card { position: relative; display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg-elevated); cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
 .wsx-folder-card:hover { border-color: var(--color-primary); box-shadow: var(--shadow-sm); }
+/* Drive-style: folders sit in the artifacts grid/table, before the artifacts. */
+.artifacts-grid > .wsx-folder-card { align-self: start; }
+.wsx-tr--folder { cursor: pointer; }
 .wsx-folder-card:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .wsx-folder-card__icon { display: inline-flex; flex-shrink: 0; width: 40px; height: 40px; align-items: center; justify-content: center; border-radius: var(--radius-md); background: var(--color-primary-light); color: var(--color-primary); }
 .wsx-folder-card__icon svg { width: 20px; height: 20px; }

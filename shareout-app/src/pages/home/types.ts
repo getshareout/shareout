@@ -60,6 +60,8 @@ export interface HomeFilters {
   filesScope: HomeFilesScope;
   /** Which folder list is open when drilling into a folder. */
   folderKind: HomeFilesScope | '';
+  /** Drive-style level view: only the artifacts directly in `folder` (the root when empty). */
+  level: boolean;
 }
 
 export interface RenderArgs {
