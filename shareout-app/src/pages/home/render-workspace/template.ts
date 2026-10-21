@@ -39,7 +39,7 @@ function buildNav(args: RenderArgs, canManage: boolean): NavGroup[] {
 }
 
 /** Lenses kept out of the rail but still reachable (account menu, ⌘K, onboarding, ?view=). */
-const HIDDEN_LENSES = ['connect', 'analytics', 'assets'];
+const HIDDEN_LENSES = ['connect', 'analytics'];
 
 function railHtml(groups: NavGroup[]): string {
   return groups.map((g, gi) => {

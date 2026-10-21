@@ -79,6 +79,38 @@ button.wsx-kn2__chip:hover { border-color: var(--color-primary); background: var
 .wsx-kn2__gname { width: 100%; margin: 8px 0; }
 .wsx-kn2__ginvalid { color: var(--color-error); font-size: var(--text-xs); margin: 6px 0; }
 
+/* ---- Note view: eyebrow → title → meta, actions beside the title; facets, body, sources ---- */
+.wsx-knd__top { display: flex; align-items: flex-start; gap: 12px; }
+.wsx-knd__titles { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.wsx-knd__eyebrow { display: flex; align-items: center; gap: 8px; }
+.wsx-knd__kind { font: 700 var(--text-xs) var(--font-body); text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-tertiary); }
+.wsx-knd__title { font: 700 var(--text-h3) var(--font-display, var(--font-body)); line-height: 1.2; margin: 0; color: var(--color-text); overflow-wrap: anywhere; }
+.wsx-knd__meta { font-size: var(--text-xs); color: var(--color-text-tertiary); }
+.wsx-knd__acts { flex: none; display: inline-flex; gap: 2px; margin-top: -4px; }
+.wsx-knd__act svg { width: 17px; height: 17px; }
+.wsx-knd__act.is-on { color: var(--color-primary); }
+.wsx-knd__act--danger:not(:disabled):hover { color: var(--color-error); background: var(--color-error-light); }
+.wsx-knd__facets { display: flex; flex-direction: column; gap: 8px; margin: 12px 0 14px; }
+.wsx-knd__facet { display: flex; align-items: baseline; gap: 12px; }
+.wsx-knd__flabel { flex: none; width: 72px; font-size: var(--text-xs); font-weight: 600; color: var(--color-text-tertiary); }
+.wsx-knd__chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.wsx-knd__chip { border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text-secondary); font: 500 var(--text-xs) var(--font-body); border-radius: 999px; padding: 3px 10px; text-transform: none; }
+button.wsx-knd__chip { cursor: pointer; transition: border-color var(--duration-fast), color var(--duration-fast); }
+button.wsx-knd__chip:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.wsx-knd__body { font-size: var(--text-sm); line-height: 1.65; }
+.wsx-knd__sec { margin-top: 22px; }
+.wsx-knd__sechead { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.wsx-knd__sechead h4 { margin: 0; font: 700 var(--text-sm) var(--font-body); color: var(--color-text); }
+.wsx-knd__count { font: 600 var(--text-xs) var(--font-body); color: var(--color-text-tertiary); font-variant-numeric: tabular-nums; }
+.wsx-knd__hint { margin-left: auto; font-size: var(--text-xs); color: var(--color-text-tertiary); }
+.wsx-knd__srcs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.wsx-knd__src { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elevated); color: var(--color-text); text-decoration: none; font: 500 var(--text-sm) var(--font-body); transition: border-color var(--duration-fast); }
+a.wsx-knd__src:hover { border-color: var(--color-primary); }
+.wsx-knd__src svg { flex: none; width: 16px; height: 16px; color: var(--color-text-tertiary); }
+.wsx-knd__srct { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wsx-knd__src.is-off { color: var(--color-text-tertiary); }
+a.wsx-knd__src:hover .wsx-knd__srcgo svg { color: var(--color-primary); }
+
 /* Desktop tree + table: the lens fills the pane, so the title, stats and controls never scroll;
    only the tree and the note body do (the note's title block stays on top). */
 @media (min-width: 861px) {

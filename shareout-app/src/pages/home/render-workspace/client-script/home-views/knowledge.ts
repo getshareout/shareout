@@ -532,16 +532,32 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
   // Re-render the shell keeping the current selection (used after pin/edit/forget).
   function knReopen(path) { var m = knMount(); if (!m) return; knCurrentPath = path || ''; knRenderShell(m); }
 
+  var KND_ICO = {
+    doc: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+    go: '<path d="M7 17 17 7"/><path d="M8 7h9v9"/>',
+    pin: '<path d="M12 17v5"/><path d="M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.2V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.8a2 2 0 0 0-1.1-1.8l-1.8-.9a2 2 0 0 1-1.1-1.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+    edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+    del: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'
+  };
   function knSrcRows(sources) {
     if (!sources || !sources.length) return '<div class="wsx-cat__linnone">' + esc(t('knowledge.srcNone')) + '</div>';
-    var rows = sources.map(function (s) {
+    return '<ul class="wsx-knd__srcs">' + sources.map(function (s) {
       if (typeof s === 'string') s = { id: s };
-      if (!s.slug || s.available === false) return '<tr class="wsx-cat__linrow"><td><span class="wsx-cat__unc">' + esc(t('knowledge.srcUnavailable')) + '</span></td></tr>';
+      if (!s.slug || s.available === false) return '<li class="wsx-knd__src is-off">' + isvg(KND_ICO.doc) + '<span>' + esc(t('knowledge.srcUnavailable')) + '</span></li>';
       var label = s.title || s.slug;
-      return '<tr class="wsx-cat__linrow wsx-kn__srclink" data-kn-src-slug="' + esc(s.slug) + '" data-kn-src-id="' + esc(s.id || '') + '" data-kn-src-title="' + esc(label) + '">'
-        + '<td><a class="wsx-atbl__link" href="/a/' + encodeURIComponent(s.slug) + '/">' + esc(label) + '</a></td></tr>';
-    }).join('');
-    return '<div class="wsx-atbl__wrap"><table class="wsx-atbl wsx-cat__lintable"><tbody>' + rows + '</tbody></table></div>';
+      return '<li><a class="wsx-knd__src wsx-kn__srclink" href="/a/' + encodeURIComponent(s.slug) + '/" data-kn-src-slug="' + esc(s.slug) + '" data-kn-src-id="' + esc(s.id || '') + '" data-kn-src-title="' + esc(label) + '">'
+        + isvg(KND_ICO.doc) + '<span class="wsx-knd__srct">' + esc(label) + '</span><span class="wsx-knd__srcgo">' + isvg(KND_ICO.go) + '</span></a></li>';
+    }).join('') + '</ul>';
+  }
+  // Topic/entity chips open their note when it's in the tree.
+  function knSlug(x) { return String(x).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+  function knChip(kind, x) {
+    var w = knWikiNode(kind + '.' + knSlug(x));
+    var label = w.node ? w.label : String(x).replace(/-/g, ' ');
+    return w.node ? '<button type="button" class="wsx-knd__chip" data-kn-go="' + esc(w.node.path) + '">' + esc(label) + '</button>' : '<span class="wsx-knd__chip">' + esc(label) + '</span>';
+  }
+  function knIconBtn(id, label, icon, cls) {
+    return '<button class="so-c-btn so-c-btn--icon wsx-knd__act' + (cls || '') + '" id="' + id + '" type="button" data-tip="' + esc(label) + '" aria-label="' + esc(label) + '">' + isvg(KND_ICO[icon]) + '</button>';
   }
 
   function knRaw(node) { return node.content || node.raw || node.body || ''; }
@@ -554,31 +570,34 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
 
   function knPaintDetail(host, node, back) {
     var topics = node.topics || [], entities = node.entities || [];
-    var rows = [[esc(t('knowledge.metaKind')), esc(knKindLabel(node.kind))]];
-    if (topics.length) rows.push([esc(t('knowledge.metaTopics')), topics.map(function (x) { return '<span class="wsx-cat__tag">' + esc(x) + '</span>'; }).join(' ')]);
-    if (entities.length) rows.push([esc(t('knowledge.metaEntities')), entities.map(function (x) { return '<span class="wsx-cat__tag">' + esc(x) + '</span>'; }).join(' ')]);
-    rows.push([esc(t('knowledge.metaLearned')), node.learned_at ? esc(adRelDate(node.learned_at)) : '\\u2014']);
-    if (node.confidence) rows.push([esc(t('knowledge.metaConfidence')), esc(node.confidence)]);
-    rows.push([esc(t('knowledge.metaPinned')), node.pinned ? esc(t('knowledge.yes')) : esc(t('knowledge.no'))]);
-    var meta = rows.map(function (r) { return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('');
     var sources = node.source_artifacts || node.sources || [];
-    var fresh = t('knowledge.freshLearned') + ' ' + adRelDate(node.learned_at);
-    if (node.updated_at && node.updated_at !== node.learned_at) fresh += ' \\u00B7 ' + t('knowledge.freshUpdated') + ' ' + adRelDate(node.updated_at);
+    var meta = [t('knowledge.freshLearned') + ' ' + adRelDate(node.learned_at)];
+    if (node.updated_at && node.updated_at !== node.learned_at) meta.push(t('knowledge.freshUpdated') + ' ' + adRelDate(node.updated_at));
+    if (node.confidence) meta.push(t('knowledge.metaConfidence') + ': ' + node.confidence);
     var title = node.kind === 'overview' ? t('knowledge.overviewTitle') : (node.title || node.path);
     var backBtn = back ? '<button class="wsx-cat__back" id="knBack" type="button">' + esc(t('knowledge.back')) + '</button>' : '';
+    // Actions sit with the title they act on, as icons; Forget is admin-only.
+    var acts = '<div class="wsx-knd__acts">'
+      + knIconBtn('knPin', t(node.pinned ? 'knowledge.unpin' : 'knowledge.pin'), 'pin', node.pinned ? ' is-on' : '')
+      + knIconBtn('knEdit', t('knowledge.edit'), 'edit')
+      + (window.WSX_ADMIN ? knIconBtn('knForget', t('knowledge.forget'), 'del', ' wsx-knd__act--danger') : '')
+      + '</div>';
+    function facet(label, kind, xs) {
+      return xs.length ? '<div class="wsx-knd__facet"><span class="wsx-knd__flabel">' + esc(t(label)) + '</span><div class="wsx-knd__chips">' + xs.map(function (x) { return knChip(kind, x); }).join('') + '</div></div>' : '';
+    }
+    var facets = facet('knowledge.metaTopics', 'topic', topics) + facet('knowledge.metaEntities', 'entity', entities);
     // Head stays put while the rest scrolls (desktop tree pane; plain blocks elsewhere).
-    host.innerHTML = '<div class="wsx-kn2__dtop">' + backBtn
-      + '<div class="wsx-cat__dhead"><span class="wsx-atbl__type">' + esc(knKindLabel(node.kind)) + '</span><h3>' + esc(title) + '</h3>' + knBadge(node) + '</div>'
-      + '<div class="wsx-sched__meta">' + esc(node.path) + '</div></div><div class="wsx-kn2__scroll">'
-      + '<dl class="wsx-cat__meta">' + meta + '</dl>'
-      + '<div id="knBody">' + (node.kind === 'overview' ? knOverviewChrome(node.body) : (node.body ? '<div class="wsx-cat__body">' + knWikiLinks(mdToHtml(node.body)) + '</div>' : '')) + '</div>'
-      + '<div class="wsx-cat__lin"><div class="wsx-cat__linhead"><span data-tip="' + esc(t('knowledge.tipSources')) + '">' + esc(t('knowledge.srcHeader')) + '</span> <span class="wsx-cat__lcount">' + sources.length + '</span><span class="wsx-cat__linhint">' + esc(t('knowledge.srcHint')) + '</span></div>' + knSrcRows(sources) + '</div>'
-      + '<div class="wsx-kn__fresh">' + esc(fresh) + '</div>'
-      + '<div class="wsx-kn__controls">'
-      + '<button class="so-c-btn" id="knPin" type="button">' + esc(t(node.pinned ? 'knowledge.unpin' : 'knowledge.pin')) + '</button>'
-      + '<button class="so-c-btn" id="knEdit" type="button">' + esc(t('knowledge.edit')) + '</button>'
-      + (window.WSX_ADMIN ? '<button class="so-c-btn wsx-kn__danger" id="knForget" type="button">' + esc(t('knowledge.forget')) + '</button>' : '')
-      + '</div></div>';
+    host.innerHTML = '<div class="wsx-kn2__dtop wsx-knd__head">' + backBtn
+      + '<div class="wsx-knd__top"><div class="wsx-knd__titles">'
+      + '<div class="wsx-knd__eyebrow"><span class="wsx-knd__kind">' + esc(knKindLabel(node.kind)) + '</span>' + knBadge(node) + '</div>'
+      + '<h3 class="wsx-knd__title" title="' + esc(node.path) + '">' + esc(title) + '</h3>'
+      + '<div class="wsx-knd__meta">' + esc(meta.join(' \\u00B7 ')) + '</div>'
+      + '</div>' + acts + '</div></div>'
+      + '<div class="wsx-kn2__scroll">'
+      + (facets ? '<div class="wsx-knd__facets">' + facets + '</div>' : '')
+      + '<div id="knBody">' + (node.kind === 'overview' ? knOverviewChrome(node.body) : (node.body ? '<div class="wsx-cat__body wsx-knd__body">' + knWikiLinks(mdToHtml(node.body)) + '</div>' : '')) + '</div>'
+      + '<section class="wsx-knd__sec"><div class="wsx-knd__sechead"><h4 data-tip="' + esc(t('knowledge.tipSources')) + '">' + esc(t('knowledge.srcHeader')) + '</h4><span class="wsx-knd__count">' + sources.length + '</span><span class="wsx-knd__hint">' + esc(t('knowledge.srcHint')) + '</span></div>' + knSrcRows(sources) + '</section>'
+      + '</div>';
     if (back) { var bk = document.getElementById('knBack'); if (bk) bk.addEventListener('click', back); }
     knBindWikiLinks(host);
     host.querySelectorAll('[data-kn-src-slug]').forEach(function (r) {
