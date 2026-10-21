@@ -15,7 +15,7 @@ import { parseEditSuggestions, applyEditsToPending, publishConversation } from '
 
 export type ProposeEditResult =
   | { ok: false; error: string }
-  | { ok: true; conversationId: string; explanation: string; files: string[] };
+  | { ok: true; conversationId: string; explanation: string; files: string[]; diff: string[] };
 
 /** Build an owner-scoped DataContext for an artifact from env alone (no request). */
 async function buildArtifactContext(env: Env, artifactId: string): Promise<DataContext> {
@@ -38,6 +38,26 @@ function explanationFrom(content: string): string {
   // Drop code/diff blocks — keep the prose so the confirm prompt reads cleanly.
   const prose = content.replace(/```[\s\S]*?```/g, '').replace(/\n{3,}/g, '\n\n').trim();
   return prose.length > 600 ? prose.slice(0, 600) + '…' : prose;
+}
+
+const DIFF_MAX_LINES = 60;
+const DIFF_LINE_CHARS = 200;
+
+/** Changed lines (- removed, + added) of every staged file, so the confirm prompt shows what will actually go live. */
+function stagedDiff(rows: Array<{ file_path: string; original_content: string; new_content: string }>): string[] {
+  const out: string[] = [];
+  for (const r of rows) {
+    const before = r.original_content.split('\n').map((l) => l.trim()).filter(Boolean);
+    const after = r.new_content.split('\n').map((l) => l.trim()).filter(Boolean);
+    const had = new Set(before);
+    const has = new Set(after);
+    out.push(`--- ${r.file_path}`);
+    for (const l of before) if (!has.has(l)) out.push(`- ${l.slice(0, DIFF_LINE_CHARS)}`);
+    for (const l of after) if (!had.has(l)) out.push(`+ ${l.slice(0, DIFF_LINE_CHARS)}`);
+  }
+  return out.length > DIFF_MAX_LINES
+    ? [...out.slice(0, DIFF_MAX_LINES), `… ${out.length - DIFF_MAX_LINES} more changed lines not shown`]
+    : out;
 }
 
 /** Run the edit agent for one instruction; stage any edits as pending. No publish yet. */
@@ -100,12 +120,16 @@ export async function proposeEdit(env: Env, artifactId: string, instruction: str
 
   if (!suggested.length) {
     // The agent answered without proposing edits (a question, a refusal, etc.).
-    return { ok: true, conversationId, explanation: explanationFrom(content) || 'I didn’t find a change to make.', files: [] };
+    return { ok: true, conversationId, explanation: explanationFrom(content) || 'I didn’t find a change to make.', files: [], diff: [] };
   }
 
   const applied = await applyEditsToPending(ctx, conversationId, suggested);
   const files = applied.filter((a) => a.success).map((a) => a.file);
-  return { ok: true, conversationId, explanation: explanationFrom(content), files };
+  const staged = await env.DB.prepare(
+    `SELECT file_path, original_content, new_content FROM artifact_pending_edits
+      WHERE artifact_id = ? AND thread_id = ? AND status = 'pending'`
+  ).bind(artifactId, conversationId).all<{ file_path: string; original_content: string; new_content: string }>();
+  return { ok: true, conversationId, explanation: explanationFrom(content), files, diff: stagedDiff(staged.results) };
 }
 
 export type PublishEditResult = { ok: false; error: string } | { ok: true; url: string | null };

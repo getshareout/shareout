@@ -580,6 +580,7 @@ describe('updateJob', () => {
   it('updates enabled, schedule, and config', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-30T08:00:00Z'));
+    getUserRole.mockResolvedValueOnce('owner');
 
     const updatedRow = {
       ...emailJobRow,

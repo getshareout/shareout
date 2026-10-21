@@ -1,5 +1,6 @@
 import { DATA_ERRORS } from '../../types';
-import { successResponse, errorResponse, type DataContext } from '../middleware';
+import { successResponse, errorResponse, verifyOwner, type DataContext } from '../middleware';
+import { isSpreadsheetInArtifact } from './allowed-ids';
 import { createLogger, logError } from '../../logging';
 import { SHEETS_API } from './constants';
 import { getArtifactAccessToken } from './artifact-tokens';
@@ -31,6 +32,14 @@ export async function fetchSheetData(
     return errorResponse({
       ...DATA_ERRORS.INVALID_REQUEST,
       message: 'Provide spreadsheetUrl or spreadsheetId',
+    });
+  }
+
+  if (!(await verifyOwner(request, ctx)) && !(await isSpreadsheetInArtifact(ctx.env, ctx.artifactId, spreadsheetId))) {
+    return errorResponse({
+      code: 'SHEETS_NOT_IN_ARTIFACT',
+      message: 'This spreadsheet is not part of this artifact',
+      status: 403,
     });
   }
 

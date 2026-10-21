@@ -349,8 +349,9 @@ type OwnerScope = { wsId: string | null; userId: string };
 
 async function rankSchedules(env: Env, scope: OwnerScope, q: string, limit: number): Promise<SearchHit[]> {
   const owners = linkedIds(scope.userId);
-  const where = scope.wsId ? 'a.workspace_id = ?' : `s.owner_id IN ${owners.sql}`;
-  const binds = scope.wsId ? [scope.wsId] : owners.binds;
+  const visible = artifactScopeSql(scope.userId, scope.wsId);
+  const where = scope.wsId ? visible.sql : `s.owner_id IN ${owners.sql}`;
+  const binds = scope.wsId ? visible.binds : owners.binds;
   const res = await env.DB.prepare(
     `SELECT s.id, s.action, s.schedule, s.enabled, s.last_status, a.name AS art_name
      FROM scheduled_jobs s JOIN artifacts a ON a.id = s.artifact_id
@@ -385,10 +386,13 @@ async function rankCrews(env: Env, workspaceId: string, q: string, limit: number
 
 async function rankAlerts(env: Env, scope: OwnerScope, q: string, limit: number): Promise<SearchHit[]> {
   const owners = linkedIds(scope.userId);
-  const where = scope.wsId ? 'workspace_id = ?' : `owner_id IN ${owners.sql}`;
-  const binds = scope.wsId ? [scope.wsId] : owners.binds;
+  const visible = artifactScopeSql(scope.userId, scope.wsId);
+  const where = scope.wsId ? visible.sql : `r.owner_id IN ${owners.sql}`;
+  const binds = scope.wsId ? visible.binds : owners.binds;
   const res = await env.DB.prepare(
-    `SELECT id, name, destination_kind, enabled, last_status FROM metric_alert_rules WHERE ${where} ORDER BY created_at DESC LIMIT 200`
+    `SELECT r.id, r.name, r.destination_kind, r.enabled, r.last_status
+     FROM metric_alert_rules r JOIN artifacts a ON a.id = r.artifact_id
+     WHERE ${where} AND a.deleted_at IS NULL ORDER BY r.created_at DESC LIMIT 200`
   ).bind(...binds).all<{ id: string; name: string; destination_kind: string; enabled: number; last_status: string | null }>();
   return rankSimple(
     res.results.map((r) => ({

@@ -56,7 +56,7 @@ export async function askWorkspace(
     userText,
     history: [],
     workspaceContext,
-    capabilities: { canQueryConnections: false, canSchedule: false, canBuild: false },
+    capabilities: { canQueryConnections: false, canSchedule: false, canBuild: false, readOnly: true },
     usageKind: 'ask_workspace',
     onToolResult: (name, _input, out) => {
       const o = out as { id?: unknown; name?: unknown; error?: unknown; artifacts?: unknown } | null;

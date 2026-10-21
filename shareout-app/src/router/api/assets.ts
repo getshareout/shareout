@@ -31,7 +31,7 @@ import { enrichDeliverable } from '../../assets/enrich';
 import { listFileUsage } from '../../assets/usage';
 import { queueKnowledgeSource } from '../../knowledge/corpus/ingest';
 import {
-  deliverableInBucket, collectionInBucket,
+  collectionInBucket,
   createDeliverable, addDeliverableVersion, listDeliverables, listDeliverableVersions, setDeliverableFields,
   createCollection, createShareLink, listShareLinks, revokeShareLink, hashAssetLinkPassword, type LinkGate,
 } from '../../assets/deliverables';
@@ -89,6 +89,12 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
   const json = (body: unknown, status = 200) => addCORS(Response.json(body, { status }));
   const body = async <T>() => (await request.json().catch(() => ({}))) as T;
   // Workspace Files feed the knowledge corpus; `version` keeps re-queues idempotent.
+  // A private file does not exist for anyone but its owner.
+  const fileRow = async (id: string) => {
+    const r = await env.DB.prepare('SELECT visibility, owner_id FROM asset_deliverables WHERE id = ? AND bucket_artifact_id = ? AND deleted_at IS NULL')
+      .bind(id, bucket.id).first<{ visibility: string; owner_id: string }>();
+    return r && (r.visibility !== 'private' || r.owner_id === user.id) ? r : null;
+  };
   const learn = (refId: string, version: string) => {
     if (workspaceId) ctx.executionCtx?.waitUntil(
       queueKnowledgeSource(env, ctx.executionCtx, { workspaceId, kind: 'asset', refId }, version).catch(() => {}),
@@ -117,6 +123,7 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
   if (dm && method === 'POST') {
     const b = await body<{ blobId?: string }>();
     if (!b.blobId) return json({ error: 'blobId required' }, 400);
+    if (!(await fileRow(dm[1]))) return json({ error: 'file not found' }, 404);
     const v = await addDeliverableVersion(env, bucket.id, dm[1], b.blobId);
     if (v === null) return json({ error: 'file not found' }, 404);
     ctx.executionCtx?.waitUntil(enrichDeliverable(env, bucket.id, dm[1]).catch(() => {}));
@@ -125,15 +132,19 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
   }
   dm = sub.match(/^deliverables\/([^/]+)\/versions$/);
   if (dm && method === 'GET') {
+    if (!(await fileRow(dm[1]))) return json({ error: 'file not found' }, 404);
     return json({ versions: await listDeliverableVersions(env, bucket.id, dm[1]) });
   }
   dm = sub.match(/^deliverables\/([^/]+)\/usage$/);
   if (dm && method === 'GET') {
-    if (!(await deliverableInBucket(env, bucket.id, dm[1]))) return json({ error: 'file not found' }, 404);
+    if (!(await fileRow(dm[1]))) return json({ error: 'file not found' }, 404);
     return json({ usage: await listFileUsage(env, dm[1]) });
   }
   dm = sub.match(/^deliverables\/([^/]+)$/);
   if (dm && method === 'PATCH') {
+    const file = await fileRow(dm[1]);
+    if (!file) return json({ error: 'file not found' }, 404);
+    if (file.owner_id !== user.id && !isWsAdmin) return forbidden();
     const b = await body<{ visibility?: string; folderId?: string | null }>();
     const fields: { visibility?: string; folderId?: string | null } = {};
     if (b.visibility !== undefined) {
@@ -145,11 +156,10 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
     return ok ? json({ ok: true }) : json({ error: 'file not found' }, 404);
   }
   if (dm && method === 'DELETE') {
-    if (!isWsAdmin) {
-      const own = await env.DB.prepare('SELECT owner_id FROM asset_deliverables WHERE id = ? AND bucket_artifact_id = ?')
-        .bind(dm[1], bucket.id).first<{ owner_id: string }>();
-      if (own?.owner_id !== user.id) return forbidden();
-    }
+    const own = await env.DB.prepare('SELECT owner_id FROM asset_deliverables WHERE id = ? AND bucket_artifact_id = ?')
+      .bind(dm[1], bucket.id).first<{ owner_id: string }>();
+    if (!own) return json({ error: 'file not found' }, 404);
+    if (!isWsAdmin && own.owner_id !== user.id) return forbidden();
     const res = await deleteDeliverable(request, env, bucket, dm[1]);
     if (res.ok) learn(dm[1], `deleted:${Date.now()}`);
     return addCORS(res);
@@ -163,8 +173,8 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
     // Only real deliverables in this bucket can be bundled — a loose-blob id silently
     // drops out of the share link's JOIN otherwise (getCollectionFiles → deliverables).
     const valid = await env.DB.prepare(
-      `SELECT id FROM asset_deliverables WHERE bucket_artifact_id = ? AND deleted_at IS NULL AND id IN ${JSON_IN}`,
-    ).bind(bucket.id, jsonList(ids)).all<{ id: string }>();
+      `SELECT id FROM asset_deliverables WHERE bucket_artifact_id = ? AND deleted_at IS NULL AND (visibility != 'private' OR owner_id = ?) AND id IN ${JSON_IN}`,
+    ).bind(bucket.id, user.id, jsonList(ids)).all<{ id: string }>();
     const validIds = (valid.results || []).map((r) => r.id);
     if (!validIds.length) return json({ error: 'no valid files to bundle' }, 400);
     const c = await createCollection(env, bucket.id, workspaceId, user.id, (b.name || '').trim() || 'Untitled collection', validIds);
@@ -242,6 +252,14 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
   }
 
   if (method === 'DELETE' && !isWsAdmin) return forbidden();
+  const blobId = sub.split('/')[0];
+  if (blobId && !['upload', 'storage'].includes(blobId)) {
+    const hidden = await env.DB.prepare(
+      `SELECT 1 AS n FROM blobs b JOIN asset_deliverables d ON d.id = b.deliverable_id
+       WHERE b.id = ? AND b.artifact_id = ? AND d.visibility = 'private' AND d.owner_id != ?`,
+    ).bind(blobId, bucket.id, user.id).first();
+    if (hidden) return json({ error: 'blob not found' }, 404);
+  }
   return addCORS(await handleBlobs(request, bctx, sub));
 }
 

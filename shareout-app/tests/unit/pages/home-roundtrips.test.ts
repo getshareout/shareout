@@ -68,6 +68,8 @@ function handler(opts: { isMember: boolean; role?: string; folders?: Row[] }): H
     if (sql.includes('FROM artifacts a') && sql.includes('identity_id IS NOT NULL')) return [card];
     if (sql.includes('FROM users WHERE id = ? OR identity_id')) return [{ id: alice.id, email: alice.email, name: null, picture: null }];
     if (sql.includes('SELECT id FROM workspaces WHERE slug = ?')) return { id: WS };
+    if (sql.includes('SELECT s.id, s.action')) return [];
+    if (sql.includes('SELECT r.id, r.name, r.destination_kind')) return [];
     if (sql.includes('SELECT 1 FROM workspace_members')) return opts.isMember ? { 1: 1 } : null;
     if (sql.includes("member_class = 'internal'")) return opts.isMember && opts.role ? { role: opts.role } : null;
     if (sql.includes('member_folders_enabled')) return { member_folders_enabled: 1 };

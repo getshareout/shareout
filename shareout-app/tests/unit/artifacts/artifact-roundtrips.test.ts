@@ -63,6 +63,7 @@ function handler(opts: { exists?: boolean } = {}): Handler {
     if (sql === 'SELECT id FROM artifacts WHERE id = ?') return exists ? { id: ART } : null;
     if (sql.includes('SELECT owner_id FROM artifacts')) return exists ? { owner_id: owner.id } : null;
     if (sql.includes('SELECT owner_id, workspace_id FROM artifacts')) return exists ? { owner_id: owner.id, workspace_id: WS } : null;
+    if (sql.includes('SELECT owner_id, workspace_id, visibility FROM artifacts')) return exists ? { owner_id: owner.id, workspace_id: WS, visibility: 'workspace' } : null;
     if (sql.includes('SELECT workspace_id FROM artifacts')) return exists ? { workspace_id: WS } : null;
     if (sql.includes('SELECT email FROM users WHERE id = ?')) {
       const u = [owner, collab, admin, stranger].find((x) => x.id === args[0]);

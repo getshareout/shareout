@@ -105,7 +105,8 @@ export const AGENT_TOKENS_PER_DAY = 100000;
 export async function checkRateLimit(
   env: Env,
   artifactId: string,
-  estimatedTokens: number = 0
+  estimatedTokens: number = 0,
+  held: { requests: number; tokens: number } = { requests: 0, tokens: 0 }
 ): Promise<{ allowed: boolean; remaining: number; retryAfter?: number }> {
   const now = new Date();
   const minuteKey = now.toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM
@@ -120,8 +121,8 @@ export async function checkRateLimit(
   `).bind(artifactId, minuteKey, dayKey).all<{ action: string; count: number }>();
 
   const counts = results ?? [];
-  const minuteCount = counts.find(r => r.action === 'agent_requests')?.count ?? 0;
-  const dayTokens = counts.find(r => r.action === 'agent_tokens')?.count ?? 0;
+  const minuteCount = (counts.find(r => r.action === 'agent_requests')?.count ?? 0) - held.requests;
+  const dayTokens = (counts.find(r => r.action === 'agent_tokens')?.count ?? 0) - held.tokens;
 
   if (minuteCount >= AGENT_REQUESTS_PER_MINUTE) {
     const nextMinute = new Date(now);
@@ -152,22 +153,35 @@ export async function checkRateLimit(
 export async function incrementRateLimit(
   env: Env,
   artifactId: string,
-  tokensUsed: number
+  tokensUsed: number,
+  requests = 1
 ): Promise<void> {
   const now = new Date();
   const minuteKey = now.toISOString().slice(0, 16);
   const dayKey = now.toISOString().slice(0, 10);
 
   await env.DB.batch([
+    ...(requests ? [env.DB.prepare(`
+      INSERT INTO rate_limits (principal_type, principal_id, action, window_start, count)
+      VALUES ('artifact', ?1, 'agent_requests', ?2, MAX(0, ?3))
+      ON CONFLICT(principal_type, principal_id, action, window_start) DO UPDATE SET count = MAX(0, count + ?3)
+    `).bind(artifactId, minuteKey, requests)] : []),
     env.DB.prepare(`
       INSERT INTO rate_limits (principal_type, principal_id, action, window_start, count)
-      VALUES ('artifact', ?, 'agent_requests', ?, 1)
-      ON CONFLICT(principal_type, principal_id, action, window_start) DO UPDATE SET count = count + 1
-    `).bind(artifactId, minuteKey),
-    env.DB.prepare(`
-      INSERT INTO rate_limits (principal_type, principal_id, action, window_start, count)
-      VALUES ('artifact', ?, 'agent_tokens', ?, ?)
-      ON CONFLICT(principal_type, principal_id, action, window_start) DO UPDATE SET count = count + excluded.count
+      VALUES ('artifact', ?1, 'agent_tokens', ?2, MAX(0, ?3))
+      ON CONFLICT(principal_type, principal_id, action, window_start) DO UPDATE SET count = MAX(0, count + ?3)
     `).bind(artifactId, dayKey, tokensUsed),
   ]);
+}
+
+/** Charges the request and its worst-case tokens up front, then checks the counters including that hold, so parallel requests cannot all pass a stale read. A refused request gives the hold back. */
+export async function reserveRateLimit(
+  env: Env,
+  artifactId: string,
+  reservedTokens: number
+): Promise<{ allowed: boolean; remaining: number; retryAfter?: number }> {
+  await incrementRateLimit(env, artifactId, reservedTokens);
+  const result = await checkRateLimit(env, artifactId, 0, { requests: 1, tokens: reservedTokens });
+  if (!result.allowed) await incrementRateLimit(env, artifactId, -reservedTokens, -1);
+  return result;
 }

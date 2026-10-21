@@ -46,7 +46,7 @@ describe('index router — publish and artifacts', () => {
 
   it('returns analytics for artifact owners', async () => {
     const env = createEnv((sql) => {
-      if (sql.includes('owner_id, workspace_id FROM artifacts')) return { owner_id: 'usr_1', workspace_id: null };
+      if (sql.includes('owner_id, workspace_id, visibility FROM artifacts')) return { owner_id: 'usr_1', workspace_id: null, visibility: 'private' };
       return null;
     });
     const response = await fetchPath('/v1/artifacts/art_1/analytics?days=90', authed(), APEX, env);
@@ -64,7 +64,7 @@ describe('index router — publish and artifacts', () => {
 
   it('returns 403 analytics for non-collaborators', async () => {
     const env = createEnv((sql) => {
-      if (sql.includes('owner_id, workspace_id FROM artifacts')) return { owner_id: 'other-user', workspace_id: null };
+      if (sql.includes('owner_id, workspace_id, visibility FROM artifacts')) return { owner_id: 'other-user', workspace_id: null, visibility: 'private' };
       if (sql.includes('FROM collaborators')) return null;
       return null;
     });

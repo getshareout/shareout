@@ -8,7 +8,7 @@ import { getPlatformHostname } from '../config/origins';
 import { errorPage, linkSuccessPage, safeRedirect } from './pages';
 import { getSessionUser, resolveSessionMaxAge } from './session';
 import { linkGoogleToUser, upsertUser } from './users';
-import { ssoRequiredFor, ssoStartPath } from './sso-config';
+import { ssoRequiredFor, ssoRequiredMessage, ssoStartPath } from './sso-config';
 import { scheduleSeedStarterKit } from '../starter-kit/schedule';
 import { scheduleWelcomeEmail, scheduleWorkspaceWelcome } from '../onboarding/welcome-email';
 
@@ -168,6 +168,8 @@ export async function handleGoogleCallback(request: Request, env: Env, execution
     // Identity linking: the OAuth'd Google account becomes (or matches) its own user
     // row, then joins the current session user's identity group.
     if (linkUserId && linkAction === 'identity') {
+      const linkSso = await ssoRequiredFor(env, userInfo.email);
+      if (linkSso) return errorPage(ssoRequiredMessage(linkSso), redirectTo);
       const other = await upsertUser(env, userInfo);
       const result = await linkIdentity(env, linkUserId, other.id);
       if (!result.success) {

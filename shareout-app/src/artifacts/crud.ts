@@ -405,6 +405,10 @@ export async function handleUpdateArtifact(
     if (!['public', 'workspace', 'private'].includes(requested)) {
       return json({ error: 'Invalid visibility', code: 'INVALID_VISIBILITY' }, 400);
     }
+    if (requested !== 'private' && artifact.workspace_id &&
+        !(await getInternalWorkspaceRole(env, artifact.workspace_id, user.id))) {
+      return json({ error: 'External collaborators can only keep their artifacts private', code: 'FORBIDDEN' }, 403);
+    }
     if (requested !== 'public') {
       // Explicit non-public choice over a held-from-public row: drop the hold so a
       // later re-classify can't restore it to public against the owner's choice.

@@ -158,8 +158,11 @@ export async function getTemplateForArtifact(
 ): Promise<EmailTemplate | null> {
   const row = await env.DB.prepare(`
     SELECT * FROM email_templates
-    WHERE id = ? AND (artifact_id IS NULL OR artifact_id = ? OR is_system = 1)
-  `).bind(templateId, artifactId).first<TemplateRow>();
+    WHERE id = ? AND (
+      artifact_id = ? OR is_system = 1
+      OR (artifact_id IS NULL AND owner_id = (SELECT owner_id FROM artifacts WHERE id = ?))
+    )
+  `).bind(templateId, artifactId, artifactId).first<TemplateRow>();
 
   return row ? rowToTemplate(row) : null;
 }
@@ -336,6 +339,10 @@ export async function previewTemplate(
     subject = request.inline_subject;
   } else {
     return { error: 'Either template_id or inline_html/inline_subject required' };
+  }
+
+  if (!(await getUserRole(env, request.artifact_id, userId))) {
+    return { error: 'Artifact not found' };
   }
 
   const artifact = await env.DB.prepare(`

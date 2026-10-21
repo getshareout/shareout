@@ -128,7 +128,7 @@ export const shareArtifactTool: AccountTool = {
 
 export const askCrewTool: AccountTool = {
   name: 'ask_crew',
-  description: 'Ask the page’s crew (its AI worker) to do something — investigate, refresh, summarize, or make a change. Owner/editor only. Confirms before the crew runs.',
+  description: 'Ask the page’s crew (its AI worker) to do something — investigate, refresh, summarize, or make a change. Owner only. Confirms before the crew runs.',
   input_schema: {
     type: 'object',
     properties: {
@@ -144,7 +144,7 @@ export const askCrewTool: AccountTool = {
 
     const access = await resolveArtifactAccessForUser(ctx.env, artifactId, ctx.userId);
     if (!access) return { error: 'You don’t have access to that page (or it doesn’t exist).' };
-    if (access.role !== 'owner' && access.role !== 'editor') return { error: 'Only the owner or an editor can do that.' };
+    if (access.role !== 'owner') return { error: 'Only the page’s owner can ask its crew.' };
     const crew = await getCrew(ctx.env, artifactId);
     if (!crew) return { error: 'That page doesn’t have a crew set up.' };
 
@@ -184,6 +184,7 @@ export const editPageTool: AccountTool = {
       conversationId: res.conversationId,
       summary: res.explanation,
       files: res.files,
+      diff: res.diff,
     });
   },
 };

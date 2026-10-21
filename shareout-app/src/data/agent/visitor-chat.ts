@@ -5,7 +5,7 @@ import type { AgentConfig, ChatRequest, Conversation, Message } from './types';
 import { streamChat, type AIConfig } from './anthropic';
 import { CLAUDE_HAIKU, CLAUDE_OPUS, CLAUDE_SONNET } from './models';
 import { buildVisitorContext, buildVisitorSystemPrompt } from './context';
-import { checkRateLimit, incrementRateLimit, recordUsage, recordError } from './usage';
+import { incrementRateLimit, reserveRateLimit, recordUsage, recordError } from './usage';
 import { resolveAgentAiConfig, recordAgentUsage } from './ai-config';
 import { checkSlidingWindowRateLimit, getTrustedClientIp } from '../../rate-limit';
 import { VisitorStore } from '../../chat-agent/store/visitor-store';
@@ -69,7 +69,7 @@ export async function handleVisitorChat(
         ctx.origin
       );
     }
-    const ipLimit = await checkSlidingWindowRateLimit(ctx.env.RATE_LIMIT_KV, `agent:${ip}`, 'aiChat');
+    const ipLimit = await checkSlidingWindowRateLimit(ctx.env.RATE_LIMIT_KV, `agent:${ip}`, 'aiChatAnonIp');
     if (!ipLimit.allowed) {
       return new Response(
         JSON.stringify({ success: false, error: 'Too many chat requests from your network. Try again later.', code: 'RATE_LIMIT_EXCEEDED', retryAfter: ipLimit.retryAfter }),
@@ -81,7 +81,7 @@ export async function handleVisitorChat(
     // their AI budget. Cap aggregate anon chat per owner too.
     const ownerId = ctx.artifact.owner_id;
     if (ownerId) {
-      const ownerLimit = await checkSlidingWindowRateLimit(ctx.env.RATE_LIMIT_KV, `agentowner:${ownerId}`, 'aiChat');
+      const ownerLimit = await checkSlidingWindowRateLimit(ctx.env.RATE_LIMIT_KV, `agentowner:${ownerId}`, 'aiChatAnonOwner');
       if (!ownerLimit.allowed) {
         return new Response(
           JSON.stringify({ success: false, error: 'This page is temporarily over its AI usage limit. Try later.', code: 'RATE_LIMIT_EXCEEDED', retryAfter: ownerLimit.retryAfter }),
@@ -95,27 +95,6 @@ export async function handleVisitorChat(
   const config = await getAgentConfig(ctx);
   if (!config || !config.visitor_enabled) {
     return errorResponse({ ...DATA_ERRORS.FORBIDDEN, message: 'Agent not enabled for this artifact' }, ctx.origin);
-  }
-
-  // Check rate limit
-  const rateLimit = await checkRateLimit(ctx.env, ctx.artifactId);
-  if (!rateLimit.allowed) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: 'Rate limit exceeded',
-        code: 'RATE_LIMIT_EXCEEDED',
-        retryAfter: rateLimit.retryAfter,
-      }),
-      {
-        status: 429,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-RateLimit-Remaining': '0',
-          'Retry-After': String(rateLimit.retryAfter || 60),
-        },
-      }
-    );
   }
 
   // Resolve which provider key serves this agent.
@@ -135,12 +114,44 @@ export async function handleVisitorChat(
     return errorResponse({ ...DATA_ERRORS.INVALID_REQUEST, message: 'message is required' }, ctx.origin);
   }
 
+  // Check and reserve quota together, before any LLM work, so parallel requests see each other.
+  const reservedTokens = config.visitor_max_tokens || 4096;
+  const rateLimit = await reserveRateLimit(ctx.env, ctx.artifactId, reservedTokens);
+  if (!rateLimit.allowed) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: 'Rate limit exceeded',
+        code: 'RATE_LIMIT_EXCEEDED',
+        retryAfter: rateLimit.retryAfter,
+      }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-RateLimit-Remaining': '0',
+          'Retry-After': String(rateLimit.retryAfter || 60),
+        },
+      }
+    );
+  }
+
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let settled = false;
+  const settleQuota = async () => {
+    if (settled) return;
+    settled = true;
+    await incrementRateLimit(ctx.env, ctx.artifactId, inputTokens + outputTokens - reservedTokens, 0);
+  };
+
   // AI credit gate (B7). Grace: never kill an in-flight conversation — only block a
   // NEW one. The conversation must actually exist for this artifact: VisitorStore
   // Get or create conversation (history + persistence via the shared store contract).
   const store = body.conversationId
-    ? new VisitorStore(ctx.env, body.conversationId)
+    ? await VisitorStore.open(ctx.env, ctx.artifactId, body.conversationId)
     : await VisitorStore.create(ctx.env, ctx.artifactId, body.message);
+  if (!store) return errorResponse(DATA_ERRORS.NOT_FOUND, ctx.origin);
   const conversationId = store.id;
   const messages: Array<{ role: 'user' | 'assistant'; content: string }> = body.conversationId
     ? (await store.loadHistory()).filter((m): m is { role: 'user' | 'assistant'; content: string } => m.role !== 'notes')
@@ -178,8 +189,6 @@ export async function handleVisitorChat(
   // Stream response
   const encoder = new TextEncoder();
   let fullContent = '';
-  let inputTokens = 0;
-  let outputTokens = 0;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -219,7 +228,7 @@ export async function handleVisitorChat(
 
         // Record usage
         await recordUsage(ctx.env, ctx.artifactId, 'visitor', inputTokens, outputTokens);
-        await incrementRateLimit(ctx.env, ctx.artifactId, inputTokens + outputTokens);
+        await settleQuota();
         await recordAgentUsage(ctx.env, {
           workspaceId: ai.workspaceId,
           artifactId: ctx.artifactId,
@@ -241,6 +250,7 @@ export async function handleVisitorChat(
           conversationId,
         });
         await recordError(ctx.env, ctx.artifactId, 'visitor');
+        await settleQuota().catch(() => {});
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({
           type: 'error',
           error: userFacingAgentChatFailure(error),

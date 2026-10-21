@@ -56,6 +56,8 @@ export async function startCrewRunStream(env: Env, crew: CrewRow, initiatedBy: s
  * insert) and meant to be wrapped in ctx.waitUntil so the run executes after the
  * triggering response, never inside it. Best-effort — never throws into caller.
  */
+const EVENT_TRIGGER_COOLDOWN_SECONDS = 60;
+
 export async function emitCrewEvent(env: Env, artifactId: string, eventType: string): Promise<void> {
   try {
     const triggers = await env.DB.prepare(
@@ -65,7 +67,15 @@ export async function emitCrewEvent(env: Env, artifactId: string, eventType: str
       .bind(artifactId, eventType)
       .all<CrewTriggerRow>();
 
+    const now = new Date().toISOString();
     for (const trigger of triggers.results) {
+      const claimed = await env.DB.prepare(
+        `UPDATE crew_triggers SET last_run_at = ?
+           WHERE id = ? AND (last_run_at IS NULL OR last_run_at <= ?)`
+      )
+        .bind(now, trigger.id, isoIn(-EVENT_TRIGGER_COOLDOWN_SECONDS))
+        .run();
+      if (!claimed.meta.changes) continue;
       const crew = await getCrewById(env, trigger.crew_id);
       if (!crew) continue;
       await dispatchCrewRun(env, crew, 'event');

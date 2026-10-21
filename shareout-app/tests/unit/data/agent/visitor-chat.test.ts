@@ -38,7 +38,7 @@ vi.mock('../../../../src/data/agent/context', () => ({
 }));
 
 vi.mock('../../../../src/data/agent/usage', () => ({
-  checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
+  reserveRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
   incrementRateLimit: (...args: unknown[]) => mockIncrementRateLimit(...args),
   recordUsage: (...args: unknown[]) => mockRecordUsage(...args),
   recordError: (...args: unknown[]) => mockRecordError(...args),
@@ -189,7 +189,8 @@ describe('handleVisitorChat', () => {
       usage: { input_tokens: 5, output_tokens: 8 },
     });
     expect(mockRecordUsage).toHaveBeenCalledWith(ctx.env, ARTIFACT_ID, 'visitor', 5, 8);
-    expect(mockIncrementRateLimit).toHaveBeenCalledWith(ctx.env, ARTIFACT_ID, 13);
+    expect(mockCheckRateLimit).toHaveBeenCalledWith(ctx.env, ARTIFACT_ID, 4096);
+    expect(mockIncrementRateLimit).toHaveBeenCalledWith(ctx.env, ARTIFACT_ID, 13 - 4096, 0);
   });
 
   it('injects per-message context into the model message but persists it clean', async () => {
@@ -237,6 +238,7 @@ describe('handleVisitorChat', () => {
     const env = makeEnv({
       first: (sql) => {
         if (sql.includes('artifact_agent_config')) return agentConfigRow();
+        if (sql.includes('agent_threads')) return { id: 'conv_1' };
         return null;
       },
       all: (sql) => {

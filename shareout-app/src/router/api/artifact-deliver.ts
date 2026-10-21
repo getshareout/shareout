@@ -105,7 +105,7 @@ export async function handleDeliverNow(
   const role = await getUserRole(env, artifactId, user.id);
   if (!role) return jsonError('Forbidden', 'FORBIDDEN', 403);
   if (role === 'viewer') {
-    const selfError = await checkViewerSelfDelivery(env, user.id, action, config);
+    const selfError = await checkViewerSelfDelivery(env, user.id, action, config, artifactId);
     if (selfError) return jsonError(selfError, 'FORBIDDEN', 403);
   }
 

@@ -116,7 +116,8 @@ export async function createRule(
       env,
       userId,
       req.destination.kind as JobAction,
-      req.destination.config as JobConfig
+      req.destination.config as JobConfig,
+      req.artifact_id
     );
     if (selfError) return { error: selfError };
   }
@@ -406,9 +407,19 @@ export async function evaluateAndDeliver(
   const artifact: ArtifactRef = { id: rule.artifact_id, workspace_id: rule.workspace_id };
 
   // Fail closed if the creator lost access to the artifact.
-  if (!(await resolveAlertRole(env, artifact, rule.owner_id))) {
+  const creatorRole = await resolveAlertRole(env, artifact, rule.owner_id);
+  if (!creatorRole) {
     await finalize(env, rule, now, { value: null, matched: false, delivered: false, status: 'failed', error: 'Access revoked' });
     return { matched: false, delivered: false, error: 'Access revoked: creator can no longer access this artifact', disable: true };
+  }
+  if (creatorRole === 'viewer') {
+    const selfError = rule.on_trigger?.crew
+      ? 'Crew investigation requires manager access'
+      : await checkViewerSelfDelivery(env, rule.owner_id, rule.destination_kind as JobAction, rule.destination_config as JobConfig, rule.artifact_id);
+    if (selfError) {
+      await finalize(env, rule, now, { value: null, matched: false, delivered: false, status: 'failed', error: 'Access downgraded' });
+      return { matched: false, delivered: false, error: `Access downgraded: ${selfError}`, disable: true };
+    }
   }
 
   // Skip (don't disable) when notifications are turned off for the workspace,

@@ -20,6 +20,7 @@ import {
 } from '../../src/workspace-context';
 import { buildClientsContextForWorkspace } from '../../src/sharees/context';
 import { setClientNotesTool } from '../../src/chat-agent/tools/client-notes';
+import { executeAction, type PendingAction } from '../../src/chat-agent/actions';
 
 const e = env as unknown as Env;
 
@@ -392,19 +393,22 @@ describe('Client context notes (reuse Intelligence module, scoped to a sharee)',
     expect(await buildShareeContextDoc(e, WS, 'Sc', 'Acme')).toContain('Pays net-30.');
   });
 
-  it('set_client_notes tool: admin writes by client name; member is refused', async () => {
-    const ok = await setClientNotesTool.execute(
+  it('set_client_notes tool: admin proposes by client name, the write lands only on confirm; member is refused', async () => {
+    const proposal = await setClientNotesTool.execute(
       { env: e, userId: 'usr_owner', selectedWorkspaceId: WS },
       { client: 'Acme', content: 'Renewal in Q4.' },
-    ) as { ok?: boolean; error?: string };
-    expect(ok.ok).toBe(true);
-    expect((await buildShareeContextDoc(e, WS, 'Sc', 'Acme'))).toContain('Renewal in Q4.');
+    ) as { __propose?: PendingAction; error?: string };
+    expect(proposal.__propose?.kind).toBe('client_notes');
+    expect(await buildShareeContextDoc(e, WS, 'Sc', 'Acme')).not.toContain('Renewal in Q4.');
+    expect(await executeAction(e, 'usr_owner', proposal.__propose!)).toMatch(/saved/i);
+    expect(await buildShareeContextDoc(e, WS, 'Sc', 'Acme')).toContain('Renewal in Q4.');
 
     const denied = await setClientNotesTool.execute(
       { env: e, userId: 'usr_mem', selectedWorkspaceId: WS },
       { client: 'Acme', content: 'nope' },
     ) as { error?: string };
     expect(denied.error).toMatch(/admin/i);
+    expect(await executeAction(e, 'usr_mem', proposal.__propose!)).toMatch(/admin/i);
   });
 });
 

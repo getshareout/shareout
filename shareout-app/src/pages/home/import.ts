@@ -42,6 +42,9 @@ export async function fetchSharedHtml(url: string): Promise<string | null> {
   } catch { return null; }
 }
 
+// Failed conversions cost the platform too, so they count toward the publish limit; instance-side gaps do not.
+const NOT_COUNTED = new Set(['CONVERT_UNAVAILABLE', 'CONVERT_BUSY']);
+
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 
 export async function handleHomeImportApi(
@@ -98,10 +101,13 @@ export async function handleHomeImportApi(
       if (Math.floor((body.content.length * 3) / 4) > IMPORT_MAX_BYTES) return json({ error: `File is larger than ${IMPORT_MAX_BYTES / 1024 / 1024} MB`, code: 'FILE_TOO_LARGE' }, 413);
       let bytes: Uint8Array;
       try { bytes = base64ToBytes(body.content); } catch { return json({ error: 'File content is not valid base64', code: 'VALIDATION_ERROR' }, 400); }
+      const early = await checkRateLimit(env, user.id, 'publish', user.email);
+      if (!early.allowed) return rateLimitExceededResponse(early.reset);
       try {
         const out = convert ? await convertOfficeImport(env, body.name, ext, convert, bytes) : await convertSlidesImport(env, body.name, ext, bytes);
         ({ files, entrypoint, source } = out);
       } catch (e) {
+        if (!(e instanceof ImportError && NOT_COUNTED.has(e.code))) await incrementRateLimit(env, user.id, 'publish', user.email);
         if (e instanceof ImportError) return json({ error: e.message, code: e.code }, e.status);
         throw e;
       }

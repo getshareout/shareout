@@ -26,7 +26,7 @@ import { proposeEdit, publishEdits } from '../../../src/data/agent/headless-edit
 
 // env.DB stub: prepare().bind().run()/first() no-ops (conversation/message inserts).
 const env = {
-  DB: { prepare: () => ({ bind: () => ({ run: async () => ({}), first: async () => ({ id: 'a1', name: 'Page', workspace_id: null }) }) }) },
+  DB: { prepare: () => ({ bind: () => ({ run: async () => ({}), all: async () => ({ results: [] }), first: async () => ({ id: 'a1', name: 'Page', workspace_id: null }) }) }) },
 } as unknown as Env;
 
 async function* gen(chunks: unknown[]) {

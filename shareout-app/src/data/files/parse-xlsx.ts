@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { assertZipWithinBounds } from './unzip-bounded';
 
 export const XLSX_MAX_INPUT_BYTES = 8_000_000; // ponytail: parse cap; stream/partial parse if users hit it
 const SAMPLE_ROWS = 20;
@@ -24,6 +25,7 @@ export function parseXlsx(bytes: ArrayBuffer): SheetSummary[] {
   if (bytes.byteLength > XLSX_MAX_INPUT_BYTES) {
     throw new Error(`Spreadsheet too large to read (max ${XLSX_MAX_INPUT_BYTES / 1_000_000}MB)`);
   }
+  assertZipWithinBounds(new Uint8Array(bytes));
   const wb = XLSX.read(bytes, { type: 'array', cellDates: true, dense: true });
   return wb.SheetNames.map(name => {
     const sheet = wb.Sheets[name];

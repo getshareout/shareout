@@ -3,6 +3,7 @@
  */
 import type { Env } from '../../types';
 import { getUserRole } from '../../artifacts/roles';
+import { parseAccessPolicy } from '../../data/access-policy';
 import type {
   EmailConfig,
   JobAction,
@@ -20,7 +21,12 @@ export async function checkViewerSelfDelivery(
   userId: string,
   action: JobAction,
   config: JobConfig,
+  artifactId?: string,
 ): Promise<string | null> {
+  if (artifactId) {
+    const blocked = await rowPolicyRenderError(env, artifactId, action, config);
+    if (blocked) return blocked;
+  }
   if (action === 'slack') {
     const c = config as SlackConfig;
     if (c.targetType !== 'dm' || !c.slackUserId) {
@@ -51,6 +57,34 @@ export async function checkViewerSelfDelivery(
     return null;
   }
   return 'Viewers can only schedule a Slack DM, email, or Telegram message to themselves';
+}
+
+const ROW_POLICY_RENDER_ERROR =
+  'This artifact limits rows per viewer, so rendered reports (PDF, CSV, email HTML, snapshots) cannot be scheduled by viewers';
+
+function rendersAsOwner(action: JobAction, config: JobConfig): boolean {
+  if (action === 'email') {
+    const c = config as EmailConfig;
+    return Boolean(c.renderPdf || c.attachArtifactCsv || c.useArtifactEmailHtml);
+  }
+  if (action === 'telegram') {
+    const mode = (config as TelegramConfig).mode;
+    return mode === 'snapshot' || mode === 'pdf' || mode === 'both';
+  }
+  return false;
+}
+
+/** Scheduled renders run as the artifact owner, so row-scoped viewers must not trigger them. */
+export async function rowPolicyRenderError(
+  env: Env,
+  artifactId: string,
+  action: JobAction,
+  config: JobConfig,
+): Promise<string | null> {
+  if (!rendersAsOwner(action, config)) return null;
+  const art = await env.DB.prepare('SELECT access_policy FROM artifacts WHERE id = ?')
+    .bind(artifactId).first<{ access_policy: string | null }>();
+  return parseAccessPolicy(art?.access_policy) ? ROW_POLICY_RENDER_ERROR : null;
 }
 
 /** A user may manage a job if they created it or own the underlying artifact. */

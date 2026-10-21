@@ -15,6 +15,7 @@ import type { Env } from '../types';
 
 const TTL_MS = 45_000;      // drop a viewer after ~2 missed 20s beats
 const SWEEP_MS = 30_000;    // alarm cadence while viewers remain
+const MAX_VIEWERS = 5000;   // distinct live ids per artifact; further new ids are ignored
 
 export class PresenceCoordinator implements DurableObject {
   private storage: DurableObjectStorage;
@@ -29,7 +30,7 @@ export class PresenceCoordinator implements DurableObject {
 
     if (request.method === 'POST' && url.pathname === '/beat') {
       const { viewerId } = (await request.json()) as { viewerId?: string };
-      if (viewerId) {
+      if (viewerId && (this.viewers.has(viewerId) || this.prune() < MAX_VIEWERS)) {
         this.viewers.set(viewerId, Date.now());
         // Arm the sweeper if it isn't already running.
         if ((await this.storage.getAlarm()) === null) {

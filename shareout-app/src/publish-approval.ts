@@ -7,7 +7,11 @@
 import type { Env } from './types';
 import type { AuthUser } from './api-auth';
 import { generateId } from './crypto-utils';
-import { contentHash, classifyAndPersist } from './moderation/check';
+import { contentHash, classifyAndPersist, findBlockedCdnHosts } from './moderation/check';
+import { setModeration } from './artifacts/satellites';
+import { requireSharingRole } from './artifacts/roles';
+import { resolveAllowOpen } from './access/allow-open';
+import { canAddPublicArtifact } from './quota';
 import { getInternalWorkspaceRole } from './workspaces/roles';
 import { invalidateDeploymentCacheById } from './serve/deployment-cache';
 import { dispatchLifecycleEmail } from './email/gateway';
@@ -160,16 +164,41 @@ export async function decidePublishApproval(
   ).bind(approvalId).first<{ n: number }>();
   if ((pending?.n ?? 1) > 0) return { ok: true, status: 'pending' };
 
-  // All approved → claim the request, flip visibility, run platform safety review.
+  // All approved → re-check the page is still the one that was approved and that the
+  // open-visibility gates still pass, then claim the request and flip visibility.
+  const refuse = async (error: string): Promise<DecisionResult> => {
+    await env.DB.prepare(
+      `UPDATE artifact_publish_approvals SET status='rejected', decided_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND status='pending'`
+    ).bind(approvalId).run();
+    return { ok: false, error, status: 'rejected' };
+  };
+  if ((await getArtifactContentHash(env, appr.artifact_id)) !== appr.content_hash) {
+    return refuse('The page changed after approval was requested. Request approval again.');
+  }
+  const art = await env.DB.prepare('SELECT owner_id, workspace_id FROM artifacts WHERE id = ?')
+    .bind(appr.artifact_id).first<{ owner_id: string | null; workspace_id: string | null }>();
+  if (!art) return { ok: false, error: 'Artifact not found' };
+  if (!(await resolveAllowOpen(env, appr.requester_id, art.workspace_id))) {
+    return refuse('Public links are turned off on this instance.');
+  }
+  if (!(await canAddPublicArtifact(env, art.owner_id ?? appr.requester_id)).allowed) {
+    return refuse('Public artifact limit reached.');
+  }
+  if ((await findBlockedCdnHosts(env, appr.artifact_id)).length) {
+    return refuse("The page loads scripts or styles from hosts that aren't allowed on public pages.");
+  }
+
   const won = await env.DB.prepare(
     `UPDATE artifact_publish_approvals SET status='approved', decided_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND status='pending' RETURNING id`
   ).bind(approvalId).first();
   if (!won) return { ok: true, status: 'approved' }; // someone else finalized
 
+  // Platform safety review still applies; a non-approved verdict holds it private.
+  const status = await classifyAndPersist(env, appr.artifact_id).catch(() => 'pending' as const);
+  const held = status !== 'approved';
   await env.DB.prepare('UPDATE artifacts SET visibility=? WHERE id=?')
-    .bind(appr.requested_visibility, appr.artifact_id).run();
-  // Platform safety review still applies; may hold it private if flagged.
-  await classifyAndPersist(env, appr.artifact_id).catch(() => {});
+    .bind(held ? 'private' : appr.requested_visibility, appr.artifact_id).run();
+  if (held) await setModeration(env, appr.artifact_id, { held_visibility: appr.requested_visibility });
   await invalidateDeploymentCacheById(env, appr.artifact_id).catch(() => {});
   await notifyRequester(env, appr.artifact_id, appr.requester_id, 'approved').catch(() => {});
   return { ok: true, status: 'approved' };
@@ -267,6 +296,8 @@ export async function handleCreatePublishApproval(request: Request, env: Env, us
   const workspaceId = await artifactWorkspace(env, artifactId);
   if (!workspaceId) return json({ error: 'Artifact is not in a workspace', code: 'NO_WORKSPACE' }, 400);
   if ((await getInternalWorkspaceRole(env, workspaceId, user.id)) === null) return json({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
+  const forbidden = await requireSharingRole(env, artifactId, user.id, 'editor');
+  if (forbidden) return forbidden;
   let body: { visibility?: string; approver_ids?: string[] };
   try { body = await request.json(); } catch { return json({ error: 'Invalid JSON', code: 'INVALID_JSON' }, 400); }
   // Legacy 'unlisted' folds into 'public' (retired 2026-07).

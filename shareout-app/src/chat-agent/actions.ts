@@ -23,13 +23,15 @@ import { inviteMany, MAX_BULK_INVITES } from '../workspaces/invite';
 import { isWorkspaceAdmin } from './tools/members';
 import { fileInUserBuckets } from './tools/files';
 import { executeReviewAction } from './review-actions';
+import { upsertShareeContextFile } from '../workspace-context';
+import { isKnownShareeContextUpsertError, logAgentToolFailure, userFacingClientNotesError } from './errors';
 
 export type PendingAction =
   | { kind: 'alert_pause' | 'alert_resume' | 'alert_delete'; ruleId: string; label: string }
   | { kind: 'job_pause' | 'job_resume' | 'job_delete'; jobId: string; label: string }
   | { kind: 'share'; artifactId: string; artifactName: string; emails: string[]; role: 'viewer' | 'editor' }
   | { kind: 'crew'; artifactId: string; artifactName: string; instruction: string }
-  | { kind: 'edit_publish'; artifactId: string; artifactName: string; conversationId: string; summary: string; files: string[] }
+  | { kind: 'edit_publish'; artifactId: string; artifactName: string; conversationId: string; summary: string; files: string[]; diff?: string[] }
   | { kind: 'data_table_insert'; artifactId: string; artifactName: string; table: string; row: Record<string, unknown> }
   | { kind: 'data_table_update'; artifactId: string; artifactName: string; table: string; rowId?: string; filter?: Record<string, unknown>; changes: Record<string, unknown> }
   | { kind: 'data_json_set'; artifactId: string; artifactName: string; key: string; value: unknown; exists: boolean }
@@ -40,7 +42,14 @@ export type PendingAction =
   | { kind: 'version_restore'; artifactId: string; artifactName: string; versionNo: number; message?: string }
   | { kind: 'version_approve'; artifactId: string; artifactName: string; versionNo: number | null; approved: boolean }
   | { kind: 'comment_resolve'; artifactId: string; artifactName: string; commentId: string; excerpt: string; resolved: boolean }
-  | { kind: 'comment_assign'; artifactId: string; artifactName: string; commentId: string; excerpt: string; assignee: string | null };
+  | { kind: 'comment_assign'; artifactId: string; artifactName: string; commentId: string; excerpt: string; assignee: string | null }
+  | { kind: 'client_notes'; workspaceId: string; clientId: string; clientName: string; note: string; content: string };
+
+// Staged-edit diff for plain-text prompts, trimmed so it can't blow past Telegram's message limit.
+function diffText(diff: string[], max = 2000): string {
+  const s = diff.join('\n');
+  return s.length > max ? s.slice(0, max) + '\n… (more changes not shown)' : s;
+}
 
 // Compact one-line JSON for confirmation prompts (trimmed so a big object can't
 // blow past Telegram's message limit).
@@ -81,7 +90,7 @@ export function describeActionRich(a: PendingAction, locale: Locale = 'en'): Act
     case 'job_delete': return { kind: a.kind, title: 'Delete schedule', subject: a.label, detail: 'This can’t be undone.', danger: true };
     case 'share': return { kind: a.kind, title: 'Share page', subject: a.artifactName, detail: `As ${a.role}`, lines: a.emails };
     case 'crew': return { kind: a.kind, title: 'Ask the crew', subject: a.artifactName, detail: a.instruction };
-    case 'edit_publish': return { kind: a.kind, title: 'Edit & publish', subject: a.artifactName, detail: a.summary, lines: a.files.length ? [`Files: ${a.files.join(', ')}`] : undefined };
+    case 'edit_publish': return { kind: a.kind, title: 'Edit & publish', subject: a.artifactName, detail: a.summary, lines: a.files.length ? [`Files: ${a.files.join(', ')}`, ...(a.diff ?? [])] : undefined };
     case 'data_table_insert': return { kind: a.kind, title: `Add row to “${a.table}”`, subject: a.artifactName, lines: kv(a.row) };
     case 'data_table_update': return { kind: a.kind, title: `Update “${a.table}”`, subject: a.artifactName, detail: a.rowId ? `row ${a.rowId}` : `rows matching ${preview(a.filter, 80)}`, lines: kv(a.changes) };
     case 'data_json_set': return { kind: a.kind, title: `Set “${a.key}”`, subject: a.artifactName, detail: a.exists ? 'Replaces the current value.' : undefined, lines: [preview(a.value, 160)] };
@@ -99,6 +108,7 @@ export function describeActionRich(a: PendingAction, locale: Locale = 'en'): Act
     case 'version_approve': return { kind: a.kind, title: a.approved ? 'Approve version' : 'Withdraw approval', subject: a.artifactName, detail: a.versionNo ? `Version ${a.versionNo}` : 'The live version' };
     case 'comment_resolve': return { kind: a.kind, title: a.resolved ? 'Resolve comment' : 'Reopen comment', subject: a.artifactName, detail: a.excerpt };
     case 'comment_assign': return { kind: a.kind, title: a.assignee ? `Assign comment to ${a.assignee}` : 'Unassign comment', subject: a.artifactName, detail: a.excerpt };
+    case 'client_notes': return { kind: a.kind, title: `Save notes on ${a.clientName}`, subject: a.note, detail: 'Replaces the file. Every workspace member’s assistant reads these notes.', lines: [a.content.slice(0, 300) + (a.content.length > 300 ? '…' : '')] };
   }
 }
 
@@ -116,7 +126,7 @@ function describeActionRichEs(a: PendingAction): ActionCard {
     case 'job_delete': return { kind: a.kind, title: 'Borrar envío programado', subject: a.label, detail: NO_UNDO_ES, danger: true };
     case 'share': return { kind: a.kind, title: 'Compartir artefacto', subject: a.artifactName, detail: `Como ${ROLE_ES[a.role]}`, lines: a.emails };
     case 'crew': return { kind: a.kind, title: 'Pedirle al agente', subject: a.artifactName, detail: a.instruction };
-    case 'edit_publish': return { kind: a.kind, title: 'Cambiar y publicar', subject: a.artifactName, detail: a.summary, lines: a.files.length ? [`Archivos: ${a.files.join(', ')}`] : undefined };
+    case 'edit_publish': return { kind: a.kind, title: 'Cambiar y publicar', subject: a.artifactName, detail: a.summary, lines: a.files.length ? [`Archivos: ${a.files.join(', ')}`, ...(a.diff ?? [])] : undefined };
     case 'data_table_insert': return { kind: a.kind, title: `Agregar fila a “${a.table}”`, subject: a.artifactName, lines: kv(a.row) };
     case 'data_table_update': return { kind: a.kind, title: `Actualizar “${a.table}”`, subject: a.artifactName, detail: a.rowId ? `fila ${a.rowId}` : `filas que coinciden con ${preview(a.filter, 80)}`, lines: kv(a.changes) };
     case 'data_json_set': return { kind: a.kind, title: `Guardar “${a.key}”`, subject: a.artifactName, detail: a.exists ? 'Reemplaza el valor actual.' : undefined, lines: [preview(a.value, 160)] };
@@ -134,6 +144,7 @@ function describeActionRichEs(a: PendingAction): ActionCard {
     case 'version_approve': return { kind: a.kind, title: a.approved ? 'Aprobar versión' : 'Retirar aprobación', subject: a.artifactName, detail: a.versionNo ? `Versión ${a.versionNo}` : 'La versión publicada' };
     case 'comment_resolve': return { kind: a.kind, title: a.resolved ? 'Resolver comentario' : 'Reabrir comentario', subject: a.artifactName, detail: a.excerpt };
     case 'comment_assign': return { kind: a.kind, title: a.assignee ? `Asignar comentario a ${a.assignee}` : 'Quitar la asignación', subject: a.artifactName, detail: a.excerpt };
+    case 'client_notes': return { kind: a.kind, title: `Guardar notas sobre ${a.clientName}`, subject: a.note, detail: 'Reemplaza el archivo. El asistente de todos los miembros del espacio lee estas notas.', lines: [a.content.slice(0, 300) + (a.content.length > 300 ? '…' : '')] };
   }
 }
 
@@ -148,7 +159,7 @@ function describeActionEs(a: PendingAction): string {
     case 'share': return `¿Comparto “${a.artifactName}” con ${a.emails.join(', ')} como ${ROLE_ES[a.role]}?`;
     case 'crew': return `¿Le pido al agente de “${a.artifactName}” que haga esto: ${a.instruction}?`;
     case 'edit_publish':
-      return `${a.summary}\n\n¿Aplico esto en “${a.artifactName}” y lo publico?${a.files.length ? `\n\nArchivos: ${a.files.join(', ')}` : ''}`;
+      return `${a.summary}\n\n¿Aplico esto en “${a.artifactName}” y lo publico?${a.files.length ? `\n\nArchivos: ${a.files.join(', ')}` : ''}${a.diff?.length ? `\n\nCambios:\n${diffText(a.diff)}` : ''}`;
     case 'data_table_insert':
       return `¿Agrego esta fila a “${a.table}” en “${a.artifactName}”?\n\n${preview(a.row)}`;
     case 'data_table_update': {
@@ -173,6 +184,8 @@ function describeActionEs(a: PendingAction): string {
       return `¿${a.resolved ? 'Resuelvo' : 'Reabro'} este comentario en “${a.artifactName}”?\n\n“${a.excerpt}”`;
     case 'comment_assign':
       return `¿${a.assignee ? `Le asigno a ${a.assignee}` : 'Le quito la asignación a'} este comentario en “${a.artifactName}”?\n\n“${a.excerpt}”`;
+    case 'client_notes':
+      return `¿Guardo estas notas de “${a.note}” sobre ${a.clientName}? Reemplazan el archivo y las lee el asistente de todo el espacio.\n\n${a.content.slice(0, 600)}${a.content.length > 600 ? '…' : ''}`;
   }
 }
 
@@ -242,7 +255,7 @@ export function describeAction(a: PendingAction, locale: Locale = 'en'): string 
     case 'share': return `Share “${a.artifactName}” with ${a.emails.join(', ')} as ${a.role}?`;
     case 'crew': return `Ask the crew on “${a.artifactName}” to: ${a.instruction}?`;
     case 'edit_publish':
-      return `${a.summary}\n\nApply this to “${a.artifactName}” and publish it live?${a.files.length ? `\n\nFiles: ${a.files.join(', ')}` : ''}`;
+      return `${a.summary}\n\nApply this to “${a.artifactName}” and publish it live?${a.files.length ? `\n\nFiles: ${a.files.join(', ')}` : ''}${a.diff?.length ? `\n\nChanges:\n${diffText(a.diff)}` : ''}`;
     case 'data_table_insert':
       return `Add this row to “${a.table}” on “${a.artifactName}”?\n\n${preview(a.row)}`;
     case 'data_table_update': {
@@ -267,6 +280,8 @@ export function describeAction(a: PendingAction, locale: Locale = 'en'): string 
       return `${a.resolved ? 'Resolve' : 'Reopen'} this comment on “${a.artifactName}”?\n\n“${a.excerpt}”`;
     case 'comment_assign':
       return `${a.assignee ? `Assign this comment to ${a.assignee}` : 'Unassign this comment'} on “${a.artifactName}”?\n\n“${a.excerpt}”`;
+    case 'client_notes':
+      return `Save these notes (“${a.note}”) on ${a.clientName}? They replace the file and every workspace member’s assistant reads them.\n\n${a.content.slice(0, 600)}${a.content.length > 600 ? '…' : ''}`;
   }
 }
 
@@ -303,7 +318,7 @@ export async function executeAction(env: Env, userId: string, a: PendingAction):
     }
     case 'crew': {
       const access = await resolveArtifactAccessForUser(env, a.artifactId, userId);
-      if (!access || (access.role !== 'owner' && access.role !== 'editor')) return 'Only the owner or an editor can do that.';
+      if (!access || access.role !== 'owner') return 'Only the page’s owner can ask its crew.';
       const res = await runCrewForArtifact(env, a.artifactId, a.instruction, userId);
       return res.ok ? (res.resultText || 'The crew finished, but didn’t leave a summary.') : res.error;
     }
@@ -360,7 +375,25 @@ export async function executeAction(env: Env, userId: string, a: PendingAction):
     case 'comment_resolve':
     case 'comment_assign':
       return await executeReviewAction(env, userId, a);
+    case 'client_notes':
+      return await executeClientNotes(env, userId, a);
   }
+}
+
+async function executeClientNotes(env: Env, userId: string, a: Extract<PendingAction, { kind: 'client_notes' }>): Promise<string> {
+  const role = await getInternalWorkspaceRole(env, a.workspaceId, userId);
+  if (role !== 'owner' && role !== 'admin') return 'Only a workspace admin can edit client notes.';
+  try {
+    const err = await upsertShareeContextFile(env, a.workspaceId, a.clientId, a.note, a.content, userId);
+    if (err) {
+      if (!isKnownShareeContextUpsertError(err)) logAgentToolFailure(env, { tool: 'set_client_notes', userId }, new Error(err));
+      return userFacingClientNotesError(err);
+    }
+  } catch (e) {
+    logAgentToolFailure(env, { tool: 'set_client_notes', userId }, e);
+    return userFacingClientNotesError(e);
+  }
+  return `Done — saved “${a.note}” for ${a.clientName}.`;
 }
 
 async function executeInviteMembers(env: Env, userId: string, a: Extract<PendingAction, { kind: 'invite_members' }>): Promise<string> {

@@ -17,7 +17,9 @@ export async function buildVisitorContext(
   };
 
   // JSON + tables live in the per-artifact minidb (ctx.db), not D1.
-  if (config.visitor_context_json) {
+  // Row-scoped viewers get neither: the JSON store is owner/editor-only and table samples are unfiltered.
+  const scoped = !!ctx.viewerScope;
+  if (config.visitor_context_json && !scoped) {
     const jsonRows = await db.prepare(`
       SELECT key, value FROM artifact_json
       WHERE artifact_id = ?
@@ -35,7 +37,7 @@ export async function buildVisitorContext(
   }
 
   // Load table samples if specified
-  if (config.visitor_context_tables) {
+  if (config.visitor_context_tables && !scoped) {
     const tables = typeof config.visitor_context_tables === 'string'
       ? JSON.parse(config.visitor_context_tables)
       : config.visitor_context_tables;

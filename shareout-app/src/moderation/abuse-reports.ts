@@ -2,7 +2,7 @@
 // on the apex (the badge's Report link). Anonymous + per-IP rate limited (strict
 // cf-connecting-ip). Reactive containment that doesn't depend on the classifier:
 //   - a CSAM-tagged report auto-pauses + blocks immediately and alerts the admin,
-//   - N distinct-IP reports auto-block the artifact for review.
+//   - N distinct-IP reports within 30 days auto-block the artifact for review.
 
 import type { Env } from '../types';
 import { generateId } from '../crypto-utils';
@@ -17,6 +17,7 @@ import { normalizeVisibility } from '../visibility-config';
 const CATEGORIES = ['phishing', 'malware', 'csam', 'spam', 'copyright', 'other'] as const;
 type Category = (typeof CATEGORIES)[number];
 const AUTO_BLOCK_DISTINCT_IPS = 3;
+const AUTO_BLOCK_WINDOW_MS = 30 * 86400_000;
 
 const REPORT_COPY: LocaleCopy<{
   title: string; heading: string; intro: string; reason: string; details: string; submit: string;
@@ -105,8 +106,8 @@ export async function handleAbuseReport(request: Request, env: Env, artifactId: 
   } else {
     // Auto-block once enough DISTINCT IPs have reported it.
     const distinct = await env.DB.prepare(
-      'SELECT COUNT(DISTINCT reporter_ip) AS n FROM abuse_reports WHERE artifact_id = ?'
-    ).bind(artifactId).first<{ n: number }>();
+      'SELECT COUNT(DISTINCT reporter_ip) AS n FROM abuse_reports WHERE artifact_id = ? AND created_at >= ?'
+    ).bind(artifactId, new Date(Date.now() - AUTO_BLOCK_WINDOW_MS).toISOString()).first<{ n: number }>();
     if ((distinct?.n ?? 0) >= AUTO_BLOCK_DISTINCT_IPS) {
       await setArtifactModeration(env, artifactId, 'block', `auto-blocked after ${distinct?.n} reports`);
       createLogger(env, { scope: 'moderation' }).warn('artifact auto-blocked after abuse reports', { artifact_id: artifactId, reports: distinct?.n });

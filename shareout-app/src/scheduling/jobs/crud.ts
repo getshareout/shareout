@@ -80,7 +80,7 @@ export async function createJob(
     return { error: 'Permission denied: no access to this artifact' };
   }
   if (role !== 'owner' && role !== 'editor') {
-    const selfError = await checkViewerSelfDelivery(env, userId, request.action, request.config);
+    const selfError = await checkViewerSelfDelivery(env, userId, request.action, request.config, request.artifact_id);
     if (selfError) {
       return { error: selfError };
     }
@@ -301,6 +301,18 @@ export async function updateJob(
 
   if (!(await canManageJob(env, job, userId))) {
     return { error: 'Permission denied' };
+  }
+
+  if (updates.config) {
+    const role = await getUserRole(env, job.artifact_id, userId);
+    if (role !== 'owner' && role !== 'editor') {
+      const selfError = await checkViewerSelfDelivery(env, userId, job.action, updates.config, job.artifact_id);
+      if (selfError) return { error: selfError };
+    }
+    const destination = getDestination(job.action);
+    const configError = destination
+      && await destination.validate(env, { artifactId: job.artifact_id, createdBy: userId, triggeredVia: 'manual' }, updates.config);
+    if (configError) return { error: configError };
   }
 
   if (updates.enabled === true || updates.config) {

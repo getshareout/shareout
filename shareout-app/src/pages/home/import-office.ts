@@ -8,7 +8,7 @@
  * Spreadsheets (.xlsx/.xls/.ods) → one CSV per sheet via SheetJS. The original file is
  * always stored next to the result so the viewer can offer it for download.
  */
-import { unzipSync } from 'fflate';
+import { ZipTooLargeError, assertZipWithinBounds, unzipBounded } from '../../data/files/unzip-bounded';
 import * as XLSX from 'xlsx';
 import type { Env, FileEntry, ImportedSource } from '../../types';
 import { XLSX_MAX_INPUT_BYTES } from '../../data/files/parse-xlsx';
@@ -225,7 +225,10 @@ function tableMarkdown(ctx: DocxContext, tblXml: string): string {
 
 export function docxToMarkdown(bytes: Uint8Array): { markdown: string; media: FileEntry[] } {
   let files: Record<string, Uint8Array>;
-  try { files = unzipSync(bytes); } catch { throw new ImportError('CONVERT_FAILED', 'This Word file could not be read.'); }
+  try { files = unzipBounded(bytes); } catch (e) {
+    if (e instanceof ZipTooLargeError) throw new ImportError('FILE_TOO_LARGE', 'This Word file expands to more than 64 MB and cannot be opened here.', 413);
+    throw new ImportError('CONVERT_FAILED', 'This Word file could not be read.');
+  }
   const dec = new TextDecoder();
   const doc = files['word/document.xml'];
   if (!doc) throw new ImportError('CONVERT_FAILED', 'This Word file could not be read.');
@@ -272,6 +275,9 @@ export function workbookToCsvSheets(bytes: Uint8Array): Array<{ name: string; cs
   // Same isolate-memory guard as data/files/parse-xlsx.ts and assets/enrich.ts.
   if (bytes.byteLength > XLSX_MAX_INPUT_BYTES) {
     throw new ImportError('SPREADSHEET_TOO_LARGE', `Spreadsheets up to ${XLSX_MAX_INPUT_BYTES / 1_000_000} MB can be opened here. Keep it in Recursos instead.`, 413);
+  }
+  try { assertZipWithinBounds(bytes); } catch {
+    throw new ImportError('SPREADSHEET_TOO_LARGE', 'This spreadsheet expands to more than 64 MB and cannot be opened here.', 413);
   }
   let wb: XLSX.WorkBook;
   try { wb = XLSX.read(bytes, { type: 'array', dense: true, sheetRows: MAX_SHEET_ROWS + 1 }); } catch {

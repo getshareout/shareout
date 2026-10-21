@@ -352,6 +352,7 @@ async function prepareUpdate(env: Env, user: AuthUser, artifactId: string) {
   if (!mine) throw new TemplateError('NOT_INSTALLED', 404, 'This page was not installed from a template');
   const t = await getTemplate(env, mine.template_id) as TemplateRow | null;
   if (!t || !(await scopeAllows(env, t, mine.workspace_id, user.id))) throw new TemplateError('NOT_FOUND', 404, 'Template not found');
+  if (mine.workspace_id && !(await getInternalWorkspaceRole(env, mine.workspace_id, user.id))) throw new TemplateError('FORBIDDEN', 403, 'Forbidden');
   const rows = await groupRows(env, mine.install_group);
   for (const r of rows) {
     const role = await getUserRole(env, r.artifact_id, user.id);

@@ -12,6 +12,17 @@ const RATE_LIMITS = {
   accountCreate: { limit: 1, windowSeconds: 86400 },
   publish: { limit: 30, windowSeconds: 3600 },
   aiChat: { limit: 100, windowSeconds: 3600 },
+  // Anonymous visitor chat: a single IP stays well under the owner-wide anon budget so
+  // one network cannot lock every other visitor out of the owner's artifacts.
+  aiChatAnonIp: { limit: 40, windowSeconds: 3600 },
+  aiChatAnonOwner: { limit: 200, windowSeconds: 3600 },
+  // Operator-funded Create LLM calls: anonymous planner per IP, signed-in preview per user.
+  createPlanAnon: { limit: 30, windowSeconds: 3600 },
+  createPreviewUser: { limit: 60, windowSeconds: 3600 },
+  // Anonymous beacons fired from artifact pages. perf is one hit per page load; presence
+  // is one per ~20 s per open tab (180/h), so 6000/h per IP fits ~33 tabs behind one NAT.
+  perfBeacon: { limit: 1200, windowSeconds: 3600 },
+  presenceBeacon: { limit: 6000, windowSeconds: 3600 },
   createPreviewAnon: { limit: 8, windowSeconds: 3600 },
   datasetRefresh: { limit: 6, windowSeconds: 3600 },
   // Shared anonymous bucket: emails sent from public artifacts by signed-out visitors
@@ -30,6 +41,7 @@ const RATE_LIMITS = {
   // tighter than OTP verify — a password is guessable in a way a fresh 6-digit code
   // with a 10-minute life is not.
   passwordLogin: { limit: 20, windowSeconds: 900 },
+  artifactGate: { limit: 20, windowSeconds: 900 },
   // Guest comments (no account): codes per IP on top of the per-address DB caps, and
   // comment ceilings per IP and per verified guest.
   guestCodeStart: { limit: 10, windowSeconds: 3600 },
@@ -189,6 +201,10 @@ export async function checkEmailOtpVerifyLimit(env: Env, request: Request): Prom
 
 export async function checkPasswordLoginLimit(env: Env, request: Request): Promise<RateLimitResult> {
   return checkKVRateLimit(env.RATE_LIMIT_KV, rateLimitClientKey(request), 'passwordLogin');
+}
+
+export async function checkArtifactGateLimit(env: Env, request: Request, artifactId: string): Promise<RateLimitResult> {
+  return checkKVRateLimit(env.RATE_LIMIT_KV, `${artifactId}:${rateLimitClientKey(request)}`, 'artifactGate');
 }
 
 export async function checkAccessRequestLimit(env: Env, userId: string): Promise<RateLimitResult> {

@@ -5,6 +5,7 @@
 import type { Credential, PublishRequest, Visibility, Env } from '../types';
 import { coerceVisibility } from '../visibility-config';
 import { generateId } from '../crypto-utils';
+import { hashGatePassword } from '../auth/artifact-auth';
 
 export function resolveVisibility(body: PublishRequest, env: Env, allowOpen = false): Visibility {
   if (body.visibility) return coerceVisibility(env, body.visibility, allowOpen);
@@ -20,14 +21,7 @@ export function resolveAuthMethod(body: PublishRequest): 'google' | 'password' |
   return 'google';
 }
 
-export async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hash = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hash))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
+export const hashPassword = hashGatePassword;
 
 export async function syncViewers(env: Env, artifactId: string, emails: string[]): Promise<void> {
   await env.DB.prepare(

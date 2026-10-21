@@ -298,7 +298,8 @@ describe('slide deck import (LibreOffice container)', () => {
     expect(res.status).toBe(status);
     expect((await res.json()).code).toBe(code);
     expect(publishArtifact).not.toHaveBeenCalled();
-    expect(incrementRateLimit).not.toHaveBeenCalled();
+    if (code === 'CONVERT_BUSY') expect(incrementRateLimit).not.toHaveBeenCalled();
+    else expect(incrementRateLimit).toHaveBeenCalledOnce();
   });
 
   it('gives up after the timeout when the converter hangs', async () => {

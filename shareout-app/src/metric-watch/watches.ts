@@ -3,6 +3,7 @@ import { generateId } from '../crypto-utils';
 import { createMiniDb } from '../data/minidb-client';
 import { evaluateMetric, type MetricResult } from '../metric-alerts/sources';
 import { getArtifactRef, resolveAlertRole } from '../metric-alerts/access';
+import { parseAccessPolicy, resolveViewerScope } from '../data/access-policy';
 
 /**
  * One-click metric watch. A watch = artifact + table + a dead-simple metric
@@ -149,6 +150,16 @@ export interface CreateWatchResult {
   error?: string;
 }
 
+/** True when a row-level access policy restricts what this user may see of the artifact's tables. */
+async function isRowRestricted(env: Env, artifactId: string, userId: string): Promise<boolean> {
+  const art = await env.DB.prepare('SELECT owner_id, access_policy FROM artifacts WHERE id = ?')
+    .bind(artifactId).first<{ owner_id: string | null; access_policy: string | null }>();
+  const policy = parseAccessPolicy(art?.access_policy);
+  if (!art || !policy) return false;
+  const user = await env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first<{ email: string }>();
+  return !!resolveViewerScope(policy, { email: user?.email ?? null, isOwner: art.owner_id === userId });
+}
+
 /** Owner/editor/workspace-member creates a watch. Non-members get a permission error. */
 export async function createWatch(
   env: Env,
@@ -160,6 +171,9 @@ export async function createWatch(
   if (!artifact) return { error: 'Artifact not found' };
   if (!(await resolveAlertRole(env, artifact, userId))) {
     return { error: 'Permission denied: no access to this artifact' };
+  }
+  if (await isRowRestricted(env, artifactId, userId)) {
+    return { error: 'Permission denied: this artifact limits which rows you can see, so you cannot watch whole-table metrics' };
   }
 
   const v = validateSpec(input);
@@ -214,7 +228,8 @@ export async function deleteWatch(
     .bind(watchId).first<Record<string, unknown>>();
   if (!row) return { success: false, error: 'Watch not found' };
   const watch = rowToWatch(row);
-  if (!(await resolveAlertRole(env, { id: watch.artifact_id, workspace_id: watch.workspace_id }, userId))) {
+  const role = await resolveAlertRole(env, { id: watch.artifact_id, workspace_id: watch.workspace_id }, userId);
+  if (role !== 'manager' && !(role && row.created_by === userId)) {
     return { success: false, error: 'Permission denied' };
   }
   await env.DB.prepare('DELETE FROM metric_watches WHERE id = ?').bind(watchId).run();

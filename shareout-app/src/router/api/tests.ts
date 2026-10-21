@@ -6,15 +6,15 @@ import type { FetchContext } from '../context';
 import type { Env } from '../../types';
 import { requireAuthUser, requireTokenOrSession, isAuthUser } from '../helpers/auth-guard';
 import { jsonError, jsonResponse } from '../helpers/json-response';
-import { getInternalWorkspaceRole } from '../../workspaces/roles';
+import { canViewArtifact } from '../../data/middleware';
 import { getTestConfig, upsertTestConfig, listRuns, getLatestRun } from '../../tests/config';
 import { runTests } from '../../tests/runner';
 import type { TestMode, TestSpec } from '../../tests/types';
 
-type ArtifactRow = { owner_id: string | null; workspace_id: string | null };
+type ArtifactRow = { id: string; owner_id: string | null; workspace_id: string | null; visibility: string };
 
 async function loadArtifact(env: Env, artifactId: string): Promise<ArtifactRow | null> {
-  return env.DB.prepare('SELECT owner_id, workspace_id FROM artifacts WHERE id = ?')
+  return env.DB.prepare('SELECT id, owner_id, workspace_id, visibility FROM artifacts WHERE id = ?')
     .bind(artifactId).first<ArtifactRow>();
 }
 
@@ -25,14 +25,6 @@ async function currentVersionId(env: Env, artifactId: string): Promise<string | 
   return row?.version_id ?? null;
 }
 
-async function canRead(env: Env, artifactId: string, userId: string, userEmail: string | null, a: ArtifactRow): Promise<boolean> {
-  if (a.owner_id === userId) return true;
-  if (a.workspace_id && (await getInternalWorkspaceRole(env, a.workspace_id, userId))) return true;
-  const collab = await env.DB.prepare('SELECT 1 FROM collaborators WHERE artifact_id = ? AND email = ?')
-    .bind(artifactId, userEmail).first();
-  return !!collab;
-}
-
 /** GET /v1/artifacts/:id/tests — config + latest run + recent history. */
 export async function handleGetTests(ctx: FetchContext, artifactId: string): Promise<Response> {
   const { env } = ctx;
@@ -40,7 +32,7 @@ export async function handleGetTests(ctx: FetchContext, artifactId: string): Pro
   if (!isAuthUser(user)) return user;
   const artifact = await loadArtifact(env, artifactId);
   if (!artifact) return jsonError('Not found', 'NOT_FOUND', 404);
-  if (!(await canRead(env, artifactId, user.id, user.email, artifact))) {
+  if (!(await canViewArtifact(env, artifact, user.id, user.email))) {
     return jsonError('Access denied', 'FORBIDDEN', 403);
   }
   const [config, latest, runs] = await Promise.all([

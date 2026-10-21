@@ -5,6 +5,7 @@
 import type { Env } from '../../../types';
 import type { AuthUser } from '../../../api-auth';
 import { getInternalWorkspaceRole } from '../../../workspaces/roles';
+import { artifactScopeSql } from '../../../search/scope-sql';
 import { listProviders } from '../../../data/platform';
 import { json, requireMember } from './shared';
 import type { CredentialScope } from './shared';
@@ -214,14 +215,15 @@ export async function handleListConnectionArtifacts(
     return json({ error: 'Connection not found', code: 'NOT_FOUND' }, 404);
   }
 
+  const visible = artifactScopeSql(user.id, workspaceId);
   const rows = await env.DB.prepare(`
     SELECT u.artifact_id, u.last_used_at, u.use_count, a.name, COALESCE(d.slug, a.slug) AS slug
     FROM connection_usage u
     JOIN artifacts a ON a.id = u.artifact_id
     LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
-    WHERE u.connection_id = ?
+    WHERE u.connection_id = ? AND ${visible.sql}
     ORDER BY u.last_used_at DESC
-  `).bind(conn.id).all<{
+  `).bind(conn.id, ...visible.binds).all<{
     artifact_id: string;
     last_used_at: string;
     use_count: number;

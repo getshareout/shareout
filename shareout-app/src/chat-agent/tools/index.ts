@@ -92,6 +92,8 @@ export const BUILD_TOOLS: AccountTool[] = [createArtifactTool];
  * surface (web, telegram, slack, visitor) declares what it can do.
  */
 export interface Capabilities {
+  /** Answer-only turn: drop every tool that writes, proposes a write, or creates something (e.g. POST /v1/ask). */
+  readOnly?: boolean;
   /** Ad-hoc read-only access to workspace connectors (list_connections, query_connection, browse_storage). */
   canQueryConnections: boolean;
   /** Set up recurring scheduled sends (create_schedule). */
@@ -109,9 +111,16 @@ export function defaultCapabilities(_platform: PlatformId): Capabilities {
   return { canQueryConnections: true, canSchedule: true, canBuild: true };
 }
 
+const WRITE_TOOLS = new Set([
+  'manage_alert', 'manage_job', 'share_artifact', 'ask_crew', 'edit_page',
+  'add_table_row', 'update_table_row', 'set_json_value', 'set_client_notes',
+  'watch_metric', 'present_artifact', 'report_problem', 'save_skill', 'invite_members',
+  'restore_version', 'approve_version', 'resolve_comment', 'assign_comment',
+]);
+
 /** The tool set for a turn: always-on account tools plus capability-gated groups. */
 export function selectTools(caps: Capabilities): AccountTool[] {
-  const tools = [...ACCOUNT_TOOLS];
+  const tools = caps.readOnly ? ACCOUNT_TOOLS.filter((t) => !WRITE_TOOLS.has(t.name)) : [...ACCOUNT_TOOLS];
   if (caps.canQueryConnections) tools.push(...CONNECTOR_TOOLS);
   if (caps.canSchedule) tools.push(...SCHEDULE_TOOLS);
   if (caps.canBuild) tools.push(...BUILD_TOOLS);

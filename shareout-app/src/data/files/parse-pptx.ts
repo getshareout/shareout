@@ -1,4 +1,4 @@
-import { unzipSync } from 'fflate';
+import { unzipBounded } from './unzip-bounded';
 
 export interface SlideSummary {
   index: number;
@@ -19,8 +19,8 @@ function decodeXmlEntities(s: string): string {
 // pptx is a zip of XML; text lives in <a:t> runs, paragraphs in <a:p>.
 // ponytail: text-only extraction; images/layout if slide fidelity ever matters
 export function parsePptx(bytes: ArrayBuffer): SlideSummary[] {
-  const files = unzipSync(new Uint8Array(bytes), {
-    filter: f => /^ppt\/slides\/slide\d+\.xml$/.test(f.name),
+  const files = unzipBounded(new Uint8Array(bytes), {
+    filter: name => /^ppt\/slides\/slide\d+\.xml$/.test(name),
   });
   const decoder = new TextDecoder();
   return Object.keys(files)

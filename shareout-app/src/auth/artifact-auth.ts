@@ -7,14 +7,35 @@ import {
 } from '../token';
 import { SESSION_MAX_AGE } from './constants';
 import { credentialsLoginPage, passwordLoginPage } from './pages';
+import { hashPassword, verifyPassword } from './password';
+import { checkArtifactGateLimit, rateLimitHeaders } from '../rate-limit';
 
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hash = await crypto.subtle.digest('SHA-256', data);
+const LEGACY_HASH = /^[0-9a-f]{64}$/;
+
+async function sha256Hex(password: string): Promise<string> {
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password));
   return Array.from(new Uint8Array(hash))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
+}
+
+export async function hashGatePassword(password: string): Promise<string> {
+  const { salt, iterations, hash } = await hashPassword(password);
+  return `pbkdf2$${iterations}$${salt}$${hash}`;
+}
+
+async function verifyGatePassword(password: string, stored: string): Promise<boolean> {
+  if (LEGACY_HASH.test(stored)) return (await sha256Hex(password)) === stored;
+  const [scheme, iterations, salt, hash] = stored.split('$');
+  if (scheme !== 'pbkdf2') return false;
+  return verifyPassword(password, { algo: 'PBKDF2-SHA256', iterations: Number(iterations), salt, hash });
+}
+
+async function gateThrottled(request: Request, env: Env, artifactId: string, slug: string): Promise<Response | null> {
+  const rl = await checkArtifactGateLimit(env, request, artifactId);
+  if (rl.allowed) return null;
+  const page = passwordLoginPage(slug, undefined, 'Too many attempts. Try again in a few minutes.', undefined, artifactId);
+  return new Response(page.body, { status: 429, headers: { ...Object.fromEntries(page.headers), ...rateLimitHeaders(rl) } });
 }
 
 /**
@@ -57,10 +78,16 @@ export async function handlePasswordAuth(request: Request, env: Env): Promise<Re
     return new Response('Not Found', { status: 404 });
   }
 
-  const inputHash = await hashPassword(password);
+  const throttled = await gateThrottled(request, env, artifact.id, slug);
+  if (throttled) return throttled;
 
-  if (inputHash !== artifact.password_hash) {
+  if (!(await verifyGatePassword(password, artifact.password_hash))) {
     return passwordLoginPage(slug, artifact.name, 'Incorrect password', undefined, artifact.id);
+  }
+
+  if (LEGACY_HASH.test(artifact.password_hash)) {
+    await env.DB.prepare('UPDATE artifacts SET password_hash = ? WHERE id = ? AND password_hash = ?')
+      .bind(await hashGatePassword(password), artifact.id, artifact.password_hash).run();
   }
 
   const accessToken = await createAccessToken(artifact.id, 'password', env, SESSION_MAX_AGE);
@@ -101,14 +128,20 @@ export async function handleCredentialsAuth(request: Request, env: Env): Promise
     return new Response('Not Found', { status: 404 });
   }
 
-  const inputHash = await hashPassword(password);
+  const throttled = await gateThrottled(request, env, artifact.id, slug);
+  if (throttled) return throttled;
 
   const credential = await env.DB.prepare(
-    'SELECT 1 FROM artifact_passwords WHERE artifact_id = ? AND username = ? AND password_hash = ?'
-  ).bind(artifact.id, username.toLowerCase().trim(), inputHash).first();
+    'SELECT password_hash FROM artifact_passwords WHERE artifact_id = ? AND username = ?'
+  ).bind(artifact.id, username.toLowerCase().trim()).first<{ password_hash: string }>();
 
-  if (!credential) {
+  if (!credential || !(await verifyGatePassword(password, credential.password_hash))) {
     return credentialsLoginPage(slug, artifact.name, 'Invalid username or password', undefined, artifact.id);
+  }
+
+  if (LEGACY_HASH.test(credential.password_hash)) {
+    await env.DB.prepare('UPDATE artifact_passwords SET password_hash = ? WHERE artifact_id = ? AND username = ? AND password_hash = ?')
+      .bind(await hashGatePassword(password), artifact.id, username.toLowerCase().trim(), credential.password_hash).run();
   }
 
   const accessToken = await createAccessToken(artifact.id, `cred:${username}`, env, SESSION_MAX_AGE);

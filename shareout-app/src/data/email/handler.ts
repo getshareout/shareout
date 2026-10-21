@@ -23,7 +23,7 @@ function isValidEmail(value: string): boolean {
 // the unspoofable cf-connecting-ip (fail closed if absent), so the per-owner
 // email rate limit downstream can't be exhausted by one anonymous attacker.
 // Returns an error Response to send, or null to proceed.
-async function guardEmailSend(request: Request, ctx: DataContext): Promise<Response | null> {
+async function guardEmailSend(request: Request, ctx: DataContext, arbitraryRecipient = false): Promise<Response | null> {
   if (ctx.isOwner === true) return null;
 
   // Only ANONYMOUS visitors of a PUBLIC artifact are gated. Authenticated viewers
@@ -32,7 +32,7 @@ async function guardEmailSend(request: Request, ctx: DataContext): Promise<Respo
   // isOwner is already false/undefined here (owner returned above), so an
   // anonymous viewer is simply one with no verified email.
   const isPublic = ctx.artifact.visibility === 'public';
-  const isAnon = !ctx.viewer?.email;
+  const isAnon = arbitraryRecipient || !ctx.viewer?.email;
   if (!isPublic || !isAnon) return null;
 
   if (ctx.artifact.allow_anon_email !== 1) {
@@ -250,8 +250,10 @@ async function handleSendReport(request: Request, ctx: DataContext): Promise<Res
   }
 
   // send-report targets an ARBITRARY recipient — the open-relay/phishing vector.
-  // Gate it behind the same anon-email opt-in + per-IP limit as notify-owner.
-  const guard = await guardEmailSend(request, ctx);
+  // Gate it behind the same anon-email opt-in + per-IP limit as notify-owner, and
+  // on a public artifact any non-owner counts as anonymous: a signed-in account
+  // proves nothing about being allowed to mail third parties.
+  const guard = await guardEmailSend(request, ctx, true);
   if (guard) return guard;
 
   const owner = await getArtifactOwner(ctx);

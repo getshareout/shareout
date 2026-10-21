@@ -1,6 +1,8 @@
 // @vitest-environment node
 import './sheets-test-setup';
 import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../../src/data/sheets/allowed-ids', () => ({ isSpreadsheetInArtifact: async () => true }));
 import * as auth from '../../../src/auth';
 import { decryptCredentials } from '../../../src/data/connections/credentials';
 import * as googleAuth from '../../../src/data/sheets/google-auth';

@@ -202,6 +202,8 @@ export async function handleLinkEmailOtpStart(ctx: FetchContext): Promise<Respon
   if (user.email && email === normalizeEmail(user.email)) {
     return json({ ok: false, error: "That's the account you're already signed in as." }, 400);
   }
+  const sso = await ssoRequiredFor(ctx.env, email);
+  if (sso) return json(ssoRequiredBody(sso, email), 403);
   const result = await startEmailOtp(ctx.env, email);
   return json(result, result.ok ? 200 : 400);
 }
@@ -212,6 +214,8 @@ export async function handleLinkEmailOtpVerify(ctx: FetchContext): Promise<Respo
   const rl = await checkEmailOtpVerifyLimit(ctx.env, ctx.request);
   if (!rl.allowed) return rateLimitResponse(rl);
   const body = await ctx.request.json().catch(() => ({})) as { email?: string; code?: string };
+  const sso = await ssoRequiredFor(ctx.env, body.email || '');
+  if (sso) return json(ssoRequiredBody(sso, body.email || ''), 403);
   const result = await verifyEmailOtp(ctx.env, body.email || '', body.code || '');
   if (!result.ok || !result.user) {
     return json({ ok: false, error: result.error }, 400);

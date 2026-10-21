@@ -1,3 +1,4 @@
+import { validateReadOnlySql } from './sql-guard';
 // Server-side querying of workspace connections, generic REST *or* a platform
 // warehouse (BigQuery, Snowflake, or any provider exposing `sql.query`: Supabase,
 // Redshift, Aurora). The generic path is the existing rest_api executor; the
@@ -117,6 +118,22 @@ function pickNum(v: unknown): number | undefined {
  * string and `params` may carry projectId/maxResults/timeoutMs. Per-user credentials
  * resolve via `userId` (pass the owner's id for unattended jobs/crews).
  */
+/** Read-only gate for model-written queries: on a warehouse connection, only one SELECT/WITH statement passes. */
+export async function readOnlyModelQuery(
+  env: Env,
+  artifactId: string,
+  name: string,
+  query: string | Record<string, unknown>
+): Promise<string | Record<string, unknown>> {
+  if (!(await resolvePlatformConnection(env, artifactId, name))) return query;
+  const sql = typeof query === 'string'
+    ? query
+    : String((query as Record<string, unknown>)?.sql ?? (query as Record<string, unknown>)?.query ?? '');
+  const guard = validateReadOnlySql(sql);
+  if (!guard.ok || !guard.sql) throw new Error(guard.reason || 'Read-only SELECT only.');
+  return guard.sql;
+}
+
 export async function queryConnectionAny(
   env: Env,
   artifactId: string,

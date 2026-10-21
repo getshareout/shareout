@@ -55,7 +55,7 @@ describe('sheets_append deliver', () => {
     expect(res).toEqual({ success: true });
 
     expect(queryConnectionAny).toHaveBeenCalledWith(
-      env, 'art_1', 'bigquery', 'SELECT date, revenue FROM t', { projectId: 'analytics-platform' }, 'usr_owner'
+      env, 'art_1', 'bigquery', 'SELECT date, revenue FROM t', { projectId: 'analytics-platform' }, 'usr_job'
     );
     const [token, spreadsheetId, range, values] = appendSheetValues.mock.calls[0];
     expect(token).toBe('ya29.token');

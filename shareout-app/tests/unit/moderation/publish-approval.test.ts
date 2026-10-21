@@ -6,7 +6,10 @@ import type { Env } from '../../../src/types';
 vi.mock('../../../src/moderation/check', () => ({
   contentHash: async () => 'hash1',
   classifyAndPersist: async () => 'approved',
+  findBlockedCdnHosts: async () => [],
 }));
+vi.mock('../../../src/access/allow-open', () => ({ resolveAllowOpen: async () => true }));
+vi.mock('../../../src/quota', () => ({ canAddPublicArtifact: async () => ({ allowed: true, count: 0, max: 0 }) }));
 vi.mock('../../../src/serve/deployment-cache', () => ({ invalidateDeploymentCacheById: async () => {} }));
 vi.mock('../../../src/scheduling/email', () => ({ sendArtifactEmail: async () => ({ success: true }) }));
 const role = vi.fn(async (userId: string) => (typeof userId === 'string' && userId.startsWith('m') ? 'member' : null));
@@ -29,6 +32,7 @@ function makeEnv(opts: { policy?: string; n?: number } = {}): Env {
           return {
             async first<T>() {
               if (sql.includes('public_publish_policy')) return { policy: opts.policy ?? 'require_approval', n: opts.n ?? 1 } as T;
+              if (sql.startsWith('SELECT owner_id, workspace_id FROM artifacts')) return { owner_id: 'm0', workspace_id: 'w' } as T;
               if (sql.includes('ast.r2_key')) return { r2_key: 'k', mime: 'text/html' } as T;
               if (sql.includes("status = 'approved' LIMIT 1")) return null as T; // hasApprovedPublish
               if (sql.startsWith('SELECT * FROM artifact_publish_approvals WHERE id')) {

@@ -36,6 +36,7 @@ interface ArtifactMeta {
   description: string | null;
   moderation_status: string;
   workspace_id: string | null;
+  visibility: string | null;
   tags: string | null;
 }
 
@@ -261,7 +262,7 @@ export async function runKnowledgeDistill(
     const path = artifactDigestPath(row.artifact_id);
     const meta = await env.DB.prepare(
       `SELECT a.name, a.description, COALESCE(m.status, 'approved') AS moderation_status,
-              a.workspace_id,
+              a.workspace_id, a.visibility,
               (SELECT GROUP_CONCAT(label, ', ') FROM artifact_tags WHERE artifact_id = a.id) AS tags
        FROM artifacts a
        LEFT JOIN artifact_moderation m ON m.artifact_id = a.id
@@ -274,6 +275,7 @@ export async function runKnowledgeDistill(
       !meta ||
       meta.moderation_status !== 'approved' ||
       !meta.workspace_id ||
+      meta.visibility === 'private' ||
       (await isTombstoned(env, ws, path))
     ) {
       await markProcessed(env, ws, row.artifact_id);

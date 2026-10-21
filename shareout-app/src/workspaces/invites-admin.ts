@@ -1,6 +1,7 @@
 import type { Env } from '../types';
 import type { AuthUser } from '../api-auth';
 import { getInternalWorkspaceRole, invalidateWorkspaceRole } from './roles';
+import { invalidateGrants } from '../access/can-access';
 import { createInviteClaim, expireOtherInviteClaims, sendInviteEmail } from '../workspaces-invite-email';
 import { logAudit } from '../audit';
 import { getPlatformOrigin } from '../config/origins';
@@ -105,7 +106,15 @@ export async function handleRevokeWorkspaceInvite(
   await env.DB.prepare(
     "DELETE FROM workspace_members WHERE workspace_id = ? AND user_id = ? AND role != 'owner'"
   ).bind(workspaceId, inv.user_id).run();
+  await env.DB.prepare(
+    `DELETE FROM sharee_members WHERE user_id = ?
+       AND sharee_id IN (SELECT id FROM sharees WHERE workspace_id = ?)`
+  ).bind(inv.user_id, workspaceId).run();
+  await env.DB.prepare(
+    "DELETE FROM grants WHERE workspace_id = ? AND subject_type = 'external_user' AND subject_id = ?"
+  ).bind(workspaceId, inv.user_id).run();
   await invalidateWorkspaceRole(env, workspaceId, inv.user_id);
+  await invalidateGrants(env, workspaceId, inv.user_id);
   await logAudit(env, {
     workspaceId, actorId: user.id, actorEmail: user.email,
     action: 'invite.revoke', targetType: 'invite', targetId: inviteId, detail: { email: inv.email },

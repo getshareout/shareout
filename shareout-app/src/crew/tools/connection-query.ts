@@ -1,4 +1,4 @@
-import { queryConnectionAny } from '../../data/connections/warehouse-query';
+import { queryConnectionAny, readOnlyModelQuery } from '../../data/connections/warehouse-query';
 import { logCrewToolFailure } from '../errors';
 import { userFacingConnectionToolError } from '../../data/connections/errors';
 import type { CrewTool } from '../types';
@@ -28,7 +28,7 @@ export const connectionQueryTool: CrewTool = {
         ctx.data.env,
         ctx.data.artifactId,
         connection,
-        query,
+        await readOnlyModelQuery(ctx.data.env, ctx.data.artifactId, connection, query),
         (input.params as Record<string, unknown>) || undefined,
         ctx.principal.ownerId
       );

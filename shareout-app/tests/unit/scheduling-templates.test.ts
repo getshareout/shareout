@@ -470,6 +470,8 @@ describe('templates CRUD', () => {
           created_at: 1704067200,
           updated_at: 1704067200,
         },
+        { owner_id: 'user_1' }, // getUserRole: artifact owner
+        { email: 'u1@example.com' }, // getUserRole: caller email
         { // artifact query
           id: 'art_456',
           name: 'My Dashboard',
@@ -489,7 +491,7 @@ describe('templates CRUD', () => {
     });
 
     it('previews inline template without saving', async () => {
-      const env = testEnv([{
+      const env = testEnv([{ owner_id: 'user_1' }, { email: 'u1@example.com' }, {
         id: 'art_456',
         name: 'Test Artifact',
         slug: 'test',

@@ -20,7 +20,7 @@ import { createWatch, runMetricWatchSweep } from '../../../src/metric-watch/watc
 const e = env as unknown as Env;
 
 beforeAll(async () => {
-  await e.DB.exec(`CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, name TEXT, deleted_at TEXT)`);
+  await e.DB.exec(`CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, name TEXT, deleted_at TEXT, owner_id TEXT, access_policy TEXT)`);
   await e.DB.exec(
     `CREATE TABLE IF NOT EXISTS metric_watches (id TEXT PRIMARY KEY, artifact_id TEXT NOT NULL, workspace_id TEXT, created_by TEXT NOT NULL, table_name TEXT NOT NULL, metric_kind TEXT NOT NULL, column_name TEXT NOT NULL DEFAULT '', threshold_pct REAL NOT NULL DEFAULT 20, last_value REAL, last_checked_at TEXT, last_alerted_at TEXT, enabled INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), UNIQUE(artifact_id, table_name, metric_kind, column_name))`
   );

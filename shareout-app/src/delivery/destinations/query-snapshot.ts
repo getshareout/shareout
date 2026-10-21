@@ -5,7 +5,7 @@ import { queryConnectionAny } from '../../data/connections/warehouse-query';
 import { resolveDateTokens, resolveDateTokensInParams } from '../date-tokens';
 
 // Generic, deterministic data refresh: run a configured list of queries against a
-// workspace connection (REST or a warehouse like BigQuery, on the artifact owner's
+// workspace connection (REST or a warehouse like BigQuery, on the job creator's
 // credentials) and write each result into the artifact store. Fixed SQL lives in
 // config — no agent authors it — so dashboards get a reliable daily snapshot.
 export const querySnapshotDestination: Destination<QuerySnapshotConfig> = {
@@ -27,9 +27,7 @@ export const querySnapshotDestination: Destination<QuerySnapshotConfig> = {
   async deliver(env, ctx, config) {
     const steps: DeliveryStep[] = [];
     try {
-      const art = await env.DB.prepare('SELECT owner_id FROM artifacts WHERE id = ?')
-        .bind(ctx.artifactId).first<{ owner_id: string | null }>();
-      const userId = art?.owner_id || ctx.createdBy;
+      const userId = ctx.createdBy;
       // One clock for the whole run, so a job spanning UTC midnight can't have its
       // queries land on two different days.
       const now = new Date();

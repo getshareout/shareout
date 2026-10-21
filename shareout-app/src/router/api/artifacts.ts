@@ -521,20 +521,22 @@ async function canWriteArtifact(env: Env, artifactId: string, user: AuthUser, ar
 }
 
 /**
- * Read gate for analytics/presence: owner, internal workspace member, collaborator or
- * an external view grant. The artifact row and the collaborator row load in one wave;
- * the role and grant checks run only when those do not already grant.
+ * Read gate for analytics/presence: the closed-artifact viewer rule (owner, collaborator,
+ * internal member of a workspace-visible artifact, or a view grant). A private artifact
+ * stays owner/collaborator/grant only.
  */
 async function requireArtifactRead(env: Env, artifactId: string, user: AuthUser): Promise<Response | null> {
   const [artifact, collab] = await Promise.all([
-    loadArtifactForAuth(env, artifactId),
+    env.DB.prepare(
+      'SELECT owner_id, workspace_id, visibility FROM artifacts WHERE id = ?'
+    ).bind(artifactId).first<ArtifactAuthRow & { visibility: string }>(),
     env.DB.prepare(
       'SELECT role FROM collaborators WHERE artifact_id = ? AND email = ?'
     ).bind(artifactId, user.email).first<{ role: string }>(),
   ]);
   if (!artifact) return jsonError('Not found', 'NOT_FOUND', 404);
   if (artifact.owner_id === user.id || collab) return null;
-  if (artifact.workspace_id && (await getInternalWorkspaceRole(env, artifact.workspace_id, user.id))) return null;
+  if (artifact.workspace_id && artifact.visibility !== 'private' && (await getInternalWorkspaceRole(env, artifact.workspace_id, user.id))) return null;
   // External-sharing spine (work/030): an external identity with a view grant
   // (e.g. a scoped sot_ token) may read this artifact's metadata.
   if (await canAccess(env, { userIds: [user.id], emails: user.email ? [user.email] : [] }, 'artifact', artifactId, 'view')) return null;

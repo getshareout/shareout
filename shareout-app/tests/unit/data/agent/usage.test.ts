@@ -172,7 +172,7 @@ describe('incrementRateLimit', () => {
     };
     expect(env.DB.batch).toHaveBeenCalledTimes(1);
     expect(prepare.mock.calls[0][0]).toContain("'agent_requests'");
-    expect(prepare.mock.results[0].value.bind.mock.calls[0]).toEqual([ARTIFACT_ID, '2026-05-30T12:00']);
+    expect(prepare.mock.results[0].value.bind.mock.calls[0]).toEqual([ARTIFACT_ID, '2026-05-30T12:00', 1]);
     expect(prepare.mock.calls[1][0]).toContain("'agent_tokens'");
     expect(prepare.mock.results[1].value.bind.mock.calls[0]).toEqual([ARTIFACT_ID, '2026-05-30', 250]);
   });

@@ -1,5 +1,5 @@
 import { runMaterialize } from '../../data/materialize';
-import { queryConnectionAny } from '../../data/connections/warehouse-query';
+import { queryConnectionAny, readOnlyModelQuery } from '../../data/connections/warehouse-query';
 import type { CrewTool } from '../types';
 
 export const materializeTool: CrewTool = {
@@ -48,7 +48,8 @@ export const materializeTool: CrewTool = {
           target: { type: target.type, name: target.name, path: target.path },
           mode,
         },
-        (c, q, p) => queryConnectionAny(ctx.data.env, ctx.data.artifactId, c, q, p, ctx.principal.ownerId)
+        async (c, q, p) =>
+          queryConnectionAny(ctx.data.env, ctx.data.artifactId, c, await readOnlyModelQuery(ctx.data.env, ctx.data.artifactId, c, q), p, ctx.principal.ownerId)
       );
       return result;
     } catch (err) {

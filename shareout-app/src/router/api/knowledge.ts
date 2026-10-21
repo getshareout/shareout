@@ -11,7 +11,7 @@ import { NODE_KINDS, type KnowledgeNode } from '../../knowledge/types';
 import { getAIProvider } from '../../data/agent/anthropic';
 import { corpusFor } from '../../knowledge/corpus/client';
 import { startIngest } from '../../knowledge/corpus/ingest';
-import { searchCorpus, searchResultMarkdown } from '../../knowledge/corpus/search';
+import { searchCorpus, searchResultMarkdown, visibleSources } from '../../knowledge/corpus/search';
 import { notesFromArtifact, sourceArtifacts } from '../../knowledge/source-links';
 import { knowledgeUsage } from '../../knowledge/corpus/usage';
 import { corpusStatus, reindexWorkspace, REINDEX_MAX } from '../../knowledge/corpus/reindex';
@@ -349,7 +349,9 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
 
     if (sub === 'sources') {
       const limit = Math.min(Number(url.searchParams.get('limit')) || 50, 200);
-      return cors(jsonResponse(await store.listSources(limit)));
+      const listed = await store.listSources(limit);
+      const { visible } = await visibleSources(ctx.env, workspaceId, auth.id, listed.sources);
+      return cors(jsonResponse({ ...listed, sources: listed.sources.filter((r) => visible.has(r.refId)) }));
     }
 
     const q = (url.searchParams.get('q') || '').trim();

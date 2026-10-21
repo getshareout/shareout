@@ -1,5 +1,6 @@
 import type { FetchContext } from '../context';
 import { hashVisitor } from '../../analytics';
+import { checkSlidingWindowRateLimit } from '../../rate-limit';
 
 // Live-presence heartbeat sink. The presence beacon (anonymous, fired from a sandboxed
 // iframe on the content domain) POSTs here every ~20s. We resolve a coarse viewer id
@@ -31,6 +32,7 @@ export async function routePresenceApi(ctx: FetchContext): Promise<Response | nu
 
   const beat = (async () => {
     try {
+      if (!(await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, ip || 'unknown', 'presenceBeacon')).allowed) return;
       const viewerId = await hashVisitor(ip, userAgent);
       const stub = env.PRESENCE.get(env.PRESENCE.idFromName(artifactId));
       await stub.fetch('https://presence/beat', {

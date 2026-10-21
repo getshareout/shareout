@@ -1,12 +1,11 @@
 import type { AccountTool, ToolContext } from './types';
+import type { PendingAction } from '../actions';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
-import { upsertShareeContextFile } from '../../workspace-context';
-import { isKnownShareeContextUpsertError, logAgentToolFailure, userFacingClientNotesError } from '../errors';
 
 // Lets the workspace assistant keep a Client's notes current — the AI half of "admin
-// or AI can edit". Workspace-private (never shared with the client). Direct write
-// (no confirm): it only touches internal account notes. The acting user must be a
-// workspace admin; the file is stamped as a user edit (the AI acts on their behalf).
+// or AI can edit". Workspace-private (never shared with the client). The notes are
+// loaded into every member's assistant context, so this only proposes the write; the
+// admin confirms it (see executeClientNotes in actions.ts).
 export const setClientNotesTool: AccountTool = {
   name: 'set_client_notes',
   description:
@@ -20,7 +19,7 @@ export const setClientNotesTool: AccountTool = {
     },
     required: ['client', 'content'],
   },
-  async execute(ctx: ToolContext, input) {
+  async execute(ctx: ToolContext, input): Promise<{ __propose: PendingAction } | { error: string }> {
     const wsId = ctx.selectedWorkspaceId;
     if (!wsId || wsId === '__personal') {
       return { error: 'Open a workspace first — client notes live in a workspace.' };
@@ -41,26 +40,6 @@ export const setClientNotesTool: AccountTool = {
     ).bind(wsId, clientRef, clientRef).first<{ id: string; name: string }>();
     if (!sharee) return { error: `No client named "${clientRef}" in this workspace.` };
 
-    try {
-      const err = await upsertShareeContextFile(ctx.env, wsId, sharee.id, name, content, ctx.userId);
-      if (err) {
-        if (!isKnownShareeContextUpsertError(err)) {
-          logAgentToolFailure(ctx.env, {
-            tool: 'set_client_notes',
-            userId: ctx.userId,
-            platform: ctx.platform,
-          }, new Error(err));
-        }
-        return { error: userFacingClientNotesError(err) };
-      }
-    } catch (e) {
-      logAgentToolFailure(ctx.env, {
-        tool: 'set_client_notes',
-        userId: ctx.userId,
-        platform: ctx.platform,
-      }, e);
-      return { error: userFacingClientNotesError(e) };
-    }
-    return { ok: true, client: sharee.name, note: name };
+    return { __propose: { kind: 'client_notes', workspaceId: wsId, clientId: sharee.id, clientName: sharee.name, note: name, content } };
   },
 };

@@ -44,6 +44,7 @@ describe('fetchSheetData', () => {
 
     const missingId = await handleSheets(
       sheetsRequest('fetch', {
+        headers: await ownerAuthHeaders(env),
         method: 'POST',
         body: JSON.stringify({ spreadsheetUrl: 'https://example.com/nope' }),
       }),
@@ -54,6 +55,7 @@ describe('fetchSheetData', () => {
 
     const notConnected = await handleSheets(
       sheetsRequest('fetch', {
+        headers: await ownerAuthHeaders(env),
         method: 'POST',
         body: JSON.stringify({ spreadsheetId: SPREADSHEET_ID }),
       }),
@@ -79,6 +81,7 @@ describe('fetchSheetData', () => {
 
     const response = await handleSheets(
       sheetsRequest('fetch', {
+        headers: await ownerAuthHeaders(env),
         method: 'POST',
         body: JSON.stringify({ spreadsheetId: SPREADSHEET_ID, range: 'Sheet1' }),
       }),
@@ -112,6 +115,7 @@ describe('fetchSheetData', () => {
 
     const response = await handleSheets(
       sheetsRequest('fetch', {
+        headers: await ownerAuthHeaders(env),
         method: 'POST',
         body: JSON.stringify({
           spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`,
@@ -141,6 +145,7 @@ describe('fetchSheetData', () => {
     });
     const empty = await handleSheets(
       sheetsRequest('fetch', {
+        headers: await ownerAuthHeaders(env),
         method: 'POST',
         body: JSON.stringify({ spreadsheetId: SPREADSHEET_ID, cache: false }),
       }),
@@ -158,6 +163,7 @@ describe('fetchSheetData', () => {
     });
     const raw = await handleSheets(
       sheetsRequest('fetch', {
+        headers: await ownerAuthHeaders(env),
         method: 'POST',
         body: JSON.stringify({ spreadsheetId: SPREADSHEET_ID, headers: false, cache: false }),
       }),
@@ -172,6 +178,7 @@ describe('fetchSheetData', () => {
     });
     const denied = await handleSheets(
       sheetsRequest('fetch', {
+        headers: await ownerAuthHeaders(env),
         method: 'POST',
         body: JSON.stringify({ spreadsheetId: SPREADSHEET_ID, cache: false }),
       }),
@@ -185,6 +192,7 @@ describe('fetchSheetData', () => {
     });
     const failed = await handleSheets(
       sheetsRequest('fetch', {
+        headers: await ownerAuthHeaders(env),
         method: 'POST',
         body: JSON.stringify({ spreadsheetId: SPREADSHEET_ID, cache: false }),
       }),
@@ -206,6 +214,7 @@ describe('fetchSheetData', () => {
     });
     const notFound = await handleSheets(
       sheetsRequest('fetch', {
+        headers: await ownerAuthHeaders(env),
         method: 'POST',
         body: JSON.stringify({ spreadsheetId: SPREADSHEET_ID, cache: false }),
       }),
@@ -220,6 +229,7 @@ describe('fetchSheetData', () => {
     });
     const limited = await handleSheets(
       sheetsRequest('fetch', {
+        headers: await ownerAuthHeaders(env),
         method: 'POST',
         body: JSON.stringify({ spreadsheetId: SPREADSHEET_ID, cache: false }),
       }),
@@ -244,6 +254,7 @@ describe('fetchSheetData', () => {
     });
     const response = await handleSheets(
       sheetsRequest('fetch', {
+        headers: await ownerAuthHeaders(env),
         method: 'POST',
         body: JSON.stringify({ spreadsheetId: SPREADSHEET_ID, cache: false }),
       }),
@@ -275,6 +286,7 @@ describe('fetchSheetData', () => {
     });
     const response = await handleSheets(
       sheetsRequest('fetch', {
+        headers: await ownerAuthHeaders(env),
         method: 'POST',
         body: JSON.stringify({ spreadsheetId: SPREADSHEET_ID, cache: false }),
       }),
@@ -305,6 +317,7 @@ describe('fetchSheetData', () => {
     );
     const response = await handleSheets(
       sheetsRequest('fetch', {
+        headers: await ownerAuthHeaders(env),
         method: 'POST',
         body: JSON.stringify({ spreadsheetId: SPREADSHEET_ID, cache: false }),
       }),
@@ -333,6 +346,7 @@ describe('fetchSheetData', () => {
 
     const response = await handleSheets(
       sheetsRequest('fetch', {
+        headers: await ownerAuthHeaders(env),
         method: 'POST',
         body: JSON.stringify({ spreadsheetId: SPREADSHEET_ID, cache: false }),
       }),
@@ -366,6 +380,7 @@ describe('fetchSheetData', () => {
 
     const response = await handleSheets(
       sheetsRequest('fetch', {
+        headers: await ownerAuthHeaders(env),
         method: 'POST',
         body: JSON.stringify({ spreadsheetId: SPREADSHEET_ID }),
       }),
@@ -395,6 +410,7 @@ describe('fetchSheetData', () => {
 
     const response = await handleSheets(
       sheetsRequest('fetch', {
+        headers: await ownerAuthHeaders(env),
         method: 'POST',
         body: JSON.stringify({ spreadsheetId: SPREADSHEET_ID }),
       }),
@@ -427,6 +443,7 @@ describe('fetchSheetData', () => {
 
     const response = await handleSheets(
       sheetsRequest('fetch', {
+        headers: await ownerAuthHeaders(env),
         method: 'POST',
         body: JSON.stringify({ spreadsheetId: SPREADSHEET_ID, forceRefresh: true }),
       }),

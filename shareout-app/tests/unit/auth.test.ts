@@ -599,7 +599,7 @@ describe('handleCredentialsAuth', () => {
         first: (sql) => {
           call += 1;
           if (call === 1) return { id: 'art_1', name: 'Demo' };
-          if (sql.includes('artifact_passwords')) return { 1: 1 };
+          if (sql.includes('artifact_passwords')) return { password_hash: passwordHash };
           return null;
         },
       }),

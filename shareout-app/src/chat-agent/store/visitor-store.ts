@@ -27,6 +27,14 @@ export class VisitorStore implements ConversationStore {
     return new VisitorStore(env, id);
   }
 
+  /** A store bound to an existing visitor conversation of this artifact, or null when the id is not one. */
+  static async open(env: Env, artifactId: string, conversationId: string): Promise<VisitorStore | null> {
+    const row = await env.DB.prepare(
+      `SELECT id FROM agent_threads WHERE id = ? AND scope_type = 'artifact_visitor' AND scope_key = ?`
+    ).bind(conversationId, artifactId).first();
+    return row ? new VisitorStore(env, conversationId) : null;
+  }
+
   get id(): string {
     return this.conversationId;
   }

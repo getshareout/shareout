@@ -144,6 +144,8 @@ export async function routeCreateApi(ctx: FetchContext): Promise<Response | null
 
   // Planning routes the request — safe for anonymous visitors.
   if (body.phase === 'plan') {
+    const rl = await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, user ? `plan:${user.id}` : getClientIp(request), 'createPlanAnon');
+    if (!rl.allowed) return addCORS(json({ ok: false, error: 'Too many requests. Try again in a while.', code: 'RATE_LIMITED' }, 429));
     return addCORS(await handlePlan(env, prompt, !!previousHtml));
   }
 
@@ -161,6 +163,9 @@ export async function routeCreateApi(ctx: FetchContext): Promise<Response | null
           )
         );
       }
+    } else {
+      const rl = await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, user.id, 'createPreviewUser');
+      if (!rl.allowed) return addCORS(json({ ok: false, error: 'Too many previews this hour. Try again in a while.', code: 'PREVIEW_LIMIT' }, 429));
     }
     return addCORS(streamGenerate({ env, prompt, previousHtml, theme }));
   }

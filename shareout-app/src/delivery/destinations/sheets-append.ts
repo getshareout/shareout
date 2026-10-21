@@ -6,7 +6,7 @@ import { getArtifactAccessToken } from '../../data/sheets/artifact-tokens';
 import { resolveSpreadsheetId } from '../../data/sheets/utils';
 
 // Generic "warehouse/REST → Google Sheet" appender. Run one configured query on
-// the artifact owner's credentials and append the result rows to a connected
+// the job creator's credentials and append the result rows to a connected
 // sheet, so any artifact can keep a growing daily history in a spreadsheet the
 // customer already shares. The append primitive (read-write OAuth scope +
 // values:append) already exists; this destination is the scheduled entry point.
@@ -49,9 +49,7 @@ export const sheetsAppendDestination: Destination<SheetsAppendConfig> = {
       const spreadsheetId = resolveSpreadsheetId(config);
       if (!spreadsheetId) return { success: false, error: 'could not resolve spreadsheetId' };
 
-      const art = await env.DB.prepare('SELECT owner_id FROM artifacts WHERE id = ?')
-        .bind(ctx.artifactId).first<{ owner_id: string | null }>();
-      const userId = art?.owner_id || ctx.createdBy;
+      const userId = ctx.createdBy;
 
       const result = await queryConnectionAny(
         env, ctx.artifactId, config.connection, config.query, config.params, userId

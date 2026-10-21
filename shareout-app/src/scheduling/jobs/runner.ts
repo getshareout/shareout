@@ -9,6 +9,7 @@ import type { DeliveryStep } from '../../delivery/types';
 import { isArtifactFeatureEnabled } from '../../features/flags';
 import { generateId } from '../../crypto-utils';
 import { DEST_FEATURE } from './constants';
+import { rowPolicyRenderError } from './permissions';
 import type { JobAction, JobConfig } from './types';
 
 export type JobActionResult = {
@@ -53,6 +54,11 @@ export async function executeJobAction(
   const destFeature = DEST_FEATURE[action];
   if (destFeature && !(await isArtifactFeatureEnabled(env, destFeature, artifactId))) {
     return { success: false, error: `Delivery to ${action} is disabled for this workspace` };
+  }
+
+  if (role !== 'owner' && role !== 'editor') {
+    const blocked = await rowPolicyRenderError(env, artifactId, action, config);
+    if (blocked) return { success: false, error: blocked };
   }
 
   const destination = getDestination(action);

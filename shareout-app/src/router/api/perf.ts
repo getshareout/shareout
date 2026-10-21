@@ -1,5 +1,6 @@
 import type { FetchContext } from '../context';
 import { hashVisitor } from '../../analytics';
+import { checkSlidingWindowRateLimit } from '../../rate-limit';
 
 // Real-user load-time beacon (opt-017). No auth — anonymous artifact viewers fire these
 // from a sandboxed iframe. Body is a text/plain JSON blob (keeps it a CORS-safelisted
@@ -50,6 +51,7 @@ export async function routePerfApi(ctx: FetchContext): Promise<Response | null> 
 
   const write = (async () => {
     try {
+      if (!(await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, ip || 'unknown', 'perfBeacon')).allowed) return;
       const visitorHash = await hashVisitor(ip, userAgent);
       await env.DB.prepare(`
         INSERT INTO artifact_perf (id, artifact_id, created_at, fcp, lcp, dcl, ttfb, visitor_hash, country)

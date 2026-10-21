@@ -25,6 +25,7 @@ import {
   resolveConnectionCredentials,
 } from './resolve';
 import { executeRestApiQuery } from './rest-query';
+import { validateReadOnlySql } from './sql-guard';
 
 export async function executeQuery(
   request: Request,
@@ -65,6 +66,14 @@ export async function executeQuery(
     conn.credential_scope ?? 'shared',
   );
 
+  if (conn.credential_scope === 'per_user' && userId && userId !== ctx.artifact.owner_id && !isReadOnlyQuery(conn.type, query)) {
+    return errorResponse({
+      ...DATA_ERRORS.FORBIDDEN,
+      message: "Your own connector credentials can only run read-only queries (GET or a single SELECT) from someone else's page",
+    }, ctx.origin);
+  }
+  const cacheParams = cacheId === conn.id ? options?.params : { ...options?.params, __user: userId };
+
   const rateLimitOk = await checkRateLimit(ctx.env, cacheId, conn.rate_limit_rpm);
   if (!rateLimitOk) {
     getRateLimitInfo(cacheId, conn.rate_limit_rpm);
@@ -77,7 +86,7 @@ export async function executeQuery(
 
   const useCache = options?.cache !== false;
   if (useCache) {
-    const cached = await getCachedResult(ctx.env, cacheId, query, options?.params);
+    const cached = await getCachedResult(ctx.env, conn.id, query, cacheParams);
     if (cached !== null) {
       return successResponse({
         data: cached,
@@ -124,7 +133,7 @@ export async function executeQuery(
 
     const ttl = options?.ttl || conn.cache_ttl_seconds;
     if (ttl > 0) {
-      await cacheResult(ctx.env, cacheId, query, options?.params, result, ttl);
+      await cacheResult(ctx.env, conn.id, query, cacheParams, result, ttl);
     }
 
     return successResponse({
@@ -212,4 +221,13 @@ export async function queryConnectionData(
     });
   }
   throw new Error(`Server-side query not supported for connection type "${conn.type}". Use inline rows materialization.`);
+}
+
+function isReadOnlyQuery(type: string, query: string | Record<string, unknown>): boolean {
+  if (type === 'rest_api') {
+    const method = typeof query === 'object' && query ? String(query.method || 'GET').toUpperCase() : 'GET';
+    return method === 'GET' || method === 'HEAD';
+  }
+  const sql = typeof query === 'string' ? query : String(query?.sql ?? query?.query ?? '');
+  return validateReadOnlySql(sql).ok;
 }
