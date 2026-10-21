@@ -7,6 +7,7 @@ import type { ActivityEvent } from '../types';
 import { homeScopeSql } from '../filters';
 import { getInternalWorkspaceRole } from '../../../workspaces/roles';
 import { type ActivityKind, type AudienceMap, resolveWorkspaceAudiences } from '../events';
+import { parseAccessPolicy, resolveViewerScope } from '../../../data/access-policy';
 import { type ActivityFeedOpts, trim140, stripMentionTokens } from './shared';
 
 /**
@@ -153,14 +154,23 @@ export async function queryNeedsYou(
   if (on('metric_watch')) {
     push(env.DB.prepare(`
       SELECT e.id AS id, a.id AS artifact_id, a.name AS artifact_name, a.slug AS slug,
-             e.message AS message, CAST(strftime('%s', e.created_at) AS INTEGER) AS ts
+             e.message AS message, CAST(strftime('%s', e.created_at) AS INTEGER) AS ts,
+             a.access_policy AS access_policy,
+             (a.owner_id IN (${idPh}) OR EXISTS (
+               SELECT 1 FROM collaborators c
+                WHERE c.artifact_id = a.id AND c.role IN ('owner', 'editor') AND lower(c.email) IN (${emailPh})
+             )) AS unscoped
       FROM notifications e
       JOIN artifacts a ON a.id = e.recipient_id
       ${base.join}
       WHERE ${base.where} AND e.recipient_type = 'artifact' AND e.kind = 'metric_watch'
       GROUP BY e.id ORDER BY e.created_at DESC LIMIT ?
-    `).bind(...base.joinParams, ...base.whereParams, limit),
-      (rows) => rows.map((r) => ({
+    `).bind(...vis.userIds, ...lowerEmails, ...base.joinParams, ...base.whereParams, limit),
+      (rows) => rows.filter((r) => {
+        if (!r.access_policy || r.unscoped) return true;
+        const policy = parseAccessPolicy(r.access_policy);
+        return !!policy && !resolveViewerScope(policy, { email: user.email, isOwner: false });
+      }).map((r) => ({
         kind: 'metric_watch', id: r.id, artifact_id: r.artifact_id, artifact_name: r.artifact_name,
         slug: r.slug, actor: null, actor_picture: null, summary: r.message, ts: r.ts,
       })));

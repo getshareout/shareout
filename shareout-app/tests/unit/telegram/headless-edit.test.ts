@@ -85,7 +85,14 @@ describe('proposeEdit', () => {
 describe('publishEdits', () => {
   it('delegates to publishConversation and returns the URL', async () => {
     publishConversation.mockResolvedValue({ ok: true, url: 'https://shareout.site/a/page', versionId: 'v', versionNo: 2, appliedEdits: 1 });
-    const res = await publishEdits(env, 'a1', 'conv_1');
+    const emptyHash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('[]'))), (b) => b.toString(16).padStart(2, '0')).join('');
+    const res = await publishEdits(env, 'a1', 'conv_1', emptyHash);
     expect(res).toEqual({ ok: true, url: 'https://shareout.site/a/page' });
+  });
+
+  it('refuses when the staged hash does not match', async () => {
+    const res = await publishEdits(env, 'a1', 'conv_1', 'stale');
+    expect(res.ok).toBe(false);
+    expect(publishConversation).not.toHaveBeenCalled();
   });
 });

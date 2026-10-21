@@ -2,6 +2,7 @@
 // corpus visibility rule (visibleSources): a member only sees artifacts they may open.
 import type { Env } from '../types';
 import { visibleSources } from './corpus/search';
+import { JSON_IN, jsonList } from '../sql-in';
 import { parseKnowledge } from './parse';
 import type { KnowledgeNode } from './types';
 
@@ -32,4 +33,17 @@ export async function notesFromArtifact(env: Env, workspaceId: string, userId: s
     .filter((n) => n.sources.includes(artifactId))
     .slice(0, MAX_NOTES)
     .map((n) => ({ path: n.path, kind: n.kind, id: n.id, title: n.title }));
+}
+
+/** Drops notes learned from a page this member may not open (private, someone else's): a note's
+ *  body carries its sources' content, so one such source hides the whole note from them. */
+export async function readableNodes<T extends { sources: string[] }>(env: Env, workspaceId: string, userId: string, nodes: T[]): Promise<T[]> {
+  const ids = [...new Set(nodes.flatMap((n) => n.sources))];
+  if (!ids.length) return nodes;
+  const rows = (await env.DB.prepare(
+    `SELECT id FROM artifacts WHERE workspace_id = ? AND visibility = 'private' AND owner_id != ? AND id IN ${JSON_IN}`,
+  ).bind(workspaceId, userId, jsonList(ids)).all<{ id: string }>()).results || [];
+  if (!rows.length) return nodes;
+  const blocked = new Set(rows.map((r) => r.id));
+  return nodes.filter((n) => !n.sources.some((id) => blocked.has(id)));
 }

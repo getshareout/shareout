@@ -8,6 +8,9 @@ import { emitJobEvent } from '../scheduling/events';
 import { purgeInbox } from '../email/inbox-store';
 import { validateAccessPolicy } from '../data/access-policy';
 import { canViewArtifact } from '../data/middleware';
+import { deleteKnowledgeFile } from '../knowledge/store';
+import { deleteKnowledgeVector } from '../knowledge/distill';
+import { artifactDigestPath } from '../knowledge/types';
 import { coerceVisibility, normalizeVisibility } from '../visibility-config';
 import { resolveAllowOpen, OPEN_VISIBILITY_PAYWALL_MESSAGE } from '../access/allow-open';
 import { classifyAndPersist, clearModerationHold, findBlockedCdnHosts } from '../moderation/check';
@@ -399,6 +402,7 @@ export async function handleUpdateArtifact(
   let moderationReason: string | null = null;
   let visibilityHeldMessage: string | null = null;
   let approvalRequired: number | null = null;
+  let madePrivate = false;
   if (body.visibility !== undefined) {
     // Accept legacy 'unlisted' input and fold it into 'public' (retired 2026-07).
     const requested = normalizeVisibility(body.visibility) as Visibility;
@@ -470,6 +474,7 @@ export async function handleUpdateArtifact(
     }
     updates.push('visibility = ?');
     values.push(coerced);
+    madePrivate = coerced === 'private';
   }
 
   if (body.paused !== undefined) {
@@ -510,6 +515,11 @@ export async function handleUpdateArtifact(
     await env.DB.prepare(
       `UPDATE artifacts SET ${updates.join(', ')} WHERE id = ?`
     ).bind(...values).run();
+  }
+  if (madePrivate && artifact.workspace_id) {
+    const digest = artifactDigestPath(artifactId);
+    await deleteKnowledgeFile(env, artifact.workspace_id, digest).catch(() => {});
+    await deleteKnowledgeVector(env, artifact.workspace_id, digest);
   }
   if (hasPresentation) await setPresentation(env, artifactId, presentation);
   if (tags) await replaceTags(env, artifactId, tags);

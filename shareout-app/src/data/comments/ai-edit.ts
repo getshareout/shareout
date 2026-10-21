@@ -109,7 +109,7 @@ export async function runCommentAiEdit(ctx: DataContext, comment: Comment): Prom
       const quota = await checkStorageQuota(env, art?.owner_id ?? userId, files);
       if (!quota.allowed) { await finish(c.failed(storageLimitMessage(quota))); return; }
 
-      const published = await publishEdits(env, ctx.artifactId, proposed.conversationId);
+      const published = await publishEdits(env, ctx.artifactId, proposed.conversationId, proposed.stagedHash, userId);
       if (!published.ok) { await finish(c.failed(published.error)); return; }
       await incrementRateLimit(env, userId, 'publish', user?.email);
       await finish(c.published(proposed.explanation, published.url));

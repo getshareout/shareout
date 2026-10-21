@@ -1,6 +1,7 @@
 import { stampEditorIdsOnBlocks } from '../dom/editor-ids';
 import { createLogger } from '../editor/logger';
 import type { EditorDom, EditorState } from '../editor/types';
+import { withCanvasCsp } from './canvas-csp';
 import { injectCanvasEditorStyles } from './editor-styles';
 
 const log = createLogger('canvas');
@@ -105,14 +106,14 @@ function writeDocSafely(doc: Document, rawHtml: string): void {
 
   // Try fast path: write full HTML.
   doc.open();
-  doc.write(normalized.fullHtml);
+  doc.write(withCanvasCsp(normalized.fullHtml));
   doc.close();
 
   if (doc.body) return;
 
   // Fallback: force-create a valid skeleton, then inject head/body.
   doc.open();
-  doc.write('<!doctype html><html><head></head><body></body></html>');
+  doc.write(withCanvasCsp('<!doctype html><html><head></head><body></body></html>'));
   doc.close();
 
   // Re-acquire after the write: TS can't see that doc.write() recreated head/body,

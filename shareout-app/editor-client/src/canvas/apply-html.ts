@@ -2,6 +2,7 @@ import { stampEditorIdsOnBlocks, EDITOR_ID_ATTR, resolveElementBySelector } from
 import { createLogger } from '../editor/logger';
 import type { EditorDom } from '../editor/types';
 import type { MutationOp } from '../dom/mutation-observer';
+import { withCanvasCsp } from './canvas-csp';
 import { injectCanvasEditorStyles } from './editor-styles';
 import { injectSdkScript, syncCanvasFrameSize } from './render-canvas';
 
@@ -46,7 +47,7 @@ export function applyHtmlToCanvasFull(dom: EditorDom, html: string): Document | 
 
   const withSdk = injectSdkScript(html);
   doc.open();
-  doc.write(withSdk);
+  doc.write(withCanvasCsp(withSdk));
   doc.close();
 
   if (!doc.body) return null;

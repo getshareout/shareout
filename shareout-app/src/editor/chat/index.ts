@@ -10,6 +10,7 @@
 import type { EditorContext } from '../index';
 import type { ChatMode } from '../types';
 import { isArtifactFeatureEnabled } from '../../features/flags';
+import { checkAiChatLimit } from '../../rate-limit';
 import { debugLog } from './config';
 import { errorResponse } from './errors';
 import {
@@ -47,6 +48,11 @@ export async function handleEditorChat(
 
   if (!(await isArtifactFeatureEnabled(ctx.env, 'ai.editor_chat', ctx.artifactId))) {
     return errorResponse('FEATURE_DISABLED', 'Editor AI is disabled for this workspace', 403);
+  }
+
+  if (mode === 'normal' || mode === 'inline' || mode === 'lasso') {
+    const rl = await checkAiChatLimit(ctx.env, ctx.userId);
+    if (!rl.allowed) return errorResponse('RATE_LIMITED', 'Too many AI requests. Try again in a while.', 429);
   }
 
   switch (mode) {

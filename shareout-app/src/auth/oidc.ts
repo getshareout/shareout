@@ -17,7 +17,7 @@ import { generateId } from '../crypto-utils';
 import { getPlatformHostname } from '../config/origins';
 import { parseSubdomainFromEnv } from '../subdomain';
 import { buildSessionCookie, cookieDomainAttr, cookieSecureAttr, isShareoutOrigin } from './cookies';
-import { errorPage } from './pages';
+import { errorPage, safeRedirect } from './pages';
 import { resolveSessionMaxAge } from './session';
 import { upsertUserByEmail } from './users';
 import { scheduleWorkspaceWelcome } from '../onboarding/welcome-email';
@@ -261,8 +261,7 @@ async function resolveConfig(url: URL, env: Env): Promise<SsoConfig | null> {
 
 export async function handleSsoStart(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
-  const redirectParam = url.searchParams.get('redirect') || '';
-  const redirect = redirectParam.startsWith('/') && !redirectParam.startsWith('//') ? redirectParam : '/home';
+  const redirect = safeRedirect(url.searchParams.get('redirect'));
 
   const config = await resolveConfig(url, env);
   if (!config) return errorPage('Single sign-on is not set up for this workspace.', '/auth/login');

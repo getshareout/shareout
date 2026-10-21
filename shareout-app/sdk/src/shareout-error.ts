@@ -17,3 +17,10 @@ export class ShareOutError extends Error {
   }
 }
 
+
+export class ConsentRequiredError extends ShareOutError {
+  constructor(message: string, status: number, public consentUrl: string, hint?: string) {
+    super(message, 'CONSENT_REQUIRED', status, hint);
+    this.name = 'ConsentRequiredError';
+  }
+}

@@ -1,5 +1,5 @@
 import { errorResponse, successResponse, verifyOwner, type DataContext } from '../middleware';
-import { getSession } from './auth';
+import { canEditPresentation, getSession } from './auth';
 import { broadcastEvent } from './realtime';
 
 export async function handlePresenterRoutes(
@@ -31,6 +31,10 @@ export async function handlePresenterRoutes(
 async function startPresentation(request: Request, ctx: DataContext, presId: string): Promise<Response> {
   if (request.method !== 'POST') {
     return errorResponse({ code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed', status: 405 });
+  }
+
+  if (!(await canEditPresentation(request, ctx, presId))) {
+    return errorResponse({ code: 'FORBIDDEN', message: 'Only owner or editors can control the presentation', status: 403 });
   }
 
   let body: { fromSlide?: number; countdown?: number } = {};
@@ -88,6 +92,10 @@ async function startPresentation(request: Request, ctx: DataContext, presId: str
 async function stopPresentation(request: Request, ctx: DataContext, presId: string): Promise<Response> {
   if (request.method !== 'POST') {
     return errorResponse({ code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed', status: 405 });
+  }
+
+  if (!(await canEditPresentation(request, ctx, presId))) {
+    return errorResponse({ code: 'FORBIDDEN', message: 'Only owner or editors can control the presentation', status: 403 });
   }
 
   await ctx.env.DB.prepare(`UPDATE presentation_state SET is_presenting = 0, updated_at = ? WHERE presentation_id = ?`)

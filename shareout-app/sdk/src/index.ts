@@ -1,5 +1,5 @@
 export type { ShareOutOptions, DataResponse, ViewerIdentity } from './types/common';
-export { ShareOutError } from './shareout-error';
+export { ShareOutError, ConsentRequiredError } from './shareout-error';
 export { ShareOut } from './core/shareout';
 
 export type {

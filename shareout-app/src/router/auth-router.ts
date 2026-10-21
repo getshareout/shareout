@@ -36,6 +36,7 @@ import {
   handleUnlinkAccount,
 } from '../auth-otp';
 import { handleClaimInvite } from '../workspaces-invite-email';
+import { handleConsentPage } from '../data/connections/consent-page';
 import { handleDeviceStart, handleDevicePoll, handleDevicePage, handleDeviceDone } from '../auth/device-auth';
 import { handleListMyTokens, handleCreateMyToken, handleRevokeMyToken } from '../api-me-tokens';
 import { handleListMyLibraries } from '../workspace-library';
@@ -251,6 +252,10 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
 
   if (path === '/auth/device' && (request.method === 'GET' || request.method === 'POST')) {
     return await handleDevicePage(request, env);
+  }
+
+  if (path === '/connect-consent' && (request.method === 'GET' || request.method === 'POST')) {
+    return await handleConsentPage(request, env);
   }
 
   if (path === '/auth/device/done' && request.method === 'GET') {

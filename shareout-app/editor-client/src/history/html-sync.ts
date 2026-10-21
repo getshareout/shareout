@@ -1,3 +1,4 @@
+import { stripCanvasCsp } from '../canvas/canvas-csp';
 import type { EditorContext } from '../editor/context';
 import { createLogger } from '../editor/logger';
 import type { EditorState } from '../editor/types';
@@ -19,7 +20,9 @@ export function updateHtmlFromCanvas(
     el.removeAttribute('data-editor-selected');
   });
 
-  state.html = '<!DOCTYPE html>' + doc.documentElement.outerHTML;
+  const clone = doc.documentElement.cloneNode(true) as HTMLElement;
+  stripCanvasCsp(clone);
+  state.html = '<!DOCTYPE html>' + clone.outerHTML;
   log.debug('html synced from canvas', { bytes: state.html.length });
 }
 

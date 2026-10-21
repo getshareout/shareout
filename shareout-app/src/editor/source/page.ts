@@ -260,7 +260,7 @@ export function generateSourceEditorPage(opts: SourceEditorOptions): string {
       renderPreview();
     }
     function renderPreview() {
-      document.getElementById('preview').innerHTML = mdToHtml(getContent());
+      document.getElementById('preview').innerHTML = safeHtml(mdToHtml(getContent()));
     }
     window.mdWrap = function (before, after) {
       var ta = document.getElementById('src');
@@ -283,6 +283,25 @@ export function generateSourceEditorPage(opts: SourceEditorOptions): string {
     };
     function escHtml(str) {
       return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    var SAFE_TAGS = { A: 1, B: 1, BLOCKQUOTE: 1, BR: 1, CODE: 1, DEL: 1, EM: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1, HR: 1, IMG: 1, LI: 1, OL: 1, P: 1, PRE: 1, STRONG: 1, TABLE: 1, TBODY: 1, TD: 1, TH: 1, THEAD: 1, TR: 1, UL: 1 };
+    var SAFE_ATTRS = { A: { href: 1 }, IMG: { src: 1, alt: 1 } };
+    function safeHtml(html) {
+      var t = document.createElement('template');
+      t.innerHTML = html;
+      (function walk(parent) {
+        Array.prototype.slice.call(parent.childNodes).forEach(function (n) {
+          if (n.nodeType === 3) return;
+          if (n.nodeType !== 1 || !SAFE_TAGS[n.tagName]) { parent.removeChild(n); return; }
+          Array.prototype.slice.call(n.attributes).forEach(function (a) {
+            var scheme = /^([^\\/?#:]*):/.exec(a.value.replace(/[\\u0000-\\u0020]/g, ''));
+            var ok = (SAFE_ATTRS[n.tagName] || {})[a.name] && (!scheme || /^(https?|mailto)$/i.test(scheme[1]));
+            if (!ok) n.removeAttribute(a.name);
+          });
+          walk(n);
+        });
+      })(t.content);
+      return t.innerHTML;
     }
     function mdToHtml(md) {
       var h = md;

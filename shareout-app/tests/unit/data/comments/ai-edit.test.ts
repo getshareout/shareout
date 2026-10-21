@@ -70,7 +70,7 @@ beforeEach(() => {
   m.checkAiChatLimit.mockResolvedValue({ allowed: true });
   m.checkRateLimit.mockResolvedValue({ allowed: true, remaining: 99, reset: 0 });
   m.checkStorageQuota.mockResolvedValue({ allowed: true, used: 0, incoming: 0, max: 0 });
-  m.proposeEdit.mockResolvedValue({ ok: true, conversationId: 'conv_1', explanation: 'Switched the chart to bars.', files: ['index.html'] });
+  m.proposeEdit.mockResolvedValue({ ok: true, conversationId: 'conv_1', explanation: 'Switched the chart to bars.', files: ['index.html'], stagedHash: 'h1' });
   m.publishEdits.mockResolvedValue({ ok: true, url: 'https://x/a/p/' });
 });
 
@@ -89,7 +89,7 @@ describe('runCommentAiEdit — permission', () => {
   it('editor: edits, publishes a new version, counts a publish and replies in the thread', async () => {
     await runCommentAiEdit(ctx, comment());
     expect(m.proposeEdit).toHaveBeenCalledWith(ctx.env, 'art_1', 'make the chart a bar chart');
-    expect(m.publishEdits).toHaveBeenCalledWith(ctx.env, 'art_1', 'conv_1');
+    expect(m.publishEdits).toHaveBeenCalledWith(ctx.env, 'art_1', 'conv_1', 'h1', 'usr_editor');
     expect(m.incrementRateLimit).toHaveBeenCalledWith(ctx.env, 'usr_editor', 'publish', 'me@example.com');
     expect(m.createCommentForTool.mock.calls[0][2]).toMatchObject({ content: 'Working on it…', parentId: 'cmt_1', notify: false });
     expect(updates).toHaveLength(1);

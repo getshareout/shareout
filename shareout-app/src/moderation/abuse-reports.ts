@@ -2,7 +2,8 @@
 // on the apex (the badge's Report link). Anonymous + per-IP rate limited (strict
 // cf-connecting-ip). Reactive containment that doesn't depend on the classifier:
 //   - a CSAM-tagged report auto-pauses + blocks immediately and alerts the admin,
-//   - N distinct-IP reports within 30 days auto-block the artifact for review.
+//   - N distinct reporters within 30 days auto-block the artifact for review. Distinct =
+//     different signed-in users, or anonymous reporters from different /24 (v4) or /48 (v6) networks.
 
 import type { Env } from '../types';
 import { generateId } from '../crypto-utils';
@@ -13,10 +14,11 @@ import { escapeHtml } from '../serve/utils';
 import { resolveLocale, type Locale } from '../i18n/locale';
 import { type LocaleCopy } from '../i18n';
 import { normalizeVisibility } from '../visibility-config';
+import { getSessionUser } from '../auth/session';
 
 const CATEGORIES = ['phishing', 'malware', 'csam', 'spam', 'copyright', 'other'] as const;
 type Category = (typeof CATEGORIES)[number];
-const AUTO_BLOCK_DISTINCT_IPS = 3;
+const AUTO_BLOCK_DISTINCT_REPORTERS = 3;
 const AUTO_BLOCK_WINDOW_MS = 30 * 86400_000;
 
 const REPORT_COPY: LocaleCopy<{
@@ -39,6 +41,21 @@ const REPORT_COPY: LocaleCopy<{
     },
   },
 };
+
+function networkOf(ip: string): string {
+  if (!ip.includes(':')) return ip.split('.').slice(0, 3).join('.');
+  const [head, tail = ''] = ip.toLowerCase().split('::');
+  const a = head ? head.split(':') : [];
+  const b = tail ? tail.split(':') : [];
+  const groups = ip.includes('::') ? [...a, ...Array(Math.max(0, 8 - a.length - b.length)).fill('0'), ...b] : a;
+  return groups.slice(0, 3).map((g) => g.replace(/^0+(?=.)/, '')).join(':');
+}
+
+/** reporter_ip holds `ip` for anonymous reports and `ip#userId` for signed-in ones. */
+function reporterKey(stored: string): string {
+  const [ip, userId] = stored.split('#');
+  return userId ? `u:${userId}` : `n:${networkOf(ip)}`;
+}
 
 /** The artifact's workspace language, else the visitor's browser. Only public artifacts
  *  take anonymous reports; any other id answers as not found. */
@@ -83,6 +100,7 @@ export async function handleAbuseReport(request: Request, env: Env, artifactId: 
   // Anonymous + per-IP rate limit (strict cf-connecting-ip, fail closed).
   const ip = getTrustedClientIp(request);
   if (!ip) return new Response('Could not verify your network.', { status: 403 });
+  if (!env.RATE_LIMIT_KV) return new Response('Reports are temporarily unavailable.', { status: 503 });
   const rl = await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, `report:${ip}`, 'anonymous');
   if (!rl.allowed) return new Response('Too many reports. Try again later.', { status: 429 });
 
@@ -94,9 +112,10 @@ export async function handleAbuseReport(request: Request, env: Env, artifactId: 
   const { exists, locale } = await reportLocale(env, request, artifactId);
   if (!exists) return new Response('Not found', { status: 404 });
 
+  const user = await getSessionUser(request, env).catch(() => null);
   await env.DB.prepare(
     'INSERT INTO abuse_reports (id, artifact_id, reporter_ip, category, detail, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).bind(generateId('rep'), artifactId, ip, category, detail || null, 'open', new Date().toISOString()).run();
+  ).bind(generateId('rep'), artifactId, user ? `${ip}#${user.id}` : ip, category, detail || null, 'open', new Date().toISOString()).run();
 
   // CSAM: do not wait for review — pause + block immediately.
   if (category === 'csam') {
@@ -104,13 +123,13 @@ export async function handleAbuseReport(request: Request, env: Env, artifactId: 
     await setArtifactModeration(env, artifactId, 'block', 'CSAM report — auto-blocked pending review');
     createLogger(env, { scope: 'moderation' }).error('CSAM report — artifact auto-paused + blocked', { artifact_id: artifactId });
   } else {
-    // Auto-block once enough DISTINCT IPs have reported it.
-    const distinct = await env.DB.prepare(
-      'SELECT COUNT(DISTINCT reporter_ip) AS n FROM abuse_reports WHERE artifact_id = ? AND created_at >= ?'
-    ).bind(artifactId, new Date(Date.now() - AUTO_BLOCK_WINDOW_MS).toISOString()).first<{ n: number }>();
-    if ((distinct?.n ?? 0) >= AUTO_BLOCK_DISTINCT_IPS) {
-      await setArtifactModeration(env, artifactId, 'block', `auto-blocked after ${distinct?.n} reports`);
-      createLogger(env, { scope: 'moderation' }).warn('artifact auto-blocked after abuse reports', { artifact_id: artifactId, reports: distinct?.n });
+    const rows = await env.DB.prepare(
+      'SELECT reporter_ip FROM abuse_reports WHERE artifact_id = ? AND created_at >= ?'
+    ).bind(artifactId, new Date(Date.now() - AUTO_BLOCK_WINDOW_MS).toISOString()).all<{ reporter_ip: string | null }>();
+    const reporters = new Set((rows.results || []).filter((r) => r.reporter_ip).map((r) => reporterKey(r.reporter_ip as string))).size;
+    if (reporters >= AUTO_BLOCK_DISTINCT_REPORTERS) {
+      await setArtifactModeration(env, artifactId, 'block', `auto-blocked after ${reporters} reporters`);
+      createLogger(env, { scope: 'moderation' }).warn('artifact auto-blocked after abuse reports', { artifact_id: artifactId, reporters });
     }
   }
 

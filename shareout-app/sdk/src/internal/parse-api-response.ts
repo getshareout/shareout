@@ -1,4 +1,4 @@
-import { ShareOutError } from '../shareout-error';
+import { ConsentRequiredError, ShareOutError } from '../shareout-error';
 import type { DataResponse } from '../types/common';
 
 type ApiBody = DataResponse<unknown> & {
@@ -8,6 +8,7 @@ type ApiBody = DataResponse<unknown> & {
   suggestion?: string;
   param?: string;
   docs?: string;
+  consent_url?: string;
 };
 
 function nonJsonError(response: Response): ShareOutError {
@@ -26,6 +27,9 @@ function nonJsonError(response: Response): ShareOutError {
 }
 
 function apiError(response: Response, body: ApiBody): ShareOutError {
+  if (body.code === 'CONSENT_REQUIRED' && body.consent_url) {
+    return new ConsentRequiredError(body.error || 'Consent required', response.status, body.consent_url, body.hint);
+  }
   return new ShareOutError(
     body.error || 'Unknown error',
     body.code || (response.status >= 500 ? 'INTERNAL_ERROR' : 'UNKNOWN'),

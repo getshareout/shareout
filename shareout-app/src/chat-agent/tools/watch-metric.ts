@@ -1,5 +1,5 @@
 import type { AccountTool } from './types';
-import { createWatch } from '../../metric-watch/watches';
+import type { ActionProposal } from './actions';
 
 /** "Watch revenue on this dashboard" → a zero-config anomaly watch. */
 export const watchMetricTool: AccountTool = {
@@ -20,8 +20,10 @@ export const watchMetricTool: AccountTool = {
   async execute(ctx, input) {
     const artifactId = typeof input.artifact_id === 'string' ? input.artifact_id.trim() : '';
     if (!artifactId) return { error: 'Tell me which artifact to watch (artifact_id).' };
-    const result = await createWatch(ctx.env, ctx.userId, artifactId, input);
-    if (result.error) return { error: result.error };
-    return { ok: true, watch: result.watch };
+    const { artifact_id: _id, ...spec } = input;
+    const row = await ctx.env.DB.prepare('SELECT name FROM artifacts WHERE id = ?').bind(artifactId).first<{ name: string }>();
+    if (!row) return { error: 'Artifact not found' };
+    const proposal: ActionProposal = { __propose: { kind: 'watch_metric', artifactId, artifactName: row.name?.trim() || 'page', spec } };
+    return proposal;
   },
 };

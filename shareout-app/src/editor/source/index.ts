@@ -9,6 +9,7 @@ import { generateSourceEditorPage, type SourceEditableType } from './page';
 import { shouldBlockPublish, runPostPublishTests } from '../../tests/block-gate';
 import { normalizeVersionMessage, scheduleVersionSummary } from '../../artifacts/version-summary';
 import { carriedManifestJson } from '../../mcp-broker/capabilities';
+import { enforcePublishGates } from '../draft';
 
 export const SOURCE_EDITABLE_TYPES: ReadonlySet<ArtifactType> = new Set<ArtifactType>([
   'markdown',
@@ -132,8 +133,8 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
     }
 
     const artifact = await env.DB.prepare(
-      `SELECT id, name, slug, workspace_id, artifact_type, type_metadata FROM artifacts WHERE id = ?`
-    ).bind(artifactId).first<{ id: string; name: string; slug: string; workspace_id: string | null; artifact_type: ArtifactType; type_metadata: string | null }>();
+      `SELECT id, name, slug, owner_id, visibility, workspace_id, artifact_type, type_metadata FROM artifacts WHERE id = ?`
+    ).bind(artifactId).first<{ id: string; name: string; slug: string; owner_id: string | null; visibility: string | null; workspace_id: string | null; artifact_type: ArtifactType; type_metadata: string | null }>();
 
     if (!artifact) {
       return errorResponse('ARTIFACT_NOT_FOUND', 'Artifact not found', 404);
@@ -146,6 +147,9 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
         return errorResponse('VALIDATION_ERROR', 'content is not valid JSON', 400);
       }
     }
+
+    const gated = await enforcePublishGates(ctx, artifact, body.content);
+    if (gated) return gated;
 
     // Artifact Tests BLOCK gate (see specs §3, §11): stage as a candidate when tests
     // block and a passing baseline exists; otherwise publish live. Never goes dark.

@@ -105,6 +105,14 @@ export async function handleBlobs(
   ctx: DataContext,
   path: string
 ): Promise<Response> {
+  if (ctx.viewerScope) {
+    return errorResponse({
+      ...DATA_ERRORS.FORBIDDEN,
+      hint: 'This artifact has a row-level access policy; blobs are restricted to owners/editors.',
+      suggestion: 'Store per-viewer data in sdk.table(), which is filtered by the access policy.',
+    }, ctx.origin);
+  }
+
   const parts = path.split('/').filter(Boolean);
   const [id, action] = parts;
   const method = request.method;

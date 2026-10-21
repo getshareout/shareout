@@ -6,7 +6,7 @@ import { corpusFor } from '../../knowledge/corpus/client';
 import { searchCorpus, visibleSources } from '../../knowledge/corpus/search';
 import { listVisibleEntities, visibleEntity } from '../../knowledge/corpus/graph';
 import { scopedWorkspaceId, selectedWorkspace } from '../scope';
-import { sourceArtifacts } from '../../knowledge/source-links';
+import { readableNodes, sourceArtifacts } from '../../knowledge/source-links';
 
 const MAX_RESULTS = 20;
 const SEMANTIC_TOPK = 15;
@@ -129,7 +129,7 @@ export const knowledgeSearchTool: AccountTool = {
       : [];
     const kind = typeof input.kind === 'string' ? input.kind : undefined;
 
-    const { nodes } = await loadKnowledge(ctx.env, wsId);
+    const nodes = await readableNodes(ctx.env, wsId, ctx.userId, (await loadKnowledge(ctx.env, wsId)).nodes);
     const byPath = new Map(nodes.map(n => [n.path, n]));
 
     let results: KnowledgeNode[];
@@ -183,7 +183,7 @@ export const knowledgeGetTool: AccountTool = {
         : '';
     if (!key) return { error: 'Tell me which node to read (path or id).' };
 
-    const { nodes } = await loadKnowledge(ctx.env, wsId);
+    const nodes = await readableNodes(ctx.env, wsId, ctx.userId, (await loadKnowledge(ctx.env, wsId)).nodes);
     const node = nodes.find(n => n.path === key || n.id === key);
     if (!node) return { error: `Nothing learned under “${key}” yet.` };
     return {

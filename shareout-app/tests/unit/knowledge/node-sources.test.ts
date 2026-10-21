@@ -76,17 +76,18 @@ describe('knowledge node sources', () => {
     expect(node.source_artifacts).toEqual([{ id: 'art_one', slug: 'weekly-report', title: 'Weekly report', url: `${getPlatformOrigin(e)}/a/weekly-report/`, available: true }]);
   });
 
-  it("does not leak the title of someone else's private artifact", async () => {
+  it("hides a note learned from someone else's private artifact, keeps own private sources named", async () => {
     await addArtifact('art_mine', { name: 'My private notes', slug: 'my-notes', visibility: 'private', owner: 'u1' });
     await addArtifact('art_theirs', { name: 'Secret plan', slug: 'secret-plan', visibility: 'private', owner: 'u2' });
-    await upsertKnowledgeFile(e, WS, { path: 'topics/retention.md', content: nodeWith(['art_mine', 'art_theirs']) });
-    const node = await getNode();
-    expect(node.source_artifacts).toEqual([
+    await upsertKnowledgeFile(e, WS, { path: 'topics/retention.md', content: nodeWith(['art_mine']) });
+    expect((await getNode()).source_artifacts).toEqual([
       { id: 'art_mine', slug: 'my-notes', title: 'My private notes', url: `${getPlatformOrigin(e)}/a/my-notes/`, available: true },
-      { id: 'art_theirs', slug: null, title: null, url: null, available: false },
     ]);
-    expect(JSON.stringify(node)).not.toContain('Secret plan');
-    expect(JSON.stringify(node)).not.toContain('secret-plan');
+    await upsertKnowledgeFile(e, WS, { path: 'topics/retention.md', content: nodeWith(['art_mine', 'art_theirs']) });
+    const res = await routeKnowledgeApi(createFetchContext(
+      new Request(`https://shareout.site/v1/workspaces/${WS}/knowledge/files/topics/retention.md`, { headers: { Cookie: 'shareout_session=x' } }), e, execCtx,
+    ));
+    expect(res?.status).toBe(404);
   });
 
   it('marks deleted, missing and other-workspace artifacts unavailable', async () => {

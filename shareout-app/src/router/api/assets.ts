@@ -151,6 +151,14 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
       if (!FILE_VISIBILITIES.includes(b.visibility)) return json({ error: VISIBILITY_ERROR }, 400);
       fields.visibility = b.visibility;
     }
+    if (b.folderId) {
+      const folder = await env.DB.prepare(
+        bucket.workspace_id
+          ? 'SELECT 1 AS n FROM folders WHERE id = ? AND workspace_id = ?'
+          : 'SELECT 1 AS n FROM folders WHERE id = ? AND workspace_id IS NULL AND owner_id = ?',
+      ).bind(b.folderId, bucket.workspace_id ?? user.id).first();
+      if (!folder) return json({ error: 'folder not found' }, 400);
+    }
     if (b.folderId !== undefined) fields.folderId = b.folderId || null;
     const ok = await setDeliverableFields(env, bucket.id, dm[1], fields);
     return ok ? json({ ok: true }) : json({ error: 'file not found' }, 404);

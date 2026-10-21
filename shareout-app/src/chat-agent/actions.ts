@@ -5,6 +5,8 @@ import { updateJob, deleteJob, createJob } from '../scheduling/jobs/crud';
 import { addCollaboratorEmails } from '../artifacts/collaborators';
 import { runCrewForArtifact } from '../crew/dispatch';
 import { publishEdits } from '../data/agent/headless-edit';
+import { createWatch } from '../metric-watch/watches';
+import { presentArtifact } from '../present/present-artifact';
 import { botInsertRows, botUpdateRowById, botUpdateRowsByFilter } from '../data/tables/bot';
 import { botSetJson } from '../data/json-store';
 import { buildBotDataContext } from './data-write';
@@ -31,7 +33,7 @@ export type PendingAction =
   | { kind: 'job_pause' | 'job_resume' | 'job_delete'; jobId: string; label: string }
   | { kind: 'share'; artifactId: string; artifactName: string; emails: string[]; role: 'viewer' | 'editor' }
   | { kind: 'crew'; artifactId: string; artifactName: string; instruction: string }
-  | { kind: 'edit_publish'; artifactId: string; artifactName: string; conversationId: string; summary: string; files: string[]; diff?: string[] }
+  | { kind: 'edit_publish'; artifactId: string; artifactName: string; conversationId: string; stagedHash: string; summary: string; files: string[]; diff?: string[] }
   | { kind: 'data_table_insert'; artifactId: string; artifactName: string; table: string; row: Record<string, unknown> }
   | { kind: 'data_table_update'; artifactId: string; artifactName: string; table: string; rowId?: string; filter?: Record<string, unknown>; changes: Record<string, unknown> }
   | { kind: 'data_json_set'; artifactId: string; artifactName: string; key: string; value: unknown; exists: boolean }
@@ -43,6 +45,8 @@ export type PendingAction =
   | { kind: 'version_approve'; artifactId: string; artifactName: string; versionNo: number | null; approved: boolean }
   | { kind: 'comment_resolve'; artifactId: string; artifactName: string; commentId: string; excerpt: string; resolved: boolean }
   | { kind: 'comment_assign'; artifactId: string; artifactName: string; commentId: string; excerpt: string; assignee: string | null }
+  | { kind: 'watch_metric'; artifactId: string; artifactName: string; spec: Record<string, unknown> }
+  | { kind: 'present_artifact'; artifactId: string; artifactName: string }
   | { kind: 'client_notes'; workspaceId: string; clientId: string; clientName: string; note: string; content: string };
 
 // Staged-edit diff for plain-text prompts, trimmed so it can't blow past Telegram's message limit.
@@ -108,6 +112,8 @@ export function describeActionRich(a: PendingAction, locale: Locale = 'en'): Act
     case 'version_approve': return { kind: a.kind, title: a.approved ? 'Approve version' : 'Withdraw approval', subject: a.artifactName, detail: a.versionNo ? `Version ${a.versionNo}` : 'The live version' };
     case 'comment_resolve': return { kind: a.kind, title: a.resolved ? 'Resolve comment' : 'Reopen comment', subject: a.artifactName, detail: a.excerpt };
     case 'comment_assign': return { kind: a.kind, title: a.assignee ? `Assign comment to ${a.assignee}` : 'Unassign comment', subject: a.artifactName, detail: a.excerpt };
+    case 'watch_metric': return { kind: a.kind, title: 'Watch a metric', subject: a.artifactName, lines: kv(a.spec) };
+    case 'present_artifact': return { kind: a.kind, title: 'Make a deck', subject: a.artifactName, detail: 'Generates a private slides artifact from this page with AI.' };
     case 'client_notes': return { kind: a.kind, title: `Save notes on ${a.clientName}`, subject: a.note, detail: 'Replaces the file. Every workspace member’s assistant reads these notes.', lines: [a.content.slice(0, 300) + (a.content.length > 300 ? '…' : '')] };
   }
 }
@@ -144,6 +150,8 @@ function describeActionRichEs(a: PendingAction): ActionCard {
     case 'version_approve': return { kind: a.kind, title: a.approved ? 'Aprobar versión' : 'Retirar aprobación', subject: a.artifactName, detail: a.versionNo ? `Versión ${a.versionNo}` : 'La versión publicada' };
     case 'comment_resolve': return { kind: a.kind, title: a.resolved ? 'Resolver comentario' : 'Reabrir comentario', subject: a.artifactName, detail: a.excerpt };
     case 'comment_assign': return { kind: a.kind, title: a.assignee ? `Asignar comentario a ${a.assignee}` : 'Quitar la asignación', subject: a.artifactName, detail: a.excerpt };
+    case 'watch_metric': return { kind: a.kind, title: 'Vigilar una métrica', subject: a.artifactName, lines: kv(a.spec) };
+    case 'present_artifact': return { kind: a.kind, title: 'Armar una presentación', subject: a.artifactName, detail: 'Genera con IA una presentación privada a partir de este artefacto.' };
     case 'client_notes': return { kind: a.kind, title: `Guardar notas sobre ${a.clientName}`, subject: a.note, detail: 'Reemplaza el archivo. El asistente de todos los miembros del espacio lee estas notas.', lines: [a.content.slice(0, 300) + (a.content.length > 300 ? '…' : '')] };
   }
 }
@@ -184,6 +192,8 @@ function describeActionEs(a: PendingAction): string {
       return `¿${a.resolved ? 'Resuelvo' : 'Reabro'} este comentario en “${a.artifactName}”?\n\n“${a.excerpt}”`;
     case 'comment_assign':
       return `¿${a.assignee ? `Le asigno a ${a.assignee}` : 'Le quito la asignación a'} este comentario en “${a.artifactName}”?\n\n“${a.excerpt}”`;
+    case 'watch_metric': return `¿Vigilo esta métrica en “${a.artifactName}”?\n\n${preview(a.spec)}`;
+    case 'present_artifact': return `¿Genero con IA una presentación privada a partir de “${a.artifactName}”?`;
     case 'client_notes':
       return `¿Guardo estas notas de “${a.note}” sobre ${a.clientName}? Reemplazan el archivo y las lee el asistente de todo el espacio.\n\n${a.content.slice(0, 600)}${a.content.length > 600 ? '…' : ''}`;
   }
@@ -280,6 +290,8 @@ export function describeAction(a: PendingAction, locale: Locale = 'en'): string 
       return `${a.resolved ? 'Resolve' : 'Reopen'} this comment on “${a.artifactName}”?\n\n“${a.excerpt}”`;
     case 'comment_assign':
       return `${a.assignee ? `Assign this comment to ${a.assignee}` : 'Unassign this comment'} on “${a.artifactName}”?\n\n“${a.excerpt}”`;
+    case 'watch_metric': return `Watch this metric on “${a.artifactName}”?\n\n${preview(a.spec)}`;
+    case 'present_artifact': return `Generate a private slides deck from “${a.artifactName}” with AI?`;
     case 'client_notes':
       return `Save these notes (“${a.note}”) on ${a.clientName}? They replace the file and every workspace member’s assistant reads them.\n\n${a.content.slice(0, 600)}${a.content.length > 600 ? '…' : ''}`;
   }
@@ -322,10 +334,18 @@ export async function executeAction(env: Env, userId: string, a: PendingAction):
       const res = await runCrewForArtifact(env, a.artifactId, a.instruction, userId);
       return res.ok ? (res.resultText || 'The crew finished, but didn’t leave a summary.') : res.error;
     }
+    case 'watch_metric': {
+      const r = await createWatch(env, userId, a.artifactId, a.spec);
+      return r.error ? `Couldn’t set that watch: ${r.error}` : 'Done — watching that metric.';
+    }
+    case 'present_artifact': {
+      const r = await presentArtifact(env, userId, a.artifactId);
+      return r.ok ? `Done — your deck: ${r.url}` : `Couldn’t make the deck: ${r.error}`;
+    }
     case 'edit_publish': {
       const access = await resolveArtifactAccessForUser(env, a.artifactId, userId);
       if (!access || (access.role !== 'owner' && access.role !== 'editor')) return 'Only the owner or an editor can publish changes.';
-      const res = await publishEdits(env, a.artifactId, a.conversationId);
+      const res = await publishEdits(env, a.artifactId, a.conversationId, a.stagedHash, userId);
       if (!res.ok) return `Couldn’t publish that: ${res.error}`;
       return res.url ? `Published ✅ ${res.url}` : 'Published ✅';
     }

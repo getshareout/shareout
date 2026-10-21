@@ -35,7 +35,7 @@ export function renderEditorShell({ slug }: EditorShellOptions): string {
     <div class="canvas" id="canvas">
       <iframe
         id="canvas-frame"
-        sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
+        sandbox="allow-same-origin allow-scripts allow-popups"
         title="Editor Canvas"
       ></iframe>
       <div class="canvas-loading" id="canvas-loading">

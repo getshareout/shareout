@@ -12,7 +12,7 @@ import { getAIProvider } from '../../data/agent/anthropic';
 import { corpusFor } from '../../knowledge/corpus/client';
 import { startIngest } from '../../knowledge/corpus/ingest';
 import { searchCorpus, searchResultMarkdown, visibleSources } from '../../knowledge/corpus/search';
-import { notesFromArtifact, sourceArtifacts } from '../../knowledge/source-links';
+import { notesFromArtifact, readableNodes, sourceArtifacts } from '../../knowledge/source-links';
 import { knowledgeUsage } from '../../knowledge/corpus/usage';
 import { corpusStatus, reindexWorkspace, REINDEX_MAX } from '../../knowledge/corpus/reindex';
 import { isPlatformAdmin } from '../../superadmin/auth';
@@ -285,8 +285,7 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
     const files = await listKnowledgeFiles(ctx.env, workspaceId);
     const file = files.find(f => f.path === target);
     if (!file) return cors(jsonError('Not found', 'NOT_FOUND', 404));
-    const { nodes } = parseKnowledge([file]);
-    const node = nodes[0];
+    const node = (await readableNodes(ctx.env, workspaceId, auth.id, parseKnowledge([file]).nodes))[0];
     if (!node) return cors(jsonError('Not found', 'NOT_FOUND', 404));
     return cors(
       jsonResponse({
@@ -375,7 +374,9 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
 
   const files = await listKnowledgeFiles(ctx.env, workspaceId);
   const metaByPath = new Map(files.map(f => [f.path, f]));
-  const { nodes, issues } = parseKnowledge(files);
+  const parsed = parseKnowledge(files);
+  const { issues } = parsed;
+  const nodes = await readableNodes(ctx.env, workspaceId, auth.id, parsed.nodes);
   const lastUpdated = files.reduce<string | null>(
     (max, f) => (!max || f.updatedAt > max ? f.updatedAt : max),
     null

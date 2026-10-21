@@ -1,5 +1,5 @@
 import type { DataContext } from '../middleware';
-import { errorResponse, successResponse } from '../middleware';
+import { errorResponse, resolveRequesterUserId, successResponse } from '../middleware';
 import { DATA_ERRORS } from '../../types';
 import type { AdminChatRequest, ApplyEditsRequest, EditSuggestion, PendingEdit } from './types';
 import { streamChat } from './anthropic';
@@ -428,7 +428,8 @@ export type PublishResult =
 export async function publishConversation(
   ctx: DataContext,
   conversationId: string,
-  commitMessage?: string
+  commitMessage?: string,
+  publishedBy?: string | null
 ): Promise<PublishResult> {
   const pendingEdits = await ctx.env.DB.prepare(`
     SELECT * FROM artifact_pending_edits
@@ -447,11 +448,11 @@ export async function publishConversation(
   }
 
   const latestVersion = await ctx.env.DB.prepare(`
-    SELECT id, version_no FROM versions
+    SELECT id, version_no, entrypoint, mobile_entrypoint, manifest_json FROM versions
     WHERE artifact_id = ?
     ORDER BY version_no DESC
     LIMIT 1
-  `).bind(ctx.artifactId).first<{ id: string; version_no: number }>();
+  `).bind(ctx.artifactId).first<{ id: string; version_no: number; entrypoint: string; mobile_entrypoint: string | null; manifest_json: string | null }>();
 
   if (!latestVersion) {
     return { ok: false, error: 'No versions found' };
@@ -470,12 +471,16 @@ export async function publishConversation(
   const newVersionNo = latestVersion.version_no + 1;
 
   await ctx.env.DB.prepare(`
-    INSERT INTO versions (id, artifact_id, version_no, message, created_at)
-    VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    INSERT INTO versions (id, artifact_id, version_no, entrypoint, mobile_entrypoint, manifest_json, created_by, message, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
   `).bind(
     newVersionId,
     ctx.artifactId,
     newVersionNo,
+    latestVersion.entrypoint,
+    latestVersion.mobile_entrypoint,
+    latestVersion.manifest_json,
+    publishedBy ?? null,
     commitMessage || `AI-assisted edit from conversation ${conversationId}`
   ).run();
 
@@ -558,7 +563,7 @@ export async function handlePublish(
     return errorResponse({ ...DATA_ERRORS.INVALID_REQUEST, message: 'conversationId is required' }, ctx.origin);
   }
 
-  const result = await publishConversation(ctx, body.conversationId, body.commitMessage);
+  const result = await publishConversation(ctx, body.conversationId, body.commitMessage, await resolveRequesterUserId(request, ctx));
   if (!result.ok) {
     return errorResponse({ ...DATA_ERRORS.NOT_FOUND, message: result.error }, ctx.origin);
   }

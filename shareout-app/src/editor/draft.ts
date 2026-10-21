@@ -8,6 +8,40 @@ import { invalidateDeploymentCache } from '../serve/deployment-cache';
 import { shouldBlockPublish, runPostPublishTests } from '../tests/block-gate';
 import { normalizeVersionMessage, scheduleVersionSummary } from '../artifacts/version-summary';
 import { carriedManifestJson } from '../mcp-broker/capabilities';
+import { runPublishModeration } from '../publish/moderation';
+import { applyWorkspaceVisibilityPolicy } from '../publish/type-metadata';
+import type { ExistingArtifactRow } from '../publish/types';
+import { storageLimitExceededResponse } from '../publish/limits';
+import { checkStorageQuota } from '../quota';
+
+/** The checks the canonical publish path applies to new content: owner storage cap,
+ *  workspace approval policy, and the safety classifier for public pages. */
+export async function enforcePublishGates(
+  ctx: EditorContext,
+  artifact: { id: string; slug: string; owner_id?: string | null; workspace_id: string | null; visibility?: string | null },
+  content: string,
+): Promise<Response | null> {
+  const { env } = ctx;
+  if (artifact.owner_id) {
+    const quota = await checkStorageQuota(env, artifact.owner_id, [{ path: 'index', content, mime: 'text/plain' }]);
+    if (!quota.allowed) return storageLimitExceededResponse(quota);
+  }
+  if (artifact.visibility !== 'public') return null;
+
+  const { effectiveVisibility } = await applyWorkspaceVisibilityPolicy(
+    env, 'public', artifact.workspace_id, { id: artifact.id } as ExistingArtifactRow, null,
+    { path: 'index', content, mime: 'text/plain' },
+  );
+  if (effectiveVisibility !== 'public') {
+    await env.DB.prepare('UPDATE artifacts SET visibility = ? WHERE id = ?').bind(effectiveVisibility, artifact.id).run();
+  }
+  const executionCtx = ctx.waitUntil ? ({ waitUntil: ctx.waitUntil } as ExecutionContext) : undefined;
+  const moderation = await runPublishModeration(env, artifact.id, content, effectiveVisibility, executionCtx);
+  if (effectiveVisibility !== 'public' || moderation.forcedPrivate) {
+    await invalidateDeploymentCache(env, artifact.slug, artifact.id);
+  }
+  return null;
+}
 
 export async function handleDraft(
   request: Request,
@@ -204,11 +238,11 @@ export async function handlePublish(
     // /a/<slug> + caches and may be suffixed if the human slug collides across
     // workspaces — fall back to the human slug only if no deployment exists yet.
     const artifact = await env.DB.prepare(`
-      SELECT a.id, a.name, a.workspace_id, a.artifact_type, COALESCE(d.slug, a.slug) AS slug
+      SELECT a.id, a.name, a.owner_id, a.visibility, a.workspace_id, a.artifact_type, COALESCE(d.slug, a.slug) AS slug
       FROM artifacts a
       LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
       WHERE a.id = ?
-    `).bind(artifactId).first<{ id: string; name: string; workspace_id: string | null; artifact_type?: string | null; slug: string }>();
+    `).bind(artifactId).first<{ id: string; name: string; owner_id?: string | null; visibility?: string | null; workspace_id: string | null; artifact_type?: string | null; slug: string }>();
 
     if (!artifact) {
       return errorResponse('ARTIFACT_NOT_FOUND', 'Artifact not found', 404);
@@ -218,6 +252,9 @@ export async function handlePublish(
     if ((artifact.artifact_type || 'html') !== 'html') {
       return errorResponse('NOT_HTML_ARTIFACT', 'Only HTML artifacts publish through this endpoint.', 409);
     }
+
+    const gated = await enforcePublishGates(ctx, artifact, body.html);
+    if (gated) return gated;
 
     // Artifact Tests BLOCK gate: when tests are set to block and a passing baseline
     // exists, stage this version on the 'candidate' channel and keep serving the live

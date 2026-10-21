@@ -1,6 +1,7 @@
 import type { AccountTool } from './types';
 import { PERSONAL_SCOPE } from '../../chat-platforms/types';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
+import { checkReportProblemLimit } from '../../rate-limit';
 import { openTicket } from '../../support/intake';
 import { TICKET_CATEGORIES, TICKET_SEVERITIES, type TicketCategory, type TicketSeverity } from '../../support/store';
 
@@ -32,6 +33,8 @@ export const reportProblemTool: AccountTool = {
     const summary = str(input.summary, 300);
     const details = str(input.details, 8000);
     if (!summary || !details) return { error: 'summary and details are required.' };
+    const limit = await checkReportProblemLimit(ctx.env, ctx.userId);
+    if (!limit.allowed) return { error: 'You’ve opened several support tickets recently — the team already has them. Try again later.' };
     const ws = ctx.selectedWorkspaceId && ctx.selectedWorkspaceId !== PERSONAL_SCOPE ? ctx.selectedWorkspaceId : null;
     const workspaceId = ws && (await getInternalWorkspaceRole(ctx.env, ws, ctx.userId)) ? ws : null;
     const category = TICKET_CATEGORIES.includes(input.category as TicketCategory) ? (input.category as TicketCategory) : 'bug';

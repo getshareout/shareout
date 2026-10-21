@@ -111,12 +111,12 @@ describe('knowledge_get tool', () => {
     expect(r.node.sources).toEqual([{ id: 'doc1', slug: 'weekly-report', title: 'Weekly report', url: `${getPlatformOrigin(e)}/a/weekly-report/`, available: true }]);
   });
 
-  it("does not name someone else's private source", async () => {
+  it("hides a note learned from someone else's private source", async () => {
     await seed();
     await e.DB.prepare('INSERT INTO artifacts (id, name, slug, owner_id, visibility, workspace_id) VALUES (?, ?, ?, ?, ?, ?)')
       .bind('doc1', 'Secret plan', 'secret-plan', 'u2', 'private', WS).run();
-    const r = (await knowledgeGetTool.execute(ctx(WS), { path: 'artifacts/doc1.md' })) as { node: { sources: unknown[] } };
-    expect(r.node.sources).toEqual([{ id: 'doc1', slug: null, title: null, url: null, available: false }]);
+    const r = await knowledgeGetTool.execute(ctx(WS), { path: 'artifacts/doc1.md' });
+    expect(r).toHaveProperty('error');
     expect(JSON.stringify(r)).not.toContain('Secret plan');
   });
 

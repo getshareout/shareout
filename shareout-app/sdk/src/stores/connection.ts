@@ -1,4 +1,5 @@
 import type { SdkClient } from '../core/sdk-client';
+import { withConsentBanner } from '../internal/consent-banner';
 
 export interface QueryOptions {
   cache?: boolean;
@@ -34,13 +35,13 @@ export class Connection {
     query: string | Record<string, unknown>,
     options?: QueryOptions
   ): Promise<QueryResult<T>> {
-    return this.sdk._internalFetch<QueryResult<T>>(
+    return withConsentBanner(this.name, () => this.sdk._internalFetch<QueryResult<T>>(
       `/connections/${encodeURIComponent(this.name)}/query`,
       {
         method: 'POST',
         body: JSON.stringify({ query, options }),
       }
-    );
+    ));
   }
 
   async fetch<T = unknown>(
@@ -84,7 +85,7 @@ export class Connection {
         throw new Error('`to` json target must be "json:key" or "json:key.path"');
       }
     }
-    return this.sdk._internalFetch<MaterializeResult>(
+    return withConsentBanner(this.name, () => this.sdk._internalFetch<MaterializeResult>(
       `/connections/${encodeURIComponent(this.name)}/materialize`,
       {
         method: 'POST',
@@ -97,7 +98,7 @@ export class Connection {
           options: params.options,
         }),
       }
-    );
+    ));
   }
 }
 

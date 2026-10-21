@@ -171,14 +171,14 @@ describe('executeAction edit_publish', () => {
   it('publishes the staged conversation for an editor and returns the URL', async () => {
     resolveArtifactAccessForUser.mockResolvedValue({ role: 'editor' });
     publishEdits.mockResolvedValue({ ok: true, url: 'https://shareout.site/a/page' });
-    const out = await executeAction(env, 'user_1', { kind: 'edit_publish', artifactId: 'a1', artifactName: 'P', conversationId: 'conv_1', summary: 's', files: ['index.html'] });
-    expect(publishEdits).toHaveBeenCalledWith(env, 'a1', 'conv_1');
+    const out = await executeAction(env, 'user_1', { kind: 'edit_publish', artifactId: 'a1', artifactName: 'P', conversationId: 'conv_1', stagedHash: 'h1', summary: 's', files: ['index.html'] });
+    expect(publishEdits).toHaveBeenCalledWith(env, 'a1', 'conv_1', 'h1', 'user_1');
     expect(out).toMatch(/Published .*shareout.site\/a\/page/);
   });
 
   it('refuses to publish for a viewer', async () => {
     resolveArtifactAccessForUser.mockResolvedValue({ role: 'viewer' });
-    const out = await executeAction(env, 'user_1', { kind: 'edit_publish', artifactId: 'a1', artifactName: 'P', conversationId: 'conv_1', summary: 's', files: [] });
+    const out = await executeAction(env, 'user_1', { kind: 'edit_publish', artifactId: 'a1', artifactName: 'P', conversationId: 'conv_1', stagedHash: 'h1', summary: 's', files: [] });
     expect(out).toMatch(/owner or an editor/i);
     expect(publishEdits).not.toHaveBeenCalled();
   });

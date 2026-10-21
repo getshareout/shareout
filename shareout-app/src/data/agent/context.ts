@@ -17,7 +17,7 @@ export async function buildVisitorContext(
   };
 
   // JSON + tables live in the per-artifact minidb (ctx.db), not D1.
-  // Row-scoped viewers get neither: the JSON store is owner/editor-only and table samples are unfiltered.
+  // Row-scoped viewers get none: the JSON store and blobs are owner/editor-only and table samples are unfiltered.
   const scoped = !!ctx.viewerScope;
   if (config.visitor_context_json && !scoped) {
     const jsonRows = await db.prepare(`
@@ -48,7 +48,7 @@ export async function buildVisitorContext(
   }
 
   // Blob metadata lives in D1 (`blobs` table).
-  if (config.visitor_context_blobs) {
+  if (config.visitor_context_blobs && !scoped) {
     const blobs = await env.DB.prepare(`
       SELECT id, filename FROM blobs
       WHERE artifact_id = ?

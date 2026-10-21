@@ -1,3 +1,4 @@
+import { stripCanvasCsp } from '../canvas/canvas-csp';
 /** Stable identity for canvas elements (collab locks, undo selection restore). */
 export const EDITOR_ID_ATTR = 'data-editor-id';
 
@@ -79,6 +80,7 @@ export function stripEditorAttributes(html: string): string {
     for (const attr of EDITOR_ONLY_ATTRS) {
       parsed.querySelectorAll(`[${attr}]`).forEach((el) => el.removeAttribute(attr));
     }
+    stripCanvasCsp(parsed);
     const prefix = /^\s*<!doctype/i.test(html) ? '<!DOCTYPE html>' : '';
     return prefix + parsed.documentElement.outerHTML;
   } catch {

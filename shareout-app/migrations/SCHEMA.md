@@ -207,6 +207,7 @@ here would silently drop artifacts from listings.
 | `template_versions` | *(0022)* Immutable versions: `version_label` (semver), `manifest_json` (items, folder tree, table/dataset schemas, connector placeholders, setup steps). Files live in R2 under `templates/<id>/<version_no>/…`, already link-tokenized and secret-redacted. Never holds source data, credentials, comments, Knowledge or analytics. |
 | `template_shares` | *(0022)* Extra workspaces a `shared` template reaches. |
 | `template_installs` | *(0022)* Which artifact came from which template item at which `version_no`; `install_group` ties one install together so an update keeps links consistent. Drives "update available". |
+| `connection_consents` | *(0023)* A viewer's approval for one page (`artifact_id`) to run queries with their own per-user credentials on one connector (`connection_id`). Written only through the signed-in viewer's `/consent` endpoint or `/connect-consent` page; no row means `CONSENT_REQUIRED`. |
 
 ## 04 Data connections
 

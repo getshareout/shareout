@@ -20,7 +20,7 @@ import { autoJoinWorkspacesByDomain } from '../workspaces/access-policy';
 import { getPlatformHostname } from '../config/origins';
 import { microsoftTenant } from '../config/auth-providers';
 import { buildSessionCookie, cookieDomainAttr, cookieSecureAttr, isShareoutOrigin } from './cookies';
-import { errorPage } from './pages';
+import { errorPage, safeRedirect } from './pages';
 import { resolveSessionMaxAge } from './session';
 import { upsertMicrosoftUser } from './users';
 import { ssoRequiredFor, ssoStartPath } from './sso-config';
@@ -66,10 +66,6 @@ export function microsoftIssuer(tenant: string): string {
 
 function stateCookie(url: URL, env: Env, value: string, maxAge: number): string {
   return `${STATE_COOKIE}=${value}; Path=/auth/microsoft; HttpOnly;${cookieSecureAttr(url)} SameSite=Lax;${cookieDomainAttr(url.hostname, getPlatformHostname(env))} Max-Age=${maxAge}`;
-}
-
-function safeRedirect(raw: string | null): string {
-  return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/home';
 }
 
 /**

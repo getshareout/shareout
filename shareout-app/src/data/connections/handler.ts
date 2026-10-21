@@ -25,6 +25,7 @@ import {
   deleteConnection,
 } from './crud';
 import { authorizeConnectionAction } from './resolve';
+import { handleConsent, requireConnectionConsent } from './consent';
 import { executeQuery, queryConnectionData } from './query';
 import { materializeConnection } from './materialize';
 import { testConnection } from './test-connection';
@@ -63,21 +64,29 @@ export async function handleConnections(
     return createConnection(request, ctx);
   }
 
+  if (name && action === 'consent') return handleConsent(request, ctx, name);
+
   if (name && action === 'query' && method === 'POST') {
     const denied = await authorizeConnectionAction(request, ctx, name);
     if (denied) return denied;
+    const needsConsent = await requireConnectionConsent(request, ctx, name);
+    if (needsConsent) return needsConsent;
     return executeQuery(request, ctx, name);
   }
 
   if (name && action === 'materialize' && method === 'POST') {
     const denied = await authorizeConnectionAction(request, ctx, name);
     if (denied) return denied;
+    const needsConsent = await requireConnectionConsent(request, ctx, name);
+    if (needsConsent) return needsConsent;
     return materializeConnection(request, ctx, name);
   }
 
   if (name && action === 'test' && method === 'POST') {
     const denied = await authorizeConnectionAction(request, ctx, name);
     if (denied) return denied;
+    const needsConsent = await requireConnectionConsent(request, ctx, name);
+    if (needsConsent) return needsConsent;
     return testConnection(request, ctx, name);
   }
 

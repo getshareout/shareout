@@ -11,6 +11,7 @@ const PREFIX = 'dispatch prefix: the routes under it are checked one by one';
 const OAUTH = 'OAuth / connector callback: state is signed and bound to the signed-in user';
 
 export const OPEN_ROUTES: Record<string, string> = {
+  '/connect-consent': 'connector consent page: renders nothing without a session (sign-in redirect, 400 without params); POST needs a session and a same-origin request',
   // Discovery, docs and static assets
   '/.well-known/agent-skills/index.json': PUBLIC,
   '/.well-known/agent-skills/shareout/SKILL.md': PUBLIC,

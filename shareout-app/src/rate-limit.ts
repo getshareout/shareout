@@ -42,12 +42,14 @@ const RATE_LIMITS = {
   // with a 10-minute life is not.
   passwordLogin: { limit: 20, windowSeconds: 900 },
   artifactGate: { limit: 20, windowSeconds: 900 },
+  artifactGateGlobal: { limit: 200, windowSeconds: 900 },
   // Guest comments (no account): codes per IP on top of the per-address DB caps, and
   // comment ceilings per IP and per verified guest.
   guestCodeStart: { limit: 10, windowSeconds: 3600 },
   guestCodeVerify: { limit: 30, windowSeconds: 3600 },
   guestCommentIp: { limit: 30, windowSeconds: 3600 },
   guestCommentToken: { limit: 20, windowSeconds: 3600 },
+  reportProblem: { limit: 5, windowSeconds: 3600 },
   accessRequest: { limit: 30, windowSeconds: 3600 },
   adminBridgeAsk: { limit: 30, windowSeconds: 3600 },
   // "Ask an admin" from a refused action; per-reason dedupe sits in the handler.
@@ -204,7 +206,13 @@ export async function checkPasswordLoginLimit(env: Env, request: Request): Promi
 }
 
 export async function checkArtifactGateLimit(env: Env, request: Request, artifactId: string): Promise<RateLimitResult> {
-  return checkKVRateLimit(env.RATE_LIMIT_KV, `${artifactId}:${rateLimitClientKey(request)}`, 'artifactGate');
+  const perClient = await checkKVRateLimit(env.RATE_LIMIT_KV, `${artifactId}:${rateLimitClientKey(request)}`, 'artifactGate');
+  if (!perClient.allowed) return perClient;
+  return checkKVRateLimit(env.RATE_LIMIT_KV, artifactId, 'artifactGateGlobal');
+}
+
+export async function checkReportProblemLimit(env: Env, userId: string): Promise<RateLimitResult> {
+  return checkKVRateLimit(env.RATE_LIMIT_KV, userId, 'reportProblem');
 }
 
 export async function checkAccessRequestLimit(env: Env, userId: string): Promise<RateLimitResult> {

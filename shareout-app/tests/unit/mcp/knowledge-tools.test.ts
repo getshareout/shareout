@@ -283,12 +283,9 @@ describe('knowledge_get / knowledge_from_artifact', () => {
     await upsertKnowledgeFile(e, WS_B, { path: 'topics/contoso.md', content: note(['art_kmcp_b']) });
   });
 
-  it('knowledge_get names and links visible sources and hides the rest', async () => {
+  it('knowledge_get hides a note built partly from a private page the person cannot see', async () => {
     const r = await callTool(ana, 'knowledge_get', { path: 'topics/renewals.md', workspace_id: WS_A });
-    expect(r!.isError).toBeUndefined();
-    expect(text(r)).toContain('Acme renews in March.');
-    expect(text(r)).toMatch(/Renewal plan \(https?:\/\/[^)]+\/a\/renewal-plan\/\)/);
-    expect(text(r)).toContain('not visible to the person');
+    expect(text(r)).not.toContain('Acme renews in March.');
     expect(text(r)).not.toContain('Bo private draft');
   });
 

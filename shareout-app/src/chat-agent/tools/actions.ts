@@ -182,6 +182,7 @@ export const editPageTool: AccountTool = {
       artifactId,
       artifactName: await artifactName(ctx.env, artifactId),
       conversationId: res.conversationId,
+      stagedHash: res.stagedHash,
       summary: res.explanation,
       files: res.files,
       diff: res.diff,

@@ -12,6 +12,7 @@ import {
 	verifyProxyToken,
 } from './core/credentials';
 import { PLATFORM_ERRORS } from './types';
+import { validateReadOnlySql } from '../connections/sql-guard';
 import { parseAccessPolicy } from '../access-policy';
 import { findPolicyQuery } from './core/viewer-scope';
 import { createLogger, logError } from '../../logging';
@@ -53,6 +54,14 @@ function scopeRequired(provider: string, endpoint: string) {
 }
 
 const METHOD_NOT_ALLOWED = { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed', status: 405 };
+
+const SQL_PROVIDERS = new Set(['bigquery', 'snowflake', 'aurora', 'redshift', 'supabase']);
+
+function sqlStatementsIn(value: unknown, key = '', depth = 0): string[] {
+	if (typeof value === 'string') return /^(sql|query|statement|body)$/i.test(key) ? [value] : [];
+	if (!value || typeof value !== 'object' || depth > 6) return [];
+	return Object.entries(value as Record<string, unknown>).flatMap(([k, v]) => sqlStatementsIn(v, k, depth + 1));
+}
 
 export async function handlePlatformRequest(
 	request: Request,
@@ -551,6 +560,15 @@ async function handleProviderRequest(
 					return errorResponse({
 						code: 'FORBIDDEN',
 						message: 'You must be a member of this workspace (or the artifact owner) to execute this connection',
+						status: 403,
+					});
+				}
+				const statements = SQL_PROVIDERS.has(providerId) ? sqlStatementsIn(body.params) : [];
+				const unsafe = statements.find((sql) => !validateReadOnlySql(sql).ok);
+				if (unsafe !== undefined) {
+					return errorResponse({
+						code: 'FORBIDDEN',
+						message: "Your own connector credentials can only run a single read-only statement (one SELECT) from someone else's page",
 						status: 403,
 					});
 				}

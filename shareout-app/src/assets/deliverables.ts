@@ -217,8 +217,8 @@ export async function resolveShareLink(env: Env, token: string): Promise<Resolve
   if (link.expires_at && new Date(link.expires_at).getTime() < Date.now()) return null;
 
   const col = await env.DB.prepare(
-    'SELECT name, bucket_artifact_id FROM asset_collections WHERE id = ?',
-  ).bind(link.collection_id).first<{ name: string; bucket_artifact_id: string }>();
+    'SELECT name, bucket_artifact_id, owner_id FROM asset_collections WHERE id = ?',
+  ).bind(link.collection_id).first<{ name: string; bucket_artifact_id: string; owner_id: string | null }>();
   if (!col) return null;
 
   const rows = await env.DB.prepare(`
@@ -226,9 +226,9 @@ export async function resolveShareLink(env: Env, token: string): Promise<Resolve
     FROM asset_collection_items ci
     JOIN asset_deliverables d ON d.id = ci.deliverable_id
     JOIN blobs b ON b.deliverable_id = d.id AND b.version_no = (SELECT MAX(version_no) FROM blobs WHERE deliverable_id = d.id)
-    WHERE ci.collection_id = ?
+    WHERE ci.collection_id = ? AND d.deleted_at IS NULL AND (d.visibility != 'private' OR d.owner_id = ?)
     ORDER BY ci.position
-  `).bind(link.collection_id).all<{ deliverable_name: string; filename: string; mime_type: string; size_bytes: number; version_no: number; blob_id: string }>();
+  `).bind(link.collection_id, col.owner_id ?? '').all<{ deliverable_name: string; filename: string; mime_type: string; size_bytes: number; version_no: number; blob_id: string }>();
 
   return {
     collectionName: col.name,

@@ -49,6 +49,21 @@ describe('f04 artifact password / credentials gate', () => {
     expect((await cred('alice-correct')).status).toBe(429);
   });
 
+  it('blocks: guesses rotating across many IPs hit a per-artifact ceiling', async () => {
+    for (let i = 0; i < 210; i++) await pw(`wrong-${i}`, `10.1.${Math.floor(i / 250)}.${i % 250}`);
+    const res = await pw('hunter2-correct', '198.51.100.77');
+    expect(res.status).toBe(429);
+    expect(res.headers.get('Set-Cookie')).toBeNull();
+  });
+
+  it('the ceiling is per artifact', async () => {
+    for (let i = 0; i < 210; i++) await pw(`wrong-${i}`, `10.1.${Math.floor(i / 250)}.${i % 250}`);
+    await e.DB.prepare("INSERT INTO artifacts (id, name, slug, owner_id, visibility, auth_method, password_hash) VALUES ('art_f04b', 'B', 'f04b', 'usr_f04', 'private', 'password', ?)").bind(await sha('other')).run();
+    const res = await handlePasswordAuth(form({ slug: 'f04b', artifact_id: 'art_f04b', password: 'other' }, '198.51.100.78'), e);
+    expect(res.status).toBe(302);
+    await e.DB.prepare("DELETE FROM artifacts WHERE id='art_f04b'").run();
+  });
+
   it('throttle is per client and artifact, not global', async () => {
     for (let i = 0; i < 60; i++) await pw(`wrong-${i}`);
     expect((await pw('hunter2-correct', '198.51.100.9')).status).toBe(302);

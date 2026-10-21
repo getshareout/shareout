@@ -15,14 +15,15 @@ import { handleAbuseReport } from '../../../src/moderation/abuse-reports';
 // DB mock: artifact exists; distinct-IP COUNT is configurable.
 function makeEnv(distinctCount = 1, locale: string | null = null, visibility = 'public'): Env {
   return {
+    RATE_LIMIT_KV: { get: async () => null, put: async () => undefined },
     DB: {
       prepare: (sql: string) => ({
         bind: () => ({
           first: async () => {
-            if (sql.includes('COUNT(DISTINCT reporter_ip)')) return { n: distinctCount };
             if (sql.includes('FROM artifacts a')) return { id: 'art_1', locale, visibility };
             return null;
           },
+          all: async () => ({ results: Array.from({ length: distinctCount }, (_, i) => ({ reporter_ip: `198.51.${i}.1` })) }),
           run: async () => ({ success: true }),
         }),
       }),

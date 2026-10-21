@@ -15,7 +15,8 @@ import {
   resolveGenericConnection,
   resolveConnectionCredentials,
 } from './resolve';
-import { staticHeaders } from './rest-query';
+import { fetchCheckingRedirects } from '../secrets/blocklist';
+import { staticHeaders, validateRestBaseUrl } from './rest-query';
 import { CONNECTION_TIMEOUT_MS } from './types';
 
 export async function testConnection(
@@ -49,6 +50,9 @@ export async function testConnection(
       }
 
       const testUrl = config.healthEndpoint ? `${baseUrl}${config.healthEndpoint}` : baseUrl;
+      const blockReason = validateRestBaseUrl(baseUrl)
+        ?? (new URL(testUrl).origin !== new URL(baseUrl).origin ? 'healthEndpoint must stay on baseUrl' : null);
+      if (blockReason) return successResponse({ success: false, error: blockReason });
       const headers: Record<string, string> = { ...staticHeaders(config) };
 
       if (credType === 'api_key' && credentials) {
@@ -60,7 +64,10 @@ export async function testConnection(
         headers['Authorization'] = `Basic ${auth}`;
       }
 
-      const response = await fetchWithTimeout(testUrl, { headers, method: 'GET' }, CONNECTION_TIMEOUT_MS);
+      const response = await fetchCheckingRedirects(testUrl, { headers, method: 'GET' }, () => null, {
+        stripCredentialsCrossOrigin: true,
+        fetcher: (u, init) => fetchWithTimeout(u, init, CONNECTION_TIMEOUT_MS),
+      });
 
       return successResponse({
         success: response.ok,

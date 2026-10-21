@@ -15,7 +15,7 @@ import { parseEditSuggestions, applyEditsToPending, publishConversation } from '
 
 export type ProposeEditResult =
   | { ok: false; error: string }
-  | { ok: true; conversationId: string; explanation: string; files: string[]; diff: string[] };
+  | { ok: true; conversationId: string; explanation: string; files: string[]; diff: string[]; stagedHash: string };
 
 /** Build an owner-scoped DataContext for an artifact from env alone (no request). */
 async function buildArtifactContext(env: Env, artifactId: string): Promise<DataContext> {
@@ -38,6 +38,16 @@ function explanationFrom(content: string): string {
   // Drop code/diff blocks — keep the prose so the confirm prompt reads cleanly.
   const prose = content.replace(/```[\s\S]*?```/g, '').replace(/\n{3,}/g, '\n\n').trim();
   return prose.length > 600 ? prose.slice(0, 600) + '…' : prose;
+}
+
+async function stagedEditsHash(env: Env, artifactId: string, conversationId: string): Promise<string> {
+  const rows = await env.DB.prepare(
+    `SELECT file_path, new_content FROM artifact_pending_edits
+      WHERE artifact_id = ? AND thread_id = ? AND status = 'pending' ORDER BY file_path`
+  ).bind(artifactId, conversationId).all<{ file_path: string; new_content: string | null }>();
+  const bytes = new TextEncoder().encode(JSON.stringify(rows.results.map((r) => [r.file_path, r.new_content ?? ''])));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 const DIFF_MAX_LINES = 60;
@@ -120,7 +130,7 @@ export async function proposeEdit(env: Env, artifactId: string, instruction: str
 
   if (!suggested.length) {
     // The agent answered without proposing edits (a question, a refusal, etc.).
-    return { ok: true, conversationId, explanation: explanationFrom(content) || 'I didn’t find a change to make.', files: [], diff: [] };
+    return { ok: true, conversationId, explanation: explanationFrom(content) || 'I didn’t find a change to make.', files: [], diff: [], stagedHash: '' };
   }
 
   const applied = await applyEditsToPending(ctx, conversationId, suggested);
@@ -129,14 +139,17 @@ export async function proposeEdit(env: Env, artifactId: string, instruction: str
     `SELECT file_path, original_content, new_content FROM artifact_pending_edits
       WHERE artifact_id = ? AND thread_id = ? AND status = 'pending'`
   ).bind(artifactId, conversationId).all<{ file_path: string; original_content: string; new_content: string }>();
-  return { ok: true, conversationId, explanation: explanationFrom(content), files, diff: stagedDiff(staged.results) };
+  return { ok: true, conversationId, explanation: explanationFrom(content), files, diff: stagedDiff(staged.results), stagedHash: await stagedEditsHash(env, artifactId, conversationId) };
 }
 
 export type PublishEditResult = { ok: false; error: string } | { ok: true; url: string | null };
 
 /** Promote a proposed conversation's staged edits to a new live version. */
-export async function publishEdits(env: Env, artifactId: string, conversationId: string): Promise<PublishEditResult> {
+export async function publishEdits(env: Env, artifactId: string, conversationId: string, stagedHash: string | undefined, publishedBy: string): Promise<PublishEditResult> {
+  if (!stagedHash || stagedHash !== await stagedEditsHash(env, artifactId, conversationId)) {
+    return { ok: false, error: 'the staged edit changed after you were shown it — ask for the change again.' };
+  }
   const ctx = await buildArtifactContext(env, artifactId);
-  const result = await publishConversation(ctx, conversationId);
+  const result = await publishConversation(ctx, conversationId, undefined, publishedBy);
   return result.ok ? { ok: true, url: result.url } : { ok: false, error: result.error };
 }
