@@ -7,6 +7,26 @@ import type { HomeFolder } from '../types';
 import { isLinkedWorkspaceMember } from '../filters';
 import { normalizeVisibility } from '../../../visibility-config';
 
+/** The folders matching `where` (aliased `f`), each with its direct sub-folder count and
+ *  the artifacts anywhere in its subtree, so a folder's number covers its sub-folders too. */
+function subtreeCountsSql(where: string, withCreator: boolean): string {
+  return `
+    WITH RECURSIVE sub(root, id, depth) AS (
+      SELECT f.id, f.id, 0 FROM folders f WHERE ${where}
+      UNION ALL
+      SELECT s.root, c.id, s.depth + 1 FROM folders c JOIN sub s ON c.parent_id = s.id
+      WHERE s.depth < 32
+    )
+    SELECT f.id, f.name${withCreator ? ', f.created_by' : ''},
+           (SELECT COUNT(*) FROM folders c WHERE c.parent_id = f.id) as subfolder_count,
+           (SELECT COUNT(*) FROM sub s JOIN artifacts a ON a.folder_id = s.id
+             WHERE s.root = f.id AND a.deleted_at IS NULL) as artifact_count
+    FROM sub JOIN folders f ON f.id = sub.id
+    WHERE sub.depth = 0
+    ORDER BY artifact_count DESC, f.name
+  `;
+}
+
 /** Folders directly inside a parent (or root, when parentId is null/undefined),
  *  scoped to a workspace (Team Space, admin-defined) or personal (workspace_id
  *  IS NULL, owner-scoped). Generalizes the former root-only queries so the
@@ -23,24 +43,14 @@ export async function queryFoldersInParent(
   if (opts.workspaceId) {
     if (!(await isLinkedWorkspaceMember(env, vis, opts.workspaceId))) return [];
     const params = opts.parentId ? [opts.workspaceId, opts.parentId] : [opts.workspaceId];
-    const rows = await env.DB.prepare(`
-      SELECT f.id, f.name, f.created_by,
-             (SELECT COUNT(*) FROM artifacts WHERE folder_id = f.id AND deleted_at IS NULL) as artifact_count
-      FROM folders f
-      WHERE f.workspace_id = ? AND ${parentSql}
-      ORDER BY artifact_count DESC, f.name
-    `).bind(...params).all<HomeFolder>();
+    const rows = await env.DB.prepare(subtreeCountsSql(`f.workspace_id = ? AND ${parentSql}`, true))
+      .bind(...params).all<HomeFolder>();
     return rows.results || [];
   }
   const idPh = placeholders(vis.userIds.length);
   const params = opts.parentId ? [...vis.userIds, opts.parentId] : [...vis.userIds];
-  const rows = await env.DB.prepare(`
-    SELECT f.id, f.name,
-           (SELECT COUNT(*) FROM artifacts WHERE folder_id = f.id AND deleted_at IS NULL) as artifact_count
-    FROM folders f
-    WHERE f.workspace_id IS NULL AND f.owner_id IN (${idPh}) AND ${parentSql}
-    ORDER BY artifact_count DESC, f.name
-  `).bind(...params).all<HomeFolder>();
+  const rows = await env.DB.prepare(subtreeCountsSql(`f.workspace_id IS NULL AND f.owner_id IN (${idPh}) AND ${parentSql}`, false))
+    .bind(...params).all<HomeFolder>();
   return rows.results || [];
 }
 

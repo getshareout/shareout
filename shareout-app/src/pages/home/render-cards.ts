@@ -287,20 +287,30 @@ export function renderArtifactRow(a: ArtifactRow, hostname: string, env?: Env): 
 
 const FOLDER_SVG = '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>';
 
+/** "2 folders · 14 artifacts": direct sub-folders, then artifacts across the whole subtree.
+ *  English fallback; the client localizes from data-count/data-folders (see
+ *  artifacts-browser localizeFolderCounts). */
+function folderCount(f: HomeFolder, extraClass = ''): string {
+  const subs = f.subfolder_count || 0;
+  const n = f.artifact_count;
+  const text = (subs ? `${subs} ${subs === 1 ? 'folder' : 'folders'} · ` : '') + `${n} ${n === 1 ? 'artifact' : 'artifacts'}`;
+  return `<span class="wsx-folder-card__count${extraClass ? ' ' + extraClass : ''}" data-count="${n}" data-folders="${subs}">${text}</span>`;
+}
+
 /** A folder as a row of the All Artifacts table, in the artifact rows' columns. */
 export function renderFolderRow(f: HomeFolder): string {
   const nm = escapeHtml(f.name);
   const id = escapeHtml(f.id);
   return `<div class="wsx-tr wsx-tr--folder" role="button" tabindex="0" data-folder-id="${id}" data-folder-name="${nm}" data-name="${nm}" onclick="enterFolder('${id}',this.getAttribute('data-folder-name'))" onkeydown="if(event.key==='Enter'){enterFolder('${id}',this.getAttribute('data-folder-name'))}">
     <span class="wsx-tr__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${FOLDER_SVG}</svg></span>
-    <span class="wsx-tr__name">${nm}</span>
+    <span class="wsx-tr__name"><span class="wsx-tr__nm">${nm}</span>${folderCount(f, 'wsx-tr__sub')}</span>
     <span class="wsx-tr__owner"></span>
     <span class="wsx-tr__shared"></span>
     <span class="wsx-tr__access"></span>
     <span class="wsx-tr__type" data-i18n="artifacts.folderType">Folder</span>
     <span class="wsx-tr__feat"></span>
     <span class="wsx-tr__tags"></span>
-    <span class="wsx-tr__views wsx-folder-card__count" data-count="${f.artifact_count}">${f.artifact_count}</span>
+    <span class="wsx-tr__views"></span>
     <span class="wsx-tr__visitors"></span>
     <span class="wsx-tr__created"></span>
     <span class="wsx-tr__date"></span>
@@ -310,8 +320,6 @@ export function renderFolderRow(f: HomeFolder): string {
 /** Drive-style folder tile for the All Artifacts grid. Click drills in; the
  *  hover actions (rename/delete) only render for users who can manage folders. */
 export function renderFolderCard(f: HomeFolder, scope: 'workspace' | 'personal', canManage: boolean): string {
-  // English fallback; the client localizes from data-count (see artifacts-browser localizeFolderCounts).
-  const count = `${f.artifact_count} ${f.artifact_count === 1 ? 'artifact' : 'artifacts'}`;
   const nm = escapeHtml(f.name);
   const id = escapeHtml(f.id);
   const actions = canManage ? `
@@ -327,7 +335,7 @@ export function renderFolderCard(f: HomeFolder, scope: 'workspace' | 'personal',
       <span class="wsx-folder-card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${FOLDER_SVG}</svg></span>
       <span class="wsx-folder-card__txt">
         <span class="wsx-folder-card__name">${nm}</span>
-        <span class="wsx-folder-card__count" data-count="${f.artifact_count}">${count}</span>
+        ${folderCount(f)}
       </span>${actions}
     </article>`;
 }

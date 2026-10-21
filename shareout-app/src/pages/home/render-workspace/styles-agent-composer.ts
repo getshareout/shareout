@@ -288,23 +288,22 @@ export const WORKSPACE_AGENT_COMPOSER_STYLES = `/* ---- agent dock (inside canva
 .wsx-tr__icon svg { width: 17px; height: 17px; }
 .wsx-tr__name { font: 600 var(--text-sm) var(--font-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wsx-tr__type { font-size: var(--text-xs); color: var(--color-text-secondary); text-transform: capitalize; }
-.wsx-tr__views { font-size: var(--text-xs); color: var(--color-text-tertiary); }
+.wsx-tr__views, .wsx-tr__visitors { font-size: var(--text-xs); color: var(--color-text-tertiary); }
 .wsx-tr__date { font-size: var(--text-xs); color: var(--color-text-tertiary); text-align: right; }
-/* Artifact tables: fixed-width flex columns so hidden columns drop out of header and rows
-   together. Wide → every column (scrolls sideways if needed); narrower containers (Home
-   widgets, phones) shed low-priority columns by class. */
+/* Artifact tables: every row (and the header) shares one grid template, so cells line up
+   as real columns whatever a row holds. Wide → every column (scrolls sideways if needed);
+   narrower containers (Home widgets, phones) shed low-priority columns by class, and the
+   template drops the same tracks. */
 .wsx-tbl--art { container-type: inline-size; overflow-x: auto; }
-.wsx-tbl--art .wsx-tbl__head, .wsx-tbl--art .wsx-tr { display: flex; gap: 12px; min-width: min-content; }
-.wsx-tbl--art :is(.wsx-tbl__head, .wsx-tr) > * { flex: none; min-width: 0; overflow: hidden; }
-.wsx-tbl--art .wsx-tr__name { flex: 1 0 200px; }
-.wsx-tbl--art .wsx-tr__owner { width: 150px; }
-.wsx-tbl--art .wsx-tr__shared { width: 92px; }
-.wsx-tbl--art .wsx-tr__access { width: 124px; }
-.wsx-tbl--art .wsx-tr__type { width: 64px; }
-.wsx-tbl--art .wsx-tr__feat { width: 96px; display: flex; gap: 3px; }
-.wsx-tbl--art .wsx-tr__tags { width: 160px; display: flex; gap: 4px; align-items: center; }
-.wsx-tbl--art :is(.wsx-tr__views, .wsx-tr__visitors) { width: 58px; text-align: right; }
-.wsx-tbl--art :is(.wsx-tr__created, .wsx-tr__date) { width: 92px; text-align: right; font-size: var(--text-xs); color: var(--color-text-tertiary); }
+.wsx-tbl--art .wsx-tbl__head, .wsx-tbl--art .wsx-tr { display: grid; gap: 12px; min-width: min-content;
+  grid-template-columns: 22px minmax(200px,1fr) 150px 116px 124px 84px 96px 160px 64px 84px 112px 112px; }
+.wsx-tbl--art :is(.wsx-tbl__head, .wsx-tr) > * { min-width: 0; overflow: hidden; }
+.wsx-tbl--art .wsx-tbl__head > * { font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; white-space: nowrap; text-overflow: ellipsis; }
+.wsx-tbl--art .wsx-tr__feat { display: flex; gap: 3px; }
+.wsx-tbl--art .wsx-tr__tags { display: flex; gap: 4px; align-items: center; }
+.wsx-tbl--art :is(.wsx-tr__views, .wsx-tr__visitors) { text-align: right; font-variant-numeric: tabular-nums; }
+.wsx-tbl--art :is(.wsx-tr__created, .wsx-tr__date) { text-align: right; white-space: nowrap; text-overflow: ellipsis; font-size: var(--text-xs); color: var(--color-text-tertiary); }
+.wsx-tr__sub { flex: none; font: 400 var(--text-xs) var(--font-body); color: var(--color-text-tertiary); }
 .wsx-tbl--art .wsx-tr__owner .card-owner { margin: 0; max-width: 100%; }
 .wsx-tbl--art .feature { width: 22px; height: 22px; }
 .wsx-tbl--art .feature svg { width: 13px; height: 13px; }
@@ -331,9 +330,18 @@ export const WORKSPACE_AGENT_COMPOSER_STYLES = `/* ---- agent dock (inside canva
 .wsx-tr__vis svg { width: 13px; height: 13px; flex: none; }
 .wsx-tr__vis.is-ws { color: var(--color-primary); }
 .wsx-tr__tag { padding: 2px 8px; border-radius: 999px; background: var(--color-surface); font-size: var(--text-xs); color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 72px; }
-@container (max-width: 1380px) { .wsx-tbl--art :is(.wsx-tr__tags, .wsx-tr__feat, .wsx-tr__created) { display: none; } }
-@container (max-width: 1000px) { .wsx-tbl--art :is(.wsx-tr__shared, .wsx-tr__visitors, .wsx-tr__access) { display: none; } }
-@container (max-width: 680px) { .wsx-tbl--art :is(.wsx-tr__owner, .wsx-tr__type, .wsx-tr__views) { display: none; } }
+@container (max-width: 1380px) {
+  .wsx-tbl--art :is(.wsx-tr__tags, .wsx-tr__feat, .wsx-tr__created) { display: none; }
+  .wsx-tbl--art :is(.wsx-tbl__head, .wsx-tr) { grid-template-columns: 22px minmax(200px,1fr) 150px 116px 124px 84px 64px 84px 112px; }
+}
+@container (max-width: 1000px) {
+  .wsx-tbl--art :is(.wsx-tr__shared, .wsx-tr__visitors, .wsx-tr__access) { display: none; }
+  .wsx-tbl--art :is(.wsx-tbl__head, .wsx-tr) { grid-template-columns: 22px minmax(160px,1fr) 150px 84px 64px 112px; }
+}
+@container (max-width: 680px) {
+  .wsx-tbl--art :is(.wsx-tr__owner, .wsx-tr__type, .wsx-tr__views) { display: none; }
+  .wsx-tbl--art :is(.wsx-tbl__head, .wsx-tr) { grid-template-columns: 22px minmax(120px,1fr) 104px; }
+}
 @media (max-width: 560px) {
   .wsx-tbl__head, .wsx-tr { grid-template-columns: 22px minmax(0,1fr) 88px; }
   .wsx-tr__type, .wsx-tr__views, .wsx-tbl__head span:nth-child(3), .wsx-tbl__head span:nth-child(4) { display: none; }

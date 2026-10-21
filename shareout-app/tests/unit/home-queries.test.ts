@@ -205,6 +205,15 @@ describe('work/026 — queryFoldersInParent generalizes root-only folder queries
     expect(sql.args).toEqual(['wsp_1', 'fld_b']);
   });
 
+  it('counts artifacts across the whole subtree and returns the direct sub-folder count', async () => {
+    const a = captureEnv({ first: () => ({ id: 1 }) });
+    await queryFoldersInParent(a.env, user, { workspaceId: 'wsp_1', parentId: null }, vis);
+    const sql = a.calls.at(-1)!.sql;
+    expect(sql).toContain('WITH RECURSIVE sub');
+    expect(sql).toContain('as subfolder_count');
+    expect(sql).toContain('WHERE s.root = f.id AND a.deleted_at IS NULL');
+  });
+
   it('queryPersonalFolders/queryTeamFolders still resolve (delegate to queryFoldersInParent at root)', async () => {
     const a = captureEnv();
     await queryPersonalFolders(a.env, user, vis);
