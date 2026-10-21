@@ -73,6 +73,13 @@ describe('files → artifacts', () => {
     expect(second.remaining).toBe(0);
     expect((await state(linked))!.deleted_at).toBeNull();
 
+    // A file whose folder was deleted lands at the top level instead of failing.
+    const orphan = await file('Logo', 'logo2.md', '# logo');
+    await e.DB.prepare("UPDATE asset_deliverables SET folder_id = 'fld_gone' WHERE id = ?").bind(orphan).run();
+    const third = await filesToArtifacts(e, WS);
+    expect(third.converted.map((c) => c.id)).toEqual([orphan]);
+    expect(await art(third.converted[0].artifactId)).toMatchObject({ folder_id: null });
+
     // Kept files are not retried until asked; a retry clears the marks and tries again.
     expect((await filesToArtifacts(e, WS)).kept).toEqual([]);
     expect((await filesToArtifacts(e, WS, { retry: true, limit: 5 })).kept.map((k) => k.code)).toEqual(['NOT_CONVERTIBLE', 'IN_USE']);
