@@ -167,8 +167,8 @@ describe('Knowledge KPI tiles', () => {
     lens.knState.counts = { entity: 8 };
     lens.knState.lastUpdated = '';
     document.body.innerHTML = lens.knKpiTiles();
-    const labels = Array.from(document.querySelectorAll('.wsx-an__l')).map((l) => l.textContent);
-    expect(labels).toEqual([t('knowledge.kpiEntities')]);
+    const stats = Array.from(document.querySelectorAll('.wsx-kn2__stat')).map((l) => l.textContent);
+    expect(stats).toEqual(['8 ' + t('knowledge.kpiEntities')]);
   });
 });
 

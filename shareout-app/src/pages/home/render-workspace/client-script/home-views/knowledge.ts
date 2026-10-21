@@ -196,8 +196,9 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     // while the nightly tidy-up hasn't run yet) â€” show only the tiles that have something.
     var some = tiles.filter(function (tile) { return tile[0] !== '0' && tile[0] !== '\\u2014'; });
     if (some.length) tiles = some;
-    return '<div class="wsx-an__cards wsx-cat__kpis">' + tiles.map(function (tile) {
-      return '<div class="wsx-an__card"' + (tile[2] ? ' data-tip="' + esc(tile[2]) + '"' : '') + '><div class="wsx-an__n">' + tile[0] + '</div><div class="wsx-an__l">' + esc(tile[1]) + '</div></div>';
+    // One quiet line in the controls row, not a row of cards.
+    return '<div class="wsx-cat__kpis wsx-kn2__stats">' + tiles.map(function (tile) {
+      return '<span class="wsx-kn2__stat"' + (tile[2] ? ' data-tip="' + esc(tile[2]) + '"' : '') + '><b>' + tile[0] + '</b> ' + esc(tile[1]) + '</span>';
     }).join('') + '</div>';
   }
 
@@ -441,12 +442,12 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     if (knCurrentPath && byPath[knCurrentPath] && (knState.view === 'table' || knNarrow())) { knFullDetail(m, knCurrentPath); return; }
     var trainBtn = window.WSX_ADMIN ? '<button class="so-c-btn so-c-btn--primary wsx-kn2__train" id="knTrain" type="button" data-tip="' + esc(t('knowledge.tipTrain')) + '">' + esc(t('knowledge.train')) + '</button>' : '';
     var prog = '<div class="wsx-kn2__prog" id="knProg" hidden><div class="wsx-kn2__progtrack"><div class="wsx-kn2__progfill" id="knProgFill"></div></div><span class="wsx-kn2__proglabel" id="knProgLabel"></span></div>';
-    var top = knKpiTiles()
-      + '<div class="wsx-cat__controls"><div class="wsx-cat__bar wsx-kn2__bar">'
-      + (knState.view === 'table'
-          ? '<input class="wsx-cat__search" id="knSearch" type="search" placeholder="' + esc(t('knowledge.searchPlaceholder')) + '" autocomplete="off">' + knSeg() + '<span class="wsx-cat__count" id="knCount"></span>'
-          : '')
-      + '<div class="wsx-kn2__ctlright">' + trainBtn + knHowBtn() + knToggle() + '</div>'
+    // Search sits where the Artifacts lens has it: right side, before the view toggle.
+    var search = knState.view === 'map' ? '' : '<div class="wsx-qsearch">' + isvg('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>')
+      + '<input id="knSearch" type="search" placeholder="' + esc(t('knowledge.searchPlaceholder')) + '" aria-label="' + esc(t('knowledge.searchPlaceholder')) + '" autocomplete="off" spellcheck="false"></div>';
+    var top = '<div class="wsx-cat__controls"><div class="wsx-cat__bar wsx-kn2__bar">' + knKpiTiles()
+      + (knState.view === 'table' ? knSeg() + '<span class="wsx-cat__count" id="knCount"></span>' : '')
+      + '<div class="wsx-kn2__ctlright">' + search + trainBtn + knHowBtn() + knToggle() + '</div>'
       + '</div>' + prog + '</div>';
     if (knState.view === 'map') { kmRender(m, top); return; }
     if (knState.view === 'table') {
@@ -456,7 +457,6 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
       m.innerHTML = top
         + '<div class="wsx-kn2">'
         + '<div class="wsx-kn2__pane wsx-kn2__treewrap">'
-        + '<input class="wsx-cat__search wsx-kn2__search" id="knSearch" type="search" placeholder="' + esc(t('knowledge.searchPlaceholder')) + '" autocomplete="off">'
         + '<div class="wsx-kn2__tree" id="knTree">' + knTreeHtml() + '</div>'
         + '<div class="wsx-empty" id="knNone" style="display:none">' + esc(t('knowledge.noMatch')) + '</div>'
         + '</div>'
@@ -566,19 +566,21 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     if (node.updated_at && node.updated_at !== node.learned_at) fresh += ' \\u00B7 ' + t('knowledge.freshUpdated') + ' ' + adRelDate(node.updated_at);
     var title = node.kind === 'overview' ? t('knowledge.overviewTitle') : (node.title || node.path);
     var backBtn = back ? '<button class="wsx-cat__back" id="knBack" type="button">' + esc(t('knowledge.back')) + '</button>' : '';
-    host.innerHTML = backBtn
+    // Head stays put while the rest scrolls (desktop tree pane; plain blocks elsewhere).
+    host.innerHTML = '<div class="wsx-kn2__dtop">' + backBtn
       + '<div class="wsx-cat__dhead"><span class="wsx-atbl__type">' + esc(knKindLabel(node.kind)) + '</span><h3>' + esc(title) + '</h3>' + knBadge(node) + '</div>'
-      + '<div class="wsx-sched__meta">' + esc(node.path) + '</div>'
+      + '<div class="wsx-sched__meta">' + esc(node.path) + '</div></div><div class="wsx-kn2__scroll">'
       + '<dl class="wsx-cat__meta">' + meta + '</dl>'
-      + '<div id="knBody">' + (node.kind === 'overview' ? knOverviewChrome(node.body) : (node.body ? '<div class="wsx-cat__body">' + mdToHtml(node.body) + '</div>' : '')) + '</div>'
+      + '<div id="knBody">' + (node.kind === 'overview' ? knOverviewChrome(node.body) : (node.body ? '<div class="wsx-cat__body">' + knWikiLinks(mdToHtml(node.body)) + '</div>' : '')) + '</div>'
       + '<div class="wsx-cat__lin"><div class="wsx-cat__linhead"><span data-tip="' + esc(t('knowledge.tipSources')) + '">' + esc(t('knowledge.srcHeader')) + '</span> <span class="wsx-cat__lcount">' + sources.length + '</span><span class="wsx-cat__linhint">' + esc(t('knowledge.srcHint')) + '</span></div>' + knSrcRows(sources) + '</div>'
       + '<div class="wsx-kn__fresh">' + esc(fresh) + '</div>'
       + '<div class="wsx-kn__controls">'
       + '<button class="so-c-btn" id="knPin" type="button">' + esc(t(node.pinned ? 'knowledge.unpin' : 'knowledge.pin')) + '</button>'
       + '<button class="so-c-btn" id="knEdit" type="button">' + esc(t('knowledge.edit')) + '</button>'
       + (window.WSX_ADMIN ? '<button class="so-c-btn wsx-kn__danger" id="knForget" type="button">' + esc(t('knowledge.forget')) + '</button>' : '')
-      + '</div>';
+      + '</div></div>';
     if (back) { var bk = document.getElementById('knBack'); if (bk) bk.addEventListener('click', back); }
+    knBindWikiLinks(host);
     host.querySelectorAll('[data-kn-src-slug]').forEach(function (r) {
       r.addEventListener('click', function (e) {
         var slug = r.getAttribute('data-kn-src-slug');
@@ -674,6 +676,28 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     });
   }
 
+  // ---- [[kind.slug]] wiki-links â†’ the note's title, clickable when it's in the tree ----
+  function knWikiNode(id) {
+    var dot = id.indexOf('.'), slug = id.slice(dot + 1);
+    var n = (knState.nodes || []).filter(function (x) { return x.id === id; })[0];
+    if (!n && id.slice(0, dot) === 'topic') n = (knState.byPath || {})['topics/' + slug + '.md'];
+    return { node: n || null, label: (n && n.title) || slug.replace(/-/g, ' ') };
+  }
+  function knWikiLinks(html) {
+    return html.replace(/\\[\\[([a-z-]+\\.[^\\]\\s]+)\\]\\]/g, function (_, id) {
+      var w = knWikiNode(id);
+      return w.node ? '<button type="button" class="wsx-kn2__wl" data-kn-go="' + esc(w.node.path) + '">' + esc(w.label) + '</button>' : esc(w.label);
+    });
+  }
+  function knBindWikiLinks(host) {
+    if (host.__knGo) return; host.__knGo = true;
+    host.addEventListener('click', function (e) {
+      var g = e.target.closest && e.target.closest('[data-kn-go]'); if (!g || !host.contains(g)) return;
+      var p = g.getAttribute('data-kn-go'), m = knMount(); if (!m) return;
+      if (knState.view === 'table' || knNarrow() || !document.getElementById('knPane')) knFullDetail(m, p); else knPanePaint(p, true);
+    });
+  }
+
   // ---- Overview i18n chrome (localized around the deterministic code-gen body) ----
   function knOverviewChrome(body) {
     body = String(body || '');
@@ -685,8 +709,14 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
       var n = Number((knState.counts && knState.counts['artifact-digest']) || 0);
       lines[0] = t('knowledge.pagesLearned').replace('{n}', n.toLocaleString());
     }
-    var html = '<div class="wsx-cat__body">' + mdToHtml(lines.join('\\n')) + '</div>';
-    if (pos >= 0) html += '<h3 class="wsx-kn2__toptopics">' + esc(t('knowledge.topTopics')) + '</h3><div class="wsx-cat__body">' + mdToHtml(topics) + '</div>';
+    var html = '<div class="wsx-cat__body">' + knWikiLinks(mdToHtml(lines.join('\\n'))) + '</div>';
+    var chips = topics.split('\\n').map(function (ln) {
+      var mm = /\\[\\[([^\\]]+)\\]\\]\\s*\\((\\d+)\\)/.exec(ln); if (!mm) return '';
+      var w = knWikiNode(mm[1]);
+      var inner = '<span class="wsx-kn2__chipl">' + esc(w.label) + '</span><span class="wsx-kn2__chipn">' + mm[2] + '</span>';
+      return w.node ? '<button type="button" class="wsx-kn2__chip" data-kn-go="' + esc(w.node.path) + '">' + inner + '</button>' : '<span class="wsx-kn2__chip">' + inner + '</span>';
+    }).join('');
+    if (chips) html += '<h3 class="wsx-kn2__toptopics">' + esc(t('knowledge.topTopics')) + '</h3><div class="wsx-kn2__chips">' + chips + '</div>';
     return html;
   }
 
@@ -701,7 +731,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     host.innerHTML = backBtn
       + '<div class="wsx-cat__dhead"><span class="wsx-atbl__type">' + esc(t('knowledge.branchGuidance')) + '</span><h3>' + esc(node.name) + '</h3>' + badges + '</div>'
       + '<div class="wsx-sched__meta">' + esc(node.path) + '</div>'
-      + '<div id="knBody"><div class="wsx-cat__body">' + mdToHtml(node.body || '') + '</div></div>'
+      + '<div id="knBody"><div class="wsx-cat__body">' + knWikiLinks(mdToHtml(node.body || '')) + '</div></div>'
       + (fresh ? '<div class="wsx-kn__fresh">' + esc(fresh) + '</div>' : '')
       + (admin ? '<div class="wsx-kn__controls">'
         + '<button class="so-c-btn" id="knGEdit" type="button">' + esc(t('knowledge.edit')) + '</button>'
