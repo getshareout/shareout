@@ -32,6 +32,13 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 .wsx-tab.is-dragging .wsx-tab__x { visibility: hidden; }
 .wsx-tab-drop { position: absolute; top: 4px; bottom: 4px; left: 0; width: 2px; border-radius: 2px; background: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-light); pointer-events: none; transition: transform var(--duration-fast) var(--ease-out); }
 
+.wsx-cmenu { position: fixed; z-index: 400; min-width: 210px; padding: 6px; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; }
+.wsx-cmenu__it { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text); font: 500 var(--text-sm) var(--font-body); text-align: left; cursor: pointer; }
+.wsx-cmenu__it svg { width: 15px; height: 15px; flex: none; color: var(--color-text-secondary); }
+.wsx-cmenu__it:hover, .wsx-cmenu__it:focus-visible { background: var(--color-surface); outline: none; }
+.wsx-cmenu__it.is-danger, .wsx-cmenu__it.is-danger svg { color: var(--color-error); }
+.wsx-cmenu__sep { height: 1px; margin: 5px 4px; background: var(--color-border); }
+
 .wsx__panes { position: relative; flex: 1; min-height: 0; }
 .wsx__pane { position: absolute; inset: 0; overflow-y: auto; padding: var(--space-5) clamp(16px, 3vw, 32px); display: none; }
 .wsx__pane.is-active { display: block; }

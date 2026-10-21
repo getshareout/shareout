@@ -153,6 +153,8 @@ export function renderArtifactCard(a: ArtifactRow, hostname: string, env?: Env):
       data-shared="${a.user_role !== 'owner' ? '1' : '0'}"
       data-favorite="${a.is_favorite ? '1' : '0'}"
       data-type-group="${artifactTypeGroup(a.artifact_type)}"
+      data-type="${escapeHtml(a.artifact_type)}"
+      data-url="${escapeHtml(pageUrl)}"
       data-name="${escapeHtml(a.name.toLowerCase())}"
       data-tags="${escapeHtml(tagList.join('\n').toLowerCase())}"
       data-role="${escapeHtml(a.user_role)}"
@@ -263,11 +265,12 @@ function fmtDate(d: string): string {
 /** Compact table row for the workspace Brief's table view (mirrors the card data).
  *  Cell classes double as column keys: the header uses the same ones and narrow
  *  containers hide low-priority columns by class (see .wsx-tbl--art). */
-export function renderArtifactRow(a: ArtifactRow, _hostname: string): string {
+export function renderArtifactRow(a: ArtifactRow, hostname: string, env?: Env): string {
   const typeKey = TYPE_META[a.artifact_type] ? a.artifact_type : 'html';
   const tm = TYPE_META[typeKey];
   const date = a.updated_at || a.created_at;
-  return `<a class="wsx-tr" href="/a/${escapeHtml(a.slug)}/" data-id="${escapeHtml(a.id)}" data-slug="${escapeHtml(a.slug)}" data-name="${escapeHtml(a.name)}">
+  const pageUrl = buildArtifactShareUrl(hostname, a.slug, a.display_slug, undefined, undefined, env);
+  return `<a class="wsx-tr" href="/a/${escapeHtml(a.slug)}/" data-id="${escapeHtml(a.id)}" data-slug="${escapeHtml(a.slug)}" data-name="${escapeHtml(a.name)}" data-type="${escapeHtml(a.artifact_type)}" data-url="${escapeHtml(pageUrl)}" data-role="${escapeHtml(a.user_role)}" data-favorite="${a.is_favorite ? '1' : '0'}" data-visibility="${escapeHtml(a.visibility)}" data-workspace="${escapeHtml(a.workspace_id || '')}">
     <span class="wsx-tr__icon" style="--type-color:${tm.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${tm.svg}</svg></span>
     <span class="wsx-tr__name">${escapeHtml(a.name)}</span>
     <span class="wsx-tr__owner">${renderOwnerAvatar(a)}</span>

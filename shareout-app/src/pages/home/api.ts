@@ -143,7 +143,7 @@ export async function handleHomeForYouApi(
   const artifacts = await queryForYou(env, user, { workspaceId, limit }, vis);
   return Response.json({
     cardsHtml: artifacts.map((a) => renderArtifactCard(a, url.hostname, env)).join(''),
-    rowsHtml: artifacts.map((a) => renderArtifactRow(a, url.hostname)).join(''),
+    rowsHtml: artifacts.map((a) => renderArtifactRow(a, url.hostname, env)).join(''),
     count: artifacts.length,
   });
 }
@@ -162,7 +162,7 @@ export async function handleHomeRecentApi(
   const artifacts = await queryRecentlyViewed(env, user, { workspaceId, limit }, vis);
   return Response.json({
     cardsHtml: artifacts.map((a) => renderArtifactCard(a, url.hostname, env)).join(''),
-    rowsHtml: artifacts.map((a) => renderArtifactRow(a, url.hostname)).join(''),
+    rowsHtml: artifacts.map((a) => renderArtifactRow(a, url.hostname, env)).join(''),
     count: artifacts.length,
   });
 }
@@ -440,7 +440,7 @@ export async function handleHomeBrowserApi(
 
   return Response.json({
     cardsHtml: artifacts.map(a => renderArtifactCard(a, hostname, env)).join(''),
-    rowsHtml: artifacts.map(a => renderArtifactRow(a, hostname)).join(''),
+    rowsHtml: artifacts.map(a => renderArtifactRow(a, hostname, env)).join(''),
     emptyHtml: artifacts.length === 0 ? renderHomeEmptyState(filters, createEnabled) : '',
     foldersHtml,
     folderRowsHtml: folders.map(renderFolderRow).join(''),
