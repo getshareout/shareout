@@ -167,6 +167,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
               <button class="wsx-chip" data-asset-filter="image" type="button" data-i18n="filter.images">Images</button>
               <button class="wsx-chip" data-asset-filter="video" type="button" data-i18n="filter.video">Video</button>
               <button class="wsx-chip" data-asset-filter="doc" type="button" data-i18n="filter.docs">Docs</button>
+              ${viewSeg('wsxAssetMount')}
             </div>
             <input type="file" id="wsxAssetFile" multiple hidden>
             <div id="wsxAssetMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>

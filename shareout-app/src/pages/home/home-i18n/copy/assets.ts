@@ -4,6 +4,12 @@ import type { HomeLocaleCopy } from '../types';
 export const ASSETS_COPY: HomeLocaleCopy = {
   en: {
     'assets.allFiles': 'All files',
+    'assets.filesLabel': 'Files',
+    'assets.filesCount': '{n} files',
+    'assets.filesCountOne': '1 file',
+    'assets.folderEmpty': 'This folder is empty.',
+    'assets.colSize': 'Size',
+    'assets.colAccess': 'Access',
     'assets.allowedDomains': 'Allowed domains (comma-separated)',
     'assets.allowedDomainsPh': 'acme.com, client.com',
     'assets.bundleFiles': 'Bundle files to send →',
@@ -88,6 +94,12 @@ export const ASSETS_COPY: HomeLocaleCopy = {
   },
   es: {
     'assets.allFiles': 'Todos los archivos',
+    'assets.filesLabel': 'Archivos',
+    'assets.filesCount': '{n} archivos',
+    'assets.filesCountOne': '1 archivo',
+    'assets.folderEmpty': 'Esta carpeta está vacía.',
+    'assets.colSize': 'Tamaño',
+    'assets.colAccess': 'Acceso',
     'assets.allowedDomains': 'Dominios permitidos (separados por coma)',
     'assets.allowedDomainsPh': 'miempresa.com, cliente.com',
     'assets.bundleFiles': 'Agrupar archivos para enviar →',

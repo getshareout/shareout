@@ -63,6 +63,13 @@ export const workspace_client_home_views_deliveries_JS = `  // ----- sent delive
         c.classList.add('is-on'); assetFilter = c.getAttribute('data-asset-filter'); renderAssets();
       });
     });
+    // The shell's viewseg handler persists the mode after this runs, so persist it here first.
+    var seg = ws.querySelector('[data-viewseg-for="wsxAssetMount"]');
+    if (seg) seg.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-vw]'); if (!b) return;
+      try { localStorage.setItem('wsx_view:wsxAssetMount', b.getAttribute('data-vw')); } catch (_) {}
+      renderAssets();
+    });
   }
   function loadAssets() { wireAssets(); fetchAssets(); }
 

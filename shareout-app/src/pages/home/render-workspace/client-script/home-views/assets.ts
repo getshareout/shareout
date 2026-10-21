@@ -66,8 +66,12 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
   function openAssetPreview(id) {
     var a = findItem(id); if (!a) return;
     var kind = assetKind(a.mimeType);
+    var mime = (a.mimeType || '').split(';')[0].trim().toLowerCase();
+    // PDF and audio are the doc types the content route serves inline; Office files download.
     var media = kind === 'image' ? '<img src="' + esc(a.url) + '" alt="">'
       : kind === 'video' ? '<video src="' + esc(a.url) + '" controls preload="metadata"></video>'
+      : mime === 'application/pdf' ? '<iframe class="wsx-asset-pv__pdf" src="' + esc(a.url) + '" title="' + esc(a.name) + '"></iframe>'
+      : mime.indexOf('audio/') === 0 ? '<audio src="' + esc(a.url) + '" controls preload="metadata"></audio>'
       : '<div class="wsx-asset__thumb--file">' + isvg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>') + '<span class="wsx-asset__ext">' + esc(assetExt(a.filename)) + '</span></div>';
     var isDlv = a.type === 'deliverable';
     var inWs = !!window.WSX_WS;
@@ -86,7 +90,7 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
       + (isDlv ? btn('move', t('assets.move')) + btn('ver', t('assets.uploadNewVersion')) + btn('hist', t('assets.versionHistory')) + btn('cmt', t('assets.comments')) : '')
       + (isDlv && a.usageCount > 0 ? btn('usage', t('assets.usedIn')) : '')
       + (a.canDelete ? '<button class="so-c-btn so-c-btn--danger-outline" type="button" data-pv-act="del">' + esc(t('common.delete')) + '</button>' : '');
-    var mo = wsxModal(a.name, '<div class="wsx-asset-pv"><div class="wsx-asset-pv__media">' + media + '</div>'
+    var mo = wsxModal(a.name, '<div class="wsx-asset-pv"><div class="wsx-asset-pv__media' + (mime === 'application/pdf' ? ' wsx-asset-pv__media--doc' : '') + '">' + media + '</div>'
       + '<p class="wsx-field__note">' + adBytes(a.sizeBytes) + (a.versionCount > 1 ? ' \\u00b7 ' + esc(t('assets.versionsCount').replace('{n}', String(a.versionCount))) : '') + '</p>'
       + vis + '<div class="wsx-asset-pv__acts">' + acts + '</div></div>');
     var sel = mo.body.querySelector('#pv_vis');
@@ -112,38 +116,69 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
       });
     });
   }
-  function renderFolderBar() {
-    var pills = '<button class="wsx-abtn' + (assetFolder ? '' : ' wsx-abtn--primary') + '" data-folder="" type="button">' + esc(t('assets.allFiles')) + '</button>';
-    pills += assetFolders.map(function (f) { return '<button class="wsx-abtn' + (assetFolder === f.id ? ' wsx-abtn--primary' : '') + '" data-folder="' + esc(f.id) + '" type="button">' + esc(f.name) + '</button>'; }).join('');
-    if (assetCanCreateFolder) pills += '<button class="wsx-abtn" id="wsxFolderNew" type="button">' + esc(t('assets.newFolder')) + '</button>';
-    if (assetFolder && window.WSX_WS) pills += '<button class="wsx-abtn" id="wsxFolderShare" type="button">' + esc(t('assets.shareFolder')) + '</button>';
-    return '<div class="wsx-asset-folders">' + pills + '</div>';
+  function assetRow(a) {
+    var on = assetSel[a.id];
+    var lead = assetSelect
+      ? '<button class="wsx-asset__check wsx-asset__check--row' + (on ? ' on' : '') + '" data-asset-sel="' + esc(a.id) + '" aria-label="' + esc(t('assets.select')) + '"></button>'
+      : '<span class="wsx-tr__icon">' + isvg(assetKind(a.mimeType) === 'image' ? '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>' : assetKind(a.mimeType) === 'video' ? '<path d="M8 5v14l11-7z"/>' : '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>') + '</span>';
+    var o = window.WSX_WS && a.type === 'deliverable' ? visInfo(a.visibility) : null;
+    return '<div class="wsx-tr wsx-asset-row' + (on ? ' is-sel' : '') + '" data-asset-id="' + esc(a.id) + '" tabindex="0" role="button" aria-label="' + esc(a.name) + '">'
+      + lead + '<span class="wsx-tr__name" title="' + esc(a.filename) + '">' + esc(a.name) + (a.versionCount > 1 ? ' <span class="wsx-asset__ver wsx-asset__ver--row">v' + a.latestVersion + '</span>' : '') + '</span>'
+      + '<span class="wsx-tr__type">' + esc(assetExt(a.filename)) + '</span><span class="wsx-tr__views">' + adBytes(a.sizeBytes) + '</span>'
+      + '<span class="wsx-tr__date">' + (o ? esc(t(o.label)) : '') + '</span></div>';
+  }
+  var FOLDER_ICON = '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>';
+  // Same shape as the Artifacts lens: a "Folders" row of cards at the root, a breadcrumb inside one.
+  function renderFolderBar(all) {
+    if (assetFolder) {
+      var cur = assetFolders.filter(function (f) { return f.id === assetFolder; })[0];
+      return '<div class="wsx-fbar"><nav class="folders-breadcrumb"><button type="button" class="crumb-root" data-folder="">' + esc(t('assets.allFiles')) + '</button><span class="crumb-sep">\\u203a</span><span class="crumb-current">' + esc(cur ? cur.name : '') + '</span></nav>'
+        + (window.WSX_WS ? '<div class="wsx-fbar__acts"><button class="wsx-abtn" id="wsxFolderShare" type="button">' + esc(t('assets.shareFolder')) + '</button></div>' : '') + '</div>';
+    }
+    if (!assetFolders.length && !assetCanCreateFolder) return '';
+    var cards = assetFolders.map(function (f) {
+      var n = all.filter(function (a) { return a.folderId === f.id; }).length;
+      return '<article class="wsx-folder-card" data-folder="' + esc(f.id) + '" tabindex="0" role="button"><span class="wsx-folder-card__icon">' + isvg(FOLDER_ICON) + '</span>'
+        + '<span class="wsx-folder-card__txt"><span class="wsx-folder-card__name" title="' + esc(f.name) + '">' + esc(f.name) + '</span><span class="wsx-folder-card__count">' + esc((n === 1 ? t('assets.filesCountOne') : t('assets.filesCount')).replace('{n}', String(n))) + '</span></span></article>';
+    }).join('');
+    var nf = assetCanCreateFolder ? '<button type="button" class="wsx-folder-new" id="wsxFolderNew">' + isvg('<path d="M12 5v14M5 12h14"/>') + '<span>' + esc(t('assets.newFolder')) + '</span></button>' : '';
+    return '<section class="wsx-folders-sec"><div class="wsx-sec-row"><span class="wsx-sec-label">' + esc(t('artifacts.foldersLabel')) + '</span>' + nf + '</div>'
+      + (cards ? '<div class="wsx-folder-grid">' + cards + '</div>' : '') + '</section>'
+      + (cards ? '<div class="wsx-sec-label wsx-sec-label--pages">' + esc(t('assets.filesLabel')) + '</div>' : '');
   }
   function wireFolderBar(m) {
     m.querySelectorAll('[data-folder]').forEach(function (b) {
-      b.addEventListener('click', function () { assetFolder = b.getAttribute('data-folder'); renderAssets(); });
+      function go() { assetFolder = b.getAttribute('data-folder'); renderAssets(); }
+      b.addEventListener('click', go);
+      b.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
     });
     var nf = m.querySelector('#wsxFolderNew'); if (nf) nf.addEventListener('click', newAssetFolder);
     var fs = m.querySelector('#wsxFolderShare'); if (fs) fs.addEventListener('click', function () { openSharePerson(assetFolder, 'folder'); });
   }
   function renderAssets() {
     var m = document.getElementById('wsxAssetMount'); if (!m) return;
-    var items = assetItems();
+    var all = assetItems();
+    if (assetFolder && !assetFolders.some(function (f) { return f.id === assetFolder; })) assetFolder = '';
+    var known = {}; assetFolders.forEach(function (f) { known[f.id] = true; });
+    // Root shows files outside any folder (or in one this viewer can't list), like Artifacts.
+    var items = all.filter(function (a) { return assetFolder ? a.folderId === assetFolder : !known[a.folderId]; });
     if (assetFilter !== 'all') items = items.filter(function (a) { return assetKind(a.mimeType) === assetFilter; });
-    if (assetFolder) items = items.filter(function (a) { return a.folderId === assetFolder; });
     var n = selCount();
     var selLbl = n === 1 ? t('assets.selectedOne') : t('assets.selectedMany');
     var bar = assetSelect
       ? '<div class="wsx-asset-bar"><span>' + esc(selLbl.replace('{n}', String(n))) + '</span><div class="wsx-asset-bar__r"><button class="wsx-abtn" id="wsxAssetCancel" type="button">' + esc(t('assets.cancel')) + '</button><button class="wsx-abtn wsx-abtn--primary" id="wsxAssetShare" type="button">' + esc(t('assets.createDelivery')) + '</button></div></div>'
       : (items.length ? '<div class="wsx-asset-bar"><button class="wsx-abtn" id="wsxAssetSelect" type="button">' + esc(t('assets.bundleFiles')) + '</button></div>' : '');
-    var grid = items.length ? '<div class="wsx-asset-grid">' + items.map(assetTile).join('') + '</div>' : i18nEmpty('assets.empty');
-    m.innerHTML = renderFolderBar() + bar + grid;
+    var head = '<div class="wsx-tbl__head"><span></span><span>' + esc(t('widget.colName')) + '</span><span>' + esc(t('widget.colType')) + '</span><span>' + esc(t('assets.colSize')) + '</span><span>' + esc(t('assets.colAccess')) + '</span></div>';
+    var grid = !items.length ? i18nEmpty(assetFolder ? 'assets.folderEmpty' : 'assets.empty')
+      : widgetView('wsxAssetMount') === 'table' ? '<div class="wsx-tbl wsx-asset-tbl">' + head + items.map(assetRow).join('') + '</div>'
+      : '<div class="wsx-asset-grid">' + items.map(assetTile).join('') + '</div>';
+    m.innerHTML = renderFolderBar(all) + bar + grid;
     wireBar(m);
     wireFolderBar(m);
     m.querySelectorAll('[data-asset-sel]').forEach(function (b) {
       b.addEventListener('click', function () { var id = b.getAttribute('data-asset-sel'); assetSel[id] = !assetSel[id]; renderAssets(); });
     });
-    m.querySelectorAll('.wsx-asset[data-asset-id]').forEach(function (card) {
+    m.querySelectorAll('.wsx-asset[data-asset-id], .wsx-asset-row[data-asset-id]').forEach(function (card) {
       var id = card.getAttribute('data-asset-id');
       function open(e) { if (e.target.closest('[data-asset-sel]')) return; if (assetSelect) { assetSel[id] = !assetSel[id]; renderAssets(); return; } openAssetPreview(id); }
       card.addEventListener('click', open);

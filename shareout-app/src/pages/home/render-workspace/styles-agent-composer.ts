@@ -270,7 +270,7 @@ export const WORKSPACE_AGENT_COMPOSER_STYLES = `/* ---- agent dock (inside canva
 
 /* ===== tile/table toggle + table view ===== */
 .wsx-viewseg { display: inline-flex; gap: 2px; margin-left: 8px; background: var(--color-surface); border-radius: 8px; padding: 2px; flex: none; }
-#wsxArtChips .wsx-viewseg { margin-left: auto; }
+#wsxArtChips .wsx-viewseg, #wsxAssetChips .wsx-viewseg { margin-left: auto; }
 /* "Recently deleted" trigger — quiet text link at the far right of the filter row */
 .wsx-trash-link { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border: 0; background: transparent; color: var(--color-text-tertiary); font: 600 var(--text-xs) var(--font-body); cursor: pointer; border-radius: var(--radius-sm); transition: color var(--duration-fast), background var(--duration-fast); }
 .wsx-trash-link svg { width: 14px; height: 14px; }

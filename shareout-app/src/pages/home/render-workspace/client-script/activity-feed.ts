@@ -108,7 +108,7 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
     var mode = widgetView(id);
     seg.querySelectorAll('[data-vw]').forEach(function (x) { x.classList.toggle('is-on', x.getAttribute('data-vw') === mode); });
   }
-  ['wsxRecentW', 'wsxForYou', 'wsxArtMount'].forEach(syncViewSeg);
+  ['wsxRecentW', 'wsxForYou', 'wsxArtMount', 'wsxAssetMount'].forEach(syncViewSeg);
   ws.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-vw]'); if (!btn) return;
     var seg = btn.closest('[data-viewseg-for]'); if (!seg) return;

@@ -34,6 +34,9 @@ export const assetGalleryStyles = `/* ── Assets lens ───────�
 .wsx-asset-pv__media { display: flex; align-items: center; justify-content: center; min-height: 140px; max-height: 50vh; border-radius: var(--radius-md); background: rgba(0,0,0,0.04); overflow: hidden; }
 .wsx-asset-pv__media img, .wsx-asset-pv__media video { max-width: 100%; max-height: 50vh; display: block; }
 .wsx-asset-pv__media .wsx-asset__thumb--file { display: flex; align-items: center; padding: var(--space-4); }
+.wsx-asset-pv__media--doc { max-height: none; background: var(--color-surface); }
+.wsx-asset-pv__pdf { display: block; width: 100%; height: 60vh; border: 0; }
+.wsx-asset-pv__media audio { width: 100%; margin: var(--space-4); }
 .wsx-asset-pv__acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: var(--space-3); }
 .wsx-asset-pv__acts a.wsx-abtn { text-decoration: none; }
 .wsx-asset-pv__acts svg { width: 15px; height: 15px; }
@@ -61,7 +64,12 @@ export const assetGalleryStyles = `/* ── Assets lens ───────�
 .wsx-share-send + .wsx-share-send { margin-top: 6px; }
 /* sent deliveries (manage + revoke) */
 .wsx-assets__headr { display: flex; gap: 8px; align-items: center; }
-.wsx-asset-folders { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 var(--space-3); }
+.wsx-asset-tbl { margin-top: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg-elevated); padding: 0; }
+.wsx-asset-row { cursor: pointer; }
+.wsx-asset-row.is-sel { background: var(--color-primary-light); }
+.wsx-asset-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.wsx-asset__check--row { position: relative; top: auto; left: auto; border-color: var(--color-border); background: var(--color-bg-elevated); box-shadow: none; }
+.wsx-asset__ver--row { position: static; margin-left: 6px; }
 .wsx-deliv { display: flex; flex-direction: column; gap: 8px; }
 .wsx-deliv__row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elevated); }
 .wsx-deliv__main { flex: 1; min-width: 0; }
