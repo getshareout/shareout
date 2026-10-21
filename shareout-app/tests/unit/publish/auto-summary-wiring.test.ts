@@ -55,10 +55,21 @@ describe('schedulePostPublishTasks — auto-summary wiring', () => {
     expect(generateArtifactSummary).toHaveBeenCalledWith(expect.anything(), 'art1');
   });
 
-  it('skips non-html artifact types', async () => {
+  it('fires for converted documents (markdown, csv) too', async () => {
+    for (const artifactType of ['markdown', 'csv'] as const) {
+      const ctx = fakeCtx();
+      schedulePostPublishTasks({} as Env, { id: 'u1' } as AuthUser, ctx, {
+        ...baseOpts, artifactId: `art_${artifactType}`, artifactType,
+      });
+      await Promise.all(ctx.tasks);
+      expect(generateArtifactSummary).toHaveBeenCalledWith(expect.anything(), `art_${artifactType}`);
+    }
+  });
+
+  it('skips other artifact types', async () => {
     const ctx = fakeCtx();
     schedulePostPublishTasks({} as Env, { id: 'u1' } as AuthUser, ctx, {
-      ...baseOpts, artifactId: 'art2', artifactType: 'csv',
+      ...baseOpts, artifactId: 'art2', artifactType: 'json',
     });
     await Promise.all(ctx.tasks);
     expect(generateArtifactSummary).not.toHaveBeenCalled();

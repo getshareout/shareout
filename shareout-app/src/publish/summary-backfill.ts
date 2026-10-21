@@ -1,5 +1,6 @@
 import type { Env } from '../types';
 import { generateArtifactSummary } from './auto-summary';
+import { SUMMARY_MIMES_SQL } from './summary-scope';
 
 /**
  * Hourly drip backfill of auto-summaries for artifacts published before the
@@ -19,7 +20,7 @@ export async function runSummaryBackfill(env: Env): Promise<{ processed: number 
        JOIN versions v ON v.id = d.version_id
        JOIN assets ast ON ast.version_id = v.id AND ast.path = v.entrypoint
        LEFT JOIN artifact_presentation pres_a ON pres_a.artifact_id = a.id
-       WHERE ast.mime = 'text/html'
+       WHERE ast.mime IN ${SUMMARY_MIMES_SQL}
          AND a.deleted_at IS NULL
          AND (a.description IS NULL OR a.description = '')
          AND pres_a.auto_summary_hash IS NULL
