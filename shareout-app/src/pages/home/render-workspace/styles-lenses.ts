@@ -28,6 +28,9 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 .wsx-vwr__n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wsx-vwr__more { margin-top: var(--space-2); background: none; border: 0; padding: 0; color: var(--color-primary); font-size: 12px; cursor: pointer; }
 /* ---- Lens intro + quick-action tiles (Schedules / Alerts empty states) ---- */
+.wsx__viewtitle:has(.wsx-lens__q) { display: flex; align-items: center; gap: 8px; }
+.wsx-lens__q { display: inline-grid; place-items: center; flex: none; width: 18px; height: 18px; padding: 0; border-radius: 999px; border: 1.5px solid var(--color-border-strong); background: transparent; color: var(--color-text-tertiary); font: 700 11px var(--font-body); line-height: 1; cursor: help; transition: color var(--duration-fast), border-color var(--duration-fast); }
+.wsx-lens__q:hover, .wsx-lens__q:focus-visible { color: var(--color-text); border-color: var(--color-text-secondary); }
 .wsx-lens__intro { font-size: var(--text-sm); color: var(--color-text-secondary); line-height: 1.55; max-width: 540px; margin: 0 0 16px; }
 .wsx-qa-grid--lens { max-width: 560px; }
 /* ---- My Schedules — Airflow-style cards ---- */
@@ -183,6 +186,12 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 .wsx-admin__artfilter.wsx__chips .wsx-chip:hover { background: var(--color-bg-elevated); color: var(--color-text); }
 .wsx-admin__artfilter.wsx__chips .wsx-chip.is-on { background: var(--color-primary); color: var(--color-text-inverse); }
 .wsx-atbl__wrap { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+/* Table toolbar: search/filters that act on a table sit in that table's card head. Only styled when a table follows. */
+.wsx-ttool:has(+ .wsx-atbl__wrap), .wsx-ttool:has(+ #wsxArtMount > .wsx-tbl:first-child) { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0; padding: 8px 10px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md) var(--radius-md) 0 0; }
+.wsx-ttool > .wsx-cat__bar { flex: 1; min-width: 0; }
+.wsx-ttool > .wsx-kn2__prog { flex-basis: 100%; margin-top: 4px; }
+.wsx-ttool + .wsx-atbl__wrap, .wsx-ttool + #wsxArtMount > .wsx-tbl:first-child { border-top: 0; border-radius: 0 0 var(--radius-md) var(--radius-md); }
+#wsxArtMount > .wsx-tbl:first-child { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 0; }
 .wsx-atbl { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
 .wsx-atbl th, .wsx-atbl td { padding: 8px 10px; border-bottom: 1px solid var(--color-border); text-align: left; white-space: nowrap; }
 .wsx-atbl tr:last-child td { border-bottom: 0; }

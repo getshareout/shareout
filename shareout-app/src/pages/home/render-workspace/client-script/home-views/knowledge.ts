@@ -106,6 +106,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
   }
 
   function knRenderOnboard(m, mode) {
+    ['knStats', 'knActions'].forEach(function (id) { var el = document.getElementById(id); if (el) el.innerHTML = ''; });
     var admin = !!window.WSX_ADMIN;
     var paid = !!window.WSX_KNOWLEDGE_PAID;
     var msg = mode === 'off' ? t('knowledge.offTitle') : t('knowledge.emptyTitle');
@@ -209,9 +210,6 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
       + '<button class="' + (knState.view === 'map' ? 'is-on' : '') + '" data-kn-view="map" type="button">' + esc(t('knowledge.viewMap')) + '</button>'
       + '</div>';
   }
-  function knHowBtn() {
-    return '<button class="wsx-kn2__how wsx-kn2__how--icon" id="knHow" type="button" data-tip="' + esc(t('knowledge.howBtn')) + '" aria-label="' + esc(t('knowledge.howBtn')) + '"><span class="wsx-kn2__q">?</span></button>';
-  }
   function knHowP(key) {
     var s = t(key), i = s.indexOf('. ');
     if (i < 0) return '<p>' + esc(s) + '</p>';
@@ -219,17 +217,16 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
   }
   function knHowModal() {
     wsxModal(t('knowledge.howTitle'), '<div class="wsx-kn2__how-body">'
-      + knHowP('knowledge.howLearn') + knHowP('knowledge.howDream') + knHowP('knowledge.howAgents') + knHowP('knowledge.howControl') + '</div>');
+      + '<p>' + esc(t('intro.knowledge')) + '</p>' + knHowP('knowledge.howLearn') + knHowP('knowledge.howDream') + knHowP('knowledge.howAgents') + knHowP('knowledge.howControl') + '</div>');
   }
 
   // ---- Table view (the alternate, kept intact behind the toggle) ----
   var KN_SEGS = [['topic', 'knowledge.segTopics'], ['entity', 'knowledge.segEntities'], ['artifact-digest', 'knowledge.segPages'], ['decision', 'knowledge.segDecisions']];
   function knSeg() {
-    var btns = '<button class="' + (knState.kind === '' ? 'is-on' : '') + '" data-kn-kind-seg="" type="button">' + esc(t('knowledge.segAll')) + '</button>';
-    btns += KN_SEGS.map(function (s) {
-      return '<button class="' + (knState.kind === s[0] ? 'is-on' : '') + '" data-kn-kind-seg="' + s[0] + '" type="button">' + esc(t(s[1])) + '</button>';
+    var opts = [['', 'knowledge.segAll']].concat(KN_SEGS).map(function (s) {
+      return '<option value="' + s[0] + '"' + (knState.kind === s[0] ? ' selected' : '') + '>' + esc(t(s[1])) + '</option>';
     }).join('');
-    return '<div class="wsx__modetog wsx-cat__seg">' + btns + '</div>';
+    return '<select class="so-c-select wsx-kn2__kind" id="knKind" aria-label="' + esc(t('knowledge.colKind')) + '">' + opts + '</select>';
   }
 
   var KN_COLS = [['title', 'knowledge.colTitle', 1], ['kind', 'knowledge.colKind', 1], ['topics', 'knowledge.colTopics', 0], ['sources', 'knowledge.colSources', 0], ['learned', 'knowledge.colLearned', 1]];
@@ -287,9 +284,8 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
   }
 
   function knBindTable(m) {
-    m.querySelectorAll('[data-kn-kind-seg]').forEach(function (b) {
-      b.addEventListener('click', function () { knState.kind = b.getAttribute('data-kn-kind-seg'); knRenderShell(m); });
-    });
+    var kind = document.getElementById('knKind');
+    if (kind) kind.addEventListener('change', function () { knState.kind = kind.value; knApplyFilter(); });
     m.querySelectorAll('th[data-knsort]').forEach(function (th) {
       th.addEventListener('click', function () {
         var k = th.getAttribute('data-knsort');
@@ -442,13 +438,14 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     if (knCurrentPath && byPath[knCurrentPath] && (knState.view === 'table' || knNarrow())) { knFullDetail(m, knCurrentPath); return; }
     var trainBtn = window.WSX_ADMIN ? '<button class="so-c-btn so-c-btn--primary wsx-kn2__train" id="knTrain" type="button" data-tip="' + esc(t('knowledge.tipTrain')) + '">' + esc(t('knowledge.train')) + '</button>' : '';
     var prog = '<div class="wsx-kn2__prog" id="knProg" hidden><div class="wsx-kn2__progtrack"><div class="wsx-kn2__progfill" id="knProgFill"></div></div><span class="wsx-kn2__proglabel" id="knProgLabel"></span></div>';
-    // Search sits where the Artifacts lens has it: right side, before the view toggle.
+    // Lens-level (stats, train, view) live in the title row; search/filter live with what they filter.
     var search = knState.view === 'map' ? '' : '<div class="wsx-qsearch">' + isvg('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>')
       + '<input id="knSearch" type="search" placeholder="' + esc(t('knowledge.searchPlaceholder')) + '" aria-label="' + esc(t('knowledge.searchPlaceholder')) + '" autocomplete="off" spellcheck="false"></div>';
-    var top = '<div class="wsx-cat__controls"><div class="wsx-cat__bar wsx-kn2__bar">' + knKpiTiles()
-      + (knState.view === 'table' ? knSeg() + '<span class="wsx-cat__count" id="knCount"></span>' : '')
-      + '<div class="wsx-kn2__ctlright">' + search + trainBtn + knHowBtn() + knToggle() + '</div>'
-      + '</div>' + prog + '</div>';
+    var stats = document.getElementById('knStats'); if (stats) stats.innerHTML = knKpiTiles();
+    var acts = document.getElementById('knActions'); if (acts) acts.innerHTML = trainBtn + knToggle();
+    var top = knState.view === 'table'
+      ? '<div class="wsx-cat__controls wsx-ttool"><div class="wsx-cat__bar wsx-kn2__bar">' + search + knSeg() + '<span class="wsx-cat__count" id="knCount"></span></div>' + prog + '</div>'
+      : prog;
     if (knState.view === 'map') { kmRender(m, top); return; }
     if (knState.view === 'table') {
       m.innerHTML = top + knTableBody();
@@ -456,7 +453,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     } else {
       m.innerHTML = top
         + '<div class="wsx-kn2">'
-        + '<div class="wsx-kn2__pane wsx-kn2__treewrap">'
+        + '<div class="wsx-kn2__pane wsx-kn2__treewrap">' + search
         + '<div class="wsx-kn2__tree" id="knTree">' + knTreeHtml() + '</div>'
         + '<div class="wsx-empty" id="knNone" style="display:none">' + esc(t('knowledge.noMatch')) + '</div>'
         + '</div>'
@@ -475,7 +472,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
 
   function knBindShell(m) {
     if (knPollTimer && knLastProg) { knShowProg(true); knSetProg(knLastProg.done, knLastProg.total); }
-    m.querySelectorAll('[data-kn-view]').forEach(function (b) {
+    document.querySelectorAll('#knActions [data-kn-view]').forEach(function (b) {
       b.addEventListener('click', function () {
         var v = b.getAttribute('data-kn-view'); if (v === knState.view) return;
         kmOnViewSwitch(knState.view, v);
@@ -483,7 +480,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
         knRenderShell(m);
       });
     });
-    var how = document.getElementById('knHow'); if (how) how.addEventListener('click', knHowModal);
+    var how = document.getElementById('knHow'); if (how) how.onclick = knHowModal;
     var tr = document.getElementById('knTrain'); if (tr) tr.addEventListener('click', function () { knStartTrain(tr); });
     var s = document.getElementById('knSearch');
     if (s) { s.value = knState.q; s.addEventListener('input', function () { knState.q = s.value.trim().toLowerCase(); if (knState.view === 'tree') knApplyTreeFilter(); else knApplyFilter(); }); }
@@ -549,6 +546,29 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
         + isvg(KND_ICO.doc) + '<span class="wsx-knd__srct">' + esc(label) + '</span><span class="wsx-knd__srcgo">' + isvg(KND_ICO.go) + '</span></a></li>';
     }).join('') + '</ul>';
   }
+  // Related = other notes sharing topics/entities, plus the topic/entity notes this one names.
+  function knRelated(node) {
+    var ts = (node.topics || []).map(knSlug), es = (node.entities || []).map(knSlug);
+    function hits(xs, ys) { return xs.filter(function (x) { return ys.indexOf(knSlug(x)) >= 0; }).length; }
+    return knState.nodes.filter(function (n) { return n.path !== node.path && n.kind !== 'overview' && n.kind !== 'guidance'; })
+      .map(function (n) {
+        var score = 2 * hits(n.topics || [], ts) + 2 * hits(n.entities || [], es);
+        if (n.kind === 'topic' && ts.indexOf(knSlug(n.id || n.title)) >= 0) score += 3;
+        if (n.kind === 'entity' && es.indexOf(knSlug(n.id || n.title)) >= 0) score += 3;
+        return { n: n, score: score };
+      })
+      .filter(function (x) { return x.score > 0; })
+      .sort(function (a, b) { return b.score - a.score; })
+      .slice(0, 6).map(function (x) { return x.n; });
+  }
+  function knRelatedSec(node) {
+    var rel = knRelated(node); if (!rel.length) return '';
+    return '<section class="wsx-knd__sec"><div class="wsx-knd__sechead"><h4>' + esc(t('knowledge.related')) + '</h4><span class="wsx-knd__count">' + rel.length + '</span></div>'
+      + '<ul class="wsx-knd__srcs">' + rel.map(function (n) {
+        return '<li><button class="wsx-knd__src wsx-knd__rel" type="button" data-kn-go="' + esc(n.path) + '"><span class="wsx-kn2__ico">' + knIcon(n.kind) + '</span>'
+          + '<span class="wsx-knd__srct">' + esc(n.title || n.path) + '</span><span class="wsx-knd__relkind">' + esc(knKindLabel(n.kind)) + '</span></button></li>';
+      }).join('') + '</ul></section>';
+  }
   // Topic/entity chips open their note when it's in the tree.
   function knSlug(x) { return String(x).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
   function knChip(kind, x) {
@@ -568,6 +588,12 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     return content;
   }
 
+  // Back = an arrow inline with the title, not its own row.
+  function knBackBtn() {
+    var lbl = esc(t('knowledge.back').replace('\\u2190', '').trim());
+    return '<button class="wsx-knd__back" id="knBack" type="button" aria-label="' + lbl + '" data-tip="' + lbl + '">' + isvg('<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>') + '</button>';
+  }
+
   function knPaintDetail(host, node, back) {
     var topics = node.topics || [], entities = node.entities || [];
     var sources = node.source_artifacts || node.sources || [];
@@ -575,7 +601,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     if (node.updated_at && node.updated_at !== node.learned_at) meta.push(t('knowledge.freshUpdated') + ' ' + adRelDate(node.updated_at));
     if (node.confidence) meta.push(t('knowledge.metaConfidence') + ': ' + node.confidence);
     var title = node.kind === 'overview' ? t('knowledge.overviewTitle') : (node.title || node.path);
-    var backBtn = back ? '<button class="wsx-cat__back" id="knBack" type="button">' + esc(t('knowledge.back')) + '</button>' : '';
+    var backBtn = back ? knBackBtn() : '';
     // Actions sit with the title they act on, as icons; Forget is admin-only.
     var acts = '<div class="wsx-knd__acts">'
       + knIconBtn('knPin', t(node.pinned ? 'knowledge.unpin' : 'knowledge.pin'), 'pin', node.pinned ? ' is-on' : '')
@@ -587,16 +613,17 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     }
     var facets = facet('knowledge.metaTopics', 'topic', topics) + facet('knowledge.metaEntities', 'entity', entities);
     // Head stays put while the rest scrolls (desktop tree pane; plain blocks elsewhere).
-    host.innerHTML = '<div class="wsx-kn2__dtop wsx-knd__head">' + backBtn
+    host.innerHTML = '<div class="wsx-kn2__dtop wsx-knd__head">'
       + '<div class="wsx-knd__top"><div class="wsx-knd__titles">'
       + '<div class="wsx-knd__eyebrow"><span class="wsx-knd__kind">' + esc(knKindLabel(node.kind)) + '</span>' + knBadge(node) + '</div>'
-      + '<h3 class="wsx-knd__title" title="' + esc(node.path) + '">' + esc(title) + '</h3>'
+      + '<div class="wsx-knd__trow">' + backBtn + '<h3 class="wsx-knd__title" title="' + esc(node.path) + '">' + esc(title) + '</h3></div>'
       + '<div class="wsx-knd__meta">' + esc(meta.join(' \\u00B7 ')) + '</div>'
       + '</div>' + acts + '</div></div>'
       + '<div class="wsx-kn2__scroll">'
       + (facets ? '<div class="wsx-knd__facets">' + facets + '</div>' : '')
       + '<div id="knBody">' + (node.kind === 'overview' ? knOverviewChrome(node.body) : (node.body ? '<div class="wsx-cat__body wsx-knd__body">' + knWikiLinks(mdToHtml(node.body)) + '</div>' : '')) + '</div>'
       + '<section class="wsx-knd__sec"><div class="wsx-knd__sechead"><h4 data-tip="' + esc(t('knowledge.tipSources')) + '">' + esc(t('knowledge.srcHeader')) + '</h4><span class="wsx-knd__count">' + sources.length + '</span><span class="wsx-knd__hint">' + esc(t('knowledge.srcHint')) + '</span></div>' + knSrcRows(sources) + '</section>'
+      + knRelatedSec(node)
       + '</div>';
     if (back) { var bk = document.getElementById('knBack'); if (bk) bk.addEventListener('click', back); }
     knBindWikiLinks(host);
@@ -624,13 +651,15 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     var next = !node.pinned;
     function paint(v) {
       node.pinned = v; if (knState.byPath[node.path]) knState.byPath[node.path].pinned = v;
-      var btn = document.getElementById('knPin'); if (btn) btn.textContent = t(v ? 'knowledge.unpin' : 'knowledge.pin');
+      if (node.content) node.content = knSetPinnedLine(node.content, v);
+      var btn = document.getElementById('knPin'), lbl = t(v ? 'knowledge.unpin' : 'knowledge.pin');
+      if (btn) { btn.classList.toggle('is-on', v); btn.setAttribute('data-tip', lbl); btn.setAttribute('aria-label', lbl); }
     }
     optimistic({
       key: 'kn:pin:' + node.path,
       apply: function () { paint(next); },
       rollback: function () { paint(!next); },
-      request: function () { return knPut(node, knSetPinnedLine(knRaw(node), next)); },
+      request: function () { return knPut(node, knRaw(node)); },
       error: t('knowledge.updateError'),
       done: function () { if (knCurrentPath === node.path) knReopen(node.path); },
     });
@@ -746,9 +775,8 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     if (node.is_entry) badges += '<span class="so-c-badge wsx-kn__bdg" data-tip="' + esc(t('knowledge.tipEntry')) + '">' + esc(t('knowledge.badgeEntry')) + '</span>';
     badges += '<span class="so-c-badge wsx-kn__bdg">' + esc(t('knowledge.badgeManual')) + '</span>';
     var fresh = node.updated_at ? (t('knowledge.freshUpdated') + ' ' + adRelDate(node.updated_at)) : '';
-    var backBtn = back ? '<button class="wsx-cat__back" id="knBack" type="button">' + esc(t('knowledge.back')) + '</button>' : '';
-    host.innerHTML = backBtn
-      + '<div class="wsx-cat__dhead"><span class="wsx-atbl__type">' + esc(t('knowledge.branchGuidance')) + '</span><h3>' + esc(node.name) + '</h3>' + badges + '</div>'
+    var backBtn = back ? knBackBtn() : '';
+    host.innerHTML = '<div class="wsx-cat__dhead">' + backBtn + '<span class="wsx-atbl__type">' + esc(t('knowledge.branchGuidance')) + '</span><h3>' + esc(node.name) + '</h3>' + badges + '</div>'
       + '<div class="wsx-sched__meta">' + esc(node.path) + '</div>'
       + '<div id="knBody"><div class="wsx-cat__body">' + knWikiLinks(mdToHtml(node.body || '')) + '</div></div>'
       + (fresh ? '<div class="wsx-kn__fresh">' + esc(fresh) + '</div>' : '')

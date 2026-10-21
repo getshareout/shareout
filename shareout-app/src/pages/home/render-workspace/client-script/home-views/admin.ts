@@ -224,7 +224,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
           });
         }
         function renderTable() {
-          var filterBtns = '<div class="wsx-admin__artfilter wsx__chips">'
+          var filterBtns = '<div class="wsx-admin__artfilter wsx__chips wsx-ttool">'
             + ['', 'public', 'private', 'unused'].map(function (v) {
               var lbl = v ? (VIS_LABEL[v] || (v === 'unused' ? t('admin.visUnused') : v)) : t('admin.visAll');
               return '<button class="wsx-chip' + (artVis === v ? ' is-on' : '') + '" data-avis="' + v + '" type="button">' + lbl + '</button>';

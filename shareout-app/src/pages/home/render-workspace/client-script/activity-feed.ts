@@ -89,7 +89,9 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
   // ===== artifact widgets: tile (cards) <-> table (rows), per-widget + persisted =====
   var ART_DATA = {};
   var VIEW_LS = 'wsx_view:';
-  var TBL_HEAD = '<div class="wsx-tbl__head"><span></span><span>' + esc(t('widget.colName')) + '</span><span>' + esc(t('widget.colType')) + '</span><span>' + esc(t('widget.colViews')) + '</span><span>' + esc(t('widget.colUpdated')) + '</span></div>';
+  // Header cells carry the row cell classes so narrow containers hide header + cells together.
+  var TBL_COLS = [['icon', ''], ['name', 'widget.colName'], ['owner', 'widget.colCreatedBy'], ['shared', 'widget.colShared'], ['access', 'widget.colAccess'], ['type', 'widget.colType'], ['feat', 'widget.colFeatures'], ['tags', 'widget.colTags'], ['views', 'widget.colViews'], ['visitors', 'widget.colVisitors'], ['created', 'widget.colCreated'], ['date', 'widget.colUpdated']];
+  var TBL_HEAD = '<div class="wsx-tbl__head">' + TBL_COLS.map(function (c) { return '<span class="wsx-tr__' + c[0] + '">' + (c[1] ? esc(t(c[1])) : '') + '</span>'; }).join('') + '</div>';
   function widgetView(id) { try { return localStorage.getItem(VIEW_LS + id) === 'table' ? 'table' : 'tile'; } catch (e) { return 'tile'; } }
   function renderArtView(id) {
     var el = document.getElementById(id); var d = ART_DATA[id]; if (!el || !d) return;
@@ -97,8 +99,9 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
     var body = !d.count
       ? '<div class="wsx-empty">' + esc(d.empty || t('common.nothingHere')) + '</div>'
       : (widgetView(id) === 'table'
-        ? '<div class="wsx-tbl">' + TBL_HEAD + (d.rowsHtml || '') + '</div>'
-        : '<div class="artifacts-grid">' + (d.cardsHtml || '') + '</div>');
+        ? '<div class="wsx-tbl wsx-tbl--art">' + TBL_HEAD + (d.rowsHtml || '') + '</div>'
+        : (d.foldersHtml ? '<div class="wsx-art-folders">' + d.foldersHtml + '</div>' : '')
+          + (d.cardsHtml ? '<div class="artifacts-grid">' + d.cardsHtml + '</div>' : ''));
     el.innerHTML = head + body;
     localizeFragment(el);
     hidePendingArts(el);

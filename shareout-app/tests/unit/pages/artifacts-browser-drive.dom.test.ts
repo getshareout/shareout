@@ -32,11 +32,11 @@ function boot() {
   });
   const win = globalThis.window as unknown as Record<string, unknown>;
   win.WSX_WS = 'wsp_1';
-  const ART_DATA: Record<string, { cardsHtml: string; count: number; folderHead: string; empty: string }> = {};
+  const ART_DATA: Record<string, { foldersHtml?: string; cardsHtml: string; count: number; folderHead: string; empty: string }> = {};
   const base: Record<string, unknown> = {
     homePane: document.getElementById('home'), ws: document.getElementById('wsx'), t, esc, fetch: fetchMock,
     i18nLoad: () => '', i18nEmpty: (k: string) => k, ART_DATA, requestIdleCallback: () => {},
-    renderArtView: (id: string) => { const d = ART_DATA[id]; document.getElementById(id)!.innerHTML = d.folderHead + (d.count ? `<div class="artifacts-grid">${d.cardsHtml}</div>` : d.empty); },
+    renderArtView: (id: string) => { const d = ART_DATA[id]; document.getElementById(id)!.innerHTML = d.folderHead + (d.count ? (d.foldersHtml ? `<div class="wsx-art-folders">${d.foldersHtml}</div>` : '') + (d.cardsHtml ? `<div class="artifacts-grid">${d.cardsHtml}</div>` : '') : d.empty); },
   };
   const scope = new Proxy({} as Record<string | symbol, unknown>, {
     has: () => true,
@@ -54,7 +54,7 @@ function boot() {
   return win as unknown as { exitFolder: () => void; enterFolder: (id: string, n: string) => void };
 }
 
-const grid = () => [...document.querySelectorAll('#wsxArtMount .artifacts-grid > *')].map((e) => e.getAttribute('data-name') || e.getAttribute('data-folder-id'));
+const grid = () => [...document.querySelectorAll('#wsxArtMount .wsx-art-folders > *, #wsxArtMount .artifacts-grid > *')].map((e) => e.getAttribute('data-name') || e.getAttribute('data-folder-id'));
 const chip = (f: string) => document.querySelector(`[data-art-filter="${f}"]`)!;
 
 beforeEach(() => { document.body.innerHTML = ''; });

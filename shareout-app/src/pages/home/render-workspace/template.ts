@@ -137,7 +137,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
           </div>
           <div class="wsx__view" data-view="artifacts">
             <h2 class="wsx__viewtitle" data-i18n="view.allArtifacts">All Artifacts</h2>
-            <div class="wsx__chips" id="wsxArtChips">
+            <div class="wsx__chips wsx-ttool" id="wsxArtChips">
               <button class="wsx-chip is-on" data-art-filter="recent" type="button"><span data-i18n="filter.recent">Recent</span><span class="wsx-chip__n"></span></button>
               <button class="wsx-chip" data-art-filter="all" type="button"><span data-i18n="filter.all">All</span><span class="wsx-chip__n"></span></button>
               <button class="wsx-chip" data-art-filter="favorites" type="button"><span data-i18n="filter.favorites">Favorites</span><span class="wsx-chip__n"></span></button>
@@ -156,13 +156,12 @@ export function buildWorkspaceBody(args: RenderArgs): string {
           </div>
           <div class="wsx__view" data-view="assets">
             <div class="wsx-assets__head">
-              <h2 class="wsx__viewtitle" data-i18n="view.assets">Assets</h2>
+              <h2 class="wsx__viewtitle"><span data-i18n="view.assets">Assets</span><button class="wsx-lens__q" type="button" data-i18n-tip="intro.assets" data-i18n-aria="intro.assets" data-tip="Keep images, video, and files for your team in one place. New files are visible to the team only; open a public link when you want to show one in an artifact or send it to a customer. Any file type." aria-label="Keep images, video, and files for your team in one place. New files are visible to the team only; open a public link when you want to show one in an artifact or send it to a customer. Any file type.">?</button></h2>
               <div class="wsx-assets__headr">
                 <button class="wsx-abtn" id="wsxAssetDeliveries" type="button">${svg('<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>')}<span data-i18n="assets.sentDeliveries">Sent deliveries</span></button>
                 <button class="wsx-assets__upload" id="wsxAssetUpload" type="button">${svg('<path d="M12 5v14"/><path d="M5 12h14"/>')}<span data-i18n="assets.uploadFiles">Upload files</span></button>
               </div>
             </div>
-            <p class="wsx-lens__intro" data-i18n="intro.assets">Keep images, video, and files for your team in one place. New files are visible to the team only; open a public link when you want to show one in an artifact or send it to a customer. Any file type.</p>
             <div class="wsx__chips" id="wsxAssetChips">
               <button class="wsx-chip is-on" data-asset-filter="all" type="button"><span data-i18n="filter.all">All</span><span class="wsx-chip__n"></span></button>
               <button class="wsx-chip" data-asset-filter="image" type="button"><span data-i18n="filter.images">Images</span><span class="wsx-chip__n"></span></button>
@@ -186,23 +185,20 @@ export function buildWorkspaceBody(args: RenderArgs): string {
             <div id="wsxAnalyticsMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="datasets">
-            <h2 class="wsx__viewtitle" data-i18n="view.datasets">Datasets</h2>
-            <p class="wsx-lens__intro" data-i18n="intro.datasets">Tables that workspace pages have shared. Any page in the workspace can read them.</p>
+            <h2 class="wsx__viewtitle"><span data-i18n="view.datasets">Datasets</span><button class="wsx-lens__q" type="button" data-i18n-tip="intro.datasets" data-i18n-aria="intro.datasets" data-tip="Tables that workspace pages have shared. Any page in the workspace can read them." aria-label="Tables that workspace pages have shared. Any page in the workspace can read them.">?</button></h2>
             <div id="wsxDatasetMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="catalog">
-            <h2 class="wsx__viewtitle" data-i18n="view.catalog">Catalog</h2>
-            <p class="wsx-lens__intro" data-i18n="intro.catalog">Your workspace data map — sources, datasets, pipelines and terms, with lineage. Agents keep it current; search to trace where data comes from.</p>
+            <h2 class="wsx__viewtitle"><span data-i18n="view.catalog">Catalog</span><button class="wsx-lens__q" type="button" data-i18n-tip="intro.catalog" data-i18n-aria="intro.catalog" data-tip="Your workspace data map — sources, datasets, pipelines and terms, with lineage. Agents keep it current; search to trace where data comes from." aria-label="Your workspace data map — sources, datasets, pipelines and terms, with lineage. Agents keep it current; search to trace where data comes from.">?</button></h2>
             <div id="wsxCatMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="knowledge">
-            <div class="wsx-kn2__titlerow"><h2 class="wsx__viewtitle" data-i18n="view.knowledge">Knowledge</h2>
-            <p class="wsx-lens__intro" data-i18n="intro.knowledge" data-i18n-title="intro.knowledge">What your workspace has learned from its pages — topics, clients and facts, kept up to date as you publish. Search it, or open a page to see where a fact came from.</p></div>
+            <div class="wsx-kn2__titlerow"><h2 class="wsx__viewtitle"><span data-i18n="view.knowledge">Knowledge</span><button class="wsx-lens__q" type="button" id="knHow" data-i18n-tip="intro.knowledge" data-i18n-aria="intro.knowledge" data-tip="What your workspace has learned from its pages — topics, clients and facts, kept up to date as you publish. Search it, or open a page to see where a fact came from." aria-label="What your workspace has learned from its pages — topics, clients and facts, kept up to date as you publish. Search it, or open a page to see where a fact came from.">?</button></h2>
+            <div id="knStats"></div><div class="wsx-kn2__ctlright" id="knActions"></div></div>
             <div id="wsxKnMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="crew">
-            <h2 class="wsx__viewtitle" data-i18n="view.crew">Crew AI</h2>
-            <p class="wsx-lens__intro" data-i18n="intro.crew">Autonomous agents that run on a schedule or an event, read your workspace data, and deliver a result. Run one now, pause it, or check its history.</p>
+            <h2 class="wsx__viewtitle"><span data-i18n="view.crew">Crew AI</span><button class="wsx-lens__q" type="button" data-i18n-tip="intro.crew" data-i18n-aria="intro.crew" data-tip="Autonomous agents that run on a schedule or an event, read your workspace data, and deliver a result. Run one now, pause it, or check its history." aria-label="Autonomous agents that run on a schedule or an event, read your workspace data, and deliver a result. Run one now, pause it, or check its history.">?</button></h2>
             <div id="wsxCrewMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="library">
@@ -214,8 +210,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
             <div id="wsxLibMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="connect">
-            <h2 class="wsx__viewtitle" data-i18n="view.connect">Connect your agent</h2>
-            <p class="wsx-lens__intro" data-i18n="intro.connect">Use the AI you already use — Claude or ChatGPT — to make pages here. Pick yours and follow the steps.</p>
+            <h2 class="wsx__viewtitle"><span data-i18n="view.connect">Connect your agent</span><button class="wsx-lens__q" type="button" data-i18n-tip="intro.connect" data-i18n-aria="intro.connect" data-tip="Use the AI you already use — Claude or ChatGPT — to make pages here. Pick yours and follow the steps." aria-label="Use the AI you already use — Claude or ChatGPT — to make pages here. Pick yours and follow the steps.">?</button></h2>
             <div class="wsx__chips" id="wsxCnTabs">
               <button class="wsx-chip is-on" data-cn-tab="claude" type="button" data-i18n="connect.tabClaude">Claude</button>
               <button class="wsx-chip" data-cn-tab="chatgpt" type="button" data-i18n="connect.tabChatgpt">ChatGPT</button>
@@ -224,8 +219,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
             <div id="wsxCnMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="connectors">
-            <h2 class="wsx__viewtitle" data-i18n="view.connectors">Connectors</h2>
-            <p class="wsx-lens__intro" data-i18n="intro.connectors">Data sources your workspace can query by name — bring your own credentials once, then use them from any page.</p>
+            <h2 class="wsx__viewtitle"><span data-i18n="view.connectors">Connectors</span><button class="wsx-lens__q" type="button" data-i18n-tip="intro.connectors" data-i18n-aria="intro.connectors" data-tip="Data sources your workspace can query by name — bring your own credentials once, then use them from any page." aria-label="Data sources your workspace can query by name — bring your own credentials once, then use them from any page.">?</button></h2>
             <div id="wsxConnMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="admin">

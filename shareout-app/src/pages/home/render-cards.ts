@@ -153,6 +153,7 @@ export function renderArtifactCard(a: ArtifactRow, hostname: string, env?: Env):
       data-shared="${a.user_role !== 'owner' ? '1' : '0'}"
       data-favorite="${a.is_favorite ? '1' : '0'}"
       data-type-group="${artifactTypeGroup(a.artifact_type)}"
+      data-url="${escapeHtml(pageUrl)}"
       data-name="${escapeHtml(a.name.toLowerCase())}"
       data-tags="${escapeHtml(tagList.join('\n').toLowerCase())}"
       data-role="${escapeHtml(a.user_role)}"
@@ -164,7 +165,7 @@ export function renderArtifactCard(a: ArtifactRow, hostname: string, env?: Env):
       data-views="${a.total_views}"
       data-updated="${escapeHtml(a.updated_at || a.created_at)}"
       data-created="${escapeHtml(a.created_at)}">
-      <button type="button" class="card-select" onclick="event.stopPropagation();event.preventDefault();toggleSelect('${escapeHtml(a.id)}')" aria-label="Select" title="Select" data-i18n-aria="assets.select" data-i18n-title="assets.select">
+      <button type="button" class="card-select" onclick="event.stopPropagation();event.preventDefault();toggleSelect('${escapeHtml(a.id)}',event)" aria-label="Select" title="Select" data-i18n-aria="assets.select" data-i18n-title="assets.select">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </button>
       <div class="card-preview-wrap">
@@ -218,18 +219,69 @@ export function renderArtifactCard(a: ArtifactRow, hostname: string, env?: Env):
     </article>`;
 }
 
-/** Compact table row for the workspace Brief's table view (mirrors the card data). */
-export function renderArtifactRow(a: ArtifactRow, _hostname: string): string {
+const DASH = '<span class="wsx-tr__none">\u2014</span>';
+
+function avatarHtml(name: string | null, picture: string | null): string {
+  const inner = picture
+    ? `<img src="${escapeHtml(picture)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">`
+    : escapeHtml(ownerInitials(name));
+  return `<span class="owner-avatar">${inner}</span>`;
+}
+
+function renderSharedCell(a: ArtifactRow): string {
+  const canSee = a.user_role === 'owner' || !!a.my_collab_role;
+  const people = canSee && a.shared_raw
+    ? a.shared_raw.split('\x1e').map(p => { const [name, picture] = p.split('\x1f'); return { name, picture: picture || null }; })
+    : [];
+  if (!people.length) return DASH;
+  const more = (a.shared_count || people.length) - people.length;
+  const names = people.map(p => p.name).join(', ') + (more > 0 ? ` +${more}` : '');
+  return `<span class="wsx-tr__stack" title="${escapeHtml(names)}">${people.map(p => avatarHtml(p.name, p.picture)).join('')}${more > 0 ? `<span class="wsx-tr__more">+${more}</span>` : ''}</span>`;
+}
+
+function renderAccessCell(a: ArtifactRow): string {
+  const isWs = a.visibility === 'workspace';
+  return `<span class="wsx-tr__vis${isWs ? ' is-ws' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${isWs ? VIS_PEOPLE_ICON : VIS_LOCK_ICON}</svg><span data-i18n="${isWs ? 'cards.visWorkspace' : 'inspector.visName.private'}">${isWs ? 'All Workspace' : 'Private'}</span></span>`;
+}
+
+function renderFeaturesCell(a: ArtifactRow): string {
+  const features = FEATURE_META.filter(f => (a[f.key] as number) > 0);
+  if (!features.length) return DASH;
+  return features.map(f => `<span class="feature" title="${escapeHtml(f.label)}" aria-label="${escapeHtml(f.label)}" data-i18n-title="cards.feat.${f.key}" data-i18n-aria="cards.feat.${f.key}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${f.svg}</svg></span>`).join('');
+}
+
+function renderTagsCell(a: ArtifactRow): string {
+  const tags = a.tags ? a.tags.split('\n').filter(Boolean) : [];
+  if (!tags.length) return DASH;
+  const more = tags.length - 2;
+  return tags.slice(0, 2).map(t => `<span class="wsx-tr__tag">${escapeHtml(t)}</span>`).join('') + (more > 0 ? `<span class="wsx-tr__more" title="${escapeHtml(tags.slice(2).join(', '))}">+${more}</span>` : '');
+}
+
+function fmtDate(d: string): string {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** Compact table row for the workspace Brief's table view (mirrors the card data).
+ *  Cell classes double as column keys: the header uses the same ones and narrow
+ *  containers hide low-priority columns by class (see .wsx-tbl--art). */
+export function renderArtifactRow(a: ArtifactRow, hostname: string, env?: Env): string {
   const typeKey = TYPE_META[a.artifact_type] ? a.artifact_type : 'html';
   const tm = TYPE_META[typeKey];
   const date = a.updated_at || a.created_at;
-  const formattedDate = new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  return `<a class="wsx-tr" href="/a/${escapeHtml(a.slug)}/" data-id="${escapeHtml(a.id)}" data-slug="${escapeHtml(a.slug)}" data-name="${escapeHtml(a.name)}">
-    <span class="wsx-tr__icon" style="--type-color:${tm.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${tm.svg}</svg></span>
-    <span class="wsx-tr__name">${escapeHtml(a.name)}</span>
+  const pageUrl = buildArtifactShareUrl(hostname, a.slug, a.display_slug, undefined, undefined, env);
+  return `<a class="wsx-tr" href="/a/${escapeHtml(a.slug)}/" data-id="${escapeHtml(a.id)}" data-slug="${escapeHtml(a.slug)}" data-name="${escapeHtml(a.name)}" data-type="${escapeHtml(a.artifact_type)}" data-url="${escapeHtml(pageUrl)}" data-role="${escapeHtml(a.user_role)}" data-favorite="${a.is_favorite ? '1' : '0'}" data-visibility="${escapeHtml(a.visibility)}" data-workspace="${escapeHtml(a.workspace_id || '')}">
+    <span class="wsx-tr__icon" style="--type-color:${tm.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${tm.svg}</svg><button type="button" class="wsx-tr__sel" onclick="event.stopPropagation();event.preventDefault();toggleSelect('${escapeHtml(a.id)}',event)" aria-label="Select" title="Select" data-i18n-aria="assets.select" data-i18n-title="assets.select"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button></span>
+    <span class="wsx-tr__name"><span class="wsx-tr__nm">${escapeHtml(a.name)}</span><button type="button" class="wsx-tr__star${a.is_favorite ? ' is-on' : ''}" onclick="event.stopPropagation();event.preventDefault();toggleFavorite('${escapeHtml(a.id)}')" aria-pressed="${a.is_favorite ? 'true' : 'false'}" aria-label="${a.is_favorite ? 'Remove from favorites' : 'Add to favorites'}" title="${a.is_favorite ? 'Remove from favorites' : 'Add to favorites'}" data-i18n-aria="${a.is_favorite ? 'inspector.favRemove' : 'inspector.favAdd'}" data-i18n-title="${a.is_favorite ? 'inspector.favRemove' : 'inspector.favAdd'}"><svg viewBox="0 0 24 24" fill="${a.is_favorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></button></span>
+    <span class="wsx-tr__owner">${renderOwnerAvatar(a)}</span>
+    <span class="wsx-tr__shared">${renderSharedCell(a)}</span>
+    <span class="wsx-tr__access">${renderAccessCell(a)}</span>
     <span class="wsx-tr__type" data-i18n="cards.type.${typeKey}">${escapeHtml(tm.label)}</span>
+    <span class="wsx-tr__feat">${renderFeaturesCell(a)}</span>
+    <span class="wsx-tr__tags">${renderTagsCell(a)}</span>
     <span class="wsx-tr__views">${fmtCount(a.total_views)}</span>
-    <span class="wsx-tr__date" data-date="${escapeHtml(date)}" data-date-y="1">${formattedDate}</span>
+    <span class="wsx-tr__visitors">${fmtCount(a.unique_visitors)}</span>
+    <span class="wsx-tr__created" data-date="${escapeHtml(a.created_at)}" data-date-y="1">${fmtDate(a.created_at)}</span>
+    <span class="wsx-tr__date" data-date="${escapeHtml(date)}" data-date-y="1">${fmtDate(date)}</span>
   </a>`;
 }
 
@@ -242,8 +294,15 @@ export function renderFolderRow(f: HomeFolder): string {
   return `<div class="wsx-tr wsx-tr--folder" role="button" tabindex="0" data-folder-id="${id}" data-folder-name="${nm}" data-name="${nm}" onclick="enterFolder('${id}',this.getAttribute('data-folder-name'))" onkeydown="if(event.key==='Enter'){enterFolder('${id}',this.getAttribute('data-folder-name'))}">
     <span class="wsx-tr__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${FOLDER_SVG}</svg></span>
     <span class="wsx-tr__name">${nm}</span>
+    <span class="wsx-tr__owner"></span>
+    <span class="wsx-tr__shared"></span>
+    <span class="wsx-tr__access"></span>
     <span class="wsx-tr__type" data-i18n="artifacts.folderType">Folder</span>
+    <span class="wsx-tr__feat"></span>
+    <span class="wsx-tr__tags"></span>
     <span class="wsx-tr__views wsx-folder-card__count" data-count="${f.artifact_count}">${f.artifact_count}</span>
+    <span class="wsx-tr__visitors"></span>
+    <span class="wsx-tr__created"></span>
     <span class="wsx-tr__date"></span>
   </div>`;
 }

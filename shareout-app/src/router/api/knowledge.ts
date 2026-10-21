@@ -294,7 +294,7 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
     return cors(
       jsonResponse({
         enabled: true,
-        node: { ...summarize(node, file), body: node.body, sources: node.sources, source_artifacts: await sourceArtifacts(ctx.env, workspaceId, auth.id, node.sources) },
+        node: { ...summarize(node, file), body: node.body, content: file.content, sources: node.sources, source_artifacts: await sourceArtifacts(ctx.env, workspaceId, auth.id, node.sources) },
       })
     );
   }

@@ -5,12 +5,13 @@
  */
 export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 .wsx__canvas { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-.wsx__chrome { display: flex; align-items: center; gap: 10px; flex: none; min-height: var(--wsx-headbar); padding: 12px 16px 0; box-sizing: border-box; }
+/* Header bar = its own card, same glass language as the rail, so tabs never read as page text. */
+.wsx__chrome { display: flex; align-items: center; gap: 10px; flex: none; min-height: var(--wsx-headbar); margin: 12px 16px 0; padding: 6px 8px; box-sizing: border-box; background: var(--glass-bg-strong); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-sm); }
 .wsx__acct--mob { display: flex; align-items: center; gap: 6px; flex: none; width: auto; padding: 4px 6px; margin-left: auto; border-radius: var(--radius-md); }
 .wsx__acct--mob:hover { background: var(--color-surface); }
 .wsx__chrome:has(.wsx__tabmode:not([hidden])) .wsx__acct--mob .wsx__acctname { display: none; }
-.wsx__tabs { position: relative; display: flex; align-items: stretch; gap: 4px; padding: 8px 10px 4px; overflow-x: auto; background: transparent; flex: 1; min-width: 0; box-sizing: border-box; }
-.wsx-tab { display: inline-flex; align-items: center; gap: 8px; padding: 8px 13px; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); cursor: pointer; white-space: nowrap; max-width: 220px; border: 0; transition: background var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
+.wsx__tabs { position: relative; display: flex; align-items: center; gap: 2px; padding: 0; overflow-x: auto; background: transparent; flex: 1; min-width: 0; box-sizing: border-box; }
+.wsx-tab { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); cursor: pointer; white-space: nowrap; max-width: 220px; border: 0; transition: background var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
 .wsx-tab:hover { background: var(--color-surface); }
 .wsx-tab.is-active { background: var(--color-primary-light); color: var(--color-primary); }
 .wsx-tab__ic { display: inline-flex; flex: none; color: currentColor; }
@@ -29,7 +30,14 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 .wsx-tab[draggable="true"] { cursor: grab; } .wsx-tab[draggable="true"]:active { cursor: grabbing; }
 .wsx-tab.is-dragging { opacity: 0.4; cursor: grabbing; }
 .wsx-tab.is-dragging .wsx-tab__x { visibility: hidden; }
-.wsx-tab-drop { position: absolute; top: 8px; bottom: 4px; left: 0; width: 2px; border-radius: 2px; background: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-light); pointer-events: none; transition: transform var(--duration-fast) var(--ease-out); }
+.wsx-tab-drop { position: absolute; top: 4px; bottom: 4px; left: 0; width: 2px; border-radius: 2px; background: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-light); pointer-events: none; transition: transform var(--duration-fast) var(--ease-out); }
+
+.wsx-cmenu { position: fixed; z-index: 400; min-width: 210px; padding: 6px; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; }
+.wsx-cmenu__it { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text); font: 500 var(--text-sm) var(--font-body); text-align: left; cursor: pointer; }
+.wsx-cmenu__it svg { width: 15px; height: 15px; flex: none; color: var(--color-text-secondary); }
+.wsx-cmenu__it:hover, .wsx-cmenu__it:focus-visible { background: var(--color-surface); outline: none; }
+.wsx-cmenu__it.is-danger, .wsx-cmenu__it.is-danger svg { color: var(--color-error); }
+.wsx-cmenu__sep { height: 1px; margin: 5px 4px; background: var(--color-border); }
 
 .wsx__panes { position: relative; flex: 1; min-height: 0; }
 .wsx__pane { position: absolute; inset: 0; overflow-y: auto; padding: var(--space-5) clamp(16px, 3vw, 32px); display: none; }

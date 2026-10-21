@@ -374,8 +374,8 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
       }
       kmPaintFinder();
       if (kmState.focus) { if (!kmState.trail.length) kmState.trail = [kmState.focus]; kmGo(kmState.focus, 'none'); return; }
-      // First open is a list, not a random entity: the person picks what to look at.
-      var c = document.getElementById('kmCanvas'); if (c) c.innerHTML = i18nEmpty('kmap.pickHint');
+      // Never open on an empty canvas: start on the most-mentioned entity.
+      kmGo(kmState.top[0].id, 'reset');
     };
     if (kmState.types.length) start(true); else kmLoadTypes(start);
   }

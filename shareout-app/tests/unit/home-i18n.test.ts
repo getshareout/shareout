@@ -37,7 +37,8 @@ describe('home i18n', () => {
     expect(body).toContain('data-view="knowledge"');
     expect(body).toContain('id="wsxKnMount"');
     expect(body).toContain('data-i18n="view.knowledge"');
-    expect(body).toContain('data-i18n="intro.knowledge"');
+    expect(body).toContain('id="knStats"');
+    expect(body).toContain('data-i18n-tip="intro.knowledge"');
     expect(scripts).toContain('function loadKnowledge()');
     expect(scripts).toContain('function knRoute(');
     expect(scripts).toContain("key === 'knowledge'");
