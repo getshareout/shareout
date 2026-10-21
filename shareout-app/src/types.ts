@@ -183,7 +183,7 @@ export interface Env {
   /** LibreOffice container: slide decks (.pptx/.ppt/.odp) → PDF on import. Optional: decks stay in Assets without it. */
   SLIDES_CONVERTER?: DurableObjectNamespace<import('./pages/home/slides-converter-do').SlidesConverter>;
   /** Durable per-source ingest. Optional: ingest runs inline in waitUntil when absent. */
-  KNOWLEDGE_INGEST?: Workflow<import('./knowledge/corpus/ingest').IngestParams>;
+  KNOWLEDGE_INGEST?: Workflow<import('./knowledge/drain').KnowledgeWorkflowParams>;
   /** Durable folder import (src/file-imports). Optional: imports run inline in waitUntil when absent (small folders only). */
   FILE_IMPORT?: Workflow<import('./file-imports/types').FileImportParams>;
   /** Vectorize index over knowledge chunks (namespace = workspace id). Optional: search degrades to keyword. */

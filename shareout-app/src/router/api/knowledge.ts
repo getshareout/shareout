@@ -7,6 +7,7 @@ import { isKnowledgeEnabled, setKnowledgeEnabled, listKnowledgeFiles, upsertKnow
 import { enqueueIngest } from '../../knowledge/ingest';
 import { parseKnowledge, parseNode } from '../../knowledge/parse';
 import { runKnowledgeDistill } from '../../knowledge/distill';
+import { startDistillDrain } from '../../knowledge/drain';
 import { NODE_KINDS, type KnowledgeNode } from '../../knowledge/types';
 import { getAIProvider } from '../../data/agent/anthropic';
 import { corpusFor } from '../../knowledge/corpus/client';
@@ -177,12 +178,15 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
     if (!canManage) return cors(jsonError('Forbidden', 'FORBIDDEN', 403));
     const queued = await backfill(ctx, workspaceId);
     const corpus = await backfillCorpus(ctx, workspaceId);
-    // Bounded on-demand distill kick so the client's progress bar moves right away; the
-    // rest drains via the hourly cron. kicked=false when no AI provider (distill no-ops).
-    const kicked = !!getAIProvider(ctx.env) && !!ctx.executionCtx;
-    ctx.executionCtx?.waitUntil(
-      runKnowledgeDistill(ctx.env, { workspaceId, maxItems: 10, maxMs: 25_000 }).catch(() => {})
-    );
+    // Learn the whole queue now: a durable drain (drain.ts) where Workflows exist, else one
+    // bounded pass and the rest via the hourly cron. kicked=false when no AI provider.
+    const draining = !!getAIProvider(ctx.env) && await startDistillDrain(ctx.env, workspaceId);
+    if (!draining) {
+      ctx.executionCtx?.waitUntil(
+        runKnowledgeDistill(ctx.env, { workspaceId, maxItems: 10, maxMs: 25_000 }).catch(() => {})
+      );
+    }
+    const kicked = !!getAIProvider(ctx.env) && (draining || !!ctx.executionCtx);
     return cors(jsonResponse({ queued, kicked, corpus: corpus.queued, corpusRemaining: corpus.remaining }));
   }
 
