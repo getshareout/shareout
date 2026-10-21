@@ -78,7 +78,9 @@ export async function filesToArtifacts(env: Env, workspaceId: string, opts: { li
     const page = await convertToPage(env, {
       user: { id: r.owner_id, email: r.email }, workspaceId, folderId: r.folder_id,
       visibility: r.visibility === 'private' ? 'private' : 'workspace',
-      filename: r.filename, displayName: r.name, bytes: new Uint8Array(await obj.arrayBuffer()), slug: null,
+      // The page name is the file's name; convertToPage strips an extension, so give it one
+      // (else "PG-05 Rev.8" loses ".8").
+      filename: r.filename, displayName: `${r.name}.${r.filename.split('.').pop()}`, bytes: new Uint8Array(await obj.arrayBuffer()), slug: null,
     });
     if (!page.ok) { await keep(r, page.code, page.message); continue; }
     await mark(env, r.id, JSON.stringify(page.artifactId), true);

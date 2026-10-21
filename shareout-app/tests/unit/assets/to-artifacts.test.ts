@@ -48,7 +48,7 @@ const state = (id: string) => e.DB.prepare('SELECT deleted_at, type_metadata FRO
 
 describe('files → artifacts', () => {
   it('plans without writing, then converts in batches by owner, folder and visibility', async () => {
-    const a = await file('Procedimiento', 'proc.md', '# Procedimiento\n\nTexto.', { owner: M });
+    const a = await file('PG-05 Revision Rev.8', 'proc.md', '# Procedimiento\n\nTexto.', { owner: M });
     const b = await file('Notas privadas', 'notas.txt', 'solo mías', { visibility: 'private' });
     const zip = await file('Backup', 'backup.zip', 'PK');
     const linked = await file('Logo', 'logo.md', '# logo', { usedBy: bucket });
@@ -61,6 +61,7 @@ describe('files → artifacts', () => {
     expect(first.converted.map((c) => c.id)).toEqual([a, b]);
     expect(first.remaining).toBe(2);
     const art = (id: string) => e.DB.prepare('SELECT owner_id, workspace_id, folder_id, visibility, artifact_type FROM artifacts WHERE id = ?').bind(id).first();
+    expect(await e.DB.prepare('SELECT name FROM artifacts WHERE id = ?').bind(first.converted[0].artifactId).first('name')).toBe('PG-05 Revision Rev.8');
     expect(await art(first.converted[0].artifactId)).toMatchObject({ owner_id: M, workspace_id: WS, folder_id: FLD, visibility: 'workspace', artifact_type: 'markdown' });
     expect(await art(first.converted[1].artifactId)).toMatchObject({ visibility: 'private', artifact_type: 'txt' });
     const done = (await state(a))!;
