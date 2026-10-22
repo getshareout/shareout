@@ -172,7 +172,7 @@ const inputClasses = `
   box-shadow: 0 0 0 3px var(--so-color-primary-alpha15);
 }
 .so-input.so-error, .so-input:invalid:not(:placeholder-shown) { border-color: var(--so-color-error); }
-.so-hint { margin-top: var(--so-space-2); font-size: var(--so-text-sm); color: var(--so-color-text-tertiary); }
+.so-hint { margin-top: var(--so-space-2); font-size: var(--so-text-sm); color: var(--so-color-text-secondary); }
 .so-error-message { margin-top: var(--so-space-2); font-size: var(--so-text-sm); color: var(--so-color-error); }`;
 
 const cardClasses = `
@@ -194,7 +194,7 @@ const badgeClasses = `
 
 const dataClasses = `
 .so-table { width: 100%; border-collapse: collapse; }
-.so-table th { padding: var(--so-space-4) var(--so-space-3); text-align: left; border-bottom: 1px solid var(--so-color-border); font: var(--so-weight-medium) var(--so-text-sm) var(--so-font-body); color: var(--so-color-text-tertiary); }
+.so-table th { padding: var(--so-space-4) var(--so-space-3); text-align: left; border-bottom: 1px solid var(--so-color-border); font: var(--so-weight-medium) var(--so-text-sm) var(--so-font-body); color: var(--so-color-text-secondary); }
 .so-table td { padding: var(--so-space-4) var(--so-space-3); text-align: left; border-bottom: 1px solid var(--so-color-border); font-size: var(--so-text-base); color: var(--so-color-text); }
 .so-table tr:hover td { background: var(--so-color-surface); }
 
@@ -258,6 +258,12 @@ const interactiveClasses = `
 }
 .so-dropdown-item:hover { background: var(--so-color-surface); }`;
 
+// Keyboard focus (Design/principles/accessibility.md). Text fields suppress the outline on :focus for their
+// soft ring, so they get the outline back on :focus-visible.
+const focusRing = `
+:focus-visible { outline: 2px solid var(--so-color-primary); outline-offset: 2px; }
+.so-input:focus-visible, .so-select:focus-visible, .so-textarea:focus-visible { outline: 2px solid var(--so-color-primary); outline-offset: 2px; }`;
+
 export const artifactStylesheet = [
   fontImports,
   rootVars,
@@ -269,4 +275,5 @@ export const artifactStylesheet = [
   badgeClasses,
   dataClasses,
   interactiveClasses,
+  focusRing,
 ].join('\n');
