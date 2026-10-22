@@ -85,6 +85,12 @@ describe('parseDeck (JSON contract)', () => {
     expect(parseDeck('{"title":"T","slides":[]}')).toBeNull();
     expect(parseDeck('{"title":"","slides":[{"heading":"H","bullets":[]}]}')).toBeNull();
   });
+  it('keeps the one-line summary and language the model returns', () => {
+    const d = parseDeck(JSON.stringify({ title: 'T', subtitle: 'Resumen de la semana', lang: 'es-AR', slides: [{ heading: 'H', bullets: ['b'] }] }));
+    expect(d).toMatchObject({ subtitle: 'Resumen de la semana', lang: 'es-AR' });
+    expect(parseDeck(JSON.stringify({ title: 'T', lang: '<x>', slides: [{ heading: 'H', bullets: [] }] }))!.lang).toBeUndefined();
+  });
+
   it('caps at 9 slides', () => {
     const slides = Array.from({ length: 20 }, (_, i) => ({ heading: `H${i}`, bullets: ['x'] }));
     const d = parseDeck(JSON.stringify({ title: 'T', slides }));
@@ -110,6 +116,10 @@ describe('presentArtifact', () => {
     const files = params.files as Array<{ content: string }>;
     expect(files[0].content).toContain('reveal.js@5');
     expect(files[0].content).toContain('Headline');
+    // Cover = the source artifact's title, not a generic English placeholder.
+    expect(files[0].content).toContain('Q3 Revenue');
+    expect(files[0].content).not.toContain('Generated deck');
+    expect(files[0].content).not.toContain('>Presentation<');
 
     // Metered by chatComplete itself (mocked here): the call carries whom it is for.
     expect(chatComplete.mock.calls[0][1]).toMatchObject({ kind: 'present_this' });

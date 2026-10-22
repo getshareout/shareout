@@ -25,3 +25,13 @@ describe('generated deck footer', () => {
     expect(renderDeckHtml(deck, 'shareout.site')).toContain('shareout.site');
   });
 });
+
+describe('deck cover', () => {
+  it('shows the cover title + one-line summary in the deck language, with no English placeholders', () => {
+    const html = renderDeckHtml({ title: 'Inducción INCRO', subtitle: 'Todo lo que necesitás el primer día', lang: 'es-AR', slides: [{ heading: 'H', bullets: ['b'] }] }, 'x.dev');
+    expect(html).toContain('<html lang="es-AR">');
+    expect(html).toContain('Todo lo que necesitás el primer día');
+    expect(html).not.toContain('Generated deck');
+    expect(html).not.toContain('Overview');
+  });
+});

@@ -22,8 +22,11 @@ const MAX_ATTEMPTS = 2;
 
 const SYSTEM = `You turn a published web page (a dashboard, report, or app) into a slide deck outline.
 Given the page's HTML, respond with STRICT JSON only:
-{"title": string, "slides": [{"heading": string, "bullets": string[], "note": string}]}
+{"title": string, "subtitle": string, "lang": string, "slides": [{"heading": string, "bullets": string[], "note": string}]}
 - title: a short deck title for the whole presentation.
+- subtitle: ONE line (under 120 characters) saying what the deck covers.
+- lang: the BCP 47 language tag of the page's content (e.g. "es-AR", "en").
+- Write the title, subtitle and every slide in the same language as the page. Never translate into English.
 - slides: 5 to 9 slides. Each slide: a punchy heading, 2-5 short bullet points (plain text, no markdown), and an optional 1-2 sentence speaker "note".
 - Summarize what the page shows and why it matters. Lead with the headline finding. Use concrete numbers from the page when present.
 No prose outside the JSON.`;
@@ -48,7 +51,7 @@ export function parseDeck(out: string): Deck | null {
   const start = out.indexOf('{');
   const end = out.lastIndexOf('}');
   if (start < 0 || end <= start) return null;
-  let obj: { title?: unknown; slides?: unknown };
+  let obj: { title?: unknown; subtitle?: unknown; lang?: unknown; slides?: unknown };
   try {
     obj = JSON.parse(out.slice(start, end + 1));
   } catch {
@@ -70,7 +73,9 @@ export function parseDeck(out: string): Deck | null {
     if (slides.length >= MAX_SLIDES) break;
   }
   if (!slides.length) return null;
-  return { title, slides };
+  const subtitle = typeof obj.subtitle === 'string' ? obj.subtitle.slice(0, 200).trim() : '';
+  const lang = typeof obj.lang === 'string' && /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}$/.test(obj.lang.trim()) ? obj.lang.trim() : '';
+  return { title, ...(subtitle ? { subtitle } : {}), ...(lang ? { lang } : {}), slides };
 }
 
 async function loadUser(env: Env, userId: string): Promise<AuthUser> {
@@ -150,7 +155,7 @@ export async function presentArtifact(
     name: title,
     slug: generateSlug(title),
     entrypoint: 'index.html',
-    files: [{ path: 'index.html', content: renderDeckHtml(deck, getPlatformHostname(env)), mime: 'text/html' }],
+    files: [{ path: 'index.html', content: renderDeckHtml({ ...deck, title: src.name }, getPlatformHostname(env)), mime: 'text/html' }],
     visibility: 'private',
     authMethod: 'google',
     shareWith: [],
