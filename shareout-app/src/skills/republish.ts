@@ -27,6 +27,12 @@ export interface RepublishResult {
   slug: string;
 }
 
+/** An edit keeps the skill's current visibility: a private draft stays private, anything else is workspace. */
+export async function skillRepublishVisibility(env: Env, skillArtifactId: string): Promise<'private' | 'workspace'> {
+  const row = await env.DB.prepare('SELECT visibility FROM artifacts WHERE id = ?').bind(skillArtifactId).first<{ visibility: string | null }>();
+  return row?.visibility === 'private' ? 'private' : 'workspace';
+}
+
 export async function republishSkillMarkdown(
   env: Env,
   actor: AuthUser,
@@ -45,7 +51,7 @@ export async function republishSkillMarkdown(
       slug: skill.displaySlug,
       entrypoint,
       files,
-      visibility: 'workspace',
+      visibility: await skillRepublishVisibility(env, skill.artifactId),
       authMethod: 'google',
       shareWith: [],
       credentials: [],

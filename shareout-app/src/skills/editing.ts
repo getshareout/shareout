@@ -22,6 +22,7 @@ import {
   setSkillEditPolicy,
 } from './policy';
 import { republishSkillMarkdown } from './republish';
+import { skillPublishVisibility } from '../skill-marketplace';
 
 const MAX_MARKDOWN = 60_000;
 const SKILL_ENTRYPOINT = 'skill.md';
@@ -31,6 +32,8 @@ export interface CreateSkillInput {
   markdown: string;
   slug?: string;
   category?: string;
+  /** Only an explicit 'private' keeps the skill to its author; anything else is workspace-visible. */
+  visibility?: string;
 }
 
 export type CreateSkillResult =
@@ -82,7 +85,7 @@ export async function createSkillFromMarkdown(
   try {
     const result = await publishArtifact(env, user, {
       name, slug, entrypoint: SKILL_ENTRYPOINT, files,
-      visibility: 'workspace', authMethod: 'google', shareWith: [], credentials: [],
+      visibility: skillPublishVisibility(input.visibility), authMethod: 'google', shareWith: [], credentials: [],
       workspaceId, folderId: null, artifactType: 'skill',
     }, executionCtx);
     return {
