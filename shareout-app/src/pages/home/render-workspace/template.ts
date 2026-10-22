@@ -232,6 +232,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
               <button class="wsx-chip" data-admin-tab="automation" type="button" data-i18n="admin.automation">Automation</button>
               <button class="wsx-chip" data-admin-tab="ai" type="button" data-i18n="admin.ai">AI</button>
               <button class="wsx-chip" data-admin-tab="security" type="button" data-i18n="admin.security">Security</button>
+              <button class="wsx-chip" data-admin-tab="usage" type="button" data-i18n="admin.usage">Usage</button>
               <button class="wsx-chip" data-admin-tab="support" type="button" data-i18n="admin.support">Support</button>
               <button class="wsx-chip" data-admin-tab="settings" type="button" data-i18n="admin.settings">Settings</button>
               <button class="wsx-chip" data-admin-tab="domains" type="button" data-i18n="admin.cdTab">Custom domain</button>
