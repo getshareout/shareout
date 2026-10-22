@@ -6,7 +6,7 @@ import { corpusFor } from '../knowledge/corpus/client';
 import { searchCorpus } from '../knowledge/corpus/search';
 
 // Runtime Knowledge search for a published artifact:
-//   GET /v1/data/{artifactId}/knowledge/search?q=&limit=
+//   GET /v1/data/{artifactId}/knowledge/search?q=&limit=&full=1 (full=1: whole passages, not ~700-char snippets)
 // The page's session token can't call /v1/workspaces/{ws}/knowledge/search (not an API
 // token), so this tier re-authorizes the viewer here. Only an authenticated INTERNAL
 // member of the artifact's own workspace gets results; searchCorpus then re-checks each
@@ -33,6 +33,7 @@ export async function handleKnowledge(request: Request, ctx: DataContext, path: 
 
   const result = await searchCorpus(ctx.env, ctx.workspaceId, userId, q, {
     limit: Number(url.searchParams.get('limit')) || undefined,
+    full: url.searchParams.get('full') === '1',
     ctx: ctx.waitUntil ? { waitUntil: ctx.waitUntil } : undefined,
   });
   return successResponse({ query: q, ...result }, 200, ctx.origin);

@@ -50,17 +50,26 @@ async function putFile(ws: string, id: string, text: string | Uint8Array, opts: 
 
 const cookie = async (userId: string) => `shareout_session=${await createSessionToken(userId, `${userId}@example.com`, authEnv)}`;
 
-async function search(q: string, userId: string | null, ws = WS) {
+async function search(q: string, userId: string | null, ws = WS, extra = '') {
   const headers = new Headers();
   if (userId) headers.set('Cookie', await cookie(userId));
-  const request = new Request(`https://example.com/v1/data/art_1/knowledge/search?q=${encodeURIComponent(q)}`, { headers });
+  const request = new Request(`https://example.com/v1/data/art_1/knowledge/search?q=${encodeURIComponent(q)}${extra}`, { headers });
   const ctx = { artifactId: 'art_1', workspaceId: ws, env: authEnv, origin: null, artifact: { workspace_id: ws } } as unknown as DataContext;
   const res = await handleKnowledge(request, ctx, '/search');
   const body = await res.json() as { data?: { hits: { source: { id: string } }[] } };
-  return { status: res.status, ids: body.data?.hits.map((h) => h.source.id) ?? [] };
+  return { status: res.status, ids: body.data?.hits.map((h) => h.source.id) ?? [], texts: (body.data?.hits as { text: string }[] | undefined)?.map((h) => h.text) ?? [] };
 }
 
 describe('artifact knowledge search', () => {
+  it('returns whole passages with full=1 and snippets without it', async () => {
+    await putFile(WS, 'dlv_long', `## Inspecciones\n\n${'zebrafish periodicidad anual '.repeat(30)}FINAL-MARKER`);
+    const short = await search('zebrafish', 'u_member');
+    expect(short.texts[0]).not.toContain('FINAL-MARKER');
+    const full = await search('zebrafish', 'u_member', WS, '&full=1');
+    expect(full.texts[0]).toContain('FINAL-MARKER');
+    expect((await search('zebrafish', null, WS, '&full=1')).status).toBe(401);
+  });
+
   it('returns hits to an internal member', async () => {
     const r = await search('inspection', 'u_member');
     expect(r.status).toBe(200);
