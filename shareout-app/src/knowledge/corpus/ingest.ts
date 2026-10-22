@@ -90,7 +90,7 @@ async function loadPage(env: Env, workspaceId: string, refId: string): Promise<L
   if (sourceFile) {
     const orig = await env.DB.prepare('SELECT r2_key, mime, size_bytes FROM assets WHERE version_id = ? AND path = ?')
       .bind(row.version_id, sourceFile).first<{ r2_key: string; mime: string; size_bytes: number }>();
-    if (orig && orig.size_bytes <= MAX_SOURCE_BYTES) file = { path: sourceFile, r2_key: orig.r2_key, mime: orig.mime };
+    if (orig && orig.size_bytes <= MAX_SOURCE_BYTES && TO_MARKDOWN.test(sourceFile)) file = { path: sourceFile, r2_key: orig.r2_key, mime: orig.mime };
   }
   const obj = await env.ARTIFACTS.get(file.r2_key);
   if (!obj) return 'gone';

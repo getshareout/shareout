@@ -299,4 +299,25 @@ describe('imported workbook pages', () => {
     const [hit] = (await searchCorpus(e, ws, 'u1', 'design team')).hits;
     expect(hit.source).toMatchObject({ kind: 'page', id: 'art_book' });
   });
+
+  it('falls back to the CSV entrypoint when the original has an unreadable name', async () => {
+    const ws = nextWs();
+    await setKnowledgeEnabled(e, ws, true);
+    const meta = JSON.stringify({ source: { original: 'original/tanques Rev.0.x', sheets: [{ name: 'Tanques', path: 'sheets/01-Tanques.csv' }] } });
+    await e.ARTIFACTS.put('test/tanques.csv', 'Tanque,Capacidad\nCisterna norte,30000 litros');
+    await e.ARTIFACTS.put('test/tanques.x', 'PK');
+    await e.DB.batch([
+      e.DB.prepare("INSERT INTO artifacts (id, name, slug, owner_id, visibility, workspace_id, type_metadata) VALUES ('art_tanques', 'Tanques', 'tanques', 'u1', 'public', ?, ?)").bind(ws, meta),
+      e.DB.prepare("INSERT INTO deployments (artifact_id, version_id, channel) VALUES ('art_tanques', 'ver_tanques', 'production')"),
+      e.DB.prepare("INSERT INTO versions (id, entrypoint) VALUES ('ver_tanques', 'sheets/01-Tanques.csv')"),
+      e.DB.prepare("INSERT INTO assets (version_id, path, r2_key, mime, size_bytes) VALUES ('ver_tanques', 'sheets/01-Tanques.csv', 'test/tanques.csv', 'text/csv', 40)"),
+      e.DB.prepare("INSERT INTO assets (version_id, path, r2_key, mime, size_bytes) VALUES ('ver_tanques', 'original/tanques Rev.0.x', 'test/tanques.x', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 2)"),
+    ]);
+    const toMarkdown = vi.fn(async () => ({ format: 'markdown', data: '| Tanque | Capacidad |\n| Cisterna norte | 30000 litros |' }));
+    const withAi = { ...e, AI: { toMarkdown, run: async () => ({}) } } as unknown as Env;
+    await queueKnowledgeSource(withAi, undefined, { workspaceId: ws, kind: 'page', refId: 'art_tanques' }, 'ver_tanques');
+    expect(toMarkdown).toHaveBeenCalledWith(expect.objectContaining({ name: '01-Tanques.csv' }));
+    const [hit] = (await searchCorpus(e, ws, 'u1', 'cisterna')).hits;
+    expect(hit.source).toMatchObject({ kind: 'page', id: 'art_tanques' });
+  });
 });

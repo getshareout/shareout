@@ -12,13 +12,14 @@ import { contentHash } from '../moderation/check';
 import { parseModelJson } from '../assets/enrich';
 import { setPresentation } from '../artifacts/satellites';
 import { SUMMARY_MIMES_SQL } from './summary-scope';
+import { toMarkdown } from '../knowledge/corpus/ingest';
 import { localeForContent, summaryLanguageRule, type Locale } from '../i18n';
 
 const MAX_HTML_CHARS = 20_000; // keep the prompt bounded + cheap
 const MODEL_LABEL = 'artifact-summary';
 
 const SYSTEM = `You describe a published web page for a workspace's search index.
-Given its content (HTML, Markdown or CSV), respond with STRICT JSON only:
+Given its content (HTML, Markdown, CSV or text read from a PDF), respond with STRICT JSON only:
 {"summary": string, "tags": string[]}
 - summary: 1-2 sentences, <= 300 characters, plain language, what the page IS and shows.
 - tags: 3-6 short lowercase keywords (topic, purpose, data type). No # prefix.
@@ -34,13 +35,14 @@ interface Row {
   description: string | null;
   auto_summary_hash: string | null;
   r2_key: string;
+  mime: string;
 }
 
 export async function generateArtifactSummary(env: Env, artifactId: string): Promise<void> {
   if (!getAIProvider(env)) return; // no AI configured — don't churn, a later deploy can backfill
 
   const row = await env.DB.prepare(`
-    SELECT a.workspace_id, a.owner_id, a.description, pres_a.auto_summary_hash, ast.r2_key
+    SELECT a.workspace_id, a.owner_id, a.description, pres_a.auto_summary_hash, ast.r2_key, ast.mime
       FROM artifacts a
       LEFT JOIN artifact_presentation pres_a ON pres_a.artifact_id = a.id
       JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
@@ -52,9 +54,16 @@ export async function generateArtifactSummary(env: Env, artifactId: string): Pro
 
   const obj = await env.ARTIFACTS.get(row.r2_key);
   if (!obj) return;
-  const html = (await obj.text()).slice(0, MAX_HTML_CHARS);
+  const text = row.mime === 'application/pdf'
+    ? (await toMarkdown(env, 'document.pdf', row.mime, await obj.arrayBuffer()).catch(() => null)) ?? ''
+    : await obj.text();
+  const html = text.slice(0, MAX_HTML_CHARS);
   const hash = await contentHash(html);
   if (hash === row.auto_summary_hash) return; // unchanged since the last summary
+  if (!html.trim()) {
+    await setPresentation(env, artifactId, { auto_summary_hash: hash }); // nothing to read — leave the drip
+    return;
+  }
 
   let out: string;
   try {
