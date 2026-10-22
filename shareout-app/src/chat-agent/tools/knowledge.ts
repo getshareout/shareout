@@ -111,6 +111,7 @@ export const knowledgeSearchTool: AccountTool = {
         enum: [...NODE_KINDS],
         description: 'Filter by node kind (artifact-digest, topic, entity, decision, timeline, overview).',
       },
+      full: { type: 'boolean', description: 'Return whole passages instead of ~700-character excerpts. Use when an excerpt is cut off mid-table or mid-sentence.' },
     },
     required: ['query'],
   },
@@ -124,7 +125,7 @@ export const knowledgeSearchTool: AccountTool = {
     const query = typeof input.query === 'string' ? input.query : '';
     const scope = query.trim() && !input.kind ? await corpusScope(ctx) : null;
     const passages = scope && isScope(scope)
-      ? (await searchCorpus(ctx.env, wsId, ctx.userId, query, { limit: PASSAGES })).hits
+      ? (await searchCorpus(ctx.env, wsId, ctx.userId, query, { limit: PASSAGES, full: input.full === true })).hits
           .map(h => ({ cite: h.cite, text: h.text, source: h.source, ...(h.page ? { page: h.page } : {}), url: h.url }))
       : [];
     const kind = typeof input.kind === 'string' ? input.kind : undefined;

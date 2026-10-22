@@ -96,7 +96,7 @@ export async function searchCorpus(
   workspaceId: string,
   userId: string,
   q: string,
-  opts: { limit?: number; ctx?: { waitUntil(p: Promise<unknown>): void } } = {},
+  opts: { limit?: number; full?: boolean; ctx?: { waitUntil(p: Promise<unknown>): void } } = {},
 ): Promise<SearchResult> {
   const store = corpusFor(env, workspaceId);
   const limit = Math.min(Math.max(opts.limit ?? 10, 1), 30);
@@ -137,7 +137,7 @@ export async function searchCorpus(
       const src = visible.get(h.refId)!;
       return {
         id: key(h),
-        text: h.text.length > SNIPPET_CHARS ? `${h.text.slice(0, SNIPPET_CHARS)}…` : h.text,
+        text: !opts.full && h.text.length > SNIPPET_CHARS ? `${h.text.slice(0, SNIPPET_CHARS)}…` : h.text,
         locator: h.locator,
         score: Number((score.get(key(h)) ?? 0).toFixed(4)),
         source: { kind: h.kind, id: h.refId, title: src.title, url: src.url },
