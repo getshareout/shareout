@@ -5,11 +5,11 @@ import type { Env } from '../../src/types';
 const BASE = 'https://shareout.example.com';
 const PWA = JSON.stringify({ enabled: true, name: 'Secret App', short_name: 'Secret', description: 'internal', icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' });
 
-function makeEnv(visibility: string): Env {
+function makeEnv(visibility: string, pwa = PWA): Env {
   const deployment = {
     deploy_slug: 'app', version_id: 'ver_1', entrypoint: 'index.html', artifact_id: 'art_1',
     artifact_name: 'Secret App', visibility, auth_method: 'google', owner_id: 'usr_owner',
-    workspace_id: null, paused: 0, moderation_status: 'approved', pwa_config: PWA,
+    workspace_id: null, paused: 0, moderation_status: 'approved', pwa_config: pwa,
     r2_key: null, mime: null, size_bytes: null,
   };
   const stmt = (sql: string) => {
@@ -17,7 +17,7 @@ function makeEnv(visibility: string): Env {
       bind: () => s,
       first: async () => {
         if (sql.includes('pres_a.pwa_config') && sql.includes('FROM deployments')) {
-          return sql.includes('ast.r2_key') ? deployment : { pwa_config: PWA, name: 'Secret App' };
+          return sql.includes('ast.r2_key') ? deployment : { pwa_config: pwa, name: 'Secret App' };
         }
         return null;
       },
@@ -53,6 +53,15 @@ describe('PWA assets follow the artifact access gate', () => {
     expect(m.description).toBe('');
     expect(m.screenshots).toEqual([]);
     expect(m.icons.length).toBeGreaterThan(0);
+  });
+
+  it('private artifact: anonymous manifest never falls back to the artifact title', async () => {
+    const unnamed = JSON.stringify({ ...JSON.parse(PWA), name: undefined, short_name: undefined });
+    const res = await worker.fetch(new Request(`${BASE}/a/app/manifest.json`), makeEnv('private', unnamed));
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).not.toContain('Secret App');
+    expect((JSON.parse(body) as { name: string }).name).toBe('ShareOut');
   });
 
   it('private artifact: anonymous icon is served', async () => {

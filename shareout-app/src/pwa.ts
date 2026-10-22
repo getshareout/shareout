@@ -62,10 +62,12 @@ export async function handleManifest(
   const artifactUrl = `${baseUrl}/a/${slug}/`;
 
   const startUrl = pwaConfig.start_url || artifactUrl;
+  // Minimal: only a name the owner set for the app, never the artifact's own title.
+  const fallbackName = opts.minimal ? 'ShareOut' : result.name;
   const manifest: PWAManifest = {
     id: startUrl,
-    name: pwaConfig.name || result.name,
-    short_name: pwaConfig.short_name || result.name.substring(0, 12),
+    name: pwaConfig.name || fallbackName,
+    short_name: pwaConfig.short_name || fallbackName.substring(0, 12),
     description: opts.minimal ? '' : pwaConfig.description || `${pwaConfig.name || result.name} - A ShareOut PWA`,
     start_url: startUrl,
     scope: artifactUrl,
