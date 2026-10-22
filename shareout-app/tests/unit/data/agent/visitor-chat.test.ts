@@ -52,9 +52,20 @@ vi.mock('../../../../src/data/agent/ai-config', () => ({
   recordAgentUsage: (...args: unknown[]) => mockRecordAgentUsage(...args),
 }));
 
+const mockMemberId = vi.fn();
+const mockReserveMember = vi.fn();
+const mockAddMemberTokens = vi.fn();
+vi.mock('../../../../src/data/agent/member-quota', () => ({
+  workspaceMemberId: (...args: unknown[]) => mockMemberId(...args),
+  reserveMemberQuota: (...args: unknown[]) => mockReserveMember(...args),
+  addMemberTokens: (...args: unknown[]) => mockAddMemberTokens(...args),
+}));
+
 const visitorContext = { json: { key: 'val' }, tables: {}, blobUrls: [] };
 
 beforeEach(() => {
+  mockMemberId.mockResolvedValue(null);
+  mockReserveMember.mockResolvedValue({ allowed: true });
   mockBuildVisitorContext.mockResolvedValue(visitorContext);
   mockBuildVisitorSystemPrompt.mockReturnValue('visitor system');
   mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
@@ -130,6 +141,27 @@ describe('handleVisitorChat', () => {
     expect(res.headers.get('Retry-After')).toBe('30');
   });
 
+
+  it('workspace members skip the per-artifact visitor cap', async () => {
+    mockCheckRateLimit.mockResolvedValue({ allowed: false, retryAfter: 30 });
+    mockMemberId.mockResolvedValue('usr_m');
+    const ctx = { ...makeCtx(makeEnv(configDb())), workspaceId: 'wsp_1', viewer: { email: 'a@b.c', isOwner: false } } as never;
+    const res = await handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx);
+    expect(res.status).toBe(200);
+    await readSSE(res);
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
+    expect(mockIncrementRateLimit).not.toHaveBeenCalled();
+    expect(mockReserveMember).toHaveBeenCalledWith(expect.anything(), 'usr_m', 'wsp_1', expect.any(Number));
+  });
+
+  it('a refused member quota returns 429', async () => {
+    mockMemberId.mockResolvedValue('usr_m');
+    mockReserveMember.mockResolvedValue({ allowed: false, retryAfter: 60, error: 'x' });
+    const ctx = { ...makeCtx(makeEnv(configDb())), workspaceId: 'wsp_1', viewer: { email: 'a@b.c', isOwner: false } } as never;
+    const res = await handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx);
+    expect(res.status).toBe(429);
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
+  });
 
   it('does NOT block a continuing conversation when over credit (grace)', async () => {
     mockResolveAgentAiConfig.mockResolvedValue({
