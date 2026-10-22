@@ -145,3 +145,13 @@ describe('Comments replies and config', () => {
     await expect(configPromise).resolves.toMatchObject({ enabled: true });
   });
 });
+
+describe('KnowledgeStore', () => {
+  it('searches via the artifact data plane', async () => {
+    const { KnowledgeStore } = await import('../src/stores/knowledge-store');
+    const calls: string[] = [];
+    const sdk = { _internalFetch: async (p: string) => { calls.push(p); return { query: 'x', mode: 'keyword', hits: [] }; } } as never;
+    await new KnowledgeStore(sdk).search('a b', { limit: 3 });
+    expect(calls).toEqual(['/knowledge/search?q=a+b&limit=3']);
+  });
+});

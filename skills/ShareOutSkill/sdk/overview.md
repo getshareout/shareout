@@ -103,6 +103,7 @@ try {
 | `sdk.table(name)` | [table.md](table.md) | Structured records (Tier 2) |
 | `sdk.grid(name)` | [grid.md](grid.md) | Editable spreadsheet grid (table or Sheets source) |
 | `sdk.workspace.table(name)` | [team/workspace-tables.md](../team/workspace-tables.md) | Share a table across artifacts in a workspace (Teams) |
+| `sdk.knowledge.search(q, {limit})` | [knowledge.md](knowledge.md) | Search the workspace Knowledge from the page (signed-in members only) |
 | `sdk.realtime(docId)` | [realtime.md](realtime.md) | Y.js collaboration (Tier 3) |
 | `sdk.blobs` | [blobs.md](blobs.md) | Per-artifact file storage (direct-from-R2) |
 | `sdk.files` | [files.md](files.md) | Workspace asset URLs (`dlv_*`, cross-artifact embed) |
