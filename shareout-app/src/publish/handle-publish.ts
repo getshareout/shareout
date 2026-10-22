@@ -21,6 +21,7 @@ import { libraryVersionExists } from '../workspace-library';
 import { json } from './http';
 import { resolveAuthMethod, resolveVisibility } from './request-auth';
 import { publishArtifact } from './publish-artifact';
+import { skillPublishVisibility } from '../skill-marketplace';
 import { resolveRequestedCapabilities } from './capabilities';
 import { rateLimitExceededResponse, storageLimitExceededResponse, publicLimitNotice } from './limits';
 
@@ -103,7 +104,7 @@ export async function handlePublish(
       if (!workspaceId) {
         return json({ error: 'Skills must be published to a workspace', code: 'SKILL_REQUIRES_WORKSPACE' }, 400);
       }
-      body.visibility = 'workspace';
+      body.visibility = skillPublishVisibility(body.visibility);
     }
 
     const wantLibrary = body.artifact_type === 'library';

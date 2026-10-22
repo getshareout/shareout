@@ -70,6 +70,11 @@ interface SkillRow {
   official: number;
 }
 
+/** Skills are workspace-visible by default; an author may keep one private (a draft). Nothing else is honoured. */
+export function skillPublishVisibility(requested: string | undefined): 'private' | 'workspace' {
+  return requested === 'private' ? 'private' : 'workspace';
+}
+
 async function getSkillRow(env: Env, artifactId: string): Promise<SkillRow | null> {
   return await env.DB.prepare(
     'SELECT workspace_id, blocked, official FROM skill_marketplace WHERE artifact_id = ?'
@@ -134,8 +139,9 @@ export async function handleListSkills(
     'sm.workspace_id = ?',
     'sm.blocked = 0',
     'a.deleted_at IS NULL',
+    "(a.visibility != 'private' OR a.owner_id = ?)",
   ];
-  const binds: unknown[] = [workspaceId];
+  const binds: unknown[] = [workspaceId, user.id];
   if (category) { filters.push('sm.category = ?'); binds.push(category); }
   if (q) {
     // type_metadata carries the skill's summary and tags; searching the raw JSON is
@@ -581,6 +587,13 @@ async function assertSkillUsable(env: Env, user: AuthUser, skillId: string): Pro
   const row = await getSkillRow(env, skillId);
   if (!row || row.blocked) return json({ error: 'Skill not found', code: 'NOT_FOUND' }, 404);
   if (!row.official) {
+    // A private (draft) skill is the author's alone, plus explicit collaborators; membership is not enough.
+    const art = await env.DB.prepare('SELECT visibility, owner_id FROM artifacts WHERE id = ?')
+      .bind(skillId).first<{ visibility: string | null; owner_id: string | null }>();
+    if (art?.visibility === 'private' && art.owner_id !== user.id) {
+      const forbidden = await requireRole(env, skillId, user.id, 'viewer');
+      if (forbidden) return forbidden;
+    }
     const member = await getInternalWorkspaceRole(env, row.workspace_id, user.id);
     if (!member) {
       const forbidden = await requireRole(env, skillId, user.id, 'viewer');

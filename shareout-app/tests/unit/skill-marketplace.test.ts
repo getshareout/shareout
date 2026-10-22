@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { generateTypeMetadata, detectArtifactType } from '../../src/validation';
-import { handleVoteSkill, workspaceHasTeamsPlan, handleAttachAgentSkill, buildAgentSkillsDoc } from '../../src/skill-marketplace';
+import { skillPublishVisibility, handleListSkills, handleVoteSkill, workspaceHasTeamsPlan, handleAttachAgentSkill, buildAgentSkillsDoc } from '../../src/skill-marketplace';
 import type { AuthUser } from '../../src/api-auth';
 import type { Env, FileEntry } from '../../src/types';
 
@@ -160,3 +160,31 @@ describe('buildAgentSkillsDoc', () => {
   });
 });
 
+
+describe('private skills (G-kit-2)', () => {
+  it('publish keeps an explicit private choice and defaults everything else to workspace', () => {
+    expect(skillPublishVisibility('private')).toBe('private');
+    expect(skillPublishVisibility('workspace')).toBe('workspace');
+    expect(skillPublishVisibility('public')).toBe('workspace');
+    expect(skillPublishVisibility(undefined)).toBe('workspace');
+  });
+
+  it("the catalog list hides other members' private skills", async () => {
+    const sqls: string[] = [];
+    const binds: unknown[][] = [];
+    const env = {
+      DB: {
+        prepare: (sql: string) => ({
+          bind: (...a: unknown[]) => {
+            sqls.push(sql); binds.push(a);
+            return { first: async () => ({ role: 'member' }), all: async () => ({ results: [] }), run: async () => ({ meta: { changes: 0 } }) };
+          },
+        }),
+      },
+    } as unknown as Env;
+    await handleListSkills(new Request('https://x/v1/workspaces/wsp_1/skills'), env, user, 'wsp_1');
+    const i = sqls.findIndex((q) => q.includes('FROM skill_marketplace sm'));
+    expect(sqls[i]).toContain("(a.visibility != 'private' OR a.owner_id = ?)");
+    expect(binds[i].filter((b) => b === 'usr_1').length).toBeGreaterThanOrEqual(4);
+  });
+});
