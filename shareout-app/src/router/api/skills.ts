@@ -26,7 +26,7 @@ import {
   handleWorkspaceSkillsIndex,
   serveSkillInstaller,
 } from '../../skills/install';
-import { handleSyncAgentSkill } from '../../skill-marketplace';
+import { handleSyncAgentSkill, handleListDefaultSkills, handleAddDefaultSkill, handleRemoveDefaultSkill } from '../../skill-marketplace';
 
 export async function routeSkillsApi(ctx: FetchContext): Promise<Response | null> {
   const { request, env, path, addCORS, executionCtx } = ctx;
@@ -87,6 +87,22 @@ export async function routeSkillsApi(ctx: FetchContext): Promise<Response | null
     const user = await requireTokenOrSession(ctx);
     if (!isAuthUser(user)) return user;
     return addCORS(await handleCreateSkill(request, env, user, wsCreateMatch[1], executionCtx));
+  }
+
+  const defaultSkillOneMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/default-skills\/([^/]+)$/);
+  if (defaultSkillOneMatch && request.method === 'DELETE') {
+    const user = await requireTokenOrSession(ctx);
+    if (!isAuthUser(user)) return user;
+    return addCORS(await handleRemoveDefaultSkill(env, user, defaultSkillOneMatch[1], defaultSkillOneMatch[2]));
+  }
+
+  const defaultSkillsMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/default-skills$/);
+  if (defaultSkillsMatch && (request.method === 'GET' || request.method === 'POST')) {
+    const user = await requireTokenOrSession(ctx);
+    if (!isAuthUser(user)) return user;
+    return addCORS(request.method === 'GET'
+      ? await handleListDefaultSkills(env, user, defaultSkillsMatch[1])
+      : await handleAddDefaultSkill(request, env, user, defaultSkillsMatch[1]));
   }
 
   const wsSkillPolicyMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/skill-policy$/);

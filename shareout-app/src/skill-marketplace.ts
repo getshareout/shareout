@@ -571,6 +571,7 @@ async function recordSkillUses(env: Env, skillIds: string[], conversationId: str
 // ---------------------------------------------------------------------------
 
 const AGENT_SKILL_LIMIT = 8;
+const DEFAULT_SKILL_LIMIT = 5;
 
 /**
  * A user may read and attach a skill if it is official, or it belongs to a workspace
@@ -747,6 +748,59 @@ export async function handleDetachAgentSkill(env: Env, user: AuthUser, scope: st
   return json({ success: true });
 }
 
+// Workspace default skills: an admin attaches a Library skill to every member's agent in this workspace.
+export async function handleListDefaultSkills(env: Env, user: AuthUser, workspaceId: string): Promise<Response> {
+  const forbidden = await requireWorkspaceRole(env, workspaceId, user.id, 'member');
+  if (forbidden) return forbidden;
+  const rows = await env.DB.prepare(
+    `SELECT s.skill_artifact_id, s.skill_version_no, a.name, a.slug
+       FROM workspace_default_skills s JOIN artifacts a ON a.id = s.skill_artifact_id
+      WHERE s.workspace_id = ? AND a.deleted_at IS NULL
+      ORDER BY s.position ASC, s.created_at ASC`
+  ).bind(workspaceId).all();
+  return json({ skills: rows.results ?? [] });
+}
+
+export async function handleAddDefaultSkill(request: Request, env: Env, user: AuthUser, workspaceId: string): Promise<Response> {
+  const forbidden = await requireWorkspaceRole(env, workspaceId, user.id, 'admin');
+  if (forbidden) return forbidden;
+  let body: { skill_artifact_id?: string };
+  try { body = await request.json(); } catch { return json({ error: 'Invalid JSON', code: 'INVALID_JSON' }, 400); }
+  const skillId = body.skill_artifact_id;
+  if (!skillId) return json({ error: 'skill_artifact_id required', code: 'BAD_REQUEST' }, 400);
+
+  const check = await assertSkillUsable(env, user, skillId);
+  if (check instanceof Response) return check;
+  if (!check.row.official && check.row.workspace_id !== workspaceId) {
+    return json({ error: 'Skill belongs to a different workspace', code: 'CROSS_WORKSPACE' }, 400);
+  }
+  const art = await env.DB.prepare('SELECT visibility FROM artifacts WHERE id = ?').bind(skillId).first<{ visibility: string | null }>();
+  if (art?.visibility === 'private') {
+    return json({ error: 'A private skill cannot be a workspace default', code: 'SKILL_PRIVATE', hint: 'Make the skill visible to the workspace first.' }, 400);
+  }
+  const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM workspace_default_skills WHERE workspace_id = ?')
+    .bind(workspaceId).first<{ n: number }>();
+  if ((count?.n ?? 0) >= DEFAULT_SKILL_LIMIT) {
+    return json({ error: `At most ${DEFAULT_SKILL_LIMIT} default skills per workspace`, code: 'LIMIT_REACHED' }, 400);
+  }
+  const ver = await env.DB.prepare('SELECT MAX(version_no) AS v FROM versions WHERE artifact_id = ?').bind(skillId).first<{ v: number }>();
+  const versionNo = ver?.v ?? 1;
+  await env.DB.prepare(
+    `INSERT INTO workspace_default_skills (workspace_id, skill_artifact_id, skill_version_no, position, created_by)
+       VALUES (?, ?, ?, (SELECT COALESCE(MAX(position) + 1, 0) FROM workspace_default_skills WHERE workspace_id = ?), ?)
+     ON CONFLICT(workspace_id, skill_artifact_id) DO UPDATE SET skill_version_no = excluded.skill_version_no`
+  ).bind(workspaceId, skillId, versionNo, workspaceId, user.id).run();
+  return json({ success: true, skill_artifact_id: skillId, version_no: versionNo });
+}
+
+export async function handleRemoveDefaultSkill(env: Env, user: AuthUser, workspaceId: string, skillId: string): Promise<Response> {
+  const forbidden = await requireWorkspaceRole(env, workspaceId, user.id, 'admin');
+  if (forbidden) return forbidden;
+  await env.DB.prepare('DELETE FROM workspace_default_skills WHERE workspace_id = ? AND skill_artifact_id = ?')
+    .bind(workspaceId, skillId).run();
+  return json({ success: true });
+}
+
 // Build the untrusted reference block of a user's attached agent skills, for the
 // chat agent's system prompt. Mirrors buildAttachedSkillsDoc but keyed on
 // (scope, user). Best-effort: a missing/deleted/blocked/cross-workspace skill is
@@ -754,6 +808,14 @@ export async function handleDetachAgentSkill(env: Env, user: AuthUser, scope: st
 export async function buildAgentSkillsDoc(env: Env, scope: string, userId: string): Promise<string> {
   let rows: Array<{ skill_artifact_id: string; skill_version_no: number; name: string }>;
   try {
+    // Workspace defaults first (admin-set, this workspace only — never for '__personal'), then the member's own.
+    const defaults = scope === '__personal' ? [] : ((await env.DB.prepare(
+      `SELECT s.skill_artifact_id, s.skill_version_no, a.name
+         FROM workspace_default_skills s JOIN artifacts a ON a.id = s.skill_artifact_id
+        WHERE s.workspace_id = ? AND a.deleted_at IS NULL
+        ORDER BY s.position ASC, s.created_at ASC
+        LIMIT ?`
+    ).bind(scope, DEFAULT_SKILL_LIMIT).all()).results ?? []) as Array<{ skill_artifact_id: string; skill_version_no: number; name: string }>;
     const res = await env.DB.prepare(
       `SELECT s.skill_artifact_id, s.skill_version_no, a.name
          FROM workspace_agent_skills s JOIN artifacts a ON a.id = s.skill_artifact_id
@@ -761,7 +823,9 @@ export async function buildAgentSkillsDoc(env: Env, scope: string, userId: strin
         ORDER BY s.position ASC, s.created_at ASC
         LIMIT ?`
     ).bind(scope, userId, AGENT_SKILL_LIMIT).all();
-    rows = (res.results ?? []) as Array<{ skill_artifact_id: string; skill_version_no: number; name: string }>;
+    const own = (res.results ?? []) as Array<{ skill_artifact_id: string; skill_version_no: number; name: string }>;
+    const seen = new Set(defaults.map((d) => d.skill_artifact_id));
+    rows = [...defaults, ...own.filter((o) => !seen.has(o.skill_artifact_id))];
   } catch {
     return '';
   }
