@@ -299,7 +299,7 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
     );
   }
 
-  // GET /search?q=&limit=&format=md — cited passages from the workspace's Files and pages.
+  // GET /search?q=&limit=&full=1&format=md — (full=1: whole passages, not 700-char snippets) cited passages from the workspace's Files and pages.
   const corpusRoute = ['search', 'sources', 'usage', 'graph', 'entities'].includes(sub) || sub.startsWith('entities/');
   if (corpusRoute) {
     if (method !== 'GET') return cors(jsonError('Method not allowed', 'METHOD_NOT_ALLOWED', 405));
@@ -361,6 +361,7 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
     if (!q) return cors(jsonError('q is required', 'BAD_REQUEST', 400));
     const result = await searchCorpus(ctx.env, workspaceId, auth.id, q, {
       limit: Number(url.searchParams.get('limit')) || undefined,
+      full: url.searchParams.get('full') === '1',
       ctx: ctx.executionCtx,
     });
     if (url.searchParams.get('format') === 'md') {

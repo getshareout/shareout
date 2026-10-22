@@ -122,6 +122,18 @@ describe('corpus ingest + search', () => {
     });
   });
 
+  it('truncates passages to a snippet unless full is requested', async () => {
+    const ws = nextWs();
+    await setKnowledgeEnabled(e, ws, true);
+    const body = `## Inspecciones\n\n${'periodicidad inspeccion anual extintor '.repeat(25)}FINAL-MARKER`;
+    await putFile(ws, 'dlv_long', body);
+    const short = (await searchCorpus(e, ws, 'u1', 'periodicidad')).hits[0].text;
+    expect(short.endsWith('…')).toBe(true);
+    expect(short).not.toContain('FINAL-MARKER');
+    const full = (await searchCorpus(e, ws, 'u1', 'periodicidad', { full: true })).hits[0].text;
+    expect(full).toContain('FINAL-MARKER');
+  });
+
   it('does nothing while Knowledge is off', async () => {
     const ws = nextWs();
     expect(await queueKnowledgeSource(e, undefined, { workspaceId: ws, kind: 'asset', refId: 'dlv_x' }, 'v1')).toBe(false);
