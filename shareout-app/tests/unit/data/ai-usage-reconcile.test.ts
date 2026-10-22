@@ -42,11 +42,12 @@ describe('reconcileAiUsage', () => {
     await row('r_late', 'anthropic/claude-sonnet-5.5', 100, 10, 'gen_LATE');
     await row('r_direct', 'gpt-4o', 1000, 100, null);
     await row('r_unknown', 'mystery-9', 10, 10, null);
-    gateway({ balance: '150.00', generations: { gen_A: { total_cost: 0.0042, tokens_prompt: 120, tokens_completion: 10 } } });
+    gateway({ balance: '150.00', generations: { gen_A: { total_cost: 0.0042, tokens_prompt: 4, tokens_completion: 10 } } });
 
     const res = await reconcileAiUsage(env());
     expect(res).toMatchObject({ actual: 1, repriced: 1, creditUsd: 150 });
-    expect(await get('r_gw')).toEqual({ cost: 4200, cost_source: 'actual', input_tokens: 120 });
+    // The debited cost lands; our streamed tokens stay (the gateway's tokens_prompt omits cache reads).
+    expect(await get('r_gw')).toEqual({ cost: 4200, cost_source: 'actual', input_tokens: 100 });
     expect(await get('r_late')).toMatchObject({ cost_source: 'pending' });
     expect(await get('r_direct')).toEqual({ cost: 2500 + 1000, cost_source: 'estimate', input_tokens: 1000 });
     expect(await get('r_unknown')).toMatchObject({ cost: 0, cost_source: 'unpriced' });

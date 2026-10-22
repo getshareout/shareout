@@ -13,7 +13,7 @@ const CONCURRENCY = 8;
 /** Below this many USD of gateway credit, /admin health shows an error. Override: AI_CREDIT_ALERT_USD. */
 const DEFAULT_CREDIT_ALERT_USD = 20;
 
-interface Generation { total_cost?: number; tokens_prompt?: number; tokens_completion?: number }
+interface Generation { total_cost?: number }
 
 async function generation(env: Env, id: string): Promise<Generation | null> {
   const res = await fetchWithTimeout(`${GATEWAY}/generation?id=${encodeURIComponent(id)}`, {
@@ -45,10 +45,10 @@ export async function reconcileAiUsage(env: Env): Promise<{ actual: number; repr
     await pool(rows, async (r) => {
       const g = await generation(env, r.provider_ref);
       if (!g || typeof g.total_cost !== 'number') return;
-      await env.DB.prepare(`
-        UPDATE ai_usage_events SET base_cost_micro_usd = ?, cost_source = 'actual',
-               input_tokens = COALESCE(?, input_tokens), output_tokens = COALESCE(?, output_tokens)
-         WHERE id = ?`).bind(Math.round(g.total_cost * 1e6), g.tokens_prompt ?? null, g.tokens_completion ?? null, r.id).run();
+      // Cost only: the gateway's tokens_prompt leaves out prompt-cache reads (a 3,388-token
+      // call came back as 4), so the tokens we streamed stay the record.
+      await env.DB.prepare(`UPDATE ai_usage_events SET base_cost_micro_usd = ?, cost_source = 'actual' WHERE id = ?`)
+        .bind(Math.round(g.total_cost * 1e6), r.id).run();
       actual++;
     });
 
