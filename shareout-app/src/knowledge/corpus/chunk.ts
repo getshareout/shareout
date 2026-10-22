@@ -17,6 +17,14 @@ export const MAX_CHUNKS = 2000;
 
 const HEADING = /^#{1,6}\s+(.+?)\s*#*$/;
 
+// A spreadsheet's markdown pads every row to the widest cell and keeps every empty
+// column: most of its text is blanks. Keep only the cells that say something.
+function compactTableRow(line: string): string | null {
+  if (!line.startsWith('|')) return line;
+  const cells = line.split('|').map((c) => c.trim()).filter((c) => c && !/^:?-+:?$/.test(c));
+  return cells.length ? `| ${cells.join(' | ')} |` : null;
+}
+
 export function chunkMarkdown(markdown: string): Chunk[] {
   const chunks: Chunk[] = [];
   let locator = '';
@@ -31,7 +39,7 @@ export function chunkMarkdown(markdown: string): Chunk[] {
   };
 
   for (const block of markdown.replace(/\r\n/g, '\n').split(/\n{2,}/)) {
-    const para = block.trim();
+    const para = block.split('\n').map((l) => compactTableRow(l.trim())).filter((l) => l !== null).join('\n').trim();
     if (!para) continue;
     const heading = HEADING.exec(para.split('\n')[0]);
     if (heading) {
