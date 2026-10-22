@@ -8,6 +8,7 @@ import {
   type EmailConfig,
 } from '../../scheduling/email';
 import { getArtifactEmail } from '../../scheduling/jobs/artifact-email';
+import { listArtifactOptouts } from '../../email/artifact-optout';
 import { checkSlidingWindowRateLimit, getTrustedClientIp } from '../../rate-limit';
 
 const MAX_SUBJECT_LEN = 200;
@@ -88,6 +89,12 @@ export async function handleEmail(
 
   if (path === '/status' && request.method === 'GET') {
     return handleStatus(ctx);
+  }
+
+  // Who unsubscribed from this artifact's emails (owner/editor only).
+  if (path === '/optouts' && request.method === 'GET') {
+    if (ctx.isOwner !== true) return errorResponse(DATA_ERRORS.FORBIDDEN, ctx.origin);
+    return successResponse({ optouts: await listArtifactOptouts(ctx.env, ctx.artifactId) }, 200, ctx.origin);
   }
 
   if (path === '/notify-owner' && request.method === 'POST') {

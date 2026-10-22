@@ -130,6 +130,8 @@ Tool names — read: `table_query`, `table_schema`, `json_get`, `file_list`, `fi
 `scheduled_job_create`, `notify_send`, `pilot_verify`. Unknown names, or a name listed under
 the wrong mode, are ignored silently — check `grants` in `GET /crew` after defining.
 
+`email_send` (and every artifact email: scheduled jobs, `sdk.email`) sends one message per recipient with an unsubscribe footer link and RFC 8058 `List-Unsubscribe` / `List-Unsubscribe-Post` headers. A recipient who unsubscribes is stored per artifact (`artifact_email_optouts`), skipped on later sends, and reported back as `skipped_opted_out`; the owner can list them with `GET /v1/data/{id}/email/optouts`. The unsubscribe page is Spanish (es-AR) for Spanish workspaces, English otherwise, and can opt back in.
+
 Triggers (`POST /crew/triggers`):
 
 ```jsonc

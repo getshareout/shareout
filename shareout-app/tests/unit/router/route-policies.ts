@@ -61,6 +61,7 @@ export const OPEN_ROUTES: Record<string, string> = {
   '/invite/': 'invite landing page; the token in the URL is the credential',
   '/report/': 'public abuse report form; accepted only for public artifacts',
   '/v1/email/unsubscribe': 'one-click unsubscribe; the signed token in the URL is the credential',
+  '/v1/email/artifact-unsubscribe': 'per-artifact one-click unsubscribe; the signed (artifact, email) token in the URL is the credential',
 
   // Sign-in and sign-up
   '/auth/login': SIGN_IN,
