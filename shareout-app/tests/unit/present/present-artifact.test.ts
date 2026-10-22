@@ -137,6 +137,17 @@ describe('presentArtifact', () => {
     expect(publishArtifact).not.toHaveBeenCalled();
   });
 
+  it('gives the model room for reasoning tokens and retries once on unusable output', async () => {
+    await seedSource();
+    chatComplete.mockResolvedValueOnce('{"title":"cut off","slides":[{"head').mockResolvedValueOnce(JSON.stringify({
+      title: 'T', slides: [{ heading: 'H', bullets: ['b'] }],
+    }));
+    const r = await presentArtifact(e, 'usr1', 'src1');
+    expect(r.ok).toBe(true);
+    expect(chatComplete).toHaveBeenCalledTimes(2);
+    expect(chatComplete.mock.calls[0][4]).toBeGreaterThanOrEqual(4000);
+  });
+
   it('502 with NO artifact created when the LLM output is unusable', async () => {
     await seedSource();
     chatComplete.mockResolvedValue('I cannot help with that.');
