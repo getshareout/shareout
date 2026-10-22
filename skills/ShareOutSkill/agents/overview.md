@@ -372,7 +372,7 @@ Publish pending edits as a new version.
 | Requests/minute | 10 | Per artifact |
 | Tokens/day | 100,000 | Per artifact |
 
-These caps apply to anonymous visitors and signed-in non-members. Signed-in members of the artifact's workspace skip them and are bounded by the workspace monthly AI budget (Settings → AI) instead; over budget returns 429.
+These caps apply to anonymous visitors and signed-in non-members. Signed-in members of the artifact's workspace skip them. They get a per-user backstop (20 requests/minute, 300,000 tokens/day) and, when set, the workspace monthly AI budget (Settings → AI); exceeding either returns 429.
 
 Rate limit exceeded returns HTTP 429 with:
 ```json

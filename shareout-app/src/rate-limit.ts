@@ -16,6 +16,8 @@ const RATE_LIMITS = {
   // one network cannot lock every other visitor out of the owner's artifacts.
   aiChatAnonIp: { limit: 40, windowSeconds: 3600 },
   aiChatAnonOwner: { limit: 200, windowSeconds: 3600 },
+  // Signed-in workspace members on the in-artifact agent: a runaway page loop or script backstop per user.
+  aiChatMember: { limit: 20, windowSeconds: 60 },
   // Operator-funded Create LLM calls: anonymous planner per IP, signed-in preview per user.
   createPlanAnon: { limit: 30, windowSeconds: 3600 },
   createPreviewUser: { limit: 60, windowSeconds: 3600 },
