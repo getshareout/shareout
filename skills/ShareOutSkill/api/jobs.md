@@ -22,6 +22,7 @@ A job's creator **or** the artifact owner may pause/delete/run it by id.
 Viewers may only schedule delivery to themselves (their own email, their linked
 Telegram, or a Slack DM); anything else — or an artifact you can't access — is `403 FORBIDDEN`.
 Cron schedules run in **UTC**: convert the recipient's local time before sending.
+**Granularity is one hour.** The platform cron fires at the top of every hour and runs whatever is due, so `30 10 * * 1` runs at 11:00, not 10:30, and `*/15 * * * *` runs once an hour. Use minute `0` for an exact time. Creating a job or a crew trigger with another minute still succeeds but the response carries a `notice` saying so. (A self-hoster can add a denser cron trigger in `wrangler.toml`.)
 
 ## Action Types
 

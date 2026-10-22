@@ -145,6 +145,15 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe('cronCadenceNotice', () => {
+  it('is silent for hour-aligned schedules and explains off-hour minutes', async () => {
+    const { cronCadenceNotice } = await import('../../src/scheduling/jobs/cron');
+    expect(cronCadenceNotice('0 10 * * 1')).toBeNull();
+    expect(cronCadenceNotice('30 10 * * 1')).toMatch(/once an hour.*minute 30/);
+    expect(cronCadenceNotice('*/15 * * * *')).toMatch(/top of the hour/);
+  });
+});
+
 describe('parseCronSchedule', () => {
   it('accepts valid 5-field cron expressions', () => {
     expect(parseCronSchedule('0 9 * * *')).toEqual({ valid: true });

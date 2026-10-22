@@ -16,6 +16,7 @@ import {
   type DefineCrewBody,
   type CreateTriggerBody,
 } from './store';
+import { cronCadenceNotice } from '../scheduling/jobs/cron';
 import { runCrew } from './run-loop';
 import { resolveCrewLimits, countActiveRuns } from './limits';
 import { listApprovals, getApproval, approveAndExecute, rejectApproval } from './approvals';
@@ -243,7 +244,8 @@ async function handleCreateTrigger(request: Request, ctx: DataContext): Promise<
   if ('error' in result) {
     return errorResponse({ ...DATA_ERRORS.INVALID_REQUEST, message: result.error }, ctx.origin);
   }
-  return successResponse({ trigger: result }, 200, ctx.origin);
+  const notice = result.kind === 'cron' && result.cron ? cronCadenceNotice(result.cron) : null;
+  return successResponse({ trigger: result, ...(notice ? { notice } : {}) }, 200, ctx.origin);
 }
 
 async function handleUpdateTrigger(request: Request, ctx: DataContext, triggerId: string): Promise<Response> {

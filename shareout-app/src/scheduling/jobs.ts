@@ -38,7 +38,7 @@ export type {
   JobLog,
 } from './jobs/types';
 
-export { parseCronSchedule, getNextRunTime } from './jobs/cron';
+export { parseCronSchedule, getNextRunTime, cronCadenceNotice } from './jobs/cron';
 export { calculateBackoffDelay } from './jobs/retry';
 export { checkViewerSelfDelivery } from './jobs/permissions';
 export { missingJobConnection } from './jobs/connection-check';

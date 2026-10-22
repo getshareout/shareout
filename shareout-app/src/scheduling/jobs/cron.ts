@@ -121,3 +121,11 @@ export function getNextRunTime(cron: string, from: Date = new Date()): string {
 
   return new Date(Date.now() + 86400 * 1000).toISOString();
 }
+
+/** The platform cron trigger is hourly (wrangler `crons = ["0 * * * *"]`), so a due job runs at the next top of the hour.
+ *  Null when the schedule is hour-aligned (minute is a literal 0); otherwise a note for the API response. */
+export function cronCadenceNotice(cron: string): string | null {
+  const minute = cron.trim().split(/\s+/)[0];
+  if (minute === '0') return null;
+  return `Schedules are checked once an hour, at the top of the hour: "${cron.trim()}" will run at the next :00 after it is due, not at minute ${minute}. Use minute 0 for an exact time.`;
+}

@@ -11,6 +11,7 @@ import { aggregateDailyStats, cleanupOldEvents } from '../analytics';
 import { cleanupExpiredAdminSessions, cleanupOldRateLimits } from '../api-auth';
 import { cleanupExpiredDeviceCodes } from '../auth/device-auth';
 import { cleanupMcpOAuth } from '../mcp/oauth';
+import { cronCadenceNotice } from './jobs/cron';
 import { runDueCrewTriggers } from '../crew/triggers';
 import { runModerationRescan, recheckPendingModeration, recheckFailOpenModeration } from '../moderation/rescan';
 import { checkContentDomainReputation, runBandwidthAutoPause } from '../moderation/maintenance';
@@ -134,7 +135,8 @@ export async function handleCreateJob(request: Request, env: Env, user: Authenti
     return errorResponse(result.error, 'INVALID_REQUEST', 400);
   }
 
-  return jsonResponse({ job: result.job && toApiJob(result.job) }, 201);
+  const notice = triggerType === 'cron' && body.schedule ? cronCadenceNotice(body.schedule) : null;
+  return jsonResponse({ job: result.job && toApiJob(result.job), ...(notice ? { notice } : {}) }, 201);
 }
 
 export async function handleListJobs(request: Request, env: Env, user: AuthenticatedUser): Promise<Response> {
