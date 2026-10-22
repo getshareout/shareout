@@ -22,6 +22,7 @@ import {
 import { handleListRecommendedSkills } from '../../official-skills/list';
 import { handleListWorkspaceLibraries } from '../../workspace-library';
 import { handleGetWorkspaceAudit } from './workspace-audit';
+import { handleGetWorkspaceSpend } from './workspace-spend';
 import { handleGetWorkspaceSessionPolicy, handleSetWorkspaceSessionPolicy } from './workspace-session-policy';
 import { handleGetWorkspaceLocale, handleSetWorkspaceLocale, handleSetMyLocale } from './workspace-locale';
 import type { FetchContext } from '../context';
@@ -99,6 +100,14 @@ export async function routeWorkspaceSettings(ctx: FetchContext): Promise<Respons
     const user = await requireTokenOrSession(ctx);
     if (!isAuthUser(user)) return user;
     return addCORS(await handleGetWorkspaceAudit(request, env, user, workspaceId));
+  }
+
+  const workspaceSpendMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/spend$/);
+  if (workspaceSpendMatch && request.method === 'GET') {
+    const [, workspaceId] = workspaceSpendMatch;
+    const user = await requireTokenOrSession(ctx);
+    if (!isAuthUser(user)) return user;
+    return addCORS(await handleGetWorkspaceSpend(request, env, user, workspaceId));
   }
 
   const workspaceSessionPolicyMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/session-policy$/);

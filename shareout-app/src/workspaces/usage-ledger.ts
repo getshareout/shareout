@@ -296,16 +296,50 @@ export interface DailyUsageRow {
   costMicroUsd: number;
 }
 
-export async function getDailyUsage(env: Env, month: string): Promise<DailyUsageRow[]> {
+export async function getDailyUsage(env: Env, month: string, workspaceId?: string): Promise<DailyUsageRow[]> {
   const { from, to } = monthBounds(month);
   const { results } = await env.DB.prepare(
     `SELECT u.day AS day, u.workspace_id AS workspaceId, COALESCE(w.name, w.slug, u.workspace_id) AS name,
             u.metric AS metric, u.quantity AS quantity, u.cost_micro_usd AS costMicroUsd
        FROM workspace_usage_daily u JOIN workspaces w ON w.id = u.workspace_id
-      WHERE u.day >= ? AND u.day < ?
+      WHERE u.day >= ? AND u.day < ?${workspaceId ? ' AND u.workspace_id = ?' : ''}
       ORDER BY u.day, name, u.metric`
-  ).bind(from, to).all<DailyUsageRow>();
+  ).bind(...(workspaceId ? [from, to, workspaceId] : [from, to])).all<DailyUsageRow>();
   return results ?? [];
+}
+
+export interface SpendSummary {
+  month: string;
+  totalMicroUsd: number;
+  /** Storage quantity is GB-months; everything else is the summed daily quantity. */
+  byMetric: Partial<Record<UsageMetric, { quantity: number; costMicroUsd: number }>>;
+  days: Array<{ day: string; costMicroUsd: number }>;
+  /** Linear month-end projection; null unless `month` is the current month. */
+  projectedMicroUsd: number | null;
+}
+
+/** One workspace's month: totals per metric and per day, plus a month-end pace.
+ *  Rollups land the morning after, so the current month is complete through yesterday. */
+export function summarizeSpend(rows: DailyUsageRow[], month: string, today = utcDay()): SpendSummary {
+  const byMetric: SpendSummary['byMetric'] = {};
+  const byDay = new Map<string, number>();
+  let total = 0;
+  for (const r of rows) {
+    const m = (byMetric[r.metric] ??= { quantity: 0, costMicroUsd: 0 });
+    m.quantity += r.quantity;
+    m.costMicroUsd += r.costMicroUsd;
+    byDay.set(r.day, (byDay.get(r.day) ?? 0) + r.costMicroUsd);
+    total += r.costMicroUsd;
+  }
+  if (byMetric.storage_bytes) byMetric.storage_bytes.quantity = gbMonths(byMetric.storage_bytes.quantity, month);
+  const elapsed = today.slice(0, 7) === month ? Number(today.slice(8)) - 1 : 0;
+  return {
+    month,
+    totalMicroUsd: total,
+    byMetric,
+    days: [...byDay].map(([day, costMicroUsd]) => ({ day, costMicroUsd })),
+    projectedMicroUsd: elapsed > 0 ? Math.round((total / elapsed) * daysInMonth(today)) : null,
+  };
 }
 
 /** GB-months for a month's summed storage byte-days — the unit R2 bills in. */

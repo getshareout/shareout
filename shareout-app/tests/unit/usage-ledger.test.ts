@@ -13,6 +13,7 @@ import {
   r2KeyOwner,
   recordArtifactUsage,
   rollupWorkspaceUsage,
+  summarizeSpend,
   usageCsv,
   utcDay,
 } from '../../src/workspaces/usage-ledger';
@@ -63,6 +64,28 @@ describe('usage-ledger pure helpers', () => {
       '2026-09,ws_1,"Acme, ""Inc""",email_sent,10,0.003500',
       '',
     ]);
+  });
+});
+
+describe('summarizeSpend', () => {
+  const rows = [
+    { day: '2026-09-01', workspaceId: 'ws_a', name: 'Acme', metric: 'ai_other_events' as const, quantity: 10, costMicroUsd: 2_000_000 },
+    { day: '2026-09-01', workspaceId: 'ws_a', name: 'Acme', metric: 'storage_bytes' as const, quantity: 30 * GB, costMicroUsd: 1000 },
+    { day: '2026-09-02', workspaceId: 'ws_a', name: 'Acme', metric: 'ai_other_events' as const, quantity: 5, costMicroUsd: 1_000_000 },
+  ];
+
+  it('totals per metric and per day, storage as GB-months', () => {
+    const s = summarizeSpend(rows, '2026-09', '2026-10-05');
+    expect(s.totalMicroUsd).toBe(3_001_000);
+    expect(s.byMetric.ai_other_events).toEqual({ quantity: 15, costMicroUsd: 3_000_000 });
+    expect(s.byMetric.storage_bytes?.quantity).toBe(1);
+    expect(s.days).toEqual([{ day: '2026-09-01', costMicroUsd: 2_001_000 }, { day: '2026-09-02', costMicroUsd: 1_000_000 }]);
+    expect(s.projectedMicroUsd).toBeNull();
+  });
+
+  it('paces the current month on the days complete so far', () => {
+    expect(summarizeSpend(rows, '2026-09', '2026-09-03').projectedMicroUsd).toBe(Math.round((3_001_000 / 2) * 30));
+    expect(summarizeSpend(rows, '2026-09', '2026-09-01').projectedMicroUsd).toBeNull();
   });
 });
 
@@ -137,6 +160,14 @@ describe('rollupWorkspaceUsage', () => {
     expect(m['ws_a:ai_llm_tokens']).toEqual([150, 1200]);
     expect(m['ws_b:ai_other_events']).toEqual([1, 450]);
     expect(Object.keys(m).some((k) => k.startsWith('ws_b:serving'))).toBe(false);
+  });
+
+  it('filters daily rows to one workspace', async () => {
+    await seed();
+    await rollupWorkspaceUsage(E, day, { measureStorage: true });
+    const rows = await getDailyUsage(E, '2026-09', 'ws_b');
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.workspaceId === 'ws_b')).toBe(true);
   });
 
   it('is idempotent and leaves live counters alone', async () => {
