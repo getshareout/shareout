@@ -7,6 +7,7 @@
  */
 import { fetchWithTimeout } from '../../fetch-utils';
 import { fetchCheckingRedirects, isBlockedDestination } from '../secrets/blocklist';
+import type { Env } from '../../types';
 import { UpstreamHttpError } from './errors';
 import { CONNECTION_TIMEOUT_MS } from './types';
 
@@ -38,6 +39,7 @@ export async function executeRestApiQuery(
   credType: string | null,
   query: string | Record<string, unknown>,
   params?: Record<string, unknown>,
+  fetcher?: (url: string, init: RequestInit) => Promise<Response>,
 ): Promise<unknown> {
   const baseUrl = config.baseUrl as string;
   if (!baseUrl) {
@@ -101,7 +103,7 @@ export async function executeRestApiQuery(
 
   const response = await fetchCheckingRedirects(url, { method, headers, body }, () => null, {
     stripCredentialsCrossOrigin: true,
-    fetcher: (u, init) => fetchWithTimeout(u, init, CONNECTION_TIMEOUT_MS),
+    fetcher: (u, init) => (fetcher ?? ((x, i) => fetchWithTimeout(x, i, CONNECTION_TIMEOUT_MS)))(u, init),
   });
 
   if (!response.ok) {
@@ -149,4 +151,44 @@ export function redactUrl(url: string): string {
   } catch {
     return url.split('?')[0];
   }
+}
+
+// Headers a self-routed call may carry. Allowlist, not blocklist: connection headers are
+// user-controlled and in-worker nothing overwrites cf-connecting-ip / host / cookie, which
+// dev-login, rate limiters and abuse controls trust.
+const SELF_HEADERS = ['authorization', 'content-type', 'accept'];
+
+/**
+ * Fetcher for REST connections whose target is this deployment itself. A Worker
+ * subrequest to its own zone fails with Cloudflare 522, so those calls are handed
+ * to the in-worker handler instead. Returns undefined for any other host.
+ *
+ * Only `/v1/` API paths are routed (checked on every redirect hop too, since the
+ * fetcher runs per hop); headers are rebuilt from an allowlist and cf-connecting-ip
+ * is a non-loopback per-caller marker, so a connection can never pass as a local or
+ * spoofed-IP request.
+ */
+export function selfFetcher(env: Env, url?: unknown, callerId?: string | null): ((url: string, init: RequestInit) => Promise<Response>) | undefined {
+  try {
+    const own = new URL(env.SHAREOUT_BASE_URL).hostname;
+    if (new URL(String(url)).hostname !== own) return undefined;
+  } catch {
+    return undefined;
+  }
+  return async (u, init) => {
+    const target = new URL(u);
+    if (target.hostname !== new URL(env.SHAREOUT_BASE_URL).hostname || !target.pathname.startsWith('/v1/')) {
+      throw new Error('Connections to this instance may only call /v1/ API paths.');
+    }
+    const src = new Headers(init.headers);
+    const headers = new Headers();
+    for (const name of SELF_HEADERS) {
+      const v = src.get(name);
+      if (v) headers.set(name, v);
+    }
+    // Per-caller marker: not an IP, never loopback; keeps per-IP limiters from sharing one bucket.
+    headers.set('cf-connecting-ip', `crew-self:${callerId || 'unknown'}`);
+    const { handleFetch } = await import('../../router/handle-fetch');
+    return handleFetch(new Request(target.toString(), { ...init, headers }), env);
+  };
 }

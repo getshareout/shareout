@@ -24,7 +24,7 @@ import {
   recordConnectionUsage,
   resolveConnectionCredentials,
 } from './resolve';
-import { executeRestApiQuery } from './rest-query';
+import { executeRestApiQuery, selfFetcher } from './rest-query';
 
 export async function executeQuery(
   request: Request,
@@ -97,7 +97,7 @@ export async function executeQuery(
     let result: unknown;
 
     if (conn.type === 'rest_api') {
-      result = await executeRestApiQuery(config, credentials, credType, query, options?.params);
+      result = await executeRestApiQuery(config, credentials, credType, query, options?.params, selfFetcher(ctx.env, config.baseUrl, userId));
     } else if (conn.type === 'snowflake' || conn.type === 'bigquery') {
       const sql = typeof query === 'string'
         ? query
@@ -200,7 +200,7 @@ export async function queryConnectionData(
   const { credentials, credType } = await resolveConnectionCredentials(env, conn, userId ?? null);
   const config = JSON.parse(conn.config) as Record<string, unknown>;
   if (conn.type === 'rest_api') {
-    return executeRestApiQuery(config, credentials, credType, query, params);
+    return executeRestApiQuery(config, credentials, credType, query, params, selfFetcher(env, config.baseUrl, userId));
   }
   if (conn.type === 'snowflake' || conn.type === 'bigquery') {
     const sql = typeof query === 'string'

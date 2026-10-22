@@ -20,7 +20,7 @@ Use `query_snapshot` when SQL is stable; use crew `materialize_query` when the a
 
 Query a workspace connection by name. Works for REST (`query = "GET /endpoint"`) **and** SQL warehouses like BigQuery (`query` = SQL string; pass `params.projectId` for BigQuery). Returns rows to the crew context — best for aggregates and small result sets.
 
-Runs on the **artifact owner's** per-user credentials when the connection is `per_user`, so unattended crews can query BigQuery the same way the interactive data API does.
+A REST connection whose `baseUrl` is this instance's own origin is routed in-process (a Worker cannot fetch its own zone: 522). Runs on the **artifact owner's** per-user credentials when the connection is `per_user`, so unattended crews can query BigQuery the same way the interactive data API does.
 
 ### `materialize_query` (write)
 
@@ -124,7 +124,7 @@ envelope `{ "success": true, "data": … }`. One crew per artifact.
 ```
 
 Tool names — read: `table_query`, `table_schema`, `json_get`, `file_list`, `file_read`,
-`web_search`, `connection_query`, `action_item_list`. Write: `json_set`, `table_insert`,
+`web_search`, `connection_query`, `action_item_list`, `workspace_artifacts` (list the workspace's artifacts the owner can open), `workspace_data_read` (read a JSON key or table of another artifact in the same workspace, in-process), `knowledge_search` (cited passages from workspace Knowledge, as the crew owner). Write: `json_set`, `table_insert`,
 `table_update`, `comment_create`, `action_item_create`, `email_send`, `materialize_query`,
 `scheduled_job_create`, `notify_send`, `pilot_verify`. Unknown names, or a name listed under
 the wrong mode, are ignored silently — check `grants` in `GET /crew` after defining.

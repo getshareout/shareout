@@ -11,6 +11,7 @@ import {
 import { validateName } from '../../../src/data/connections/crud';
 import {
   executeRestApiQuery,
+  selfFetcher,
   redactUrl,
   staticHeaders,
   validateRestBaseUrl,
@@ -102,6 +103,49 @@ describe('connections/rest-query', () => {
     expect(hop.get('Authorization')).toBeNull();
     expect(hop.get('X-Api-Key')).toBeNull();
     fetchMock.mockRestore();
+  });
+});
+
+const handleFetchMock = vi.hoisted(() => vi.fn());
+vi.mock('../../../src/router/handle-fetch', () => ({ handleFetch: handleFetchMock }));
+
+describe('connections/rest-query selfFetcher', () => {
+  const env = { SHAREOUT_BASE_URL: 'https://shareout.site' } as never;
+  const spoof = { 'cf-connecting-ip': '127.0.0.1', 'x-forwarded-for': '127.0.0.1', 'true-client-ip': '127.0.0.1', cookie: 'a=b', host: 'localhost', Authorization: 'Bearer k', 'content-type': 'application/json' };
+
+  it('only intercepts the deployment\'s own host', () => {
+    expect(selfFetcher(env, 'https://shareout.site/v1')).toBeTypeOf('function');
+    expect(selfFetcher(env, 'https://api.example.com/v1')).toBeUndefined();
+    expect(selfFetcher(env, undefined)).toBeUndefined();
+  });
+
+  it('routes /v1 calls in-worker with scrubbed headers and a non-loopback marker', async () => {
+    handleFetchMock.mockReset().mockResolvedValue(new Response('{"ok":true}', { headers: { 'Content-Type': 'application/json' } }));
+    await expect(executeRestApiQuery(
+      { baseUrl: 'https://shareout.site/v1', headers: spoof }, { apiKey: 'k' }, 'api_key', '/artifacts', undefined, selfFetcher(env, 'https://shareout.site/v1', 'usr_1'),
+    )).resolves.toEqual({ ok: true });
+    const req = handleFetchMock.mock.calls[0][0] as Request;
+    expect(new URL(req.url).pathname).toBe('/v1/artifacts');
+    expect(req.headers.get('cf-connecting-ip')).toBe('crew-self:usr_1');
+    for (const h of ['x-forwarded-for', 'true-client-ip', 'cookie']) expect(req.headers.get(h)).toBeNull();
+    expect(req.headers.get('host')).not.toBe('localhost');
+    expect(req.headers.get('authorization')).toBe('Bearer k');
+  });
+
+  it('refuses non-/v1 paths (dev login) without reaching handleFetch', async () => {
+    handleFetchMock.mockReset();
+    await expect(executeRestApiQuery(
+      { baseUrl: 'https://shareout.site', headers: spoof }, null, null, '/auth/dev?email=x@y.z', undefined, selfFetcher(env, 'https://shareout.site', 'usr_1'),
+    )).rejects.toThrow(/only call \/v1\//);
+    expect(handleFetchMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a redirect hop from /v1 to a non-/v1 self path', async () => {
+    handleFetchMock.mockReset().mockResolvedValueOnce(new Response(null, { status: 302, headers: { Location: '/auth/dev?email=x@y.z' } }));
+    await expect(executeRestApiQuery(
+      { baseUrl: 'https://shareout.site/v1' }, { apiKey: 'k' }, 'api_key', '/redir', undefined, selfFetcher(env, 'https://shareout.site/v1', 'usr_1'),
+    )).rejects.toThrow(/only call \/v1\//);
+    expect(handleFetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -19,6 +19,9 @@ import { scheduledJobCreateTool } from './tools/scheduled-job-create';
 import { notifySendTool } from './tools/notify-send';
 import { platformMetricsDigestTool } from './tools/platform-metrics-digest';
 import { platformMetricsInvestigateTool } from './tools/platform-metrics-investigate';
+import { workspaceArtifactsTool } from './tools/workspace-artifacts';
+import { workspaceDataReadTool } from './tools/workspace-data-read';
+import { knowledgeSearchTool } from './tools/knowledge-search';
 import { pilotVerifyTool } from './tools/pilot-verify';
 
 /** Every tool the Crew runtime knows about. */
@@ -30,6 +33,10 @@ export const CREW_TOOLS: Record<string, CrewTool> = {
   // read (workspace file library — work/042 P4)
   [fileListTool.name]: fileListTool,
   [fileReadTool.name]: fileReadTool,
+  // read (other artifacts + Knowledge in the crew's own workspace, acting as the crew owner)
+  [workspaceArtifactsTool.name]: workspaceArtifactsTool,
+  [workspaceDataReadTool.name]: workspaceDataReadTool,
+  [knowledgeSearchTool.name]: knowledgeSearchTool,
   // read, external (Phase 2.1)
   [webSearchTool.name]: webSearchTool,
   [connectionQueryTool.name]: connectionQueryTool,
