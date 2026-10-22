@@ -40,3 +40,21 @@ export async function countActiveRuns(env: Env, ownerId: string): Promise<number
     .first<{ n: number }>();
   return r?.n ?? 0;
 }
+
+/** Runs started by the hourly scheduled handler (cron/condition) get this at most. Cron Triggers have a 15 min wall
+ *  limit and the run is mostly waiting on the model (I/O, not CPU); stale-run reaping is at 300 s, so stay well under. */
+export const MAX_SCHEDULED_RUNTIME_MS = 120_000;
+/** Everything else (manual SSE, event wake in waitUntil, Telegram/alert follow-ups) keeps the 25 s default:
+ *  waitUntil work is cut ~30 s after the response. */
+export const DEFAULT_RUNTIME_MS = 25_000;
+
+export function effectiveMaxRuntimeMs(configured: number, triggerKind: string | null | undefined): number {
+  const scheduled = triggerKind === 'cron' || triggerKind === 'condition';
+  return Math.min(configured, scheduled ? MAX_SCHEDULED_RUNTIME_MS : DEFAULT_RUNTIME_MS);
+}
+
+/** True when the owner already has as many running crew runs as their plan allows. */
+export async function ownerAtCapacity(env: Env, ownerId: string): Promise<boolean> {
+  const limits = await resolveCrewLimits(env, ownerId);
+  return (await countActiveRuns(env, ownerId)) >= limits.max_concurrent_runs;
+}

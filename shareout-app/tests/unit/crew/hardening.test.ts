@@ -6,7 +6,8 @@
 import { env } from 'cloudflare:test';
 import { beforeAll, beforeEach, describe, it, expect } from 'vitest';
 import { createMiniDb } from '../../../src/data/minidb-client';
-import { reapStaleRuns } from '../../../src/crew/store';
+import { reapStaleRuns, defineCrew } from '../../../src/crew/store';
+import { effectiveMaxRuntimeMs, MAX_SCHEDULED_RUNTIME_MS } from '../../../src/crew/limits';
 import { countActiveRuns } from '../../../src/crew/limits';
 import { runDueCrewTriggers, claimTrigger } from '../../../src/crew/triggers';
 import { reapStaleApprovals, approveAndExecute } from '../../../src/crew/approvals';
@@ -16,6 +17,8 @@ import type { DataContext } from '../../../src/data/middleware';
 
 beforeAll(async () => {
   const stmts = [
+    `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, tier TEXT, disabled INTEGER)`,
+    `CREATE TABLE IF NOT EXISTS plan_crew_limits (plan TEXT PRIMARY KEY, max_crews_per_artifact INTEGER, max_concurrent_runs INTEGER, default_run_budget_micro_usd INTEGER, max_iterations_cap INTEGER)`,
     `CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, workspace_id TEXT, owner_id TEXT, name TEXT, visibility TEXT)`,
     `CREATE TABLE IF NOT EXISTS crews (id TEXT PRIMARY KEY, artifact_id TEXT, workspace_id TEXT, owner_id TEXT, name TEXT,
        instructions TEXT, model TEXT, status TEXT, max_iterations INTEGER, max_tokens_per_call INTEGER,
@@ -100,6 +103,70 @@ describe('runDueCrewTriggers storm guard (#2 re-fire storm)', () => {
     const row = await env.DB.prepare(`SELECT next_run_at FROM crew_triggers WHERE id='ctrg_bad'`).first<{ next_run_at: string }>();
     // Backed off into the future — no longer due, so the next tick won't re-fire it.
     expect(row!.next_run_at > iso(0)).toBe(true);
+  });
+});
+
+describe('runDueCrewTriggers when the owner is busy (G13 dropped runs)', () => {
+  const setup = async (dueOffsetSec: number) => {
+    const iso = (d: number) => new Date(Date.now() + d * 1000).toISOString();
+    await env.DB.prepare(`INSERT INTO crews (id, artifact_id, owner_id, status) VALUES ('crew_b', 'art_b', 'usr_b', 'active')`).run();
+    await env.DB.prepare(`INSERT INTO crews (id, artifact_id, owner_id, status) VALUES ('crew_o', 'art_o', 'usr_b', 'active')`).run();
+    await env.DB.prepare(`INSERT INTO crew_runs (id, crew_id, artifact_id, trigger_kind, status) VALUES ('crun_busy', 'crew_o', 'art_o', 'manual', 'running')`).run();
+    const due = iso(dueOffsetSec);
+    await env.DB.prepare(
+      `INSERT INTO crew_triggers (id, crew_id, artifact_id, kind, cron, enabled, next_run_at) VALUES ('ctrg_w', 'crew_b', 'art_b', 'cron', '0 9 * * 1', 1, ?)`
+    ).bind(due).run();
+    return due;
+  };
+
+  it('leaves the trigger due (not advanced) so the next tick retries it', async () => {
+    const due = await setup(-3600);
+    await runDueCrewTriggers(env as never);
+    const row = await env.DB.prepare(`SELECT next_run_at FROM crew_triggers WHERE id='ctrg_w'`).first<{ next_run_at: string }>();
+    expect(row!.next_run_at).toBe(due);
+  });
+
+  it('gives up after the retry window and advances to the next occurrence', async () => {
+    const due = await setup(-7 * 3600);
+    await runDueCrewTriggers(env as never);
+    const row = await env.DB.prepare(`SELECT next_run_at FROM crew_triggers WHERE id='ctrg_w'`).first<{ next_run_at: string }>();
+    expect(row!.next_run_at > due).toBe(true);
+    expect(row!.next_run_at > new Date().toISOString()).toBe(true);
+  });
+});
+
+describe('runDueCrewTriggers tick budget (G13)', () => {
+  it('stops starting new crews once the time budget is spent and leaves them due', async () => {
+    const due = new Date(Date.now() - 3600_000).toISOString();
+    await env.DB.prepare(`INSERT INTO crews (id, artifact_id, owner_id, status) VALUES ('crew_q', 'art_q', 'usr_q', 'active')`).run();
+    await env.DB.prepare(
+      `INSERT INTO crew_triggers (id, crew_id, artifact_id, kind, cron, enabled, next_run_at) VALUES ('ctrg_q', 'crew_q', 'art_q', 'cron', '0 9 * * 1', 1, ?)`
+    ).bind(due).run();
+    const res = await runDueCrewTriggers(env as never, -1);
+    expect(res).toEqual({ executed: 0, failed: 0 });
+    const row = await env.DB.prepare(`SELECT next_run_at FROM crew_triggers WHERE id='ctrg_q'`).first<{ next_run_at: string }>();
+    expect(row!.next_run_at).toBe(due);
+  });
+});
+
+describe('crew max runtime (G13 25 s cap)', () => {
+  it('scheduled triggers get the configured runtime up to the ceiling; other contexts stay at 25 s', () => {
+    expect(effectiveMaxRuntimeMs(120_000, 'cron')).toBe(120_000);
+    expect(effectiveMaxRuntimeMs(999_999, 'cron')).toBe(MAX_SCHEDULED_RUNTIME_MS);
+    expect(effectiveMaxRuntimeMs(120_000, 'condition')).toBe(120_000);
+    expect(effectiveMaxRuntimeMs(120_000, 'event')).toBe(25_000);
+    expect(effectiveMaxRuntimeMs(120_000, 'manual')).toBe(25_000);
+    expect(effectiveMaxRuntimeMs(10_000, 'cron')).toBe(10_000);
+  });
+
+  it('define accepts maxRuntimeMs, clamped to the ceiling', async () => {
+    await env.DB.prepare(`INSERT OR IGNORE INTO artifacts (id, owner_id, workspace_id) VALUES ('art_r', 'usr_r', NULL)`).run();
+    const a = await defineCrew(env as never, 'art_r', '', { name: 'n', maxRuntimeMs: 90_000 });
+    expect(a.max_runtime_ms).toBe(90_000);
+    const b = await defineCrew(env as never, 'art_r', '', { maxRuntimeMs: 9_999_999 });
+    expect(b.max_runtime_ms).toBe(MAX_SCHEDULED_RUNTIME_MS);
+    const c = await defineCrew(env as never, 'art_r', '', { name: 'x' });
+    expect(c.max_runtime_ms).toBe(MAX_SCHEDULED_RUNTIME_MS);
   });
 });
 

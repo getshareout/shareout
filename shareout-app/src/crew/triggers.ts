@@ -1,13 +1,19 @@
 import type { Env } from '../types';
 import { getNextRunTime } from '../scheduling/jobs/cron';
 import { getCrewById, createRun, reapStaleRuns } from './store';
-import { resolveCrewLimits, countActiveRuns } from './limits';
+import { resolveCrewLimits, countActiveRuns, ownerAtCapacity } from './limits';
+import { createLogger } from '../logging';
 import { buildOwnerDataContextForCrew } from './principal';
 import { runCrew, runCrewToCompletion } from './run-loop';
 import { evaluateCondition, validateConditionConfig, clampSeconds, RECHECK_SECONDS } from './condition';
 import type { CrewRow, CrewTriggerRow } from './types';
 
 const MAX_CREW_DISPATCH_PER_TICK = 25;
+// A trigger that finds its owner busy stays due and is retried each hourly tick for this long, then skips to its next occurrence.
+// The hourly invocation is shared by every scheduled task and has one 15 min wall limit; due crews run one after
+// another, so stop starting new ones after this long and leave the rest due for the next tick.
+export const CREW_TICK_BUDGET_MS = 8 * 60 * 1000;
+const BUSY_RETRY_WINDOW_MS = 6 * 3600 * 1000;
 
 /**
  * Run a crew autonomously (cron/event/condition). Honors status + the per-tenant
@@ -91,7 +97,7 @@ function isoIn(seconds: number): string {
   return new Date(Date.now() + seconds * 1000).toISOString();
 }
 
-export async function runDueCrewTriggers(env: Env): Promise<{ executed: number; failed: number }> {
+export async function runDueCrewTriggers(env: Env, budgetMs = CREW_TICK_BUDGET_MS): Promise<{ executed: number; failed: number }> {
   // Free concurrency slots held by runs the platform killed before finalize, so
   // a crash can't permanently lock out this tenant's autonomous runs.
   await reapStaleRuns(env).catch(() => 0);
@@ -111,6 +117,7 @@ export async function runDueCrewTriggers(env: Env): Promise<{ executed: number; 
   let failed = 0;
 
   for (const trigger of due.results) {
+    if (Date.now() - nowMs > budgetMs) break; // untouched triggers stay due for the next tick
     try {
       const ran =
         trigger.kind === 'condition'
@@ -139,9 +146,10 @@ async function runCronTrigger(env: Env, trigger: CrewTriggerRow, now: string): P
   // so an overlapping heartbeat can't dispatch the same trigger twice. Doing it
   // FIRST also means a slow/failing run can't re-fire next tick.
   const nextRunAt = trigger.cron ? getNextRunTime(trigger.cron) : null;
+  const crew = await getCrewById(env, trigger.crew_id);
+  if (crew && (await deferWhileOwnerBusy(env, crew, trigger, now))) return false;
   if (!(await claimTrigger(env, trigger, nextRunAt, now))) return false;
 
-  const crew = await getCrewById(env, trigger.crew_id);
   if (!crew) return false;
   return dispatchCrewRun(env, crew, 'cron', trigger.id);
 }
@@ -170,9 +178,28 @@ async function runConditionTrigger(env: Env, trigger: CrewTriggerRow, now: strin
   // About to run: claim the trigger by advancing next_run_at (storm guard +
   // race guard). If another heartbeat already claimed it, don't dispatch again.
   // The crew can still override the wake via finish(nextRunInHours).
+  if (await deferWhileOwnerBusy(env, crew, trigger, now)) return false;
   if (!(await claimTrigger(env, trigger, isoIn(clampSeconds(cfg.cooldownSeconds)), now))) return false;
 
   return dispatchCrewRun(env, crew, 'condition', trigger.id);
+}
+
+/**
+ * Owner already has a crew run active: dispatch would be refused, and claiming first would lose this
+ * occurrence (a weekly crew loses a week). Leave the trigger due so the next hourly tick retries; once it
+ * has been due longer than the retry window, give up (the caller then advances it) and log.
+ * Returns true when the caller should skip this tick without claiming.
+ */
+async function deferWhileOwnerBusy(env: Env, crew: CrewRow, trigger: CrewTriggerRow, now: string): Promise<boolean> {
+  if (!(await ownerAtCapacity(env, crew.owner_id))) return false;
+  const overdueMs = Date.parse(now) - Date.parse(String(trigger.next_run_at));
+  if (overdueMs <= BUSY_RETRY_WINDOW_MS) return true;
+  createLogger(env, { scope: 'crew-triggers' }).warn('crew trigger skipped: owner stayed busy past the retry window', {
+    trigger_id: trigger.id,
+    crew_id: crew.id,
+    overdue_hours: Math.round(overdueMs / 3600000),
+  });
+  return false;
 }
 
 /**
