@@ -83,7 +83,22 @@ describe('generateArtifactSummary (post-publish, background)', () => {
     expect((await artifactOf('md1'))!.description).toBe('A dashboard of quarterly revenue.');
   });
 
-  it('skips artifacts whose entrypoint is not html, markdown or csv', async () => {
+  it('summarizes a PDF from the text Workers AI reads out of it', async () => {
+    await seedArtifact('pdf1', { mime: 'application/pdf', html: '%PDF-1.7' });
+    const toMd = vi.fn(async () => ({ format: 'markdown', data: 'Informe 24 hs de incidentes' }));
+    await generateArtifactSummary({ ...e, AI: { toMarkdown: toMd } } as unknown as Env, 'pdf1');
+    expect(chatComplete.mock.calls[0][2]).toEqual([{ role: 'user', content: 'Informe 24 hs de incidentes' }]);
+    expect((await artifactOf('pdf1'))!.description).toBe('A dashboard of quarterly revenue.');
+  });
+
+  it('a PDF with no readable text is marked done without a model call', async () => {
+    await seedArtifact('pdf2', { mime: 'application/pdf', html: '%PDF-1.7' });
+    await generateArtifactSummary({ ...e, AI: { toMarkdown: async () => ({ format: 'markdown', data: '  ' }) } } as unknown as Env, 'pdf2');
+    expect(chatComplete).not.toHaveBeenCalled();
+    expect((await artifactOf('pdf2'))!.auto_summary_hash).toBeTruthy();
+  });
+
+  it('skips artifacts whose entrypoint is not html, markdown, csv or pdf', async () => {
     await seedArtifact('js1', { mime: 'application/json', html: '{}' });
     await generateArtifactSummary(e, 'js1');
     expect(chatComplete).not.toHaveBeenCalled();
