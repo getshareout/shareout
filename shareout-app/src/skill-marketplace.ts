@@ -809,13 +809,16 @@ export async function buildAgentSkillsDoc(env: Env, scope: string, userId: strin
   let rows: Array<{ skill_artifact_id: string; skill_version_no: number; name: string }>;
   try {
     // Workspace defaults first (admin-set, this workspace only — never for '__personal'), then the member's own.
-    const defaults = scope === '__personal' ? [] : ((await env.DB.prepare(
+    // A missing table (migration 0025 not applied yet) must not take the member's own skills down with it.
+    const defaults = scope === '__personal' ? [] : await env.DB.prepare(
       `SELECT s.skill_artifact_id, s.skill_version_no, a.name
          FROM workspace_default_skills s JOIN artifacts a ON a.id = s.skill_artifact_id
         WHERE s.workspace_id = ? AND a.deleted_at IS NULL
         ORDER BY s.position ASC, s.created_at ASC
         LIMIT ?`
-    ).bind(scope, DEFAULT_SKILL_LIMIT).all()).results ?? []) as Array<{ skill_artifact_id: string; skill_version_no: number; name: string }>;
+    ).bind(scope, DEFAULT_SKILL_LIMIT).all()
+      .then((r) => (r.results ?? []) as Array<{ skill_artifact_id: string; skill_version_no: number; name: string }>)
+      .catch(() => [] as Array<{ skill_artifact_id: string; skill_version_no: number; name: string }>);
     const res = await env.DB.prepare(
       `SELECT s.skill_artifact_id, s.skill_version_no, a.name
          FROM workspace_agent_skills s JOIN artifacts a ON a.id = s.skill_artifact_id

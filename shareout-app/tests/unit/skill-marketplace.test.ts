@@ -229,6 +229,29 @@ describe('workspace default skills (G-kit-1)', () => {
     expect(defaultBinds[0][0]).toBe('wsp_a');
   });
 
+  it("still injects the member's own skills when the defaults table does not exist yet", async () => {
+    const env = {
+      DB: {
+        prepare: (sql: string) => ({
+          bind: () => ({
+            all: async () => {
+              if (sql.includes('workspace_default_skills')) throw new Error('no such table: workspace_default_skills');
+              return { results: [{ skill_artifact_id: 'sk_own', skill_version_no: 1, name: 'Mine' }] };
+            },
+            first: async () => {
+              if (sql.includes('FROM skill_marketplace WHERE artifact_id')) return { workspace_id: 'wsp_a', blocked: 0, official: 0 };
+              if (sql.includes('FROM versions WHERE artifact_id = ? AND version_no')) return { id: 'v', entrypoint: 'SKILL.md' };
+              if (sql.includes('FROM assets WHERE version_id')) return { r2_key: 'k' };
+              return null;
+            },
+          }),
+        }),
+      },
+      ARTIFACTS: { get: async () => ({ text: async () => 'OWN SKILL BODY' }) },
+    } as unknown as Env;
+    expect(await buildAgentSkillsDoc(env, 'wsp_a', 'usr_member')).toContain('OWN SKILL BODY');
+  });
+
   it('never injects them into personal turns', async () => {
     const { env, defaultBinds } = envFor();
     expect(await buildAgentSkillsDoc(env, '__personal', 'usr_member')).toBe('');
