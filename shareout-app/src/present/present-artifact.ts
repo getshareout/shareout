@@ -16,6 +16,9 @@ import { renderDeckHtml, type Deck, type DeckSlide } from './deck-template';
 const MAX_HTML_CHARS = 20_000; // keep the prompt bounded + cheap (matches auto-summary)
 const MODEL_LABEL = 'present-this';
 const MAX_SLIDES = 9;
+// Reasoning models spend max_tokens on thinking before the JSON; 1500 truncated the outline (502 PRESENT_FAILED).
+const MAX_OUTPUT_TOKENS = 8000;
+const MAX_ATTEMPTS = 2;
 
 const SYSTEM = `You turn a published web page (a dashboard, report, or app) into a slide deck outline.
 Given the page's HTML, respond with STRICT JSON only:
@@ -128,18 +131,19 @@ export async function presentArtifact(
     html,
   ].filter(Boolean).join('\n');
 
-  let out: string;
-  try {
-    out = await chatComplete(env, { workspaceId: src.workspace_id, userId, kind: 'present_this', source: artifactId }, [{ role: 'user', content: userMsg }], SYSTEM, 1500);
-  } catch {
-    return { ok: false, error: 'Could not generate the deck (AI request failed). No deck was created.', status: 502 };
+  let deck: Deck | null = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS && !deck; attempt++) {
+    let out: string;
+    try {
+      out = await chatComplete(env, { workspaceId: src.workspace_id, userId, kind: 'present_this', source: artifactId }, [{ role: 'user', content: userMsg }], SYSTEM, MAX_OUTPUT_TOKENS);
+    } catch {
+      return { ok: false, error: 'Could not generate the deck (AI request failed). No deck was created.', status: 502 };
+    }
+    deck = parseDeck(out);
   }
-
-  const deck = parseDeck(out);
   if (!deck) {
     return { ok: false, error: 'Could not generate the deck (unusable AI output). No deck was created.', status: 502 };
   }
-
 
   const title = `${src.name} — deck`;
   const res = await publishArtifact(env, user, {
