@@ -40,6 +40,7 @@ import { TemplatesStore } from '../stores/templates-store';
 import { SourcesStore } from '../stores/sources-store';
 import { PythonStore } from '../stores/python-store';
 import { WorkspaceStore } from '../stores/workspace-store';
+import { KnowledgeStore } from '../stores/knowledge-store';
 
 // --- Automatic content-ready signalling ---------------------------------------
 // The viewer wrapper shows a loading skeleton until the artifact posts
@@ -427,6 +428,11 @@ export class ShareOut {
   // and share this artifact's own tables. See WorkspaceStore.
   get workspace(): WorkspaceStore {
     return new WorkspaceStore(this);
+  }
+
+  // Search the workspace's Knowledge (signed-in internal members only). See KnowledgeStore.
+  get knowledge(): KnowledgeStore {
+    return new KnowledgeStore(this);
   }
 
   realtime(docId: string): RealtimeDoc {

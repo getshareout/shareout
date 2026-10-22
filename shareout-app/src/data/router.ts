@@ -5,6 +5,7 @@ import { handleJsonStore } from './json-store';
 import { handleTables } from './tables/handler';
 import { handleProvision } from './provision';
 import { handleWorkspaceData } from './workspace-shared';
+import { handleKnowledge } from './knowledge-search';
 import { handleDatasets, handleDatasetUpload } from './datasets/handler';
 import { handleConnections } from './connections/handler';
 import { handleSecrets } from './secrets/handler';
@@ -365,6 +366,9 @@ async function handleDataRequestInner(
 
     case 'workspace':
       return handleWorkspaceData(request, ctx, subPath);
+
+    case 'knowledge':
+      return handleKnowledge(request, ctx, subPath);
 
     case 'datasets':
       if (rest[0] === '_upload' && rest[1]) {

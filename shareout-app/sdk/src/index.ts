@@ -61,6 +61,8 @@ export type {
   PythonResult,
 } from './stores/python-store';
 
+export type { KnowledgeHit, KnowledgeSearchResult } from './stores/knowledge-store';
+
 export type {
   TemplateVariable,
   EmailTemplate,
