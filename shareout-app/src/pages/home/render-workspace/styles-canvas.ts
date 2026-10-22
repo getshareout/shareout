@@ -10,14 +10,29 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 .wsx__acct--mob { display: flex; align-items: center; gap: 6px; flex: none; width: auto; padding: 4px 6px; margin-left: auto; border-radius: var(--radius-md); }
 .wsx__acct--mob:hover { background: var(--color-surface); }
 .wsx__chrome:has(.wsx__tabmode:not([hidden])) .wsx__acct--mob .wsx__acctname { display: none; }
-.wsx__tabs { position: relative; display: flex; align-items: center; gap: 2px; padding: 0; overflow-x: auto; background: transparent; flex: 1; min-width: 0; box-sizing: border-box; }
-.wsx-tab { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); cursor: pointer; white-space: nowrap; max-width: 220px; border: 0; transition: background var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
+/* Tab row: inline in the bar with one artifact open; with 2+ it wraps to its own
+   full-width row. Tabs shrink to fit before scrolling; the list button names them all. */
+.wsx__tabrow { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; }
+.wsx__chrome:has(.wsx__tabrow.is-row) { flex-wrap: wrap; row-gap: 6px; }
+.wsx__tabrow.is-row { order: 10; flex-basis: 100%; padding-top: 6px; border-top: 1px solid var(--color-border); }
+.wsx__tablist { flex: none; display: inline-flex; align-items: center; gap: 2px; padding: 5px 8px; border: 0; border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-secondary); font: 600 var(--text-xs) var(--font-body); cursor: pointer; }
+.wsx__tablist:hover, .wsx__tablist[aria-expanded="true"] { color: var(--color-text); background: var(--color-border); }
+.wsx__tablist[hidden] { display: none; }
+.wsx__tablist svg { width: 14px; height: 14px; }
+.wsx-tablist { width: 300px; max-height: min(440px, 70vh); }
+.wsx-tablist__items { overflow-y: auto; min-height: 0; }
+.wsx-tablist__it[hidden] { display: none; }
+.wsx-tablist__it .wsx-tab__label { flex: 1; min-width: 0; white-space: nowrap; }
+.wsx-tablist__it.is-active { background: var(--color-primary-light); color: var(--color-primary); }
+.wsx-tablist__q { margin: 2px 2px 6px; padding: 6px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg-elevated); color: var(--color-text); font: 500 var(--text-sm) var(--font-body); }
+.wsx__tabs { position: relative; display: flex; align-items: center; gap: 2px; padding: 0; overflow-x: auto; scrollbar-width: none; background: transparent; flex: 1; min-width: 0; box-sizing: border-box; }
+.wsx-tab { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); cursor: pointer; white-space: nowrap; flex: 0 1 200px; min-width: 96px; max-width: 200px; box-sizing: border-box; border: 0; transition: background var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
 .wsx-tab:hover { background: var(--color-surface); }
 .wsx-tab.is-active { background: var(--color-primary-light); color: var(--color-primary); }
 .wsx-tab__ic { display: inline-flex; flex: none; color: currentColor; }
 .wsx-tab__ic svg { width: 16px; height: 16px; }
-.wsx-tab--home { flex: none; }
-.wsx-tab__label { overflow: hidden; text-overflow: ellipsis; }
+.wsx-tab--home { flex: none; min-width: 0; max-width: none; }
+.wsx-tab__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* View/Edit toggle pinned right in the tab bar (controls the active artifact) */
 .wsx__tabmode { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--radius-md); background: var(--color-surface); flex: none; }
 .wsx__tabmode[hidden] { display: none; }

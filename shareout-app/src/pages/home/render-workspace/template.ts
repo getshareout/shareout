@@ -111,7 +111,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
     <main class="wsx__canvas">
       <div class="wsx__chrome">
         <button class="wsx__hamb" id="wsxHamb" type="button" data-i18n-aria="nav.openMenu" aria-label="Open menu" aria-controls="wsxRail" aria-expanded="false">${svg('<path d="M3 6h18M3 12h18M3 18h18"/>')}</button>
-        <div class="wsx__tabs" id="wsxTabs"></div>
+        <div class="wsx__tabrow" id="wsxTabRow"><div class="wsx__tabs" id="wsxTabs"></div><button class="wsx__tablist" id="wsxTabList" type="button" hidden aria-haspopup="menu" aria-expanded="false" data-i18n-title="tabs.allTabs" data-i18n-aria="tabs.allTabs" title="All open tabs" aria-label="All open tabs">${svg('<path d="m6 9 6 6 6-6"/>')}<span></span></button></div>
         <div class="wsx__tabmode" id="wsxTabMode" hidden><button data-mode="view" class="is-on" type="button" data-i18n="tabs.view">View</button><button data-mode="edit" type="button" data-i18n="tabs.edit">Edit</button></div>
         <button class="wsx__search" id="wsxOpenSearch" type="button" data-i18n-aria="palette.aria" aria-label="Search" data-i18n-title="palette.aria" title="Search (⌘K)">${svg('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>')}<span class="wsx__search-label" data-i18n="palette.search">Search</span><kbd class="wsx__search-kbd">⌘K</kbd></button>
         <button class="wsx__tabdevice" id="wsxTabDevice" type="button" hidden aria-pressed="false" data-i18n-title="tabs.mobilePreview" data-i18n-aria="tabs.mobilePreview" title="Toggle mobile preview" aria-label="Toggle mobile preview">${svg('<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>')}</button>
