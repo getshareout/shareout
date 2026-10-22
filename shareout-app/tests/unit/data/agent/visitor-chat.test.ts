@@ -52,9 +52,18 @@ vi.mock('../../../../src/data/agent/ai-config', () => ({
   recordAgentUsage: (...args: unknown[]) => mockRecordAgentUsage(...args),
 }));
 
+const mockIsMember = vi.fn();
+const mockOverBudget = vi.fn();
+vi.mock('../../../../src/data/agent/member-quota', () => ({
+  isWorkspaceMemberRequest: (...args: unknown[]) => mockIsMember(...args),
+  workspaceOverBudget: (...args: unknown[]) => mockOverBudget(...args),
+}));
+
 const visitorContext = { json: { key: 'val' }, tables: {}, blobUrls: [] };
 
 beforeEach(() => {
+  mockIsMember.mockResolvedValue(false);
+  mockOverBudget.mockResolvedValue(false);
   mockBuildVisitorContext.mockResolvedValue(visitorContext);
   mockBuildVisitorSystemPrompt.mockReturnValue('visitor system');
   mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
@@ -130,6 +139,26 @@ describe('handleVisitorChat', () => {
     expect(res.headers.get('Retry-After')).toBe('30');
   });
 
+
+  it('workspace members skip the per-artifact visitor cap', async () => {
+    mockCheckRateLimit.mockResolvedValue({ allowed: false, retryAfter: 30 });
+    mockIsMember.mockResolvedValue(true);
+    const ctx = { ...makeCtx(makeEnv(configDb())), workspaceId: 'wsp_1', viewer: { email: 'a@b.c', isOwner: false } } as never;
+    const res = await handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx);
+    expect(res.status).toBe(200);
+    await readSSE(res);
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
+    expect(mockIncrementRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('workspace members are blocked by the workspace monthly budget', async () => {
+    mockIsMember.mockResolvedValue(true);
+    mockOverBudget.mockResolvedValue(true);
+    const ctx = { ...makeCtx(makeEnv(configDb())), workspaceId: 'wsp_1', viewer: { email: 'a@b.c', isOwner: false } } as never;
+    const res = await handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx);
+    expect(res.status).toBe(429);
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
+  });
 
   it('does NOT block a continuing conversation when over credit (grace)', async () => {
     mockResolveAgentAiConfig.mockResolvedValue({

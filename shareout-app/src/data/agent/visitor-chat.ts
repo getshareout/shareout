@@ -5,6 +5,7 @@ import type { AgentConfig, ChatRequest, Conversation, Message } from './types';
 import { streamChat, type AIConfig } from './anthropic';
 import { CLAUDE_HAIKU, CLAUDE_OPUS, CLAUDE_SONNET } from './models';
 import { buildVisitorContext, buildVisitorSystemPrompt } from './context';
+import { isWorkspaceMemberRequest, workspaceOverBudget } from './member-quota';
 import { incrementRateLimit, reserveRateLimit, recordUsage, recordError } from './usage';
 import { resolveAgentAiConfig, recordAgentUsage } from './ai-config';
 import { checkSlidingWindowRateLimit, getTrustedClientIp } from '../../rate-limit';
@@ -114,14 +115,20 @@ export async function handleVisitorChat(
     return errorResponse({ ...DATA_ERRORS.INVALID_REQUEST, message: 'message is required' }, ctx.origin);
   }
 
-  // Check and reserve quota together, before any LLM work, so parallel requests see each other.
+  // Signed-in workspace members are bounded by the workspace AI budget; the per-artifact
+  // counters below are the anonymous-visitor cap and would throttle a whole crew sharing one tool.
+  const member = await isWorkspaceMemberRequest(request, ctx);
   const reservedTokens = config.visitor_max_tokens || 4096;
-  const rateLimit = await reserveRateLimit(ctx.env, ctx.artifactId, reservedTokens);
+  const rateLimit = member
+    ? ctx.workspaceId && (await workspaceOverBudget(ctx.env, ctx.workspaceId))
+      ? { allowed: false, retryAfter: 3600 }
+      : { allowed: true }
+    : await reserveRateLimit(ctx.env, ctx.artifactId, reservedTokens);
   if (!rateLimit.allowed) {
     return new Response(
       JSON.stringify({
         success: false,
-        error: 'Rate limit exceeded',
+        error: member ? 'This workspace reached its monthly AI budget' : 'Rate limit exceeded',
         code: 'RATE_LIMIT_EXCEEDED',
         retryAfter: rateLimit.retryAfter,
       }),
@@ -142,6 +149,7 @@ export async function handleVisitorChat(
   const settleQuota = async () => {
     if (settled) return;
     settled = true;
+    if (member) return;
     await incrementRateLimit(ctx.env, ctx.artifactId, inputTokens + outputTokens - reservedTokens, 0);
   };
 
