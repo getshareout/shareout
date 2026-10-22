@@ -12,6 +12,10 @@ export interface DeckSlide {
 
 export interface Deck {
   title: string;
+  /** One-line summary shown under the cover title. */
+  subtitle?: string;
+  /** BCP 47 tag of the deck's language (the source page's). */
+  lang?: string;
   slides: DeckSlide[];
 }
 
@@ -23,12 +27,12 @@ function esc(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-function titleSlide(title: string, host: string): string {
+function titleSlide(title: string, subtitle: string | undefined, host: string): string {
   return `<section>
         <div class="stage hero">
-          <div class="topbar"><div class="brand"><span class="brand-mark"></span> ShareOut</div><div class="pill">Presentation</div></div>
-          <div><div class="eyebrow">Overview</div><h1><span class="gradient-text">${esc(title)}</span></h1></div>
-          <div class="footer"><span>${esc(host)}</span><span>Generated deck</span></div>
+          <div class="topbar"><div class="brand"><span class="brand-mark"></span> ShareOut</div></div>
+          <div><h1><span class="gradient-text">${esc(title)}</span></h1>${subtitle ? `<p class="subtitle">${esc(subtitle)}</p>` : ''}</div>
+          <div class="footer"><span>${esc(host)}</span></div>
         </div>
       </section>`;
 }
@@ -65,6 +69,7 @@ body{color:var(--text);font-family:var(--sans);background:radial-gradient(circle
 .brand{display:inline-flex;align-items:center;gap:12px;color:var(--soft);font-size:14px;font-weight:800}
 .brand-mark{width:28px;height:28px;border:1px solid rgba(255,255,255,.2);border-radius:10px;background:linear-gradient(135deg,rgba(88,166,255,.9),rgba(155,124,255,.88))}
 .pill{display:inline-flex;align-items:center;min-height:32px;padding:8px 13px;border:1px solid var(--line);border-radius:999px;color:var(--soft);background:rgba(255,255,255,.06);font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.subtitle{margin-top:28px!important;max-width:900px;font-size:28px;line-height:1.35;color:var(--soft)}
 .feature-list{display:grid;gap:14px;margin:32px 0 0;padding:0;list-style:none}
 .feature-list li{display:grid;grid-template-columns:34px 1fr;gap:14px;align-items:start}
 .feature-list li::before{content:"";width:34px;height:34px;border:1px solid rgba(53,212,255,.42);border-radius:12px;background:radial-gradient(circle at 50% 50%,rgba(53,212,255,.7) 0 4px,transparent 5px),rgba(53,212,255,.09)}
@@ -81,12 +86,12 @@ body{color:var(--text);font-family:var(--sans);background:radial-gradient(circle
 export function renderDeckHtml(deck: Deck, host: string): string {
   const total = deck.slides.length;
   const sections = [
-    titleSlide(deck.title, host),
+    titleSlide(deck.title, deck.subtitle, host),
     ...deck.slides.map((s, i) => contentSlide(s, i, total, deck.title)),
   ].join('\n      ');
 
   return `<!doctype html>
-<html lang="en">
+<html lang="${esc(deck.lang || 'en')}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
