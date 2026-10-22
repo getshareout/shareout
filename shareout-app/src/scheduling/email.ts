@@ -4,6 +4,7 @@ import { renderTemplate, buildTemplateContext, applyDefaults } from './template-
 import { captureArtifactReport } from '../screenshots';
 import { generateId } from '../crypto-utils';
 import { suppressedSet } from '../email/suppressions';
+import { artifactOptoutUrl, optedOutSet } from '../email/artifact-optout';
 import { getPlatformHostname } from '../config/origins';
 import { isLocale } from '../i18n/locale';
 import { t } from '../i18n';
@@ -11,8 +12,8 @@ import { recordArtifactUsage } from '../workspaces/usage-ledger';
 
 // Fallback words around a scheduled delivery, in the page's workspace language.
 const DELIVERY_COPY = {
-  en: { view: 'View', viewPage: 'View artifact', viewButton: 'View Artifact', scheduledFrom: 'Scheduled email from', updateFrom: 'Update from' },
-  es: { view: 'Ver', viewPage: 'Ver la página', viewButton: 'Ver la página', scheduledFrom: 'Envío programado de', updateFrom: 'Novedades de' },
+  en: { view: 'View', viewPage: 'View artifact', viewButton: 'View Artifact', scheduledFrom: 'Scheduled email from', updateFrom: 'Update from', unsubQ: "Don't want to receive this anymore?", unsubAction: 'Unsubscribe' },
+  es: { view: 'Ver', viewPage: 'Ver la página', viewButton: 'Ver la página', scheduledFrom: 'Envío programado de', updateFrom: 'Novedades de', unsubQ: '¿No querés recibir más este aviso?', unsubAction: 'Darte de baja' },
 };
 
 // Attachments use the Workers binding's ambient `EmailAttachment` type
@@ -60,6 +61,8 @@ export interface SendEmailResult {
   messageId?: string;
   /** Recipients actually sent to, after suppression filtering. */
   recipients?: number;
+  /** Recipients skipped because they unsubscribed from this artifact's emails. */
+  skippedOptedOut?: string[];
 }
 
 export function artifactEmailDomain(env: Env): string {
@@ -273,15 +276,41 @@ export async function sendArtifactEmail(
     htmlContent = `<p>${copy.scheduledFrom} <strong>${artifact.name}</strong></p><p><a href="${artifactUrl}">${copy.viewButton}</a></p>`;
   }
 
-  const result = await sendEmail(env, {
-    from: fromEmail,
-    replyTo: config.replyTo || emailRecord?.reply_to || undefined,
-    to: config.recipients,
-    subject: subjectContent || `${copy.updateFrom} ${artifact.name}`,
-    text: textContent || undefined,
-    html: htmlContent || undefined,
-    attachments: attachments.length ? attachments : undefined,
-  });
+  // Per-artifact opt-out: skip recipients who unsubscribed from THIS artifact (not the global list).
+  // Fail-open on a lookup error so a missing table never blocks a send.
+  const norm = (a: string) => a.toLowerCase().trim();
+  const optedOut = await optedOutSet(env, artifactId, config.recipients).catch(() => new Set<string>());
+  const skippedOptedOut = config.recipients.filter((r) => optedOut.has(norm(r))).map(norm);
+  const targets = [...new Map(config.recipients.filter((r) => !optedOut.has(norm(r))).map((r) => [norm(r), r])).values()];
+  if (!targets.length) {
+    return { success: false, error: "All recipients opted out of this artifact's emails", skippedOptedOut };
+  }
+
+  // One message per recipient: each carries its own signed one-click link (footer + RFC 8058 headers).
+  const subject = subjectContent || `${copy.updateFrom} ${artifact.name}`;
+  let result: SendEmailResult = { success: false, error: 'No message sent' };
+  let sentCount = 0;
+  for (const to of targets) {
+    const link = await artifactOptoutUrl(env, artifactId, to);
+    const r = await sendEmail(env, {
+      from: fromEmail,
+      replyTo: config.replyTo || emailRecord?.reply_to || undefined,
+      to: [to],
+      subject,
+      text: `${textContent || ''}\n\n--\n${copy.unsubQ} ${copy.unsubAction}: ${link}`.trimStart(),
+      html: `${htmlContent || ''}<p style="margin-top:24px;font-size:12px;color:#57534e">${copy.unsubQ} <a href="${link}">${copy.unsubAction}</a></p>`,
+      attachments: attachments.length ? attachments : undefined,
+      headers: { 'List-Unsubscribe': `<${link}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+    });
+    if (r.success) {
+      sentCount += r.recipients ?? 1;
+      if (!result.success) result = { success: true, messageId: r.messageId };
+    } else if (!result.success) {
+      result = r;
+    }
+  }
+  if (result.success) result = { ...result, recipients: sentCount };
+  result = { ...result, skippedOptedOut };
   if (result.success) {
     await recordArtifactUsage(env, artifactId, 'email_sent', result.recipients ?? 0).catch(() => {});
   }

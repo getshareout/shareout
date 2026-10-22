@@ -4,6 +4,7 @@ import { getSessionUser } from '../auth/session';
 import { colors, fonts, radius } from '../../packages/design-tokens/src/index';
 import { addSuppression, removeSuppression } from './suppressions';
 import { verifyUnsubscribeToken } from './unsubscribe-token';
+import { verifyArtifactOptoutToken, addArtifactOptout, removeArtifactOptout, optedOutSet } from './artifact-optout';
 import { getPreferences, setPreference, type EmailCategory } from './preferences';
 import { jsonWithApiErrors } from '../http/api-error';
 
@@ -66,6 +67,56 @@ async function handleEmailEventWebhook(req: Request, env: Env, url: URL): Promis
     }
   }
   return json({ ok: true, suppressed });
+}
+
+const OPTOUT_COPY = {
+  en: { lang: 'en', title: 'Unsubscribe', ask: (n: string) => `Stop emails from “${n}”?`, askBody: 'You will stop receiving this notice. Other emails from ShareOut are not affected.', unsub: 'Unsubscribe', done: 'You are unsubscribed', doneBody: (n: string) => `You will no longer receive emails from “${n}”.`, resub: 'Subscribe again', again: 'You are subscribed again', againBody: (n: string) => `You will receive emails from “${n}” again.`, invalid: 'This link is invalid or expired.', already: 'You are currently unsubscribed from this notice.' },
+  es: { lang: 'es-AR', title: 'Darte de baja', ask: (n: string) => `¿Dejar de recibir los avisos de “${n}”?`, askBody: 'Vas a dejar de recibir este aviso. Los demás mails de ShareOut no se ven afectados.', unsub: 'Darte de baja', done: 'Ya te diste de baja', doneBody: (n: string) => `No vas a recibir más mails de “${n}”.`, resub: 'Volver a suscribirte', again: 'Volviste a suscribirte', againBody: (n: string) => `Vas a volver a recibir los mails de “${n}”.`, invalid: 'Este enlace no es válido o venció.', already: 'Ahora mismo estás dado de baja de este aviso.' },
+};
+const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+function optoutPage(c: (typeof OPTOUT_COPY)['en'], inner: string, status = 200): Response {
+  const res = html(page(c.title, inner).replace('<html lang="en">', `<html lang="${c.lang}">`), status);
+  res.headers.set('Cache-Control', 'no-store');
+  return res;
+}
+
+// GET/POST /v1/email/artifact-unsubscribe?token= — per-artifact opt-out. GET only shows a confirmation
+// form (mail scanners prefetch links and must not unsubscribe anyone); POST acts (RFC 8058 one-click or
+// the form), and the result page offers opting back in. The token is the only credential; no redirects.
+async function handleArtifactUnsubscribe(ctx: FetchContext): Promise<Response> {
+  const token = ctx.url.searchParams.get('token') || '';
+  const parsed = await verifyArtifactOptoutToken(ctx.env, token);
+  const art = parsed
+    ? await ctx.env.DB.prepare('SELECT a.name, w.locale FROM artifacts a LEFT JOIN workspaces w ON w.id = a.workspace_id WHERE a.id = ?')
+        .bind(parsed.artifactId).first<{ name: string; locale: string | null }>()
+    : null;
+  if (!parsed || !art) {
+    return optoutPage(OPTOUT_COPY.en, `<p style="margin:0;color:${colors.textSecondary}">${OPTOUT_COPY.en.invalid}</p>`, 400);
+  }
+  const c = art.locale === 'es' ? OPTOUT_COPY.es : OPTOUT_COPY.en;
+  const name = escHtml(art.name || '');
+  const action = `/v1/email/artifact-unsubscribe?token=${encodeURIComponent(token)}`;
+  const button = (value: string, label: string) =>
+    `<form method="post" action="${action}" style="margin:0"><input type="hidden" name="action" value="${value}"><button type="submit" style="background:${colors.primary};color:${colors.textInverse};border:0;font-weight:600;padding:10px 20px;border-radius:${radius.sm};cursor:pointer;font:inherit">${label}</button></form>`;
+  const h1 = (t: string) => `<h1 style="margin:0 0 8px;font-family:${fonts.display};font-size:20px">${t}</h1>`;
+  const p = (t: string) => `<p style="margin:0 0 16px;color:${colors.textSecondary}">${t}</p>`;
+
+  if (ctx.request.method === 'POST') {
+    const form = new URLSearchParams(await ctx.request.text().catch(() => ''));
+    if (form.get('action') === 'resubscribe') {
+      await removeArtifactOptout(ctx.env, parsed.artifactId, parsed.email);
+      return optoutPage(c, h1(c.again) + p(c.againBody(name)));
+    }
+    await addArtifactOptout(ctx.env, parsed.artifactId, parsed.email);
+    // Mailbox-provider one-click POSTs expect a bare 200.
+    if (form.has('List-Unsubscribe')) return new Response('OK', { status: 200 });
+    return optoutPage(c, h1(c.done) + p(c.doneBody(name)) + button('resubscribe', c.resub));
+  }
+  const already = (await optedOutSet(ctx.env, parsed.artifactId, [parsed.email])).size > 0;
+  return optoutPage(c, already
+    ? h1(c.done) + p(c.already) + button('resubscribe', c.resub)
+    : h1(c.ask(name)) + p(c.askBody) + button('unsubscribe', c.unsub));
 }
 
 // GET/POST /v1/email/unsubscribe?token= — one-click unsubscribe (RFC 8058).
@@ -147,6 +198,7 @@ export async function routeEmail(ctx: FetchContext): Promise<Response | null> {
     return handleEmailEventWebhook(request, ctx.env, ctx.url);
   }
   if (path === '/v1/email/unsubscribe') return handleUnsubscribe(ctx);
+  if (path === '/v1/email/artifact-unsubscribe') return handleArtifactUnsubscribe(ctx);
   if (path === '/v1/email/preferences') return handlePreferencesApi(ctx);
   if (path === '/v1/email/center') return handleCenter(ctx);
   return null;

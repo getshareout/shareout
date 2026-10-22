@@ -49,9 +49,10 @@ export const emailSendTool: CrewTool = {
       body: text,
       includeArtifactLink: false,
     });
-    if (!result.success) return { error: result.error || 'email send failed' };
+    if (!result.success) return { error: result.error || 'email send failed', ...(result.skippedOptedOut?.length ? { skipped_opted_out: result.skippedOptedOut } : {}) };
 
     if (owner) await incrementEmailCount(env, owner.ownerId, artifactId);
-    return { sent: true, to: recipients, messageId: result.messageId };
+    const skipped = result.skippedOptedOut ?? [];
+    return { sent: true, to: recipients.filter((r) => !skipped.includes(r.toLowerCase().trim())), ...(skipped.length ? { skipped_opted_out: skipped } : {}), messageId: result.messageId };
   },
 };
