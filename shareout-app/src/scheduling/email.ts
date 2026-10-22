@@ -291,16 +291,19 @@ export async function sendArtifactEmail(
   let result: SendEmailResult = { success: false, error: 'No message sent' };
   let sentCount = 0;
   for (const to of targets) {
-    const link = await artifactOptoutUrl(env, artifactId, to);
+    // No SESSION_SECRET (misconfigured instance): send as before rather than not at all.
+    const link = env.SESSION_SECRET ? await artifactOptoutUrl(env, artifactId, to) : null;
     const r = await sendEmail(env, {
       from: fromEmail,
       replyTo: config.replyTo || emailRecord?.reply_to || undefined,
       to: [to],
       subject,
-      text: `${textContent || ''}\n\n--\n${copy.unsubQ} ${copy.unsubAction}: ${link}`.trimStart(),
-      html: `${htmlContent || ''}<p style="margin-top:24px;font-size:12px;color:#57534e">${copy.unsubQ} <a href="${link}">${copy.unsubAction}</a></p>`,
+      text: (link ? `${textContent || ''}\n\n--\n${copy.unsubQ} ${copy.unsubAction}: ${link}` : textContent).trimStart() || undefined,
+      html: link
+        ? `${htmlContent || ''}<p style="margin-top:24px;font-size:12px;color:#57534e">${copy.unsubQ} <a href="${link}">${copy.unsubAction}</a></p>`
+        : htmlContent || undefined,
       attachments: attachments.length ? attachments : undefined,
-      headers: { 'List-Unsubscribe': `<${link}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+      ...(link ? { headers: { 'List-Unsubscribe': `<${link}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } } : {}),
     });
     if (r.success) {
       sentCount += r.recipients ?? 1;
@@ -310,7 +313,7 @@ export async function sendArtifactEmail(
     }
   }
   if (result.success) result = { ...result, recipients: sentCount };
-  result = { ...result, skippedOptedOut };
+  if (skippedOptedOut.length) result = { ...result, skippedOptedOut };
   if (result.success) {
     await recordArtifactUsage(env, artifactId, 'email_sent', result.recipients ?? 0).catch(() => {});
   }
