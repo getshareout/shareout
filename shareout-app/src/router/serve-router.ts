@@ -440,7 +440,13 @@ async function routeArtifactServe(ctx: FetchContext): Promise<Response | null> {
   const pwa = servePwaAsset(env, slug, assetPath);
   if (pwa) {
     const gate = await gateArtifactSideAsset(request, env, slug);
-    if (gate instanceof Response) return gate;
+    if (gate instanceof Response) {
+      // Install needs the manifest and icons without a session (browsers fetch them uncredentialed).
+      // They leak only name/colors/icons; sw.js and screenshots stay behind the gate.
+      if (assetPath === 'manifest.json') return handleManifest(env, slug, { minimal: true });
+      if (/^_pwa\/icon-\d+\.png$/.test(assetPath)) return pwa();
+      return gate;
+    }
     const res = await pwa();
     if (gate.isOpen) return res;
     const headers = new Headers(res.headers);

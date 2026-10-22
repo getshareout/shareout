@@ -33,7 +33,7 @@ function makeEnv(visibility: string): Env {
   } as unknown as Env;
 }
 
-const PATHS = ['manifest.json', 'sw.js', '_pwa/icon-192.png', '_pwa/screenshot-mobile.png'];
+const PATHS = ['sw.js', '_pwa/screenshot-mobile.png'];
 
 describe('PWA assets follow the artifact access gate', () => {
   it.each(PATHS)('private artifact: anonymous %s is denied', async (p) => {
@@ -45,7 +45,23 @@ describe('PWA assets follow the artifact access gate', () => {
     expect(body).not.toContain('internal');
   });
 
-  it.each(PATHS)('public artifact: anonymous %s is served', async (p) => {
+  it('private artifact: anonymous manifest.json is served without description or screenshots (install needs it)', async () => {
+    const res = await worker.fetch(new Request(`${BASE}/a/app/manifest.json`), makeEnv('private'));
+    expect(res.status).toBe(200);
+    const m = await res.json() as { name: string; description: string; screenshots: unknown[]; icons: unknown[] };
+    expect(m.name).toBe('Secret App');
+    expect(m.description).toBe('');
+    expect(m.screenshots).toEqual([]);
+    expect(m.icons.length).toBeGreaterThan(0);
+  });
+
+  it('private artifact: anonymous icon is served', async () => {
+    const res = await worker.fetch(new Request(`${BASE}/a/app/_pwa/icon-192.png`), makeEnv('private'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toBe('image/png');
+  });
+
+  it.each(['manifest.json', '_pwa/icon-192.png', ...PATHS])('public artifact: anonymous %s is served', async (p) => {
     const res = await worker.fetch(new Request(`${BASE}/a/app/${p}`), makeEnv('public'));
     expect(res.status).toBe(200);
   });

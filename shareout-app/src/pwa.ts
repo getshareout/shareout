@@ -27,9 +27,12 @@ interface PWAManifest {
   }>;
 }
 
+/** `minimal`: for viewers the artifact gate refused. Browsers fetch the manifest and icons without credentials, so
+ *  installing a private PWA needs them; they carry only name, colors and icons, never the description or screenshots. */
 export async function handleManifest(
   env: Env,
-  slug: string
+  slug: string,
+  opts: { minimal?: boolean } = {}
 ): Promise<Response> {
   // Fetch artifact PWA config
   const result = await env.DB.prepare(`
@@ -63,7 +66,7 @@ export async function handleManifest(
     id: startUrl,
     name: pwaConfig.name || result.name,
     short_name: pwaConfig.short_name || result.name.substring(0, 12),
-    description: pwaConfig.description || `${pwaConfig.name || result.name} - A ShareOut PWA`,
+    description: opts.minimal ? '' : pwaConfig.description || `${pwaConfig.name || result.name} - A ShareOut PWA`,
     start_url: startUrl,
     scope: artifactUrl,
     display: pwaConfig.display || 'standalone',
@@ -71,14 +74,14 @@ export async function handleManifest(
     theme_color: pwaConfig.theme_color || colors.primary,
     background_color: pwaConfig.background_color || colors.bgElevated,
     icons: generateIconList(baseUrl, slug),
-    screenshots: generateScreenshots(baseUrl, slug, pwaConfig.theme_color || colors.primary),
+    screenshots: opts.minimal ? [] : generateScreenshots(baseUrl, slug, pwaConfig.theme_color || colors.primary),
   };
 
   return new Response(JSON.stringify(manifest, null, 2), {
     status: 200,
     headers: {
       'Content-Type': 'application/manifest+json',
-      'Cache-Control': 'public, max-age=86400',
+      'Cache-Control': opts.minimal ? 'public, max-age=300' : 'public, max-age=86400',
       'Access-Control-Allow-Origin': '*',
     },
   });
