@@ -114,6 +114,7 @@ envelope `{ "success": true, "data": … }`. One crew per artifact.
   "model": "<optional; unsupported values fall back to the default>",
   "maxIterations": 8,                 // clamped to the plan cap
   "runBudgetMicroUsd": 200000,        // optional
+  "maxRuntimeMs": 90000,              // optional; scheduled (cron/condition) runs only, max 120000. Manual, event and chat-triggered runs stay at 25000
   "tools": {
     "read":  ["json_get", "table_query", "connection_query"],
     "write": ["json_set", "notify_send"],

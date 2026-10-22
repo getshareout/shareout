@@ -1,3 +1,4 @@
+import { effectiveMaxRuntimeMs } from './limits';
 import type { Env } from '../types';
 import type { DataContext } from '../data/middleware';
 import { generateId } from '../crypto-utils';
@@ -108,7 +109,7 @@ export async function executeCrewRun(
   const caps: RunCaps = {
     maxIterations: crew.max_iterations,
     maxTokensPerCall: crew.max_tokens_per_call,
-    maxRuntimeMs: crew.max_runtime_ms,
+    maxRuntimeMs: effectiveMaxRuntimeMs(crew.max_runtime_ms, run.trigger_kind),
     runBudgetMicroUsd: crew.run_budget_micro_usd,
   };
 

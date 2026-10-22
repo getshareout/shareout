@@ -2,7 +2,7 @@ import type { Env } from '../types';
 import { generateId } from '../crypto-utils';
 import { parseCronSchedule, getNextRunTime } from '../scheduling/jobs/cron';
 import { CREW_TOOLS } from './tool-registry';
-import { resolveCrewLimits } from './limits';
+import { resolveCrewLimits, MAX_SCHEDULED_RUNTIME_MS } from './limits';
 import { validateConditionConfig } from './condition';
 import type { CrewRow, CrewRunRow, CrewTriggerRow, ToolLimits } from './types';
 import { CLAUDE_HAIKU, DEFAULT_CLAUDE_MODEL, claudeModelById } from '../data/agent/models';
@@ -21,6 +21,8 @@ export interface DefineCrewBody {
   model?: string;
   maxIterations?: number;
   runBudgetMicroUsd?: number;
+  /** Wall-clock cap for scheduled runs, in ms; clamped to MAX_SCHEDULED_RUNTIME_MS. Other run contexts stay at 25 s. */
+  maxRuntimeMs?: number;
   tools?: {
     read?: string[];
     write?: string[];
@@ -77,12 +79,14 @@ export async function defineCrew(
   const clampedMaxIter =
     body.maxIterations != null ? Math.min(body.maxIterations, planLimits.max_iterations_cap) : null;
   const runBudget = body.runBudgetMicroUsd ?? null;
+  const maxRuntime = Number.isFinite(body.maxRuntimeMs) ? Math.min(Math.max(Math.floor(body.maxRuntimeMs!), 5_000), MAX_SCHEDULED_RUNTIME_MS) : null;
 
   if (existing) {
     await env.DB.prepare(
       `UPDATE crews SET name = ?, instructions = ?, model = ?,
          max_iterations = COALESCE(?, max_iterations),
          run_budget_micro_usd = COALESCE(?, run_budget_micro_usd),
+         max_runtime_ms = COALESCE(?, max_runtime_ms),
          updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
        WHERE id = ?`
     )
@@ -92,14 +96,15 @@ export async function defineCrew(
         model,
         clampedMaxIter,
         runBudget,
+        maxRuntime,
         crewId
       )
       .run();
   } else {
     await env.DB.prepare(
       `INSERT INTO crews (id, artifact_id, workspace_id, owner_id, name, instructions, model,
-         max_iterations, run_budget_micro_usd)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         max_iterations, run_budget_micro_usd, max_runtime_ms)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 25000))`
     )
       .bind(
         crewId,
@@ -110,7 +115,8 @@ export async function defineCrew(
         body.instructions ?? null,
         model,
         clampedMaxIter ?? Math.min(8, planLimits.max_iterations_cap),
-        runBudget ?? planLimits.default_run_budget_micro_usd
+        runBudget ?? planLimits.default_run_budget_micro_usd,
+        maxRuntime
       )
       .run();
   }
