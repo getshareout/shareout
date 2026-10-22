@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { generateTypeMetadata, detectArtifactType } from '../../src/validation';
-import { skillPublishVisibility, handleListSkills, handleVoteSkill, workspaceHasTeamsPlan, handleAttachAgentSkill, buildAgentSkillsDoc } from '../../src/skill-marketplace';
+import { handleAddDefaultSkill, skillPublishVisibility, handleListSkills, handleVoteSkill, workspaceHasTeamsPlan, handleAttachAgentSkill, buildAgentSkillsDoc } from '../../src/skill-marketplace';
 import type { AuthUser } from '../../src/api-auth';
 import type { Env, FileEntry } from '../../src/types';
 
@@ -186,5 +186,102 @@ describe('private skills (G-kit-2)', () => {
     const i = sqls.findIndex((q) => q.includes('FROM skill_marketplace sm'));
     expect(sqls[i]).toContain("(a.visibility != 'private' OR a.owner_id = ?)");
     expect(binds[i].filter((b) => b === 'usr_1').length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe('workspace default skills (G-kit-1)', () => {
+  function envFor(opts: { skillWorkspace?: string; role?: string; visibility?: string } = {}) {
+    const defaultBinds: unknown[][] = [];
+    const env = {
+      DB: {
+        prepare: (sql: string) => ({
+          bind: (...a: unknown[]) => ({
+            all: async () => {
+              if (sql.includes('FROM workspace_default_skills')) {
+                defaultBinds.push(a);
+                return { results: [{ skill_artifact_id: 'sk1', skill_version_no: 2, name: 'Design kit' }] };
+              }
+              return { results: [] };
+            },
+            first: async () => {
+              if (sql.includes('FROM skill_marketplace WHERE artifact_id')) return { workspace_id: opts.skillWorkspace ?? 'wsp_a', blocked: 0, official: 0 };
+              if (sql.includes('FROM versions WHERE artifact_id = ? AND version_no')) return { id: 'ver1', entrypoint: 'SKILL.md' };
+              if (sql.includes('FROM assets WHERE version_id')) return { r2_key: 'k1' };
+              if (sql.includes('SELECT role FROM workspace_members')) return { role: opts.role ?? 'admin', member_class: 'internal' };
+              if (sql.includes('SELECT visibility, owner_id FROM artifacts')) return { visibility: opts.visibility ?? 'workspace', owner_id: 'usr_1' };
+              if (sql.includes('SELECT visibility FROM artifacts')) return { visibility: opts.visibility ?? 'workspace' };
+              if (sql.includes('MAX(version_no)')) return { v: 2 };
+              return null;
+            },
+            run: async () => ({ meta: { changes: 1 } }),
+          }),
+        }),
+      },
+      ARTIFACTS: { get: async () => ({ text: async () => 'DESIGN KIT RULES' }) },
+    } as unknown as Env;
+    return { env, defaultBinds };
+  }
+
+  it("injects the workspace's default skills for turns scoped to that workspace", async () => {
+    const { env, defaultBinds } = envFor();
+    const doc = await buildAgentSkillsDoc(env, 'wsp_a', 'usr_member');
+    expect(doc).toContain('DESIGN KIT RULES');
+    expect(defaultBinds[0][0]).toBe('wsp_a');
+  });
+
+  it("still injects the member's own skills when the defaults table does not exist yet", async () => {
+    const env = {
+      DB: {
+        prepare: (sql: string) => ({
+          bind: () => ({
+            all: async () => {
+              if (sql.includes('workspace_default_skills')) throw new Error('no such table: workspace_default_skills');
+              return { results: [{ skill_artifact_id: 'sk_own', skill_version_no: 1, name: 'Mine' }] };
+            },
+            first: async () => {
+              if (sql.includes('FROM skill_marketplace WHERE artifact_id')) return { workspace_id: 'wsp_a', blocked: 0, official: 0 };
+              if (sql.includes('FROM versions WHERE artifact_id = ? AND version_no')) return { id: 'v', entrypoint: 'SKILL.md' };
+              if (sql.includes('FROM assets WHERE version_id')) return { r2_key: 'k' };
+              return null;
+            },
+          }),
+        }),
+      },
+      ARTIFACTS: { get: async () => ({ text: async () => 'OWN SKILL BODY' }) },
+    } as unknown as Env;
+    expect(await buildAgentSkillsDoc(env, 'wsp_a', 'usr_member')).toContain('OWN SKILL BODY');
+  });
+
+  it('never injects them into personal turns', async () => {
+    const { env, defaultBinds } = envFor();
+    expect(await buildAgentSkillsDoc(env, '__personal', 'usr_member')).toBe('');
+    expect(defaultBinds).toHaveLength(0);
+  });
+
+  it("skips a default skill that belongs to another workspace (no cross-workspace leak)", async () => {
+    const { env } = envFor({ skillWorkspace: 'wsp_b' });
+    expect(await buildAgentSkillsDoc(env, 'wsp_a', 'usr_member')).toBe('');
+  });
+
+  it('only workspace admins can attach a default skill', async () => {
+    const { env } = envFor({ role: 'member' });
+    const res = await handleAddDefaultSkill(new Request('https://x', { method: 'POST', body: JSON.stringify({ skill_artifact_id: 'sk1' }) }), env, user, 'wsp_a');
+    expect(res.status).toBe(403);
+  });
+
+  it('refuses a private skill and a skill from another workspace', async () => {
+    const body = JSON.stringify({ skill_artifact_id: 'sk1' });
+    const priv = envFor({ visibility: 'private' });
+    const r1 = await handleAddDefaultSkill(new Request('https://x', { method: 'POST', body }), priv.env, user, 'wsp_a');
+    expect(r1.status).toBe(400);
+    const other = envFor({ skillWorkspace: 'wsp_b' });
+    const r2 = await handleAddDefaultSkill(new Request('https://x', { method: 'POST', body }), other.env, user, 'wsp_a');
+    expect((await r2.json() as { code: string }).code).toBe('CROSS_WORKSPACE');
+  });
+
+  it('attaches for an admin', async () => {
+    const { env } = envFor();
+    const res = await handleAddDefaultSkill(new Request('https://x', { method: 'POST', body: JSON.stringify({ skill_artifact_id: 'sk1' }) }), env, user, 'wsp_a');
+    expect(res.status).toBe(200);
   });
 });

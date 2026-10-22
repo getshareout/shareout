@@ -335,6 +335,7 @@ erDiagram
 | `skill_installs` / `skill_votes` / `skill_uses` | Install, upvote and usage records feeding the score. |
 | `artifact_skills` | Skills attached to an artifact, pinned to `skill_version_no`. |
 | `workspace_agent_skills` | Skills a member attached to their own assistant, pinned to `skill_version_no` and re-pinned by `POST /v1/workspaces/{scope}/agent-skills/{skillId}`. |
+| `workspace_default_skills` | Library skills a workspace admin attached to every member's agent in that workspace, pinned to `skill_version_no` (`/v1/workspaces/{ws}/default-skills`). Injected only for turns scoped to that workspace. |
 
 `workspaces.default_skill_edit_policy` is the policy a newly published skill is born
 with; it never rewrites an existing skill's own `edit_policy`.
