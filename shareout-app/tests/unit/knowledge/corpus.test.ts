@@ -86,6 +86,15 @@ describe('chunkMarkdown', () => {
     expect(chunks.every((c) => c.text.length <= 1500)).toBe(true);
     expect(chunkMarkdown('x\n\n'.repeat(MAX_CHUNKS * 2).replace(/x/g, 'y'.repeat(1400))).length).toBe(MAX_CHUNKS);
   });
+
+  it('drops the blank cells and padding of spreadsheet tables', () => {
+    const pad = ' '.repeat(90);
+    const row = (a: string, b: string) => `| ${a}${pad} |${pad}|${pad}| ${b}${pad} |`;
+    const table = ['## Normativa', row('Ley', 'Estado'), `|${'-'.repeat(90)}|${'-'.repeat(90)}|`, row('19587', 'Cumple'), `|${pad}|${pad}|`].join('\n');
+    const [chunk] = chunkMarkdown(table);
+    expect(chunk.locator).toBe('Normativa');
+    expect(chunk.text).toBe('## Normativa\n| Ley | Estado |\n| 19587 | Cumple |');
+  });
 });
 
 describe('ftsQuery', () => {
