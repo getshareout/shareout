@@ -11,6 +11,7 @@ import {
   listTriggers,
   createTrigger,
   updateTrigger,
+  deleteCrew,
   deleteTrigger,
   type DefineCrewBody,
   type CreateTriggerBody,
@@ -41,6 +42,7 @@ export async function handleCrew(request: Request, ctx: DataContext, path: strin
 
   // GET /crew  → crew config + grants
   if (parts.length === 0) {
+    if (request.method === 'DELETE') return handleDeleteCrew(ctx);
     if (request.method !== 'GET') return methodNotAllowed(ctx);
     return getCrewConfig(ctx);
   }
@@ -142,6 +144,13 @@ async function getCrewConfig(ctx: DataContext): Promise<Response> {
     .bind(crew.id)
     .all();
   return successResponse({ crew, grants: grants.results }, 200, ctx.origin);
+}
+
+async function handleDeleteCrew(ctx: DataContext): Promise<Response> {
+  if (!(await deleteCrew(ctx.env, ctx.artifactId))) {
+    return errorResponse({ ...DATA_ERRORS.NOT_FOUND, message: 'No crew defined for this artifact' }, ctx.origin);
+  }
+  return successResponse({ deleted: true }, 200, ctx.origin);
 }
 
 async function handleDefine(request: Request, ctx: DataContext): Promise<Response> {
