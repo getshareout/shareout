@@ -32,6 +32,7 @@ import { isKnownFeature } from '../../features/registry';
 import { setGlobalFlag, setWorkspaceFlag, GLOBAL_TARGET } from '../../features/flags';
 import { defaultReportDate, getDailyPlatformDigest } from '../../superadmin/digest';
 import { backfillVectors } from '../../search/semantic';
+import { runSummaryBackfill } from '../../publish/summary-backfill';
 import {
   dailyUsageCsv,
   getDailyUsage,
@@ -52,6 +53,15 @@ export async function routeAdminApi(ctx: FetchContext): Promise<Response | null>
   // POST /v1/admin/vectorize/backfill — embed all live artifacts into the semantic index.
   if (path === '/v1/admin/vectorize/backfill' && request.method === 'POST') {
     return jsonResponse(await backfillVectors(env));
+  }
+
+  // POST /v1/admin/summaries/backfill?workspace_id=…&limit=25 — one batch of the hourly
+  // TL;DR drip, now, for one workspace. Call again until processed is 0.
+  if (path === '/v1/admin/summaries/backfill' && request.method === 'POST') {
+    const workspaceId = url.searchParams.get('workspace_id')?.trim();
+    if (!workspaceId) return jsonError('workspace_id is required', 'VALIDATION_ERROR', 400);
+    const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 25, 1), 50);
+    return jsonResponse(await runSummaryBackfill(env, { workspaceId, limit }));
   }
 
   // GET /v1/admin/metrics/daily?date=YYYY-MM-DD — structured daily platform digest (default: yesterday UTC)

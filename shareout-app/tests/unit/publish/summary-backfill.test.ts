@@ -16,7 +16,7 @@ const { runSummaryBackfill } = await import('../../../src/publish/summary-backfi
 const e = env as unknown as Env;
 
 beforeAll(async () => {
-  await e.DB.exec(`CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, description TEXT, deleted_at TEXT)`);
+  await e.DB.exec(`CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, workspace_id TEXT, description TEXT, deleted_at TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS artifact_presentation (artifact_id TEXT PRIMARY KEY, social_title TEXT, social_description TEXT, social_image_url TEXT, thumbnail_ext TEXT, thumbnail_generated_at TEXT, pwa_config TEXT, has_mobile INTEGER NOT NULL DEFAULT 0, embed_allowed INTEGER NOT NULL DEFAULT 1, embed_origins TEXT, editor_readiness TEXT, auto_summary_hash TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS deployments (id TEXT PRIMARY KEY, artifact_id TEXT, version_id TEXT, channel TEXT, updated_at TEXT)`);
   await e.DB.exec(`CREATE TABLE IF NOT EXISTS versions (id TEXT PRIMARY KEY, artifact_id TEXT, entrypoint TEXT)`);
@@ -37,9 +37,10 @@ async function seedArtifact(id: string, opts: {
   deletedAt?: string | null;
   mime?: string;
   publishedAt?: string;
+  workspaceId?: string;
 } = {}) {
-  await e.DB.prepare('INSERT INTO artifacts (id, description, deleted_at) VALUES (?, ?, ?)')
-    .bind(id, opts.description ?? null, opts.deletedAt ?? null).run();
+  await e.DB.prepare('INSERT INTO artifacts (id, workspace_id, description, deleted_at) VALUES (?, ?, ?, ?)')
+    .bind(id, opts.workspaceId ?? 'wsp_a', opts.description ?? null, opts.deletedAt ?? null).run();
   if (opts.hash !== undefined && opts.hash !== null) {
     await e.DB.prepare('INSERT INTO artifact_presentation (artifact_id, auto_summary_hash) VALUES (?, ?)')
       .bind(id, opts.hash).run();
@@ -85,6 +86,16 @@ describe('runSummaryBackfill', () => {
     expect(generateArtifactSummary).toHaveBeenCalledTimes(25);
     // freshest (highest day number) processed first
     expect(generateArtifactSummary).toHaveBeenNthCalledWith(1, e, 'art_29');
+  });
+
+  it('scopes to one workspace and honours a custom limit', async () => {
+    await seedArtifact('a1', { workspaceId: 'wsp_incro', publishedAt: '2026-01-01 00:00:00' });
+    await seedArtifact('a2', { workspaceId: 'wsp_incro', publishedAt: '2026-01-02 00:00:00' });
+    await seedArtifact('other', { workspaceId: 'wsp_other' });
+
+    expect((await runSummaryBackfill(e, { workspaceId: 'wsp_incro', limit: 1 })).processed).toBe(1);
+    expect(generateArtifactSummary).toHaveBeenCalledWith(e, 'a2');
+    expect(generateArtifactSummary).not.toHaveBeenCalledWith(e, 'other');
   });
 
   it('one failing artifact does not stop the rest of the run', async () => {

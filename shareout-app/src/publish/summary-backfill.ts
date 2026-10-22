@@ -11,7 +11,10 @@ import { SUMMARY_MIMES_SQL } from './summary-scope';
  */
 const BACKFILL_LIMIT = 25;
 
-export async function runSummaryBackfill(env: Env): Promise<{ processed: number }> {
+export async function runSummaryBackfill(
+  env: Env,
+  opts: { workspaceId?: string; limit?: number } = {},
+): Promise<{ processed: number }> {
   try {
     const { results } = await env.DB.prepare(
       `SELECT a.id AS artifact_id
@@ -24,9 +27,10 @@ export async function runSummaryBackfill(env: Env): Promise<{ processed: number 
          AND a.deleted_at IS NULL
          AND (a.description IS NULL OR a.description = '')
          AND pres_a.auto_summary_hash IS NULL
+         AND (?1 IS NULL OR a.workspace_id = ?1)
        ORDER BY d.updated_at DESC
-       LIMIT ?`,
-    ).bind(BACKFILL_LIMIT).all<{ artifact_id: string }>();
+       LIMIT ?2`,
+    ).bind(opts.workspaceId ?? null, opts.limit ?? BACKFILL_LIMIT).all<{ artifact_id: string }>();
 
     let processed = 0;
     for (const r of results || []) {
