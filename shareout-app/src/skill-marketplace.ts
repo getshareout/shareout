@@ -772,6 +772,10 @@ export async function buildAgentSkillsDoc(env: Env, scope: string, userId: strin
       const skill = await getSkillRow(env, r.skill_artifact_id);
       if (!skill || skill.blocked) return null;
       if (!skill.official && skill.workspace_id !== scope) return null;
+      // Attached before the author made it private (or published as a draft): skip silently, never expose the body.
+      const art = await env.DB.prepare('SELECT visibility, owner_id FROM artifacts WHERE id = ?')
+        .bind(r.skill_artifact_id).first<{ visibility: string | null; owner_id: string | null }>();
+      if (art?.visibility === 'private' && art.owner_id !== userId) return null;
       const md = await readSkillMarkdown(env, r.skill_artifact_id, r.skill_version_no);
       return md ? { name: r.name, md } : null;
     } catch {

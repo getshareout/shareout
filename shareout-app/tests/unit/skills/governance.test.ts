@@ -23,7 +23,9 @@ import {
   handleGetSkillMarkdown,
   handleListAgentSkills,
   handleSyncAgentSkill,
+  buildAgentSkillsDoc,
 } from '../../../src/skill-marketplace';
+import { skillRepublishVisibility } from '../../../src/skills/republish';
 
 const e = env as unknown as Env;
 
@@ -38,6 +40,7 @@ const SK_OWNER = 'art_owner_only';
 const SK_WS = 'art_ws_editable';
 const SK_APPROVAL = 'art_approval';
 const SK_OFFICIAL = 'art_official';
+const SK_PRIVATE = 'art_private_draft';
 
 const user = (id: string): AuthUser => ({ id, email: `${id}@example.com`, username: null });
 
@@ -48,7 +51,7 @@ beforeAll(async () => {
     `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT, name TEXT, username TEXT)`,
     `CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, name TEXT, owner_id TEXT, slug TEXT, default_skill_edit_policy TEXT NOT NULL DEFAULT 'owner_only')`,
     `CREATE TABLE IF NOT EXISTS workspace_members (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, role TEXT, member_class TEXT NOT NULL DEFAULT 'internal')`,
-    `CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, name TEXT, slug TEXT, display_slug TEXT, owner_id TEXT, workspace_id TEXT, description TEXT, type_metadata TEXT, deleted_at TEXT)`,
+    `CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, name TEXT, slug TEXT, display_slug TEXT, owner_id TEXT, workspace_id TEXT, description TEXT, type_metadata TEXT, deleted_at TEXT, visibility TEXT NOT NULL DEFAULT 'private')`,
     `CREATE TABLE IF NOT EXISTS collaborators (id TEXT PRIMARY KEY, artifact_id TEXT, email TEXT, role TEXT)`,
     `CREATE TABLE IF NOT EXISTS versions (id TEXT PRIMARY KEY, artifact_id TEXT, version_no INTEGER, entrypoint TEXT)`,
     `CREATE TABLE IF NOT EXISTS assets (id TEXT PRIMARY KEY, version_id TEXT, path TEXT, r2_key TEXT, mime TEXT)`,
@@ -83,12 +86,13 @@ beforeAll(async () => {
     [SK_WS, 'Team glossary', 'workspace', 0],
     [SK_APPROVAL, 'Security review', 'approval', 0],
     [SK_OFFICIAL, 'ShareOut', 'owner_only', 1],
+    [SK_PRIVATE, 'Draft playbook', 'owner_only', 0],
   ];
   for (const [id, name, policy, official] of skills) {
     const slug = id.replace('art_', '');
     await e.DB.prepare(
-      'INSERT INTO artifacts (id, name, slug, display_slug, owner_id, workspace_id, type_metadata) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).bind(id, name, slug, slug, OWNER, WS, JSON.stringify({ skill: { summary: 'How we ship' } })).run();
+      'INSERT INTO artifacts (id, name, slug, display_slug, owner_id, workspace_id, type_metadata, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(id, name, slug, slug, OWNER, WS, JSON.stringify({ skill: { summary: 'How we ship' } }), id === SK_PRIVATE ? 'private' : 'workspace').run();
     await e.DB.prepare(
       'INSERT INTO skill_marketplace (artifact_id, workspace_id, edit_policy, official) VALUES (?, ?, ?, ?)'
     ).bind(id, WS, policy, official).run();
@@ -355,5 +359,35 @@ describe('a workspace member can actually use a teammate’s skill', () => {
 
     const onWsSkill = await (await handleGetSkillMarkdown(e, user(MEMBER), SK_WS)).json() as { can_edit: boolean; can_propose: boolean };
     expect(onWsSkill).toMatchObject({ can_edit: true, can_propose: false });
+  });
+});
+
+describe('private skills stay private (visibility)', () => {
+  it('a teammate cannot read or attach a private skill; its owner can read it', async () => {
+    expect((await handleGetSkillMarkdown(e, user(MEMBER), SK_PRIVATE)).status).toBe(403);
+    expect((await handleAttachAgentSkill(post({ skill_artifact_id: SK_PRIVATE }), e, user(MEMBER), WS)).status).toBe(403);
+    expect((await handleGetSkillMarkdown(e, user(OWNER), SK_PRIVATE)).status).toBe(200);
+  });
+
+  it('an edit keeps the skill’s current visibility (private stays private, workspace stays workspace)', async () => {
+    expect(await skillRepublishVisibility(e, SK_PRIVATE)).toBe('private');
+    expect(await skillRepublishVisibility(e, SK_WS)).toBe('workspace');
+  });
+
+  it('injection silently skips a private skill attached to someone else’s agent, and never emits its body', async () => {
+    await e.DB.prepare("DELETE FROM workspace_agent_skills WHERE user_id = ?").bind(EDITOR).run();
+    for (const id of [SK_PRIVATE, SK_WS]) {
+      await e.DB.prepare('INSERT INTO workspace_agent_skills (workspace_id, user_id, skill_artifact_id, skill_version_no) VALUES (?, ?, ?, 1)')
+        .bind(WS, EDITOR, id).run();
+    }
+    await e.ARTIFACTS.put(`skills/${SK_PRIVATE}-1.md`, 'PRIVATE-SECRET-BODY');
+    const doc = await buildAgentSkillsDoc(e, WS, EDITOR);
+    expect(doc).toContain('Team glossary');
+    expect(doc).not.toContain('Draft playbook');
+    expect(doc).not.toContain('PRIVATE-SECRET-BODY');
+    // The owner's own agent still gets it.
+    await e.DB.prepare('INSERT INTO workspace_agent_skills (workspace_id, user_id, skill_artifact_id, skill_version_no) VALUES (?, ?, ?, 1)')
+      .bind(WS, OWNER, SK_PRIVATE).run();
+    expect(await buildAgentSkillsDoc(e, WS, OWNER)).toContain('PRIVATE-SECRET-BODY');
   });
 });
