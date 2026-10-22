@@ -37,6 +37,72 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
     var el = rec.iframe;
     if (el && el.requestFullscreen) el.requestFullscreen();
   });
+  // With 2+ open artifacts the strip takes its own full-width row; once tabs no longer
+  // fit, a list button names every open tab (filterable past 8).
+  var tabRowEl = document.getElementById('wsxTabRow');
+  var tabListBtn = document.getElementById('wsxTabList');
+  var tabMenu = null;
+  function syncTabRow() {
+    if (!tabRowEl) return;
+    tabRowEl.classList.toggle('is-row', tabs.length > 2);
+    var act = tabsEl.querySelector('.wsx-tab.is-active');
+    if (act) {
+      var l = act.offsetLeft, r = l + act.offsetWidth;
+      if (l < tabsEl.scrollLeft) tabsEl.scrollLeft = l;
+      else if (r > tabsEl.scrollLeft + tabsEl.clientWidth) tabsEl.scrollLeft = r - tabsEl.clientWidth;
+    }
+    if (tabListBtn) {
+      tabListBtn.hidden = tabsEl.scrollWidth <= tabsEl.clientWidth + 1;
+      tabListBtn.querySelector('span').textContent = String(tabs.length - 1);
+    }
+  }
+  function closeTabMenu() {
+    if (!tabMenu) return;
+    tabMenu.remove(); tabMenu = null;
+    tabListBtn.setAttribute('aria-expanded', 'false');
+  }
+  function openTabMenu() {
+    closeTabMenu();
+    var find = t('tabs.findTab');
+    tabMenu = document.createElement('div');
+    tabMenu.className = 'wsx-cmenu wsx-tablist';
+    tabMenu.setAttribute('role', 'menu');
+    tabMenu.innerHTML = (tabs.length > 9 ? '<input class="wsx-tablist__q" type="search" placeholder="' + esc(find) + '" aria-label="' + esc(find) + '">' : '')
+      + '<div class="wsx-tablist__items">' + tabs.slice(1).map(function (tab) {
+        return '<div class="wsx-cmenu__it wsx-tablist__it' + (tab.key === activeKey ? ' is-active' : '') + '" role="menuitem" tabindex="0" data-tab-go="' + esc(tab.key) + '" data-name="' + esc((tab.label || '').toLowerCase()) + '">'
+          + '<span class="wsx-tab__label">' + esc(tab.label) + '</span>'
+          + '<button class="wsx-tab__x" type="button" data-tab-close="' + esc(tab.key) + '" aria-label="' + esc(t('inspector.closeTab')) + '">\\u00D7</button></div>';
+      }).join('') + '</div>';
+    document.body.appendChild(tabMenu);
+    var r = tabListBtn.getBoundingClientRect();
+    tabMenu.style.top = (r.bottom + 6) + 'px';
+    tabMenu.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
+    tabListBtn.setAttribute('aria-expanded', 'true');
+    var q = tabMenu.querySelector('.wsx-tablist__q');
+    if (q) {
+      q.focus();
+      q.addEventListener('input', function () {
+        var v = q.value.trim().toLowerCase();
+        tabMenu.querySelectorAll('[data-tab-go]').forEach(function (it) { it.hidden = !!v && it.getAttribute('data-name').indexOf(v) < 0; });
+      });
+    }
+    tabMenu.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var x = e.target.closest('[data-tab-close]');
+      if (x) { closeTab(x.getAttribute('data-tab-close')); if (tabs.length > 1) openTabMenu(); else closeTabMenu(); return; }
+      var it = e.target.closest('[data-tab-go]');
+      if (it) { activateTab(it.getAttribute('data-tab-go')); closeTabMenu(); }
+    });
+    tabMenu.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { closeTabMenu(); tabListBtn.focus(); return; }
+      var it = e.key === 'Enter' && e.target.closest('[data-tab-go]');
+      if (it) { activateTab(it.getAttribute('data-tab-go')); closeTabMenu(); }
+    });
+  }
+  if (tabListBtn) tabListBtn.addEventListener('click', function (e) { e.stopPropagation(); if (tabMenu) closeTabMenu(); else openTabMenu(); });
+  document.addEventListener('click', function () { closeTabMenu(); });
+  window.addEventListener('resize', syncTabRow);
+
   // Reflect the active pane's mode + show only on an artifact tab.
   function syncTabMode() {
     if (!tabModeEl) return;

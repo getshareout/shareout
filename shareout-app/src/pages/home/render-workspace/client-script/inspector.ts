@@ -826,7 +826,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   function renderTabs() {
     tabsEl.innerHTML = tabs.map(function (tab) {
       var dirty = !tab.home && panes[tab.key] && panes[tab.key].dirty;
-      return '<div class="wsx-tab' + (tab.key === activeKey ? ' is-active' : '') + (tab.home ? ' wsx-tab--home' : '') + '" data-tab="' + esc(tab.key) + '"' + (tab.home ? '' : ' draggable="true"') + '>'
+      return '<div class="wsx-tab' + (tab.key === activeKey ? ' is-active' : '') + (tab.home ? ' wsx-tab--home' : '') + '" data-tab="' + esc(tab.key) + '"' + (tab.home ? '' : ' draggable="true" title="' + esc(tab.label) + '"') + '>'
         + (dirty ? '<span class="wsx-tab__dot" title="' + esc(t('inspector.unsavedDot')) + '"></span>' : '')
         + (tab.home ? '<span class="wsx-tab__ic">' + HOUSE_SVG + '</span>' : '')
         + '<span class="wsx-tab__label">' + esc(tab.home ? homeTabLabel() : tab.label) + '</span>'
@@ -840,6 +840,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       b.addEventListener('click', function (e) { e.stopPropagation(); closeTab(b.getAttribute('data-close')); });
     });
     wireTabDrag();
+    syncTabRow();
   }
   // Drag-to-reorder open artifact tabs. Home tab (index 0) is pinned and never a drop target.
   // The dragged tab is NOT moved mid-drag; a vertical bar marks the drop slot and the
