@@ -11,6 +11,7 @@ import {
 import { validateName } from '../../../src/data/connections/crud';
 import {
   executeRestApiQuery,
+  selfFetcher,
   redactUrl,
   staticHeaders,
   validateRestBaseUrl,
@@ -102,6 +103,15 @@ describe('connections/rest-query', () => {
     expect(hop.get('Authorization')).toBeNull();
     expect(hop.get('X-Api-Key')).toBeNull();
     fetchMock.mockRestore();
+  });
+});
+
+describe('connections/rest-query selfFetcher', () => {
+  it('only intercepts the deployment\'s own host', () => {
+    const env = { SHAREOUT_BASE_URL: 'https://shareout.site' } as never;
+    expect(selfFetcher(env, 'https://shareout.site/v1')).toBeTypeOf('function');
+    expect(selfFetcher(env, 'https://api.example.com/v1')).toBeUndefined();
+    expect(selfFetcher(env, undefined)).toBeUndefined();
   });
 });
 

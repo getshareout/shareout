@@ -7,6 +7,7 @@
  */
 import { fetchWithTimeout } from '../../fetch-utils';
 import { fetchCheckingRedirects, isBlockedDestination } from '../secrets/blocklist';
+import type { Env } from '../../types';
 import { UpstreamHttpError } from './errors';
 import { CONNECTION_TIMEOUT_MS } from './types';
 
@@ -38,6 +39,7 @@ export async function executeRestApiQuery(
   credType: string | null,
   query: string | Record<string, unknown>,
   params?: Record<string, unknown>,
+  fetcher?: (url: string, init: RequestInit) => Promise<Response>,
 ): Promise<unknown> {
   const baseUrl = config.baseUrl as string;
   if (!baseUrl) {
@@ -101,7 +103,7 @@ export async function executeRestApiQuery(
 
   const response = await fetchCheckingRedirects(url, { method, headers, body }, () => null, {
     stripCredentialsCrossOrigin: true,
-    fetcher: (u, init) => fetchWithTimeout(u, init, CONNECTION_TIMEOUT_MS),
+    fetcher: (u, init) => (fetcher ?? ((x, i) => fetchWithTimeout(x, i, CONNECTION_TIMEOUT_MS)))(u, init),
   });
 
   if (!response.ok) {
@@ -149,4 +151,22 @@ export function redactUrl(url: string): string {
   } catch {
     return url.split('?')[0];
   }
+}
+
+/**
+ * Fetcher for REST connections whose target is this deployment itself. A Worker
+ * subrequest to its own zone fails with Cloudflare 522, so those calls are handed
+ * to the in-worker handler instead. Returns undefined for any other host.
+ */
+export function selfFetcher(env: Env, url?: unknown): ((url: string, init: RequestInit) => Promise<Response>) | undefined {
+  try {
+    const own = new URL(env.SHAREOUT_BASE_URL).hostname;
+    if (new URL(String(url)).hostname !== own) return undefined;
+  } catch {
+    return undefined;
+  }
+  return async (u, init) => {
+    const { handleFetch } = await import('../../router/handle-fetch');
+    return handleFetch(new Request(u, init), env);
+  };
 }
