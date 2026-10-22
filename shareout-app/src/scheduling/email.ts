@@ -65,6 +65,8 @@ export interface SendEmailResult {
   skippedOptedOut?: string[];
 }
 
+const escHtml = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 export function artifactEmailDomain(env: Env): string {
   if (env.EMAIL_ARTIFACTS_DOMAIN) return env.EMAIL_ARTIFACTS_DOMAIN;
   const host = getPlatformHostname(env);
@@ -248,7 +250,7 @@ export async function sendArtifactEmail(
   }
 
   if (config.includeArtifactLink) {
-    const linkHtml = `<p><a href="${artifactUrl}">${copy.view} ${artifact.name}</a></p>`;
+    const linkHtml = `<p><a href="${artifactUrl}">${copy.view} ${escHtml(artifact.name)}</a></p>`;
     const linkText = `\n\n${copy.viewPage}: ${artifactUrl}`;
     htmlContent = htmlContent ? `${htmlContent}${linkHtml}` : linkHtml;
     textContent = textContent ? `${textContent}${linkText}` : `${copy.viewPage}: ${artifactUrl}`;
@@ -273,7 +275,7 @@ export async function sendArtifactEmail(
 
   if (!htmlContent && !textContent) {
     textContent = `${copy.scheduledFrom} ${artifact.name}\n\n${artifactUrl}`;
-    htmlContent = `<p>${copy.scheduledFrom} <strong>${artifact.name}</strong></p><p><a href="${artifactUrl}">${copy.viewButton}</a></p>`;
+    htmlContent = `<p>${copy.scheduledFrom} <strong>${escHtml(artifact.name)}</strong></p><p><a href="${artifactUrl}">${copy.viewButton}</a></p>`;
   }
 
   // Per-artifact opt-out: skip recipients who unsubscribed from THIS artifact (not the global list).

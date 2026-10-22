@@ -102,6 +102,38 @@ describe('GET/POST /v1/email/artifact-unsubscribe', () => {
   });
 });
 
+describe('malicious artifact name', () => {
+  const EVIL = '<img src=x onerror=alert(document.cookie)>"\'';
+  it('is HTML-escaped on every state of the page (GET, POST done, POST resubscribe)', async () => {
+    await e.DB.exec(`INSERT INTO artifacts (id, name, workspace_id) VALUES ('art_evil', '${EVIL.replace(/'/g, "''")}', 'wsp_es')`);
+    await e.DB.exec(`INSERT INTO deployments (artifact_id, channel, slug) VALUES ('art_evil', 'production', 'evil')`);
+    const tok = await createArtifactOptoutToken(e, 'art_evil', 'a@x.com');
+    const bodies = [
+      await (await route(tok)).text(),
+      await (await route(tok, 'POST', 'action=unsubscribe')).text(),
+      await (await route(tok)).text(), // now shows the already-unsubscribed state
+      await (await route(tok, 'POST', 'action=resubscribe')).text(),
+    ];
+    for (const b of bodies) {
+      expect(b).not.toContain('<img');
+      expect(b).not.toContain('onerror=alert(document.cookie)>');
+    }
+    for (const i of [0, 1, 3]) expect(bodies[i]).toContain('&lt;img src=x');
+    // English workspace too.
+    await e.DB.exec(`UPDATE artifacts SET workspace_id = 'wsp_en' WHERE id = 'art_evil'`);
+    expect(await (await route(tok)).text()).not.toContain('<img');
+  });
+
+  it('does not put the raw name into the email body or its footer', async () => {
+    await e.DB.exec(`INSERT INTO artifacts (id, name, workspace_id) VALUES ('art_evil2', '<script>alert(1)</script>', 'wsp_es')`);
+    await e.DB.exec(`INSERT INTO deployments (artifact_id, channel, slug) VALUES ('art_evil2', 'production', 'evil2')`);
+    await sendArtifactEmail(e, 'art_evil2', { recipients: ['a@x.com'], subject: 's' });
+    const html = (sent[0] as { html: string }).html;
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;script&gt;');
+  });
+});
+
 describe('sendArtifactEmail honours the per-artifact opt-out', () => {
   it('skips opted-out recipients, reports them, and sends each other recipient their own link + RFC 8058 headers', async () => {
     await e.DB.exec(`INSERT INTO artifact_email_optouts (artifact_id, email) VALUES ('art_es', 'gone@x.com')`);
