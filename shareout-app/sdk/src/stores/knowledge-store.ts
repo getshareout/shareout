@@ -23,9 +23,10 @@ export interface KnowledgeSearchResult {
 export class KnowledgeStore {
   constructor(private sdk: SdkClient) {}
 
-  search(query: string, opts: { limit?: number } = {}): Promise<KnowledgeSearchResult> {
+  search(query: string, opts: { limit?: number; full?: boolean } = {}): Promise<KnowledgeSearchResult> {
     const params = new URLSearchParams({ q: query });
     if (opts.limit) params.set('limit', String(opts.limit));
+    if (opts.full) params.set('full', '1');
     return this.sdk._internalFetch(`/knowledge/search?${params}`);
   }
 }

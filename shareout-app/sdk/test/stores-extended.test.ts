@@ -153,5 +153,7 @@ describe('KnowledgeStore', () => {
     const sdk = { _internalFetch: async (p: string) => { calls.push(p); return { query: 'x', mode: 'keyword', hits: [] }; } } as never;
     await new KnowledgeStore(sdk).search('a b', { limit: 3 });
     expect(calls).toEqual(['/knowledge/search?q=a+b&limit=3']);
+    await new KnowledgeStore(sdk).search('a', { full: true });
+    expect(calls[1]).toBe('/knowledge/search?q=a&full=1');
   });
 });
