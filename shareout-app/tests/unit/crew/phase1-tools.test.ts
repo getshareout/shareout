@@ -54,6 +54,16 @@ describe('json_set tool', () => {
     expect(JSON.parse(db.store.get('theme')!.value)).toEqual({ dark: false });
   });
 
+  it('stores an object passed as JSON text as an object, not a string', async () => {
+    const db = fakeDb();
+    await jsonSetTool.execute(ctx(db), { key: 'digest', value: '{"a":1,"b":[2]}' });
+    expect(JSON.parse(db.store.get('digest')!.value)).toEqual({ a: 1, b: [2] });
+    await jsonSetTool.execute(ctx(db), { key: 'snap', value: '[1,2]', path: 'x' });
+    expect(JSON.parse(db.store.get('snap')!.value)).toEqual({ x: [1, 2] });
+    await jsonSetTool.execute(ctx(db), { key: 'note', value: 'plain text' });
+    expect(JSON.parse(db.store.get('note')!.value)).toBe('plain text');
+  });
+
   it('merges at a path into the key object', async () => {
     const db = fakeDb();
     await jsonSetTool.execute(ctx(db), { key: 'snap', value: [1], path: 'a' });

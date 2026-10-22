@@ -35,6 +35,22 @@ export async function getCrew(env: Env, artifactId: string): Promise<CrewRow | n
     .first<CrewRow>();
 }
 
+/** Remove the artifact's crew and everything keyed on it (grants, triggers, runs, events, approvals). */
+export async function deleteCrew(env: Env, artifactId: string): Promise<boolean> {
+  const crew = await getCrew(env, artifactId);
+  if (!crew) return false;
+  const byRun = `run_id IN (SELECT id FROM crew_runs WHERE crew_id = ?)`;
+  await env.DB.batch([
+    env.DB.prepare(`DELETE FROM crew_run_events WHERE ${byRun}`).bind(crew.id),
+    env.DB.prepare(`DELETE FROM crew_action_approvals WHERE ${byRun}`).bind(crew.id),
+    env.DB.prepare('DELETE FROM crew_runs WHERE crew_id = ?').bind(crew.id),
+    env.DB.prepare('DELETE FROM crew_triggers WHERE crew_id = ?').bind(crew.id),
+    env.DB.prepare('DELETE FROM crew_grants WHERE crew_id = ?').bind(crew.id),
+    env.DB.prepare('DELETE FROM crews WHERE id = ?').bind(crew.id),
+  ]);
+  return true;
+}
+
 export async function getCrewById(env: Env, crewId: string): Promise<CrewRow | null> {
   return env.DB.prepare('SELECT * FROM crews WHERE id = ?').bind(crewId).first<CrewRow>();
 }

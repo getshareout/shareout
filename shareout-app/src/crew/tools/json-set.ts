@@ -1,6 +1,13 @@
 import { generateId } from '../../crypto-utils';
 import type { CrewTool } from '../types';
 
+function parseStructured(v: unknown): unknown {
+  if (typeof v !== 'string') return v;
+  const t = v.trim();
+  if (t[0] !== '{' && t[0] !== '[') return v;
+  try { return JSON.parse(t); } catch { return v; }
+}
+
 export const jsonSetTool: CrewTool = {
   name: 'json_set',
   mode: 'write',
@@ -29,7 +36,8 @@ export const jsonSetTool: CrewTool = {
     const path = typeof input.path === 'string' ? input.path : undefined;
 
     const db = ctx.data.db;
-    let toStore: unknown = input.value;
+    // Models often pass an object/array as its JSON text; store the structure, not the encoded string.
+    let toStore: unknown = parseStructured(input.value);
     if (path) {
       const existing = await db.prepare('SELECT value FROM artifact_json WHERE artifact_id = ? AND key = ?')
         .bind(ctx.data.artifactId, key).first<{ value: string }>();
@@ -40,7 +48,7 @@ export const jsonSetTool: CrewTool = {
           if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) obj = parsed as Record<string, unknown>;
         } catch { /* overwrite a non-object value */ }
       }
-      obj[path] = input.value;
+      obj[path] = parseStructured(input.value);
       toStore = obj;
     }
 

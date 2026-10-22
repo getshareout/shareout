@@ -95,6 +95,7 @@ envelope `{ "success": true, "data": … }`. One crew per artifact.
 | Method | Path | Notes |
 |--------|------|-------|
 | GET | `/v1/data/{id}/crew` | `{ crew, grants[] }`; `404` if none defined |
+| DELETE | `/v1/data/{id}/crew` | Delete the crew and its grants, triggers, runs and approvals (`404` if none) |
 | POST | `/v1/data/{id}/crew/define` | Create or replace the crew (upsert). Body below. Grants are rewritten from `tools` |
 | POST | `/v1/data/{id}/crew/run` | `{ "input": "…" }` (optional). Streams **SSE** events: `run_start`, `reasoning`, `tool_call`, `tool_result`, `finish`, `error`, `done`. `429 CONCURRENCY_LIMIT` when too many runs are active |
 | GET | `/v1/data/{id}/crew/runs` | Last 20 runs |
