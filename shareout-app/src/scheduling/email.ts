@@ -301,8 +301,8 @@ export async function sendArtifactEmail(
       to: [to],
       subject,
       text: (link ? `${textContent || ''}\n\n--\n${copy.unsubQ} ${copy.unsubAction}: ${link}` : textContent).trimStart() || undefined,
-      html: link
-        ? `${htmlContent || ''}<p style="margin-top:24px;font-size:12px;color:#57534e">${copy.unsubQ} <a href="${link}">${copy.unsubAction}</a></p>`
+      html: link && htmlContent
+        ? `${htmlContent}<p style="margin-top:24px;font-size:12px;color:#57534e">${copy.unsubQ} <a href="${link}">${copy.unsubAction}</a></p>`
         : htmlContent || undefined,
       attachments: attachments.length ? attachments : undefined,
       ...(link ? { headers: { 'List-Unsubscribe': `<${link}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } } : {}),

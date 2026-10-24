@@ -154,6 +154,15 @@ describe('sendArtifactEmail honours the per-artifact opt-out', () => {
     expect(await verifyArtifactOptoutToken(e, tok)).toEqual({ artifactId: 'art_es', email: 'a@x.com' });
   });
 
+  it('a text-only email gets no HTML part (else clients show only the footer)', async () => {
+    const r = await sendArtifactEmail(e, 'art_es', { recipients: ['a@x.com'], subject: 's', body: 'hola' });
+    expect(r.success).toBe(true);
+    const m = sent[0] as { html?: string; text: string; headers: Record<string, string> };
+    expect(m.html).toBeUndefined();
+    expect(m.text).toMatch(/^hola\n\n--\n.*Darte de baja: https:/s);
+    expect(m.headers['List-Unsubscribe']).toContain('artifact-unsubscribe');
+  });
+
   it('sends nothing and says why when everyone opted out', async () => {
     await e.DB.exec(`INSERT INTO artifact_email_optouts (artifact_id, email) VALUES ('art_en', 'a@x.com')`);
     const r = await sendArtifactEmail(e, 'art_en', { recipients: ['a@x.com'], subject: 's', body: 'x' });
