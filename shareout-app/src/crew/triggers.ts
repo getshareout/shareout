@@ -4,6 +4,7 @@ import { getCrewById, createRun, reapStaleRuns } from './store';
 import { resolveCrewLimits, countActiveRuns, ownerAtCapacity } from './limits';
 import { createLogger } from '../logging';
 import { buildOwnerDataContextForCrew } from './principal';
+import { enqueueCrewRun, drainCrewQueue, ownersWithQueuedRuns } from './queue';
 import { runCrew, runCrewToCompletion } from './run-loop';
 import { evaluateCondition, validateConditionConfig, clampSeconds, RECHECK_SECONDS } from './condition';
 import type { CrewRow, CrewTriggerRow } from './types';
@@ -31,12 +32,19 @@ export async function dispatchCrewRun(
   const owner = await env.DB.prepare('SELECT disabled FROM users WHERE id = ?').bind(crew.owner_id).first<{ disabled: number | null }>();
   if (owner?.disabled) return false;
 
-  const limits = await resolveCrewLimits(env, crew.owner_id);
-  if ((await countActiveRuns(env, crew.owner_id)) >= limits.max_concurrent_runs) return false;
+  // An orphaned 'running' row (client gone, worker killed) must not hold the slot until the next hourly tick.
+  await reapStaleRuns(env).catch(() => 0);
+  if (await ownerAtCapacity(env, crew.owner_id)) {
+    // An event wake (e.g. a new row = maybe an alert) is queued, not dropped; cron/condition triggers retry via next_run_at.
+    if (triggerKind === 'event') await enqueueCrewRun(env, crew, triggerKind);
+    return false;
+  }
 
   const ownerCtx = await buildOwnerDataContextForCrew(env, crew);
   const run = await createRun(env, crew, '', null, triggerKind);
   await runCrewToCompletion({ env, crew, run, ownerCtx, input: '', triggerId });
+  // Queued runs are NOT drained here: an event dispatch runs inside waitUntil (cut ~30 s after the response),
+  // and a cron dispatch is already inside the tick's own time budget. The tick drains with what is left.
   return true;
 }
 
@@ -116,6 +124,18 @@ export async function runDueCrewTriggers(env: Env, budgetMs = CREW_TICK_BUDGET_M
   let executed = 0;
   let failed = 0;
 
+  // Queued event runs first (already due when they arrived), then again after the due triggers with
+  // whatever budget is left, so an event that queued behind a cron run in this same tick starts without
+  // waiting an hour. Always bounded by the tick budget, never a fresh one.
+  const drainQueued = async () => {
+    for (const ownerId of await ownersWithQueuedRuns(env).catch(() => [] as string[])) {
+      const left = budgetMs - (Date.now() - nowMs);
+      if (left <= 0) break;
+      executed += await drainCrewQueue(env, ownerId, left).catch(() => 0);
+    }
+  };
+  await drainQueued();
+
   for (const trigger of due.results) {
     if (Date.now() - nowMs > budgetMs) break; // untouched triggers stay due for the next tick
     try {
@@ -137,6 +157,8 @@ export async function runDueCrewTriggers(env: Env, budgetMs = CREW_TICK_BUDGET_M
       }
     }
   }
+
+  await drainQueued();
 
   return { executed, failed };
 }

@@ -132,6 +132,8 @@ the wrong mode, are ignored silently — check `grants` in `GET /crew` after def
 
 `email_send` (and every artifact email: scheduled jobs, `sdk.email`) sends one message per recipient with an unsubscribe footer link and RFC 8058 `List-Unsubscribe` / `List-Unsubscribe-Post` headers. A recipient who unsubscribes is stored per artifact (`artifact_email_optouts`), skipped on later sends, and reported back as `skipped_opted_out`; the owner can list them with `GET /v1/data/{id}/email/optouts`. The unsubscribe page is Spanish (es-AR) for Spanish workspaces, English otherwise, and can opt back in.
 
+Concurrency: an owner runs one crew at a time by default (`plan_crew_limits.max_concurrent_runs`, or 1 without a row). An **event** trigger that fires while the owner is busy is not dropped: it is queued (`crew_runs.status = 'queued'`, max 20 per owner, 24 h) and starts, oldest first, in the next hourly tick (at its start, and again after its due triggers if budget remains), so worst-case latency is about an hour. A run abandoned in `running` (worker killed) is reaped after 5 minutes, at the next dispatch or tick, and frees the slot; an event run killed before its first tool call is re-queued once. Cron triggers that find the owner busy retry hourly for 6 h.
+
 Triggers (`POST /crew/triggers`):
 
 ```jsonc
