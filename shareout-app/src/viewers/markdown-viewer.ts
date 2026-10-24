@@ -46,8 +46,9 @@ export function renderMarkdownViewer(ctx: ViewerContext): string {
         </article>
       </div>`;
 
-  // Knowledge citations open /a/slug/?section=<anchor>: scroll to that heading (its `h-` id, see parseMarkdown).
-  const sectionScript = `${scriptOpen(ctx)}(function(){var s=new URLSearchParams(location.search).get('section');if(!s||!/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/.test(s))return;var el=document.getElementById(s);if(!el)return;var n=el.nextElementSibling,t=n&&/^H[1-6]$/.test(n.tagName)?n:el;t.scrollIntoView({block:'start'});t.classList.add('sec-hit');})();</script>`;
+  // Knowledge citations open /a/slug/?section=<anchor>. The anchor is headingAnchors() of the heading text (the
+  // corpus chunker's function, embedded here via toString as the page agent does), numbered across the page.
+  const sectionScript = `${scriptOpen(ctx)}(function(){var s=new URLSearchParams(location.search).get('section');if(!s||!/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/.test(s))return;var hs=document.querySelectorAll('.content h1,.content h2,.content h3,.content h4,.content h5,.content h6');var texts=[];for(var i=0;i<hs.length;i++)texts.push(hs[i].textContent||'');var an=(${headingAnchors.toString()})(texts);var t=document.getElementById(s);for(var j=0;!t&&j<hs.length;j++)if(an[j]===s)t=hs[j];if(!t)return;t.scrollIntoView({block:'start'});t.classList.add('sec-hit');})();</script>`;
 
   const bodyContent = `
     <div class="markdown-viewer">
@@ -284,16 +285,11 @@ export function parseMarkdown(md: string): string {
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
 
   // Headers with anchors
-  // Each heading also carries the `h-` section anchor the Knowledge chunker gives it (same function), so a
-  // citation's ?section= resolves here. The plain id stays for the table of contents.
-  const headingRe = /^(#{1,6})\s+(.+)$/gm;
-  const sectionAnchors = headingAnchors([...html.matchAll(headingRe)].map((m) => unescapeHtml(m[2])));
-  let headingIdx = 0;
-  html = html.replace(headingRe, (_, hashes, text) => {
+  // Headers with anchors
+  html = html.replace(/^(#{1,6})\s+(.+)$/gm, (_, hashes, text) => {
     const level = hashes.length;
     const anchor = unescapeHtml(text).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const section = sectionAnchors[headingIdx++];
-    return `${section ? `<a id="${section}"></a>` : ''}<h${level} id="${anchor}">${text}</h${level}>`;
+    return `<h${level} id="${anchor}">${text}</h${level}>`;
   });
 
   // Bold and italic
