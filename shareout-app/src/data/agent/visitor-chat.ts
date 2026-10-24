@@ -5,7 +5,7 @@ import type { AgentConfig, ChatRequest, Conversation, Message } from './types';
 import { streamChat, type AIConfig } from './anthropic';
 import { CLAUDE_HAIKU, CLAUDE_OPUS, CLAUDE_SONNET } from './models';
 import { buildVisitorContext, buildVisitorSystemPrompt } from './context';
-import { workspaceMemberId, reserveMemberQuota, addMemberTokens } from './member-quota';
+import { agentCaller, reserveAgentQuota, settleAgentTokens, type QuotaResult } from './member-quota';
 import { incrementRateLimit, reserveRateLimit, recordUsage, recordError } from './usage';
 import { resolveAgentAiConfig, recordAgentUsage } from './ai-config';
 import { checkSlidingWindowRateLimit, getTrustedClientIp } from '../../rate-limit';
@@ -117,10 +117,10 @@ export async function handleVisitorChat(
 
   // Signed-in workspace members skip the per-artifact counters below (the anonymous-visitor cap would
   // throttle a whole crew sharing one tool); they get per-user caps plus the workspace AI budget.
-  const memberId = await workspaceMemberId(request, ctx);
+  const caller = await agentCaller(request, ctx);
   const reservedTokens = config.visitor_max_tokens || 4096;
-  const rateLimit: { allowed: boolean; error?: string; retryAfter?: number } = memberId
-    ? await reserveMemberQuota(ctx.env, memberId, ctx.workspaceId, reservedTokens)
+  const rateLimit: QuotaResult | { allowed: boolean; retryAfter?: number; error?: string; limit?: undefined; resetsAt?: undefined } = caller
+    ? await reserveAgentQuota(ctx.env, caller, ctx.workspaceId, reservedTokens)
     : await reserveRateLimit(ctx.env, ctx.artifactId, reservedTokens);
   if (!rateLimit.allowed) {
     return new Response(
@@ -129,6 +129,7 @@ export async function handleVisitorChat(
         error: rateLimit.error || 'Rate limit exceeded',
         code: 'RATE_LIMIT_EXCEEDED',
         retryAfter: rateLimit.retryAfter,
+        ...(rateLimit.limit ? { limit: rateLimit.limit, resets_at: rateLimit.resetsAt } : {}),
       }),
       {
         status: 429,
@@ -147,7 +148,7 @@ export async function handleVisitorChat(
   const settleQuota = async () => {
     if (settled) return;
     settled = true;
-    if (memberId) return addMemberTokens(ctx.env, memberId, inputTokens + outputTokens - reservedTokens);
+    if (caller) return settleAgentTokens(ctx.env, caller, ctx.workspaceId, inputTokens + outputTokens - reservedTokens);
     await incrementRateLimit(ctx.env, ctx.artifactId, inputTokens + outputTokens - reservedTokens, 0);
   };
 

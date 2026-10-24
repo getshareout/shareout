@@ -52,19 +52,19 @@ vi.mock('../../../../src/data/agent/ai-config', () => ({
   recordAgentUsage: (...args: unknown[]) => mockRecordAgentUsage(...args),
 }));
 
-const mockMemberId = vi.fn();
+const mockCaller = vi.fn();
 const mockReserveMember = vi.fn();
-const mockAddMemberTokens = vi.fn();
+const mockSettle = vi.fn();
 vi.mock('../../../../src/data/agent/member-quota', () => ({
-  workspaceMemberId: (...args: unknown[]) => mockMemberId(...args),
-  reserveMemberQuota: (...args: unknown[]) => mockReserveMember(...args),
-  addMemberTokens: (...args: unknown[]) => mockAddMemberTokens(...args),
+  agentCaller: (...args: unknown[]) => mockCaller(...args),
+  reserveAgentQuota: (...args: unknown[]) => mockReserveMember(...args),
+  settleAgentTokens: (...args: unknown[]) => mockSettle(...args),
 }));
 
 const visitorContext = { json: { key: 'val' }, tables: {}, blobUrls: [] };
 
 beforeEach(() => {
-  mockMemberId.mockResolvedValue(null);
+  mockCaller.mockResolvedValue(null);
   mockReserveMember.mockResolvedValue({ allowed: true });
   mockBuildVisitorContext.mockResolvedValue(visitorContext);
   mockBuildVisitorSystemPrompt.mockReturnValue('visitor system');
@@ -144,22 +144,34 @@ describe('handleVisitorChat', () => {
 
   it('workspace members skip the per-artifact visitor cap', async () => {
     mockCheckRateLimit.mockResolvedValue({ allowed: false, retryAfter: 30 });
-    mockMemberId.mockResolvedValue('usr_m');
+    mockCaller.mockResolvedValue({ kind: 'member', userId: 'usr_m' });
     const ctx = { ...makeCtx(makeEnv(configDb())), workspaceId: 'wsp_1', viewer: { email: 'a@b.c', isOwner: false } } as never;
     const res = await handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx);
     expect(res.status).toBe(200);
     await readSSE(res);
     expect(mockCheckRateLimit).not.toHaveBeenCalled();
     expect(mockIncrementRateLimit).not.toHaveBeenCalled();
-    expect(mockReserveMember).toHaveBeenCalledWith(expect.anything(), 'usr_m', 'wsp_1', expect.any(Number));
+    expect(mockReserveMember).toHaveBeenCalledWith(expect.anything(), { kind: 'member', userId: 'usr_m' }, 'wsp_1', expect.any(Number));
   });
 
   it('a refused member quota returns 429', async () => {
-    mockMemberId.mockResolvedValue('usr_m');
-    mockReserveMember.mockResolvedValue({ allowed: false, retryAfter: 60, error: 'x' });
+    mockCaller.mockResolvedValue({ kind: 'member', userId: 'usr_m' });
+    mockReserveMember.mockResolvedValue({ allowed: false, retryAfter: 60, error: 'x', limit: 'member_daily', resetsAt: '2030-01-01T00:00:00.000Z' });
     const ctx = { ...makeCtx(makeEnv(configDb())), workspaceId: 'wsp_1', viewer: { email: 'a@b.c', isOwner: false } } as never;
     const res = await handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx);
     expect(res.status).toBe(429);
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
+    expect(await res.json()).toMatchObject({ limit: 'member_daily', resets_at: '2030-01-01T00:00:00.000Z', code: 'RATE_LIMIT_EXCEEDED' });
+  });
+
+  it('an automation caller is billed through the workspace quota and settles there', async () => {
+    mockCaller.mockResolvedValue({ kind: 'automation', userId: 'usr_leo' });
+    const ctx = { ...makeCtx(makeEnv(configDb())), workspaceId: 'wsp_1' } as never;
+    const res = await handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx);
+    expect(res.status).toBe(200);
+    await readSSE(res);
+    expect(mockReserveMember).toHaveBeenCalledWith(expect.anything(), { kind: 'automation', userId: 'usr_leo' }, 'wsp_1', expect.any(Number));
+    expect(mockSettle).toHaveBeenCalledWith(expect.anything(), { kind: 'automation', userId: 'usr_leo' }, 'wsp_1', expect.any(Number));
     expect(mockCheckRateLimit).not.toHaveBeenCalled();
   });
 

@@ -13,6 +13,7 @@ import {
   handleGetWorkspaceUsage,
 } from './workspace-llm';
 import { handleGetWorkspaceCrewUsage } from './workspace-crew-usage';
+import { handleGetWorkspaceAiLimits } from './workspace-ai-limits';
 import type { FetchContext } from '../context';
 import { isAuthUser, requireTokenOrSession, getTokenOrSessionUser } from '../helpers/auth-guard';
 
@@ -123,6 +124,13 @@ export async function routeWorkspaceConnections(ctx: FetchContext): Promise<Resp
     const user = await requireTokenOrSession(ctx);
     if (!isAuthUser(user)) return user;
     return addCORS(await handleGetWorkspaceUsage(request, env, user, workspaceId));
+  }
+
+  const aiLimitsMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/ai-limits$/);
+  if (aiLimitsMatch && request.method === 'GET') {
+    const user = await requireTokenOrSession(ctx);
+    if (!isAuthUser(user)) return user;
+    return addCORS(await handleGetWorkspaceAiLimits(env, user, aiLimitsMatch[1]));
   }
 
   const crewUsageMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/crew-usage$/);
