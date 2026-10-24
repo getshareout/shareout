@@ -45,6 +45,13 @@ beforeEach(async () => {
 });
 
 describe('notifications', () => {
+  it('opening the panel marks needs-you items read: badge clears, items stay listed', () => {
+    const marked = fetchMock.mock.calls.find((c) => String(c[0]).includes('/v1/home/dismiss-event'));
+    expect(JSON.parse((marked![1] as RequestInit).body as string)).toEqual({ eventIds: ['e1', 'e2'] });
+    expect(document.getElementById('wsxNotifBadge')!.hidden).toBe(true);
+    expect(ids()).toEqual(['e1', 'e2']);
+  });
+
   it('dismiss removes the card at once and puts it back in place if the request fails', async () => {
     let fail!: () => void;
     fetchMock.mockImplementationOnce(() => new Promise<Response>((r) => { fail = () => r(new Response('{}', { status: 500 })); }));
