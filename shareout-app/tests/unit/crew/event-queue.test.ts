@@ -78,6 +78,67 @@ describe('orphaned runs do not hold the slot', () => {
   });
 });
 
+describe('draining stays inside budgets (G19 review)', () => {
+  const queue = async (n: number) => {
+    const crew = (await rows(`SELECT * FROM crews WHERE id = 'crew_a'`))[0] as unknown as CrewRow;
+    for (let i = 0; i < n; i++) await enqueueCrewRun(env as never, crew, 'event');
+  };
+  const queued = async () => (await rows(`SELECT COUNT(*) AS n FROM crew_runs WHERE status = 'queued'`))[0].n;
+
+  it('an event dispatch never drains the queue (it runs inside waitUntil)', async () => {
+    await queue(2);
+    const { dispatchCrewRun } = await import('../../../src/crew/triggers');
+    const other = (await rows(`SELECT * FROM crews WHERE id = 'crew_b'`))[0] as unknown as CrewRow;
+    await dispatchCrewRun(env as never, other, 'event');
+    expect(await queued()).toBe(2);
+  });
+
+  it('a cron dispatch does not drain inline either; the tick does, with the remaining budget', async () => {
+    await queue(2);
+    const { dispatchCrewRun } = await import('../../../src/crew/triggers');
+    const other = (await rows(`SELECT * FROM crews WHERE id = 'crew_b'`))[0] as unknown as CrewRow;
+    await dispatchCrewRun(env as never, other, 'cron');
+    expect(await queued()).toBe(2);
+  });
+
+  it('an exhausted budget starts nothing, in the drain and in the tick', async () => {
+    await queue(2);
+    expect(await drainCrewQueue(env as never, 'usr_o', 0)).toBe(0);
+    await runDueCrewTriggers(env as never, -1);
+    expect(await queued()).toBe(2);
+    await runDueCrewTriggers(env as never);
+    expect(await queued()).toBe(0);
+  });
+});
+
+describe('a killed event run gets exactly one second chance', () => {
+  const stale = (id: string, kind: string, reason: string | null = null) => env.DB.prepare(
+    `INSERT INTO crew_runs (id, crew_id, artifact_id, trigger_kind, status, termination_reason, started_at) VALUES (?, 'crew_a', 'art_a', ?, 'running', ?, strftime('%%Y-%%m-%%dT%%H:%%M:%%fZ','now','-900 seconds'))`
+  ).bind(id, kind, reason).run();
+  const state = async (id: string) => (await rows(`SELECT status, termination_reason FROM crew_runs WHERE id = ?`, id))[0];
+
+  it('re-queues once, then fails it as abandoned', async () => {
+    const { reapStaleRuns } = await import('../../../src/crew/store');
+    await stale('crun_e1', 'event');
+    await reapStaleRuns(env as never);
+    expect(await state('crun_e1')).toEqual({ status: 'queued', termination_reason: 'requeued' });
+    // claimed again and killed again
+    await env.DB.prepare(`UPDATE crew_runs SET status = 'running', started_at = strftime('%%Y-%%m-%%dT%%H:%%M:%%fZ','now','-900 seconds') WHERE id = 'crun_e1'`).run();
+    await reapStaleRuns(env as never);
+    expect(await state('crun_e1')).toEqual({ status: 'error', termination_reason: 'abandoned' });
+  });
+
+  it('does not re-queue an event run that already called a tool, or a non-event run', async () => {
+    const { reapStaleRuns } = await import('../../../src/crew/store');
+    await stale('crun_e2', 'event');
+    await env.DB.prepare(`INSERT INTO crew_run_events (id, run_id, crew_id, seq, event_type) VALUES ('ev1', 'crun_e2', 'crew_a', 1, 'tool_call')`).run();
+    await stale('crun_c1', 'cron');
+    await reapStaleRuns(env as never);
+    expect(await state('crun_e2')).toEqual({ status: 'error', termination_reason: 'abandoned' });
+    expect(await state('crun_c1')).toEqual({ status: 'error', termination_reason: 'abandoned' });
+  });
+});
+
 describe('the queue drains FIFO once a slot frees', () => {
   it('does nothing while busy; starts the oldest first when free; the hourly tick also drains', async () => {
     await busy();

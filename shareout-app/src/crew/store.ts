@@ -170,15 +170,27 @@ export async function createRun(
 // concurrency cap forever (countActiveRuns), silently deadlocking future runs.
 const STALE_RUN_SECONDS = 300;
 
-/** Mark abandoned 'running' runs as failed so they stop consuming a concurrency slot. */
+/**
+ * Free the slots of runs the platform killed. An EVENT run that never reached a tool call (so nothing it
+ * did can repeat) goes back to the queue once (marked 'requeued'); everything else is marked failed.
+ */
 export async function reapStaleRuns(env: Env): Promise<number> {
-  const r = await env.DB.prepare(
-    `UPDATE crew_runs SET status = 'error', termination_reason = 'abandoned', ended_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-       WHERE status = 'running' AND started_at < strftime('%Y-%m-%dT%H:%M:%fZ','now', '-' || ? || ' seconds')`
+  const stale = `status = 'running' AND started_at < strftime('%Y-%m-%dT%H:%M:%fZ','now', '-' || ? || ' seconds')`;
+  const requeued = await env.DB.prepare(
+    `UPDATE crew_runs SET status = 'queued', termination_reason = 'requeued', started_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+       WHERE ${stale} AND trigger_kind = 'event'
+         AND (termination_reason IS NULL OR termination_reason != 'requeued')
+         AND NOT EXISTS (SELECT 1 FROM crew_run_events e WHERE e.run_id = crew_runs.id AND e.event_type = 'tool_call')`
   )
     .bind(STALE_RUN_SECONDS)
     .run();
-  return r.meta.changes || 0;
+  const r = await env.DB.prepare(
+    `UPDATE crew_runs SET status = 'error', termination_reason = 'abandoned', ended_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+       WHERE ${stale}`
+  )
+    .bind(STALE_RUN_SECONDS)
+    .run();
+  return (requeued.meta.changes || 0) + (r.meta.changes || 0);
 }
 
 export async function listRuns(env: Env, crewId: string, limit = 20): Promise<CrewRunRow[]> {
