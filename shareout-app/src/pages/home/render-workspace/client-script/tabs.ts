@@ -41,6 +41,10 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
   var tabRowEl = document.getElementById('wsxTabRow');
   var tabListBtn = document.getElementById('wsxTabList');
   var tabMenu = null;
+  tabsEl.addEventListener('wheel', function (e) {
+    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    tabsEl.scrollLeft += e.deltaY; e.preventDefault();
+  }, { passive: false });
   function syncTabRow() {
     if (!tabRowEl) return;
     var act = tabsEl.querySelector('.wsx-tab.is-active');
