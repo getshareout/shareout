@@ -111,6 +111,26 @@ describe('handleCreatePersonalFolder', () => {
     expect((await jsonBody(response)).code).toBe('SLUG_TAKEN');
   });
 
+  it('409s a name whose legacy accent-dashed slug already exists', async () => {
+    const env = {
+      ...baseEnv,
+      DB: makeDbMock({
+        first: (sql, ...args) => {
+          if (sql.includes('SELECT id FROM folders WHERE workspace_id IS NULL')) return args.includes('gesti-n') ? { id: 'fld_old' } : null;
+          return visScopeFirst(sql);
+        },
+      }),
+    };
+    const response = await handleCreatePersonalFolder(
+      new Request('https://shareout.example.com/v1/folders', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Gestión' }),
+      }),
+      env, user,
+    );
+    expect(response.status).toBe(409);
+    expect((await jsonBody(response)).code).toBe('SLUG_TAKEN');
+  });
+
   it('creates a personal folder owned by the user', async () => {
     const run = vi.fn(async () => ({ success: true }));
     const env = {

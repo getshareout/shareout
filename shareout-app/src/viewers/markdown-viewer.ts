@@ -1,5 +1,6 @@
-import { generateViewerShell, type ViewerContext } from './viewer-shell';
+import { generateViewerShell, scriptOpen, type ViewerContext } from './viewer-shell';
 import { viewerCopy } from './copy';
+import { headingAnchors } from '../serve/heading-anchors';
 
 function escapeHtml(str: string): string {
   return str
@@ -45,11 +46,16 @@ export function renderMarkdownViewer(ctx: ViewerContext): string {
         </article>
       </div>`;
 
+  // Knowledge citations open /a/slug/?section=<anchor>. The anchor is headingAnchors() of the heading text (the
+  // corpus chunker's function, embedded here via toString as the page agent does), numbered across the page.
+  const sectionScript = `${scriptOpen(ctx)}(function(){var s=new URLSearchParams(location.search).get('section');if(!s||!/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/.test(s))return;var hs=document.querySelectorAll('.content h1,.content h2,.content h3,.content h4,.content h5,.content h6');var texts=[];for(var i=0;i<hs.length;i++)texts.push(hs[i].textContent||'');var an=(${headingAnchors.toString()})(texts);var t=document.getElementById(s);for(var j=0;!t&&j<hs.length;j++)if(an[j]===s)t=hs[j];if(!t)return;t.scrollIntoView({block:'start'});t.classList.add('sec-hit');})();</script>`;
+
   const bodyContent = `
     <div class="markdown-viewer">
       ${tabsHtml}
       ${main}
     </div>
+    ${sectionScript}
   `;
 
   const extraStyles = MARKDOWN_VIEWER_STYLES;
@@ -61,6 +67,7 @@ export const MARKDOWN_VIEWER_STYLES = `
     .markdown-viewer {
       height: 100%;
     }
+    .sec-hit { background: color-mix(in srgb, var(--primary) 12%, transparent); border-radius: 6px; scroll-margin-top: 16px; }
     .doc-tabs { display: flex; gap: 4px; max-width: 1200px; margin: 0 auto 16px; border-bottom: 1px solid var(--border); }
     .doc-tab { padding: 8px 12px; font-size: 13px; color: var(--text-muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
     .doc-tab:hover { color: var(--text); }
@@ -277,6 +284,7 @@ export function parseMarkdown(md: string): string {
   // Inline code
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
 
+  // Headers with anchors
   // Headers with anchors
   html = html.replace(/^(#{1,6})\s+(.+)$/gm, (_, hashes, text) => {
     const level = hashes.length;

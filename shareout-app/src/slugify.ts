@@ -20,3 +20,9 @@ export function slugify(name: string, max?: number): string {
   const slug = asciiFold(name).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   return max ? slug.slice(0, max) : slug;
 }
+
+/** The pre-transliteration algorithm ("gestión" -> "gesti-n"). Only for finding slugs that older versions wrote. */
+export function legacySlugify(name: string, max?: number): string {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return max ? slug.slice(0, max) : slug;
+}
