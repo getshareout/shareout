@@ -9,12 +9,13 @@ export const WORKSPACE_PALETTE_STYLES = `
 .wsx-qsearch__dd { position: absolute; top: calc(100% + 8px); right: 0; z-index: 40; width: 380px; max-width: 92vw; max-height: 380px; overflow-y: auto; background: var(--color-bg-elevated); border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); box-shadow: var(--shadow-xl, 0 24px 60px rgba(0,0,0,0.28)); padding: 6px; }
 .wsx-qsearch__dd .wsx-cmdk__item { width: 100%; }
 
-/* ---- topbar search trigger ---- */
-.wsx__search { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; padding: 7px 12px; border: 1.5px solid var(--color-border); border-radius: 999px; background: var(--color-bg-elevated); color: var(--color-text-secondary); font: 600 var(--text-xs) var(--font-body); cursor: pointer; transition: border-color var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
+/* ---- rail search trigger (under New) ---- */
+.wsx__search { display: flex; align-items: center; gap: 9px; flex: none; padding: 9px 12px; margin-bottom: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); white-space: nowrap; overflow: hidden; background: var(--color-bg-elevated); color: var(--color-text-secondary); font: 600 var(--text-xs) var(--font-body); cursor: pointer; transition: border-color var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
 .wsx__search:hover { border-color: var(--color-primary); color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-light); }
 .wsx__search svg { width: 15px; height: 15px; }
-.wsx__search-kbd { padding: 1px 6px; border-radius: 5px; background: var(--color-surface); border: 1px solid var(--color-border); font: 600 11px var(--font-mono, monospace); color: var(--color-text-tertiary); }
-@media (max-width: 640px) { .wsx__search-label, .wsx__search-kbd { display: none; } .wsx__search { padding: 7px; } }
+.wsx__search-kbd { margin-left: auto; padding: 1px 6px; border-radius: 5px; background: var(--color-surface); border: 1px solid var(--color-border); font: 600 11px var(--font-mono, monospace); color: var(--color-text-tertiary); }
+.wsx.is-rail-collapsed .wsx__search-label, .wsx.is-rail-collapsed .wsx__search-kbd { display: none; }
+.wsx.is-rail-collapsed .wsx__search { justify-content: center; padding-inline: 0; }
 
 /* ---- command palette (Cmd+K) ---- */
 .wsx-cmdk { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: flex-start; justify-content: center; }
