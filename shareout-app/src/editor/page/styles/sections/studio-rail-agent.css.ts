@@ -58,7 +58,7 @@ export const studioRailAgentCss = `
 /* Proactive suggestion chips */
 .rail-suggestions {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 8px 0 4px;
 }
@@ -68,29 +68,20 @@ export const studioRailAgentCss = `
 }
 
 .rail-suggestion {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
+  padding: 6px 13px;
   text-align: left;
-  padding: 10px 14px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
-  transition: all var(--duration-fast);
+  background: var(--color-bg-elevated);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  font: 600 13px var(--font-sans);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: border-color var(--duration-fast), color var(--duration-fast);
 }
 
 .rail-suggestion:hover {
-  border-color: var(--primary);
-  background: var(--primary-soft);
-}
-
-.rail-suggestion-icon {
-  color: var(--primary);
-  flex-shrink: 0;
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
 }
 
 /* Persistent agent input strip */
@@ -225,33 +216,20 @@ export const studioRailAgentCss = `
 .chat-welcome {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 32px 20px;
-  color: var(--text-secondary);
-}
-
-.welcome-icon {
-  width: 56px;
-  height: 56px;
-  background: var(--primary-soft);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--primary);
-  margin-bottom: 16px;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px 2px;
 }
 
 .welcome-text {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 6px;
+  margin: 0;
+  font: 600 16px var(--font-sans);
+  color: var(--color-text);
 }
 
 .welcome-hint {
+  margin: 0;
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--color-text-tertiary);
+}
 `;
