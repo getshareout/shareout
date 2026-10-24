@@ -4,6 +4,7 @@ import type { AuthUser } from './api-auth';
 import { getVisibilityScope, placeholders } from './account-links';
 import { jsonWithApiErrors } from './http/api-error';
 import { handleCreateFolder } from './folders';
+import { slugify } from './slugify';
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
 
@@ -221,11 +222,7 @@ async function ownedFolder(env: Env, user: AuthUser, folderId: string): Promise<
 }
 
 function generateFolderSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 30) || 'folder';
+  return slugify(name, 30) || 'folder';
 }
 
 function json(data: unknown, status = 200): Response {

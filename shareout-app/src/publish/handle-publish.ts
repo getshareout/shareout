@@ -5,7 +5,7 @@
  * delegates to {@link publishArtifact}.
  */
 import type { Env, PublishRequest } from '../types';
-import { validatePublishRequest, generateSlug, detectArtifactType, resolveEntrypoint } from '../validation';
+import { validatePublishRequest, generateSlug, legacySlug, detectArtifactType, resolveEntrypoint } from '../validation';
 import { validateToken, checkRateLimit, incrementRateLimit, hasScope } from '../api-auth';
 import { unauthorizedFor } from '../auth/unauthorized';
 import { SUPPORT_CONTACT } from '../http/api-error';
@@ -21,6 +21,7 @@ import { libraryVersionExists } from '../workspace-library';
 import { json } from './http';
 import { resolveAuthMethod, resolveVisibility } from './request-auth';
 import { publishArtifact } from './publish-artifact';
+import { resolveNameSlug } from './artifact-upsert';
 import { skillPublishVisibility } from '../skill-marketplace';
 import { resolveRequestedCapabilities } from './capabilities';
 import { rateLimitExceededResponse, storageLimitExceededResponse, publicLimitNotice } from './limits';
@@ -61,7 +62,7 @@ export async function handlePublish(
       return json(validationError, 400);
     }
 
-    const slug = body.slug || generateSlug(body.name);
+    let slug = body.slug || generateSlug(body.name);
     const entrypoint = resolveEntrypoint(body);
 
     let workspaceId: string | null = body.workspace_id ?? null;
@@ -94,10 +95,13 @@ export async function handlePublish(
       }
     } else {
       const prior = await env.DB.prepare(
-        'SELECT workspace_id FROM artifacts WHERE display_slug = ? AND owner_id = ? AND workspace_id IS NOT NULL AND deleted_at IS NULL LIMIT 1'
-      ).bind(slug, user.id).first<{ workspace_id: string }>();
+        'SELECT workspace_id FROM artifacts WHERE display_slug IN (?, ?) AND owner_id = ? AND workspace_id IS NOT NULL AND deleted_at IS NULL LIMIT 1'
+      ).bind(slug, body.slug ? slug : legacySlug(body.name), user.id).first<{ workspace_id: string }>();
       workspaceId = prior?.workspace_id ?? null;
     }
+
+    // Name-only publish: land on an artifact published under the old accent-dashing slug instead of duplicating it.
+    if (!body.slug) slug = await resolveNameSlug(env, body.name, workspaceId, user.id);
 
     const wantSkill = body.artifact_type === 'skill';
     if (wantSkill) {

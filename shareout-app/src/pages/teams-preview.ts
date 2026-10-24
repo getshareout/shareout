@@ -2,14 +2,10 @@ import { renderHtmlPage } from '../design-system/shell';
 import { brandLockupHtml } from '../brand';
 import { getPlatformHostname } from '../config/origins';
 import type { Env } from '../types';
+import { slugify } from '../slugify';
 
 function sanitizeSlug(raw: string): string {
-  return (raw || '')
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 32) || 'acme';
+  return slugify(raw || '', 32) || 'acme';
 }
 
 function titleCase(slug: string): string {

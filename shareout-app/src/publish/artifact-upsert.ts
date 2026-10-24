@@ -8,6 +8,7 @@ import { getUserRole } from '../artifacts/roles';
 import { generateId } from '../crypto-utils';
 import { hashPassword } from './request-auth';
 import { allocateRoutingSlug } from './routing-slug';
+import { generateSlug, legacySlug } from '../validation';
 import type { ExistingArtifactRow } from './types';
 import { setPresentation, type PresentationFields } from '../artifacts/satellites';
 
@@ -154,4 +155,20 @@ export async function upsertArtifactRecord(
   });
 
   return { artifactId, routingSlug, versionNo: 1 };
+}
+
+/**
+ * Slug for a publish that gave only a name. Normally the clean (transliterated) slug. But if nothing exists under
+ * it in this scope and an artifact exists under the legacy slug the old algorithm produced ("gesti-n"), return the
+ * legacy one: the publish then updates that artifact in place (no rename, no duplicate).
+ */
+export async function resolveNameSlug(env: Env, name: string, workspaceId: string | null, userId: string): Promise<string> {
+  const clean = generateSlug(name);
+  const legacy = legacySlug(name);
+  if (legacy === clean) return clean;
+  const exists = async (slug: string) => !!(workspaceId
+    ? await env.DB.prepare('SELECT 1 FROM artifacts WHERE display_slug = ? AND workspace_id = ? AND deleted_at IS NULL').bind(slug, workspaceId).first()
+    : await env.DB.prepare('SELECT 1 FROM artifacts WHERE display_slug = ? AND workspace_id IS NULL AND owner_id = ? AND deleted_at IS NULL').bind(slug, userId).first());
+  if (await exists(clean)) return clean;
+  return (await exists(legacy)) ? legacy : clean;
 }

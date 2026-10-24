@@ -1,5 +1,6 @@
 import type { Env } from '../types';
 import { listCatalogFiles, upsertCatalogFile } from './store';
+import { slugify } from '../slugify';
 
 interface ConnectionRow {
   name: string;
@@ -8,12 +9,7 @@ interface ConnectionRow {
 }
 
 export function slugifyName(name: string): string {
-  return (
-    name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'connection'
-  );
+  return slugify(name) || 'connection';
 }
 
 export function buildConnectorEntry(conn: ConnectionRow): { path: string; content: string } {

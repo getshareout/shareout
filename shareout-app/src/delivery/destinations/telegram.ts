@@ -4,6 +4,7 @@ import { getLinkedChatId } from '../../telegram/linking';
 import { sendMessage, sendPhoto, sendDocument } from '../../telegram/client';
 import { renderArtifactImage, renderArtifactPdf } from '../../screenshots';
 import type { Destination, DeliveryContext, DeliveryResult } from '../types';
+import { slugify } from '../../slugify';
 
 // Deliver an artifact to Telegram (message / snapshot / PDF). The target is an
 // explicit chatId, or — by default — the linked chat of the user the delivery
@@ -28,7 +29,7 @@ async function artifactMeta(env: Env, artifactId: string): Promise<{ name: strin
 }
 
 function safeFilename(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'page';
+  return slugify(name, 60) || 'page';
 }
 
 export const telegramDestination: Destination<TelegramConfig> = {

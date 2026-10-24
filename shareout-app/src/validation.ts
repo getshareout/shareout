@@ -1,4 +1,5 @@
 import type { PublishRequest, FileEntry, ApiError, PWAConfig, ArtifactType } from './types';
+import { slugify } from './slugify';
 
 const ALLOWED_MIMES = new Set([
   'text/html',
@@ -271,12 +272,18 @@ function validateFile(file: FileEntry): string[] {
   return errors;
 }
 
-export function generateSlug(name: string): string {
+/** The pre-transliteration algorithm (accents became dashes: "gestión" -> "gesti-n"). Used ONLY to find an existing
+ *  artifact published under that slug, so a re-publish by name updates it instead of creating a duplicate. */
+export function legacySlug(name: string): string {
   return name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 50) || 'artifact';
+}
+
+export function generateSlug(name: string): string {
+  return slugify(name, 50) || 'artifact';
 }
 
 // Cheap, stable, deterministic string hash (djb2) → base36. Used to derive a
