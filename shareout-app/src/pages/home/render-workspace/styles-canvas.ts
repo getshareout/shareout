@@ -11,8 +11,8 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 .wsx__acct--mob { display: flex; align-items: center; gap: 6px; flex: none; width: auto; padding: 4px 6px; border-radius: var(--radius-md); }
 .wsx__acct--mob:hover { background: var(--color-surface); }
 .wsx__chrome:has(.wsx-tab:not(.wsx-tab--home)) .wsx__acct--mob .wsx__acctname { display: none; }
-/* One row: tabs take all the free width and shrink (to 84px, title ellipsized) before scrolling;
-   the active tab never shrinks below its title's start, and the list button names them all. */
+/* One row: newest tab opens next to Home; tabs keep up to 260px of title and the strip
+   scrolls (wheel too) instead of crushing names; the list button names them all. */
 .wsx__tabrow { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; }
 .wsx__tablist { flex: none; display: inline-flex; align-items: center; gap: 2px; padding: 5px 8px; border: 0; border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-secondary); font: 600 var(--text-xs) var(--font-body); cursor: pointer; }
 .wsx__tablist:hover, .wsx__tablist[aria-expanded="true"] { color: var(--color-text); background: var(--color-border); }
@@ -25,13 +25,13 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 .wsx-tablist__it.is-active { background: var(--color-primary-light); color: var(--color-primary); }
 .wsx-tablist__q { margin: 2px 2px 6px; padding: 6px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg-elevated); color: var(--color-text); font: 500 var(--text-sm) var(--font-body); }
 .wsx__tabs { position: relative; display: flex; align-items: center; gap: 2px; padding: 0; overflow-x: auto; scrollbar-width: none; background: transparent; flex: 1; min-width: 0; box-sizing: border-box; }
-.wsx-tab { display: inline-flex; align-items: center; gap: 6px; padding: 7px 8px 7px 12px; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); cursor: pointer; white-space: nowrap; flex: 0 1 auto; min-width: 84px; max-width: 220px; box-sizing: border-box; border: 0; transition: background var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
+.wsx-tab { display: inline-flex; align-items: center; gap: 6px; padding: 7px 8px 7px 12px; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); cursor: pointer; white-space: nowrap; flex: none; max-width: 260px; box-sizing: border-box; border: 0; transition: background var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
 .wsx-tab:hover { background: var(--color-surface); }
-.wsx-tab.is-active { background: var(--color-primary-light); color: var(--color-primary); flex-shrink: 0.3; }
+.wsx-tab.is-active { background: var(--color-primary-light); color: var(--color-primary); }
 .wsx-tab__ic { display: inline-flex; flex: none; color: currentColor; }
 .wsx-tab__ic svg { width: 16px; height: 16px; }
 .wsx-tab--home { flex: none; min-width: 0; max-width: none; }
-.wsx-tab__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.wsx-tab__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* Artifact bar: View/Edit, mobile preview and full screen sit above the artifact they control, not in the app header */
 .wsx__artbar { display: flex; align-items: center; gap: 6px; flex: none; margin: 10px clamp(16px, 3vw, 32px) 0; }
 .wsx__artbar:not(:has(> :not([hidden]))) { display: none; }
@@ -60,6 +60,8 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 .wsx__pane { position: absolute; inset: 0; overflow-y: auto; padding: var(--space-5) clamp(16px, 3vw, 32px); display: none; }
 .wsx__pane.is-active { display: block; }
 .wsx__pane--art.is-active { display: flex; flex-direction: column; padding-top: var(--space-3); padding-bottom: var(--space-4); }
+/* The resting chat floats over the canvas bottom (18px + 60px); stop the artifact above it so its end stays readable. */
+.wsx:has(.wsx__composer[data-state="resting"]) .wsx__pane--art.is-active { padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
 
 .wsx__narration { font: 600 var(--text-base) var(--font-body); color: var(--color-text); margin-bottom: var(--space-3); }
 .wsx__narration .muted { color: var(--color-text-tertiary); font-weight: 400; }

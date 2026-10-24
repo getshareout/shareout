@@ -842,9 +842,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     wireTabDrag();
     syncTabRow();
   }
-  // Drag-to-reorder open artifact tabs. Home tab (index 0) is pinned and never a drop target.
-  // The dragged tab is NOT moved mid-drag; a vertical bar marks the drop slot and the
-  // reorder happens once on drop (preventDefault suppresses the browser's snap-back animation).
+  // Drag-to-reorder tabs (Home pinned): a bar marks the slot; the move happens once on drop.
   var dragKey = null, dropBar = null, dropIdx = -1;
   function keyIndex(key) { for (var i = 0; i < tabs.length; i++) if (tabs[i].key === key) return i; return -1; }
   function clearDropBar() { if (dropBar) { dropBar.remove(); dropBar = null; } dropIdx = -1; }
@@ -913,14 +911,14 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     if (activeKey === key) activateTab(tabs[Math.max(0, idx - 1)].key);
     else renderTabs();
   }
-  function makeTab(key, art) {
+  function makeTab(key, art, first) {
     var made = makeArtifactPane(art);
-    panes[key] = made; panesEl.appendChild(made.pane); tabs.push({ key: key, label: art.name });
+    panes[key] = made; panesEl.appendChild(made.pane); tabs.splice(first ? 1 : tabs.length, 0, { key: key, label: art.name });
   }
   function openArtifact(slug, name, id, type) {
     var key = id || slug;
     if (!panes[key]) {
-      makeTab(key, { key: key, id: id || '', slug: slug, name: name || t('inspector.artifact'), type: type || '' });
+      makeTab(key, { key: key, id: id || '', slug: slug, name: name || t('inspector.artifact'), type: type || '' }, true);
       saveTabs();
       if (id) fetch('/v1/home/viewed', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ artifactId: id }) }).catch(function () {});
     }
