@@ -113,14 +113,8 @@ export function renderEditorShell({ slug }: EditorShellOptions): string {
       <div class="rail-suggestions" id="rail-suggestions"></div>
       <div class="chat-messages" id="chat-messages">
         <div class="chat-welcome">
-          <div class="welcome-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2L9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2z"/>
-            </svg>
-          </div>
           <p class="welcome-text">Ask me to edit your page</p>
           <p class="welcome-hint">Try: "Add a blue button" or "Make the heading bigger"</p>
-          <p class="welcome-draft-note" style="margin-top:12px;font-size:12px;opacity:0.75;line-height:1.4;">Autosave is <strong>your</strong> draft. Collaborators see live edits while you are both connected; each person keeps their own draft on reload.</p>
         </div>
       </div>
     </section>
@@ -172,8 +166,8 @@ export function renderEditorShell({ slug }: EditorShellOptions): string {
         rows="1"
       ></textarea>
       <button class="chat-send" id="chat-send" title="Send">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 12h15M13 6l6 6-6 6"/>
         </svg>
       </button>
     </div>
