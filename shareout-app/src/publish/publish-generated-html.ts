@@ -4,7 +4,7 @@
  * daily publish limit + storage quota themselves (same as POST /v1/publish).
  */
 import type { Env, PublishResponse, FileEntry, Visibility } from '../types';
-import { generateSlug } from '../validation';
+import { resolveNameSlug } from './artifact-upsert';
 import { coerceVisibility } from '../visibility-config';
 import { publishArtifact } from './publish-artifact';
 
@@ -13,7 +13,7 @@ export async function publishGeneratedHtml(
   user: { id: string; email: string },
   opts: { name: string; slug?: string; html: string; workspaceId?: string | null; visibility?: Visibility },
 ): Promise<PublishResponse> {
-  const slug = opts.slug || generateSlug(opts.name);
+  const slug = opts.slug || (await resolveNameSlug(env, opts.name, opts.workspaceId ?? null, user.id));
   const visibility = opts.visibility ?? 'public';
   const files: FileEntry[] = [{ path: 'index.html', content: opts.html, mime: 'text/html' }];
 

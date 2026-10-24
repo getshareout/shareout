@@ -3,7 +3,8 @@
  */
 import type { Env, FileEntry } from '../types';
 import type { AuthUser } from '../api-auth';
-import { generateSlug, invalidPathError, isSafeAssetPath } from '../validation';
+import { resolveNameSlug } from './artifact-upsert';
+import { invalidPathError, isSafeAssetPath } from '../validation';
 import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { createLogger, logError } from '../logging';
 import { libraryVersionExists } from '../workspace-library';
@@ -38,7 +39,7 @@ export async function handleCreateLibraryModule(
     if (!workspaceId) return json({ error: 'workspace_id required for workspace scope', code: 'BAD_REQUEST' }, 400);
     if (!(await getInternalWorkspaceRole(env, workspaceId, user.id))) return json({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
   }
-  const slug = body.slug || generateSlug(name);
+  const slug = body.slug || (await resolveNameSlug(env, name, workspaceId, user.id));
   const prior = workspaceId
     ? await env.DB.prepare('SELECT id FROM artifacts WHERE display_slug = ? AND workspace_id = ? AND deleted_at IS NULL').bind(slug, workspaceId).first<{ id: string }>()
     : await env.DB.prepare('SELECT id FROM artifacts WHERE display_slug = ? AND workspace_id IS NULL AND owner_id = ? AND deleted_at IS NULL').bind(slug, user.id).first<{ id: string }>();

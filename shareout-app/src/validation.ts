@@ -272,6 +272,16 @@ function validateFile(file: FileEntry): string[] {
   return errors;
 }
 
+/** The pre-transliteration algorithm (accents became dashes: "gestión" -> "gesti-n"). Used ONLY to find an existing
+ *  artifact published under that slug, so a re-publish by name updates it instead of creating a duplicate. */
+export function legacySlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 50) || 'artifact';
+}
+
 export function generateSlug(name: string): string {
   return slugify(name, 50) || 'artifact';
 }
