@@ -1,4 +1,5 @@
 import type { PublishRequest, FileEntry, ApiError, PWAConfig, ArtifactType } from './types';
+import { slugify } from './slugify';
 
 const ALLOWED_MIMES = new Set([
   'text/html',
@@ -272,11 +273,7 @@ function validateFile(file: FileEntry): string[] {
 }
 
 export function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 50) || 'artifact';
+  return slugify(name, 50) || 'artifact';
 }
 
 // Cheap, stable, deterministic string hash (djb2) → base36. Used to derive a

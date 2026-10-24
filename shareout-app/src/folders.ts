@@ -5,6 +5,7 @@ import type { AuthUser } from './api-auth';
 import { getInternalWorkspaceRole } from './workspaces/roles';
 import { getUserRole } from './artifacts/roles';
 import { jsonWithApiErrors } from './http/api-error';
+import { slugify } from './slugify';
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
 
@@ -457,11 +458,7 @@ async function getEffectiveVisibility(env: Env, folderId: string): Promise<Visib
 }
 
 export function generateFolderSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 30) || 'folder';
+  return slugify(name, 30) || 'folder';
 }
 
 function json(data: unknown, status = 200): Response {

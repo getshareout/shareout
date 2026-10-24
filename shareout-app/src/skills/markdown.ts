@@ -1,3 +1,4 @@
+import { slugify } from '../slugify';
 /**
  * Turn a stored skill into a file an external agent can actually load.
  *
@@ -35,12 +36,7 @@ function splitFrontmatter(markdown: string): SplitMarkdown {
 
 /** `Brand Guidelines!` → `brand-guidelines`. Falls back to `skill` when nothing survives. */
 export function toSkillName(raw: string): string {
-  const slug = raw
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, MAX_NAME)
-    .replace(/-+$/, '');
+  const slug = slugify(raw, MAX_NAME).replace(/-+$/, '');
   return slug || 'skill';
 }
 

@@ -9,6 +9,7 @@ import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { membersCanCreateFolders } from '../folders';
 import { normalizeVisibility } from '../visibility-config';
 import { validateFilename } from '../data/blobs/handler';
+import { slugify as sharedSlugify } from '../slugify';
 
 /**
  * Importing creates Team Space folders and files, so it takes what creating a folder
@@ -52,8 +53,7 @@ export function pageVisibility(a: Audience): 'private' | 'workspace' {
 }
 
 function slugify(name: string): string {
-  return name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30).replace(/-$/, '') || 'folder';
+  return sharedSlugify(name, 30).replace(/-$/, '') || 'folder';
 }
 
 /**

@@ -4,6 +4,7 @@ import { renderArtifactImage, renderArtifactPdf } from '../../screenshots';
 import { createTelegramReplyPort } from '../../chat-platforms/telegram/reply-port';
 import type { ChatReplyPort } from '../../chat-platforms/types';
 import type { AccountTool, ToolContext } from './types';
+import { slugify } from '../../slugify';
 
 function resolveReply(ctx: ToolContext): ChatReplyPort | null {
   if (ctx.reply) return ctx.reply;
@@ -21,7 +22,7 @@ async function artifactName(env: Env, artifactId: string): Promise<string> {
 }
 
 function safeFilename(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'page';
+  return slugify(name, 60) || 'page';
 }
 
 export const sendSnapshotTool: AccountTool = {

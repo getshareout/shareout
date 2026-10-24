@@ -8,6 +8,7 @@ import { requireWorkspaceRole } from '../workspaces/roles';
 import { generateId } from '../crypto-utils';
 import { logAudit } from '../audit';
 import { requireExternalSharing } from './guard';
+import { slugify as sharedSlugify } from '../slugify';
 
 interface ShareeRow {
   id: string;
@@ -23,10 +24,7 @@ interface ShareeRow {
 }
 
 function slugify(name: string): string {
-  return name.toLowerCase().trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 48) || 'sharee';
+  return sharedSlugify(name, 48) || 'sharee';
 }
 
 async function uniqueSlug(env: Env, workspaceId: string, base: string): Promise<string> {
