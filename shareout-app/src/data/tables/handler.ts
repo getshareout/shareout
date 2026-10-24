@@ -30,7 +30,7 @@ import { exportTableCsv } from './export';
 import { getOrCreateTable, getTableId, listTables } from './meta';
 import { countRows, distinctValues, queryRows } from './query';
 import type { Filter, QueryBody } from './types';
-import { parseJsonBody, validateFilter, validateInsertBody, validateTableName } from './validation';
+import { normalizeRowPatchBody, parseJsonBody, validateBulkPatchBody, validateFilter, validateInsertBody, validateTableName } from './validation';
 import { denyTableWrite } from './write-policy';
 
 export { buildScopeClause } from './scope';
@@ -123,7 +123,9 @@ export async function handleTables(
         if (denied) return errorResponse(denied, ctx.origin);
         const body = await parseJsonBody(request, ctx.origin);
         if (body instanceof Response) return body;
-        return updateRowById(ctx, tableName, rowId, body);
+        const normalized = normalizeRowPatchBody(body);
+        if ('error' in normalized) return errorResponse(normalized.error, ctx.origin);
+        return updateRowById(ctx, tableName, rowId, normalized.changes);
       }
       case 'DELETE': {
         const denied = await denyTableWrite(ctx, tableName);
@@ -152,8 +154,8 @@ export async function handleTables(
       if (denied) return errorResponse(denied, ctx.origin);
       const body = await parseJsonBody(request, ctx.origin);
       if (body instanceof Response) return body;
-      const filterError = validateFilter(body.filter);
-      if (filterError) return errorResponse(filterError, ctx.origin);
+      const bulkError = validateBulkPatchBody(body) ?? validateFilter(body.filter);
+      if (bulkError) return errorResponse(bulkError, ctx.origin);
       return updateRows(ctx, tableName, body as { filter: Filter; changes: Record<string, unknown> });
     }
     case 'DELETE': {

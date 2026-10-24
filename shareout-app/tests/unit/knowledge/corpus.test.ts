@@ -342,3 +342,18 @@ describe('imported workbook pages', () => {
     expect(hit.source).toMatchObject({ kind: 'page', id: 'art_tanques' });
   });
 });
+
+describe('chunkMarkdown section anchors (G18)', () => {
+  it('gives each heading chunk the same h- anchor the markdown viewer emits', () => {
+    const chunks = chunkMarkdown('# Manual\n\nintro\n\n## Gestión\n\nuno\n\n## Gestión\n\ndos');
+    expect(chunks.map((c) => [c.locator, c.anchor])).toEqual([
+      ['Manual', 'h-manual'], ['Gestión', 'h-gestion'], ['Gestión', 'h-gestion-2'],
+    ]);
+  });
+
+  it('leaves text before the first heading without an anchor', () => {
+    const chunks = chunkMarkdown('preamble\n\n# Title\n\nbody');
+    expect(chunks[0].anchor ?? null).toBeNull();
+    expect(chunks[1].anchor).toBe('h-title');
+  });
+});

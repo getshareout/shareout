@@ -1,5 +1,6 @@
-import { generateViewerShell, type ViewerContext } from './viewer-shell';
+import { generateViewerShell, scriptOpen, type ViewerContext } from './viewer-shell';
 import { viewerCopy } from './copy';
+import { headingAnchors } from '../serve/heading-anchors';
 
 function escapeHtml(str: string): string {
   return str
@@ -45,11 +46,15 @@ export function renderMarkdownViewer(ctx: ViewerContext): string {
         </article>
       </div>`;
 
+  // Knowledge citations open /a/slug/?section=<anchor>: scroll to that heading (its `h-` id, see parseMarkdown).
+  const sectionScript = `${scriptOpen(ctx)}(function(){var s=new URLSearchParams(location.search).get('section');if(!s||!/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/.test(s))return;var el=document.getElementById(s);if(!el)return;var n=el.nextElementSibling,t=n&&/^H[1-6]$/.test(n.tagName)?n:el;t.scrollIntoView({block:'start'});t.classList.add('sec-hit');})();</script>`;
+
   const bodyContent = `
     <div class="markdown-viewer">
       ${tabsHtml}
       ${main}
     </div>
+    ${sectionScript}
   `;
 
   const extraStyles = MARKDOWN_VIEWER_STYLES;
@@ -61,6 +66,7 @@ export const MARKDOWN_VIEWER_STYLES = `
     .markdown-viewer {
       height: 100%;
     }
+    .sec-hit { background: color-mix(in srgb, var(--primary) 12%, transparent); border-radius: 6px; scroll-margin-top: 16px; }
     .doc-tabs { display: flex; gap: 4px; max-width: 1200px; margin: 0 auto 16px; border-bottom: 1px solid var(--border); }
     .doc-tab { padding: 8px 12px; font-size: 13px; color: var(--text-muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
     .doc-tab:hover { color: var(--text); }
@@ -278,10 +284,16 @@ export function parseMarkdown(md: string): string {
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
 
   // Headers with anchors
-  html = html.replace(/^(#{1,6})\s+(.+)$/gm, (_, hashes, text) => {
+  // Each heading also carries the `h-` section anchor the Knowledge chunker gives it (same function), so a
+  // citation's ?section= resolves here. The plain id stays for the table of contents.
+  const headingRe = /^(#{1,6})\s+(.+)$/gm;
+  const sectionAnchors = headingAnchors([...html.matchAll(headingRe)].map((m) => unescapeHtml(m[2])));
+  let headingIdx = 0;
+  html = html.replace(headingRe, (_, hashes, text) => {
     const level = hashes.length;
     const anchor = unescapeHtml(text).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    return `<h${level} id="${anchor}">${text}</h${level}>`;
+    const section = sectionAnchors[headingIdx++];
+    return `${section ? `<a id="${section}"></a>` : ''}<h${level} id="${anchor}">${text}</h${level}>`;
   });
 
   // Bold and italic

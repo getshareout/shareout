@@ -5,7 +5,7 @@ import type { AuthUser } from './api-auth';
 import { getInternalWorkspaceRole } from './workspaces/roles';
 import { getUserRole } from './artifacts/roles';
 import { jsonWithApiErrors } from './http/api-error';
-import { slugify } from './slugify';
+import { slugify, legacySlugify } from './slugify';
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
 
@@ -148,7 +148,15 @@ export async function handleCreateFolder(
     'SELECT id FROM folders WHERE workspace_id = ? AND slug = ? AND (parent_id = ? OR (parent_id IS NULL AND ? IS NULL))'
   ).bind(workspaceId, slug, body.parent_id || null, body.parent_id || null).first();
 
-  if (existing) {
+  // A folder made before slugs were transliterated is stored as "gesti-n": a same-named new one must not slip past.
+  const legacy = body.slug ? null : legacySlugify(body.name, 30);
+  const legacyExisting = !existing && legacy && legacy !== slug
+    ? await env.DB.prepare(
+      'SELECT id FROM folders WHERE workspace_id = ? AND slug = ? AND (parent_id = ? OR (parent_id IS NULL AND ? IS NULL))'
+    ).bind(workspaceId, legacy, body.parent_id || null, body.parent_id || null).first()
+    : null;
+
+  if (existing || legacyExisting) {
     return json({ error: 'Folder slug already exists at this level', code: 'SLUG_TAKEN' }, 409);
   }
 

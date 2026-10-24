@@ -69,3 +69,38 @@ export function validateInsertBody(body: unknown): ReturnType<typeof Errors.vali
   const bad = rows.findIndex((r) => r === null || typeof r !== 'object' || Array.isArray(r));
   return bad === -1 ? null : Errors.validation(`rows[${bad}]`, 'Each row must be a JSON object', { example: '{"name":"a"}' });
 }
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+/**
+ * PATCH /tables/{name}/{rowId}: the body is the fields to change. The bulk route's {"changes": {...}} wrapper is
+ * accepted too (agents reuse it) and unwrapped; any other use of a `changes` key is rejected so a literal
+ * `changes` field is never stored.
+ */
+export function normalizeRowPatchBody(
+  body: Record<string, unknown>,
+): { changes: Record<string, unknown> } | { error: ReturnType<typeof Errors.validation> } {
+  if (!('changes' in body)) return { changes: body };
+  const keys = Object.keys(body);
+  if (keys.length === 1 && isPlainObject(body.changes)) return { changes: body.changes };
+  return {
+    error: Errors.validation('changes', '"changes" is the bulk wrapper: send {"changes":{...fields}} alone, or the fields directly', {
+      example: '{"estado":"pendiente"}',
+    }),
+  };
+}
+
+/** PATCH /tables/{name} (bulk): needs a filter object ({} matches every row) and a changes object. */
+export function validateBulkPatchBody(body: Record<string, unknown>): ReturnType<typeof Errors.validation> | null {
+  if (!isPlainObject(body.filter)) {
+    return Errors.validation('filter', 'Bulk PATCH needs "filter" ({} matches every row). To update one row use PATCH /tables/{name}/{rowId}', {
+      example: '{"filter":{"id":"row_..."},"changes":{"estado":"pendiente"}}',
+    });
+  }
+  if (!isPlainObject(body.changes)) {
+    return Errors.validation('changes', 'Bulk PATCH needs "changes" as an object of fields to set', {
+      example: '{"filter":{"estado":"nuevo"},"changes":{"estado":"pendiente"}}',
+    });
+  }
+  return null;
+}

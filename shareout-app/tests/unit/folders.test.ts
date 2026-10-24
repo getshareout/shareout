@@ -333,6 +333,28 @@ describe('handleCreateFolder', () => {
     expect((await jsonBody(response)).code).toBe('SLUG_TAKEN');
   });
 
+  it('409s a name whose legacy accent-dashed slug already exists (Gestión next to gesti-n)', async () => {
+    const env = {
+      ...baseEnv,
+      DB: makeDbMock({
+        first: roleFirst('admin', (sql, ...args) => {
+          if (sql.includes('SELECT id FROM folders WHERE workspace_id = ? AND slug = ?')) {
+            return args[1] === 'gesti-n' ? { id: 'fld_old' } : null;
+          }
+          return null;
+        }),
+      }),
+    };
+    const response = await handleCreateFolder(
+      new Request(`https://shareout.example.com/v1/workspaces/${workspaceId}/folders`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Gestión' }),
+      }),
+      env, user, workspaceId,
+    );
+    expect(response.status).toBe(409);
+    expect((await jsonBody(response)).code).toBe('SLUG_TAKEN');
+  });
+
   it('creates folder and returns details', async () => {
     const run = vi.fn(async () => ({ success: true }));
     const env = {

@@ -100,6 +100,8 @@ DELETE /v1/data/{artifactId}/tables/{name}?confirm=true   # drop the table
 GET|PATCH|DELETE /v1/data/{artifactId}/tables/{name}/{rowId}
 ```
 
+Row `PATCH` takes the fields to change as the body (`{"estado":"cerrado"}`); the bulk wrapper `{"changes":{...}}` is also accepted and unwrapped, but `changes` is never stored as a field: any other use of that key is a 400. Bulk `PATCH /tables/{name}` needs `filter` (`{}` matches every row) and `changes` as an object, otherwise 400.
+
 Bulk insert is `{"rows": [{...}, {...}]}` (what `insertMany` sends). A top-level JSON array
 is rejected with `400 VALIDATION_ERROR` (`param: "body"`) rather than stored as one row.
 

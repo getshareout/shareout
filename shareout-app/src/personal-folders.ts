@@ -4,7 +4,7 @@ import type { AuthUser } from './api-auth';
 import { getVisibilityScope, placeholders } from './account-links';
 import { jsonWithApiErrors } from './http/api-error';
 import { handleCreateFolder } from './folders';
-import { slugify } from './slugify';
+import { slugify, legacySlugify } from './slugify';
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
 
@@ -82,7 +82,14 @@ export async function handleCreatePersonalFolder(
     `SELECT id FROM folders WHERE workspace_id IS NULL AND (parent_id = ? OR (parent_id IS NULL AND ? IS NULL)) AND slug = ? AND owner_id IN (${idPh})`
   ).bind(parentId, parentId, slug, ...vis.userIds).first();
 
-  if (existing) {
+  const legacy = body.slug ? null : legacySlugify(body.name, 30);
+  const legacyExisting = !existing && legacy && legacy !== slug
+    ? await env.DB.prepare(
+      `SELECT id FROM folders WHERE workspace_id IS NULL AND (parent_id = ? OR (parent_id IS NULL AND ? IS NULL)) AND slug = ? AND owner_id IN (${idPh})`
+    ).bind(parentId, parentId, legacy, ...vis.userIds).first()
+    : null;
+
+  if (existing || legacyExisting) {
     return json({ error: 'A folder with that name already exists', code: 'SLUG_TAKEN' }, 409);
   }
 
