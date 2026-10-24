@@ -60,6 +60,8 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 .wsx__pane { position: absolute; inset: 0; overflow-y: auto; padding: var(--space-5) clamp(16px, 3vw, 32px); display: none; }
 .wsx__pane.is-active { display: block; }
 .wsx__pane--art.is-active { display: flex; flex-direction: column; padding-top: var(--space-3); padding-bottom: var(--space-4); }
+/* The resting chat floats over the canvas bottom (18px + 60px); stop the artifact above it so its end stays readable. */
+.wsx:has(.wsx__composer[data-state="resting"]) .wsx__pane--art.is-active { padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
 
 .wsx__narration { font: 600 var(--text-base) var(--font-body); color: var(--color-text); margin-bottom: var(--space-3); }
 .wsx__narration .muted { color: var(--color-text-tertiary); font-weight: 400; }
