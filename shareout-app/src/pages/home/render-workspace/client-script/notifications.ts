@@ -168,7 +168,6 @@ export const workspace_client_notifications_JS = `
       render();
       load(true).then(function () { render(); markViewed(); });
     }
-    // Opening the panel reads it: items stay listed now, leave the badge, show under Seen next time.
     function markViewed() {
       var ids = needs.map(function (x) { return x.id; });
       if (!ids.length || needsViewed) return;

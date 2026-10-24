@@ -21,8 +21,9 @@ export const workspace_client_artifact_links_JS = `  // ===== dismiss a "Needs y
     if (dx) { e.preventDefault(); e.stopPropagation(); dismissEvents(dx.getAttribute('data-eids'), dx.closest('.wsx-ev, .wsx-tl')); return; }
     var a = e.target.closest('a[href]');
     if (!a) return;
-    var m = (a.getAttribute('href') || '').match(/^\\/a\\/([^/]+)\\//);
-    if (!m) return;
+    var href = a.getAttribute('href') || '';
+    var m = href.match(/^\\/a\\/([^/]+)\\//);
+    if (!m || /^\\/a\\/[^/]+\\/edit\\b/.test(href)) return;
     e.preventDefault();
     var slug = decodeURIComponent(m[1]);
     var card = a.closest('.artifact-card');
