@@ -6,7 +6,7 @@ describe('toSkillName', () => {
   it('slugs a display name to the Agent Skills shape', () => {
     expect(toSkillName('Brand Guidelines!')).toBe('brand-guidelines');
     expect(toSkillName('  Deploy   checklist  ')).toBe('deploy-checklist');
-    expect(toSkillName('Ya está 2026')).toBe('ya-est-2026');
+    expect(toSkillName('Ya está 2026')).toBe('ya-esta-2026');
   });
 
   it('never emits an empty or trailing-hyphen name', () => {
