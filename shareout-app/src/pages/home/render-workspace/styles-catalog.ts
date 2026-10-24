@@ -75,7 +75,7 @@ export const WORKSPACE_CATALOG_STYLES = WORKSPACE_ONBOARDING_STYLES + WORKSPACE_
 .wsx.is-home { --wsx-rightcol: 0px; }
 
 /* ---- Account menu docked in the right-sidebar region (over the inspector; opens the rail on Home) ---- */
-.wsx__accpanel { position: absolute; top: 12px; right: 12px; bottom: 12px; z-index: 45; width: calc(var(--wsx-act) - 12px); display: flex; flex-direction: column; background: var(--glass-bg-strong); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); overflow: hidden; }
+.wsx__accpanel { position: absolute; top: calc(var(--wsx-chrome-h) + 24px); right: 12px; bottom: 12px; z-index: 45; width: calc(var(--wsx-act) - 12px); display: flex; flex-direction: column; background: var(--glass-bg-strong); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); overflow: hidden; }
 .wsx__accpanel[hidden] { display: none; }
 .wsx__accpanel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 10px 10px 14px; border-bottom: 1px solid var(--color-border); flex: none; }
 .wsx__accpanel-head .wsx__accmenu-head { padding: 0; }

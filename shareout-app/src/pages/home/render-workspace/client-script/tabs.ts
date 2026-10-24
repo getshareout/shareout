@@ -37,14 +37,12 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
     var el = rec.iframe;
     if (el && el.requestFullscreen) el.requestFullscreen();
   });
-  // With 2+ open artifacts the strip takes its own full-width row; once tabs no longer
-  // fit, a list button names every open tab (filterable past 8).
+  // Once tabs no longer fit, a list button names every open tab (filterable past 8).
   var tabRowEl = document.getElementById('wsxTabRow');
   var tabListBtn = document.getElementById('wsxTabList');
   var tabMenu = null;
   function syncTabRow() {
     if (!tabRowEl) return;
-    tabRowEl.classList.toggle('is-row', tabs.length > 2);
     var act = tabsEl.querySelector('.wsx-tab.is-active');
     if (act) {
       var l = act.offsetLeft, r = l + act.offsetWidth;

@@ -108,16 +108,18 @@ export function buildWorkspaceBody(args: RenderArgs): string {
       </footer>
     </aside>
 
+    <div class="wsx__chrome">
+      <button class="wsx__hamb" id="wsxHamb" type="button" data-i18n-aria="nav.openMenu" aria-label="Open menu" aria-controls="wsxRail" aria-expanded="false">${svg('<path d="M3 6h18M3 12h18M3 18h18"/>')}</button>
+      <div class="wsx__tabrow" id="wsxTabRow"><div class="wsx__tabs" id="wsxTabs"></div><button class="wsx__tablist" id="wsxTabList" type="button" hidden aria-haspopup="menu" aria-expanded="false" data-i18n-title="tabs.allTabs" data-i18n-aria="tabs.allTabs" title="All open tabs" aria-label="All open tabs">${svg('<path d="m6 9 6 6 6-6"/>')}<span></span></button></div>
+      <button class="wsx__search" id="wsxOpenSearch" type="button" data-i18n-aria="palette.aria" aria-label="Search" data-i18n-title="palette.aria" title="Search (⌘K)">${svg('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>')}<span class="wsx__search-label" data-i18n="palette.search">Search</span><kbd class="wsx__search-kbd">⌘K</kbd></button>
+      <button class="wsx__notifbtn" id="wsxNotifBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="wsxNotifPanel" data-i18n-title="notif.title" data-i18n-aria="notif.title" title="Notifications" aria-label="Notifications">${svg('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>')}<span class="wsx__notifbadge" id="wsxNotifBadge" hidden>0</span></button>
+      <button class="wsx__acct wsx__acct--mob" id="wsxAcctBtnMob" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="wsxAccPanel" data-i18n-title="nav.account" title="Account">${avatar}<span class="wsx__acctname">${escapeHtml(name)}</span></button>
+    </div>
     <main class="wsx__canvas">
-      <div class="wsx__chrome">
-        <button class="wsx__hamb" id="wsxHamb" type="button" data-i18n-aria="nav.openMenu" aria-label="Open menu" aria-controls="wsxRail" aria-expanded="false">${svg('<path d="M3 6h18M3 12h18M3 18h18"/>')}</button>
-        <div class="wsx__tabrow" id="wsxTabRow"><div class="wsx__tabs" id="wsxTabs"></div><button class="wsx__tablist" id="wsxTabList" type="button" hidden aria-haspopup="menu" aria-expanded="false" data-i18n-title="tabs.allTabs" data-i18n-aria="tabs.allTabs" title="All open tabs" aria-label="All open tabs">${svg('<path d="m6 9 6 6 6-6"/>')}<span></span></button></div>
+      <div class="wsx__artbar" id="wsxArtBar">
         <div class="wsx__tabmode" id="wsxTabMode" hidden><button data-mode="view" class="is-on" type="button" data-i18n="tabs.view">View</button><button data-mode="edit" type="button" data-i18n="tabs.edit">Edit</button></div>
-        <button class="wsx__search" id="wsxOpenSearch" type="button" data-i18n-aria="palette.aria" aria-label="Search" data-i18n-title="palette.aria" title="Search (⌘K)">${svg('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>')}<span class="wsx__search-label" data-i18n="palette.search">Search</span><kbd class="wsx__search-kbd">⌘K</kbd></button>
         <button class="wsx__tabdevice" id="wsxTabDevice" type="button" hidden aria-pressed="false" data-i18n-title="tabs.mobilePreview" data-i18n-aria="tabs.mobilePreview" title="Toggle mobile preview" aria-label="Toggle mobile preview">${svg('<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>')}</button>
         <button class="wsx__tabdevice" id="wsxTabFull" type="button" hidden data-i18n-title="tabs.fullScreen" data-i18n-aria="tabs.fullScreen" title="Full screen" aria-label="View full screen">${svg('<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>')}</button>
-        <button class="wsx__notifbtn" id="wsxNotifBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="wsxNotifPanel" data-i18n-title="notif.title" data-i18n-aria="notif.title" title="Notifications" aria-label="Notifications">${svg('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>')}<span class="wsx__notifbadge" id="wsxNotifBadge" hidden>0</span></button>
-        <button class="wsx__acct wsx__acct--mob" id="wsxAcctBtnMob" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="wsxAccPanel" data-i18n-title="nav.account" title="Account">${avatar}<span class="wsx__acctname">${escapeHtml(name)}</span></button>
       </div>
       <div class="wsx__panes" id="wsxPanes">
         <div class="wsx__pane is-active" data-pane="home" id="wsxHomePane">

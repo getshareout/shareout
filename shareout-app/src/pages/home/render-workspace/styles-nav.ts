@@ -61,6 +61,7 @@ export const WORKSPACE_NAV_STYLES = `/* ===== account menu: workspace switcher +
 
 @media (max-width: 720px) {
   .wsx__body, .wsx.is-home .wsx__body { grid-template-columns: 1fr; }
+  .wsx__chrome { grid-column: 1 / -1; margin: 12px 12px 0; }
   /* hamburger in the canvas chrome */
   .wsx__hamb { display: grid; place-items: center; flex: none; width: 38px; height: 38px; margin-left: 6px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); cursor: pointer; }
   .wsx__hamb:hover { background: var(--color-surface); color: var(--color-text); }

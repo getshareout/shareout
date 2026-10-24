@@ -14,7 +14,7 @@ export const WORKSPACE_NOTIF_STYLES = `/* ===== notifications: bell + badge (top
 /* ===== notifications panel (right-docked glass sheet + scrim) ===== */
 .wsx__notif-scrim { position: fixed; inset: 0; z-index: 59; background: color-mix(in srgb, var(--color-text) 10%, transparent); -webkit-backdrop-filter: blur(1px); backdrop-filter: blur(1px); }
 .wsx__notif-scrim[hidden] { display: none; }
-.wsx__notif-panel { position: fixed; top: 12px; right: 12px; bottom: 12px; z-index: 60; width: min(400px, calc(100vw - 24px)); display: flex; flex-direction: column; background: var(--glass-bg-strong); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-xl); overflow: hidden; animation: wsx-notif-in var(--duration-normal, .2s) var(--ease-out-expo); }
+.wsx__notif-panel { position: fixed; top: calc(var(--wsx-chrome-h) + 24px); right: 12px; bottom: 12px; z-index: 60; width: min(400px, calc(100vw - 24px)); display: flex; flex-direction: column; background: var(--glass-bg-strong); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-xl); overflow: hidden; animation: wsx-notif-in var(--duration-normal, .2s) var(--ease-out-expo); }
 .wsx__notif-panel[hidden] { display: none; }
 @keyframes wsx-notif-in { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .wsx__notif-panel { animation: none; } }
