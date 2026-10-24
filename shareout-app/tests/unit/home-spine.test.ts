@@ -380,7 +380,7 @@ describe('buildWorkspaceView — Phase 1 shell SSR', () => {
     expect(shell).toContain('function setEditMode');
     const scripts = shell + lazyChunkBody('edit');
     expect(scripts).toContain('wsx__editframe');                // separate edit iframe in the pane
-    expect(body).toContain('id="wsxTabMode"');                  // View/Edit toggle lives in the tab bar
+    expect(body).toContain('id="wsxTabMode"');                  // View/Edit toggle lives in the artifact bar
     expect(body).toContain('data-mode="edit"');
     expect(scripts).toContain('function loadEditSource');       // GET …/editor
     expect(scripts).toContain('/editor/draft');                 // autosave draft

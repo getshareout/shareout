@@ -15,14 +15,14 @@ export const workspace_client_notifications_JS = `
 
     var wsId = window.WSX_WS || '';
     var wsq = wsId ? '&workspace=' + encodeURIComponent(wsId) : '';
-    var needs = [], approvals = [], actions = [], seen = [], loaded = false, tab = 'unread';
+    var needs = [], approvals = [], actions = [], seen = [], loaded = false, tab = 'unread', needsViewed = false;
     var svgUp = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
     var svgBell = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
 
     function decidable() { return approvals.filter(function (a) { return a.viewer_can_decide; }).length; }
     function openActions() { return actions.filter(function (a) { return !a.resolved; }).length; }
     function overdueActions() { return actions.filter(function (a) { return !a.resolved && a.due_at && Date.parse(a.due_at) < Date.now(); }).length; }
-    function total() { return decidable() + needs.length + openActions(); }
+    function total() { return decidable() + (needsViewed ? 0 : needs.length) + openActions(); }
     function setBadge() {
       var n = total();
       if (n > 0) { badge.hidden = false; badge.textContent = n > 99 ? '99+' : String(n); }
@@ -117,7 +117,7 @@ export const workspace_client_notifications_JS = `
         html = '<div class="wsx-notif-empty">' + svgBell + '<div class="wsx-notif-empty__t">' + esc(t('notif.emptyTitle')) + '</div><div class="wsx-notif-empty__s">' + esc(t('notif.emptySub')) + '</div></div>';
       }
       body.innerHTML = html;
-      if (readAll) readAll.hidden = !needs.length;
+      if (readAll) readAll.hidden = !needs.length || needsViewed;
     }
 
     function renderSeen() {
@@ -148,7 +148,7 @@ export const workspace_client_notifications_JS = `
         : fetch('/v1/home/activity-feed?limit=30&window=30d' + wsq, { credentials: 'same-origin' }).then(function (r) { return r.json(); });
       var jobs = [
         feed
-          .then(function (d) { needs = (d && d.needs) || []; actions = (d && d.actionItems) || []; seen = (d && d.seen) || []; })
+          .then(function (d) { needsViewed = false; needs = (d && d.needs) || []; actions = (d && d.actionItems) || []; seen = (d && d.seen) || []; })
           .catch(function () { needs = []; actions = []; seen = []; }),
       ];
       if (wsId) {
@@ -166,7 +166,18 @@ export const workspace_client_notifications_JS = `
       panel.hidden = false; if (scrim) scrim.hidden = false;
       btn.classList.add('is-active'); btn.setAttribute('aria-expanded', 'true');
       render();
-      load(true).then(render);
+      load(true).then(function () { render(); markViewed(); });
+    }
+    function markViewed() {
+      var ids = needs.map(function (x) { return x.id; });
+      if (!ids.length || needsViewed) return;
+      optimistic({
+        key: 'notif:viewed',
+        apply: function () { needsViewed = true; setBadge(); if (readAll) readAll.hidden = true; },
+        rollback: function () { needsViewed = false; setBadge(); if (!panel.hidden) render(); },
+        request: function () { return post('/v1/home/dismiss-event', 'POST', { eventIds: ids }); },
+        error: t('evt.dismissFailed'),
+      });
     }
     function close() {
       panel.hidden = true; if (scrim) scrim.hidden = true;

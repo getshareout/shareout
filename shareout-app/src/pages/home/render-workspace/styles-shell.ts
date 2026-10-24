@@ -4,7 +4,7 @@
  * WORKSPACE_STYLES in the same cascade position so order is unchanged.
  */
 export const WORKSPACE_SHELL_STYLES = `.wsx { position: relative; height: 100vh; height: 100dvh; overflow: hidden; color: var(--color-text); background-color: var(--color-bg); background-image: radial-gradient(circle, color-mix(in srgb, var(--color-text) 11%, transparent) 1px, transparent 1.4px); background-size: 22px 22px; background-position: -1px -1px; }
-.wsx__body { height: 100%; display: grid; grid-template-columns: var(--wsx-rail) minmax(0,1fr) var(--wsx-act); min-height: 0; }
+.wsx__body { height: 100%; display: grid; grid-template-columns: var(--wsx-rail) minmax(0,1fr) var(--wsx-act); grid-template-rows: auto minmax(0,1fr); min-height: 0; }
 /* !important so the collapsed width beats any inline --wsx-rail. */
 .wsx.is-rail-collapsed { --wsx-rail: 70px !important; }
 
@@ -14,7 +14,7 @@ export const WORKSPACE_SHELL_STYLES = `.wsx { position: relative; height: 100vh;
 .wsx__acthandle:hover, .wsx__acthandle.is-dragging { background: var(--color-primary); }
 
 /* ---- rail (floating liquid-glass panel on the canvas) ---- */
-.wsx__rail { margin: 12px 0 12px 12px; background: var(--glass-bg-strong); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: var(--space-3) var(--space-2) var(--space-3); display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+.wsx__rail { grid-row: 1 / -1; margin: 12px 0 12px 12px; background: var(--glass-bg-strong); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: var(--space-3) var(--space-2) var(--space-3); display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow-y: auto; overflow-x: hidden; }
 .wsx__railtop { display: flex; align-items: center; gap: 8px; padding: 4px 8px 8px; }
 .wsx__brand { font: 800 var(--text-base) var(--font-display, var(--font-body)); color: var(--color-text); white-space: nowrap; overflow: hidden; }
 .wsx__collapse { margin-left: auto; width: 26px; height: 26px; display: grid; place-items: center; border: 0; background: transparent; border-radius: var(--radius-sm); color: var(--color-text-tertiary); cursor: pointer; flex: none; }

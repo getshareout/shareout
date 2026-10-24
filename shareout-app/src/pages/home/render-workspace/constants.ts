@@ -10,7 +10,7 @@ export const WORKSPACE_TOKENS = `
   --ease-out-expo: cubic-bezier(0.16,1,0.3,1);
   --text-xs: 0.75rem; --text-sm: 0.875rem; --text-base: 1rem; --text-h3: 1.5rem;
   --wsx-rail: 244px; --wsx-act: 300px; --wsx-rightcol: var(--wsx-act);
-  --wsx-headbar: 45px;
+  --wsx-headbar: 45px; --wsx-chrome-h: 56px;
 }`;
 
 export const ICON = {

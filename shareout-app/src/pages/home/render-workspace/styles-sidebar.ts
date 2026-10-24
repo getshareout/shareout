@@ -4,7 +4,7 @@
  * WORKSPACE_STYLES in the same cascade position so order is unchanged.
  */
 export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspector: Activity · Details · Comments · Automate · History) ---- */
-.wsx__activity { position: relative; margin: 12px 12px 12px 0; background: var(--glass-bg-strong); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.wsx__activity { grid-row: 2; position: relative; margin: 12px 12px 12px 0; background: var(--glass-bg-strong); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 /* Four tabs fit the default 300px rail in en and es; a narrower (resized) rail scrolls the row instead of clipping a label. */
 .wsx__rtabs { display: flex; gap: 0; padding: 0 6px; flex: none; min-height: var(--wsx-headbar); box-sizing: border-box; align-items: stretch; overflow-x: auto; scrollbar-width: none; }
 .wsx__rtabs::-webkit-scrollbar { display: none; }

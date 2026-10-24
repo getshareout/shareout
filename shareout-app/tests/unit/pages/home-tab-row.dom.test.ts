@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 //
-// Studio tab row: with 2+ open artifacts the strip takes its own row, and once tabs
+// Studio tab row: once tabs
 // overflow a list button names every open tab (activate / close from the menu).
 import { describe, expect, it } from 'vitest';
 import { workspace_client_tabs_JS as tabsJs } from '../../../src/pages/home/render-workspace/client-script/tabs';
@@ -42,11 +42,6 @@ function load(open: string[], overflow = false) {
 }
 
 describe('tab row', () => {
-  it('stays inline with one artifact open, moves to its own row with two', () => {
-    expect(load(['A']).row.classList.contains('is-row')).toBe(false);
-    expect(load(['A', 'B']).row.classList.contains('is-row')).toBe(true);
-  });
-
   it('shows the list button (with the open count) only when tabs overflow', () => {
     expect(load(['A', 'B']).btn.hidden).toBe(true);
     const { btn } = load(['A', 'B', 'C'], true);

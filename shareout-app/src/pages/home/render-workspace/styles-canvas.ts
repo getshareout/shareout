@@ -4,17 +4,16 @@
  * WORKSPACE_STYLES in the same cascade position so order is unchanged.
  */
 export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
-.wsx__canvas { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-/* Header bar = its own card, same glass language as the rail, so tabs never read as page text. */
-.wsx__chrome { display: flex; align-items: center; gap: 10px; flex: none; min-height: var(--wsx-headbar); margin: 12px 16px 0; padding: 6px 8px; box-sizing: border-box; background: var(--glass-bg-strong); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-sm); }
-.wsx__acct--mob { display: flex; align-items: center; gap: 6px; flex: none; width: auto; padding: 4px 6px; margin-left: auto; border-radius: var(--radius-md); }
+.wsx__canvas { grid-row: 2; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+/* Header bar = its own card, same glass language as the rail, spanning canvas + inspector;
+   everything that belongs to the open artifact sits below it. */
+.wsx__chrome { grid-column: 2 / -1; grid-row: 1; display: flex; align-items: center; gap: 10px; height: var(--wsx-chrome-h); margin: 12px 12px 0 16px; padding: 6px 8px; box-sizing: border-box; background: var(--glass-bg-strong); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-sm); }
+.wsx__acct--mob { display: flex; align-items: center; gap: 6px; flex: none; width: auto; padding: 4px 6px; border-radius: var(--radius-md); }
 .wsx__acct--mob:hover { background: var(--color-surface); }
-.wsx__chrome:has(.wsx__tabmode:not([hidden])) .wsx__acct--mob .wsx__acctname { display: none; }
-/* Tab row: inline in the bar with one artifact open; with 2+ it wraps to its own
-   full-width row. Tabs shrink to fit before scrolling; the list button names them all. */
+.wsx__chrome:has(.wsx-tab:not(.wsx-tab--home)) .wsx__acct--mob .wsx__acctname { display: none; }
+/* One row: tabs take all the free width and shrink (to 84px, title ellipsized) before scrolling;
+   the active tab never shrinks below its title's start, and the list button names them all. */
 .wsx__tabrow { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; }
-.wsx__chrome:has(.wsx__tabrow.is-row) { flex-wrap: wrap; row-gap: 6px; }
-.wsx__tabrow.is-row { order: 10; flex-basis: 100%; padding-top: 6px; border-top: 1px solid var(--color-border); }
 .wsx__tablist { flex: none; display: inline-flex; align-items: center; gap: 2px; padding: 5px 8px; border: 0; border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-secondary); font: 600 var(--text-xs) var(--font-body); cursor: pointer; }
 .wsx__tablist:hover, .wsx__tablist[aria-expanded="true"] { color: var(--color-text); background: var(--color-border); }
 .wsx__tablist[hidden] { display: none; }
@@ -26,14 +25,17 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 .wsx-tablist__it.is-active { background: var(--color-primary-light); color: var(--color-primary); }
 .wsx-tablist__q { margin: 2px 2px 6px; padding: 6px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg-elevated); color: var(--color-text); font: 500 var(--text-sm) var(--font-body); }
 .wsx__tabs { position: relative; display: flex; align-items: center; gap: 2px; padding: 0; overflow-x: auto; scrollbar-width: none; background: transparent; flex: 1; min-width: 0; box-sizing: border-box; }
-.wsx-tab { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); cursor: pointer; white-space: nowrap; flex: 0 1 200px; min-width: 96px; max-width: 200px; box-sizing: border-box; border: 0; transition: background var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
+.wsx-tab { display: inline-flex; align-items: center; gap: 6px; padding: 7px 8px 7px 12px; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); cursor: pointer; white-space: nowrap; flex: 0 1 auto; min-width: 84px; max-width: 220px; box-sizing: border-box; border: 0; transition: background var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
 .wsx-tab:hover { background: var(--color-surface); }
-.wsx-tab.is-active { background: var(--color-primary-light); color: var(--color-primary); }
+.wsx-tab.is-active { background: var(--color-primary-light); color: var(--color-primary); flex-shrink: 0.3; }
 .wsx-tab__ic { display: inline-flex; flex: none; color: currentColor; }
 .wsx-tab__ic svg { width: 16px; height: 16px; }
 .wsx-tab--home { flex: none; min-width: 0; max-width: none; }
 .wsx-tab__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-/* View/Edit toggle pinned right in the tab bar (controls the active artifact) */
+/* Artifact bar: View/Edit, mobile preview and full screen sit above the artifact they control, not in the app header */
+.wsx__artbar { display: flex; align-items: center; gap: 6px; flex: none; margin: 10px clamp(16px, 3vw, 32px) 0; }
+.wsx__artbar:not(:has(> :not([hidden]))) { display: none; }
+.wsx__artbar .wsx__tabdevice:first-of-type { margin-left: auto; }
 .wsx__tabmode { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--radius-md); background: var(--color-surface); flex: none; }
 .wsx__tabmode[hidden] { display: none; }
 .wsx__tabmode button { border: 0; background: transparent; padding: 5px 14px; border-radius: calc(var(--radius-md) - 3px); font: 600 var(--text-sm) var(--font-body); color: var(--color-text-secondary); cursor: pointer; transition: background var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
@@ -57,7 +59,7 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 .wsx__panes { position: relative; flex: 1; min-height: 0; }
 .wsx__pane { position: absolute; inset: 0; overflow-y: auto; padding: var(--space-5) clamp(16px, 3vw, 32px); display: none; }
 .wsx__pane.is-active { display: block; }
-.wsx__pane--art.is-active { display: flex; flex-direction: column; padding-bottom: var(--space-4); }
+.wsx__pane--art.is-active { display: flex; flex-direction: column; padding-top: var(--space-3); padding-bottom: var(--space-4); }
 
 .wsx__narration { font: 600 var(--text-base) var(--font-body); color: var(--color-text); margin-bottom: var(--space-3); }
 .wsx__narration .muted { color: var(--color-text-tertiary); font-weight: 400; }
