@@ -19,4 +19,13 @@ describe('bundle versions manifest', () => {
     const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 12);
     expect((versions as Record<string, string>)[path], 'run node scripts/stage-bundle-versions.mjs').toBe(hash);
   });
+
+  // The SDK imports yjs as /_bundles/yjs.js?v=<hash>, which is served immutable.
+  it('the staged SDK imports the staged yjs bytes, and does not inline them', () => {
+    const read = (file: string) => readFileSync(join(__dirname, '../../public/_bundles', file));
+    const hash = createHash('sha256').update(read('yjs.js')).digest('hex').slice(0, 12);
+    const sdk = read('shareout-sdk.js').toString('utf8');
+    expect(sdk, 'run npm run build:sdk').toContain(`/_bundles/yjs.js?v=${hash}`);
+    expect(sdk).not.toContain('Yjs was already imported');
+  });
 });

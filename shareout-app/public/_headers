@@ -11,3 +11,10 @@
   Access-Control-Allow-Origin: *
   Cache-Control: public, max-age=31536000, immutable
   X-Content-Type-Options: nosniff
+
+# The SDK imports yjs on the first realtime connect(), always as ?v=<content hash>. The
+# import runs inside the opaque-origin artifact iframe, so the module fetch needs CORS.
+/_bundles/yjs.js
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=31536000, immutable
+  X-Content-Type-Options: nosniff

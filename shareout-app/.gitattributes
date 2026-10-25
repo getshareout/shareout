@@ -18,6 +18,8 @@ public/_bundles/shareout-mobile.js merge=generated
 public/_bundles/shareout-sdk.js merge=generated
 public/sdk/shareout.js merge=generated linguist-generated=true
 public/sdk/v1/shareout.js merge=generated linguist-generated=true
+public/_bundles/yjs.js merge=generated
+sdk/src/stores/yjs-path.generated.ts merge=generated
 public/_bundles/versions.json merge=generated linguist-generated=true
 public/_bundles/skill-meta.json merge=generated linguist-generated=true
 public/_bundles/skill.zip -diff -text merge=generated linguist-generated=true
