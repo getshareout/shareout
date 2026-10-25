@@ -84,7 +84,7 @@ export interface ShareData {
 }
 export interface FirstPublishData { pageName: string; url: string }
 export interface MemberJoinedData { memberName: string; workspaceName: string }
-export interface AccessRequestData { requesterEmail: string; pageName: string; url: string }
+export interface AccessRequestData { requesterEmail: string; pageName: string; url: string; edit?: boolean }
 export interface AdminRequestData { requesterName: string; workspaceName: string; action: string; reason: string; url: string }
 export interface FirstViewData { pageName: string; url: string }
 export interface WeeklyDigestData { views: number; comments: number; published: number }
@@ -124,7 +124,7 @@ export interface AssetDeliveryData { collectionName: string; downloadUrl: string
 export interface AssetDeliveryOpenedData { collectionName: string; viewerEmail?: string | null }
 export interface WorkspaceWelcomeData { workspaceName: string; inviterName: string; role: string }
 export interface InviteAcceptedData { memberName: string; workspaceName: string }
-export interface AccessApprovedData { pageName: string; url: string }
+export interface AccessApprovedData { pageName: string; url: string; edit?: boolean }
 export interface ModerationApprovedData { pageName: string; url: string }
 export interface AccessDeclinedData { pageName: string }
 
@@ -319,13 +319,13 @@ export const EMAILS = {
     category: 'transactional',
     audiences: ['ANY', 'EXTERNAL'],
     trigger: 'Owner approves an access request — artifacts/access-requests.ts.',
-    build: ({ pageName, url }: AccessApprovedData) => ({
+    build: ({ pageName, url, edit }: AccessApprovedData) => ({
       subject: `You're in — ${pageName}`,
-      preheader: `You now have access to ${pageName}.`,
-      heading: `You have access to ${pageName}`,
-      bodyHtml: p(`Your request went through — you can open <strong>${escapeHtml(pageName)}</strong> now.`),
+      preheader: `You now have ${edit ? 'edit ' : ''}access to ${pageName}.`,
+      heading: `You have ${edit ? 'edit ' : ''}access to ${pageName}`,
+      bodyHtml: p(`Your request went through — you can ${edit ? 'edit' : 'open'} <strong>${escapeHtml(pageName)}</strong> now.`),
       cta: { label: 'Open page', href: url },
-      bodyText: `You now have access to ${pageName}. Open page: ${url}`,
+      bodyText: `You now have ${edit ? 'edit ' : ''}access to ${pageName}. Open page: ${url}`,
     }),
   } satisfies EmailTemplate<AccessApprovedData>,
 
@@ -532,16 +532,16 @@ export const EMAILS = {
   access_request: {
     category: 'product',
     audiences: ['ANY'],
-    trigger: 'access-requests.ts — someone asks for access (email fallback when the owner has no Telegram).',
-    build: ({ requesterEmail, pageName, url }: AccessRequestData) => ({
-      subject: `${requesterEmail} asked for access to ${pageName}`,
-      preheader: `${requesterEmail} wants access to ${pageName}.`,
-      heading: 'Someone wants access to your page',
+    trigger: 'access-requests.ts — someone asks to view or edit a page.',
+    build: ({ requesterEmail, pageName, url, edit }: AccessRequestData) => ({
+      subject: `${requesterEmail} asked for ${edit ? 'edit ' : ''}access to ${pageName}`,
+      preheader: `${requesterEmail} wants ${edit ? 'to edit' : 'access to'} ${pageName}.`,
+      heading: edit ? 'Someone wants to edit your page' : 'Someone wants access to your page',
       bodyHtml:
-        p(`<strong>${escapeHtml(requesterEmail)}</strong> asked for access to your page <strong>${escapeHtml(pageName)}</strong>.`) +
-        p('Open the page to approve or decline.'),
+        p(`<strong>${escapeHtml(requesterEmail)}</strong> asked for ${edit ? 'edit ' : ''}access to your page <strong>${escapeHtml(pageName)}</strong>.`) +
+        p('Open ShareOut to approve or decline.'),
       cta: { label: 'Review the request', href: url },
-      bodyText: `${requesterEmail} asked for access to your page "${pageName}". Open the page to approve or decline: ${url}`,
+      bodyText: `${requesterEmail} asked for ${edit ? 'edit ' : ''}access to your page "${pageName}". Open ShareOut to approve or decline: ${url}`,
     }),
   } satisfies EmailTemplate<AccessRequestData>,
 

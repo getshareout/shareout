@@ -102,7 +102,7 @@ export async function queryNeedsYou(
   if (on('access')) {
     push(env.DB.prepare(`
       SELECT ar.id AS id, a.id AS artifact_id, a.name AS artifact_name, a.slug AS slug,
-             ar.requester_email AS actor,
+             ar.requester_email AS actor, ar.role AS role,
              CAST(strftime('%s', ar.created_at) AS INTEGER) AS ts
       FROM access_requests ar
       JOIN artifacts a ON a.id = ar.artifact_id
@@ -112,7 +112,7 @@ export async function queryNeedsYou(
     `).bind(...vis.userIds, ...(workspaceId ? [workspaceId] : []), limit),
       (rows) => rows.map((r) => ({
         kind: 'access', id: r.id, artifact_id: r.artifact_id, artifact_name: r.artifact_name,
-        slug: r.slug, actor: r.actor, actor_picture: null, summary: `wants access · ${r.actor}`, ts: r.ts,
+        slug: r.slug, actor: r.actor, actor_picture: null, summary: `${r.role === 'editor' ? 'wants to edit' : 'wants access'} · ${r.actor}`, ts: r.ts,
       })));
   }
 

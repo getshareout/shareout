@@ -1,5 +1,5 @@
 /**
- * Access requests — viewers ask artifact owners for permission (Google Drive style).
+ * Access requests — people ask artifact owners to view or edit (Google Drive style).
  */
 import type { Env } from '../types';
 import type { AuthUser } from '../api-auth';
@@ -13,6 +13,7 @@ import { sendMessageWithButtons, answerCallbackQuery, editMessageText } from '..
 import { getPlatformOrigin } from '../config/origins';
 
 export type AccessRequestStatus = 'pending' | 'approved' | 'denied';
+export type AccessRequestRole = 'viewer' | 'editor';
 
 export interface AccessRequestRow {
   id: string;
@@ -20,6 +21,7 @@ export interface AccessRequestRow {
   requester_user_id: string;
   requester_email: string;
   requester_name: string | null;
+  role: AccessRequestRole;
   status: AccessRequestStatus;
   created_at: string;
 }
@@ -31,6 +33,7 @@ export interface IncomingAccessRequest {
   artifact_slug: string;
   requester_email: string;
   requester_name: string | null;
+  role: AccessRequestRole;
   created_at: string;
 }
 
@@ -56,7 +59,7 @@ export async function getPendingAccessRequest(
   requesterUserId: string,
 ): Promise<AccessRequestRow | null> {
   return env.DB.prepare(
-    `SELECT id, artifact_id, requester_user_id, requester_email, requester_name, status, created_at
+    `SELECT id, artifact_id, requester_user_id, requester_email, requester_name, role, status, created_at
      FROM access_requests
      WHERE artifact_id = ? AND requester_user_id = ? AND status = 'pending'
      LIMIT 1`
@@ -72,7 +75,7 @@ export async function listIncomingAccessRequests(
   // otherwise a request against a departed member's page sits in a queue nobody
   // can see. Matches who decideAccessRequest lets answer.
   const rows = await env.DB.prepare(`
-    SELECT ar.id, ar.artifact_id, ar.requester_email, ar.requester_name, ar.created_at,
+    SELECT ar.id, ar.artifact_id, ar.requester_email, ar.requester_name, ar.role, ar.created_at,
            a.name AS artifact_name, a.slug AS artifact_slug
     FROM access_requests ar
     JOIN artifacts a ON a.id = ar.artifact_id
@@ -96,19 +99,18 @@ async function notifyOwnerOfAccessRequest(
   requesterLabel: string,
 ): Promise<void> {
   const baseUrl = getPlatformOrigin(env);
+  const edit = request.role === 'editor';
+
+  await dispatchLifecycleEmail(env, {
+    type: 'access_request',
+    toUserId: artifact.owner_id,
+    data: { requesterEmail: requesterLabel, pageName: artifact.name, url: `${baseUrl}/home`, edit },
+  }).catch(() => {});
 
   const chatId = await getLinkedChatId(env, artifact.owner_id);
-  if (!chatId) {
-    // No Telegram link — fall back to email so the owner still hears about it.
-    await dispatchLifecycleEmail(env, {
-      type: 'access_request',
-      toUserId: artifact.owner_id,
-      data: { requesterEmail: requesterLabel, pageName: artifact.name, url: `${baseUrl}/home` },
-    }).catch(() => {});
-    return;
-  }
+  if (!chatId) return;
 
-  const text = `${requesterLabel} is requesting access to “${artifact.name}”.`;
+  const text = `${requesterLabel} is requesting ${edit ? 'edit access' : 'access'} to “${artifact.name}”.`;
 
   await sendMessageWithButtons(env, chatId, text, [
     [
@@ -125,6 +127,7 @@ export async function createAccessRequestForSlug(
   env: Env,
   user: AuthUser,
   slug: string,
+  role: AccessRequestRole = 'viewer',
 ): Promise<{ ok: true; status: 'created' | 'pending' } | { ok: false; error: string; code: string; status: number }> {
   if (!user.email) {
     return { ok: false, error: 'Sign in with an email address to request access.', code: 'EMAIL_REQUIRED', status: 400 };
@@ -135,7 +138,7 @@ export async function createAccessRequestForSlug(
     return { ok: false, error: 'Page not found', code: 'NOT_FOUND', status: 404 };
   }
 
-  if (artifact.visibility !== 'private' && artifact.visibility !== 'workspace') {
+  if (role === 'viewer' && artifact.visibility !== 'private' && artifact.visibility !== 'workspace') {
     return { ok: false, error: 'This page is already open to you.', code: 'NOT_PRIVATE', status: 400 };
   }
 
@@ -143,15 +146,21 @@ export async function createAccessRequestForSlug(
     return { ok: false, error: 'You already own this page.', code: 'IS_OWNER', status: 400 };
   }
 
+  // A viewer collaborator may still ask to edit; anything else already covers the ask.
   const existingCollab = await env.DB.prepare(
-    'SELECT 1 FROM collaborators WHERE artifact_id = ? AND email = ?'
-  ).bind(artifact.id, user.email).first();
-  if (existingCollab) {
+    'SELECT role FROM collaborators WHERE artifact_id = ? AND email = ?'
+  ).bind(artifact.id, user.email).first<{ role: string }>();
+  if (existingCollab && (role === 'viewer' || existingCollab.role !== 'viewer')) {
     return { ok: false, error: 'You already have access.', code: 'HAS_ACCESS', status: 400 };
   }
 
   const pending = await getPendingAccessRequest(env, artifact.id, user.id);
   if (pending) {
+    // A pending view request upgrades to edit in place (one pending row per requester).
+    if (role === 'editor' && pending.role === 'viewer') {
+      await env.DB.prepare(`UPDATE access_requests SET role = 'editor' WHERE id = ?`).bind(pending.id).run();
+      await notifyOwnerOfAccessRequest(env, { ...pending, role }, artifact, pending.requester_name || user.email);
+    }
     return { ok: true, status: 'pending' };
   }
 
@@ -178,9 +187,9 @@ export async function createAccessRequestForSlug(
 
   try {
     await env.DB.prepare(
-      `INSERT INTO access_requests (id, artifact_id, requester_user_id, requester_email, requester_name)
-       VALUES (?, ?, ?, ?, ?)`
-    ).bind(requestId, artifact.id, user.id, user.email.toLowerCase(), requesterName).run();
+      `INSERT INTO access_requests (id, artifact_id, requester_user_id, requester_email, requester_name, role)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).bind(requestId, artifact.id, user.id, user.email.toLowerCase(), requesterName, role).run();
   } catch {
     const again = await getPendingAccessRequest(env, artifact.id, user.id);
     if (again) return { ok: true, status: 'pending' };
@@ -193,6 +202,7 @@ export async function createAccessRequestForSlug(
     requester_user_id: user.id,
     requester_email: user.email.toLowerCase(),
     requester_name: requesterName,
+    role,
     status: 'pending',
     created_at: new Date().toISOString(),
   };
@@ -209,7 +219,7 @@ export async function decideAccessRequest(
   action: 'approve' | 'deny',
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const row = await env.DB.prepare(`
-    SELECT ar.id, ar.artifact_id, ar.requester_email, ar.requester_name, ar.status,
+    SELECT ar.id, ar.artifact_id, ar.requester_email, ar.requester_name, ar.role, ar.status,
            a.name AS artifact_name, a.slug AS artifact_slug, a.owner_id, a.workspace_id
     FROM access_requests ar
     JOIN artifacts a ON a.id = ar.artifact_id
@@ -219,6 +229,7 @@ export async function decideAccessRequest(
     artifact_id: string;
     requester_email: string;
     requester_name: string | null;
+    role: AccessRequestRole;
     status: AccessRequestStatus;
     artifact_name: string;
     artifact_slug: string;
@@ -250,7 +261,8 @@ export async function decideAccessRequest(
     return { ok: true };
   }
 
-  await addCollaboratorEmails(env, row.artifact_id, [row.requester_email], 'viewer', ownerUserId);
+  const edit = row.role === 'editor';
+  await addCollaboratorEmails(env, row.artifact_id, [row.requester_email], edit ? 'editor' : 'viewer', ownerUserId);
   await env.DB.prepare(
     `UPDATE access_requests SET status = 'approved', decided_by = ?, decided_at = ? WHERE id = ?`
   ).bind(ownerUserId, now, requestId).run();
@@ -258,7 +270,7 @@ export async function decideAccessRequest(
     type: 'access_approved',
     toEmail: row.requester_email,
     workspaceId: row.workspace_id ?? undefined,
-    data: { pageName: row.artifact_name, url: `${baseUrl}/a/${encodeURIComponent(row.artifact_slug)}/` },
+    data: { pageName: row.artifact_name, url: `${baseUrl}/a/${encodeURIComponent(row.artifact_slug)}/`, edit },
   }).catch(() => {});
 
   return { ok: true };
@@ -285,15 +297,15 @@ export async function handleAccessRequestTelegramCallback(
   }
 
   const row = await env.DB.prepare(`
-    SELECT ar.requester_name, ar.requester_email, a.name AS artifact_name
+    SELECT ar.requester_name, ar.requester_email, ar.role, a.name AS artifact_name
     FROM access_requests ar
     JOIN artifacts a ON a.id = ar.artifact_id
     WHERE ar.id = ?
-  `).bind(requestId).first<{ requester_name: string | null; requester_email: string; artifact_name: string }>();
+  `).bind(requestId).first<{ requester_name: string | null; requester_email: string; role: AccessRequestRole; artifact_name: string }>();
 
   const who = row?.requester_name || row?.requester_email || 'The requester';
   const label = action === 'approve'
-    ? `✅ Approved — ${who} can now view “${row?.artifact_name ?? 'the page'}”.`
+    ? `✅ Approved — ${who} can now ${row?.role === 'editor' ? 'edit' : 'view'} “${row?.artifact_name ?? 'the page'}”.`
     : `Denied — ${who} was not given access.`;
 
   await answerCallbackQuery(env, callbackId, action === 'approve' ? 'Access granted' : 'Request denied');
@@ -306,7 +318,7 @@ export async function handleCreateAccessRequest(
   env: Env,
   user: AuthUser,
 ): Promise<Response> {
-  let body: { slug?: string };
+  let body: { slug?: string; role?: string };
   try {
     body = await request.json();
   } catch {
@@ -318,7 +330,8 @@ export async function handleCreateAccessRequest(
     return json({ error: 'slug is required', code: 'INVALID_SLUG' }, 400);
   }
 
-  const result = await createAccessRequestForSlug(env, user, slug);
+  const role: AccessRequestRole = body.role === 'editor' ? 'editor' : 'viewer';
+  const result = await createAccessRequestForSlug(env, user, slug, role);
   if (!result.ok) {
     return json({ error: result.error, code: result.code }, result.status);
   }

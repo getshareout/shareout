@@ -18,7 +18,8 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
     var open = state === 'sheet';
     ws.classList.toggle('is-composer-sheet', open);
     scrim.hidden = !open;
-    if (open) { composer.setAttribute('role', 'dialog'); composer.setAttribute('aria-modal', 'true'); markRead(); }
+    // A thread replayed while the sheet was closed had no height to scroll; land on the latest message.
+    if (open) { composer.setAttribute('role', 'dialog'); composer.setAttribute('aria-modal', 'true'); markRead(); requestAnimationFrame(function () { scrollEnd(true); }); }
     else { composer.removeAttribute('role'); composer.removeAttribute('aria-modal'); }
   }
   // Opening from the pill moves focus into the composer; closing returns it to the pill.

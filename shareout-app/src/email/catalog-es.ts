@@ -175,15 +175,15 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
     };
   },
 
-  access_request: ({ requesterEmail, pageName, url }: AccessRequestData) => ({
-    subject: `${requesterEmail} pidió acceso a ${pageName}`,
-    preheader: `${requesterEmail} quiere ver ${pageName}.`,
-    heading: 'Alguien quiere ver tu artefacto',
+  access_request: ({ requesterEmail, pageName, url, edit }: AccessRequestData) => ({
+    subject: `${requesterEmail} pidió ${edit ? 'permiso de edición' : 'acceso'} a ${pageName}`,
+    preheader: `${requesterEmail} quiere ${edit ? 'editar' : 'ver'} ${pageName}.`,
+    heading: edit ? 'Alguien quiere editar tu artefacto' : 'Alguien quiere ver tu artefacto',
     bodyHtml:
-      p(`<strong>${escapeHtml(requesterEmail)}</strong> pidió acceso a tu artefacto <strong>${escapeHtml(pageName)}</strong>.`) +
-      p('Abrí el artefacto para aprobar o rechazar el pedido.'),
+      p(`<strong>${escapeHtml(requesterEmail)}</strong> pidió ${edit ? 'permiso de edición' : 'acceso'} a tu artefacto <strong>${escapeHtml(pageName)}</strong>.`) +
+      p('Abrí ShareOut para aprobar o rechazar el pedido.'),
     cta: { label: 'Ver el pedido', href: url },
-    bodyText: `${requesterEmail} pidió acceso a tu artefacto "${pageName}". Abrí el artefacto para aprobar o rechazar el pedido: ${url}`,
+    bodyText: `${requesterEmail} pidió ${edit ? 'permiso de edición' : 'acceso'} a tu artefacto "${pageName}". Abrí ShareOut para aprobar o rechazar el pedido: ${url}`,
   }),
 
   admin_request: ({ requesterName, workspaceName, action, reason, url }: AdminRequestData) => ({
@@ -200,13 +200,13 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
     bodyText: `${requesterName} intentó algo en ${workspaceName} que solo puede hacer un admin.${action ? `\nQué intentó: ${action}` : ''}${reason ? `\nQué vio: ${reason}` : ''}\nAbrir tu workspace: ${url}`,
   }),
 
-  access_approved: ({ pageName, url }: AccessApprovedData) => ({
+  access_approved: ({ pageName, url, edit }: AccessApprovedData) => ({
     subject: `Ya tenés acceso: ${pageName}`,
-    preheader: `Ya podés ver ${pageName}.`,
-    heading: `Ya tenés acceso a ${pageName}`,
-    bodyHtml: p(`Aprobaron tu pedido: ya podés abrir <strong>${escapeHtml(pageName)}</strong>.`),
+    preheader: `Ya podés ${edit ? 'editar' : 'ver'} ${pageName}.`,
+    heading: `Ya tenés ${edit ? 'permiso de edición en' : 'acceso a'} ${pageName}`,
+    bodyHtml: p(`Aprobaron tu pedido: ya podés ${edit ? 'editar' : 'abrir'} <strong>${escapeHtml(pageName)}</strong>.`),
     cta: { label: 'Abrir el artefacto', href: url },
-    bodyText: `Ya tenés acceso a ${pageName}. Abrir el artefacto: ${url}`,
+    bodyText: `Ya tenés ${edit ? 'permiso de edición en' : 'acceso a'} ${pageName}. Abrir el artefacto: ${url}`,
   }),
 
   access_declined: ({ pageName }: AccessDeclinedData) => ({
