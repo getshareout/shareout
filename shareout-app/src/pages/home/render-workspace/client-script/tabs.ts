@@ -20,6 +20,22 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
       setEditMode(rec, b.getAttribute('data-mode'));
     });
   });
+  // No edit rights → ask the owner (Google Docs style); approval adds an editor collaborator.
+  var tabReqEl = document.getElementById('wsxTabReqEdit'), reqSent = {};
+  if (tabReqEl) tabReqEl.addEventListener('click', function () {
+    var rec = panes[activeKey]; if (!rec || reqSent[rec.art.slug]) return;
+    var slug = rec.art.slug;
+    tabReqEl.disabled = true;
+    fetch('/v1/access-requests', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: slug, role: 'editor' }) })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok) throw new Error((res.d && res.d.error) || '');
+        reqSent[slug] = 1;
+        showToast(t('tabs.requestEditSent'), 'success');
+      })
+      .catch(function (e) { showToast(e.message || t('tabs.requestEditFailed'), 'error'); })
+      .then(syncTabMode);
+  });
   // Device (mobile/web) preview toggle — lives next to View/Edit, drives the active pane.
   var tabDeviceEl = document.getElementById('wsxTabDevice');
   if (tabDeviceEl) tabDeviceEl.addEventListener('click', function () {
@@ -111,6 +127,12 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
     var rec = panes[activeKey], bar = rec ? rec.bar : null;
     if (artBarEl && bar !== curBar) { if (curBar) curBar.remove(); if (bar) artBarEl.prepend(bar); curBar = bar; }
     tabModeEl.hidden = !rec || rec.art.canEdit === false || !canEditType(rec.art);
+    if (tabReqEl) {
+      tabReqEl.hidden = !rec || rec.art.canEdit !== false || !canEditType(rec.art);
+      var sent = !!(rec && reqSent[rec.art.slug]);
+      tabReqEl.disabled = sent;
+      tabReqEl.textContent = t(sent ? 'tabs.requestEditPending' : 'tabs.requestEdit');
+    }
     if (rec) tabModeEl.querySelectorAll('[data-mode]').forEach(function (b) { b.classList.toggle('is-on', b.getAttribute('data-mode') === rec.mode); });
     if (tabDeviceEl) {
       tabDeviceEl.hidden = !rec;

@@ -517,7 +517,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
             var who = q.requester_name || q.requester_email || t('inspector.someone');
             return '<div class="wsx-admin__row" data-req="' + esc(q.id) + '"><span class="wsx-cm__av">' + esc((who[0] || '?').toUpperCase()) + '</span>'
               + '<div class="wsx-admin__who"><span class="wsx-admin__nm">' + esc(who) + '</span>'
-              + '<span class="wsx-admin__sub">' + esc(t('admin.wantsArtifact').replace('{name}', q.artifact_name || t('admin.anArtifact'))) + ' \\u00B7 ' + adRelDate(q.created_at) + '</span></div>'
+              + '<span class="wsx-admin__sub">' + esc(t(q.role === 'editor' ? 'admin.wantsToEditArtifact' : 'admin.wantsArtifact').replace('{name}', q.artifact_name || t('admin.anArtifact'))) + ' \\u00B7 ' + adRelDate(q.created_at) + '</span></div>'
               + '<button class="wsx-atbl__act" data-req-approve="' + esc(q.id) + '" type="button">' + esc(t('common.approve')) + '</button>'
               + '<button class="wsx-atbl__act" data-req-deny="' + esc(q.id) + '" type="button">' + esc(t('common.deny')) + '</button></div>';
           }).join('') + '</div></div>';

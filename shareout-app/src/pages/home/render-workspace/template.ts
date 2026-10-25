@@ -118,6 +118,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
     <main class="wsx__canvas">
       <div class="wsx__artbar" id="wsxArtBar">
         <div class="wsx__tabmode" id="wsxTabMode" role="group" hidden><button data-mode="view" class="is-on" type="button" data-i18n-title="tabs.view" data-i18n-aria="tabs.view" title="View" aria-label="View">${svg('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>')}</button><button data-mode="edit" type="button" data-i18n-title="tabs.edit" data-i18n-aria="tabs.edit" title="Edit" aria-label="Edit">${svg('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>')}</button></div>
+        <button class="wsx-abtn wsx__tabreq" id="wsxTabReqEdit" type="button" hidden data-i18n="tabs.requestEdit">Request edit access</button>
         <button class="wsx__tabdevice" id="wsxTabDevice" type="button" hidden aria-pressed="false" data-i18n-title="tabs.mobilePreview" data-i18n-aria="tabs.mobilePreview" title="Toggle mobile preview" aria-label="Toggle mobile preview">${svg('<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>')}</button>
         <button class="wsx__tabdevice" id="wsxTabFull" type="button" hidden data-i18n-title="tabs.fullScreen" data-i18n-aria="tabs.fullScreen" title="Full screen" aria-label="View full screen">${svg('<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>')}</button>
       </div>

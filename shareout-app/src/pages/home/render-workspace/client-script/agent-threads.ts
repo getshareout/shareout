@@ -37,10 +37,8 @@ export const workspace_client_agent_threads_JS = `  // ----- thread history draw
     }
     messages.slice(start).forEach(renderMsg);
     replaying = false;
-    // Reopen at the last user message, not the absolute bottom. [11]
-    var rows = threadList.querySelectorAll('.wsx-row.user');
-    var lastUser = rows.length ? rows[rows.length - 1] : null;
-    if (scroller && lastUser) scroller.scrollToAnchor(lastUser); else scrollEnd(true);
+    // Reopen at the latest message, like any chat app.
+    scrollEnd(true);
   }
   function openThread(id, silent) {
     setThread(id);
