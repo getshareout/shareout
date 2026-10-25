@@ -282,14 +282,17 @@ describe('perf budget: D1 waves per request through the router (workspace subdom
     expect(out.headers.get('ETag')).toMatch(/^W\//);
   });
 
-  it('/home: one wave before the first byte, at most 4 more for the body', async () => {
+  it('/home: one wave before the first byte, at most 2 more for the body (was 4)', async () => {
     const db = wavesDb((sql, args) => (sql.includes('AS n FROM users') ? { n: 1 } : handler({ isMember: true, role: 'member' })(sql, args)));
     const { out, waves } = await db.settle(routed(db, '/home'));
     expect(out.status).toBe(200);
     expect(waves).toBeLessThanOrEqual(1);
     expect(out.headers.get('Server-Timing')).toMatch(/auth;dur=\d+.*d1;desc="\d+ calls, \d+ waves"/);
     const body = await db.settle(out.text());
-    expect(body.waves).toBeLessThanOrEqual(4);
+    expect(body.waves).toBeLessThanOrEqual(2);
+    // Artifact lists, counts, folders, tags and access requests load client-side
+    // (/v1/home/*, /v1/access-requests/incoming); the document itself never reads them.
+    expect(db.calls.filter((s) => /FROM artifacts|FROM folders|artifact_tags|access_requests/.test(s))).toEqual([]);
   });
 });
 

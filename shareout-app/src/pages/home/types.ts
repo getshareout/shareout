@@ -75,31 +75,10 @@ export interface HomeFilters {
 export interface RenderArgs {
   user: { id: string; email: string | null };
   userInfo: { name: string | null; picture: string | null } | null;
-  catalog: ArtifactRow[];
-  catalogTruncated: boolean;
-  catalogTotal: number;
-  allCount: number;
-  favCount: number;
-  sharedCount: number;
-  workspaces: Array<{ id: string; name: string; slug: string; branding?: string | null; artifact_count: number; can_manage?: boolean }>;
-  folders: HomeFolder[];
-  teamFolders: HomeFolder[];
-  personalFolders: HomeFolder[];
-  filesScope: HomeFilesScope;
-  folderKind: HomeFilesScope | '';
-  tags: HomeTag[];
-  search: string;
-  folder: string;
-  sort: string;
-  type: string;
-  scope: string;
+  workspaces: Array<{ id: string; name: string; slug: string; branding?: string | null }>;
   workspace: string;
-  page: number;
-  openVisDisabled: boolean;
   workspaceId: string | null;
   workspaceRole: string | null;
-  /** Workspace owner is on a Teams/Enterprise plan → Skill Marketplace is available. */
-  wsTeamsPlan: boolean;
   /** Workspace owner is on a paid tier (Pro+) → Knowledge lens shows the enable flow, not the upsell. */
   wsKnowledgePaid: boolean;
   /** Domain inbound file inboxes actually receive on, derived from this instance.
@@ -114,23 +93,12 @@ export interface RenderArgs {
   fileImportProviders?: string[];
   /** Public origin of this instance — the Connect view's MCP / skill URLs point here. */
   platformOrigin?: string;
-  hostname: string;
   /** Server-resolved language (person's choice → workspace's); null = let the browser decide. */
   locale: 'en' | 'es' | null;
   /** Short current-release id (Cloudflare deployment version) for the rail footer; '' when unavailable. */
   appVersion: string;
-  visualEditorOffWorkspaces: string[];
   /** Whether the /create AI chat flow is enabled for the current workspace context. */
   createEnabled: boolean;
-  accessRequests: Array<{
-    id: string;
-    artifact_id: string;
-    artifact_name: string;
-    artifact_slug: string;
-    requester_email: string;
-    requester_name: string | null;
-    created_at: string;
-  }>;
 }
 
 /** A recent view event, shown in the (lazy-loaded) Activity panel. */
