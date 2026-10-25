@@ -156,6 +156,12 @@ export function listPages(rows: Array<{ entrypoint: string; path: string }>): { 
   return { entrypoint, pages };
 }
 
+// Owner name for anyone who can view; the email only for workspace members (and the owner).
+export function ownerOf(a: { owner_name: string | null; owner_email: string | null }, showEmail: boolean): { name: string | null; email: string | null } | null {
+  const email = showEmail ? a.owner_email : null;
+  return a.owner_name || email ? { name: a.owner_name, email } : null;
+}
+
 export async function handleGetArtifact(
   request: Request,
   env: Env,
@@ -282,7 +288,7 @@ export async function handleGetArtifact(
     paused: artifact.paused === 1,
     created_at: artifact.created_at,
     updated_at: artifact.updated_at,
-    owner: artifact.owner_name || artifact.owner_email ? { name: artifact.owner_name, email: artifact.owner_email } : null,
+    owner: ownerOf(artifact, wsRole != null || artifact.owner_id === user.id),
     current_version: artifact.current_version || 1,
     latest_version: artifact.latest_version || artifact.current_version || 1,
     live_message: artifact.live_message ?? null,
