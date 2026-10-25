@@ -249,7 +249,8 @@ export async function handlePilot(request: Request, ctx: DataContext): Promise<R
     if (!ip) {
       return errorResponse({ ...DATA_ERRORS.FORBIDDEN, message: 'Could not verify your network; request blocked.' }, origin);
     }
-    const ipLimit = await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, `pilot:${ip}`, 'aiChat');
+    // Counter writes ride waitUntil; the owner check stays behind the per-IP one (as in visitor chat).
+    const ipLimit = await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, `pilot:${ip}`, 'aiChat', ctx.waitUntil);
     if (!ipLimit.allowed) {
       return jsonError(
         { error: 'Too many requests from your network. Try again later.', code: 'RATE_LIMIT_EXCEEDED', retryAfter: ipLimit.retryAfter },
@@ -259,7 +260,7 @@ export async function handlePilot(request: Request, ctx: DataContext): Promise<R
     }
     const ownerId = ctx.artifact.owner_id;
     if (ownerId) {
-      const ownerLimit = await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, `pilotowner:${ownerId}`, 'aiChat');
+      const ownerLimit = await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, `pilotowner:${ownerId}`, 'aiChat', ctx.waitUntil);
       if (!ownerLimit.allowed) {
         return jsonError(
           { error: 'This page is temporarily over its AI usage limit. Try later.', code: 'RATE_LIMIT_EXCEEDED', retryAfter: ownerLimit.retryAfter },
@@ -365,7 +366,9 @@ export const _internal = { sanitizeMessages, MAX_MSG_CHARS };
  * config/billing gates for local testing. Production never reaches this — the
  * router only dispatches here for localhost requests.
  */
-export async function handlePilotSpike(request: Request, env: Env, origin: string | null): Promise<Response> {
+export async function handlePilotSpike(
+  request: Request, env: Env, origin: string | null, waitUntil?: (promise: Promise<unknown>) => void,
+): Promise<Response> {
   if (request.method !== 'POST') {
     return pilotError('Method not allowed', 405, origin);
   }
@@ -374,7 +377,7 @@ export async function handlePilotSpike(request: Request, env: Env, origin: strin
   if (!ip) {
     return errorResponse({ ...DATA_ERRORS.FORBIDDEN, message: 'Could not verify your network; request blocked.' }, origin);
   }
-  const ipLimit = await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, `pilot:${ip}`, 'aiChat');
+  const ipLimit = await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, `pilot:${ip}`, 'aiChat', waitUntil);
   if (!ipLimit.allowed) {
     return jsonError(
       { error: 'Too many requests from your network. Try again later.', code: 'RATE_LIMIT_EXCEEDED', retryAfter: ipLimit.retryAfter },

@@ -370,3 +370,23 @@ describe('pilot upstream error sanitization', () => {
     expect(json.error.message).toBe('AI request failed');
   });
 });
+
+describe('pilot rate-limit counter writes ride waitUntil', () => {
+  it('passes the request waitUntil to the anonymous per-IP and per-owner checks', async () => {
+    const ctx = realCtx();
+    ctx.isOwner = false;
+    ctx.viewer = undefined;
+    ctx.waitUntil = vi.fn();
+    const res = await handlePilot(realRequest({ messages: [{ role: 'user', content: 'hi' }] }), ctx);
+    expect(res.status).toBe(200);
+    expect(mockCheckSlidingWindowRateLimit).toHaveBeenCalledWith(expect.anything(), 'pilot:203.0.113.7', 'aiChat', ctx.waitUntil);
+    expect(mockCheckSlidingWindowRateLimit).toHaveBeenCalledWith(expect.anything(), 'pilotowner:usr_owner', 'aiChat', ctx.waitUntil);
+  });
+
+  it('passes the spike path its waitUntil', async () => {
+    const waitUntil = vi.fn();
+    const res = await handlePilotSpike(spikeRequest({ messages: [{ role: 'user', content: 'hi' }] }), makeEnv(), null, waitUntil);
+    expect(res.status).toBe(200);
+    expect(mockCheckSlidingWindowRateLimit).toHaveBeenCalledWith(undefined, 'pilot:203.0.113.7', 'aiChat', waitUntil);
+  });
+});

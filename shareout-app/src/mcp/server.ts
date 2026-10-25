@@ -75,7 +75,7 @@ export async function handleMcp(request: Request, env: Env, origin: string, exec
   // Workspace Agent tokens carry their own scope model this surface does not map.
   if (user.service) return respond({ error: 'Workspace agent tokens cannot use the MCP connector; sign in as a person.' }, 403);
 
-  const limit = await checkKVRateLimit(env.RATE_LIMIT_KV, user.id, 'mcp');
+  const limit = await checkKVRateLimit(env.RATE_LIMIT_KV, user.id, 'mcp', executionCtx?.waitUntil.bind(executionCtx));
   if (!limit.allowed) {
     return respond({ error: 'Too many requests, try again shortly.' }, 429, { 'Retry-After': String(limit.retryAfter ?? 60) });
   }

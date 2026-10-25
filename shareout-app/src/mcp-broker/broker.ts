@@ -103,7 +103,10 @@ async function handleList(env: Env, origin: string | null, page: McpPageContext,
   return ok(origin, { connections });
 }
 
-async function handleCall(env: Env, request: Request, origin: string | null, page: McpPageContext, userId: string): Promise<Response> {
+async function handleCall(
+  env: Env, request: Request, origin: string | null, page: McpPageContext, userId: string,
+  waitUntil?: (promise: Promise<unknown>) => void,
+): Promise<Response> {
   const text = await request.text();
   if (text.length > MAX_INPUT_BYTES) return fail(origin, 'bad_request', 'Input is larger than 1 MiB');
   let body: { connection?: unknown; tool?: unknown; input?: unknown };
@@ -138,7 +141,8 @@ async function handleCall(env: Env, request: Request, origin: string | null, pag
       return fail(origin, 'not_read_only', `${connectionName}.${toolName} is not marked read-only; only read-only tools can be called from a page`);
     }
 
-    const rate = await checkKVRateLimit(env.RATE_LIMIT_KV, `${userId}:${page.artifactId}`, 'mcpBroker');
+    // Dashboards poll this every ~30 s per section: the counter write rides waitUntil.
+    const rate = await checkKVRateLimit(env.RATE_LIMIT_KV, `${userId}:${page.artifactId}`, 'mcpBroker', waitUntil);
     if (!rate.allowed) return fail(origin, 'rate_limited', 'Too many MCP calls from this page', { retryAfterMs: (rate.retryAfter ?? 60) * 1000 });
 
     const started = Date.now();
@@ -163,7 +167,10 @@ async function handleCall(env: Env, request: Request, origin: string | null, pag
   }
 }
 
-export async function handleMcpBroker(request: Request, env: Env, artifactId: string, action: string, origin: string | null): Promise<Response> {
+export async function handleMcpBroker(
+  request: Request, env: Env, artifactId: string, action: string, origin: string | null,
+  waitUntil?: (promise: Promise<unknown>) => void,
+): Promise<Response> {
   const auth = request.headers.get('Authorization');
   const token = await verifyMcpToken(env, auth?.startsWith('Bearer ') ? auth.slice(7) : null, artifactId);
   if (!token) return fail(origin, 'token_invalid', 'Missing or expired MCP token; ask the page host for a new one');
@@ -182,6 +189,6 @@ export async function handleMcpBroker(request: Request, env: Env, artifactId: st
   }
 
   if (action === 'list' && request.method === 'GET') return handleList(env, origin, page, user.id);
-  if (action === 'call' && request.method === 'POST') return handleCall(env, request, origin, page, user.id);
+  if (action === 'call' && request.method === 'POST') return handleCall(env, request, origin, page, user.id, waitUntil);
   return fail(origin, 'bad_request', 'Use GET mcp/list or POST mcp/call');
 }

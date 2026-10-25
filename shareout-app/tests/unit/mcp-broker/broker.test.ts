@@ -192,6 +192,33 @@ describe('MCP broker', () => {
     expect(await code(await broker('art_change', fresh, 'call', { connection: 'notion', tool: 'search' }))).toBe('approval_required');
   });
 
+  it('answers a call without waiting on the rate-limit counter write', async () => {
+    fakeWithMemberToken();
+    const token = await mcpToken('art_mcp', member);
+    await host('/v1/artifacts/art_mcp/mcp/consent', member, { method: 'POST', body: JSON.stringify({ connections: ['notion'] }) });
+    const counterWrites: Promise<void>[] = [];
+    const kv = {
+      get: async () => null,
+      put: (key: string) => {
+        if (!key.startsWith('rl:mcpBroker:')) return Promise.resolve(); // e.g. the MCP session cache
+        const write = new Promise<void>(() => {}); // the counter write never settles
+        counterWrites.push(write);
+        return write;
+      },
+    };
+    const deferred: Promise<unknown>[] = [];
+    const waitCtx = { waitUntil: (p: Promise<unknown>) => { deferred.push(p); }, passThroughOnException: () => {} } as unknown as ExecutionContext;
+
+    const res = await worker.fetch(new Request(`${ORIGIN}/v1/data/art_mcp/mcp/call`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Origin: 'null' },
+      body: JSON.stringify({ connection: 'notion', tool: 'search', input: { q: 'roadmap' } }),
+    }), { ...e, RATE_LIMIT_KV: kv } as never, waitCtx);
+    expect(res.status).toBe(200);
+    expect(counterWrites).toHaveLength(1);
+    expect(deferred).toContain(counterWrites[0]);
+  });
+
   it('stops working when the page becomes public', async () => {
     await makeArtifact('art_flip', 'workspace', declared());
     const token = await mcpToken('art_flip', member);

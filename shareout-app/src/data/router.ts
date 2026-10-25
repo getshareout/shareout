@@ -285,14 +285,14 @@ async function handleDataRequestInner(
     const urlHost = new URL(request.url).hostname;
     const urlIsLoopback = urlHost === 'localhost' || urlHost === '127.0.0.1';
     if (artifactId === 'spike' && urlIsLoopback && isLocalRequest(request, urlHost)) {
-      return handlePilotSpike(request, env, origin);
+      return handlePilotSpike(request, env, origin, waitUntil);
     }
   }
 
   // Viewer MCP broker authenticates with its own short-lived token only, so it runs
   // before the data middleware (which would also accept the long-lived data token).
   if (tier === 'mcp') {
-    return handleMcpBroker(request, env, artifactId, rest[0] ?? '', origin);
+    return handleMcpBroker(request, env, artifactId, rest[0] ?? '', origin, waitUntil);
   }
 
   const ctx = await dataMiddleware(request, env, artifactId);
