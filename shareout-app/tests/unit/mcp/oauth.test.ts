@@ -140,6 +140,48 @@ describe('redirect URIs', () => {
   });
 });
 
+describe('client names', () => {
+  async function registerNamed(clientName: string): Promise<{ client_id: string; client_name: string }> {
+    const res = await call('/oauth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_name: clientName, redirect_uris: [CALLBACK], token_endpoint_auth_method: 'none' }),
+    });
+    expect(res.status).toBe(201);
+    return (await res.json()) as { client_id: string; client_name: string };
+  }
+
+  async function storedName(clientId: string): Promise<string> {
+    const row = await e.DB.prepare('SELECT client_name FROM oauth_clients WHERE id = ?').bind(clientId).first<{ client_name: string }>();
+    return row!.client_name;
+  }
+
+  it('drops angle brackets from a registered name', async () => {
+    const reg = await registerNamed('Evil</title><script>x()</script>App');
+    expect(reg.client_name).toBe('Evil/titlescriptx()/scriptApp');
+    expect(await storedName(reg.client_id)).toBe('Evil/titlescriptx()/scriptApp');
+  });
+
+  it('keeps an ordinary name as sent', async () => {
+    const reg = await registerNamed('  ChatGPT — Work & Co. "beta"  ');
+    expect(reg.client_name).toBe('ChatGPT — Work & Co. "beta"');
+    expect(await storedName(reg.client_id)).toBe('ChatGPT — Work & Co. "beta"');
+  });
+
+  it('falls back to a generic name when nothing is left', async () => {
+    const reg = await registerNamed('<>\u0007');
+    expect(reg.client_name).toBe('An AI app');
+  });
+
+  it('renders a stored name as text on the consent page', async () => {
+    const clientId = await register();
+    await e.DB.prepare('UPDATE oauth_clients SET client_name = ? WHERE id = ?').bind('</title><script>x()</script>', clientId).run();
+    const { html } = await consentFields(clientId);
+    expect(html).toContain('<title>Connect &lt;/title&gt;&lt;script&gt;x()&lt;/script&gt; to ShareOut - ShareOut</title>');
+    expect(html).not.toContain('<script>x()</script>');
+  });
+});
+
 describe('authorize', () => {
   it('sends a signed-out person to login and back', async () => {
     const clientId = await register();
