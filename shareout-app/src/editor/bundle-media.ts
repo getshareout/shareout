@@ -66,13 +66,14 @@ export async function writeMedia(env: Env, artifactId: string, versionId: string
   return stmts;
 }
 
-/** Statement carrying the live version's earlier media forward, minus paths just re-bundled. */
+/** Statement carrying every other file of the live version forward (styles, sibling pages, images,
+ *  earlier media) — the editor only rewrites index.html — minus media paths just re-bundled. */
 export function carryMedia(env: Env, versionId: string, artifactId: string, items: MediaItem[]) {
   const skip = items.length ? items.map(() => '?').join(',') : "''";
   return env.DB.prepare(
     `INSERT INTO assets (id, version_id, path, r2_key, mime, size_bytes, sha256)
      SELECT 'ast_' || lower(hex(randomblob(12))), ?, path, r2_key, mime, size_bytes, sha256
-       FROM assets WHERE path LIKE 'media/%' AND path NOT IN (${skip})
+       FROM assets WHERE path != 'index.html' AND path NOT IN (${skip})
         AND version_id = (SELECT version_id FROM deployments WHERE artifact_id = ? AND channel = 'production')`
   ).bind(versionId, ...items.map((m) => m.path), artifactId);
 }
