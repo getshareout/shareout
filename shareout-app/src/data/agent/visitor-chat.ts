@@ -70,9 +70,9 @@ export async function handleVisitorChat(
         ctx.origin
       );
     }
-    // Counter writes ride waitUntil. The two checks stay in sequence: the owner-wide
-    // bucket only counts requests the per-IP limit let through.
-    const ipLimit = await checkSlidingWindowRateLimit(ctx.env.RATE_LIMIT_KV, `agent:${ip}`, 'aiChatAnonIp', ctx.waitUntil);
+    // Anonymous callers spend the owner's AI budget, so these counter writes stay
+    // awaited (not deferred to waitUntil), and the per-owner check runs after this one.
+    const ipLimit = await checkSlidingWindowRateLimit(ctx.env.RATE_LIMIT_KV, `agent:${ip}`, 'aiChatAnonIp');
     if (!ipLimit.allowed) {
       return new Response(
         JSON.stringify({ success: false, error: 'Too many chat requests from your network. Try again later.', code: 'RATE_LIMIT_EXCEEDED', retryAfter: ipLimit.retryAfter }),
@@ -84,7 +84,7 @@ export async function handleVisitorChat(
     // their AI budget. Cap aggregate anon chat per owner too.
     const ownerId = ctx.artifact.owner_id;
     if (ownerId) {
-      const ownerLimit = await checkSlidingWindowRateLimit(ctx.env.RATE_LIMIT_KV, `agentowner:${ownerId}`, 'aiChatAnonOwner', ctx.waitUntil);
+      const ownerLimit = await checkSlidingWindowRateLimit(ctx.env.RATE_LIMIT_KV, `agentowner:${ownerId}`, 'aiChatAnonOwner');
       if (!ownerLimit.allowed) {
         return new Response(
           JSON.stringify({ success: false, error: 'This page is temporarily over its AI usage limit. Try later.', code: 'RATE_LIMIT_EXCEEDED', retryAfter: ownerLimit.retryAfter }),

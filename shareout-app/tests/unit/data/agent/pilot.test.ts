@@ -371,22 +371,43 @@ describe('pilot upstream error sanitization', () => {
   });
 });
 
-describe('pilot rate-limit counter writes ride waitUntil', () => {
-  it('passes the request waitUntil to the anonymous per-IP and per-owner checks', async () => {
-    const ctx = realCtx();
+describe('pilot anonymous counter writes stay awaited', () => {
+  it('awaits the per-IP, then per-owner, counter write before forwarding', async () => {
+    const actual = await vi.importActual<typeof import('../../../../src/rate-limit')>('../../../../src/rate-limit');
+    mockCheckSlidingWindowRateLimit.mockImplementation(actual.checkSlidingWindowRateLimit);
+    const kv = makeKv();
+    const writes: Array<() => void> = [];
+    // Counter writes (rl:*) settle only when released; the step-counter write settles at once.
+    kv.put.mockImplementation((key: string) => (key.startsWith('rl:')
+      ? new Promise<void>((resolve) => { writes.push(resolve); })
+      : Promise.resolve()));
+    const ctx = realCtx(kv);
     ctx.isOwner = false;
     ctx.viewer = undefined;
     ctx.waitUntil = vi.fn();
-    const res = await handlePilot(realRequest({ messages: [{ role: 'user', content: 'hi' }] }), ctx);
-    expect(res.status).toBe(200);
-    expect(mockCheckSlidingWindowRateLimit).toHaveBeenCalledWith(expect.anything(), 'pilot:203.0.113.7', 'aiChat', ctx.waitUntil);
-    expect(mockCheckSlidingWindowRateLimit).toHaveBeenCalledWith(expect.anything(), 'pilotowner:usr_owner', 'aiChat', ctx.waitUntil);
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+    let answered = false;
+    const pending = handlePilot(realRequest({ messages: [{ role: 'user', content: 'hi' }] }), ctx)
+      .then((res) => { answered = true; return res; });
+    await vi.waitFor(() => expect(writes).toHaveLength(1));
+    await tick();
+    expect(answered).toBe(false);
+    expect(writes).toHaveLength(1); // the per-owner check waits for the per-IP write
+    writes[0]();
+    await vi.waitFor(() => expect(writes).toHaveLength(2));
+    await tick();
+    expect(answered).toBe(false);
+    expect(mockFetchWithTimeout).not.toHaveBeenCalled();
+    writes[1]();
+
+    expect((await pending).status).toBe(200);
+    expect(ctx.waitUntil).not.toHaveBeenCalled();
   });
 
-  it('passes the spike path its waitUntil', async () => {
-    const waitUntil = vi.fn();
-    const res = await handlePilotSpike(spikeRequest({ messages: [{ role: 'user', content: 'hi' }] }), makeEnv(), null, waitUntil);
+  it('gives the localhost spike check no defer hook either', async () => {
+    const res = await handlePilotSpike(spikeRequest({ messages: [{ role: 'user', content: 'hi' }] }), makeEnv(), null);
     expect(res.status).toBe(200);
-    expect(mockCheckSlidingWindowRateLimit).toHaveBeenCalledWith(undefined, 'pilot:203.0.113.7', 'aiChat', waitUntil);
+    expect(mockCheckSlidingWindowRateLimit).toHaveBeenCalledWith(undefined, 'pilot:203.0.113.7', 'aiChat');
   });
 });

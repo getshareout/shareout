@@ -348,24 +348,34 @@ describe('handleVisitorChat', () => {
     expect(res.status).toBe(403);
   });
 
-  it('answers anonymous chat without waiting on the per-IP and per-owner counter writes', async () => {
-    const puts: Promise<void>[] = [];
+  it('awaits the anonymous per-IP, then per-owner, counter write before answering', async () => {
+    const writes: Array<() => void> = [];
     const kv = {
       get: vi.fn(async () => null),
-      put: vi.fn(() => { const p = new Promise<void>(() => {}); puts.push(p); return p; }), // never settles
+      put: vi.fn(() => new Promise<void>((resolve) => { writes.push(resolve); })),
     };
     const ctx = makeCtx(makeEnv(configDb(), { RATE_LIMIT_KV: kv as unknown as KVNamespace }));
     ctx.artifact.owner_id = 'usr_owner';
-    const deferred: Promise<unknown>[] = [];
-    ctx.waitUntil = (p) => { deferred.push(p); };
+    ctx.waitUntil = vi.fn();
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-    const res = await handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx);
+    let answered = false;
+    const pending = handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx)
+      .then((res) => { answered = true; return res; });
+    await vi.waitFor(() => expect(writes).toHaveLength(1));
+    await tick();
+    expect(answered).toBe(false);
+    expect(writes).toHaveLength(1); // the per-owner check waits for the per-IP write
+    writes[0]();
+    await vi.waitFor(() => expect(writes).toHaveLength(2));
+    await tick();
+    expect(answered).toBe(false);
+    writes[1]();
+
+    const res = await pending;
     expect(res.status).toBe(200);
     await readSSE(res);
-    expect(kv.put).toHaveBeenCalledTimes(2);
-    expect(deferred).toHaveLength(2);
-    expect(deferred[0]).toBe(puts[0]);
-    expect(deferred[1]).toBe(puts[1]);
+    expect(ctx.waitUntil).not.toHaveBeenCalled();
   });
 
   it('keeps the owner check behind the per-IP one: a refused IP never touches the owner bucket', async () => {

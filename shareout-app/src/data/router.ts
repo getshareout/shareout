@@ -285,7 +285,7 @@ async function handleDataRequestInner(
     const urlHost = new URL(request.url).hostname;
     const urlIsLoopback = urlHost === 'localhost' || urlHost === '127.0.0.1';
     if (artifactId === 'spike' && urlIsLoopback && isLocalRequest(request, urlHost)) {
-      return handlePilotSpike(request, env, origin, waitUntil);
+      return handlePilotSpike(request, env, origin);
     }
   }
 
