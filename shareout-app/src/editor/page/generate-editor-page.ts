@@ -8,6 +8,7 @@ import type { EditorPageOptions } from './types';
 import { googleFontsPreconnect } from '../../../packages/design-tokens/src/index';
 import { brandFaviconHead } from '../../brand';
 import { versionedBundlePath } from '../../bundle-versions';
+import { escapeHtml } from '../../html/utils';
 
 export type { EditorPageOptions } from './types';
 
@@ -27,7 +28,7 @@ export function generateEditorPage(options: EditorPageOptions): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Edit - ${name || slug} | ShareOut</title>
+  <title>Edit - ${escapeHtml(name || slug)} | ShareOut</title>
   ${brandFaviconHead}
   ${googleFontsPreconnect}
   <style>

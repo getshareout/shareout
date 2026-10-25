@@ -31,3 +31,19 @@ describe('renderEditorConfigScript aiEnabled', () => {
     expect(script).toContain('aiEnabled: false');
   });
 });
+
+describe('renderEditorConfigScript embedding', () => {
+  it('keeps names that contain markup inside the script as data', () => {
+    const name = '</script><script>x()</script>';
+    const description = 'a\u2028b <!-- c';
+    const script = renderEditorConfigScript({ ...baseOptions, name, description, userName: '</SCRIPT>' });
+
+    expect(script.match(/<\/script/gi)).toHaveLength(1);
+    expect(script).not.toContain('<!--');
+    expect(script).not.toContain('\u2028');
+    const value = (key: string) => JSON.parse(script.match(new RegExp(`${key}: (.*)`))![1].replace(/,$/, ''));
+    expect(value('name')).toBe(name);
+    expect(value('description')).toBe(description);
+    expect(value('userName')).toBe('</SCRIPT>');
+  });
+});
