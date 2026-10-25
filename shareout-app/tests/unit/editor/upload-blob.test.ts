@@ -10,6 +10,7 @@ const OWNER = 'usr_upblob_o';
 const ART = 'art_upblob';
 const PRIV = 'art_upblob_priv';
 const OTHER = 'art_upblob_other';
+const BUNDLE = 'art_upblob_bundle';
 const BASE = 'https://shareout.example.com';
 const exec = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
 
@@ -27,6 +28,12 @@ beforeAll(async () => {
     e.DB.prepare("INSERT INTO artifacts (id, name, slug, owner_id, visibility) VALUES (?, ?, ?, ?, 'public')").bind(ART, ART, `s-${ART}`, OWNER),
     e.DB.prepare("INSERT INTO artifacts (id, name, slug, owner_id, visibility) VALUES (?, ?, ?, ?, 'private')").bind(PRIV, PRIV, 'upblob-priv', OWNER),
     e.DB.prepare("INSERT INTO artifacts (id, name, slug, owner_id, visibility) VALUES (?, ?, ?, ?, 'private')").bind(OTHER, OTHER, 'upblob-other', OWNER),
+    e.DB.prepare("INSERT INTO artifacts (id, name, slug, owner_id, visibility) VALUES (?, ?, ?, ?, 'private')").bind(BUNDLE, BUNDLE, 'upblob-bundle', OWNER),
+    e.DB.prepare("INSERT INTO versions (id, artifact_id, version_no, entrypoint) VALUES ('ver_upblob_b1', ?, 1, 'index.html')").bind(BUNDLE),
+    ...['index.html', 'styles.css', 'pg-01.html', 'img/p01.jpg'].map((p, i) => e.DB.prepare(
+      "INSERT INTO assets (id, version_id, path, r2_key, mime, size_bytes, sha256) VALUES (?, 'ver_upblob_b1', ?, ?, 'text/plain', 1, 'x')"
+    ).bind(`ast_upblob_b${i}`, p, `${BUNDLE}/ver_upblob_b1/${p}`)),
+    e.DB.prepare("INSERT INTO deployments (id, artifact_id, version_id, channel, slug) VALUES ('dep_upblob_b', ?, 'ver_upblob_b1', 'production', 'upblob-bundle')").bind(BUNDLE),
   ]);
 });
 
@@ -102,6 +109,16 @@ describe('editor upload goes through the blob tier', () => {
           WHERE d.artifact_id = ? AND d.channel = 'production' AND a.path = ?`
       ).bind(PRIV, row!.path).first();
       expect(kept).toBeTruthy();
+    });
+
+    it('keeps the rest of a multi-file bundle (styles, pages, images) on publish', async () => {
+      expect((await publish(BUNDLE, '<link rel="stylesheet" href="styles.css"><a href="pg-01.html">x</a>')).status).toBe(200);
+      const { results } = await e.DB.prepare(
+        `SELECT a.path, a.r2_key FROM assets a JOIN deployments d ON d.version_id = a.version_id
+          WHERE d.artifact_id = ? AND d.channel = 'production' ORDER BY a.path`
+      ).bind(BUNDLE).all<{ path: string; r2_key: string }>();
+      expect(results.map((r) => r.path)).toEqual(['img/p01.jpg', 'index.html', 'pg-01.html', 'styles.css']);
+      expect(results.find((r) => r.path === 'index.html')!.r2_key).not.toContain('ver_upblob_b1');
     });
   });
 });
