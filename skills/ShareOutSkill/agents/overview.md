@@ -372,7 +372,15 @@ Publish pending edits as a new version.
 | Requests/minute | 10 | Per artifact |
 | Tokens/day | 100,000 | Per artifact |
 
-These caps apply to anonymous visitors and signed-in non-members. Signed-in members of the artifact's workspace skip them. They get a per-user backstop (20 requests/minute, 300,000 tokens/day) and, when set, the workspace monthly AI budget (Settings → AI); exceeding either returns 429.
+These caps apply to anonymous visitors and signed-in non-members. Signed-in members of the artifact's workspace skip them and are billed by **who is calling**:
+
+| Caller | Billed to | Limits |
+|---|---|---|
+| A person in a browser (session cookie, or the artifact page's own token) | the person | 20 requests/minute and 300,000 tokens/day per person (`member_rate`, `member_daily`), plus the workspace monthly AI budget when set (`workspace_budget`) |
+| An API or agent token (`so_`, `sot_`) and other server-side automation | the **workspace** | the workspace monthly AI budget when set (`workspace_budget`), and always 1,000,000 tokens/day per workspace (`workspace_automation_daily`). It never counts against a person. |
+| Crews | the workspace (usage rows by `crew_id`) | their own run budgets; they never touch a person's counter |
+
+A refused call is HTTP 429 with `limit` (one of `member_rate`, `member_daily`, `workspace_budget`, `workspace_automation_daily`) and `resets_at` (ISO timestamp) in the body. `GET /v1/workspaces/{id}/ai-limits` shows today's usage: your own, the workspace automation total, and (owners/admins) every member.
 
 Rate limit exceeded returns HTTP 429 with:
 ```json

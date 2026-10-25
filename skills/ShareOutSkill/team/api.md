@@ -401,6 +401,7 @@ Per-workspace catalog of `artifact_type: "skill"` markdown playbooks. Full guide
 | `GET` | `/v1/workspaces/{scope}/agent-skills` | Member | Skills attached to caller's assistant (`scope` = workspace id or `__personal`). |
 | `POST` | `/v1/workspaces/{scope}/agent-skills` | Member | Attach skill to caller's assistant (max 8). |
 | `DELETE` | `/v1/workspaces/{scope}/agent-skills/{skillId}` | Member | Detach from caller's assistant. |
+| `GET` | `/v1/workspaces/{ws}/ai-limits` | Member | Today's in-artifact agent usage: yours, the workspace automation total and daily cap, and (owner/admin) every member. |
 | `GET` | `/v1/workspaces/{ws}/default-skills` | Member | Skills attached to every member's assistant in this workspace. |
 | `POST` | `/v1/workspaces/{ws}/default-skills` | Admin | `{ "skill_artifact_id" }`: attach a workspace-visible Library skill to every member's assistant (max 5; injected only for turns scoped to this workspace; re-POST re-pins to the latest version). |
 | `DELETE` | `/v1/workspaces/{ws}/default-skills/{skillId}` | Admin | Remove it. |
