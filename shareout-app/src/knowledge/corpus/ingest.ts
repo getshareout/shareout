@@ -13,6 +13,7 @@ import { CHUNKER_VERSION, chunkSections, htmlSections } from './sections';
 import { corpusFor, type SourceKind, type SourceMeta } from './client';
 import { estimateTokens, meterKnowledge, PRICING } from './usage';
 import { EXTRACT_BATCH, extractBatch } from './extract';
+import { workspaceBudgetBlock } from '../../data/ai-budget';
 
 const EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
 export const EMBED_BATCH = 50;
@@ -42,7 +43,7 @@ interface Loaded {
 const MAX_SITE_PAGES = 60;
 const MAX_PAGE_CHARS = 2_000_000;
 
-export type ExtractResult = { status: 'gone' | 'unsupported' | 'chunked'; chunkCount: number; previousCount: number };
+export type ExtractResult = { status: 'gone' | 'unsupported' | 'chunked' | 'deferred'; chunkCount: number; previousCount: number };
 
 async function loadAsset(env: Env, workspaceId: string, refId: string): Promise<Loaded | 'gone' | 'too_big'> {
   const row = await env.DB.prepare(`
@@ -168,6 +169,12 @@ export async function extractStep(env: Env, p: IngestParams): Promise<ExtractRes
     );
     return { status: 'unsupported', chunkCount: 0, previousCount: 0 };
   }
+  // Over the workspace's monthly AI budget: spend nothing, keep the source queued ('processing', chunker 0)
+  // so the nightly refresh re-learns it once the budget is raised or the month turns. Never 'failed'.
+  if (await workspaceBudgetBlock(env, p.workspaceId)) {
+    await store.setStatus(loaded.meta, 'processing', BUDGET_WAIT, 0);
+    return { status: 'deferred', chunkCount: 0, previousCount: 0 };
+  }
   let markdown: string | null;
   try {
     markdown = loaded.site ? '' : await toMarkdown(env, loaded.filename, loaded.mime, loaded.bytes);
@@ -202,10 +209,14 @@ export async function embedStep(env: Env, p: IngestParams, offset: number): Prom
 }
 
 const KNOWN_ENTITIES = 60;
+const BUDGET_WAIT = 'Waiting for the monthly AI budget';
+/** graphStep result when the workspace budget is spent: the graph for this source is left to the next refresh. */
+export const GRAPH_DEFERRED = -1;
 
 /** Extract entities/relations/facts from one batch of chunks into the graph. */
 export async function graphStep(env: Env, p: IngestParams, offset: number): Promise<number> {
   if (!env.AI) return 0;
+  if (await workspaceBudgetBlock(env, p.workspaceId)) return GRAPH_DEFERRED;
   const store = corpusFor(env, p.workspaceId)!;
   const chunks = await store.chunkTexts(p.refId, offset, EXTRACT_BATCH);
   if (!chunks.length) return 0;
@@ -222,7 +233,8 @@ export function ingestSteps(env: Env, chunkCount: number): number {
 }
 
 /** Drop vectors past the new end (a shorter new version), then mark the source ready. */
-export async function finishStep(env: Env, p: IngestParams, r: ExtractResult): Promise<void> {
+export async function finishStep(env: Env, p: IngestParams, r: ExtractResult, graphDeferred = false): Promise<void> {
+  if (r.status === 'deferred') return;
   if (env.KNOWLEDGE_VECTORS && r.previousCount > r.chunkCount) {
     const stale = [];
     for (let ord = r.chunkCount; ord < r.previousCount; ord++) stale.push(vectorId(p.refId, ord));
@@ -236,7 +248,7 @@ export async function finishStep(env: Env, p: IngestParams, r: ExtractResult): P
   if (r.status !== 'chunked') return;
   const store = corpusFor(env, p.workspaceId)!;
   const src = await store.getSource(p.refId);
-  if (src) await store.setStatus(src, 'ready');
+  if (src) await (graphDeferred ? store.setStatus(src, 'processing', BUDGET_WAIT, 0) : store.setStatus(src, 'ready'));
 }
 
 export async function markFailed(env: Env, p: IngestParams, err: unknown): Promise<void> {
@@ -251,14 +263,15 @@ export async function markFailed(env: Env, p: IngestParams, err: unknown): Promi
 export async function ingestInline(env: Env, p: IngestParams): Promise<void> {
   try {
     const r = await extractStep(env, p);
+    let graphDeferred = false;
     if (r.status === 'chunked') {
       for (let offset = 0; offset < r.chunkCount; offset += EXTRACT_BATCH) {
         // The graph is best-effort: a failed batch never blocks search.
-        await graphStep(env, p, offset).catch(() => 0);
+        if ((await graphStep(env, p, offset).catch(() => 0)) === GRAPH_DEFERRED) { graphDeferred = true; break; }
       }
       for (let offset = 0; offset < r.chunkCount; offset += EMBED_BATCH) await embedStep(env, p, offset);
     }
-    await finishStep(env, p, r);
+    await finishStep(env, p, r, graphDeferred);
   } catch (err) {
     await markFailed(env, p, err);
   }

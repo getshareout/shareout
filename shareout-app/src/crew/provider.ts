@@ -1,5 +1,6 @@
 import type { Env } from '../types';
 import { meterAiCall, type AiMeter } from '../data/ai-usage';
+import { workspaceBudgetBlock } from '../data/ai-budget';
 import { getBuildChain, isProviderLevelStatus, providerHeaders, type AIConfig } from '../data/agent/anthropic';
 import { logCrewProviderFailure, userFacingCrewProviderError } from './errors';
 import { GATEWAY_CACHING_PARAMS, gatewayReasoningParams, thinkingOffParams } from '../data/agent/models';
@@ -39,7 +40,13 @@ export type ProviderEvent =
   | { type: 'text_delta'; text: string }
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'message_stop'; stopReason: string; usage: { inputTokens: number; outputTokens: number } }
-  | { type: 'error'; error: string; retryable?: boolean };
+  | { type: 'error'; error: string; retryable?: boolean; code?: string };
+
+/** A refused turn when the workspace's monthly AI budget is spent; null otherwise. */
+async function budgetRefusal(env: Env, meter: AiMeter): Promise<ProviderEvent | null> {
+  const blocked = await workspaceBudgetBlock(env, meter.workspaceId);
+  return blocked ? { type: 'error', error: blocked.message, code: blocked.code } : null;
+}
 
 export interface CrewProvider {
   readonly provider: string;
@@ -158,6 +165,8 @@ export class OpenAICompatCrewProvider implements CrewProvider {
   }
 
   async *streamTurn(args: ProviderTurnArgs): AsyncGenerator<ProviderEvent> {
+    const refused = await budgetRefusal(this.env, args.meter);
+    if (refused) { yield refused; return; }
     const wireTools = args.tools.map((t) => ({
       type: 'function',
       function: { name: t.name, description: t.description, parameters: t.input_schema },
@@ -258,6 +267,8 @@ export class AnthropicCrewProvider implements CrewProvider {
   }
 
   async *streamTurn(args: ProviderTurnArgs): AsyncGenerator<ProviderEvent> {
+    const refused = await budgetRefusal(this.env, args.meter);
+    if (refused) { yield refused; return; }
     const body = yield* requestTurn(this.env, this.cfg, `${this.cfg.baseUrl}/messages`, {
       model: this.model,
       max_tokens: args.maxTokens,

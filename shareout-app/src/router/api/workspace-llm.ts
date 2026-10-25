@@ -4,6 +4,7 @@ import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { encryptCredentials } from '../../data/connections/credentials';
 import { getWorkspaceLlmConfig } from '../../data/agent/ai-config';
 import { jsonWithApiErrors } from '../../http/api-error';
+import { resetBudgetCache } from '../../data/ai-budget';
 
 const BYO_PROVIDERS = ['openai', 'vercel-gateway'] as const;
 const ASSISTANT_USAGE_KINDS = ['assistant_chat', 'ask_workspace'];
@@ -259,4 +260,36 @@ export async function handleGetWorkspaceUsage(
     limit,
     offset,
   });
+}
+
+// PUT /v1/workspaces/{id}/llm/budget — the monthly AI ceiling in USD, or null to remove it (admin+)
+export async function handleSetWorkspaceBudget(
+  request: Request,
+  env: Env,
+  user: AuthUser,
+  workspaceId: string
+): Promise<Response> {
+  if (!(await requireAdmin(env, workspaceId, user.id))) {
+    return json({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
+  }
+  let body: { monthlyBudgetUsd?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'Invalid JSON body', code: 'INVALID_JSON' }, 400);
+  }
+  const v = body.monthlyBudgetUsd;
+  if (v !== null && (typeof v !== 'number' || !Number.isFinite(v) || v <= 0 || v > 100000)) {
+    return json({ error: 'monthlyBudgetUsd must be a number above 0 and up to 100000, or null to remove the budget', code: 'VALIDATION_ERROR' }, 400);
+  }
+  const micro = v === null ? null : Math.round(v * 1_000_000);
+  await env.DB.prepare(`
+    INSERT INTO workspace_llm_config (workspace_id, monthly_budget_micro_usd, updated_at)
+    VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    ON CONFLICT(workspace_id) DO UPDATE SET
+      monthly_budget_micro_usd = excluded.monthly_budget_micro_usd,
+      updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+  `).bind(workspaceId, micro).run();
+  resetBudgetCache(workspaceId);
+  return json({ ok: true, monthlyBudgetUsd: v });
 }

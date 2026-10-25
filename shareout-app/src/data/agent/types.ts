@@ -82,6 +82,9 @@ export interface ChatChunk {
   content?: string;
   usage?: { input_tokens: number; output_tokens: number };
   error?: string;
+  /** Set on `error` when the workspace's monthly AI budget refused the call (`workspace_budget`). */
+  code?: string;
+  resets_at?: string;
   /** Set on `done` when the model stopped at the max-token limit (output cut off). */
   truncated?: boolean;
 }

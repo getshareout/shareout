@@ -13,11 +13,12 @@ beforeAll(async () => {
     `CREATE TABLE IF NOT EXISTS workspace_members (workspace_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL, member_class TEXT NOT NULL DEFAULT 'internal', PRIMARY KEY (workspace_id, user_id))`,
     `CREATE TABLE IF NOT EXISTS rate_limits (principal_type TEXT NOT NULL, principal_id TEXT NOT NULL, action TEXT NOT NULL, window_start TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (principal_type, principal_id, action, window_start))`,
     `CREATE TABLE IF NOT EXISTS workspace_llm_config (workspace_id TEXT PRIMARY KEY, monthly_budget_micro_usd INTEGER)`,
+    `CREATE TABLE IF NOT EXISTS ai_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, kind TEXT, model TEXT, base_cost_micro_usd INTEGER, input_tokens INTEGER, output_tokens INTEGER, cost_source TEXT, created_at TEXT)`,
     `CREATE TABLE IF NOT EXISTS agent_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, base_cost_micro_usd INTEGER, created_at TEXT)`,
   ]) await env.DB.exec(sql);
 });
 beforeEach(async () => {
-  for (const t of ['users', 'workspace_members', 'rate_limits', 'workspace_llm_config', 'agent_usage_events']) await env.DB.exec(`DELETE FROM ${t}`);
+  for (const t of ['users', 'workspace_members', 'rate_limits', 'workspace_llm_config', 'agent_usage_events', 'ai_usage_events']) await env.DB.exec(`DELETE FROM ${t}`);
   await env.DB.exec(`INSERT INTO users (id, email) VALUES ('usr_admin','usr_admin@x.com'), ('usr_m','usr_m@x.com'), ('usr_out','usr_out@x.com')`);
   await env.DB.exec(`INSERT INTO workspace_members (workspace_id, user_id, role) VALUES ('wsp_1','usr_admin','admin'), ('wsp_1','usr_m','member')`);
   await addMemberTokens(e, 'usr_m', 1234);

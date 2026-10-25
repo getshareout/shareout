@@ -72,6 +72,7 @@ export type TerminationReason =
   | 'goal_met'
   | 'max_iterations'
   | 'budget_exhausted'
+  | 'workspace_budget'
   | 'timeout'
   | 'awaiting_approval'
   | 'abandoned'

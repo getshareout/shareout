@@ -1,5 +1,6 @@
 import type { Env } from '../../types';
 import { meterAiCall } from '../ai-usage';
+import { workspaceBudgetBlock } from '../ai-budget';
 import { DATA_ERRORS } from '../../types';
 import type { DataContext } from '../middleware';
 import { errorResponse, corsHeaders } from '../middleware';
@@ -316,6 +317,9 @@ export async function handlePilot(request: Request, ctx: DataContext): Promise<R
   if (forwardText.length > MAX_BODY_BYTES) {
     return pilotError('Request body too large', 413, origin);
   }
+
+  const blocked = await workspaceBudgetBlock(env, ai.workspaceId);
+  if (blocked) return jsonError({ error: blocked.message, code: blocked.code, resets_at: blocked.resetsAt }, 429, origin);
 
   const forwarded = await forwardToProvider(aiConfig.baseUrl, aiConfig.apiKey, forwardText, origin);
   if (forwarded instanceof Response) return forwarded;

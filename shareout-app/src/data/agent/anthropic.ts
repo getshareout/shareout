@@ -1,6 +1,7 @@
 import type { Env } from '../../types';
 import type { ChatChunk, MessageRole } from './types';
 import { meterAiCall, type AiMeter } from '../ai-usage';
+import { BUDGET_CODE, WorkspaceBudgetError, workspaceBudgetBlock } from '../ai-budget';
 import { fetchWithTimeout, FetchTimeoutError } from '../../fetch-utils';
 import { createLogger } from '../../logging';
 import { DEFAULT_CLAUDE_MODEL, OPENAI_CHAT_MODEL, gatewayReasoningParams, temperatureParams, thinkingOffParams } from './models';
@@ -261,7 +262,10 @@ export async function chatComplete(
   let out = '';
   for await (const chunk of streamChat(env, meter, messages, systemPrompt, '', maxTokens, configOverride)) {
     if (chunk.type === 'content' && chunk.content) out += chunk.content;
-    else if (chunk.type === 'error') throw new Error(chunk.error || 'AI stream error');
+    else if (chunk.type === 'error') {
+      if (chunk.code === BUDGET_CODE) throw new WorkspaceBudgetError(chunk.resets_at ?? '');
+      throw new Error(chunk.error || 'AI stream error');
+    }
   }
   return out;
 }
@@ -277,6 +281,11 @@ export async function* streamChat(
   configOverride?: AIConfig | null,
   options: StreamChatOptions = {}
 ): AsyncGenerator<ChatChunk> {
+  const blocked = await workspaceBudgetBlock(env, meter.workspaceId);
+  if (blocked) {
+    yield { type: 'error', error: blocked.message, code: blocked.code, resets_at: blocked.resetsAt };
+    return;
+  }
   const attempts = resolveFailoverChain(env, configOverride);
   if (attempts.length === 0) {
     yield { type: 'error', error: NO_PROVIDER_ERROR };
@@ -410,6 +419,8 @@ export async function chat(
   configOverride?: AIConfig | null,
   timeoutMs: number = AI_TIMEOUT_MS
 ): Promise<{ content: string; usage: { input_tokens: number; output_tokens: number } }> {
+  const blocked = await workspaceBudgetBlock(env, meter.workspaceId);
+  if (blocked) throw blocked;
   const aiConfig = configOverride ?? getAIProvider(env);
   if (!aiConfig) {
     throw new Error(NO_PROVIDER_ERROR);

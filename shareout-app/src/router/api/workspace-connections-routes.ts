@@ -8,6 +8,7 @@ import {
   handleGetWorkspaceLlm,
   handleSetWorkspaceByoKey,
   handleDeleteWorkspaceByoKey,
+  handleSetWorkspaceBudget,
   handleSetWorkspaceGatewayModel,
   handleDeleteWorkspaceGatewayModel,
   handleGetWorkspaceUsage,
@@ -102,6 +103,13 @@ export async function routeWorkspaceConnections(ctx: FetchContext): Promise<Resp
     if (request.method === 'DELETE') {
       return addCORS(await handleDeleteWorkspaceByoKey(env, user, workspaceId));
     }
+  }
+
+  const llmBudgetMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/llm\/budget$/);
+  if (llmBudgetMatch && (request.method === 'PUT' || request.method === 'PATCH')) {
+    const user = await requireTokenOrSession(ctx);
+    if (!isAuthUser(user)) return user;
+    return addCORS(await handleSetWorkspaceBudget(request, env, user, llmBudgetMatch[1]));
   }
 
   const llmModelMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/llm\/model$/);
