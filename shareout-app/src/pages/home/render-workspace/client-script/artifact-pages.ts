@@ -46,7 +46,7 @@ export const workspace_client_artifact_pages_JS = `  // ===== multi-page artifac
       var v = p === entry ? '' : p;
       return '<button type="button" class="wsx-det__page' + (v === cur ? ' is-on' : '') + '" data-art-page="' + esc(v) + '" title="' + esc(p) + '">' + esc(p.replace(/\\.html?$/i, '')) + '</button>';
     }).join('');
-    return sec('pages', t('pages.title').replace('{n}', pages.length), t('pages.help'), '<div class="wsx-det__pages">' + items + '</div>', false);
+    return sec('pages', t('pages.title').replace('{n}', pages.length), t('pages.help'), '<div class="wsx-det__pages">' + items + '</div>');
   }
   if (rbodyEl) rbodyEl.addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('[data-art-page]');

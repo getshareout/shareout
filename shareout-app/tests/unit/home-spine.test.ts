@@ -3,7 +3,7 @@ import { queryNeedsYou, queryPulse, queryActivityFeed, queryActionItems, queryFo
 import { canRoleSee, defaultAudiences, resolveWorkspaceAudiences, EVENT_DEFS } from '../../src/pages/home/events';
 import { getUserProfile, setUserProfile, addFollow, removeFollow } from '../../src/users/user-profile';
 import { buildWorkspaceView, WORKSPACE_STYLES } from '../../src/pages/home/render-workspace';
-import { lazyChunkBody } from '../../src/pages/home/render-workspace/client-script/lazy-chunks';
+import { lazyChunkBody, LAZY_CHUNKS } from '../../src/pages/home/render-workspace/client-script/lazy-chunks';
 import { createWebReplyPort } from '../../src/chat-platforms/web/reply-port';
 import { CANVAS_TOOLS } from '../../src/chat-agent/tools/canvas';
 import { semanticSearchIds, semanticSearchArtifacts, indexArtifactVector, backfillVectors } from '../../src/search/semantic';
@@ -366,7 +366,8 @@ describe('buildWorkspaceView — Phase 1 shell SSR', () => {
     expect(scripts).toContain('function renderDetails');        // Details tab
     expect(scripts).toContain('function paintComments');        // Comments thread+composer
     expect(scripts).toContain('function renderAutomate');       // Automate tab
-    expect(scripts).toContain('data-dest="Slack"');             // deliver destination picker
+    expect(LAZY_CHUNKS.deliver.src).toContain('data-dest="Slack"'); // deliver picker (Envíos tab, lazy chunk)
+    expect(scripts).toContain("function renderDeliver() { return wsxLazy('deliver'");
     expect(scripts).toContain('patchArtifact');                 // inline meta edit
     expect(scripts).toContain('/v1/home/comments');             // list + post comments
     expect(scripts).toContain('function postComment');          // add a comment / reply

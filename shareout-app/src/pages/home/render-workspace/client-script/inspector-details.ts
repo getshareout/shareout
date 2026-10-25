@@ -2,41 +2,43 @@
  *  Extracted from inspector.ts to stay under the module line cap; shares the workspace IIFE scope,
  *  so it must be composed alongside inspector.ts (see client-script/index.ts). */
 export const workspace_client_inspector_details_JS = `  // ===== Inspector Details helpers =====
-  var GRIP_SVG = '<svg viewBox="0 0 16 16" width="14" height="16" fill="currentColor" aria-hidden="true"><circle cx="6" cy="4" r="1.4"/><circle cx="10" cy="4" r="1.4"/><circle cx="6" cy="8" r="1.4"/><circle cx="10" cy="8" r="1.4"/><circle cx="6" cy="12" r="1.4"/><circle cx="10" cy="12" r="1.4"/></svg>';
-
-  // Section order is user-reorderable and persisted globally (all artifacts share one order).
-  var SEC_ORDER_KEY = 'wsx.inspector.sections';
-  var DEFAULT_SEC_ORDER = ['share', 'deliver', 'about', 'description', 'tags', 'folder', 'tests', 'analytics', 'watches', 'knowledge'];
-  function loadSecOrder() {
-    var saved = [];
-    try { saved = JSON.parse(localStorage.getItem(SEC_ORDER_KEY) || '[]'); } catch (e) { saved = []; }
-    if (!Array.isArray(saved)) saved = [];
-    var out = saved.filter(function (k) { return DEFAULT_SEC_ORDER.indexOf(k) >= 0; });
-    DEFAULT_SEC_ORDER.forEach(function (k) { if (out.indexOf(k) < 0) out.push(k); }); // new sections append
-    return out;
-  }
-  function saveSecOrder(order) { try { localStorage.setItem(SEC_ORDER_KEY, JSON.stringify(order)); } catch (e) {} }
-
-  function sec(key, labelText, helpText, body, draggable) {
-    var grip = draggable ? '<button class="wsx-det__grip" type="button" draggable="true" aria-label="' + esc(t('inspector.dragHint')) + '" data-tip="' + esc(t('inspector.dragHint')) + '">' + GRIP_SVG + '</button>' : '';
+  // Sections: fixed most→least important order, collapsible, open state remembered per user.
+  var SEC_OPEN_KEY = 'wsx.inspector.open', SEC_OPEN = ['share', 'approvals', 'pages'];
+  try { var so = JSON.parse(localStorage.getItem(SEC_OPEN_KEY) || 'null'); if (Array.isArray(so)) SEC_OPEN = so; } catch (e) {}
+  // [icon path, tone] — tone colors the section chip (p primary, s success, w warning, n neutral).
+  var SEC_IC = {
+    share: ['<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M17 11h5M19.5 8.5v5"/>', 'p'],
+    approvals: ['<path d="M20 6 9 17l-5-5"/>', 's'],
+    pages: ['<path d="M4 4h16v16H4z"/><path d="M4 9h16"/>', 'n'],
+    organize: ['<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>', 'n'],
+    analytics: ['<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>', 'p'],
+    tests: ['<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/>', 'w'],
+    knowledge: ['<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M8 7h7"/>', 'p']
+  };
+  function sec(key, labelText, helpText, body) {
     var help = helpText ? '<button class="wsx-det__help" type="button" aria-label="' + esc(helpText) + '" data-tip="' + esc(helpText) + '">?</button>' : '';
-    return '<div class="wsx-det__sec" data-sec="' + key + '"><div class="wsx-det__label">' + grip + '<span class="wsx-det__labeltxt">' + esc(labelText) + '</span>' + help + '</div>' + body + '</div>';
+    var ic = SEC_IC[key] ? '<span class="wsx-det__secic t-' + SEC_IC[key][1] + '">' + isvg(SEC_IC[key][0]) + '</span>' : '';
+    return '<details class="wsx-det__sec" data-sec="' + key + '"' + (SEC_OPEN.indexOf(key) >= 0 ? ' open' : '') + '><summary class="wsx-det__label">' + ic + '<span class="wsx-det__labeltxt">' + esc(labelText) + '</span>' + help + '</summary><div class="wsx-det__secbody">' + body + '</div></details>';
+  }
+  function wireSecs(root) {
+    root.addEventListener('click', function (e) { if (e.target.closest('.wsx-det__help')) e.preventDefault(); });
+    root.addEventListener('toggle', function (e) {
+      var k = e.target.getAttribute && e.target.getAttribute('data-sec'); if (!k) return;
+      SEC_OPEN = SEC_OPEN.filter(function (x) { return x !== k; }); if (e.target.open) SEC_OPEN.push(k);
+      try { localStorage.setItem(SEC_OPEN_KEY, JSON.stringify(SEC_OPEN)); } catch (e2) {}
+    }, true);
   }
 
-  // About → compact meta pills (was a 7-row key/value table).
+  // Meta line under the title: owner · version · updated (created on hover), then status chips.
   function aboutHtml(meta, type, vis) {
-    function pill(inner, tip) { return '<span class="wsx-det__mpill"' + (tip ? ' data-tip="' + esc(tip) + '"' : '') + '>' + inner + '</span>'; }
-    var h = pill('<span class="dot" style="background:' + (meta.paused ? 'var(--color-warning)' : 'var(--color-success)') + '"></span>' + esc(meta.paused ? t('inspector.statusPaused') : t('inspector.statusActive')));
-    if (type) h += pill(esc(String(type).toUpperCase()), t('inspector.metaTypeTip'));
-    h += pill('v' + (meta.current_version || 1));
-    var upd = fmtDate(meta.updated_at);
-    h += pill(esc(t('inspector.updatedShort').replace('{d}', upd)), t('inspector.metaDatesTip').replace('{c}', fmtDate(meta.created_at)).replace('{u}', upd));
-    if (vis !== 'public' && meta.auth_method) {
-      var authLabel = meta.auth_method === 'google' ? t('inspector.authGoogle') : (meta.auth_method === 'password' ? t('inspector.authPassword') : meta.auth_method);
-      h += pill('<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>' + esc(authLabel));
-    }
+    var own = meta.owner && (meta.owner.name || meta.owner.email), upd = fmtDate(meta.updated_at);
+    var line = [own ? esc(t('inspector.byOwner').replace('{who}', own)) : '', 'v' + (meta.current_version || 1), '<span data-tip="' + esc(t('inspector.metaDatesTip').replace('{c}', fmtDate(meta.created_at)).replace('{u}', upd)) + '">' + esc(t('inspector.updatedShort').replace('{d}', upd)) + '</span>'].filter(Boolean).join(' \\u00B7 ');
+    function pill(inner, cls) { return '<span class="wsx-det__mpill' + (cls ? ' ' + cls : '') + '">' + inner + '</span>'; }
+    var h = pill('<span class="dot"></span>' + esc(meta.paused ? t('inspector.statusPaused') : t('inspector.statusActive')), meta.paused ? 'is-warn' : 'is-ok');
+    if (type) h += pill(esc(String(type).toUpperCase()));
+    if (vis !== 'public' && meta.auth_method) h += pill(esc(meta.auth_method === 'google' ? t('inspector.authGoogle') : (meta.auth_method === 'password' ? t('inspector.authPassword') : meta.auth_method)));
     if (meta.embed_allowed) h += pill(esc(t('inspector.embedsOn')));
-    return '<div class="wsx-det__meta">' + h + '</div>' + liveChangeHtml(meta);
+    return '<div class="wsx-det__metaline">' + line + '</div><div class="wsx-det__meta">' + h + '</div>' + liveChangeHtml(meta);
   }
   function liveChangeHtml(meta) {
     if (!meta.live_message) return '';
@@ -44,44 +46,8 @@ export const workspace_client_inspector_details_JS = `  // ===== Inspector Detai
     return '<div class="wsx-det__change">' + esc(t('inspector.liveChange').replace('{d}', when)) + ' ' + aiBadge(meta.live_message_source) + esc(meta.live_message) + '</div>';
   }
 
-  // Deliver → destination tiles + a per-destination body (recipient/send, or a Connect prompt).
-  function deliverHtml() {
-    return '<div class="wsx-det__dests" role="radiogroup" aria-label="' + esc(t('inspector.deliver')) + '">'
-      + '<button class="wsx-det__dest" data-dest="Slack" role="radio" aria-checked="false" type="button"><img class="wsx-det__destlogo" src="/brand/slack-icon.png" alt="" width="22" height="22" decoding="async">Slack</button>'
-      + '<button class="wsx-det__dest" data-dest="Telegram" role="radio" aria-checked="false" type="button"><img class="wsx-det__destlogo" src="/brand/telegram-icon.png" alt="" width="22" height="22" decoding="async">Telegram</button>'
-      + '<button class="wsx-det__dest" data-dest="Email" role="radio" aria-checked="false" type="button">' + isvg('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>') + 'Email</button>'
-      + '</div>'
-      + '<div class="wsx-det__delbody" id="wsxDelBody"></div>';
-  }
-
   // Thin alias over the shared design-system toast (window.showToast).
   function wsxToast(text, isError) { if (typeof window.showToast === 'function') window.showToast(text, isError ? 'error' : 'success'); }
-  // Live drag-reorder of sections; persists the resulting order on drop.
-  function wireSecDnd(root) {
-    var cont = root.querySelector('#wsxSecs'); if (!cont) return;
-    var dragging = null;
-    function afterEl(y) {
-      var els = [].slice.call(cont.querySelectorAll('.wsx-det__sec:not(.is-dragging)'));
-      var best = { off: -Infinity, el: null };
-      els.forEach(function (c) { var box = c.getBoundingClientRect(); var off = y - box.top - box.height / 2; if (off < 0 && off > best.off) best = { off: off, el: c }; });
-      return best.el;
-    }
-    cont.querySelectorAll('.wsx-det__grip').forEach(function (g) {
-      g.addEventListener('dragstart', function (e) { dragging = g.closest('.wsx-det__sec'); dragging.classList.add('is-dragging'); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragging.getAttribute('data-sec')); } catch (_) {} });
-      g.addEventListener('dragend', function () {
-        if (dragging) dragging.classList.remove('is-dragging');
-        dragging = null;
-        var order = [].slice.call(cont.querySelectorAll('.wsx-det__sec')).map(function (s) { return s.getAttribute('data-sec'); });
-        if (order.length === DEFAULT_SEC_ORDER.length) saveSecOrder(order); // only persist the full set
-      });
-    });
-    cont.addEventListener('dragover', function (e) {
-      if (!dragging) return; e.preventDefault();
-      var after = afterEl(e.clientY);
-      if (after == null) cont.appendChild(dragging); else cont.insertBefore(dragging, after);
-    });
-  }
-
   function copyText(txt, btn) {
     var done = function () { btn.classList.add('is-on'); setTimeout(function () { btn.classList.remove('is-on'); }, 1100); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done).catch(function () {});
@@ -105,79 +71,6 @@ export const workspace_client_inspector_details_JS = `  // ===== Inspector Detai
     closeTab(art.key);
     // Undo (or a failed DELETE) also brings the closed tab back.
     deleteArtifacts([art.id]).then(function (ok) { if (!ok && art.slug) openArtifact(art.slug, art.name, art.id); });
-  }
-
-  // ----- Watches (metric_watches via /v1/metric-watch). No table-list plumbing —
-  // table is free text; a bad table/column name surfaces as a toast from the API. -----
-  function watchMetricLabel(w) { return w.metric_kind === 'sum' ? 'sum(' + w.column_name + ')' : (w.metric_kind === 'last' ? w.column_name : t('inspector.watchKind.count')); }
-  function watchRow(w) {
-    return '<div class="wsx-row"><div class="wsx-row__main"><div class="wsx-row__title">' + esc(w.table_name) + ' \\u00B7 ' + esc(watchMetricLabel(w)) + '</div><div class="wsx-row__sub">' + esc(t('inspector.watchThreshold').replace('{n}', w.threshold_pct)) + '</div></div>'
-      + '<button class="wsx-det__icon is-danger" data-wdel="' + esc(w.id) + '" type="button" data-tip="' + esc(t('inspector.act.trash')) + '" aria-label="' + esc(t('inspector.act.trash')) + '">' + isvg(SVG_TRASH) + '</button></div>';
-  }
-  function watchFormHtml() {
-    var kinds = ['count', 'sum', 'last'].map(function (k) { return '<option value="' + k + '">' + esc(t('inspector.watchKind.' + k)) + '</option>'; }).join('');
-    return '<div class="wsx-list" id="wsxWForm">'
-      + '<input class="wsx-share__search" id="wsxWTable" placeholder="' + esc(t('inspector.watchTablePh')) + '" autocomplete="off">'
-      + '<select class="wsx-share__search" id="wsxWKind">' + kinds + '</select>'
-      + '<input class="wsx-share__search" id="wsxWColumn" placeholder="' + esc(t('inspector.watchColumnPh')) + '" autocomplete="off" hidden>'
-      + '<input class="wsx-share__search" id="wsxWThreshold" type="number" min="1" placeholder="20">'
-      + '<button class="wsx-abtn wsx-abtn--block" id="wsxWAdd" type="button">' + esc(t('inspector.watchAdd')) + '</button>'
-      + '</div>';
-  }
-  function loadWatches(art, box) {
-    fetch('/v1/metric-watch?artifact_id=' + encodeURIComponent(art.id), { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { paintWatches(art, box, (d && d.watches) || []); })
-      .catch(function () { paintWatches(art, box, []); });
-  }
-  function paintWatches(art, box, watches) {
-    var listH = watches.length ? '<div class="wsx-list">' + watches.map(watchRow).join('') + '</div>' : '<div class="wsx-tests__off">' + esc(t('inspector.watchesEmpty')) + '</div>';
-    box.innerHTML = listH + watchFormHtml();
-    box.querySelectorAll('[data-wdel]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var wid = b.getAttribute('data-wdel'), row = b.closest('.wsx-row'), leaving = null;
-        optimistic({
-          key: 'watch:del:' + wid,
-          undo: true,
-          apply: function () { leaving = window.soOptimistic.leave(row); },
-          rollback: function () { if (leaving) leaving.restore(); },
-          request: function () {
-            return fetch('/v1/metric-watch/' + encodeURIComponent(wid), { method: 'DELETE', credentials: 'same-origin', keepalive: true })
-              .then(function (r) { return r.ok ? r.json() : null; })
-              .then(function (j) { if (!j || !j.success) throw new Error('watch'); });
-          },
-          success: t('inspector.watchRemoved'),
-          error: t('inspector.watchDeleteFailed'),
-          done: function () { if (leaving) leaving.commit(); },
-        });
-      });
-    });
-    var kindSel = box.querySelector('#wsxWKind'), colInp = box.querySelector('#wsxWColumn');
-    function syncCol() { colInp.hidden = kindSel.value === 'count'; }
-    kindSel.addEventListener('change', syncCol); syncCol();
-    box.querySelector('#wsxWAdd').addEventListener('click', function () {
-      var btn = box.querySelector('#wsxWAdd');
-      var table = box.querySelector('#wsxWTable').value.trim();
-      var column = colInp.value.trim();
-      var threshold = box.querySelector('#wsxWThreshold').value.trim();
-      if (!table) { try { wsxToast(t('inspector.watchTableRequired'), true); } catch (e) {} return; }
-      var body = { artifact_id: art.id, table: table, kind: kindSel.value };
-      if (column) body.column = column;
-      if (threshold) body.threshold_pct = Number(threshold);
-      // Exception to optimistic: the server validates the table/column and returns the new
-      // watch id the row's delete needs — keep a busy button until it answers.
-      var btnLabel = btn.textContent;
-      btn.disabled = true; btn.textContent = t('common.saving');
-      fetch('/v1/metric-watch', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-        .then(function (r) { return r.json().catch(function () { return null; }).then(function (j) { return { ok: r.ok, j: j }; }); })
-        .then(function (res) { if (!res.ok || !res.j || !res.j.watch) { btn.disabled = false; btn.textContent = btnLabel; wsxToast((res.j && res.j.error) || t('inspector.watchAddFailed'), true); return; } loadWatches(art, box); })
-        .catch(function () { btn.disabled = false; btn.textContent = btnLabel; wsxToast(t('inspector.watchAddFailed'), true); });
-    });
-  }
-  function renderWatches(art) {
-    var box = rbodyEl.querySelector('#wsxWatches'); if (!box || !art.id) return;
-    box.innerHTML = i18nLoad();
-    loadWatches(art, box);
   }
 
   // ----- Knowledge from this artifact: notes whose sources include it. The route answers

@@ -81,27 +81,30 @@ export const workspace_client_inspector_review_JS = `  // ----- Review (/v1/home
       });
     });
   }
-  // Details strip: who approved the live version, and the approve/withdraw button.
+  // Approvals section: status chip (approved = success), approve/withdraw with busy → done feedback.
   function paintApprovals(art) {
     var box = rbodyEl.querySelector('#wsxApprove'); if (!box || !art.id) return;
-    function draw(r) {
-      if (!document.body.contains(box) || !r || !r.live_version_id) { box.hidden = true; return; }
+    var secEl = box.closest('.wsx-det__sec');
+    function draw(r, flash) {
+      if (!document.body.contains(box)) return;
+      if (!r || !r.live_version_id) { if (secEl) secEl.hidden = true; return; }
       var on = (r.approvals || []).filter(function (a) { return a.version_id === r.live_version_id; });
       var me = (r.my_approvals || []).indexOf(r.live_version_id) >= 0;
       var names = on.map(function (a) { return a.name || a.email || t('inspector.someone'); }).join(', ');
-      box.hidden = false;
-      box.innerHTML = '<div class="wsx-det__label"><span class="wsx-det__labeltxt">' + esc(t('review.approvals')) + '</span></div>'
-        + '<div class="wsx-row__sub">' + esc(on.length ? t('review.approvedBy').replace('{who}', names) + ' \\u00B7 v' + r.live_version_no : t('review.notApproved').replace('{n}', String(r.live_version_no))) + '</div>'
-        + (r.can_review ? '<button class="wsx-abtn wsx-det__approve" type="button" data-approve="' + (me ? '0' : '1') + '">' + esc(t(me ? 'review.withdraw' : 'review.approve')) + '</button>' : '');
+      if (secEl) secEl.hidden = false;
+      box.innerHTML = '<div class="wsx-det__apst' + (on.length ? ' is-ok' : '') + (flash ? ' is-flash' : '') + '"><span class="wsx-det__apchip">' + (on.length ? '\\u2713 v' + r.live_version_no : 'v' + r.live_version_no) + '</span>'
+        + '<span class="wsx-row__sub">' + esc(on.length ? t('review.approvedBy').replace('{who}', names) : t('review.notApproved').replace('{n}', String(r.live_version_no))) + '</span></div>'
+        + (r.can_review ? '<button class="wsx-abtn' + (me ? '' : ' wsx-abtn--primary') + ' wsx-det__approve" type="button" data-approve="' + (me ? '0' : '1') + '">' + esc(t(me ? 'review.withdraw' : 'review.approve')) + '</button>' : '');
       var b = box.querySelector('[data-approve]');
       if (b) b.addEventListener('click', function () {
-        b.disabled = true;
-        reviewPost('/v1/home/approvals', { artifactId: art.id, versionId: r.live_version_id, approved: b.getAttribute('data-approve') === '1' })
-          .then(function (d) { reviewCache[art.id] = d; delete histCache[art.id]; draw(d); })
-          .catch(function (err) { b.disabled = false; failToast(err, t('review.approveFailed')); });
+        var yes = b.getAttribute('data-approve') === '1';
+        b.disabled = true; b.classList.add('is-busy'); b.textContent = t(yes ? 'review.approving' : 'review.withdrawing');
+        reviewPost('/v1/home/approvals', { artifactId: art.id, versionId: r.live_version_id, approved: yes })
+          .then(function (d) { reviewCache[art.id] = d; delete histCache[art.id]; draw(d, true); wsxToast(t(yes ? 'review.approvedToast' : 'review.withdrawnToast')); })
+          .catch(function (err) { draw(r); failToast(err, t('review.approveFailed')); });
       });
     }
-    loadReview(art, draw);
+    loadReview(art, function (r) { draw(r); });
   }
   function histReviewLine(v) {
     var n = v.comment_count || 0, ap = v.approvals || [], parts = [];

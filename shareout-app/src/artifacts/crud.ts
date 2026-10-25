@@ -172,7 +172,7 @@ export async function handleGetArtifact(
       COALESCE(mod_a.status, 'approved') AS moderation_status,
       mod_a.reason AS moderation_reason, mod_a.checked_at AS moderation_checked_at,
       d.updated_at, d.slug as deploy_slug,
-      w.slug as workspace_slug,
+      w.slug as workspace_slug, ou.name AS owner_name, ou.email AS owner_email,
       COALESCE((SELECT version_no FROM versions WHERE id = d.version_id), (SELECT MAX(version_no) FROM versions WHERE artifact_id = a.id)) as current_version,
       (SELECT MAX(version_no) FROM versions WHERE artifact_id = a.id) as latest_version,
       lv.message AS live_message, lv.message_source AS live_message_source,
@@ -181,6 +181,7 @@ export async function handleGetArtifact(
     LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
     LEFT JOIN versions lv ON lv.id = d.version_id
     LEFT JOIN workspaces w ON w.id = a.workspace_id
+    LEFT JOIN users ou ON ou.id = a.owner_id
     LEFT JOIN artifact_presentation pres_a ON pres_a.artifact_id = a.id
     LEFT JOIN artifact_moderation mod_a ON mod_a.artifact_id = a.id
     WHERE (a.id = ? OR a.slug = ?) AND a.deleted_at IS NULL
@@ -191,6 +192,8 @@ export async function handleGetArtifact(
     slug: string;
     visibility: string;
     paused: number;
+    owner_name: string | null;
+    owner_email: string | null;
     created_at: string;
     description: string | null;
     social_title: string | null;
@@ -279,6 +282,7 @@ export async function handleGetArtifact(
     paused: artifact.paused === 1,
     created_at: artifact.created_at,
     updated_at: artifact.updated_at,
+    owner: artifact.owner_name || artifact.owner_email ? { name: artifact.owner_name, email: artifact.owner_email } : null,
     current_version: artifact.current_version || 1,
     latest_version: artifact.latest_version || artifact.current_version || 1,
     live_message: artifact.live_message ?? null,
