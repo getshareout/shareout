@@ -145,13 +145,15 @@ describe('handleVisitorChat', () => {
   it('workspace members skip the per-artifact visitor cap', async () => {
     mockCheckRateLimit.mockResolvedValue({ allowed: false, retryAfter: 30 });
     mockCaller.mockResolvedValue({ kind: 'member', userId: 'usr_m' });
-    const ctx = { ...makeCtx(makeEnv(configDb())), workspaceId: 'wsp_1', viewer: { email: 'a@b.c', isOwner: false } } as never;
+    const waitUntil = vi.fn();
+    const ctx = { ...makeCtx(makeEnv(configDb())), workspaceId: 'wsp_1', viewer: { email: 'a@b.c', isOwner: false }, waitUntil } as never;
     const res = await handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx);
     expect(res.status).toBe(200);
     await readSSE(res);
     expect(mockCheckRateLimit).not.toHaveBeenCalled();
     expect(mockIncrementRateLimit).not.toHaveBeenCalled();
-    expect(mockReserveMember).toHaveBeenCalledWith(expect.anything(), { kind: 'member', userId: 'usr_m' }, 'wsp_1', expect.any(Number));
+    // The request's waitUntil reaches the quota so its rate counter write is deferred.
+    expect(mockReserveMember).toHaveBeenCalledWith(expect.anything(), { kind: 'member', userId: 'usr_m' }, 'wsp_1', expect.any(Number), waitUntil);
   });
 
   it('a refused member quota returns 429', async () => {
@@ -170,7 +172,7 @@ describe('handleVisitorChat', () => {
     const res = await handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx);
     expect(res.status).toBe(200);
     await readSSE(res);
-    expect(mockReserveMember).toHaveBeenCalledWith(expect.anything(), { kind: 'automation', userId: 'usr_leo' }, 'wsp_1', expect.any(Number));
+    expect(mockReserveMember).toHaveBeenCalledWith(expect.anything(), { kind: 'automation', userId: 'usr_leo' }, 'wsp_1', expect.any(Number), undefined);
     expect(mockSettle).toHaveBeenCalledWith(expect.anything(), { kind: 'automation', userId: 'usr_leo' }, 'wsp_1', expect.any(Number));
     expect(mockCheckRateLimit).not.toHaveBeenCalled();
   });
@@ -344,6 +346,51 @@ describe('handleVisitorChat', () => {
     ctx.artifact.allow_anon_agent = 0; // owner has NOT enabled anon AI chat
     const res = await handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx);
     expect(res.status).toBe(403);
+  });
+
+  it('awaits the anonymous per-IP, then per-owner, counter write before answering', async () => {
+    const writes: Array<() => void> = [];
+    const kv = {
+      get: vi.fn(async () => null),
+      put: vi.fn(() => new Promise<void>((resolve) => { writes.push(resolve); })),
+    };
+    const ctx = makeCtx(makeEnv(configDb(), { RATE_LIMIT_KV: kv as unknown as KVNamespace }));
+    ctx.artifact.owner_id = 'usr_owner';
+    ctx.waitUntil = vi.fn();
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+    let answered = false;
+    const pending = handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx)
+      .then((res) => { answered = true; return res; });
+    await vi.waitFor(() => expect(writes).toHaveLength(1));
+    await tick();
+    expect(answered).toBe(false);
+    expect(writes).toHaveLength(1); // the per-owner check waits for the per-IP write
+    writes[0]();
+    await vi.waitFor(() => expect(writes).toHaveLength(2));
+    await tick();
+    expect(answered).toBe(false);
+    writes[1]();
+
+    const res = await pending;
+    expect(res.status).toBe(200);
+    await readSSE(res);
+    expect(ctx.waitUntil).not.toHaveBeenCalled();
+  });
+
+  it('keeps the owner check behind the per-IP one: a refused IP never touches the owner bucket', async () => {
+    const kv = {
+      get: vi.fn(async (key: string) => (key.startsWith('rl:aiChatAnonIp:') ? '1000' : null)),
+      put: vi.fn(async () => undefined),
+    };
+    const ctx = makeCtx(makeEnv(configDb(), { RATE_LIMIT_KV: kv as unknown as KVNamespace }));
+    ctx.artifact.owner_id = 'usr_owner';
+    ctx.waitUntil = vi.fn();
+
+    const res = await handleVisitorChat(jsonRequest(`${BASE_URL}/chat`, 'POST', { message: 'hi' }), ctx);
+    expect(res.status).toBe(429);
+    expect(kv.get).not.toHaveBeenCalledWith(expect.stringContaining('agentowner:'));
+    expect(kv.put).not.toHaveBeenCalled();
   });
 });
 

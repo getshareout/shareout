@@ -70,6 +70,8 @@ export async function handleVisitorChat(
         ctx.origin
       );
     }
+    // Anonymous callers spend the owner's AI budget, so these counter writes stay
+    // awaited (not deferred to waitUntil), and the per-owner check runs after this one.
     const ipLimit = await checkSlidingWindowRateLimit(ctx.env.RATE_LIMIT_KV, `agent:${ip}`, 'aiChatAnonIp');
     if (!ipLimit.allowed) {
       return new Response(
@@ -120,7 +122,7 @@ export async function handleVisitorChat(
   const caller = await agentCaller(request, ctx);
   const reservedTokens = config.visitor_max_tokens || 4096;
   const rateLimit: QuotaResult | { allowed: boolean; retryAfter?: number; error?: string; limit?: undefined; resetsAt?: undefined } = caller
-    ? await reserveAgentQuota(ctx.env, caller, ctx.workspaceId, reservedTokens)
+    ? await reserveAgentQuota(ctx.env, caller, ctx.workspaceId, reservedTokens, ctx.waitUntil)
     : await reserveRateLimit(ctx.env, ctx.artifactId, reservedTokens);
   if (!rateLimit.allowed) {
     return new Response(
