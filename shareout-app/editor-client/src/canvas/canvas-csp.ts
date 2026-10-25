@@ -1,10 +1,18 @@
 export const CANVAS_CSP_ATTR = 'data-so-canvas-csp';
-const CANVAS_CSP_META = `<meta ${CANVAS_CSP_ATTR} http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'">`;
+const CANVAS_CSP = "script-src 'none'; object-src 'none'; base-uri 'none'";
 
 export function withCanvasCsp(html: string): string {
-  if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => m + CANVAS_CSP_META);
-  if (/<html[^>]*>/i.test(html)) return html.replace(/<html[^>]*>/i, (m) => `${m}<head>${CANVAS_CSP_META}</head>`);
-  return `<!doctype html><html><head>${CANVAS_CSP_META}</head><body>${html}</body></html>`;
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const root = doc.documentElement;
+  const head = doc.head ?? doc.createElement('head');
+  root.insertBefore(head, root.firstChild);
+  const meta = doc.createElement('meta');
+  meta.setAttribute(CANVAS_CSP_ATTR, '');
+  meta.setAttribute('http-equiv', 'Content-Security-Policy');
+  meta.setAttribute('content', CANVAS_CSP);
+  head.insertBefore(meta, head.firstChild);
+  const standards = doc.doctype !== null || !/<(?:html|head)[\s>]/i.test(html);
+  return `${standards ? '<!DOCTYPE html>' : ''}${root.outerHTML}`;
 }
 
 export function stripCanvasCsp(root: ParentNode): void {
