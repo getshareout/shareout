@@ -318,12 +318,8 @@ describe('user-profile store', () => {
 
 describe('buildWorkspaceView — Phase 1 shell SSR', () => {
   const args = {
-    user, userInfo: { name: 'Leonel', picture: null }, catalog: [], catalogTruncated: false,
-    catalogTotal: 0, allCount: 0, favCount: 0, sharedCount: 0, workspaces: [], folders: [],
-    teamFolders: [], personalFolders: [], filesScope: 'team', folderKind: '', folder: '', tags: [],
-    search: '', sort: 'recent', type: '', scope: 'all', workspace: '', page: 1, openVisDisabled: false,
-    workspaceId: null, workspaceRole: null, wsTeamsPlan: false, accessRequests: [], hostname: 'shareout.site',
-    visualEditorOffWorkspaces: [], createEnabled: true, userSubscription: null,
+    user, userInfo: { name: 'Leonel', picture: null }, workspaces: [], workspace: '',
+    workspaceId: null, workspaceRole: null, createEnabled: true,
   } as unknown as RenderArgs;
 
   it('renders the three regions + dock and the hydration script', () => {
