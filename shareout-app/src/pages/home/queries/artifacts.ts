@@ -5,7 +5,7 @@ import type { Env } from '../../../types';
 import { getVisibilityScope, placeholders, type VisibilityScope } from '../../../account-links';
 import type { ArtifactRow, HomeFilters } from '../types';
 import { HOME_CATALOG_LIMIT, HOME_PAGE_SIZE, TYPE_GROUPS } from '../constants';
-import { homeScopeSql, isLinkedWorkspaceMember } from '../filters';
+import { homeScopeSql, isLinkedWorkspaceMember, linkedWorkspaceMemberSql } from '../filters';
 import { type ActivityFeedOpts } from './shared';
 import { artifactCardSelect, ARTIFACT_CARD_JOINS } from './artifact-card';
 
@@ -210,6 +210,38 @@ export async function queryHomeArtifactCatalog(
   const truncated = results.length > HOME_CATALOG_LIMIT;
   const artifacts = truncated ? results.slice(0, HOME_CATALOG_LIMIT) : results;
   return { artifacts, total: artifacts.length, truncated };
+}
+
+/**
+ * The first `limit` catalog entries as `id, name` — all an assistant snapshot lists. Same
+ * visibility rules and order as queryHomeArtifactCatalog, without the card projection,
+ * and the membership check rides in the select instead of its own round trip.
+ */
+export async function queryHomeArtifactNames(
+  env: Env,
+  user: { id: string; email: string | null },
+  workspace: string | null,
+  limit: number,
+): Promise<{ artifacts: { id: string; name: string }[]; truncated: boolean }> {
+  const vis = await getVisibilityScope(env, user);
+  const base = homeScopeSql(vis, workspace);
+  const member = workspace ? linkedWorkspaceMemberSql(vis, workspace) : null;
+
+  const rows = await env.DB.prepare(`
+    SELECT a.id, a.name
+    FROM artifacts a
+    LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
+    ${base.join}
+    WHERE ${base.where}${member ? ` AND ${member.sql}` : ''}
+    GROUP BY a.id
+    ORDER BY COALESCE(d.updated_at, a.created_at) DESC
+    LIMIT ?
+  `).bind(...base.joinParams, ...base.whereParams, ...(member?.binds ?? []), limit + 1)
+    .all<{ id: string; name: string }>();
+
+  const results = rows.results || [];
+  const truncated = results.length > limit;
+  return { artifacts: truncated ? results.slice(0, limit) : results, truncated };
 }
 
 export async function queryHomeCounts(

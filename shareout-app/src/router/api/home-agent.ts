@@ -17,8 +17,8 @@ import { resolveAgentScope, type AgentScope } from '../../chat-agent/scope';
 import { checkAiChatLimit } from '../../rate-limit';
 import { transcribeAudioBytes } from '../../data/transcribe';
 import { hostWorkspaceId } from '../../pages/home/host';
-import { queryHomeArtifactCatalog } from '../../pages/home/queries/artifacts';
-import { queryActivityFeed } from '../../pages/home/queries/activity-feed';
+import { queryHomeArtifactNames } from '../../pages/home/queries/artifacts';
+import { queryActionItems, queryActivityFeed } from '../../pages/home/queries/activity-feed';
 import type { ActionItem } from '../../pages/home/types';
 import { getCrewProvider } from '../../crew/provider';
 import { resolveGatewayModel } from '../../data/agent/ai-config';
@@ -59,17 +59,17 @@ export function actionItemsBlock(items: ActionItem[]): string {
  *  prompt. Untrusted data. */
 export async function buildHomeSnapshot(env: Env, ws: string | null, user: AuthUser): Promise<string> {
   const u = { id: user.id, email: user.email };
-  const [cat, feed, wsRow, clientNotes, trunk, guidance] = await Promise.all([
-    queryHomeArtifactCatalog(env, u, ws)
-      .catch(() => ({ artifacts: [] as { id: string; name: string }[], total: 0, truncated: false })),
-    queryActivityFeed(env, u, { workspaceId: ws }).catch(() => null),
+  const [cat, actionItems, wsRow, clientNotes, trunk, guidance] = await Promise.all([
+    queryHomeArtifactNames(env, u, ws, 15)
+      .catch(() => ({ artifacts: [] as { id: string; name: string }[], truncated: false })),
+    queryActionItems(env, u, ws).then((r) => r.items).catch((): ActionItem[] => []),
     ws ? env.DB.prepare('SELECT slug FROM workspaces WHERE id = ?').bind(ws).first<{ slug: string }>() : null,
     ws ? buildClientsContextForWorkspace(env, ws).catch(() => '') : '',
     ws ? knowledgeTrunkForContext(env, ws) : '',
     ws ? guidanceEntryForContext(env, ws) : '',
   ]);
-  const pages = cat.artifacts.slice(0, 15).map((a) => `- ${a.name} (id: ${a.id})`).join('\n');
-  const actions = feed ? actionItemsBlock(feed.actionItems) : '';
+  const pages = cat.artifacts.map((a) => `- ${a.name} (id: ${a.id})`).join('\n');
+  const actions = actionItemsBlock(actionItems);
   const inboxLine = wsRow?.slug
     ? `Members can email files to ${inboxAddress(wsRow.slug, env)}; they appear in list_files.`
     : '';
