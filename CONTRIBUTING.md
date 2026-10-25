@@ -28,9 +28,9 @@ npm run dev                      # http://localhost:55162
 ```
 
 Working on several branches at once? `./tooling/scripts/new-worktree.sh <branch>` adds a
-worktree off `origin/main` and clones `node_modules` from this checkout rather than
-running `npm ci` again — copy-on-write on APFS, so it takes seconds and almost no disk.
-It falls back to `npm ci` whenever the lockfiles differ.
+worktree off `origin/main` and clones `node_modules` from this checkout instead of
+installing a second copy — copy-on-write on APFS, so it costs almost no disk. It falls
+back to `npm ci` whenever the lockfiles differ (~5 s with a warm npm cache).
 
 No secrets to fill in: `npm run dev` creates `.dev.vars` from `.dev.vars.example` and
 generates a local `SESSION_SECRET` if there isn't one. Sessions are signed with that secret,
@@ -64,7 +64,8 @@ local-only.
 
 ## Checks before a PR
 
-There is no hosted CI — these local checks are the gate. Before a PR:
+There is no hosted CI, by design — these local checks are the gate. Before a PR from a
+single checkout:
 
 ```bash
 ./tooling/scripts/ci-check.sh
@@ -74,6 +75,11 @@ That runs static gates, fresh D1 migrate, typecheck, the **full unit suite**, wo
 tests, bundles, `npm audit --omit=dev --audit-level=high` (runtime deps), gitleaks, and
 the docs-site build. Coverage floors are opt-in — `SHAREOUT_COVERAGE=1` roughly doubles
 the run; run them when a change could move coverage.
+
+Running several worktrees (or agents) on one machine? Don't run the full suite in each:
+push light and integrate once, as described under
+[Hooks, worktrees and generated files](#hooks-worktrees-and-generated-files) and in
+[AGENTS.md → Gate contract](AGENTS.md#gate-contract).
 
 Faster loop while iterating (skips migrate, coverage, audit, docs, and runs only the
 tests your change touches):
