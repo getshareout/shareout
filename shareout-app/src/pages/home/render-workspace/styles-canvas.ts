@@ -33,13 +33,14 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 .wsx-tab--home { flex: none; min-width: 0; max-width: none; }
 .wsx-tab__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* Artifact bar: View/Edit, mobile preview and full screen sit above the artifact they control, not in the app header */
-.wsx__artbar { display: flex; align-items: center; gap: 6px; flex: none; margin: 10px clamp(16px, 3vw, 32px) 0; }
+.wsx__artbar { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex: none; margin: 10px clamp(16px, 3vw, 32px) 0; }
 .wsx__artbar:not(:has(> :not([hidden]))) { display: none; }
-.wsx__artbar .wsx__tabdevice:first-of-type { margin-left: auto; }
+.wsx__artbar > .wsx__stagebar2 + .wsx__tabmode { margin-left: 10px; }
 .wsx__tabmode { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--radius-md); background: var(--color-surface); flex: none; }
 .wsx__tabmode[hidden] { display: none; }
-.wsx__tabmode button { border: 0; background: transparent; padding: 5px 14px; border-radius: calc(var(--radius-md) - 3px); font: 600 var(--text-sm) var(--font-body); color: var(--color-text-secondary); cursor: pointer; transition: background var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
+.wsx__tabmode button { display: grid; place-items: center; border: 0; background: transparent; padding: 5px 9px; border-radius: calc(var(--radius-md) - 3px); font: 600 var(--text-sm) var(--font-body); color: var(--color-text-secondary); cursor: pointer; transition: background var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
 .wsx__tabmode button:hover { color: var(--color-text); }
+.wsx__tabmode svg { width: 16px; height: 16px; }
 .wsx__tabmode button.is-on { background: var(--color-bg-elevated); color: var(--color-text); box-shadow: var(--shadow-sm); }
 .wsx-tab__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-warning); flex: none; }
 .wsx-tab__x { width: 18px; height: 18px; display: grid; place-items: center; border: 0; background: transparent; border-radius: 50%; color: var(--color-text-tertiary); cursor: pointer; flex: none; font-size: 13px; }

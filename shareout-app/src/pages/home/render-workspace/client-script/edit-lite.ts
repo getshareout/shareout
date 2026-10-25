@@ -9,7 +9,8 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
   var MD_TEXT_SEL = 'p,h1,h2,h3,h4,h5,h6,span,a,li,td,th,blockquote,pre';
   function textSel(rec) { return rec.md ? MD_TEXT_SEL : TEXT_SEL; }
   var EDIT_CSS = '<style data-wsx-edit="1">'
-    + '[data-wsx-hover]{outline:1.5px dashed color-mix(in srgb, ${colors.primary} 33%, transparent);outline-offset:2px;cursor:text}'
+    + '[data-wsx-hover]{outline:1.5px solid color-mix(in srgb, ${colors.primary} 55%, transparent);outline-offset:2px;cursor:pointer}'
+    + '[data-wsx-sel]{outline:2px solid ${colors.primary};outline-offset:2px}'
     + '[contenteditable="true"]{outline:2px solid ${colors.primary};outline-offset:2px;border-radius:2px}'
     + '*{caret-color:${colors.primary}}</style>';
   // ---- source-mapped model: render scripts-ON for fidelity (charts/JS render like View),
@@ -36,7 +37,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
     var s = srcOf(rec, liveEl); if (!s) return;
     if (liveEl.hasAttribute('style')) s.setAttribute('style', liveEl.getAttribute('style')); else s.removeAttribute('style');
     ['src', 'href', 'alt', 'target'].forEach(function (a) { if (liveEl.hasAttribute(a)) s.setAttribute(a, liveEl.getAttribute(a)); else s.removeAttribute(a); });
-    s.innerHTML = liveEl.innerHTML;
+    if (liveEl.__wsxW) s.innerHTML = liveEl.innerHTML; // containers: attrs only, never JS-rendered children
   }
   function renderLive(rec) {
     if (!rec.srcDoc) return;
@@ -47,7 +48,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
   function reselectById(rec, id) {
     if (id == null) { setSel(rec, null); return; }
     var doc = rec.editframe.contentDocument; var el = doc && doc.querySelector('[data-wsx-id="' + id + '"]');
-    if (el) setSel(rec, { type: el.tagName === 'IMG' ? 'img' : (el.tagName === 'A' ? 'link' : 'text'), el: el }); else setSel(rec, null);
+    if (el) setSel(rec, { type: el.tagName === 'IMG' ? 'img' : !el.__wsxW ? 'box' : el.tagName === 'A' ? 'link' : 'text', el: el }); else setSel(rec, null);
   }
   function loadEditSource(rec) {
     if (!rec.art.id) { rec.editframe.removeAttribute('srcdoc'); rec.editframe.srcdoc = '<div style="${EDIT_PLACEHOLDER_STYLE}">' + esc(t('edit.openFromLibrary')) + '</div>'; rec.publishBtn.hidden = true; return; }
@@ -87,7 +88,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
         rec.idCounter = stampTree(rec.srcDoc, 0);
         rec.history = []; rec.histIdx = -1; rec.pendingSel = null;
         renderLive(rec);
-        setSaveStatus(rec, d.editor.hasDraft ? t('edit.editingDraft') : t('edit.ready'));
+        setSaveStatus(rec, d.editor.hasDraft ? t('edit.editingDraft') : '');
       })
       .catch(function (e) { if (e !== 'forbidden') setSaveStatus(rec, t('edit.couldNotLoad'), 'warn'); });
   }
@@ -101,8 +102,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
   }
   function wireTextEl(rec, el) {
     if (el.querySelector && el.querySelector(textSel(rec))) return; // leaf text only
-    el.addEventListener('mouseenter', function () { if (el.getAttribute('contenteditable') !== 'true') el.setAttribute('data-wsx-hover', '1'); });
-    el.addEventListener('mouseleave', function () { el.removeAttribute('data-wsx-hover'); });
+    el.__wsxW = 1;
     el.addEventListener('click', function (e) {
       if (el.tagName === 'A') { e.preventDefault(); setSel(rec, { type: 'link', el: el }); }
       else setSel(rec, { type: 'text', el: el });
@@ -112,8 +112,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
     el.addEventListener('blur', function () { el.removeAttribute('contenteditable'); syncLiveToSource(rec, el); });
   }
   function wireImgEl(rec, img) {
-    img.addEventListener('mouseenter', function () { img.setAttribute('data-wsx-hover', '1'); });
-    img.addEventListener('mouseleave', function () { img.removeAttribute('data-wsx-hover'); });
+    img.__wsxW = 1;
     img.addEventListener('click', function (e) { e.preventDefault(); img.removeAttribute('data-wsx-hover'); setSel(rec, { type: 'img', el: img }); });
   }
   // Only AUTHORED elements (data-wsx-id) are editable; JS-generated nodes stay read-only.
@@ -131,11 +130,27 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
     var doc = rec.editframe.contentDocument; if (!doc) { setSaveStatus(rec, t('edit.couldNotOpen'), 'warn'); return; }
     if (!doc.body) return;
     wireSubtree(rec, doc.body);
-    doc.body.addEventListener('click', function (e) { if (e.target === doc.body || e.target === doc.documentElement) setSel(rec, null); });
+    // Hover/click any authored element, like the full editor; text + images keep their own handlers.
+    var hov = null;
+    function hover(el) { if (hov === el) return; if (hov) hov.removeAttribute('data-wsx-hover'); hov = el; if (el && el.getAttribute('contenteditable') !== 'true') el.setAttribute('data-wsx-hover', '1'); }
+    doc.addEventListener('mouseover', function (e) { hover(pickable(rec, e.target)); });
+    doc.addEventListener('mouseout', function (e) { if (!e.relatedTarget) hover(null); });
+    doc.addEventListener('click', function (e) {
+      var el = pickable(rec, e.target);
+      if (!el) { setSel(rec, null); return; }
+      if (el.__wsxW) return;
+      e.preventDefault(); setSel(rec, { type: 'box', el: el });
+    });
     doc.addEventListener('keydown', function (e) { editKeydown(rec, e); });
     if (rec.pendingSel !== undefined && rec.pendingSel !== null) { var id = rec.pendingSel; rec.pendingSel = null; reselectById(rec, id); }
     else if (rec.pendingSel === null) { rec.pendingSel = undefined; setSel(rec, null); }
     if (!rec.history.length) pushHistory(rec); // baseline on first render
+  }
+  function pickable(rec, n) {
+    var el = n && n.closest ? n.closest('[data-wsx-id]') : null;
+    if (el && el.closest('svg') && el.tagName.toLowerCase() !== 'svg') el = el.closest('svg').closest('[data-wsx-id]');
+    for (var w = el; w; w = w.parentElement) if (w.__wsxW) return w; // inline bits belong to their text
+    return rec.md ? null : el;
   }
   function editKeydown(rec, e) {
     if (e.key === 'Escape') { var a = (rec.editframe.contentDocument || {}).activeElement; if (a && a.blur) a.blur(); setSel(rec, null); return; }
@@ -254,26 +269,6 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
     var tgt = sdoc.getElementById('wsxAiTarget'); if (tgt) tgt.removeAttribute('id');
     rec.idCounter = stampTree(sdoc, rec.idCounter || 0); // stamp any AI-added nodes
   }
-  var INSERT_MAP = { p: '<p>' + esc(t('edit.newText')) + '</p>', h2: '<h2>' + esc(t('edit.newHeading')) + '</h2>', img: '<img alt="" style="max-width:100%">', button: '<button>' + esc(t('edit.newButton')) + '</button>', hr: '<hr>' };
-  function insertBlock(rec, kind) {
-    if (!rec.srcDoc) return;
-    var tmp = rec.srcDoc.createElement('div'); tmp.innerHTML = INSERT_MAP[kind] || ''; var node = tmp.firstElementChild; if (!node) return;
-    stampFresh(rec, node);
-    var ref = srcOf(rec, rec.sel && rec.sel.el);
-    var host = rec.md ? mdRoot(rec.srcDoc) : rec.srcDoc.body;
-    if (rec.md) while (ref && ref.parentNode !== host) ref = ref.parentNode; // new Markdown blocks sit at the top level
-    if (ref && ref.parentNode) ref.parentNode.insertBefore(node, ref.nextSibling); else host.appendChild(node);
-    rec.pendingSel = (kind === 'hr') ? null : node.getAttribute('data-wsx-id');
-    markDirty(rec); renderLive(rec);
-  }
-  function insertSection(rec, label) {
-    return '<div class="wsx-edit__sec"><div class="lbl" data-inslbl>' + esc(label || t('edit.insertBelow')) + '</div><div class="wsx-edit__palette">'
-      + '<button data-ins="p" type="button">+ ' + esc(t('edit.text')) + '</button><button data-ins="h2" type="button">+ ' + esc(t('edit.heading')) + '</button>'
-      + '<button data-ins="img" type="button">+ ' + esc(t('edit.image')) + '</button>'
-      + (rec.md ? '' : '<button data-ins="button" type="button">+ ' + esc(t('edit.newButton')) + '</button>')
-      + '<button data-ins="hr" type="button">+ ' + esc(t('edit.divider')) + '</button></div></div>';
-  }
-  function wireInsert(rec) { rbodyEl.querySelectorAll('[data-ins]').forEach(function (b) { b.addEventListener('click', function () { insertBlock(rec, b.getAttribute('data-ins')); }); }); }
   function boxSectionHtml(includeAlign) {
     return '<div class="wsx-edit__sec"><div class="lbl">' + esc(t('edit.background')) + '</div><div class="wsx-edit__inrow"><input type="color" id="wsxBg" title="' + esc(t('edit.backgroundColor')) + '"><button class="wsx-edit__btn" id="wsxBgClear" type="button">' + esc(t('edit.clear')) + '</button></div></div>'
       + '<div class="wsx-edit__sec"><div class="lbl">' + esc(t('edit.padding')) + '</div><select class="wsx-edit__sel" id="wsxPad"><option value="">' + esc(t('edit.default')) + '</option><option value="4px">XS</option><option value="8px">S</option><option value="16px">M</option><option value="24px">L</option><option value="40px">XL</option></select></div>'
@@ -289,19 +284,50 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
     if (includeAlign) rbodyEl.querySelectorAll('[data-al]').forEach(function (b) { b.addEventListener('mousedown', function (e) { e.preventDefault(); }); b.addEventListener('click', function () { el.style.textAlign = b.getAttribute('data-al'); markDirty(rec, el); }); });
   }
   // Selection drives the right-rail Edit panel (the "editing sidebar").
-  function setSel(rec, sel) { rec.sel = sel; if (panes[activeKey] === rec && rec.mode === 'edit') renderEditPanel(rec); }
+  function setSel(rec, sel) {
+    if (rec.sel && rec.sel.el) rec.sel.el.removeAttribute('data-wsx-sel');
+    rec.sel = sel; if (sel && sel.el) sel.el.setAttribute('data-wsx-sel', '1');
+    if (panes[activeKey] === rec && rec.mode === 'edit') renderEditPanel(rec);
+  }
   function renderEditPanel(rec) {
     var sel = rec.sel;
-    if (!sel) {
-      rbodyEl.innerHTML = '<div class="wsx-edit"><div class="wsx-edit__hint">' + t('edit.hintIdle') + '</div>'
-        + (rec.mdLocked ? '<div class="wsx-edit__hint">' + esc(t('edit.mdLocked')) + '</div>' : '')
-        + insertSection(rec, t('edit.addToPage')) + '</div>';
-      wireInsert(rec);
-      return;
-    }
-    if (sel.type === 'img') return editPanelImg(rec, sel.el);
-    if (sel.type === 'link') return editPanelLink(rec, sel.el);
-    return editPanelText(rec, sel.el);
+    if (!sel) rbodyEl.innerHTML = '<div class="wsx-edit"><div class="wsx-edit__hint">' + t('edit.hintIdle') + '</div>'
+      + (rec.mdLocked ? '<div class="wsx-edit__hint">' + esc(t('edit.mdLocked')) + '</div>' : '') + '</div>';
+    else if (sel.type === 'img') editPanelImg(rec, sel.el);
+    else if (sel.type === 'link') editPanelLink(rec, sel.el);
+    else if (sel.type === 'box') editPanelBox(rec, sel.el);
+    else editPanelText(rec, sel.el);
+    rbodyEl.firstElementChild.insertAdjacentHTML('afterbegin', treeHtml(rec));
+    wireTree(rec);
+  }
+  // Element tree (like the full editor's layers): authored elements only, click selects, hover highlights.
+  function treeHtml(rec) {
+    var doc = rec.editframe.contentDocument; if (!doc || !doc.body) return '';
+    var rows = '', selId = rec.sel && rec.sel.el.getAttribute('data-wsx-id');
+    (function walk(el, depth) {
+      for (var c = el.firstElementChild; c; c = c.nextElementSibling) {
+        var id = c.getAttribute('data-wsx-id');
+        if (id == null || (rec.md && !c.__wsxW)) { walk(c, depth); continue; }
+        var tag = c.tagName.toLowerCase(), txt = c.children.length ? '' : (c.textContent || '').trim().slice(0, 40);
+        rows += '<button type="button" class="wsx-edit__node' + (id === selId ? ' is-on' : '') + '" data-node="' + id + '" data-d="' + Math.min(depth, 8) + '"><span class="wsx-edit__ntag">' + esc(tag) + '</span>' + (txt ? '<span class="wsx-edit__ntxt">' + esc(txt) + '</span>' : '') + '</button>';
+        if (tag !== 'svg' && !c.__wsxW) walk(c, depth + 1);
+      }
+    })(doc.body, 0);
+    return rows ? '<div class="wsx-edit__sec"><div class="lbl">' + esc(t('edit.layers')) + '</div><div class="wsx-edit__tree">' + rows + '</div></div>' : '';
+  }
+  function wireTree(rec) {
+    var doc = rec.editframe.contentDocument;
+    function live(b) { return doc && doc.querySelector('[data-wsx-id="' + b.getAttribute('data-node') + '"]'); }
+    rbodyEl.querySelectorAll('[data-node]').forEach(function (b) {
+      b.addEventListener('mouseenter', function () { var el = live(b); if (el) el.setAttribute('data-wsx-hover', '1'); });
+      b.addEventListener('mouseleave', function () { var el = live(b); if (el) el.removeAttribute('data-wsx-hover'); });
+      b.addEventListener('click', function () { var el = live(b); if (!el) return; el.removeAttribute('data-wsx-hover'); reselectById(rec, b.getAttribute('data-node')); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); });
+    });
+    var on = rbodyEl.querySelector('.wsx-edit__node.is-on'); if (on) on.scrollIntoView({ block: 'nearest' });
+  }
+  function editPanelBox(rec, el) {
+    rbodyEl.innerHTML = '<div class="wsx-edit">' + editHeader(t('edit.block'), el.tagName.toLowerCase()) + boxSectionHtml(true) + EDIT_ACTIONS + '</div>';
+    wireBox(rec, el, true); wireEditActions(rec);
   }
   var EDIT_ACTIONS = '<div class="wsx-edit__sec"><div class="lbl">' + esc(t('edit.element')) + '</div><div class="wsx-edit__inrow">'
     + '<button class="wsx-edit__btn sq" data-eact="up" title="' + esc(t('edit.moveUp')) + '" type="button">\\u2191</button>'
@@ -340,7 +366,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
       + (md ? '' : '<div class="wsx-edit__sec"><div class="lbl">' + esc(t('edit.colorSize')) + '</div><div class="wsx-edit__inrow"><input type="color" id="wsxTxtColor" title="' + esc(t('edit.textColor')) + '"><select class="wsx-edit__sel" id="wsxTxtSize"><option value="">' + esc(t('edit.defaultSize')) + '</option><option value="0.85em">' + esc(t('edit.sizeS')) + '</option><option value="1em">' + esc(t('edit.sizeM')) + '</option><option value="1.25em">' + esc(t('edit.sizeL')) + '</option><option value="1.6em">' + esc(t('edit.sizeXL')) + '</option></select></div></div>')
       + '<div class="wsx-edit__hint">' + esc(t(md ? 'edit.hintTextMd' : 'edit.hintText')) + '</div>'
       + aiSectionHtml()
-      + (md ? '' : boxSectionHtml(true)) + insertSection(rec) + EDIT_ACTIONS + '</div>';
+      + (md ? '' : boxSectionHtml(true)) + EDIT_ACTIONS + '</div>';
     rbodyEl.querySelectorAll('[data-fmt]').forEach(function (b) {
       b.addEventListener('mousedown', function (e) { e.preventDefault(); });
       b.addEventListener('click', function () {
@@ -362,7 +388,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
       size.addEventListener('change', function () { el.style.fontSize = size.value; markDirty(rec, el); });
       wireBox(rec, el, true);
     }
-    wireAi(rec, el); wireInsert(rec); wireEditActions(rec);
+    wireAi(rec, el); wireEditActions(rec);
   }
   function editPanelLink(rec, a) {
     var blank = a.getAttribute('target') === '_blank';
@@ -371,7 +397,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
       + '<div class="wsx-edit__sec"><div class="lbl">URL</div><div class="wsx-edit__inrow"><input type="url" id="wsxLinkHref" placeholder="https://\\u2026"><button class="wsx-edit__btn" id="wsxLinkApply" type="button">' + esc(t('edit.apply')) + '</button></div></div>'
       + (rec.md ? '' : '<label class="wsx-edit__check"><input type="checkbox" id="wsxLinkBlank"' + (blank ? ' checked' : '') + '> ' + esc(t('edit.newTab')) + '</label>')
       + '<div class="wsx-edit__hint">' + esc(t('edit.hintLink')) + '</div>'
-      + (rec.md ? '' : boxSectionHtml(false)) + insertSection(rec) + EDIT_ACTIONS + '</div>';
+      + (rec.md ? '' : boxSectionHtml(false)) + EDIT_ACTIONS + '</div>';
     var inp = document.getElementById('wsxLinkHref'); inp.value = a.getAttribute('href') || '';
     function apply() { a.setAttribute('href', inp.value.trim()); markDirty(rec, a); }
     document.getElementById('wsxLinkApply').addEventListener('click', apply);
@@ -380,7 +406,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
       document.getElementById('wsxLinkBlank').addEventListener('change', function (e) { if (e.target.checked) a.setAttribute('target', '_blank'); else a.removeAttribute('target'); markDirty(rec, a); });
       wireBox(rec, a, false);
     }
-    wireInsert(rec); wireEditActions(rec);
+    wireEditActions(rec);
   }
   function editPanelImg(rec, img) {
     rbodyEl.innerHTML = '<div class="wsx-edit">'
@@ -389,7 +415,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
       + '<div class="wsx-edit__sec"><div class="lbl">' + esc(t('edit.imgSrc')) + '</div><div class="wsx-edit__inrow"><input type="url" id="wsxImgSrc" placeholder="' + esc(t('edit.imgUrlPh')) + '"><button class="wsx-edit__btn" id="wsxImgRep" type="button">' + esc(t('edit.set')) + '</button></div></div>'
       + '<button class="wsx-edit__btn full" id="wsxImgUp" type="button">' + esc(t('edit.uploadImg')) + '</button>'
       + '<div class="wsx-edit__sec"><div class="lbl">' + esc(t('edit.altText')) + '</div><input type="text" id="wsxImgAlt" placeholder="' + esc(t('edit.altPh')) + '"></div>'
-      + (rec.md ? '' : boxSectionHtml(false)) + insertSection(rec) + EDIT_ACTIONS + '</div>';
+      + (rec.md ? '' : boxSectionHtml(false)) + EDIT_ACTIONS + '</div>';
     var srcEl = document.getElementById('wsxImgSrc'); srcEl.value = img.getAttribute('src') || '';
     var thumb = rbodyEl.querySelector('.wsx-edit__thumb');
     function setSrc(v) { img.setAttribute('src', v); thumb.src = v; markDirty(rec, img); }
@@ -410,7 +436,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
       f.click();
     });
     if (!rec.md) wireBox(rec, img, false);
-    wireInsert(rec); wireEditActions(rec);
+    wireEditActions(rec);
   }
   function markDirty(rec, el) {
     if (el) syncLiveToSource(rec, el);
@@ -428,7 +454,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
     var clone = rec.srcDoc.documentElement.cloneNode(true);
     clone.querySelectorAll('[data-wsx-id]').forEach(function (el) { el.removeAttribute('data-wsx-id'); });
     clone.querySelectorAll('[contenteditable]').forEach(function (el) { el.removeAttribute('contenteditable'); });
-    clone.querySelectorAll('[data-wsx-hover]').forEach(function (el) { el.removeAttribute('data-wsx-hover'); });
+    clone.querySelectorAll('[data-wsx-hover], [data-wsx-sel]').forEach(function (el) { el.removeAttribute('data-wsx-hover'); el.removeAttribute('data-wsx-sel'); });
     clone.querySelectorAll('base, style[data-wsx-edit], [data-shareout-editor]').forEach(function (el) { el.remove(); });
     return '<!DOCTYPE html>' + clone.outerHTML;
   }
@@ -486,7 +512,7 @@ export const workspace_client_edit_lite_core_JS = `  function setModeButtons(rec
     rec.fullEdit.hidden = rec.mode !== 'edit';
     rec.undoBtn.hidden = rec.mode !== 'edit';
     rec.redoBtn.hidden = rec.mode !== 'edit';
-    rec.mobileBtn.hidden = rec.mode !== 'edit';
+    rec.bar.hidden = rec.mode !== 'edit';
     rec.discardBtn.hidden = rec.mode !== 'edit';
     if (rec.mode === 'edit') updateUndoButtons(rec); else { rec.sel = null; }
   }

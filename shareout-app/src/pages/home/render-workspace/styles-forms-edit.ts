@@ -46,8 +46,8 @@ export const WORKSPACE_FORMS_EDIT_STYLES = `/* ---- Modal + native create forms 
 .wsx-mt-12 { margin-top: 12px; }
 .wsx__stageframe { width: 100%; flex: 1; min-height: 360px; border: 1px solid var(--color-border); border-radius: var(--radius-2xl); box-shadow: var(--shadow-hero); background: var(--color-surface); display: block; }
 /* ---- Edit-Lite: per-pane toolbar + edit surface ---- */
-.wsx__stagebar2 { display: flex; align-items: center; gap: 10px; margin-bottom: var(--space-3); flex: none; }
-.wsx__pane--art:not(.is-editing) .wsx__stagebar2 { display: none; }
+.wsx__stagebar2 { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.wsx__stagebar2[hidden] { display: none; }
 .wsx__modetog { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--radius-md); background: var(--color-surface); }
 .wsx__modetog button { border: 0; background: transparent; padding: 5px 15px; border-radius: calc(var(--radius-md) - 3px); font: 600 var(--text-sm) var(--font-body); color: var(--color-text-secondary); cursor: pointer; transition: background var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
 .wsx__modetog button:hover { color: var(--color-text); }
@@ -85,6 +85,15 @@ export const WORKSPACE_FORMS_EDIT_STYLES = `/* ---- Modal + native create forms 
 .wsx-edit__tag { font: 600 10px var(--font-body); text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; background: var(--color-primary-light); color: var(--color-primary); }
 .wsx-edit__sec { display: flex; flex-direction: column; gap: 7px; }
 .wsx-edit__sec .lbl { font: 600 var(--text-xs) var(--font-body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-tertiary); }
+.wsx-edit__tree { display: flex; flex-direction: column; max-height: 240px; overflow-y: auto; padding: 4px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elevated); }
+.wsx-edit__node { display: flex; align-items: baseline; gap: 6px; min-width: 0; padding: 4px 8px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text-secondary); font: 500 var(--text-xs) var(--font-body); text-align: left; cursor: pointer; white-space: nowrap; }
+.wsx-edit__node:hover { background: var(--color-surface); color: var(--color-text); }
+.wsx-edit__node.is-on { background: var(--color-primary-light); color: var(--color-primary); }
+.wsx-edit__ntag { flex: none; font: 600 11px var(--font-mono, monospace); color: var(--color-text-tertiary); }
+.wsx-edit__node.is-on .wsx-edit__ntag { color: inherit; }
+.wsx-edit__ntxt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.wsx-edit__node[data-d="1"] { padding-left: 20px; } .wsx-edit__node[data-d="2"] { padding-left: 32px; } .wsx-edit__node[data-d="3"] { padding-left: 44px; } .wsx-edit__node[data-d="4"] { padding-left: 56px; }
+.wsx-edit__node[data-d="5"] { padding-left: 68px; } .wsx-edit__node[data-d="6"] { padding-left: 80px; } .wsx-edit__node[data-d="7"] { padding-left: 92px; } .wsx-edit__node[data-d="8"] { padding-left: 104px; }
 .wsx-edit__inrow { display: flex; gap: 6px; }
 .wsx-edit input[type="url"], .wsx-edit input[type="text"] { flex: 1; min-width: 0; box-sizing: border-box; padding: 8px 11px; border: 1.5px solid var(--color-border-strong); border-radius: var(--radius-md); font: 400 var(--text-sm) var(--font-body); outline: none; }
 .wsx-edit input:focus { border-color: var(--color-primary); }
