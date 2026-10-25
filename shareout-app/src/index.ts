@@ -13,9 +13,13 @@ import { handleScheduledEvent } from './scheduling/handler';
 import { handleViewEventBatch } from './analytics';
 import { logScheduledRun, withRequestLogging } from './request-logging';
 import { handleFetch } from './router/handle-fetch';
+import { setSelfFetch } from './http/self-fetch';
 import { handleInboundEmail } from './email/inbound';
 
 export { RealtimeCoordinator, CommentsCoordinator, MiniDB, ChatDO, PresenceCoordinator, Showtime, KnowledgeStore, KnowledgeIngestWorkflow, FileImportWorkflow, SlidesConverter };
+
+// The router is reachable from src/ only through this registration; see http/self-fetch.ts.
+setSelfFetch(handleFetch);
 
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
