@@ -21,6 +21,7 @@ import { workspace_client_home_views_catalog_JS } from './home-views/catalog';
 import { workspace_client_home_views_crew_JS } from './home-views/crew';
 import { workspace_client_home_views_library_JS } from './home-views/library';
 import { workspace_client_inspector_history_JS } from './inspector-history';
+import { workspace_client_inspector_deliver_JS } from './inspector-deliver';
 import { workspace_client_edit_lite_JS } from './edit-lite';
 import { workspace_client_guest_comments_lazy_JS } from './guest-comments';
 import { workspace_client_home_views_fileImport_JS } from './home-views/file-import';
@@ -42,6 +43,7 @@ export const LAZY_CHUNKS: Record<string, ChunkDef> = {
   crew: { src: workspace_client_home_views_crew_JS, exports: ['loadCrew'] },
   library: { src: workspace_client_home_views_library_JS, exports: ['loadLibrary'] },
   history: { src: workspace_client_inspector_history_JS, exports: ['renderHistory'] },
+  deliver: { src: workspace_client_inspector_deliver_JS, exports: ['renderDeliver', 'renderWatches'] },
   edit: {
     src: workspace_client_edit_lite_JS,
     exports: ['loadEditSource', 'renderLive', 'renderEditPanel', 'autosaveDraft', 'publishEdit'],

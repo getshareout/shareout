@@ -10,7 +10,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   function isvg(p) { return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + p + '</svg>'; }
   var SVG_OPEN = '<path d="M14 3h7v7"/><path d="M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/>';
   var SVG_EDIT = '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>';
-  var SVG_COPY = '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>';
+  var SVG_LINK = '<path d="M10 13a5 5 0 0 0 7.1 0l3-3a5 5 0 0 0-7.1-7.1l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.1 0l-3 3a5 5 0 0 0 7.1 7.1l1.2-1.2"/>';
   var SVG_STAR = '<path d="M12 17.3l-5.5 3.3 1.5-6.3-4.9-4.2 6.4-.5L12 3.5l2.5 5.9 6.4.5-4.9 4.2 1.5 6.3z"/>';
   var SVG_TRASH = '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>';
   var SVG_EMOJI = '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5s1.3 1.8 3.5 1.8 3.5-1.8 3.5-1.8"/><line x1="9" y1="9.2" x2="9.01" y2="9.2"/><line x1="15" y1="9.2" x2="15.01" y2="9.2"/>';
@@ -85,8 +85,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   function visSub(k) { var c = visCaption(k); return k === 'public' ? c + ' ' + t('inspector.visCdnHint') : c; }
   // "Shared with" empty-state title tracks visibility so it never contradicts the badge (Public but "only you see").
   function shareEmptyTitle(v) { return v === 'private' ? t('inspector.onlyYouSee') : visCaption(v === 'unlisted' ? 'public' : v); }
-  // Details helpers (GRIP_SVG, loadSecOrder/saveSecOrder, sec, aboutHtml, deliverHtml,
-  // wsxToast, bgAgent, wireSecDnd) live in inspector-details.ts — same IIFE scope.
+  // Details helpers (sec, wireSecs, aboutHtml, wsxToast, copyText…) live in inspector-details.ts.
   function paintDetails(art, meta) {
     var editable = !!(meta && meta.can_edit);
     var name = (meta && meta.name) || art.name || t('inspector.artifact');
@@ -102,7 +101,6 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     var visOpts = ['private'].concat(hasWs ? ['workspace'] : [], ['public']);
     var visCur = (vis === 'unlisted' ? 'public' : vis) || 'private';
 
-    // Header: name + star (banner removed to reclaim vertical space).
     var favTip = fav ? t('inspector.favRemove') : t('inspector.favAdd');
     var star = meta ? '<button class="wsx-det__star' + (fav ? ' is-on' : '') + '" data-iact="fav" type="button" data-tip="' + esc(favTip) + '" aria-label="' + esc(favTip) + '">' + isvg(SVG_STAR) + '</button>' : '';
     var visBlock = editable
@@ -111,63 +109,35 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
         + '</div><div class="wsx-vis-seg__sub" id="wsxVisSub">' + esc(visSub(visCur)) + '</div>'
       : '<span class="wsx-det__type">' + esc(visName(visCur)) + '</span>';
 
-    var h = '<div class="wsx__details">';
+    // 1 identity (title, description, meta) → 2 actions → 3 held notice → 4 sections.
+    var h = '<div class="wsx__details"><div class="wsx-det__head">';
     h += '<div class="wsx-det__hrow"><div class="wsx-det__name"' + ce + ' data-edit="name">' + esc(name) + '</div>' + star + '</div>';
-    h += visBlock;
-    // Persistent held banner (Workstream C): meta.moderation is present only to the
-    // owner/admin of a held page (GET detail, Workstream B). Reason + the standard
-    // pending/blocked message, so the hold isn't a silent dead end.
-    if (meta && meta.moderation) {
-      var mod = meta.moderation;
-      var modTint = mod.status === 'blocked' ? 'var(--color-error)' : 'var(--color-warning)';
-      var modLabel = mod.status === 'blocked' ? t('inspector.modBlocked') : t('cards.underReview');
-      h += '<div class="wsx-det__modnote" style="margin:8px 0 4px;padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.45;background:color-mix(in srgb,' + modTint + ' 12%,transparent);color:var(--color-text-secondary);border:1px solid color-mix(in srgb,' + modTint + ' 30%,transparent)">'
-        + '<strong style="color:' + modTint + '">' + esc(modLabel) + '</strong>'
-        + (mod.reason ? ' \\u00B7 ' + esc(mod.reason) : '')
-        + '<div style="margin-top:4px">' + esc(mod.message) + '</div></div>';
-    }
-    h += '<div class="wsx-det__actions2">'
-      + '<button class="wsx-abtn wsx-det__act" data-iact="open" type="button">' + isvg(SVG_OPEN) + esc(t('inspector.openLabel')) + '</button>'
-      + (editable ? '<button class="wsx-abtn wsx-det__act" data-iact="edit" type="button">' + isvg(SVG_EDIT) + esc(t('inspector.editLabel')) + '</button>' : '')
-      + iconBtn('copy', t('inspector.act.copy'), SVG_COPY)
+    if (desc || editable) h += '<div class="wsx-det__desc"' + ce + ' data-edit="description" data-ph="' + esc(t('inspector.addDescription')) + '">' + esc(desc) + '</div>';
+    if (meta) h += aboutHtml(meta, type, vis);
+    if (!editable) h += visBlock;
+    h += '<div class="wsx-det__acts">'
+      + iconBtn('open', t('inspector.act.open'), SVG_OPEN)
+      + (editable ? iconBtn('edit', t('inspector.act.edit'), SVG_EDIT) : '')
+      + iconBtn('copy', t('inspector.act.copy'), SVG_LINK)
       // A PDF has no viewer shell, so a converted deck's "Download original" lives here.
       + (meta && meta.original && type === 'pdf' ? iconBtn('original', t('inspector.act.original'), SVG_DOWNLOAD) : '')
       + (meta && meta.can_delete ? iconBtn('trash', t('inspector.act.trash'), SVG_TRASH, 'is-danger') : '')
-      + '</div>';
-    h += '<div class="wsx-det__sec wsx-det__approval" id="wsxApprove" hidden></div>';
-    h += pagesHtml(meta, art);
-
-    // Section bodies, keyed; rendered in the user's saved order.
-    var secBody = {
-      share: '<div class="wsx-det__chips wsx-det__sharecard" id="wsxShare"></div>',
-      deliver: deliverHtml(),
-      about: meta ? aboutHtml(meta, type, vis) : '',
-      description: '<div class="wsx-det__desc"' + ce + ' data-edit="description" data-ph="' + esc(t('inspector.addDescription')) + '">' + esc(desc) + '</div>',
-      tags: '<div class="wsx-det__chips" id="wsxTags"></div>',
-      folder: '<div id="wsxFolder"></div>',
-      tests: '<div id="wsxTests"></div>',
-      analytics: '<div id="wsxDetStats" class="wsx-det__stats"></div>',
-      watches: '<div id="wsxWatches"></div>',
-      knowledge: '<div id="wsxKnFrom"></div>'
-    };
-    var secMeta = {
-      share: [t('inspector.sharedWith'), t('inspector.sharedWithHelp')],
-      deliver: [t('inspector.deliver'), t('inspector.deliverHelp')],
-      about: [t('inspector.about'), t('inspector.aboutHelp')],
-      description: [t('inspector.description'), t('inspector.descriptionHelp')],
-      tags: [t('inspector.tags'), t('inspector.tagsHelp')],
-      folder: [t('inspector.folder'), t('inspector.folderHelp')],
-      tests: [t('inspector.tests'), t('inspector.testsHelp')],
-      analytics: [t('inspector.analytics'), t('inspector.analyticsHelp')],
-      watches: [t('inspector.watches'), t('inspector.watchesHelp')],
-      knowledge: [t('inspector.knowledgeFrom'), t('inspector.knowledgeFromHelp')]
-    };
-    var order = editable ? loadSecOrder() : (desc ? ['description'] : []).concat(['knowledge']);
-    h += '<div class="wsx-det__secs" id="wsxSecs">' + order.map(function (k) {
-      if (!secBody[k]) return '';
-      return sec(k, secMeta[k][0], secMeta[k][1], secBody[k], editable);
-    }).join('') + '</div>';
-    h += '</div>';
+      + '</div></div>';
+    // Held banner: meta.moderation reaches only the owner/admin of a held page.
+    if (meta && meta.moderation) {
+      var mod = meta.moderation;
+      h += '<div class="wsx-det__modnote' + (mod.status === 'blocked' ? ' is-err' : '') + '"><strong>' + esc(mod.status === 'blocked' ? t('inspector.modBlocked') : t('cards.underReview')) + '</strong>'
+        + (mod.reason ? ' \\u00B7 ' + esc(mod.reason) : '') + '<div>' + esc(mod.message) + '</div></div>';
+    }
+    h += '<div class="wsx-det__secs" id="wsxSecs">'
+      + sec('share', t('inspector.sharedWith'), t('inspector.sharedWithHelp'), (editable ? visBlock : '') + '<div class="wsx-det__chips wsx-det__sharecard" id="wsxShare"></div>')
+      + sec('approvals', t('review.approvals'), t('review.approvalsHelp'), '<div id="wsxApprove"></div>')
+      + pagesHtml(meta, art)
+      + (editable ? sec('organize', t('inspector.organize'), t('inspector.organizeHelp'), '<div id="wsxFolder"></div><div class="wsx-det__chips" id="wsxTags"></div>') : '')
+      + (editable ? sec('analytics', t('inspector.analytics'), t('inspector.analyticsHelp'), '<div id="wsxDetStats" class="wsx-det__stats"></div>') : '')
+      + (editable ? sec('tests', t('inspector.tests'), t('inspector.testsHelp'), '<div id="wsxTests"></div>') : '')
+      + sec('knowledge', t('inspector.knowledgeFrom'), t('inspector.knowledgeFromHelp'), '<div id="wsxKnFrom"></div>')
+      + '</div></div>';
     rbodyEl.innerHTML = h;
     var root = rbodyEl.querySelector('.wsx__details');
     paintApprovals(art);
@@ -248,110 +218,12 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       });
     }
 
-    // deliver — pick destination; if the channel isn't connected, offer a Connect button,
-    // otherwise recipient + Send now (direct API) / Schedule (POST /v1/jobs). No agent turn.
-    var dest = null, delStatus = null;
-    var delBody = root.querySelector('#wsxDelBody');
-    var recipPh = { Slack: t('inspector.deliverToSlack'), Telegram: t('inspector.deliverToTelegram'), Email: t('inspector.deliverToEmail') };
-    var CRON = { Daily: '0 9 * * *', Weekly: '0 9 * * 1', Monthly: '0 9 1 * *' };
-    function deliverConfig() {
-      var inp = delBody && delBody.querySelector('#wsxRecip'); var r = inp && inp.value.trim();
-      if (dest === 'Email') return { recipients: r ? [r] : [], includeArtifactLink: true };
-      if (dest === 'Telegram') return r ? { chatId: r, includeArtifactLink: true } : { includeArtifactLink: true };
-      return { connection: delStatus && delStatus.slack ? delStatus.slack.connectionName : undefined, channelId: r || undefined, includeArtifactLink: true }; // Slack
-    }
-    function actionRowHtml(ctl) {
-      return ctl
-        + '<div class="wsx-det__delact"><button class="wsx-abtn wsx-abtn--primary wsx-det__send" data-dsend="now" type="button">' + esc(t(dest === 'Slack' ? 'inspector.postToSlack' : 'inspector.sendNow')) + '</button>'
-        + '<button class="wsx-abtn wsx-det__sched" data-dsend="schedule" type="button">' + esc(t('inspector.schedule')) + '</button></div>'
-        + '<div class="wsx-det__freq" id="wsxFreq" hidden>' + ['Daily', 'Weekly', 'Monthly'].map(function (f) { return '<button class="wsx-abtn wsx-det__freqbtn" data-freq="' + f + '" type="button">' + esc(t('inspector.freq' + f)) + '</button>'; }).join('') + '</div>';
-    }
-    function recipControlHtml() {
-      if (dest === 'Slack') return '<select class="wsx-share__search wsx-det__recip" id="wsxRecip"><option value="">' + esc(t('inspector.loadingChannels')) + '</option></select>';
-      return '<input class="wsx-share__search wsx-det__recip" id="wsxRecip" autocomplete="off" placeholder="' + esc(recipPh[dest] || '') + '">';
-    }
-    function loadSlackChannels() {
-      var sel = delBody.querySelector('#wsxRecip'); if (!sel) return;
-      fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/deliver/slack-channels', { credentials: 'same-origin' })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (j) {
-          var ch = (j && j.channels) || [];
-          if (!ch.length) { sel.innerHTML = '<option value="">' + esc(t('inspector.noChannels')) + '</option>'; return; }
-          sel.innerHTML = '<option value="">' + esc(t('inspector.pickChannel')) + '</option>' + ch.map(function (c) { return '<option value="' + esc(c.id) + '">#' + esc(c.name) + '</option>'; }).join('');
-        })
-        .catch(function () { sel.innerHTML = '<option value="">' + esc(t('inspector.noChannels')) + '</option>'; });
-    }
-    function connectRowHtml(url, label, hint) {
-      return '<div class="wsx-det__connect"><div class="wsx-det__connhint">' + esc(hint) + '</div>'
-        + '<div class="wsx-det__delact"><a class="wsx-abtn wsx-abtn--primary wsx-det__send" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(label) + '</a>'
-        + '<button class="wsx-abtn" data-recheck="1" type="button">' + esc(t('inspector.checkAgain')) + '</button></div></div>';
-    }
-    function renderDelBody() {
-      if (!delBody || !dest) return;
-      var s = delStatus || {};
-      if (dest === 'Telegram' && s.telegram && !s.telegram.linked) delBody.innerHTML = connectRowHtml(s.telegram.connectUrl, t('inspector.connectTelegram'), t('inspector.telegramHint'));
-      else if (dest === 'Slack' && s.slack && !s.slack.available) delBody.innerHTML = '<div class="wsx-det__connhint">' + esc(t('inspector.slackNeedsWs')) + '</div>';
-      else if (dest === 'Slack' && s.slack && !s.slack.connected) delBody.innerHTML = connectRowHtml(s.slack.connectUrl, t('inspector.connectSlack'), t('inspector.slackHint'));
-      else delBody.innerHTML = actionRowHtml(recipControlHtml());
-      wireDelBody();
-      if (dest === 'Slack' && s.slack && s.slack.connected) loadSlackChannels();
-    }
-    function wireDelBody() {
-      var recheck = delBody.querySelector('[data-recheck]');
-      if (recheck) recheck.addEventListener('click', function () { loadStatus(); });
-      var freqRow = delBody.querySelector('#wsxFreq');
-      delBody.querySelectorAll('[data-dsend]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          if (b.getAttribute('data-dsend') === 'schedule') { if (freqRow) freqRow.hidden = !freqRow.hidden; return; }
-          var label = b.textContent; b.disabled = true; b.textContent = t('inspector.deliverSending');
-          // Slack "Post to Slack" sends the rich preview card (TL;DR, image, owner, updated).
-          var cfg = deliverConfig(), slack = dest === 'Slack';
-          fetch('/v1/artifacts/' + encodeURIComponent(art.id) + (slack ? '/share/slack' : '/deliver'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(slack ? { connection: cfg.connection, channelId: cfg.channelId, preview: true } : { action: dest.toLowerCase(), config: cfg }) })
-            .then(okOr)
-            .then(function (r) { return r.json().catch(function () { return null; }); })
-            .then(function (j) { b.disabled = false; b.textContent = label; if (j && (j.success || j.delivered)) wsxToast(t('inspector.deliverSent').replace('{dest}', dest)); else wsxToast((j && j.error) || t('inspector.deliverFailed'), true); })
-            .catch(function (e) { b.disabled = false; b.textContent = label; failToast(e, t('inspector.deliverFailed')); });
-        });
-      });
-      delBody.querySelectorAll('[data-freq]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var f = b.getAttribute('data-freq'), d = dest, cfg = deliverConfig();
-          optimistic({
-            key: 'sched:' + art.id,
-            apply: function () { if (freqRow) freqRow.hidden = true; },
-            rollback: function () { if (freqRow) freqRow.hidden = false; },
-            request: function () {
-              return fetch('/v1/jobs', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ artifact_id: art.id, action: d.toLowerCase(), config: cfg, schedule: CRON[f] }) })
-                .then(okOr)
-                .then(function (r) { return r.json().catch(function () { return null; }); })
-                .then(function (j) { if (j && (j.id || j.job || j.success)) return j; var e = new Error('schedule'); e.userMessage = j && j.error; throw e; });
-            },
-            success: t('inspector.scheduled').replace('{freq}', t('inspector.freq' + f)).replace('{dest}', d),
-            error: function (e) { return (e && e.userMessage) || t('inspector.deliverFailed'); },
-          });
-        });
-      });
-    }
-    function loadStatus() {
-      fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/deliver', { credentials: 'same-origin' })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (j) { delStatus = j; renderDelBody(); })
-        .catch(function () {});
-    }
-    root.querySelectorAll('[data-dest]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        root.querySelectorAll('[data-dest]').forEach(function (x) { x.classList.remove('is-on'); x.setAttribute('aria-checked', 'false'); });
-        b.classList.add('is-on'); b.setAttribute('aria-checked', 'true');
-        dest = b.getAttribute('data-dest'); renderDelBody();
-      });
-    });
-    if (editable && art.id) loadStatus(); // prefetch connection status
 
-    if (editable) wireSecDnd(root); // drag-reorder sections; persisted per user
+    wireSecs(root);
 
     renderShare(art, meta, editable);
     renderKnowledgeFrom(art, meta);
-    if (editable) { renderTags(art, (meta.tags || []).slice()); renderFolder(art, meta); renderTests(art); renderWatches(art); }
+    if (editable) { renderTags(art, (meta.tags || []).slice()); renderFolder(art, meta); renderTests(art); }
     var statsEl = root.querySelector('#wsxDetStats');
     if (art.id && statsEl) loadAnalytics(art.id, statsEl);
   }

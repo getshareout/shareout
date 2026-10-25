@@ -62,19 +62,25 @@ export const workspace_client_inspector_automate_JS = `  // ----- Tests (artifac
     return '<button class="wsx-qa" data-aauto="' + act + '" type="button"><span class="wsx-qa__ic">' + isvg(icon) + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(title) + '</span><span class="wsx-qa__s">' + esc(sub) + '</span></span></button>';
   }
   function paintAutomate(art, data) {
-    var jobs = data.jobs || [], alerts = data.alerts || [];
+    var jobs = data.jobs || [], alerts = data.alerts || [], m = metaCache[art.id], ed = !!(m && m.can_edit);
+    // Send now → what already runs → monitoring → start something new.
+    function blk(label, help, body) { return '<div class="wsx-auto__sec"><div class="wsx-det__label"><span class="wsx-det__labeltxt">' + esc(label) + '</span>' + (help ? '<button class="wsx-det__help" type="button" aria-label="' + esc(help) + '" data-tip="' + esc(help) + '">?</button>' : '') + '</div>' + body + '</div>'; }
     var h = '<div class="wsx-auto">';
-    if (jobs.length) h += '<div class="wsx-det__label">' + esc(t('inspector.autoSchedules')) + '</div><div class="wsx-list">' + jobs.map(autoJobRow).join('') + '</div>';
-    if (alerts.length) h += '<div class="wsx-det__label"' + (jobs.length ? ' style="margin-top:10px"' : '') + '>' + esc(t('inspector.autoAlerts')) + '</div><div class="wsx-list">' + alerts.map(autoAlertRow).join('') + '</div>';
-    h += '<div class="wsx-det__label"' + (jobs.length || alerts.length ? ' style="margin-top:12px"' : '') + '>' + esc(t('inspector.autoQuick')) + '</div>'
+    if (ed) h += blk(t('inspector.deliver'), t('inspector.deliverHelp'), '<div id="wsxDeliver"></div>');
+    if (jobs.length) h += blk(t('inspector.autoSchedules'), '', '<div class="wsx-list">' + jobs.map(autoJobRow).join('') + '</div>');
+    if (alerts.length) h += blk(t('inspector.autoAlerts'), '', '<div class="wsx-list">' + alerts.map(autoAlertRow).join('') + '</div>');
+    if (ed) h += blk(t('inspector.watches'), t('inspector.watchesHelp'), '<div id="wsxWatches"></div>');
+    h += '<div class="wsx-auto__sec"><div class="wsx-det__label">' + esc(t('inspector.autoQuick')) + '</div>'
       + '<div class="wsx-qa-grid">'
       + autoTile('schedule', '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', t('inspector.autoScheduleSend'), t('inspector.autoScheduleSub'))
       + autoTile('alert', '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>', t('inspector.autoSetAlert'), t('inspector.autoSetAlertSub'))
       + autoTile('crew', '<circle cx="9" cy="7" r="3"/><path d="M2 21v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"/><circle cx="18" cy="8" r="2.5"/>', t('inspector.autoStartCrew'), t('inspector.autoStartCrewSub'))
       + '</div>'
       + '<button class="wsx-auto__chat" data-aauto="chat" type="button">' + isvg('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>') + esc(t('inspector.autoCustom')) + '</button>'
-      + '</div>';
+      + '</div></div>';
     rbodyEl.innerHTML = h;
+    var dl = rbodyEl.querySelector('#wsxDeliver');
+    if (dl) { renderDeliver(art, dl); renderWatches(art); }
     rbodyEl.querySelectorAll('[data-aauto]').forEach(function (b) {
       b.addEventListener('click', function () {
         var n = art.name || t('inspector.thisPage'); var k = b.getAttribute('data-aauto');

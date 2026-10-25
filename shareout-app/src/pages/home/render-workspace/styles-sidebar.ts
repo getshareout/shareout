@@ -48,7 +48,34 @@ export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspect
 .wsx-det__icon.is-danger:hover { border-color: var(--color-error); color: var(--color-error); background: var(--color-error-light); }
 .wsx-det__icon.is-on { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-light); }
 .wsx-det__label { font: 600 var(--text-xs) var(--font-body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-tertiary); margin-bottom: 7px; }
-.wsx-det__sec { display: flex; flex-direction: column; }
+.wsx-det__sec { display: flex; flex-direction: column; border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+.wsx-det__sec[hidden] { display: none; }
+.wsx-det__sec > summary { list-style: none; cursor: pointer; margin-bottom: 0; }
+.wsx-det__sec > summary::-webkit-details-marker { display: none; }
+.wsx-det__sec > summary::after { content: ''; width: 7px; height: 7px; margin-right: 3px; border-right: 1.5px solid var(--color-text-tertiary); border-bottom: 1.5px solid var(--color-text-tertiary); transform: rotate(-45deg); transition: transform var(--duration-fast); }
+.wsx-det__sec[open] > summary::after { transform: rotate(45deg); }
+.wsx-det__sec > summary:hover .wsx-det__labeltxt { color: var(--color-text); }
+.wsx-det__secbody { padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.wsx-det__secic { width: 22px; height: 22px; flex: none; display: grid; place-items: center; border-radius: var(--radius-sm); color: var(--tone); background: color-mix(in srgb, var(--tone) 13%, transparent); }
+.wsx-det__secic svg { width: 13px; height: 13px; }
+.t-p { --tone: var(--color-primary); } .t-s { --tone: var(--color-success); } .t-w { --tone: var(--color-warning); } .t-n { --tone: var(--color-text-secondary); }
+.wsx-det__head { display: flex; flex-direction: column; gap: 8px; }
+.wsx-det__metaline { font: 500 var(--text-xs) var(--font-body); color: var(--color-text-tertiary); }
+.wsx-det__acts { display: flex; gap: 6px; margin-top: 4px; }
+.wsx-det__acts .is-danger { margin-left: auto; }
+.wsx-det__mpill.is-ok .dot { background: var(--color-success); } .wsx-det__mpill.is-warn .dot { background: var(--color-warning); }
+.wsx-det__modnote { padding: 10px 12px; border-radius: var(--radius-md); font-size: var(--text-xs); line-height: 1.45; color: var(--color-text-secondary); background: var(--color-warning-light); border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent); }
+.wsx-det__modnote strong { color: var(--color-warning); } .wsx-det__modnote.is-err { background: var(--color-error-light); } .wsx-det__modnote.is-err strong { color: var(--color-error); }
+.wsx-det__apst { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--radius-md); background: var(--color-surface); }
+.wsx-det__apst.is-ok { background: var(--color-success-light); }
+.wsx-det__apchip { flex: none; padding: 2px 8px; border-radius: 999px; font: 700 var(--text-xs) var(--font-body); background: var(--color-bg-elevated); color: var(--color-text-secondary); }
+.wsx-det__apst.is-ok .wsx-det__apchip { background: var(--color-success); color: var(--color-text-inverse); }
+.wsx-det__apst.is-flash { animation: wsx-ap-flash var(--duration-slow) var(--ease-out); }
+@keyframes wsx-ap-flash { from { transform: scale(0.97); box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-success) 35%, transparent); } to { transform: none; box-shadow: none; } }
+@media (prefers-reduced-motion: reduce) { .wsx-det__apst.is-flash { animation: none; } }
+.wsx-det__approve.is-busy { opacity: 0.7; cursor: progress; }
+.wsx-auto__sec { display: flex; flex-direction: column; gap: 8px; padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-border); }
+.wsx-auto__sec:last-child { border-bottom: 0; }
 .wsx-det__desc { font: 400 var(--text-sm) var(--font-body); line-height: 1.5; color: var(--color-text-secondary); border-radius: var(--radius-sm); padding: 7px 9px; margin: -7px -9px; min-height: 1.2em; }
 .wsx-det__desc[contenteditable]:empty::before { content: attr(data-ph); color: var(--color-text-tertiary); }
 .wsx-det__desc[contenteditable]:hover { background: var(--color-surface); }
@@ -107,10 +134,6 @@ export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspect
 .wsx-det__star:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 3.5px var(--color-primary); }
 @keyframes wsx-star-pop { 0% { transform: scale(0.7); } 55% { transform: scale(1.15); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .wsx-det__star.is-on svg { animation: none; } }
-.wsx-det__actions2 { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; }
-.wsx-det__act { flex: 1 1 96px; min-width: 0; justify-content: center; gap: 6px; }
-.wsx-det__actions2 .wsx-det__icon { flex: none; }
-.wsx-det__act svg { width: 16px; height: 16px; }
 .wsx-vis-seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1.5px solid var(--color-border); border-radius: 999px; overflow: hidden; background: var(--color-surface); }
 .wsx-vis-seg button { border: 0; background: transparent; padding: 5px 4px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font: 600 var(--text-xs) var(--font-body); color: var(--color-text-secondary); cursor: pointer; transition: background var(--duration-fast), color var(--duration-fast); }
 .wsx-vis-seg button:hover { color: var(--color-text); }
@@ -122,13 +145,8 @@ export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspect
 .wsx-vis-seg .is-sel.vk-unlisted { background: var(--color-bg-elevated); } .wsx-vis-seg .is-sel.vk-unlisted .dot { background: var(--color-text-tertiary); }
 .wsx-vis-seg .is-sel.vk-public { background: var(--color-success-light); } .wsx-vis-seg .is-sel.vk-public .dot { background: var(--color-success); }
 .wsx-vis-seg__sub { font: 400 var(--text-xs) var(--font-body); color: var(--color-text-tertiary); margin-top: 5px; }
-.wsx-det__secs { display: flex; flex-direction: column; gap: var(--space-4); }
+.wsx-det__secs { display: flex; flex-direction: column; gap: var(--space-3); }
 .wsx-det__labeltxt { flex: 1; }
-.wsx-det__grip { width: 14px; height: 16px; flex: none; margin: 0 2px 0 -2px; color: var(--color-text-tertiary); opacity: 0; cursor: grab; transition: opacity var(--duration-fast); border: 0; background: transparent; padding: 0; display: inline-grid; place-items: center; }
-.wsx-det__sec:hover .wsx-det__grip, .wsx-det__grip:focus-visible { opacity: 1; outline: none; }
-.wsx-det__grip:active { cursor: grabbing; }
-.wsx-det__sec.is-dragging { opacity: 0.95; background: var(--color-bg-elevated); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); }
-@media (hover: none) { .wsx-det__grip { opacity: 0.35; } }
 .wsx-det__meta { display: flex; flex-wrap: wrap; gap: 6px; }
 .wsx-det__mpill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; background: var(--color-surface); font: 600 var(--text-xs) var(--font-body); color: var(--color-text-secondary); }
 .wsx-det__mpill .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
@@ -259,8 +277,6 @@ export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspect
 .wsx-cm__asg { background: var(--color-primary-light); color: var(--color-primary); }
 .wsx-cm__picker { margin-top: 6px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elevated); box-shadow: var(--shadow-xl); max-height: 200px; overflow-y: auto; }
 .wsx-cm__picker .wsx-cm__mention:hover { background: var(--color-primary-light); }
-.wsx-det__approval { margin: 10px 0 2px; display: flex; flex-direction: column; gap: 6px; }
-.wsx-det__approval[hidden] { display: none; }
 .wsx-det__approve { align-self: flex-start; }
 .wsx-vh__rv { font-size: var(--text-xs); color: var(--color-text-tertiary); }
 .wsx-cm__replybox { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }

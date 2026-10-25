@@ -13,6 +13,7 @@ function harness(meta: { id: string } | null) {
   const ctx = {
     rbodyEl: document.createElement('div'),
     autoCache: {} as Record<string, unknown>,
+    metaCache: {} as Record<string, unknown>,
     activeArt: null as Art | null,
     retried: 0,
     i18nLoad: () => 'loading',
