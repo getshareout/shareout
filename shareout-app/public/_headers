@@ -1,0 +1,13 @@
+# Workers Static Assets answer these paths before the Worker runs, so these rules stand in
+# for the headers src/sdk-serve.ts sets on its fallback route. Keep the paths exact: a
+# request matching two rules gets both, and a header set twice is comma-joined.
+
+/sdk/shareout.js
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=300, must-revalidate
+  X-Content-Type-Options: nosniff
+
+/sdk/v1/shareout.js
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=31536000, immutable
+  X-Content-Type-Options: nosniff

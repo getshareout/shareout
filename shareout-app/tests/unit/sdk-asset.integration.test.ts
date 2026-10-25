@@ -18,3 +18,23 @@ describe('SDK served from static asset (Phase 4)', () => {
     expect(body).toContain('ShareOut');
   });
 });
+
+// The paths artifacts load are answered by the assets layer before the Worker runs, with
+// headers from public/_headers: same bytes and caching as the fallback route above.
+describe('SDK static copies (public/sdk + public/_headers)', () => {
+  it.each([
+    ['/sdk/shareout.js', false],
+    ['/sdk/v1/shareout.js', true],
+  ])('%s matches the fallback route', async (path, immutable) => {
+    const url = `https://shareout.test${path}`;
+    const [res, fallback] = await Promise.all([
+      env.ASSETS.fetch(new Request(url)),
+      handleServeSDK(new Request(url, { headers: { 'Sec-Fetch-Dest': 'script' } }), env as never, immutable),
+    ]);
+    expect(res.status).toBe(200);
+    for (const h of ['Cache-Control', 'Access-Control-Allow-Origin']) expect(res.headers.get(h)).toBe(fallback.headers.get(h));
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(res.headers.get('Content-Type')).toMatch(/javascript/);
+    expect(await res.text()).toBe(await fallback.text());
+  });
+});
