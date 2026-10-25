@@ -26,7 +26,6 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
     var rec = panes[activeKey]; if (!rec) return;
     var on = !rec.pane.classList.contains('is-mobile');
     rec.pane.classList.toggle('is-mobile', on);
-    if (rec.mobileBtn) rec.mobileBtn.classList.toggle('is-on', on);
     syncTabMode();
   });
   // Full-screen toggle — shows the active artifact's live stage full screen (Escape exits, native).
@@ -106,9 +105,11 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
   window.addEventListener('resize', syncTabRow);
 
   // Reflect the active pane's mode + show only on an artifact tab.
+  var artBarEl = document.getElementById('wsxArtBar'), curBar = null;
   function syncTabMode() {
     if (!tabModeEl) return;
-    var rec = panes[activeKey];
+    var rec = panes[activeKey], bar = rec ? rec.bar : null;
+    if (artBarEl && bar !== curBar) { if (curBar) curBar.remove(); if (bar) artBarEl.prepend(bar); curBar = bar; }
     tabModeEl.hidden = !rec || rec.art.canEdit === false || !canEditType(rec.art);
     if (rec) tabModeEl.querySelectorAll('[data-mode]').forEach(function (b) { b.classList.toggle('is-on', b.getAttribute('data-mode') === rec.mode); });
     if (tabDeviceEl) {
@@ -157,10 +158,9 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
   // Edit-Lite renders the source HTML statically (scripts off) into the edit iframe so
   // the parent can drive contentEditable text edits and round-trip them cleanly.
   var ART_PANE_HTML =
-    '<div class="wsx__stagebar2">'
+    '<div class="wsx__stagebar2" hidden>'
     + '<button class="wsx__ubtn js-undo" type="button" title="' + esc(t('tabs.undo')) + '" hidden>' + isvg('<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/>') + '</button>'
     + '<button class="wsx__ubtn js-redo" type="button" title="' + esc(t('tabs.redo')) + '" hidden>' + isvg('<path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h1"/>') + '</button>'
-    + '<button class="wsx__ubtn js-mobile" type="button" title="' + esc(t('tabs.mobilePreview')) + '" hidden>' + isvg('<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>') + '</button>'
     + '<span class="wsx__savestat js-savestat"></span>'
     + '<span class="wsx__editspacer"></span>'
     + '<button class="wsx__discard js-discard" type="button" hidden>' + esc(t('tabs.discard')) + '</button>'
@@ -244,7 +244,7 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
       fullEdit: pane.querySelector('.js-fulledit'),
       undoBtn: pane.querySelector('.js-undo'),
       redoBtn: pane.querySelector('.js-redo'),
-      mobileBtn: pane.querySelector('.js-mobile'),
+      bar: pane.querySelector('.wsx__stagebar2'),
       discardBtn: pane.querySelector('.js-discard'),
       sel: null, history: [], histIdx: -1,
     };
@@ -253,7 +253,6 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
     rec.undoBtn.addEventListener('click', function () { undoEdit(rec); });
     rec.redoBtn.addEventListener('click', function () { redoEdit(rec); });
     rec.discardBtn.addEventListener('click', function () { discardDraft(rec); });
-    rec.mobileBtn.addEventListener('click', function () { var on = !rec.pane.classList.contains('is-mobile'); rec.pane.classList.toggle('is-mobile', on); rec.mobileBtn.classList.toggle('is-on', on); syncTabMode(); });
     return rec;
   }
   function discardDraft(rec) {
