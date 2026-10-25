@@ -3,6 +3,7 @@ import { createLogger, logError } from '../../logging';
 
 const SAFE_STREAM_ERRORS = new Set([
   'AI API request timed out',
+  'This workspace reached its monthly AI budget',
 ]);
 
 const SAFE_EDIT_ERRORS = new Set([

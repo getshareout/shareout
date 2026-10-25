@@ -8,6 +8,7 @@ import { corpusFor, type SourceKind, type SourceMeta, type SourceStats } from '.
 import { forceIngest, type IngestParams } from './ingest';
 import { CHUNKER_VERSION } from './sections';
 import { visibleSources } from './search';
+import { workspaceOverBudget } from '../../data/ai-budget';
 
 export const REINDEX_WINDOW_MS = 10 * 60 * 1000;
 export const REINDEX_MAX = 300;
@@ -151,6 +152,7 @@ export async function runCorpusRefresh(
   for (const { workspace_id: workspaceId } of wsRows) {
     const budget = Math.min(perWs, perRun - result.queued);
     if (budget <= 0) break;
+    if (await workspaceOverBudget(env, workspaceId).catch(() => false)) continue;
     const store = corpusFor(env, workspaceId)!;
     const stale = await store.staleSources(CHUNKER_VERSION, budget, REFRESH_MAX_FAILS).catch(() => []);
     if (!stale.length) continue;

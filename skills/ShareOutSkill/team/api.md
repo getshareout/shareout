@@ -401,7 +401,8 @@ Per-workspace catalog of `artifact_type: "skill"` markdown playbooks. Full guide
 | `GET` | `/v1/workspaces/{scope}/agent-skills` | Member | Skills attached to caller's assistant (`scope` = workspace id or `__personal`). |
 | `POST` | `/v1/workspaces/{scope}/agent-skills` | Member | Attach skill to caller's assistant (max 8). |
 | `DELETE` | `/v1/workspaces/{scope}/agent-skills/{skillId}` | Member | Detach from caller's assistant. |
-| `GET` | `/v1/workspaces/{ws}/ai-limits` | Member | Today's in-artifact agent usage: yours, the workspace automation total and daily cap, and (owner/admin) every member. |
+| `GET` | `/v1/workspaces/{ws}/ai-limits` | Member | Today's in-artifact agent usage: yours, the workspace automation total and daily cap, and (owner/admin) every member. Also the monthly AI budget: `month_spend_usd`, `budget_usd`, `pct`, `budget_state` (`none`/`ok`/`near`/`reached`), `budget_resets_at`, and (owner/admin) `spend_by_kind`. |
+| `PUT` | `/v1/workspaces/{ws}/llm/budget` | Owner/admin | Set the monthly AI budget `{"monthlyBudgetUsd": 100}` (above 0, up to 100000) or `null` to remove it. It caps every metered AI call of the workspace (chat, automations, Knowledge, summaries); once reached, new calls are refused with code `workspace_budget` until `budget_resets_at` (first of next month, UTC). Embeddings, search, transcription and publish checks are never blocked. |
 | `GET` | `/v1/workspaces/{ws}/default-skills` | Member | Skills attached to every member's assistant in this workspace. |
 | `POST` | `/v1/workspaces/{ws}/default-skills` | Admin | `{ "skill_artifact_id" }`: attach a workspace-visible Library skill to every member's assistant (max 5; injected only for turns scoped to this workspace; re-POST re-pins to the latest version). |
 | `DELETE` | `/v1/workspaces/{ws}/default-skills/{skillId}` | Admin | Remove it. |

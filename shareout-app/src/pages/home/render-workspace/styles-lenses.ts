@@ -175,6 +175,16 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 .wsx-admin__cardval { font: 700 var(--text-lg) var(--font-body); color: var(--color-text); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .wsx-admin__cardsub { font-size: var(--text-xs); color: var(--color-text-tertiary); margin-top: 4px; }
 .wsx-admin__seatbar { margin-top: 8px; height: 4px; background: var(--color-surface); border-radius: 2px; overflow: hidden; }
+.wsx-admin__budget { padding: 16px 18px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg-elevated); margin-bottom: 20px; }
+.wsx-admin__budgethead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.wsx-admin__budgetbar { position: relative; margin: 12px 0 8px; height: 8px; background: var(--color-surface); border-radius: 4px; }
+.wsx-admin__budgetfill { height: 100%; background: var(--color-primary); border-radius: 4px; max-width: 100%; }
+.wsx-admin__budget.is-near .wsx-admin__budgetfill { background: var(--color-warning); }
+.wsx-admin__budget.is-reached .wsx-admin__budgetfill { background: var(--color-error); }
+.wsx-admin__budgetmark { position: absolute; left: 80%; top: -3px; bottom: -3px; width: 2px; background: var(--color-text-tertiary); border-radius: 1px; }
+.wsx-admin__budgetstate { font-size: var(--text-xs); color: var(--color-text-secondary); }
+.wsx-admin__budget.is-near .wsx-admin__budgetstate { color: var(--color-warning); }
+.wsx-admin__budget.is-reached .wsx-admin__budgetstate { color: var(--color-error); }
 .wsx-admin__seatfill { height: 100%; background: var(--color-primary); border-radius: 2px; }
 /* Admin badge extras */
 .wsx-admin__rolebadge.is-trial { background: color-mix(in srgb, var(--color-warning) 14%, transparent); color: var(--color-warning); }

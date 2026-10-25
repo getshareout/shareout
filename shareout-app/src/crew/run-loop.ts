@@ -171,7 +171,7 @@ export async function executeCrewRun(
        WHERE id = ?`
     )
       .bind(
-        reason === 'error' || reason === 'budget_exhausted' || reason === 'timeout' ? 'error' : 'done',
+        reason === 'error' || reason === 'budget_exhausted' || reason === 'workspace_budget' || reason === 'timeout' ? 'error' : 'done',
         reason,
         summary || null,
         iterations,
@@ -232,6 +232,7 @@ export async function executeCrewRun(
       let turnIn = 0;
       let turnOut = 0;
       let turnError: string | null = null;
+      let turnCode: string | undefined;
 
       for await (const ev of provider.streamTurn({
         system,
@@ -251,6 +252,7 @@ export async function executeCrewRun(
           turnOut = ev.usage.outputTokens;
         } else if (ev.type === 'error') {
           turnError = ev.error;
+          turnCode = ev.code;
         }
       }
 
@@ -275,6 +277,14 @@ export async function executeCrewRun(
         toolName: null,
       });
       await logEvent('model_start', { tokenInput: turnIn, tokenOutput: turnOut });
+
+      if (turnError && turnCode === 'workspace_budget') {
+        emit({ type: 'error', error: turnError });
+        await logEvent('error', { output: redact(turnError) });
+        resultText = `${turnError} Runs resume once the budget is raised or next month.`;
+        termination = 'workspace_budget';
+        break;
+      }
 
       if (turnError) {
         logCrewRunFailure(env, { ownerId: crew.owner_id, crewId: crew.id, runId: run.id }, turnError);

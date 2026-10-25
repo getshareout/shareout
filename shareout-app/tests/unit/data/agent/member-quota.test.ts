@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:test';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { resetBudgetCache } from '../../../../src/data/ai-budget';
 import { MEMBER_TOKENS_PER_DAY, addMemberTokens, reserveMemberQuota } from '../../../../src/data/agent/member-quota';
 
 function fakeKv() {
@@ -15,10 +16,11 @@ const testEnv = (kv = fakeKv()) => ({ ...env, DB: env.DB, RATE_LIMIT_KV: kv }) a
 beforeAll(async () => {
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS rate_limits (principal_type TEXT NOT NULL, principal_id TEXT NOT NULL, action TEXT NOT NULL, window_start TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (principal_type, principal_id, action, window_start))`).run();
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS workspace_llm_config (workspace_id TEXT PRIMARY KEY, monthly_budget_micro_usd INTEGER)`).run();
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS agent_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, base_cost_micro_usd INTEGER, created_at TEXT)`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS ai_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, kind TEXT, model TEXT, units INTEGER, unit_kind TEXT, base_cost_micro_usd INTEGER, source TEXT, input_tokens INTEGER, output_tokens INTEGER, cost_source TEXT, provider_ref TEXT, created_at TEXT)`).run();
 });
 beforeEach(async () => {
-  for (const t of ['rate_limits', 'workspace_llm_config', 'agent_usage_events']) await env.DB.prepare(`DELETE FROM ${t}`).run();
+  resetBudgetCache();
+  for (const t of ['rate_limits', 'workspace_llm_config', 'ai_usage_events']) await env.DB.prepare(`DELETE FROM ${t}`).run();
 });
 
 describe('reserveMemberQuota', () => {
@@ -51,7 +53,7 @@ describe('reserveMemberQuota', () => {
 
   it('still enforces the workspace budget when set', async () => {
     await env.DB.prepare(`INSERT INTO workspace_llm_config VALUES ('wsp_b', 100)`).run();
-    await env.DB.prepare(`INSERT INTO agent_usage_events VALUES ('e1', 'wsp_b', 100, ?)`).bind(new Date().toISOString()).run();
+    await env.DB.prepare(`INSERT INTO ai_usage_events (id, workspace_id, kind, model, base_cost_micro_usd, cost_source, created_at) VALUES ('e1', 'wsp_b', 'assistant_chat', 'm', 100, 'actual', ?)`).bind(new Date().toISOString()).run();
     const r = await reserveMemberQuota(testEnv(), 'usr_c', 'wsp_b', 10);
     expect(r.allowed).toBe(false);
   });
