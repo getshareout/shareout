@@ -1,9 +1,9 @@
-import type { Env } from '../../types';
 import type { DataContext } from '../middleware';
 import type { MiniDb } from '../minidb-client';
 import type { AgentConfig, VisitorContext, AdminContext } from './types';
 import { agentLanguageRule } from '../../i18n/agent-language';
 import { getWorkspaceLocale } from '../../i18n/locale';
+import { SDK_REFERENCE } from './sdk-reference.generated';
 
 export async function buildVisitorContext(
   ctx: DataContext,
@@ -130,8 +130,7 @@ export async function buildAdminContext(
     }
   }
 
-  // Get skill docs
-  const skillDocs = await getSkillDocs(env);
+  const skillDocs = SDK_REFERENCE;
 
   // JSON + tables live in the per-artifact minidb (ctx.db), not D1.
   const jsonRows = await db.prepare(`
@@ -210,70 +209,6 @@ function isTextMime(mime: string): boolean {
     mime.endsWith('+json') ||
     mime.endsWith('+xml')
   );
-}
-
-export async function getSkillDocs(env: Env): Promise<string> {
-  // Return a condensed version of the SDK docs for the AI context
-  return `# ShareOut SDK Reference
-
-## Data Storage
-
-### JSON Store (Key-Value)
-\`\`\`javascript
-await shareout.json.get(key)           // Get value
-await shareout.json.set(key, value)    // Set value
-await shareout.json.delete(key)        // Delete key
-await shareout.json.merge(key, partial) // Merge into object
-shareout.json.subscribe(key, handler)  // Watch for changes
-\`\`\`
-
-### Tables (Structured Data)
-\`\`\`javascript
-const table = shareout.table('items');
-await table.insert({ name: 'Item 1' })
-await table.find({ status: 'active' }).sort('createdAt', 'desc').limit(10).exec()
-await table.updateById(id, { status: 'done' })
-await table.deleteById(id)
-\`\`\`
-
-### Real-time Collaboration
-\`\`\`javascript
-const doc = shareout.realtime('document');
-await doc.connect();
-doc.text('content').insert(0, 'Hello');
-doc.presence.set({ cursor: { x, y } });
-\`\`\`
-
-## File Storage
-\`\`\`javascript
-await shareout.blobs.upload(file)
-shareout.blobs.getUrl(blobId)
-await shareout.blobs.list()
-\`\`\`
-
-## External Integrations
-\`\`\`javascript
-// Google Sheets
-await shareout.sheets.authorize()
-await shareout.sheets.fetch({ spreadsheetId, range })
-
-// GitHub Export
-await shareout.github.authorize()
-await shareout.github.export({ repo, branch })
-\`\`\`
-
-## Comments
-\`\`\`javascript
-await shareout.comments.add({ content, contextId })
-await shareout.comments.find({ contextId }).exec()
-\`\`\`
-
-## User & Theme
-\`\`\`javascript
-const user = await shareout.user.current()
-const theme = shareout.theme.current()
-\`\`\`
-`;
 }
 
 export function buildVisitorSystemPrompt(

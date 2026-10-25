@@ -42,7 +42,8 @@ echo "==> regenerate committed bundles"
 npm run -s check:bundles >/dev/null 2>&1 || true
 cd "$DIR"
 if ! git diff --quiet; then
-  git add -A shareout-app/public shareout-app/src/discovery shareout-app/src/official-skills
+  git add -A shareout-app/public shareout-app/src/discovery shareout-app/src/official-skills \
+    shareout-app/src/data/agent/sdk-reference.generated.ts
   git commit -q -m "integration: regenerate bundles"
 fi
 
