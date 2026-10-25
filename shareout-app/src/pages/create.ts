@@ -68,7 +68,7 @@ export function renderCreatePage(
           <div class="spinner"></div>
           <div class="building-label">Designing your page…</div>
         </div>
-        <iframe id="previewFrame" class="preview-frame" title="Live preview" hidden></iframe>
+        <iframe id="previewFrame" class="preview-frame" title="Live preview" sandbox="allow-scripts" hidden></iframe>
         <pre class="code-view" id="codeView" hidden></pre>
       </div>
     </div>
