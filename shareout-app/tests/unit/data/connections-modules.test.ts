@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FetchTimeoutError } from '../../../src/fetch-utils';
 import {
   UpstreamHttpError,
@@ -17,6 +17,7 @@ import {
   validateRestBaseUrl,
 } from '../../../src/data/connections/rest-query';
 import { CONNECTION_TYPES, CONNECTION_TIMEOUT_MS } from '../../../src/data/connections/types';
+import { setSelfFetch } from '../../../src/http/self-fetch';
 
 describe('connections/types', () => {
   it('exports expected connection types and timeout', () => {
@@ -106,12 +107,13 @@ describe('connections/rest-query', () => {
   });
 });
 
-const handleFetchMock = vi.hoisted(() => vi.fn());
-vi.mock('../../../src/router/handle-fetch', () => ({ handleFetch: handleFetchMock }));
+const handleFetchMock = vi.fn();
 
 describe('connections/rest-query selfFetcher', () => {
   const env = { SHAREOUT_BASE_URL: 'https://shareout.site' } as never;
   const spoof = { 'cf-connecting-ip': '127.0.0.1', 'x-forwarded-for': '127.0.0.1', 'true-client-ip': '127.0.0.1', cookie: 'a=b', host: 'localhost', Authorization: 'Bearer k', 'content-type': 'application/json' };
+  beforeEach(() => setSelfFetch(handleFetchMock));
+  afterAll(() => setSelfFetch(null));
 
   it('only intercepts the deployment\'s own host', () => {
     expect(selfFetcher(env, 'https://shareout.site/v1')).toBeTypeOf('function');
@@ -146,6 +148,13 @@ describe('connections/rest-query selfFetcher', () => {
       { baseUrl: 'https://shareout.site/v1' }, { apiKey: 'k' }, 'api_key', '/redir', undefined, selfFetcher(env, 'https://shareout.site/v1', 'usr_1'),
     )).rejects.toThrow(/only call \/v1\//);
     expect(handleFetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails loudly when no entry registered the router', async () => {
+    setSelfFetch(null);
+    await expect(executeRestApiQuery(
+      { baseUrl: 'https://shareout.site/v1' }, { apiKey: 'k' }, 'api_key', '/artifacts', undefined, selfFetcher(env, 'https://shareout.site/v1', 'usr_1'),
+    )).rejects.toThrow(/no router registered/);
   });
 });
 

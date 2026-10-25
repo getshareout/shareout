@@ -3,7 +3,7 @@
 // Fails (exit 1) when product source crosses a boundary it must not cross.
 // Generated/embedded-bundle files are excluded: generated code is not reviewed like source.
 import { readdirSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = join(fileURLToPath(import.meta.url), '..', '..', '..');
@@ -38,6 +38,18 @@ function walk(dir, acc = []) {
 
 const isGenerated = (rel) => GENERATED.some((r) => r.test(rel));
 
+// Product source reaches the router only through the Worker entry. A module in src/ that
+// imports it, even with a lazy import(), closes an import cycle through a large part of
+// src/, and vitest's related-test mapping (npm run test:affected) then selects over half
+// the suite for a change to any module in that cycle. In-process API calls go through
+// src/http/self-fetch.ts instead.
+const SRC = join(worker, 'src');
+const ENTRY = join(SRC, 'index.ts');
+const ROUTER = join(SRC, 'router', 'handle-fetch');
+const LOCAL_IMPORT = /\b(?:from|import)\s*\(?\s*['"](\.{1,2}(?:\/[^'"]*)?)['"]/g;
+const localImports = (text, file) =>
+  [...text.matchAll(LOCAL_IMPORT)].map(([, spec]) => resolve(dirname(file), spec).replace(/\.[cm]?[jt]s$/, ''));
+
 const rules = [
   {
     id: 'no-customer-code-in-product-source',
@@ -59,6 +71,20 @@ const rules = [
     root: join(worker, 'src'),
     check(text) {
       return /from\s+['"][^'"]*\b(demos|examples)\//.test(text) ? ['imports demo/example content as code'] : [];
+    },
+  },
+  {
+    id: 'router-only-from-entry',
+    desc: 'Only the Worker entry (src/index.ts) imports the router; src/ calls it through src/http/self-fetch.ts.',
+    root: SRC,
+    check(text, file) {
+      if (file === ENTRY) return [];
+      const hits = [];
+      for (const target of localImports(text, file)) {
+        if (target === ROUTER) hits.push('imports router/handle-fetch (only src/index.ts may; call selfFetch from src/http/self-fetch.ts)');
+        if (target === SRC || target === join(SRC, 'index')) hits.push('imports the Worker entry src/index.ts (it imports the router)');
+      }
+      return hits;
     },
   },
   {
@@ -84,7 +110,7 @@ for (const rule of rules) {
   for (const file of walk(rule.root)) {
     const rel = relative(repoRoot, file);
     if (isGenerated(rel)) continue;
-    const hits = rule.check(readFileSync(file, 'utf8'));
+    const hits = rule.check(readFileSync(file, 'utf8'), file);
     for (const hit of hits) {
       violations++;
       console.error(`✗ [${rule.id}] ${rel}: ${hit}`);

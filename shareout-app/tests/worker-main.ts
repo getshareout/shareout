@@ -5,6 +5,7 @@
 // the agent loop and the screenshot/summary stack (~8s per file); no test here uses them. Tests that need a real chat session run in the `workers-chat`
 // project (vitest.config.ts), whose main is src/index.ts.
 import { DurableObject } from 'cloudflare:workers';
+import { setSelfFetch } from '../src/http/self-fetch';
 
 export { RealtimeCoordinator } from '../src/realtime/coordinator';
 export { CommentsCoordinator } from '../src/realtime/comments-coordinator';
@@ -14,6 +15,10 @@ export { KnowledgeStore } from '../src/knowledge/corpus/store-do';
 
 export class ChatDO extends DurableObject {}
 export class Showtime extends DurableObject {}
+
+// Same registration as src/index.ts, but the router loads on first use: this module is
+// imported into every file that uses `cloudflare:test`, and the router would come with it.
+setSelfFetch(async (request, env, ctx) => (await import('../src/router/handle-fetch')).handleFetch(request, env, ctx));
 
 export default {
   async fetch(): Promise<Response> {
