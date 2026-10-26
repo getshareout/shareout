@@ -75,17 +75,17 @@ Consequences, all of them load-bearing:
   reason as `datetime('now')`; PR-2's grep missed 21 of them precisely because of the
   quoting.
 
-**One exception, and it is not a timestamp.** The scheduler cursors —
-`scheduled_jobs.next_run_at`, `scheduled_jobs.last_run_at`,
-`metric_alert_rules.next_run_at`, and `job_runs.created_at` — hold **unix seconds** as
-TEXT. They are queue keys: the dispatch loop compares and advances them numerically, and
-converting them is a dispatch-correctness change, not a formatting one. If you convert one,
-convert all four in the same commit, or the loop silently stops firing.
+**One exception, and it is not a timestamp.** `scheduled_jobs.last_run_at` and
+`job_runs.created_at` hold **unix seconds** as TEXT; the jobs API converts them on the way
+out (`isoTime` in `scheduling/handler.ts`).
 
-`crew_triggers.next_run_at` is **not** one of them: it is ISO like everything else, and the
-trigger loop compares it as a string. An epoch written there sorts before every ISO value,
-so the trigger is due on every hourly tick — that is how a weekly crew emailed four hours
-in a row (2026-10-26).
+The scheduler cursors — `scheduled_jobs.next_run_at`, `crew_triggers.next_run_at`,
+`metric_alert_rules.next_run_at` — are ISO like everything else, and each dispatch loop
+compares them as strings against `new Date().toISOString()`. An epoch written there breaks
+the loop silently: as text it sorts before every ISO value (`'1793…' < '2026-…'`), so it is
+either due on every tick or, compared the other way, never due. Both happened in 2026:
+a weekly crew emailed four hours in a row (2026-10-26), and every cron job stopped after
+2026-09-18 because the job runner bound epoch seconds against ISO `next_run_at`.
 
 Names are as fixed as the format:
 

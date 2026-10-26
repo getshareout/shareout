@@ -126,7 +126,7 @@ export async function createJob(
   const id = generateId('job');
   const nextRunAt = triggerType === 'cron' && request.schedule
     ? getNextRunTime(request.schedule)
-    : Math.floor(Date.now() / 1000) + 86400;
+    : new Date(Date.now() + 86400_000).toISOString();
 
   const title = typeof request.title === 'string' ? request.title.slice(0, 200) : null;
   const description = typeof request.description === 'string' ? request.description.slice(0, 1000) : null;
