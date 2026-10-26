@@ -46,7 +46,7 @@ export const workspace_client_home_views_catalogCert_JS = `  // ----- Catalog â€
         + (h.current ? '' : ' <span class="wsx-cat__hold">' + esc(t('catalog.histEarlier')) + '</span>')
         + (h.note ? '<div class="wsx-cat__hnote">' + esc(h.note) + '</div>' : '') + '</li>';
     }).join('');
-    return '<details class="wsx-cat__hist"><summary>' + esc(t('inspector.history')) + ' <span class="wsx-cat__lcount">' + hist.length + '</span></summary><ul>' + rows + '</ul></details>';
+    return '<details class="wsx-cat__hist"><summary>' + esc(t('catalog.certHistory')) + ' <span class="wsx-cat__lcount">' + hist.length + '</span></summary><ul>' + rows + '</ul></details>';
   }
 
   function catCertHtml(e) {
