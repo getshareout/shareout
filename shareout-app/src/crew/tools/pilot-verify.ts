@@ -5,6 +5,7 @@ import { createAccessToken } from '../../token';
 import { getPlatformOrigin } from '../../config/origins';
 import { logCrewToolFailure, userFacingPilotVerifyToolError } from '../errors';
 import { recordBrowserSince } from '../../workspaces/usage-ledger';
+import { captureOwnHosts, guardCapturePage } from '../../screenshots/request-policy';
 
 // Verify runs are short and cheap: cap steps low and wall-clock the whole in-page
 // run so a stuck agent can never burn budget or hold the browser open.
@@ -152,6 +153,7 @@ export const pilotVerifyTool: CrewTool = {
       browser = await puppeteer.launch(env.BROWSER as Parameters<typeof puppeteer.launch>[0]);
       const page = await browser.newPage();
       await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+      const guard = await guardCapturePage(page, captureOwnHosts(env));
       await page.goto(url, { waitUntil: 'load', timeout: NAV_TIMEOUT_MS });
 
       // The SDK (window.so) is only present if the artifact loads it. Ensure the core
@@ -165,6 +167,9 @@ export const pilotVerifyTool: CrewTool = {
       const timeout = new Promise<{ timedOut: true }>((r) => setTimeout(() => r({ timedOut: true }), RUN_TIMEOUT_MS));
       const outcome = await Promise.race([run, timeout]);
 
+      if (guard.privateResponse()) {
+        return { success: false, error: 'Run result withheld: the page loaded content from a private network address.', data: '' };
+      }
       if ('timedOut' in outcome) {
         await page.evaluate(() => {
           const g = globalThis as any;

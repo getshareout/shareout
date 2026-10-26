@@ -1,7 +1,8 @@
 import puppeteer from '@cloudflare/puppeteer';
 import type { Env } from './types';
-import { createAccessToken } from './token';
+import { mintCaptureCredentials } from './auth/capture-session';
 import { getPlatformOrigin } from './config/origins';
+import { captureOwnHosts, guardCapturePage } from './screenshots/request-policy';
 import { setPresentation } from './artifacts/satellites';
 import { recordBrowserSince } from './workspaces/usage-ledger';
 
@@ -39,10 +40,13 @@ export interface PdfOptions extends WaitOptions {
 
 /**
  * Open an artifact's production page in headless Chromium, wait for its data to
- * load and paint, then hand the live page to `capture`. Mints short-lived owner
- * credentials so private artifacts render real content instead of the login
- * wall. Returns null when there's no production deployment, BROWSER is unbound,
- * or rendering fails.
+ * load and paint, then hand the live page to `capture`. Mints a short-lived capture
+ * link and read-only data session so private artifacts render real content instead of
+ * the login wall (see auth/capture-session.ts). The page runs under the capture request
+ * policy, which attaches the session to the page's data requests; a render that
+ * received content from a private network address is withheld. Returns null when
+ * there's no production deployment, BROWSER is unbound, rendering fails, or the
+ * capture was withheld.
  *
  * Data-heavy artifacts (e.g. BigQuery-backed dashboards) can set
  * `window.__shareoutReady = true` once their data has rendered; the renderer
@@ -78,14 +82,14 @@ export async function withArtifactPage<T>(
 
   const base = getPlatformOrigin(env);
   // Render the dedicated capture view: the bare artifact HTML at top-level (no
-  // sandbox iframe, no toolbar), authorized by a short-lived signed token and served
-  // with an injected READ-ONLY owner session (owner_test) so its data calls
-  // authenticate for reads but can never mutate. This is the only way full-height
-  // capture works — the normal viewer nests the dashboard in a fixed-height,
-  // cross-origin iframe we can't reach into.
-  const captureToken = await createAccessToken(artifactId, 'capture', env, 300);
+  // sandbox iframe, no toolbar), authorized by a short-lived signed token. Its data
+  // calls carry a READ-ONLY session (owner_test), attached by the request policy
+  // below rather than put in the page, so they read this artifact's data but can
+  // never mutate. This is the only way full-height capture works — the normal viewer
+  // nests the dashboard in a fixed-height, cross-origin iframe we can't reach into.
+  const { link, session } = await mintCaptureCredentials(env, artifactId);
   const verPin = opts.versionId ? `&_ver=${encodeURIComponent(opts.versionId)}` : '';
-  const url = `${base}/a/${dep.slug}/?_capture=${encodeURIComponent(captureToken)}${verPin}`;
+  const url = `${base}/a/${dep.slug}/?_capture=${encodeURIComponent(link)}${verPin}`;
 
   const idleTimeout = waits.idleTimeout ?? 8000;
   const settleMs = waits.settleMs ?? 1200;
@@ -96,6 +100,9 @@ export async function withArtifactPage<T>(
     browser = await puppeteer.launch(env.BROWSER as Parameters<typeof puppeteer.launch>[0]);
     const page = await browser.newPage();
     await page.setViewport({ ...viewport, deviceScaleFactor: 2 });
+    const guard = await guardCapturePage(page, captureOwnHosts(env), {
+      dataSession: { token: session, artifactId, origin: base },
+    });
     if (opts.beforeNavigate) opts.beforeNavigate(page);
     await page.goto(url, { waitUntil: 'load', timeout: NAV_TIMEOUT });
 
@@ -110,9 +117,15 @@ export async function withArtifactPage<T>(
     ).catch(() => {});
     await new Promise((r) => setTimeout(r, settleMs));
 
-    return await capture(page);
+    const result = await capture(page);
+    const privateAddress = guard.privateResponse();
+    if (privateAddress) {
+      console.warn('capture withheld: private network response', { artifactId, address: privateAddress });
+      return null;
+    }
+    return result;
   } catch (err) {
-    console.error('withArtifactPage failed', { artifactId, url, error_stack: (err as Error)?.stack || String(err) });
+    console.error('withArtifactPage failed', { artifactId, slug: dep.slug, error_stack: (err as Error)?.stack || String(err) });
     return null;
   } finally {
     if (browser) {
@@ -271,8 +284,8 @@ export interface CapturedReport {
 /**
  * Render an artifact's live page once and return BOTH a full-content PDF and the
  * artifact's `window.__shareoutExport` payload. Used by scheduled delivery so a
- * single headless render (with injected owner creds — the data re-runs against
- * the workspace connection) yields the PDF, the email HTML, and the CSV together.
+ * single headless render (under the read-only capture session — the page reloads
+ * this artifact's data) yields the PDF, the email HTML, and the CSV together.
  */
 export async function captureArtifactReport(
   env: Env,
@@ -362,12 +375,14 @@ export async function renderHtmlToPng(
     browser = await puppeteer.launch(env.BROWSER as Parameters<typeof puppeteer.launch>[0]);
     const page = await browser.newPage();
     await page.setViewport({ width, height, deviceScaleFactor: 2 });
+    const guard = await guardCapturePage(page, captureOwnHosts(env));
     await page.setContent(html, { waitUntil: 'load', timeout: 15000 });
     await new Promise((r) => setTimeout(r, 400));
-    return (await page.screenshot({
+    const png = (await page.screenshot({
       type: 'png',
       clip: { x: 0, y: 0, width, height },
     } as Parameters<typeof page.screenshot>[0])) as unknown as ArrayBuffer;
+    return guard.privateResponse() ? null : png;
   } catch (err) {
     console.error('renderHtmlToPng failed', { error_stack: (err as Error)?.stack || String(err) });
     return null;

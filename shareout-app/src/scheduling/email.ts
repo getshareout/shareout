@@ -221,8 +221,8 @@ export async function sendArtifactEmail(
     textContent = config.body || '';
   }
 
-  // Server-rendered delivery: re-run the live artifact (with injected owner creds,
-  // so its data queries the workspace connection) once, and reuse the result for
+  // Server-rendered delivery: re-run the live artifact (under the read-only capture
+  // session, so it reloads its data) once, and reuse the result for
   // the email body, a PDF attachment, and a CSV attachment.
   const attachments: EmailAttachment[] = [];
   if (config.renderPdf || config.attachArtifactCsv || config.useArtifactEmailHtml) {

@@ -9,7 +9,8 @@ import { serveTypeViewer } from './type-viewer';
 import { serveAsset } from './assets';
 import { hasCustomViewer } from '../viewers';
 import { resolveArtifactSocialPreview } from './social-meta';
-import { verifyAccessToken, createAccessToken } from '../token';
+import { verifyAccessToken } from '../token';
+import { mintCaptureSessionToken } from '../auth/capture-session';
 import { isCommentsOverlayEnabled } from './comments-config';
 import { injectPerfBeacon } from './perf-beacon';
 import { injectPresenceBeacon } from './presence-beacon';
@@ -33,7 +34,7 @@ function injectCommentsAgent(resp: Response, baseUrl: string): Response {
 
 // Capture mode: serve the bare artifact HTML at top-level (no sandbox iframe, no
 // toolbar) so server-side screenshot/PDF can render the whole, data-loaded page.
-// The artifact's SDK reads its auth from an inline #shareout-initial-data script
+// The artifact's SDK reads its setup from an inline #shareout-initial-data script
 // (the wrapper normally supplies this via the iframe postMessage bridge); we
 // inject the same here. Gated by a signed capture token only the renderer can
 // mint, so the un-sandboxed origin is never reachable by the public.
@@ -44,23 +45,25 @@ async function serveCaptureView(
   slug: string,
   result: ArtifactWithAsset,
   baseUrl: string,
-  // writable: mint a full-WRITE `owner` session instead of the read-only `owner_test`.
-  // Used only by the crew `pilot_verify` flow, which drives the real UI (submit a
-  // form, save a record) to catch UI regressions — it MUST be able to persist. Every
-  // other capture render (thumbnail, smoke, PDF, report, test flow) stays read-only.
+  // linkExp: the capture token's expiry. A writable session ends with it, so
+  // reloading the capture link never extends access.
+  linkExp: number,
+  // writable: inject a full-WRITE `owner` session. Used only by the crew
+  // `pilot_verify` flow, which drives the real UI (submit a form, save a record) to
+  // catch UI regressions — it MUST be able to persist, and its in-page agent sends
+  // the session itself. Every other capture render (thumbnail, smoke, PDF, report,
+  // test flow) is read-only and gets no credential in the page: the renderer attaches
+  // its read-only session to the page's data requests (auth/capture-session.ts).
   writable = false,
 ): Promise<Response> {
-  const owner = await env.DB.prepare('SELECT email FROM users WHERE id = ?')
-    .bind(result.owner_id).first<{ email: string | null }>();
-  // Read-only capture uses `owner_test` (reads as owner, router blocks every write).
-  // The pilot_verify path uses a real `owner` session so its in-page run can submit.
-  // A full-WRITE credential must not outlive its ≤90s run, so the writable session
-  // gets a tight 120s TTL; the read-only owner_test keeps the long 2h window.
-  const sessionTtlSec = writable ? 120 : 60 * 60 * 2;
-  const sessionToken = await createAccessToken(
-    result.artifact_id, writable ? 'owner' : 'owner_test', env, sessionTtlSec, owner?.email ?? undefined,
-  );
-  const initial = { artifactId: result.artifact_id, baseUrl, sessionToken };
+  const initial: { artifactId: string; baseUrl: string; sessionToken?: string } = { artifactId: result.artifact_id, baseUrl };
+  if (writable) {
+    const owner = await env.DB.prepare('SELECT email FROM users WHERE id = ?')
+      .bind(result.owner_id).first<{ email: string | null }>();
+    initial.sessionToken = await mintCaptureSessionToken(env, result.artifact_id, {
+      linkExp, writable: true, ownerEmail: owner?.email ?? null,
+    });
+  }
   const json = JSON.stringify(initial).replace(/</g, '\\u003c');
   const scriptTag = `<script id="shareout-initial-data" type="application/json">${json}</script>`;
 
@@ -242,7 +245,7 @@ export async function handleServe(
       return new Response('Not Found', { status: 404 });
     }
     return serveCaptureView(
-      request, env, captureAsset, slug, result, servingOrigin(env), writableCapture,
+      request, env, captureAsset, slug, result, servingOrigin(env), payload.exp, writableCapture,
     );
   }
 
