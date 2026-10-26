@@ -10,7 +10,7 @@ import { shouldBlockPublish, runPostPublishTests } from '../../tests/block-gate'
 import { normalizeVersionMessage, scheduleVersionSummary } from '../../artifacts/version-summary';
 import { carriedManifestJson } from '../../mcp-broker/capabilities';
 import { planMedia, writeMedia } from '../bundle-media';
-import { checkEditorPublishRate, enforcePublishGates } from '../draft';
+import { checkEditorPublishRate, enforcePublishGates, liveUpdatedAt, parseBaseLiveAt, staleBaseConflict } from '../draft';
 import { incrementRateLimit } from '../../api-auth';
 
 export const SOURCE_EDITABLE_TYPES: ReadonlySet<ArtifactType> = new Set<ArtifactType>([
@@ -132,9 +132,14 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
     const limited = await checkEditorPublishRate(ctx);
     if (limited) return limited;
 
-    const body = await request.json() as { content?: string; path?: string; message?: string };
+    const body = await request.json() as { content?: string; path?: string; message?: string; baseLiveAt?: string };
     if (typeof body.content !== 'string') {
       return errorResponse('INVALID_REQUEST', 'content required', 400);
+    }
+    const baseLiveAt = parseBaseLiveAt(body.baseLiveAt);
+    if (baseLiveAt) {
+      const stale = await staleBaseConflict(env, artifactId, ctx.userId, baseLiveAt);
+      if (stale) return stale;
     }
 
     const artifact = await env.DB.prepare(
@@ -246,6 +251,7 @@ async function handleSourcePublish(request: Request, ctx: EditorContext): Promis
     return new Response(JSON.stringify({
       success: true,
       versionNo: newVersionNo,
+      liveUpdatedAt: await liveUpdatedAt(env, artifactId),
       url: `${env.SHAREOUT_BASE_URL.replace(/\/$/, '')}/a/${artifact.slug}/`,
       ...(blocking ? { tests: { mode: 'block', pending: true } } : {}),
     }), { headers: { 'Content-Type': 'application/json' } });

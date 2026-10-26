@@ -58,6 +58,7 @@ export async function saveDraft(ctx: EditorContext, opts: { force?: boolean } = 
         // EDIT-09 F1: send the timestamp we loaded so the server returns 409 instead of silently
         // clobbering a save made in another tab/device. `force` re-saves after the user chooses.
         baseUpdatedAt: opts.force ? undefined : ctx.state.draftUpdatedAt,
+        baseLiveAt: ctx.state.baseLiveAt,
       }),
       credentials: 'same-origin',
     });
@@ -148,6 +149,7 @@ export function setupDraftLifecycle(ctx: EditorContext): () => void {
     const payload = JSON.stringify({
       html: stripEditorAttributes(ctx.state.html),
       baseUpdatedAt: ctx.state.draftUpdatedAt,
+      baseLiveAt: ctx.state.baseLiveAt,
     });
 
     if (typeof navigator.sendBeacon === 'function') {
@@ -203,7 +205,41 @@ async function captureThumbnail(ctx: EditorContext): Promise<void> {
   }
 }
 
-export async function publish(ctx: EditorContext, opts: { force?: boolean } = {}) {
+interface PublishOpts {
+  /** Skip the draft-conflict check (the person chose to overwrite the newer draft). */
+  force?: boolean;
+  /** Skip the stale-base check (the person chose "Publish anyway"). */
+  overLive?: boolean;
+}
+
+interface StaleBase {
+  live?: { versionNo?: number; updatedAt?: string; by?: string | null; byYou?: boolean; source?: string | null };
+}
+
+const es = () => /^es\b/i.test(navigator.language || '');
+
+function relTime(iso: string | undefined): string {
+  const ms = iso ? Date.now() - Date.parse(iso) : NaN;
+  if (!Number.isFinite(ms)) return '';
+  try {
+    const rtf = new Intl.RelativeTimeFormat(navigator.language || 'en', { numeric: 'auto' });
+    const mins = Math.round(ms / 60000);
+    if (mins < 60) return rtf.format(-Math.max(mins, 0), 'minute');
+    const hrs = Math.round(mins / 60);
+    return hrs < 24 ? rtf.format(-hrs, 'hour') : rtf.format(-Math.round(hrs / 24), 'day');
+  } catch {
+    return new Date(iso!).toLocaleString();
+  }
+}
+
+/** "v14 · Ana · 2 hours ago" — the version that went live after this edit started. */
+export function staleBaseLine(data: StaleBase): string {
+  const live = data.live || {};
+  const who = live.byYou ? (es() ? 'vos' : 'you') : live.by || (live.source === 'agent' ? (es() ? 'un agente' : 'an agent') : '');
+  return [live.versionNo ? `v${live.versionNo}` : '', who, relTime(live.updatedAt)].filter(Boolean).join(' · ');
+}
+
+export async function publish(ctx: EditorContext, opts: PublishOpts = {}) {
   if (!opts.force) {
     const ok = await showConfirmDialog({
       title: 'Publish changes?',
@@ -219,7 +255,7 @@ export async function publish(ctx: EditorContext, opts: { force?: boolean } = {}
   await withBusy(document.getElementById('btn-publish') as HTMLButtonElement | null, 'Publishing…', () => publishNow(ctx, opts));
 }
 
-async function publishNow(ctx: EditorContext, opts: { force?: boolean } = {}): Promise<void> {
+async function publishNow(ctx: EditorContext, opts: PublishOpts = {}): Promise<void> {
   updateHtmlFromCanvas(ctx.state, ctx.dom.canvasFrame);
 
   try {
@@ -231,12 +267,27 @@ async function publishNow(ctx: EditorContext, opts: { force?: boolean } = {}): P
         // EDIT-09 F1: publishing deletes the draft and ships live — refuse if a newer
         // draft was saved elsewhere. `force` re-publishes after the user chooses.
         baseUpdatedAt: opts.force ? undefined : ctx.state.draftUpdatedAt,
+        baseLiveAt: opts.overLive ? undefined : ctx.state.baseLiveAt,
       }),
       credentials: 'same-origin',
     });
 
     if (response.status === 409) {
       const data = await response.json().catch(() => ({}));
+      if (data.code === 'STALE_BASE') {
+        // Someone published after this edit started: publishing now would revert them.
+        const line = staleBaseLine(data);
+        const anyway = await showConfirmDialog({
+          title: es() ? 'Cambió desde que empezaste' : 'Changed since you started',
+          body: es()
+            ? `Hay una versión más nueva en vivo (${line}). Si publicás ahora, reemplazás esos cambios. Mirá qué cambió en Historial de versiones.`
+            : `A newer version is live (${line}). Publishing now replaces those changes. See what changed in Version history.`,
+          confirmLabel: es() ? 'Publicar igual' : 'Publish anyway',
+          cancelLabel: es() ? 'Ahora no' : 'Not now',
+        });
+        if (anyway) return publishNow(ctx, { ...opts, overLive: true });
+        return;
+      }
       const overwrite = await showConfirmDialog({
         title: 'Newer draft exists',
         body:
@@ -258,6 +309,7 @@ async function publishNow(ctx: EditorContext, opts: { force?: boolean } = {}): P
       showToast('Published successfully', 'success');
       ctx.state.isDirty = false;
       ctx.state.draftUpdatedAt = undefined;
+      if (data.liveUpdatedAt) ctx.state.baseLiveAt = data.liveUpdatedAt;
       if (data.versionNo) {
         ctx.state.version = data.versionNo;
         const versionIndicator = document.getElementById('version-indicator');

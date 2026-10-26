@@ -141,6 +141,63 @@ async function draftConflict(
   }), { status: 409, headers: { 'Content-Type': 'application/json' } });
 }
 
+const ISO_TS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/;
+
+/** A client-sent `baseLiveAt` (when the live page it started from was published), or
+ *  null when absent or malformed. Never in the future: it's a point the client saw. */
+export function parseBaseLiveAt(value: unknown): string | null {
+  if (typeof value !== 'string' || !ISO_TS.test(value)) return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) && ms <= Date.now() ? value : null;
+}
+
+/** 409 STALE_BASE when the live page changed after `baseLiveAt` (someone — a teammate, an
+ *  agent, a crew — published since this edit started): publishing would silently revert
+ *  their change. Says which version went live, by whom and when, and the version the edit
+ *  started from so the client can show what changed. */
+export async function staleBaseConflict(
+  env: Env,
+  artifactId: string,
+  userId: string,
+  baseLiveAt: string,
+): Promise<Response | null> {
+  const live = await env.DB.prepare(`
+    SELECT d.updated_at, v.version_no, v.source, v.created_by, u.name, u.email
+    FROM deployments d
+    JOIN versions v ON v.id = d.version_id
+    LEFT JOIN users u ON u.id = v.created_by
+    WHERE d.artifact_id = ? AND d.channel = 'production'
+  `).bind(artifactId).first<{
+    updated_at: string | null; version_no: number; source: string | null;
+    created_by: string | null; name: string | null; email: string | null;
+  }>();
+  if (!live?.updated_at || Date.parse(live.updated_at) <= Date.parse(baseLiveAt)) return null;
+  const base = await env.DB.prepare(`
+    SELECT MAX(version_no) AS version_no FROM versions WHERE artifact_id = ? AND created_at <= ?
+  `).bind(artifactId, baseLiveAt).first<{ version_no: number | null }>();
+  return new Response(JSON.stringify({
+    success: false,
+    code: 'STALE_BASE',
+    error: 'The live page changed since this edit started.',
+    live: {
+      versionNo: live.version_no,
+      updatedAt: live.updated_at,
+      by: live.name || live.email || null,
+      byYou: !!live.created_by && live.created_by === userId,
+      source: live.source,
+    },
+    baseVersionNo: base?.version_no ?? null,
+  }), { status: 409, headers: { 'Content-Type': 'application/json' } });
+}
+
+/** The production pointer's timestamp right after a publish: the client's next base. */
+export async function liveUpdatedAt(env: Env, artifactId: string): Promise<string | null> {
+  const row = await env.DB.prepare(
+    `SELECT updated_at FROM deployments WHERE artifact_id = ? AND channel = 'production'`
+  ).bind(artifactId).first<{ updated_at: string | null }>();
+  return row?.updated_at ?? null;
+}
+
 async function saveDraft(request: Request, ctx: EditorContext): Promise<Response> {
   const { artifactId, userId, env } = ctx;
 
@@ -149,6 +206,7 @@ async function saveDraft(request: Request, ctx: EditorContext): Promise<Response
       html: string;
       cursorPosition?: { x: number; y: number };
       baseUpdatedAt?: string;
+      baseLiveAt?: string;
     };
 
     if (!body.html) {
@@ -165,13 +223,16 @@ async function saveDraft(request: Request, ctx: EditorContext): Promise<Response
 
     const draftId = `draft_${generateId('draft').slice(6)}`;
 
+    // A new draft's created_at is its base: when the live page it was opened on went live
+    // (the editor may have been open a while before this first save). Publish compares it
+    // with the live page to refuse a stale publish. An update keeps it.
     await env.DB.prepare(`
-      INSERT INTO artifact_drafts (id, artifact_id, user_id, html_content)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO artifact_drafts (id, artifact_id, user_id, html_content, created_at)
+      VALUES (?, ?, ?, ?, COALESCE(?, strftime('%Y-%m-%dT%H:%M:%fZ','now')))
       ON CONFLICT(artifact_id, user_id) DO UPDATE SET
         html_content = excluded.html_content,
         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-    `).bind(draftId, artifactId, userId, body.html).run();
+    `).bind(draftId, artifactId, userId, body.html, parseBaseLiveAt(body.baseLiveAt)).run();
 
     // Read back the new timestamp so the client can advance its base for the next save.
     const saved = await env.DB.prepare(`
@@ -235,6 +296,7 @@ export async function handlePublish(
       commitMessage?: string;
       message?: string;
       baseUpdatedAt?: string;
+      baseLiveAt?: string;
     };
 
     if (!body.html) {
@@ -247,6 +309,13 @@ export async function handlePublish(
     if (body.baseUpdatedAt) {
       const conflict = await draftConflict(env, artifactId, userId, body.baseUpdatedAt);
       if (conflict) return conflict;
+    }
+    // Someone published since this edit started: refuse rather than revert their change.
+    // "Publish anyway" omits the base.
+    const baseLiveAt = parseBaseLiveAt(body.baseLiveAt);
+    if (baseLiveAt) {
+      const stale = await staleBaseConflict(env, artifactId, userId, baseLiveAt);
+      if (stale) return stale;
     }
 
     // Get artifact info. The routing slug (deployments.slug) drives canonical
@@ -351,6 +420,7 @@ export async function handlePublish(
       success: true,
       versionId,
       versionNo: newVersionNo,
+      liveUpdatedAt: await liveUpdatedAt(env, artifactId),
       // Returned to the editor as "your page is live at …". Hardcoded, it sent the
       // author to another instance for a page that only exists on theirs.
       url: `${getPlatformOrigin(env)}/a/${artifact.slug}/`,

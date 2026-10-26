@@ -73,6 +73,16 @@ export const WORKSPACE_FORMS_EDIT_STYLES = `/* ---- Modal + native create forms 
 .wsx__discard:hover { color: var(--color-error); }
 .wsx__discard[hidden] { display: none; }
 .wsx__editnote { flex: 1; display: grid; place-items: center; text-align: center; color: var(--color-text-tertiary); font-size: var(--text-sm); padding: 24px; }
+.wsx-editbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; flex: none; margin-bottom: 10px; padding: 9px 10px 9px 14px; border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent); border-radius: var(--radius-md); background: var(--color-warning-light); color: var(--color-text); font: 500 var(--text-sm) var(--font-body); }
+.wsx-editbar[hidden], .wsx__pane--art:not(.is-editing) .wsx-editbar { display: none; }
+.wsx-editbar__msg { flex: 1; min-width: 12em; }
+.wsx-editbar__btn { border: 0; background: transparent; padding: 5px 4px; border-radius: var(--radius-md); color: var(--color-primary); font: 600 var(--text-sm) var(--font-body); cursor: pointer; white-space: nowrap; }
+.wsx-editbar__btn:hover { text-decoration: underline; }
+.wsx-editbar__btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.wsx-editbar__btn.is-primary { padding: 5px 12px; background: var(--color-primary); color: var(--color-text-inverse); }
+.wsx-editbar__btn.is-primary:hover { text-decoration: none; }
+.wsx-editbar__btn.is-x { padding: 2px 8px; color: var(--color-text-tertiary); font-size: var(--text-base); }
+.wsx-editbar__btn.is-x:hover { color: var(--color-text); text-decoration: none; }
 .wsx__toast { position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%); z-index: 50; background: var(--color-text); color: var(--color-bg); padding: 10px 18px; border-radius: 999px; font: 600 var(--text-sm) var(--font-body); box-shadow: var(--shadow-xl); opacity: 0; transition: opacity var(--duration-fast); pointer-events: none; }
 .wsx__toast.is-show { opacity: 1; }
 /* Edit-Lite: right-rail property panel (context-sensitive, in Edit mode) */

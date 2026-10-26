@@ -148,7 +148,7 @@ async function handleLoadEditor(
     // Get artifact info
     const artifact = await env.DB.prepare(`
       SELECT a.id, a.name, a.slug, a.visibility, a.owner_id, a.artifact_type,
-             d.version_id, v.entrypoint, v.version_no
+             d.version_id, d.updated_at AS live_updated_at, v.entrypoint, v.version_no
       FROM artifacts a
       LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
       LEFT JOIN versions v ON v.id = d.version_id
@@ -161,6 +161,7 @@ async function handleLoadEditor(
       owner_id: string;
       artifact_type: ArtifactType | null;
       version_id: string | null;
+      live_updated_at: string | null;
       entrypoint: string | null;
       version_no: number | null;
     }>();
@@ -192,12 +193,13 @@ async function handleLoadEditor(
 
     // Get user's draft if exists
     const draft = await env.DB.prepare(`
-      SELECT id, html_content, updated_at
+      SELECT id, html_content, created_at, updated_at
       FROM artifact_drafts
       WHERE artifact_id = ? AND user_id = ?
     `).bind(artifactId, ctx.userId).first<{
       id: string;
       html_content: string;
+      created_at: string;
       updated_at: string;
     }>();
 
@@ -258,6 +260,9 @@ async function handleLoadEditor(
         versionNo: artifact.version_no || 0,
         hasDraft: !!usableDraft,
         draftUpdatedAt: usableDraft?.updated_at,
+        // The live page this edit builds on (a draft's start, else the live page now):
+        // sent back on publish, which refuses with STALE_BASE if someone published since.
+        baseLiveAt: usableDraft?.created_at ?? artifact.live_updated_at ?? undefined,
         assets: assetRefs,
         collaborators,
       },

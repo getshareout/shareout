@@ -38,6 +38,9 @@ export interface EditorState {
   version?: number;
   /** updated_at of the draft we loaded — sent back for optimistic-concurrency saves (F1). */
   draftUpdatedAt?: string;
+  /** When the live page this edit builds on went live — publish refuses (STALE_BASE) if
+   *  someone published after it. */
+  baseLiveAt?: string;
   lassoContext?: LassoContext | null;
   /** Parsed manifest from <script type="shareout/manifest"> */
   manifest?: ParsedManifest | null;

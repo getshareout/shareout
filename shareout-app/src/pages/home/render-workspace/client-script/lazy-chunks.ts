@@ -42,7 +42,7 @@ export const LAZY_CHUNKS: Record<string, ChunkDef> = {
   catalog: { src: workspace_client_home_views_catalog_JS, exports: ['loadCatalog', 'catRoute'], vars: ['catCurrentId'] },
   crew: { src: workspace_client_home_views_crew_JS, exports: ['loadCrew'] },
   library: { src: workspace_client_home_views_library_JS, exports: ['loadLibrary'] },
-  history: { src: workspace_client_inspector_history_JS, exports: ['renderHistory'] },
+  history: { src: workspace_client_inspector_history_JS, exports: ['renderHistory', 'openVersionDiff'] },
   deliver: { src: workspace_client_inspector_deliver_JS, exports: ['renderDeliver', 'renderWatches'] },
   edit: {
     src: workspace_client_edit_lite_JS,
