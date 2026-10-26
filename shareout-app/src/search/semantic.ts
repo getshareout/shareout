@@ -12,7 +12,9 @@ import { listArtifactsForUser } from '../chat-agent/tools/artifacts';
 import type { WorkspaceSelection } from '../chat-platforms/types';
 
 const EMBED_MODEL = '@cf/baai/bge-base-en-v1.5'; // 768-dim, cosine
-const QUERY_TOPK = 40;
+// The index is not split per workspace, so the caller's nearest artifacts compete with
+// everyone's: fetch Vectorize's maximum (100 without values or metadata) before the access cut.
+const QUERY_TOPK = 100;
 
 type Accessible = Awaited<ReturnType<typeof listArtifactsForUser>>;
 
@@ -96,7 +98,9 @@ export async function semanticSearchArtifacts(
 ): Promise<Accessible | null> {
   const ids = await semanticSearchIds(env, query);
   if (!ids) return null;
-  const accessible = await listArtifactsForUser(env, userId, { limit: 500, workspaceId: opts.workspaceId });
+  // Access is checked for these candidates themselves, not looked up in the caller's most
+  // recent artifacts (an older page they can open would otherwise never come back).
+  const accessible = await listArtifactsForUser(env, userId, { limit: ids.length, workspaceId: opts.workspaceId, ids });
   const byId = new Map(accessible.map((a) => [a.id, a]));
   const ordered = ids.map((id) => byId.get(id)).filter((a): a is Accessible[number] => !!a);
   return ordered.slice(0, opts.limit ?? 24);
