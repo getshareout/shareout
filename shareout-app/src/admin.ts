@@ -52,15 +52,11 @@ export async function handleAdminPage(
     return notFoundPage();
   }
 
-  let userId: string | null = null;
   let isAuthorized = false;
 
   if (sessionToken) {
     const session = await validateAdminSession(env, sessionToken);
     if (session && session.artifactId === deployment.id) {
-      userId = session.userId;
-      isAuthorized = true;
-
       const redirectUrl = new URL(request.url);
       redirectUrl.searchParams.delete('session');
 
@@ -68,7 +64,7 @@ export async function handleAdminPage(
         status: 302,
         headers: {
           'Location': redirectUrl.toString(),
-          'Set-Cookie': `${ADMIN_COOKIE_NAME}=${await createAdminCookie(deployment.id, userId, env)}; Path=/a/${slug}/admin; HttpOnly; Secure; SameSite=Strict; Max-Age=${ADMIN_COOKIE_EXPIRY}`,
+          'Set-Cookie': `${ADMIN_COOKIE_NAME}=${await createAdminCookie(deployment.id, session.userId, env)}; Path=/a/${slug}/admin; HttpOnly; Secure; SameSite=Strict; Max-Age=${ADMIN_COOKIE_EXPIRY}`,
         },
       });
     }
@@ -82,7 +78,6 @@ export async function handleAdminPage(
     if (cookiePayload) {
       const authorizedUser = await isAdminUserAuthorized(env, deployment, cookiePayload.userId);
       if (authorizedUser) {
-        userId = cookiePayload.userId;
         isAuthorized = true;
       }
     }
@@ -96,7 +91,6 @@ export async function handleAdminPage(
       ).bind(deployment.owner_id, sessionUser.email).first();
 
       if (isOwner) {
-        userId = deployment.owner_id;
         isAuthorized = true;
       } else {
         const collab = await env.DB.prepare(
@@ -108,7 +102,6 @@ export async function handleAdminPage(
             'SELECT id FROM users WHERE email = ?'
           ).bind(sessionUser.email).first<{ id: string }>();
           if (user) {
-            userId = user.id;
             isAuthorized = true;
           }
         }
@@ -323,7 +316,6 @@ function renderChart(dailyStats: AnalyticsSummary['dailyStats']): string {
 
   const bars = sorted.map(day => {
     const height = Math.max((day.views / maxViews) * 100, 2);
-    const label = new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' });
     return `<div class="chart-bar" style="height: ${height}%" data-value="${day.views} views" title="${day.date}: ${day.views} views"></div>`;
   }).join('');
 
@@ -335,7 +327,7 @@ function renderChart(dailyStats: AnalyticsSummary['dailyStats']): string {
   return `<div class="chart">${bars}</div><div class="chart-labels">${labels}</div>`;
 }
 
-function renderVersionList(versions: VersionInfo[], slug: string, baseUrl: string): string {
+function renderVersionList(versions: VersionInfo[], _slug: string, _baseUrl: string): string {
   if (versions.length === 0) {
     return `<div class="empty">
       <p class="empty-title">No versions yet</p>

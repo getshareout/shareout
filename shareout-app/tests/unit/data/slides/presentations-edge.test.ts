@@ -21,25 +21,15 @@ vi.mock('../../../../src/crypto-utils', () => ({
 }));
 import * as middleware from '../../../../src/data/middleware';
 import { handleSlides } from '../../../../src/data/slides/handler';
-import { broadcastEvent } from '../../../../src/data/slides/realtime';
 import {
   ARTIFACT_ID,
   BASE_URL,
-  MAX_CONTENT_LENGTH,
-  MAX_SLIDES_PER_PRESENTATION,
-  MAX_VERSIONS_PER_PRESENTATION,
   PRES_ID,
-  SLIDE_ID_1,
-  SLIDE_ID_2,
-  VER_ID,
   createSlidesDb,
   jsonRequest,
   makeCtx,
-  makePresentation,
-  makeSlide,
   parseJson,
   seedPresentationWithSlides,
-  type StoredVersion,
 } from './shared';
 
 

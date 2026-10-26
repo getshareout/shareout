@@ -63,7 +63,7 @@ export class ElementSyncManager {
         const elementId = path[0] as string;
 
         if (path.length === 1) {
-          for (const [key, change] of event.changes.keys) {
+          for (const key of event.changes.keys.keys()) {
             if (key === 'attrs') continue;
             if (key === 'textContent') {
               const elMap = this.elements.get(elementId);
@@ -74,7 +74,7 @@ export class ElementSyncManager {
             }
           }
         } else if (path.length === 2 && path[1] === 'attrs') {
-          for (const [attrName, change] of event.changes.keys) {
+          for (const attrName of event.changes.keys.keys()) {
             const elMap = this.elements.get(elementId);
             const attrs = elMap?.get('attrs') as Y.Map<string> | undefined;
             const value = attrs?.get(attrName) ?? null;

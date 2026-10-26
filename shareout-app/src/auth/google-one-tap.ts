@@ -13,7 +13,7 @@ import { ssoRequiredFor, ssoRequiredBody } from './sso-config';
 export async function handleGoogleOneTap(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
 
-  let credential = '';
+  let credential: string;
   try {
     const body = await request.json<{ credential?: string }>();
     credential = body.credential || '';

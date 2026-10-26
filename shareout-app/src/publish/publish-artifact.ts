@@ -60,7 +60,7 @@ export async function publishArtifact(
   const {
     name, slug, entrypoint, authMethod, shareWith, password, credentials,
     workspaceId, folderId, mobileEntrypoint, pwa, embed, accessPolicy,
-    agent, artifactType, attachedSkillIds, isExample, library,
+    agent, artifactType, attachedSkillIds, isExample,
   } = params;
 
   // Point the artifact's library <script>/<link> tags at this instance's vendored

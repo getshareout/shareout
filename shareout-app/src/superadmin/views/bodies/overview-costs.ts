@@ -5,7 +5,7 @@
 import { escapeHtml } from '../../../html/utils';
 import type { PlatformMetrics } from '../../metrics';
 import type { CostMetrics, FunnelMetrics, WorkspaceCosts, WorkspaceCostRow } from '../../insights';
-import { barChart, bytes, card, costRow, deltaText, fmt, money, stat, stat2 } from '../components';
+import { bytes, card, costRow, deltaText, fmt, money, stat, stat2 } from '../components';
 import { recentTable, topArtifactsTable } from '../tables';
 
 export function overviewBody(m: PlatformMetrics, b: CostMetrics, f: FunnelMetrics): string {

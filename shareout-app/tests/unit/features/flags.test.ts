@@ -6,7 +6,6 @@ import {
   featureDisabledResponse,
   buildFeaturesPayload,
   webAgentBlockedMessage,
-  webAgentUpgradeMarkdown,
 } from '../../../src/features/flags';
 
 // Minimal fake D1: routes the two queries flags.ts issues to canned rows.

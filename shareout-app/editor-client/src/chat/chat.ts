@@ -524,7 +524,7 @@ function showAppliedFeedback(ctx: EditorContext, patches: Array<Record<string, u
           el.classList.remove('ai-change-applied');
         }, 2000);
       }
-    } catch (e) {
+    } catch {
       // Element may have been replaced, that's ok
     }
   });
@@ -736,7 +736,7 @@ export function applyPatches(ctx: EditorContext, patches: Array<Record<string, u
       return;
     }
 
-    let element: Element | null = null;
+    let element: Element | null;
     try {
       element = resolveElementBySelector(doc, selector);
     } catch (e) {

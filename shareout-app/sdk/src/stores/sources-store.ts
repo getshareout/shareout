@@ -300,7 +300,7 @@ export class SourcesStore {
     };
 
     for (const feed of this.feeds()) {
-      let node: Element | null = null;
+      let node: Element | null;
       try {
         node = document.querySelector(feed.element);
       } catch {

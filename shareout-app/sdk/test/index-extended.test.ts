@@ -4,7 +4,6 @@ import {
   init,
   registerServiceWorker,
   ShareOut,
-  ShareOutError,
 } from '../src/index';
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -232,7 +231,7 @@ describe('Dataset stream', () => {
   });
 
   it('sends the viewer session Bearer on stream (sandbox-safe)', async () => {
-    const fetchSpy = vi.fn(async (_url: string, init?: RequestInit) => {
+    const fetchSpy = vi.fn(async (_url: string, _init?: RequestInit) => {
       return new Response(new ReadableStream({
         start(c) { c.enqueue(new TextEncoder().encode('x')); c.close(); },
       }), { status: 200 });

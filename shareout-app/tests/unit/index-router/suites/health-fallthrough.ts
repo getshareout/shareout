@@ -2,20 +2,15 @@
  * Index router test suite: health fallthrough.
  * Registered from `index.test.ts` so Vitest hoists `vi.mock` in the entry file.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { HandlerMocks } from '../handlers';
 import {
   APEX,
-  SUB,
-  authed,
   createEnv,
   fetchPath,
-  handlerTag,
-  githubState,
-  sheetsState,
 } from '../fixtures';
 
-export function registerHealthFallthroughTests(handlers: HandlerMocks): void {
+export function registerHealthFallthroughTests(_handlers: HandlerMocks): void {
 describe('index router — health, debug, and fallthrough', () => {
   it('returns health JSON with the instance origin and no warnings', async () => {
     const response = await fetchPath('/health');

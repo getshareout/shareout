@@ -1,5 +1,5 @@
-// Minimal baseline for contributor tooling. Not part of the gate (no hosted CI; the
-// tooling/scripts/ci-check*.sh scripts don't lint): run `npx eslint <files>` on what you touch.
+// Minimal baseline, enforced at --max-warnings 0: ci-check-fast.sh (pre-push) lints the
+// files a branch changed, ci-check.sh lints the whole tree (`npm run lint`).
 import js from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';

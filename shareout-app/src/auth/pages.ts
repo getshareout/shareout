@@ -112,6 +112,7 @@ function renderAuthPage(title: string, body: string, status = 200, opts?: { noin
 }
 
 export function safeRedirect(raw: string | null | undefined, fallback = '/home'): string {
+  // eslint-disable-next-line no-control-regex
   return raw && /^\/(?![/\\])/.test(raw) && !/[\x00-\x1f]/.test(raw) ? raw : fallback;
 }
 

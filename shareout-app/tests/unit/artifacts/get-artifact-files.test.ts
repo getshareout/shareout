@@ -3,13 +3,10 @@ import './setup';
 import { describe, expect, it, vi } from 'vitest';
 import { handleGetArtifactFiles } from '../../../src/artifacts';
 import {
-  artifactRow,
   baseEnv,
   jsonBody,
   makeDbMock,
   makeR2Mock,
-  makeSlugsMock,
-  ownerRoleFirst,
   user,
 } from './shared';
 
@@ -97,7 +94,7 @@ describe('handleGetArtifactFiles', () => {
         return null;
       }),
       DB: makeDbMock({
-        first: (sql, ...args) => {
+        first: (sql) => {
           if (sql.includes('SELECT id, owner_id FROM artifacts')) return { id: 'art_1', owner_id: 'usr_1' };
           if (sql.includes('owner_id FROM artifacts')) return { owner_id: 'usr_1' };
           if (sql.includes('version_id FROM deployments')) return { version_id: 'ver_1' };
@@ -155,7 +152,7 @@ describe('handleGetArtifactFiles', () => {
 
   it('loads a specific version by version number or version id', async () => {
     const textObject = { text: vi.fn(async () => 'v2'), arrayBuffer: vi.fn() };
-    const makeEnv = (url: string) => ({
+    const makeEnv = (_url: string) => ({
       ...baseEnv,
       ARTIFACTS: makeR2Mock(() => textObject),
       DB: makeDbMock({

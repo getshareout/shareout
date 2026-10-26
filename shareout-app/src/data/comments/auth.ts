@@ -17,7 +17,7 @@ export async function getSession(
   ctx: DataContext,
 ): Promise<CommentSession | null> {
   const apiUser = await validateToken(request, ctx.env);
-  let payload: { userId: string; email: string } | null = null;
+  let payload: { userId: string; email: string } | null;
   if (apiUser) {
     payload = { userId: apiUser.id, email: apiUser.email ?? apiUser.username ?? apiUser.id };
   } else {

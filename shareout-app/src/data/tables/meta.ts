@@ -1,7 +1,6 @@
 import { generateId } from '../../crypto-utils';
 import { DATA_ERRORS } from '../../types';
 import { errorResponse, successResponse, type DataContext } from '../middleware';
-import { Errors } from '../errors';
 import { MAX_TABLES_PER_ARTIFACT } from './constants';
 import { validateTableName } from './validation';
 

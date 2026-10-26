@@ -1,6 +1,5 @@
 import { renderHtmlPage } from '../design-system/shell';
 import { colors } from '../../packages/design-tokens/src/index';
-import { escapeHtml } from '../html/utils';
 import { RUN_DRAWER_JS } from '../runs/run-drawer-client';
 import type { Env } from '../types';
 
@@ -10,7 +9,7 @@ interface SessionUser { id: string; email: string; name?: string }
 // automation surfaces (crew / job / alert) for one workspace. Thin shell — the
 // client fetches /v1/workspaces/{ws}/runs (admin-gated) and opens the shared
 // run drawer on row click. Workspace comes from ?ws=.
-export async function renderRunsPage(request: Request, env: Env, _user: SessionUser): Promise<Response> {
+export async function renderRunsPage(request: Request, _env: Env, _user: SessionUser): Promise<Response> {
   const url = new URL(request.url);
   const ws = url.searchParams.get('ws') || '';
 

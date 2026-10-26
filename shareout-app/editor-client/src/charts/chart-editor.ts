@@ -18,11 +18,7 @@ import {
   writeChartConfig,
   migrateLegacyDataBinding,
 } from './chart-data-model';
-import { escapeHtml, rgbToHex } from '../utils';
-import { showToast } from '../toast';
-import { getElementSelector as buildElementSelector } from '../dom/element-selector';
-import { renderCanvas } from '../canvas/render-canvas';
-import { renderSelectionHandles } from '../canvas/selection';
+import { escapeHtml } from '../utils';
 import { syncHtmlFromCanvas } from '../history/html-sync';
 import { markDirty } from '../persistence/draft';
 import { pushUndo } from '../history/undo-redo';
@@ -212,7 +208,7 @@ export async function updateChartConfig(ctx: EditorContext, element, chartId, up
       const charts = new ChartsClass();
       try {
         await charts.update(chartId, updates);
-      } catch (e) {
+      } catch {
         // Re-create chart if update fails
         await charts.create(element, newConfig);
       }

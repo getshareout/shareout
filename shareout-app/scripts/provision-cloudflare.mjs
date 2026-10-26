@@ -38,7 +38,7 @@ function run(args, { allowFail = false } = {}) {
   } catch (err) {
     if (allowFail) return String(err.stdout || '') + String(err.stderr || '');
     const msg = String(err.stderr || err.stdout || err.message);
-    throw new Error(`wrangler ${args.join(' ')} failed:\n${msg}`);
+    throw new Error(`wrangler ${args.join(' ')} failed:\n${msg}`, { cause: err });
   }
 }
 

@@ -61,7 +61,6 @@ export interface CommentsDbBundle {
 }
 
 /** Composite key for grouping reactions in the mock (unit separator, not NUL). */
-const REACTION_KEY_SEP = '\x1f';
 
 export function createCommentsDb(initial?: {
   comments?: StoredComment[];

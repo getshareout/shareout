@@ -44,7 +44,6 @@ vi.mock('../../../../src/fetch-utils', () => ({
 import { handlePilot, handlePilotSpike } from '../../../../src/data/agent/pilot';
 import { makeCtx, makeEnv, BASE_URL } from './helpers';
 import type { DataContext } from '../../../../src/data/middleware';
-import type { Env } from '../../../../src/types';
 
 const TASK_ID = 'task-abcdef12';
 

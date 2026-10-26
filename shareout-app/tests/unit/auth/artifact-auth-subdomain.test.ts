@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Env } from '../../../src/types';
 
 // The handler does a lot besides redirect (token mint, D1 lookups); this exercises

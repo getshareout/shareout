@@ -5,7 +5,6 @@ import type { EditorContext } from '../../../src/editor/index';
 import type { Env } from '../../../src/types';
 import {
   ARTIFACT_ID,
-  USER_ID,
   editorAnthropicDoneStream,
   editorAnthropicStopStream,
   editorOpenAIDoneStream,

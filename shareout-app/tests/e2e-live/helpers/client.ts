@@ -303,7 +303,7 @@ export class ShareOutClient {
       body: content,
     });
     const text = await response.text();
-    let body: DataResponse | null = null;
+    let body: DataResponse | null;
     try {
       body = JSON.parse(text) as DataResponse;
     } catch {

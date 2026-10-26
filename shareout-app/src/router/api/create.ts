@@ -339,7 +339,7 @@ function publishedFields(published: PublishResponse) {
 // Phase 1: route the request to a reply, a confirmation, or a build.
 async function handlePlan(env: Env, prompt: string, hasPage: boolean, meter: AiMeter): Promise<Response> {
   const context = (hasPage ? 'The user already has a published page. ' : 'No page exists yet. ') + `Request: ${prompt}`;
-  let raw = '';
+  let raw: string;
   try {
     const res = await chat(env, meter, [{ role: 'user', content: context }], PLANNER_SYSTEM_PROMPT, getAgentChatModel(env), 500);
     raw = res.content;

@@ -1,7 +1,7 @@
 import type { DataContext } from '../middleware';
 import { errorResponse, successResponse } from '../middleware';
 import { DATA_ERRORS } from '../../types';
-import type { AgentConfig, ChatRequest, Conversation, Message } from './types';
+import type { AgentConfig, ChatRequest, Conversation } from './types';
 import { streamChat, type AIConfig } from './anthropic';
 import { CLAUDE_HAIKU, CLAUDE_OPUS, CLAUDE_SONNET } from './models';
 import { buildVisitorContext, buildVisitorSystemPrompt } from './context';
@@ -173,7 +173,7 @@ export async function handleVisitorChat(
   // carries a snapshot, so the model always sees the freshest data.
   let modelContent = body.message;
   if (body.context && typeof body.context === 'object' && !Array.isArray(body.context)) {
-    let ctxJson = '';
+    let ctxJson: string;
     try { ctxJson = JSON.stringify(body.context); } catch { ctxJson = ''; }
     if (ctxJson && ctxJson !== '{}') {
       const MAX_CONTEXT_CHARS = 200_000; // guard against runaway payloads
@@ -285,7 +285,7 @@ export async function handleConversations(
   request: Request,
   ctx: DataContext,
   conversationId?: string,
-  action?: string
+  _action?: string
 ): Promise<Response> {
   if (conversationId) {
     if (request.method === 'GET') {

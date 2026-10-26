@@ -6,7 +6,7 @@ import { escapeHtml } from '../../html/utils';
 import type { ArtifactRow, HomeFilters, HomeFolder, RecentActivityRow, RecentCommentRow } from './types';
 import { FEATURE_META, TYPE_META } from './constants';
 import { artifactTypeGroup } from './filters';
-import { buildResultLabel, fmtCount, buildArtifactShareUrl } from './utils';
+import { fmtCount, buildArtifactShareUrl } from './utils';
 
 /** analytics_events.created_at is ISO text; tolerate unix seconds and ms too. */
 function parseTs(ts: string | number): number {

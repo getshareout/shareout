@@ -338,7 +338,7 @@ async function handleRollback(
 
 async function handleDetectComponents(
   request: Request,
-  ctx: EditorContext
+  _ctx: EditorContext
 ): Promise<Response> {
   try {
     const body = await request.json() as { html: string };

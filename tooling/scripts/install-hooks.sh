@@ -35,7 +35,7 @@ if [ "$MODE" = "full" ]; then
   echo "pre-push: main/integration push — running checks with tests"
   exec "$ROOT/tooling/scripts/ci-check-fast.sh"
 fi
-echo "pre-push: feature branch — light checks (tests run once in tooling/scripts/integrate.sh)"
+echo "pre-push: feature branch — light checks (tests run in tooling/scripts/land.sh / integrate.sh)"
 SHAREOUT_CHECK_MODE=light exec "$ROOT/tooling/scripts/ci-check-fast.sh"
 HOOK
 
@@ -47,5 +47,6 @@ git -C "$REPO_ROOT" config merge.generated.name "generated file: keep ours, rege
 git -C "$REPO_ROOT" config merge.generated.driver true
 echo "✓ Installed pre-push hook → $HOOKS_DIR/pre-push"
 echo "✓ Configured merge driver 'generated' (keeps one side; check:bundles regenerates)"
-echo "  Feature-branch pushes run light checks; integrate before main:"
+echo "  Feature-branch pushes run light checks; tests run on what lands:"
+echo "  ./tooling/scripts/land.sh <pr-number>   or, for a batch:"
 echo "  ./tooling/scripts/integrate.sh <branch> [<branch>…]"

@@ -1,16 +1,14 @@
 // @vitest-environment node
 import './setup';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { handleDatasets } from '../../../../src/data/datasets/handler';
 import {
   ARTIFACT_ID,
   BASE_URL,
-  jsonRequest,
   makeCtx,
   makeDatasetEnv,
   r2Body,
   sampleDataset,
-  sampleToken,
 } from './fixtures';
 
 describe('getDatasetContent', () => {

@@ -361,7 +361,7 @@ export async function getAccountAnalytics(
     const countryCounts: Record<string, number> = {};
     const referrerCounts: Record<string, number> = {};
     const mergeJsonArray = (wrapped: string, sink: Record<string, number>) => {
-      let outer: string[] = [];
+      let outer: string[];
       try { outer = JSON.parse(wrapped) as string[]; } catch { return; }
       for (const inner of outer) {
         if (!inner) continue;
@@ -606,7 +606,7 @@ async function aggregateArtifactRange(
   // (SQLite has no URL parser); the stored shape is unchanged: [{name, count}].
   const referrerJson = new Map<string, string>();
   for (const row of referrerRows.results || []) {
-    let items: Array<{ referrer: string; count: number }> = [];
+    let items: Array<{ referrer: string; count: number }>;
     try {
       items = JSON.parse(row.items) as Array<{ referrer: string; count: number }>;
     } catch {

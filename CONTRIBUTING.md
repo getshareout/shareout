@@ -29,8 +29,10 @@ npm run dev                      # http://localhost:55162
 
 Working on several branches at once? `./tooling/scripts/new-worktree.sh <branch>` adds a
 worktree off `origin/main` and clones `node_modules` from this checkout instead of
-installing a second copy — copy-on-write on APFS, so it costs almost no disk. It falls
-back to `npm ci` whenever the lockfiles differ (~5 s with a warm npm cache).
+installing a second copy — copy-on-write on APFS, so it costs almost no disk. It clones
+only when what this checkout has installed (`node_modules/.package-lock.json`) matches the
+new worktree's lockfile, and runs `npm ci --prefer-offline` otherwise (~5 s with a warm
+npm cache).
 
 No secrets to fill in: `npm run dev` creates `.dev.vars` from `.dev.vars.example` and
 generates a local `SESSION_SECRET` if there isn't one. Sessions are signed with that secret,
@@ -99,11 +101,11 @@ vitest's module graph. Force the whole suite with `SHAREOUT_FULL_TESTS=1`.
 `.git` dir, so it covers every worktree, and it configures the `generated` merge driver.
 Skip one push with `git push --no-verify` or `SHAREOUT_SKIP_HOOK=1`.
 
-- **Feature branches push light; the suite runs once on the integration.** Pushing a
-  feature branch runs static checks, typecheck, secret scan and bundle checks, but no
-  tests (`SHAREOUT_CHECK_MODE=light`). Many worktrees each running the suite on one
-  machine starve each other into timeout failures. Before landing, combine the branches
-  and run everything once:
+- **Feature branches push light; tests run on what lands.** Pushing a feature branch
+  runs static checks, eslint on changed files, the worker and workspace typechecks,
+  secret scan and bundle checks, but no tests (`SHAREOUT_CHECK_MODE=light`). Many
+  worktrees each running the suite on one machine starve each other into timeout
+  failures. To land several branches together, combine them and run everything once:
 
   ```bash
   ./tooling/scripts/integrate.sh -n <name> <branch-a> <branch-b> …
@@ -112,6 +114,15 @@ Skip one push with `git push --no-verify` or `SHAREOUT_SKIP_HOOK=1`.
   It merges them onto `origin/main` in a throwaway worktree on `integration/<name>`,
   regenerates bundles, and runs the full suite. Fix failures there, push it (pushes to
   `main` and `integration/*` run the tests), and land it as one PR.
+
+- **Landing a single PR (maintainers): `./tooling/scripts/land.sh <pr-number>`.** This
+  is the default way to merge one PR. Under a machine-wide lock it rebases the PR onto
+  `origin/main` in a throwaway worktree, regenerates and commits the bundles, runs the
+  light checks plus `test:affected` (affected root tests and touched workspace
+  suites), force-pushes the rebased head with `--force-with-lease`, then squash-merges
+  with `--match-head-commit` — and refuses if `main` moved during the run. What merges
+  is exactly what was tested. `--dry-run` prints the plan without changing anything.
+  Hooks are never bypassed; `integrate.sh` stays the tool for batches.
 
 - **Generated files.** Committed build outputs (`public/_bundles/*`, `src/discovery/*`,
   `src/official-skills/*.generated.ts`) are marked `merge=generated` in
@@ -149,19 +160,22 @@ TZ=UTC npm run test:critical
 
 Maintainer release steps: [RELEASING.md](RELEASING.md).
 
-### Lint / format (optional locally; not a full-tree gate yet)
+### Lint / format
 
-Configs ship so new code can match the house style without a repo-wide reformat:
+ESLint is part of the gate at `--max-warnings 0`: the pre-push check lints the files your
+branch changed (vs its merge base with `origin/main`), and `ci-check.sh` lints the whole
+tree. The tree is clean, so any warning it reports is in a file you touched — fix it
+rather than suppress it.
 
 ```bash
 cd shareout-app
+npm run lint:changed -- path/to/file.ts   # what the hook does, for chosen files
+npm run lint                              # whole tree (~12 s)
 npx prettier --check path/to/file.ts
-npx eslint path/to/file.ts
 ```
 
-`npm run format` / `npm run lint` exist; running them on the whole tree will
-surface a large existing baseline — prefer formatting/linting only files you touch
-until a dedicated cleanup PR lands.
+Prettier is not a gate: `npm run format` on the whole tree would reformat a large
+existing baseline, so format only the files you touch.
 
 ## Design system
 

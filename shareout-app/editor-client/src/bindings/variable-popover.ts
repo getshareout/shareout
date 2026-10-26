@@ -5,7 +5,7 @@
  * When clicking a bound variable, displays its source and binding type.
  */
 
-import { parseBinding, describeBinding, getBindingSources, getElementBinding } from './parser';
+import { describeBinding, getBindingSources, getElementBinding } from './parser';
 import { escapeHtml } from '../utils';
 import { BINDING_ATTR, BINDING_DISPLAY_ATTR } from '../sdk-patterns';
 

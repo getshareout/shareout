@@ -88,8 +88,6 @@ export async function isFeatureEnabled(
   ]);
   if (ws && key in ws) return ws[key];
   if (key in global) return global[key];
-  if (workspaceId) {
-  }
   return featureDefault(key);
 }
 

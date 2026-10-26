@@ -9,7 +9,6 @@ import {
 import {
   getAuthUrl,
   handleAuthCallback,
-  handleSheetsOAuthCallback,
   getTokenStatus,
 } from './artifact-auth';
 import { clearCache, getCacheStatus } from './cache';

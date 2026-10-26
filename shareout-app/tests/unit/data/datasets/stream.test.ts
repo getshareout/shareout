@@ -5,12 +5,9 @@ import { handleDatasets } from '../../../../src/data/datasets/handler';
 import {
   ARTIFACT_ID,
   BASE_URL,
-  jsonRequest,
   makeCtx,
   makeDatasetEnv,
-  r2Body,
   sampleDataset,
-  sampleToken,
 } from './fixtures';
 
 describe('streamDataset', () => {

@@ -75,7 +75,7 @@ async function handleAdminEndpoint(
   ctx: DataContext,
   parts: string[]
 ): Promise<Response> {
-  const [action, id] = parts;
+  const [action] = parts;
 
   // Agent admin can be used by owners and editor collaborators, but only after
   // cryptographic session/API-token verification.

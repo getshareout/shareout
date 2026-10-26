@@ -217,6 +217,7 @@ describe('export entry names (stored paths from before path validation)', () => 
     for (const name of sources) {
       const rest = name.slice('source/'.length);
       const segs = rest.split('/');
+      // eslint-disable-next-line no-control-regex
       expect(rest).not.toMatch(/[\\\u0000-\u001f\u007f<>:"|?*]/);
       expect(segs.every((seg) => seg && seg !== '.' && seg !== '..' && !/[. ]$/.test(seg))).toBe(true);
       expect(segs.every((seg) => !/^(con|prn|aux|nul|com\d|lpt\d)(\.|$)/i.test(seg))).toBe(true);

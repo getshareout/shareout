@@ -1,6 +1,6 @@
 // @vitest-environment node
 import './setup';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { handleGetArtifact } from '../../../src/artifacts';
 import { MODERATION_PENDING_MESSAGE } from '../../../src/publish/deployment';
 import {
@@ -8,8 +8,6 @@ import {
   baseEnv,
   jsonBody,
   makeDbMock,
-  makeR2Mock,
-  makeSlugsMock,
   ownerRoleFirst,
   user,
 } from './shared';

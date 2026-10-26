@@ -26,7 +26,7 @@ import {
 } from './crud';
 import { authorizeConnectionAction } from './resolve';
 import { handleConsent, requireConnectionConsent } from './consent';
-import { executeQuery, queryConnectionData } from './query';
+import { executeQuery } from './query';
 import { materializeConnection } from './materialize';
 import { testConnection } from './test-connection';
 

@@ -273,7 +273,7 @@ describe('handleApplyEdits', () => {
 
   it('applies search-replace edit successfully', async () => {
     const env = makeEnv({
-      first: (sql, args) => {
+      first: (sql) => {
         if (sql.includes('FROM versions')) return { id: 'ver_1' };
         if (sql.includes('FROM assets')) return { r2_key: 'r2/index.html', mime: 'text/html' };
         return null;

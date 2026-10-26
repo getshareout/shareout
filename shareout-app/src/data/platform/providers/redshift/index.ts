@@ -102,7 +102,7 @@ class RedshiftProvider extends StaticCredentialsProvider {
 
 		const deadline = Date.now() + timeoutMs;
 		let wait = 250;
-		let status: { Status?: string; Error?: string; HasResultSet?: boolean } = {};
+		let status: { Status?: string; Error?: string; HasResultSet?: boolean };
 		for (;;) {
 			await sleep(wait);
 			wait = Math.min(wait * 2, 2000);

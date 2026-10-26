@@ -431,7 +431,7 @@ export async function routeServe(ctx: FetchContext): Promise<Response | null> {
 }
 
 async function routeArtifactServe(ctx: FetchContext): Promise<Response | null> {
-  const { request, env, path, url } = ctx;
+  const { request, env, path } = ctx;
   const match = path.match(/^\/a\/([^/]+)\/?(.*)$/);
   if (!match) return null;
 

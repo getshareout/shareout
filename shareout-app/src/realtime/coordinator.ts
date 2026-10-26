@@ -86,7 +86,7 @@ export class RealtimeCoordinator implements DurableObject {
 
     try {
       await this.initializeDoc(artifactId, docName);
-    } catch (err) {
+    } catch {
       return new Response(JSON.stringify({
         success: false,
         error: 'Failed to initialize document'
@@ -131,7 +131,6 @@ export class RealtimeCoordinator implements DurableObject {
   }
 
   async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string): Promise<void> {
-    const tags = this.state.getWebSocketAutoResponseTimestamp(ws);
     const clientId = this.getClientId(ws);
 
     if (typeof message === 'string') {
@@ -178,7 +177,7 @@ export class RealtimeCoordinator implements DurableObject {
     }
   }
 
-  async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean): Promise<void> {
+  async webSocketClose(ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): Promise<void> {
     const clientId = this.getClientId(ws);
     const entry = this.awareness.get(clientId);
 
@@ -193,7 +192,7 @@ export class RealtimeCoordinator implements DurableObject {
     this.broadcastPresence('leave', clientId);
   }
 
-  async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
+  async webSocketError(ws: WebSocket, _error: unknown): Promise<void> {
     const clientId = this.getClientId(ws);
     const entry = this.awareness.get(clientId);
 

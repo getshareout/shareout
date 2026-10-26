@@ -14,6 +14,7 @@ function dangerous(md: string): boolean {
   t.innerHTML = render(md);
   return [...t.content.querySelectorAll('*')].some((el) =>
     ['script', 'iframe', 'object', 'embed', 'svg', 'style'].includes(el.tagName.toLowerCase()) ||
+    // eslint-disable-next-line no-control-regex
     [...el.attributes].some((a) => a.name.startsWith('on') || (['href', 'src'].includes(a.name) && /^\s*(javascript|data|vbscript):/i.test(a.value.replace(/[\u0000- ]/g, '')))));
 }
 

@@ -36,8 +36,8 @@ for b in "$@"; do
   fi
 done
 
+"$REPO_ROOT/tooling/scripts/install-deps.sh" "$DIR/shareout-app" worker
 cd shareout-app
-npm ci --silent
 echo "==> regenerate committed bundles"
 npm run -s check:bundles >/dev/null 2>&1 || true
 cd "$DIR"

@@ -1,6 +1,5 @@
 // ShareOut Design Tokens
 const PRIMARY = '#2563eb';
-const PRIMARY_HOVER = '#1d4ed8';
 const PRIMARY_LIGHT = 'rgba(37, 99, 235, 0.15)';
 const PRIMARY_GLOW = 'rgba(37, 99, 235, 0.25)';
 

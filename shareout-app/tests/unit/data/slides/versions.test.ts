@@ -21,12 +21,7 @@ vi.mock('../../../../src/crypto-utils', () => ({
 }));
 import * as middleware from '../../../../src/data/middleware';
 import { handleSlides } from '../../../../src/data/slides/handler';
-import { broadcastEvent } from '../../../../src/data/slides/realtime';
 import {
-  ARTIFACT_ID,
-  BASE_URL,
-  MAX_CONTENT_LENGTH,
-  MAX_SLIDES_PER_PRESENTATION,
   MAX_VERSIONS_PER_PRESENTATION,
   PRES_ID,
   SLIDE_ID_1,
@@ -55,18 +50,6 @@ describe('version routes', () => {
 
   it('lists versions', async () => {
     const { db } = seedPresentationWithSlides();
-    const version: StoredVersion = {
-      id: VER_ID,
-      presentation_id: PRES_ID,
-      name: 'v1',
-      description: null,
-      snapshot: '[]',
-      slide_count: 0,
-      created_by_id: null,
-      created_by_name: null,
-      is_auto_save: 0,
-      created_at: '2026-05-30T12:00:00.000Z',
-    };
     db.prepare('INSERT INTO presentation_versions')
       .bind(VER_ID, PRES_ID, 'v1', null, '[]', 0, null, null, 0)
       .run();

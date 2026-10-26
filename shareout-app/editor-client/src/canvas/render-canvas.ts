@@ -251,7 +251,7 @@ function setupReadySignal(dom: EditorDom): void {
 }
 
 /** Ensure iframe fills available space - scrolling happens inside the iframe. */
-export function syncCanvasFrameSize(dom: EditorDom): void {
+export function syncCanvasFrameSize(_dom: EditorDom): void {
   // No-op: Canvas and iframe now use CSS height: 100% to fill available space.
   // Content scrolls inside the iframe, not the outer container.
   log.debug('syncCanvasFrameSize: using CSS-based sizing');

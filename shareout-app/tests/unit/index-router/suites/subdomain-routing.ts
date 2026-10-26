@@ -2,7 +2,7 @@
  * Index router test suite: subdomain routing.
  * Registered from `index.test.ts` so Vitest hoists `vi.mock` in the entry file.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { HandlerMocks } from '../handlers';
 import {
   APEX,
@@ -11,8 +11,6 @@ import {
   createEnv,
   fetchPath,
   handlerTag,
-  githubState,
-  sheetsState,
 } from '../fixtures';
 
 export function registerSubdomainRoutingTests(handlers: HandlerMocks): void {

@@ -10,7 +10,6 @@ import { cleanupRateLimiters } from '../../../../src/data/platform/core/rate-lim
 import * as credentialsModule from '../../../../src/data/platform/core/credentials';
 import {
   ARTIFACT_ID,
-  CREDENTIALS_KEY,
   encryptTestCredentials,
   publicArtifactEnv,
 } from './helpers';

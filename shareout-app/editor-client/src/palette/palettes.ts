@@ -1,12 +1,4 @@
 import type { EditorContext } from '../editor/context';
-import { SDK_DETECTION_PATTERNS } from '../sdk-patterns';
-import { escapeHtml, rgbToHex } from '../utils';
-import { showToast } from '../toast';
-import { getElementSelector as buildElementSelector } from '../dom/element-selector';
-import { renderCanvas } from '../canvas/render-canvas';
-import { renderSelectionHandles } from '../canvas/selection';
-import { updateHtmlFromCanvas } from '../history/html-sync';
-import { pushUndo } from '../history/undo-redo';
 import { PLACEHOLDER_IMAGE_SRC } from './placeholder-image';
 
 export function initPalette(ctx: EditorContext) {
@@ -41,7 +33,7 @@ export function initPalette(ctx: EditorContext) {
   initDashboardPalette(ctx);
 }
 
-export function initChartsPalette(ctx: EditorContext) {
+export function initChartsPalette(_ctx: EditorContext) {
   const chartItems = [
     {
       icon: '[L]',
@@ -95,7 +87,7 @@ export function initChartsPalette(ctx: EditorContext) {
   });
 }
 
-export function initSlidesPalette(ctx: EditorContext) {
+export function initSlidesPalette(_ctx: EditorContext) {
   const slideTemplates = [
     { icon: '[]', name: 'Blank', template: 'blank' },
     { icon: 'T', name: 'Title', template: 'title' },
@@ -128,7 +120,7 @@ export function initSlidesPalette(ctx: EditorContext) {
   });
 }
 
-export function initDashboardPalette(ctx: EditorContext) {
+export function initDashboardPalette(_ctx: EditorContext) {
   const widgetTypes = [
     { icon: '#', name: 'KPI', type: 'kpi' },
     { icon: '[C]', name: 'Chart', type: 'chart' },

@@ -75,7 +75,7 @@ export async function saveDraft(ctx: EditorContext, opts: { force?: boolean } = 
     ctx.state.isDirty = false;
     refreshValidityChip(ctx);
     return true;
-  } catch (error) {
+  } catch {
     setSaveStatus(ctx, 'failed');
     return false;
   }
@@ -270,7 +270,7 @@ async function publishNow(ctx: EditorContext, opts: { force?: boolean } = {}): P
     } else {
       showToast('Publish failed: ' + (data.error || 'unknown error'), 'error');
     }
-  } catch (error) {
+  } catch {
     showToast('Publish failed', 'error');
   }
 }
@@ -380,7 +380,7 @@ export async function openVersionHistory(ctx: EditorContext) {
       list.innerHTML = '<div class="version-empty">No published versions yet</div>';
       styleEl(panel, '.version-empty', 'text-align:center;padding:24px;color:var(--text-muted);');
     }
-  } catch (error) {
+  } catch {
     const list = panel.querySelector<HTMLElement>('.version-history-list');
     if (list) list.innerHTML = '<div class="version-error">Failed to load versions</div>';
     styleEl(panel, '.version-error', 'text-align:center;padding:24px;color:var(--error);');

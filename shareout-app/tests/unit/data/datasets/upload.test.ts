@@ -9,7 +9,6 @@ import {
   makeCtx,
   makeDatasetEnv,
   r2Body,
-  sampleDataset,
   sampleToken,
 } from './fixtures';
 

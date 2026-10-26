@@ -1,7 +1,6 @@
 import type {
 	Env,
 	DecryptedCredentials,
-	DirectCredentials,
 	CredentialExchangeResult,
 	ConnectionConfig,
 	ExecutionMode,

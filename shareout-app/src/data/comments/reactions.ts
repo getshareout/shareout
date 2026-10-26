@@ -1,6 +1,6 @@
 import { generateId } from '../../crypto-utils';
 import { successResponse, errorResponse, type DataContext } from '../middleware';
-import { MAX_EMOJI_LENGTH, type Comment, type CommentRow } from './types';
+import { MAX_EMOJI_LENGTH, type Comment } from './types';
 import { getSession } from './auth';
 import { broadcastRaw } from './broadcast';
 import { JSON_IN, jsonList } from '../../sql-in';

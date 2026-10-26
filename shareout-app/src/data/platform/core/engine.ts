@@ -12,7 +12,6 @@ import { getRateLimiter, type RateLimitResult } from './rate-limiter';
 import {
 	loadConnection,
 	loadWorkspaceConnection,
-	loadConnectionByName,
 	getDecryptedCredentials,
 	prepareCredentialsForRequest,
 	saveCredentials,

@@ -2,20 +2,15 @@
  * Index router test suite: workspaces folders.
  * Registered from `index.test.ts` so Vitest hoists `vi.mock` in the entry file.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { HandlerMocks } from '../handlers';
 import {
-  APEX,
-  SUB,
   authed,
-  createEnv,
   fetchPath,
   handlerTag,
-  githubState,
-  sheetsState,
 } from '../fixtures';
 
-export function registerWorkspacesFoldersTests(handlers: HandlerMocks): void {
+export function registerWorkspacesFoldersTests(_handlers: HandlerMocks): void {
 describe('index router — workspaces and folders', () => {
   it('dispatches workspace collection and member routes', async () => {
     expect(await handlerTag(await fetchPath('/v1/workspaces', authed()))).toBe('handleListWorkspaces');

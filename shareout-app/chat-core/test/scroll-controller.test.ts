@@ -141,7 +141,7 @@ describe('createScrollController', () => {
   it('onEdgeChange fires on transitions only', () => {
     const v = makeViewport(1000, 200);
     const onEdge = vi.fn();
-    const c = createScrollController(v.el, { onEdgeChange: onEdge });
+    createScrollController(v.el, { onEdgeChange: onEdge });
     v.scrollTo(0); // follow -> away
     v.scrollTo(maxScroll(1000, 200)); // away -> follow
     expect(onEdge).toHaveBeenCalledTimes(2);

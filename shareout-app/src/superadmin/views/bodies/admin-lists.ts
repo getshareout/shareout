@@ -6,7 +6,7 @@ import { escapeHtml } from '../../../html/utils';
 import type { AdminAuditRow } from '../../../audit';
 import type { ModerationQueueRow } from '../../artifacts-admin';
 import type { UserRow } from '../../users';
-import { card, fmt, fmtDate } from '../components';
+import { fmt, fmtDate } from '../components';
 import { userRow } from '../rows';
 
 export function usersBody(d: { users: UserRow[]; total: number }): string {

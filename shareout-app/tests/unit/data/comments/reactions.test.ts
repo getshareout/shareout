@@ -4,7 +4,7 @@
  */
 import './mocks';
 import './setup';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { handleComments } from '../../../../src/data/comments';
 import { createSessionToken } from '../../../../src/token';
 import { ARTIFACT_ID, CHILD_COMMENT, ROOT_COMMENT, commentsRequest, createCommentsDb, ctxFromDb } from './shared';

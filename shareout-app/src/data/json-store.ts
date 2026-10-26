@@ -1,4 +1,3 @@
-import type { Env } from '../types';
 import { DATA_ERRORS } from '../types';
 import { generateId } from '../crypto-utils';
 import { successResponse, errorResponse, type DataContext } from './middleware';

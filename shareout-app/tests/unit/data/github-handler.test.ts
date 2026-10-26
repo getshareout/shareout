@@ -93,7 +93,7 @@ function makeGithubEnv(
 ): Env {
   const DB = {
     prepare: vi.fn((sql: string) => ({
-      bind: vi.fn((...args: unknown[]) => ({
+      bind: vi.fn((..._args: unknown[]) => ({
         first: vi.fn(async () => {
           if (sql.includes('FROM artifacts WHERE id = ?')) {
             return scenario.artifact === undefined ? { id: ARTIFACT_ID, name: 'Demo Site', owner_id: OWNER_ID } : scenario.artifact && { owner_id: OWNER_ID, ...scenario.artifact };

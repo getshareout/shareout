@@ -2,7 +2,7 @@ import { createMiniDb, type MiniDb } from '../../data/minidb-client';
 import { readJsonValue } from './json-editor';
 import { dispatchAction } from './dispatch';
 import { jsonResponse } from './response';
-import type { SDKEditorContext, SDKEditorHandler } from './types';
+import type { SDKEditorHandler } from './types';
 
 export const handleBindingEditor: SDKEditorHandler = async (request, ctx, action) => {
   const { artifactId, env, component } = ctx;

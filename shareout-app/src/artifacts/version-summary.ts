@@ -17,7 +17,6 @@ export type MessageSource = 'author' | 'ai';
 const DIFF_MAX_CHARS = 6_000;
 const LINE_MAX_CHARS = 200;
 const SUMMARY_MAX_CHARS = 160;
-const MODEL_LABEL = 'version-summary';
 
 /** A publisher-supplied message, trimmed and capped; null when absent or blank. */
 export function normalizeVersionMessage(raw: unknown): string | null {

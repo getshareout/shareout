@@ -16,11 +16,7 @@ DOCS="$REPO_ROOT/docs-site"
 
 echo "==> CI checks (worker)"
 cd "$WORKER"
-if [ ! -d node_modules ] || [ package-lock.json -nt node_modules ]; then
-  npm ci
-else
-  echo "==> Skipping npm ci (worker lockfile unchanged)"
-fi
+"$REPO_ROOT/tooling/scripts/install-deps.sh" "$WORKER" worker
 npm run check:boundaries
 npm run check:design-tokens
 npm run check:domains
@@ -32,6 +28,7 @@ npm run check:inline
 npm run check:access-seams
 npm run check:file-size
 "$REPO_ROOT/tooling/scripts/check-agent-guides.sh"
+npm run lint
 npm run db:migrate:fresh
 npm run typecheck
 if [ "${SHAREOUT_COVERAGE:-}" = "1" ]; then
@@ -67,11 +64,7 @@ if [ -n "${SHAREOUT_CHANGED_FILES:-}" ] && ! printf '%s\n' "$SHAREOUT_CHANGED_FI
 else
   echo "==> CI checks (docs site)"
   cd "$DOCS"
-  if [ ! -d node_modules ] || [ package-lock.json -nt node_modules ]; then
-    npm ci
-  else
-    echo "==> Skipping npm ci (docs lockfile unchanged)"
-  fi
+  "$REPO_ROOT/tooling/scripts/install-deps.sh" "$DOCS" docs-site
   npm run build
 fi
 

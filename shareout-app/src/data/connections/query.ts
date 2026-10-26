@@ -18,7 +18,7 @@ import { getCachedResult, cacheResult } from './cache';
 import { checkRateLimit, getRateLimitInfo } from './rate-limiter';
 import { createLogger, logError } from '../../logging';
 import { executeWarehouseQuery } from './warehouse-exec';
-import { UpstreamHttpError, mapQueryFailure, userFacingQueryError } from './errors';
+import { mapQueryFailure, userFacingQueryError } from './errors';
 import {
   resolveGenericConnection,
   recordConnectionUsage,
