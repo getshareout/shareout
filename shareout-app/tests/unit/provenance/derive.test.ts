@@ -316,6 +316,12 @@ describe('buildSources', () => {
     expect(cronIntervalMs('0 6 * * *', NOW)).toBe(86_400_000);
     expect(cronIntervalMs('0 6 * * 1-5', NOW)).toBe(3 * 86_400_000);
     expect(cronIntervalMs('*/5 * * * *', NOW)).toBe(3_600_000);
+    expect(cronIntervalMs('30 6 1 * *', NOW)).toBe(31 * 86_400_000);
+    expect(cronIntervalMs('0 0 1 1 *', NOW)).toBe(366 * 86_400_000);
+    expect(cronIntervalMs('0 0 29 2 *', NOW)).toBeGreaterThan(366 * 86_400_000);
+    // Valid but never fires: no schedule to go by (and no year of minutes walked per run).
+    expect(cronIntervalMs('0 0 31 2 *', NOW)).toBeNull();
+    expect(staleAfterMs({ schedules: ['0 0 31 2 *'], refresh: 'daily' }, NOW)).toBe(2 * 86_400_000);
     expect(cronIntervalMs('not a cron', NOW)).toBeNull();
     expect(refreshWordsIntervalMs('todos los días 12:00 UTC')).toBe(86_400_000);
     expect(refreshWordsIntervalMs('semanal')).toBe(7 * 86_400_000);
