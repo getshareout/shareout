@@ -1,4 +1,5 @@
 import type { Env, EmailReceivedPayload } from '../types';
+import type { EmailSource } from '../scheduling/email';
 
 /** One phase of a delivery, surfaced per-run in the Run Inspector. */
 export interface DeliveryStep {
@@ -25,6 +26,8 @@ export interface DeliveryContext {
   /** Set when the delivery was fired by an `email.received` event, so destinations
    *  can interpolate the inbound message (sender, subject, tag, body) into templates. */
   eventPayload?: EmailReceivedPayload;
+  /** Who sent it, when not a plain job (alert rule, crew). Emails show it in their footer. */
+  source?: EmailSource;
 }
 
 /**

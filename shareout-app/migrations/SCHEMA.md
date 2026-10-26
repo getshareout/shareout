@@ -420,6 +420,7 @@ Artifacts have real inboxes, and users get notified through email or a chat plat
 |---|---|
 | `artifact_emails` | An artifact's email identity (`email_prefix`) and inbound settings: `inbound_enabled`, `inbound_allowlist`, plus daily send/receive counters that reset on `last_reset_date`. |
 | `artifact_email_optouts` | Recipients who unsubscribed from one artifact's emails (signed link or List-Unsubscribe). Per artifact, not the global `email_suppressions` list. |
+| `email_sends` | One row per outbound email per recipient: artifact, subject, who sent it (crew, job, alert, page, system), and whether it went out, failed, or was skipped as a repeat. |
 | `email_templates` | Reusable subject/HTML/text with a `variables_schema`. `is_system` marks built-ins. |
 | `email_log` | Deduplication ledger — `(type, key)` records that a given email was already sent. Also the claim ledger for review notices: `version_notice` per version, `version_approved` per version+approver, `folder_first_open` per folder+person+day. |
 | `email_preferences` | Per-user, per-category opt-in. |

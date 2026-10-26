@@ -12,9 +12,18 @@ import { recordArtifactUsage } from '../workspaces/usage-ledger';
 
 // Fallback words around a scheduled delivery, in the page's workspace language.
 const DELIVERY_COPY = {
-  en: { view: 'View', viewPage: 'View artifact', viewButton: 'View Artifact', scheduledFrom: 'Scheduled email from', updateFrom: 'Update from', unsubQ: "Don't want to receive this anymore?", unsubAction: 'Unsubscribe' },
-  es: { view: 'Ver', viewPage: 'Ver la página', viewButton: 'Ver la página', scheduledFrom: 'Envío programado de', updateFrom: 'Novedades de', unsubQ: '¿No querés recibir más este aviso?', unsubAction: 'Darte de baja' },
+  en: {
+    view: 'View', viewPage: 'View artifact', viewButton: 'View Artifact', scheduledFrom: 'Scheduled email from', updateFrom: 'Update from', unsubQ: "Don't want to receive this anymore?", unsubAction: 'Unsubscribe',
+    sentBy: { crew: 'Sent automatically by the AI agent', job: 'Sent automatically by a scheduled delivery', alert: 'Sent automatically by an alert' }, from: 'from',
+  },
+  es: {
+    view: 'Ver', viewPage: 'Ver la página', viewButton: 'Ver la página', scheduledFrom: 'Envío programado de', updateFrom: 'Novedades de', unsubQ: '¿No querés recibir más este aviso?', unsubAction: 'Darte de baja',
+    sentBy: { crew: 'Enviado automáticamente por el agente de IA', job: 'Enviado automáticamente por un envío programado', alert: 'Enviado automáticamente por una alerta' }, from: 'desde',
+  },
 };
+
+/** A crew may not send the same subject to the same person from the same page more than once in this window. */
+const CREW_REPEAT_WINDOW_MS = 12 * 3600_000;
 
 // Attachments use the Workers binding's ambient `EmailAttachment` type
 // (workers-types). We only ever produce `disposition: 'attachment'` (CSV as a raw
@@ -41,6 +50,21 @@ export interface EmailConfig {
   useArtifactEmailHtml?: boolean;
   /** Filename for the rendered PDF attachment (default: <slug>.pdf). */
   pdfFilename?: string;
+  /** Set on automated sends: adds a "sent automatically by …" footer, and is recorded in email_sends. */
+  source?: EmailSource;
+}
+
+export interface EmailSource {
+  kind: 'crew' | 'job' | 'alert';
+  /** crew id or alert rule id, when known. */
+  id?: string;
+}
+
+/** What email_sends records about where a message came from. */
+export interface EmailSendLog {
+  artifactId?: string;
+  sourceKind: EmailSource['kind'] | 'page' | 'system';
+  sourceId?: string;
 }
 
 export interface SendEmailParams {
@@ -53,6 +77,8 @@ export interface SendEmailParams {
   attachments?: EmailAttachment[];
   /** Extra MIME headers, e.g. List-Unsubscribe (set by the email gateway). */
   headers?: Record<string, string>;
+  /** Defaults to platform mail ('system') with no artifact. */
+  log?: EmailSendLog;
 }
 
 export interface SendEmailResult {
@@ -63,6 +89,8 @@ export interface SendEmailResult {
   recipients?: number;
   /** Recipients skipped because they unsubscribed from this artifact's emails. */
   skippedOptedOut?: string[];
+  /** Recipients skipped because this crew already sent them this subject recently. */
+  skippedDuplicate?: string[];
 }
 
 const escHtml = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -110,8 +138,40 @@ function defaultFromEmail(env: Env): string {
   return !host || host === 'localhost' ? 'noreply@shareout.site' : `noreply@${host}`;
 }
 
+/** One email_sends row per recipient. Fail-open: a logging error must never block or fail a send. */
+async function recordSends(
+  env: Env,
+  recipients: string[],
+  subject: string,
+  log: EmailSendLog | undefined,
+  status: 'sent' | 'failed' | 'skipped_duplicate',
+  messageId?: string,
+  error?: string,
+): Promise<void> {
+  if (!env.DB || !recipients.length) return;
+  try {
+    await env.DB.batch(recipients.map((r) => env.DB.prepare(
+      `INSERT INTO email_sends (id, artifact_id, recipient, subject, source_kind, source_id, status, error, message_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(generateId('esnd'), log?.artifactId ?? null, r.toLowerCase().trim(), subject, log?.sourceKind ?? 'system', log?.sourceId ?? null, status, error ?? null, messageId ?? null)));
+  } catch {
+    /* fail-open */
+  }
+}
+
+async function sentRecently(env: Env, artifactId: string, recipient: string, subject: string): Promise<boolean> {
+  try {
+    const row = await env.DB.prepare(
+      `SELECT 1 FROM email_sends WHERE artifact_id = ? AND recipient = ? AND subject = ? AND status = 'sent' AND created_at > ? LIMIT 1`
+    ).bind(artifactId, recipient, subject, new Date(Date.now() - CREW_REPEAT_WINDOW_MS).toISOString()).first();
+    return !!row;
+  } catch {
+    return false;
+  }
+}
+
 export async function sendEmail(env: Env, params: SendEmailParams): Promise<SendEmailResult> {
-  const { from, replyTo, to, subject, text, html, attachments, headers } = params;
+  const { from, replyTo, to, subject, text, html, attachments, headers, log } = params;
 
   if (!text && !html) {
     return { success: false, error: 'Email must have text or html content' };
@@ -155,10 +215,13 @@ export async function sendEmail(env: Env, params: SendEmailParams): Promise<Send
       ...(attachments && attachments.length ? { attachments } : {}),
     });
 
+    await recordSends(env, recipients, subject, log, 'sent', result.messageId);
     return { success: true, messageId: result.messageId, recipients: recipients.length };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return { success: false, error: `Cloudflare Email Service error: ${message}` };
+    const error = `Cloudflare Email Service error: ${message}`;
+    await recordSends(env, recipients, subject, log, 'failed', undefined, error);
+    return { success: false, error };
   }
 }
 
@@ -288,24 +351,45 @@ export async function sendArtifactEmail(
     return { success: false, error: "All recipients opted out of this artifact's emails", skippedOptedOut };
   }
 
+  // Automated sends say who sent them and link back to the page, so recipients know where it comes from.
+  const source = config.source;
+  const crewName = source?.kind === 'crew' && source.id
+    ? await env.DB.prepare('SELECT name FROM crews WHERE id = ?').bind(source.id).first<{ name: string | null }>().then((r) => r?.name, () => null)
+    : null;
+  const sentBy = source ? `${copy.sentBy[source.kind]}${crewName ? ` «${crewName}»` : ''} ${copy.from}` : '';
+  const log: EmailSendLog = { artifactId, sourceKind: source?.kind ?? 'page', sourceId: source?.id };
+
   // One message per recipient: each carries its own signed one-click link (footer + RFC 8058 headers).
   const subject = subjectContent || `${copy.updateFrom} ${artifact.name}`;
   let result: SendEmailResult = { success: false, error: 'No message sent' };
   let sentCount = 0;
+  const skippedDuplicate: string[] = [];
   for (const to of targets) {
+    if (source?.kind === 'crew' && (await sentRecently(env, artifactId, norm(to), subject))) {
+      skippedDuplicate.push(norm(to));
+      await recordSends(env, [to], subject, log, 'skipped_duplicate');
+      continue;
+    }
     // No SESSION_SECRET (misconfigured instance): send as before rather than not at all.
     const link = env.SESSION_SECRET ? await artifactOptoutUrl(env, artifactId, to) : null;
+    const footerText = [
+      sentBy && `${sentBy} ${artifact.name} (ShareOut): ${artifactUrl}`,
+      link && `${copy.unsubQ} ${copy.unsubAction}: ${link}`,
+    ].filter(Boolean).join('\n');
+    const footerHtml = [
+      sentBy && `${escHtml(sentBy)} <a href="${artifactUrl}">${escHtml(artifact.name)}</a> (ShareOut).`,
+      link && `${copy.unsubQ} <a href="${link}">${copy.unsubAction}</a>`,
+    ].filter(Boolean).map((line) => `<p style="margin-top:24px;font-size:12px;color:#57534e">${line}</p>`).join('');
     const r = await sendEmail(env, {
       from: fromEmail,
       replyTo: config.replyTo || emailRecord?.reply_to || undefined,
       to: [to],
       subject,
-      text: (link ? `${textContent || ''}\n\n--\n${copy.unsubQ} ${copy.unsubAction}: ${link}` : textContent).trimStart() || undefined,
-      html: link && htmlContent
-        ? `${htmlContent}<p style="margin-top:24px;font-size:12px;color:#57534e">${copy.unsubQ} <a href="${link}">${copy.unsubAction}</a></p>`
-        : htmlContent || undefined,
+      text: (footerText ? `${textContent || ''}\n\n--\n${footerText}` : textContent).trimStart() || undefined,
+      html: htmlContent ? `${htmlContent}${footerHtml}` : undefined,
       attachments: attachments.length ? attachments : undefined,
       ...(link ? { headers: { 'List-Unsubscribe': `<${link}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } } : {}),
+      log,
     });
     if (r.success) {
       sentCount += r.recipients ?? 1;
@@ -315,7 +399,11 @@ export async function sendArtifactEmail(
     }
   }
   if (result.success) result = { ...result, recipients: sentCount };
+  if (!result.success && skippedDuplicate.length && skippedDuplicate.length === targets.length) {
+    result = { success: false, error: 'This email was already sent to these recipients in the last 12 hours' };
+  }
   if (skippedOptedOut.length) result = { ...result, skippedOptedOut };
+  if (skippedDuplicate.length) result = { ...result, skippedDuplicate };
   if (result.success) {
     await recordArtifactUsage(env, artifactId, 'email_sent', result.recipients ?? 0).catch(() => {});
   }

@@ -409,7 +409,7 @@ export async function executeCrewRun(
     // Self-pacing: a trigger-initiated run can set its own next wake.
     if (triggerId && nextWakeHours != null) {
       const hours = Math.max(NEXT_RUN_MIN_HOURS, Math.min(NEXT_RUN_MAX_HOURS, nextWakeHours));
-      const nextRunAt = Math.floor(Date.now() / 1000) + Math.round(hours * 3600);
+      const nextRunAt = new Date(Date.now() + Math.round(hours * 3600) * 1000).toISOString();
       await env.DB.prepare("UPDATE crew_triggers SET next_run_at = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
         .bind(nextRunAt, triggerId)
         .run();

@@ -192,3 +192,55 @@ describe('owner view of opt-outs', () => {
     expect((await call(false)).status).toBe(403);
   });
 });
+
+describe('email_sends log, crew repeat guard, and sent-by footer', () => {
+  beforeAll(async () => {
+    await e.DB.exec(`CREATE TABLE IF NOT EXISTS crews (id TEXT PRIMARY KEY, name TEXT)`);
+    await e.DB.exec(`CREATE TABLE IF NOT EXISTS email_sends (id TEXT PRIMARY KEY, artifact_id TEXT, recipient TEXT NOT NULL, subject TEXT NOT NULL, source_kind TEXT NOT NULL, source_id TEXT, status TEXT NOT NULL, error TEXT, message_id TEXT, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))`);
+  });
+  beforeEach(async () => {
+    await e.DB.exec(`DELETE FROM email_sends`);
+    await e.DB.exec(`DELETE FROM crews`);
+    await e.DB.exec(`INSERT INTO crews (id, name) VALUES ('crew_legal', 'Monitor de novedades legales')`);
+  });
+  const rows = () => e.DB.prepare('SELECT recipient, subject, source_kind, source_id, status, message_id FROM email_sends ORDER BY created_at, id').all().then((r) => r.results);
+
+  it('logs one row per recipient with its source', async () => {
+    await sendArtifactEmail(e, 'art_es', { recipients: ['Ana@x.com', 'bo@x.com'], subject: 'Hola', body: 'b' });
+    expect(await rows()).toEqual([
+      expect.objectContaining({ recipient: 'ana@x.com', subject: 'Hola', source_kind: 'page', status: 'sent', message_id: 'm1' }),
+      expect.objectContaining({ recipient: 'bo@x.com', source_kind: 'page', status: 'sent', message_id: 'm2' }),
+    ]);
+  });
+
+  it('a crew cannot send the same subject to the same person twice within the window', async () => {
+    const cfg = { recipients: ['ana@x.com'], subject: 'Novedades legales', body: 'v1', source: { kind: 'crew' as const, id: 'crew_legal' } };
+    expect((await sendArtifactEmail(e, 'art_es', cfg)).success).toBe(true);
+    const again = await sendArtifactEmail(e, 'art_es', { ...cfg, body: 'v2, reworded' });
+    expect(again.success).toBe(false);
+    expect(again.skippedDuplicate).toEqual(['ana@x.com']);
+    expect(sent).toHaveLength(1);
+    expect((await rows()).map((r) => r.status)).toEqual(['sent', 'skipped_duplicate']);
+    // A different subject still goes out.
+    expect((await sendArtifactEmail(e, 'art_es', { ...cfg, subject: 'Incidente nuevo' })).success).toBe(true);
+    expect(sent).toHaveLength(2);
+  });
+
+  it('non-crew sends are never held back as repeats', async () => {
+    await sendArtifactEmail(e, 'art_es', { recipients: ['ana@x.com'], subject: 'S', body: 'b', source: { kind: 'job' } });
+    await sendArtifactEmail(e, 'art_es', { recipients: ['ana@x.com'], subject: 'S', body: 'b', source: { kind: 'job' } });
+    expect(sent).toHaveLength(2);
+  });
+
+  it('automated emails say who sent them and link to the page', async () => {
+    await sendArtifactEmail(e, 'art_es', { recipients: ['ana@x.com'], subject: 'S', html: '<p>hi</p>', body: 'hi', source: { kind: 'crew', id: 'crew_legal' } });
+    expect(sent[0].text).toContain('Enviado automáticamente por el agente de IA «Monitor de novedades legales» desde Campo & Co (ShareOut): https://shareout.site/a/campo/');
+    expect(sent[0].html).toContain('Enviado automáticamente por el agente de IA «Monitor de novedades legales» desde <a href="https://shareout.site/a/campo/">Campo &amp; Co</a> (ShareOut).');
+    sent.length = 0;
+    await sendArtifactEmail(e, 'art_en', { recipients: ['ana@x.com'], subject: 'S', body: 'hi', source: { kind: 'alert', id: 'mar_1' } });
+    expect(sent[0].text).toContain('Sent automatically by an alert from Plain (ShareOut): https://shareout.site/a/plain/');
+    sent.length = 0;
+    await sendArtifactEmail(e, 'art_en', { recipients: ['ana@x.com'], subject: 'S', body: 'hi' });
+    expect(sent[0].text).not.toContain('Sent automatically');
+  });
+});
