@@ -125,10 +125,7 @@ async function handleStatus(ctx: DataContext): Promise<Response> {
 
 async function handleNotifyOwner(request: Request, ctx: DataContext): Promise<Response> {
   if (!ctx.env.EMAIL) {
-    return errorResponse(
-      { ...DATA_ERRORS.CONFIG_ERROR, message: 'Email sending is not configured on this deployment' },
-      ctx.origin
-    );
+    return errorResponse(DATA_ERRORS.EMAIL_UNAVAILABLE, ctx.origin);
   }
 
   const guard = await guardEmailSend(request, ctx);
@@ -250,10 +247,7 @@ async function handleNotifyOwner(request: Request, ctx: DataContext): Promise<Re
 
 async function handleSendReport(request: Request, ctx: DataContext): Promise<Response> {
   if (!ctx.env.EMAIL) {
-    return errorResponse(
-      { ...DATA_ERRORS.CONFIG_ERROR, message: 'Email sending is not configured on this deployment' },
-      ctx.origin
-    );
+    return errorResponse(DATA_ERRORS.EMAIL_UNAVAILABLE, ctx.origin);
   }
 
   // send-report targets an ARBITRARY recipient — the open-relay/phishing vector.

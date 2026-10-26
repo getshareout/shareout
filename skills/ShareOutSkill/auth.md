@@ -53,6 +53,9 @@ Store credentials locally at `~/.shareout/credentials`:
 }
 ```
 
+Or from the environment: `SHAREOUT_TOKEN` (token) and `SHAREOUT_ORIGIN` (instance URL).
+Either source is enough to call the API; an agent that finds only the env vars uses them.
+
 ## Log in with Google (device login)
 
 For a user who **already has a ShareOut account** — most importantly one **invited to a workspace by email** — anonymous `create-account` is wrong: it would strand them in a fresh headless account instead of their real one. Device login signs them in as themselves via Google and returns an `so_` token to the CLI.

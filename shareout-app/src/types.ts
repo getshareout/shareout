@@ -202,7 +202,7 @@ export interface Env {
    *  out of the worker script bundle (plan §19 Phase 4). */
   ASSETS: Fetcher;
   /** Cloudflare deployment version metadata — surfaces the current release id in the UI footer. */
-  CF_VERSION_METADATA?: { id: string; tag?: string };
+  CF_VERSION_METADATA?: { id: string; tag?: string; timestamp?: string };
   /** Workers AI — text embeddings for semantic artifact search. Optional: code falls back to keyword search when absent. */
   AI?: Ai;
   /** Vectorize index over artifact embeddings. Optional: semantic search degrades to keyword when absent. */
@@ -659,6 +659,13 @@ export const DATA_ERRORS = {
     status: 500,
     hint: 'The server is missing required configuration.',
     suggestion: 'Contact the artifact owner or ShareOut support.',
+  },
+  EMAIL_UNAVAILABLE: {
+    code: 'EMAIL_UNAVAILABLE',
+    message: 'Email sending is not configured on this instance',
+    status: 503,
+    hint: 'This ShareOut instance has no EMAIL binding, so artifacts cannot send mail. Check sdk.email.status().enabled before offering email.',
+    suggestion: 'Ask the instance admin to add a Cloudflare send_email binding named EMAIL (plus EMAIL_DEFAULT_FROM) and redeploy.',
   },
 
   // JSON Store Specific

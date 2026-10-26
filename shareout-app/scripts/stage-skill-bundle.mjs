@@ -4,14 +4,14 @@
  * fresh self-hosted instance with nothing in R2.
  *
  * The founder instance keeps its R2 copy (sync-skill-to-r2.mjs) for live skill
- * updates without a redeploy; src/skill.ts prefers R2 and falls back to this asset.
+ * updates without a redeploy; src/skill.ts serves whichever copy is newer.
  * A self-hoster has no R2 sync, so this asset is the only copy they get — without
  * it `GET {ORIGIN}/v1/skill` 404s, which is exactly what the deploy docs promise
  * will work.
  *
  * Output (committed, guarded by check:bundles):
  *   public/_bundles/skill.zip   — the whole skill tree
- *   public/_bundles/skill-meta.json — name/version/updated_at/description
+ *   public/_bundles/skill-meta.json — name/version/updated_at/description/sha256
  *
  * Usage: node scripts/stage-skill-bundle.mjs
  */
@@ -19,6 +19,7 @@ import { readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'n
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { zipSync } from 'fflate';
 
 // fflate encodes each zip entry's DOS timestamp via Date's *local-timezone*
@@ -112,6 +113,8 @@ writeFileSync(
       version: meta.version,
       updated_at: meta.updated_at || '',
       description: meta.description || '',
+      // /v1/skill serves `<version>+<sha8>` so agents refresh on any content change.
+      sha256: createHash('sha256').update(zip).digest('hex'),
     },
     null,
     2

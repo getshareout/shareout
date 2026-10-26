@@ -82,6 +82,10 @@ There is no mock/localStorage mode. Locally, artifacts talk to a real ShareOut b
 class ShareOutError extends Error {
   code: string;
   status: number;
+  hint?: string;       // why it failed
+  suggestion?: string; // how to fix it
+  reason?: string;     // finer cause under `code` (e.g. UNAUTHORIZED → expired)
+  requestId?: string;  // quote it in a support ticket
 }
 ```
 
@@ -89,8 +93,8 @@ class ShareOutError extends Error {
 try {
   await sdk.json.get('key');
 } catch (e) {
-  if (e instanceof ShareOutError) {
-    console.log(e.message, e.code, e.status);
+  if (e instanceof ShareOutError) {   // also ShareOut.ShareOutError
+    console.log(e.message, e.code, e.status, e.requestId);
   }
 }
 ```

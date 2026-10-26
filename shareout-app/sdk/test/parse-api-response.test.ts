@@ -46,6 +46,34 @@ describe('parseApiResponse', () => {
     });
   });
 
+  it('carries request_id and reason onto the error', async () => {
+    await expect(parseApiResponse(jsonResponse({
+      success: false,
+      error: 'Unauthorized',
+      code: 'UNAUTHORIZED',
+      reason: 'expired',
+      request_id: 'req_abc',
+    }, 401))).rejects.toMatchObject({ requestId: 'req_abc', reason: 'expired' });
+  });
+
+  it('keeps request_id on ConsentRequiredError', async () => {
+    await expect(parseApiResponse(jsonResponse({
+      success: false,
+      error: 'Consent required',
+      code: 'CONSENT_REQUIRED',
+      consent_url: 'https://example.com/consent',
+      request_id: 'req_c',
+    }, 403))).rejects.toMatchObject({ name: 'ConsentRequiredError', requestId: 'req_c' });
+  });
+
+  it('returns a bare (non-envelope) body only when bareBody is set', async () => {
+    await expect(parseApiResponse(jsonResponse({ url: '/lib/a/b@1.0.0.js' }), { bareBody: true }))
+      .resolves.toEqual({ url: '/lib/a/b@1.0.0.js' });
+    await expect(parseApiResponse(jsonResponse({ success: true, data: { ok: 1 } }), { bareBody: true }))
+      .resolves.toEqual({ ok: 1 });
+    await expect(parseApiResponse(jsonResponse({ url: '/x' }))).resolves.toBeUndefined();
+  });
+
   it('throws ShareOutError for non-JSON 5xx responses', async () => {
     const response = new Response('Bad Gateway', { status: 502 });
     await expect(parseApiResponse(response)).rejects.toMatchObject({

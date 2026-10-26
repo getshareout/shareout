@@ -164,7 +164,7 @@ describe('handleEmail status', () => {
 });
 
 describe('handleEmail notify-owner', () => {
-  it('returns config error when EMAIL binding is missing', async () => {
+  it('returns 503 EMAIL_UNAVAILABLE with a hint when the EMAIL binding is missing', async () => {
     const ctx = makeCtx({ emailBinding: false });
     const response = await handleEmail(
       emailRequest('/notify-owner', {
@@ -174,8 +174,12 @@ describe('handleEmail notify-owner', () => {
       ctx,
       '/notify-owner'
     );
-    expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toMatchObject({ code: 'CONFIG_ERROR' });
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Content-Type')).toContain('application/json');
+    const body = await response.json() as Record<string, unknown>;
+    expect(body).toMatchObject({ success: false, code: 'EMAIL_UNAVAILABLE' });
+    expect(body.hint).toMatch(/EMAIL binding/);
+    expect(body.suggestion).toMatch(/send_email/);
   });
 
   it('returns artifact not found when owner lookup fails', async () => {
@@ -323,7 +327,7 @@ describe('handleEmail notify-owner', () => {
 });
 
 describe('handleEmail send-report', () => {
-  it('returns config error when EMAIL binding is missing', async () => {
+  it('returns 503 EMAIL_UNAVAILABLE when the EMAIL binding is missing', async () => {
     const ctx = makeCtx({ emailBinding: false });
     const response = await handleEmail(
       emailRequest('/send-report', {
@@ -333,7 +337,8 @@ describe('handleEmail send-report', () => {
       ctx,
       '/send-report'
     );
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({ success: false, code: 'EMAIL_UNAVAILABLE' });
   });
 
   it('returns artifact not found when owner lookup fails', async () => {

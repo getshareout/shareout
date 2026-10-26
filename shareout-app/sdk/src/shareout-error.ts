@@ -10,7 +10,11 @@ export class ShareOutError extends Error {
     public hint?: string,
     public suggestion?: string,
     public param?: string,
-    public docs?: string
+    public docs?: string,
+    // `request_id` from the envelope: quote it in a support ticket.
+    public requestId?: string,
+    // Finer-grained cause under a stable `code` (e.g. UNAUTHORIZED → missing | expired).
+    public reason?: string
   ) {
     super(message);
     this.name = 'ShareOutError';
@@ -19,8 +23,8 @@ export class ShareOutError extends Error {
 
 
 export class ConsentRequiredError extends ShareOutError {
-  constructor(message: string, status: number, public consentUrl: string, hint?: string) {
-    super(message, 'CONSENT_REQUIRED', status, hint);
+  constructor(message: string, status: number, public consentUrl: string, hint?: string, requestId?: string) {
+    super(message, 'CONSENT_REQUIRED', status, hint, undefined, undefined, undefined, requestId);
     this.name = 'ConsentRequiredError';
   }
 }
