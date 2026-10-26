@@ -8,8 +8,9 @@ import { isFeatureEnabled, webAgentBlockedPayload } from '../../features/flags';
 import { buildClientsContextForWorkspace } from '../../sharees/context';
 import { knowledgeTrunkForContext } from '../../knowledge-context';
 import { guidanceEntryForContext } from '../../workspace-context';
-import { checkAiChatLimit, checkWebAgentWorkspaceLimit } from '../../rate-limit';
-import { queryHomeArtifactCatalog } from '../../pages/home/queries/artifacts';
+import { checkWebAgentTurnLimits } from '../../rate-limit';
+import { queryHomeArtifactNames } from '../../pages/home/queries/artifacts';
+import { resolveAgentScope } from '../../chat-agent/scope';
 import {
   jsonResp, streamAgentChat, confirmAgentAction, listAgentThreads,
   getAgentThreadMessages, renameAgentThread, deleteAgentThread, serveAgentMedia,
@@ -18,8 +19,8 @@ import {
 /** Lightweight orientation snapshot injected into the system prompt. Untrusted user data. */
 export async function buildWorkspaceSnapshot(env: Env, wsId: string, user: AuthUser): Promise<string> {
   const [cat, conns, mc, wsRow, clientNotes, trunk, guidance] = await Promise.all([
-    queryHomeArtifactCatalog(env, { id: user.id, email: user.email }, wsId)
-      .catch(() => ({ artifacts: [] as { id: string; name: string }[], total: 0, truncated: false })),
+    queryHomeArtifactNames(env, { id: user.id, email: user.email }, wsId, 15)
+      .catch(() => ({ artifacts: [] as { id: string; name: string }[], truncated: false })),
     env.DB.prepare(
       "SELECT name, provider, kind, agent_query_enabled FROM connections WHERE scope_type = 'workspace' AND scope_id = ? ORDER BY name"
     ).bind(wsId).all<{ name: string; provider: string; kind: string; agent_query_enabled: number }>(),
@@ -30,7 +31,7 @@ export async function buildWorkspaceSnapshot(env: Env, wsId: string, user: AuthU
     knowledgeTrunkForContext(env, wsId),
     guidanceEntryForContext(env, wsId),
   ]);
-  const pages = cat.artifacts.slice(0, 15).map((a) => `- ${a.name} (id: ${a.id})`).join('\n');
+  const pages = cat.artifacts.map((a) => `- ${a.name} (id: ${a.id})`).join('\n');
 
   const connLines = conns.results
     .map((c) => `- ${c.name} (${c.provider}${c.kind === 'platform' && c.agent_query_enabled === 1 ? ', queryable' : ''})`)
@@ -64,15 +65,20 @@ async function handleChat(ctx: FetchContext, wsId: string, user: AuthUser): Prom
   const retryMin = (r: { reset: number }) => Math.max(1, Math.ceil((r.reset - Math.floor(Date.now() / 1000)) / 60));
   const limitsAt = Date.now();
   const defer = ctx.executionCtx ? (p: Promise<unknown>) => ctx.executionCtx!.waitUntil(p) : undefined;
-  const perUser = await checkAiChatLimit(env, user.id, defer);
+  // The turn limits and the scope the turn runs in don't depend on each other: one wave.
+  const [{ perUser, perWorkspace }, scope] = await Promise.all([
+    checkWebAgentTurnLimits(env, user.id, wsId, defer),
+    resolveAgentScope(env, user.id, wsId),
+  ]);
   if (!perUser.allowed) return jsonResp({ error: `You’re sending messages too fast — try again in about ${retryMin(perUser)} min.` }, 429);
-  const perWs = await checkWebAgentWorkspaceLimit(env, wsId, defer);
-  if (!perWs.allowed) return jsonResp({ error: `This workspace has hit its assistant limit — try again in about ${retryMin(perWs)} min.` }, 429);
+  if (!perWorkspace.allowed) return jsonResp({ error: `This workspace has hit its assistant limit — try again in about ${retryMin(perWorkspace)} min.` }, 429);
+  if (!scope) return jsonResp({ error: 'Forbidden' }, 403);
 
   return streamAgentChat(env, {
     scopeKey: wsId,
     user,
     selectedWorkspaceId: wsId,
+    scope,
     text,
     threadId: typeof body.threadId === 'string' ? body.threadId : undefined,
     buildSnapshot: () => buildWorkspaceSnapshot(env, wsId, user),

@@ -92,17 +92,24 @@ function calculateSlidingWindowCount(
   return Math.floor(prevCount * (1 - windowWeight) + currCount);
 }
 
-export async function checkSlidingWindowRateLimit(
+/** A window read but not yet counted. `count` records the hit, and only when it was allowed. */
+interface WindowRead {
+  result: RateLimitResult;
+  count: (defer?: (write: Promise<unknown>) => void) => Promise<void>;
+}
+
+const notCounted = async (): Promise<void> => {};
+
+async function readSlidingWindow(
   kv: KVNamespace | undefined,
   identifier: string,
-  action: RateLimitAction,
-  defer?: (write: Promise<unknown>) => void
-): Promise<RateLimitResult> {
+  action: RateLimitAction
+): Promise<WindowRead> {
   const config = RATE_LIMITS[action];
   const reset = getWindowEnd(config.windowSeconds);
 
   if (!kv) {
-    return { allowed: true, limit: config.limit, remaining: config.limit, reset };
+    return { result: { allowed: true, limit: config.limit, remaining: config.limit, reset }, count: notCounted };
   }
 
   const windowStart = getWindowStart(config.windowSeconds);
@@ -125,29 +132,46 @@ export async function checkSlidingWindowRateLimit(
   if (effectiveCount >= config.limit) {
     const retryAfter = reset - Math.floor(Date.now() / 1000);
     return {
-      allowed: false,
-      limit: config.limit,
-      remaining: 0,
-      reset,
-      retryAfter: Math.max(1, retryAfter),
+      result: {
+        allowed: false,
+        limit: config.limit,
+        remaining: 0,
+        reset,
+        retryAfter: Math.max(1, retryAfter),
+      },
+      count: notCounted,
     };
   }
 
-  // Atomic increment using KV with metadata for optimistic concurrency
-  // Note: KV doesn't support true atomic increment, so we accept eventual consistency
-  // For strict atomicity, use Durable Objects (see RateLimitCoordinator below)
-  const write = kv.put(currKey, String(currCount + 1), {
-    expirationTtl: config.windowSeconds * 2 + 60
-  });
-  if (defer) defer(write);
-  else await write;
-
   return {
-    allowed: true,
-    limit: config.limit,
-    remaining: Math.max(0, config.limit - effectiveCount - 1),
-    reset,
+    result: {
+      allowed: true,
+      limit: config.limit,
+      remaining: Math.max(0, config.limit - effectiveCount - 1),
+      reset,
+    },
+    // Atomic increment using KV with metadata for optimistic concurrency
+    // Note: KV doesn't support true atomic increment, so we accept eventual consistency
+    // For strict atomicity, use Durable Objects (see RateLimitCoordinator below)
+    count: async (defer) => {
+      const write = kv.put(currKey, String(currCount + 1), {
+        expirationTtl: config.windowSeconds * 2 + 60
+      });
+      if (defer) defer(write);
+      else await write;
+    },
   };
+}
+
+export async function checkSlidingWindowRateLimit(
+  kv: KVNamespace | undefined,
+  identifier: string,
+  action: RateLimitAction,
+  defer?: (write: Promise<unknown>) => void
+): Promise<RateLimitResult> {
+  const window = await readSlidingWindow(kv, identifier, action);
+  await window.count(defer);
+  return window.result;
 }
 
 // Legacy function for backwards compatibility - now uses sliding window
@@ -175,12 +199,24 @@ export async function checkAiChatLimit(
   return checkKVRateLimit(env.RATE_LIMIT_KV, userId, 'aiChat', defer);
 }
 
-export async function checkWebAgentWorkspaceLimit(
+/**
+ * A workspace assistant turn's two limits, per user then per workspace, read in one wave.
+ * Hits count exactly as the two checks in a row would count them: the user's window when
+ * the user is allowed, the workspace's only when both are, so a turn the per-user limit
+ * refuses never spends the workspace's budget.
+ */
+export async function checkWebAgentTurnLimits(
   env: Env,
+  userId: string,
   workspaceId: string,
   defer?: (write: Promise<unknown>) => void
-): Promise<RateLimitResult> {
-  return checkKVRateLimit(env.RATE_LIMIT_KV, workspaceId, 'webAgentWorkspace', defer);
+): Promise<{ perUser: RateLimitResult; perWorkspace: RateLimitResult }> {
+  const [user, workspace] = await Promise.all([
+    readSlidingWindow(env.RATE_LIMIT_KV, userId, 'aiChat'),
+    readSlidingWindow(env.RATE_LIMIT_KV, workspaceId, 'webAgentWorkspace'),
+  ]);
+  if (user.result.allowed) await Promise.all([user.count(defer), workspace.count(defer)]);
+  return { perUser: user.result, perWorkspace: workspace.result };
 }
 
 export async function checkWebAgentQueryLimit(

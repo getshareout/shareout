@@ -107,6 +107,11 @@ tables become one. `tsc` cannot see inside a SQL string; budget accordingly.
 
 ## Repo gotchas that cost real time
 
+_Recorded during the July 2026 redesign. The first three are out of date: `main` has no
+branch protection and PRs are squash-merged, feature-branch pushes run light checks, and
+`check:bundles` in the pre-push check rebuilds `skill.zip`. The current gate is
+[AGENTS.md → Gate contract](../../AGENTS.md#gate-contract)._
+
 - Merging needs `gh pr merge <n> --merge --admin` — branch protection blocks a plain
   merge and auto-merge is off. Delete branches with
   `gh api -X DELETE repos/getshareout/shareout/git/refs/heads/<branch>`; `git push

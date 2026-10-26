@@ -1,6 +1,6 @@
 import type { Env } from '../types';
 import { getSecurityHeaders, getSandboxedCSP, getArtifactCspOrigin, ARTIFACT_SANDBOX_CSP, isScriptableDocumentMime, SANDBOX_PERMISSIONS_LOCKED } from './security';
-import { notFound } from './utils';
+import { notFound, runBackground } from './utils';
 
 function isCacheableAsset(mime: string): boolean {
   return (
@@ -79,6 +79,9 @@ export async function serveAsset(
     // sandbox: add the CSP sandbox directive to HTML and script-capable documents.
     // Default on; off only on the dedicated content domain and for owner captures.
     sandbox?: boolean;
+    // executionCtx: the edge-cache fill is registered with waitUntil, so the runtime
+    // doesn't cancel it once the response completes.
+    executionCtx?: ExecutionContext;
   } = {},
 ): Promise<Response> {
   const rangeHeader = request.headers.get('Range');
@@ -185,7 +188,7 @@ export async function serveAsset(
   if (cacheable) {
     // The Cache API refuses to store a `no-store` response, so gated bytes go in under
     // an internal TTL and get their wire header back on the way out (see withNoStore).
-    cache.put(cacheKey, noStore ? withInternalTtl(response.clone()) : response.clone());
+    runBackground(opts.executionCtx, cache.put(cacheKey, noStore ? withInternalTtl(response.clone()) : response.clone()));
   }
 
   return response;

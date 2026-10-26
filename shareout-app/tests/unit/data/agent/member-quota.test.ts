@@ -57,4 +57,38 @@ describe('reserveMemberQuota', () => {
     const r = await reserveMemberQuota(testEnv(), 'usr_c', 'wsp_b', 10);
     expect(r.allowed).toBe(false);
   });
+
+  it('names the rate limit when the rate and the budget both refuse', async () => {
+    await env.DB.prepare(`INSERT INTO workspace_llm_config VALUES ('wsp_rb', 100)`).run();
+    await env.DB.prepare(`INSERT INTO ai_usage_events (id, workspace_id, kind, model, base_cost_micro_usd, cost_source, created_at) VALUES ('e2', 'wsp_rb', 'assistant_chat', 'm', 100, 'actual', ?)`).bind(new Date().toISOString()).run();
+    const e = testEnv();
+    expect(await reserveMemberQuota(e, 'usr_rb', 'wsp_rb', 1)).toMatchObject({ allowed: false, limit: 'workspace_budget' });
+    let last = { allowed: true } as { allowed: boolean };
+    for (let i = 0; i < 25; i++) last = await reserveMemberQuota(e, 'usr_rb', 'wsp_rb', 1);
+    expect(last).toMatchObject({ allowed: false, limit: 'member_rate' });
+  });
+
+  it('reads the per-minute rate and the workspace budget together', async () => {
+    // The rate check's KV read only returns once the budget read has started; run in
+    // sequence, the two would wait on each other forever.
+    let budgetStarted!: () => void;
+    const started = new Promise<void>((resolve) => { budgetStarted = resolve; });
+    const db = {
+      prepare: (sql: string) => {
+        if (sql.includes('workspace_llm_config')) budgetStarted();
+        return env.DB.prepare(sql);
+      },
+    };
+    const kv = { get: async () => { await started; return null; }, put: async () => undefined };
+    const r = await reserveMemberQuota({ ...env, DB: db, RATE_LIMIT_KV: kv } as never, 'usr_p', 'wsp_p', 1);
+    expect(r.allowed).toBe(true);
+  });
+
+  it('hands the rate counter write to defer instead of waiting on it', async () => {
+    const deferred: Promise<unknown>[] = [];
+    const kv = { get: async () => null, put: () => new Promise<void>(() => {}) } as unknown as KVNamespace; // never settles
+    const r = await reserveMemberQuota(testEnv(kv), 'usr_d', 'wsp_1', 1, (p) => { deferred.push(p); });
+    expect(r.allowed).toBe(true);
+    expect(deferred).toHaveLength(1);
+  });
 });

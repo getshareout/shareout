@@ -25,7 +25,7 @@ North star (from AGENTS.md): *Ideas deserve to exist* — one clear action per s
 
 QA state lives on the **issue**, never in someone's head or a spreadsheet. A feature cannot reach `Done` without passing through QA.
 
-Labels:
+Labels — planned for Rollout phase 1 (below); none of them exist in the repo yet:
 
 | Label | Meaning | Set by |
 |-------|---------|--------|
@@ -50,10 +50,11 @@ Per PR / feature branch:
 
 ### Running the loop
 
-The loop is encoded as a slash command: **`.claude/commands/qa.md`**.
+The loop is to be encoded as a slash command, **`.claude/commands/qa.md`** — Rollout
+phase 3; it is not in the repo yet.
 
 - **Locally / in Claude Code:** `/qa <PR# | branch>` (empty = current branch vs `main`).
-- **From an automation / cloud agent:** the same prompt runs headless — `claude -p "/qa <PR#>"` — so a GitHub Action (on `ready-for-qa` label or PR event) or any agent runner triggers an identical pass.
+- **From an automation / cloud agent:** the same prompt runs headless — `claude -p "/qa <PR#>"` — so any agent runner (scheduled, or fired by the `ready-for-qa` label) triggers an identical pass. Not GitHub Actions: there is no hosted CI, by design.
 
 Calibrate `/qa` locally on a few real changes first; once it's trustworthy, wire it to fire automatically. Same prompt, two runners — no divergence.
 
@@ -120,4 +121,4 @@ The gaps this methodology closes: **Cloudflare Workers Builds preview URLs**, **
 | 5 | Cloud trigger | Workers Builds or manual `/qa` on `ready-for-qa` label |
 | 6 | Promote | proven scenarios → committed `e2e/` specs |
 
-**Agent triggering:** calibrate the charter **local-first**, then wire the same prompt to whatever runner you prefer — GitHub Actions, Cloudflare Workers Builds, or a scheduled agent.
+**Agent triggering:** calibrate the charter **local-first**, then wire the same prompt to a runner — Cloudflare Workers Builds or a scheduled agent (not GitHub Actions; there is no hosted CI, by design).

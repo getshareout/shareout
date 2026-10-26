@@ -128,7 +128,7 @@ export async function renderWorkspaceUsagePage(
 <script>${pageScript}</script>`;
 
   return renderHtmlPage({
-    title: `Usage · ${escapeHtml(workspace.name)}`,
+    title: `Usage · ${workspace.name}`,
     pageStyles: usageStyles,
     body,
     cacheControl: 'no-store',

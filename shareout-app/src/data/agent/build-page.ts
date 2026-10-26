@@ -6,7 +6,7 @@
 import { rewriteSkillOrigin } from '../../skill-origin';
 import type { AiMeter } from '../ai-usage';
 import type { Env } from '../../types';
-import { getSkillDocs } from './context';
+import { SDK_REFERENCE } from './sdk-reference.generated';
 import { chatComplete, getBuildConfig } from './anthropic';
 
 export const BUILD_MAX_TOKENS = 12000;
@@ -16,8 +16,8 @@ const BASE_SYSTEM_PROMPT = `You are ShareOut's build agent. You turn a user's re
 Output contract:
 - Output ONLY the HTML document. No markdown, no code fences, no commentary.
 - Start with <!DOCTYPE html> and include <html>, <head>, and <body>.
-- Inline all CSS in a <style> tag and all JS in a <script> tag. Do not reference external files (the SDK below is the one exception).
-- You may load assets/libraries from public CDNs via <link>/<script src> when genuinely needed. On PUBLIC/UNLISTED pages, use a reputable allowlisted CDN — jsDelivr, unpkg, cdnjs, esm.sh, Skypack, ajax.googleapis.com, cdn.tailwindcss.com, code.jquery.com, d3js.org, cdn.plot.ly (these cover most libraries). A CDN outside that allowlist is CSP-blocked on open pages and only works on private pages, so prefer an allowlisted host or inline the library.
+- Inline your own CSS in a <style> tag and JS in a <script> tag. External files are limited to the ShareOut /sdk files and /vendor libraries below (plus Google Fonts stylesheets).
+- Third-party libraries load root-relative from this instance, never a public CDN: /vendor/<npm package>@<version>/<file in the package> (jsDelivr's layout without the host and /npm), e.g. <script src="/vendor/d3@7/dist/d3.min.js"></script>. This works on private, workspace and public pages alike.
 - Make it polished, modern, and responsive. Use real, sensible placeholder content — never lorem ipsum.
 - When the user asks for a change, return the FULL updated document, not a diff.
 
@@ -27,9 +27,10 @@ Pages you publish run on ShareOut and can use the ShareOut SDK to persist data, 
 Use the SDK ONLY when the page genuinely benefits from it — anything that should save state, remember entries across visits, sync live between viewers, accept file uploads, or chat. For purely static or presentational pages, skip the SDK entirely and keep the output clean.
 
 When you DO use it:
-- Load it before your own script: <script src="https://shareout.site/sdk/v1/shareout.js"></script>
-- Initialize once: const shareout = new ShareOut();
+- Load it root-relative before your own script: <script src="/sdk/shareout.js"></script>
+- Initialize once, inside an async function: const sdk = await ShareOut.create();
 - It auto-detects the published artifact, so data persists per page automatically with no config.
+- Call only methods listed in the SDK reference below.
 - Degrade gracefully: render usable UI before data loads and handle empty states.
 
 `;
@@ -44,7 +45,7 @@ Commit to a direction. Pick ONE clear aesthetic (e.g. editorial brutalism, organ
 
 Typography. Choose distinctive, characterful fonts (load from Google Fonts when useful). Pair a display font with a clean body font. Use a real type scale with strong size/weight contrast — hero headlines large (clamp), body crisp at 16-18px, line-height ~1.5-1.7, readable line length.
 
-Color & theme. Commit to a cohesive palette via CSS variables. Dominant colors with sharp, sparing accents beat timid, evenly-spread ones. Vary light/dark across pages — do not default to the same look every time.
+Color & theme. Link <link rel="stylesheet" href="/sdk/shareout.css"> and build on its design-token CSS variables so the page follows the workspace's design. Dominant colors with sharp, sparing accents beat timid, evenly-spread ones.
 
 Layout & hierarchy. Every screen must answer at a glance: what is this, what's the primary action, what's secondary. Use a spacing scale (4/8/12/16/24/32/48/64/96); more space BETWEEN groups than within them. Consider asymmetry, overlap, and generous negative space — but keep the next action obvious.
 
@@ -57,14 +58,13 @@ Never ship AI-slop defaults: no Inter/Roboto/Arial/system-font-only type, no pur
 
 let cachedSystemPrompt: string | null = null;
 
-/** The full build-agent system prompt: contract + design standards + live skill docs. */
+/** The full build-agent system prompt: contract + design standards + generated SDK reference. */
 export async function buildSystemPrompt(env: Env): Promise<string> {
   if (cachedSystemPrompt) return cachedSystemPrompt;
-  const skillDocs = await getSkillDocs(env);
-  // The prompt names the SDK URL literally. Unrewritten, every page this builder
-  // produces on a self-hosted instance loads its SDK from the founder's server.
+  // Every URL in the prompt is root-relative; the rewrite keeps any founder-host
+  // literal from pointing a self-hosted instance's pages at someone else's server.
   cachedSystemPrompt = rewriteSkillOrigin(
-    `${BASE_SYSTEM_PROMPT}${DESIGN_SYSTEM_PROMPT}\n${skillDocs}`,
+    `${BASE_SYSTEM_PROMPT}${DESIGN_SYSTEM_PROMPT}\n${SDK_REFERENCE}`,
     env,
   );
   return cachedSystemPrompt;

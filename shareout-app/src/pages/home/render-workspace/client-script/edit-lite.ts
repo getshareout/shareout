@@ -8,14 +8,14 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
   // Markdown mode (rec.md): the doc is the rendered Markdown; saves go back as Markdown.
   var MD_TEXT_SEL = 'p,h1,h2,h3,h4,h5,h6,span,a,li,td,th,blockquote,pre';
   function textSel(rec) { return rec.md ? MD_TEXT_SEL : TEXT_SEL; }
-  var EDIT_CSS = '<style data-wsx-edit="1">'
-    + '[data-wsx-hover]{outline:1.5px solid color-mix(in srgb, ${colors.primary} 55%, transparent);outline-offset:2px;cursor:pointer}'
+  var EDIT_CSS = '[data-wsx-hover]{outline:1.5px solid color-mix(in srgb, ${colors.primary} 55%, transparent);outline-offset:2px;cursor:pointer}'
     + '[data-wsx-sel]{outline:2px solid ${colors.primary};outline-offset:2px}'
     + '[contenteditable="true"]{outline:2px solid ${colors.primary};outline-offset:2px;border-radius:2px}'
-    + '*{caret-color:${colors.primary}}</style>';
-  // ---- source-mapped model: render scripts-ON for fidelity (charts/JS render like View),
-  // but edits target a separate stamped SOURCE doc — that's what we save (never the live
-  // DOM). Only authored (data-wsx-id) elements are editable; JS-generated nodes are read-only.
+    + '*{caret-color:${colors.primary}}';
+  var EDIT_CSP = "script-src 'none'; object-src 'none'; base-uri 'self'";
+  // ---- source-mapped model: the edit frame shares this page's origin, so it shows a static
+  // copy (page scripts never run there), and edits target a separate stamped SOURCE doc —
+  // that's what we save (never the live DOM). Only authored (data-wsx-id) elements are editable.
   function stampTree(doc, n) {
     var els = doc.querySelectorAll('*');
     for (var i = 0; i < els.length; i++) {
@@ -41,7 +41,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
   }
   function renderLive(rec) {
     if (!rec.srcDoc) return;
-    var html = injectEditBase('<!DOCTYPE html>' + rec.srcDoc.documentElement.outerHTML, rec.art.slug, !rec.md);
+    var html = editFrameHtml(rec.srcDoc, rec.art.slug);
     rec.editframe.onload = function () { rec.editframe.onload = null; wireEditDoc(rec); };
     rec.editframe.srcdoc = html;
   }
@@ -92,13 +92,21 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
       })
       .catch(function (e) { if (e !== 'forbidden') setSaveStatus(rec, t('edit.couldNotLoad'), 'warn'); });
   }
-  // Inject base + edit CSS + (if missing) the SDK so scripts-on artifacts render with data.
-  function injectEditBase(html, slug, withSdk) {
-    var add = '<base href="/a/' + slug + '/">' + EDIT_CSS;
-    if (withSdk !== false && !/\\/sdk\\/shareout(\\.v1)?\\.js/.test(html)) add += '<script src="/sdk/shareout.js"><\\/script>';
-    if (/<head[^>]*>/i.test(html)) return html.replace(/<head([^>]*)>/i, '<head$1>' + add);
-    if (/<html[^>]*>/i.test(html)) return html.replace(/<html([^>]*)>/i, '<html$1><head>' + add + '</head>');
-    return '<head>' + add + '</head>' + html;
+  // The policy is the first child of the parsed <head>, ahead of anything the page carries.
+  function editFrameHtml(srcDoc, slug) {
+    var root = srcDoc.documentElement.cloneNode(true), head = srcDoc.createElement('head');
+    for (var c = root.firstElementChild; c; c = c.nextElementSibling) if (c.localName === 'head') { head = c; break; }
+    root.insertBefore(head, root.firstChild);
+    var csp = srcDoc.createElement('meta'), base = srcDoc.createElement('base'), css = srcDoc.createElement('style');
+    csp.setAttribute('http-equiv', 'Content-Security-Policy');
+    csp.setAttribute('content', EDIT_CSP);
+    base.setAttribute('href', '/a/' + slug + '/');
+    css.setAttribute('data-wsx-edit', '1');
+    css.textContent = EDIT_CSS;
+    head.insertBefore(css, head.firstChild);
+    head.insertBefore(base, css);
+    head.insertBefore(csp, base);
+    return '<!DOCTYPE html>' + root.outerHTML;
   }
   function wireTextEl(rec, el) {
     if (el.querySelector && el.querySelector(textSel(rec))) return; // leaf text only
@@ -160,7 +168,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
     else if (k === 'z' && !e.shiftKey) { e.preventDefault(); undoEdit(rec); }
     else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redoEdit(rec); }
   }
-  // Structural ops mutate the SOURCE doc, then re-render the live preview (re-runs scripts).
+  // Structural ops mutate the SOURCE doc, then re-render the edit frame.
   function duplicateSel(rec) {
     var s = srcOf(rec, rec.sel && rec.sel.el); if (!s || !s.parentNode) return;
     var c = s.cloneNode(true); stampFresh(rec, c);

@@ -7,7 +7,8 @@ single-maintainer project; items move when capacity and real users need them.
 
 - [x] Apache-2.0 public tree with self-host path (`BILLING_MODE=none`, Deploy button)
 - [x] Community files: CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, SUPPORT, NOTICE
-- [x] Public CI: critical-path suite on PR; full suite on main/nightly; gitleaks
+- [x] Local gate instead of hosted CI (by design): pre-push checks + gitleaks on every
+      push; the full suite once per landing (`tooling/scripts/integrate.sh`)
 - [x] Canonical API error envelope + artifact/publish/workspace/router helpers
 - [x] Dependabot (grouped) + RELEASING.md
 - [x] Billing/payments removed from OSS tree (unlocked self-host by construction)
@@ -17,7 +18,8 @@ single-maintainer project; items move when capacity and real users need them.
 
 - [x] Agent deploy skill + skill **source of truth** (`skills/README.md`; monorepo canonical)
 - [x] One-shot skill mirror to `getshareout/shareout-skill` + `mirror-skill-repo.sh`
-- [x] Branch protection on `main` (`Checks`, `Gitleaks`, strict, require PR)
+- [x] Maintainer-only merges to `main` — by convention: `main` has no branch protection
+      ([MAINTAINING.md](MAINTAINING.md))
 - [x] OSS skill: no paywall language (billing hosted-only stub; workspace admin without plans)
 - [x] Official primer `official-skills/shareout.md` origin-aware + points at full `$ORIGIN/v1/skill`
 - [ ] Verify Deploy-to-Cloudflare on a **fresh** Workers Paid account (then promote to `v0.1.0`)

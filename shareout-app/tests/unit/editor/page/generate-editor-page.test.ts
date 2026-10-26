@@ -34,6 +34,14 @@ describe('generateEditorPage', () => {
     expect(html.match(/<script type="module"/g)?.length).toBe(1);
   });
 
+  it('renders the artifact name as text in the title and script', () => {
+    const html = generateEditorPage({ ...options, name: '</title><script>x()</script>' });
+
+    expect(html).toContain('<title>Edit - &lt;/title&gt;&lt;script&gt;x()&lt;/script&gt; | ShareOut</title>');
+    expect(html).not.toContain('<script>x()</script>');
+    expect(html).toContain('name: "\\u003c/title>\\u003cscript>x()\\u003c/script>"');
+  });
+
   it('defaults theme to auto when omitted', () => {
     const html = generateEditorPage({
       artifactId: 'art_x',

@@ -4,6 +4,7 @@ import {
   checkAiChatLimit,
   checkKVRateLimit,
   checkSlidingWindowRateLimit,
+  checkWebAgentTurnLimits,
   getClientIp,
   rateLimitHeaders,
   rateLimitResponse,
@@ -173,6 +174,56 @@ describe('deferred counter write', () => {
       limit: 100,
     });
     expect(deferred).toHaveLength(1);
+  });
+});
+
+describe('checkWebAgentTurnLimits', () => {
+  const NOW = 1_700_000_030;
+  const windowKey = (action: string, id: string) => `rl:${action}:${id}:${Math.floor(NOW / 3600) * 3600}`;
+  const USER = windowKey('aiChat', 'u1');
+  const WS = windowKey('webAgentWorkspace', 'ws1');
+
+  it('reads the per-user and per-workspace windows in one wave', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(NOW * 1000);
+    const gets: string[] = [];
+    const env = {
+      RATE_LIMIT_KV: { get: (key: string) => { gets.push(key); return new Promise(() => {}); }, put: async () => {} },
+    } as unknown as Env;
+
+    void checkWebAgentTurnLimits(env, 'u1', 'ws1');
+
+    expect(gets).toEqual(expect.arrayContaining([USER, WS]));
+  });
+
+  it('counts both windows when the turn is allowed', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(NOW * 1000);
+    const store = new Map<string, string>();
+
+    const r = await checkWebAgentTurnLimits(kvEnv(store), 'u1', 'ws1');
+
+    expect([r.perUser.allowed, r.perWorkspace.allowed]).toEqual([true, true]);
+    expect([store.get(USER), store.get(WS)]).toEqual(['1', '1']);
+  });
+
+  it('a turn the per-user limit refuses never spends the workspace budget', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(NOW * 1000);
+    const store = new Map([[USER, '100']]);
+
+    const r = await checkWebAgentTurnLimits(kvEnv(store), 'u1', 'ws1');
+
+    expect(r.perUser.allowed).toBe(false);
+    expect(store.get(USER)).toBe('100');
+    expect(store.has(WS)).toBe(false);
+  });
+
+  it('a workspace refusal still counts the user, as the two checks in a row did', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(NOW * 1000);
+    const store = new Map([[WS, '500']]);
+
+    const r = await checkWebAgentTurnLimits(kvEnv(store), 'u1', 'ws1');
+
+    expect([r.perUser.allowed, r.perWorkspace.allowed]).toEqual([true, false]);
+    expect([store.get(USER), store.get(WS)]).toEqual(['1', '500']);
   });
 });
 

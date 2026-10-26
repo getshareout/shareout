@@ -163,6 +163,19 @@ describe('access layer', () => {
     expect(await handleSpaceGuestPortal(new Request(ORIGIN, { headers: { Cookie: cookie } }), env, 'fld_sg_sub')).not.toBeNull();
   });
 
+  it('renders the folder name as text in the page title', async () => {
+    const cookie = await sessionFor();
+    await env.DB.prepare("UPDATE folders SET name = ? WHERE id = 'fld_sg_space'").bind('</title><script>x()</script>').run();
+    try {
+      const portal = await handleSpaceGuestPortal(new Request(`${ORIGIN}/shared?folder=fld_sg_space`, { headers: { Cookie: cookie } }), env, 'fld_sg_space');
+      const html = await portal!.text();
+      expect(html).toContain('<title>&lt;/title&gt;&lt;script&gt;x()&lt;/script&gt;</title>');
+      expect(html).not.toContain('<script>x()</script>');
+    } finally {
+      await env.DB.prepare("UPDATE folders SET name = 'Client space' WHERE id = 'fld_sg_space'").run();
+    }
+  });
+
   it('is denied for another folder in the same workspace, another workspace, and a password page', async () => {
     const cookie = await sessionFor();
     expect(await view(A.other, cookie)).not.toBeNull();
