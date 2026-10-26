@@ -102,7 +102,7 @@ await sdk.email.notifyOwner({
 |------|-------------|
 | `RATE_LIMITED` | Daily email cap for artifact or user |
 | `INVALID_REQUEST` | Missing body, invalid replyTo, owner has no email |
-| `CONFIG_ERROR` | Email binding not configured |
+| `EMAIL_UNAVAILABLE` (503) | This instance has no `EMAIL` binding — check `sdk.email.status().enabled` first; the instance admin adds the binding |
 | `INTERNAL_ERROR` | Cloudflare send failed |
 
 ## Rate Limits

@@ -652,6 +652,13 @@ export const DATA_ERRORS = {
     hint: 'The server is missing required configuration.',
     suggestion: 'Contact the artifact owner or ShareOut support.',
   },
+  EMAIL_UNAVAILABLE: {
+    code: 'EMAIL_UNAVAILABLE',
+    message: 'Email sending is not configured on this instance',
+    status: 503,
+    hint: 'This ShareOut instance has no EMAIL binding, so artifacts cannot send mail. Check sdk.email.status().enabled before offering email.',
+    suggestion: 'Ask the instance admin to add a Cloudflare send_email binding named EMAIL (plus EMAIL_DEFAULT_FROM) and redeploy.',
+  },
 
   // JSON Store Specific
   KEY_NOT_FOUND: {

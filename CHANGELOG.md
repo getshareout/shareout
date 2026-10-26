@@ -15,6 +15,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- **Email without an `EMAIL` binding:** `POST /v1/data/{id}/email/notify-owner` and `/email/send-report` answer `503 EMAIL_UNAVAILABLE` with a hint and suggestion instead of `500 CONFIG_ERROR`. The other mail paths (sign-in codes, invites, notifications, scheduled deliveries, crew tools) already degrade without the binding.
 - **SDK errors and control-plane calls:** `e instanceof ShareOutError` no longer throws `ReferenceError` in artifacts — the script-tag bundle exposes `ShareOutError` / `ConsentRequiredError` as globals and as statics on `ShareOut` (`ShareOut.ShareOutError`, also `ShareOut.McpError`). `sdk.lib(name)` and `sdk.crew.usage()` return the route's bare JSON body instead of `undefined`. `ShareOutError` carries the envelope's `requestId` and `reason`.
 - **Export zip-slip + `.doc` text boxes:** artifact/workspace export normalizes stored source paths (backslashes → `/`, no empty/`.`/`..` segments, no leading `/`, control or Windows-reserved characters/names, length caps; collisions `~2`, `~3`…) so no entry escapes `source/`; safe paths are byte-identical, and a `RENAMED.txt` lists any rewrite. The legacy `.doc` reader now reads every story in CP order (main, footnotes, headers/footers, annotations, endnotes, text boxes, header text boxes), so forms whose body is only shapes anchoring text boxes extract; a body that is only pictures/drawings fails with "Document has no extractable text (images/drawings only)" instead of "No text found".
 
