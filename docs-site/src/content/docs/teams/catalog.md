@@ -84,6 +84,14 @@ What it is, gotchas, a sample query.
 so a source that only its datasets point at still shows them downstream (and isn't counted
 as an orphan). `aliases: [old.id]` keeps links to an entry's previous id working.
 
+### It maps both kinds of data
+
+- **External data** — anything behind a workspace connector (Snowflake, BigQuery, Sheets,
+  Shopify…). These are `source` entries with a `connection` and `fqn`.
+- **Data your artifacts create** — tables and JSON stored inside an artifact. These are
+  `dataset` entries. Lineage links the two, so you can see a dashboard's data traced all the
+  way back to the warehouse table that feeds it.
+
 ## Certification
 
 **Certified** means a workspace **owner or admin** vouched for one exact version of an
@@ -112,14 +120,6 @@ Content-Type: application/json
 `decision` is `certified`, `revoked` or `deprecated`. Send the `content_hash` from the entry
 you reviewed (`certification.content_hash`): if someone edited it meanwhile you get a
 `409 CONFLICT` instead of certifying a version nobody looked at. Members get `403`.
-
-### It maps both kinds of data
-
-- **External data** — anything behind a workspace connector (Snowflake, BigQuery, Sheets,
-  Shopify…). These are `source` entries with a `connection` and `fqn`.
-- **Data your artifacts create** — tables and JSON stored inside an artifact. These are
-  `dataset` entries. Lineage links the two, so you can see a dashboard's data traced all the
-  way back to the warehouse table that feeds it.
 
 ## Browsing the catalog
 

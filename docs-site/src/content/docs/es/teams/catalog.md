@@ -85,6 +85,14 @@ dos puntas: el catálogo lee ambas, así que una fuente a la que solo apuntan su
 los muestra aguas abajo (y no cuenta como huérfana). `aliases: [id.anterior]` mantiene
 funcionando los enlaces al id viejo de una entrada.
 
+### Mapea los dos tipos de datos
+
+- **Datos externos** — todo lo que está detrás de una conexión del workspace (Snowflake,
+  BigQuery, Sheets, Shopify…). Son entradas `source` con `connection` y `fqn`.
+- **Datos que crean tus artefactos** — tablas y JSON guardados dentro de un artefacto. Son
+  entradas `dataset`. El linaje une ambos, así podés ver los datos de un dashboard trazados
+  hasta la tabla del warehouse que los alimenta.
+
 ## Certificación
 
 **Certificada** quiere decir que un **propietario o administrador** del espacio avaló una
@@ -115,14 +123,6 @@ Content-Type: application/json
 `decision` es `certified`, `revoked` o `deprecated`. Mandá el `content_hash` de la entrada
 que revisaste (`certification.content_hash`): si alguien la editó mientras tanto, recibís
 `409 CONFLICT` en lugar de certificar una versión que nadie miró. Los miembros reciben `403`.
-
-### Mapea los dos tipos de datos
-
-- **Datos externos** — todo lo que está detrás de una conexión del workspace (Snowflake,
-  BigQuery, Sheets, Shopify…). Son entradas `source` con `connection` y `fqn`.
-- **Datos que crean tus artefactos** — tablas y JSON guardados dentro de un artefacto. Son
-  entradas `dataset`. El linaje une ambos, así podés ver los datos de un dashboard trazados
-  hasta la tabla del warehouse que los alimenta.
 
 ## Navegar el catálogo
 

@@ -52,6 +52,32 @@ Prose notes — what it is, gotchas, a sample query.
 A half-documented entry (just `kind`/`id`/`title`) is valid. Unknown frontmatter keys are
 preserved.
 
+### Entry kinds
+
+| Kind | Use for |
+| --- | --- |
+| `source` | External data behind a workspace connector — set `connection` + `fqn` |
+| `event` | Raw analytics or telemetry events (often upstream of tables and pipelines) |
+| `dataset` | Data your artifacts create — set `artifact` + `store` (e.g. `table:daily_metrics`) |
+| `table`, `view`, `pipeline`, `dashboard`, `model`, `metric` | Finer-grained assets in your data mesh |
+| `term` | Glossary entry — other assets link via `terms: [active-user]` |
+
+### Two data planes, one lineage graph
+
+ShareOut data comes from two places, and the catalog maps both:
+
+- **External** — a workspace **connector** (Snowflake, BigQuery, Sheets, Shopify…).
+  Use `kind: source`, set `connection` + `fqn`.
+- **Internal** — an **artifact-generated** SDK store (json/table/blobs) living in the
+  artifact's MiniDB. Use `kind: dataset`, set `artifact` + `store`.
+
+`upstream`/`downstream` edges cross planes freely — e.g. an artifact `dataset` whose
+`upstream` is a connector `source`.
+
+### `kind: term` (glossary)
+
+A business term (e.g. *Active User*). Other entries reference it via `terms: [active-user]`.
+
 ## Certification (owners and admins)
 
 **Certified** is a decision, not a field. A workspace **owner or admin** certifies one
@@ -83,32 +109,6 @@ Every read carries the overlay: `entry.status` is the **effective** status, and
 `decision` is the record that explains it (`decision`, `note`, `decided_by: { id, name,
 email }`, `decided_at`). `GET …/entries/{entryId}` adds `history` (newest first; `current`
 marks decisions made on the current version).
-
-### Entry kinds
-
-| Kind | Use for |
-| --- | --- |
-| `source` | External data behind a workspace connector — set `connection` + `fqn` |
-| `event` | Raw analytics or telemetry events (often upstream of tables and pipelines) |
-| `dataset` | Data your artifacts create — set `artifact` + `store` (e.g. `table:daily_metrics`) |
-| `table`, `view`, `pipeline`, `dashboard`, `model`, `metric` | Finer-grained assets in your data mesh |
-| `term` | Glossary entry — other assets link via `terms: [active-user]` |
-
-### Two data planes, one lineage graph
-
-ShareOut data comes from two places, and the catalog maps both:
-
-- **External** — a workspace **connector** (Snowflake, BigQuery, Sheets, Shopify…).
-  Use `kind: source`, set `connection` + `fqn`.
-- **Internal** — an **artifact-generated** SDK store (json/table/blobs) living in the
-  artifact's MiniDB. Use `kind: dataset`, set `artifact` + `store`.
-
-`upstream`/`downstream` edges cross planes freely — e.g. an artifact `dataset` whose
-`upstream` is a connector `source`.
-
-### `kind: term` (glossary)
-
-A business term (e.g. *Active User*). Other entries reference it via `terms: [active-user]`.
 
 ## Auto-seed
 
