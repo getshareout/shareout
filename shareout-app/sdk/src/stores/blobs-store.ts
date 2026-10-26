@@ -1,4 +1,5 @@
 import { ShareOutError } from '../shareout-error';
+import { errorFromEnvelope } from '../internal/parse-api-response';
 import type { SdkClient } from '../core/sdk-client';
 
 export interface BlobMetadata {
@@ -83,8 +84,8 @@ export class BlobsStore {
     });
 
     if (!uploadResponse.ok) {
-      const error = await uploadResponse.json().catch(() => ({ error: 'Upload failed' })) as { error?: string; code?: string };
-      throw new ShareOutError(error.error || 'Upload failed', error.code || 'UPLOAD_FAILED', uploadResponse.status);
+      const error = await uploadResponse.json().catch(() => ({ error: 'Upload failed' })) as Parameters<typeof errorFromEnvelope>[0];
+      throw errorFromEnvelope({ ...error, error: error.error || 'Upload failed' }, uploadResponse.status, 'UPLOAD_FAILED');
     }
 
     const result = await uploadResponse.json() as { success: boolean; data: BlobUploadResult; error?: string; code?: string };

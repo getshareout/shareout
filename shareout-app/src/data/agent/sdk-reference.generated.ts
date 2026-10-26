@@ -242,6 +242,9 @@ export const SDK_SURFACE: Record<string, readonly string[]> = {
     "version"
   ],
   "ShareOut": [
+    "ConsentRequiredError",
+    "McpError",
+    "ShareOutError",
     "create",
     "ready"
   ]

@@ -131,6 +131,9 @@ Each store page below shows its manifest shape.
 try {
   await sdk.json.get('key');
 } catch (e) {
-  if (e instanceof ShareOutError) console.log(e.code, e.status, e.message);
+  if (e instanceof ShareOutError) console.log(e.code, e.status, e.message, e.requestId);
 }
 ```
+
+`ShareOutError` (also `ShareOut.ShareOutError`) carries `code`, `status`, `hint`,
+`suggestion`, `reason` and `requestId` — quote the `requestId` in a support ticket.
