@@ -97,7 +97,9 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
     var el = document.getElementById(id); var d = ART_DATA[id]; if (!el || !d) return;
     var head = d.folderHead || '';
     var body = !d.count
-      ? '<div class="wsx-empty">' + esc(d.empty || t('common.nothingHere')) + '</div>'
+      ? (d.emptyCta && typeof newBtn !== 'undefined' && newBtn
+        ? '<div class="wsx-empty wsx-empty--first"><p>' + esc(t('artifacts.emptyFirst')) + '</p><button type="button" class="so-c-btn so-c-btn--primary" data-art-first>' + esc(t('artifacts.createFirst')) + '</button></div>'
+        : '<div class="wsx-empty">' + esc(d.empty || t('common.nothingHere')) + '</div>')
       : (widgetView(id) === 'table'
         ? '<div class="wsx-tbl wsx-tbl--art">' + TBL_HEAD + (d.rowsHtml || '') + '</div>'
         : (d.foldersHtml ? '<div class="wsx-art-folders">' + d.foldersHtml + '</div>' : '')
@@ -113,6 +115,7 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
   }
   ['wsxRecentW', 'wsxForYou', 'wsxArtMount', 'wsxAssetMount'].forEach(syncViewSeg);
   ws.addEventListener('click', function (e) {
+    if (e.target.closest('[data-art-first]')) { newDoc('blank'); return; }
     var btn = e.target.closest('[data-vw]'); if (!btn) return;
     var seg = btn.closest('[data-viewseg-for]'); if (!seg) return;
     var id = seg.getAttribute('data-viewseg-for'); var mode = btn.getAttribute('data-vw');

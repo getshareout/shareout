@@ -106,4 +106,17 @@ describe('renderSetupPage', () => {
     expect(html).toContain('https://acme.workers.dev');
     expect(html).not.toContain('would land there, not on this Worker');
   });
+
+  it('shows no problem list or warnings when everything required is configured', async () => {
+    const html = await (await renderSetupPage(env({ SHAREOUT_BASE_URL: 'https://acme.workers.dev' }))).text();
+    expect(html).not.toContain('class="setup-checks"');
+    expect(html).not.toContain('setup-warn">');
+  });
+
+  it('lists only what failed', async () => {
+    const html = await (await renderSetupPage(env({ SHAREOUT_BASE_URL: '' }))).text();
+    expect(html).toContain('class="setup-checks"');
+    expect(html).toContain('Instance URL');
+    expect(html).not.toContain('Database schema');
+  });
 });

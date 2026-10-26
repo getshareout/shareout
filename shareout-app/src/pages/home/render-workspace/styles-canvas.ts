@@ -86,6 +86,8 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 .wsx-widget:hover .wsx-widget__rz { opacity: 0.8; }
 .wsx-widget__rz:hover { opacity: 1; }
 .wsx-empty { padding: 22px 14px; text-align: center; font-size: var(--text-sm); color: var(--color-text-tertiary); }
+.wsx-empty--first { padding: 40px 14px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.wsx-empty--first p { margin: 0; }
 
 .wsx-ev { display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; border-radius: var(--radius-md); cursor: pointer; transition: background var(--duration-fast); text-decoration: none; color: inherit; }
 .wsx-ev:hover { background: var(--color-surface); }

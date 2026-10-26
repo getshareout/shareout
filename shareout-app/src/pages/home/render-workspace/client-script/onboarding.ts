@@ -41,17 +41,17 @@ export const workspace_client_onboarding_JS = `  // ===== onboarding checklist =
     }
   }
 
-  // One neutral card: only the NEXT open step gets the primary button, the rest are
-  // quiet links. Progress changes are announced once (not every focus refetch).
+  // One neutral card showing only the NEXT open step. Progress changes are announced once (not every focus refetch).
   var onbLastSpoken = null;
   function renderOnb(s, kickoff) {
+    var firstDone = (s.tasks || []).some(function (tk) { return tk.key === 'first_artifact' && tk.done; });
     if (kickoff && !onbGreeted) {
       onbGreeted = true;
       var nm = (window.WSX_NAME || '').trim();
       var greet = t(s.track === 'member' ? 'onb.greetMember' : 'onb.greet').replace('{name}', nm ? ', ' + nm : '');
       var gcol = makeCol('bot'); var gb = el('div', 'wsx-msg bot'); gb.innerHTML = mdToHtml(greet); gcol.appendChild(gb);
       // Concrete first builds: one click sends it, so a new account starts by making something.
-      if (s.track !== 'member' && s.pct === 0) {
+      if (!firstDone) {
         var chips = el('div', 'wsx-chatempty__chips');
         t('onb.starters').split('|').forEach(function (txt) {
           var c = el('button', 'wsx-chip'); c.type = 'button'; c.textContent = txt;
@@ -65,6 +65,10 @@ export const workspace_client_onboarding_JS = `  // ===== onboarding checklist =
     var tasks = (s.tasks || []).filter(function (tk) { return skipped.indexOf(tk.key) < 0; });
     var doneCount = tasks.filter(function (tk) { return tk.done; }).length;
     var full = s.pct >= 100;
+    var nextTask = null;
+    tasks.forEach(function (tk) { if (!tk.done && !nextTask) nextTask = tk; });
+    // Until the first page exists the starter chips are the one action; the checklist waits.
+    if (!full && (!firstDone || !nextTask)) return;
     var isNew = !onbCard;
 
     if (!onbCard) {
@@ -94,34 +98,23 @@ export const workspace_client_onboarding_JS = `  // ===== onboarding checklist =
     onbCard.appendChild(head);
 
     if (!full) {
-      var list = el('ul', 'wsx-onb__list');
-      var nextKey = null;
-      tasks.forEach(function (tk) { if (!tk.done && nextKey === null) nextKey = tk.key; });
-      tasks.forEach(function (tk) {
-        var isNext = tk.key === nextKey;
-        var li = el('li', 'wsx-onb__item' + (tk.done ? ' is-done' : '') + (isNext ? ' is-next' : ''));
-        if (tk.done && !onbDone[tk.key]) li.classList.add('is-justdone');
-        var chk = el('span', 'wsx-onb__check'); chk.setAttribute('aria-hidden', 'true'); chk.textContent = tk.done ? '\\u2713' : '\\u25CB';
-        var body = el('span', 'wsx-onb__body');
-        var lab = el('span', 'wsx-onb__label'); lab.textContent = t('onb.task.' + tk.key);
-        body.appendChild(lab);
-        if (isNext) { var why = el('span', 'wsx-onb__why'); why.textContent = t('onb.why.' + tk.key); body.appendChild(why); }
-        li.appendChild(chk); li.appendChild(body);
-        if (!tk.done) {
-          var acts = el('span', 'wsx-onb__acts');
-          var cta = el('button', isNext ? 'wsx-onb__cta' : 'wsx-onb__link'); cta.type = 'button'; cta.textContent = t('onb.cta.' + tk.key);
-          cta.addEventListener('click', function () { onbDispatch(tk.action); });
-          acts.appendChild(cta);
-          if (tk.skippable) {
-            var sk = el('button', 'wsx-onb__skipbtn'); sk.type = 'button'; sk.textContent = t('onb.skip');
-            sk.addEventListener('click', function () { onbSkip(tk.key); refreshOnb(false); });
-            acts.appendChild(sk);
-          }
-          li.appendChild(acts);
-        }
-        list.appendChild(li);
-      });
-      onbCard.appendChild(list);
+      var tk = nextTask;
+      var row = el('div', 'wsx-onb__item is-next');
+      var body = el('span', 'wsx-onb__body');
+      var lab = el('span', 'wsx-onb__label'); lab.textContent = t('onb.task.' + tk.key);
+      var why = el('span', 'wsx-onb__why'); why.textContent = t('onb.why.' + tk.key);
+      body.appendChild(lab); body.appendChild(why); row.appendChild(body);
+      var acts = el('span', 'wsx-onb__acts');
+      var cta = el('button', 'wsx-onb__cta'); cta.type = 'button'; cta.textContent = t('onb.cta.' + tk.key);
+      cta.addEventListener('click', function () { onbDispatch(tk.action); });
+      acts.appendChild(cta);
+      if (tk.skippable) {
+        var sk = el('button', 'wsx-onb__skipbtn'); sk.type = 'button'; sk.textContent = t('onb.skip');
+        sk.addEventListener('click', function () { onbSkip(tk.key); refreshOnb(false); });
+        acts.appendChild(sk);
+      }
+      row.appendChild(acts);
+      onbCard.appendChild(row);
     }
 
     onbDone = {}; tasks.forEach(function (tk) { if (tk.done) onbDone[tk.key] = 1; });
