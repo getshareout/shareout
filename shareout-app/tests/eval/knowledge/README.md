@@ -14,7 +14,7 @@ Current numbers: [BASELINE.md](BASELINE.md).
 From `shareout-app/`:
 
 ```bash
-npm run eval:knowledge                     # keyword (FTS5) only, as this branch ships it — ~15 s, no credentials
+npm run eval:knowledge                     # keyword (FTS5) only, as this branch ships it — ~20 s, no credentials
 npm run eval:knowledge -- --check          # validate the corpus + golden set only
 npm run eval:knowledge -- --baseline       # also rewrite BASELINE.md's table + baseline.json
 ```
