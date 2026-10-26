@@ -22,12 +22,13 @@ import { embedded, fakeAi, FakeVectorize } from '../helpers/fake-vectors';
 
 const OWNER = 'usr_vec_owner';
 const MEMBER = 'usr_vec_member';
+const OTHER = 'usr_vec_other';
 let n = 0;
 
 beforeAll(async () => {
   await applyMigrations();
-  await e.DB.prepare("INSERT INTO users (id, email, name) VALUES (?, 'owner@vec.example', 'Owner'), (?, 'member@vec.example', 'Member')")
-    .bind(OWNER, MEMBER).run();
+  await e.DB.prepare("INSERT INTO users (id, email, name) VALUES (?, 'owner@vec.example', 'Owner'), (?, 'member@vec.example', 'Member'), (?, 'other@vec.example', 'Other')")
+    .bind(OWNER, MEMBER, OTHER).run();
 });
 
 async function newWorkspace(): Promise<string> {
@@ -38,12 +39,17 @@ async function newWorkspace(): Promise<string> {
 }
 
 /** A workspace page with one passage per section. */
-async function publishPage(env: Env, ws: string, id: string, sections: string[], name = id): Promise<void> {
+async function publishPage(
+  env: Env, ws: string, id: string, sections: string[], name = id,
+  opts: { owner?: string; visibility?: string; held?: boolean } = {},
+): Promise<void> {
   const html = `<!doctype html><html><body><h1>${name}</h1>${sections.map((s, i) => `<h2>Section ${i}</h2><p>${s}</p>`).join('')}</body></html>`;
   const key = `test/vec/${id}/index.html`;
   await e.ARTIFACTS.put(key, html);
   await e.DB.batch([
-    e.DB.prepare("INSERT INTO artifacts (id, owner_id, name, slug, visibility, workspace_id) VALUES (?, ?, ?, ?, 'workspace', ?)").bind(id, OWNER, name, id, ws),
+    e.DB.prepare('INSERT INTO artifacts (id, owner_id, name, slug, visibility, workspace_id) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(id, opts.owner ?? OWNER, name, id, opts.visibility ?? 'workspace', ws),
+    ...(opts.held ? [e.DB.prepare("INSERT INTO artifact_moderation (artifact_id, status) VALUES (?, 'pending')").bind(id)] : []),
     e.DB.prepare("INSERT INTO versions (id, artifact_id, version_no, entrypoint) VALUES (?, ?, 1, 'index.html')").bind(`ver_${id}`, id),
     e.DB.prepare("INSERT INTO deployments (id, artifact_id, version_id, channel, slug) VALUES (?, ?, ?, 'production', ?)").bind(`dep_${id}`, id, `ver_${id}`, id),
     e.DB.prepare("INSERT INTO assets (id, version_id, path, r2_key, mime, size_bytes, sha256) VALUES (?, ?, 'index.html', ?, 'text/html', ?, 'x')")
@@ -345,4 +351,40 @@ describe('notes and pages', () => {
     await removeArtifactVector(env, id);
     expect(v2.rows.has(`a:${id}`)).toBe(false);
   });
+});
+
+describe('dense candidates for the member asking', () => {
+  it('ingest records who may see each source, and the store counts what is hidden from whom', async () => {
+    const ws = await newWorkspace();
+    const { env } = vecEnv();
+    await publishPage(env, ws, `art_vec_seen_${n}`, ['open to everyone']);
+    await publishPage(env, ws, `art_vec_mine_${n}`, ['only for other'], undefined, { owner: OTHER, visibility: 'private' });
+    await publishPage(env, ws, `art_vec_held_${n}`, ['waiting for review'], undefined, { held: true });
+    const store = corpusFor(env, ws)!;
+    expect(await store.hiddenCount(MEMBER)).toBe(2);
+    expect(await store.hiddenCount(OTHER)).toBe(1); // held for moderation: hidden from its owner too
+  });
+
+  for (const index of ['v1', 'v2'] as const) {
+    it(`${index}: another member's private copies don't crowd the dense pool — more are fetched, D1 keeps the visible ones`, async () => {
+      const ws = await newWorkspace();
+      const fake = new FakeVectorize();
+      const { env } = vecEnv(index === 'v1' ? { v1: fake } : { v2: fake });
+      const visible = `art_vec_crowd_${index}_${n}`;
+      await publishPage(env, ws, visible, ['zeta omega quarterly figures']);
+      // 40 nearer passages in another member's private page: more than a plain fetch (30) holds.
+      await publishPage(env, ws, `art_vec_copies_${index}_${n}`, Array(40).fill('zeta omega'), 'Z', { owner: OTHER, visibility: 'private' });
+
+      const r = await searchCorpus(env, ws, MEMBER, 'zeta omega');
+      const asked = fake.queries.at(-1)!;
+      expect(asked.topK).toBe(100);
+      expect(asked.filter?.source_id).toBeUndefined(); // nothing left out on the store's say-so
+      expect(r.hits.map((h) => h.source.id)).toEqual([visible]);
+      // First in both lists as the member sees them: the 40 private copies took no dense slot.
+      expect(r.hits[0].score).toBe(Number((2 / 61).toFixed(4)));
+
+      await searchCorpus(env, ws, OTHER, 'zeta omega');
+      expect(fake.queries.at(-1)!.topK).toBe(30); // nothing hidden from the copies' owner
+    });
+  }
 });

@@ -47,6 +47,11 @@ export interface ChunkHit {
  */
 export type SourceAccess = 'all' | 'owner' | 'none';
 
+/** Access from a source's D1 row (search.ts lookups, ingest): held for moderation → nobody, private → its owner. */
+export function sourceAccess(visibility: string, moderation = 'approved'): SourceAccess {
+  return moderation !== 'approved' ? 'none' : visibility === 'private' ? 'owner' : 'all';
+}
+
 /** The store's last record of a source's access; null = never checked. */
 export interface CachedAccess {
   access: SourceAccess | null;

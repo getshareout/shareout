@@ -11,7 +11,7 @@ import { DocReadError, docToMarkdown } from '../../data/files/parse-doc';
 import { isKnowledgeEnabled } from '../store';
 import { chunkMarkdown, MAX_CHUNKS, type Chunk } from './chunk';
 import { CHUNKER_VERSION, chunkSections, htmlSections } from './sections';
-import { corpusFor, type SourceKind, type SourceMeta } from './client';
+import { corpusFor, sourceAccess, type SourceAccess, type SourceKind, type SourceMeta } from './client';
 import { meterKnowledge, PRICING } from './usage';
 import { EXTRACT_BATCH, extractBatch } from './extract';
 import { workspaceBudgetBlock } from '../../data/ai-budget';
@@ -148,6 +148,20 @@ export async function toMarkdown(env: Env, filename: string, mime: string, bytes
   return null;
 }
 
+/** The source's access per D1 (sourceAccess), or null when it can't be read: recording it is best-effort. */
+async function currentAccess(env: Env, p: IngestParams): Promise<SourceAccess | null> {
+  try {
+    const row = p.kind === 'page'
+      ? await env.DB.prepare(
+          "SELECT a.visibility, (SELECT status FROM artifact_moderation WHERE artifact_id = a.id) AS moderation FROM artifacts a WHERE a.id = ?",
+        ).bind(p.refId).first<{ visibility: string; moderation: string | null }>()
+      : await env.DB.prepare('SELECT visibility, NULL AS moderation FROM asset_deliverables WHERE id = ?').bind(p.refId).first<{ visibility: string; moderation: null }>();
+    return row ? sourceAccess(row.visibility, row.moderation ?? undefined) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function extractStep(env: Env, p: IngestParams): Promise<ExtractResult> {
   const store = corpusFor(env, p.workspaceId)!;
   const loaded = p.kind === 'asset' ? await loadAsset(env, p.workspaceId, p.refId) : await loadPage(env, p.workspaceId, p.refId);
@@ -183,6 +197,10 @@ export async function extractStep(env: Env, p: IngestParams): Promise<ExtractRes
     return { status: 'unsupported', chunkCount: 0, previousCount: 0 };
   }
   const { previousCount } = await store.replaceChunks(loaded.meta, chunks, CHUNKER_VERSION);
+  // Who may see it now, so search starts from that instead of an unknown (search.ts). A hint
+  // for picking candidates, never an access decision: every hit is re-checked in D1.
+  const access = await currentAccess(env, p);
+  if (access) await store.recordAccess([{ refId: p.refId, access, ownerId: loaded.meta.ownerId }]).catch(() => {});
   return { status: 'chunked', chunkCount: chunks.length, previousCount };
 }
 

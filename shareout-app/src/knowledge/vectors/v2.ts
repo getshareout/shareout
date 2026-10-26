@@ -124,15 +124,36 @@ export interface DenseKeys {
   model: EmbedModel;
 }
 
+/** Dense candidates fetched when the member has hidden neighbours: Vectorize's maximum without values or metadata. */
+export const DENSE_FETCH = 100;
+
 /**
  * Dense candidates for a corpus search: from v2 (this workspace's passages of the configured
  * model) once reads use it, else from v1 exactly as before. An empty or failing v2 answer
  * falls back to v1 while v1 exists. Null = no dense retrieval (keyword only).
+ *
+ * Another member's private passages crowd the dense pool just as they crowded the keyword
+ * one. When the store knows of sources hidden from this member (its access records, kept by
+ * search and ingest), DENSE_FETCH candidates are fetched instead of `candidates`, and the
+ * caller keeps the first `candidates` D1 lets the member see. Nothing is excluded from the
+ * query on the store's say-so (`source_id $nin`): that record can be stale, and a source left
+ * out would never be re-checked, so a page shared since would silently stay out of results.
  */
-export async function denseCorpusKeys(env: Env, store: Store, workspaceId: string, q: string, topK: number): Promise<DenseKeys | null> {
+export async function denseCorpusKeys(
+  env: Env,
+  store: Store,
+  workspaceId: string,
+  q: string,
+  opts: { viewer: string; candidates: number },
+): Promise<DenseKeys | null> {
   if (!env.AI) return null;
   const v1 = env.KNOWLEDGE_VECTORS;
-  const v2 = await readTargetV2(env, workspaceId, 'chunks', v1, store).catch(() => null);
+  const [v2, hidden] = await Promise.all([
+    readTargetV2(env, workspaceId, 'chunks', v1, store).catch(() => null),
+    // A store still on the previous deploy has no hiddenCount: fetch as before.
+    Promise.resolve().then(() => store.hiddenCount(opts.viewer)).catch(() => 0),
+  ]);
+  const topK = hidden ? DENSE_FETCH : opts.candidates;
   if (v2) {
     try {
       const matches = await queryV2(env, v2, workspaceId, q, { kinds: ['page', 'asset'], topK });

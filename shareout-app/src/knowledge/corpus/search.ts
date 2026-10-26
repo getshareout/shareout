@@ -11,7 +11,7 @@
 // recorded in the store, so the next search starts from them.
 import type { Env } from '../../types';
 import { artifactLink } from '../../artifacts/page-links';
-import { corpusFor, type CachedAccess, type CandidateQuery, type Candidates, type ChunkHit, type SourceAccess, type SourceKind } from './client';
+import { corpusFor, sourceAccess, type CachedAccess, type CandidateQuery, type Candidates, type ChunkHit, type SourceAccess, type SourceKind } from './client';
 import { queueKnowledgeSource } from './ingest';
 import { meterKnowledge } from './usage';
 import { JSON_IN, jsonList } from '../../sql-in';
@@ -48,9 +48,11 @@ export interface SearchResult {
 const key = (h: { refId: string; ord: number }) => `${h.refId}:${h.ord}`;
 
 // Dense candidates: the v1 index, or the multilingual v2 index once reads are cut over and it
-// covers this workspace's passages (vectors/v2.ts). The model rides along for metering.
-function semanticKeys(env: Env, store: NonNullable<ReturnType<typeof corpusFor>>, workspaceId: string, q: string): Promise<DenseKeys | null> {
-  return denseCorpusKeys(env, store, workspaceId, q.slice(0, 2000), CANDIDATES).catch(() => null);
+// covers this workspace's passages (vectors/v2.ts). Over-fetched when the store knows of
+// sources hidden from this member; searchCorpus keeps the first CANDIDATES that D1 lets them
+// see. The model rides along for metering.
+function semanticKeys(env: Env, store: NonNullable<ReturnType<typeof corpusFor>>, workspaceId: string, userId: string, q: string): Promise<DenseKeys | null> {
+  return denseCorpusKeys(env, store, workspaceId, q.slice(0, 2000), { viewer: userId, candidates: CANDIDATES }).catch(() => null);
 }
 
 export interface Visible { title: string; url: string | null; slug?: string }
@@ -103,12 +105,12 @@ async function lookupSources(env: Env, workspaceId: string, refs: Map<string, So
     out.set(r.id, {
       kind: 'page',
       // Pages awaiting moderation stay in the corpus but out of results until approved.
-      access: r.moderation !== 'approved' ? 'none' : r.visibility === 'private' ? 'owner' : 'all',
+      access: sourceAccess(r.visibility, r.moderation),
       ownerId: r.owner_id, gone: false, title: r.name, url: artifactLink(env, r.slug), slug: r.slug,
     });
   }
   for (const r of assetRows) {
-    out.set(r.id, { kind: 'asset', access: r.visibility === 'private' ? 'owner' : 'all', ownerId: r.owner_id, gone: false, title: r.name, url: null });
+    out.set(r.id, { kind: 'asset', access: sourceAccess(r.visibility), ownerId: r.owner_id, gone: false, title: r.name, url: null });
   }
   for (const [id, kind] of refs) if (!out.has(id)) out.set(id, { kind, access: 'none', ownerId: null, gone: true, title: '', url: null });
   return out;
@@ -203,7 +205,7 @@ export async function searchCorpus(
 
   const check = new AccessCheck(env, workspaceId, userId);
   const stale = new Map<string, AccessRecord>();
-  const [keyword, dense] = await Promise.all([keywordPool(store, check, q, opts.kinds, stale), semanticKeys(env, store, workspaceId, q)]);
+  const [keyword, dense] = await Promise.all([keywordPool(store, check, q, opts.kinds, stale), semanticKeys(env, store, workspaceId, userId, q)]);
   const semantic = dense?.keys ?? null;
   const metered = meterKnowledge(env, workspaceId, 'knowledge_search', {
     model: dense ? dense.model.id : 'fts5',
@@ -220,12 +222,20 @@ export async function searchCorpus(
   // Semantic candidates get the same D1 check; both lists are ranked as this member sees them.
   const semanticHits = (semantic || []).flatMap((k) => byKey.get(key(k)) ?? []).filter((h) => !opts.kinds?.length || opts.kinds.includes(h.kind));
   await check.lookup(semanticHits);
+  // Dense-only sources teach the store too, so its next over-fetch decision starts from D1.
+  for (const h of semanticHits as (ChunkHit & Partial<CachedAccess>)[]) {
+    const f = check.facts.get(h.refId);
+    // A store still on the previous deploy returns chunks without access (undefined): skip.
+    if (f && !f.gone && h.access !== undefined && differs({ access: h.access, ownerId: h.ownerId ?? null }, f)) {
+      stale.set(h.refId, { refId: h.refId, access: f.access, ownerId: f.ownerId });
+    }
+  }
 
   const score = new Map<string, number>();
   const add = (list: { refId: string; ord: number }[]) =>
     list.forEach((h, rank) => score.set(key(h), (score.get(key(h)) ?? 0) + 1 / (RRF_K + rank + 1)));
   add(keyword);
-  add(semanticHits.filter((h) => check.canSee(h.refId)));
+  add(semanticHits.filter((h) => check.canSee(h.refId)).slice(0, CANDIDATES));
 
   const ranked = [...byKey.values()].filter((h) => score.has(key(h))).sort((a, b) => score.get(key(b))! - score.get(key(a))!);
   // A deleted Asset/page still in the corpus: re-run ingest, which removes it.

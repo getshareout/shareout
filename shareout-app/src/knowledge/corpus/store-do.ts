@@ -5,7 +5,7 @@ import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../../types';
 import type { Chunk } from './chunk';
 import type {
-  CachedAccess, Candidates, CandidateQuery, ChunkHit, SkippedSource, SourceAccess, SourceKind, SourceMeta, SourceRow, SourceStats, SourceStatus,
+  CachedAccess, CandidateHit, Candidates, CandidateQuery, ChunkHit, SkippedSource, SourceAccess, SourceKind, SourceMeta, SourceRow, SourceStats, SourceStatus,
 } from './client';
 import type { Extraction } from './extract';
 import * as graphSql from './graph-store';
@@ -373,20 +373,33 @@ export class KnowledgeStore extends DurableObject<Env> {
     });
   }
 
-  chunksByKey(keys: { refId: string; ord: number }[]): ChunkHit[] {
+  /** These chunks, with their source's recorded access (dense candidates: search.ts records D1's answer when it differs). */
+  chunksByKey(keys: { refId: string; ord: number }[]): CandidateHit[] {
     return this.metered(() => {
-      const out: ChunkHit[] = [];
+      const out: CandidateHit[] = [];
       for (const k of keys) {
         const r = this.q(
-            `SELECT c.ref_id, s.kind, c.title, c.ord, c.locator, c.text, c.page, c.anchor
+            `SELECT c.ref_id, s.kind, c.title, c.ord, c.locator, c.text, c.page, c.anchor, s.access, s.owner_id
                FROM chunks c JOIN sources s ON s.ref_id = c.ref_id WHERE c.ref_id = ? AND c.ord = ?`,
             k.refId, k.ord,
           )
           .toArray()[0];
-        if (r) out.push(toHit(r));
+        if (r) out.push({ ...toHit(r), ...cachedAccess(r) });
       }
       return out;
     });
+  }
+
+  /**
+   * How many sources with passages this store last saw hidden from `viewer`. Search fetches
+   * more dense candidates when there are any, so D1 can drop them and still fill the pool.
+   */
+  hiddenCount(viewer: string): number {
+    return this.metered(() => this.q(
+      `SELECT COUNT(*) AS n FROM sources
+        WHERE chunk_count > 0 AND (access = 'none' OR (access = 'owner' AND COALESCE(owner_id, '') != ?))`,
+      viewer,
+    ).one().n as number);
   }
 
   listSources(limit: number): { counts: Record<SourceStatus, number>; chunks: number; sources: SourceRow[] } {
