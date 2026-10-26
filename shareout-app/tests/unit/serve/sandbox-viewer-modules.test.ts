@@ -18,9 +18,23 @@ describe('sandbox-viewer modules', () => {
     expect(head).toContain('<!DOCTYPE html>');
     expect(head).toContain('id="so-loading"');
     expect(head).toContain('so-sk-card');
+    expect(head).not.toContain('so-sk-row');
     expect(head).toContain('<body>');
     // Body stays open for the rest of the streamed body (iframe/toolbar/scripts).
     expect(head).not.toContain('</body>');
+  });
+
+  it('signed-out visitors get the labeled Comments pill directly, signed-in keep the menu trigger', () => {
+    const base = {
+      loggedIn: false, isFav: false, commentsEnabled: true, commentsIdentityMode: 'anonymous', commentsGuest: false,
+      commentCount: 0, hasMetrics: false, adminInfo: null, currentUser: null, hideToolbar: false,
+      baseUrl: 'https://x.dev', slug: 's', artifactId: 'art_1', visualEditorEnabled: false, attachedSkills: [], locale: 'es',
+    } as unknown as Parameters<typeof buildToolbarContext>[0];
+    const anon = renderToolbar(buildToolbarContext(base)!);
+    expect(anon).toContain('class="so-solo so-open"');
+    expect(anon).toContain('Comentarios');
+    const signed = renderToolbar(buildToolbarContext({ ...base, loggedIn: true })!);
+    expect(signed).not.toContain('class="so-solo so-open"');
   });
 
   it('renderLoadingHideScript hides the skeleton on content-ready with fallbacks', () => {

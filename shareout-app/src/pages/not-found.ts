@@ -4,6 +4,7 @@
 import { renderHtmlPage } from '../design-system/shell';
 import { brandLockupHtml } from '../brand';
 import { escapeHtml } from '../html/utils';
+import { localeFromAcceptLanguage, t, type LocaleCopy } from '../i18n';
 
 /** Shared branded error/404 layout styles (also used by streamed page fallbacks). */
 export const notFoundStyles = `
@@ -40,21 +41,49 @@ export function renderStreamedPageErrorBody(): string {
 </main>`;
 }
 
-export function renderNotFoundPage(): Response {
+const NOT_FOUND_COPY: LocaleCopy<{ title: string; text: string; home: string; create: string; pageTitle: string; description: string }> = {
+  en: {
+    title: 'This page wandered off',
+    text: "The link may be broken, or the page may have moved. Let's get you back to something live.",
+    home: 'Go to my artifacts',
+    create: 'Create with AI',
+    pageTitle: 'Page not found · ShareOut',
+    description: 'The page you are looking for could not be found.',
+  },
+  es: {
+    title: 'Esta página se perdió',
+    text: 'Puede que el link esté roto o que la página se haya movido. Volvamos a algo que funcione.',
+    home: 'Ir a mis artefactos',
+    create: 'Crear con IA',
+    pageTitle: 'Página no encontrada · ShareOut',
+    description: 'No pudimos encontrar la página que buscás.',
+  },
+};
+
+/** Request-aware 404: styled page for document navigations, plain body for asset/API fetches. */
+export function notFoundResponse(request: Request): Response {
+  const wantsHtml = request.method === 'GET' && (request.headers.get('Accept') || '').includes('text/html');
+  return wantsHtml ? renderNotFoundPage(request) : new Response('Not Found', { status: 404 });
+}
+
+export function renderNotFoundPage(request?: Request): Response {
+  const locale = localeFromAcceptLanguage(request?.headers.get('Accept-Language')) ?? 'en';
+  const c = t(locale, NOT_FOUND_COPY);
   const body = `<main class="nf-wrap">
   <div class="nf-brand">${brandLockupHtml({ markSize: 30, href: '/' })}</div>
   <div class="nf-code">404</div>
-  <h1 class="nf-title">This page wandered off</h1>
-  <p class="nf-text">The link may be broken, or the page may have moved. Let's get you back to something live.</p>
+  <h1 class="nf-title">${c.title}</h1>
+  <p class="nf-text">${c.text}</p>
   <div class="nf-actions">
-    <a class="so-c-btn so-c-btn--primary" href="/home">Go to my artifacts</a>
-    <a class="so-c-btn so-c-btn--secondary" href="/create">Create with AI</a>
+    <a class="so-c-btn so-c-btn--primary" href="/home">${c.home}</a>
+    <a class="so-c-btn so-c-btn--secondary" href="/create">${c.create}</a>
   </div>
 </main>`;
 
   return renderHtmlPage({
-    title: 'Page not found · ShareOut',
-    description: 'The page you are looking for could not be found.',
+    title: c.pageTitle,
+    lang: locale,
+    description: c.description,
     pageStyles: notFoundStyles,
     body,
     status: 404,

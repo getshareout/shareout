@@ -1,6 +1,7 @@
 import type { Env } from '../types';
 import type { ArtifactInfo } from './types';
 import { handleServe } from './handle-serve';
+import { notFoundResponse } from '../pages/not-found';
 
 export async function handleServeNamespaced(
   request: Request,
@@ -28,13 +29,13 @@ export async function handleServeNamespaced(
   `).bind(workspaceSlug, artifactSlug).first<ArtifactInfo & { deploy_slug: string; workspace_slug: string }>();
 
   if (!result) {
-    return new Response('Not Found', { status: 404 });
+    return notFoundResponse(request);
   }
 
   if (folderPath) {
     const folderMatch = await verifyFolderPath(env, result.artifact_id, folderPath);
     if (!folderMatch) {
-      return new Response('Not Found', { status: 404 });
+      return notFoundResponse(request);
     }
   }
 

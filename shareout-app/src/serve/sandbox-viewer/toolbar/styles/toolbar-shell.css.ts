@@ -19,6 +19,8 @@ export const toolbarShellStyles = `
     #shareout-admin-toolbar.so-pos-bl { top: auto; right: auto; bottom: 20px; left: 20px; flex-direction: row-reverse; }
     #shareout-admin-toolbar.so-pos-tr { bottom: auto; left: auto; top: 20px; right: 20px; flex-direction: row; }
     #shareout-admin-toolbar.so-pos-tl { bottom: auto; right: auto; top: 20px; left: 20px; flex-direction: row-reverse; }
+    /* Signed-out visitors only ever get the comment action: show it labeled, no mystery logo menu. */
+    #shareout-admin-toolbar.so-solo #so-toolbar-trigger { display: none; }
     #shareout-admin-toolbar.so-dragging { transition: none; user-select: none; }
     #shareout-admin-toolbar.so-dragging #so-toolbar-trigger { cursor: grabbing; box-shadow: var(--shadow-xl); }
     #so-toolbar-items {
@@ -30,6 +32,7 @@ export const toolbarShellStyles = `
       display: flex;
       align-items: center;
       gap: 6px;
+      min-height: 44px;
       padding: 10px 18px;
       background: rgba(255, 255, 255, 0.85);
       backdrop-filter: blur(12px);

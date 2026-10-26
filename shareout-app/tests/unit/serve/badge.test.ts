@@ -16,6 +16,14 @@ describe('injectBadge', () => {
     expect(out).toContain('href="https://acme.workers.dev"');
     expect(out).not.toContain('shareout.site');
   });
+
+  it('keeps a visible label and 44px targets on small screens, report link included', async () => {
+    const out = await injectBadge(new Response('<body></body>', { headers: { 'Content-Type': 'text/html' } }), 'art_1', 'https://x.dev').text();
+    expect(out).toContain('aria-label="Made with ShareOut"');
+    expect(out).toContain('min-height:44px');
+    expect(out).toContain('so-short');
+    expect(out).not.toMatch(/max-width:480px\)\{[^}]*so-report/);
+  });
 });
 
 describe('badgeEnabled', () => {

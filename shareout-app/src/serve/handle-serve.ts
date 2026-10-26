@@ -191,7 +191,7 @@ export async function handleServe(
   }
 
   if (!result) {
-    return renderNotFoundPage();
+    return renderNotFoundPage(request);
   }
 
   // Paused / blocked pages must not leak the artifact title to strangers. Generic
@@ -450,7 +450,7 @@ export async function handleServe(
     }
   }
 
-  return notFound();
+  return notFound(request);
 }
 
 /** `?section=<heading id>` from a deep link (bot citations), when it is a plain id. */

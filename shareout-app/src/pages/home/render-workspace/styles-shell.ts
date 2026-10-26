@@ -59,7 +59,7 @@ export const WORKSPACE_SHELL_STYLES = `.wsx { position: relative; height: 100vh;
 .wsx__follows:empty::after { content: 'Nothing followed yet'; font-size: var(--text-xs); color: var(--color-text-tertiary); padding: 0 12px; white-space: nowrap; }
 .wsx__railspace { flex: 1; min-height: 8px; } .wsx__railfoot { display: flex; align-items: center; gap: 4px; margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--color-border); }
 .wsx__footbtn { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border: none; background: none; border-radius: var(--radius-md); color: var(--color-text-tertiary); cursor: pointer; text-decoration: none; } .wsx__footbtn:hover { background: var(--color-surface); color: var(--color-text); }
-.wsx__footver { margin-left: auto; padding: 3px 8px; border-radius: var(--radius-pill, 999px); font: 600 var(--text-xs) var(--font-mono, var(--font-body)); color: var(--color-text-tertiary); text-decoration: none; white-space: nowrap; letter-spacing: 0.02em; } .wsx__footver:hover { color: var(--color-text-secondary); background: var(--color-surface); }
+.wsx__helpver { margin: var(--space-3) 0 0; font: 500 var(--text-xs) var(--font-body); color: var(--color-text-tertiary); } .wsx__helpver-id { font-family: var(--font-mono, var(--font-body)); user-select: all; }
 .wsx__acct { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: var(--radius-md); text-decoration: none; color: var(--color-text-secondary); }
 .wsx__acct:hover { background: var(--color-surface); }
 .wsx__avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: var(--color-primary-light); display: grid; place-items: center; color: var(--color-primary); font: 700 12px var(--font-body); flex: none; }
@@ -69,7 +69,7 @@ export const WORKSPACE_SHELL_STYLES = `.wsx { position: relative; height: 100vh;
 .wsx.is-rail-collapsed .wsx-lens span, .wsx.is-rail-collapsed .wsx__create span, .wsx.is-rail-collapsed .wsx__new span,
 .wsx.is-rail-collapsed .wsx__brand, .wsx.is-rail-collapsed .wsx__railgroup-title,
 .wsx.is-rail-collapsed .wsx__follows, .wsx.is-rail-collapsed .wsx__acctname,
-.wsx.is-rail-collapsed .wsx__acctout, .wsx.is-rail-collapsed .wsx__footver { display: none; }
+.wsx.is-rail-collapsed .wsx__acctout { display: none; }
 .wsx.is-rail-collapsed .wsx-lens, .wsx.is-rail-collapsed .wsx__create, .wsx.is-rail-collapsed .wsx__new, .wsx.is-rail-collapsed .wsx__acct { justify-content: center; padding-inline: 0; } .wsx.is-rail-collapsed .wsx__railfoot { flex-direction: column; gap: 2px; }
 /* collapsed: logo mark only (no wordmark), stacked above the expand chevron so
    neither gets clipped in the 58px rail. */

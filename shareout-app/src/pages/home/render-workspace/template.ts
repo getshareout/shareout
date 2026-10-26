@@ -107,7 +107,6 @@ export function buildWorkspaceBody(args: RenderArgs): string {
       <footer class="wsx__railfoot">
         <button class="wsx__footbtn" id="wsxHelpBtn" type="button" data-i18n-aria="help.title" data-i18n-tip="help.title" aria-label="Help &amp; support" data-tip="Help &amp; support">${svg('<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/>')}</button>
         <a class="wsx__footbtn" href="https://docs.shareout.site" target="_blank" rel="noopener" data-i18n-aria="foot.docs" data-i18n-tip="foot.docs" aria-label="Documentation" data-tip="Documentation">${svg('<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>')}</a>
-        ${args.appVersion ? `<span class="wsx__footver" title="Release ${escapeHtml(args.appVersion)}">v${escapeHtml(args.appVersion)}</span>` : ''}
       </footer>
     </aside>
 
@@ -333,6 +332,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
       <div class="wsx__help-actions"><button class="wsx-abtn" id="wsxHelpSend" type="button" data-i18n="help.send">Send</button><span class="wsx-admin__savemsg" id="wsxHelpMsg"></span></div>
       </div>
       <div class="wsx__help-mine" id="wsxHelpMine"></div>
+      ${args.appVersion ? `<p class="wsx__helpver"><span data-i18n="help.version">Version</span> <span class="wsx__helpver-id">${escapeHtml(args.appVersion)}</span></p>` : ''}
     </div>
   </section>
 
