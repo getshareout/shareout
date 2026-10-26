@@ -26,6 +26,7 @@ import { KNOWLEDGE_TOOLS } from './knowledge-tools';
 import { CONNECTOR_TOOLS } from './connector-tools';
 import { PAGE_TOOLS } from './page-tools';
 import { SHARING_TOOLS } from './sharing-tools';
+import { EDIT_TOOLS } from './edit-tools';
 import { lossyWrite, mainText, readSource } from './page-source';
 
 export type { ToolContext, ToolResult } from './tool-kit';
@@ -39,6 +40,7 @@ export const SERVER_INSTRUCTIONS = [
   'a warning), tell them plainly.',
   'To change a page they already have: find it with list_artifacts, read it with get_artifact (include_files when it has several files),',
   'then send the whole new page to update_artifact with base_version set to the version you read.',
+  'For a small change (a word, a color, one section) use read_artifact and edit_artifact instead: they change only what you name, without sending the whole page again.',
   'For a site of several pages, send files instead of content: index.html plus the other pages and any css/js/images, linked with relative links.',
   'If they have several workspaces and did not say which one, ask them before publishing.',
   'A page\'s history is list_versions; restore_version brings an old one back as a new version (confirm first).',
@@ -612,7 +614,7 @@ const fetchTool: ToolDef = {
 
 // Deterministic order (lets clients cache the list).
 export const TOOLS: ToolDef[] = [
-  whoami, listWorkspaces, listArtifacts, getArtifact, publishArtifact, updateArtifact,
+  whoami, listWorkspaces, listArtifacts, getArtifact, publishArtifact, updateArtifact, ...EDIT_TOOLS,
   ...PAGE_TOOLS, ...SHARING_TOOLS, ...MEMBER_TOOLS, ...KNOWLEDGE_TOOLS, ...CONNECTOR_TOOLS, getHelp, reportProblem, search, fetchTool,
 ];
 

@@ -38,6 +38,14 @@ const EXTENSION_TO_MIME: Record<string, string> = {
   mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', woff: 'font/woff', woff2: 'font/woff2', pdf: 'application/pdf',
 };
 
+/** Whether a published file may have this mime (the REST allow-list). */
+export function isAllowedMime(mime: string): boolean {
+  return ALLOWED_MIMES.has(mime);
+}
+
+/** Largest single file a publish accepts, in bytes. */
+export const MAX_PUBLISH_FILE_BYTES = 100 * 1024 * 1024;
+
 export function mimeForPath(path: string): string {
   const ext = path.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? '';
   return EXTENSION_TO_MIME[ext] ?? 'application/octet-stream';
@@ -135,7 +143,7 @@ export function detectArtifactType(
   return 'html';
 }
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB per file
+const MAX_FILE_SIZE = MAX_PUBLISH_FILE_BYTES;
 const MAX_TOTAL_SIZE = 500 * 1024 * 1024; // 500MB total
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
 const SEMVER_REGEX = /^\d+\.\d+\.\d+([-+].+)?$/;

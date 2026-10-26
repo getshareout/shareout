@@ -69,4 +69,6 @@ export interface ArtifactFilesResponse {
   version_no: number;
   entrypoint: string;
   files: ArtifactFile[];
+  /** Files of the version whose stored bytes could not be read. */
+  unreadable?: string[];
 }

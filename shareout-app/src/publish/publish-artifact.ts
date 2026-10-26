@@ -11,7 +11,7 @@ import { recordLibraryVersion, upsertLibraryModuleRow } from '../workspace-libra
 import { getWorkspaceDefaultSkillPolicy } from '../skills/policy';
 import type { TypeMetadata } from '../types';
 import { upsertAgentConfig } from './agent-config';
-import { storeVersionAssets } from './assets';
+import { carryVersionAssets, storeVersionAssets } from './assets';
 import { vendorizePublishFiles } from './vendorize';
 import { stripOriginPlaceholders, placeholderWarnings } from './origin-placeholder';
 import { syncCredentials, syncViewers } from './request-auth';
@@ -27,7 +27,7 @@ import { buildEnhancedManifest } from './manifest';
 import { runPublishModeration } from './moderation';
 import { findExistingArtifacts, upsertArtifactRecord } from './artifact-upsert';
 import { applyWorkspaceVisibilityPolicy, buildTypeMetadata, resolveStoredArtifactType } from './type-metadata';
-import type { PublishParams } from './types';
+import { VersionConflictError, type ExistingArtifactRow, type PublishParams } from './types';
 import { publishSource } from '../artifacts/versions';
 import { normalizeVersionMessage, scheduleVersionSummary } from '../artifacts/version-summary';
 import { carriedCapabilities, type VersionCapabilities } from '../mcp-broker/capabilities';
@@ -86,13 +86,17 @@ export async function publishArtifact(
   }
 
   const visibility = coerceVisibility(env, params.visibility, params.allowOpen ?? false);
-  const hasMobile = !!mobileHtml;
+  const hasMobile = !!mobileHtml || params.keepsMobile === true;
   const accessPolicyJson = accessPolicy ? JSON.stringify(accessPolicy) : null;
   const storedType = resolveStoredArtifactType(artifactType);
-  const mainFile = files.find(f => f.path === entrypoint) || files[0];
+  const carriedMain = params.mainText !== undefined ? params.carried?.find(c => c.path === entrypoint) : undefined;
+  const mainFile = files.find(f => f.path === entrypoint)
+    || (carriedMain ? { path: entrypoint, content: params.mainText ?? '', mime: carriedMain.mime } : files[0]);
 
-  const { typeMetadata, libraryScope } = await buildTypeMetadata(env, params, user);
-  const { existing, globalExisting } = await findExistingArtifacts(env, slug, workspaceId, user.id);
+  const { typeMetadata, libraryScope } = await buildTypeMetadata(env, { ...params, files: mainFile ? [mainFile] : files }, user);
+  const { existing, globalExisting } = params.artifactId
+    ? { existing: await targetArtifact(env, params.artifactId), globalExisting: null }
+    : await findExistingArtifacts(env, slug, workspaceId, user.id);
   const { effectiveVisibility, policyNotice, approvalRequired } = await applyWorkspaceVisibilityPolicy(
     env, visibility, workspaceId, existing, globalExisting, mainFile,
   );
@@ -108,6 +112,9 @@ export async function publishArtifact(
     },
     existing, globalExisting,
   );
+  if (params.expectedVersionNo !== undefined && versionNo !== params.expectedVersionNo) {
+    throw new VersionConflictError(versionNo - 1);
+  }
 
   await syncMarketplaceSidecars(env, user, {
     artifactId, artifactType, workspaceId, typeMetadata,
@@ -132,9 +139,10 @@ export async function publishArtifact(
     'INSERT INTO versions (id, artifact_id, version_no, entrypoint, mobile_entrypoint, manifest_json, created_by, source, message, message_source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).bind(versionId, artifactId, versionNo, entrypoint, actualMobileEntrypoint, '{}', user.id, publishSource(user), message, message ? 'author' : null).run();
 
-  const assetMetadata = await storeVersionAssets(
-    env, versionId, artifactId, versionNo, files, mobileHtml, actualMobileEntrypoint,
-  );
+  const assetMetadata = [
+    ...await storeVersionAssets(env, versionId, artifactId, versionNo, files, mobileHtml, actualMobileEntrypoint),
+    ...await carryVersionAssets(env, versionId, params.carried ?? []),
+  ];
 
   const capabilities = await resolveVersionCapabilities(env, artifactId, params.capabilities, effectiveVisibility, workspaceId, warnings);
   const manifest = {
@@ -173,6 +181,15 @@ export async function publishArtifact(
     policyNotice, approvalRequired, blocking,
     warnings: [...new Set(warnings)],
   });
+}
+
+/** The artifact an edit publishes onto, by id; a missing one must never become a new artifact. */
+async function targetArtifact(env: Env, artifactId: string): Promise<ExistingArtifactRow> {
+  const row = await env.DB.prepare(
+    'SELECT id, owner_id, workspace_id, slug FROM artifacts WHERE id = ? AND deleted_at IS NULL'
+  ).bind(artifactId).first<ExistingArtifactRow>();
+  if (!row) throw new Error('NOT_FOUND');
+  return row;
 }
 
 async function syncMarketplaceSidecars(
