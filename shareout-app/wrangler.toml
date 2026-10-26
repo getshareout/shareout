@@ -38,6 +38,11 @@ SHAREOUT_BASE_URL = "https://shareout.workers.dev"
 # DOCS_ORIGIN = "my-docs.pages.dev"
 # Same-zone artifacts until you add a CDN domain
 # ARTIFACT_ORIGIN = "https://shareout.workers.dev"
+# Multilingual Knowledge index (KNOWLEDGE_VECTORS_V2 below). Model: @cf/baai/bge-m3 unless set;
+# the other supported 1024-d model is @cf/qwen/qwen3-embedding-0.6b.
+# KNOWLEDGE_EMBED_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
+# Searches read the multilingual index (per workspace, once backfilled; else the 768-d ones).
+# KNOWLEDGE_VECTORS_READ = "v2"
 
 # Optional Email / Queues / AI / Browser / Vectorize — uncomment after core boot.
 # Deploy button stays leaner without them; product degrades (OTP→logs, no queue, keyword search).
@@ -85,6 +90,20 @@ binding = "CF_VERSION_METADATA"
 # [[vectorize]]
 # binding = "KNOWLEDGE_VECTORS"
 # index_name = "shareout-knowledge"
+
+# Multilingual Knowledge search (Spanish ↔ English and paraphrases): one 1024-d index for
+# passages, notes and workspace pages, one namespace per workspace. Create the index AND its
+# three metadata indexes before binding it — Vectorize only indexes metadata of vectors
+# written after a metadata index exists:
+#   wrangler vectorize create shareout-knowledge-v2 --dimensions=1024 --metric=cosine
+#   wrangler vectorize create-metadata-index shareout-knowledge-v2 --property-name=source_kind --type=string
+#   wrangler vectorize create-metadata-index shareout-knowledge-v2 --property-name=source_id --type=string
+#   wrangler vectorize create-metadata-index shareout-knowledge-v2 --property-name=embed_model --type=string
+# Bound, it is written next to the 768-d indexes; searches move to it with
+# KNOWLEDGE_VECTORS_READ = "v2" after the backfill (docs: self-host/ops, "Multilingual Knowledge search").
+# [[vectorize]]
+# binding = "KNOWLEDGE_VECTORS_V2"
+# index_name = "shareout-knowledge-v2"
 
 # Durable per-file knowledge ingest (without it, ingest runs inline after the request).
 [[workflows]]

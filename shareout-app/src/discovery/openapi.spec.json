@@ -5667,6 +5667,204 @@
         }
       }
     },
+    "/v1/workspaces/{workspaceId}/knowledge/vectors": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Where the workspace's vectors stand (multilingual index)",
+        "description": "Owner/admin of the workspace, or an instance admin. The 768-d indexes and the multilingual 1024-d index (`KNOWLEDGE_VECTORS_V2`): what is bound and configured, whether searches prefer it (`read`), how many passages carry a vector of which model, which backfill passes finished, and which index each kind of search reads right now.",
+        "operationId": "getKnowledgeVectors",
+        "responses": {
+          "200": {
+            "description": "Status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "v1": {
+                      "type": "object",
+                      "properties": {
+                        "model": {
+                          "type": "string"
+                        },
+                        "dimensions": {
+                          "type": "integer"
+                        },
+                        "passages": {
+                          "type": "boolean",
+                          "description": "KNOWLEDGE_VECTORS is bound"
+                        },
+                        "notes_and_pages": {
+                          "type": "boolean",
+                          "description": "VECTORIZE is bound"
+                        }
+                      }
+                    },
+                    "v2": {
+                      "type": "object",
+                      "properties": {
+                        "bound": {
+                          "type": "boolean"
+                        },
+                        "model": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "dimensions": {
+                          "type": "integer"
+                        },
+                        "active": {
+                          "type": "boolean",
+                          "description": "Bound and its model is usable — written on every change"
+                        },
+                        "problem": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Why a bound index is unused"
+                        }
+                      }
+                    },
+                    "read": {
+                      "type": "string",
+                      "enum": [
+                        "v1",
+                        "v2"
+                      ]
+                    },
+                    "workspace": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "chunks": {
+                          "type": "object",
+                          "properties": {
+                            "total": {
+                              "type": "integer"
+                            },
+                            "by_model": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "integer"
+                              },
+                              "description": "Passages per model of their v2 vector (`none` = no v2 vector)"
+                            },
+                            "missing": {
+                              "type": "integer",
+                              "description": "Passages without a vector of the configured model"
+                            }
+                          }
+                        },
+                        "passes": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Backfill passes finished (chunks, notes, artifacts) → model"
+                        },
+                        "reading": {
+                          "type": "object",
+                          "properties": {
+                            "chunks": {
+                              "type": "string",
+                              "enum": [
+                                "v1",
+                                "v2",
+                                "none"
+                              ]
+                            },
+                            "notes": {
+                              "type": "string",
+                              "enum": [
+                                "v1",
+                                "v2",
+                                "none"
+                              ]
+                            },
+                            "artifacts": {
+                              "type": "string",
+                              "enum": [
+                                "v1",
+                                "v2",
+                                "none"
+                              ]
+                            }
+                          }
+                        },
+                        "mixed": {
+                          "type": "boolean",
+                          "description": "Vectors of more than one model",
+                          "or of a model other than the configured one": null
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/knowledge/vectors/backfill": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Embed what the multilingual index is missing",
+        "description": "Owner/admin of the workspace, or an instance admin. Re-embeds the workspace's stored passages, notes and pages into `KNOWLEDGE_VECTORS_V2` with the configured model — only what is missing — as one paced Workflow (a second call within 30 minutes joins it). Without Workflows it runs a bounded pass inline; call again until `done`. Metered as `knowledge_embedding`. `reset` forgets what was written first (after recreating the index).",
+        "operationId": "backfillKnowledgeVectors",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reset": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ran inline (no Workflows) — `{ started false, inline true, done, embedded }`"
+          },
+          "202": {
+            "description": "Started — `{ started true, instance }`"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "501": {
+            "description": "The multilingual index is not configured (`NOT_CONFIGURED`)"
+          }
+        }
+      }
+    },
     "/v1/workspaces/{workspaceId}/context": {
       "parameters": [
         {

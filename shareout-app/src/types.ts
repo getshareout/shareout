@@ -188,6 +188,14 @@ export interface Env {
   FILE_IMPORT?: Workflow<import('./file-imports/types').FileImportParams>;
   /** Vectorize index over knowledge chunks (namespace = workspace id). Optional: search degrades to keyword. */
   KNOWLEDGE_VECTORS?: VectorizeIndex;
+  /** Multilingual Knowledge index (1024-d, cosine): one namespace per workspace for passages, notes and workspace pages
+   *  (knowledge/vectors/v2.ts). Optional: when bound it is written next to the 768-d indexes; reads move with KNOWLEDGE_VECTORS_READ. */
+  KNOWLEDGE_VECTORS_V2?: Vectorize;
+  /** Embedding model for KNOWLEDGE_VECTORS_V2: `@cf/baai/bge-m3` (default) or `@cf/qwen/qwen3-embedding-0.6b`.
+   *  The 768-d indexes keep `@cf/baai/bge-base-en-v1.5`. */
+  KNOWLEDGE_EMBED_MODEL?: string;
+  /** `v2` = searches read KNOWLEDGE_VECTORS_V2 for each workspace it fully covers (else the 768-d indexes). Default v1. */
+  KNOWLEDGE_VECTORS_READ?: string;
   /** Workers AI model for knowledge-graph extraction (JSON mode). Defaults to @cf/meta/llama-3.3-70b-instruct-fp8-fast. */
   KNOWLEDGE_EXTRACT_MODEL?: string;
   /** Workers Static Assets binding — serves build artifacts (editor bundle, etc.)

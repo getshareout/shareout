@@ -126,6 +126,48 @@ Las keys por workspace se guardan cifradas y necesitan `CREDENTIALS_KEY` — el 
 se niega sin eso en lugar de guardar algo que no puede proteger. El mismo secret cifra
 las credenciales de conectores.
 
+### Búsqueda multilingüe de Knowledge
+
+Los índices originales de Knowledge (`KNOWLEDGE_VECTORS`, `VECTORIZE`) usan un modelo solo
+en inglés: una pregunta en español casi nunca encuentra por significado un documento en
+inglés. El índice multilingüe, `KNOWLEDGE_VECTORS_V2`, usa `@cf/baai/bge-m3` (o
+`@cf/qwen/qwen3-embedding-0.6b` con `KNOWLEDGE_EMBED_MODEL`) y un namespace por workspace.
+Se activa por pasos, y cada paso se puede deshacer:
+
+1. **Creá** el índice y sus índices de metadata, en este orden:
+
+   ```bash
+   npx wrangler vectorize create shareout-knowledge-v2 --dimensions=1024 --metric=cosine
+   npx wrangler vectorize create-metadata-index shareout-knowledge-v2 --property-name=source_kind --type=string
+   npx wrangler vectorize create-metadata-index shareout-knowledge-v2 --property-name=source_id --type=string
+   npx wrangler vectorize create-metadata-index shareout-knowledge-v2 --property-name=embed_model --type=string
+   ```
+
+2. **Conectalo** (descomentá `KNOWLEDGE_VECTORS_V2` en `wrangler.toml`) y deployá. Desde ahí
+   los pasajes, notas y páginas nuevos o cambiados se escriben en los dos índices; las
+   búsquedas siguen leyendo los viejos.
+3. **Backfill** de lo que ya existe, desde el texto guardado (no se vuelve a bajar nada). Un
+   Workflow con pausas por workspace; repetí con `after=<next>` hasta que `next` sea `null`:
+
+   ```bash
+   curl -sS -X POST "$ORIGIN/v1/admin/knowledge/vectors/backfill?limit=10" \
+     -H "Authorization: Bearer $SHAREOUT_ADMIN_TOKEN"
+   ```
+
+   Un solo workspace: `POST /v1/workspaces/{id}/knowledge/vectors/backfill`. Progreso:
+   `GET /v1/workspaces/{id}/knowledge/vectors` — un workspace está cubierto cuando
+   `workspace.chunks.missing` es 0 y `workspace.passes` nombra el modelo. Repetirlo solo
+   embebe lo que falta; la pasada de Knowledge de las 03:00 UTC también arranca algunos para
+   workspaces con huecos. Se mide como el ingest (`knowledge_embedding`, source
+   `vectors-backfill`): bge-m3 cuesta USD 0,012 por millón de tokens.
+4. **Pasá las búsquedas**: `KNOWLEDGE_VECTORS_READ = "v2"` y deployá. Cada workspace lee el
+   índice nuevo cuando está cubierto y el viejo mientras tanto; una respuesta vacía del nuevo
+   también vuelve al viejo. Para volver atrás, sacá la variable.
+
+Cambiar `KNOWLEDGE_EMBED_MODEL` más adelante es igual: deploy, backfill, y las lecturas siguen
+en el índice viejo hasta que el modelo nuevo cubre cada workspace. Si recreás el índice, hacé
+el backfill con `{"reset": true}` (por workspace) o `&reset=1` (admin) para escribir todo de nuevo.
+
 ## Upgrades
 
 1. Traé el último release público (o re-sincronizá el export si espejás en privado).
