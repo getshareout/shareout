@@ -1003,6 +1003,16 @@ paths:
                     type: integer
                   entrypoint:
                     type: string
+                  live_version:
+                    type: integer
+                    nullable: true
+                    description: "`manifest=1` only: the version live in production."
+                  newest_version:
+                    type: integer
+                    nullable: true
+                    description: >-
+                      `manifest=1` only: the newest saved version — the `base_version` an edit
+                      needs. Ahead of `live_version` while a version waits on blocking tests.
                   files:
                     type: array
                     description: With `manifest=1`, ManifestEntry items; otherwise FileEntry items with content.
@@ -1030,8 +1040,10 @@ paths:
         through the normal publish pipeline (moderation, tests gate, readiness), and
         files the ops leave unchanged are carried over without re-uploading. Counts once
         against the daily publish limit (`dry_run` does not). Requires the editor role.
-        Works on html, markdown, csv, txt and json artifacts. Send `Idempotency-Key` to
-        make retries safe.
+        Works on html, markdown, csv, txt and json artifacts. Workspace Agent tokens need
+        `artifacts:publish` and reach only artifacts in their own workspace. Renaming or
+        deleting the mobile entrypoint turns the artifact's mobile view off. Send
+        `Idempotency-Key` to make retries safe.
       operationId: editArtifact
       requestBody:
         required: true

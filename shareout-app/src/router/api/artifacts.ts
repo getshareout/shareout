@@ -63,7 +63,8 @@ export async function routeArtifactApi(ctx: FetchContext): Promise<Response | nu
   // outside the v1 scope model, so Agent tokens are denied. Humans/personal tokens
   // have no `.service` → validateToken returns it null → this never triggers.
   // validateToken is memoized per request, so this peek is free for later branches.
-  if (path !== '/v1/publish') {
+  // POST …/edits is a publish: editArtifact checks artifacts:publish and the token's workspace.
+  if (path !== '/v1/publish' && !(request.method === 'POST' && /^\/v1\/artifacts\/[^/]+\/edits$/.test(path))) {
     const svc = await validateToken(request, env);
     if (svc?.service) {
       if (request.method === 'GET') {

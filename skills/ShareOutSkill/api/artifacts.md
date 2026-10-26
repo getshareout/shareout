@@ -201,7 +201,9 @@ Fetch the files of an artifact version (the live one unless `version` is given).
 
 **Query Parameters:**
 - `version` (optional): Version number or ID
-- `manifest=1` (optional): list `{path, mime, size, sha256}` only — no content, no storage reads
+- `manifest=1` (optional): list `{path, mime, size, sha256}` only — no content, no storage reads. Also
+  returns `live_version` (what people see) and `newest_version` (the newest saved, which edits start from;
+  it is ahead of `live_version` while a version waits on blocking tests)
 - `paths` (optional): `paths=index.html,styles.css` (or repeat `paths=`) reads only those files; a path the version lacks is `404 FILE_NOT_FOUND` with `missing`
 
 **Response:**
@@ -249,7 +251,13 @@ files you will change (`GET /v1/artifacts/{id}/files?paths=styles.css`), then:
 - Errors name the op: `422 EDIT_NO_MATCH` (`nearest`: the closest line), `422 EDIT_AMBIGUOUS` (`lines`
   of every match), `FILE_NOT_FOUND`, `FILE_EXISTS`, `NOT_TEXT`, `ENTRYPOINT_MISSING`; each has `op_index`.
 
-Requires `editor` or owner. Works on html, markdown, csv, txt and json artifacts. The new version goes
+`base_version` is `newest_version` from `GET …/files?manifest=1` — read the files with `?version=` that number
+when it differs from `live_version`.
+
+Requires `editor` or owner. Workspace Agent tokens (`sot_`) need the `artifacts:publish` scope and can edit
+only artifacts in their own workspace that they may publish to. Works on html, markdown, csv, txt and json
+artifacts. Renaming or deleting an artifact's mobile entrypoint (`mobile.html`) turns its mobile view off.
+The new version goes
 through the normal publish pipeline (moderation, tests gate) and keeps visibility, sharing and folder;
 only changed files are uploaded. Counts once against the daily publish limit (dry runs do not).
 Returns `201` with the publish response plus `base_version` and `changes`

@@ -5,8 +5,9 @@
  * character offset, so a file of any size comes back whole across calls. edit_artifact
  * runs the same ops as POST /v1/artifacts/{id}/edits, in-process as the caller.
  */
+import { hasScope } from '../api-auth';
 import { requireRole } from '../artifacts/roles';
-import { decodeText, isTextMime, toBase64 } from '../artifacts/files';
+import { decodeText, isTextMime, toBase64, versionHeads } from '../artifacts/files';
 import { editArtifact } from '../artifacts/edits';
 import { SOURCE_MAX_BYTES } from '../artifacts/versions';
 import { MAX_OPS } from '../artifacts/apply-ops';
@@ -41,7 +42,10 @@ const readArtifact: ToolDef = {
   async run(ctx, args) {
     const id = str(args.artifact_id, 100);
     if (!id) return fail('artifact_id is required.');
-    if (await requireRole(ctx.env, id, ctx.user.id, 'viewer')) {
+    const svc = ctx.user.service;
+    if (svc && !hasScope(ctx.user, 'artifacts:read')) return invalid('This token lacks the artifacts:read scope.', { code: 'INSUFFICIENT_SCOPE' });
+    const home = svc ? await ctx.env.DB.prepare('SELECT workspace_id FROM artifacts WHERE id = ?').bind(id).first<{ workspace_id: string | null }>() : null;
+    if ((svc && home?.workspace_id !== svc.workspaceId) || await requireRole(ctx.env, id, ctx.user.id, 'viewer')) {
       return invalid('That page was not found, or the person cannot open it.');
     }
     const wanted = typeof args.version === 'number' ? args.version : null;
@@ -58,11 +62,16 @@ const readArtifact: ToolDef = {
 
     if (path === null) {
       const files = assets.map((a) => ({ path: a.path, mime: a.mime, size_bytes: a.size_bytes, sha256: a.sha256 }));
+      const heads = await versionHeads(ctx.env, id);
+      const notLive = heads.live_version !== null && heads.live_version !== heads.newest_version
+        ? [`Version ${heads.newest_version} is saved but not live yet: people still see version ${heads.live_version}.`]
+        : [];
       return ok([
-        `Version ${version.version_no}${wanted ? '' : ' (newest)'}: ${files.length} ${files.length === 1 ? 'file' : 'files'}, main file ${version.entrypoint}.`,
+        `Version ${version.version_no}${version.version_no === heads.newest_version ? ' (newest)' : ''}: ${files.length} ${files.length === 1 ? 'file' : 'files'}, main file ${version.entrypoint}.`,
+        ...notLive,
         ...files.map((f) => `- ${f.path} (${f.mime}, ${f.size_bytes} bytes)`),
-        `Read a file with path; change it with edit_artifact and base_version ${version.version_no}.`,
-      ].join('\n'), { artifact_id: id, version: version.version_no, entrypoint: version.entrypoint, files });
+        `Read a file with path; change it with edit_artifact and base_version ${heads.newest_version ?? version.version_no} (the newest version).`,
+      ].join('\n'), { artifact_id: id, version: version.version_no, ...heads, entrypoint: version.entrypoint, files });
     }
 
     const asset = assets.find((a) => a.path === path);
@@ -187,3 +196,6 @@ const editArtifactTool: ToolDef = {
 };
 
 export const EDIT_TOOLS: ToolDef[] = [readArtifact, editArtifactTool];
+
+/** The only MCP tools a workspace Agent token may call: they enforce its scopes and workspace. */
+export const AGENT_TOKEN_TOOLS: ReadonlySet<string> = new Set(EDIT_TOOLS.map((t) => t.name));

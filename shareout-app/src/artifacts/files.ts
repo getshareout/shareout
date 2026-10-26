@@ -44,6 +44,19 @@ function selectPaths(values: string[], known: string[]): { paths: Set<string> | 
   return { paths: new Set(wanted), missing: [...new Set(wanted.filter((p) => !all.has(p)))] };
 }
 
+/**
+ * The live (production) version and the newest saved one. They differ while a version
+ * waits on blocking tests; edits must start from `newest_version`.
+ */
+export async function versionHeads(env: Env, artifactId: string): Promise<{ live_version: number | null; newest_version: number | null }> {
+  const row = await env.DB.prepare(`
+    SELECT (SELECT v.version_no FROM deployments d JOIN versions v ON v.id = d.version_id
+             WHERE d.artifact_id = ? AND d.channel = 'production') AS live,
+           (SELECT MAX(version_no) FROM versions WHERE artifact_id = ?) AS newest
+  `).bind(artifactId, artifactId).first<{ live: number | null; newest: number | null }>();
+  return { live_version: row?.live ?? null, newest_version: row?.newest ?? null };
+}
+
 export async function handleGetArtifactFiles(
   request: Request,
   env: Env,
@@ -110,11 +123,13 @@ export async function handleGetArtifactFiles(
   const selected = (assets ?? []).filter((a) => !picked.paths || picked.paths.has(a.path));
 
   if (url.searchParams.get('manifest') === '1') {
+    const heads = await versionHeads(env, artifactId);
     return json({
       artifact_id: artifactId,
       version_id: version.id,
       version_no: version.version_no,
       entrypoint: version.entrypoint,
+      ...heads,
       files: selected.map((a) => ({ path: a.path, mime: a.mime, size: a.size_bytes, sha256: a.sha256 })),
     });
   }

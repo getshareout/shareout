@@ -6,6 +6,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { AuthUser } from '../../../src/api-auth';
 import { generateToken, hashToken } from '../../../src/api-auth';
 import { handleEditArtifact } from '../../../src/artifacts/edits';
+import { handleFetch } from '../../../src/router/handle-fetch';
+import { handleMcp } from '../../../src/mcp/server';
 import { callTool } from '../../../src/mcp/tools';
 import type { Env } from '../../../src/types';
 import { applyMigrations, e } from '../helpers/migrated-db';
@@ -245,5 +247,85 @@ describe('MCP read_artifact / edit_artifact', () => {
     const denied = await call(carol, 'edit_artifact', { artifact_id: id, base_version: 1, ops: [{ op: 'write', path: 'index.html', content: '<p>bye</p>' }] });
     expect(denied.isError).toBe(true);
     expect(denied.structuredContent).toMatchObject({ code: 'FORBIDDEN' });
+  });
+});
+
+describe('workspace Agent tokens (sot_)', () => {
+  const AGENT = 'usr_edits_agent';
+  const OTHER_WS = 'wsp_edits_other';
+  const TOK = { publish: 'sot_' + '5'.repeat(64), read: 'sot_' + '6'.repeat(64), other: 'sot_' + '7'.repeat(64) };
+  const rest = (token: string, method: string, path: string, body?: unknown) =>
+    handleFetch(new Request(`https://shareout.test${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }), e);
+  const rpc = async (token: string, method: string, params: Record<string, unknown> = {}) => {
+    const res = await handleMcp(new Request('https://shareout.test/mcp', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'MCP-Protocol-Version': '2025-11-25' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    }), e, 'https://shareout.test');
+    return (await res.json() as { result: Record<string, unknown> }).result;
+  };
+  let id: string;
+
+  beforeAll(async () => {
+    await e.DB.batch([
+      e.DB.prepare("INSERT INTO users (id, email, name, is_service) VALUES (?, NULL, 'agent', 1)").bind(AGENT),
+      e.DB.prepare("INSERT INTO workspaces (id, name, slug, owner_id) VALUES (?, 'Other', 'edits-other', ?)").bind(OTHER_WS, alice.id),
+      e.DB.prepare("INSERT INTO workspace_members (id, workspace_id, user_id, role, member_class) VALUES ('wm_edits_ag', ?, ?, 'member', 'internal')").bind(WS, AGENT),
+      e.DB.prepare("INSERT INTO tokens (id, principal_type, principal_id, user_id, token_hash, scopes) VALUES ('sot_edits_p', 'workspace', ?, ?, ?, 'artifacts:read,artifacts:publish')")
+        .bind(WS, AGENT, await hashToken(TOK.publish)),
+      e.DB.prepare("INSERT INTO tokens (id, principal_type, principal_id, user_id, token_hash, scopes) VALUES ('sot_edits_r', 'workspace', ?, ?, ?, 'artifacts:read')")
+        .bind(WS, AGENT, await hashToken(TOK.read)),
+      e.DB.prepare("INSERT INTO tokens (id, principal_type, principal_id, user_id, token_hash, scopes) VALUES ('sot_edits_o', 'workspace', ?, ?, ?, 'artifacts:read,artifacts:publish')")
+        .bind(OTHER_WS, AGENT, await hashToken(TOK.other)),
+    ]);
+    const res = await rest(TOK.publish, 'POST', '/v1/publish', {
+      name: 'Agent page', workspace_id: WS, visibility: 'workspace',
+      files: [{ path: 'index.html', content: '<h1>v1</h1>', mime: 'text/html' }, { path: 'a.css', content: 'h1{}', mime: 'text/css' }],
+    });
+    expect(res.status).toBe(201);
+    id = ((await res.json()) as { artifact: { id: string } }).artifact.id;
+  });
+
+  it('edits over REST with artifacts:publish, in its own workspace', async () => {
+    const manifest = await rest(TOK.publish, 'GET', `/v1/artifacts/${id}/files?manifest=1`);
+    expect(await manifest.json()).toMatchObject({ version_no: 1, live_version: 1, newest_version: 1 });
+    const res = await rest(TOK.publish, 'POST', `/v1/artifacts/${id}/edits`, { base_version: 1, ops: [{ op: 'replace', path: 'index.html', old: 'v1', new: 'v2' }] });
+    expect(res.status).toBe(201);
+    const v = await e.DB.prepare('SELECT source FROM versions WHERE artifact_id = ? AND version_no = 2').bind(id).first<{ source: string }>();
+    expect(v!.source).toBe('agent');
+  });
+
+  it('is refused without artifacts:publish, and from another workspace', async () => {
+    const noScope = await rest(TOK.read, 'POST', `/v1/artifacts/${id}/edits`, { base_version: 2, ops: [{ op: 'delete', path: 'a.css' }] });
+    expect(noScope.status).toBe(403);
+    expect(await noScope.json()).toMatchObject({ code: 'INSUFFICIENT_SCOPE' });
+    const elsewhere = await rest(TOK.other, 'POST', `/v1/artifacts/${id}/edits`, { base_version: 2, ops: [{ op: 'delete', path: 'a.css' }] });
+    expect(elsewhere.status).toBe(403);
+    expect(await versions(id)).toHaveLength(2);
+  });
+
+  it('reaches only read_artifact and edit_artifact over MCP, with the same scope rules', async () => {
+    const list = await rpc(TOK.publish, 'tools/list');
+    expect((list.tools as Array<{ name: string }>).map((t) => t.name).sort()).toEqual(['edit_artifact', 'read_artifact']);
+
+    const read = await rpc(TOK.publish, 'tools/call', { name: 'read_artifact', arguments: { artifact_id: id } });
+    expect(read.isError).toBeUndefined();
+    expect(read.structuredContent).toMatchObject({ version: 2, live_version: 2, newest_version: 2 });
+
+    const edited = await rpc(TOK.publish, 'tools/call', { name: 'edit_artifact', arguments: { artifact_id: id, base_version: 2, ops: [{ op: 'replace', path: 'a.css', old: 'h1{}', new: 'h1{color:red}' }] } });
+    expect(edited.isError, JSON.stringify(edited)).toBeUndefined();
+    expect(edited.structuredContent).toMatchObject({ version: 3 });
+
+    const refused = await rpc(TOK.read, 'tools/call', { name: 'edit_artifact', arguments: { artifact_id: id, base_version: 3, ops: [{ op: 'delete', path: 'a.css' }] } });
+    expect(refused).toMatchObject({ isError: true, structuredContent: { code: 'INSUFFICIENT_SCOPE' } });
+    const otherWs = await rpc(TOK.other, 'tools/call', { name: 'read_artifact', arguments: { artifact_id: id } });
+    expect(otherWs.isError).toBe(true);
+    const publish = await rpc(TOK.publish, 'tools/call', { name: 'publish_artifact', arguments: { title: 'x', content: '<p>x</p>' } });
+    expect(publish.isError).toBe(true);
+    expect(await versions(id)).toHaveLength(3);
   });
 });

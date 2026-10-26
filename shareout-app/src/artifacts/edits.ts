@@ -148,6 +148,10 @@ export async function editArtifact(
     'SELECT name, slug, display_slug, workspace_id, visibility, auth_method, artifact_type, type_metadata FROM artifacts WHERE id = ? AND deleted_at IS NULL'
   ).bind(artifactId).first<ArtifactRow>();
   if (!row) return err(404, 'NOT_FOUND', 'Artifact not found');
+  // A workspace Agent token edits only inside its own workspace, then by the same role rule as publish.
+  if (user.service && row.workspace_id !== user.service.workspaceId) {
+    return err(403, 'FORBIDDEN', 'This token belongs to another workspace.');
+  }
   if (await requireRole(env, artifactId, user.id, 'editor')) {
     return err(403, 'FORBIDDEN', 'You cannot edit this artifact.', { hint: 'Editing needs the owner or editor role on it.' });
   }

@@ -261,6 +261,7 @@ describe('handleGetArtifactFiles', () => {
           if (sql.includes('owner_id FROM artifacts')) return { owner_id: 'usr_1' };
           if (sql.includes('version_id FROM deployments')) return { version_id: 'ver_3' };
           if (sql.includes('entrypoint FROM versions WHERE id = ?')) return { id: 'ver_3', version_no: 3, entrypoint: 'index.html' };
+          if (sql.includes('AS newest')) return { live: 3, newest: 4 };
           return null;
         },
         all: (sql) => (sql.includes('FROM assets WHERE version_id')
@@ -276,7 +277,7 @@ describe('handleGetArtifactFiles', () => {
     const response = await handleGetArtifactFiles(new Request('https://shareout.example.com/v1/artifacts/art_1/files?manifest=1'), env, user, 'art_1');
     expect(response.status).toBe(200);
     const body = await jsonBody(response);
-    expect(body).toMatchObject({ version_no: 3, entrypoint: 'index.html' });
+    expect(body).toMatchObject({ version_no: 3, entrypoint: 'index.html', live_version: 3, newest_version: 4 });
     expect(body.files).toEqual([
       { path: 'a,b.css', mime: 'text/css', size: 9, sha256: 'h-a,b.css' },
       { path: 'index.html', mime: 'text/html', size: 9, sha256: 'h-index.html' },
