@@ -9,6 +9,7 @@ import { hashToken } from '../../../src/api-auth';
 import { signSpaceGuestToken, spaceGuestCookieName } from '../../../src/sharees/space-guest';
 import { hashGuestEmail } from '../../../src/data/comments/guest';
 import { createMiniDb } from '../../../src/data/minidb-client';
+import { checkSlidingWindowRateLimit } from '../../../src/rate-limit';
 import type { DataSource, SourcesResponse } from '../../../src/provenance/types';
 
 const ORIGIN = 'https://shareout.test';
@@ -65,10 +66,11 @@ async function publish(id: string, visibility: string, opts: { policy?: unknown;
   ]);
 }
 
-async function sources(id: string, auth: { cookie?: string; bearer?: string } = {}, query = ''): Promise<Response> {
+async function sources(id: string, auth: { cookie?: string; bearer?: string; ip?: string } = {}, query = ''): Promise<Response> {
   const headers = new Headers();
   if (auth.cookie) headers.set('Cookie', auth.cookie);
   if (auth.bearer) headers.set('Authorization', `Bearer ${auth.bearer}`);
+  if (auth.ip) headers.set('cf-connecting-ip', auth.ip);
   return worker.fetch(new Request(`${ORIGIN}/v1/artifacts/${id}/sources${query}`, { headers }), e, ctx);
 }
 const session = async (u: { id: string; email: string }) => ({ cookie: `shareout_session=${await createSessionToken(u.id, u.email, e)}` });
@@ -129,6 +131,13 @@ beforeAll(async () => {
     e.DB.prepare(`INSERT INTO crew_run_events (id, run_id, crew_id, seq, event_type, tool_name, input_json)
                   VALUES ('cev_ps', 'crun_ps', 'crew_ps', 1, 'tool_call', 'table_insert', '{"table":"leads","rows":[{"company":2}]}')`),
   ]);
+  // The public page is refreshed daily by a named job.
+  await e.DB.batch([
+    e.DB.prepare(`INSERT INTO scheduled_jobs (id, artifact_id, owner_id, action, schedule, config, next_run_at, last_run_at, last_status, title)
+                  VALUES ('job_ps_pub', 'art_ps_pub', ?, 'query_snapshot', '0 6 * * *', ?, ?, ?, 'success', 'Pauta diaria')`)
+      .bind(U.owner.id, JSON.stringify({ connection: 'warehouse', queries: [{ query: 'SELECT 1', target: { type: 'table', name: 'leads' } }] }), String(NOW_S + 3600), String(NOW_S - 600)),
+    e.DB.prepare("INSERT INTO job_runs (id, job_id, created_at, status) VALUES ('jr_ps_pub', 'job_ps_pub', ?, 'success')").bind(String(NOW_S - 600)),
+  ]);
   // The public page's json key was last written an hour ago (by the data API).
   await createMiniDb(e, 'art_ps_pub', WS).prepare(
     "INSERT INTO artifact_json (id, artifact_id, key, value, size_bytes, created_at, updated_at) VALUES ('jsn_ps', 'art_ps_pub', 'snapshot', '{}', 2, ?, ?)",
@@ -186,6 +195,46 @@ describe('who can read a page\'s sources', () => {
   it('a paused page is hidden from viewers but not from its owner', async () => {
     expect((await sources('art_ps_paused')).status).toBe(404);
     expect((await sources('art_ps_paused', await session(U.owner))).status).toBe(200);
+  });
+});
+
+describe('refresher names, cost limits and caching', () => {
+  it('a public link learns when and how often, not who: names are for people tied to the page', async () => {
+    const anon = find(await body(await sources('art_ps_pub', { ip: '198.51.100.7' })), 'table:leads');
+    expect(anon.freshness.refresher).toEqual({ type: 'job', schedule: '0 6 * * *' });
+    expect(anon.freshness.last_refresh_at).toBeTruthy();
+    const member = find(await body(await sources('art_ps_pub', await session(U.member))), 'table:leads');
+    expect(member.freshness.refresher).toMatchObject({ type: 'job', name: 'Pauta diaria' });
+    // Signed in but unrelated to the page or its workspace: still a public-link viewer.
+    const stranger = find(await body(await sources('art_ps_pub', await session(U.outsider))), 'table:leads');
+    expect(stranger.freshness.refresher?.name).toBeUndefined();
+  });
+
+  it('signed-out callers share a per-IP budget; signed-in callers are not counted', async () => {
+    const ip = '203.0.113.9';
+    for (let i = 0; i < 120; i++) await checkSlidingWindowRateLimit(e.RATE_LIMIT_KV, ip, 'sourcesAnon');
+    const limited = await sources('art_ps_pub', { ip });
+    expect(limited.status).toBe(429);
+    expect(((await limited.json()) as { code: string }).code).toBe('RATE_LIMIT_EXCEEDED');
+    expect((await sources('art_ps_pub', { ...(await session(U.member)), ip })).status).toBe(200);
+    expect((await sources('art_ps_pub', { ip: '203.0.113.10' })).status).toBe(200);
+  });
+
+  it('caches per caller class, so an editor\'s answer never reaches a viewer', async () => {
+    const full = await body(await sources('art_ps_ws', await session(U.owner)));
+    expect(full.access).toBe('full');
+    await new Promise((r) => setTimeout(r, 50));
+    const keys = (await e.SLUGS!.list({ prefix: 'prov:v1:resp:art_ps_ws:' })).keys.map((k) => k.name);
+    expect(keys.some((k) => k.endsWith(':full'))).toBe(true);
+    const member = await body(await sources('art_ps_ws', await session(U.member)));
+    expect(member.access).toBe('summary');
+    expect(member.sources.every((src) => src.details === undefined)).toBe(true);
+    expect(JSON.stringify(member)).not.toContain('SELECT');
+    await new Promise((r) => setTimeout(r, 50));
+    const after = (await e.SLUGS!.list({ prefix: 'prov:v1:resp:art_ps_ws:' })).keys.map((k) => k.name);
+    expect(after.some((k) => k.endsWith(':named'))).toBe(true);
+    // A version's page scan is cached once and reused by every caller class.
+    expect((await e.SLUGS!.list({ prefix: 'prov:v1:scan:ver_art_ps_ws:' })).keys).toHaveLength(1);
   });
 });
 

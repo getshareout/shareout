@@ -65,6 +65,9 @@ const RATE_LIMITS = {
   // A page calling the viewer's MCP connections, per viewer + page. Sized for a
   // dashboard of several sections each refreshing about every 30 s.
   mcpBroker: { limit: 1200, windowSeconds: 3600 },
+  // GET /v1/artifacts/{id}/sources from signed-out viewers, per IP. The viewer's Data
+  // panel loads once per open; this leaves room for a busy office behind one NAT.
+  sourcesAnon: { limit: 120, windowSeconds: 3600 },
 } as const;
 
 type RateLimitAction = keyof typeof RATE_LIMITS;

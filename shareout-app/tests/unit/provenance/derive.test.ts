@@ -5,13 +5,16 @@ import { attrSelector, bindingRefs, cssEscapeIdent, idSelector, normalizeRef } f
 import { detectCodeRefs, resolveScriptPath, scanPage, type PageScan } from '../../../src/provenance/scan';
 import { buildSources } from '../../../src/provenance/build';
 import { crewToolEffects, jobTargets, toIso, type SourceFacts } from '../../../src/provenance/facts';
+import { cronIntervalMs, parseDuration, refreshWordsIntervalMs, staleAfterMs } from '../../../src/provenance/staleness';
 import type { DataSource } from '../../../src/provenance/types';
 
 const NOW = Date.parse('2026-10-25T12:00:00Z');
 const ctx = { artifactId: 'art_x', workspaceId: 'wsp_x', now: NOW };
-const VIEWER = { full: false, scoped: false };
-const EDITOR = { full: true, scoped: false };
-const SCOPED = { full: false, scoped: true };
+// MEMBER: tied to the page or workspace (sees who refreshes); VIEWER: anonymous public link.
+const MEMBER = { full: false, scoped: false, named: true };
+const VIEWER = { full: false, scoped: false, named: false };
+const EDITOR = { full: true, scoped: false, named: true };
+const SCOPED = { full: false, scoped: true, named: false };
 
 function facts(over: Partial<SourceFacts> = {}): SourceFacts {
   return {
@@ -162,7 +165,7 @@ describe('buildSources', () => {
   const conn = { id: 'conn_1', scope: 'workspace' as const, name: 'warehouse', kind: 'platform' as const, provider: 'bigquery', credential_scope: 'shared' as const };
 
   it('gives viewers names, freshness and what each source feeds — never queries or connection ids', async () => {
-    const list = buildSources(await scanned(), facts({ jobs: [job], connections: [conn] }), VIEWER, ctx);
+    const list = buildSources(await scanned(), facts({ jobs: [job], connections: [conn] }), MEMBER, ctx);
     const snap = byKey(list, 'json:snapshot')!;
     expect(snap).toMatchObject({
       kind: 'json', label: 'Ads snapshot', description: 'Spend and clicks per campaign', declared: true, direct: true,
@@ -181,6 +184,15 @@ describe('buildSources', () => {
     expect(wh.feeds).toEqual([{ selector: '#spend-chart', label: 'Spend trend' }]);
     expect(byKey(list, 'knowledge:workspace')?.freshness.refresher).toEqual({ type: 'live' });
     expect(byKey(list, 'table:leads')?.feed_count).toBe(2);
+  });
+
+  it('an anonymous public-link viewer learns the schedule, never who refreshes', async () => {
+    const list = buildSources(await scanned(), facts({ jobs: [job], connections: [conn] }), VIEWER, ctx);
+    expect(byKey(list, 'json:snapshot')?.freshness).toMatchObject({
+      last_refresh_at: '2026-10-25T10:00:00.000Z', refresher: { type: 'job', schedule: '0 6 * * *' },
+    });
+    expect(byKey(list, 'json:snapshot')?.freshness.refresher?.name).toBeUndefined();
+    expect(JSON.stringify(list)).not.toContain('Ads diario');
   });
 
   it('gives editors the query, the connection and every refresher', async () => {
@@ -207,7 +219,7 @@ describe('buildSources', () => {
 
   it('hides server-only names from viewers behind opaque keys', async () => {
     const hidden = { ...job, connection: 'client_x_ads', targets: [{ ref: 'json:raw_client_x' }] };
-    const list = buildSources(await scanned(), facts({ jobs: [hidden], connections: [{ ...conn, name: 'client_x_ads', provider: 'google-ads' }] }), VIEWER, ctx);
+    const list = buildSources(await scanned(), facts({ jobs: [hidden], connections: [{ ...conn, name: 'client_x_ads', provider: 'google-ads' }] }), MEMBER, ctx);
     expect(JSON.stringify(list)).not.toContain('client_x');
     const store = list.find((s) => s.key === 'json:~1' || s.key === 'json:~2')!;
     expect(store.freshness.refresher?.name).toBe('Ads diario');
@@ -272,12 +284,42 @@ describe('buildSources', () => {
     expect(editor.details).toMatchObject({ tools: ['search_deals'], connection: { id: 'conn_m', credential_scope: 'per_user' } });
   });
 
-  it('flags a source as stale past seven days; the newest of observed and declared dates wins', async () => {
-    const old = { ...job, last_ok_at: '2026-10-01T00:00:00.000Z', targets: [{ ref: 'table:leads' }, { ref: 'json:snapshot' }] };
-    const list = buildSources(await scanned(), facts({ jobs: [old] }), VIEWER, ctx);
-    expect(byKey(list, 'table:leads')?.freshness.stale).toBe(true);
-    // snapshot declares as_of 2026-10-20: five days old, not stale.
-    expect(byKey(list, 'json:snapshot')?.freshness.stale).toBeUndefined();
+  it('stale follows the schedule: twice its interval, the declared SLA first, a week without either', async () => {
+    const at = (h: number) => new Date(NOW - h * 3_600_000).toISOString();
+    const stale = (over: Partial<typeof job>, page = PAGE) => async (ref: string) =>
+      byKey(buildSources(await scanPage(page, 'index.html'), facts({ jobs: [{ ...job, ...over }] }), MEMBER, ctx), ref)?.freshness.stale ?? false;
+    // Daily job: 30 h is one missed run (fine), 50 h is two.
+    expect(await stale({ last_ok_at: at(30), targets: [{ ref: 'table:leads' }] })('table:leads')).toBe(false);
+    expect(await stale({ last_ok_at: at(50), targets: [{ ref: 'table:leads' }] })('table:leads')).toBe(true);
+    // Weekly job: eight days is fine, fifteen is not.
+    expect(await stale({ schedule: '0 6 * * 1', last_ok_at: at(8 * 24), targets: [{ ref: 'table:leads' }] })('table:leads')).toBe(false);
+    expect(await stale({ schedule: '0 6 * * 1', last_ok_at: at(15 * 24), targets: [{ ref: 'table:leads' }] })('table:leads')).toBe(true);
+    // The author's SLA wins over the schedule.
+    const sla = PAGE.replace('"refresh":"daily"', '"refresh":"daily","freshness_sla":"6h"');
+    expect(await stale({ last_ok_at: at(7) }, sla)('json:snapshot')).toBe(true);
+    // No job: the declared words ("daily" → 48 h) and, failing those, a week.
+    const declared = (asOfHours: number, refresh: string) => PAGE
+      .replace('"as_of":"2026-10-20"', `"as_of":"${at(asOfHours)}"`).replace('"refresh":"daily"', `"refresh":"${refresh}"`);
+    const noJob = async (page: string) => byKey(buildSources(await scanPage(page, 'index.html'), facts(), MEMBER, ctx), 'json:snapshot')?.freshness.stale ?? false;
+    expect(await noJob(declared(72, 'daily'))).toBe(true);
+    expect(await noJob(declared(72, 'whenever we can'))).toBe(false);
+    expect(await noJob(declared(8 * 24, 'whenever we can'))).toBe(true);
+  });
+
+  it('reads durations, cron intervals and cadence words', () => {
+    expect(parseDuration('24h')).toBe(86_400_000);
+    expect(parseDuration('90m')).toBe(5_400_000);
+    expect(parseDuration('2d')).toBe(172_800_000);
+    expect(parseDuration('P1DT12H')).toBe(129_600_000);
+    expect(parseDuration('PT')).toBeNull();
+    expect(parseDuration('soon')).toBeNull();
+    expect(cronIntervalMs('0 6 * * *', NOW)).toBe(86_400_000);
+    expect(cronIntervalMs('0 6 * * 1-5', NOW)).toBe(3 * 86_400_000);
+    expect(cronIntervalMs('*/5 * * * *', NOW)).toBe(3_600_000);
+    expect(cronIntervalMs('not a cron', NOW)).toBeNull();
+    expect(refreshWordsIntervalMs('todos los días 12:00 UTC')).toBe(86_400_000);
+    expect(refreshWordsIntervalMs('semanal')).toBe(7 * 86_400_000);
+    expect(staleAfterMs({ schedules: [undefined] }, NOW)).toBe(7 * 86_400_000);
   });
 
   it('a page with no data has no sources', async () => {
