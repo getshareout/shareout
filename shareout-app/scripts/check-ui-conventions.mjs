@@ -22,6 +22,7 @@ const TARGETS = [
   'src/serve/sandbox-viewer/toolbar/script-admin.ts',
   'src/serve/sandbox-viewer/toolbar/script-comments.ts',
   'src/serve/sandbox-viewer/toolbar/script-core.ts',
+  'src/serve/sandbox-viewer/data-sources/script.ts',
   'src/pages/home/client-script/artifacts.ts',
   'src/pages/home/client-script/workspace-admin.ts',
   'src/pages/home/client-script/events.ts',

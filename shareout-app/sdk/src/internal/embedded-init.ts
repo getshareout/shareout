@@ -17,9 +17,20 @@ export interface EmbeddedInitialData {
 }
 
 let postMessageData: EmbeddedInitialData | null = null;
+// Origin of the page that delivered init: the only host the frame answers (source-highlight).
+let initOrigin: string | null = null;
 
 export function getPostMessageData(): EmbeddedInitialData | null {
   return postMessageData;
+}
+
+export function getInitOrigin(): string | null {
+  return initOrigin;
+}
+
+function acceptInit(e: MessageEvent): void {
+  postMessageData = e.data.data as EmbeddedInitialData;
+  if (typeof e.origin === 'string' && e.origin) initOrigin = e.origin;
 }
 
 export function setPostMessageData(data: EmbeddedInitialData): void {
@@ -45,7 +56,7 @@ export async function waitForPostMessageInit(timeoutMs: number = POST_MESSAGE_IN
     const timeout = setTimeout(resolve, timeoutMs);
     const handler = (e: MessageEvent) => {
       if (isParentInit(e)) {
-        postMessageData = e.data.data as EmbeddedInitialData;
+        acceptInit(e);
         clearTimeout(timeout);
         window.removeEventListener('message', handler);
         resolve();
@@ -60,9 +71,7 @@ export async function waitForPostMessageInit(timeoutMs: number = POST_MESSAGE_IN
 // Set up listener early to catch init message from parent frame
 if (typeof window !== 'undefined') {
   window.addEventListener('message', (e) => {
-    if (isParentInit(e)) {
-      postMessageData = e.data.data as EmbeddedInitialData;
-    }
+    if (isParentInit(e)) acceptInit(e);
   });
   // Signal parent we're ready
   if (window.parent !== window) {
