@@ -14,6 +14,7 @@ const extractHtml = vi.hoisted(() => vi.fn());
 const checkRateLimit = vi.hoisted(() => vi.fn());
 const incrementRateLimit = vi.hoisted(() => vi.fn());
 const checkStorageQuota = vi.hoisted(() => vi.fn());
+const getInternalWorkspaceRole = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../src/auth/session', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -37,6 +38,7 @@ vi.mock('../../../src/publish/publish-generated-html', async (importOriginal) =>
 }));
 vi.mock('../../../src/api-auth', () => ({ checkRateLimit, incrementRateLimit, RATE_LIMIT_MAX: 100 }));
 vi.mock('../../../src/quota', () => ({ checkStorageQuota }));
+vi.mock('../../../src/workspaces/roles', () => ({ getInternalWorkspaceRole }));
 vi.mock('../../../src/logging', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
   logError: vi.fn(),
@@ -74,6 +76,7 @@ beforeEach(() => {
   checkRateLimit.mockReset().mockResolvedValue({ allowed: true, remaining: 99, reset: 0 });
   incrementRateLimit.mockReset().mockResolvedValue(undefined);
   checkStorageQuota.mockReset().mockResolvedValue({ allowed: true, used: 0, incoming: 0, max: 0 });
+  getInternalWorkspaceRole.mockReset().mockResolvedValue(null);
 });
 
 afterEach(() => vi.restoreAllMocks());
@@ -202,6 +205,47 @@ describe('routeCreateApi', () => {
     const done = (await sseEvents(await post({ phase: 'build', prompt: 'hi page' }))).at(-1);
     expect(done).toMatchObject({ type: 'done', visibility: 'public' });
     expect(done).not.toHaveProperty('moderation');
+  });
+
+  describe('who can see it', () => {
+    const lastOpts = () => publishGeneratedHtml.mock.calls.at(-1)![2];
+    beforeEach(() => {
+      getSessionUser.mockResolvedValue({ id: 'u1', email: 'a@x.com' });
+      publishGeneratedHtml.mockResolvedValue({ ...deployed, visibility: 'private' });
+    });
+
+    it('publishes private when the client says nothing', async () => {
+      await post({ phase: 'publish', prompt: 'hi page', html });
+      expect(lastOpts()).toMatchObject({ visibility: 'private', workspaceId: null });
+    });
+
+    it('publishes private for an unknown visibility value', async () => {
+      await post({ phase: 'publish', prompt: 'hi page', html, visibility: 'unlisted' });
+      expect(lastOpts()).toMatchObject({ visibility: 'private' });
+    });
+
+    it('passes public through on publish and on the streamed build', async () => {
+      await post({ phase: 'publish', prompt: 'hi page', html, visibility: 'public' });
+      expect(lastOpts()).toMatchObject({ visibility: 'public', workspaceId: null });
+      streamChat.mockImplementation(async function* () { yield { type: 'content', content: html }; });
+      extractHtml.mockReturnValue(html);
+      await sseEvents(await post({ phase: 'build', prompt: 'hi page', visibility: 'public' }));
+      expect(lastOpts()).toMatchObject({ visibility: 'public' });
+    });
+
+    it('team needs a workspace the user belongs to', async () => {
+      getInternalWorkspaceRole.mockResolvedValue('member');
+      await post({ phase: 'publish', prompt: 'hi page', html, visibility: 'workspace', workspace_id: 'wsp_1' });
+      expect(getInternalWorkspaceRole).toHaveBeenCalledWith(env, 'wsp_1', 'u1');
+      expect(lastOpts()).toMatchObject({ visibility: 'workspace', workspaceId: 'wsp_1' });
+    });
+
+    it('team falls back to private for a non-member or no workspace', async () => {
+      await post({ phase: 'publish', prompt: 'hi page', html, visibility: 'workspace', workspace_id: 'wsp_other' });
+      expect(lastOpts()).toMatchObject({ visibility: 'private', workspaceId: null });
+      await post({ phase: 'publish', prompt: 'hi page', html, visibility: 'workspace' });
+      expect(lastOpts()).toMatchObject({ visibility: 'private', workspaceId: null });
+    });
   });
 
   it('429s build and publish at the daily publish limit, stating the limit and reset', async () => {

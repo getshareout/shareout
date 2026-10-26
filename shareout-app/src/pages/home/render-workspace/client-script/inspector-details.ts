@@ -49,9 +49,10 @@ export const workspace_client_inspector_details_JS = `  // ===== Inspector Detai
   // Thin alias over the shared design-system toast (window.showToast).
   function wsxToast(text, isError) { if (typeof window.showToast === 'function') window.showToast(text, isError ? 'error' : 'success'); }
   function copyText(txt, btn) {
-    var done = function () { btn.classList.add('is-on'); setTimeout(function () { btn.classList.remove('is-on'); }, 1100); };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done).catch(function () {});
-    else { var i = document.createElement('input'); i.value = txt; document.body.appendChild(i); i.select(); try { document.execCommand('copy'); done(); } catch (e) {} i.remove(); }
+    var done = function () { if (btn) { btn.classList.add('is-on'); setTimeout(function () { btn.classList.remove('is-on'); }, 1100); } wsxToast(t('cards.linkCopied')); };
+    var fail = function () { wsxToast(t('inspector.copyFailed'), true); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, fail);
+    else { var i = document.createElement('input'); i.value = txt; document.body.appendChild(i); i.select(); try { if (document.execCommand('copy')) done(); else fail(); } catch (e) { fail(); } i.remove(); }
   }
   function toggleFav(id, btn) {
     var on = btn.classList.contains('is-on');

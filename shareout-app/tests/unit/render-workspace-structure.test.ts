@@ -48,4 +48,11 @@ describe('render-workspace module structure', () => {
     expect(scripts).toContain('function loadFeed');
     expect(scripts).toContain('Edit-Lite');
   });
+
+  it('puts a Share button on the artifact bar, wired to the share popover', () => {
+    const { body, scripts } = buildWorkspaceView(args);
+    expect(body).toContain('id="wsxShareBtn"');
+    expect(scripts).toContain('function openSharePop');
+    expect(scripts).toContain('function wireVis');
+  });
 });

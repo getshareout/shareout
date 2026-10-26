@@ -121,6 +121,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
         <button class="wsx-abtn wsx__tabreq" id="wsxTabReqEdit" type="button" hidden data-i18n="tabs.requestEdit">Request edit access</button>
         <button class="wsx__tabdevice" id="wsxTabDevice" type="button" hidden aria-pressed="false" data-i18n-title="tabs.mobilePreview" data-i18n-aria="tabs.mobilePreview" title="Toggle mobile preview" aria-label="Toggle mobile preview">${svg('<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>')}</button>
         <button class="wsx__tabdevice" id="wsxTabFull" type="button" hidden data-i18n-title="tabs.fullScreen" data-i18n-aria="tabs.fullScreen" title="Full screen" aria-label="View full screen">${svg('<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>')}</button>
+        <span class="wsx__sharewrap" id="wsxShareWrap" hidden><button class="wsx-abtn wsx-abtn--primary" id="wsxShareBtn" type="button" aria-haspopup="dialog" aria-expanded="false" data-i18n="share.button">Share</button></span>
       </div>
       <div class="wsx__panes" id="wsxPanes">
         <div class="wsx__pane is-active" data-pane="home" id="wsxHomePane">

@@ -241,6 +241,9 @@ body { overflow: hidden; background: var(--color-bg); color: var(--color-text); 
 .tp-swatch { position: relative; width: 100%; height: 74px; border-radius: 11px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 9px; overflow: hidden; }
 .tp-dot { width: 22px; height: 22px; border-radius: 50%; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); }
 .tp-swatch-surprise { background: conic-gradient(from 180deg, #ff5d8f, #ffd166, #3ad6c4, #6c8cff, #ff5d8f); color: #fff; font-size: 27px; font-weight: 700; }
+.tp-vis { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; margin: 16px auto 0; }
+.tp-vis-label { font: 600 0.85rem var(--font-body); color: var(--color-text-secondary); }
+.tp-vis-opts { display: flex; flex-wrap: wrap; gap: 7px; }
 .tp-name { font: 700 0.98rem var(--font-display); color: var(--color-text); }
 .tp-blurb { font: 400 0.82rem/1.4 var(--font-body); color: var(--color-text-secondary); }
 
