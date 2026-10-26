@@ -64,14 +64,18 @@ call is not wired in the eval — search doesn't read the graph.
    (`scripts/lib/knowledge-eval-host.mjs`) for embeddings and the report.
 3. `retrieval.eval.ts` publishes every doc the way the product stores it — pages as
    artifact + version + production deployment + HTML assets in R2, files as Assets in the
-   workspace bucket (deliverable + blob in R2) — into two workspaces:
+   workspace bucket (deliverable + blob in R2) — into three workspaces:
    - **main**: everything, including docs private to another member;
-   - **control**: only what the eval member can see — the ideal list for starvation.
-4. It learns both with `forceIngest()` (the reindex path: the same extract → chunk →
-   `KnowledgeStore` FTS5 → embed steps as publish-time ingest). Every source must end
-   `ready`, and every gold evidence must sit in some learned passage of its doc, or the run fails.
+   - **control**: only what the eval member can see — the ideal list for starvation;
+   - **stress**: what the member can see plus another member's private copies of all of
+     it (2 per doc), so most passages matching any question are ones the member can't read.
+4. It learns them with `forceIngest()` (the reindex path: the same extract → chunk →
+   `KnowledgeStore` FTS5 → embed steps as publish-time ingest), then drains each store's
+   alarms so background indexing — the stemmed-index backfill — is finished before any
+   question. Every source must end `ready`, and every gold evidence must sit in some learned
+   passage of its doc, or the run fails.
 5. Every question goes through `searchCorpus(env, ws, member, q, { limit: 20, full: true })`
-   in both workspaces. Retrieval is a black box: nothing in `src/` is re-implemented, so
+   in all three workspaces. Retrieval is a black box: nothing in `src/` is re-implemented, so
    the eval measures whatever chunker, tokenizer, query and model the branch has. The only
    stand-ins, in dense mode, are the `AI` binding (embeddings only) and `KNOWLEDGE_VECTORS`.
 6. A hit counts for a gold passage when it comes from the gold doc (or one of its `alt`s)
@@ -90,6 +94,7 @@ call is not wired in the eval — search doesn't read the graph.
 | zero | Questions with no results at all. |
 | starved | The member got fewer results than in control (`< min(20, control)`): private passages filled the candidate pool before the permission post-filter. |
 | perm loss | The first gold passage is in control's top 10 but not in main's: what other members' private docs cost this member. |
+| stress row | The same questions in the stress workspace; its starved and perm loss compare with control too. Starvation sits near 100% while the permission filter runs after a fixed candidate pool — the number a fix should move. |
 | p50 / p95 ms | `searchCorpus` wall time in local Miniflare, query-embedding time excluded. Compare runs on one machine; it is not production latency. |
 
 ## Slices
@@ -107,6 +112,7 @@ call is not wired in the eval — search doesn't read the graph.
   pricing, policy, catalog, slides, table, brief, reference.
 - **tag: perm** — a private near-duplicate owned by another member competes with the gold
   doc (a 2027 draft rate card, an unreviewed draft report, a confidential returns policy).
+- **stress: most matches private** — every question again, in the stress workspace.
 
 ## The corpus and the golden set
 

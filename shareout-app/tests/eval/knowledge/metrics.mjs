@@ -82,6 +82,11 @@ export function slices(records) {
       if (subset.length) rows.push({ group, value, ...aggregate(subset) });
     }
   }
+  // The same questions in the stress workspace, where most matching passages are private
+  // to another member; starved and perm loss still compare against control.
+  if (records.length && records.every((r) => r.stress)) {
+    rows.push({ group: 'stress', value: 'most matches private', ...aggregate(records.map((r) => ({ ...r, ...r.stress }))) });
+  }
   return rows;
 }
 

@@ -5,6 +5,7 @@
 // judges the hits and hands them to the Node host (scripts/lib/knowledge-eval-host.mjs) for
 // metrics and the report. Retrieval is a black box: whatever chunker, FTS and embedding
 // code this branch has is what gets measured. README.md next to this file explains it all.
+import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
 import { expect, it } from 'vitest';
 import type { Env } from '../../../src/types';
@@ -33,6 +34,8 @@ const files = Object.fromEntries(Object.entries(raw).map(([p, text]) => [p.repla
 
 const base = env as unknown as Env & { KNOWLEDGE_EVAL_MODE: 'keyword' | 'dense'; KNOWLEDGE_EVAL_HOST: Fetcher };
 const USERS = { author: 'usr_keval_author', other: 'usr_keval_other', member: 'usr_keval_member' } as const;
+/** Starvation stress: another member's private copies of every doc the eval member can see. */
+const STRESS_COPIES = 2;
 const bytes = (s: string) => new TextEncoder().encode(s).length;
 
 /** Publish docs into a workspace the way the product stores them. Returns refId → doc id. */
@@ -80,7 +83,13 @@ async function publish(e: Env, ws: string, tag: string, docs: Doc[]): Promise<Ma
 async function learn(e: Env, ws: string, refToDoc: Map<string, string>): Promise<SourceRow[]> {
   await setKnowledgeEnabled(e, ws, true);
   await forceIngest(e, undefined, [...refToDoc.keys()].map((refId) => ({ workspaceId: ws, kind: refId.startsWith('art_') ? 'page' as const : 'asset' as const, refId })));
-  const { sources } = await corpusFor(e, ws)!.listSources(10_000);
+  // Background indexing runs on the store's alarm (the stemmed-index backfill): finish it
+  // before asking anything, or the eval would measure a half-built index.
+  const store = corpusFor(e, ws)!;
+  for (let i = 0; i < 10_000 && (await runDurableObjectAlarm(store)); i++);
+  const backlog = await runInDurableObject(store, (o) => (o as unknown as { stemCursor?: number | null }).stemCursor);
+  if (backlog !== undefined && backlog !== null) throw new Error(`${ws}: stemmed index still backfilling (cursor ${backlog})`);
+  const { sources } = await store.listSources(10_000);
   const bad = sources.filter((s) => s.status !== 'ready');
   if (bad.length || sources.length !== refToDoc.size) {
     throw new Error(`ingest: ${sources.length - bad.length}/${refToDoc.size} sources ready in ${ws}:\n${bad.map((s) => `  ${refToDoc.get(s.refId)} → ${s.status}${s.error ? ` (${s.error})` : ''}`).join('\n')}`);
@@ -179,18 +188,25 @@ it('knowledge retrieval eval', async () => {
   await e.DB.batch([
     e.DB.prepare('INSERT INTO users (id, email, name) VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)').bind(
       USERS.author, 'author@keval.example', 'Author', USERS.other, 'other@keval.example', 'Other member', USERS.member, 'member@keval.example', 'Eval member'),
-    e.DB.prepare("INSERT INTO workspaces (id, name, slug, owner_id) VALUES ('wsp_keval_main', 'Eval', 'keval-main', ?), ('wsp_keval_control', 'Eval control', 'keval-control', ?)")
-      .bind(USERS.author, USERS.author),
+    e.DB.prepare(`INSERT INTO workspaces (id, name, slug, owner_id) VALUES ('wsp_keval_main', 'Eval', 'keval-main', ?),
+      ('wsp_keval_control', 'Eval control', 'keval-control', ?), ('wsp_keval_stress', 'Eval stress', 'keval-stress', ?)`)
+      .bind(USERS.author, USERS.author, USERS.author),
   ]);
 
   // main: every doc, some private to another member. control: only what the member can see —
-  // the ideal result list, against which permission starvation is measured.
+  // the ideal result list, against which permission starvation is measured. stress: what the
+  // member can see plus another member's private copies of all of it, so most passages that
+  // match any question are ones the member may not read.
   const t0 = performance.now();
   const visible = docs.filter((d) => d.visibility !== 'private' || d.owner === 'member');
+  const copies = Array.from({ length: STRESS_COPIES }, (_, k) =>
+    visible.map((d): Doc => ({ ...d, id: `${d.id}--copy${k + 1}`, visibility: 'private', owner: 'other' }))).flat();
   const mainRefs = await publish(e, 'wsp_keval_main', 'main', docs);
   const controlRefs = await publish(e, 'wsp_keval_control', 'ctl', visible);
+  const stressRefs = await publish(e, 'wsp_keval_stress', 'str', [...visible, ...copies]);
   const sources = await learn(e, 'wsp_keval_main', mainRefs);
   await learn(e, 'wsp_keval_control', controlRefs);
+  await learn(e, 'wsp_keval_stress', stressRefs);
   const ingestMs = performance.now() - t0;
 
   const refOf = new Map([...mainRefs].map(([ref, doc]) => [doc, ref]));
@@ -210,16 +226,22 @@ it('knowledge retrieval eval', async () => {
     // Query-embedding time is the provider's (or the cache's), not the search path's.
     const ms = performance.now() - start - ((state?.embedMs ?? 0) - embedBefore);
     const control = await searchCorpus(e, 'wsp_keval_control', USERS.member, q.q, { limit: LIMIT, full: true, ctx });
+    const stressEmbed = state?.embedMs ?? 0;
+    const stressStart = performance.now();
+    const stress = await searchCorpus(e, 'wsp_keval_stress', USERS.member, q.q, { limit: LIMIT, full: true, ctx });
+    const stressMs = performance.now() - stressStart - ((state?.embedMs ?? 0) - stressEmbed);
     await Promise.all(pending);
     if (mode === 'dense' && main.mode !== 'hybrid') fellBack++;
     const hits = main.hits.map((h) => ({ doc: mainRefs.get(h.source.id) ?? h.source.id, text: h.text, locator: h.locator }));
     const controlHits = control.hits.map((h) => ({ doc: controlRefs.get(h.source.id) ?? h.source.id, text: h.text, locator: h.locator }));
+    const stressHits = stress.hits.map((h) => ({ doc: stressRefs.get(h.source.id) ?? h.source.id, text: h.text, locator: h.locator }));
     const goldDocs = q.gold.map((g) => byId.get(g.doc)!);
     records.push({
       id: q.id, lang: q.lang, type: q.type, tags: q.tags, cluster: q.cluster,
       sources: [...new Set(goldDocs.map((d) => d.format))], genres: [...new Set(goldDocs.map((d) => d.genre))],
       ...judge(q, hits, norm),
       ctlFound: judge(q, controlHits, norm).found,
+      stress: { ...judge(q, stressHits, norm), hits: stress.hits.length, ms: stressMs },
       hits: main.hits.length, controlHits: control.hits.length, ms,
       top: hits.slice(0, 10).map((h) => (h.locator ? `${h.doc} § ${h.locator}` : h.doc)),
     });
@@ -231,7 +253,7 @@ it('knowledge retrieval eval', async () => {
     body: JSON.stringify({
       meta: {
         mode, model: state ? [...state.models].join(', ') : '', limit: LIMIT,
-        docs: docs.length, privateDocs: docs.length - visible.length,
+        docs: docs.length, privateDocs: docs.length - visible.length, stressCopies: STRESS_COPIES,
         chunks: sources.reduce((n, s) => n + s.chunkCount, 0), questions: questions.length, ingestMs,
       },
       records,
