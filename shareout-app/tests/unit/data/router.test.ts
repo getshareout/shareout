@@ -361,7 +361,7 @@ describe('pilot spike bypass is loopback-only (defense in depth)', () => {
 describe('test-run sandbox blocks mutations (Unit B)', () => {
   it('blocks any mutating method with 403 under an owner_test token', async () => {
     const env = artifactEnv();
-    const token = await createAccessToken(ARTIFACT_ID, 'owner_test', env, 600, 'owner@example.com');
+    const token = await createAccessToken(ARTIFACT_ID, 'owner_test', env, 600);
 
     for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
       const response = await handleDataRequest(
@@ -380,7 +380,7 @@ describe('test-run sandbox blocks mutations (Unit B)', () => {
 
   it('still allows reads (GET) under an owner_test token', async () => {
     const env = artifactEnv();
-    const token = await createAccessToken(ARTIFACT_ID, 'owner_test', env, 600, 'owner@example.com');
+    const token = await createAccessToken(ARTIFACT_ID, 'owner_test', env, 600);
     const response = await handleDataRequest(
       new Request(`${BASE_URL}/v1/data/${ARTIFACT_ID}/json`, {
         method: 'GET',

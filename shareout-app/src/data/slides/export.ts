@@ -4,6 +4,7 @@ import { canEditPresentation } from './auth';
 import type { DbPresentation, DbSlide } from './db';
 import { mapPresentation } from './db';
 import { recordBrowserSince } from '../../workspaces/usage-ledger';
+import { captureOwnHosts, guardCapturePage } from '../../screenshots/request-policy';
 
 const NAV_TIMEOUT = 20000;
 
@@ -94,6 +95,12 @@ export async function handleExportRoute(request: Request, ctx: DataContext, pres
     browser = await puppeteer.launch(ctx.env.BROWSER as Parameters<typeof puppeteer.launch>[0]);
     const page = await browser.newPage();
     await page.setViewport({ width: style.width, height: style.height, deviceScaleFactor: 1 });
+    const guard = await guardCapturePage(page, captureOwnHosts(ctx.env));
+    const withheld = () => errorResponse({
+      code: 'PRIVATE_NETWORK_CONTENT',
+      message: 'Export withheld: the slides loaded content from a private network address',
+      status: 422,
+    });
 
     if (format === 'png') {
       const target = slideId ? slides.find((s) => s.id === slideId) : slides[0];
@@ -106,6 +113,7 @@ export async function handleExportRoute(request: Request, ctx: DataContext, pres
         type: 'png',
         clip: { x: 0, y: 0, width: style.width, height: style.height },
       })) as unknown as ArrayBuffer;
+      if (guard.privateResponse()) return withheld();
       return new Response(buf, { headers: { 'Content-Type': 'image/png' } });
     }
 
@@ -120,6 +128,7 @@ export async function handleExportRoute(request: Request, ctx: DataContext, pres
       printBackground: true,
       pageRanges: '',
     })) as unknown as ArrayBuffer;
+    if (guard.privateResponse()) return withheld();
     return new Response(pdf, { headers: { 'Content-Type': 'application/pdf' } });
   } catch (err) {
     console.error('slide export failed', { presId, format, error_stack: (err as Error)?.stack || String(err) });

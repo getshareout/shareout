@@ -9,7 +9,8 @@ import { serveTypeViewer } from './type-viewer';
 import { serveAsset } from './assets';
 import { hasCustomViewer } from '../viewers';
 import { resolveArtifactSocialPreview } from './social-meta';
-import { verifyAccessToken, createAccessToken } from '../token';
+import { verifyAccessToken } from '../token';
+import { mintCaptureSessionToken } from '../auth/capture-session';
 import { isCommentsOverlayEnabled } from './comments-config';
 import { injectPerfBeacon } from './perf-beacon';
 import { injectPresenceBeacon } from './presence-beacon';
@@ -44,22 +45,23 @@ async function serveCaptureView(
   slug: string,
   result: ArtifactWithAsset,
   baseUrl: string,
+  // linkExp: the capture token's expiry. The session ends with it, so reloading the
+  // capture link never extends access.
+  linkExp: number,
   // writable: mint a full-WRITE `owner` session instead of the read-only `owner_test`.
   // Used only by the crew `pilot_verify` flow, which drives the real UI (submit a
   // form, save a record) to catch UI regressions — it MUST be able to persist. Every
   // other capture render (thumbnail, smoke, PDF, report, test flow) stays read-only.
   writable = false,
 ): Promise<Response> {
-  const owner = await env.DB.prepare('SELECT email FROM users WHERE id = ?')
-    .bind(result.owner_id).first<{ email: string | null }>();
-  // Read-only capture uses `owner_test` (reads as owner, router blocks every write).
-  // The pilot_verify path uses a real `owner` session so its in-page run can submit.
-  // A full-WRITE credential must not outlive its ≤90s run, so the writable session
-  // gets a tight 120s TTL; the read-only owner_test keeps the long 2h window.
-  const sessionTtlSec = writable ? 120 : 60 * 60 * 2;
-  const sessionToken = await createAccessToken(
-    result.artifact_id, writable ? 'owner' : 'owner_test', env, sessionTtlSec, owner?.email ?? undefined,
-  );
+  // Read-only capture uses an identity-less `owner_test` session (reads this artifact
+  // as its owner, router blocks every write). The pilot_verify path uses the owner's
+  // own short session so its in-page run can submit. See auth/capture-session.ts.
+  const ownerEmail = writable
+    ? (await env.DB.prepare('SELECT email FROM users WHERE id = ?')
+        .bind(result.owner_id).first<{ email: string | null }>())?.email ?? null
+    : null;
+  const sessionToken = await mintCaptureSessionToken(env, result.artifact_id, { linkExp, writable, ownerEmail });
   const initial = { artifactId: result.artifact_id, baseUrl, sessionToken };
   const json = JSON.stringify(initial).replace(/</g, '\\u003c');
   const scriptTag = `<script id="shareout-initial-data" type="application/json">${json}</script>`;
@@ -242,7 +244,7 @@ export async function handleServe(
       return new Response('Not Found', { status: 404 });
     }
     return serveCaptureView(
-      request, env, captureAsset, slug, result, servingOrigin(env), writableCapture,
+      request, env, captureAsset, slug, result, servingOrigin(env), payload.exp, writableCapture,
     );
   }
 

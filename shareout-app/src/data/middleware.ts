@@ -7,6 +7,7 @@ import {
 import { validateToken, type ServiceScope } from '../api-auth';
 import { verifyLiveSessionToken } from '../auth/session';
 import { getInternalWorkspaceRole } from '../workspaces/roles';
+import { isCaptureCredential, isCaptureLink, isCaptureSession } from '../auth/capture-session';
 import { canAccess } from '../access/can-access';
 import { normalizeVisibility } from '../visibility-config';
 import { apiErrorResponse } from '../http/api-error';
@@ -303,12 +304,17 @@ async function checkDataAuth(
       if (!guest || !(await spaceGuestCovers(env, guest, 'artifact', artifact.id))) return deny;
       return { authorized: true, needsAuth: false, viewer: { email: null, isOwner: false }, isArtifactOwner: false, spaceGuest: guest };
     }
+    // A capture render's session (owner_test) carries no identity and lives one capture
+    // window at most (auth/capture-session.ts). One that does not fit — minted under
+    // an earlier scheme — authorizes nothing.
+    if (payload?.authType === 'owner_test' && !isCaptureSession(payload)) return deny;
     // 'content' tokens authorize loading static artifact bytes on the content domain
     // ONLY (ADR 30) — they carry no viewer identity and must never grant data access.
-    if (payload && payload.authType !== 'content') {
+    // Capture links likewise only open the capture view.
+    if (payload && payload.authType !== 'content' && !isCaptureLink(payload.authType)) {
       // Artifact-scoped access token (password/credentials/owner/viewer-minted).
-      // 'owner_test' is the owner identity used by a sandboxed test render: it reads
-      // as the owner but flags the request so the router blocks every mutation.
+      // 'owner_test' is the read-only session of a capture render: it reads this
+      // artifact as the owner but flags the request so the router blocks every mutation.
       const isOwner = payload.authType === 'owner' || payload.authType === 'editor' || payload.authType === 'owner_test';
       const isArtifactOwner = payload.authType === 'owner' || payload.authType === 'owner_test';
       const testRun = payload.authType === 'owner_test';
@@ -421,7 +427,9 @@ async function checkDataAuth(
     const token = extractTokenFromCookie(cookies, new RegExp(`shareout_access_${artifact.id}=([^;]+)`));
     if (token) {
       const payload = await verifyAccessToken(token, artifact.id, env);
-      if (payload) {
+      // A capture credential is no password-gate cookie: as one it would skip the
+      // read-only flag its Bearer use carries.
+      if (payload && !isCaptureCredential(payload.authType)) {
         const owns = payload.authType === 'owner';
         return {
           authorized: true,
@@ -575,7 +583,8 @@ export async function resolveRequesterUserId(request: Request, ctx: DataContext)
     const apiUser = await validateToken(request, ctx.env);
     if (apiUser) return apiUser.id;
     const payload = await verifyAccessToken(authHeader.slice(7), ctx.artifactId, ctx.env);
-    if (payload?.email) {
+    // A capture session never stands for a user, whatever it carries.
+    if (payload?.email && payload.authType !== 'owner_test') {
       const u = await ctx.env.DB.prepare('SELECT id FROM users WHERE email = ?')
         .bind(payload.email).first<{ id: string }>();
       if (u) return u.id;

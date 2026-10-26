@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createSessionToken, createAccessToken } from '../../../src/token';
 import type { Env } from '../../../src/types';
-import { dataMiddleware } from '../../../src/data/middleware';
+import { dataMiddleware, resolveRequesterUserId, type DataContext } from '../../../src/data/middleware';
 
 function envWithDb(firstForSql: (sql: string) => unknown, extras: Partial<Env> = {}): Env {
   return {
@@ -219,7 +219,7 @@ describe('dataMiddleware test-run sandbox (Unit B)', () => {
 
   it('an owner_test token reads as the owner but is read-only (testRun, canWrite=false)', async () => {
     const env = envWithDb(dbFor);
-    const token = await createAccessToken('art_1', 'owner_test', env, 600, 'owner@example.com');
+    const token = await createAccessToken('art_1', 'owner_test', env, 600);
     const request = new Request('https://example.com', { headers: { Authorization: `Bearer ${token}` } });
 
     const result = await dataMiddleware(request, env, 'art_1');
@@ -230,7 +230,38 @@ describe('dataMiddleware test-run sandbox (Unit B)', () => {
       testRun: true,
       canWrite: false,      // ...but every mutation is denied
       canWriteCollab: false,
+      viewer: { email: null, isOwner: true }, // ...and it stands for no user
     });
+  });
+
+  it('refuses an owner_test token that carries an identity (the earlier capture session)', async () => {
+    const env = envWithDb(dbFor);
+    const token = await createAccessToken('art_1', 'owner_test', env, 600, 'owner@example.com');
+    const request = new Request('https://example.com', { headers: { Authorization: `Bearer ${token}` } });
+
+    const response = await dataMiddleware(request, env, 'art_1') as Response;
+
+    expect(response.status).toBe(401);
+  });
+
+  it('refuses an owner_test token that outlives a capture window', async () => {
+    const env = envWithDb(dbFor);
+    const token = await createAccessToken('art_1', 'owner_test', env, 60 * 60 * 2);
+    const request = new Request('https://example.com', { headers: { Authorization: `Bearer ${token}` } });
+
+    const response = await dataMiddleware(request, env, 'art_1') as Response;
+
+    expect(response.status).toBe(401);
+  });
+
+  it.each(['capture', 'capture_test', 'capture_verify'])('a %s link is no data credential', async (authType) => {
+    const env = envWithDb(dbFor);
+    const link = await createAccessToken('art_1', authType, env, 300);
+    const request = new Request('https://example.com', { headers: { Authorization: `Bearer ${link}` } });
+
+    const response = await dataMiddleware(request, env, 'art_1') as Response;
+
+    expect(response.status).toBe(401);
   });
 
   it('a normal owner token is NOT a test run and can write', async () => {
@@ -241,5 +272,45 @@ describe('dataMiddleware test-run sandbox (Unit B)', () => {
     const result = await dataMiddleware(request, env, 'art_1');
 
     expect(result).toMatchObject({ isOwner: true, testRun: false, canWrite: true });
+  });
+});
+
+describe('capture credentials on a password-gated artifact', () => {
+  const gated = { id: 'art_1', name: 'Artifact', visibility: 'private', auth_method: 'password', owner_id: 'usr_1' };
+  const dbFor = (sql: string) => (sql.includes('FROM artifacts WHERE id') ? gated : null);
+  const withCookie = (token: string) => new Request('https://example.com', { headers: { Cookie: `shareout_access_art_1=${token}` } });
+
+  it.each(['owner_test', 'capture', 'capture_verify'])('a %s token is no password-gate cookie', async (authType) => {
+    const env = envWithDb(dbFor);
+    const token = await createAccessToken('art_1', authType, env, 300);
+
+    const response = await dataMiddleware(withCookie(token), env, 'art_1') as Response;
+
+    expect(response.status).toBe(401);
+  });
+
+  it('the password form token still opens it', async () => {
+    const env = envWithDb(dbFor);
+    const token = await createAccessToken('art_1', 'password', env, 300);
+
+    const result = await dataMiddleware(withCookie(token), env, 'art_1');
+
+    expect(result).toMatchObject({ artifactId: 'art_1', testRun: false });
+  });
+});
+
+describe('resolveRequesterUserId', () => {
+  const env = envWithDb((sql) => (sql.includes('FROM users WHERE email') ? { id: 'usr_1' } : null));
+  const ctx = { env, artifactId: 'art_1' } as unknown as DataContext;
+  const bearer = (token: string) => new Request('https://example.com', { headers: { Authorization: `Bearer ${token}` } });
+
+  it('never resolves a capture session to a user, even one that names an email', async () => {
+    const token = await createAccessToken('art_1', 'owner_test', env, 600, 'owner@example.com');
+    await expect(resolveRequesterUserId(bearer(token), ctx)).resolves.toBeNull();
+  });
+
+  it('still resolves a viewer token to its user', async () => {
+    const token = await createAccessToken('art_1', 'viewer', env, 600, 'viewer@example.com');
+    await expect(resolveRequesterUserId(bearer(token), ctx)).resolves.toBe('usr_1');
   });
 });

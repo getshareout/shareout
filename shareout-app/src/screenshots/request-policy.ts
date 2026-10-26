@@ -1,0 +1,137 @@
+import type { HTTPRequest, HTTPResponse, Page } from '@cloudflare/puppeteer';
+import type { Env } from '../types';
+import { getPlatformHostname, getPlatformOrigin } from '../config/origins';
+
+// Network policy for every headless capture render (thumbnails, image/PDF renders,
+// report captures, Artifact Tests, pilot_verify, slide export). The rendered HTML is
+// authored content and the output is stored or sent on (a public thumbnail, an email,
+// a chat upload), so a render stays on the public internet:
+//   - requests to loopback, private, link-local, CGNAT and metadata addresses, to
+//     local-only host names, and to non-web schemes are aborted;
+//   - a capture is withheld when a response still came from such an address (a public
+//     name that resolves to a private one).
+// This instance's own hosts are exempt, so a local instance can render itself.
+
+const LOCAL_SUFFIXES = ['localhost', 'local', 'internal', 'home.arpa', 'lan', 'home', 'corp', 'intranet', 'private'];
+const LOCAL_NAMES = new Set(['metadata.goog']);
+const PASS_SCHEMES = new Set(['data:', 'blob:', 'about:']);
+const WEB_SCHEMES = new Set(['http:', 'https:', 'ws:', 'wss:']);
+
+function isPrivateIpv4(a: number, b: number): boolean {
+  return a === 0 || a === 10 || a === 127 || a >= 224
+    || (a === 100 && b >= 64 && b <= 127)
+    || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && (b === 168 || b === 0))
+    || (a === 198 && (b === 18 || b === 19));
+}
+
+/** Loopback, private, link-local, CGNAT, multicast and metadata hosts (IP literals),
+ *  plus names that only resolve on a local network (single-label, .local, .internal…). */
+export function isPrivateNetworkHost(hostname: string): boolean {
+  const h = hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+  if (!h) return true;
+  const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/);
+  if (v4) return isPrivateIpv4(Number(v4[1]), Number(v4[2]));
+  if (h.includes(':')) {
+    // ::, ::1, fc00::/7, fe80::/10 (and the rest of fe/ff), IPv4-mapped, NAT64.
+    return h === '::' || h === '::1' || /^f[c-f][0-9a-f]{0,2}:/.test(h) || h.startsWith('::ffff:') || h.startsWith('64:ff9b:');
+  }
+  if (!h.includes('.') || LOCAL_NAMES.has(h)) return true;
+  return LOCAL_SUFFIXES.some((s) => h.endsWith(`.${s}`));
+}
+
+export type CaptureRequestVerdict =
+  | { allow: true }
+  | { allow: false; reason: 'private_network' | 'scheme' };
+
+/** Decide one request of a capture render. `ownHosts` are lower-case host names. */
+export function decideCaptureRequest(rawUrl: string, ownHosts: ReadonlySet<string>): CaptureRequestVerdict {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return { allow: false, reason: 'scheme' };
+  }
+  if (PASS_SCHEMES.has(url.protocol)) return { allow: true };
+  if (!WEB_SCHEMES.has(url.protocol)) return { allow: false, reason: 'scheme' };
+  const host = url.hostname.toLowerCase();
+  if (!ownHosts.has(host) && isPrivateNetworkHost(host)) return { allow: false, reason: 'private_network' };
+  return { allow: true };
+}
+
+/** This instance's own host names: the capture view and the SDK's API live here. */
+export function captureOwnHosts(env: Env): string[] {
+  const hosts = [new URL(getPlatformOrigin(env)).hostname, getPlatformHostname(env)];
+  if (env.ARTIFACT_ORIGIN) {
+    try {
+      hosts.push(new URL(env.ARTIFACT_ORIGIN).hostname);
+    } catch { /* unset in practice */ }
+  }
+  return [...new Set(hosts.map((h) => h.toLowerCase()))];
+}
+
+export interface CaptureGuard {
+  /** Requests aborted so far. */
+  blocked(): number;
+  /** The private address a response came from, or null. When set, drop the capture. */
+  privateResponse(): string | null;
+}
+
+const noop = () => {};
+
+function connectedDirectly(url: URL, port: number | undefined): boolean {
+  if (port === undefined) return true;
+  const expected = url.port || (url.protocol === 'https:' || url.protocol === 'wss:' ? '443' : '80');
+  return String(port) === expected;
+}
+
+/**
+ * Apply the capture policy to `page`. Call before the first navigation.
+ *
+ * The response check counts a private remote address only on a direct connection
+ * (remote port = the URL's port) and switches off when one of this instance's own
+ * responses also came from a private address: behind an egress proxy every response
+ * carries the proxy's address, and a local instance serves itself from loopback, so
+ * neither can tell an inward-resolving name apart. Request blocking still applies.
+ */
+export async function guardCapturePage(page: Page, ownHosts: readonly string[]): Promise<CaptureGuard> {
+  const own = new Set(ownHosts.map((h) => h.toLowerCase()));
+  let blocked = 0;
+  let ownFromPrivate = false;
+  let privateIp: string | null = null;
+
+  // A service worker could answer requests without them reaching the interception.
+  await page.setBypassServiceWorker(true).catch(noop);
+  await page.setRequestInterception(true);
+  page.on('request', (req: HTTPRequest) => {
+    if (req.isInterceptResolutionHandled()) return;
+    if (decideCaptureRequest(req.url(), own).allow) {
+      req.continue().catch(noop);
+      return;
+    }
+    blocked++;
+    req.abort('blockedbyclient').catch(noop);
+  });
+  page.on('response', (res: HTTPResponse) => {
+    let url: URL;
+    let remote: { ip?: string; port?: number };
+    try {
+      url = new URL(res.url());
+      remote = res.remoteAddress() ?? {};
+    } catch {
+      return;
+    }
+    if (!remote.ip || !isPrivateNetworkHost(remote.ip)) return;
+    if (own.has(url.hostname.toLowerCase())) {
+      ownFromPrivate = true;
+      return;
+    }
+    if (privateIp === null && connectedDirectly(url, remote.port)) privateIp = remote.ip;
+  });
+
+  return {
+    blocked: () => blocked,
+    privateResponse: () => (ownFromPrivate ? null : privateIp),
+  };
+}
