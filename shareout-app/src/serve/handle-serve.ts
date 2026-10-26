@@ -1,3 +1,4 @@
+import { renderNotFoundPage } from '../pages/not-found';
 import type { Env, TypeMetadata } from '../types';
 import type { ArtifactWithAsset, CachedDeployment } from './types';
 import { getCachedDeployment, cacheDeployment, buildCacheRecord, fetchAssetRow, DEPLOYMENT_SELECT } from './deployment-cache';
@@ -190,7 +191,7 @@ export async function handleServe(
   }
 
   if (!result) {
-    return new Response('Not Found', { status: 404 });
+    return renderNotFoundPage();
   }
 
   // Paused / blocked pages must not leak the artifact title to strangers. Generic

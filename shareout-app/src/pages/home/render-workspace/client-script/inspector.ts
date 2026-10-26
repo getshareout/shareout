@@ -89,6 +89,48 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   function visSub(k) { var c = visCaption(k); return k === 'public' ? c + ' ' + t('inspector.visCdnHint') : c; }
   // "Shared with" empty-state title tracks visibility so it never contradicts the badge (Public but "only you see").
   function shareEmptyTitle(v) { return v === 'private' ? t('inspector.onlyYouSee') : visCaption(v === 'unlisted' ? 'public' : v); }
+  // Visibility segmented control — shared by the Details rail and the Share popover.
+  function visBlockHtml(editable, visOpts, visCur) {
+    return editable
+      ? '<div class="wsx-vis-seg" id="wsxVisSeg" role="radiogroup" aria-label="' + esc(t('inspector.visibility')) + '">'
+        + visOpts.map(function (o) { return '<button data-vis="' + o + '" role="radio" aria-checked="' + (o === visCur ? 'true' : 'false') + '" type="button" class="' + (o === visCur ? 'is-sel vk-' + o : '') + '"><span class="dot"></span>' + esc(visName(o)) + '</button>'; }).join('')
+        + '</div><div class="wsx-vis-seg__sub" id="wsxVisSub">' + esc(visSub(visCur)) + '</div>'
+      : '<span class="wsx-det__type">' + esc(visName(visCur)) + '</span>';
+  }
+  function wireVis(root, art, visCur) {
+    var seg = root.querySelector('#wsxVisSeg');
+    if (seg) {
+      var subEl = root.querySelector('#wsxVisSub');
+      var applyVis = function (v) {
+        seg.querySelectorAll('[data-vis]').forEach(function (b) { var o = b.getAttribute('data-vis'), on = o === v; b.setAttribute('aria-checked', on ? 'true' : 'false'); b.className = on ? 'is-sel vk-' + o : ''; });
+        if (subEl) subEl.textContent = visSub(v);
+        var etEl = root.querySelector('#wsxShareEmptyT');
+        if (etEl) etEl.textContent = shareEmptyTitle(v);
+        if (metaCache[art.id]) metaCache[art.id].visibility = v;
+      };
+      seg.querySelectorAll('[data-vis]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var next = b.getAttribute('data-vis'), prev = visCur;
+          seg.querySelectorAll('[data-vis]').forEach(function (x) { if (x.classList.contains('is-sel')) prev = x.getAttribute('data-vis'); });
+          if (next === prev) return;
+          optimistic({
+            key: 'vis:' + art.id,
+            apply: function () { applyVis(next); },
+            rollback: function () { applyVis(prev); },
+            request: function () { return patchArtifact(art.id, { visibility: next }); },
+            error: t('cards.visFailed'),
+            done: function (j) {
+              var applied = (j && j.visibility) || next;
+              if (j && j.message) wsxToast(j.message, true);
+              else wsxToast(t('inspector.visToast.' + (applied === 'unlisted' ? 'public' : applied)));
+              if (applied !== next) applyVis(applied); // server overrode (moderation)
+            },
+          });
+        });
+      });
+    }
+  }
+
   // Details helpers (sec, wireSecs, aboutHtml, wsxToast, copyText…) live in inspector-details.ts.
   function paintDetails(art, meta) {
     var editable = !!(meta && meta.can_edit);
@@ -107,11 +149,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
 
     var favTip = fav ? t('inspector.favRemove') : t('inspector.favAdd');
     var star = meta ? '<button class="wsx-det__star' + (fav ? ' is-on' : '') + '" data-iact="fav" type="button" data-tip="' + esc(favTip) + '" aria-label="' + esc(favTip) + '">' + isvg(SVG_STAR) + '</button>' : '';
-    var visBlock = editable
-      ? '<div class="wsx-vis-seg" id="wsxVisSeg" role="radiogroup" aria-label="' + esc(t('inspector.visibility')) + '">'
-        + visOpts.map(function (o) { return '<button data-vis="' + o + '" role="radio" aria-checked="' + (o === visCur ? 'true' : 'false') + '" type="button" class="' + (o === visCur ? 'is-sel vk-' + o : '') + '"><span class="dot"></span>' + esc(visName(o)) + '</button>'; }).join('')
-        + '</div><div class="wsx-vis-seg__sub" id="wsxVisSub">' + esc(visSub(visCur)) + '</div>'
-      : '<span class="wsx-det__type">' + esc(visName(visCur)) + '</span>';
+    var visBlock = visBlockHtml(editable, visOpts, visCur);
 
     // 1 identity (title, description, meta) → 2 actions → 3 held notice → 4 sections.
     var h = '<div class="wsx__details"><div class="wsx-det__head">';
@@ -190,38 +228,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       });
     });
 
-    // visibility — single-select segmented control; optimistic PATCH + rollback + moderation override.
-    var seg = root.querySelector('#wsxVisSeg');
-    if (seg) {
-      var subEl = root.querySelector('#wsxVisSub');
-      var applyVis = function (v) {
-        seg.querySelectorAll('[data-vis]').forEach(function (b) { var o = b.getAttribute('data-vis'), on = o === v; b.setAttribute('aria-checked', on ? 'true' : 'false'); b.className = on ? 'is-sel vk-' + o : ''; });
-        if (subEl) subEl.textContent = visSub(v);
-        var etEl = root.querySelector('#wsxShareEmptyT');
-        if (etEl) etEl.textContent = shareEmptyTitle(v);
-        if (metaCache[art.id]) metaCache[art.id].visibility = v;
-      };
-      seg.querySelectorAll('[data-vis]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var next = b.getAttribute('data-vis'), prev = visCur;
-          seg.querySelectorAll('[data-vis]').forEach(function (x) { if (x.classList.contains('is-sel')) prev = x.getAttribute('data-vis'); });
-          if (next === prev) return;
-          optimistic({
-            key: 'vis:' + art.id,
-            apply: function () { applyVis(next); },
-            rollback: function () { applyVis(prev); },
-            request: function () { return patchArtifact(art.id, { visibility: next }); },
-            error: t('cards.visFailed'),
-            done: function (j) {
-              var applied = (j && j.visibility) || next;
-              if (j && j.message) wsxToast(j.message, true);
-              if (applied !== next) applyVis(applied); // server overrode (moderation)
-            },
-          });
-        });
-      });
-    }
-
+    wireVis(root, art, visCur);
 
     wireSecs(root);
 
@@ -234,8 +241,8 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   // Share-with: role-aware collaborators + always-visible workspace-member search (multi-add).
   var memberCache = {};
   var PEOPLE_SVG = '<svg class="wsx-share__emptyic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
-  function renderShare(art, meta, editable) {
-    var box = rbodyEl.querySelector('#wsxShare'); if (!box) return;
+  function renderShare(art, meta, editable, host) {
+    var box = host || rbodyEl.querySelector('#wsxShare'); if (!box) return;
     var wsId = (meta && meta.workspace_id) || '';
     var list = [];          // [{email, role}]
     var role = 'viewer';    // role for the next add

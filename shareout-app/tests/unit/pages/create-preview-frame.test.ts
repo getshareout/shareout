@@ -13,4 +13,16 @@ describe('/create live preview frame', () => {
     expect(html).toContain('frame.srcdoc = ');
     expect(html).not.toMatch(/frame\.content(Document|Window)/);
   });
+
+  it('asks who can see it before building, private by default, and sends the choice', async () => {
+    const html = await renderCreatePage('build me a dashboard', { id: 'usr_1', email: 'a@b.test' }).text();
+    expect(html).toContain('Who can see it?');
+    expect(html).toContain("vis: 'private'");
+    expect(html).toContain('visibility: state.vis');
+  });
+
+  it('only says Copied! once the clipboard write succeeds', async () => {
+    const html = await renderCreatePage('build me a dashboard', { id: 'usr_1', email: 'a@b.test' }).text();
+    expect(html).toContain("writeText(url).then(function(){ flash('Copied!'); }, function(){ flash('Couldn’t copy'); })");
+  });
 });

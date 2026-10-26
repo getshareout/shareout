@@ -98,7 +98,7 @@ ${SRCDOC_THROTTLE_JS}
   var urlBar = document.getElementById('urlBar');
   var shareBtn = document.getElementById('shareBtn');
 
-  var state = { slug: null, html: '', url: '', busy: false, authed: S.loggedIn, previewHtml: null, theme: null };
+  var state = { slug: null, html: '', url: '', busy: false, authed: S.loggedIn, previewHtml: null, theme: null, vis: 'private' };
 
   // Shared message-list view (chat-core). Loaded via <script src="/sdk/chat-core.js">.
   var view = window.ChatCore.createChatView(bodyEl, { userClass: 'msg user', botClass: 'msg ai' });
@@ -231,8 +231,21 @@ ${SRCDOC_THROTTLE_JS}
       '<span class="tp-swatch tp-swatch-surprise">✦</span>' +
       '<span class="tp-name">Surprise me</span>' +
       '<span class="tp-blurb">Let ShareOut pick a bold direction.</span>' +
-      '</button></div>';
+      '</button></div>' +
+      '<div class="tp-vis"><span class="tp-vis-label">Who can see it?</span><div class="tp-vis-opts" role="radiogroup">' +
+      '<button type="button" class="clarify-opt selected" role="radio" aria-checked="true" data-vis="private">Private</button>' +
+      '<button type="button" class="clarify-opt" role="radio" aria-checked="false" data-vis="public">Anyone with the link</button>' +
+      '</div></div>';
     wrap.innerHTML = html;
+    var visBtns = wrap.querySelectorAll('[data-vis]');
+    for (var vi = 0; vi < visBtns.length; vi++){
+      (function(b){
+        b.addEventListener('click', function(){
+          state.vis = b.getAttribute('data-vis');
+          for (var k = 0; k < visBtns.length; k++){ var on = visBtns[k] === b; visBtns[k].classList.toggle('selected', on); visBtns[k].setAttribute('aria-checked', on); }
+        });
+      })(visBtns[vi]);
+    }
     frameBody.appendChild(wrap);
 
     var cards = wrap.querySelectorAll('.tp-card');
@@ -274,6 +287,14 @@ ${SRCDOC_THROTTLE_JS}
     bodyEl.appendChild(card); scrollDown();
   }
 
+  // Says "Copied!" only when the clipboard actually took it.
+  function copyLink(url, btn){
+    var prev = btn.textContent;
+    function flash(msg){ btn.textContent = msg; setTimeout(function(){ btn.textContent = prev; }, 1400); }
+    if (!url || !navigator.clipboard){ flash('Couldn’t copy'); return; }
+    navigator.clipboard.writeText(url).then(function(){ flash('Copied!'); }, function(){ flash('Couldn’t copy'); });
+  }
+
   // ---- Result card ----
   function resultCard(d){
     var editUrl = '/a/' + encodeURIComponent(d.slug) + '/edit';
@@ -305,8 +326,7 @@ ${SRCDOC_THROTTLE_JS}
       '</div>';
     var copy = card.querySelector('.copy');
     copy.addEventListener('click', function(){
-      if (navigator.clipboard && d.url){ navigator.clipboard.writeText(d.url); }
-      var prev = copy.textContent; copy.textContent = 'Copied!'; setTimeout(function(){ copy.textContent = prev; }, 1400);
+      copyLink(d.url, copy);
     });
     bodyEl.appendChild(card); scrollDown();
   }
@@ -344,7 +364,7 @@ ${SRCDOC_THROTTLE_JS}
     return fetch('/v1/create/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phase: phase, prompt: prompt, slug: state.slug || undefined, html: state.html || undefined, theme: state.theme || undefined })
+      body: JSON.stringify({ phase: phase, prompt: prompt, slug: state.slug || undefined, html: state.html || undefined, theme: state.theme || undefined, visibility: state.vis })
     }).then(function(resp){
       // A non-streaming JSON response means an error/limit before generation started.
       var ct = resp.headers.get('Content-Type') || '';
@@ -424,7 +444,7 @@ ${SRCDOC_THROTTLE_JS}
     fetch('/v1/create/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phase: 'publish', prompt: S.prompt, html: state.previewHtml })
+      body: JSON.stringify({ phase: 'publish', prompt: S.prompt, html: state.previewHtml, visibility: state.vis })
     }).then(function(r){ return r.json(); }).then(function(d){
       state.busy = false;
       skeleton.hidden = true;
@@ -620,9 +640,7 @@ ${SRCDOC_THROTTLE_JS}
   // ---- Share (copy link) ----
   shareBtn.addEventListener('click', function(){
     if (!state.url) return;
-    if (navigator.clipboard){ navigator.clipboard.writeText(state.url); }
-    var prev = shareBtn.textContent; shareBtn.textContent = 'Copied!';
-    setTimeout(function(){ shareBtn.textContent = prev; }, 1400);
+    copyLink(state.url, shareBtn);
   });
 
   // ---- Kickoff ----

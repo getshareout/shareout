@@ -338,4 +338,10 @@ export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspect
 .wsx-vd__frame { flex: 1; width: 100%; border: 0; background: var(--color-bg); }
 .wsx-vd__foot { justify-content: flex-end; }
 .wsx-vd__foot .so-c-btn { flex: none; }
+.wsx__sharewrap { position: relative; flex: none; order: 99; }
+.wsx__sharewrap[hidden] { display: none; }
+.wsx-sharepop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; width: min(360px, calc(100vw - 32px)); box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 14px; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
+.wsx-sharepop__title { font: 700 var(--text-base) var(--font-display, var(--font-body)); color: var(--color-text); }
+.wsx-sharepop__copy { align-self: flex-start; }
+.wsx-sharepop__copy svg { width: 15px; height: 15px; }
 `;

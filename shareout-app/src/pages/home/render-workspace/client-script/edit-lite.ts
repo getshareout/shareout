@@ -446,7 +446,11 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
         if (!j || !j.success) { setSaveStatus(rec, t('edit.publishFailed'), 'warn'); return; }
         rec.dirty = false; rec.baseUpdatedAt = null; rec.baseLiveAt = j.liveUpdatedAt || rec.baseLiveAt; hideBar(rec); renderTabs();
         if (j.tests && j.tests.pending) { setSaveStatus(rec, t('edit.publishedTests'), 'ok'); toast(t('edit.publishedTests')); }
-        else { setSaveStatus(rec, t('edit.publishedV').replace('{v}', j.versionNo || ''), 'ok'); toast(t('edit.publishedV').replace('{v}', j.versionNo || '')); }
+        else {
+          setSaveStatus(rec, t('edit.published'), 'ok');
+          var pm = metaCache[rec.art.id], pUrl = (pm && pm.url) || (location.origin + '/a/' + encodeURIComponent(rec.art.slug) + '/');
+          window.showToast(t('edit.published'), 'success', { action: { label: t('share.copyLink'), run: function () { copyText(pUrl, null); } } });
+        }
         metaCache[rec.art.id] = undefined;
         try { rec.iframe.src = '/a/' + encodeURIComponent(rec.art.slug) + '/?wsx=1&t=' + Date.now(); } catch (e) {}
       })

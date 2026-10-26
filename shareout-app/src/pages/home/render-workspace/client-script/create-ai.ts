@@ -54,12 +54,28 @@ export const workspace_client_create_ai_JS = `  // ===== Create with AI (in-Stud
     }
     renderQ();
   }
+  // Who can see the page the moment it goes live: private unless picked at "Build it".
+  var createVis = 'private';
+  function visChoice(box) {
+    var wrap = document.createElement('div'); wrap.className = 'wsx-confirm__who';
+    var opts = ['private'].concat(window.WSX_WS ? ['workspace'] : [], ['public']), names = { private: 'create.visPrivate', workspace: 'create.visTeam', public: 'create.visPublic' };
+    wrap.innerHTML = '<div class="wsx-confirm__p">' + esc(t('create.whoCanSee')) + '</div><div class="wsx-confirm__row" role="radiogroup">'
+      + opts.map(function (o) { return '<button class="wsx-chip' + (o === createVis ? ' is-on' : '') + '" data-cv="' + o + '" role="radio" aria-checked="' + (o === createVis) + '" type="button">' + esc(t(names[o])) + '</button>'; }).join('') + '</div>';
+    wrap.querySelectorAll('[data-cv]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        createVis = b.getAttribute('data-cv');
+        wrap.querySelectorAll('[data-cv]').forEach(function (x) { var on = x === b; x.classList.toggle('is-on', on); x.setAttribute('aria-checked', on); });
+      });
+    });
+    box.appendChild(wrap);
+  }
   function renderConfirm(c) {
     var box = document.createElement('div'); box.className = 'wsx-confirm';
     var p = document.createElement('div'); p.className = 'wsx-confirm__p'; p.textContent = c.label || t('create.confirmReady');
+    visChoice(box);
     var row = document.createElement('div'); row.className = 'wsx-confirm__row';
     var ok = document.createElement('button'); ok.className = 'wsx-confirm__ok'; ok.textContent = t('create.buildIt');
-    row.appendChild(ok); box.appendChild(p); box.appendChild(row); threadList.appendChild(box);
+    row.appendChild(ok); box.insertBefore(p, box.firstChild); box.appendChild(row); threadList.appendChild(box);
     ok.addEventListener('click', function () { ok.disabled = true; ok.textContent = t('create.building'); createBuild(c.prompt); });
   }
   function renderSuggestions(s) {
@@ -140,7 +156,7 @@ export const workspace_client_create_ai_JS = `  // ===== Create with AI (in-Stud
       } else addRetry(prompt);
     }
     if (live()) arm();
-    fetch('/v1/create/generate', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phase: 'build', prompt: prompt }), signal: ctl ? ctl.signal : undefined })
+    fetch('/v1/create/generate', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phase: 'build', prompt: prompt, visibility: createVis, workspace_id: window.WSX_WS || undefined }), signal: ctl ? ctl.signal : undefined })
       .then(function (resp) {
         if (!resp.ok || !resp.body) {
           return resp.json().catch(function () { return {}; }).then(function (d) {

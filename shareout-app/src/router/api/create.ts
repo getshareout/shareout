@@ -13,7 +13,8 @@ import { jsonWithApiErrors } from '../../http/api-error';
 import { checkRateLimit, incrementRateLimit } from '../../api-auth';
 import { checkStorageQuota } from '../../quota';
 import { rateLimitExceededResponse, storageLimitMessage } from '../../publish/limits';
-import type { PublishResponse } from '../../types';
+import type { PublishResponse, Visibility } from '../../types';
+import { getInternalWorkspaceRole } from '../../workspaces/roles';
 
 // The builder runs on a stronger model and produces a full document — give it room.
 // It streams (see chatComplete), so a slow full-page generation isn't bound by a read timeout.
@@ -118,6 +119,18 @@ function json(data: unknown, status = 200): Response {
 
 type Env = FetchContext['env'];
 type SessionUser = { id: string; email: string };
+type Share = { visibility: Visibility; workspaceId: string | null };
+
+// Who can see the page the moment it goes live. Private unless the builder asked otherwise;
+// "workspace" needs a workspace the user belongs to, else it stays private.
+async function resolveShare(env: Env, user: SessionUser, body: { visibility?: unknown; workspace_id?: unknown }, hostWs: string | null): Promise<Share> {
+  if (body.visibility === 'public') return { visibility: 'public', workspaceId: null };
+  if (body.visibility === 'workspace') {
+    const ws = hostWs || (typeof body.workspace_id === 'string' ? body.workspace_id.trim() : '');
+    if (ws && (await getInternalWorkspaceRole(env, ws, user.id))) return { visibility: 'workspace', workspaceId: ws };
+  }
+  return { visibility: 'private', workspaceId: null };
+}
 
 export async function routeCreateApi(ctx: FetchContext): Promise<Response | null> {
   const { request, env, path, addCORS } = ctx;
@@ -131,7 +144,7 @@ export async function routeCreateApi(ctx: FetchContext): Promise<Response | null
   // Page building is metered to the host workspace (if any) and the signed-in user (if any).
   const meter = (kind: string): AiMeter => ({ workspaceId: hostWs ?? null, userId: user?.id ?? null, kind, source: 'create' });
 
-  let body: { phase?: string; prompt?: string; slug?: string; html?: string; theme?: string };
+  let body: { phase?: string; prompt?: string; slug?: string; html?: string; theme?: string; visibility?: string; workspace_id?: string };
   try {
     body = await request.json();
   } catch {
@@ -186,11 +199,12 @@ export async function routeCreateApi(ctx: FetchContext): Promise<Response | null
   }
 
   // Publish the exact HTML the visitor already previewed (no regeneration).
+  const share = await resolveShare(env, user, body, hostWs);
   if (body.phase === 'publish' && previousHtml) {
-    return addCORS(await handlePublish(env, user, prompt, previousHtml, slug));
+    return addCORS(await handlePublish(env, user, prompt, previousHtml, slug, share));
   }
 
-  return addCORS(streamGenerate({ env, prompt, previousHtml, theme, publish: { user, slug }, meter: meter('page_build') }));
+  return addCORS(streamGenerate({ env, prompt, previousHtml, theme, publish: { user, slug, share }, meter: meter('page_build') }));
 }
 
 function sseLine(obj: unknown): string {
@@ -205,7 +219,7 @@ function streamGenerate(opts: {
   prompt: string;
   previousHtml: string;
   theme?: string;
-  publish?: { user: SessionUser; slug?: string };
+  publish?: { user: SessionUser; slug?: string; share: Share };
   meter: AiMeter;
 }): Response {
   const { env, prompt, previousHtml, theme, publish } = opts;
@@ -250,6 +264,7 @@ function streamGenerate(opts: {
               name: deriveName(prompt),
               slug: publish.slug,
               html,
+              ...publish.share,
             });
             if ('error' in outcome) {
               send({ type: 'error', error: outcome.error, code: outcome.code });
@@ -290,11 +305,12 @@ async function handlePublish(
   user: SessionUser,
   prompt: string,
   html: string,
-  slug: string | undefined
+  slug: string | undefined,
+  share: Share
 ): Promise<Response> {
   let outcome;
   try {
-    outcome = await publishWithLimits(env, user, { name: deriveName(prompt), slug, html });
+    outcome = await publishWithLimits(env, user, { name: deriveName(prompt), slug, html, ...share });
   } catch (err) {
     logError(createLogger(env, { scope: 'create', event: 'publish.failed' }), 'create publish failed', err);
     return json({ ok: false, error: 'Publishing failed. Try again.', code: 'INTERNAL_ERROR' }, 500);
@@ -313,7 +329,7 @@ async function handlePublish(
 async function publishWithLimits(
   env: Env,
   user: SessionUser,
-  opts: { name: string; slug?: string; html: string }
+  opts: { name: string; slug?: string; html: string } & Share
 ): Promise<PublishResponse | { error: string; code: 'STORAGE_LIMIT_EXCEEDED' }> {
   const quota = await checkStorageQuota(env, user.id, [{ path: 'index.html', content: opts.html, mime: 'text/html' }]);
   if (!quota.allowed) return { error: storageLimitMessage(quota), code: 'STORAGE_LIMIT_EXCEEDED' };

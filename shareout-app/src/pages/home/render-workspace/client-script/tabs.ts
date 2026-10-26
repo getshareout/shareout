@@ -141,6 +141,9 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
       tabDeviceEl.setAttribute('aria-pressed', mob ? 'true' : 'false');
     }
     if (tabFullEl) tabFullEl.hidden = !rec;
+    var shareWrap = document.getElementById('wsxShareWrap');
+    if (shareWrap) shareWrap.hidden = !(rec && rec.art.canEdit);
+    if (typeof sharePopArt !== 'undefined' && sharePopArt && (!rec || rec.art !== sharePopArt)) closeSharePop();
   }
 
   // Artifact type decides the stage and the Edit toggle. A PDF is inert bytes: Chrome

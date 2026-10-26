@@ -11,10 +11,10 @@ import { publishArtifact } from './publish-artifact';
 export async function publishGeneratedHtml(
   env: Env,
   user: { id: string; email: string },
-  opts: { name: string; slug?: string; html: string; workspaceId?: string | null; visibility?: Visibility },
+  opts: { name: string; slug?: string; html: string; workspaceId?: string | null; visibility: Visibility },
 ): Promise<PublishResponse> {
   const slug = opts.slug || (await resolveNameSlug(env, opts.name, opts.workspaceId ?? null, user.id));
-  const visibility = opts.visibility ?? 'public';
+  const visibility = opts.visibility;
   const files: FileEntry[] = [{ path: 'index.html', content: opts.html, mime: 'text/html' }];
 
   const result = await publishArtifact(env, { id: user.id, email: user.email, username: null }, {

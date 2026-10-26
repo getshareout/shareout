@@ -24,6 +24,10 @@ describe('handleServe', () => {
     const { env } = createServeEnv({ deployment: null });
     const response = await handleServe(serveRequest(''), env, SLUG, '');
     expect(response.status).toBe(404);
+    expect(response.headers.get('Content-Type')).toContain('text/html');
+    const html = await response.text();
+    expect(html).toContain('This page wandered off');
+    expect(html).not.toContain(SLUG);
   });
 
   it('returns paused page when artifact is paused', async () => {

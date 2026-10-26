@@ -13,6 +13,7 @@ import { workspace_client_guest_comments_JS } from './guest-comments';
 import { workspace_client_inspector_details_JS } from './inspector-details';
 import { workspace_client_inspector_activity_JS } from './inspector-activity';
 import { workspace_client_inspector_JS } from './inspector';
+import { workspace_client_share_popover_JS } from './share-popover';
 import { workspace_client_inspector_automate_JS } from './inspector-automate';
 import { workspace_client_inspector_history_core_JS } from './inspector-history';
 import { workspace_client_inspector_review_JS } from './inspector-review';
@@ -51,6 +52,7 @@ export const WORKSPACE_CLIENT = [
   workspace_client_inspector_details_JS,
   workspace_client_inspector_activity_JS,
   workspace_client_inspector_JS,
+  workspace_client_share_popover_JS,
   workspace_client_inspector_automate_JS,
   workspace_client_inspector_history_core_JS,
   workspace_client_inspector_review_JS,
