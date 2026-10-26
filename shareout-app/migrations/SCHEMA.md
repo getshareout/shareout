@@ -492,6 +492,7 @@ erDiagram
 | `asset_share_links` | Tokenised share of a collection, gated and revocable. |
 | `file_artifact_usage` | Which artifacts consume which deliverable. |
 | `catalog_settings` | Enable flag for the per-workspace data catalogue. The files themselves are `workspace_files` rows with `namespace='catalog'`. |
+| `catalog_certifications` | *(0030)* Append-only trust decisions on catalogue entries: `decision` is `certified`, `revoked` or `deprecated`, made by an owner or admin (`decided_by`) on one exact version of the entry (`content_hash`; for `kind: metric` the hash covers the normalised spec, so prose edits keep it). An entry is certified only while its current hash matches a certification made since the last revoke/deprecate. `entry_id` is the frontmatter id, not a foreign key. |
 | `knowledge_ingest` | Queue of artifacts awaiting knowledge extraction, deduped by `content_hash`. |
 | `knowledge_settings` | Per-workspace enable flag, `last_consolidated_at`, and `rebuild_requested_at` — set when a page that notes may cite goes private or into the trash, cleared by the consolidator once every such note is rebuilt without it. |
 | `knowledge_tombstones` | Paths deliberately forgotten, so re-ingestion does not resurrect them. |

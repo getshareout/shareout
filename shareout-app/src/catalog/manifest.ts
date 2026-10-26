@@ -1,4 +1,6 @@
 import type { CatalogEntry, CatalogManifest } from './types';
+import { buildLineage } from './lineage';
+import { effectiveStatus } from './certification';
 
 export interface ManifestOptions {
   nowMs: number;
@@ -16,11 +18,13 @@ export function buildManifest(entries: CatalogEntry[], opts: ManifestOptions): C
   const staleDays = opts.staleDays ?? 90;
   const byKind: Record<string, number> = {};
   const byStatus: Record<string, number> = {};
-  const ids = new Set(entries.map(e => e.id));
+  // Lineage from both ends of every edge (aliases resolved): an entry only its
+  // neighbors point at is linked, not an orphan.
+  const graph = buildLineage(entries);
+  const linked = new Set(graph.edges.flatMap(edge => [edge.from, edge.to]));
 
   const orphans: string[] = [];
   const stale: string[] = [];
-  const danglingSet = new Set<string>();
 
   let documented = 0;
   let owned = 0;
@@ -29,29 +33,24 @@ export function buildManifest(entries: CatalogEntry[], opts: ManifestOptions): C
 
   for (const e of entries) {
     byKind[e.kind] = (byKind[e.kind] ?? 0) + 1;
-    if (e.status) byStatus[e.status] = (byStatus[e.status] ?? 0) + 1;
+    const status = effectiveStatus(e);
+    byStatus[status] = (byStatus[status] ?? 0) + 1;
 
     if (e.body.trim()) documented += 1;
     if (e.owner) owned += 1;
 
     if (e.kind !== 'term') {
       certifiable += 1;
-      if (e.status === 'certified') certified += 1;
+      if (status === 'certified') certified += 1;
     }
 
-    if (e.kind !== 'term' && e.upstream.length === 0 && e.downstream.length === 0) {
-      orphans.push(e.id);
-    }
+    if (e.kind !== 'term' && !linked.has(e.id)) orphans.push(e.id);
 
     if (e.lastUpdated) {
       const ts = Date.parse(e.lastUpdated);
       if (!Number.isNaN(ts) && opts.nowMs - ts > staleDays * DAY_MS) {
         stale.push(e.id);
       }
-    }
-
-    for (const ref of [...e.upstream, ...e.downstream]) {
-      if (!ids.has(ref)) danglingSet.add(ref);
     }
   }
 
@@ -66,7 +65,7 @@ export function buildManifest(entries: CatalogEntry[], opts: ManifestOptions): C
       stale: stale.length,
     },
     orphans,
-    dangling: [...danglingSet].sort(),
+    dangling: graph.nodes.filter(n => !n.present).map(n => n.id).sort(),
     stale,
     entries: entries.map(e => e.path).sort(),
   };

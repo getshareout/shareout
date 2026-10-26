@@ -107,7 +107,10 @@ describe('home shell assets', () => {
     for (const l of ['en', 'es'] as const) {
       const u = new URL(await homeI18nUrl(l), 'https://x.test');
       const copy = await (await serveHomeShellAsset(u.pathname, u.searchParams.get('v')))!.text();
-      expect(new TextEncoder().encode(copy).length, l).toBeLessThan(120_000);
+      // Raised from 120 KB for the catalog certification + metrics copy (#223, #234):
+      // es measured 120.2 KB, budget = that + ~5%. Follow-up: ship lens copy inside the
+      // lazy lens chunks, so lens strings stop counting against every page load.
+      expect(new TextEncoder().encode(copy).length, l).toBeLessThan(126_000);
     }
     for (const [name, c] of Object.entries(LAZY_CHUNKS)) expect(text.includes(c.src), `${name} is not in the boot shell`).toBe(false);
   });

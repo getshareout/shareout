@@ -258,7 +258,8 @@ Mapa de datos opcional por workspace. Ver [Catálogo de datos](/es/teams/catalog
 | --- | --- | --- | --- |
 | `GET` | `/v1/workspaces/{id}/catalog` | Member+ | Búsqueda (`q`, `kind`, `domain`, `status`, `tag`) + facetas. |
 | `GET` | `/v1/workspaces/{id}/catalog/manifest` | Member+ | KPIs de adopción, huérfanos, refs colgantes. |
-| `GET` | `/v1/workspaces/{id}/catalog/entries/{entryId}` | Member+ | Entrada + vecinos de linaje. |
+| `GET` | `/v1/workspaces/{id}/catalog/entries/{entryId}` | Member+ | Entrada + vecinos de linaje + `history` de certificación. |
+| `POST` | `/v1/workspaces/{id}/catalog/entries/{entryId}/certify` | Admin+, con sesión iniciada (tokens: `403 SESSION_REQUIRED`) | `{ "decision": "certified" \| "revoked" \| "deprecated", "note"?, "content_hash"? }` — 409 si la entrada cambió desde `content_hash`. |
 | `GET` | `/v1/workspaces/{id}/catalog/lineage` | Member+ | Grafo completo (`nodes`, `edges`). |
 | `POST` | `/v1/workspaces/{id}/catalog/enable` | Admin+ | `{ "enabled": true \| false }`. |
 | `POST` | `/v1/workspaces/{id}/catalog/seed` | Admin+ | Seed idempotente desde conectores. |

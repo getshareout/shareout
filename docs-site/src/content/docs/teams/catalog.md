@@ -7,7 +7,8 @@ The **Data Catalog** is an optional, per-workspace map of your data: its **sourc
 datasets, pipelines, dashboards, models, metrics and business terms**. It is written as flat
 markdown + YAML files, kept up to date mostly by agents, and read two ways — humans browse
 and search it; the authoring assistant consults it to use real table names, prefer
-**certified** data, and steer clear of **deprecated** sources.
+**certified** data — vouched for by a workspace owner or admin — and steer clear of
+**deprecated** sources.
 
 It's **opt-in and advisory**. A workspace without a catalog works exactly as before, and the
 catalog never blocks anything — it informs. Turn it on when you want more out of your data.
@@ -39,6 +40,10 @@ Authorization: Bearer {token}
 
 Re-seeding is idempotent and **never overwrites** an entry someone edited by hand.
 
+Seeded `source` entries are keyed by the connection's id (`conn.<connectionId>`), so
+renaming a connector never breaks a link to it. Entries seeded earlier were keyed by the
+name (`conn.<name-slug>`); that id stays on the entry as an alias and keeps resolving.
+
 ## What's in it
 
 One markdown file describes one asset. The YAML frontmatter holds the metadata; the body is
@@ -50,7 +55,7 @@ else is optional, filled in over time.
 kind: source              # source · event · dataset · table · view · pipeline · dashboard · model · metric · term
 id: events_silver.chat_sent
 title: Chat Sent
-status: certified         # draft · certified · deprecated
+status: deprecated        # optional: draft · deprecated (certification is not a field — see below)
 owner: data-platform
 domain: chat
 tags: [tier.silver, PII.None]
@@ -75,7 +80,9 @@ What it is, gotchas, a sample query.
 | `term` | Glossary entry — other assets link via `terms: [active-user]` |
 
 `upstream` / `downstream` edges cross planes freely — e.g. an artifact `dataset` whose
-`upstream` is a connector `source`.
+`upstream` is a connector `source`. Declare an edge on either end: the catalog reads both,
+so a source that only its datasets point at still shows them downstream (and isn't counted
+as an orphan). `aliases: [old.id]` keeps links to an entry's previous id working.
 
 ### It maps both kinds of data
 
@@ -85,16 +92,51 @@ What it is, gotchas, a sample query.
   `dataset` entries. Lineage links the two, so you can see a dashboard's data traced all the
   way back to the warehouse table that feeds it.
 
+## Certification
+
+**Certified** means a workspace **owner or admin** vouched for one exact version of an
+entry. It is a decision with a name and a date, not a line in the file: writing
+`status: certified` yourself certifies nothing — the entry stays a draft.
+
+In the **Catalog** lens, open an entry: owners and admins see **Certify entry**,
+**Revoke certification** and **Mark deprecated**, with an optional note ("Matches the ads
+platform for March"). Everyone sees who certified it, when, and the full history.
+
+- **Edit a certified entry** and it shows **changed since certification** — it reads as a
+  draft until someone certifies the new version.
+- **Metrics** are pinned to their definition only (what they compute and how they're
+  shown). Fixing a description, synonyms, examples or notes keeps a metric certified.
+- **Deprecated** sticks across edits until an owner or admin certifies the entry again or
+  sends it back to draft.
+- **Certifying is a person's call.** It takes an owner or admin signed in to ShareOut.
+  Tokens — personal, Agent or MCP — are refused with `403 SESSION_REQUIRED`, so an agent
+  can draft and propose but never certify its own work.
+
+This is the call the Catalog lens makes, from a signed-in owner's or admin's session:
+
+```http
+POST /v1/workspaces/{workspaceId}/catalog/entries/{entryId}/certify
+Content-Type: application/json
+
+{ "decision": "certified", "note": "Matches the ads platform for March", "content_hash": "…" }
+```
+
+`decision` is `certified`, `revoked` or `deprecated`. The `content_hash` is the entry's
+`certification.content_hash` as reviewed: if someone edited it meanwhile you get a
+`409 CONFLICT` instead of certifying a version nobody looked at. Members get `403`.
+
 ## Browsing the catalog
 
-The **Catalog** lens is read-only and built for large workspaces (1,600+ entries):
+The **Catalog** lens is built for large workspaces (1,600+ entries):
 
 - **List view** — KPI strip (entries, events, % certified, % documented, orphans), instant
   search, kind/domain/status filters, and a **sortable dense table** (name, kind, domain,
-  status, origin, lineage counts). Click a column header to sort.
-- **Entry view** — metadata grid, notes body, and **navigable lineage tables** for upstream
-  and downstream neighbors. Click any catalogued neighbor to jump to its entry; uncatalogued
-  refs show as dashed placeholders so gaps are obvious.
+  status, origin, lineage counts). Click a column header to sort. Entries edited since their
+  certification carry a **changed** marker.
+- **Entry view** — status badge, certification (who, when, note, history), metadata grid,
+  notes body, and **navigable lineage tables** for upstream and downstream neighbors. Click
+  any catalogued neighbor to jump to its entry; uncatalogued refs show as dashed placeholders
+  so gaps are obvious.
 
 ### Deep links
 
@@ -108,9 +150,10 @@ Bookmark or share a catalog view from Home:
 ## Why it helps the assistant
 
 When a workspace has a catalog, the authoring assistant looks things up in it before
-building — so it uses the correct table names, prefers data you've marked **certified**, and
-warns you before relying on something **deprecated**. It's a hint, never a hard rule: you
-stay in control.
+building — so it uses the correct table names, prefers data an owner or admin
+**certified** (and can tell you who certified it, and when), and warns you before relying
+on something **deprecated** or changed since its certification. It's a hint, never a hard
+rule: you stay in control.
 
 The assistant has read-only tools: **`catalog_search`** (filter by query, kind, domain,
 status, tag) and **`catalog_get`** (full entry + lineage). Both return `{ enabled: false }`
@@ -155,7 +198,8 @@ All routes require workspace membership. A disabled catalog returns `{ "enabled"
 | --- | --- | --- | --- |
 | `GET` | `/v1/workspaces/{id}/catalog` | Member+ | Search (`q`, `kind`, `domain`, `status`, `tag`) + facets |
 | `GET` | `/v1/workspaces/{id}/catalog/manifest` | Member+ | Counts, adoption KPIs, orphans, dangling refs, staleness |
-| `GET` | `/v1/workspaces/{id}/catalog/entries/{entryId}` | Member+ | One entry + upstream/downstream neighbors |
+| `GET` | `/v1/workspaces/{id}/catalog/entries/{entryId}` | Member+ | One entry + upstream/downstream neighbors + certification history |
+| `POST` | `/v1/workspaces/{id}/catalog/entries/{entryId}/certify` | Admin+, signed in | `{ decision, note?, content_hash? }` — certify, revoke or deprecate; tokens get `403 SESSION_REQUIRED` |
 | `GET` | `/v1/workspaces/{id}/catalog/lineage` | Member+ | Full node+edge graph |
 | `POST` | `/v1/workspaces/{id}/catalog/enable` | Admin+ | Opt in/out |
 | `POST` | `/v1/workspaces/{id}/catalog/seed` | Admin+ | Seed `source` entries from connectors |

@@ -3,24 +3,27 @@ import { jsonResponse, jsonError } from '../helpers/json-response';
 import { requireTokenOrSession, isAuthUser } from '../helpers/auth-guard';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import {
-  isCatalogEnabled, setCatalogEnabled, loadCatalog, upsertCatalogFile, deleteCatalogFile,
+  isCatalogEnabled, setCatalogEnabled, upsertCatalogFile, deleteCatalogFile,
   isValidCatalogPath, catalogContentBytes, CATALOG_PATH_RULE, MAX_CATALOG_FILE_BYTES,
 } from '../../catalog/store';
 import { apiErrorResponse } from '../../http/api-error';
 import { showPath } from '../../validation';
 import { searchEntries, buildFacets } from '../../catalog/search';
 import { buildManifest } from '../../catalog/manifest';
-import { buildLineage } from '../../catalog/lineage';
+import { buildLineage, findEntry } from '../../catalog/lineage';
+import { loadGovernedCatalog } from '../../catalog/governed';
 import { seedConnectorsAsSources } from '../../catalog/seed';
 import { type CatalogEntry } from '../../catalog/types';
+import { certificationHistory, handleCatalogCertify, isBearer, isSignedInPerson, sessionRequiredResponse } from './catalog-certify';
 
 const PREFIX_RE = /^\/v1\/workspaces\/([^/]+)\/catalog(?:\/(.*))?$/;
+const CERTIFY_RE = /^entries\/([^/]+)\/certify$/;
 
 function neighbors(entries: CatalogEntry[], ids: string[]) {
   const byId = new Map(entries.map(e => [e.id, e]));
   return ids.map(id => {
     const e = byId.get(id);
-    return { id, present: !!e, title: e?.title, kind: e?.kind };
+    return { id, present: !!e, title: e?.title, kind: e?.kind, status: e?.status };
   });
 }
 
@@ -86,7 +89,13 @@ export async function routeCatalogApi(ctx: FetchContext): Promise<Response | nul
           hint: 'Keep one asset per file and its notes short; link to longer material instead.',
         }));
       }
-      await upsertCatalogFile(ctx.env, workspaceId, { path: body.path, content: body.content });
+      await upsertCatalogFile(ctx.env, workspaceId, {
+        path: body.path,
+        content: body.content,
+        updatedBy: auth.id,
+        // A bearer-token write is an agent's; the Home lens writes with the session cookie.
+        updatedByKind: isBearer(request) ? 'agent' : 'user',
+      });
       return cors(jsonResponse({ ok: true }));
     }
     if (method === 'DELETE') {
@@ -98,6 +107,17 @@ export async function routeCatalogApi(ctx: FetchContext): Promise<Response | nul
     return cors(jsonError('Method not allowed', 'METHOD_NOT_ALLOWED', 405));
   }
 
+  // POST /entries/{id}/certify — certify, revoke or deprecate the current version (owner/admin).
+  const certify = sub.match(CERTIFY_RE);
+  if (certify) {
+    if (method !== 'POST') return cors(jsonError('Method not allowed', 'METHOD_NOT_ALLOWED', 405));
+    if (!(await isSignedInPerson(ctx.env, request, auth.id))) return cors(sessionRequiredResponse());
+    if (!canManage) {
+      return cors(jsonError('Only workspace owners and admins can certify catalog entries', 'FORBIDDEN', 403));
+    }
+    return cors(await handleCatalogCertify(ctx.env, workspaceId, decodeURIComponent(certify[1]), auth, request));
+  }
+
   if (method !== 'GET') return cors(jsonError('Method not allowed', 'METHOD_NOT_ALLOWED', 405));
 
   const enabled = await isCatalogEnabled(ctx.env, workspaceId);
@@ -105,7 +125,9 @@ export async function routeCatalogApi(ctx: FetchContext): Promise<Response | nul
     return cors(jsonResponse({ enabled: false, entries: [], facets: null }));
   }
 
-  const { entries, issues } = await loadCatalog(ctx.env, workspaceId);
+  // Effective status (owner/admin certifications on the current version) and lineage
+  // from both ends of every edge, on every read below.
+  const { entries, issues, decisions } = await loadGovernedCatalog(ctx.env, workspaceId);
 
   // GET /manifest — counts, adoption KPIs, orphans, dangling refs, staleness.
   if (sub === 'manifest') {
@@ -116,7 +138,7 @@ export async function routeCatalogApi(ctx: FetchContext): Promise<Response | nul
   // GET /entries/{id} — one entry plus its lineage neighbors.
   if (sub.startsWith('entries/')) {
     const entryId = decodeURIComponent(sub.slice('entries/'.length));
-    const entry = entries.find(e => e.id === entryId);
+    const entry = findEntry(entries, entryId);
     if (!entry) return cors(jsonError('Not found', 'NOT_FOUND', 404));
     return cors(
       jsonResponse({
@@ -124,6 +146,7 @@ export async function routeCatalogApi(ctx: FetchContext): Promise<Response | nul
         entry,
         upstream: neighbors(entries, entry.upstream),
         downstream: neighbors(entries, entry.downstream),
+        history: certificationHistory(decisions.get(entry.id) ?? [], entry.certification?.content_hash ?? ''),
       })
     );
   }
