@@ -77,23 +77,24 @@ describe('Rail structure', () => {
   const visible = (html: string) => Array.from(html.matchAll(/<button class="wsx-lens[^"]*" data-lens="(\w+)" type="button"(?! hidden)/g)).map((m) => m[1]);
   const hidden = (html: string) => Array.from(html.matchAll(/data-lens="(\w+)" type="button" hidden/g)).map((m) => m[1]);
 
-  it('personal: Home, Artifacts, Automations', () => {
+  it('personal: Home, Artifacts, AI skills, Automations', () => {
     const h = rail({});
-    expect(visible(h)).toEqual(['brief', 'artifacts', 'schedules']);
-    expect(hidden(h)).toEqual(expect.arrayContaining(['alerts', 'library', 'connect', 'analytics']));
+    expect(visible(h)).toEqual(['brief', 'artifacts', 'library', 'schedules']);
+    expect(hidden(h)).toEqual(expect.arrayContaining(['alerts', 'connect', 'analytics']));
+    expect(hidden(h)).not.toContain('library');
     expect(h).not.toContain('wsx__railgroup-title');
   });
 
   it('member: adds Data; Tables/Knowledge/Catalog/Alerts stay reachable', () => {
     const h = rail({ workspaceId: 'wsp_1', workspaceRole: 'member' });
-    expect(visible(h)).toEqual(['brief', 'artifacts', 'schedules', 'connectors']);
-    expect(hidden(h)).toEqual(expect.arrayContaining(['alerts', 'datasets', 'knowledge', 'catalog', 'library']));
+    expect(visible(h)).toEqual(['brief', 'artifacts', 'library', 'schedules', 'connectors']);
+    expect(hidden(h)).toEqual(expect.arrayContaining(['alerts', 'datasets', 'knowledge', 'catalog']));
     expect(hidden(h)).not.toContain('crew');
   });
 
   it('admin: adds Admin and AI tasks (as an Automations chip)', () => {
     const h = rail({ workspaceId: 'wsp_1', workspaceRole: 'admin' });
-    expect(visible(h)).toEqual(['brief', 'artifacts', 'schedules', 'connectors', 'admin']);
+    expect(visible(h)).toEqual(['brief', 'artifacts', 'library', 'schedules', 'connectors', 'admin']);
     expect(hidden(h)).toContain('crew');
     expect(h).toContain('data-sib="crew"');
   });

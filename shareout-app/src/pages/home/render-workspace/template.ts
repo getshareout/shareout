@@ -28,7 +28,7 @@ function buildNav(args: RenderArgs, canManage: boolean): NavGroup[] {
   const ws = !!(args.workspaceId || args.workspace);
   const v = (key: string, label: string, icon: NavItem['icon']): NavItem => ({ key, label, i18n: `nav.${key}`, icon, kind: 'view' });
   const groups: NavGroup[] = [
-    { items: [v('brief', 'Home', 'brief'), v('artifacts', 'Artifacts', 'browse'), v('schedules', 'Automations', 'recent'), ...(ws ? [{ ...v('connectors', 'Data', 'plug'), i18n: 'nav.data' }] : [])] },
+    { items: [v('brief', 'Home', 'brief'), v('artifacts', 'Artifacts', 'browse'), v('library', 'AI skills', 'library'), v('schedules', 'Automations', 'recent'), ...(ws ? [{ ...v('connectors', 'Data', 'plug'), i18n: 'nav.data' }] : [])] },
     { items: ws && canManage ? [v('admin', 'Admin', 'admin')] : [] },
   ];
   return groups.filter(g => g.items.length);
@@ -45,7 +45,7 @@ function siblingChips(views: [string, string, string][], active: string, args: R
 }
 
 /** Lenses kept out of the rail but still reachable (account menu, ⌘K, onboarding, ?view=). */
-const HIDDEN_LENSES = ['connect', 'analytics', 'library'];
+const HIDDEN_LENSES = ['connect', 'analytics'];
 
 function railHtml(groups: NavGroup[], hidden: string[]): string {
   return groups.map((g, gi) => (gi === 0 ? '' : '<div class="wsx__raildiv"></div>') + g.items.map(n => railNav(n, n.key === 'brief')).join('')).join('')
