@@ -69,6 +69,10 @@ the user for their instance URL). Do **not** invent a default host.
 }
 ```
 
+**Env vars are a valid setup too.** No credentials file, but `SHAREOUT_TOKEN` (and
+`SHAREOUT_ORIGIN`) set in the environment? Use them and go ahead — no file needed, and
+where examples read `~/.shareout/credentials`, use `$SHAREOUT_TOKEN` / `$SHAREOUT_ORIGIN`.
+
 | Call | URL |
 |------|-----|
 | API | `$ORIGIN/v1/...` |
