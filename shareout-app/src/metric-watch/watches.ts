@@ -3,7 +3,7 @@ import { generateId } from '../crypto-utils';
 import { createMiniDb } from '../data/minidb-client';
 import { evaluateMetric, type MetricResult } from '../metric-alerts/sources';
 import { getArtifactRef, resolveAlertRole } from '../metric-alerts/access';
-import { parseAccessPolicy, resolveViewerScope } from '../data/access-policy';
+import { isRowRestricted } from '../metric-alerts/row-scope';
 
 /**
  * One-click metric watch. A watch = artifact + table + a dead-simple metric
@@ -150,16 +150,6 @@ export interface CreateWatchResult {
   error?: string;
 }
 
-/** True when a row-level access policy restricts what this user may see of the artifact's tables. */
-async function isRowRestricted(env: Env, artifactId: string, userId: string): Promise<boolean> {
-  const art = await env.DB.prepare('SELECT owner_id, access_policy FROM artifacts WHERE id = ?')
-    .bind(artifactId).first<{ owner_id: string | null; access_policy: string | null }>();
-  const policy = parseAccessPolicy(art?.access_policy);
-  if (!art || !policy) return false;
-  const user = await env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first<{ email: string }>();
-  return !!resolveViewerScope(policy, { email: user?.email ?? null, isOwner: art.owner_id === userId });
-}
-
 /** Owner/editor/workspace-member creates a watch. Non-members get a permission error. */
 export async function createWatch(
   env: Env,
@@ -216,7 +206,9 @@ export async function listWatches(
   if (!(await resolveAlertRole(env, artifact, userId))) return { error: 'Permission denied' };
   const res = await env.DB.prepare('SELECT * FROM metric_watches WHERE artifact_id = ? ORDER BY created_at DESC')
     .bind(artifactId).all<Record<string, unknown>>();
-  return { watches: (res.results || []).map(rowToWatch) };
+  const watches = (res.results || []).map(rowToWatch);
+  if (!(await isRowRestricted(env, artifactId, userId))) return { watches };
+  return { watches: watches.map((w) => ({ ...w, last_value: null })) };
 }
 
 export async function deleteWatch(

@@ -23,6 +23,7 @@ export interface RunStep {
 export interface RunDetail {
   id: string;
   surface: RunSurface;
+  artifactId?: string;
   source?: string;              // crew / job / rule name for the drawer title
   status: string;               // done | error | success | failed | running
   trigger?: string;
@@ -174,6 +175,7 @@ async function alertRunDetail(env: Env, workspaceId: string, eventId: string): P
   return {
     id: String(ev.id),
     surface: 'alert',
+    artifactId: ev.artifact_id as string,
     source: (ev.rule_name as string) || undefined,
     status,
     trigger: ev.schedule ? `cron: ${ev.schedule}` : undefined,

@@ -7,6 +7,7 @@ import { parseCronSchedule, getNextRunTime } from '../scheduling/jobs/cron';
 import { checkViewerSelfDelivery } from '../scheduling/jobs/permissions';
 import { type JobAction, type JobConfig } from '../scheduling/jobs/types';
 import { getArtifactRef, resolveAlertRole, type ArtifactRef } from './access';
+import { isRowRestricted, rowScopedArtifacts, ROW_SCOPED_ERROR } from './row-scope';
 import { isFeatureEnabled } from '../features/flags';
 import { getDefinition } from './definitions';
 import { evaluateMetric, evaluateCondition } from './sources';
@@ -93,6 +94,7 @@ export async function createRule(
 
   const role = await resolveAlertRole(env, artifact, userId);
   if (!role) return { error: 'Permission denied: no access to this artifact' };
+  if (await isRowRestricted(env, req.artifact_id, userId)) return { error: ROW_SCOPED_ERROR };
 
   if (typeof req.name !== 'string' || !req.name.trim()) return { error: 'name is required' };
 
@@ -197,7 +199,7 @@ export async function listRulesForArtifact(
   const result = await env.DB.prepare(query).bind(...params).all<Record<string, unknown>>();
   const rules = (result.results || []).map(rowToRule);
   await attachHistories(env, rules);
-  return { rules };
+  return { rules: await hideScopedValues(env, userId, rules) };
 }
 
 /** A user's own alert rules (the "My alerts" view). workspaceId: undefined = every workspace, null = personal pages only. */
@@ -211,7 +213,7 @@ export async function listRulesForOwner(env: Env, userId: string, workspaceId?: 
   ).bind(...params).all<Record<string, unknown>>();
   const rules = (result.results || []).map(rowToRule);
   await attachHistories(env, rules);
-  return rules;
+  return hideScopedValues(env, userId, rules);
 }
 
 /**
@@ -247,6 +249,16 @@ async function attachHistories(env: Env, rules: MetricAlertRule[]): Promise<void
   for (const r of rules) r.history = hist[r.id] || [];
 }
 
+function withoutValues(rule: MetricAlertRule): MetricAlertRule {
+  return { ...rule, last_value: null, last_triggered_value: null, ...(rule.history ? { history: [] } : {}) };
+}
+
+/** Values and their trend are whole-table numbers: blank them for a caller the artifact's row policy scopes. */
+async function hideScopedValues(env: Env, userId: string, rules: MetricAlertRule[]): Promise<MetricAlertRule[]> {
+  const scoped = await rowScopedArtifacts(env, userId, rules.map((r) => r.artifact_id));
+  return scoped.size ? rules.map((r) => (scoped.has(r.artifact_id) ? withoutValues(r) : r)) : rules;
+}
+
 async function canManageRule(env: Env, rule: { owner_id: string; artifact_id: string; workspace_id: string | null }, userId: string): Promise<boolean> {
   if (rule.owner_id === userId) return true;
   const role = await resolveAlertRole(env, { id: rule.artifact_id, workspace_id: rule.workspace_id }, userId);
@@ -259,12 +271,23 @@ export async function getRuleById(env: Env, ruleId: string): Promise<MetricAlert
   return row ? rowToRule(row) : null;
 }
 
-export async function getRule(env: Env, userId: string, ruleId: string): Promise<{ rule?: MetricAlertRule; error?: string }> {
-  const row = await env.DB.prepare('SELECT * FROM metric_alert_rules WHERE id = ?').bind(ruleId).first<Record<string, unknown>>();
-  if (!row) return { error: 'Alert not found' };
-  const rule = rowToRule(row);
+/** The stored rule, values included, when `userId` may manage it. For evaluation, not for responses. */
+async function loadRule(env: Env, userId: string, ruleId: string): Promise<{ rule?: MetricAlertRule; error?: string }> {
+  const rule = await getRuleById(env, ruleId);
+  if (!rule) return { error: 'Alert not found' };
   if (!(await canManageRule(env, rule, userId))) return { error: 'Permission denied' };
   return { rule };
+}
+
+export async function getRule(env: Env, userId: string, ruleId: string): Promise<{ rule?: MetricAlertRule; error?: string }> {
+  const got = await loadRule(env, userId, ruleId);
+  if (!got.rule) return got;
+  return { rule: (await hideScopedValues(env, userId, [got.rule]))[0] };
+}
+
+/** Pausing only lowers what a scoped caller could learn, so it stays allowed; any other change does not. */
+function isPauseOnly(u: { enabled?: boolean; schedule?: string; condition?: AlertCondition; message?: string; cooldown_seconds?: number; on_trigger?: OnTrigger | null }): boolean {
+  return u.enabled === false && !u.schedule && !u.condition && u.message === undefined && u.cooldown_seconds === undefined && u.on_trigger === undefined;
 }
 
 export async function updateRule(
@@ -277,6 +300,8 @@ export async function updateRule(
   if (!row) return { error: 'Alert not found' };
   const rule = rowToRule(row);
   if (!(await canManageRule(env, rule, userId))) return { error: 'Permission denied' };
+  const scoped = await isRowRestricted(env, rule.artifact_id, userId);
+  if (scoped && !isPauseOnly(updates)) return { error: ROW_SCOPED_ERROR };
 
   const sets: string[] = [];
   const params: (string | number | null)[] = [];
@@ -320,8 +345,8 @@ export async function updateRule(
   params.push(ruleId);
 
   await env.DB.prepare(`UPDATE metric_alert_rules SET ${sets.join(', ')} WHERE id = ?`).bind(...params).run();
-  const updated = await env.DB.prepare('SELECT * FROM metric_alert_rules WHERE id = ?').bind(ruleId).first<Record<string, unknown>>();
-  return { rule: updated ? rowToRule(updated) : undefined };
+  const updated = await getRuleById(env, ruleId);
+  return { rule: updated && scoped ? withoutValues(updated) : updated ?? undefined };
 }
 
 export async function deleteRule(env: Env, userId: string, ruleId: string): Promise<{ success: boolean; error?: string }> {
@@ -338,12 +363,14 @@ export async function getRuleEvents(
   userId: string,
   ruleId: string
 ): Promise<{ events?: Record<string, unknown>[]; error?: string }> {
-  const got = await getRule(env, userId, ruleId);
-  if (got.error) return { error: got.error };
+  const got = await loadRule(env, userId, ruleId);
+  if (!got.rule) return { error: got.error };
   const result = await env.DB.prepare(
     'SELECT id, evaluated_at, value, matched, delivered, destination_kind, error, message FROM metric_alert_runs WHERE rule_id = ? ORDER BY evaluated_at DESC LIMIT 50'
   ).bind(ruleId).all<Record<string, unknown>>();
-  return { events: result.results || [] };
+  const events = result.results || [];
+  if (!(await isRowRestricted(env, got.rule.artifact_id, userId))) return { events };
+  return { events: events.map((ev) => ({ ...ev, value: null, message: null })) };
 }
 
 // --- Evaluation + delivery ---------------------------------------------------
@@ -420,6 +447,11 @@ export async function evaluateAndDeliver(
       await finalize(env, rule, now, { value: null, matched: false, delivered: false, status: 'failed', error: 'Access downgraded' });
       return { matched: false, delivered: false, error: `Access downgraded: ${selfError}`, disable: true };
     }
+  }
+  // Fail closed (and disable) once the artifact's row policy scopes the creator: the metric reads every row.
+  if (await isRowRestricted(env, rule.artifact_id, rule.owner_id)) {
+    await finalize(env, rule, now, { value: null, matched: false, delivered: false, status: 'failed', error: 'Row access limited' });
+    return { matched: false, delivered: false, error: "Row access limited: the artifact's row policy now limits which rows this alert's creator can see", disable: true };
   }
 
   // Skip (don't disable) when notifications are turned off for the workspace,
@@ -570,8 +602,9 @@ export async function runRuleManually(
   userId: string,
   ruleId: string
 ): Promise<{ outcome?: EvalOutcome; error?: string }> {
-  const got = await getRule(env, userId, ruleId);
+  const got = await loadRule(env, userId, ruleId);
   if (got.error || !got.rule) return { error: got.error || 'Alert not found' };
+  if (await isRowRestricted(env, got.rule.artifact_id, userId)) return { error: ROW_SCOPED_ERROR };
   return { outcome: await evaluateAndDeliver(env, got.rule, 'manual') };
 }
 

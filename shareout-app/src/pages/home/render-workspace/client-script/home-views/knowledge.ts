@@ -731,8 +731,10 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     if (!n && id.slice(0, dot) === 'topic') n = (knState.byPath || {})['topics/' + slug + '.md'];
     return { node: n || null, label: (n && n.title) || slug.replace(/-/g, ' ') };
   }
+  // Rewrites text only: a [[...]] that sits inside a tag (say, in a link's URL) is left as it is.
   function knWikiLinks(html) {
-    return html.replace(/\\[\\[([a-z-]+\\.[^\\]\\s]+)\\]\\]/g, function (_, id) {
+    return html.replace(/(<[^>]*>)|\\[\\[([a-z-]+\\.[^\\]\\s]+)\\]\\]/g, function (_, tag, id) {
+      if (tag) return tag;
       var w = knWikiNode(id);
       return w.node ? '<button type="button" class="wsx-kn2__wl" data-kn-go="' + esc(w.node.path) + '">' + esc(w.label) + '</button>' : esc(w.label);
     });

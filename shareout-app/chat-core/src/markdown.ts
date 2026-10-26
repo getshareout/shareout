@@ -11,10 +11,10 @@ export function renderMarkdown(src: string): string {
   s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
-  // [text](https://url) — url chars are already escaped; allow the safe set.
+  // [text](https://url) — url already escaped (quotes too); no `<`/`>`, so a tag from a rule above never lands in it.
   s = s.replace(
-    /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener">$1</a>'
+    /\[([^\]]+)\]\((https?:\/\/[^\s)<>]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
   );
   s = s.replace(/\n/g, '<br>');
   return s;
