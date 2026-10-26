@@ -84,7 +84,7 @@ export function renderToolbarMarkup(ctx: ToolbarRenderContext): string {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
     <span class="so-back-label">${c.allArtifacts}</span>
   </a>` : ''}
-  <div id="shareout-admin-toolbar">
+  <div id="shareout-admin-toolbar"${loggedIn ? '' : ' class="so-solo so-open"'}>
     <div id="so-toolbar-items">${currentUser ? `
       <button class="so-toolbar-btn so-avatar-btn"${adminInfo ? ' onclick="openAdmin()"' : ''} title="${escapeHtml(userLabel)}">
         <span class="so-avatar">${avatarInner}</span>
