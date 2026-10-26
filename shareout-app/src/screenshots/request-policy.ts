@@ -11,6 +11,8 @@ import { getPlatformHostname, getPlatformOrigin } from '../config/origins';
 //   - a capture is withheld when a response still came from such an address (a public
 //     name that resolves to a private one).
 // This instance's own hosts are exempt, so a local instance can render itself.
+// A read-only render's data session rides here too: the renderer attaches it to the
+// page's requests for that artifact's data, so page scripts never hold it.
 
 const LOCAL_SUFFIXES = ['localhost', 'local', 'internal', 'home.arpa', 'lan', 'home', 'corp', 'intranet', 'private'];
 const LOCAL_NAMES = new Set(['metadata.goog']);
@@ -78,7 +80,39 @@ export interface CaptureGuard {
   privateResponse(): string | null;
 }
 
+/** The read-only session the renderer attaches to one artifact's data requests. */
+export interface CaptureDataSession {
+  token: string;
+  artifactId: string;
+  /** Origin of the data API the page calls (the platform origin). */
+  origin: string;
+}
+
 const noop = () => {};
+
+function isDataRequest(rawUrl: string, session: CaptureDataSession): boolean {
+  try {
+    const url = new URL(rawUrl);
+    return url.origin === session.origin && url.pathname.startsWith(`/v1/data/${session.artifactId}/`);
+  } catch {
+    return false;
+  }
+}
+
+/** Headers to continue `req` with: the session on this artifact's data requests, and
+ *  stripped from anything else still carrying it (a redirect hop). null = unchanged. */
+export function captureRequestHeaders(
+  url: string,
+  headers: Record<string, string>,
+  session: CaptureDataSession | undefined,
+): Record<string, string> | null {
+  if (!session) return null;
+  const bearer = `Bearer ${session.token}`;
+  const authKeys = Object.keys(headers).filter((k) => k.toLowerCase() === 'authorization');
+  const strip = () => Object.fromEntries(Object.entries(headers).filter(([k]) => !authKeys.includes(k)));
+  if (isDataRequest(url, session)) return { ...strip(), authorization: bearer };
+  return authKeys.some((k) => headers[k] === bearer) ? strip() : null;
+}
 
 function connectedDirectly(url: URL, port: number | undefined): boolean {
   if (port === undefined) return true;
@@ -87,7 +121,8 @@ function connectedDirectly(url: URL, port: number | undefined): boolean {
 }
 
 /**
- * Apply the capture policy to `page`. Call before the first navigation.
+ * Apply the capture policy to `page`. Call before the first navigation. With
+ * `dataSession`, the page's requests for that artifact's data carry the session.
  *
  * The response check counts a private remote address only on a direct connection
  * (remote port = the URL's port) and switches off when one of this instance's own
@@ -95,7 +130,11 @@ function connectedDirectly(url: URL, port: number | undefined): boolean {
  * carries the proxy's address, and a local instance serves itself from loopback, so
  * neither can tell an inward-resolving name apart. Request blocking still applies.
  */
-export async function guardCapturePage(page: Page, ownHosts: readonly string[]): Promise<CaptureGuard> {
+export async function guardCapturePage(
+  page: Page,
+  ownHosts: readonly string[],
+  opts: { dataSession?: CaptureDataSession } = {},
+): Promise<CaptureGuard> {
   const own = new Set(ownHosts.map((h) => h.toLowerCase()));
   let blocked = 0;
   let ownFromPrivate = false;
@@ -107,7 +146,8 @@ export async function guardCapturePage(page: Page, ownHosts: readonly string[]):
   page.on('request', (req: HTTPRequest) => {
     if (req.isInterceptResolutionHandled()) return;
     if (decideCaptureRequest(req.url(), own).allow) {
-      req.continue().catch(noop);
+      const headers = captureRequestHeaders(req.url(), req.headers(), opts.dataSession);
+      (headers ? req.continue({ headers }) : req.continue()).catch(noop);
       return;
     }
     blocked++;

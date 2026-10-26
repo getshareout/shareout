@@ -46,8 +46,7 @@ export async function handleWorkspaceData(
   const [head, ...rest] = parts;
 
   if (head === '_shares' || head === 'tables') {
-    const userId = await resolveRequesterUserId(request, ctx);
-    if (!userId || !(await getInternalWorkspaceRole(ctx.env, ctx.workspaceId, userId))) {
+    if (!(await mayUseWorkspaceTables(request, ctx))) {
       return errorResponse({
         ...DATA_ERRORS.FORBIDDEN,
         message: 'Workspace shared tables are available to workspace members only.',
@@ -70,6 +69,15 @@ export async function handleWorkspaceData(
   }
 
   return errorResponse(DATA_ERRORS.NOT_FOUND, ctx.origin);
+}
+
+// Internal members of the artifact's workspace use its shared tables. A capture render's
+// session (testRun) names no user: it reads them on the artifact's own standing — when
+// the artifact's owner is an internal member, the rule the owner's own view meets —
+// and the router lets it read only.
+async function mayUseWorkspaceTables(request: Request, ctx: DataContext): Promise<boolean> {
+  const userId = ctx.testRun ? ctx.artifact.owner_id : await resolveRequesterUserId(request, ctx);
+  return !!userId && !!(await getInternalWorkspaceRole(ctx.env, ctx.workspaceId, userId));
 }
 
 // ── Read/write proxy ─────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import {
   isCaptureCredential,
   isCaptureLink,
   isCaptureSession,
+  mintCaptureCredentials,
   mintCaptureLinkToken,
   mintCaptureSessionToken,
 } from '../../../src/auth/capture-session';
@@ -60,6 +61,19 @@ describe('capture page session', () => {
     expect(session.email).toBe('owner@example.com');
     expect(session.exp).toBeLessThanOrEqual(nowSec() + WRITABLE_CAPTURE_SESSION_TTL_SEC);
     expect(session.exp).toBeLessThanOrEqual(linkExp);
+  });
+});
+
+describe('read-only render credentials', () => {
+  it('pair a capture link with an identity-less session that ends no later than it', async () => {
+    const { link, session } = await mintCaptureCredentials(env, 'art_1');
+    const l = decode(link);
+    const s = decode(session);
+    expect(l).toMatchObject({ artifactId: 'art_1', authType: 'capture' });
+    expect(s).toMatchObject({ artifactId: 'art_1', authType: 'owner_test' });
+    expect(s).not.toHaveProperty('email');
+    expect(s.exp).toBeLessThanOrEqual(l.exp);
+    expect(isCaptureSession(s)).toBe(true);
   });
 });
 

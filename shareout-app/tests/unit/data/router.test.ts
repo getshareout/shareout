@@ -378,6 +378,51 @@ describe('test-run sandbox blocks mutations (Unit B)', () => {
     }
   });
 
+  const post = (token: string, sub: string, body: unknown) => handleDataRequest(
+    new Request(`${BASE_URL}/v1/data/${ARTIFACT_ID}${sub}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+    artifactEnv(),
+    `${ARTIFACT_ID}${sub}`,
+  );
+  const readOnlyRefusal = async (response: Response) =>
+    response.status === 403 && /read-only test run/.test(((await response.clone().json()) as { error?: string }).error ?? '');
+
+  it('lets an owner_test token make the POSTs that only read', async () => {
+    const env = artifactEnv();
+    const token = await createAccessToken(ARTIFACT_ID, 'owner_test', env, 600);
+    for (const sub of ['/tables/orders/query', '/tables/orders/count', '/workspace/tables/leads/query', '/workspace/tables/leads/distinct']) {
+      expect(await readOnlyRefusal(await post(token, sub, {})), sub).toBe(false);
+    }
+  });
+
+  it('still refuses writes dressed as table or shared-table POSTs', async () => {
+    const env = artifactEnv();
+    const token = await createAccessToken(ARTIFACT_ID, 'owner_test', env, 600);
+    for (const sub of ['/tables/orders', '/workspace/tables/leads', '/workspace/_share', '/connections/wh/query']) {
+      expect(await readOnlyRefusal(await post(token, sub, { name: 'x' })), sub).toBe(true);
+    }
+  });
+
+  it('runs the reads of a batch and refuses the writes inside it', async () => {
+    const env = artifactEnv();
+    const token = await createAccessToken(ARTIFACT_ID, 'owner_test', env, 600);
+    const response = await post(token, '/batch', {
+      requests: [
+        { path: '/json/key1', method: 'GET' },
+        { path: '/json/key1', method: 'PUT', body: { value: 1 } },
+        { path: '/tables/orders', method: 'POST', body: { name: 'x' } },
+      ],
+    });
+    expect(response.status).toBe(200);
+    const { data } = await response.json() as { data: { results: Array<{ success: boolean; error?: string }> } };
+    expect(data.results[0].error ?? '').not.toMatch(/read-only test run/);
+    expect(data.results[1]).toMatchObject({ success: false, error: expect.stringContaining('read-only test run') });
+    expect(data.results[2]).toMatchObject({ success: false, error: expect.stringContaining('read-only test run') });
+  });
+
   it('still allows reads (GET) under an owner_test token', async () => {
     const env = artifactEnv();
     const token = await createAccessToken(ARTIFACT_ID, 'owner_test', env, 600);

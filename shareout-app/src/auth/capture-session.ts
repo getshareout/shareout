@@ -3,15 +3,16 @@ import { createAccessToken, type AccessTokenPayload } from '../token';
 
 // Credentials of a headless capture render (thumbnail, image/PDF, report, Artifact
 // Tests). The renderer opens the bare artifact page with a capture link token
-// (`?_capture=`); serving that page injects a session token so the page's SDK can read
-// its data. Both are visible to the page's own scripts, so both stay as narrow as a
-// render allows:
-//   - one window: the link lives CAPTURE_TTL_SEC and every session it opens ends no
-//     later than the link, so reloading the link never extends access;
-//   - artifact-scoped, read-only: the session is `owner_test` (the data router refuses
-//     every write) bound to one artifact id;
-//   - no identity: the session carries no email, so it never resolves to the owner's
-//     account (workspace Knowledge, shared tables, connections, per-user credentials).
+// (`?_capture=`), and its page reads data with a read-only session that the renderer
+// attaches to the page's data requests at the browser layer — the session is never put
+// in the page (screenshots/request-policy.ts). Both stay as narrow as a render allows:
+//   - one window: the link lives CAPTURE_TTL_SEC and the session ends no later than
+//     the link; reopening the link yields no session at all;
+//   - artifact-scoped, read-only: the session is `owner_test` (the data router lets it
+//     read only) bound to one artifact id;
+//   - no identity: the session carries no email, so it never resolves to a user
+//     (Knowledge search, per-user connection credentials). Workspace shared tables are
+//     read on the artifact's own standing (data/workspace-shared.ts).
 // Tokens are stateless HMAC, so a session cannot be revoked when the render ends; the
 // short window is the bound.
 
@@ -30,9 +31,9 @@ export function mintCaptureLinkToken(env: Env, artifactId: string): Promise<stri
 }
 
 /**
- * The page session for a capture view opened with a link that expires at `linkExp`
- * (epoch seconds). Read-only renders get an identity-less `owner_test` session;
- * `writable` (pilot_verify) gets the owner's own short write session.
+ * The session for a capture render whose link expires at `linkExp` (epoch seconds).
+ * Read-only renders get an identity-less `owner_test` session; `writable`
+ * (pilot_verify, injected into its page) gets the owner's own short write session.
  */
 export function mintCaptureSessionToken(
   env: Env,
@@ -46,6 +47,13 @@ export function mintCaptureSessionToken(
   return opts.writable
     ? createAccessToken(artifactId, 'owner', env, maxAge, opts.ownerEmail ?? undefined)
     : createAccessToken(artifactId, 'owner_test', env, maxAge);
+}
+
+/** A read-only render's link and the session the renderer attaches for its page. */
+export async function mintCaptureCredentials(env: Env, artifactId: string): Promise<{ link: string; session: string }> {
+  const link = await mintCaptureLinkToken(env, artifactId);
+  const { exp } = JSON.parse(atob(link.split('.')[0])) as AccessTokenPayload;
+  return { link, session: await mintCaptureSessionToken(env, artifactId, { linkExp: exp }) };
 }
 
 /** Whether an `owner_test` payload has the shape capture renders mint: no identity, and

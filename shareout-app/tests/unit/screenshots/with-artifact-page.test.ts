@@ -18,8 +18,9 @@ interface FakeTraffic {
 function fakeRequest(url: string) {
   return {
     url: () => url,
+    headers: () => ({}) as Record<string, string>,
     isInterceptResolutionHandled: () => false,
-    continue: vi.fn(async () => {}),
+    continue: vi.fn(async (_overrides?: { headers?: Record<string, string> }) => {}),
     abort: vi.fn(async () => {}),
   };
 }
@@ -91,6 +92,26 @@ describe('withArtifactPage', () => {
     // The policy is in place before the page loads.
     expect(page.setRequestInterception).toHaveBeenCalledWith(true);
     expect(page.setRequestInterception.mock.invocationCallOrder[0]).toBeLessThan(page.goto.mock.invocationCallOrder[0]);
+  });
+
+  it("attaches a read-only session to the page's data requests; the page itself never holds it", async () => {
+    const { page, sent } = fakeBrowser({
+      requests: ['https://shareout.example/v1/data/art_1/workspace/tables/leads/query', 'https://cdn.jsdelivr.net/npm/x@1/x.js'],
+      responses: [PAGE],
+    });
+
+    await withArtifactPage(env, 'art_1', VIEWPORT, FAST, async () => 'shot');
+
+    const auth = sent[0].continue.mock.calls[0][0]?.headers?.authorization ?? '';
+    expect(auth).toMatch(/^Bearer /);
+    const token = auth.slice(7);
+    const session = JSON.parse(atob(token.split('.')[0])) as AccessTokenPayload;
+    expect(session).toMatchObject({ artifactId: 'art_1', authType: 'owner_test' });
+    expect(session).not.toHaveProperty('email');
+    const link = new URL(page.goto.mock.calls[0][0] as string).searchParams.get('_capture')!;
+    expect(session.exp).toBeLessThanOrEqual((JSON.parse(atob(link.split('.')[0])) as AccessTokenPayload).exp);
+    expect(page.goto.mock.calls[0][0]).not.toContain(token);
+    expect(sent[1].continue).toHaveBeenCalledWith();
   });
 
   it('aborts private-network requests the page makes and lets public ones through', async () => {

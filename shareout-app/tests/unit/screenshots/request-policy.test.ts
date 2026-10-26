@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Page } from '@cloudflare/puppeteer';
 import {
   captureOwnHosts,
+  captureRequestHeaders,
   decideCaptureRequest,
   guardCapturePage,
   isPrivateNetworkHost,
@@ -84,11 +85,12 @@ function fakePage() {
   return { page, asPage: page as unknown as Page, emit };
 }
 
-function fakeRequest(url: string) {
+function fakeRequest(url: string, headers: Record<string, string> = {}) {
   return {
     url: () => url,
+    headers: () => headers,
     isInterceptResolutionHandled: () => false,
-    continue: vi.fn(async () => {}),
+    continue: vi.fn(async (_overrides?: { headers?: Record<string, string> }) => {}),
     abort: vi.fn(async () => {}),
   };
 }
@@ -157,5 +159,44 @@ describe('guardCapturePage', () => {
     emit('request', handled);
     expect(handled.abort).not.toHaveBeenCalled();
     expect(handled.continue).not.toHaveBeenCalled();
+  });
+});
+
+describe('captureRequestHeaders', () => {
+  const session = { token: 'sess.sig', artifactId: 'art_1', origin: 'https://shareout.example' };
+
+  it("puts the session on this artifact's data requests only", () => {
+    expect(captureRequestHeaders('https://shareout.example/v1/data/art_1/tables/leads/query', { 'content-type': 'application/json' }, session))
+      .toEqual({ 'content-type': 'application/json', authorization: 'Bearer sess.sig' });
+    expect(captureRequestHeaders('https://shareout.example/v1/data/art_2/json', {}, session)).toBeNull();
+    expect(captureRequestHeaders('https://shareout.example/a/demo/app.js', {}, session)).toBeNull();
+    expect(captureRequestHeaders('https://elsewhere.example.net/v1/data/art_1/json', {}, session)).toBeNull();
+    expect(captureRequestHeaders('https://shareout.example/v1/data/art_1/json', {}, undefined)).toBeNull();
+  });
+
+  it('replaces whatever Authorization the page set on a data request', () => {
+    expect(captureRequestHeaders('https://shareout.example/v1/data/art_1/json', { Authorization: 'Bearer undefined' }, session))
+      .toEqual({ authorization: 'Bearer sess.sig' });
+  });
+
+  it('strips the session from any other request still carrying it, and leaves page headers alone', () => {
+    expect(captureRequestHeaders('https://files.example.net/blob', { authorization: 'Bearer sess.sig', accept: '*/*' }, session))
+      .toEqual({ accept: '*/*' });
+    expect(captureRequestHeaders('https://api.example.org/v2', { Authorization: 'Bearer page-key' }, session)).toBeNull();
+  });
+});
+
+describe('guardCapturePage with a data session', () => {
+  it("continues this artifact's data requests with the session and nothing else", async () => {
+    const { asPage, emit } = fakePage();
+    await guardCapturePage(asPage, ['shareout.example'], {
+      dataSession: { token: 'sess.sig', artifactId: 'art_1', origin: 'https://shareout.example' },
+    });
+    const data = fakeRequest('https://shareout.example/v1/data/art_1/workspace/tables/leads/query');
+    const asset = fakeRequest('https://cdn.jsdelivr.net/npm/x@1/x.js');
+    emit('request', data);
+    emit('request', asset);
+    expect(data.continue).toHaveBeenCalledWith({ headers: { authorization: 'Bearer sess.sig' } });
+    expect(asset.continue).toHaveBeenCalledWith();
   });
 });

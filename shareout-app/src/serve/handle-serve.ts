@@ -34,7 +34,7 @@ function injectCommentsAgent(resp: Response, baseUrl: string): Response {
 
 // Capture mode: serve the bare artifact HTML at top-level (no sandbox iframe, no
 // toolbar) so server-side screenshot/PDF can render the whole, data-loaded page.
-// The artifact's SDK reads its auth from an inline #shareout-initial-data script
+// The artifact's SDK reads its setup from an inline #shareout-initial-data script
 // (the wrapper normally supplies this via the iframe postMessage bridge); we
 // inject the same here. Gated by a signed capture token only the renderer can
 // mint, so the un-sandboxed origin is never reachable by the public.
@@ -45,24 +45,25 @@ async function serveCaptureView(
   slug: string,
   result: ArtifactWithAsset,
   baseUrl: string,
-  // linkExp: the capture token's expiry. The session ends with it, so reloading the
-  // capture link never extends access.
+  // linkExp: the capture token's expiry. A writable session ends with it, so
+  // reloading the capture link never extends access.
   linkExp: number,
-  // writable: mint a full-WRITE `owner` session instead of the read-only `owner_test`.
-  // Used only by the crew `pilot_verify` flow, which drives the real UI (submit a
-  // form, save a record) to catch UI regressions — it MUST be able to persist. Every
-  // other capture render (thumbnail, smoke, PDF, report, test flow) stays read-only.
+  // writable: inject a full-WRITE `owner` session. Used only by the crew
+  // `pilot_verify` flow, which drives the real UI (submit a form, save a record) to
+  // catch UI regressions — it MUST be able to persist, and its in-page agent sends
+  // the session itself. Every other capture render (thumbnail, smoke, PDF, report,
+  // test flow) is read-only and gets no credential in the page: the renderer attaches
+  // its read-only session to the page's data requests (auth/capture-session.ts).
   writable = false,
 ): Promise<Response> {
-  // Read-only capture uses an identity-less `owner_test` session (reads this artifact
-  // as its owner, router blocks every write). The pilot_verify path uses the owner's
-  // own short session so its in-page run can submit. See auth/capture-session.ts.
-  const ownerEmail = writable
-    ? (await env.DB.prepare('SELECT email FROM users WHERE id = ?')
-        .bind(result.owner_id).first<{ email: string | null }>())?.email ?? null
-    : null;
-  const sessionToken = await mintCaptureSessionToken(env, result.artifact_id, { linkExp, writable, ownerEmail });
-  const initial = { artifactId: result.artifact_id, baseUrl, sessionToken };
+  const initial: { artifactId: string; baseUrl: string; sessionToken?: string } = { artifactId: result.artifact_id, baseUrl };
+  if (writable) {
+    const owner = await env.DB.prepare('SELECT email FROM users WHERE id = ?')
+      .bind(result.owner_id).first<{ email: string | null }>();
+    initial.sessionToken = await mintCaptureSessionToken(env, result.artifact_id, {
+      linkExp, writable: true, ownerEmail: owner?.email ?? null,
+    });
+  }
   const json = JSON.stringify(initial).replace(/</g, '\\u003c');
   const scriptTag = `<script id="shareout-initial-data" type="application/json">${json}</script>`;
 
