@@ -1,5 +1,15 @@
 import { ShareOutError } from '../shareout-error';
 import type { SdkClient } from '../core/sdk-client';
+import { YJS_PATH } from './yjs-path.generated';
+
+// currentScript is the SDK's own <script> only while the bundle first runs. yjs is staged
+// next to it, on a host the page's CSP already lets scripts load from.
+const sdkScriptSrc = typeof document === 'undefined' ? '' : (document.currentScript as HTMLScriptElement | null)?.src ?? '';
+
+/** The yjs module URL: beside the SDK script, else on the API origin. */
+export function yjsModuleUrl(baseUrl: string, scriptSrc = sdkScriptSrc): string {
+  return new URL(YJS_PATH, /^https?:/.test(scriptSrc) ? scriptSrc : baseUrl).href;
+}
 
 type StatusListener = (status: 'connecting' | 'connected' | 'disconnected') => void;
 type PresenceListener = (users: Map<string, PresenceState>) => void;
@@ -35,7 +45,8 @@ export class RealtimeDoc {
     if (this.ws) return;
 
     if (!this.Y) {
-      this.Y = await import('yjs');
+      // Not bundled: only pages that open a realtime doc download yjs.
+      this.Y = await import(/* @vite-ignore */ yjsModuleUrl(this.sdk._baseUrl));
     }
 
     if (!this.doc) {
@@ -65,6 +76,9 @@ export class RealtimeDoc {
       this.ws.onopen = () => {
         clearTimeout(timeout);
         this.reconnectAttempts = 0;
+        // The server sends the document as it stands only in reply to our step 1. Once per
+        // connection: it answers every step 1 with its own, so replying in kind never ends.
+        this.ws?.send(new Uint8Array([SYNC_STEP1, ...this.Y.encodeStateVector(this.doc)]));
         this.emitStatus('connected');
         if (Object.keys(this.localPresence).length > 0) {
           this.sendPresence();

@@ -5,6 +5,9 @@ import { SDK_IMMUTABLE_CACHE } from './sdk-version';
 // (public/_bundles/shareout-sdk.js, via scripts/stage-sdk-bundle.mjs, with the
 // global-unwrap fix already appended). Served from the ASSETS binding to keep
 // ~160 KB of generated JS out of the worker script bundle (plan §19 Phase 4).
+// The same bytes are staged at public/sdk/shareout.js and public/sdk/v1/shareout.js,
+// which the assets layer serves before the Worker runs (public/_headers mirrors the
+// headers below), so handleServeSDK is the fallback when those copies are absent.
 const SDK_ASSET = '/_bundles/shareout-sdk.js';
 const COMMENTS_AGENT_ASSET = '/_bundles/shareout-comments-agent.js';
 const CHAT_CORE_ASSET = '/_bundles/chat-core.js';

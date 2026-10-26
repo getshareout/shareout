@@ -11,7 +11,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const KB = 1024;
 const BUDGETS = {
   'public/_bundles/editor.js': 640 * KB,
-  'public/_bundles/shareout-sdk.js': 256 * KB,
+  // yjs loads on demand from public/_bundles/yjs.js; inlined again it would add ~90 KB.
+  'public/_bundles/shareout-sdk.js': 160 * KB,
+  'public/_bundles/yjs.js': 128 * KB,
   'public/_bundles/shareout-comments-agent.js': 32 * KB,
   'public/_bundles/chat-core.js': 16 * KB,
   'public/_bundles/shareout-mobile.js': 32 * KB,
