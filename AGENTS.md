@@ -84,6 +84,8 @@ tooling/scripts/       ← ci-check, gitleaks, boundary helpers
 | `CUSTOM_DOMAINS_CNAME_TARGET` | Turns on workspace custom domains; the hostname customers CNAME to. Alone = manual mode (DNS TXT check) |
 | `CF_CUSTOM_HOSTNAMES_TOKEN` / `CF_CUSTOM_HOSTNAMES_ZONE_ID` | Optional; provision custom domains via Cloudflare for SaaS (token: Zone → SSL and Certificates: Edit) |
 | `SUPPORT_ALERT_TELEGRAM_CHAT_ID` | Optional; Telegram chat pinged on every new support ticket (needs `TELEGRAM_BOT_TOKEN`) |
+| `KNOWLEDGE_EMBED_MODEL` | Model of the multilingual Knowledge index (binding `KNOWLEDGE_VECTORS_V2`, 1024-d cosine; create commands in `wrangler.toml`): `@cf/baai/bge-m3` (default) or `@cf/qwen/qwen3-embedding-0.6b`. The 768-d indexes keep `@cf/baai/bge-base-en-v1.5` |
+| `KNOWLEDGE_VECTORS_READ` | `v2` = Knowledge and page search read `KNOWLEDGE_VECTORS_V2` for each workspace it fully covers; the rest stay on the 768-d indexes until backfilled. Unset = v1. Rollout: [self-host ops](docs-site/src/content/docs/self-host/ops.md#multilingual-knowledge-search) |
 
 ---
 
