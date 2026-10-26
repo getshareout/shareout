@@ -41,6 +41,16 @@ body {
 
 .icon-primary {
   background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.icon img {
+  display: block;
 }
 
 .icon-success {
@@ -121,6 +131,10 @@ p strong { color: var(--color-text); }
   font-size: 0.9rem;
 }
 
+.auth-note {
+  margin: var(--space-4) 0;
+}
+
 .auth-help--warning {
   color: var(--color-warning);
 }
@@ -137,6 +151,19 @@ p strong { color: var(--color-text); }
   margin-top: var(--space-3);
   font-size: 0.9rem;
   text-align: center;
+}
+
+.auth-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
 }
 
 .status {

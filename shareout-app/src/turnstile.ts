@@ -14,11 +14,17 @@ const TIMEOUT_MS = 5000;
 // key is configured (so forms render normally pre-provisioning). Place the div
 // INSIDE the <form>; Cloudflare injects a hidden `cf-turnstile-response` input the
 // client reads and posts as `turnstileToken`. data-action enables Spin telemetry.
-export function turnstileWidgetHtml(siteKey?: string, lang?: 'en' | 'es'): string {
+// `deferred`: the challenge runs only when the page calls turnstile.execute(), and the
+// widget is drawn only if Cloudflare needs a human check (interaction-only).
+export function turnstileWidgetHtml(siteKey?: string, lang?: 'en' | 'es', opts?: { deferred?: boolean }): string {
   if (!siteKey) return '';
   const language = lang ? ` data-language="${lang}"` : '';
+  if (opts?.deferred) {
+    return `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<div class="cf-turnstile" data-sitekey="${siteKey}" data-action="turnstile-spin-v1"${language} data-appearance="interaction-only" data-execution="execute" data-callback="soTsOk" data-error-callback="soTsFail"></div>`;
+  }
   return `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<div class="cf-turnstile" data-sitekey="${siteKey}" data-action="turnstile-spin-v1"${language} style="margin:8px 0"></div>`;
+<div class="cf-turnstile" data-sitekey="${siteKey}" data-action="turnstile-spin-v1"${language} data-appearance="interaction-only"></div>`;
 }
 
 interface SiteverifyResponse {
