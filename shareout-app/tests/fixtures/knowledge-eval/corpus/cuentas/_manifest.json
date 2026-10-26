@@ -1,0 +1,19 @@
+{ "docs": [
+  {"id": "gx-reporte-2026-07", "title": "Globex — Reporte mensual julio 2026", "kind": "page", "path": "gx-reporte-2026-07.html", "lang": "es", "genre": "report", "visibility": "workspace", "owner": "author"},
+  {"id": "gx-reporte-2026-08", "title": "Globex — Reporte mensual agosto 2026", "kind": "page", "path": "gx-reporte-2026-08.html", "lang": "es", "genre": "report", "visibility": "workspace", "owner": "author"},
+  {"id": "gx-reporte-2026-09", "title": "Globex — Reporte mensual septiembre 2026", "kind": "page", "path": "gx-reporte-2026-09.html", "lang": "es", "genre": "report", "visibility": "workspace", "owner": "author"},
+  {"id": "gx-reporte-2026-08-borrador", "title": "Globex — Reporte agosto 2026 (borrador sin revisar)", "kind": "page", "path": "gx-reporte-2026-08-borrador.html", "lang": "es", "genre": "report", "visibility": "private", "owner": "other"},
+  {"id": "gx-qbr-q3", "title": "Globex — QBR Q3 2026", "kind": "page", "path": "gx-qbr-q3.html", "lang": "mixed", "genre": "slides", "visibility": "workspace", "owner": "author"},
+  {"id": "gx-brief-invierno", "title": "Brief campaña Invierno 2026 — Globex Lácteos.md", "kind": "file", "path": "gx-brief-invierno.md", "lang": "es", "genre": "brief", "visibility": "workspace", "owner": "author"},
+  {"id": "gx-plan-medios-q4", "title": "Plan de medios Q4 2026 — Globex.md", "kind": "file", "path": "gx-plan-medios-q4.md", "lang": "es", "genre": "table", "visibility": "workspace", "owner": "author"},
+  {"id": "gx-minuta-2026-08-12", "title": "Minuta Globex 12-08-2026.txt", "kind": "file", "path": "gx-minuta-2026-08-12.txt", "lang": "es", "genre": "meeting-notes", "visibility": "workspace", "owner": "author"},
+  {"id": "gx-minuta-2026-09-16", "title": "Minuta Globex 16-09-2026.txt", "kind": "file", "path": "gx-minuta-2026-09-16.txt", "lang": "es", "genre": "meeting-notes", "visibility": "workspace", "owner": "author"},
+  {"id": "gx-contrato", "title": "Globex — Resumen de contrato y alcance.md", "kind": "file", "path": "gx-contrato.md", "lang": "es", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "gx-renegociacion-privado", "title": "Notas privadas — renegociación contrato Globex.md", "kind": "file", "path": "gx-renegociacion-privado.md", "lang": "es", "genre": "meeting-notes", "visibility": "private", "owner": "other"},
+  {"id": "in-report-2026-09-en", "title": "Initech — Monthly Performance Report, September 2026", "kind": "page", "path": "in-report-2026-09-en.html", "lang": "en", "genre": "report", "visibility": "workspace", "owner": "author"},
+  {"id": "in-qbr-q3-en", "title": "Initech — Q3 2026 Business Review", "kind": "page", "path": "in-qbr-q3-en.html", "lang": "en", "genre": "slides", "visibility": "workspace", "owner": "author"},
+  {"id": "in-webinar-mx", "title": "Initech — Resultados campaña webinar México (agosto 2026)", "kind": "page", "path": "in-webinar-mx.html", "lang": "es", "genre": "campaign-results", "visibility": "workspace", "owner": "author"},
+  {"id": "in-kickoff-en", "title": "Initech kickoff meeting notes 2026-02-10.md", "kind": "file", "path": "in-kickoff-en.md", "lang": "en", "genre": "meeting-notes", "visibility": "workspace", "owner": "author"},
+  {"id": "in-acuerdo-servicio", "title": "Initech — Acuerdo de servicio y alcance.md", "kind": "file", "path": "in-acuerdo-servicio.md", "lang": "es", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "in-personas-en", "title": "Initech — Buyer Personas.md", "kind": "file", "path": "in-personas-en.md", "lang": "en", "genre": "reference", "visibility": "workspace", "owner": "author"}
+] }

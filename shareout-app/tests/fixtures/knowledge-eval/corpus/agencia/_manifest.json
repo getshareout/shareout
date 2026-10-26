@@ -1,0 +1,21 @@
+{ "docs": [
+  {"id": "ag-onboarding", "title": "Guía de onboarding — Acme Digital.md", "kind": "file", "path": "ag-onboarding.md", "lang": "es", "genre": "onboarding", "visibility": "workspace", "owner": "author"},
+  {"id": "ag-vacaciones-licencias", "title": "Política de vacaciones y licencias 2026.md", "kind": "file", "path": "ag-vacaciones-licencias.md", "lang": "es", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "ag-vacaciones-2027-borrador", "title": "Borrador — Política de vacaciones 2027 (no circular).md", "kind": "file", "path": "ag-vacaciones-2027-borrador.md", "lang": "es", "genre": "policy", "visibility": "private", "owner": "other"},
+  {"id": "ag-trabajo-hibrido", "title": "Política de trabajo híbrido.md", "kind": "file", "path": "ag-trabajo-hibrido.md", "lang": "es", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "ag-contractors-en", "title": "Remote Work Policy for International Contractors.md", "kind": "file", "path": "ag-contractors-en.md", "lang": "en", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "ag-viaticos", "title": "Política de viáticos y reintegros.md", "kind": "file", "path": "ag-viaticos.md", "lang": "es", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "ag-seguridad", "title": "Política de seguridad de la información.md", "kind": "file", "path": "ag-seguridad.md", "lang": "es", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "ag-herramientas", "title": "Stack de herramientas y accesos", "kind": "page", "path": "ag-herramientas.html", "lang": "es", "genre": "reference", "visibility": "workspace", "owner": "author"},
+  {"id": "ag-directorio", "title": "Directorio del equipo", "kind": "page", "path": "ag-directorio.html", "lang": "es", "genre": "reference", "visibility": "workspace", "owner": "author"},
+  {"id": "ag-okrs", "title": "OKRs 2026 — segundo semestre", "kind": "page", "path": "ag-okrs.html", "lang": "es", "genre": "reference", "visibility": "workspace", "owner": "author"},
+  {"id": "ag-minuta-2026-09-07", "title": "Minuta reunión de dirección 07-09-2026.txt", "kind": "file", "path": "ag-minuta-2026-09-07.txt", "lang": "es", "genre": "meeting-notes", "visibility": "workspace", "owner": "author"},
+  {"id": "ag-minuta-2026-09-21", "title": "Minuta reunión de dirección 21-09-2026.txt", "kind": "file", "path": "ag-minuta-2026-09-21.txt", "lang": "es", "genre": "meeting-notes", "visibility": "workspace", "owner": "author"},
+  {"id": "ag-minuta-2026-10-05", "title": "Minuta reunión de dirección 05-10-2026.md", "kind": "file", "path": "ag-minuta-2026-10-05.md", "lang": "es", "genre": "meeting-notes", "visibility": "workspace", "owner": "author"},
+  {"id": "ag-all-hands-q3", "title": "All-hands Q3 2026", "kind": "page", "path": "ag-all-hands-q3.html", "lang": "mixed", "genre": "slides", "visibility": "workspace", "owner": "author"},
+  {"id": "ag-benefits-en", "title": "Employee Benefits Summary 2026.md", "kind": "file", "path": "ag-benefits-en.md", "lang": "en", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "ag-evaluacion-desempeno", "title": "Proceso de evaluación de desempeño.md", "kind": "file", "path": "ag-evaluacion-desempeno.md", "lang": "es", "genre": "procedure", "visibility": "workspace", "owner": "author"},
+  {"id": "ag-evaluaciones-h1-confidencial", "title": "Evaluaciones de desempeño H1 2026 — consolidado (confidencial).md", "kind": "file", "path": "ag-evaluaciones-h1-confidencial.md", "lang": "es", "genre": "table", "visibility": "private", "owner": "other"},
+  {"id": "ag-bandas-salariales", "title": "Bandas salariales 2026 (confidencial).md", "kind": "file", "path": "ag-bandas-salariales.md", "lang": "es", "genre": "table", "visibility": "private", "owner": "other"},
+  {"id": "ag-notas-1a1", "title": "Mis notas 1 a 1 con Tomás.txt", "kind": "file", "path": "ag-notas-1a1.txt", "lang": "es", "genre": "meeting-notes", "visibility": "private", "owner": "member"}
+] }

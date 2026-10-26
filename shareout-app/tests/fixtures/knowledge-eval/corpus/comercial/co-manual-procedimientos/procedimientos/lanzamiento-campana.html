@@ -1,0 +1,26 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Lanzamiento de campañas — Manual de procedimientos</title><style>body{font-family:system-ui,sans-serif;max-width:820px;margin:2rem auto;padding:0 16px;color:#1d1d1f}h2{margin-top:1.6rem}code{background:#f2f2f2;padding:0 4px}</style></head><body>
+<h1>Lanzamiento de campañas</h1>
+<p>Checklist obligatorio para cualquier campaña nueva o relanzamiento en Google Ads, Meta Ads, TikTok Ads o LinkedIn Ads.</p>
+<h2>1. Brief y presupuesto</h2>
+<p>No se arma ninguna campaña sin el brief completo en Notion y el presupuesto aprobado según la política de inversión en medios. El brief indica objetivo, audiencia, mensajes, fechas y KPI principal.</p>
+<h2>2. UTMs y nomenclatura</h2>
+<ul>
+<li>Todos los links llevan utm_source, utm_medium, utm_campaign y utm_content, en minúsculas y sin espacios (usá guiones medios).</li>
+<li>utm_campaign sigue el formato <code>cliente_pais_objetivo_aaaamm</code>, por ejemplo <code>globex_ar_ventas_202610</code>.</li>
+<li>Los nombres de campaña en las plataformas usan el mismo formato que utm_campaign.</li>
+<li>Generá los links con la planilla "Constructor de UTMs" de la carpeta del cliente; no los escribas a mano.</li>
+</ul>
+<h2>3. Píxeles y conversiones</h2>
+<p>Antes de lanzar, verificá que disparen el píxel de Meta con la API de Conversiones (con deduplicación de eventos), la etiqueta de conversión de Google Ads, los eventos de GA4 (purchase o generate_lead) y el píxel de TikTok si corresponde. Hacé una conversión de prueba y confirmá que aparece en cada plataforma en menos de una hora.</p>
+<h2>4. QA antes del lanzamiento</h2>
+<p>El QA lo hace una persona distinta de quien armó la campaña (regla de los cuatro ojos), con esta lista:</p>
+<ul>
+<li>Links y UTMs funcionando desde el anuncio publicado en vista previa.</li>
+<li>Presupuesto diario y tope total correctos; fechas de inicio y fin cargadas.</li>
+<li>Segmentación, exclusiones de audiencias y ubicaciones revisadas.</li>
+<li>Textos sin errores y creatividades aprobadas en su versión final.</li>
+<li>Landing con el QA aprobado y carga correcta en mobile.</li>
+</ul>
+<h2>5. Aprobaciones y salida</h2>
+<p>La campaña sale solo con aprobación escrita del cliente (mail o canal de Slack) sobre presupuesto, creatividades y fechas. No lancés campañas los viernes después de las 15 h ni la víspera de un feriado. Durante las primeras 48 horas, el trafficker revisa entrega y gasto dos veces por día.</p>
+</body></html>
