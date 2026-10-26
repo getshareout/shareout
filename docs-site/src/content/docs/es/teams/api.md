@@ -259,7 +259,7 @@ Mapa de datos opcional por workspace. Ver [Catálogo de datos](/es/teams/catalog
 | `GET` | `/v1/workspaces/{id}/catalog` | Member+ | Búsqueda (`q`, `kind`, `domain`, `status`, `tag`) + facetas. |
 | `GET` | `/v1/workspaces/{id}/catalog/manifest` | Member+ | KPIs de adopción, huérfanos, refs colgantes. |
 | `GET` | `/v1/workspaces/{id}/catalog/entries/{entryId}` | Member+ | Entrada + vecinos de linaje + `history` de certificación. |
-| `POST` | `/v1/workspaces/{id}/catalog/entries/{entryId}/certify` | Admin+ | `{ "decision": "certified" \| "revoked" \| "deprecated", "note"?, "content_hash"? }` — 409 si la entrada cambió desde `content_hash`. |
+| `POST` | `/v1/workspaces/{id}/catalog/entries/{entryId}/certify` | Admin+, con sesión iniciada (tokens: `403 SESSION_REQUIRED`) | `{ "decision": "certified" \| "revoked" \| "deprecated", "note"?, "content_hash"? }` — 409 si la entrada cambió desde `content_hash`. |
 | `GET` | `/v1/workspaces/{id}/catalog/metrics` | Member+ | Métricas ejecutables: estado, fórmula, fuente, frescura, `can_run`. |
 | `GET` | `/v1/workspaces/{id}/catalog/metrics/{metricId}` | Member+ | Una métrica con su definición y frescura al momento. |
 | `POST` | `/v1/workspaces/{id}/catalog/metrics/{metricId}/query` | Member+ certificada; borradores Admin+/autor | `{ grain?, by?, from?, to?, where? }` → filas + procedencia (`status`, `certified_by`, `spec_hash`, `freshness`). 429 al llegar al límite de consultas. |

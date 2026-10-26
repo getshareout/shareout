@@ -13,6 +13,11 @@ vi.mock('../../../src/router/helpers/auth-guard', () => ({
   requireTokenOrSession: async () => ({ id: h.userId, email: `${h.userId}@agencia.example`, username: null }),
   isAuthUser: () => true,
 }));
+// Callers are signed in to ShareOut (certification only accepts a browser session).
+vi.mock('../../../src/auth/session', async (orig) => ({
+  ...(await orig<object>()),
+  getSessionUser: async () => ({ id: h.userId, email: `${h.userId}@agencia.example` }),
+}));
 vi.mock('../../../src/data/connections/warehouse-query', async (orig) => ({
   ...(await orig<object>()),
   queryWorkspaceConnection: async (_env: unknown, _ws: string, conn: { id: string }, sql: string, opts: Record<string, unknown>, userId: unknown) => {

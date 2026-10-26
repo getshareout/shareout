@@ -170,6 +170,6 @@ describe("a metric's entry", () => {
     lens.catRoute('metric.roas');
     lens.loadCatalog();
     await flush();
-    expect(document.getElementById('catMetric')?.textContent).toContain('Can’t run: No shared table "ads_daily" in this workspace');
+    expect(document.getElementById('catMetric')?.textContent).toContain('This metric can’t run: No shared table "ads_daily" in this workspace');
   });
 });

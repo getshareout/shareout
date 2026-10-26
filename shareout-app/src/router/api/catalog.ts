@@ -14,17 +14,12 @@ import { buildLineage, findEntry } from '../../catalog/lineage';
 import { loadGovernedCatalog } from '../../catalog/governed';
 import { seedConnectorsAsSources } from '../../catalog/seed';
 import { type CatalogEntry } from '../../catalog/types';
-import { certificationHistory, handleCatalogCertify } from './catalog-certify';
+import { certificationHistory, handleCatalogCertify, isBearer, isSignedInPerson, sessionRequiredResponse } from './catalog-certify';
 import { metricWriteIssue } from '../../catalog/metrics/spec';
 import { syncMetricIndex } from '../../catalog/metrics/index-sync';
 
 const PREFIX_RE = /^\/v1\/workspaces\/([^/]+)\/catalog(?:\/(.*))?$/;
 const CERTIFY_RE = /^entries\/([^/]+)\/certify$/;
-
-// A bearer-token write is an agent's; the Home lens writes with the session cookie.
-function isBearer(request: Request): boolean {
-  return /^bearer\s/i.test(request.headers.get('Authorization') ?? '');
-}
 
 function neighbors(entries: CatalogEntry[], ids: string[]) {
   const byId = new Map(entries.map(e => [e.id, e]));
@@ -115,6 +110,7 @@ export async function routeCatalogApi(ctx: FetchContext): Promise<Response | nul
         path: body.path,
         content: body.content,
         updatedBy: auth.id,
+        // A bearer-token write is an agent's; the Home lens writes with the session cookie.
         updatedByKind: isBearer(request) ? 'agent' : 'user',
       });
       return cors(jsonResponse({ ok: true }));
@@ -132,6 +128,7 @@ export async function routeCatalogApi(ctx: FetchContext): Promise<Response | nul
   const certify = sub.match(CERTIFY_RE);
   if (certify) {
     if (method !== 'POST') return cors(jsonError('Method not allowed', 'METHOD_NOT_ALLOWED', 405));
+    if (!(await isSignedInPerson(ctx.env, request, auth.id))) return cors(sessionRequiredResponse());
     if (!canManage) {
       return cors(jsonError('Only workspace owners and admins can certify catalog entries', 'FORBIDDEN', 403));
     }

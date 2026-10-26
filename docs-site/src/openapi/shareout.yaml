@@ -6250,11 +6250,13 @@ paths:
       summary: Certify, revoke or deprecate a catalog entry
       operationId: certifyWorkspaceCatalogEntry
       description: >-
-        Owner/admin only. Records an append-only decision on the entry's current version
-        (for kind metric, its normalized spec). The entry reads certified while its
-        current version matches a certification made since the last revoke/deprecate;
-        an edit shows it as changed since certification. Send the content_hash you
-        reviewed to get 409 CONFLICT instead of deciding on a version you did not see.
+        Owner/admin in a signed-in browser session only: certification is a human act,
+        so bearer tokens (personal, Agent, MCP) get 403 SESSION_REQUIRED. Records an
+        append-only decision on the entry's current version (for kind metric, its
+        normalized spec). The entry reads certified while its current version matches a
+        certification made since the last revoke/deprecate; an edit shows it as changed
+        since certification. Send the content_hash you reviewed to get 409 CONFLICT
+        instead of deciding on a version you did not see.
       requestBody:
         required: true
         content:
@@ -6278,7 +6280,7 @@ paths:
         "400":
           description: Invalid decision or note
         "403":
-          $ref: "#/components/responses/Forbidden"
+          description: FORBIDDEN (not an owner/admin) or SESSION_REQUIRED (a token, not a signed-in session)
         "404":
           $ref: "#/components/responses/NotFound"
         "409":

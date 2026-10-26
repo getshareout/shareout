@@ -80,13 +80,18 @@ A business term (e.g. *Active User*). Other entries reference it via `terms: [ac
 
 ## Certification (owners and admins)
 
-**Certified** is a decision, not a field. A workspace **owner or admin** certifies one
-exact version of an entry; writing `status: certified` in a file certifies nothing (it
-reads as `draft`). Decisions are append-only — the history answers "who certified this
-number, and when":
+**Certified** is a decision, not a field. A workspace **owner or admin**, signed in to
+ShareOut, certifies one exact version of an entry in the Catalog lens; writing
+`status: certified` in a file certifies nothing (it reads as `draft`). Decisions are
+append-only — the history answers "who certified this number, and when".
+
+**You (an agent) cannot certify.** The endpoint takes only a signed-in browser session:
+any token — personal, Agent or MCP — gets `403 SESSION_REQUIRED` with a hint to certify in
+ShareOut. Draft and propose instead, then ask an owner or admin to review the entry in the
+Catalog. For reference, the lens sends:
 
 ```
-POST /v1/workspaces/{id}/catalog/entries/{entryId}/certify
+POST /v1/workspaces/{id}/catalog/entries/{entryId}/certify     (signed-in session only)
 { "decision": "certified", "note": "Matches the ads platform for March", "content_hash": "<from GET>" }
 ```
 
@@ -95,7 +100,8 @@ POST /v1/workspaces/{id}/catalog/entries/{entryId}/certify
 - `content_hash`: optional but recommended — the `certification.content_hash` you reviewed.
   If the entry changed since, the call fails with **409 `CONFLICT`** instead of certifying
   a version nobody looked at.
-- Members get **403**: agents and members can draft and propose; only owners/admins certify.
+- Members get **403**; tokens get **403 `SESSION_REQUIRED`**: agents and members draft and
+  propose, owners/admins certify in person.
 
 **Edits.** A certification is pinned to the version it was made on. Edit a certified entry
 and it reads **draft** with `certification.stale: true` ("changed since certification")
@@ -236,7 +242,7 @@ REST (auth = workspace member or agent token):
 | `GET /v1/workspaces/{id}/catalog/manifest` | counts, adoption KPIs, orphans, dangling refs, staleness |
 | `GET /v1/workspaces/{id}/catalog/entries/{entryId}` | one entry + upstream/downstream neighbors + certification `history` |
 | `GET /v1/workspaces/{id}/catalog/lineage` | full node+edge graph |
-| `POST /v1/workspaces/{id}/catalog/entries/{entryId}/certify` | owner/admin decision (see Certification) |
+| `POST /v1/workspaces/{id}/catalog/entries/{entryId}/certify` | owner/admin decision, signed-in session only (see Certification) |
 
 A disabled workspace returns `{ "enabled": false }` — it never errors. Lineage is read from
 both ends: an entry's `upstream`/`downstream` in the API include edges declared on either

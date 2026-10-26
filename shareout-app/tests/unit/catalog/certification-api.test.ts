@@ -3,10 +3,15 @@
 // certification does to it ("changed since certification").
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const h = vi.hoisted(() => ({ userId: '' }));
+const h = vi.hoisted(() => ({ userId: '', session: true }));
 vi.mock('../../../src/router/helpers/auth-guard', () => ({
   requireTokenOrSession: async () => ({ id: h.userId, email: `${h.userId}@agencia.example`, username: null }),
   isAuthUser: () => true,
+}));
+// The caller is signed in to ShareOut (a browser session) unless a test says otherwise.
+vi.mock('../../../src/auth/session', async (orig) => ({
+  ...(await orig<object>()),
+  getSessionUser: async () => (h.session ? { id: h.userId, email: `${h.userId}@agencia.example` } : null),
 }));
 
 import { applyMigrations, e } from '../helpers/migrated-db';
@@ -77,6 +82,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  h.session = true;
   await e.DB.exec('DELETE FROM catalog_certifications');
   await e.DB.exec('DELETE FROM workspace_files');
   await e.DB.exec('DELETE FROM catalog_settings');
@@ -136,6 +142,30 @@ describe('who may certify', () => {
     expect((await certify(OUTSIDER, 't.orders', { decision: 'revoked' })).status).toBe(403);
     expect((await getEntry('t.orders', EXTERNAL)).status).toBe(403);
     expect((await getEntry('t.orders')).body.entry.status).toBe('certified');
+  });
+});
+
+describe('certification is a human act', () => {
+  it('refuses any token, even an admin\'s, and points to the Catalog', async () => {
+    for (const token of ['so_personal_token', 'sot_agent_token', 'so_mcp_access_token']) {
+      const res = await call(ADMIN, 'POST', '/entries/t.orders/certify', { decision: 'certified' }, { Authorization: `Bearer ${token}` });
+      expect(res.status).toBe(403);
+      expect(res.body).toMatchObject({ code: 'SESSION_REQUIRED', error: 'Certification is done by an owner or admin in ShareOut', hint: expect.stringContaining('Catalog') });
+    }
+    expect((await getEntry('t.orders')).body.history).toEqual([]);
+  });
+
+  it('needs a signed-in session for the caller', async () => {
+    h.session = false;
+    const res = await certify(ADMIN, 't.orders', { decision: 'certified' });
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('SESSION_REQUIRED');
+  });
+
+  it('records a signed-in decision as such in the audit trail', async () => {
+    await certify(OWNER, 't.orders', { decision: 'deprecated', note: 'Use orders_v2' });
+    const row = await e.DB.prepare("SELECT detail FROM audit_log WHERE workspace_id = ? AND action = 'catalog.deprecate'").bind(WS).first<{ detail: string }>();
+    expect(JSON.parse(row!.detail)).toMatchObject({ via: 'session', note: 'Use orders_v2' });
   });
 });
 

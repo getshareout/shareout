@@ -178,6 +178,8 @@ export async function recordCertification(
     decidedBy: string;
   }
 ): Promise<CertificationRecord> {
+  // The one write path for decisions; the schema leaves the vocabulary to this check.
+  if (!isCertDecision(input.decision)) throw new Error(`Unknown certification decision: ${String(input.decision)}`);
   const id = generateId('ccert');
   const decidedAt = new Date().toISOString();
   await env.DB.prepare(
