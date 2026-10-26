@@ -34,7 +34,7 @@ Without the two variables `--dense` / `--model` stop before running (except `loc
 
 Every run prints the report and writes `.eval/knowledge/results/<time>-<mode>[-<model>].{json,md}`
 plus `.eval/knowledge/latest.{json,md}` (gitignored). The JSON keeps every question's ranks
-and its top-10 doc ids, for digging into a regression. When `baseline.json` exists the
+and its top 10 hits (`doc § section`), for digging into a regression. When `baseline.json` exists the
 report ends with **Δ vs baseline** per slice and the questions whose first gold passage
 entered or left the top 10 — that table is what goes in a knowledge PR.
 
@@ -138,8 +138,11 @@ How it was made:
    and private near-duplicates owned by another member (a 2027 draft rate card, an
    unreviewed draft report, a draft returns policy, confidential salary bands…).
 4. `npm run eval:knowledge -- --check` enforces the rules below; the eval itself re-checks
-   every evidence against the passages the real chunker produced. Questions were then
-   reviewed for ambiguity, and cross-cluster multi-hop questions were added by hand.
+   every evidence against the passages the real chunker produced. Cross-cluster multi-hop
+   questions were added by hand. Every question whose gold wasn't ranked first was then
+   reviewed (LLM, then by hand) against the passages ranked above it, looking for a second
+   right answer or an underspecified question; that review added the section-scoped alts
+   below.
 
 Question rules:
 
@@ -161,4 +164,5 @@ Question rules:
 - Add docs to a cluster's `_manifest.json`, questions to its golden file (next free id),
   then `npm run eval:knowledge -- --check` and a run.
 - After a change that moves the numbers on purpose lands, re-baseline in that PR with
-  `npm run eval:knowledge -- --baseline` (keyword) and commit `BASELINE.md` + `baseline.json`.
+  `npm run eval:knowledge -- --baseline` (keyword-only: the path every install has) and
+  commit `BASELINE.md` + `baseline.json`; update its notes by hand.
