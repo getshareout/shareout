@@ -4,6 +4,7 @@
 // member meets: Catalog, Knowledge KPIs, and the first tab naming the real section.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildWorkspaceBody } from '../../../src/pages/home/render-workspace/template';
+import { WORKSPACE_SHELL_STYLES } from '../../../src/pages/home/render-workspace/styles-shell';
 import { workspace_client_new_menu_JS as newMenuJs } from '../../../src/pages/home/render-workspace/client-script/new-menu';
 import { workspace_client_preamble_JS as preambleJs } from '../../../src/pages/home/render-workspace/client-script/preamble';
 import { workspace_client_inspector_JS as inspectorJs } from '../../../src/pages/home/render-workspace/client-script/inspector';
@@ -72,6 +73,10 @@ describe('New button — only where the viewer can create', () => {
 });
 
 describe('Rail structure', () => {
+  it('hidden lenses stay hidden (.wsx-lens display:flex must not override [hidden])', () => {
+    expect(WORKSPACE_SHELL_STYLES).toContain('.wsx-lens[hidden] { display: none; }');
+  });
+
   const rbase = { user: { id: 'u', email: null }, userInfo: null, workspaces: [], workspace: '', workspaceId: null, workspaceRole: null, createEnabled: true } as unknown as RenderArgs;
   const rail = (a: Partial<RenderArgs>) => buildWorkspaceBody({ ...rbase, ...a } as RenderArgs);
   const visible = (html: string) => Array.from(html.matchAll(/<button class="wsx-lens[^"]*" data-lens="(\w+)" type="button"(?! hidden)/g)).map((m) => m[1]);
