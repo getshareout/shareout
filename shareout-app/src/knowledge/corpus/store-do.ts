@@ -4,7 +4,9 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../../types';
 import type { Chunk } from './chunk';
-import type { ChunkHit, SourceKind, SourceMeta, SourceRow, SourceStats, SourceStatus } from './client';
+import type {
+  CachedAccess, Candidates, CandidateQuery, ChunkHit, SkippedSource, SourceAccess, SourceKind, SourceMeta, SourceRow, SourceStats, SourceStatus,
+} from './client';
 import type { Extraction } from './extract';
 import * as graphSql from './graph-store';
 import { dropStem, keywordSearch, STEM_SCHEMA, writeStem } from './keyword-index';
@@ -66,6 +68,9 @@ export class KnowledgeStore extends DurableObject<Env> {
       const srcCols = new Set(this.sql.exec('PRAGMA table_info(sources)').toArray().map((r) => r.name as string));
       if (!srcCols.has('chunker_version')) this.sql.exec('ALTER TABLE sources ADD COLUMN chunker_version INTEGER NOT NULL DEFAULT 0');
       if (!srcCols.has('fail_count')) this.sql.exec('ALTER TABLE sources ADD COLUMN fail_count INTEGER NOT NULL DEFAULT 0');
+      // Who may see each source, as D1 last said (SourceAccess; NULL = not checked yet).
+      // Search uses it to pick candidates per member; D1 still decides every result.
+      if (!srcCols.has('access')) this.sql.exec('ALTER TABLE sources ADD COLUMN access TEXT');
       this.stemCursor = this.prepareStemIndex();
       if (this.stemCursor !== null && (await state.storage.getAlarm()) === null) await state.storage.setAlarm(Date.now());
     });
@@ -273,8 +278,44 @@ export class KnowledgeStore extends DurableObject<Env> {
     });
   }
 
+  /** Best `limit` chunks for a query, whoever may see them. */
   search(q: string, limit: number): ChunkHit[] {
-    return this.metered(() => keywordSearch(this.q.bind(this), q, limit, this.stemCursor === null).map(toHit));
+    return this.metered(() => keywordSearch(this.q.bind(this), q, limit, this.stemCursor === null).rows.map(toHit));
+  }
+
+  /**
+   * Keyword candidates for one member (search.ts): the best chunks from sources this store
+   * doesn't know to be hidden from them, plus the hidden sources skipped on the way. The
+   * recorded access is a hint — the caller re-checks every source in D1, the ones returned
+   * and the ones skipped, and asks again with D1's answers when they disagree.
+   */
+  searchCandidates(q: string, opts: CandidateQuery): Candidates {
+    return this.metered(() => {
+      const r = keywordSearch(this.q.bind(this), q, opts.limit, this.stemCursor === null, {
+        strictMin: opts.strictMin,
+        filter: { viewer: opts.viewer, exclude: opts.exclude ?? [], include: opts.include ?? [], kinds: opts.kinds?.length ? opts.kinds : null },
+      });
+      const skipped = new Map<string, SkippedSource>();
+      for (const s of r.skipped) {
+        if (!skipped.has(s.ref_id as string)) skipped.set(s.ref_id as string, { refId: s.ref_id as string, kind: s.kind as SourceKind, ...cachedAccess(s) });
+      }
+      return {
+        hits: r.rows.map((row) => ({ ...toHit(row), ...cachedAccess(row) })),
+        skipped: [...skipped.values()],
+        full: r.rows.length >= opts.limit,
+        strict: r.strict,
+      };
+    });
+  }
+
+  /** Remember who may see these sources, as D1 just said (search.ts, when it disagreed). */
+  recordAccess(facts: { refId: string; access: SourceAccess; ownerId: string | null }[]): void {
+    return this.metered(() => {
+      for (const f of facts) {
+        if (!ACCESS.has(f.access)) continue;
+        this.q('UPDATE sources SET access = ?, owner_id = COALESCE(?, owner_id) WHERE ref_id = ?', f.access, f.ownerId, f.refId);
+      }
+    });
   }
 
   chunksByKey(keys: { refId: string; ord: number }[]): ChunkHit[] {
@@ -376,6 +417,13 @@ function toSource(r: Record<string, SqlStorageValue>): SourceRow {
     chunkCount: r.chunk_count as number,
     updatedAt: r.updated_at as string,
   };
+}
+
+const ACCESS = new Set<string>(['all', 'owner', 'none'] satisfies SourceAccess[]);
+
+function cachedAccess(r: Record<string, SqlStorageValue>): CachedAccess {
+  const access = r.access as string | null;
+  return { access: access && ACCESS.has(access) ? (access as SourceAccess) : null, ownerId: (r.owner_id as string | null) ?? null };
 }
 
 function toHit(r: Record<string, SqlStorageValue>): ChunkHit {
