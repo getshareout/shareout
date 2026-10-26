@@ -15,11 +15,17 @@ const THUMB_HEIGHT = 750;
 const CARD_SCALE = 0.6;
 const NAV_TIMEOUT = 20000;
 
-interface WaitOptions {
+export type RenderBrowser = Awaited<ReturnType<typeof puppeteer.launch>>;
+export type RenderPage = Awaited<ReturnType<RenderBrowser['newPage']>>;
+
+export interface WaitOptions {
   /** Max time (ms) to wait for in-flight requests (e.g. BigQuery) to settle. */
   idleTimeout?: number;
   /** Extra fixed settle delay (ms) after network idle, for chart paint. */
   settleMs?: number;
+  /** Wait for `window.__shareoutReady` (up to idleTimeout) even on a page that does
+   *  not visibly declare it — report emails read `__shareoutExport` right after. */
+  requireReadyFlag?: boolean;
 }
 
 export interface RenderOptions extends WaitOptions {
@@ -39,6 +45,69 @@ export interface PdfOptions extends WaitOptions {
 }
 
 /**
+ * Run `session` with one Browser Rendering session for an artifact. Records the
+ * browser seconds against the artifact and always closes the browser. Returns null
+ * when BROWSER is unbound or the session throws.
+ */
+export async function withArtifactBrowser<T>(
+  env: Env,
+  artifactId: string,
+  session: (browser: RenderBrowser) => Promise<T>,
+): Promise<T | null> {
+  if (!env.BROWSER) return null;
+  let browser: RenderBrowser | null = null;
+  const startedAt = Date.now();
+  try {
+    browser = await puppeteer.launch(env.BROWSER as Parameters<typeof puppeteer.launch>[0]);
+    return await session(browser);
+  } catch (err) {
+    console.error('withArtifactPage failed', { artifactId, error_stack: (err as Error)?.stack || String(err) });
+    return null;
+  } finally {
+    if (browser) {
+      await browser.close().catch(() => {});
+      await recordBrowserSince(env, artifactId, startedAt);
+    }
+  }
+}
+
+/** True when the page takes part in the `__shareoutReady` protocol: the flag is
+ *  already defined, or an inline script mentions it. */
+async function declaresReadyFlag(page: RenderPage): Promise<boolean> {
+  return (await page.evaluate(() => {
+    const g = globalThis as any;
+    if ('__shareoutReady' in g) return true;
+    const scripts: any[] = Array.prototype.slice.call(g.document?.scripts ?? []);
+    return scripts.some((s) => !s.src && String(s.textContent || '').includes('__shareoutReady'));
+  }).catch(() => false)) === true;
+}
+
+/**
+ * Wait until a loaded artifact has painted. A page that takes part in the
+ * `window.__shareoutReady` protocol is waited on until it sets the flag (data has
+ * rendered). Any other page is done at the first of the flag or network idle —
+ * waiting on a flag it never sets used to burn the whole idleTimeout. concurrency:2
+ * tolerates the persistent realtime/comments socket that would otherwise keep the
+ * page from ever going "idle". Then web fonts, then a fixed settle for chart paint.
+ */
+export async function waitForArtifactReady(page: RenderPage, waits: WaitOptions): Promise<void> {
+  const idleTimeout = waits.idleTimeout ?? 8000;
+  const settleMs = waits.settleMs ?? 1200;
+  const flag = page.waitForFunction('window.__shareoutReady === true', { timeout: idleTimeout });
+  const networkIdle = () => page.waitForNetworkIdle({ idleTime: 1000, timeout: idleTimeout, concurrency: 2 });
+  if (waits.requireReadyFlag || await declaresReadyFlag(page)) {
+    await flag.catch(() => {});
+    await networkIdle().catch(() => {});
+  } else {
+    await Promise.any([flag, networkIdle()]).catch(() => {});
+  }
+  await page.evaluate(() =>
+    (globalThis as any).document?.fonts?.ready ?? Promise.resolve()
+  ).catch(() => {});
+  await new Promise((r) => setTimeout(r, settleMs));
+}
+
+/**
  * Open an artifact's production page in headless Chromium, wait for its data to
  * load and paint, then hand the live page to `capture`. Mints a short-lived capture
  * link and read-only data session so private artifacts render real content instead of
@@ -50,15 +119,14 @@ export interface PdfOptions extends WaitOptions {
  *
  * Data-heavy artifacts (e.g. BigQuery-backed dashboards) can set
  * `window.__shareoutReady = true` once their data has rendered; the renderer
- * waits for that flag before capturing. Absent the flag it falls back to a
- * network-idle heuristic that tolerates the persistent realtime socket.
+ * waits for that flag before capturing (see waitForArtifactReady).
  */
 export async function withArtifactPage<T>(
   env: Env,
   artifactId: string,
   viewport: { width: number; height: number },
   waits: WaitOptions,
-  capture: (page: Awaited<ReturnType<Awaited<ReturnType<typeof puppeteer.launch>>['newPage']>>) => Promise<T>,
+  capture: (page: RenderPage) => Promise<T>,
   // versionId: pin a specific (candidate) version to render instead of the live
   //   deployment — used by Artifact Tests BLOCK-mode gating.
   // beforeNavigate: hook run after the page is created and BEFORE navigation, so a
@@ -66,7 +134,7 @@ export async function withArtifactPage<T>(
   //   (the capture callback runs post-navigation, too late for that). T1 smoke.
   opts: {
     versionId?: string;
-    beforeNavigate?: (page: Awaited<ReturnType<Awaited<ReturnType<typeof puppeteer.launch>>['newPage']>>) => void;
+    beforeNavigate?: (page: RenderPage) => void;
   } = {}
 ): Promise<T | null> {
   if (!env.BROWSER) return null;
@@ -81,23 +149,12 @@ export async function withArtifactPage<T>(
   if (!dep?.slug) return null;
 
   const base = getPlatformOrigin(env);
-  // Render the dedicated capture view: the bare artifact HTML at top-level (no
-  // sandbox iframe, no toolbar), authorized by a short-lived signed token. Its data
-  // calls carry a READ-ONLY session (owner_test), attached by the request policy
-  // below rather than put in the page, so they read this artifact's data but can
-  // never mutate. This is the only way full-height capture works — the normal viewer
-  // nests the dashboard in a fixed-height, cross-origin iframe we can't reach into.
+  // Its data calls carry a READ-ONLY session (owner_test), attached by the request
+  // policy below rather than put in the page, so they read this artifact's data but
+  // can never mutate.
   const { link, session } = await mintCaptureCredentials(env, artifactId);
-  const verPin = opts.versionId ? `&_ver=${encodeURIComponent(opts.versionId)}` : '';
-  const url = `${base}/a/${dep.slug}/?_capture=${encodeURIComponent(link)}${verPin}`;
-
-  const idleTimeout = waits.idleTimeout ?? 8000;
-  const settleMs = waits.settleMs ?? 1200;
-
-  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
-  const startedAt = Date.now();
-  try {
-    browser = await puppeteer.launch(env.BROWSER as Parameters<typeof puppeteer.launch>[0]);
+  const url = captureUrl(link, `${base}/a/${dep.slug}/`, opts.versionId);
+  return withArtifactBrowser(env, artifactId, async (browser) => {
     const page = await browser.newPage();
     await page.setViewport({ ...viewport, deviceScaleFactor: 2 });
     const guard = await guardCapturePage(page, captureOwnHosts(env), {
@@ -105,18 +162,7 @@ export async function withArtifactPage<T>(
     });
     if (opts.beforeNavigate) opts.beforeNavigate(page);
     await page.goto(url, { waitUntil: 'load', timeout: NAV_TIMEOUT });
-
-    // Preferred signal: the artifact tells us its data has rendered.
-    await page.waitForFunction('window.__shareoutReady === true', { timeout: idleTimeout }).catch(() => {});
-    // Fallback: wait for data requests (BigQuery etc.) to finish. concurrency:2
-    // tolerates the persistent realtime/comments socket that would otherwise
-    // keep the page from ever going "idle".
-    await page.waitForNetworkIdle({ idleTime: 1000, timeout: idleTimeout, concurrency: 2 }).catch(() => {});
-    await page.evaluate(() =>
-      (globalThis as any).document?.fonts?.ready ?? Promise.resolve()
-    ).catch(() => {});
-    await new Promise((r) => setTimeout(r, settleMs));
-
+    await waitForArtifactReady(page, waits);
     const result = await capture(page);
     const privateAddress = guard.privateResponse();
     if (privateAddress) {
@@ -124,18 +170,21 @@ export async function withArtifactPage<T>(
       return null;
     }
     return result;
-  } catch (err) {
-    console.error('withArtifactPage failed', { artifactId, slug: dep.slug, error_stack: (err as Error)?.stack || String(err) });
-    return null;
-  } finally {
-    if (browser) {
-      await browser.close().catch(() => {});
-      await recordBrowserSince(env, artifactId, startedAt);
-    }
-  }
+  });
 }
 
-type RenderPage = Awaited<ReturnType<Awaited<ReturnType<typeof puppeteer.launch>>['newPage']>>;
+/**
+ * The dedicated capture view: the bare artifact HTML at top-level (no sandbox iframe,
+ * no toolbar), opened with a capture link token (auth/capture-session.ts). This is the
+ * only way full-height capture works — the normal viewer nests the dashboard in a
+ * fixed-height, cross-origin iframe we can't reach into. `base` is the page URL
+ * without a query: the platform `/a/{slug}/` path, or the artifact's content-origin
+ * URL (verify). `versionId` pins a version that is not live.
+ */
+export function captureUrl(link: string, base: string, versionId?: string): string {
+  const verPin = versionId ? `&_ver=${encodeURIComponent(versionId)}` : '';
+  return `${base}?_capture=${encodeURIComponent(link)}${verPin}`;
+}
 
 // Runs in the browser: flatten internal scroll containers (app shells often
 // wrap content in an overflow:auto div of fixed/viewport height, so the document
@@ -192,6 +241,28 @@ async function growToContent(page: RenderPage, maxW = 2000, maxH = 18000): Promi
   await page.evaluate(flattenScrollers).catch(() => {});
   dims = await measure().catch(() => ({ w, h }));
   return { w: Math.min(Math.max(dims.w, w), maxW), h: Math.min(Math.max(dims.h, h), maxH) };
+}
+
+/**
+ * growToContent for a fixed-width capture: flatten inner scrollers and grow only the
+ * viewport height (keeping width, scale and mobile emulation), so a phone-width
+ * page is captured at phone width — horizontal overflow and all. Returns the height.
+ */
+export async function growToContentHeight(page: RenderPage, maxH: number): Promise<number> {
+  await page.evaluate(flattenScrollers).catch(() => {});
+  await new Promise((r) => setTimeout(r, 300));
+  const h = await page.evaluate(() => {
+    const d = (globalThis as any).document.documentElement;
+    const b = (globalThis as any).document.body;
+    return Math.max(d.scrollHeight, b ? b.scrollHeight : 0);
+  }).catch(() => 0) as number;
+  const vp = page.viewport();
+  const height = Math.min(Math.max(h, vp?.height ?? 1), maxH);
+  if (vp && height !== vp.height) {
+    await page.setViewport({ ...vp, height }).catch(() => {});
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  return height;
 }
 
 /** Render an artifact's production page to image bytes. */
@@ -294,7 +365,7 @@ export async function captureArtifactReport(
 ): Promise<CapturedReport> {
   const width = opts.width ?? 1280;
   const height = opts.height ?? 900;
-  const waits: WaitOptions = { idleTimeout: opts.idleTimeout ?? 12000, settleMs: opts.settleMs ?? 1500 };
+  const waits: WaitOptions = { idleTimeout: opts.idleTimeout ?? 12000, settleMs: opts.settleMs ?? 1500, requireReadyFlag: true };
 
   const out = await withArtifactPage(env, artifactId, { width, height }, waits, async (page) => {
     const data = (await page.evaluate(() => {
@@ -333,19 +404,34 @@ export async function generateArtifactThumbnail(env: Env, artifactId: string): P
     // Give data-heavy dashboards (BigQuery etc.) time to render before snapping
     // the first screen, matching the PDF path — avoids blank/skeleton previews.
     { idleTimeout: 12000, settleMs: 1500 },
-    async (page) => {
-      const clip = { x: 0, y: 0, width: THUMB_WIDTH, height: THUMB_HEIGHT };
-      // Full preview at the 2x device scale set in withArtifactPage → 2400×1500.
-      const full = (await page.screenshot({ type: 'webp', quality: 88, clip } as Parameters<typeof page.screenshot>[0])) as unknown as ArrayBuffer;
-      // Re-rasterize the identical layout at a lower device scale for the card image.
-      await page.setViewport({ width: THUMB_WIDTH, height: THUMB_HEIGHT, deviceScaleFactor: CARD_SCALE }).catch(() => {});
-      await new Promise((r) => setTimeout(r, 200));
-      const card = (await page.screenshot({ type: 'webp', quality: 90, clip } as Parameters<typeof page.screenshot>[0])) as unknown as ArrayBuffer;
-      return { full, card };
-    }
+    captureThumbnailShots,
   );
   if (!shots) return false;
+  await storeThumbnail(env, artifactId, shots);
+  return true;
+}
 
+export interface ThumbnailShots {
+  full: ArrayBuffer;
+  card: ArrayBuffer;
+}
+
+/** The thumbnail viewport: callers on another viewport set this before capturing. */
+export const THUMBNAIL_VIEWPORT = { width: THUMB_WIDTH, height: THUMB_HEIGHT, deviceScaleFactor: 2 } as const;
+
+/** Both previews from a page already at THUMBNAIL_VIEWPORT. */
+export async function captureThumbnailShots(page: RenderPage): Promise<ThumbnailShots> {
+  const clip = { x: 0, y: 0, width: THUMB_WIDTH, height: THUMB_HEIGHT };
+  // Full preview at the 2x device scale → 2400×1500.
+  const full = (await page.screenshot({ type: 'webp', quality: 88, clip } as Parameters<typeof page.screenshot>[0])) as unknown as ArrayBuffer;
+  // Re-rasterize the identical layout at a lower device scale for the card image.
+  await page.setViewport({ width: THUMB_WIDTH, height: THUMB_HEIGHT, deviceScaleFactor: CARD_SCALE }).catch(() => {});
+  await new Promise((r) => setTimeout(r, 200));
+  const card = (await page.screenshot({ type: 'webp', quality: 90, clip } as Parameters<typeof page.screenshot>[0])) as unknown as ArrayBuffer;
+  return { full, card };
+}
+
+export async function storeThumbnail(env: Env, artifactId: string, shots: ThumbnailShots): Promise<void> {
   await env.ARTIFACTS.put(`thumbnails/${artifactId}.webp`, shots.full, {
     httpMetadata: { contentType: 'image/webp', cacheControl: 'public, max-age=86400' },
   });
@@ -357,8 +443,6 @@ export async function generateArtifactThumbnail(env: Env, artifactId: string): P
     thumbnail_generated_at: new Date().toISOString(),
     thumbnail_ext: 'webp',
   });
-
-  return true;
 }
 
 /** Render arbitrary HTML to a PNG screenshot (admin briefs, etc.). */

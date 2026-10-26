@@ -194,7 +194,7 @@ window.__shareoutReady = true;   // REQUIRED — tells the renderer data is read
 Contract — every one of these is load-bearing (omitting any silently falls back to the plain `html`):
 
 - **Bootstrap with `await ShareOut.create()`** (not `new ShareOut()`, and there is no `ShareOut.connect()`). If `create()` throws or is misnamed, the page never sets `__shareoutExport` and the email falls back to `config.html`.
-- **Set `window.__shareoutReady = true`** once the page has rendered with data — in *every* code path (success, empty, and error). The renderer waits for this flag before capturing; without it the capture races your async data load and grabs nothing.
+- **Set `window.__shareoutReady = true`** once the page has rendered with data — in *every* code path (success, empty, and error). The renderer waits for this flag before capturing; without it the capture races your async data load and grabs nothing. Report emails always wait for it (up to 12 s); other captures (thumbnails, PDFs, verify) wait only for a page that visibly uses it — the flag is defined at load or an inline script mentions it — so if you set it from a separate `.js` file after async work, also put `window.__shareoutReady = false;` in an inline `<script>` at the top of the page.
 - **Inline every style in `emailHtml`.** Use table-based layout for KPI rows/grids (Outlook ignores fl/grid). The on-page CSS in `<style>`/`<head>` is for the dashboard view only.
 - Keep `html` set to a short plain fallback (e.g. `"<p>Report attached.</p>"`) — it ships only if the render fails, so seeing it in your inbox means the contract above broke.
 

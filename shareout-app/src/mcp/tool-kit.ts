@@ -15,7 +15,7 @@ export interface ToolContext {
 }
 
 export interface ToolResult {
-  content: Array<{ type: 'text'; text: string }>;
+  content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>;
   structuredContent?: Record<string, unknown>;
   isError?: boolean;
 }

@@ -28,6 +28,7 @@ import { invalidIntParam } from '../http/query-params';
 import type { ArtifactDetail, ArtifactSummary } from './types';
 import { setPresentation, type PresentationFields } from './satellites';
 import { parseTagList, replaceTags } from './tags';
+import { deleteVerifyRuns } from '../verify/store';
 
 // Soft-deleted artifacts are recoverable for this many days, then a daily cron
 // sweep (purgeSoftDeleted) runs the real hard purge.
@@ -907,6 +908,7 @@ export async function purgeArtifact(
     await env.ARTIFACTS.delete(`thumbnails/${artifactId}.${ext}`).catch(() => {});
     await env.ARTIFACTS.delete(`thumbnails/${artifactId}_card.${ext}`).catch(() => {});
   }
+  await deleteVerifyRuns(env, artifactId).catch(() => {});
 
   await invalidateDeploymentCache(env, slug, artifactId, routeKeys);
 }

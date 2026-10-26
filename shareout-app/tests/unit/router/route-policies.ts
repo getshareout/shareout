@@ -181,6 +181,7 @@ export const MCP_TOOL_POLICIES: Record<string, McpToolPolicy> = {
   update_artifact: 'artifact',
   read_artifact: 'artifact',
   edit_artifact: 'artifact',
+  verify_artifact: 'artifact',
   fetch: 'artifact',
   list_versions: 'artifact',
   get_version_source: 'artifact',

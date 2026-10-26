@@ -48,6 +48,8 @@ const AGENT_OPERATIONS = [
   ['/v1/artifacts', 'get'],
   ['/v1/artifacts/{id}', 'get'],
   ['/v1/artifacts/{id}', 'patch'],
+  ['/v1/artifacts/{id}/verify', 'post'],
+  ['/v1/artifacts/{id}/verify/latest', 'get'],
   ['/v1/search', 'get'],
   ['/v1/support/tickets', 'post'],
   ['/v1/support/tickets', 'get'],
@@ -94,7 +96,8 @@ function buildAgentSpec(spec) {
       title: 'ShareOut API (agent essentials)',
       description:
         'The small set of ShareOut calls an AI agent needs to publish pages for a person: ' +
-        'check the key, list workspaces, publish, find and update pages, and ask the ' +
+        'check the key, list workspaces, publish, check a published page (verify), find and ' +
+        'update pages, and ask the ' +
         'ShareOut team for help. Errors carry `code`, `hint` and `request_id`; on a 5xx or ' +
         'when stuck, create a support ticket quoting the request_id. Full spec: /openapi.json.',
     },

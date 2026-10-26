@@ -210,7 +210,7 @@ export async function handleServe(
   // Capture mode short-circuit: a signed capture token authorizes the renderer to
   // get the bare, un-sandboxed HTML at top-level. Bypasses the login gate (the
   // token is the capability) and the iframe wrapper.
-  if (captureToken && !assetPath && result.mime === 'text/html') {
+  if (captureToken && (assetPath || result.mime === 'text/html')) {
     const payload = await verifyAccessToken(captureToken, result.artifact_id, env);
     // Capture tokens authorize a headless render. 'capture' is the token every render
     // mints now; 'capture_test' is still accepted for any in-flight tokens minted by
@@ -226,20 +226,44 @@ export async function handleServe(
     ) {
       return new Response('Forbidden', { status: 403 });
     }
-    const writableCapture = payload.authType === 'capture_verify';
     // Version-pinned capture: the renderer can pin a specific version (?_ver=) so
     // Artifact Tests can render a CANDIDATE version that isn't the live deployment
     // (BLOCK-mode gating). Capability is the capture token; the version must belong
-    // to this artifact. Without _ver, capture the live deployment's entrypoint.
+    // to this artifact. Without _ver, capture the live deployment.
     const verPin = url.searchParams.get('_ver');
-    let captureAsset: { r2_key: string; mime: string; size_bytes: number } | null =
-      result.r2_key && result.size_bytes ? { r2_key: result.r2_key, mime: result.mime, size_bytes: result.size_bytes } : null;
-    if (verPin && verPin !== result.version_id) {
+    const pinned = !!verPin && verPin !== result.version_id;
+    type CaptureAsset = { r2_key: string; mime: string; size_bytes: number };
+    // The page's own files in a capture render: verify adds ?_capture= (and ?_ver= when
+    // it pins a version) to them, so a pinned version renders with its own CSS/JS and a
+    // private page's files load without a session cookie. Served `private, no-store`.
+    if (assetPath) {
+      const file: CaptureAsset | null = pinned
+        ? await env.DB.prepare(`
+            SELECT ast.r2_key, ast.mime, ast.size_bytes
+            FROM assets ast JOIN versions v ON v.id = ast.version_id
+            WHERE ast.version_id = ? AND ast.path = ? AND v.artifact_id = ?
+          `).bind(verPin, assetPath, result.artifact_id).first<CaptureAsset>()
+        : result.r2_key && result.mime && result.size_bytes
+          ? { r2_key: result.r2_key, mime: result.mime, size_bytes: result.size_bytes }
+          : null;
+      if (!file) return notFound();
+      return serveAsset(request, env, file, slug, true, {
+        noStore: true, relaxCsp: true, sandbox: !contentOrigin, executionCtx: opts.executionCtx,
+      });
+    }
+    const writableCapture = payload.authType === 'capture_verify';
+    // ?v=mobile captures the version's mobile entrypoint when it has one (verify's phone view).
+    let captureAsset: CaptureAsset | null =
+      result.r2_key && result.mime && result.size_bytes ? { r2_key: result.r2_key, mime: result.mime, size_bytes: result.size_bytes } : null;
+    if (pinned) {
       captureAsset = await env.DB.prepare(`
         SELECT ast.r2_key, ast.mime, ast.size_bytes
-        FROM versions v JOIN assets ast ON ast.version_id = v.id AND ast.path = v.entrypoint
+        FROM versions v JOIN assets ast ON ast.version_id = v.id
+          AND ast.path = CASE WHEN ? = 1 AND v.mobile_entrypoint IS NOT NULL THEN v.mobile_entrypoint ELSE v.entrypoint END
         WHERE v.id = ? AND v.artifact_id = ?
-      `).bind(verPin, result.artifact_id).first<{ r2_key: string; mime: string; size_bytes: number }>();
+      `).bind(forceMobile ? 1 : 0, verPin, result.artifact_id).first<CaptureAsset>();
+    } else if (forceMobile && mobileEntryAsset) {
+      captureAsset = mobileEntryAsset;
     }
     if (!captureAsset || captureAsset.mime !== 'text/html') {
       return new Response('Not Found', { status: 404 });

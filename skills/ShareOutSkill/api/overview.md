@@ -45,6 +45,7 @@ For protected endpoints, include one of:
 | Domain | File | Endpoints |
 |--------|------|-----------|
 | **Publish** | [artifacts.md](artifacts.md) | `/v1/publish`, `/v1/artifacts` |
+| **Verify** | [verify.md](verify.md) | `/v1/artifacts/{id}/verify` (what viewers see and what broke, desktop + phone) |
 | **Search** | [search.md](search.md) | `/v1/search` (ranked fuzzy search: pages, folders, datasets, connectors) |
 | **Auth** | [artifacts.md](artifacts.md) | `/auth/google`, `/auth/callback` |
 | **Data** | [artifacts.md](artifacts.md) | `/v1/data/{id}/json`, `/v1/data/{id}/tables` |
@@ -111,6 +112,7 @@ python3 build_payload.py | curl -sS -X POST "$ORIGIN/v1/publish" \
 | Endpoint | Limit |
 |----------|-------|
 | Publish | 100/day per user |
+| Verify | 30/hour per user (instance setting `VERIFY_RUNS_PER_HOUR`) |
 | Data API | No dedicated limiter today — don't rely on a specific number |
 | Email | 50/day per user, 10/day per artifact |
 | CORS Proxy | 100/min per artifact |

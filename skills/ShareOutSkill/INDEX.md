@@ -80,6 +80,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Run Python in-browser | [sdk/python.md](sdk/python.md) | [integrations/overview.md](integrations/overview.md) |
 | Scheduled notifications | [api/jobs.md](api/jobs.md) | [api/overview.md](api/overview.md) |
 | Deterministic warehouse/json snapshot refresh | [api/jobs.md](api/jobs.md#querysnapshotconfig) | [agents/crew.md](agents/crew.md), [sdk/connections.md](sdk/connections.md) |
+| Check a published page: what viewers see, what broke (desktop + phone) | [api/verify.md](api/verify.md) | [creating/pre-ship.md](creating/pre-ship.md) |
 | Add a safety net / test an artifact won't break on change | [api/tests.md](api/tests.md) | [sdk/table.md](sdk/table.md), [sdk/json.md](sdk/json.md) |
 | Alert when a metric/KPI crosses a threshold | [api/metric-alerts.md](api/metric-alerts.md) | [patterns/dashboards.md](patterns/dashboards.md#followable-kpis-metric-alerts) |
 | Watch a table metric for sharp moves (bell only) | [api/metric-watch.md](api/metric-watch.md) | [patterns/dashboards.md](patterns/dashboards.md#one-click-metric-watches-simpler) |
