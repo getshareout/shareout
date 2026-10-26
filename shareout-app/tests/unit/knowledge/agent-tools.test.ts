@@ -97,6 +97,24 @@ describe('knowledge_search tool', () => {
     })) as { nodes: { path: string }[] };
     expect(r.nodes[0].path).toBe('topics/retention.md');
   });
+
+  it('finds this workspace’s notes behind nearer notes of other workspaces', async () => {
+    await seed();
+    let topK = 0;
+    const fakeAI = { run: async () => ({ data: [[0.1, 0.2, 0.3]] }) } as unknown as Env['AI'];
+    const elsewhere = Array.from({ length: 40 }, (_, i) => ({ id: `kn:wsp_other:topics/t${i}.md` }));
+    const fakeVectorize = {
+      query: async (_v: unknown, o: { topK: number }) => {
+        topK = o.topK;
+        return { matches: [...elsewhere, { id: `kn:${WS}:topics/retention.md` }].slice(0, o.topK) };
+      },
+    } as unknown as Env['VECTORIZE'];
+    const r = (await knowledgeSearchTool.execute(ctx(WS, { AI: fakeAI, VECTORIZE: fakeVectorize }), {
+      query: 'how sticky are users',
+    })) as { nodes: { path: string }[] };
+    expect(topK).toBe(100);
+    expect(r.nodes.map((n) => n.path)).toEqual(['topics/retention.md']);
+  });
 });
 
 describe('knowledge_get tool', () => {

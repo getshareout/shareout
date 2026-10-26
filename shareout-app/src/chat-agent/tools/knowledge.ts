@@ -10,6 +10,10 @@ import { DISPLAY_SOURCES, readableNodes, sourceArtifacts } from '../../knowledge
 
 const MAX_RESULTS = 20;
 const SEMANTIC_TOPK = 15;
+// Notes of every workspace share one index namespace, so the nearest ones are fetched at
+// Vectorize's maximum (100 without values or metadata) and cut to SEMANTIC_TOPK only after
+// keeping this workspace's notes the member may read.
+const SEMANTIC_FETCH = 100;
 const EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
 const EMBED_TEXT_CAP = 2000;
 const DISABLED_MESSAGE = "Knowledge isn't turned on for this workspace.";
@@ -75,7 +79,7 @@ async function semanticPaths(env: Env, wsId: string, query: string): Promise<str
     const values = res.data?.[0];
     if (!values) return [];
     const q = await env.VECTORIZE.query(values, {
-      topK: SEMANTIC_TOPK,
+      topK: SEMANTIC_FETCH,
       namespace: 'knowledge',
       returnValues: false,
       returnMetadata: false,
@@ -135,7 +139,7 @@ export const knowledgeSearchTool: AccountTool = {
 
     let results: KnowledgeNode[];
     if (query.trim()) {
-      const semantic = await semanticPaths(ctx.env, wsId, query);
+      const semantic = (await semanticPaths(ctx.env, wsId, query)).filter(p => byPath.has(p)).slice(0, SEMANTIC_TOPK);
       const substr = substringPaths(nodes, query);
       const seen = new Set<string>();
       results = [];
