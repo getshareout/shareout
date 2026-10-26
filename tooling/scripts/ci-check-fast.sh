@@ -7,10 +7,10 @@
 # graph). Force the whole suite with SHAREOUT_FULL_TESTS=1.
 #
 # SHAREOUT_CHECK_MODE=light skips every test run: static checks + eslint on changed
-# files, typecheck, secrets and bundles only. The pre-push hook uses it for
-# feature branches: parallel agents each running suites on one machine starve each other
-# into timeouts. Tests run once, on the integrated result, via tooling/scripts/integrate.sh
-# before anything reaches main.
+# files, worker + workspace typechecks, secrets and bundles only. The pre-push hook uses
+# it for feature branches: parallel agents each running suites on one machine starve
+# each other into timeouts. Tests run once, on the integrated result
+# (tooling/scripts/integrate.sh), before anything reaches main.
 #
 # Independent checks run in parallel; each one's output is printed only if it fails.
 # check:bundles runs last, alone: it rewrites public/_bundles/ (as does the
@@ -84,12 +84,13 @@ static_checks() {
   lint_changed
 }
 
+# Workspace suites run as their own jobs below, so test:affected skips them here.
 app_tests() {
   if [ "${SHAREOUT_FULL_TESTS:-}" = "1" ]; then
     npm test -- --reporter=dot
   else
     npm run test:critical -- --reporter=dot
-    npm run test:affected
+    SHAREOUT_AFFECTED_WORKSPACES=0 npm run test:affected
   fi
 }
 
@@ -125,6 +126,12 @@ if [ "$LIGHT" = "0" ]; then
   job chat-core workspace chat-core
   job sdk workspace sdk
   job editor workspace editor-client
+else
+  # Typechecks only (0.4–0.9 s each): sdk/, editor-client/ and chat-core/ changes are
+  # otherwise unchecked until integration.
+  job chat-core-types npm run typecheck --workspace @shareout/chat-core
+  job sdk-types npm run typecheck --workspace @shareout/sdk
+  job editor-types npm run typecheck --workspace @shareout/editor-client
 fi
 
 FAILED=()
