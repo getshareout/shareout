@@ -288,8 +288,8 @@ knows (connections, refresh jobs, crews, sheet syncs, datasets, metrics, MCP con
 Anyone who can open the page may call it (session, password, guest, public link, or a
 personal API token); everyone else gets `404`. Query params: `page=<html path>` for one
 page of a multi-page site; `version=<no|id>` is editors-only (`403` otherwise). Signed-out
-callers share a per-IP budget (`429 RATE_LIMIT_EXCEEDED`); answers are cached for about a
-minute.
+callers share a per-IP budget (`429 RATE_LIMIT_EXCEEDED`); viewers' answers are cached for
+about a minute, editors always get a fresh one.
 
 ```json
 {
