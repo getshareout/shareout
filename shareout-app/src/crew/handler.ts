@@ -18,7 +18,7 @@ import {
 } from './store';
 import { cronCadenceNotice } from '../scheduling/jobs/cron';
 import { runCrew } from './run-loop';
-import { resolveCrewLimits, countActiveRuns, maxRuntimeMsError } from './limits';
+import { resolveCrewLimits, countActiveRuns, crewCapsError } from './limits';
 import { listApprovals, getApproval, approveAndExecute, rejectApproval } from './approvals';
 
 function methodNotAllowed(ctx: DataContext): Response {
@@ -162,8 +162,9 @@ async function handleDefine(request: Request, ctx: DataContext, patch = false): 
   } catch {
     return errorResponse(DATA_ERRORS.INVALID_JSON, ctx.origin);
   }
-  const runtimeError = maxRuntimeMsError(body.maxRuntimeMs);
-  if (runtimeError) return errorResponse({ ...DATA_ERRORS.INVALID_REQUEST, message: runtimeError }, ctx.origin);
+  const { max_iterations_cap } = await resolveCrewLimits(ctx.env, (await resolveOwnerId(ctx)) ?? '');
+  const capsError = crewCapsError(body as Record<string, unknown>, max_iterations_cap);
+  if (capsError) return errorResponse({ ...DATA_ERRORS.INVALID_REQUEST, message: capsError }, ctx.origin);
   if (patch && !(await getCrew(ctx.env, ctx.artifactId))) {
     return errorResponse({ ...DATA_ERRORS.NOT_FOUND, message: 'No crew defined. Call POST /crew/define first.' }, ctx.origin);
   }

@@ -14,7 +14,7 @@ const FALLBACK: CrewLimits = {
   max_crews_per_artifact: 1,
   max_concurrent_runs: 1,
   default_run_budget_micro_usd: 250000,
-  max_iterations_cap: 8,
+  max_iterations_cap: 40,
 };
 
 /** Resolve the crew limits for an owner from users.tier → plan_crew_limits. */
@@ -45,16 +45,30 @@ export async function countActiveRuns(env: Env, ownerId: string): Promise<number
  *  series inside ONE cron invocation (15 min wall, shared with jobs, imports and sweeps; crews get an 8 min dispatch
  *  budget), so a single run can't take the whole 15 min. The run is mostly waiting on the model (I/O, not CPU). */
 export const MAX_SCHEDULED_RUNTIME_MS = 300_000;
-export const MIN_RUNTIME_MS = 5_000;
+export const MAX_ITERATIONS = 40;
+export const MAX_TOKENS_PER_CALL = 16_384;
+
+const CAP_BOUNDS = {
+  maxRuntimeMs: { min: 5_000, max: MAX_SCHEDULED_RUNTIME_MS, why: ' (5 min): scheduled crew runs share one hourly cron invocation capped at 15 min' },
+  maxIterations: { min: 1, max: MAX_ITERATIONS, why: '' },
+  maxTokensPerCall: { min: 256, max: MAX_TOKENS_PER_CALL, why: '' },
+} as const;
 /** Everything else (manual SSE, event wake in waitUntil, Telegram/alert follow-ups) keeps the 25 s default:
  *  waitUntil work is cut ~30 s after the response. */
 export const DEFAULT_RUNTIME_MS = 25_000;
 
-/** Error message for an out-of-range maxRuntimeMs, or null when it is valid or omitted. */
-export function maxRuntimeMsError(v: unknown): string | null {
-  if (v === undefined) return null;
-  if (typeof v === 'number' && Number.isInteger(v) && v >= MIN_RUNTIME_MS && v <= MAX_SCHEDULED_RUNTIME_MS) return null;
-  return `maxRuntimeMs must be an integer from ${MIN_RUNTIME_MS} to ${MAX_SCHEDULED_RUNTIME_MS} (5 min): scheduled crew runs share one hourly cron invocation capped at 15 min.`;
+/** Error message for the first out-of-range cap in a define/PATCH body, or null when all are valid or omitted.
+ *  maxIterations is also bounded by the owner's plan cap (max_iterations_cap). */
+export function crewCapsError(body: Record<string, unknown>, maxIterationsCap: number): string | null {
+  for (const [key, b] of Object.entries(CAP_BOUNDS)) {
+    const v = body[key];
+    if (v === undefined) continue;
+    const planCapped = key === 'maxIterations' && maxIterationsCap < b.max;
+    const max = planCapped ? maxIterationsCap : b.max;
+    if (typeof v === 'number' && Number.isInteger(v) && v >= b.min && v <= max) continue;
+    return `${key} must be an integer from ${b.min} to ${max}${planCapped ? " (this owner's plan cap)" : b.why}.`;
+  }
+  return null;
 }
 
 export function effectiveMaxRuntimeMs(configured: number, triggerKind: string | null | undefined): number {

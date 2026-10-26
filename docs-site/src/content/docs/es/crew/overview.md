@@ -104,9 +104,12 @@ flowchart LR
 
 | Control | Qué hace |
 | --- | --- |
-| `maxIterations` | Tope de loops por run |
+| `maxIterations` | Tope de loops por run: 8 por defecto, máximo 40 (o el tope del plan del owner) |
+| `maxTokensPerCall` | Tope de tokens de salida por llamada al modelo: 4096 por defecto, máximo 16384 |
 | `runBudgetMicroUsd` | Tope de gasto por run |
 | `maxRuntimeMs` | Tope de duración de runs programados (cron/condition): 25000 por defecto, máximo 300000 (5 min). Runs manuales, por evento y de chat quedan en 25 s |
+
+Un valor fuera de rango se rechaza con `400 INVALID_REQUEST` (no se recorta) en `POST /crew/define` y `PATCH /crew`.
 | Balance AI del workspace | Detiene runs si se agota |
 
 Uso: `sdk.crew.usage(workspaceId)`.

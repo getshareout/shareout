@@ -44,6 +44,7 @@ curl -X POST "https://shareout.site/v1/data/art_abc123/crew/define" \
     "model": "claude-sonnet-5",
     "maxIterations": 6,
     "maxRuntimeMs": 240000,
+    "maxTokensPerCall": 8192,
     "tools": { "read": ["json_get"], "write": ["notify_send"] }
   }'
 ```
@@ -88,11 +89,15 @@ interface CrewDefineConfig {
   name?: string;
   instructions: string;
   model?: 'claude-sonnet-5' | 'claude-haiku-4-5-20251001';
+  /** 1–40 (or the owner's plan cap), default 8. */
   maxIterations?: number;
   runBudgetMicroUsd?: number;
   /** Scheduled (cron/condition) runs only: 5000–300000 ms, default 25000.
-   *  Out of range → 400 INVALID_REQUEST. Manual, event and chat runs stay at 25000. */
+   *  Manual, event and chat runs stay at 25000. */
   maxRuntimeMs?: number;
+  /** Max output tokens per model call: 256–16384, default 4096. */
+  maxTokensPerCall?: number;
+  // A cap out of range → 400 INVALID_REQUEST naming the field and its bounds.
   tools?: CrewToolGrant;
 }
 

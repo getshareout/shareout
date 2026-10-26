@@ -14,10 +14,13 @@ export interface CrewDefineConfig {
   name?: string;
   instructions: string;
   model?: 'claude-sonnet-5' | 'claude-haiku-4-5-20251001';
+  /** Agent loop iterations per run: 1–40 (or the owner's plan cap), default 8. */
   maxIterations?: number;
   runBudgetMicroUsd?: number;
   /** Wall-clock cap for scheduled (cron/condition) runs, in ms: 5000–300000, default 25000. Other runs stay at 25000. */
   maxRuntimeMs?: number;
+  /** Max output tokens per model call: 256–16384, default 4096. */
+  maxTokensPerCall?: number;
   tools?: CrewToolGrant;
 }
 

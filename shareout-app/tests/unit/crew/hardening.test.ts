@@ -203,6 +203,43 @@ describe('crew max runtime (G13 25 s cap)', () => {
     expect(await grants()).toEqual(['json_get']);
   });
 
+  it('maxIterations (≤40) and maxTokensPerCall (≤16384) persist; defaults stay 8 / 4096', async () => {
+    expect((await call('POST', 'define', { name: 'n' })).json.crew).toMatchObject({ max_iterations: 8, max_tokens_per_call: 4096 });
+    const r = await call('PATCH', '', { maxIterations: 30, maxTokensPerCall: 16_384, maxRuntimeMs: 300_000 });
+    expect(r.json.crew).toMatchObject({ max_iterations: 30, max_tokens_per_call: 16_384, max_runtime_ms: 300_000 });
+    expect((await call('POST', 'define', { maxIterations: 40 })).json.crew?.max_iterations).toBe(40);
+  });
+
+  it('rejects maxIterations and maxTokensPerCall out of range with a 400 naming the field', async () => {
+    await call('POST', 'define', { name: 'n' });
+    for (const [body, msg] of [
+      [{ maxIterations: 41 }, 'maxIterations must be an integer from 1 to 40.'],
+      [{ maxIterations: 0 }, 'maxIterations must be an integer from 1 to 40.'],
+      [{ maxTokensPerCall: 16_385 }, 'maxTokensPerCall must be an integer from 256 to 16384.'],
+      [{ maxTokensPerCall: 100 }, 'maxTokensPerCall must be an integer from 256 to 16384.'],
+    ] as const) {
+      for (const [method, path] of [['POST', 'define'], ['PATCH', '']] as const) {
+        const r = await call(method, path, body);
+        expect(r.status).toBe(400);
+        expect(JSON.stringify(r.json)).toContain(msg);
+      }
+    }
+    expect(await getCrewForTest()).toMatchObject({ max_iterations: 8, max_tokens_per_call: 4096 });
+  });
+
+  it("bounds maxIterations by the owner's plan cap when it is lower than 40", async () => {
+    await env.DB.prepare(`INSERT OR REPLACE INTO users (id, tier) VALUES ('usr_r', 'tight')`).run();
+    await env.DB.prepare(`INSERT OR REPLACE INTO plan_crew_limits VALUES ('tight', 1, 1, 1000, 12)`).run();
+    try {
+      const r = await call('POST', 'define', { maxIterations: 13 });
+      expect(r.status).toBe(400);
+      expect(JSON.stringify(r.json)).toContain("maxIterations must be an integer from 1 to 12 (this owner's plan cap).");
+      expect((await call('POST', 'define', { maxIterations: 12 })).json.crew?.max_iterations).toBe(12);
+    } finally {
+      await env.DB.prepare(`DELETE FROM users WHERE id = 'usr_r'`).run();
+    }
+  });
+
   it('PATCH /crew 404s when no crew is defined', async () => {
     expect((await call('PATCH', '', { maxRuntimeMs: 60_000 })).status).toBe(404);
   });

@@ -113,7 +113,8 @@ envelope `{ "success": true, "data": … }`. One crew per artifact.
   "name": "Daily narrator",
   "instructions": "Read json key `snapshot`, write a 3-line summary to `summary`, then notify Slack.",
   "model": "<optional; unsupported values fall back to the default>",
-  "maxIterations": 8,                 // clamped to the plan cap
+  "maxIterations": 8,                 // optional; 1–40 (or the plan cap), default 8, else 400
+  "maxTokensPerCall": 4096,           // optional; 256–16384, default 4096, else 400
   "runBudgetMicroUsd": 200000,        // optional
   "maxRuntimeMs": 240000,             // optional; scheduled (cron/condition) runs only, 5000–300000 (default 25000), else 400. Manual, event and chat-triggered runs stay at 25000
   "tools": {
