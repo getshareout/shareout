@@ -1,0 +1,241 @@
+ticket_id,created_at,channel,category,priority,status,assignee,first_response_minutes,resolution_hours,csat
+T-10401,2026-07-08 01:53,web form,Data import,urgent,open,Bruno M.,26,,
+T-10402,2026-09-29 03:34,email,Performance,urgent,closed,Ana R.,26,25.1,3
+T-10403,2026-09-26 18:15,web form,Feature request,urgent,pending,Carla T.,22,,
+T-10404,2026-08-14 15:28,chat,Billing,urgent,solved,Elena V.,14,6.3,4
+T-10405,2026-10-03 16:48,email,Bug,low,solved,Elena V.,28,89.1,
+T-10406,2026-07-23 15:47,chat,Performance,low,pending,Ana R.,183,,
+T-10407,2026-07-11 08:21,phone,Performance,urgent,closed,Carla T.,6,15.1,4
+T-10408,2026-10-15 14:31,email,Data import,urgent,closed,Bruno M.,33,30.0,3
+T-10409,2026-07-03 18:17,email,Bug,urgent,solved,Ana R.,20,27.5,4
+T-10410,2026-10-05 13:17,web form,Performance,low,solved,Elena V.,137,92.0,5
+T-10411,2026-10-17 18:19,phone,Billing,urgent,open,Bruno M.,31,,
+T-10412,2026-09-12 17:06,chat,Performance,low,pending,Diego S.,49,,
+T-10413,2026-09-23 04:57,email,Login,medium,open,Bruno M.,38,,
+T-10414,2026-07-02 06:35,email,Billing,urgent,solved,Ana R.,9,16.8,3
+T-10415,2026-07-23 06:00,chat,Billing,medium,closed,Ana R.,55,5.6,
+T-10416,2026-08-20 03:50,phone,Billing,low,closed,Bruno M.,65,30.1,3
+T-10417,2026-09-11 15:23,web form,Feature request,medium,open,Ana R.,104,,
+T-10418,2026-07-06 15:26,web form,Login,urgent,open,Diego S.,8,,
+T-10419,2026-09-26 20:42,email,Bug,high,open,Elena V.,56,,
+T-10420,2026-07-04 18:17,chat,Login,urgent,closed,Bruno M.,11,6.9,
+T-10421,2026-09-25 11:34,chat,Performance,high,open,Ana R.,236,,
+T-10422,2026-09-01 21:40,web form,Login,medium,pending,Elena V.,190,,
+T-10423,2026-07-31 08:40,email,Performance,high,solved,Diego S.,14,4.9,3
+T-10424,2026-07-08 10:30,phone,Data import,medium,open,Carla T.,147,,
+T-10425,2026-07-30 14:11,chat,Feature request,medium,pending,Bruno M.,59,,
+T-10426,2026-08-25 23:44,phone,Feature request,medium,solved,Ana R.,16,22.9,4
+T-10427,2026-08-30 01:34,chat,Feature request,low,closed,Elena V.,184,69.8,3
+T-10428,2026-07-15 02:10,chat,Billing,low,solved,Elena V.,23,71.2,4
+T-10429,2026-09-16 17:09,chat,Billing,medium,solved,Carla T.,17,12.3,3
+T-10430,2026-09-03 02:50,chat,Performance,urgent,closed,Carla T.,18,25.1,4
+T-10431,2026-09-29 05:29,email,Data import,medium,pending,Ana R.,159,,
+T-10432,2026-09-08 12:49,email,Data import,urgent,pending,Carla T.,12,,
+T-10433,2026-08-04 09:48,chat,Feature request,medium,closed,Diego S.,20,29.3,4
+T-10434,2026-07-26 21:26,web form,Billing,high,open,Carla T.,155,,
+T-10435,2026-09-12 00:43,phone,Billing,medium,open,Diego S.,194,,
+T-10436,2026-08-25 19:10,chat,Billing,high,pending,Bruno M.,218,,
+T-10437,2026-08-06 19:25,email,Bug,high,closed,Diego S.,37,7.0,3
+T-10438,2026-08-21 14:43,email,Login,high,open,Carla T.,136,,
+T-10439,2026-07-04 21:40,chat,Data import,high,pending,Bruno M.,81,,
+T-10440,2026-08-27 19:17,email,Login,urgent,pending,Diego S.,7,,
+T-10441,2026-08-09 07:42,phone,Billing,high,pending,Diego S.,202,,
+T-10442,2026-10-16 04:00,web form,Feature request,urgent,pending,Elena V.,24,,
+T-10443,2026-07-24 01:37,email,Billing,medium,pending,Carla T.,87,,
+T-10444,2026-07-07 15:36,web form,Login,medium,pending,Ana R.,121,,
+T-10445,2026-09-15 10:48,web form,Performance,urgent,pending,Elena V.,10,,
+T-10446,2026-09-20 01:04,web form,Data import,urgent,open,Ana R.,18,,
+T-10447,2026-07-22 14:54,phone,Performance,urgent,open,Elena V.,24,,
+T-10448,2026-10-02 02:02,email,Data import,medium,closed,Elena V.,11,1.5,4
+T-10449,2026-08-28 09:32,web form,Billing,medium,solved,Ana R.,196,23.9,4
+T-10450,2026-09-11 07:11,chat,Bug,low,open,Bruno M.,39,,
+T-10451,2026-08-02 10:53,chat,Data import,urgent,closed,Carla T.,10,17.7,
+T-10452,2026-09-08 18:04,chat,Login,urgent,open,Ana R.,26,,
+T-10453,2026-07-02 22:39,email,Bug,low,pending,Ana R.,8,,
+T-10454,2026-09-04 16:35,phone,Login,urgent,closed,Ana R.,8,13.1,4
+T-10455,2026-08-13 07:46,phone,Billing,low,pending,Diego S.,161,,
+T-10456,2026-07-26 23:12,web form,Data import,urgent,closed,Ana R.,9,17.5,4
+T-10457,2026-09-09 08:32,web form,Performance,medium,closed,Bruno M.,29,22.4,4
+T-10458,2026-07-13 01:18,web form,Login,urgent,open,Bruno M.,15,,
+T-10459,2026-07-13 10:25,email,Bug,high,pending,Diego S.,173,,
+T-10460,2026-07-25 14:55,email,Login,high,pending,Bruno M.,166,,
+T-10461,2026-07-22 03:09,email,Data import,low,open,Diego S.,119,,
+T-10462,2026-09-25 20:36,email,Performance,low,open,Diego S.,48,,
+T-10463,2026-09-06 10:45,chat,Billing,high,pending,Ana R.,106,,
+T-10464,2026-09-12 10:48,chat,Performance,medium,open,Elena V.,86,,
+T-10465,2026-10-04 23:12,phone,Data import,low,solved,Diego S.,217,64.7,5
+T-10466,2026-09-03 16:17,web form,Login,low,open,Carla T.,221,,
+T-10467,2026-08-12 00:10,email,Bug,low,pending,Carla T.,79,,
+T-10468,2026-07-10 13:14,phone,Data import,urgent,closed,Diego S.,6,15.7,4
+T-10469,2026-08-26 00:40,chat,Feature request,medium,pending,Ana R.,140,,
+T-10470,2026-10-04 12:50,web form,Login,medium,closed,Carla T.,92,22.5,4
+T-10471,2026-09-09 22:40,chat,Bug,high,pending,Diego S.,191,,
+T-10472,2026-07-30 13:17,web form,Billing,low,solved,Ana R.,241,83.1,4
+T-10473,2026-09-02 20:47,email,Billing,urgent,pending,Diego S.,12,,
+T-10474,2026-07-19 09:49,web form,Data import,high,open,Bruno M.,219,,
+T-10475,2026-09-28 02:33,web form,Bug,urgent,pending,Bruno M.,21,,
+T-10476,2026-09-14 17:47,web form,Login,low,pending,Bruno M.,139,,
+T-10477,2026-09-29 00:34,web form,Performance,medium,pending,Diego S.,208,,
+T-10478,2026-07-31 10:13,email,Data import,urgent,open,Diego S.,30,,
+T-10479,2026-10-18 08:40,email,Data import,high,closed,Bruno M.,62,24.0,
+T-10480,2026-08-23 09:19,chat,Login,medium,open,Diego S.,173,,
+T-10481,2026-07-28 18:49,phone,Login,low,pending,Elena V.,89,,
+T-10482,2026-09-02 14:58,chat,Performance,low,closed,Carla T.,26,57.1,
+T-10483,2026-10-17 07:27,web form,Performance,urgent,solved,Ana R.,7,20.1,3
+T-10484,2026-09-23 02:40,chat,Feature request,high,open,Bruno M.,134,,
+T-10485,2026-10-10 09:03,phone,Bug,urgent,solved,Diego S.,15,22.1,3
+T-10486,2026-09-29 07:00,chat,Bug,medium,closed,Ana R.,55,30.2,4
+T-10487,2026-09-16 01:42,chat,Bug,medium,closed,Elena V.,176,14.1,4
+T-10488,2026-08-31 06:42,chat,Performance,urgent,solved,Diego S.,13,4.7,3
+T-10489,2026-10-11 14:20,chat,Feature request,high,open,Diego S.,147,,
+T-10490,2026-09-29 20:24,phone,Feature request,medium,open,Ana R.,45,,
+T-10491,2026-07-06 20:04,chat,Billing,low,pending,Bruno M.,29,,
+T-10492,2026-09-02 00:34,chat,Feature request,urgent,solved,Bruno M.,18,21.5,4
+T-10493,2026-07-23 03:49,chat,Bug,low,closed,Diego S.,49,80.1,5
+T-10494,2026-07-07 08:08,web form,Data import,urgent,open,Bruno M.,14,,
+T-10495,2026-08-30 21:54,phone,Bug,urgent,solved,Elena V.,22,21.0,3
+T-10496,2026-07-24 20:53,chat,Feature request,low,pending,Bruno M.,141,,
+T-10497,2026-09-17 07:21,web form,Billing,high,closed,Bruno M.,185,16.8,3
+T-10498,2026-07-27 01:10,phone,Billing,low,pending,Elena V.,58,,
+T-10499,2026-07-01 13:32,phone,Performance,high,solved,Ana R.,111,11.4,4
+T-10500,2026-08-14 17:49,email,Performance,medium,pending,Bruno M.,51,,
+T-10501,2026-10-14 12:39,chat,Bug,medium,pending,Bruno M.,35,,
+T-10502,2026-09-04 03:27,chat,Billing,low,open,Ana R.,226,,
+T-10503,2026-07-29 20:36,chat,Performance,high,closed,Diego S.,161,11.1,5
+T-10504,2026-09-02 04:19,email,Feature request,medium,open,Bruno M.,42,,
+T-10505,2026-10-12 05:38,chat,Billing,medium,closed,Diego S.,153,8.0,4
+T-10506,2026-09-01 19:10,phone,Billing,high,open,Bruno M.,134,,
+T-10507,2026-07-20 11:57,phone,Login,low,solved,Carla T.,241,12.2,
+T-10508,2026-09-18 11:28,web form,Billing,low,closed,Elena V.,85,89.9,4
+T-10509,2026-07-07 06:50,chat,Billing,high,closed,Ana R.,109,30.0,4
+T-10510,2026-07-05 01:47,email,Feature request,medium,open,Elena V.,190,,
+T-10511,2026-07-20 13:00,chat,Data import,medium,open,Diego S.,14,,
+T-10512,2026-10-11 13:55,email,Performance,low,open,Elena V.,35,,
+T-10513,2026-10-08 16:29,chat,Performance,urgent,pending,Bruno M.,28,,
+T-10514,2026-10-05 10:33,phone,Data import,medium,open,Carla T.,65,,
+T-10515,2026-08-03 09:56,chat,Billing,high,solved,Elena V.,69,3.6,5
+T-10516,2026-09-15 19:05,phone,Bug,high,open,Ana R.,124,,
+T-10517,2026-08-17 02:28,phone,Performance,low,pending,Ana R.,186,,
+T-10518,2026-09-05 00:50,email,Feature request,low,solved,Ana R.,131,34.3,
+T-10519,2026-10-10 16:47,web form,Billing,high,open,Diego S.,211,,
+T-10520,2026-07-10 11:24,web form,Billing,low,solved,Ana R.,176,35.2,3
+T-10521,2026-08-30 15:37,email,Login,low,pending,Elena V.,15,,
+T-10522,2026-09-18 08:35,phone,Billing,low,closed,Elena V.,207,94.3,4
+T-10523,2026-08-19 04:31,chat,Performance,high,solved,Carla T.,12,24.0,
+T-10524,2026-10-03 07:05,email,Performance,urgent,closed,Bruno M.,17,29.0,4
+T-10525,2026-07-15 09:25,chat,Bug,medium,pending,Elena V.,97,,
+T-10526,2026-09-02 18:48,email,Feature request,urgent,closed,Bruno M.,9,3.1,4
+T-10527,2026-09-17 03:27,chat,Billing,urgent,pending,Carla T.,9,,
+T-10528,2026-08-29 06:03,chat,Billing,high,pending,Elena V.,148,,
+T-10529,2026-08-24 07:18,web form,Feature request,low,pending,Bruno M.,221,,
+T-10530,2026-08-12 08:53,web form,Bug,high,solved,Diego S.,39,12.9,4
+T-10531,2026-09-07 13:53,phone,Performance,high,open,Elena V.,177,,
+T-10532,2026-09-17 05:20,web form,Login,low,open,Elena V.,193,,
+T-10533,2026-08-02 03:49,web form,Performance,high,closed,Elena V.,225,4.3,5
+T-10534,2026-07-30 06:55,phone,Data import,medium,open,Carla T.,122,,
+T-10535,2026-10-05 21:38,email,Login,urgent,solved,Diego S.,34,22.5,4
+T-10536,2026-07-16 14:57,web form,Feature request,urgent,closed,Ana R.,30,30.3,4
+T-10537,2026-10-01 13:12,chat,Data import,low,pending,Bruno M.,51,,
+T-10538,2026-10-13 06:52,email,Feature request,high,closed,Diego S.,13,27.0,
+T-10539,2026-08-05 01:00,phone,Billing,urgent,closed,Ana R.,16,29.5,
+T-10540,2026-07-04 10:04,chat,Billing,medium,solved,Elena V.,137,18.0,5
+T-10541,2026-08-12 04:43,phone,Billing,high,solved,Carla T.,40,8.0,4
+T-10542,2026-07-24 02:09,phone,Data import,high,open,Carla T.,37,,
+T-10543,2026-09-03 04:48,web form,Login,medium,pending,Ana R.,233,,
+T-10544,2026-07-21 09:06,phone,Billing,low,closed,Elena V.,148,54.2,3
+T-10545,2026-07-06 09:03,chat,Login,urgent,open,Diego S.,27,,
+T-10546,2026-09-26 20:59,email,Performance,high,pending,Elena V.,203,,
+T-10547,2026-09-16 17:27,email,Bug,low,open,Ana R.,107,,
+T-10548,2026-08-30 04:47,web form,Data import,urgent,closed,Elena V.,27,10.4,4
+T-10549,2026-08-23 21:41,phone,Login,urgent,closed,Bruno M.,8,9.1,3
+T-10550,2026-07-27 07:38,phone,Login,urgent,closed,Bruno M.,18,5.7,3
+T-10551,2026-10-04 20:09,phone,Performance,high,open,Bruno M.,199,,
+T-10552,2026-10-08 06:01,phone,Bug,low,pending,Carla T.,79,,
+T-10553,2026-08-19 16:12,email,Login,medium,pending,Carla T.,92,,
+T-10554,2026-07-06 03:38,chat,Data import,medium,pending,Bruno M.,6,,
+T-10555,2026-10-05 22:14,chat,Data import,urgent,open,Diego S.,10,,
+T-10556,2026-08-25 15:24,web form,Feature request,urgent,closed,Elena V.,9,25.2,
+T-10557,2026-10-18 23:28,chat,Billing,urgent,solved,Bruno M.,24,14.1,
+T-10558,2026-07-09 17:15,web form,Feature request,high,closed,Elena V.,224,3.7,5
+T-10559,2026-09-21 09:38,chat,Performance,low,closed,Diego S.,99,1.2,5
+T-10560,2026-10-07 20:58,chat,Feature request,medium,open,Diego S.,188,,
+T-10561,2026-10-08 11:22,email,Billing,medium,pending,Carla T.,74,,
+T-10562,2026-07-30 05:21,phone,Billing,urgent,pending,Ana R.,8,,
+T-10563,2026-08-28 21:42,chat,Login,urgent,solved,Ana R.,11,20.2,4
+T-10564,2026-07-15 05:07,email,Feature request,urgent,open,Diego S.,6,,
+T-10565,2026-10-01 09:22,chat,Feature request,medium,solved,Ana R.,99,18.0,
+T-10566,2026-09-26 16:01,web form,Login,high,solved,Elena V.,240,1.6,3
+T-10567,2026-08-08 09:36,chat,Login,high,closed,Diego S.,187,19.4,5
+T-10568,2026-10-13 06:53,phone,Feature request,high,solved,Diego S.,50,14.6,4
+T-10569,2026-07-13 10:19,email,Billing,medium,pending,Bruno M.,74,,
+T-10570,2026-09-13 00:35,phone,Bug,low,closed,Carla T.,137,2.9,5
+T-10571,2026-08-26 05:06,phone,Login,medium,closed,Carla T.,232,2.9,5
+T-10572,2026-09-30 21:49,web form,Bug,medium,open,Ana R.,232,,
+T-10573,2026-10-01 11:50,phone,Bug,medium,open,Carla T.,140,,
+T-10574,2026-07-02 16:18,phone,Feature request,medium,open,Elena V.,211,,
+T-10575,2026-08-25 01:48,email,Login,urgent,solved,Elena V.,26,13.9,
+T-10576,2026-07-27 05:37,chat,Billing,urgent,pending,Elena V.,34,,
+T-10577,2026-08-02 11:59,email,Bug,high,open,Elena V.,40,,
+T-10578,2026-09-27 16:28,web form,Login,urgent,solved,Bruno M.,33,28.1,
+T-10579,2026-09-18 22:07,phone,Bug,low,solved,Carla T.,63,40.9,4
+T-10580,2026-10-18 17:32,phone,Login,medium,solved,Elena V.,21,22.7,3
+T-10581,2026-09-08 22:12,chat,Billing,low,closed,Ana R.,164,28.0,
+T-10582,2026-08-03 06:03,web form,Bug,low,open,Ana R.,156,,
+T-10583,2026-09-09 16:07,chat,Bug,low,open,Ana R.,160,,
+T-10584,2026-09-13 05:03,phone,Data import,high,closed,Ana R.,243,24.0,4
+T-10585,2026-10-16 16:45,web form,Login,high,pending,Diego S.,55,,
+T-10586,2026-08-16 13:59,web form,Billing,medium,closed,Carla T.,239,23.5,4
+T-10587,2026-08-20 02:35,email,Login,medium,pending,Diego S.,242,,
+T-10588,2026-08-31 14:31,phone,Billing,low,open,Elena V.,108,,
+T-10589,2026-08-16 04:41,chat,Bug,urgent,closed,Diego S.,21,19.0,4
+T-10590,2026-07-07 22:08,web form,Bug,urgent,solved,Carla T.,34,12.8,3
+T-10591,2026-09-18 01:35,phone,Login,high,pending,Ana R.,61,,
+T-10592,2026-07-04 00:23,email,Billing,high,open,Bruno M.,66,,
+T-10593,2026-09-25 03:55,chat,Billing,medium,open,Ana R.,121,,
+T-10594,2026-09-01 09:10,chat,Billing,high,closed,Ana R.,39,26.7,5
+T-10595,2026-09-04 13:51,phone,Billing,high,closed,Diego S.,86,11.4,5
+T-10596,2026-07-20 14:35,phone,Data import,high,pending,Diego S.,163,,
+T-10597,2026-08-16 17:04,email,Feature request,high,pending,Ana R.,122,,
+T-10598,2026-10-14 10:14,chat,Feature request,medium,solved,Ana R.,63,3.6,4
+T-10599,2026-07-18 21:34,email,Bug,low,pending,Carla T.,73,,
+T-10600,2026-08-24 15:58,chat,Feature request,low,open,Diego S.,43,,
+T-10601,2026-08-12 09:24,chat,Performance,urgent,solved,Bruno M.,8,1.7,3
+T-10602,2026-09-06 23:19,web form,Data import,low,pending,Ana R.,108,,
+T-10603,2026-09-16 14:40,phone,Performance,urgent,pending,Bruno M.,24,,
+T-10604,2026-10-11 04:07,phone,Login,low,closed,Elena V.,33,12.3,
+T-10605,2026-09-07 02:17,email,Bug,urgent,open,Ana R.,26,,
+T-10606,2026-09-17 19:05,chat,Feature request,low,closed,Bruno M.,32,33.1,4
+T-10607,2026-09-09 14:40,chat,Data import,low,solved,Ana R.,54,2.1,
+T-10608,2026-08-07 02:37,email,Billing,medium,pending,Bruno M.,229,,
+T-10609,2026-08-24 14:05,chat,Billing,high,open,Carla T.,214,,
+T-10610,2026-09-03 19:30,email,Data import,high,solved,Elena V.,180,25.4,4
+T-10611,2026-10-06 02:24,chat,Performance,low,open,Bruno M.,194,,
+T-10612,2026-09-17 18:55,phone,Bug,low,open,Ana R.,13,,
+T-10613,2026-09-30 01:04,web form,Billing,medium,pending,Diego S.,225,,
+T-10614,2026-09-22 20:17,email,Feature request,medium,closed,Carla T.,220,29.9,
+T-10615,2026-10-17 02:13,phone,Data import,high,open,Ana R.,32,,
+T-10616,2026-07-27 16:00,email,Performance,high,pending,Carla T.,170,,
+T-10617,2026-09-29 23:40,web form,Data import,urgent,solved,Diego S.,10,7.7,4
+T-10618,2026-10-14 12:08,chat,Data import,low,solved,Ana R.,18,40.1,4
+T-10619,2026-10-02 14:40,chat,Billing,medium,solved,Carla T.,234,28.9,4
+T-10620,2026-07-04 12:43,chat,Feature request,urgent,pending,Diego S.,18,,
+T-10621,2026-08-24 10:57,web form,Login,medium,open,Elena V.,101,,
+T-10622,2026-08-01 05:40,web form,Billing,high,open,Ana R.,152,,
+T-10623,2026-07-12 06:14,email,Billing,high,pending,Elena V.,29,,
+T-10624,2026-07-08 11:37,phone,Billing,urgent,closed,Carla T.,28,2.8,4
+T-10625,2026-07-11 22:10,email,Data import,urgent,pending,Diego S.,10,,
+T-10626,2026-10-17 03:38,email,Bug,urgent,solved,Carla T.,29,28.9,
+T-10627,2026-08-04 20:39,phone,Login,medium,open,Bruno M.,137,,
+T-10628,2026-07-19 17:11,email,Feature request,low,open,Diego S.,37,,
+T-10629,2026-09-05 16:45,phone,Bug,medium,solved,Ana R.,190,14.8,4
+T-10630,2026-07-27 06:32,web form,Login,high,open,Elena V.,172,,
+T-10631,2026-10-17 16:24,chat,Login,low,open,Carla T.,55,,
+T-10632,2026-09-03 05:53,chat,Data import,medium,closed,Bruno M.,208,18.5,
+T-10633,2026-10-07 03:23,web form,Login,urgent,solved,Bruno M.,10,15.8,3
+T-10634,2026-10-14 02:25,email,Feature request,urgent,pending,Ana R.,19,,
+T-10635,2026-09-05 21:28,phone,Login,high,pending,Bruno M.,23,,
+T-10636,2026-07-17 16:55,phone,Bug,high,open,Diego S.,150,,
+T-10637,2026-09-12 19:15,chat,Data import,medium,open,Carla T.,98,,
+T-10638,2026-08-23 22:54,email,Login,low,closed,Ana R.,67,5.3,5
+T-10639,2026-08-20 05:56,chat,Login,medium,solved,Diego S.,205,6.4,5
+T-10640,2026-10-07 20:48,web form,Login,urgent,closed,Elena V.,18,1.9,3

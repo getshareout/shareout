@@ -1,0 +1,33 @@
+id: iterate-feedback
+title: Iterate from written feedback
+lang: en
+suites: [core]
+fixtures: []
+setup:
+  - key: poll
+    file: seed/offsite-poll-v1.html
+    name: Offsite date poll
+    slug: offsite-poll
+    visibility: private
+    rows:
+      votes:
+        - { name: "Priya", choice: "Fri 13 Nov" }
+        - { name: "Marcus", choice: "Thu 19 Nov" }
+        - { name: "Lucía", choice: "Fri 13 Nov" }
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  Thanks for the offsite poll ({{url:poll}}). Feedback from the team after a day: it looks like
+  it's from 1998 — make it look like something we'd actually send around. People want a "Can't
+  make any" option. Only show the results after you've voted, and show who picked what. And show
+  the deadline: voting closes Friday 6 November at 18:00. Don't lose the votes already in.
+expect:
+  target: poll
+  stores: ["table"]
+functional:
+  - { do: expect_text, text: "6 Nov|Nov(ember)? 6\\b|6th" }
+  - { do: expect_text, text: "can.?t make" }
+  - { do: fill_form, prefs: { "name": "{{token}}" }, submit: "vote|submit", label: vote }
+  - { do: expect_text, text: "{{token}}", label: results with names after voting }
+  - { do: expect_text, text: "Priya", label: existing votes kept }
+  - { do: rest, check: rows, min: 4 }
+  - { do: rest, check: versions, min: 2, label: same link updated }

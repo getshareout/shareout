@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Offsite date poll</title>
+<link rel="stylesheet" href="/sdk/shareout.css">
+<script src="/sdk/shareout.js"></script>
+<style>
+  body { font-family: "Times New Roman", serif; background: #ffffcc; padding: 10px; }
+  h1 { color: blue; text-decoration: underline; }
+  table { border: 2px solid black; }
+</style>
+</head>
+<body>
+<h1>Offsite date poll</h1>
+<p>Which date works for the team offsite?</p>
+<form id="f">
+  <input id="name" placeholder="Your name" required>
+  <select id="choice">
+    <option>Thu 12 Nov</option>
+    <option>Fri 13 Nov</option>
+    <option>Thu 19 Nov</option>
+  </select>
+  <button>Vote</button>
+</form>
+<h2>Results</h2>
+<table id="results"></table>
+<script>
+(async () => {
+  const sdk = await ShareOut.create();
+  const votes = sdk.table('votes');
+  async function show() {
+    const rows = await votes.find({}).exec();
+    const counts = {};
+    rows.forEach((r) => { counts[r.choice] = (counts[r.choice] || 0) + 1; });
+    document.getElementById('results').innerHTML = Object.entries(counts).map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+  }
+  document.getElementById('f').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await votes.insert({ name: document.getElementById('name').value, choice: document.getElementById('choice').value });
+    show();
+  });
+  show();
+})();
+</script>
+</body>
+</html>

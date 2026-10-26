@@ -1,0 +1,18 @@
+id: changelog
+title: Changelog
+lang: en
+suites: [core]
+fixtures: [changelog-notes.md]
+budget: { minutes: 15, usd: 5 }
+prompt: |
+  Can you turn these messy release notes (changelog-notes.md) into a proper public changelog page
+  for our customers? Newest first, grouped by version, each change labelled New, Improved, Fixed
+  or Breaking — and make the breaking changes impossible to miss.
+expect:
+  stores: []
+functional:
+  - { do: expect_text, text: "2\\.5\\.1" }
+  - { do: expect_text, text: "breaking" }
+  - { do: expect_text, text: "actor" }
+  - { do: eval, js: "(() => { const t = document.body.innerText; return t.indexOf('2.5.1') > -1 && t.indexOf('2.5.1') < t.indexOf('2.3.0'); })()", label: newest first }
+  - { do: rest, check: visibility, equals: "public|unlisted" }

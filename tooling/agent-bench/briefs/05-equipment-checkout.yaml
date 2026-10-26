@@ -1,0 +1,21 @@
+id: equipment-checkout
+title: Equipment checkout (form + table)
+lang: en
+suites: [core]
+fixtures: [equipment.json]
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  We keep losing track of who has the studio gear. Can you make a simple checkout page? Someone
+  picks an item from our list (equipment.json, attached), enters their name and the date they'll
+  bring it back, and the item shows as checked out until someone marks it returned. I also want a
+  table of what's out right now, with anything overdue standing out. The whole team uses it.
+expect:
+  stores: ["table|json"]
+functional:
+  - { do: expect_text, text: "Canon|Sony|tripod" }
+  - { do: fill_form, submit: "check ?out|borrow|reserve|submit|save|confirm", label: check an item out }
+  - { do: expect_text, text: "{{token}}", label: checkout shows up }
+  - { do: reload }
+  - { do: expect_text, text: "{{token}}", label: checkout persists }
+  - { do: rest, check: rows, min: 1 }
+  - { do: click, name: "return", optional: true }

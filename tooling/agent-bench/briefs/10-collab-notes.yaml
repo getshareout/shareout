@@ -1,0 +1,18 @@
+id: collab-notes
+title: Collaborative notes
+lang: en
+suites: [core]
+fixtures: []
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  I want a shared meeting-notes page for our weekly product sync: an agenda list anyone can add
+  to before the meeting, a notes area we all type into at the same time during the call, and
+  action items with an owner and a due date. Everyone's changes should show up for everyone live.
+expect:
+  stores: ["realtime"]
+functional:
+  - { do: add_item, field: "agenda|topic|item", value: "{{token}}", label: add an agenda item }
+  - { do: open_second }
+  - { do: expect_text, in: b, text: "{{token}}" }
+  - { do: type, in: b, value: "{{token2}}", label: type in the shared notes }
+  - { do: expect_text, in: a, text: "{{token2}}", timeout: 10000, label: notes sync live }

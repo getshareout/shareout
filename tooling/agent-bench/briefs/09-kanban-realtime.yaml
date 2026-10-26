@@ -1,0 +1,21 @@
+id: kanban-realtime
+title: Kanban (realtime)
+lang: en
+suites: [core]
+fixtures: []
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  Our team needs a shared kanban board for the website relaunch, with columns Backlog, In
+  progress, Review and Done. Anyone on the team can add cards, move them between columns and
+  assign themselves. When two of us have it open we should see each other's changes right away,
+  without refreshing.
+expect:
+  stores: ["realtime|table"]
+functional:
+  - { do: expect_text, text: "Backlog" }
+  - { do: expect_text, text: "Review" }
+  - { do: add_item, open: "add|new|\\+", value: "{{token}}", label: add a card }
+  - { do: open_second, label: a teammate joins late }
+  - { do: expect_text, in: b, text: "{{token}}", label: late joiner sees the card }
+  - { do: add_item, in: b, open: "add|new|\\+", value: "{{token2}}", label: teammate adds a card }
+  - { do: expect_text, in: a, text: "{{token2}}", timeout: 10000, label: first viewer sees it live }
