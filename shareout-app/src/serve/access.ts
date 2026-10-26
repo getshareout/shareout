@@ -10,6 +10,7 @@ import { recordShareeView } from '../sharees/activity';
 import { recordSpaceGuestView, spaceGuestFor } from '../sharees/space-guest';
 import { getPendingAccessRequest } from '../artifacts/access-requests';
 import type { ArtifactInfo } from './types';
+import { pageLocale } from '../i18n/accept-language';
 
 // The name to attribute a share to on the sign-in screen — the page owner, but only
 // when the page is actually meant for others (has collaborators or workspace visibility).
@@ -90,6 +91,7 @@ export async function checkAccess(
       Boolean(env.GOOGLE_CLIENT_ID?.trim() && env.GOOGLE_CLIENT_SECRET?.trim()),
       returnPath(request, slug),
       microsoftOAuthConfigured(env),
+      pageLocale(request),
     );
   }
 

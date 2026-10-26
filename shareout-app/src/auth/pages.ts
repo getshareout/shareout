@@ -14,10 +14,13 @@ const SIGN_IN_COPY = {
     signIn: 'Sign in',
     signInTo: 'Sign in to {name}',
     ssoOnly: 'Your organization signs in with single sign-on.',
-    intro: 'Use your email and password to continue.',
-    introGoogle: 'Use your email and password, or Google, to continue.',
-    introMicrosoft: 'Use your email and password, or Microsoft, to continue.',
-    introSocial: 'Use your email and password, Google or Microsoft to continue.',
+    welcome: 'Welcome back.',
+    codeSubtitle: 'Enter the code we emailed you.',
+    privateTitle: 'Private content',
+    privateSubtitle: 'This content is private. Sign in to continue.',
+    sharedBy: 'Shared with you by <strong>{name}</strong>. Sign in to view it.',
+    verifying: 'Verifying…',
+    change: 'Change',
     or: 'or',
     codeInstead: 'Email me a code instead',
     noEmailBinding: 'This instance has no email binding configured, so the code is written to the Worker log rather than sent.',
@@ -29,7 +32,6 @@ const SIGN_IN_COPY = {
     sentTo: 'We sent a 6-digit code to',
     codeLabel: 'One-time code',
     continue: 'Continue',
-    otherEmail: 'Use another email',
     enterEmail: 'Enter your email address.',
     sending: 'Sending...',
     couldNotSend: "Couldn't send a code. Try again.",
@@ -55,10 +57,13 @@ const SIGN_IN_COPY = {
     signIn: 'Iniciá sesión',
     signInTo: 'Iniciá sesión en {name}',
     ssoOnly: 'Tu organización inicia sesión con inicio de sesión único (SSO).',
-    intro: 'Usá tu email y contraseña para seguir.',
-    introGoogle: 'Usá tu email y contraseña, o Google, para seguir.',
-    introMicrosoft: 'Usá tu email y contraseña, o Microsoft, para seguir.',
-    introSocial: 'Usá tu email y contraseña, Google o Microsoft para seguir.',
+    welcome: 'Bienvenido de nuevo.',
+    codeSubtitle: 'Escribí el código que te mandamos.',
+    privateTitle: 'Contenido privado',
+    privateSubtitle: 'Este contenido es privado. Iniciá sesión para seguir.',
+    sharedBy: '<strong>{name}</strong> compartió esto con vos. Iniciá sesión para verlo.',
+    verifying: 'Verificando…',
+    change: 'Cambiar',
     or: 'o',
     codeInstead: 'Mandame un código por email',
     noEmailBinding: 'Esta instancia no tiene email configurado: el código se escribe en el log del Worker en vez de enviarse.',
@@ -70,7 +75,6 @@ const SIGN_IN_COPY = {
     sentTo: 'Te mandamos un código de 6 dígitos a',
     codeLabel: 'Código',
     continue: 'Continuar',
-    otherEmail: 'Usar otro email',
     enterEmail: 'Escribí tu email.',
     sending: 'Enviando...',
     couldNotSend: 'No pudimos mandar el código. Probá de nuevo.',
@@ -92,6 +96,7 @@ const SIGN_IN_COPY = {
   },
 };
 type SignInCopy = (typeof SIGN_IN_COPY)['en'];
+const LOCK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
 const EN = SIGN_IN_COPY.en;
 
 /** Auth/access gates for private content: never index, never emit OG of the page or artifact. */
@@ -146,33 +151,63 @@ export function loginPage(
   // multi-page `?page=` deep link from a bot). Same-host paths only.
   returnTo?: string,
   microsoftEnabled = false,
+  locale: PageLocale = 'en',
 ): Response {
   // Private-by-default gates must not reveal title, description, or thumbnail to
   // unauthorized visitors (or crawlers). Optional sharedBy is a first-name hint only
   // when the page was deliberately shared with collaborators / workspace members.
-  const subtitle = sharedBy
-    ? `Shared with you by <strong>${escapeHtml(sharedBy)}</strong>. Sign in to view it.`
-    : 'This content is private. Sign in to continue.';
+  const c = SIGN_IN_COPY[locale];
+  const subtitle = sharedBy ? c.sharedBy.replace('{name}', escapeHtml(sharedBy)) : c.privateSubtitle;
   const redirect = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') && !/[\\\s<>"]/.test(returnTo)
     ? returnTo
     : `/a/${escapeHtml(slug)}/`;
-  return renderAuthPage('Sign in - ShareOut', `
-  <div class="card card-share">
-    <div class="icon icon-primary">🔒</div>
-    <h1 class="share-title">Private content</h1>
-    <p class="share-subtitle">${subtitle}</p>
-    <div class="auth-methods">
-    ${googleEnabled ? googleButtonHtml(redirect) : ''}
-    ${microsoftEnabled ? microsoftButtonHtml(redirect) : ''}
-    ${googleEnabled || microsoftEnabled ? '<div class="auth-divider"><span>or</span></div>' : ''}
-    ${emailOtpFormsHtml(turnstileSiteKey)}
+  return renderAuthPage(c.pageTitle, `
+  <div class="card">
+    <div class="icon icon-primary">${LOCK_ICON}</div>
+    <h1>${escapeHtml(c.privateTitle)}</h1>
+    <p id="auth-subtitle" data-code="${escapeHtml(c.codeSubtitle)}">${subtitle}</p>
+    ${signInMethodsHtml({ c, redirect, googleEnabled, microsoftEnabled, turnstileSiteKey, emailConfigured: true })}
+    ${poweredByHtml()}
+  </div>
+  ${passwordLoginScript(redirect, c)}
+  ${emailOtpScript(redirect, c)}`, 401, { lang: locale });
+}
+
+function poweredByHtml(): string {
+  return `<div class="footer">
+      Powered by <a href="/" class="footer-brand">${brandMarkImg('footer-mark', 16)}ShareOut</a>
+    </div>`;
+}
+
+/** The one sign-in form: social buttons, then email + password, "email me a code", forgot password. */
+function signInMethodsHtml(o: {
+  c: SignInCopy;
+  redirect: string;
+  googleEnabled: boolean;
+  microsoftEnabled: boolean;
+  turnstileSiteKey?: string;
+  emailConfigured: boolean;
+  loginHint?: string | null;
+  sso?: { label: string; href: string } | null;
+}): string {
+  const { c } = o;
+  const socialEnabled = o.googleEnabled || o.microsoftEnabled;
+  // Password first: it is the one method that works on every instance. A one-time
+  // code needs mail delivery, and offering it as the primary route on an instance
+  // with no EMAIL binding sends people to a code that only appears in a log.
+  return `<div class="auth-methods">
+    <div id="auth-alt">
+    ${o.sso ? ssoButtonHtml(o.sso) : ''}
+    ${o.googleEnabled ? googleButtonHtml(o.redirect, o.loginHint, c) : ''}
+    ${o.microsoftEnabled ? microsoftButtonHtml(o.redirect, o.loginHint, c) : ''}
+    ${socialEnabled ? `<div class="auth-divider"><span>${escapeHtml(c.or)}</span></div>` : ''}
+    </div>
+    ${passwordFormHtml(c, o.emailConfigured, o.turnstileSiteKey)}
+    ${o.emailConfigured ? '' : `<p class="auth-help auth-note">${escapeHtml(c.noEmailBinding)}</p>`}
+    ${emailOtpFormsHtml(o.turnstileSiteKey, c, '', true)}
     <div id="email-code-status" class="status" role="status" aria-live="polite" hidden></div>
     </div>
-    <div class="footer">
-      Powered by <a href="/" class="footer-brand">${brandMarkImg('footer-mark', 16)}ShareOut</a>
-    </div>
-  </div>
-  ${emailOtpScript(redirect)}`, 401);
+    `;
 }
 
 /** App-shell sign-in (home, settings, admin) — email OTP always; Google when configured. */
@@ -206,11 +241,9 @@ export function appLoginPage(opts: {
     : '<div class="card">';
   const mark = brand?.logoUrl
     ? `<img class="auth-logo" src="${escapeHtml(brand.logoUrl)}" alt="${escapeHtml(brand.name)}">`
-    : '<div class="icon icon-primary">✦</div>';
+    : `<div class="icon icon-primary">${brandMarkImg('auth-mark', 32)}</div>`;
   const signInTitle = brand ? c.signInTo.replace('{name}', brand.name) : c.signIn;
-  const footer = `<div class="footer">
-      Powered by <a href="/" class="footer-brand">${brandMarkImg('footer-mark', 16)}ShareOut</a>
-    </div>`;
+  const footer = poweredByHtml();
 
   if (sso?.enforced) {
     return renderAuthPage(c.pageTitle, `
@@ -250,27 +283,12 @@ export function appLoginPage(opts: {
   ${emailOtpScript(redirect, c)}`, 200, { lang });
   }
 
-  // Password first: it is the one method that works on every instance. A one-time
-  // code needs mail delivery, and offering it as the primary route on an instance
-  // with no EMAIL binding sends people to a code that only appears in a log.
-  const otpSection = `
-    ${emailConfigured ? '' : `<p class="auth-help">${escapeHtml(c.noEmailBinding)}</p>`}
-    ${emailOtpFormsHtml(opts.turnstileSiteKey, c, '', true)}
-    <div id="email-code-status" class="status" role="status" aria-live="polite" hidden></div>`;
-
   return renderAuthPage(c.pageTitle, `
   ${card}
     ${mark}
     <h1>${escapeHtml(signInTitle)}</h1>
-    <p>${escapeHtml(googleEnabled && microsoftEnabled ? c.introSocial : googleEnabled ? c.introGoogle : microsoftEnabled ? c.introMicrosoft : c.intro)}</p>
-    <div class="auth-methods">
-    ${sso ? ssoButtonHtml(sso) : ''}
-    ${googleEnabled ? googleButtonHtml(redirect, opts.loginHint, c) : ''}
-    ${microsoftEnabled ? microsoftButtonHtml(redirect, opts.loginHint, c) : ''}
-    ${socialEnabled ? `<div class="auth-divider"><span>${escapeHtml(c.or)}</span></div>` : ''}
-    ${passwordFormHtml(c, emailConfigured)}
-    ${otpSection}
-    </div>
+    <p id="auth-subtitle" data-code="${escapeHtml(c.codeSubtitle)}">${escapeHtml(c.welcome)}</p>
+    ${signInMethodsHtml({ c, redirect, googleEnabled, microsoftEnabled, turnstileSiteKey: opts.turnstileSiteKey, emailConfigured, loginHint: opts.loginHint, sso })}
     ${footer}
   </div>
   ${passwordLoginScript(redirect, c)}
@@ -281,7 +299,7 @@ function ssoButtonHtml(sso: { label: string; href: string }): string {
   return `<a href="${escapeHtml(sso.href)}" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(sso.label)}</a>`;
 }
 
-function passwordFormHtml(c: SignInCopy = EN, canReset = false): string {
+function passwordFormHtml(c: SignInCopy = EN, canReset = false, turnstileSiteKey?: string): string {
   return `<form id="password-login" class="email-code-form" novalidate>
       <div class="field">
         <label class="field-label" for="password-email">${escapeHtml(c.emailLabel)}</label>
@@ -294,6 +312,7 @@ function passwordFormHtml(c: SignInCopy = EN, canReset = false): string {
       </div>
       <button id="password-submit" type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(c.continue)}</button>
       <div id="password-status" class="status" role="status" aria-live="polite" hidden></div>
+      ${turnstileWidgetHtml(turnstileSiteKey, c.lang, { deferred: true })}
       <button id="password-code-link" type="button" class="auth-forgot">${escapeHtml(c.codeInstead)}</button>
       ${canReset ? `<a id="password-forgot" class="auth-forgot" href="#">${escapeHtml(c.forgot)}</a>` : ''}
     </form>`;
@@ -406,11 +425,11 @@ function emailOtpFormsHtml(turnstileSiteKey?: string, c: SignInCopy = EN, prefil
   return `<form id="email-code-start" class="email-code-form" novalidate${sharedEmail ? ' hidden' : ''}>
       <p id="email-code-reset-note" class="auth-help" hidden>${escapeHtml(c.resetIntro)}</p>
       ${emailField}
-      ${turnstileWidgetHtml(turnstileSiteKey, c.lang)}
+      ${sharedEmail ? '' : turnstileWidgetHtml(turnstileSiteKey, c.lang)}
       <button id="email-code-send" type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(c.sendCode)}</button>
     </form>
     <form id="email-code-verify" class="email-code-form" hidden novalidate>
-      <p class="auth-help">${escapeHtml(c.sentTo)} <span id="email-code-target" class="email"></span>.</p>
+      <p class="auth-help">${escapeHtml(c.sentTo)} <span id="email-code-target" class="email"></span>. <button id="email-code-change" type="button" class="auth-link">${escapeHtml(c.change)}</button></p>
       <div class="field">
         <label class="field-label" for="email-code-code">${escapeHtml(c.codeLabel)}</label>
         <input id="email-code-code" type="text" name="code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="123456" required>
@@ -420,7 +439,6 @@ function emailOtpFormsHtml(turnstileSiteKey?: string, c: SignInCopy = EN, prefil
         <input id="email-code-password" type="password" name="new_password" autocomplete="new-password" minlength="12">
       </div>
       <button id="email-code-continue" type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(c.continue)}</button>
-      <button id="email-code-change" type="button" class="so-c-btn so-c-btn--secondary so-c-btn--block">${escapeHtml(c.otherEmail)}</button>
     </form>`;
 }
 
@@ -449,20 +467,44 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
     var pwEmail = document.getElementById('password-email');
     var codeLink = document.getElementById('password-code-link');
     var shared = !!(pwForm && pwEmail && startForm && startForm.hidden);
+    var subtitle = document.getElementById('auth-subtitle');
+    var alt = document.getElementById('auth-alt');
+    var subtitleHtml = subtitle ? subtitle.innerHTML : '';
+    var tsBox = document.querySelector('.cf-turnstile');
+    var tsPending = false;
 
-    // One email field: the sign-in form's address feeds the code flow. With a Turnstile
-    // widget the visitor has one more step (the challenge); otherwise it sends at once.
+    // Code step: the page says so (subtitle) and drops the other methods; Change brings them back.
+    function codeMode(on) {
+      if (subtitle) subtitle.innerHTML = on ? subtitle.getAttribute('data-code') : subtitleHtml;
+      if (alt) alt.hidden = on;
+    }
+
+    // The visitor-facing widget only shows when Cloudflare needs a human check; it is
+    // armed on demand, so password sign-in never triggers it.
+    window.soTsOk = function () {
+      if (!tsPending) return;
+      tsPending = false;
+      setStatus('', '');
+      startForm.requestSubmit();
+    };
+    window.soTsFail = function () {
+      tsPending = false;
+      setStatus(L.couldNotSend, 'error');
+    };
+
+    // One email field: the sign-in form's address feeds the code flow.
     function startFromPassword() {
       var typed = pwEmail.value.trim();
       if (!typed) { setStatus(L.enterEmail, 'error'); pwEmail.focus(); return; }
       emailInput.value = typed;
-      if (startForm.querySelector('.cf-turnstile')) {
-        startForm.hidden = false;
-        pwForm.hidden = true;
-        sendButton.focus();
-      } else {
-        startForm.requestSubmit();
-      }
+      if (!tsBox) { startForm.requestSubmit(); return; }
+      if (!window.turnstile) { setStatus(L.couldNotSend, 'error'); return; }
+      tsPending = true;
+      setStatus(L.verifying, '');
+      try {
+        window.turnstile.reset(tsBox);
+        window.turnstile.execute(tsBox);
+      } catch (_err) { window.soTsFail(); }
     }
 
     if (!startForm || !verifyForm || !emailInput || !codeInput || !sendButton || !continueButton || !changeButton || !statusBox || !target || !window.fetch) {
@@ -523,7 +565,7 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
       setBusy(sendButton, true, L.sending);
       setStatus('', '');
       try {
-        var tsEl = startForm.querySelector('[name="cf-turnstile-response"]');
+        var tsEl = document.querySelector('[name="cf-turnstile-response"]');
         var response = await fetch('/v1/auth/email/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -543,6 +585,7 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
         startForm.hidden = true;
         if (shared) pwForm.hidden = true;
         verifyForm.hidden = false;
+        codeMode(true);
         setStatus(L.checkEmail, 'success');
         codeInput.focus();
       } catch (err) {
@@ -598,6 +641,7 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
       codeInput.value = '';
       verifyForm.hidden = true;
       setStatus('', '');
+      codeMode(false);
       if (shared) { pwForm.hidden = false; resetMode = false; pwEmail.focus(); return; }
       startForm.hidden = false;
       emailInput.focus();
@@ -694,7 +738,7 @@ export function passwordLoginPage(
   // Always 401 — a 200 password form was indexable and advertised the page title.
   return renderAuthPage('Enter Password - ShareOut', `
   <div class="card">
-    <div class="icon icon-primary">🔐</div>
+    <div class="icon icon-primary">${LOCK_ICON}</div>
     <h1>Password required</h1>
     <p>Enter the password to view this content.</p>
     ${error ? `<div class="error-box">${escapeHtml(error)}</div>` : ''}
@@ -719,7 +763,7 @@ export function credentialsLoginPage(
 ): Response {
   return renderAuthPage('Sign in - ShareOut', `
   <div class="card">
-    <div class="icon icon-primary">🔒</div>
+    <div class="icon icon-primary">${LOCK_ICON}</div>
     <h1>Sign in required</h1>
     <p>Sign in with your credentials to view this content.</p>
     ${error ? `<div class="error-box">${escapeHtml(error)}</div>` : ''}
