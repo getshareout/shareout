@@ -26,6 +26,7 @@ import { routeKnowledgeApi } from './api/knowledge';
 import { routeDemoApi } from './api/demo';
 import { jsonError } from './helpers/json-response';
 import { routeArtifactMcpApi } from './api/artifact-mcp';
+import { routeArtifactSourcesApi } from './api/artifact-sources';
 
 export async function routeApi(ctx: FetchContext): Promise<Response | null> {
   try {
@@ -41,6 +42,7 @@ export async function routeApi(ctx: FetchContext): Promise<Response | null> {
       (await routeFolderApi(ctx)) ??
       (await routeAssetApi(ctx)) ??
       (await routeArtifactMcpApi(ctx)) ??
+      (await routeArtifactSourcesApi(ctx)) ??
       (await routeFileImportApi(ctx)) ??
       (await routeArtifactApi(ctx)) ??
       (await routeAccessRequestsApi(ctx)) ??

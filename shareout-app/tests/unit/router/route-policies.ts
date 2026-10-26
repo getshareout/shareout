@@ -123,6 +123,7 @@ export const OPEN_ROUTES: Record<string, string> = {
   [String.raw`^\/embed\/([^/]+)\/?(.*)$`]: CONTENT,
   [String.raw`^\/t\/([^.]+)\.(webp|png|jpg)$`]: CONTENT,
   [String.raw`^\/wl\/([^.]+)\.(webp|png|jpg|svg)$`]: 'workspace logo; public by design',
+  [String.raw`^\/v1\/artifacts\/([^/]+)\/sources$`]: 'page data sources: the page\'s own view gate decides (public, session, password, guest, grant); editor detail only for editors; unknown ids are 404',
   [String.raw`^\/v1\/files\/([^/]+)$`]: CONTENT,
   [String.raw`^\/v1\/files\/([^/]+)\/content$`]: CONTENT,
   '/v1/data/': 'artifact data API: data middleware decides per artifact and tier',

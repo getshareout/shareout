@@ -8,6 +8,7 @@ import {
   POST_MESSAGE_INIT_TIMEOUT_MS,
   waitForPostMessageInit,
 } from '../internal/embedded-init';
+import { noteDataRequest } from '../internal/source-highlight';
 import {
   detectArtifactId,
   detectBaseUrl,
@@ -276,6 +277,7 @@ export class ShareOut {
     options: RequestInit = {}
   ): Promise<T> {
     noteRequestStart();
+    noteDataRequest(path);
     try {
       return await this._fetchInner<T>(path, options);
     } finally {
