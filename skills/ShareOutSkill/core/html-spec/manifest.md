@@ -219,10 +219,11 @@ Any `json`, `table`, or `connection` source can carry the optional
 `SourceProvenance` fields shown in the Schema above (`label`, `description`,
 `query`, `tables`, `refresh`, `as_of`, `replication`) so viewers can answer "where
 does this data come from?" Link each chart/table to its source via a
-`data-shareout-source="connection:NAME"` attribute or a `feeds` entry, then render
-the SDK drawer + badges with `so.sources.mount()` (or `<body data-shareout-sources>`).
-Strongly recommended for any data-backed artifact; fully optional and
-backward-compatible.
+`data-shareout-source="connection:NAME"` attribute or a `feeds` entry. Viewers see it
+automatically: the page's **Data** button lists every source with its freshness and
+highlights what it feeds (editors also see the query and replication). `so.sources.mount()`
+adds an optional in-page drawer + badges. Strongly recommended for any data-backed
+artifact; fully optional and backward-compatible.
 
 Full data-provenance patterns: [patterns/data-provenance.md](../../patterns/data-provenance.md).
 

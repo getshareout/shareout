@@ -277,6 +277,49 @@ Each comment records the version that was live when it was written (`versionId` 
 
 On `GET /v1/artifacts/{id}`, `current_version` is the version **live in production** (so it reflects a rollback) and `latest_version` is the highest published `version_no`. `live_message` / `live_message_source` are the live version's change note. The next publish becomes `latest_version + 1` and goes live.
 
+## GET /v1/artifacts/{id}/sources — where a page's data comes from
+
+What the published page reads, where each source comes from, how fresh it is and which
+elements it feeds — the list behind the viewer's **Data** button and the Studio/editor
+**Data** tabs. Derived from the published version (manifest `sources`/`feeds`,
+`data-shareout-*` bindings, SDK calls in the page and its scripts) plus what the server
+knows (connections, refresh jobs, crews, sheet syncs, datasets, metrics, MCP connections).
+
+Anyone who can open the page may call it (session, password, guest, public link, or a
+personal API token); everyone else gets `404`. Query params: `page=<html path>` for one
+page of a multi-page site; `version=<no|id>` is editors-only (`403` otherwise).
+
+```json
+{
+  "artifact_id": "art_…",
+  "version": { "number": 7, "page": "index.html" },
+  "access": "summary",
+  "scoped": false,
+  "sources": [{
+    "key": "json:snapshot", "kind": "json", "label": "Ads snapshot",
+    "provider": "shareout", "provider_label": null, "declared": true, "direct": true,
+    "freshness": { "as_of": "2026-10-20", "last_refresh_at": "2026-10-25T10:00:00Z",
+                   "refresher": { "type": "job", "name": "Ads diario", "schedule": "0 6 * * *" } },
+    "feeds": [{ "selector": "#kpi-spend", "element_id": "kpi-spend", "label": "Spend" }],
+    "feed_count": 3, "upstream": ["connection:warehouse"], "access": "summary"
+  }]
+}
+```
+
+- `kind`: `table | json | file | connection | mcp | dataset | knowledge | metric | external`.
+- `declared: false` means the page uses it but the manifest doesn't describe it — say
+  "not declared" rather than guessing. Freshness fields are absent when unknown.
+- `refresher.type`: `job | crew | manual | live` (`live` = read when the page loads).
+- `direct: false` sources only feed another one (see `upstream`).
+- Editors and workspace admins get `access: "full"` and a `details` object per source:
+  `query`, `tables`, `replication`, `connection {id, name, scope, kind, credential_scope}`
+  (or `missing_connection`), `refreshers[]` with status, MCP `tools`, proxy `hosts`, and
+  `manage` links. Viewers never see queries, connection identifiers or credential hints.
+- Viewers whose rows an [access policy](../core/access-policy.md) filters (`scoped: true`)
+  see only what the page source names, no job/crew names, and refresh times only for
+  scheduled refreshes. Names only the server knows get opaque keys (`connection:~1`) for
+  non-editors.
+
 ## Collaborator API
 
 Every route below accepts the artifact's own roles (owner / editor / viewer as noted)

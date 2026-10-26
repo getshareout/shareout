@@ -108,8 +108,8 @@ direct-from-R2. See [../api/jobs.md](../api/jobs.md) for the job API.
 
 When you declare a connection in the manifest, add provenance (`description`,
 `query`, `tables`, `refresh`, `as_of`, `replication`) so viewers can see where the
-data comes from and how to rebuild it — ShareOut renders a Data sources drawer +
-per-element badges from it. See [../patterns/data-provenance.md](../patterns/data-provenance.md).
+data comes from and how to rebuild it — viewers see it in the page's **Data** button
+(editors also see the query). See [../patterns/data-provenance.md](../patterns/data-provenance.md).
 
 ## Related
 

@@ -40,7 +40,7 @@ import { renderLoadingHideScript } from './loading';
 import { renderPageBridge } from '../page-agent';
 import { buildToolbarContext } from './toolbar/context';
 import { renderToolbar } from './toolbar';
-import { renderDataSourcesPanel } from './data-sources';
+import { renderDataSourcesBridge, renderDataSourcesPanel } from './data-sources';
 import { getViewerConfig } from '../../data/viewer-config';
 import { isVisualEditorEnabled } from '../../editor/visual-editor-gate';
 import { localeForArtifactWorkspace, localeFromAcceptLanguage } from '../../i18n/locale';
@@ -246,9 +246,11 @@ export async function serveSandboxedViewer(
       const toolbar = toolbarContext ? renderToolbar(toolbarContext) : '';
       // "Data" pill + Data sources panel for every viewer, toolbar or not. Hidden until
       // the artifact frame says it shows data; follows the owner's hide-toolbar choice.
-      const dataSources = viewerConfig.hide_toolbar || studioEmbed ? '' : renderDataSourcesPanel({
-        artifactId, page: entrypoint, locale, visible: mcpPage, withVars: !toolbar,
-      });
+      const dataSources = studioEmbed
+        ? renderDataSourcesBridge()
+        : viewerConfig.hide_toolbar ? '' : renderDataSourcesPanel({
+          artifactId, page: entrypoint, locale, visible: mcpPage, withVars: !toolbar,
+        });
       const bodyClass = viewerConfig.hide_toolbar
         ? ''
         : viewerConfig.show_on_mobile
