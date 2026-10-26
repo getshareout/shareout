@@ -1,10 +1,13 @@
 // Multi-file sites over MCP against the real migrated schema and the real /v1/publish
 // handler: publish_artifact / update_artifact `files` land as one version with every
 // file, the result links each page, and REST's own path, size and quota rules apply.
+// get_artifact reads every file back (flagging what did not fit), and update_artifact
+// refuses writes that would lose work: a stale base_version or files left out.
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { AuthUser } from '../../../src/api-auth';
 import { generateToken, hashToken } from '../../../src/api-auth';
 import { callTool } from '../../../src/mcp/tools';
+import type { SourceFile } from '../../../src/mcp/page-source';
 import type { Env } from '../../../src/types';
 import { applyMigrations, e } from '../helpers/migrated-db';
 
@@ -81,15 +84,18 @@ describe('publish_artifact with files', () => {
     expect(r.structuredContent!.artifact).toMatchObject({ entrypoint: 'index.html', pages: ['index.html', 'about.html', 'guides/setup.html'] });
   });
 
-  it('update_artifact with files replaces the whole file set in a new version', async () => {
-    const r = await call(alice, 'update_artifact', {
-      artifact_id: artifactId,
-      files: [
-        { path: 'index.html', content: '<!doctype html><h1>Acme manual v2</h1><a href="faq.html">FAQ</a>' },
-        { path: 'faq.html', content: '<!doctype html><h1>FAQ</h1>' },
-      ],
-      message: 'Added the FAQ',
-    });
+  it('update_artifact refuses files that leave some out; replace_all_files: true replaces the whole set', async () => {
+    const files = [
+      { path: 'index.html', content: '<!doctype html><h1>Acme manual v2</h1><a href="faq.html">FAQ</a>' },
+      { path: 'faq.html', content: '<!doctype html><h1>FAQ</h1>' },
+    ];
+    const refused = await call(alice, 'update_artifact', { artifact_id: artifactId, files, message: 'Added the FAQ' });
+    expect(refused.isError).toBe(true);
+    expect(refused.structuredContent).toEqual({ code: 'WOULD_REMOVE_FILES', would_remove: ['about.html', 'css/site.css', 'guides/setup.html', 'img/dot.png'] });
+    expect(refused.content[0].text).toContain('replace_all_files: true');
+    expect(await versionsOf(artifactId)).toHaveLength(1);
+
+    const r = await call(alice, 'update_artifact', { artifact_id: artifactId, files, message: 'Added the FAQ', replace_all_files: true });
     expect(r.isError).toBeUndefined();
     const versions = await versionsOf(artifactId);
     expect(versions.map((v) => v.version_no)).toEqual([1, 2]);
@@ -166,5 +172,139 @@ describe('single-file publish', () => {
     expect(await assetsOf(versions[0].id)).toEqual([{ path: 'index.html', mime: 'text/html' }]);
     expect(r.structuredContent).not.toHaveProperty('pages');
     expect(r.content[0].text).not.toContain('Pages (');
+  });
+});
+
+describe('reading a site back and changing it without losing files', () => {
+  let id: string;
+  const filesOf = async () => (await call(alice, 'get_artifact', { artifact_id: id, include_files: true })).structuredContent!.files as SourceFile[];
+  const site = SITE.map((f) => f.path).sort();
+
+  beforeAll(async () => {
+    id = (await call(alice, 'publish_artifact', { title: 'Acme handbook', files: SITE, workspace_id: WS })).structuredContent!.artifact_id as string;
+  });
+
+  it('include_files returns every file whole, main file first, binary files as base64', async () => {
+    const r = await call(alice, 'get_artifact', { artifact_id: id, include_files: true });
+    expect(r.structuredContent).toMatchObject({ version: 1, entrypoint: 'index.html', truncated: false });
+    const files = r.structuredContent!.files as SourceFile[];
+    expect(files[0].path).toBe('index.html');
+    expect(files.map((f) => f.path).sort()).toEqual(site);
+    for (const f of SITE) {
+      expect(files.find((x) => x.path === f.path)).toMatchObject({ content: f.content, encoding: f.encoding ?? 'utf8', truncated: false });
+    }
+    expect(r.content[0].text).toContain('Files of version 1: 5 files, main file index.html.');
+    expect(r.content[0].text).toMatch(/=== img\/dot\.png \(image\/png, \d+ bytes, base64\) ===\niVBORw0KGgo/);
+  });
+
+  it('include_content alone names the other files, so a site is not taken for one page', async () => {
+    const r = await call(alice, 'get_artifact', { artifact_id: id, include_content: true });
+    expect(r.structuredContent).toMatchObject({
+      version: 1, content: SITE[0].content, truncated: false, size_bytes: SITE[0].content.length,
+      other_files: ['about.html', 'css/site.css', 'guides/setup.html', 'img/dot.png'],
+    });
+    expect(r.content[0].text).toContain('this page has 4 more files: about.html, css/site.css, guides/setup.html, img/dot.png');
+  });
+
+  it('refuses content alone on a site, and files that leave some out: nothing is saved', async () => {
+    const one = await call(alice, 'update_artifact', { artifact_id: id, content: '<!doctype html><h1>Only this</h1>' });
+    expect(one.isError).toBe(true);
+    expect(one.structuredContent).toEqual({ code: 'WOULD_REMOVE_FILES', would_remove: ['about.html', 'css/site.css', 'guides/setup.html', 'img/dot.png'] });
+    expect(one.content[0].text).toContain('content only replaces index.html');
+    expect(one.content[0].text).not.toContain('report_problem');
+
+    const some = await call(alice, 'update_artifact', { artifact_id: id, files: SITE.filter((f) => f.path !== 'css/site.css') });
+    expect(some.isError).toBe(true);
+    expect(some.structuredContent).toEqual({ code: 'WOULD_REMOVE_FILES', would_remove: ['css/site.css'] });
+    expect(some.content[0].text).toContain('Only if the person wants that file gone, call again with replace_all_files: true.');
+    expect(await versionsOf(id)).toHaveLength(1);
+  });
+
+  it('saves the whole set read back with include_files, from the version it was read at', async () => {
+    const files = (await filesOf()).map(({ path, content, encoding }) => ({
+      path, encoding, content: path === 'index.html' ? content!.replace('Acme manual', 'Acme handbook v2') : content,
+    }));
+    const r = await call(alice, 'update_artifact', { artifact_id: id, files, base_version: 1, message: 'Renamed the manual' });
+    expect(r.isError).toBeUndefined();
+    expect(r.content[0].text).toContain('Updated "Acme handbook" (version 2).');
+    const after = await filesOf();
+    expect(after.map((f) => f.path).sort()).toEqual(site);
+    expect(after.find((f) => f.path === 'index.html')!.content).toContain('Acme handbook v2');
+    expect(after.find((f) => f.path === 'img/dot.png')!.content).toBe(SITE[4].content);
+  });
+
+  it('refuses a write made from an older read, and a version that does not exist', async () => {
+    const stale = await call(alice, 'update_artifact', { artifact_id: id, files: SITE, base_version: 1 });
+    expect(stale.isError).toBe(true);
+    expect(stale.structuredContent).toEqual({ code: 'VERSION_CONFLICT', base_version: 1 });
+    expect(stale.content[0].text).toContain('the page changed after you read version 1 (alice saved a newer version at');
+    expect(stale.content[0].text).not.toContain('report_problem');
+    const unknown = await call(alice, 'update_artifact', { artifact_id: id, files: SITE, base_version: 9 });
+    expect(unknown.content[0].text).toContain('this page has no version 9');
+    expect(await versionsOf(id)).toHaveLength(2);
+  });
+
+  it('replace_all_files: true turns the site into one page when the person wants that', async () => {
+    const r = await call(alice, 'update_artifact', { artifact_id: id, content: '<!doctype html><h1>One page now</h1>', base_version: 2, replace_all_files: true });
+    expect(r.isError).toBeUndefined();
+    const versions = await versionsOf(id);
+    expect(versions).toHaveLength(3);
+    expect(await assetsOf(versions[2].id)).toEqual([{ path: 'index.html', mime: 'text/html' }]);
+  });
+
+  it('content still replaces a one-file page, even under a new main file name', async () => {
+    const note = (await call(alice, 'publish_artifact', { title: 'Acme notes', content: '# Notes', workspace_id: WS })).structuredContent!.artifact_id as string;
+    const r = await call(alice, 'update_artifact', { artifact_id: note, content: '<!doctype html><h1>Notes</h1>', format: 'html', base_version: 1 });
+    expect(r.isError).toBeUndefined();
+    const versions = await versionsOf(note);
+    expect(await assetsOf(versions[1].id)).toEqual([{ path: 'index.html', mime: 'text/html' }]);
+  });
+
+  it('reads the newest saved version when it is not live yet, and checks base_version against it', async () => {
+    const page = (await call(alice, 'publish_artifact', { title: 'Acme staged', content: '<!doctype html><h1>One</h1>', workspace_id: WS })).structuredContent!.artifact_id as string;
+    await call(alice, 'update_artifact', { artifact_id: page, content: '<!doctype html><h1>Two</h1>', base_version: 1 });
+    const [v1] = await versionsOf(page);
+    await e.DB.prepare("UPDATE deployments SET version_id = ? WHERE artifact_id = ? AND channel = 'production'").bind(v1.id, page).run();
+
+    const r = await call(alice, 'get_artifact', { artifact_id: page, include_content: true });
+    expect(r.structuredContent).toMatchObject({ version: 2, content: '<!doctype html><h1>Two</h1>' });
+    expect(r.content[0].text).toContain('Content of version 2 (saved, not live yet: people still see version 1)');
+    const stale = await call(alice, 'update_artifact', { artifact_id: page, content: '<!doctype html><h1>One, edited</h1>', base_version: 1 });
+    expect(stale.structuredContent).toMatchObject({ code: 'VERSION_CONFLICT' });
+  });
+});
+
+describe('answers that do not fit say so', () => {
+  it('include_content cuts a long main file at 512 KB and flags it; fetch flags it too', async () => {
+    const content = `<!doctype html><p>${'x'.repeat(600_000)}</p>`;
+    const page = (await call(alice, 'publish_artifact', { title: 'Acme long page', content, workspace_id: WS })).structuredContent!.artifact_id as string;
+    const r = await call(alice, 'get_artifact', { artifact_id: page, include_content: true });
+    expect(r.structuredContent).toMatchObject({ version: 1, truncated: true, size_bytes: content.length });
+    expect(r.structuredContent!.content).toBe(content.slice(0, 512 * 1024));
+    expect(r.content[0].text).toContain(`CUT: only the first ${512 * 1024} characters of this ${content.length}-byte file fit in one answer`);
+    expect((await call(alice, 'fetch', { id: page })).structuredContent!.metadata).toMatchObject({ truncated: true });
+  });
+
+  it('include_files fits the smallest files whole, then cuts or leaves out the rest, flagging each', async () => {
+    const files = [
+      { path: 'index.html', content: '<!doctype html><h1>Data</h1>' },
+      { path: 'img/dot.png', content: SITE[4].content, encoding: 'base64' },
+      { path: 'a.css', content: 'a'.repeat(200_000) },
+      { path: 'b.css', content: 'b'.repeat(250_000) },
+      { path: 'img/big.png', content: 'A'.repeat(400_000), encoding: 'base64' },
+      { path: 'data.json', content: `"${'d'.repeat(2_000_000)}"` },
+    ];
+    const page = (await call(alice, 'publish_artifact', { title: 'Acme data site', files, workspace_id: WS })).structuredContent!.artifact_id as string;
+    const r = await call(alice, 'get_artifact', { artifact_id: page, include_files: true });
+    const got = r.structuredContent!.files as SourceFile[];
+    expect(got.map((f) => [f.path, f.truncated])).toEqual([
+      ['index.html', false], ['img/dot.png', false], ['a.css', false], ['b.css', false], ['img/big.png', true], ['data.json', true],
+    ]);
+    expect(got[4].content).toBeUndefined();
+    const used = got.slice(0, 4).reduce((n, f) => n + f.content!.length, 0);
+    expect(got[5].content).toBe(`"${'d'.repeat(512 * 1024 - used - 1)}`);
+    expect(r.structuredContent!.truncated).toBe(true);
+    expect(r.content[0].text).toContain('Only 512 KB of file content fits in one answer. Cut: data.json. Not included: img/big.png.');
+    expect(r.content[0].text).toContain('=== img/big.png (image/png, 300000 bytes, base64) (not included) ===');
   });
 });

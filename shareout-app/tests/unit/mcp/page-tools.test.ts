@@ -83,6 +83,17 @@ describe('list_versions / get_version_source', () => {
   });
 });
 
+describe('get_artifact source', () => {
+  it('reads with the viewer gate of the files endpoint: a collaborator gets it, a member without a role does not', async () => {
+    const r = await call(carol, 'get_artifact', { artifact_id: ART, include_content: true });
+    expect(r.structuredContent).toMatchObject({ version: 2, content: '<h1>Two</h1>', truncated: false });
+    const member = await call(dave, 'get_artifact', { artifact_id: ART, include_files: true });
+    expect(member.isError).toBeUndefined();
+    expect(member.content[0].text).toContain('Its files are not shown');
+    expect(member.structuredContent).not.toHaveProperty('files');
+  });
+});
+
 describe('restore_version', () => {
   it('denies a viewer and creates no version', async () => {
     const r = await call(carol, 'restore_version', { artifact_id: ART, version_no: 1 });
