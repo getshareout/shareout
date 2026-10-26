@@ -6,6 +6,7 @@ import { handleGetCollaborators, handleAddCollaborators, handleRemoveCollaborato
 import { handleShareArtifact } from '../../artifacts/share';
 import { handleGetVersions, handleGetVersionSource, handleRestoreVersion, handleRollback } from '../../artifacts/versions';
 import { handleGetArtifactFiles } from '../../artifacts/files';
+import { handleEditArtifact } from '../../artifacts/edits';
 import { handleAddFavorite, handleRemoveFavorite } from '../../artifacts/favorites';
 import { handleGetTags, handleAddTag, handleRemoveTag } from '../../artifacts/tags';
 import {
@@ -425,6 +426,14 @@ export async function routeArtifactApi(ctx: FetchContext): Promise<Response | nu
     const user = await requireAuthUser(ctx);
     if (!isAuthUser(user)) return user;
     return addCORS(await handleGetArtifactFiles(request, env, user, artifactId));
+  }
+
+  const editsMatch = path.match(/^\/v1\/artifacts\/([^/]+)\/edits$/);
+  if (editsMatch && request.method === 'POST') {
+    const [, artifactId] = editsMatch;
+    const user = await requireAuthUser(ctx);
+    if (!isAuthUser(user)) return user;
+    return addCORS(await handleEditArtifact(request, env, user, artifactId, ctx.executionCtx));
   }
 
   const rollbackMatch = path.match(/^\/v1\/artifacts\/([^/]+)\/rollback$/);

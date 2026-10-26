@@ -313,6 +313,37 @@ describe('handleApplyEdits', () => {
     expect(body.data.applied[0]).toEqual({ file: 'f.txt', success: false, error: 'Search text not found' });
   });
 
+  it('replaces literally ($& stays as typed) and refuses an ambiguous search', async () => {
+    const inserted: unknown[][] = [];
+    const env = makeEnv({
+      first: (sql) => {
+        if (sql.includes('FROM versions')) return { id: 'ver_1' };
+        if (sql.includes('FROM assets')) return { r2_key: 'r2/f', mime: 'text/plain' };
+        return null;
+      },
+      run: (sql, args) => {
+        if (sql.includes('artifact_pending_edits')) inserted.push(args);
+        return { success: true };
+      },
+    }, { ARTIFACTS: makeR2Mock({ getText: { 'r2/f': 'price: X\nnote: Y Y' } }) });
+
+    const res = await handleApplyEdits(
+      jsonRequest(BASE_URL, 'POST', {
+        conversationId: 'conv_1',
+        edits: [
+          { file: 'f.txt', type: 'replace', search: 'X', replace: '$& and $$5' },
+          { file: 'f.txt', type: 'replace', search: 'Y', replace: 'Z' },
+        ],
+      }),
+      makeCtx(env),
+    );
+    const body = await res.json() as { data: { applied: Array<{ success: boolean; error?: string }> } };
+    expect(body.data.applied[0].success).toBe(true);
+    expect(inserted[0][5]).toBe('price: $& and $$5\nnote: Y Y');
+    expect(body.data.applied[1]).toEqual({ file: 'f.txt', success: false, error: 'Search text matches 2 places (lines 2, 2); include more surrounding text' });
+    expect(inserted).toHaveLength(1);
+  });
+
   it('applies full file replacement when no search', async () => {
     const env = makeEnv({
       first: (sql) => {

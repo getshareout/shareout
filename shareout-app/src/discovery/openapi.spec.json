@@ -1472,16 +1472,36 @@
           "Artifacts"
         ],
         "summary": "Get artifact files",
-        "description": "Fetch all files for an artifact version. Requires viewer access or higher.",
+        "description": "Fetch the files of an artifact version (the live one unless `version` is given). Requires viewer access or higher. `manifest=1` lists path, mime, size and sha256 without any content; `paths` reads only the files named. Before editing, read the files you change and pass `version_no` as `base_version` to `POST /v1/artifacts/{id}/edits`.",
         "operationId": "getArtifactFiles",
         "parameters": [
           {
             "name": "version",
             "in": "query",
-            "description": "Version number or ID. Defaults to the latest.",
+            "description": "Version number or ID. Defaults to the live (production) version.",
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "manifest",
+            "in": "query",
+            "description": "`1`: return `[{path, mime, size, sha256}]` only, from the database (no file content).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            }
+          },
+          {
+            "name": "paths",
+            "in": "query",
+            "description": "Comma-separated paths (or repeat the parameter) to read only those files. A path the version lacks is a 404 `FILE_NOT_FOUND` listing it under `missing`.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "index.html,styles.css"
           }
         ],
         "responses": {
@@ -1498,11 +1518,32 @@
                     "version_id": {
                       "type": "string"
                     },
+                    "version_no": {
+                      "type": "integer"
+                    },
+                    "entrypoint": {
+                      "type": "string"
+                    },
                     "files": {
                       "type": "array",
+                      "description": "With `manifest=1`, ManifestEntry items; otherwise FileEntry items with content.",
                       "items": {
-                        "$ref": "#/components/schemas/FileEntry"
+                        "oneOf": [
+                          {
+                            "$ref": "#/components/schemas/FileEntry"
+                          },
+                          {
+                            "$ref": "#/components/schemas/ManifestEntry"
+                          }
+                        ]
                       }
+                    },
+                    "unreadable": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Files of the version whose stored bytes could not be read (absent when none)."
                     }
                   }
                 }
@@ -1511,6 +1552,180 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/artifacts/{id}/edits": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ArtifactId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Artifacts"
+        ],
+        "summary": "Edit artifact files",
+        "description": "Change an artifact with small operations instead of re-publishing every file. The ops run in order on the newest version, which `base_version` must name; if any op fails nothing is written. The result is published as the next version through the normal publish pipeline (moderation, tests gate, readiness), and files the ops leave unchanged are carried over without re-uploading. Counts once against the daily publish limit (`dry_run` does not). Requires the editor role. Works on html, markdown, csv, txt and json artifacts. Send `Idempotency-Key` to make retries safe.",
+        "operationId": "editArtifact",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditRequest"
+              },
+              "example": {
+                "base_version": 3,
+                "message": "Blue headings",
+                "ops": [
+                  {
+                    "op": "replace",
+                    "path": "styles.css",
+                    "old": "h1 { color: red; }",
+                    "new": "h1 { color: blue; }"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`dry_run: true` (`{dry_run, base_version, would_create_version, entrypoint, changes}`), or ops that leave every file as it was (`{unchanged: true}`): no version is created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dry_run": {
+                      "type": "boolean"
+                    },
+                    "unchanged": {
+                      "type": "boolean"
+                    },
+                    "base_version": {
+                      "type": "integer"
+                    },
+                    "would_create_version": {
+                      "type": "integer"
+                    },
+                    "changes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FileChange"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Saved as a new version. Same body as `POST /v1/publish`, plus `base_version` and `changes`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "artifact": {
+                      "type": "object"
+                    },
+                    "version": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "version_no": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "deployment": {
+                      "type": "object"
+                    },
+                    "visibility": {
+                      "$ref": "#/components/schemas/Visibility"
+                    },
+                    "base_version": {
+                      "type": "integer"
+                    },
+                    "changes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FileChange"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request (`VALIDATION_ERROR`, `INVALID_OPS`, `INVALID_PATH`, `INVALID_JSON`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditError"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "`VERSION_CONFLICT`: the artifact has a newer version than `base_version`; `current_version` says which. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "base_version": {
+                          "type": "integer"
+                        },
+                        "current_version": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`STORAGE_LIMIT_EXCEEDED` or `FILE_TOO_LARGE`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "An op could not be applied; nothing was written. `EDIT_NO_MATCH` (`old` not found; `nearest` is the closest line), `EDIT_AMBIGUOUS` (`old` matches several places; `lines` lists them — add context or set `all`), `FILE_NOT_FOUND`, `FILE_EXISTS`, `NOT_TEXT`, `RENAME_CHANGES_TYPE`, `ENTRYPOINT_MISSING`, `UNSUPPORTED_ARTIFACT_TYPE`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditError"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           }
         }
       }
@@ -12274,6 +12489,169 @@
             "type": "integer"
           }
         }
+      },
+      "ManifestEntry": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "description": "Bytes."
+          },
+          "sha256": {
+            "type": "string",
+            "description": "Hex SHA-256 of the stored bytes."
+          }
+        }
+      },
+      "EditOp": {
+        "type": "object",
+        "required": [
+          "op"
+        ],
+        "description": "`replace {path, old, new, all?}`: `old` must match exactly once unless `all`; both are literal text (`$&` stays `$&`). In a CRLF file an `old` written with LF still matches and the replacement takes CRLF. `write {path, content, encoding?}` creates or replaces a whole file (`encoding: base64` for binary). `delete {path}`. `rename {from, to}` moves a file without re-uploading it (same file type only).",
+        "properties": {
+          "op": {
+            "type": "string",
+            "enum": [
+              "replace",
+              "write",
+              "delete",
+              "rename"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "old": {
+            "type": "string"
+          },
+          "new": {
+            "type": "string"
+          },
+          "all": {
+            "type": "boolean"
+          },
+          "content": {
+            "type": "string"
+          },
+          "encoding": {
+            "type": "string",
+            "enum": [
+              "utf8",
+              "base64"
+            ]
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        }
+      },
+      "EditRequest": {
+        "type": "object",
+        "required": [
+          "base_version",
+          "ops"
+        ],
+        "properties": {
+          "base_version": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The `version_no` of the files you read; must be the newest version."
+          },
+          "ops": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/EditOp"
+            }
+          },
+          "message": {
+            "type": "string",
+            "description": "Note for the version history."
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "Report `changes` without saving anything."
+          }
+        }
+      },
+      "FileChange": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "change": {
+            "type": "string",
+            "enum": [
+              "added",
+              "modified",
+              "deleted",
+              "renamed"
+            ]
+          },
+          "from": {
+            "type": "string",
+            "description": "Old path of a renamed file."
+          },
+          "size_before": {
+            "type": "integer"
+          },
+          "size_after": {
+            "type": "integer"
+          },
+          "replacements": {
+            "type": "integer"
+          }
+        }
+      },
+      "EditError": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Error"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "op_index": {
+                "type": "integer",
+                "description": "Index in `ops` of the op that failed."
+              },
+              "path": {
+                "type": "string"
+              },
+              "nearest": {
+                "type": "object",
+                "description": "`EDIT_NO_MATCH`: the line most like the first line of `old`.",
+                "properties": {
+                  "line": {
+                    "type": "integer"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                }
+              },
+              "lines": {
+                "type": "array",
+                "description": "`EDIT_AMBIGUOUS`: 1-based line of each match (first 20).",
+                "items": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ]
       },
       "PublishRequest": {
         "type": "object",

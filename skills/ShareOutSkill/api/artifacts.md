@@ -195,18 +195,22 @@ Serve raw content (for iframe embedding).
 
 ## GET /v1/artifacts/{id}/files
 
-Fetch all files for an artifact version.
+Fetch the files of an artifact version (the live one unless `version` is given).
 
 **Required Role:** `viewer` or higher
 
 **Query Parameters:**
 - `version` (optional): Version number or ID
+- `manifest=1` (optional): list `{path, mime, size, sha256}` only — no content, no storage reads
+- `paths` (optional): `paths=index.html,styles.css` (or repeat `paths=`) reads only those files; a path the version lacks is `404 FILE_NOT_FOUND` with `missing`
 
 **Response:**
 ```json
 {
   "artifact_id": "art_abc123",
   "version_id": "ver_xyz789",
+  "version_no": 3,
+  "entrypoint": "index.html",
   "files": [
     {
       "path": "index.html",
@@ -218,6 +222,38 @@ Fetch all files for an artifact version.
   ]
 }
 ```
+
+## POST /v1/artifacts/{id}/edits — edit, don't rewrite
+
+To change part of an existing artifact, send ops instead of re-publishing every file. Read the
+files you will change (`GET /v1/artifacts/{id}/files?paths=styles.css`), then:
+
+```json
+{
+  "base_version": 3,
+  "message": "Blue headings",
+  "ops": [
+    { "op": "replace", "path": "styles.css", "old": "h1 { color: red; }", "new": "h1 { color: blue; }" }
+  ]
+}
+```
+
+- `replace {path, old, new, all?}` — `old` must match **exactly once** (copy it from the file, with enough
+  context to be unique) unless `all: true`. Text is literal: `$&` stays `$&`. A CRLF file matches an `old`
+  written with LF and keeps CRLF.
+- `write {path, content, encoding?}` — create or replace a whole file (`"encoding": "base64"` for binary).
+- `delete {path}` · `rename {from, to}` (same file type; the stored bytes move without re-upload).
+- Ops run in order; **if any fails, nothing is written.** `dry_run: true` returns `changes` without saving.
+- `base_version` must be the newest version. If someone saved since: `409 VERSION_CONFLICT` with
+  `current_version` — re-read the files you change at that version and retry.
+- Errors name the op: `422 EDIT_NO_MATCH` (`nearest`: the closest line), `422 EDIT_AMBIGUOUS` (`lines`
+  of every match), `FILE_NOT_FOUND`, `FILE_EXISTS`, `NOT_TEXT`, `ENTRYPOINT_MISSING`; each has `op_index`.
+
+Requires `editor` or owner. Works on html, markdown, csv, txt and json artifacts. The new version goes
+through the normal publish pipeline (moderation, tests gate) and keeps visibility, sharing and folder;
+only changed files are uploaded. Counts once against the daily publish limit (dry runs do not).
+Returns `201` with the publish response plus `base_version` and `changes`
+(`[{path, change: added|modified|deleted|renamed, from?, size_before?, size_after?, replacements?}]`).
 
 ## Versions & restore
 

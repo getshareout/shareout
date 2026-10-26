@@ -321,6 +321,9 @@ Minimal payload — publish into the user's team workspace so their team sees it
 
 Re-publishing the same `slug` adds a new version. Add `"message": "one line on what changed"`
 so the page history says why; leave it out and ShareOut writes a short note itself.
+To change part of an existing artifact, edit, don't rewrite: `POST /v1/artifacts/{id}/edits`
+with `base_version` and `ops` (`replace`/`write`/`delete`/`rename`) —
+[api/artifacts.md](api/artifacts.md#post-v1artifactsidedits--edit-dont-rewrite).
 To go back to an older version, `POST /v1/artifacts/{id}/versions/{no}/restore` (a new
 version with the old files; `/rollback` is deprecated). Several pages? Ship one HTML file
 per page in `files[]` and link them with relative hrefs:
