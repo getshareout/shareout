@@ -20,7 +20,7 @@ export const WORKSPACE_DATA_SOURCES_STYLES = `
 .wsx-ds__stale { display: inline-flex; align-items: center; gap: var(--space-1); width: fit-content; margin-top: 2px; padding: 2px var(--space-2); border-radius: var(--radius-full); background: var(--color-warning-light); color: var(--color-text); font-size: var(--text-xs); font-weight: 500; }
 .wsx-ds__stale svg { flex: none; color: var(--color-warning); }
 .wsx-ds__more { margin: 0 var(--space-3) var(--space-2) calc(28px + 2 * var(--space-3)); font-size: var(--text-xs); color: var(--color-text-secondary); }
-.wsx-ds__more summary { min-height: 28px; display: inline-flex; align-items: center; color: var(--color-primary); font-weight: 500; cursor: pointer; }
+.wsx-ds__more summary { min-height: 44px; display: inline-flex; align-items: center; color: var(--color-primary); font-weight: 500; cursor: pointer; }
 .wsx-ds__more summary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .wsx-ds__more pre { max-height: 180px; margin: var(--space-2) 0; padding: var(--space-3); overflow: auto; border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text); font: 12px/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .wsx-ds__more dl { display: grid; grid-template-columns: auto 1fr; gap: var(--space-1) var(--space-3); margin: var(--space-2) 0 0; }

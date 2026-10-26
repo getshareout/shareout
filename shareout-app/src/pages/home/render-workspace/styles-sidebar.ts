@@ -122,7 +122,7 @@ export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspect
 .wsx-share__opt { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border: 0; background: transparent; text-align: left; cursor: pointer; font: 500 var(--text-sm) var(--font-body); color: var(--color-text); }
 .wsx-share__opt:hover { background: var(--color-surface); }
 .wsx-share__opt small { color: var(--color-text-tertiary); font-size: var(--text-xs); margin-left: auto; }
-.wsx-det__who .role { font-size: 10px; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; }
+.wsx-det__who .role { font-size: var(--text-xs); color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; }
 /* ===== Studio inspector redesign ===== */
 .wsx-det__hrow { display: flex; align-items: flex-start; gap: 8px; }
 .wsx-det__hrow .wsx-det__name { flex: 1; }

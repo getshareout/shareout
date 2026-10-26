@@ -114,7 +114,7 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 .wsx__evrow b { font: 600 var(--text-sm) var(--font-body); display: block; }
 .wsx__evrow small { color: var(--color-text-tertiary); font-size: var(--text-xs); }
 .wsx__evrow select { margin-left: auto; flex: none; font: 600 var(--text-xs) var(--font-body); padding: 4px 6px; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-bg-elevated); color: var(--color-text); }
-.wsx__evtier { font-size: 9px; letter-spacing: .05em; text-transform: uppercase; padding: 1px 5px; border-radius: 4px; background: var(--color-surface); color: var(--color-text-tertiary); }
+.wsx__evtier { font-size: var(--text-xs); letter-spacing: .05em; text-transform: uppercase; padding: 1px 5px; border-radius: 4px; background: var(--color-surface); color: var(--color-text-tertiary); }
 .wsx__evhead { display: flex; align-items: center; gap: 8px; padding: 8px 6px 12px; }
 .wsx__evhead b { font: 700 var(--text-sm) var(--font-body); }
 .wsx__evclose { margin-left: auto; border: 0; background: transparent; font-size: 15px; cursor: pointer; color: var(--color-text-secondary); }
