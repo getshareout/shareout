@@ -5,7 +5,7 @@ import type { Env } from '../types';
 import { renderHtmlPage } from '../design-system/shell';
 import { escapeHtml } from '../html/utils';
 import { parseBranding } from '../workspaces/branding';
-import { localeFromAcceptLanguage, localeForArtifactWorkspace, type Locale } from '../i18n/locale';
+import { localeFromAcceptLanguage, localeForViewer, type Locale } from '../i18n/locale';
 import { renderPortal } from './portal-page';
 import { recordSpaceGuestView, resolveSpaceGuests, spaceGuestCovers, type SpaceGuest } from './space-guest';
 
@@ -95,7 +95,7 @@ export async function handleSpaceGuestPortal(request: Request, env: Env, folderI
        WHERE d.deleted_at IS NULL AND d.workspace_id = ? AND d.folder_id IN (SELECT id FROM sub)
          AND d.visibility NOT IN ('private', 'team')
        ORDER BY d.name`).bind(folderId, ws, ws).all<{ id: string; name: string; bucket_artifact_id: string; filename: string }>(),
-    localeForArtifactWorkspace(env, ws, request),
+    localeForViewer(env, { workspaceId: ws, request }),
   ]);
   const c = COPY[locale];
   const brand = parseBranding(workspace?.branding);

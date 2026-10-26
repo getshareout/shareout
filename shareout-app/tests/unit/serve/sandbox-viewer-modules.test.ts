@@ -35,6 +35,9 @@ describe('sandbox-viewer modules', () => {
     expect(anon).toContain('Comentarios');
     const signed = renderToolbar(buildToolbarContext({ ...base, loggedIn: true })!);
     expect(signed).not.toContain('class="so-solo so-open"');
+    const en = renderToolbar(buildToolbarContext({ ...base, locale: 'en' })!);
+    expect(en).toContain('Comments');
+    expect(en).not.toContain('Comentarios');
   });
 
   it('renderLoadingHideScript hides the skeleton on content-ready with fallbacks', () => {

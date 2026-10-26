@@ -5,6 +5,7 @@ import { renderHtmlPage } from '../design-system/shell';
 import { brandLockupHtml } from '../brand';
 import { escapeHtml } from '../html/utils';
 import { localeFromAcceptLanguage, t, type LocaleCopy } from '../i18n';
+import { COOKIE_NAME } from '../auth/constants';
 
 /** Shared branded error/404 layout styles (also used by streamed page fallbacks). */
 export const notFoundStyles = `
@@ -41,12 +42,14 @@ export function renderStreamedPageErrorBody(): string {
 </main>`;
 }
 
-const NOT_FOUND_COPY: LocaleCopy<{ title: string; text: string; home: string; create: string; pageTitle: string; description: string }> = {
+const NOT_FOUND_COPY: LocaleCopy<{ title: string; text: string; home: string; create: string; landing: string; signIn: string; pageTitle: string; description: string }> = {
   en: {
     title: 'This page wandered off',
     text: "The link may be broken, or the page may have moved. Let's get you back to something live.",
     home: 'Go to my artifacts',
     create: 'Create with AI',
+    landing: 'Go to ShareOut',
+    signIn: 'Sign in',
     pageTitle: 'Page not found · ShareOut',
     description: 'The page you are looking for could not be found.',
   },
@@ -55,6 +58,8 @@ const NOT_FOUND_COPY: LocaleCopy<{ title: string; text: string; home: string; cr
     text: 'Puede que el link esté roto o que la página se haya movido. Volvamos a algo que funcione.',
     home: 'Ir a mis artefactos',
     create: 'Crear con IA',
+    landing: 'Ir a ShareOut',
+    signIn: 'Iniciar sesión',
     pageTitle: 'Página no encontrada · ShareOut',
     description: 'No pudimos encontrar la página que buscás.',
   },
@@ -66,17 +71,24 @@ export function notFoundResponse(request: Request): Response {
   return wantsHtml ? renderNotFoundPage(request) : new Response('Not Found', { status: 404 });
 }
 
+/** Cookie presence only (no DB hit on the 404 path): it picks which links to offer, never what exists. */
+const hasSessionCookie = (request?: Request) => (request?.headers.get('Cookie') || '').includes(`${COOKIE_NAME}=`);
+
 export function renderNotFoundPage(request?: Request): Response {
   const locale = localeFromAcceptLanguage(request?.headers.get('Accept-Language')) ?? 'en';
   const c = t(locale, NOT_FOUND_COPY);
+  const actions = hasSessionCookie(request)
+    ? `<a class="so-c-btn so-c-btn--primary" href="/home">${c.home}</a>
+    <a class="so-c-btn so-c-btn--secondary" href="/create">${c.create}</a>`
+    : `<a class="so-c-btn so-c-btn--primary" href="/">${c.landing}</a>
+    <a class="so-c-btn so-c-btn--secondary" href="/auth/login?redirect=/home">${c.signIn}</a>`;
   const body = `<main class="nf-wrap">
   <div class="nf-brand">${brandLockupHtml({ markSize: 30, href: '/' })}</div>
   <div class="nf-code">404</div>
   <h1 class="nf-title">${c.title}</h1>
   <p class="nf-text">${c.text}</p>
   <div class="nf-actions">
-    <a class="so-c-btn so-c-btn--primary" href="/home">${c.home}</a>
-    <a class="so-c-btn so-c-btn--secondary" href="/create">${c.create}</a>
+    ${actions}
   </div>
 </main>`;
 

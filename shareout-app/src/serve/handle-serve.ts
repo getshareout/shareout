@@ -17,7 +17,7 @@ import { injectPerfBeacon } from './perf-beacon';
 import { injectPresenceBeacon } from './presence-beacon';
 import { badgeEnabled, injectBadge } from './badge';
 import { versionedBundlePath } from '../bundle-versions';
-import { localeForArtifactWorkspace } from '../i18n/locale';
+import { localeForViewer } from '../i18n/locale';
 import { injectPageAgent, isSafePagePath, isSafeSectionId } from './page-agent';
 import { hasMcpCapability } from '../mcp-broker/capabilities';
 import { servingOrigin } from '../workspaces/domains/host-binding';
@@ -92,10 +92,10 @@ export async function gateArtifactSideAsset(
     .bind(null, slug).first<ArtifactWithAsset>();
   if (!result) return new Response('Not Found', { status: 404 });
   if (result.paused === 1) {
-    return pausedPage(undefined, await localeForArtifactWorkspace(env, result.workspace_id, request));
+    return pausedPage(undefined, await localeForViewer(env, { workspaceId: result.workspace_id, request }));
   }
   if ((result.moderation_status ?? 'approved') === 'blocked') {
-    return takedownPage(undefined, await localeForArtifactWorkspace(env, result.workspace_id, request));
+    return takedownPage(undefined, await localeForViewer(env, { workspaceId: result.workspace_id, request }));
   }
   if ((normalizeVisibility(result.visibility) || 'public') === 'public') return { isOpen: true };
   return (await checkAccess(request, env, slug, result)) ?? { isOpen: false };
@@ -197,7 +197,7 @@ export async function handleServe(
   // Paused / blocked pages must not leak the artifact title to strangers. Generic
   // copy only — name was previously embedded in the HTML before the access gate.
   if (result.paused === 1) {
-    return pausedPage(undefined, await localeForArtifactWorkspace(env, result.workspace_id, request));
+    return pausedPage(undefined, await localeForViewer(env, { workspaceId: result.workspace_id, request }));
   }
 
   // Moderation gate (Workstream B). A blocked artifact shows a takedown page to
@@ -205,7 +205,7 @@ export async function handleServe(
   // publish, so non-owners are already gated by the visibility check below and the
   // owner may still preview their own under-review artifact — no extra gate here.
   if ((result.moderation_status ?? 'approved') === 'blocked') {
-    return takedownPage(undefined, await localeForArtifactWorkspace(env, result.workspace_id, request));
+    return takedownPage(undefined, await localeForViewer(env, { workspaceId: result.workspace_id, request }));
   }
 
   // Capture mode short-circuit: a signed capture token authorizes the renderer to
@@ -302,7 +302,7 @@ export async function handleServe(
       // truthful "being reviewed" page instead of a login wall they can't clear. The
       // owner passed checkAccess above (accessResult null), so they still see the page.
       if ((result.moderation_status ?? 'approved') === 'pending' && result.moderation_held_visibility) {
-        return underReviewPage(undefined, await localeForArtifactWorkspace(env, result.workspace_id, request));
+        return underReviewPage(undefined, await localeForViewer(env, { workspaceId: result.workspace_id, request }));
       }
       return accessResult;
     }
