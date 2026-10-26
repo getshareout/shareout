@@ -124,6 +124,18 @@ describe('Studio create: watch it build', () => {
     expect(frame.getAttribute('srcdoc')).toBe('<h1>Hi there</h1>');
   });
 
+  it('never shows the markdown fence a streamed page arrives in', async () => {
+    const h = load();
+    h.createBuild('Fenced page');
+    await h.flush();
+    h.streams[0].emit({ type: 'delta', text: '```ht' });
+    const frame = h.liveFrame()!;
+    expect(frame.getAttribute('srcdoc')).toBe('');
+    h.streams[0].emit({ type: 'delta', text: 'ml\n<h1>Hi</h1>\n```' });
+    vi.advanceTimersByTime(250);
+    expect(frame.getAttribute('srcdoc')).toBe('<h1>Hi</h1>');
+  });
+
   it('swaps the published artifact into the same slot: one tab, active, Edit available', async () => {
     const h = load();
     h.openArtifact('older', 'Older', 'art_old', 'html');
