@@ -10,6 +10,10 @@ import { loadGovernedCatalog } from '../../catalog/governed';
 import { seedConnectorsAsSources } from '../../catalog/seed';
 import { type CatalogEntry } from '../../catalog/types';
 import { certificationHistory, handleCatalogCertify } from './catalog-certify';
+import { apiErrorResponse } from '../../http/api-error';
+import { metricWriteIssue } from '../../catalog/metrics/spec';
+import { syncMetricIndex } from '../../catalog/metrics/index-sync';
+import { listCatalogFiles } from '../../catalog/store';
 
 const PREFIX_RE = /^\/v1\/workspaces\/([^/]+)\/catalog(?:\/(.*))?$/;
 const CERTIFY_RE = /^entries\/([^/]+)\/certify$/;
@@ -59,7 +63,9 @@ export async function routeCatalogApi(ctx: FetchContext): Promise<Response | nul
     if (method !== 'POST') return cors(jsonError('Method not allowed', 'METHOD_NOT_ALLOWED', 405));
     if (!canManage) return cors(jsonError('Forbidden', 'FORBIDDEN', 403));
     const result = await seedConnectorsAsSources(ctx.env, workspaceId);
-    return cors(jsonResponse(result));
+    // Seeding also backfills the metric index for files written before it existed.
+    const metrics = await syncMetricIndex(ctx.env, workspaceId, await listCatalogFiles(ctx.env, workspaceId));
+    return cors(jsonResponse({ ...result, metrics }));
   }
 
   // PUT/DELETE /files — agents (and humans) grow the catalog. Any member.
@@ -70,6 +76,19 @@ export async function routeCatalogApi(ctx: FetchContext): Promise<Response | nul
         | null;
       if (!body?.path || typeof body.content !== 'string') {
         return cors(jsonError('path and content are required', 'BAD_REQUEST', 400));
+      }
+      // An executable `kind: metric` must be a valid spec (unknown keys refused with a hint).
+      const specIssue = metricWriteIssue(body.path, body.content);
+      if (specIssue) {
+        return cors(
+          apiErrorResponse({
+            code: 'INVALID_METRIC_SPEC',
+            message: specIssue.message,
+            status: 400,
+            ...(specIssue.param ? { param: specIssue.param } : {}),
+            ...(specIssue.hint ? { hint: specIssue.hint } : {}),
+          })
+        );
       }
       await upsertCatalogFile(ctx.env, workspaceId, {
         path: body.path,

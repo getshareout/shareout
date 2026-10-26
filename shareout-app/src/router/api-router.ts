@@ -22,6 +22,7 @@ import { routeFeaturesApi } from './api/features';
 import { routeAccessRequestsApi } from './api/access-requests';
 import { routeSupportApi } from './api/support';
 import { routeCatalogApi } from './api/catalog';
+import { routeCatalogMetricsApi } from './api/catalog-metrics';
 import { routeKnowledgeApi } from './api/knowledge';
 import { routeDemoApi } from './api/demo';
 import { jsonError } from './helpers/json-response';
@@ -52,6 +53,7 @@ export async function routeApi(ctx: FetchContext): Promise<Response | null> {
       (await routeMetricWatchApi(ctx)) ??
       (await routeFeaturesApi(ctx)) ??
       (await routeSupportApi(ctx)) ??
+      (await routeCatalogMetricsApi(ctx)) ??
       (await routeCatalogApi(ctx)) ??
       (await routeKnowledgeApi(ctx)) ??
       (await routeDemoApi(ctx))

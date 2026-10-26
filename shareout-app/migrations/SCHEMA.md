@@ -492,6 +492,7 @@ erDiagram
 | `file_artifact_usage` | Which artifacts consume which deliverable. |
 | `catalog_settings` | Enable flag for the per-workspace data catalogue. The files themselves are `workspace_files` rows with `namespace='catalog'`. |
 | `catalog_certifications` | *(0030)* Append-only trust decisions on catalogue entries: `decision` is `certified`, `revoked` or `deprecated`, made by an owner or admin (`decided_by`) on one exact version of the entry (`content_hash`; for `kind: metric` the hash covers the normalised spec, so prose edits keep it). An entry is certified only while its current hash matches a certification made since the last revoke/deprecate. `entry_id` is the frontmatter id, not a foreign key. |
+| `catalog_metrics` | *(0031)* Index of executable `kind: metric` entries, derived from the catalog file on every write/delete (the file stays the source of truth): `spec_json` (the validated spec), `spec_hash` (the certification hash of the spec), `compile_error` (why it cannot run), `connection_id` (SET NULL when the connection is deleted, which makes the metric unrunnable) and `updated_by` (the author a draft may be run by). One row per `(workspace_id, entry_id)`. |
 | `knowledge_ingest` | Queue of artifacts awaiting knowledge extraction, deduped by `content_hash`. |
 | `knowledge_settings` | Per-workspace enable flag and `last_consolidated_at`. |
 | `knowledge_tombstones` | Paths deliberately forgotten, so re-ingestion does not resurrect them. |

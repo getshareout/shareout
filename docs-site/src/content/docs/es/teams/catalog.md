@@ -124,6 +124,58 @@ Content-Type: application/json
 que revisaste (`certification.content_hash`): si alguien la editó mientras tanto, recibís
 `409 CONFLICT` en lugar de certificar una versión que nadie miró. Los miembros reciben `403`.
 
+## Métricas que se calculan
+
+Una entrada `metric` puede llevar su definición completa — de dónde salen los datos, qué se
+suma, por qué períodos y aperturas se puede ver — y ShareOut la calcula por vos. Cada
+respuesta dice si la métrica está certificada y por quién, qué versión de la definición usó,
+de dónde salieron las filas y qué tan frescas son.
+
+```markdown
+---
+kind: metric
+id: metric.roas
+title: ROAS
+title_es: Retorno de la inversión publicitaria
+owner: ana@agencia.example
+source: { shared_table: ads_daily }     # o { connection: conn_…, fqn: dataset.tabla } / { connection: conn_…, sql: "SELECT …" }
+type: ratio                             # simple: una medida · ratio: numerador ÷ denominador
+numerator: { agg: sum, expr: Ingresos }
+denominator: { agg: sum, expr: Inversión }
+time: { dimension: Fecha, grains: [week, month] }
+dimensions: [{ name: cliente, column: cliente_id }, { name: canal, column: Canal }]
+filters: ["Estado = 'activo'"]
+format: { kind: ratio, decimals: 2, suffix: "x" }   # o currency (con currency: ARS / USD), percent, number
+freshness_sla: 26h
+---
+```
+
+- **¿No tenés warehouse?** Actualizá los datos de anuncios, analytics, tu tienda o una planilla
+  en una **tabla compartida** del espacio (con un job programado o un crew) y apuntá la métrica
+  a esa tabla con `source: { shared_table: … }`. Los warehouses funcionan directo: BigQuery,
+  Snowflake, Supabase, Redshift y Aurora PostgreSQL.
+- **Se revisa al guardar.** Una clave mal escrita ("numerador") se rechaza indicando la que
+  probablemente quisiste poner; las columnas son nombres simples; cada filtro es una condición.
+- **Quién la puede calcular.** Todo el espacio calcula una métrica certificada. Un borrador lo
+  calculan propietarios, administradores y quien lo escribió — y todo el equipo cuando los datos
+  ya están abiertos (una tabla compartida, o una conexión que el asistente puede consultar).
+
+Abrí una métrica en el lente **Catálogo** para ver su fórmula ("Σ Ingresos ÷ Σ Inversión"),
+períodos y dimensiones, y **Probala**: elegí período, fechas y apertura, y los números vuelven
+con el formato de tu idioma (`2,50x`, `$ 1.520,50`).
+
+```http
+POST /v1/workspaces/{workspaceId}/catalog/metrics/metric.roas/query
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{ "grain": "month", "by": ["canal"], "from": "2026-03-01", "to": "2026-03-31" }
+```
+
+La respuesta trae `rows` (`period`, cada apertura, `value`), más `status`, `certified_by`,
+`certified_at`, `spec_hash`, `format`, `source`, `freshness` y `computed_at`. Propietarios y
+administradores reciben también el SQL que se ejecutó.
+
 ## Navegar el catálogo
 
 El lente **Catálogo** está pensado para workspaces grandes (1.600+ entradas):
@@ -132,7 +184,8 @@ El lente **Catálogo** está pensado para workspaces grandes (1.600+ entradas):
   huérfanos), búsqueda instantánea, filtros por kind/dominio/estado y una **tabla densa
   ordenable** (nombre, kind, dominio, estado, origen, conteos de linaje). Clic en el encabezado
   de columna para ordenar. Las entradas editadas después de certificarse llevan la marca
-  **cambió**.
+  **cambió**. El filtro **Métrica** muestra las métricas con su estado, dueño, fuente y
+  frescura.
 - **Vista de entrada** — estado, certificación (quién, cuándo, nota, historial), grilla de
   metadatos, cuerpo de notas y **tablas de linaje navegables** para vecinos upstream y
   downstream. Clic en cualquier vecino catalogado para saltar a su
@@ -195,6 +248,10 @@ Todas las rutas requieren membresía del workspace. Un catálogo desactivado dev
 | `GET` | `/v1/workspaces/{id}/catalog/manifest` | Member+ | Conteos, KPIs de adopción, huérfanos, refs colgantes, staleness |
 | `GET` | `/v1/workspaces/{id}/catalog/entries/{entryId}` | Member+ | Una entrada + vecinos de linaje + historial de certificación |
 | `POST` | `/v1/workspaces/{id}/catalog/entries/{entryId}/certify` | Admin+ | `{ decision, note?, content_hash? }` — certificar, revocar o marcar obsoleta |
+| `GET` | `/v1/workspaces/{id}/catalog/metrics` | Member+ | Métricas con estado, fórmula, fuente y frescura |
+| `GET` | `/v1/workspaces/{id}/catalog/metrics/{metricId}` | Member+ | Una métrica completa |
+| `POST` | `/v1/workspaces/{id}/catalog/metrics/{metricId}/query` | Member+ (certificada) | `{ grain?, by?, from?, to?, where? }` → filas con su procedencia |
+| `GET` | `/v1/workspaces/{id}/catalog/metrics/{metricId}/explain` | Member+ | Fórmula y consulta; el SQL para Admin+ |
 | `GET` | `/v1/workspaces/{id}/catalog/lineage` | Member+ | Grafo completo de nodos+aristas |
 | `POST` | `/v1/workspaces/{id}/catalog/enable` | Admin+ | Activar/desactivar |
 | `POST` | `/v1/workspaces/{id}/catalog/seed` | Admin+ | Sembrar entradas `source` desde conectores |

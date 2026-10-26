@@ -110,6 +110,86 @@ Every read carries the overlay: `entry.status` is the **effective** status, and
 email }`, `decided_at`). `GET …/entries/{entryId}` adds `history` (newest first; `current`
 marks decisions made on the current version).
 
+## Executable metrics
+
+A `kind: metric` entry whose frontmatter is a **spec** can be run: ShareOut compiles it to
+SQL for its source and returns the numbers with their provenance (who certified the metric,
+which spec version, where the rows came from, how fresh they are). The spec is validated on
+write — `PUT …/catalog/files` answers `400 INVALID_METRIC_SPEC` with the offending `param`,
+and a mistyped key gets a "did you mean". A metric without `source` and `type` stays
+descriptive.
+
+```markdown
+---
+kind: metric
+id: metric.roas
+title: ROAS
+title_es: Retorno de la inversión publicitaria
+owner: ana@agencia.example
+synonyms: { es: [retorno publicitario], en: [return on ad spend] }
+description: { es: Ingresos atribuidos ÷ inversión, en: Attributed revenue ÷ ad spend }
+source: { connection: conn_7f2a…, fqn: analytics.ads_daily }   # or sql: "SELECT …" | shared_table: ads_daily
+type: ratio                                    # simple (measure) | ratio (numerator ÷ denominator)
+numerator: { agg: sum, expr: revenue }         # agg: sum | count | count_distinct | avg | min | max
+denominator: { agg: sum, expr: spend }
+time: { dimension: date, grains: [day, week, month] }   # also quarter, year
+dimensions: [{ name: cliente, column: client_id }, { name: canal, column: channel }]
+filters: ["status = 'active'"]
+format: { kind: ratio, decimals: 2, suffix: "x" }   # number | ratio | percent | currency (+ currency: ARS)
+scope_field: client_id
+freshness_sla: 26h                             # 90m, 26h, 2d, 1w
+examples: [{ es: "ROAS de marzo por canal", query: { grain: month, by: [canal], from: 2026-03-01, to: 2026-03-31 } }]
+---
+```
+
+- **Sources.** `source.connection` is a connection **id** (`GET /v1/workspaces/{id}/connections`)
+  plus `fqn` (a table) or `sql` (one read-only SELECT). Metrics run on BigQuery, Snowflake and
+  the Postgres family (Supabase, Redshift, Aurora PostgreSQL). `source.shared_table` names a
+  workspace **shared table** — the path for Meta/Google Ads, Analytics, Tiendanube or Sheets
+  data: refresh it into a shared table (materialize / query snapshot job, or a crew), then
+  define metrics on it. Shared-table columns are the row keys and may carry accents and spaces.
+- **Columns** (`expr`, `column`, `time.dimension`, `scope_field`) are plain column names;
+  compute anything else in `source.sql`. `expr: "*"` with `agg: count` counts rows.
+- **Filters** are fixed conditions, one per item: no comments, `;` or backslashes; on a shared
+  table they can only compare the table's own columns.
+- **Ratios** are `SUM(n) / NULLIF(SUM(d), 0)` — a zero denominator answers `null`.
+- **Certification** pins the spec (id, titles, source, type, measures, time, dimensions,
+  filters, format, scope_field, freshness_sla); description, synonyms, examples, owner and
+  notes are prose and editing them keeps it certified.
+
+### Running a metric
+
+| Method & path | Who | Returns |
+| --- | --- | --- |
+| `GET /v1/workspaces/{id}/catalog/metrics` | Member+ | every metric: `status`, `certified_by`, `formula` ("Σ revenue ÷ Σ spend"), `source`, `grains`, `dimensions`, `freshness_sla`, `problem`, `can_run` |
+| `GET /v1/workspaces/{id}/catalog/metrics/{metricId}` | Member+ | one metric, plus description, synonyms, measures, examples and live `freshness` |
+| `POST /v1/workspaces/{id}/catalog/metrics/{metricId}/query` | see below | rows for `{ grain?, by?, from?, to?, where? }` |
+| `GET /v1/workspaces/{id}/catalog/metrics/{metricId}/explain?grain=&by=&from=&to=` | Member+ | formula and resolved query; the compiled SQL for owners/admins |
+
+**Query.** `grain` is one of the metric's grains (default: the first); `by` lists dimension
+names; `from`/`to` are dates (default: a window ending today — 30 days, 12 weeks, 12 months,
+8 quarters or 5 years); `where` is `{ dimension: [values] }`. Only names from the spec are
+accepted, and values become escaped literals. At most 1,000 rows (`truncated: true` past
+that) and 30 seconds.
+
+**Answer.** `{ metric, status, certified_by, certified_at, spec_hash, query, rows, truncated,
+format, computed_at, source, freshness, scope }`, plus `sql` for owners/admins. Rows are
+`{ period?, <dimension>: value, value, numerator?, denominator? }`. When you report a number,
+say whether it is certified and by whom; flag a draft.
+
+**Who can run it.** Any internal member runs a **certified** metric — an owner/admin
+certification is consent for its connection, even with agent queries off. A draft runs for
+owners/admins and its author, and for anyone when its data is already open to members (a
+connection with agent queries on, or a shared table); otherwise `403 METRIC_NOT_CERTIFIED`.
+On a private connection only its creator can run their own draft.
+Runs count against the workspace data-query limit (`429 RATE_LIMITED`). A metric that cannot
+run says why: `problem` in listings, `422 METRIC_UNAVAILABLE` / `METRIC_INVALID` on a run.
+
+**Scope.** A metric with `scope_field` can answer a viewer limited to some values of that
+column: the restriction applies to rows before they are aggregated. A metric without one
+refuses a scoped viewer (`403 SCOPE_REQUIRED`) rather than answer with every row. Internal
+members are not scoped.
+
 ## Auto-seed
 
 `POST /v1/workspaces/{id}/catalog/seed` creates a `kind: source` entry for every workspace
@@ -183,6 +263,9 @@ large workspaces (1,600+ entries):
   kind/domain/status facet chips, and a **sortable dense table** (name, kind, domain, status,
   origin, lineage counts). Click a column header to sort. A **changed** marker flags entries
   edited since their certification.
+- **Metrics** — the metric segment lists metrics with their status, owner, source and freshness.
+  A metric's entry shows its formula, periods and dimensions and a **Try it** panel (period,
+  dates, break-down) that runs it, with numbers in the reader's language (`2,50x`, `$ 1.520,50`).
 - **Detail** — status badge, a **certification panel** (who certified it and when, their note,
   the history), metadata grid, the notes body, and **navigable lineage tables** for upstream and
   downstream neighbors. Owners/admins get **Certify entry / Revoke certification / Mark

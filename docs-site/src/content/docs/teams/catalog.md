@@ -121,6 +121,58 @@ Content-Type: application/json
 you reviewed (`certification.content_hash`): if someone edited it meanwhile you get a
 `409 CONFLICT` instead of certifying a version nobody looked at. Members get `403`.
 
+## Metrics you can run
+
+A `metric` entry can carry a full definition — where the data comes from, what to add up,
+the periods and breakdowns it supports — and then ShareOut computes it for you. Every answer
+says whether the metric is certified and by whom, which version of the definition it used,
+where the rows came from and how fresh they are.
+
+```markdown
+---
+kind: metric
+id: metric.roas
+title: ROAS
+title_es: Retorno de la inversión publicitaria
+owner: ana@agency.example
+source: { shared_table: ads_daily }     # or { connection: conn_…, fqn: dataset.table } / { connection: conn_…, sql: "SELECT …" }
+type: ratio                             # simple: one measure · ratio: numerator ÷ denominator
+numerator: { agg: sum, expr: revenue }
+denominator: { agg: sum, expr: spend }
+time: { dimension: date, grains: [week, month] }
+dimensions: [{ name: client, column: client_id }, { name: channel, column: channel }]
+filters: ["status = 'active'"]
+format: { kind: ratio, decimals: 2, suffix: "x" }   # or currency (with currency: ARS / USD), percent, number
+freshness_sla: 26h
+---
+```
+
+- **No warehouse?** Refresh your ads, analytics, store or spreadsheet data into a workspace
+  **shared table** (a scheduled job or a crew), then point the metric at it with
+  `source: { shared_table: … }`. Warehouses work directly: BigQuery, Snowflake, Supabase,
+  Redshift and Aurora PostgreSQL.
+- **Checked when you save.** A mistyped key ("numerador") is refused with the key it most
+  likely meant; columns are plain names; filters are single conditions.
+- **Who can run it.** Everyone in the workspace can run a certified metric. A draft runs for
+  owners, admins and its author — and for everyone when its data is already open to the team
+  (a shared table, or a connection the assistant may query).
+
+Open a metric in the **Catalog** lens to see its formula ("Σ revenue ÷ Σ spend"), periods
+and dimensions, and **Try it**: pick a period, dates and a breakdown, and the numbers come
+back formatted for your language.
+
+```http
+POST /v1/workspaces/{workspaceId}/catalog/metrics/metric.roas/query
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{ "grain": "month", "by": ["channel"], "from": "2026-03-01", "to": "2026-03-31" }
+```
+
+The answer carries `rows` (`period`, each breakdown, `value`), plus `status`,
+`certified_by`, `certified_at`, `spec_hash`, `format`, `source`, `freshness` and
+`computed_at`. Owners and admins also get the SQL that ran.
+
 ## Browsing the catalog
 
 The **Catalog** lens is built for large workspaces (1,600+ entries):
@@ -128,7 +180,8 @@ The **Catalog** lens is built for large workspaces (1,600+ entries):
 - **List view** — KPI strip (entries, events, % certified, % documented, orphans), instant
   search, kind/domain/status filters, and a **sortable dense table** (name, kind, domain,
   status, origin, lineage counts). Click a column header to sort. Entries edited since their
-  certification carry a **changed** marker.
+  certification carry a **changed** marker. The **Metric** filter shows metrics with their
+  status, owner, source and freshness.
 - **Entry view** — status badge, certification (who, when, note, history), metadata grid,
   notes body, and **navigable lineage tables** for upstream and downstream neighbors. Click
   any catalogued neighbor to jump to its entry; uncatalogued refs show as dashed placeholders
@@ -191,6 +244,10 @@ All routes require workspace membership. A disabled catalog returns `{ "enabled"
 | `GET` | `/v1/workspaces/{id}/catalog/manifest` | Member+ | Counts, adoption KPIs, orphans, dangling refs, staleness |
 | `GET` | `/v1/workspaces/{id}/catalog/entries/{entryId}` | Member+ | One entry + upstream/downstream neighbors + certification history |
 | `POST` | `/v1/workspaces/{id}/catalog/entries/{entryId}/certify` | Admin+ | `{ decision, note?, content_hash? }` — certify, revoke or deprecate |
+| `GET` | `/v1/workspaces/{id}/catalog/metrics` | Member+ | Metrics with status, formula, source, freshness |
+| `GET` | `/v1/workspaces/{id}/catalog/metrics/{metricId}` | Member+ | One metric in full |
+| `POST` | `/v1/workspaces/{id}/catalog/metrics/{metricId}/query` | Member+ (certified) | `{ grain?, by?, from?, to?, where? }` → rows with provenance |
+| `GET` | `/v1/workspaces/{id}/catalog/metrics/{metricId}/explain` | Member+ | Formula and query; the SQL for Admin+ |
 | `GET` | `/v1/workspaces/{id}/catalog/lineage` | Member+ | Full node+edge graph |
 | `POST` | `/v1/workspaces/{id}/catalog/enable` | Admin+ | Opt in/out |
 | `POST` | `/v1/workspaces/{id}/catalog/seed` | Admin+ | Seed `source` entries from connectors |

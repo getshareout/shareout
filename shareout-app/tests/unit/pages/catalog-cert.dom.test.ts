@@ -158,7 +158,7 @@ describe('catalog certification panel — member', () => {
     locale = 'es';
     serve(entry({ status: 'draft' }), []);
     const panel = await open();
-    expect(panel.textContent).toContain('Solo los propietarios y administradores del espacio pueden certificar entradas.');
+    expect(panel.textContent).toContain('Solo propietarios y administradores pueden certificar.');
     expect(panel.querySelector('[data-cat-decide]')).toBeNull();
   });
 });

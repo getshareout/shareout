@@ -72,6 +72,17 @@ export const WORKSPACE_CATALOG_STYLES = WORKSPACE_ONBOARDING_STYLES + WORKSPACE_
 .wsx-cat__hwhen { color: var(--color-text-tertiary); }
 .wsx-cat__hold { font-size: var(--text-xs); color: var(--color-text-tertiary); background: var(--color-surface); border-radius: 999px; padding: 0 7px; }
 .wsx-cat__hnote { color: var(--color-text-secondary); margin-top: 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.wsx-cat__metric:empty { display: none; }
+.wsx-cat__metric .wsx-cat__meta { margin: 14px 0 8px; }
+.wsx-cat__formula { font-family: var(--font-mono, ui-monospace, monospace); color: var(--color-text); }
+.wsx-cat__mproblem { color: var(--color-warning); max-width: none; }
+.wsx-cat__try { margin: 10px 0 4px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: 10px; }
+.wsx-cat__tryhead { font: 700 var(--text-base) var(--font-display, var(--font-body)); }
+.wsx-cat__tryrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: var(--text-sm); color: var(--color-text-secondary); }
+.wsx-cat__tryrow label { display: inline-flex; align-items: center; gap: 6px; }
+.wsx-cat__tryrow .so-c-input { width: auto; padding: 6px 8px; }
+.wsx-cat__trydim { cursor: pointer; }
+.wsx-cat__tryt td, .wsx-cat__tryt th { padding: 7px 12px; }
 
 /* ---- Knowledge lens (structural sibling — shares the wsx-cat__* patterns above) ---- */
 .wsx-kn__bdg { margin-left: 8px; vertical-align: middle; }

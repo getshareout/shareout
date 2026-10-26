@@ -6115,6 +6115,139 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           description: CONFLICT (entry changed since content_hash) or CATALOG_DISABLED
+  /v1/workspaces/{workspaceId}/catalog/metrics:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Catalog]
+      summary: List catalog metrics
+      operationId: listWorkspaceCatalogMetrics
+      description: >-
+        Every kind metric entry with its effective status, who certified it, the formula,
+        source, grains, dimensions, freshness SLA, why it cannot run (problem) and whether
+        the caller can run it (can_run). enabled false when the catalog is off.
+      responses:
+        "200":
+          description: Metrics
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/catalog/metrics/{metricId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: metricId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Catalog]
+      summary: Get one catalog metric
+      operationId: getWorkspaceCatalogMetric
+      responses:
+        "200":
+          description: The metric with spec details and live freshness
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: CATALOG_DISABLED
+  /v1/workspaces/{workspaceId}/catalog/metrics/{metricId}/query:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: metricId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Catalog]
+      summary: Run a catalog metric
+      operationId: queryWorkspaceCatalogMetric
+      description: >-
+        Compiles the metric spec to one read-only SELECT for its source (BigQuery,
+        Snowflake, Postgres family, or a workspace shared table) and runs it: at most 1,000
+        rows, 30 seconds, counted against the workspace data-query limit. Internal members
+        run certified metrics; drafts run for owners/admins and the author, or for anyone
+        when the data is already open to members. Every answer carries status,
+        certified_by, certified_at, spec_hash, source, freshness and computed_at; owners
+        and admins also get the compiled sql.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                grain:
+                  type: string
+                  enum: [day, week, month, quarter, year]
+                by:
+                  type: array
+                  items:
+                    type: string
+                from:
+                  type: string
+                  format: date
+                to:
+                  type: string
+                  format: date
+                where:
+                  type: object
+                  additionalProperties:
+                    type: array
+                    items:
+                      oneOf:
+                        - type: string
+                        - type: number
+      responses:
+        "200":
+          description: Rows with provenance
+        "400":
+          description: The query names something the spec does not
+        "403":
+          description: METRIC_NOT_CERTIFIED or SCOPE_REQUIRED
+        "422":
+          description: METRIC_UNAVAILABLE or METRIC_INVALID (see problem)
+        "429":
+          description: RATE_LIMITED
+        "502":
+          description: METRIC_QUERY_FAILED
+        "504":
+          description: METRIC_TIMEOUT
+  /v1/workspaces/{workspaceId}/catalog/metrics/{metricId}/explain:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: metricId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: grain
+        in: query
+        schema:
+          type: string
+      - name: by
+        in: query
+        description: Comma-separated dimension names
+        schema:
+          type: string
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date
+    get:
+      tags: [Catalog]
+      summary: Explain a catalog metric
+      operationId: explainWorkspaceCatalogMetric
+      description: The formula, resolved query and dialect; the compiled SQL for owners/admins.
+      responses:
+        "200":
+          description: Explanation
   /v1/workspaces/{workspaceId}/catalog/files:
     parameters:
       - $ref: "#/components/parameters/WorkspaceId"
