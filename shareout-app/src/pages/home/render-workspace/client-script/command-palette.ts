@@ -40,7 +40,7 @@ export const workspace_client_command_palette_JS = `
     // ---- Actions: navigate a lens, or create. Only offer lenses that exist. ----
     function buildActions() {
       var acts = [];
-      if (document.getElementById('wsxCreateBtn')) acts.push({ label: t('palette.newPage') || 'New page with AI', run: function () { var b = document.getElementById('wsxCreateBtn'); if (b) b.click(); } });
+      if (document.querySelector('#wsxNewBtn[data-ai]')) acts.push({ label: t('palette.newPage') || 'New page with AI', run: function () { closePalette(); enterCreate(); } });
       if (window.WSX_ADMIN && window.WSX_WS) acts.push({ label: t('invite.cta'), run: function () { closePalette(); wsxInvite(); } });
       var rail = document.querySelectorAll('[data-lens]');
       rail.forEach(function (el) {

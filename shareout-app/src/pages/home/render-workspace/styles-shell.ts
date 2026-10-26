@@ -51,7 +51,7 @@ export const WORKSPACE_SHELL_STYLES = `.wsx { position: relative; height: 100vh;
 .wsx-drop__acts { display: flex; flex-wrap: wrap; gap: 12px; flex-basis: 100%; }
 .wsx-lens { display: flex; align-items: center; gap: 11px; width: 100%; padding: 9px 12px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); text-align: left; cursor: pointer; transition: background var(--duration-fast), color var(--duration-fast); white-space: nowrap; overflow: hidden; }
 .wsx-lens:hover { background: var(--color-surface); color: var(--color-text); }
-.wsx-lens.is-active { background: var(--color-primary-light); color: var(--color-primary); }
+.wsx-lens.is-parent, .wsx-lens.is-active { background: var(--color-primary-light); color: var(--color-primary); }
 .wsx-lens svg, .wsx__create svg, .wsx__new svg { flex: none; }
 .wsx__raildiv { height: 1px; margin: var(--space-2) 12px; background: var(--color-border); flex: none; }
 .wsx__railgroup-title { font: 600 var(--text-xs) var(--font-body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-tertiary); padding: var(--space-3) 12px var(--space-1); white-space: nowrap; }

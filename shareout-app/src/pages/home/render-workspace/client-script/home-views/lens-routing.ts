@@ -1,7 +1,9 @@
 /** Lens tab routing, lazy view loading, and help panel. */
 export const workspace_client_home_views_lensRouting_JS = `  var lenses = ws.querySelectorAll('[data-lens]');
   var loaded = {};
+  var LENS_PARENT = { alerts: 'schedules', crew: 'schedules', datasets: 'connectors', knowledge: 'connectors', catalog: 'connectors' };
   function openView(key) {
+    lenses.forEach(function (x) { x.classList.toggle('is-parent', !!LENS_PARENT[key] && x.getAttribute('data-lens') === LENS_PARENT[key]); });
     if (key !== 'knowledge' && typeof knStopPoll === 'function') knStopPoll();
     activateTab('home'); show(key === 'brief' ? 'brief' : key);
     if (key === 'artifacts') loadArtifacts();
@@ -26,6 +28,11 @@ export const workspace_client_home_views_lensRouting_JS = `  var lenses = ws.que
       b.classList.add('is-active');
       openView(b.getAttribute('data-lens'));
     });
+  });
+
+  ws.addEventListener('click', function (e) {
+    var sb = e.target.closest && e.target.closest('[data-sib]'); if (!sb) return;
+    var lb = ws.querySelector('[data-lens="' + sb.getAttribute('data-sib') + '"]'); if (lb) lb.click();
   });
 
   (function () {

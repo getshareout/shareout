@@ -25,7 +25,7 @@ export const workspace_client_rail_resizers_JS = `  // ===== rail collapse + rig
   // close after picking a destination in the drawer (lenses, create, account)
   var railEl = document.getElementById('wsxRail');
   if (railEl) railEl.addEventListener('click', function (e) {
-    if (e.target.closest('[data-lens], #wsxCreateBtn, #wsxAcctBtn, .wsx__follow')) setRail(false);
+    if (e.target.closest('[data-lens], #wsxAcctBtn, .wsx__follow')) setRail(false);
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ws.classList.contains('is-rail-open')) setRail(false); });
 
