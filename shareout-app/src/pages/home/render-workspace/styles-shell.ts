@@ -50,6 +50,7 @@ export const WORKSPACE_SHELL_STYLES = `.wsx { position: relative; height: 100vh;
 .wsx-drop__row[data-state="err"] .wsx-drop__st { flex-basis: 100%; color: var(--color-error); }
 .wsx-drop__acts { display: flex; flex-wrap: wrap; gap: 12px; flex-basis: 100%; }
 .wsx-lens { display: flex; align-items: center; gap: 11px; width: 100%; padding: 9px 12px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); text-align: left; cursor: pointer; transition: background var(--duration-fast), color var(--duration-fast); white-space: nowrap; overflow: hidden; }
+.wsx-lens[hidden] { display: none; }
 .wsx-lens:hover { background: var(--color-surface); color: var(--color-text); }
 .wsx-lens.is-parent, .wsx-lens.is-active { background: var(--color-primary-light); color: var(--color-primary); }
 .wsx-lens svg, .wsx__create svg, .wsx__new svg { flex: none; }
