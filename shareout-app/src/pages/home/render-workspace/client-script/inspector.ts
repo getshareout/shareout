@@ -42,9 +42,13 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       renderRTabs([{ key: 'edit', label: t('inspector.editing') }]);
       renderEditPanel(panes[activeKey]);
     } else {
-      if (['details', 'comments', 'automate', 'history'].indexOf(rActive) < 0) rActive = 'details';
-      renderRTabs([{ key: 'details', label: t('inspector.details') }, { key: 'comments', label: t('inspector.comments') }, { key: 'automate', label: t('inspector.automate') }, { key: 'history', label: t('inspector.history') }]);
-      if (rActive === 'comments') renderComments(activeArt);
+      // Data: what the page reads and where it comes from (lazy chunk 'data'); HTML pages only.
+      var withData = !activeArt.type || activeArt.type === 'html';
+      if (['details', 'comments', 'automate', 'history'].concat(withData ? ['data'] : []).indexOf(rActive) < 0) rActive = 'details';
+      renderRTabs([{ key: 'details', label: t('inspector.details') }].concat(withData ? [{ key: 'data', label: t('inspector.data') }] : [], [{ key: 'comments', label: t('inspector.comments') }, { key: 'automate', label: t('inspector.automate') }, { key: 'history', label: t('inspector.history') }]));
+      if (rActive !== 'data') dataClear();
+      if (rActive === 'data') renderData(activeArt);
+      else if (rActive === 'comments') renderComments(activeArt);
       else if (rActive === 'automate') renderAutomate(activeArt);
       else if (rActive === 'history') renderHistory(activeArt);
       else renderDetails(activeArt);

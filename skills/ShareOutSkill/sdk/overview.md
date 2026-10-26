@@ -114,7 +114,7 @@ try {
 | `sdk.dataset(name)` | [datasets.md](datasets.md) | Bulk read-only data extracts (direct-from-R2) |
 | `sdk.connection(name)` | [connections.md](connections.md) | Query external sources + materialize extracts |
 | `sdk.lib(name)` | [libraries.md](libraries.md) | Import a private versioned JS module (workspace library, Teams) |
-| `sdk.sources` | [../patterns/data-provenance.md](../patterns/data-provenance.md) | Data-sources drawer + per-element provenance badges |
+| `sdk.sources` | [../patterns/data-provenance.md](../patterns/data-provenance.md) | Optional in-page drawer + badges (viewers already get a Data button from the manifest) |
 | Live data / BigQuery / Mixpanel in artifacts | [live-data.md](live-data.md) | **Required reading** — auth, anti-patterns, parsing |
 | `sdk.email` | [email.md](email.md) | Outbound email |
 | `sdk.comments` | [comments.md](comments.md) | Threaded comments |

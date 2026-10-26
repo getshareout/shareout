@@ -60,7 +60,7 @@ Run this before every publish. If a box can't be honestly ticked, it's not done.
 
 ## Provenance & meta
 
-- [ ] Data-backed artifact declares its **sources** (label/description/query) so viewers can answer "where does this come from?" See [../patterns/data-provenance.md](../patterns/data-provenance.md).
+- [ ] Data-backed artifact declares its **sources** (label/description/query, `as_of`/`refresh`) and links charts/tables to them (`data-shareout-source` or `feeds`). Viewers see them automatically in the page's **Data** button — check it says where each number comes from. See [../patterns/data-provenance.md](../patterns/data-provenance.md).
 - [ ] Real `<title>`, meta description, and `og:image` for sharing; a favicon.
 
 ## Then publish

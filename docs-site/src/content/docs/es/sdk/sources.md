@@ -40,7 +40,9 @@ close(): void
 ### `mount(options?)`
 
 Renderiza el botón flotante, el drawer lateral y los badges por elemento.
-Devuelve `{ open(ref?), close(), destroy() }`.
+Devuelve `{ open(ref?), close(), destroy() }`. Dentro del visor de ShareOut y de Studio
+el botón flotante queda oculto: lo reemplaza el botón **Datos** del visor (el drawer, los
+badges y `open()` siguen funcionando).
 
 | Opción | Default | Propósito |
 | --- | --- | --- |
@@ -66,6 +68,7 @@ interface SourceEntry {
   tables?: string[];
   refresh?: string;
   asOf?: string;
+  freshnessSla?: string; // `freshness_sla` del manifest ("24h", "PT6H"): stale pasado ese plazo, si no 7 días
   replication?: {
     build?: string;
     publish?: string;

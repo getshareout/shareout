@@ -23,6 +23,7 @@ const TARGETS = [
   'src/serve/sandbox-viewer/toolbar/script-drag.ts',
   'src/serve/sandbox-viewer/toolbar/script-presence.ts',
   'src/serve/sandbox-viewer/data-sources/script.ts',
+  'src/serve/sandbox-viewer/data-sources/format-js.ts',
 ];
 
 // Skip a JS string starting at quote char q (s[i] === q). Returns index after close.

@@ -75,9 +75,18 @@ describe('Data sources in the shared-link viewer', () => {
     expect(html).toContain('"visible":true');
   });
 
-  it('stays out of the Studio stage and of pages whose owner hid the ShareOut toolbar', async () => {
-    expect(await render({ url: 'https://shareout.example.com/a/demo/?wsx=1' })).not.toContain('so-ds-pill');
+  it('in the Studio stage ships only the frame bridge the Studio Data tab drives', async () => {
+    const html = await render({ url: 'https://shareout.example.com/a/demo/?wsx=1' });
+    expect(html).not.toContain('so-ds-pill');
+    expect(html).toContain('window.soDataSources = {');
+    expect(html).toContain("type: 'shareout:sources:highlight'");
+    expect(html).toContain("type: 'shareout:sources:host', panel: true");
+  });
+
+  it('stays out of pages whose owner hid the ShareOut toolbar', async () => {
     viewerConfig.getViewerConfig.mockResolvedValue({ hide_toolbar: true, show_on_mobile: false });
-    expect(await render()).not.toContain('so-ds-pill');
+    const html = await render();
+    expect(html).not.toContain('so-ds-pill');
+    expect(html).not.toContain('soDataSources');
   });
 });

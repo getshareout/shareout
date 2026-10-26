@@ -146,3 +146,43 @@ describe('data hint', () => {
     expect(sent()).toEqual([[{ type: 'shareout:sources:hint' }, HOST]]);
   });
 });
+
+describe('the in-page drawer inside the ShareOut viewer', () => {
+  async function mountDrawer() {
+    const { SourcesStore } = await import('../src/stores/sources-store');
+    return new SourcesStore({} as never).mount();
+  }
+  const button = () => document.querySelector<HTMLButtonElement>('.so-src-btn')!;
+
+  it('drops its floating button once the host says it shows the sources', async () => {
+    await load(PAGE, '<div id="chart"></div>');
+    init();
+    await tick();
+    const ctrl = await mountDrawer();
+    expect(button().style.display).toBe('none');
+    post({ type: 'shareout:sources:host', panel: true }, 'https://evil.test');
+    expect(mod.hostShowsSources()).toBe(false);
+    post({ type: 'shareout:sources:host', panel: true });
+    expect(mod.hostShowsSources()).toBe(true);
+    expect(button().style.display).toBe('none');
+    // Badges and the drawer still work from inside the page.
+    expect(document.querySelector('#chart .so-src-badge')).not.toBeNull();
+    ctrl.open();
+    expect(document.getElementById('so-sources-root')!.classList.contains('open')).toBe(true);
+    ctrl.destroy();
+  });
+
+  it('shows the button when no host speaks up (framed elsewhere)', async () => {
+    vi.useFakeTimers();
+    try {
+      await load(PAGE, '');
+      const ctrl = await mountDrawer();
+      expect(button().style.display).toBe('none');
+      vi.advanceTimersByTime(2600);
+      expect(button().style.display).toBe('');
+      ctrl.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

@@ -1,8 +1,7 @@
-import type { LocaleCopy } from '../../../i18n';
-
-// Copy for the viewer's Data sources panel. Only the viewer's locale ships to the page,
-// as JSON (so quotes and accents need no escaping). {name}, {n}, {when}, {date} and
-// {text} are filled in by the panel script.
+// Data sources wording, one table for every surface: the shared-link viewer panel, the
+// Studio inspector tab and the editor's Data tab. Shipped to pages as JSON (so quotes and
+// accents need no escaping); {name}, {n}, {when}, {date} and {text} are filled in by
+// the formatter (format.ts / the viewer's format script).
 
 const en = {
   pill: 'Data',
@@ -50,6 +49,7 @@ const en = {
   daysAgo: '{n} days ago',
   onDate: 'on {date}',
   editorsOnly: 'Only people who can edit this page see queries and credentials.',
+  publishedVersion: 'From the published version (v{n}).',
   details: 'Details',
   query: 'Query',
   connection: 'Connection',
@@ -132,6 +132,7 @@ const es: DataSourcesCopy = {
   daysAgo: 'hace {n} días',
   onDate: 'el {date}',
   editorsOnly: 'Las consultas y las credenciales solo las ve quien puede editar esta página.',
+  publishedVersion: 'Según la versión publicada (v{n}).',
   details: 'Detalles',
   query: 'Consulta',
   connection: 'Conexión',
@@ -166,4 +167,6 @@ const es: DataSourcesCopy = {
   kindConnection: 'Conexión',
 };
 
-export const DATA_SOURCES_COPY: LocaleCopy<DataSourcesCopy> = { en, es };
+export type DataSourcesLocale = 'en' | 'es';
+
+export const DATA_SOURCES_COPY: Record<DataSourcesLocale, DataSourcesCopy> = { en, es };

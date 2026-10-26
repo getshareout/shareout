@@ -92,4 +92,26 @@ describe('SourcesStore', () => {
     expect(root.classList.contains('open')).toBe(true);
     expect(root.querySelector('.so-src-card.hl')).not.toBeNull();
   });
+
+  it('flags a source stale past its freshness_sla, else after 7 days', () => {
+    const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    setManifest({
+      version: '2.0',
+      sources: {
+        json: {
+          strict: { as_of: twoDaysAgo, freshness_sla: '24h' },
+          iso: { as_of: twoDaysAgo, freshness_sla: 'P3D' },
+          plain: { as_of: twoDaysAgo },
+          junk: { as_of: twoDaysAgo, freshness_sla: 'soon' },
+        },
+      },
+    });
+    const s = new SourcesStore(stubClient);
+    expect(s.get('json:strict')?.freshnessSla).toBe('24h');
+    s.mount();
+    const stale = [...document.querySelectorAll('.so-src-card')]
+      .filter((card) => card.querySelector('.so-src-tag.stale'))
+      .map((card) => card.querySelector('h3')?.firstChild?.textContent);
+    expect(stale).toEqual(['strict']);
+  });
 });

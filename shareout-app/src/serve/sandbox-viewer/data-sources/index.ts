@@ -6,7 +6,7 @@
  */
 import type { Locale } from '../../../i18n';
 import { cssVariables } from '../../../design-system/base.css';
-import { DATA_SOURCES_COPY } from './copy';
+import { DATA_SOURCES_COPY } from '../../../../shared/data-sources/copy';
 import { dataSourcesStyles } from './styles';
 import { dataSourcesIcon, renderDataSourcesScript } from './script';
 
@@ -42,4 +42,31 @@ export function renderDataSourcesPanel(opts: DataSourcesPanelOptions): string {
     <p id="so-ds-foot" class="so-ds-foot" hidden>${attr(c.editorsOnly)}</p>
   </section>
   <script>${renderDataSourcesScript({ artifactId: opts.artifactId, page: opts.page, lang: opts.locale, copy: c, visible: opts.visible })}</script>`;
+}
+
+/**
+ * Studio stage: no pill or panel (the Studio inspector has a Data tab), only the frame
+ * bridge, so the Studio page — same origin as this wrapper — can outline what a source
+ * feeds with `stageWindow.soDataSources.highlight(ref, selectors, scroll)`. The message
+ * must come from this window: the artifact frame only answers its own parent.
+ */
+export function renderDataSourcesBridge(): string {
+  return `<script>
+(function() {
+  if (window.soDataSources) return;
+  window.soDataSources = {
+    highlight: function(ref, selectors, scroll) {
+      var f = document.querySelector('iframe');
+      if (!f || !f.contentWindow) return;
+      f.contentWindow.postMessage({ type: 'shareout:sources:highlight', ref: ref || null, selectors: Array.isArray(selectors) ? selectors : [], scroll: !!scroll }, '*');
+    }
+  };
+  // The Studio's Data tab shows this page's sources: the page needs no button of its own.
+  window.addEventListener('message', function(e) {
+    var f = document.querySelector('iframe');
+    if (!f || e.source !== f.contentWindow || !e.data || e.data.type !== 'shareout:sources:hint') return;
+    f.contentWindow.postMessage({ type: 'shareout:sources:host', panel: true }, '*');
+  });
+})();
+</script>`;
 }
