@@ -22,6 +22,7 @@ import {
   type Args, type ToolContext, type ToolDef, type ToolResult,
 } from './tool-kit';
 import { MEMBER_TOOLS } from './member-tools';
+import { BUILD_TOOLS } from './build-tools';
 import { KNOWLEDGE_TOOLS } from './knowledge-tools';
 import { CONNECTOR_TOOLS } from './connector-tools';
 import { PAGE_TOOLS } from './page-tools';
@@ -614,7 +615,7 @@ const fetchTool: ToolDef = {
 
 // Deterministic order (lets clients cache the list).
 export const TOOLS: ToolDef[] = [
-  whoami, listWorkspaces, listArtifacts, getArtifact, publishArtifact, updateArtifact, ...EDIT_TOOLS,
+  whoami, listWorkspaces, listArtifacts, getArtifact, publishArtifact, updateArtifact, ...EDIT_TOOLS, ...BUILD_TOOLS,
   ...PAGE_TOOLS, ...SHARING_TOOLS, ...MEMBER_TOOLS, ...KNOWLEDGE_TOOLS, ...CONNECTOR_TOOLS, getHelp, reportProblem, search, fetchTool,
 ];
 

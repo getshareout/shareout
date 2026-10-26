@@ -44,6 +44,7 @@ import { resolveArtifactEditorAccess } from '../helpers/editor-access';
 import { isVisualEditorRoute, requireVisualEditorEnabled } from '../../editor/visual-editor-gate';
 import { jsonError, jsonResponse } from '../helpers/json-response';
 import { handleDeliverNow, handleDeliverStatus, handleDeliverSlackChannels } from './artifact-deliver';
+import { handleVerifyLatest, handleVerifyRun, handleVerifyScreenshot } from './artifact-verify';
 import { quickSearch, type SearchGroup } from '../../search/quick-search';
 import { askWorkspace } from '../../search/ask-workspace';
 import { presentArtifact } from '../../present/present-artifact';
@@ -54,11 +55,14 @@ import { createLogger } from '../../logging';
 // Agent tokens reach these routes; the scope gate at the top of routeArtifactApi bounds them.
 const { requireAuthUser, requireToken, requireTokenOrSession } = allowingAgentTokens;
 
+const VERIFY_RUN_RE = /^\/v1\/artifacts\/([^/]+)\/verify$/;
+
 export async function routeArtifactApi(ctx: FetchContext): Promise<Response | null> {
   const { request, env, path, url, addCORS } = ctx;
 
   // Agent (service) token scope gate, one chokepoint for the whole artifact REST
-  // surface. /v1/publish enforces artifacts:publish in handlePublish; GETs need
+  // surface. /v1/publish enforces artifacts:publish in handlePublish, and so does
+  // POST …/verify (part of the publish loop) in src/verify/service.ts; GETs need
   // artifacts:read; every other mutation (update/delete/collaborators/share/…) is
   // outside the v1 scope model, so Agent tokens are denied. Humans/personal tokens
   // have no `.service` → validateToken returns it null → this never triggers.
@@ -71,7 +75,7 @@ export async function routeArtifactApi(ctx: FetchContext): Promise<Response | nu
         if (!hasScope(svc, 'artifacts:read')) {
           return addCORS(jsonError('Token missing artifacts:read scope', 'INSUFFICIENT_SCOPE', 403));
         }
-      } else {
+      } else if (!(request.method === 'POST' && VERIFY_RUN_RE.test(path))) {
         return addCORS(jsonError('Agent tokens cannot perform this action', 'INSUFFICIENT_SCOPE', 403));
       }
     }
@@ -453,6 +457,23 @@ export async function routeArtifactApi(ctx: FetchContext): Promise<Response | nu
   const screenshotMatch = path.match(/^\/v1\/artifacts\/([^/]+)\/screenshot$/);
   if (screenshotMatch && request.method === 'POST') {
     return addCORS(await handleGenerateScreenshot(ctx, screenshotMatch[1]));
+  }
+
+  // Verify: what viewers see and what broke, desktop + phone (editors and above).
+  const verifyRunMatch = path.match(VERIFY_RUN_RE);
+  if (verifyRunMatch && request.method === 'POST') {
+    return addCORS(await handleVerifyRun(ctx, verifyRunMatch[1]));
+  }
+
+  const verifyLatestMatch = path.match(/^\/v1\/artifacts\/([^/]+)\/verify\/latest$/);
+  if (verifyLatestMatch && request.method === 'GET') {
+    return addCORS(await handleVerifyLatest(ctx, verifyLatestMatch[1]));
+  }
+
+  const verifyShotMatch = path.match(/^\/v1\/artifacts\/([^/]+)\/verify\/([^/]+)\/([^/.]+)\.webp$/);
+  if (verifyShotMatch && request.method === 'GET') {
+    const [, artifactId, runId, viewport] = verifyShotMatch;
+    return addCORS(await handleVerifyScreenshot(ctx, artifactId, runId, viewport));
   }
 
   const analyticsMatch = path.match(/^\/v1\/artifacts\/([^/]+)\/analytics$/);
