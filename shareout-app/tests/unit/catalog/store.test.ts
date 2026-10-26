@@ -1,6 +1,5 @@
-import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, it, expect } from 'vitest';
-import type { Env } from '../../../src/types';
+import { applyMigrations, e } from '../helpers/migrated-db';
 import {
   isCatalogEnabled,
   setCatalogEnabled,
@@ -13,22 +12,18 @@ import {
   slugifyName,
 } from '../../../src/catalog';
 
-const e = env as unknown as Env;
 const WS = 'wsp_cat';
 
 beforeAll(async () => {
-  await e.DB.exec(
-    `CREATE TABLE IF NOT EXISTS catalog_settings (workspace_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT (datetime('now')))`
-  );
-  await e.DB.exec(
-    `CREATE TABLE IF NOT EXISTS workspace_files (workspace_id TEXT NOT NULL, namespace TEXT NOT NULL, scope_id TEXT NOT NULL DEFAULT '', path TEXT NOT NULL, content TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'manual', updated_by TEXT, updated_by_kind TEXT NOT NULL DEFAULT 'user', created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), PRIMARY KEY (workspace_id, namespace, scope_id, path))`
-  );
-  await e.DB.exec(
-    `CREATE TABLE IF NOT EXISTS connections (id TEXT PRIMARY KEY, scope_type TEXT NOT NULL, scope_id TEXT NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'generic', provider TEXT NOT NULL, auth_type TEXT, config TEXT NOT NULL DEFAULT '{}', encrypted_credentials TEXT, iv TEXT, expires_at TEXT, preferred_mode TEXT NOT NULL DEFAULT 'auto', cache_ttl_seconds INTEGER NOT NULL DEFAULT 300, rate_limit_rpm INTEGER NOT NULL DEFAULT 60, is_private INTEGER NOT NULL DEFAULT 0, credential_scope TEXT NOT NULL DEFAULT 'shared', agent_query_enabled INTEGER NOT NULL DEFAULT 0, created_by TEXT, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), UNIQUE(scope_type, scope_id, name))`
-  );
+  await applyMigrations();
+  await e.DB.batch([
+    e.DB.prepare("INSERT INTO users (id, email, name) VALUES ('usr_cat_owner', 'owner@agencia.example', 'Olga')"),
+    e.DB.prepare("INSERT INTO workspaces (id, name, slug, owner_id) VALUES (?, 'Agencia', 'agencia-cat', 'usr_cat_owner')").bind(WS),
+  ]);
 });
 
 beforeEach(async () => {
+  await e.DB.exec('DELETE FROM catalog_metrics');
   await e.DB.exec('DELETE FROM catalog_settings');
   await e.DB.exec('DELETE FROM workspace_files');
   await e.DB.exec('DELETE FROM connections');
@@ -123,12 +118,12 @@ describe('seedConnectorsAsSources', () => {
     await e.DB.prepare(
       "INSERT INTO connections (id, scope_type, scope_id, name, kind, provider) VALUES (?, 'workspace', ?, ?, ?, ?)"
     )
-      .bind('c1', WS, 'Snowflake Prod', 'warehouse', 'snowflake')
+      .bind('c1', WS, 'Snowflake Prod', 'platform', 'snowflake')
       .run();
     await e.DB.prepare(
       "INSERT INTO connections (id, scope_type, scope_id, name, kind, provider) VALUES (?, 'workspace', ?, ?, ?, ?)"
     )
-      .bind('c2', WS, 'Shopify', 'ecommerce', 'shopify')
+      .bind('c2', WS, 'Shopify', 'platform', 'shopify')
       .run();
   });
 

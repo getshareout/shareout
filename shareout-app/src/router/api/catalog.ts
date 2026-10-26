@@ -3,7 +3,7 @@ import { jsonResponse, jsonError } from '../helpers/json-response';
 import { requireTokenOrSession, isAuthUser } from '../helpers/auth-guard';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import {
-  isCatalogEnabled, setCatalogEnabled, upsertCatalogFile, deleteCatalogFile,
+  isCatalogEnabled, setCatalogEnabled, upsertCatalogFile, deleteCatalogFile, listCatalogFiles,
   isValidCatalogPath, catalogContentBytes, CATALOG_PATH_RULE, MAX_CATALOG_FILE_BYTES,
 } from '../../catalog/store';
 import { apiErrorResponse } from '../../http/api-error';
@@ -15,6 +15,8 @@ import { loadGovernedCatalog } from '../../catalog/governed';
 import { seedConnectorsAsSources } from '../../catalog/seed';
 import { type CatalogEntry } from '../../catalog/types';
 import { certificationHistory, handleCatalogCertify, isBearer, isSignedInPerson, sessionRequiredResponse } from './catalog-certify';
+import { metricWriteIssue } from '../../catalog/metrics/spec';
+import { syncMetricIndex } from '../../catalog/metrics/index-sync';
 
 const PREFIX_RE = /^\/v1\/workspaces\/([^/]+)\/catalog(?:\/(.*))?$/;
 const CERTIFY_RE = /^entries\/([^/]+)\/certify$/;
@@ -59,7 +61,9 @@ export async function routeCatalogApi(ctx: FetchContext): Promise<Response | nul
     if (method !== 'POST') return cors(jsonError('Method not allowed', 'METHOD_NOT_ALLOWED', 405));
     if (!canManage) return cors(jsonError('Forbidden', 'FORBIDDEN', 403));
     const result = await seedConnectorsAsSources(ctx.env, workspaceId);
-    return cors(jsonResponse(result));
+    // Seeding also backfills the metric index for files written before it existed.
+    const metrics = await syncMetricIndex(ctx.env, workspaceId, await listCatalogFiles(ctx.env, workspaceId));
+    return cors(jsonResponse({ ...result, metrics }));
   }
 
   // PUT/DELETE /files — agents (and humans) grow the catalog. Any member.
@@ -88,6 +92,19 @@ export async function routeCatalogApi(ctx: FetchContext): Promise<Response | nul
           param: 'content',
           hint: 'Keep one asset per file and its notes short; link to longer material instead.',
         }));
+      }
+      // An executable `kind: metric` must be a valid spec (unknown keys refused with a hint).
+      const specIssue = metricWriteIssue(body.path, body.content);
+      if (specIssue) {
+        return cors(
+          apiErrorResponse({
+            code: 'INVALID_METRIC_SPEC',
+            message: specIssue.message,
+            status: 400,
+            ...(specIssue.param ? { param: specIssue.param } : {}),
+            ...(specIssue.hint ? { hint: specIssue.hint } : {}),
+          })
+        );
       }
       await upsertCatalogFile(ctx.env, workspaceId, {
         path: body.path,

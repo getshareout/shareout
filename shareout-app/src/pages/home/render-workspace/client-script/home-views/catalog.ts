@@ -140,7 +140,9 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
     catCurrentId = '';
     if (typeof syncHash === 'function') syncHash();
     var f = catState.facets;
-    var heads = CAT_COLS.map(function (c) {
+    // The metric segment lists metrics with their own columns (catalog-metrics.ts).
+    var metricsView = catState.kind === 'metric';
+    var heads = metricsView ? catMetricHeads() : CAT_COLS.map(function (c) {
       if (!c[2]) return '<th>' + esc(t(c[1])) + '</th>';
       return '<th class="' + (catState.sort === c[0] ? 'is-sort' : '') + '" data-asort="' + c[0] + '">' + esc(t(c[1])) + catArrow(c[0]) + '</th>';
     }).join('');
@@ -151,7 +153,7 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
       + '<span class="wsx-cat__count" id="catCount"></span>'
       + '</div></div>'
       + '<div class="wsx-atbl__wrap"><table class="wsx-atbl wsx-cat__table"><thead><tr>' + heads + '</tr></thead>'
-      + '<tbody id="catList">' + catSortedEntries().map(catRow).join('') + '</tbody></table></div>'
+      + '<tbody id="catList">' + (metricsView ? catMetricRows(m) : catSortedEntries().map(catRow).join('')) + '</tbody></table></div>'
       + '<div class="wsx-empty" id="catNone" style="display:none">' + esc(t('catalog.noMatch')) + '</div>';
     var s = document.getElementById('catSearch'); if (s) s.value = catState.q;
     catApplyFilter();
@@ -225,6 +227,7 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
       + '<div class="wsx-cat__dhead"><span class="wsx-atbl__type">' + esc(catKindLabel(e.kind)) + '</span><h3>' + esc(e.title) + '</h3><span id="catDetailBadge">' + catBadge(e.status) + catStaleChip(e) + '</span></div>'
       + '<div class="wsx-sched__meta">' + esc(e.id) + '</div>'
       + '<section class="wsx-cat__cert" id="catCert" aria-label="' + esc(t('catalog.certTitle')) + '"></section>'
+      + (e.kind === 'metric' ? '<section class="wsx-cat__metric" id="catMetric" aria-label="' + esc(t('catalog.kindMetric')) + '"></section>' : '')
       + '<dl class="wsx-cat__meta">' + meta + '</dl>'
       + (e.body ? '<div class="wsx-cat__body">' + mdToHtml(e.body) + '</div>' : '')
       + '<div class="wsx-cat__lin">'
@@ -236,6 +239,7 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
       b.addEventListener('click', function () { catDetail(m, b.getAttribute('data-cat-goto')); });
     });
     catLoadCert(m, id);
+    if (e.kind === 'metric') catMetricPanel(m, id);
   }
 
 `;
