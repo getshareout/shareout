@@ -222,6 +222,10 @@ Authorization: Bearer {token}
 - **Your own pages only.** Notes are derived from your workspace's published pages — nothing
   from other workspaces, and only pages approved by moderation.
 - **Opt-in.** Knowledge is off until an owner or admin turns it on, and can be turned off again.
+- **Unlearning.** When a page goes private or into the trash, every note learned from it — topics,
+  entities, the timeline and the overview — stops being shown to other members and their
+  assistants straight away, and the next nightly run rebuilds those notes from the pages still
+  open to everyone.
 
 ## Related
 

@@ -13,7 +13,7 @@ import { getAIProvider } from '../../data/agent/anthropic';
 import { corpusFor } from '../../knowledge/corpus/client';
 import { startIngest } from '../../knowledge/corpus/ingest';
 import { searchCorpus, searchResultMarkdown, visibleSources } from '../../knowledge/corpus/search';
-import { notesFromArtifact, readableNodes, sourceArtifacts } from '../../knowledge/source-links';
+import { DISPLAY_SOURCES, notesFromArtifact, readableNodes, sourceArtifacts } from '../../knowledge/source-links';
 import { knowledgeUsage } from '../../knowledge/corpus/usage';
 import { corpusStatus, reindexWorkspace, REINDEX_MAX } from '../../knowledge/corpus/reindex';
 import { isPlatformAdmin } from '../../superadmin/auth';
@@ -311,10 +311,11 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
     if (!file) return cors(jsonError('Not found', 'NOT_FOUND', 404));
     const node = (await readableNodes(ctx.env, workspaceId, auth.id, parseKnowledge([file]).nodes))[0];
     if (!node) return cors(jsonError('Not found', 'NOT_FOUND', 404));
+    const shown = node.sources.slice(0, DISPLAY_SOURCES);
     return cors(
       jsonResponse({
         enabled: true,
-        node: { ...summarize(node, file), body: node.body, content: file.content, sources: node.sources, source_artifacts: await sourceArtifacts(ctx.env, workspaceId, auth.id, node.sources) },
+        node: { ...summarize(node, file), body: node.body, content: file.content, sources: shown, source_artifacts: await sourceArtifacts(ctx.env, workspaceId, auth.id, shown) },
       })
     );
   }

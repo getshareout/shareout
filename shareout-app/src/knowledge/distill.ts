@@ -2,7 +2,7 @@ import type { Env } from '../types';
 import { extractTextFromHtml } from '../serve/utils';
 import { chatComplete, getAIProvider } from '../data/agent/anthropic';
 import { upsertLearnedFile, isTombstoned, loadKnowledge, getKnowledgeFile } from './store';
-import { artifactDigestPath, INDEX_PATH } from './types';
+import { artifactDigestPath, INDEX_PATH, PROVENANCE_LINE } from './types';
 import { toMarkdown } from './corpus/ingest';
 
 const MAX_PER_RUN = 20;
@@ -188,11 +188,14 @@ async function regenerateIndex(env: Env, workspaceId: string): Promise<void> {
   for (const d of digests) for (const t of d.topics) counts.set(t, (counts.get(t) ?? 0) + 1);
   const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, TOP_TOPICS);
 
+  // Its topic names come from these pages, so it cites them (see PROVENANCE_LINE).
   const fm = [
     '---',
     'kind: overview',
     'id: index',
     'title: "Workspace knowledge"',
+    `sources: ${yamlList([...new Set(digests.flatMap(d => d.sources))])}`,
+    PROVENANCE_LINE,
     'pinned: false',
     '---',
   ].join('\n');

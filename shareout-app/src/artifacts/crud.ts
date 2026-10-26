@@ -8,7 +8,7 @@ import { emitJobEvent } from '../scheduling/events';
 import { purgeInbox } from '../email/inbox-store';
 import { validateAccessPolicy } from '../data/access-policy';
 import { canViewArtifact } from '../data/middleware';
-import { deleteKnowledgeFile } from '../knowledge/store';
+import { deleteKnowledgeFile, requestKnowledgeRebuild } from '../knowledge/store';
 import { deleteKnowledgeVector } from '../knowledge/distill';
 import { artifactDigestPath } from '../knowledge/types';
 import { coerceVisibility, normalizeVisibility } from '../visibility-config';
@@ -530,6 +530,8 @@ export async function handleUpdateArtifact(
     const digest = artifactDigestPath(artifactId);
     await deleteKnowledgeFile(env, artifact.workspace_id, digest).catch(() => {});
     await deleteKnowledgeVector(env, artifact.workspace_id, digest);
+    // Notes learned from it are hidden from other members now; rebuild them without it.
+    await requestKnowledgeRebuild(env, artifact.workspace_id);
   }
   if (hasPresentation) await setPresentation(env, artifactId, presentation);
   if (tags) await replaceTags(env, artifactId, tags);
@@ -643,6 +645,7 @@ export async function softDeleteArtifact(
   const ws = await env.DB.prepare('SELECT workspace_id FROM artifacts WHERE id = ?')
     .bind(artifactId).first<{ workspace_id: string | null }>();
   await relearnPage(env, ws?.workspace_id ?? null, artifactId, `deleted:${deletedAt}`);
+  await requestKnowledgeRebuild(env, ws?.workspace_id ?? null);
   return deletedAt;
 }
 

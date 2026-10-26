@@ -22,11 +22,16 @@ function quotedBody(text: string): string {
   return text.slice(start + OPEN.length + 1, end);
 }
 
-function overviewFile(body: string) {
+interface Overview { sources?: string[]; legacy?: boolean; source?: string }
+
+// A learned overview lists the pages it was written from (`provenance: full`); one written before
+// that (`legacy`) has neither line.
+function overviewFile(body: string, o: Overview = {}) {
+  const provenance = o.legacy ? '' : `sources: [${(o.sources ?? []).join(', ')}]\nprovenance: full\n`;
   return {
     path: 'index.md',
-    content: `---\nkind: overview\nid: ws.overview\ntitle: Overview\n---\n${body}`,
-    source: 'consolidated',
+    content: `---\nkind: overview\nid: ws.overview\ntitle: Overview\n${provenance}---\n${body}`,
+    source: o.source ?? 'consolidated',
     updated_at: '2026-07-01T00:00:00Z',
   };
 }
@@ -34,9 +39,12 @@ function overviewFile(body: string) {
 function mockDb(opts: {
   enabled?: boolean;
   overviewBody?: string;
+  overview?: Overview;
+  /** Artifact ids that went private or into the trash. */
+  withdrawn?: string[];
   contextFiles?: { name: string; content: string; updated_by: string | null; updated_at: string }[];
 } = {}): Env['DB'] {
-  const knowledgeFiles = opts.overviewBody ? [overviewFile(opts.overviewBody)] : [];
+  const knowledgeFiles = opts.overviewBody ? [overviewFile(opts.overviewBody, opts.overview)] : [];
   const contextFiles = opts.contextFiles ?? [];
   return {
     prepare: (sql: string) => ({
@@ -54,6 +62,7 @@ function mockDb(opts: {
           if (sql.includes("namespace = 'knowledge'"))
             throw new Error('trunk helper must not load the whole KB');
           if (sql.includes("namespace = 'context'")) return { results: contextFiles };
+          if (sql.includes('FROM artifacts')) return { results: (opts.withdrawn ?? []).map((id) => ({ id })) };
           return { results: [] };
         },
         run: async () => ({ success: true, meta: { changes: 0 } }),
@@ -106,6 +115,26 @@ describe('knowledgeTrunkForContext', () => {
     expect(lines[2]).toBe(OPEN);
     expect(lines.at(-1)).toBe(CLOSE);
     expect(quotedBody(trunk)).toBe('Acme is a chat app.');
+  });
+
+  it('withholds an overview that cites a page members can no longer all open', async () => {
+    const open = { DB: mockDb({ enabled: true, overviewBody: 'Acme is a chat app.', overview: { sources: ['art_a', 'art_b'] } }) } as Env;
+    expect(quotedBody(await knowledgeTrunkForContext(open, WS))).toBe('Acme is a chat app.');
+    const withdrawn = { DB: mockDb({ enabled: true, overviewBody: 'Acme is a chat app.', overview: { sources: ['art_a', 'art_b'] }, withdrawn: ['art_b'] }) } as Env;
+    expect(await knowledgeTrunkForContext(withdrawn, WS)).toBe('');
+  });
+
+  it('withholds a learned overview written before overviews listed their sources', async () => {
+    const env = { DB: mockDb({ enabled: true, overviewBody: 'Acme is a chat app.', overview: { legacy: true } }) } as Env;
+    expect(await knowledgeTrunkForContext(env, WS)).toBe('');
+    expect(await buildHomeSnapshot(env, WS, user)).not.toContain(TRUNK_HEADER);
+  });
+
+  it('an overview an admin wrote by hand needs no source list, and is still quoted as data', async () => {
+    const env = { DB: mockDb({ enabled: true, overviewBody: 'House overview.', overview: { legacy: true, source: 'manual' } }) } as Env;
+    const trunk = await knowledgeTrunkForContext(env, WS);
+    expect(trunk.startsWith(`${TRUNK_HEADER}\n`)).toBe(true);
+    expect(quotedBody(trunk)).toBe('House overview.');
   });
 
   it('an overview body cannot close its quote block or open another one', async () => {

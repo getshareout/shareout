@@ -287,6 +287,8 @@ A note that wouldn't parse (no frontmatter, missing `kind`/`id`/`title`, unknown
 
 The overview, `index.md`, is loaded into every member's assistant, so only owners and admins can write it — a member gets `403 FORBIDDEN` with a hint. `kind: overview` and `id: index` belong to that path only (`400` elsewhere). Agents receive the overview quoted as workspace data inside `<workspace_knowledge>` tags, never as instructions.
 
+**A page that stops being open to everyone.** When a page goes private or into the trash, every note citing it in `sources` (topics, entities, the timeline, the overview) is withheld from other members and their assistants at once, and the next nightly consolidation rebuilds it from the pages still open to all (a note left with none is removed). Notes keep every source id; the API shows the newest 50.
+
 **Sources ↔ notes.** `GET …/knowledge/files/{path}` returns `source_artifacts`, one per id in `sources`: `{ id, slug, title, url, available }`, where `url` is the absolute `$ORIGIN/a/{slug}/` link. When the artifact is deleted, held, in another workspace or private to someone else, it comes back `available: false` with no title, slug or url. The reverse, `GET …/knowledge/from/{artifactId}`, returns `{ enabled, notes: [{ path, kind, id, title }] }` (max 50) — empty when you may not open that artifact, `enabled: false` when Knowledge is off. Home shows these as "Knowledge from this artifact" in the Inspector's Details.
 
 ## Related

@@ -172,6 +172,7 @@ las rutas requieren membresía del workspace.
 - **Solo miembros.** La biblioteca Knowledge es visible para miembros del workspace. Los sharees externos no ven Knowledge.
 - **Solo tus artefactos.** Las notas se derivan de los artefactos publicados de tu workspace.
 - **Opt-in.** Knowledge está apagado hasta que un owner o admin lo active.
+- **Desaprender.** Cuando una página pasa a privada o a la papelera, las notas aprendidas de ella (temas, entidades, la línea de tiempo y el overview) dejan de mostrarse al resto de los miembros y a sus asistentes en el momento, y la corrida nocturna siguiente las reconstruye con las páginas que siguen abiertas para todos.
 
 ## Relacionado
 
