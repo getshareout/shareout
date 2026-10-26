@@ -48,6 +48,12 @@ const TIER_FEATURE: Record<string, string> = {
 // HTTP methods that mutate state.
 export const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+const TEST_RUN_READ_ONLY = {
+  code: DATA_ERRORS.FORBIDDEN.code,
+  message: 'This is a read-only test run — writes, emails, and provisioning are disabled.',
+  hint: 'Artifact Tests execute flows against a read-only view; mutations are intentionally blocked.',
+};
+
 // Tiers backing the artifact's OWN private stores, which had NO write auth and
 // so accepted anonymous writes on a public artifact (the hole closed by
 // Workstream A). Anonymous mutations here require the owner's per-artifact
@@ -67,6 +73,16 @@ export function shouldBlockAnonWrite(tier: string, method: string, canWrite: boo
 // POST endpoints that only read (table query/count/distinct): a filter body, no mutation.
 export function isReadOnlyPost(tier: string, method: string, subPath: string): boolean {
   return tier === 'tables' && method.toUpperCase() === 'POST' && /^\/[^/]+\/(query|count|distinct)\/?$/.test(subPath);
+}
+
+// The POSTs a read-only test run may make, because they only read: table reads (the
+// artifact's own or a workspace-shared table) and the batch envelope, whose
+// sub-requests are gated one by one in handleBatch.
+export function testRunMayPost(tier: string, method: string, subPath: string): boolean {
+  if (method.toUpperCase() !== 'POST') return false;
+  if (tier === 'batch') return true;
+  if (tier === 'workspace') return /^\/tables\/[^/]+\/(query|count|distinct)\/?$/.test(subPath);
+  return isReadOnlyPost(tier, method, subPath);
 }
 
 // A space guest (no account) reaches only what a viewer of the page needs: reads of the
@@ -154,6 +170,11 @@ async function handleBatch(
         const parts = req.path.split('/').filter(Boolean);
         const [tier, ...rest] = parts;
         const subPath = '/' + rest.join('/');
+
+        // A read-only test run's batch carries reads only.
+        if (ctx.testRun && MUTATING_METHODS.has(method) && !isReadOnlyPost(tier, method, subPath)) {
+          return { path: req.path, success: false, error: TEST_RUN_READ_ONLY.message, code: TEST_RUN_READ_ONLY.code };
+        }
 
         // Read-only-default gate applies per sub-request, not per batch envelope:
         // a batch can't be used to smuggle anonymous writes past the gate.
@@ -301,17 +322,14 @@ async function handleDataRequestInner(
   }
   ctx.waitUntil = waitUntil;
 
-  // Sandboxed test run (Artifact Tests Phase 2, Unit B): the render carries an
+  // Sandboxed test run (capture renders and Artifact Tests): the render carries an
   // `owner_test` token so reads resolve as the owner and the artifact loads, but
   // NOTHING may persist or send. Block every mutating method across every tier at
   // this one chokepoint — covers stores, email, provision, secrets, sheets, etc.,
-  // without trusting each tier's own gate. Reads (GET) pass through unchanged.
-  if (ctx.testRun && MUTATING_METHODS.has(request.method.toUpperCase())) {
-    return errorResponse({
-      ...DATA_ERRORS.FORBIDDEN,
-      message: 'This is a read-only test run — writes, emails, and provisioning are disabled.',
-      hint: 'Artifact Tests execute flows against a read-only view; mutations are intentionally blocked.',
-    }, origin);
+  // without trusting each tier's own gate. Reads pass: GET, and the few POSTs that
+  // only read (testRunMayPost).
+  if (ctx.testRun && MUTATING_METHODS.has(request.method.toUpperCase()) && !testRunMayPost(tier, request.method, subPath)) {
+    return errorResponse({ ...DATA_ERRORS.FORBIDDEN, ...TEST_RUN_READ_ONLY }, origin);
   }
 
   if (ctx.spaceGuest && !spaceGuestTierAllowed(tier, request.method, subPath)) {

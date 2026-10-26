@@ -6,6 +6,7 @@ import {
   extractTokenFromCookie,
 } from '../token';
 import { SESSION_MAX_AGE } from './constants';
+import { isCaptureCredential } from './capture-session';
 import { credentialsLoginPage, passwordLoginPage } from './pages';
 import { hashPassword, verifyPassword } from './password';
 import { checkArtifactGateLimit, rateLimitHeaders } from '../rate-limit';
@@ -165,5 +166,5 @@ export async function verifyAccessToken(
   if (!token) return false;
 
   const payload = await verifyAccessTokenRaw(token, artifactId, env);
-  return payload !== null;
+  return payload !== null && !isCaptureCredential(payload.authType);
 }
