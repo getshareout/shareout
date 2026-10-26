@@ -3,16 +3,18 @@
  * the refresh interval of its schedule (a missed run is fine, two in a row is not); else
  * twice what the declared `refresh` words imply; else a week.
  */
-import { getNextRunTime, parseCronSchedule } from '../scheduling/jobs/cron';
+import { matchesField, parseCronSchedule } from '../scheduling/jobs/cron';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 export const DEFAULT_STALE_MS = 7 * DAY;
-// Schedules are checked once an hour (wrangler cron), so nothing refreshes faster.
+// Schedules are checked once an hour (wrangler cron): a due job runs at the next :00, so
+// the hours a cron fires in are its runs, and nothing refreshes faster than hourly.
 const MIN_INTERVAL_MS = HOUR;
 const RUNS = 7;
-const HORIZON_MS = 62 * DAY;
+// Room for three runs of a yearly schedule.
+const HORIZON_DAYS = 800;
 
 /** `24h`, `90m`, `2d`, `1w` or ISO 8601 (`PT6H`, `P1D`, `P1DT12H`, `P2W`) → ms. */
 export function parseDuration(text: unknown): number | null {
@@ -36,30 +38,53 @@ export function parseDuration(text: unknown): number | null {
 
 const intervals = new Map<string, number | null>();
 
-/** The longest gap between consecutive runs of a 5-field cron (UTC), or null if unusable. */
+/**
+ * The longest gap between consecutive runs of a 5-field cron (UTC), or null if unusable
+ * or it never fires. Walks days rather than minutes, so a cron that never matches
+ * (`0 0 31 2 *`) costs microseconds, not a year of minutes per run.
+ */
 export function cronIntervalMs(cron: string | undefined, from = Date.now()): number | null {
   if (!cron) return null;
   const key = cron.trim();
   if (intervals.has(key)) return intervals.get(key) ?? null;
-  let out: number | null = null;
-  if (parseCronSchedule(key).valid) {
-    const runs: number[] = [];
-    let at = new Date(from);
-    for (let i = 0; i < RUNS; i++) {
-      const next = Date.parse(getNextRunTime(key, at));
-      if (Number.isNaN(next) || next - from > HORIZON_MS) break;
-      runs.push(next);
-      at = new Date(next);
-    }
-    let gap = 0;
-    for (let i = 1; i < runs.length; i++) gap = Math.max(gap, runs[i] - runs[i - 1]);
-    // A single run inside the horizon (monthly and sparser): the horizon is the gap.
-    if (runs.length === 1) gap = HORIZON_MS / 2;
-    out = gap > 0 ? Math.max(MIN_INTERVAL_MS, gap) : null;
-  }
+  const runs = parseCronSchedule(key).valid ? runHours(key, from) : [];
+  let gap = 0;
+  for (let i = 1; i < runs.length; i++) gap = Math.max(gap, runs[i] - runs[i - 1]);
+  // One run in the whole horizon (a leap day): rarer than the horizon itself.
+  if (runs.length === 1) gap = HORIZON_DAYS * DAY;
+  const out = gap > 0 ? Math.max(MIN_INTERVAL_MS, gap) : null;
   if (intervals.size > 200) intervals.clear();
   intervals.set(key, out);
   return out;
+}
+
+/** The first RUNS hours after `from` in which a valid cron fires. */
+function runHours(cron: string, from: number): number[] {
+  const [, hourSpec, daySpec, monthSpec, weekdaySpec] = cron.split(/\s+/);
+  const mask = (spec: string, min: number, max: number) => {
+    const on: boolean[] = [];
+    for (let v = min; v <= max; v++) on[v] = matchesField(v, spec, min, max);
+    return on;
+  };
+  const hours = mask(hourSpec, 0, 23).flatMap((on, h) => (on ? [h] : []));
+  const days = mask(daySpec, 1, 31);
+  const months = mask(monthSpec, 1, 12);
+  const weekdays = mask(weekdaySpec, 0, 6);
+  // Standard cron, as in getNextRunTime: when both day fields are restricted, either matches.
+  const either = daySpec !== '*' && weekdaySpec !== '*';
+  const start = Math.floor(from / DAY) * DAY;
+  const runs: number[] = [];
+  for (let d = 0; d < HORIZON_DAYS && runs.length < RUNS; d++) {
+    const date = new Date(start + d * DAY);
+    const byDay = days[date.getUTCDate()];
+    const byWeekday = weekdays[date.getUTCDay()];
+    if (!months[date.getUTCMonth() + 1] || !(either ? byDay || byWeekday : byDay && byWeekday)) continue;
+    for (const h of hours) {
+      const at = start + d * DAY + h * HOUR;
+      if (at > from && runs.length < RUNS) runs.push(at);
+    }
+  }
+  return runs;
 }
 
 /** What a declared cadence in words implies ("daily 12:00 UTC", "cada hora", "semanal"). */

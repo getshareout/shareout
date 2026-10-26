@@ -45,7 +45,7 @@ function parseSegment(
 }
 
 /** Does `value` satisfy a full cron field (comma-separated segments, OR'd)? */
-function matchesField(value: number, spec: string, min: number, max: number): boolean {
+export function matchesField(value: number, spec: string, min: number, max: number): boolean {
   return spec.split(',').some(seg => {
     const p = parseSegment(seg, min, max);
     return p !== null && value >= p.start && value <= p.end && (value - p.start) % p.step === 0;
