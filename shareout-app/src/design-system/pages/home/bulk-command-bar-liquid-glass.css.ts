@@ -27,7 +27,7 @@ export const bulkCommandBarLiquidGlassStyles = `/* ── Bulk command bar (liqu
 .cmdbar-actions { display: flex; align-items: center; gap: 4px; }
 .cmdbar-btn {
   display: inline-flex; align-items: center; gap: 0.4rem;
-  padding: 8px 12px;
+  padding: 8px 12px; min-height: 44px;
   border: none; border-radius: var(--radius-full);
   background: transparent;
   color: var(--color-text); font: inherit;
@@ -40,13 +40,14 @@ export const bulkCommandBarLiquidGlassStyles = `/* ── Bulk command bar (liqu
 .cmdbar-btn.danger { color: var(--color-danger, var(--color-error)); }
 .cmdbar-btn.danger:hover { background: var(--color-danger, var(--color-error)); color: var(--color-text-inverse); }
 .cmdbar-clear {
-  width: 34px; height: 34px; flex-shrink: 0;
+  width: 34px; height: 34px; flex-shrink: 0; position: relative;
   display: flex; align-items: center; justify-content: center;
   border: none; border-radius: 50%;
   background: rgba(28, 25, 23, 0.06);
   color: var(--color-text-secondary); cursor: pointer;
   transition: all var(--duration-fast);
 }
+.cmdbar-clear::before { content: ''; position: absolute; inset: -5px; }
 .cmdbar-clear svg { width: 16px; height: 16px; }
 .cmdbar-clear:hover { background: rgba(28, 25, 23, 0.12); color: var(--color-text); }
 

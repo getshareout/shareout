@@ -8,9 +8,10 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 .wsx__stagebar .js-title { font: 700 var(--text-h3) var(--font-display, var(--font-body)); }
 .wsx__stagebar a { font-size: var(--text-sm); color: var(--color-primary); text-decoration: none; }
 .wsx__toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: var(--space-3); flex: none; }
-.wsx-abtn { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 0 12px; border-radius: var(--radius-md); border: 1.5px solid var(--color-border); background: var(--color-bg-elevated); color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); cursor: pointer; transition: border-color var(--duration-fast), color var(--duration-fast), background var(--duration-fast); }
+.wsx-abtn { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; position: relative; padding: 0 12px; border-radius: var(--radius-md); border: 1.5px solid var(--color-border); background: var(--color-bg-elevated); color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); cursor: pointer; transition: border-color var(--duration-fast), color var(--duration-fast), background var(--duration-fast); }
+.wsx-abtn::before { content: ''; position: absolute; inset: -5px 0; }
 .wsx-abtn:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-light); }
-.wsx-caret { opacity: 0.7; font-size: 10px; }
+.wsx-caret { opacity: 0.7; font-size: var(--text-xs); }
 .wsx__deliver { position: relative; }
 .wsx__deliver-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 5; min-width: 150px; padding: 6px; display: flex; flex-direction: column; gap: 2px; background: var(--glass-bg-strong); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-xl); }
 .wsx__deliver-menu[hidden] { display: none; }
@@ -89,6 +90,7 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 /* ---- shared lens bits: code chips, card actions, brief message ---- */
 .wsx__view code { font: 600 0.85em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--color-surface); padding: 1px 6px; border-radius: 6px; color: var(--color-text); }
 .wsx-sched__actions { display: flex; gap: 8px; margin-top: 10px; }
+.wsx-sched__actions .wsx-abtn::before { inset: -7px 0; }
 .wsx-sched__actions .wsx-abtn { min-height: 30px; padding: 0 12px; font-size: var(--text-xs); }
 .wsx-sched__actions .wsx-runst { align-self: center; margin: 0; }
 .wsx-runst { font-size: var(--text-xs); color: var(--color-text-secondary); margin: 0 0 10px; overflow-wrap: anywhere; }
@@ -155,6 +157,7 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 .wsx-admin__logo img { max-width: 100%; max-height: 100%; }
 .wsx-admin__logo--empty { font-size: var(--text-xs); color: var(--color-text-tertiary); }
 .wsx-admin__logocol { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+.wsx-admin__logobtn::before { inset: -7px 0; }
 .wsx-admin__logobtn { justify-content: center; min-height: 30px; font-size: var(--text-xs); }
 .wsx-admin__rolesel { padding: 5px 8px; }
 .wsx-admin__brandfields { display: flex; flex-direction: column; gap: 12px; }
@@ -220,7 +223,8 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 .wsx-admin__ctxedit:focus { outline: none; border-color: var(--color-primary); }
 .wsx-atbl__flag { display: inline-block; margin-left: 6px; font-size: var(--text-xs); font-weight: 600; color: var(--color-text-tertiary); background: var(--color-surface); border: 1px solid var(--color-border); padding: 0 6px; border-radius: 999px; }
 .wsx-atbl__actions { white-space: nowrap; text-align: right; }
-.wsx-atbl__act { min-height: 26px; padding: 0 9px; margin-left: 4px; border-radius: var(--radius-sm); border: 1.5px solid var(--color-border); background: var(--color-bg-elevated); color: var(--color-text-secondary); font: 600 var(--text-xs) var(--font-body); cursor: pointer; transition: border-color var(--duration-fast), color var(--duration-fast); }
+.wsx-atbl__act::before { content: ''; position: absolute; inset: -9px -4px; }
+.wsx-atbl__act { position: relative; min-height: 26px; padding: 0 9px; margin-left: 4px; border-radius: var(--radius-sm); border: 1.5px solid var(--color-border); background: var(--color-bg-elevated); color: var(--color-text-secondary); font: 600 var(--text-xs) var(--font-body); cursor: pointer; transition: border-color var(--duration-fast), color var(--duration-fast); }
 .wsx-atbl__act:hover { border-color: var(--color-primary); color: var(--color-primary); }
 .wsx-atbl__act:disabled { opacity: 0.5; cursor: default; }
 /* Security: Audit log */

@@ -77,6 +77,7 @@ a.wsx-ncard:hover { border-color: var(--color-border-strong); box-shadow: var(--
 .wsx-ncard__actrow { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
 .wsx-ncard__act { flex: none; display: flex; align-items: center; }
 .wsx-ncard__act .wsx-abtn { min-height: 30px; }
+.wsx-ncard__act .wsx-abtn::before, .wsx-ncard__act--split .wsx-abtn::before { inset: -7px 0; }
 .wsx-duechip { font: 600 var(--text-xs) var(--font-body); color: var(--color-text-tertiary); padding: 1px 7px; border-radius: 999px; background: var(--color-surface); white-space: nowrap; }
 .wsx-duechip.is-overdue { color: var(--color-error); background: var(--color-error-light); }
 .wsx-ncard--access { align-items: center; }

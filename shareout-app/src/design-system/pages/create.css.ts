@@ -172,7 +172,7 @@ body { overflow: hidden; background: var(--color-bg); color: var(--color-text); 
 .field input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: 500 0.95rem var(--font-body); color: var(--color-text); letter-spacing: 0.01em; }
 .field input#codeInput { letter-spacing: 0.32em; font-variant-numeric: tabular-nums; }
 
-.icon-btn { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--color-primary); color: #fff; box-shadow: 0 8px 18px -6px var(--color-primary-glow); transition: transform 0.15s var(--ease-out), background 0.15s var(--ease-out); }
+.icon-btn { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--color-primary); color: #fff; box-shadow: 0 8px 18px -6px var(--color-primary-glow); transition: transform 0.15s var(--ease-out), background 0.15s var(--ease-out); }
 .icon-btn:hover { background: var(--color-primary-hover); transform: translateY(-1px); }
 .icon-btn:disabled { opacity: 0.5; transform: none; cursor: default; }
 .icon-btn svg { width: 18px; height: 18px; }
