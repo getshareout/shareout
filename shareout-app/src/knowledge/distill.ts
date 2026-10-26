@@ -4,19 +4,19 @@ import { chatComplete, getAIProvider } from '../data/agent/anthropic';
 import { upsertLearnedFile, isTombstoned, loadKnowledge, getKnowledgeFile } from './store';
 import { artifactDigestPath, INDEX_PATH, PROVENANCE_LINE } from './types';
 import { toMarkdown } from './corpus/ingest';
+import { EMBED_TEXT_CAP, embedTexts, V1_MODEL } from './vectors/models';
+import { deleteNoteV2, writeNoteV2 } from './vectors/v2';
 
 const MAX_PER_RUN = 20;
 const MAX_PER_WORKSPACE = 5;
 // ponytail: hard wall-clock cap so a pathological run can't monopolize the cron; raise if legit runs approach it.
 const MAX_RUN_MS = 120_000;
 const ARTIFACT_TEXT_CAP = 8000;
-const EMBED_TEXT_CAP = 2000;
 const DISTILL_MAX_TOKENS = 600;
 const TOP_TOPICS = 15;
 // ponytail: retry ceiling — rows unprocessed for >7 days are dropped from the
 // sweep (never re-selected), not retried forever. P1 cleanup can prune the rows.
 const STALE_INGEST_WINDOW = '-7 days';
-const EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
 
 /** `workspaceId` (+ `source`) say whom the call is metered to. */
 export type DistillComplete = (system: string, user: string, workspaceId?: string, source?: string) => Promise<string>;
@@ -132,6 +132,7 @@ async function readArtifactText(env: Env, artifactId: string): Promise<string> {
   return text.slice(0, ARTIFACT_TEXT_CAP);
 }
 
+/** A note's vector in v1 (VECTORIZE, shared namespace 'knowledge') and v2 (the workspace's namespace). Best-effort. */
 export async function upsertKnowledgeVector(
   env: Env,
   workspaceId: string,
@@ -139,13 +140,10 @@ export async function upsertKnowledgeVector(
   kind: string,
   text: string
 ): Promise<void> {
+  await writeNoteV2(env, workspaceId, path, kind, text);
   if (!env.VECTORIZE || !env.AI) return;
   try {
-    const res = (await env.AI.run(EMBED_MODEL, { text: [text.slice(0, EMBED_TEXT_CAP)] })) as {
-      data?: number[][];
-    };
-    const values = res.data?.[0];
-    if (!values) return;
+    const [values] = await embedTexts(env, V1_MODEL, [text.slice(0, EMBED_TEXT_CAP)], 'document');
     await env.VECTORIZE.upsert([
       { id: `kn:${workspaceId}:${path}`, values, namespace: 'knowledge', metadata: { workspace_id: workspaceId, path, kind } },
     ]);
@@ -159,6 +157,7 @@ export async function deleteKnowledgeVector(
   workspaceId: string,
   path: string
 ): Promise<void> {
+  await deleteNoteV2(env, workspaceId, path);
   if (!env.VECTORIZE) return;
   try {
     await env.VECTORIZE.deleteByIds([`kn:${workspaceId}:${path}`]);

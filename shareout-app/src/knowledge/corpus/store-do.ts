@@ -63,6 +63,9 @@ export class KnowledgeStore extends DurableObject<Env> {
       const cols = new Set(this.sql.exec('PRAGMA table_info(chunks)').toArray().map((r) => r.name as string));
       if (!cols.has('page')) this.sql.exec('ALTER TABLE chunks ADD COLUMN page TEXT');
       if (!cols.has('anchor')) this.sql.exec('ALTER TABLE chunks ADD COLUMN anchor TEXT');
+      // Model of the chunk's vector in the v2 index (NULL = none yet): the backfill resumes
+      // from it, and reads stay on v1 until the workspace is covered (vectors/v2.ts v2Covers).
+      if (!cols.has('embed_model')) this.sql.exec('ALTER TABLE chunks ADD COLUMN embed_model TEXT');
       // Which chunker produced a source's chunks (0 = before versioning), and how many
       // ingests in a row failed — the nightly refresh re-learns stale and failed sources.
       const srcCols = new Set(this.sql.exec('PRAGMA table_info(sources)').toArray().map((r) => r.name as string));
@@ -276,6 +279,58 @@ export class KnowledgeStore extends DurableObject<Env> {
         .toArray()
         .map((r) => ({ ord: r.ord as number, text: `${r.title}\n${r.locator}\n${r.text}`.trim() }));
     });
+  }
+
+  // ----- v2 vector index bookkeeping (vectors/v2.ts, vectors/backfill.ts) -----
+
+  /** Record that these chunks' vectors in the v2 index were written with `model`. */
+  markEmbedded(model: string, keys: { refId: string; ord: number }[]): void {
+    return this.metered(() => this.ctx.storage.transactionSync(() => {
+      for (const k of keys) this.q('UPDATE chunks SET embed_model = ? WHERE ref_id = ? AND ord = ?', model, k.refId, k.ord);
+    }));
+  }
+
+  /** Chunks after row `afterId` whose v2 vector is missing or from another model, oldest first. */
+  chunksToEmbed(model: string, afterId: number, limit: number): { id: number; refId: string; kind: SourceKind; ord: number; text: string }[] {
+    return this.metered(() => this.q(
+      `SELECT c.id, c.ref_id, s.kind, c.ord, c.title, c.locator, c.text FROM chunks c JOIN sources s ON s.ref_id = c.ref_id
+        WHERE c.id > ? AND (c.embed_model IS NULL OR c.embed_model != ?) ORDER BY c.id LIMIT ?`,
+      afterId, model, limit,
+    ).toArray().map((r) => ({
+      id: r.id as number,
+      refId: r.ref_id as string,
+      kind: r.kind as SourceKind,
+      ord: r.ord as number,
+      text: `${r.title}\n${r.locator}\n${r.text}`.trim(),
+    })));
+  }
+
+  /** Chunk count per v2 model ('' = no v2 vector) and the finished backfill passes (kind → model). */
+  vectorState(): { chunks: Record<string, number>; passes: Record<string, string> } {
+    return this.metered(() => {
+      const chunks: Record<string, number> = {};
+      for (const r of this.q("SELECT COALESCE(embed_model, '') AS m, COUNT(*) AS n FROM chunks GROUP BY 1").toArray()) {
+        chunks[r.m as string] = r.n as number;
+      }
+      const passes: Record<string, string> = {};
+      for (const r of this.q("SELECT key, value FROM meta WHERE key LIKE 'vectors:%'").toArray()) {
+        passes[(r.key as string).slice('vectors:'.length)] = r.value as string;
+      }
+      return { chunks, passes };
+    });
+  }
+
+  /** A backfill pass over `kind` finished with `model`. */
+  setVectorPass(kind: string, model: string): void {
+    return this.metered(() => this.setMeta(`vectors:${kind}`, model));
+  }
+
+  /** Forget every v2 vector record (the index was recreated): the next backfill re-embeds all. */
+  resetVectors(): void {
+    return this.metered(() => this.ctx.storage.transactionSync(() => {
+      this.q('UPDATE chunks SET embed_model = NULL WHERE embed_model IS NOT NULL');
+      this.q("DELETE FROM meta WHERE key LIKE 'vectors:%'");
+    }));
   }
 
   /** Best `limit` chunks for a query, whoever may see them. */

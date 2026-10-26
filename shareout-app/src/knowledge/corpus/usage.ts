@@ -4,14 +4,18 @@
 //
 // Costs are Cloudflare list prices in micro-USD, before account-level free
 // allowances — tracking only, nothing is billed. Checked 2026-10-09:
-//   Workers AI  bge-base-en-v1.5 $0.067 / M input tokens (extraction models: extract.ts)
+//   Workers AI  bge-base-en-v1.5 $0.067 / M input tokens (extraction models: extract.ts;
+//               the v2 index's models, bge-m3 and qwen3-embedding $0.012: vectors/models.ts)
 //   Vectorize   $0.01 / M queried dimensions, $0.05 / 100M stored dimensions
 //   DO SQLite   $1.00 / M rows written, $0.001 / M rows read, $0.20 / GB-month
 //   Workflows   $0.80 / 100k steps
 import type { Env } from '../../types';
 import { recordAiUsage } from '../../data/ai-usage';
+import { V1_MODEL, v2Target } from '../vectors/models';
 
-export const EMBED_DIMENSIONS = 768;
+export { estimateTokens } from '../vectors/models';
+
+export const EMBED_DIMENSIONS = V1_MODEL.dimensions;
 export const PRICING = {
   asOf: '2026-10-09',
   embedTokenMicroUsd: 0.067,
@@ -22,9 +26,6 @@ export const PRICING = {
   storageGbMonthMicroUsd: 200_000,
   workflowStepMicroUsd: 8,
 } as const;
-
-/** Workers AI doesn't return token counts for embeddings; ~4 chars per token. */
-export const estimateTokens = (texts: string[]) => Math.ceil(texts.reduce((n, t) => n + t.length, 0) / 4);
 
 export const KNOWLEDGE_USAGE_KINDS = ['knowledge_embedding', 'knowledge_extraction', 'knowledge_search', 'knowledge_ingest'] as const;
 
@@ -70,7 +71,7 @@ export interface StoreUsage { bytes: number; sources: number; chunks: number; ro
 export async function knowledgeUsage(
   env: Env,
   workspaceId: string,
-  store: { usage(days: number): Promise<StoreUsage> },
+  store: { usage(days: number): Promise<StoreUsage>; vectorState?(): Promise<{ chunks: Record<string, number> }> },
   days: number,
 ): Promise<UsageSummary> {
   const rows = (await env.DB.prepare(
@@ -91,9 +92,18 @@ export async function knowledgeUsage(
     s.rowsRead * PRICING.rowReadMicroUsd +
     (s.bytes / 1e9) * PRICING.storageGbMonthMicroUsd * (days / 30),
   );
-  // One vector per chunk when embeddings are configured.
-  const vectors = env.KNOWLEDGE_VECTORS
-    ? { stored: s.chunks, monthlyCostMicroUsd: Math.round(s.chunks * EMBED_DIMENSIONS * PRICING.storedDimensionMonthMicroUsd) }
+  // One vector per chunk in v1 when embeddings are configured, plus the chunks the v2 index
+  // holds with the configured model (1024-d) while it is written alongside.
+  const v2 = v2Target(env);
+  const v2Stored = v2 && store.vectorState ? ((await store.vectorState()).chunks[v2.model.id] ?? 0) : 0;
+  const v1Stored = env.KNOWLEDGE_VECTORS ? s.chunks : 0;
+  const vectors = env.KNOWLEDGE_VECTORS || v2
+    ? {
+        stored: v1Stored + v2Stored,
+        monthlyCostMicroUsd: Math.round(
+          (v1Stored * EMBED_DIMENSIONS + v2Stored * (v2?.model.dimensions ?? 0)) * PRICING.storedDimensionMonthMicroUsd,
+        ),
+      }
     : null;
   const vectorCost = vectors ? Math.round(vectors.monthlyCostMicroUsd * (days / 30)) : 0;
 

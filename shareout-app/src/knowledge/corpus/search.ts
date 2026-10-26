@@ -13,10 +13,10 @@ import type { Env } from '../../types';
 import { artifactLink } from '../../artifacts/page-links';
 import { corpusFor, type CachedAccess, type CandidateQuery, type Candidates, type ChunkHit, type SourceAccess, type SourceKind } from './client';
 import { queueKnowledgeSource } from './ingest';
-import { EMBED_DIMENSIONS, estimateTokens, meterKnowledge, PRICING } from './usage';
+import { meterKnowledge } from './usage';
 import { JSON_IN, jsonList } from '../../sql-in';
+import { denseCorpusKeys, queryCostMicroUsd, type DenseKeys } from '../vectors/v2';
 
-const EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
 const CANDIDATES = 30;
 /** Keyword picks per search at most: each is one store call plus one D1 round trip. */
 const MAX_ROUNDS = 4;
@@ -47,19 +47,10 @@ export interface SearchResult {
 
 const key = (h: { refId: string; ord: number }) => `${h.refId}:${h.ord}`;
 
-async function semanticKeys(env: Env, workspaceId: string, q: string): Promise<{ refId: string; ord: number }[] | null> {
-  if (!env.AI || !env.KNOWLEDGE_VECTORS) return null;
-  try {
-    const res = (await env.AI.run(EMBED_MODEL, { text: [q.slice(0, 2000)] })) as { data?: number[][] };
-    if (!res.data?.[0]) return null;
-    const out = await env.KNOWLEDGE_VECTORS.query(res.data[0], { topK: CANDIDATES, namespace: workspaceId });
-    return (out.matches || []).map((m) => {
-      const i = m.id.lastIndexOf(':');
-      return { refId: m.id.slice(0, i), ord: Number(m.id.slice(i + 1)) };
-    });
-  } catch {
-    return null;
-  }
+// Dense candidates: the v1 index, or the multilingual v2 index once reads are cut over and it
+// covers this workspace's passages (vectors/v2.ts). The model rides along for metering.
+function semanticKeys(env: Env, store: NonNullable<ReturnType<typeof corpusFor>>, workspaceId: string, q: string): Promise<DenseKeys | null> {
+  return denseCorpusKeys(env, store, workspaceId, q.slice(0, 2000), CANDIDATES).catch(() => null);
 }
 
 export interface Visible { title: string; url: string | null; slug?: string }
@@ -212,13 +203,13 @@ export async function searchCorpus(
 
   const check = new AccessCheck(env, workspaceId, userId);
   const stale = new Map<string, AccessRecord>();
-  const [keyword, semantic] = await Promise.all([keywordPool(store, check, q, opts.kinds, stale), semanticKeys(env, workspaceId, q)]);
-  const tokens = semantic ? estimateTokens([q.slice(0, 2000)]) : 0;
+  const [keyword, dense] = await Promise.all([keywordPool(store, check, q, opts.kinds, stale), semanticKeys(env, store, workspaceId, q)]);
+  const semantic = dense?.keys ?? null;
   const metered = meterKnowledge(env, workspaceId, 'knowledge_search', {
-    model: semantic ? EMBED_MODEL : 'fts5',
+    model: dense ? dense.model.id : 'fts5',
     units: 1,
     unitKind: 'queries',
-    costMicroUsd: semantic ? tokens * PRICING.embedTokenMicroUsd + EMBED_DIMENSIONS * PRICING.queriedDimensionMicroUsd : 0,
+    costMicroUsd: dense ? queryCostMicroUsd(dense.model, q) : 0,
     userId,
   });
   if (opts.ctx) opts.ctx.waitUntil(metered);

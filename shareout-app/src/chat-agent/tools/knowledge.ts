@@ -7,15 +7,17 @@ import { searchCorpus, visibleSources } from '../../knowledge/corpus/search';
 import { listVisibleEntities, visibleEntity } from '../../knowledge/corpus/graph';
 import { scopedWorkspaceId, selectedWorkspace } from '../scope';
 import { DISPLAY_SOURCES, readableNodes, sourceArtifacts } from '../../knowledge/source-links';
+import { EMBED_TEXT_CAP, embedTexts, V1_MODEL } from '../../knowledge/vectors/models';
+import { notePathsV2 } from '../../knowledge/vectors/v2';
 
 const MAX_RESULTS = 20;
 const SEMANTIC_TOPK = 15;
-// Notes of every workspace share one index namespace, so the nearest ones are fetched at
-// Vectorize's maximum (100 without values or metadata) and cut to SEMANTIC_TOPK only after
-// keeping this workspace's notes the member may read.
+// Semantic notes are cut to SEMANTIC_TOPK only after keeping the ones this member may read
+// (execute), so more are fetched: v1's `knowledge` namespace is shared by every workspace
+// (Vectorize's maximum, 100 without values or metadata); v2 holds only this workspace's notes
+// but returns their paths as metadata (at most 50 then).
 const SEMANTIC_FETCH = 100;
-const EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
-const EMBED_TEXT_CAP = 2000;
+const SEMANTIC_FETCH_V2 = 50;
 const DISABLED_MESSAGE = "Knowledge isn't turned on for this workspace.";
 const NO_WORKSPACE = 'Knowledge is only available inside a workspace.';
 const PASSAGES = 8;
@@ -68,16 +70,16 @@ function summarize(n: KnowledgeNode) {
   };
 }
 
-// Access is enforced by filtering ids to the kn:<wsId>: prefix — Vectorize
-// metadata is never trusted for access (same rule as search/semantic.ts).
+// v2 (once it covers the workspace's notes) answers from the workspace's own namespace. On
+// v1, access is enforced by filtering ids to the kn:<wsId>: prefix. Either way Vectorize is
+// never trusted for access: paths only count if readableNodes lets this member read them.
 async function semanticPaths(env: Env, wsId: string, query: string): Promise<string[]> {
-  if (!env.VECTORIZE || !env.AI || !query.trim()) return [];
+  if (!env.AI || !query.trim()) return [];
+  const v2 = await notePathsV2(env, wsId, query.slice(0, EMBED_TEXT_CAP), SEMANTIC_FETCH_V2);
+  if (v2) return v2;
+  if (!env.VECTORIZE) return [];
   try {
-    const res = (await env.AI.run(EMBED_MODEL, { text: [query.slice(0, EMBED_TEXT_CAP)] })) as {
-      data?: number[][];
-    };
-    const values = res.data?.[0];
-    if (!values) return [];
+    const [values] = await embedTexts(env, V1_MODEL, [query.slice(0, EMBED_TEXT_CAP)], 'query');
     const q = await env.VECTORIZE.query(values, {
       topK: SEMANTIC_FETCH,
       namespace: 'knowledge',
