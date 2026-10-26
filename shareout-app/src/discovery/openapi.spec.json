@@ -918,6 +918,162 @@
         }
       }
     },
+    "/v1/artifacts/{id}/verify": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ArtifactId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Artifacts"
+        ],
+        "summary": "Verify — what viewers see and what broke",
+        "description": "Opens the page the way its viewers get it — on its content origin, in a fresh browser with no ShareOut session, with the viewer sandbox emulated (storage, cookies and IndexedDB throw `SecurityError`) and the viewer's Content-Security-Policy enforced — on a 1280×800 desktop and a 390×844 phone, and reports script errors (with file:line:col), failed requests (with the `code`/`hint` of ShareOut API errors), blocked CDNs, accessibility (axe-core, WCAG 2.1 A/AA), horizontal overflow, tap targets under 44 px, broken images, blank screens, design lint, LCP/CLS/bytes and common source mistakes. Writes the page makes on load are refused (read-only render). The phone view renders the version's mobile entrypoint when it has one, and a pinned `version` is rendered entirely from that version's files. Verifying the live version also refreshes the thumbnail. Owners and editors only; workspace Agent tokens need `artifacts:publish`. Limited per user per hour (30 unless the instance sets `VERIFY_RUNS_PER_HOUR`). Without a Browser Rendering binding the result is `partial` (source checks only). Typical run: 5–15 s.",
+        "operationId": "verifyArtifact",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The verify run (also stored as the latest)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Nothing to render — not published yet (`NOT_PUBLISHED`), paused or taken down",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/artifacts/{id}/verify/latest": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ArtifactId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Artifacts"
+        ],
+        "summary": "Latest verify run",
+        "description": "The most recent verify result for this page (only the latest run is kept). Owners and editors only. 404 `NO_VERIFY_RUN` until the first verify.",
+        "operationId": "getLatestVerify",
+        "responses": {
+          "200": {
+            "description": "The latest verify run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/artifacts/{id}/verify/{runId}/{viewport}.webp": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ArtifactId"
+        },
+        {
+          "name": "runId",
+          "in": "path",
+          "required": true,
+          "description": "The verify run id (`vfy_…`) from `VerifyResult.id`.",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "viewport",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "desktop",
+              "mobile"
+            ]
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Artifacts"
+        ],
+        "summary": "Verify screenshot",
+        "description": "A screenshot of the latest verify run (WebP, at most 800 px wide): the desktop view scaled from 1280×800, the phone view at 2× (780 px wide). Owners and editors only; the `screenshot.url` of each `VerifyResult.viewports` entry points here.",
+        "operationId": "getVerifyScreenshot",
+        "responses": {
+          "200": {
+            "description": "The screenshot",
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/artifacts/{id}/deliver": {
       "parameters": [
         {
@@ -12571,6 +12727,255 @@
       }
     },
     "schemas": {
+      "VerifyRequest": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Version number to verify, with all of its files. Defaults to the live version."
+          },
+          "viewports": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "desktop",
+                "mobile"
+              ]
+            },
+            "description": "Defaults to both."
+          },
+          "full_page": {
+            "type": "boolean",
+            "default": false,
+            "description": "Screenshot the whole page height (up to 4000 px) instead of the first screen."
+          }
+        }
+      },
+      "VerifyIssue": {
+        "type": "object",
+        "required": [
+          "check",
+          "rule",
+          "severity",
+          "message"
+        ],
+        "properties": {
+          "check": {
+            "type": "string",
+            "enum": [
+              "render",
+              "console",
+              "network",
+              "a11y",
+              "layout",
+              "design",
+              "performance",
+              "source"
+            ]
+          },
+          "rule": {
+            "type": "string",
+            "description": "Stable id, e.g. `js_error`, `storage_blocked`, `request_failed`, `api_error`, `csp_blocked`, `horizontal_overflow`, `small_tap_targets`, `broken_image`, `blank_page`, `absolute_path`, or an axe-core rule id such as `image-alt`."
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "error",
+              "warning",
+              "info"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "where": {
+            "type": "string",
+            "description": "`file:line:col`, a CSS selector, or a URL."
+          },
+          "hint": {
+            "type": "string",
+            "description": "How to fix it."
+          },
+          "viewports": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "desktop",
+                "mobile"
+              ]
+            }
+          },
+          "count": {
+            "type": "integer"
+          }
+        }
+      },
+      "VerifyResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Run id (`vfy_…`)."
+          },
+          "artifact_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "version_id": {
+            "type": "string"
+          },
+          "live": {
+            "type": "boolean",
+            "description": "Whether the verified version is the one viewers get now."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "warn",
+              "fail",
+              "partial"
+            ],
+            "description": "`fail` = at least one error, `warn` = warnings only, `pass` = neither, `partial` = the page was not rendered (see `partial_reason`) and only the source was checked."
+          },
+          "partial_reason": {
+            "type": "string",
+            "enum": [
+              "no_browser",
+              "render_failed"
+            ]
+          },
+          "summary": {
+            "type": "string"
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "integer"
+              },
+              "warning": {
+                "type": "integer"
+              },
+              "info": {
+                "type": "integer"
+              }
+            }
+          },
+          "issues": {
+            "type": "array",
+            "description": "Errors first, then warnings, then notes (at most 60).",
+            "items": {
+              "$ref": "#/components/schemas/VerifyIssue"
+            }
+          },
+          "viewports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "viewport": {
+                  "type": "string",
+                  "enum": [
+                    "desktop",
+                    "mobile"
+                  ]
+                },
+                "entrypoint": {
+                  "type": "string",
+                  "description": "The file this view rendered (the phone renders the mobile entrypoint when there is one)."
+                },
+                "width": {
+                  "type": "integer"
+                },
+                "height": {
+                  "type": "integer"
+                },
+                "dpr": {
+                  "type": "number"
+                },
+                "screenshot": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "url": {
+                      "type": "string"
+                    },
+                    "path": {
+                      "type": "string"
+                    },
+                    "width": {
+                      "type": "integer"
+                    },
+                    "height": {
+                      "type": "integer"
+                    },
+                    "full_page": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "metrics": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "load_ms": {
+                      "type": "integer"
+                    },
+                    "lcp_ms": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "cls": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "bytes": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "requests": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "design": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Fonts, accent colors, longest line and missing meta tags, from the first viewport."
+          },
+          "thumbnail_refreshed": {
+            "type": "boolean"
+          },
+          "duration_ms": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "ProvisionSummary": {
         "type": "object",
         "properties": {
