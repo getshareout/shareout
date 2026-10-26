@@ -100,8 +100,11 @@ load [deploy/SKILL.md](deploy/SKILL.md).
 
 Frontmatter `version` is this file (`2.60.0`).
 
-1. `GET $ORIGIN/v1/skill/version` → `{ "version", "updated_at" }`.
-2. If newer: download `GET $ORIGIN/v1/skill` (zip), replace local skill copy, continue.
+1. `GET $ORIGIN/v1/skill/version` → `{ "version", "semver", "updated_at" }`. `version` is
+   `<frontmatter>+<content hash>` (e.g. `2.60.0+18c8deb6`).
+2. Compare the full `version` string (or the ETag) with the one you last downloaded — **equality,
+   not semver**: content changes keep the same frontmatter version. Different (or never
+   downloaded): download `GET $ORIGIN/v1/skill` (zip), replace local skill copy, remember its `version`, continue.
 3. If the instance has no skill endpoint yet (brand-new deploy mid-setup): use this repo copy and finish [deploy/SKILL.md](deploy/SKILL.md).
 
 Shortcuts: `HEAD $ORIGIN/v1/skill` → `X-Skill-Version`; `If-None-Match` → `304` when unchanged.
@@ -303,8 +306,9 @@ All later requests: `Authorization: Bearer so_…` against **`$ORIGIN`**.
 Build JSON however you want; prefer `curl` for the HTTP call (Cloudflare may block some HTTP clients):
 
 ```bash
-ORIGIN=$(python3 -c "import json,os; c=json.load(open(os.path.expanduser('~/.shareout/credentials'))); print(c.get('origin') or os.environ.get('SHAREOUT_ORIGIN','$ORIGIN'))")
-TOKEN=$(python3 -c "import json,os; print(json.load(open(os.path.expanduser('~/.shareout/credentials')))['token'])")
+# env first, then ~/.shareout/credentials
+ORIGIN=${SHAREOUT_ORIGIN:-$(python3 -c "import json,os; print(json.load(open(os.path.expanduser('~/.shareout/credentials'))).get('origin','$ORIGIN'))")}
+TOKEN=${SHAREOUT_TOKEN:-$(python3 -c "import json,os; print(json.load(open(os.path.expanduser('~/.shareout/credentials')))['token'])")}
 python3 build_payload.py | curl -sS -X POST "$ORIGIN/v1/publish" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
