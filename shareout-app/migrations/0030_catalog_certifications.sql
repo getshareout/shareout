@@ -7,12 +7,14 @@
 -- `entry_id` is the catalog entry's frontmatter id, not a foreign key: entries are
 -- `workspace_files` rows addressed by path, and the id is what lineage and agents use.
 -- `decided_by` is attribution (no cascade): deleting a user must not erase the trail.
+-- `decision` is certified | revoked | deprecated, enforced where it is written
+-- (CERT_DECISIONS in src/catalog/types.ts), per CONVENTIONS.md.
 CREATE TABLE IF NOT EXISTS catalog_certifications (
   id            TEXT PRIMARY KEY,
   workspace_id  TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   entry_id      TEXT NOT NULL,
   content_hash  TEXT NOT NULL,
-  decision      TEXT NOT NULL CHECK (decision IN ('certified','revoked','deprecated')),
+  decision      TEXT NOT NULL,
   note          TEXT,
   decided_by    TEXT NOT NULL REFERENCES users(id),
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))

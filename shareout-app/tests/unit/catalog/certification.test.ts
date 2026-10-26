@@ -5,6 +5,7 @@ import {
   canonicalJson,
   certificationHash,
   effectiveStatus,
+  recordCertification,
   resolveCertification,
 } from '../../../src/catalog/certification';
 import { parseEntry } from '../../../src/catalog/parse';
@@ -134,6 +135,13 @@ describe('resolveCertification — effective status', () => {
     const d = rec('deprecated', 'h1');
     expect(resolveCertification(undefined, 'h1', [rec('certified', 'h1'), d])).toMatchObject({ status: 'deprecated', stale: false });
     expect(resolveCertification(undefined, 'h2', [d])).toMatchObject({ status: 'deprecated', stale: true, decision: d });
+  });
+
+  it('the write path refuses a decision outside the vocabulary (the schema does not check it)', async () => {
+    const env = { DB: { prepare: () => { throw new Error('must not reach the database'); } } } as never;
+    await expect(
+      recordCertification(env, { workspaceId: 'w', entryId: 'e', contentHash: 'h', decision: 'approved' as CertDecision, note: null, decidedBy: 'u' })
+    ).rejects.toThrow('Unknown certification decision: approved');
   });
 
   it('effectiveStatus reads the overlay, and never trusts a raw declared certified', () => {

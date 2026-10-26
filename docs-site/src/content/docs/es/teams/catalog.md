@@ -111,18 +111,25 @@ el historial completo.
   certificación.
 - **Obsoleta** se mantiene aunque edites la entrada, hasta que un propietario o administrador
   la vuelva a certificar o la devuelva a borrador.
+- **Certificar es una decisión de una persona.** Hace falta un propietario o administrador
+  con la sesión iniciada en ShareOut. Los tokens — personales, de Agente o de MCP — reciben
+  `403 SESSION_REQUIRED`: un agente puede redactar y proponer, pero nunca certificar su
+  propio trabajo.
+
+Esta es la llamada que hace el lente Catálogo, desde la sesión de un propietario o
+administrador:
 
 ```http
 POST /v1/workspaces/{workspaceId}/catalog/entries/{entryId}/certify
-Authorization: Bearer {token}
 Content-Type: application/json
 
 { "decision": "certified", "note": "Coincide con la plataforma de anuncios en marzo", "content_hash": "…" }
 ```
 
-`decision` es `certified`, `revoked` o `deprecated`. Mandá el `content_hash` de la entrada
-que revisaste (`certification.content_hash`): si alguien la editó mientras tanto, recibís
-`409 CONFLICT` en lugar de certificar una versión que nadie miró. Los miembros reciben `403`.
+`decision` es `certified`, `revoked` o `deprecated`. El `content_hash` es el
+`certification.content_hash` de la entrada que revisaste: si alguien la editó mientras
+tanto, recibís `409 CONFLICT` en lugar de certificar una versión que nadie miró. Los
+miembros reciben `403`.
 
 ## Navegar el catálogo
 
@@ -199,7 +206,7 @@ Todas las rutas requieren membresía del workspace. Un catálogo desactivado dev
 | `GET` | `/v1/workspaces/{id}/catalog` | Member+ | Búsqueda (`q`, `kind`, `domain`, `status`, `tag`) + facetas |
 | `GET` | `/v1/workspaces/{id}/catalog/manifest` | Member+ | Conteos, KPIs de adopción, huérfanos, refs colgantes, staleness |
 | `GET` | `/v1/workspaces/{id}/catalog/entries/{entryId}` | Member+ | Una entrada + vecinos de linaje + historial de certificación |
-| `POST` | `/v1/workspaces/{id}/catalog/entries/{entryId}/certify` | Admin+ | `{ decision, note?, content_hash? }` — certificar, revocar o marcar obsoleta |
+| `POST` | `/v1/workspaces/{id}/catalog/entries/{entryId}/certify` | Admin+, con sesión iniciada | `{ decision, note?, content_hash? }` — certificar, revocar o marcar obsoleta; los tokens reciben `403 SESSION_REQUIRED` |
 | `GET` | `/v1/workspaces/{id}/catalog/lineage` | Member+ | Grafo completo de nodos+aristas |
 | `POST` | `/v1/workspaces/{id}/catalog/enable` | Admin+ | Activar/desactivar |
 | `POST` | `/v1/workspaces/{id}/catalog/seed` | Admin+ | Sembrar entradas `source` desde conectores |

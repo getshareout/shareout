@@ -1,6 +1,7 @@
 import type { AuthUser } from '../../api-auth';
 import type { Env } from '../../types';
 import { apiErrorResponse } from '../../http/api-error';
+import { getSessionUser } from '../../auth/session';
 import { jsonResponse } from '../helpers/json-response';
 import { logAudit } from '../../audit';
 import { isCatalogEnabled } from '../../catalog/store';
@@ -14,6 +15,29 @@ import {
 } from '../../catalog/certification';
 import type { CertificationRecord } from '../../catalog/types';
 
+/** A bearer-token request (personal, Agent or MCP token); the Home lens uses the session cookie. */
+export const isBearer = (request: Request) => /^bearer\s/i.test(request.headers.get('Authorization') ?? '');
+
+/**
+ * Certification is a human act: an owner or admin signed in to ShareOut, never a token
+ * (personal, Agent or MCP) — so an agent can draft and propose, but cannot certify
+ * its own work. True when the request carries no bearer token and its session is the
+ * caller's.
+ */
+export async function isSignedInPerson(env: Env, request: Request, userId: string): Promise<boolean> {
+  if (isBearer(request)) return false;
+  return (await getSessionUser(request, env))?.id === userId;
+}
+
+export function sessionRequiredResponse(): Response {
+  return apiErrorResponse({
+    code: 'SESSION_REQUIRED',
+    message: 'Certification is done by an owner or admin in ShareOut',
+    status: 403,
+    hint: 'Open the entry in the Catalog and certify it there. Tokens (personal, Agent or MCP) cannot certify.',
+  });
+}
+
 /** One entry's decisions, newest first, each marked when it was made on the current version. */
 export function certificationHistory(decisions: CertificationRecord[], currentHash: string) {
   return decisions
@@ -25,8 +49,9 @@ export function certificationHistory(decisions: CertificationRecord[], currentHa
 /**
  * POST /v1/workspaces/{id}/catalog/entries/{entryId}/certify — an owner/admin decision
  * (`certified` | `revoked` | `deprecated`) on the entry's current version. The caller
- * (routeCatalogApi) has already checked the role. Sending the `content_hash` the reviewer
- * saw makes it a decision about that exact version: if the entry changed meanwhile, 409.
+ * (routeCatalogApi) has already checked the role and that a signed-in person sent it.
+ * Sending the `content_hash` the reviewer saw makes it a decision about that exact
+ * version: if the entry changed meanwhile, 409.
  */
 export async function handleCatalogCertify(
   env: Env,
@@ -101,8 +126,8 @@ export async function handleCatalogCertify(
     action: `catalog.${decision === 'certified' ? 'certify' : decision === 'revoked' ? 'revoke' : 'deprecate'}`,
     targetType: 'catalog_entry',
     targetId: entry.id,
-    // `via` keeps provenance honest: a decision sent with a personal token may be an agent's.
-    detail: { content_hash: hash, note: note || null, via: /^bearer\s/i.test(request.headers.get('Authorization') ?? '') ? 'token' : 'session' },
+    // `via` records how the decision arrived; only a browser session is accepted today.
+    detail: { content_hash: hash, note: note || null, via: isBearer(request) ? 'token' : 'session' },
   });
 
   const decisions = [...(catalog.decisions.get(entry.id) ?? []), record];

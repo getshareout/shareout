@@ -108,17 +108,21 @@ platform for March"). Everyone sees who certified it, when, and the full history
   shown). Fixing a description, synonyms, examples or notes keeps a metric certified.
 - **Deprecated** sticks across edits until an owner or admin certifies the entry again or
   sends it back to draft.
+- **Certifying is a person's call.** It takes an owner or admin signed in to ShareOut.
+  Tokens — personal, Agent or MCP — are refused with `403 SESSION_REQUIRED`, so an agent
+  can draft and propose but never certify its own work.
+
+This is the call the Catalog lens makes, from a signed-in owner's or admin's session:
 
 ```http
 POST /v1/workspaces/{workspaceId}/catalog/entries/{entryId}/certify
-Authorization: Bearer {token}
 Content-Type: application/json
 
 { "decision": "certified", "note": "Matches the ads platform for March", "content_hash": "…" }
 ```
 
-`decision` is `certified`, `revoked` or `deprecated`. Send the `content_hash` from the entry
-you reviewed (`certification.content_hash`): if someone edited it meanwhile you get a
+`decision` is `certified`, `revoked` or `deprecated`. The `content_hash` is the entry's
+`certification.content_hash` as reviewed: if someone edited it meanwhile you get a
 `409 CONFLICT` instead of certifying a version nobody looked at. Members get `403`.
 
 ## Browsing the catalog
@@ -195,7 +199,7 @@ All routes require workspace membership. A disabled catalog returns `{ "enabled"
 | `GET` | `/v1/workspaces/{id}/catalog` | Member+ | Search (`q`, `kind`, `domain`, `status`, `tag`) + facets |
 | `GET` | `/v1/workspaces/{id}/catalog/manifest` | Member+ | Counts, adoption KPIs, orphans, dangling refs, staleness |
 | `GET` | `/v1/workspaces/{id}/catalog/entries/{entryId}` | Member+ | One entry + upstream/downstream neighbors + certification history |
-| `POST` | `/v1/workspaces/{id}/catalog/entries/{entryId}/certify` | Admin+ | `{ decision, note?, content_hash? }` — certify, revoke or deprecate |
+| `POST` | `/v1/workspaces/{id}/catalog/entries/{entryId}/certify` | Admin+, signed in | `{ decision, note?, content_hash? }` — certify, revoke or deprecate; tokens get `403 SESSION_REQUIRED` |
 | `GET` | `/v1/workspaces/{id}/catalog/lineage` | Member+ | Full node+edge graph |
 | `POST` | `/v1/workspaces/{id}/catalog/enable` | Admin+ | Opt in/out |
 | `POST` | `/v1/workspaces/{id}/catalog/seed` | Admin+ | Seed `source` entries from connectors |
