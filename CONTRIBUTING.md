@@ -149,19 +149,22 @@ TZ=UTC npm run test:critical
 
 Maintainer release steps: [RELEASING.md](RELEASING.md).
 
-### Lint / format (optional locally; not a full-tree gate yet)
+### Lint / format
 
-Configs ship so new code can match the house style without a repo-wide reformat:
+ESLint is part of the gate at `--max-warnings 0`: the pre-push check lints the files your
+branch changed (vs its merge base with `origin/main`), and `ci-check.sh` lints the whole
+tree. The tree is clean, so any warning it reports is in a file you touched — fix it
+rather than suppress it.
 
 ```bash
 cd shareout-app
+npm run lint:changed -- path/to/file.ts   # what the hook does, for chosen files
+npm run lint                              # whole tree (~12 s)
 npx prettier --check path/to/file.ts
-npx eslint path/to/file.ts
 ```
 
-`npm run format` / `npm run lint` exist; running them on the whole tree will
-surface a large existing baseline — prefer formatting/linting only files you touch
-until a dedicated cleanup PR lands.
+Prettier is not a gate: `npm run format` on the whole tree would reformat a large
+existing baseline, so format only the files you touch.
 
 ## Design system
 

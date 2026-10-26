@@ -32,6 +32,7 @@ npm run check:inline
 npm run check:access-seams
 npm run check:file-size
 "$REPO_ROOT/tooling/scripts/check-agent-guides.sh"
+npm run lint
 npm run db:migrate:fresh
 npm run typecheck
 if [ "${SHAREOUT_COVERAGE:-}" = "1" ]; then

@@ -6,10 +6,11 @@
 # Tests run as critical-path + whatever the change actually touches (vitest module
 # graph). Force the whole suite with SHAREOUT_FULL_TESTS=1.
 #
-# SHAREOUT_CHECK_MODE=light skips every test run (static, typecheck, secrets, bundles
-# only). The pre-push hook uses it for feature branches: parallel agents each running
-# suites on one machine starve each other into timeouts. Tests run once, on the
-# integrated result, via tooling/scripts/integrate.sh before anything reaches main.
+# SHAREOUT_CHECK_MODE=light skips every test run: static checks + eslint on changed
+# files, typecheck, secrets and bundles only. The pre-push hook uses it for
+# feature branches: parallel agents each running suites on one machine starve each other
+# into timeouts. Tests run once, on the integrated result, via tooling/scripts/integrate.sh
+# before anything reaches main.
 #
 # Independent checks run in parallel; each one's output is printed only if it fails.
 # check:bundles runs last, alone: it rewrites public/_bundles/ (as does the
@@ -53,11 +54,34 @@ job() {
   NAMES+=("$name")
 }
 
+# eslint on the files this branch changed (vs the merge base), not the whole tree: ~1 s.
+# The tree is clean at --max-warnings 0, so a warning here is one this branch added or
+# left in a file it touched. Whole tree: npm run lint.
+lint_changed() {
+  local files=()
+  if ! git merge-base "$BASE" HEAD >/dev/null 2>&1; then
+    echo "lint: no merge-base with $BASE — linting the whole tree"
+    npm run -s lint
+    return
+  fi
+  while IFS= read -r f; do
+    [ -f "$f" ] && files+=("$f")
+  done < <(git diff --name-only --relative --diff-filter=ACMR "$BASE...HEAD" -- \
+    '*.ts' '*.tsx' '*.mts' '*.cts' '*.js' '*.mjs' '*.cjs')
+  if [ "${#files[@]}" -eq 0 ]; then
+    echo "lint: no lintable files changed vs $BASE"
+    return 0
+  fi
+  echo "lint: ${#files[@]} changed file(s)"
+  npm run -s lint:changed -- --no-warn-ignored "${files[@]}"
+}
+
 static_checks() {
   for c in boundaries design-tokens ui inline domains customer-names skill-links migrations access-seams file-size; do
     npm run -s "check:$c"
   done
   "$REPO_ROOT/tooling/scripts/check-agent-guides.sh"
+  lint_changed
 }
 
 app_tests() {
