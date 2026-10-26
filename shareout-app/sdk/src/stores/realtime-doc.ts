@@ -76,6 +76,9 @@ export class RealtimeDoc {
       this.ws.onopen = () => {
         clearTimeout(timeout);
         this.reconnectAttempts = 0;
+        // The server sends the document as it stands only in reply to our step 1. Once per
+        // connection: it answers every step 1 with its own, so replying in kind never ends.
+        this.ws?.send(new Uint8Array([SYNC_STEP1, ...this.Y.encodeStateVector(this.doc)]));
         this.emitStatus('connected');
         if (Object.keys(this.localPresence).length > 0) {
           this.sendPresence();
