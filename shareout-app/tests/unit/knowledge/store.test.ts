@@ -12,6 +12,8 @@ import {
   loadKnowledge,
   listConsolidationCandidates,
   setLastConsolidatedAt,
+  requestKnowledgeRebuild,
+  clearKnowledgeRebuild,
 } from '../../../src/knowledge';
 
 const e = env as unknown as Env;
@@ -19,7 +21,7 @@ const WS = 'wsp_kn';
 
 beforeAll(async () => {
   await e.DB.exec(
-    `CREATE TABLE IF NOT EXISTS knowledge_settings (workspace_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0, last_consolidated_at TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now')))`
+    `CREATE TABLE IF NOT EXISTS knowledge_settings (workspace_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0, last_consolidated_at TEXT, rebuild_requested_at TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now')))`
   );
   await e.DB.exec(
     `CREATE TABLE IF NOT EXISTS workspace_files (workspace_id TEXT NOT NULL, namespace TEXT NOT NULL, scope_id TEXT NOT NULL DEFAULT '', path TEXT NOT NULL, content TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'manual', updated_by TEXT, updated_by_kind TEXT NOT NULL DEFAULT 'user', created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), PRIMARY KEY (workspace_id, namespace, scope_id, path))`
@@ -133,6 +135,22 @@ describe('listConsolidationCandidates', () => {
     expect((await listConsolidationCandidates(e, 25)).map(c => c.workspaceId)).toContain('ws_a');
     await setLastConsolidatedAt(e, 'ws_a', new Date(Date.now() + 60_000).toISOString());
     expect((await listConsolidationCandidates(e, 25)).map(c => c.workspaceId)).not.toContain('ws_a');
+  });
+
+  it('a rebuild request makes a fresh workspace a candidate until it is cleared', async () => {
+    await enable('ws_req', true, "datetime('now','-1 hour')");
+    const ids = async () => (await listConsolidationCandidates(e, 25)).map(c => c.workspaceId);
+    expect(await ids()).not.toContain('ws_req');
+
+    await requestKnowledgeRebuild(e, 'ws_req');
+    const cand = (await listConsolidationCandidates(e, 25)).find(c => c.workspaceId === 'ws_req');
+    expect(cand?.rebuildRequestedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+    // Clearing an older request leaves a newer one in place.
+    await clearKnowledgeRebuild(e, 'ws_req', '2000-01-01T00:00:00.000Z');
+    expect(await ids()).toContain('ws_req');
+    await clearKnowledgeRebuild(e, 'ws_req', cand!.rebuildRequestedAt!);
+    expect(await ids()).not.toContain('ws_req');
   });
 });
 

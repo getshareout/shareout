@@ -8,18 +8,22 @@ import {
   isTombstoned,
   setLastConsolidatedAt,
   listConsolidationCandidates,
+  clearKnowledgeRebuild,
 } from './store';
 import { upsertKnowledgeVector, deleteKnowledgeVector } from './distill';
-import { enqueueIngest } from './ingest';
 import { parseNode } from './parse';
 import type { KnowledgeNode } from './types';
+import { topicPath, entityPath, artifactIdFromDigestPath, INDEX_PATH, PROVENANCE_LINE } from './types';
 import {
-  topicPath,
-  entityPath,
-  timelinePath,
-  artifactIdFromDigestPath,
-  INDEX_PATH,
-} from './types';
+  appendTimeline,
+  byLearnedDesc,
+  dropPage,
+  findStaleNotes,
+  isStale,
+  pruneDeadDigests,
+  rebuildFeed,
+  reenqueueStaleDigests,
+} from './upkeep';
 
 const MAX_WORKSPACES_PER_NIGHT = 25;
 const MAX_TOPIC_CALLS_PER_WS = 10;
@@ -30,9 +34,8 @@ const MAX_DIGESTS_PER_PAGE_CALL = 12; // newest first
 const DIGEST_EXCERPT_CAP = 700; // chars of digest body fed per new note
 const CURRENT_PAGE_CAP = 6_000; // chars of existing page body fed back
 const PAGE_BODY_CAP = 4_000; // hard truncate of LLM output body
-const MAX_SOURCES_PER_PAGE = 50; // sources[] frontmatter cap, newest kept
 const MAX_ALIAS_NAMES_PER_CALL = 40; // unresolved entity names per night; rest deferred
-const MAX_TIMELINE_LINES = 200; // per month file
+const SAFE_SLUG = /^[\p{L}\p{N}][\p{L}\p{N}._-]*$/u;
 const MAX_PAGE_ENTITIES = 20;
 const MAX_PAGE_ALIASES = 20;
 const OVERVIEW_TOP_TOPICS = 15;
@@ -115,6 +118,9 @@ function dedupeCap(items: string[], cap: number): string[] {
   return out;
 }
 
+// A note's sources decide who may read it, so they are never capped (readers see the newest 50).
+const allSources = (items: string[]) => dedupeCap(items, Infinity);
+
 export function normalizeEntitySlug(name: string): string {
   return name
     .trim()
@@ -186,70 +192,6 @@ async function llm(ctx: RunCtx, ws: string, system: string, user: string): Promi
   const out = await ctx.complete(system, user, ws);
   ctx.llmCalls++;
   return out;
-}
-
-// ---------- prune (runs FIRST per workspace) ----------
-
-interface Removed {
-  artifactId: string;
-  title: string;
-  topics: string[];
-  entities: string[];
-}
-
-async function pruneDeadDigests(env: Env, ws: string): Promise<Removed[]> {
-  // artifactId from path 'artifacts/<id>.md': len('artifacts/')=10 → substr start 11;
-  // trailing '.md' (3) added to the 10 → subtract 10+3=13 from the length.
-  const rows = (
-    await env.DB.prepare(
-      `SELECT kf.path, kf.content, kf.source FROM workspace_files kf
-       LEFT JOIN artifacts a ON a.id = substr(kf.path, 11, length(kf.path) - 13)
-       WHERE kf.workspace_id = ? AND kf.namespace = 'knowledge' AND kf.path LIKE 'artifacts/%'
-         AND (a.id IS NULL OR a.deleted_at IS NOT NULL)
-       LIMIT 200`
-    )
-      .bind(ws)
-      .all<{ path: string; content: string; source: string }>()
-  ).results;
-
-  const removed: Removed[] = [];
-  for (const row of rows) {
-    const { node } = parseNode(row.path, row.content);
-    // HARD RULE: pinned or manual digests are the human's — never pruned.
-    // Parse failure (node undefined) → keep: corrupted frontmatter could be a pinned node.
-    if (!node || row.source === 'manual' || node.pinned) continue;
-    await deleteKnowledgeFile(env, ws, row.path); // plain delete, no tombstone — republish re-learns
-    await deleteKnowledgeVector(env, ws, row.path);
-    removed.push({
-      artifactId: artifactIdFromDigestPath(row.path),
-      title: node?.title ?? artifactIdFromDigestPath(row.path),
-      topics: node?.topics ?? [],
-      entities: node?.entities ?? [],
-    });
-  }
-  return removed;
-}
-
-async function reenqueueStaleDigests(env: Env, ws: string, today: string): Promise<void> {
-  // Cheap prefilter ('stale_after' only appears in a digest that declares one) + LIMIT
-  // keep this off a full-content scan of every digest every night (spec §2: targeted reads).
-  const rows = (
-    await env.DB.prepare(
-      `SELECT path, content FROM workspace_files
-       WHERE workspace_id = ? AND namespace = 'knowledge' AND path LIKE 'artifacts/%'
-         AND content LIKE '%stale_after%'
-       LIMIT 200`
-    )
-      .bind(ws)
-      .all<{ path: string; content: string }>()
-  ).results;
-  for (const row of rows) {
-    const { node } = parseNode(row.path, row.content);
-    if (node?.staleAfter && node.staleAfter < today) {
-      // null hash forces the distiller to reprocess fresh content this hour-cycle.
-      await enqueueIngest(env, ws, artifactIdFromDigestPath(row.path), 'stale', null);
-    }
-  }
 }
 
 // ---------- dirty set ----------
@@ -379,7 +321,8 @@ async function evolveTopicPage(
   slug: string,
   digests: KnowledgeNode[],
   removedTitles: string[],
-  res: AliasResolution
+  res: AliasResolution,
+  withdrawn: Set<string>
 ): Promise<boolean> {
   const path = topicPath(slug);
   if (await isTombstoned(ctx.env, ws, path)) return false; // a forgotten topic is never re-learned
@@ -388,15 +331,25 @@ async function evolveTopicPage(
   let currentBody = '';
   let oldSources: string[] = [];
   let oldEntities: string[] = [];
+  let rebuild = false;
   if (existing) {
     if (existing.source === 'manual') return false; // human's page — don't even call the LLM
     const { node } = parseNode(existing.path, existing.content);
     if (node?.pinned) return false;
+    rebuild = !!node && isStale(node, withdrawn);
     currentBody = node?.body ?? '';
     oldSources = node?.sources ?? [];
     oldEntities = node?.entities ?? [];
   }
-  const fed = digests.slice(0, MAX_DIGESTS_PER_PAGE_CALL);
+  let fed = digests.slice(0, MAX_DIGESTS_PER_PAGE_CALL);
+  if (rebuild) {
+    fed = await rebuildFeed(ctx.env, ws, oldSources, digests, withdrawn);
+    if (!fed.length) return dropPage(ctx.env, ws, path);
+    currentBody = '';
+    oldSources = [];
+    oldEntities = [];
+    removedTitles = [];
+  }
   if (!fed.length && !currentBody) return false; // nothing to build, nothing to prune
   if (!budgetOk(ctx)) return false;
 
@@ -404,7 +357,7 @@ async function evolveTopicPage(
     `Topic: ${slug}`,
     '',
     'CURRENT PAGE:',
-    currentBody ? currentBody.slice(0, CURRENT_PAGE_CAP) : '(empty — new topic)',
+    currentBody ? currentBody.slice(0, CURRENT_PAGE_CAP) : rebuild ? '(empty — rebuilt from its sources)' : '(empty — new topic)',
     ...(removedTitles.length
       ? ['', 'REMOVED SOURCES (facts only from these must be dropped):', ...removedTitles.map(t => `- ${t}`)]
       : []),
@@ -423,7 +376,7 @@ async function evolveTopicPage(
   if (!parsed.body) return false; // never blank a page
 
   const fedIds = fed.map(d => d.sources[0] ?? artifactIdFromDigestPath(d.path));
-  const sources = dedupeCap([...fedIds, ...oldSources], MAX_SOURCES_PER_PAGE);
+  const sources = allSources([...fedIds, ...oldSources]);
   const fedEntities = fed.flatMap(d => d.entities.map(e => `entity.${resolveSlug(res, e)}`));
   const entities = dedupeCap([...oldEntities, ...fedEntities], MAX_PAGE_ENTITIES);
 
@@ -434,6 +387,7 @@ async function evolveTopicPage(
     `title: ${JSON.stringify(parsed.title)}`,
     `topics: ${yamlList([slug])}`,
     `sources: ${yamlList(sources)}`,
+    PROVENANCE_LINE,
     `entities: ${yamlList(entities)}`,
     'confidence: inferred',
     `learned_at: ${ctx.nowIso}`,
@@ -459,6 +413,8 @@ async function evolveEntityPage(
   digests: KnowledgeNode[],
   seedAliases: string[],
   removedTitles: string[],
+  res: AliasResolution,
+  withdrawn: Set<string>,
   // Duplicate-merge seed: the loser page folded into this winner. Its FULL body (bounded by
   // PAGE_BODY_CAP, not the 700-char digest cap) and FULL sources are carried over — F4.
   mergeSeed?: { title: string; body: string; sources: string[] }
@@ -471,16 +427,30 @@ async function evolveEntityPage(
   let oldSources: string[] = [];
   let oldAliases: string[] = [];
   let oldTopics: string[] = [];
+  let rebuild = false;
   if (existing) {
     if (existing.source === 'manual') return false;
     const { node } = parseNode(existing.path, existing.content);
     if (node?.pinned) return false;
+    rebuild = !!node && isStale(node, withdrawn);
     currentBody = node?.body ?? '';
     oldSources = node?.sources ?? [];
     oldAliases = asList(node?.extra.aliases);
     oldTopics = node?.topics ?? [];
   }
-  const fed = digests.slice(0, MAX_DIGESTS_PER_PAGE_CALL);
+  let fed = digests.slice(0, MAX_DIGESTS_PER_PAGE_CALL);
+  if (rebuild) {
+    // Aliases may have come from a withdrawn page too: keep only names the kept digests use.
+    fed = await rebuildFeed(ctx.env, ws, oldSources, digests, withdrawn);
+    if (!fed.length) return dropPage(ctx.env, ws, path);
+    seedAliases = fed.flatMap(d => d.entities.filter(raw => resolveSlug(res, raw) === slug));
+    currentBody = '';
+    oldSources = [];
+    oldAliases = [];
+    oldTopics = [];
+    removedTitles = [];
+    mergeSeed = undefined;
+  }
   if (!fed.length && !currentBody && !mergeSeed) return false;
   if (!budgetOk(ctx)) return false;
 
@@ -495,7 +465,7 @@ async function evolveEntityPage(
     `Entity: ${slug}`,
     '',
     'CURRENT PAGE:',
-    currentBody ? currentBody.slice(0, CURRENT_PAGE_CAP) : '(empty — new entity)',
+    currentBody ? currentBody.slice(0, CURRENT_PAGE_CAP) : rebuild ? '(empty — rebuilt from its sources)' : '(empty — new entity)',
     ...(removedTitles.length
       ? ['', 'REMOVED SOURCES (facts only from these must be dropped):', ...removedTitles.map(t => `- ${t}`)]
       : []),
@@ -514,10 +484,7 @@ async function evolveEntityPage(
   if (!parsed.body) return false;
 
   const fedIds = fed.map(d => d.sources[0] ?? artifactIdFromDigestPath(d.path));
-  const sources = dedupeCap(
-    [...fedIds, ...(mergeSeed?.sources ?? []), ...oldSources],
-    MAX_SOURCES_PER_PAGE
-  );
+  const sources = allSources([...fedIds, ...(mergeSeed?.sources ?? []), ...oldSources]);
   const aliases = dedupeCap(
     [...oldAliases, ...seedAliases, ...parsed.aliases].map(a => a.trim()).filter(Boolean),
     MAX_PAGE_ALIASES
@@ -531,6 +498,7 @@ async function evolveEntityPage(
     `title: ${JSON.stringify(parsed.title)}`,
     `topics: ${yamlList(topics)}`,
     `sources: ${yamlList(sources)}`,
+    PROVENANCE_LINE,
     `aliases: ${yamlList(aliases)}`,
     'confidence: inferred',
     `learned_at: ${ctx.nowIso}`,
@@ -594,7 +562,9 @@ async function mergeEntity(
   ws: string,
   pair: MergePair,
   winnerDirty: KnowledgeNode[],
-  winnerRemoved: string[]
+  winnerRemoved: string[],
+  res: AliasResolution,
+  withdrawn: Set<string>
 ): Promise<boolean> {
   const winnerSlug = entityNodeSlug(pair.winner);
   const loserSlug = entityNodeSlug(pair.loser);
@@ -625,6 +595,8 @@ async function mergeEntity(
     winnerDirty,
     seedAliases,
     winnerRemoved,
+    res,
+    withdrawn,
     mergeSeed
   );
   if (!wrote) return false;
@@ -635,70 +607,12 @@ async function mergeEntity(
   return true;
 }
 
-// ---------- timeline ----------
-
-async function appendTimeline(
-  ctx: RunCtx,
-  ws: string,
-  digests: KnowledgeNode[]
-): Promise<void> {
-  const byMonth = new Map<string, KnowledgeNode[]>();
-  for (const d of digests) {
-    const month = (d.learnedAt ?? ctx.nowIso).slice(0, 7);
-    (byMonth.get(month) ?? byMonth.set(month, []).get(month)!).push(d);
-  }
-  for (const [month, list] of byMonth) {
-    const path = timelinePath(month);
-    const existing = await getKnowledgeFile(ctx.env, ws, path);
-    if (existing?.source === 'manual') continue;
-    const existingNode = existing ? parseNode(existing.path, existing.content).node : undefined;
-    if (existingNode?.pinned) continue; // human-pinned month file — never rewritten
-    const parsedBody = existingNode?.body ?? '';
-    const lines = parsedBody
-      .split('\n')
-      .filter(l => l.startsWith('- ') && !l.startsWith('- …and'));
-    for (const d of list) {
-      const id = d.sources[0] ?? artifactIdFromDigestPath(d.path);
-      if (lines.some(l => l.includes(`[${id}]`))) continue; // dedupe by artifact id
-      const when = (d.learnedAt ?? ctx.nowIso).slice(0, 10);
-      const tags = d.topics.slice(0, 3).join(', ');
-      lines.push(`- ${when}: learned ${JSON.stringify(d.title)}${tags ? ` (${tags})` : ''} [${id}]`);
-    }
-    lines.sort();
-    let bodyLines = lines;
-    if (lines.length > MAX_TIMELINE_LINES) {
-      const overflow = lines.length - MAX_TIMELINE_LINES;
-      bodyLines = [...lines.slice(0, MAX_TIMELINE_LINES), `- …and ${overflow} more`];
-    }
-    const ids = dedupeCap(
-      bodyLines.map(l => l.match(/\[([^\]]+)\]$/)?.[1] ?? '').filter(Boolean),
-      MAX_SOURCES_PER_PAGE
-    );
-    const title = new Date(`${month}-01T00:00:00Z`).toLocaleString('en-US', {
-      month: 'long',
-      year: 'numeric',
-      timeZone: 'UTC',
-    });
-    const fm = [
-      '---',
-      'kind: timeline',
-      `id: timeline.${month}`,
-      `title: ${JSON.stringify(title)}`,
-      `sources: ${yamlList(ids)}`,
-      'pinned: false',
-      '---',
-    ].join('\n');
-    await upsertLearnedFile(ctx.env, ws, {
-      path,
-      content: `${fm}\n${bodyLines.join('\n')}\n`,
-      source: 'consolidated',
-    });
-  }
-}
-
 // ---------- overview (trunk) ----------
 
-async function regenerateOverview(ctx: RunCtx, ws: string): Promise<void> {
+// The overview goes to every member's assistant, so it is written only from pages whose sources
+// every member can open (a stale page still waiting for its rebuild is left out), and it records
+// those sources so it is withheld again the moment one of them stops being open to all.
+async function regenerateOverview(ctx: RunCtx, ws: string, withdrawn: Set<string>): Promise<void> {
   const existing = await getKnowledgeFile(ctx.env, ws, INDEX_PATH);
   if (existing?.source === 'manual') return; // human-edited trunk is never overwritten
   if (existing && parseNode(existing.path, existing.content).node?.pinned) return; // pinned trunk
@@ -707,10 +621,10 @@ async function regenerateOverview(ctx: RunCtx, ws: string): Promise<void> {
   const entityFiles = await listKnowledgeFilesByPrefix(ctx.env, ws, 'entities/');
   const topicNodes = topicFiles
     .map(f => parseNode(f.path, f.content).node)
-    .filter((n): n is KnowledgeNode => !!n);
+    .filter((n): n is KnowledgeNode => !!n && !isStale(n, withdrawn));
   const entityNodes = entityFiles
     .map(f => parseNode(f.path, f.content).node)
-    .filter((n): n is KnowledgeNode => !!n);
+    .filter((n): n is KnowledgeNode => !!n && !isStale(n, withdrawn));
   const digestCount =
     (
       await ctx.env.DB.prepare(
@@ -721,14 +635,10 @@ async function regenerateOverview(ctx: RunCtx, ws: string): Promise<void> {
     )?.n ?? 0;
 
   if (!budgetOk(ctx)) return;
-  const topicsBlock = topicNodes
-    .slice(0, OVERVIEW_MAX_PAGES)
-    .map(n => `- ${n.title}: ${n.body.slice(0, 200)}`)
-    .join('\n');
-  const entitiesLine = entityNodes
-    .slice(0, OVERVIEW_MAX_PAGES)
-    .map(n => n.title)
-    .join(', ');
+  const fedTopics = topicNodes.slice(0, OVERVIEW_MAX_PAGES);
+  const fedEntities = entityNodes.slice(0, OVERVIEW_MAX_PAGES);
+  const topicsBlock = fedTopics.map(n => `- ${n.title}: ${n.body.slice(0, 200)}`).join('\n');
+  const entitiesLine = fedEntities.map(n => n.title).join(', ');
   const user = `TOPICS:\n${topicsBlock || '(none)'}\n\nENTITIES: ${entitiesLine || '(none)'}\n\nPAGES LEARNED: ${digestCount}`;
 
   let prose: string;
@@ -741,15 +651,18 @@ async function regenerateOverview(ctx: RunCtx, ws: string): Promise<void> {
 
   // ## Top topics stays deterministic: rank topic pages by their source count (a
   // proxy for tag frequency), so the trunk never needs a full-digest scan.
-  const top = [...topicNodes]
+  const topNodes = [...topicNodes]
     .sort((a, b) => b.sources.length - a.sources.length)
-    .slice(0, OVERVIEW_TOP_TOPICS)
-    .map(n => `- [[topic.${topicNodeSlug(n)}]] (${n.sources.length})`);
+    .slice(0, OVERVIEW_TOP_TOPICS);
+  const top = topNodes.map(n => `- [[topic.${topicNodeSlug(n)}]] (${n.sources.length})`);
+  const sources = allSources([...fedTopics, ...fedEntities, ...topNodes].flatMap(n => n.sources));
   const fm = [
     '---',
     'kind: overview',
     'id: index',
     'title: "Workspace knowledge"',
+    `sources: ${yamlList(sources)}`,
+    PROVENANCE_LINE,
     `learned_at: ${ctx.nowIso}`,
     'pinned: false',
     '---',
@@ -773,6 +686,7 @@ async function consolidateWorkspace(
   ctx: RunCtx,
   ws: string,
   watermark: string | null,
+  rebuildRequestedAt: string | null,
   result: ConsolidateResult
 ): Promise<'done' | 'skipped'> {
   // (review note 2) capture the watermark ceiling right before reading dirty digests.
@@ -793,7 +707,19 @@ async function consolidateWorkspace(
   result.pruned += removed.length;
   await reenqueueStaleDigests(ctx.env, ws, runStartedAt.slice(0, 10));
 
-  const dirty = await collectDirtyDigests(ctx.env, ws, watermark);
+  const dirtyAll = await collectDirtyDigests(ctx.env, ws, watermark);
+  // Notes citing a page members can no longer all open are rebuilt first (privacy before
+  // freshness), and a pinned or hand-written digest of such a page never feeds shared notes.
+  const { withdrawn, stale } = await findStaleNotes(ctx.env, ws, dirtyAll.flatMap(d => d.sources));
+  const dirty = dirtyAll.filter(d => !d.sources.some(id => withdrawn.has(id)));
+  const staleUnder = (prefix: string) =>
+    [...stale].filter(p => p.startsWith(prefix)).map(p => p.slice(prefix.length, -'.md'.length));
+  // A page from before slugs were normalized could carry a newline into the rewritten
+  // frontmatter (F6); such a page is dropped instead of rebuilt.
+  for (const prefix of ['topics/', 'entities/'])
+    for (const slug of staleUnder(prefix))
+      if (!SAFE_SLUG.test(slug)) await dropPage(ctx.env, ws, `${prefix}${slug}.md`);
+  const staleSlugs = (prefix: string) => staleUnder(prefix).filter(slug => SAFE_SLUG.test(slug));
 
   // group topics + collect removed titles. Topic slugs come from the distill LLM (page-
   // steered) — normalize them (same as entities) so a slug like "retention\npinned: true"
@@ -843,6 +769,8 @@ async function consolidateWorkspace(
   const mergedWinners = new Set<string>();
   for (const pair of merges) {
     if (!budgetOk(ctx)) break;
+    // A stale side is rebuilt on its own first; the pair can merge on a later night.
+    if (stale.has(pair.winner.path) || stale.has(pair.loser.path)) continue;
     const winnerSlug = entityNodeSlug(pair.winner);
     const loserSlug = entityNodeSlug(pair.loser);
     // Fold both sides' new digests (deduped by path) into the winner this night, else the
@@ -855,28 +783,39 @@ async function consolidateWorkspace(
       ...(removedByEntity.get(winnerSlug) ?? []),
       ...(removedByEntity.get(loserSlug) ?? []),
     ];
-    if (await mergeEntity(ctx, ws, pair, winnerDirty, winnerRemoved)) {
+    if (await mergeEntity(ctx, ws, pair, winnerDirty, winnerRemoved, res, withdrawn)) {
       mergedWinners.add(winnerSlug);
       mergedWinners.add(loserSlug); // loser slug excluded from the evolve pass → no resurrection
       result.entityPages++;
     }
   }
 
-  // topic evolve (biggest signal first, capped)
-  const topicSlugs = [...new Set([...dirtyTopics.keys(), ...removedByTopic.keys()])]
-    .sort((a, b) => (dirtyTopics.get(b)?.length ?? 0) - (dirtyTopics.get(a)?.length ?? 0))
-    .slice(0, MAX_TOPIC_CALLS_PER_WS);
+  // topic evolve (stale pages first, then biggest signal first, capped)
+  const topicSlugs = [
+    ...new Set([
+      ...staleSlugs('topics/'),
+      ...[...new Set([...dirtyTopics.keys(), ...removedByTopic.keys()])].sort(
+        (a, b) => (dirtyTopics.get(b)?.length ?? 0) - (dirtyTopics.get(a)?.length ?? 0)
+      ),
+    ]),
+  ].slice(0, MAX_TOPIC_CALLS_PER_WS);
   for (const slug of topicSlugs) {
     if (!budgetOk(ctx)) return 'skipped';
     const digests = (dirtyTopics.get(slug) ?? []).slice().sort(byLearnedDesc);
-    if (await evolveTopicPage(ctx, ws, slug, digests, removedByTopic.get(slug) ?? [], res))
+    if (await evolveTopicPage(ctx, ws, slug, digests, removedByTopic.get(slug) ?? [], res, withdrawn))
       result.topicPages++;
   }
 
-  // entity evolve (capped) — skip winners already written by the merge pass
-  const entitySlugs = [...new Set([...dirtyEntities.keys(), ...removedByEntity.keys()])]
+  // entity evolve (stale pages first, capped) — skip winners already written by the merge pass
+  const entitySlugs = [
+    ...new Set([
+      ...staleSlugs('entities/'),
+      ...[...new Set([...dirtyEntities.keys(), ...removedByEntity.keys()])].sort(
+        (a, b) => (dirtyEntities.get(b)?.digests.length ?? 0) - (dirtyEntities.get(a)?.digests.length ?? 0)
+      ),
+    ]),
+  ]
     .filter(s => !mergedWinners.has(s))
-    .sort((a, b) => (dirtyEntities.get(b)?.digests.length ?? 0) - (dirtyEntities.get(a)?.digests.length ?? 0))
     .slice(0, MAX_ENTITY_CALLS_PER_WS);
   for (const slug of entitySlugs) {
     if (!budgetOk(ctx)) return 'skipped';
@@ -889,24 +828,28 @@ async function consolidateWorkspace(
         slug,
         digests,
         [...(e?.aliases ?? [])],
-        removedByEntity.get(slug) ?? []
+        removedByEntity.get(slug) ?? [],
+        res,
+        withdrawn
       )
     )
       result.entityPages++;
   }
 
-  await appendTimeline(ctx, ws, dirty);
+  await appendTimeline(ctx.env, ctx.nowIso, ws, dirty, withdrawn, staleUnder('timeline/'));
 
   const changed =
     result.topicPages - t0 + (result.entityPages - e0) > 0 || removed.length > 0;
-  if (changed) await regenerateOverview(ctx, ws);
+  if (changed || stale.has(INDEX_PATH)) await regenerateOverview(ctx, ws, withdrawn);
 
   await setLastConsolidatedAt(ctx.env, ws, runStartedAt);
+  // The request is served once nothing is left to rebuild. Checking again (rather than trusting
+  // this run's list) also catches a page that went private while it ran; whatever is left —
+  // over the per-run caps, or a call that failed — keeps the request for the next run.
+  if (rebuildRequestedAt && !(await findStaleNotes(ctx.env, ws)).stale.size) {
+    await clearKnowledgeRebuild(ctx.env, ws, rebuildRequestedAt);
+  }
   return 'done';
-}
-
-function byLearnedDesc(a: KnowledgeNode, b: KnowledgeNode): number {
-  return (b.learnedAt ?? '').localeCompare(a.learnedAt ?? '');
 }
 
 // ---------- entry point ----------
@@ -961,7 +904,7 @@ export async function runKnowledgeConsolidate(
       continue;
     }
     try {
-      const state = await consolidateWorkspace(ctx, cand.workspaceId, cand.lastConsolidatedAt, result);
+      const state = await consolidateWorkspace(ctx, cand.workspaceId, cand.lastConsolidatedAt, cand.rebuildRequestedAt, result);
       if (state === 'done') result.workspaces++;
       else result.skipped++;
     } catch {

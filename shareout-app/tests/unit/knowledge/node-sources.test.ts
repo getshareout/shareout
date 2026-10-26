@@ -90,17 +90,46 @@ describe('knowledge node sources', () => {
     expect(res?.status).toBe(404);
   });
 
-  it('marks deleted, missing and other-workspace artifacts unavailable', async () => {
-    await addArtifact('art_gone', { name: 'Old page', slug: 'old-page', deleted: true });
+  it('marks missing and other-workspace artifacts unavailable', async () => {
     await addArtifact('art_other', { name: 'Elsewhere', slug: 'elsewhere', ws: 'wsp_other' });
-    await upsertKnowledgeFile(e, WS, { path: 'topics/retention.md', content: nodeWith(['art_gone', 'art_missing', 'art_other']) });
+    await upsertKnowledgeFile(e, WS, { path: 'topics/retention.md', content: nodeWith(['art_missing', 'art_other']) });
     const node = await getNode();
     expect(node.source_artifacts).toEqual([
-      { id: 'art_gone', slug: null, title: null, url: null, available: false },
       { id: 'art_missing', slug: null, title: null, url: null, available: false },
       { id: 'art_other', slug: null, title: null, url: null, available: false },
     ]);
     expect(JSON.stringify(node)).not.toContain('Elsewhere');
+  });
+
+  // Until the consolidator rebuilds it without that page, a note may still quote it.
+  it('hides a note learned from a page in the trash, from everyone, until it is rebuilt', async () => {
+    await addArtifact('art_one', { name: 'Weekly report', slug: 'weekly-report' });
+    await addArtifact('art_gone', { name: 'Old page', slug: 'old-page', deleted: true, owner: 'u1' });
+    await upsertKnowledgeFile(e, WS, { path: 'topics/retention.md', content: nodeWith(['art_one', 'art_gone']) });
+    const res = await routeKnowledgeApi(createFetchContext(
+      new Request(`https://shareout.site/v1/workspaces/${WS}/knowledge/files/topics/retention.md`, { headers: { Cookie: 'shareout_session=x' } }), e, execCtx,
+    ));
+    expect(res?.status).toBe(404);
+    expect((await fromArtifact('art_one')).body.notes).toEqual([]);
+  });
+
+  it('hides a note learned from a private page with no owner from every member', async () => {
+    await addArtifact('art_one', { name: 'Weekly report', slug: 'weekly-report' });
+    await e.DB.prepare("INSERT INTO artifacts (id, name, slug, owner_id, visibility, workspace_id) VALUES ('art_ws_private', 'Unowned', 'unowned', NULL, 'private', ?)").bind(WS).run();
+    await upsertKnowledgeFile(e, WS, { path: 'topics/retention.md', content: nodeWith(['art_one', 'art_ws_private']) });
+    const res = await routeKnowledgeApi(createFetchContext(
+      new Request(`https://shareout.site/v1/workspaces/${WS}/knowledge/files/topics/retention.md`, { headers: { Cookie: 'shareout_session=x' } }), e, execCtx,
+    ));
+    expect(res?.status).toBe(404);
+  });
+
+  it('shows at most 50 sources, newest first, while the note keeps them all', async () => {
+    const ids = Array.from({ length: 60 }, (_, i) => `art_n${i}`);
+    await upsertKnowledgeFile(e, WS, { path: 'topics/retention.md', content: nodeWith(ids) });
+    const node = await getNode();
+    expect(node.sources).toEqual(ids.slice(0, 50));
+    expect(node.source_artifacts).toHaveLength(50);
+    expect(((node as unknown as { content: string }).content.match(/art_n/g) ?? []).length).toBe(60);
   });
 
   it('returns the raw file so pin/edit can PUT it back with its frontmatter', async () => {
@@ -140,6 +169,15 @@ const fromArtifact = async (artifactId: string) => {
 };
 
 describe('knowledge notes from an artifact (reverse of sources)', () => {
+  it("does not list a note that also cites someone else's private page", async () => {
+    await addArtifact('art_one', { name: 'Weekly report', slug: 'weekly-report' });
+    await addArtifact('art_theirs', { name: 'Secret plan', slug: 'secret-plan', visibility: 'private', owner: 'u2' });
+    await upsertKnowledgeFile(e, WS, { path: 'topics/plan.md', content: noteFrom('topic.plan', 'Launch plan', ['art_one', 'art_theirs']) });
+    const { body } = await fromArtifact('art_one');
+    expect(body.notes).toEqual([]);
+    expect(JSON.stringify(body)).not.toContain('Launch plan');
+  });
+
   it('lists only the notes whose sources include the artifact', async () => {
     await addArtifact('art_one', { name: 'Weekly report', slug: 'weekly-report' });
     await upsertKnowledgeFile(e, WS, { path: 'topics/retention.md', content: noteFrom('topic.retention', 'Retention', ['art_one', 'art_two']) });

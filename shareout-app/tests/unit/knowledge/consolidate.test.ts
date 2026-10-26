@@ -16,11 +16,11 @@ const WS = 'wsp_cons';
 
 beforeAll(async () => {
   for (const sql of [
-    `CREATE TABLE IF NOT EXISTS knowledge_settings (workspace_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0, last_consolidated_at TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now')))`,
+    `CREATE TABLE IF NOT EXISTS knowledge_settings (workspace_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0, last_consolidated_at TEXT, rebuild_requested_at TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now')))`,
     `CREATE TABLE IF NOT EXISTS workspace_files (workspace_id TEXT NOT NULL, namespace TEXT NOT NULL, scope_id TEXT NOT NULL DEFAULT '', path TEXT NOT NULL, content TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'manual', updated_by TEXT, updated_by_kind TEXT NOT NULL DEFAULT 'user', created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), PRIMARY KEY (workspace_id, namespace, scope_id, path))`,
     `CREATE TABLE IF NOT EXISTS knowledge_ingest (workspace_id TEXT NOT NULL, artifact_id TEXT NOT NULL, content_hash TEXT, reason TEXT NOT NULL, queued_at TEXT NOT NULL DEFAULT (datetime('now')), processed_at TEXT, PRIMARY KEY (workspace_id, artifact_id, reason))`,
     `CREATE TABLE IF NOT EXISTS knowledge_tombstones (workspace_id TEXT NOT NULL, path TEXT NOT NULL, forgotten_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (workspace_id, path))`,
-    `CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, name TEXT, description TEXT, workspace_id TEXT, deleted_at TEXT)`,
+    `CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, name TEXT, description TEXT, workspace_id TEXT, owner_id TEXT, visibility TEXT NOT NULL DEFAULT 'workspace', deleted_at TEXT)`,
     `CREATE TABLE IF NOT EXISTS artifact_moderation (artifact_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'approved', reason TEXT, checked_at TEXT, content_hash TEXT, held_visibility TEXT)`,
     `CREATE TABLE IF NOT EXISTS ai_usage_events (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, kind TEXT, model TEXT, units INTEGER, unit_kind TEXT, base_cost_micro_usd INTEGER, source TEXT, input_tokens INTEGER, output_tokens INTEGER, cost_source TEXT, provider_ref TEXT, created_at TEXT)`,
   ]) {
@@ -497,7 +497,7 @@ describe('F5: `changed` is per-workspace, not the fleet-global accumulator', () 
     )
       .bind(WS2)
       .run();
-    const stableTrunk = '---\nkind: overview\nid: index\ntitle: "Workspace knowledge"\n---\nstable trunk\n';
+    const stableTrunk = '---\nkind: overview\nid: index\ntitle: "Workspace knowledge"\nsources: []\nprovenance: full\n---\nstable trunk\n';
     await insertFile(WS2, 'index.md', stableTrunk, 'consolidated');
 
     const fake = makeFake();
@@ -694,5 +694,171 @@ describe('F9: night-1 clustering of new names among themselves', () => {
     await runKnowledgeConsolidate(e, { complete: fake.complete });
     const entities = (await listKnowledgeFiles(e, WS)).filter(f => f.path.startsWith('entities/'));
     expect(entities.map(f => f.path)).toEqual(['entities/acme.md']);
+  });
+});
+
+// ---- notes citing a page members can no longer all open (private, or in the trash) ----
+
+function noteContent(o: { kind: string; slug: string; sources: string[]; body: string; aliases?: string[]; legacy?: boolean }): string {
+  return [
+    '---',
+    `kind: ${o.kind}`,
+    `id: ${o.kind === 'overview' ? 'index' : `${o.kind}.${o.slug}`}`,
+    `title: ${JSON.stringify(o.slug)}`,
+    `sources: [${o.sources.map(s => JSON.stringify(s)).join(', ')}]`,
+    ...(o.aliases ? [`aliases: [${o.aliases.map(a => JSON.stringify(a)).join(', ')}]`] : []),
+    ...(o.legacy ? [] : ['provenance: full']),
+    '---',
+    o.body,
+    '',
+  ].join('\n');
+}
+
+const settings = () =>
+  e.DB.prepare('SELECT last_consolidated_at, rebuild_requested_at FROM knowledge_settings WHERE workspace_id = ?')
+    .bind(WS)
+    .first<{ last_consolidated_at: string | null; rebuild_requested_at: string | null }>();
+
+// Nothing dirty (watermark ahead of every digest) and not idle: only a rebuild request makes WS a candidate.
+async function onlyRebuildRequested(at = '2026-10-01T00:00:00.000Z') {
+  await e.DB.prepare("UPDATE knowledge_settings SET last_consolidated_at = '2999-01-01 00:00:00', rebuild_requested_at = ? WHERE workspace_id = ?")
+    .bind(at, WS)
+    .run();
+}
+
+async function nodeAt(path: string) {
+  return (await loadKnowledge(e, WS)).nodes.find(n => n.path === path);
+}
+
+describe('notes learned from a page that goes private or into the trash', () => {
+  beforeEach(async () => {
+    await seedDigest(WS, { id: 'pub', title: 'Public Retention', topics: ['retention'], entities: ['Acme'], body: 'Day-0 retention is 42%.', learnedAt: '2026-07-02T00:00:00Z' });
+    await e.DB.prepare("INSERT INTO artifacts (id, name, workspace_id, owner_id, visibility) VALUES ('priv', 'Board plan', ?, 'usr_owner', 'private')").bind(WS).run();
+    await insertFile(WS, 'topics/retention.md', noteContent({ kind: 'topic', slug: 'retention', sources: ['priv', 'pub'], body: '- PRIVATE-FACT\n- Day-0 retention is 42%.' }), 'consolidated');
+    await insertFile(WS, 'entities/acme.md', noteContent({ kind: 'entity', slug: 'acme', sources: ['priv', 'pub'], aliases: ['Secret Codename', 'Acme'], body: '- PRIVATE-ENTITY-FACT' }), 'consolidated');
+    await insertFile(WS, 'timeline/2026-07.md', noteContent({ kind: 'timeline', slug: '2026-07', sources: ['priv', 'pub'], body: '- 2026-07-01: learned "Board plan" [priv]\n- 2026-07-02: learned "Public Retention" (retention) [pub]' }), 'consolidated');
+    await insertFile(WS, 'index.md', noteContent({ kind: 'overview', slug: 'Workspace knowledge', sources: ['priv', 'pub'], body: 'Mentions PRIVATE-FACT.' }), 'consolidated');
+    await onlyRebuildRequested();
+  });
+
+  it('rebuilds every note citing it from the other sources, without it, and clears the request', async () => {
+    const fake = makeFake({
+      topic: () => '{"title":"Retention"}\n\n- Day-0 retention is 42%.',
+      entity: () => '{"title":"Acme","aliases":[]}\n\n- Acme tracks retention.',
+      overview: () => 'This workspace tracks Acme retention.',
+    });
+    await runKnowledgeConsolidate(e, { complete: fake.complete });
+
+    // Started over from the open page's digest: the old body (and its private fact) is never fed.
+    expect(fake.calls.lastTopicUser).toContain('(empty — rebuilt from its sources)');
+    expect(fake.calls.lastTopicUser).toContain('Public Retention');
+    expect(fake.calls.lastTopicUser).not.toContain('PRIVATE-FACT');
+    expect(fake.calls.lastEntityUser).not.toContain('PRIVATE-ENTITY-FACT');
+
+    const topic = await nodeAt('topics/retention.md');
+    expect(topic?.sources).toEqual(['pub']);
+    expect(topic?.extra.provenance).toBe('full');
+    const acme = await nodeAt('entities/acme.md');
+    expect(acme?.sources).toEqual(['pub']);
+    // An alias only the private page used is gone; the name the open page uses stays.
+    expect(acme?.extra.aliases).toEqual(['Acme']);
+
+    const timeline = await getKnowledgeFile(e, WS, 'timeline/2026-07.md');
+    expect(timeline?.content).not.toContain('Board plan');
+    expect((await nodeAt('timeline/2026-07.md'))?.sources).toEqual(['pub']);
+
+    const overview = await nodeAt('index.md');
+    expect(overview?.body).toContain('This workspace tracks Acme retention.');
+    expect(overview?.sources).toEqual(['pub']);
+    expect(overview?.extra.provenance).toBe('full');
+
+    expect((await settings())?.rebuild_requested_at).toBeNull();
+  });
+
+  it('a page in the trash counts the same, and a note left with no open source is removed', async () => {
+    await e.DB.prepare("UPDATE artifacts SET visibility = 'workspace', deleted_at = '2026-10-01T00:00:00.000Z' WHERE id = 'priv'").run();
+    await insertFile(WS, 'topics/board.md', noteContent({ kind: 'topic', slug: 'board', sources: ['priv'], body: '- BOARD-ONLY-FACT' }), 'consolidated');
+    const fake = makeFake();
+    await runKnowledgeConsolidate(e, { complete: fake.complete });
+    expect(await getKnowledgeFile(e, WS, 'topics/board.md')).toBeNull();
+    expect(await isTombstoned(e, WS, 'topics/board.md')).toBe(false);
+    expect((await nodeAt('topics/retention.md'))?.sources).toEqual(['pub']);
+    expect((await settings())?.rebuild_requested_at).toBeNull();
+  });
+
+  it('hand-written and pinned notes are never rewritten', async () => {
+    const manual = noteContent({ kind: 'topic', slug: 'retention', sources: ['priv', 'pub'], body: '- hand written' });
+    await insertFile(WS, 'topics/retention.md', manual, 'manual');
+    const pinned = noteContent({ kind: 'entity', slug: 'acme', sources: ['priv'], body: '- pinned' }).replace('---\n', '---\npinned: true\n');
+    await insertFile(WS, 'entities/acme.md', pinned, 'consolidated');
+    const fake = makeFake();
+    await runKnowledgeConsolidate(e, { complete: fake.complete });
+    expect(fake.calls.topic + fake.calls.entity).toBe(0);
+    expect((await getKnowledgeFile(e, WS, 'topics/retention.md'))?.content).toBe(manual);
+    expect((await getKnowledgeFile(e, WS, 'entities/acme.md'))?.content).toBe(pinned);
+  });
+
+  it('keeps the request when a new one arrives during the run', async () => {
+    const fake = makeFake();
+    const complete: ConsolidateComplete = async (system, user, ws) => {
+      // Another page goes private while the run is rebuilding this one.
+      if (system.startsWith('You maintain one evolving topic')) {
+        await e.DB.prepare("UPDATE knowledge_settings SET rebuild_requested_at = '2026-10-02T00:00:00.000Z' WHERE workspace_id = ?").bind(WS).run();
+      }
+      return fake.complete(system, user, ws);
+    };
+    await runKnowledgeConsolidate(e, { complete });
+    expect((await settings())?.rebuild_requested_at).toBe('2026-10-02T00:00:00.000Z');
+  });
+});
+
+describe('note sources are complete', () => {
+  it('a page keeps every source id, past the 50 it used to keep', async () => {
+    const many = Array.from({ length: 60 }, (_, i) => `old${i}`);
+    await insertFile(WS, 'topics/retention.md', noteContent({ kind: 'topic', slug: 'retention', sources: many, body: '- old facts' }), 'consolidated');
+    await seedDigest(WS, { id: 'a1', title: 'D1', topics: ['retention'] });
+    await runKnowledgeConsolidate(e, makeFake());
+    const topic = await nodeAt('topics/retention.md');
+    expect(topic?.sources).toHaveLength(61);
+    expect(topic?.sources[0]).toBe('a1');
+  });
+
+  it('a page written at the old 50-source cap is rebuilt once from the sources it lists', async () => {
+    const listed = Array.from({ length: 50 }, (_, i) => `s${i}`);
+    await insertFile(WS, 'topics/retention.md', noteContent({ kind: 'topic', slug: 'retention', sources: listed, body: '- facts from before', legacy: true }), 'consolidated');
+    for (const id of ['s0', 's1']) await seedDigest(WS, { id, title: `Digest ${id}`, topics: ['retention'] });
+    await onlyRebuildRequested();
+    const fake = makeFake();
+    await runKnowledgeConsolidate(e, { complete: fake.complete });
+    expect(fake.calls.lastTopicUser).toContain('(empty — rebuilt from its sources)');
+    expect(fake.calls.lastTopicUser).toContain('Digest s0');
+    const topic = await nodeAt('topics/retention.md');
+    expect(topic?.sources.sort()).toEqual(['s0', 's1']);
+    expect(topic?.extra.provenance).toBe('full');
+  });
+
+  it('an overview learned before overviews listed their sources is rewritten with them', async () => {
+    await seedDigest(WS, { id: 'pub', title: 'Public Retention', topics: ['retention'] });
+    await insertFile(WS, 'topics/retention.md', noteContent({ kind: 'topic', slug: 'retention', sources: ['pub'], body: '- Day-0 retention is 42%.' }), 'consolidated');
+    await insertFile(WS, 'index.md', '---\nkind: overview\nid: index\ntitle: "Workspace knowledge"\n---\nold trunk\n', 'consolidated');
+    await onlyRebuildRequested();
+    const fake = makeFake({ overview: () => 'Retention numbers for the team.' });
+    await runKnowledgeConsolidate(e, { complete: fake.complete });
+    expect(fake.calls.overview).toBe(1);
+    const overview = await nodeAt('index.md');
+    expect(overview?.sources).toEqual(['pub']);
+    expect(overview?.extra.provenance).toBe('full');
+    expect((await settings())?.rebuild_requested_at).toBeNull();
+  });
+
+  it('a pinned digest of a private page never feeds a shared topic', async () => {
+    await e.DB.prepare("INSERT INTO artifacts (id, name, workspace_id, owner_id, visibility) VALUES ('pinpriv', 'Pinned private', ?, 'usr_owner', 'private')").bind(WS).run();
+    await insertFile(WS, 'artifacts/pinpriv.md', digestContent({ id: 'pinpriv', title: 'PINNED-PRIVATE', topics: ['retention'], pinned: true }));
+    await seedDigest(WS, { id: 'pub2', title: 'Open Retention', topics: ['retention'] });
+    const fake = makeFake();
+    await runKnowledgeConsolidate(e, { complete: fake.complete });
+    expect(fake.calls.lastTopicUser).toContain('Open Retention');
+    expect(fake.calls.lastTopicUser).not.toContain('PINNED-PRIVATE');
+    expect((await nodeAt('topics/retention.md'))?.sources).toEqual(['pub2']);
   });
 });

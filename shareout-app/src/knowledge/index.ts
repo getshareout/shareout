@@ -13,6 +13,8 @@ export {
   listKnowledgeFilesByPrefix,
   setLastConsolidatedAt,
   listConsolidationCandidates,
+  requestKnowledgeRebuild,
+  clearKnowledgeRebuild,
   type KnowledgeFileSource,
   type StoredKnowledgeFile,
 } from './store';
