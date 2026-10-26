@@ -54,6 +54,24 @@ export const WORKSPACE_CATALOG_STYLES = WORKSPACE_ONBOARDING_STYLES + WORKSPACE_
 .wsx-cat__unc { font-size: var(--text-xs); color: var(--color-text-tertiary); background: var(--color-surface); border-radius: 999px; padding: 0 7px; margin-left: 4px; }
 .wsx-cat__linnone { color: var(--color-text-tertiary); font-size: var(--text-sm); padding: 6px 2px 4px; }
 @media (max-width: 560px) { .wsx-cat__meta { grid-template-columns: 1fr; gap: 2px 0; } .wsx-cat__meta dt { margin-top: 8px; } }
+.wsx-cat__chg { font: 600 var(--text-xs) var(--font-body); color: var(--color-warning); margin-left: 4px; white-space: nowrap; }
+.wsx-cat__cert { margin: 14px 0 4px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg-elevated); font-size: var(--text-sm); color: var(--color-text); }
+.wsx-cat__cert:empty { display: none; }
+.wsx-cat__certline { line-height: 1.5; }
+.wsx-cat__certok { color: var(--color-success); }
+.wsx-cat__certok strong { color: var(--color-text); }
+.wsx-cat__certnote { margin: 6px 0 0; color: var(--color-text-secondary); white-space: pre-wrap; overflow-wrap: anywhere; }
+.wsx-cat__cert .wsx-cat__hint { margin: 8px 0 0; max-width: none; }
+.wsx-cat__certform { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.wsx-cat__certin { width: 100%; box-sizing: border-box; min-height: 56px; resize: vertical; }
+.wsx-cat__certbtns { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wsx-cat__certerr { color: var(--color-error); font-size: var(--text-xs); }
+.wsx-cat__hist { margin-top: 10px; }
+.wsx-cat__hist summary { cursor: pointer; color: var(--color-text-secondary); font-weight: 600; }
+.wsx-cat__hist ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.wsx-cat__hwhen { color: var(--color-text-tertiary); }
+.wsx-cat__hold { font-size: var(--text-xs); color: var(--color-text-tertiary); background: var(--color-surface); border-radius: 999px; padding: 0 7px; }
+.wsx-cat__hnote { color: var(--color-text-secondary); margin-top: 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* ---- Knowledge lens (structural sibling — shares the wsx-cat__* patterns above) ---- */
 .wsx-kn__bdg { margin-left: 8px; vertical-align: middle; }

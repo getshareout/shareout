@@ -24,7 +24,8 @@ vi.mock('../../../src/data/platform', async (orig) => {
 });
 
 import { seedCatalogForConnection, recordDatasetLineage, removeCatalogForConnection } from '../../../src/catalog/seed-resources';
-import { listCatalogFiles, upsertCatalogFile } from '../../../src/catalog/store';
+import { listCatalogFiles, loadCatalog, upsertCatalogFile } from '../../../src/catalog/store';
+import { withGraphLineage } from '../../../src/catalog/lineage';
 
 const e = env as unknown as Env;
 const WS = 'wsp_seed_ds';
@@ -80,11 +81,12 @@ describe('seedCatalogForConnection — Snowflake', () => {
     expect(res).toEqual({ seeded: 2, skipped: 0, provider: 'snowflake' });
 
     const files = await listCatalogFiles(e, WS);
-    expect(files.find((f) => f.path === 'sources/snowflake-prod.md')).toBeTruthy();
+    expect(files.find((f) => f.path === 'sources/c1.md')).toBeTruthy();
     const orders = files.find((f) => f.path === 'datasets/snowflake-prod/orders.md');
     expect(orders).toBeTruthy();
     expect(orders?.content).toContain('id: ds.snowflake-prod.orders');
-    expect(orders?.content).toContain('upstream: [conn.snowflake-prod]');
+    // Lineage points at the connection-id entry, which survives a rename.
+    expect(orders?.content).toContain('upstream: [conn.c1]');
     expect(orders?.source).toBe('seed:connector');
   });
 
@@ -118,7 +120,7 @@ describe('seedCatalogForConnection — Snowflake', () => {
     expect(res.seeded).toBe(0);
     // Source entry still gets seeded even though the table listing failed.
     const files = await listCatalogFiles(e, WS);
-    expect(files.find((f) => f.path === 'sources/snowflake-prod.md')).toBeTruthy();
+    expect(files.find((f) => f.path === 'sources/c1.md')).toBeTruthy();
   });
 });
 
@@ -178,7 +180,7 @@ describe('seedCatalogForConnection — unsupported provider', () => {
     // Source entry (kind: source) is still seeded — only per-resource dataset
     // enumeration is skipped.
     const files = await listCatalogFiles(e, WS);
-    expect(files.find((f) => f.path === 'sources/store.md')).toBeTruthy();
+    expect(files.find((f) => f.path === 'sources/c5.md')).toBeTruthy();
   });
 
   it('resolves to an empty result for an unknown connection id', async () => {
@@ -187,7 +189,53 @@ describe('seedCatalogForConnection — unsupported provider', () => {
   });
 });
 
+describe('seedCatalogForConnection — connection-id keys', () => {
+  it('retires the name-keyed source seeded before, and keeps lineage resolving through its alias', async () => {
+    await insertConnection('c1', 'Snowflake Prod', 'snowflake');
+    await upsertCatalogFile(e, WS, {
+      path: 'sources/snowflake-prod.md',
+      content: '---\nkind: source\nid: conn.snowflake-prod\ntitle: Snowflake Prod\n---',
+      source: 'seed:connector',
+    });
+    await upsertCatalogFile(e, WS, {
+      path: 'datasets/snowflake-prod/legacy.md',
+      content: '---\nkind: dataset\nid: ds.snowflake-prod.legacy\ntitle: legacy\nupstream: [conn.snowflake-prod]\n---',
+      source: 'manual',
+    });
+    await seedCatalogForConnection(e, WS, 'c1');
+    const { entries, issues } = await loadCatalog(e, WS);
+    expect(issues).toHaveLength(0);
+    expect(entries.map((x) => x.id).sort()).toEqual(['conn.c1', 'ds.snowflake-prod.legacy']);
+    const source = withGraphLineage(entries).find((x) => x.id === 'conn.c1');
+    expect(source?.downstream).toEqual(['ds.snowflake-prod.legacy']);
+  });
+
+  it('points datasets at a hand-edited name-keyed source instead of seeding a second one', async () => {
+    await insertConnection('c1', 'Snowflake Prod', 'snowflake');
+    await upsertCatalogFile(e, WS, {
+      path: 'sources/snowflake-prod.md',
+      content: '---\nkind: source\nid: conn.snowflake-prod\ntitle: Snowflake (curated)\n---\nmine',
+      source: 'manual',
+    });
+    EXECUTE_IMPL = async (req) =>
+      req.endpoint === 'statements.execute'
+        ? { success: true, data: { resultSetMetaData: { rowType: [{ name: 'name', type: 'text' }] }, data: [['orders']] } }
+        : { success: false };
+    await seedCatalogForConnection(e, WS, 'c1');
+    const files = await listCatalogFiles(e, WS);
+    expect(files.map((f) => f.path).sort()).toEqual(['datasets/snowflake-prod/orders.md', 'sources/snowflake-prod.md']);
+    expect(files.find((f) => f.path === 'datasets/snowflake-prod/orders.md')?.content).toContain('upstream: [conn.snowflake-prod]');
+  });
+});
+
 describe('recordDatasetLineage', () => {
+  it('links a materialized dataset to the connection-id source entry when the connection exists', async () => {
+    await insertConnection('c1', 'Snowflake Prod', 'snowflake');
+    await recordDatasetLineage(e, WS, 'Snowflake Prod', 'sales', 'art_123');
+    const entry = (await listCatalogFiles(e, WS)).find((f) => f.path === 'datasets/snowflake-prod/sales.md');
+    expect(entry?.content).toContain('upstream: [conn.c1]');
+  });
+
   it('creates a dataset entry with connection upstream + artifact provenance', async () => {
     await recordDatasetLineage(e, WS, 'Snowflake Prod', 'sales', 'art_123');
     const files = await listCatalogFiles(e, WS);
@@ -225,19 +273,20 @@ describe('seedCatalogForConnection — scope', () => {
     await insertConnection('c2', 'My API', 'rest_api');
     await seedCatalogForConnection(e, WS, 'c2');
     const files = await listCatalogFiles(e, WS);
-    expect(files.map((f) => f.path)).toEqual(['sources/my-api.md']);
+    expect(files.map((f) => f.path)).toEqual(['sources/c2.md']);
   });
 });
 
 describe('removeCatalogForConnection', () => {
   it('drops the seeded source + dataset entries, keeps manual edits, provenance, and other connectors', async () => {
+    await upsertCatalogFile(e, WS, { path: 'sources/c1.md', content: 'x', source: 'seed:connector' });
     await upsertCatalogFile(e, WS, { path: 'sources/snowflake-prod.md', content: 'x', source: 'seed:connector' });
     await upsertCatalogFile(e, WS, { path: 'datasets/snowflake-prod/orders.md', content: 'x', source: 'seed:connector' });
     await upsertCatalogFile(e, WS, { path: 'datasets/snowflake-prod/notes.md', content: 'x', source: 'manual' });
     await upsertCatalogFile(e, WS, { path: 'datasets/snowflake-prod/sales.md', content: 'x', source: 'seed:provenance' });
     await upsertCatalogFile(e, WS, { path: 'sources/other.md', content: 'x', source: 'seed:connector' });
 
-    await removeCatalogForConnection(e, WS, 'Snowflake Prod');
+    await removeCatalogForConnection(e, WS, { id: 'c1', name: 'Snowflake Prod' });
 
     const paths = (await listCatalogFiles(e, WS)).map((f) => f.path);
     expect(paths).toEqual(['datasets/snowflake-prod/notes.md', 'datasets/snowflake-prod/sales.md', 'sources/other.md']);

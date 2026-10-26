@@ -1,6 +1,15 @@
 export * from './types';
 export { parseCatalog, parseEntry, extractFrontmatter, type CatalogFile } from './parse';
-export { buildLineage, traverseLineage, type LineageDirection } from './lineage';
+export {
+  buildLineage,
+  traverseLineage,
+  aliasIndex,
+  findEntry,
+  lineageNeighbors,
+  withGraphLineage,
+  type LineageDirection,
+  type LineageNeighbors,
+} from './lineage';
 export { buildManifest, type ManifestOptions } from './manifest';
 export {
   searchEntries,
@@ -17,12 +26,36 @@ export {
   listCatalogFiles,
   loadCatalog,
   type CatalogFileSource,
+  type CatalogEditorKind,
   type StoredCatalogFile,
 } from './store';
 export {
+  METRIC_SPEC_KEYS,
+  MAX_CERT_NOTE_CHARS,
+  canonicalJson,
+  certificationHash,
+  certificationPayload,
+  effectiveStatus,
+  groupDecisions,
+  isCertDecision,
+  listCertifications,
+  metricSpecPayload,
+  recordCertification,
+  resolveCertification,
+} from './certification';
+export { loadGovernedCatalog, type GovernedCatalog } from './governed';
+export {
   seedConnectorsAsSources,
   buildConnectorEntry,
+  connectorEntryId,
+  connectorEntryPath,
+  connectorSourceId,
+  legacyConnectorEntryId,
+  legacyConnectorEntryPath,
   slugifyName,
+  writeConnectorEntry,
+  yamlString,
+  type ConnectionRow,
   type SeedResult,
 } from './seed';
 export {

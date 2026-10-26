@@ -259,7 +259,8 @@ Optional per-workspace data map. See [Data Catalog](/teams/catalog/).
 | --- | --- | --- | --- |
 | `GET` | `/v1/workspaces/{id}/catalog` | Member+ | Search (`q`, `kind`, `domain`, `status`, `tag`) + facets. |
 | `GET` | `/v1/workspaces/{id}/catalog/manifest` | Member+ | Adoption KPIs, orphans, dangling refs. |
-| `GET` | `/v1/workspaces/{id}/catalog/entries/{entryId}` | Member+ | Entry + lineage neighbors. |
+| `GET` | `/v1/workspaces/{id}/catalog/entries/{entryId}` | Member+ | Entry + lineage neighbors + certification `history`. |
+| `POST` | `/v1/workspaces/{id}/catalog/entries/{entryId}/certify` | Admin+ | `{ "decision": "certified" \| "revoked" \| "deprecated", "note"?, "content_hash"? }` — 409 if the entry changed since `content_hash`. |
 | `GET` | `/v1/workspaces/{id}/catalog/lineage` | Member+ | Full graph (`nodes`, `edges`). |
 | `POST` | `/v1/workspaces/{id}/catalog/enable` | Admin+ | `{ "enabled": true \| false }`. |
 | `POST` | `/v1/workspaces/{id}/catalog/seed` | Admin+ | Idempotent connector seed. |

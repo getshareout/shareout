@@ -320,7 +320,7 @@ describe('workspace connections routes', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as { deleted: boolean };
     expect(body.deleted).toBe(true);
-    expect(catalogRemoveMock).toHaveBeenCalledWith(env, WORKSPACE_ID, 'my_api');
+    expect(catalogRemoveMock).toHaveBeenCalledWith(env, WORKSPACE_ID, { id: 'conn_1', name: 'my_api' });
   });
 
   it('404s when deleting a missing connector', async () => {

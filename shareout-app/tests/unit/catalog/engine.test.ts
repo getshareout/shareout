@@ -7,6 +7,10 @@ import {
   buildManifest,
   searchEntries,
   buildFacets,
+  withGraphLineage,
+  findEntry,
+  resolveCertification,
+  type CatalogEntry,
   type CatalogFile,
 } from '../../../src/catalog';
 
@@ -113,6 +117,12 @@ describe('parseEntry', () => {
     expect(parseEntry('x.md', 'no frontmatter here').issue?.message).toContain('frontmatter');
   });
 
+  it('reads aliases (never the entry\'s own id) and connection_id', () => {
+    const { entry } = parseEntry('x.md', '---\nkind: source\nid: conn.c1\ntitle: S\nconnection_id: c1\naliases: [conn.old, conn.c1]\n---');
+    expect(entry).toMatchObject({ aliases: ['conn.old'], connectionId: 'c1' });
+    expect(entry?.extra).toEqual({});
+  });
+
   it('preserves unknown frontmatter keys in extra', () => {
     const { entry } = parseEntry('x.md', '---\nkind: table\nid: a\ntitle: B\ncustom_field: 7\n---');
     expect(entry?.extra).toEqual({ custom_field: 7 });
@@ -163,6 +173,39 @@ describe('buildLineage', () => {
   });
 });
 
+const SEEDED = (): CatalogFile[] => [
+  { path: 'sources/c1.md', content: '---\nkind: source\nid: conn.c1\ntitle: Warehouse\naliases: [conn.warehouse]\n---' },
+  // Seeded before entries were keyed by connection id: it still points at the old id.
+  { path: 'datasets/warehouse/orders.md', content: '---\nkind: dataset\nid: ds.warehouse.orders\ntitle: orders\nupstream: [conn.warehouse]\n---' },
+  { path: 'datasets/warehouse/users.md', content: '---\nkind: dataset\nid: ds.warehouse.users\ntitle: users\nupstream: [conn.c1]\n---' },
+];
+
+describe('lineage — aliases and reverse edges', () => {
+  it('resolves a ref to an alias onto the entry that keeps it', () => {
+    const { entries } = parseCatalog(SEEDED());
+    const g = buildLineage(entries);
+    expect(g.edges).toContainEqual({ from: 'conn.c1', to: 'ds.warehouse.orders' });
+    expect(g.nodes.find(n => n.id === 'conn.warehouse')).toBeUndefined();
+    expect(findEntry(entries, 'conn.warehouse')?.id).toBe('conn.c1');
+  });
+
+  it('gives a source its downstream even though only the datasets declared the edge', () => {
+    const { entries } = parseCatalog(SEEDED());
+    const source = withGraphLineage(entries).find(e => e.id === 'conn.c1');
+    expect(source?.downstream.sort()).toEqual(['ds.warehouse.orders', 'ds.warehouse.users']);
+    expect(traverseLineage(entries, 'conn.warehouse', 'downstream').sort()).toEqual(['ds.warehouse.orders', 'ds.warehouse.users']);
+  });
+
+  it('a real id wins over another entry\'s alias', () => {
+    const { entries } = parseCatalog([
+      { path: 'a.md', content: '---\nkind: table\nid: a\ntitle: A\naliases: [b]\n---' },
+      { path: 'b.md', content: '---\nkind: table\nid: b\ntitle: B\n---' },
+      { path: 'c.md', content: '---\nkind: table\nid: c\ntitle: C\nupstream: [b]\n---' },
+    ]);
+    expect(buildLineage(entries).edges).toEqual([{ from: 'b', to: 'c' }]);
+  });
+});
+
 describe('traverseLineage', () => {
   it('walks downstream and upstream', () => {
     const { entries } = parseCatalog(files());
@@ -182,7 +225,9 @@ describe('buildManifest', () => {
     expect(m.counts.entries).toBe(3);
     expect(m.counts.byKind).toMatchObject({ source: 1, dataset: 1, term: 1 });
     expect(m.kpis.documentedPct).toBe(100);
-    expect(m.kpis.certifiedPct).toBe(50);
+    // `status: certified` in a file is a claim, not a certification.
+    expect(m.kpis.certifiedPct).toBe(0);
+    expect(m.counts.byStatus).toEqual({ draft: 3 });
     expect(m.dangling).toContain('warehouse.clustered_events');
     expect(m.dangling).toContain('pipelines.chat_metrics');
     expect(m.orphans).toHaveLength(0);
@@ -192,6 +237,23 @@ describe('buildManifest', () => {
     const { entries } = parseCatalog(files());
     const m = buildManifest(entries, { nowMs: Date.parse('2026-12-31T00:00:00Z'), staleDays: 90 });
     expect(m.stale.length).toBeGreaterThan(0);
+  });
+
+  it('counts certified from the overlay', () => {
+    const entries = parseCatalog(files()).entries.map((e): CatalogEntry =>
+      e.kind === 'source'
+        ? { ...e, certification: resolveCertification(e.status, 'h', [{ id: 'c', entry_id: e.id, content_hash: 'h', decision: 'certified', note: null, decided_by: { id: 'u', name: null, email: null }, decided_at: '2026-10-01T00:00:00.000Z' }]) }
+        : e
+    );
+    const m = buildManifest(entries, { nowMs: Date.parse('2026-07-01T00:00:00Z') });
+    expect(m.kpis.certifiedPct).toBe(50);
+    expect(m.counts.byStatus).toEqual({ certified: 1, draft: 2 });
+  });
+
+  it('counts inbound edges: an entry only others point at is not an orphan', () => {
+    const m = buildManifest(parseCatalog(SEEDED()).entries, { nowMs: Date.now() });
+    expect(m.orphans).toEqual([]);
+    expect(m.dangling).toEqual([]);
   });
 
   it('flags entries with no lineage as orphans (terms excluded)', () => {
@@ -208,7 +270,8 @@ describe('searchEntries + buildFacets', () => {
   it('filters by facet and free text', () => {
     const { entries } = parseCatalog(files());
     expect(searchEntries(entries, { kind: 'source' })).toHaveLength(1);
-    expect(searchEntries(entries, { status: 'draft' })).toHaveLength(1);
+    expect(searchEntries(entries, { status: 'draft' })).toHaveLength(3);
+    expect(searchEntries(entries, { status: 'certified' })).toHaveLength(0);
     expect(searchEntries(entries, { tag: 'tier.gold' })).toHaveLength(1);
     expect(searchEntries(entries, { q: 'pipeline' }).map(e => e.id)).toContain('events_silver.chat_sent');
     expect(searchEntries(entries, { domain: 'growth', q: 'chat_sent' })).toHaveLength(1);
@@ -218,7 +281,7 @@ describe('searchEntries + buildFacets', () => {
     const { entries } = parseCatalog(files());
     const facets = buildFacets(entries);
     expect(facets.kind.map(f => f.value).sort()).toEqual(['dataset', 'source', 'term']);
-    expect(facets.status).toContainEqual({ value: 'certified', count: 1 });
+    expect(facets.status).toEqual([{ value: 'draft', count: 3 }]);
     expect(facets.tag.find(f => f.value === 'tier.silver')?.count).toBe(1);
   });
 });

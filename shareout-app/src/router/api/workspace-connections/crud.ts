@@ -421,7 +421,7 @@ export async function handleDeleteWorkspaceConnection(
   await env.DB.prepare(
     "DELETE FROM connections WHERE scope_type = 'workspace' AND scope_id = ? AND id = ?"
   ).bind(workspaceId, connectionId).run();
-  await removeCatalogForConnection(env, workspaceId, conn.name);
+  await removeCatalogForConnection(env, workspaceId, conn);
 
   await logAudit(env, {
     workspaceId, actorId: user.id, actorEmail: user.email,

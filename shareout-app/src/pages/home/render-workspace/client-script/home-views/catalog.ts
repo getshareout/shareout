@@ -120,7 +120,7 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
       + '<td><span class="wsx-atbl__link">' + esc(e.title) + '</span></td>'
       + '<td><span class="wsx-atbl__type">' + esc(catKindLabel(e.kind)) + '</span></td>'
       + '<td class="wsx-cat__cdom">' + (e.domain ? esc(e.domain) : '\\u2014') + '</td>'
-      + '<td>' + (catBadge(e.status) || '<span class="wsx-atbl__date">\\u2014</span>') + '</td>'
+      + '<td>' + (catBadge(e.status) || '<span class="wsx-atbl__date">\\u2014</span>') + catStaleChip(e) + '</td>'
       + '<td class="wsx-cat__corigin" title="' + origin + '">' + (origin || '\\u2014') + '</td>'
       + '<td class="wsx-atbl__num wsx-cat__clin">' + lc + '</td></tr>';
   }
@@ -222,8 +222,9 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
     var meta = rows.map(function (r) { return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('');
     var up = e.upstream || [], down = e.downstream || [];
     m.innerHTML = '<button class="wsx-cat__back" id="catBack" type="button">' + esc(t('catalog.back')) + '</button>'
-      + '<div class="wsx-cat__dhead"><span class="wsx-atbl__type">' + esc(catKindLabel(e.kind)) + '</span><h3>' + esc(e.title) + '</h3>' + catBadge(e.status) + '</div>'
+      + '<div class="wsx-cat__dhead"><span class="wsx-atbl__type">' + esc(catKindLabel(e.kind)) + '</span><h3>' + esc(e.title) + '</h3><span id="catDetailBadge">' + catBadge(e.status) + catStaleChip(e) + '</span></div>'
       + '<div class="wsx-sched__meta">' + esc(e.id) + '</div>'
+      + '<section class="wsx-cat__cert" id="catCert" aria-label="' + esc(t('catalog.certTitle')) + '"></section>'
       + '<dl class="wsx-cat__meta">' + meta + '</dl>'
       + (e.body ? '<div class="wsx-cat__body">' + mdToHtml(e.body) + '</div>' : '')
       + '<div class="wsx-cat__lin">'
@@ -234,6 +235,7 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
     m.querySelectorAll('[data-cat-goto]').forEach(function (b) {
       b.addEventListener('click', function () { catDetail(m, b.getAttribute('data-cat-goto')); });
     });
+    catLoadCert(m, id);
   }
 
 `;

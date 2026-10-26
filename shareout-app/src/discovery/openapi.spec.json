@@ -9887,6 +9887,7 @@
           {
             "name": "status",
             "in": "query",
+            "description": "Effective status — certified only by an owner/admin decision on the current version.",
             "schema": {
               "type": "string",
               "enum": [
@@ -10031,12 +10032,84 @@
         ],
         "summary": "Get one catalog entry",
         "operationId": "getWorkspaceCatalogEntry",
+        "description": "The entry (accepts an alias of its id) with its effective `status`, the `certification` overlay, upstream/downstream neighbors read from both ends of every edge, and the certification `history` (newest first).",
         "responses": {
           "200": {
-            "description": "Entry with upstream/downstream neighbors"
+            "description": "Entry with upstream/downstream neighbors and certification history"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/catalog/entries/{entryId}/certify": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        },
+        {
+          "name": "entryId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Certify, revoke or deprecate a catalog entry",
+        "operationId": "certifyWorkspaceCatalogEntry",
+        "description": "Owner/admin only. Records an append-only decision on the entry's current version (for kind metric, its normalized spec). The entry reads certified while its current version matches a certification made since the last revoke/deprecate; an edit shows it as changed since certification. Send the content_hash you reviewed to get 409 CONFLICT instead of deciding on a version you did not see.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "decision"
+                ],
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "certified",
+                      "revoked",
+                      "deprecated"
+                    ]
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "content_hash": {
+                    "type": "string",
+                    "description": "certification.content_hash of the version you reviewed"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The new effective status, certification overlay and history"
+          },
+          "400": {
+            "description": "Invalid decision or note"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "CONFLICT (entry changed since content_hash) or CATALOG_DISABLED"
           }
         }
       }
