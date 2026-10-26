@@ -112,7 +112,7 @@ python3 build_payload.py | curl -sS -X POST "$ORIGIN/v1/publish" \
 | Endpoint | Limit |
 |----------|-------|
 | Publish | 100/day per user |
-| Verify | 30/hour per user |
+| Verify | 30/hour per user (instance setting `VERIFY_RUNS_PER_HOUR`) |
 | Data API | No dedicated limiter today — don't rely on a specific number |
 | Email | 50/day per user, 10/day per artifact |
 | CORS Proxy | 100/min per artifact |

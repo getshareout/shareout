@@ -20,7 +20,7 @@ curl -sS -X POST "$ORIGIN/v1/artifacts/$ID/verify" \
 
 | Field | Default | Meaning |
 |-------|---------|---------|
-| `version` | live version | Version number to verify (an approval-pending or older one). Its HTML is rendered; its other files load from the live version. |
+| `version` | live version | Version number to verify (an approval-pending or older one), rendered entirely from that version's files. |
 | `viewports` | `["desktop","mobile"]` | One or both. |
 | `full_page` | `false` | Screenshot the whole page height (up to 4000 px) instead of the first screen. |
 
@@ -65,7 +65,9 @@ Owners and editors of the page only. A workspace Agent token (`sot_`) needs
 - **Screenshots** are WebP, at most 800 px wide (desktop scaled from 1280, phone at 2×).
   Fetch them with the same token and look at them:
   `curl -H "Authorization: Bearer $TOKEN" -o desktop.webp "<screenshot.url>"`.
-- Verifying the live version also refreshes the page's thumbnail.
+- `viewports[].entrypoint` is the file each view rendered: a page published with a
+  separate mobile HTML is checked on the phone with that file, as phone viewers get it.
+- Verifying the live version also refreshes the page's thumbnail (the MCP tool does not).
 
 `GET /v1/artifacts/{id}/verify/latest` returns the last run (only the latest is kept).
 
@@ -111,15 +113,18 @@ Owners and editors of the page only. A workspace Agent token (`sot_`) needs
 
 ## Limits
 
-30 runs per user per hour (`429 RATE_LIMIT_EXCEEDED` with `Retry-After`). Batch fixes and
+30 runs per user per hour unless the instance sets `VERIFY_RUNS_PER_HOUR`
+(`429 RATE_LIMIT_EXCEEDED` with `Retry-After`, `limit` and `reset`). Batch fixes and
 verify once per change set; do not loop on the same failure — after two tries with no
 progress, follow the `hint` or ask the user.
 
 ## From an AI app (MCP)
 
 The ShareOut connector's `verify_artifact` tool runs the same check and answers with a
-short report (≤ 40 lines) plus the desktop and phone screenshots. Call it right after
-`publish_artifact` / `update_artifact`.
+short report (≤ 40 lines) plus the desktop and phone screenshots. It is marked read-only
+(it changes nothing on the page and leaves the thumbnail alone), so an AI app can call it
+in a fix loop without asking each time. Call it right after `publish_artifact`,
+`update_artifact` or `edit_artifact`.
 
 ## Related
 
