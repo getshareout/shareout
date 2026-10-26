@@ -67,7 +67,40 @@ describe('New button — only where the viewer can create', () => {
   it('does not depend on AI: present with Create with AI off, and Create with AI stays gated', () => {
     const off = buildWorkspaceBody({ ...base, workspaceId: 'wsp_1', workspaceRole: 'member', createEnabled: false } as RenderArgs);
     expect(off).toContain('id="wsxNewBtn"');
-    expect(off).not.toContain('id="wsxCreateBtn"');
+    expect(off).not.toContain('data-ai="1"');
+  });
+});
+
+describe('Rail structure', () => {
+  const rbase = { user: { id: 'u', email: null }, userInfo: null, workspaces: [], workspace: '', workspaceId: null, workspaceRole: null, createEnabled: true } as unknown as RenderArgs;
+  const rail = (a: Partial<RenderArgs>) => buildWorkspaceBody({ ...rbase, ...a } as RenderArgs);
+  const visible = (html: string) => Array.from(html.matchAll(/<button class="wsx-lens[^"]*" data-lens="(\w+)" type="button"(?! hidden)/g)).map((m) => m[1]);
+  const hidden = (html: string) => Array.from(html.matchAll(/data-lens="(\w+)" type="button" hidden/g)).map((m) => m[1]);
+
+  it('personal: Home, Artifacts, AI skills, Automations', () => {
+    const h = rail({});
+    expect(visible(h)).toEqual(['brief', 'artifacts', 'library', 'schedules']);
+    expect(hidden(h)).toEqual(expect.arrayContaining(['alerts', 'connect', 'analytics']));
+    expect(hidden(h)).not.toContain('library');
+    expect(h).not.toContain('wsx__railgroup-title');
+  });
+
+  it('member: adds Data; Tables/Knowledge/Catalog/Alerts stay reachable', () => {
+    const h = rail({ workspaceId: 'wsp_1', workspaceRole: 'member' });
+    expect(visible(h)).toEqual(['brief', 'artifacts', 'library', 'schedules', 'connectors']);
+    expect(hidden(h)).toEqual(expect.arrayContaining(['alerts', 'datasets', 'knowledge', 'catalog']));
+    expect(hidden(h)).not.toContain('crew');
+  });
+
+  it('admin: adds Admin and AI tasks (as an Automations chip)', () => {
+    const h = rail({ workspaceId: 'wsp_1', workspaceRole: 'admin' });
+    expect(visible(h)).toEqual(['brief', 'artifacts', 'library', 'schedules', 'connectors', 'admin']);
+    expect(hidden(h)).toContain('crew');
+    expect(h).toContain('data-sib="crew"');
+  });
+
+  it('has no separate Create with AI button', () => {
+    expect(rail({})).not.toContain('wsxCreateBtn');
   });
 });
 
@@ -75,15 +108,17 @@ describe('New menu', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   let opened: unknown[];
   let edited: unknown[];
+  let entered = 0;
   const panes: Record<string, unknown> = {};
 
-  function setup() {
-    document.body.innerHTML = '<div id="wsx"><div data-lens="assets"></div><button id="wsxAssetUpload"></button></div><button id="wsxNewBtn" aria-expanded="false"></button><div id="wsxNewMenu" hidden></div>';
+  function setup(ai = false) {
+    document.body.innerHTML = '<div id="wsx"><div data-lens="assets"></div><button id="wsxAssetUpload"></button></div><button id="wsxNewBtn" aria-expanded="false"' + (ai ? ' data-ai="1"' : '') + '></button><div id="wsxNewMenu" hidden></div>';
     fetchMock = vi.fn();
-    opened = []; edited = [];
+    opened = []; edited = []; entered = 0;
     const ws = document.getElementById('wsx');
     load(newMenuJs, [], {
       ws,
+      enterCreate: () => { entered++; },
       panes,
       fetch: (...a: unknown[]) => fetchMock(...a),
       showToast: () => {},
@@ -102,6 +137,15 @@ describe('New menu', () => {
     expect(items()).toEqual(['Subir archivos', 'Documento en blanco', 'Desde una plantilla']);
     (document.querySelector('[data-new="tpl"]') as HTMLButtonElement).click();
     expect(items()).toEqual(['Informe', 'Minuta de reunión', 'Propuesta']);
+  });
+
+  it('leads with "Describe it to AI" when AI create is on, and opens the composer', () => {
+    setup(true);
+    (document.getElementById('wsxNewBtn') as HTMLButtonElement).click();
+    expect(items()).toEqual(['Describe it to AI', 'Upload files', 'Blank document', 'From a template']);
+    (document.querySelector('[data-new="ai"]') as HTMLButtonElement).click();
+    expect(entered).toBe(1);
+    expect(document.getElementById('wsxNewMenu')!.hidden).toBe(true);
   });
 
   it('creates from a template in the current workspace and opens it in Edit', async () => {

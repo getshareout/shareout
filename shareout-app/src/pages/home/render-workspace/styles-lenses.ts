@@ -29,6 +29,7 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 .wsx-vwr__n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wsx-vwr__more { margin-top: var(--space-2); background: none; border: 0; padding: 0; color: var(--color-primary); font-size: 12px; cursor: pointer; }
 /* ---- Lens intro + quick-action tiles (Schedules / Alerts empty states) ---- */
+.wsx-sibs { margin-bottom: var(--space-3); }
 .wsx__viewtitle:has(.wsx-lens__q) { display: flex; align-items: center; gap: 8px; }
 .wsx-lens__q { display: inline-grid; place-items: center; flex: none; width: 18px; height: 18px; padding: 0; border-radius: 999px; border: 1.5px solid var(--color-border-strong); background: transparent; color: var(--color-text-tertiary); font: 700 11px var(--font-body); line-height: 1; cursor: help; transition: color var(--duration-fast), border-color var(--duration-fast); }
 .wsx-lens__q:hover, .wsx-lens__q:focus-visible { color: var(--color-text); border-color: var(--color-text-secondary); }

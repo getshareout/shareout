@@ -18,8 +18,6 @@ export const workspace_client_create_ai_JS = `  // ===== Create with AI (in-Stud
     createMode = false; ws.classList.remove('is-create');
     ask.placeholder = t('composer.placeholder');
   }
-  var createBtn = document.getElementById('wsxCreateBtn');
-  if (createBtn) createBtn.addEventListener('click', enterCreate);
 
   function createSend(text) { if (!text) return; addMsg('user', text); createPlan(text); }
   function createPlan(prompt) {

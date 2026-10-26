@@ -5,6 +5,8 @@ export const NEW_MENU_COPY: HomeLocaleCopy = {
   en: {
     'nav.new': 'New',
     'new.menu': 'Create something new',
+    'new.ai': 'Describe it to AI',
+    'new.aiHint': 'Say what you need; AI builds it',
     'new.upload': 'Upload files',
     'new.uploadHint': 'Documents become artifacts; the rest goes to Assets',
     'new.blank': 'Blank document',
@@ -24,6 +26,8 @@ export const NEW_MENU_COPY: HomeLocaleCopy = {
   es: {
     'nav.new': 'Nuevo',
     'new.menu': 'Crear algo nuevo',
+    'new.ai': 'Describilo a la IA',
+    'new.aiHint': 'Contá qué necesitás y la IA lo arma',
     'new.upload': 'Subir archivos',
     'new.uploadHint': 'Los documentos son artefactos; el resto va a Recursos',
     'new.blank': 'Documento en blanco',

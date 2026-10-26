@@ -417,7 +417,8 @@ describe('buildWorkspaceView — Phase 1 shell SSR', () => {
   it('Create with AI runs in the chat: no create view, planner/build via /v1/create/generate', () => {
     const { body, scripts } = buildWorkspaceView(args);
     expect(body).not.toContain('data-view="create"'); // no separate create screen
-    expect(body).toContain('id="wsxCreateBtn"');     // rail Create button (no nav-away)
+    expect(body).toContain('data-ai="1"');          // New menu offers Describe it to AI (no nav-away)
+    expect(body).not.toContain('id="wsxCreateBtn"');
     expect(body).not.toContain("location.href='/create'");
     expect(scripts).toContain('/v1/create/generate'); // reuses the create endpoints
     expect(scripts).toContain('renderClarify');       // one-by-one questions
@@ -425,7 +426,7 @@ describe('buildWorkspaceView — Phase 1 shell SSR', () => {
 
   it('hides Create with AI when ai.create is off for the workspace', () => {
     const { body } = buildWorkspaceView({ ...args, createEnabled: false });
-    expect(body).not.toContain('id="wsxCreateBtn"');
+    expect(body).not.toContain('data-ai="1"');
   });
 });
 

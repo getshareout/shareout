@@ -28,26 +28,28 @@ function buildNav(args: RenderArgs, canManage: boolean): NavGroup[] {
   const ws = !!(args.workspaceId || args.workspace);
   const v = (key: string, label: string, icon: NavItem['icon']): NavItem => ({ key, label, i18n: `nav.${key}`, icon, kind: 'view' });
   const groups: NavGroup[] = [
-    { items: [v('brief', 'Home', 'brief'), v('artifacts', 'Artifacts', 'browse')] },
-    { title: 'Library', i18n: 'nav.group.library', items: [v('library', 'AI skills', 'library')] },
-    { title: 'Automation', i18n: 'nav.group.automation', items: [v('schedules', 'Scheduled', 'recent'), v('alerts', 'Alerts', 'alert'), ...(ws && canManage ? [v('crew', 'AI tasks', 'crew')] : [])] },
-    { title: 'Data', i18n: 'nav.group.data', items: ws ? [v('connectors', 'Data sources', 'plug'), v('datasets', 'Tables', 'datasets')] : [] },
-    { title: 'Context', i18n: 'nav.group.context', items: ws ? [v('knowledge', 'Knowledge', 'knowledge'), v('catalog', 'Catalog', 'catalog')] : [] },
+    { items: [v('brief', 'Home', 'brief'), v('artifacts', 'Artifacts', 'browse'), v('library', 'AI skills', 'library'), v('schedules', 'Automations', 'recent'), ...(ws ? [{ ...v('connectors', 'Data', 'plug'), i18n: 'nav.data' }] : [])] },
     { items: ws && canManage ? [v('admin', 'Admin', 'admin')] : [] },
   ];
   return groups.filter(g => g.items.length);
 }
 
+/** Views grouped under one rail item; the rail button opens the first, chips switch between them. */
+const AUTOMATION_VIEWS: [string, string, string][] = [['schedules', 'nav.schedules', 'Automations'], ['alerts', 'nav.alerts', 'Alerts'], ['crew', 'nav.crew', 'AI tasks']];
+const DATA_VIEWS: [string, string, string][] = [['connectors', 'nav.connectors', 'Data sources'], ['datasets', 'nav.datasets', 'Tables'], ['knowledge', 'nav.knowledge', 'Knowledge'], ['catalog', 'nav.catalog', 'Catalog']];
+
+function siblingChips(views: [string, string, string][], active: string, args: RenderArgs, canManage: boolean): string {
+  const ws = !!(args.workspaceId || args.workspace);
+  const list = views.filter(([k]) => k !== 'crew' || (ws && canManage));
+  return `<div class="wsx__chips wsx-sibs" role="group">${list.map(([k, i18n, label]) => `<button class="wsx-chip${k === active ? ' is-on' : ''}" data-sib="${k}" type="button" data-i18n="${i18n}">${label}</button>`).join('')}</div>`;
+}
+
 /** Lenses kept out of the rail but still reachable (account menu, ⌘K, onboarding, ?view=). */
 const HIDDEN_LENSES = ['connect', 'analytics'];
 
-function railHtml(groups: NavGroup[]): string {
-  return groups.map((g, gi) => {
-    const head = gi === 0 ? '' : g.title
-      ? `<div class="wsx__railgroup-title" data-i18n="${g.i18n}">${g.title}</div>`
-      : '<div class="wsx__raildiv"></div>';
-    return head + g.items.map(n => railNav(n, n.key === 'brief')).join('');
-  }).join('') + HIDDEN_LENSES.map(k => `<button class="wsx-lens" data-lens="${k}" type="button" hidden><span data-i18n="nav.${k}"></span></button>`).join('');
+function railHtml(groups: NavGroup[], hidden: string[]): string {
+  return groups.map((g, gi) => (gi === 0 ? '' : '<div class="wsx__raildiv"></div>') + g.items.map(n => railNav(n, n.key === 'brief')).join('')).join('')
+    + hidden.map(k => `<button class="wsx-lens" data-lens="${k}" type="button" hidden><span data-i18n="nav.${k}"></span></button>`).join('');
 }
 
 /** Builds the static workspace DOM inserted into the page body. */
@@ -58,6 +60,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
     ? `<img class="wsx__avatar" src="${escapeHtml(args.userInfo.picture)}" alt="">`
     : `<span class="wsx__avatar">${initial}</span>`;
   const canManage = canManageWorkspace(args);
+  const ws = !!(args.workspaceId || args.workspace);
 
   const brandWs = args.workspaceId ? args.workspaces.find(w => w.id === args.workspaceId) : undefined;
   const brandWsBranding = brandWs ? parseBranding(brandWs.branding) : null;
@@ -97,10 +100,9 @@ export function buildWorkspaceBody(args: RenderArgs): string {
         <button class="wsx__collapse" id="wsxCollapse" type="button" data-i18n-title="nav.collapse" data-i18n-aria="nav.collapse" title="Collapse" aria-label="Collapse sidebar">${svg('<path d="M15 6l-6 6 6 6"/>')}</button>
         <button class="wsx__railclose" id="wsxRailClose" type="button" data-i18n-aria="nav.closeMenu" aria-label="Close menu">${svg('<path d="M6 6l12 12M18 6L6 18"/>')}</button>
       </div>
-      ${args.createEnabled ? `<button class="wsx__create" id="wsxCreateBtn" type="button" data-tip-rail data-i18n-tip="nav.create" data-tip="Create with AI">${svg(ICON.foryou)}<span data-i18n="nav.create">Create with AI</span></button>` : ''}
-      ${canCreateHere(args) ? `<button class="wsx__new" id="wsxNewBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="wsxNewMenu" data-tip-rail data-i18n-tip="nav.new" data-tip="New">${svg('<path d="M12 5v14M5 12h14"/>')}<span data-i18n="nav.new">New</span></button>` : ''}
+      ${canCreateHere(args) ? `<button class="wsx__new" id="wsxNewBtn" type="button"${args.createEnabled ? ' data-ai="1"' : ''} aria-haspopup="menu" aria-expanded="false" aria-controls="wsxNewMenu" data-tip-rail data-i18n-tip="nav.new" data-tip="New">${svg('<path d="M12 5v14M5 12h14"/>')}<span data-i18n="nav.new">New</span></button>` : ''}
       <button class="wsx__search" id="wsxOpenSearch" type="button" data-i18n-aria="palette.aria" aria-label="Search" data-i18n-title="palette.aria" title="Search (⌘K)">${svg('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>')}<span class="wsx__search-label" data-i18n="palette.search">Search</span><kbd class="wsx__search-kbd">⌘K</kbd></button>
-      ${railHtml(buildNav(args, canManage))}
+      ${railHtml(buildNav(args, canManage), [...HIDDEN_LENSES, 'alerts', ...(ws ? ['datasets', 'knowledge', 'catalog', ...(canManage ? ['crew'] : [])] : [])])}
       <div class="wsx__railspace"></div>
       <footer class="wsx__railfoot">
         <button class="wsx__footbtn" id="wsxHelpBtn" type="button" data-i18n-aria="help.title" data-i18n-tip="help.title" aria-label="Help &amp; support" data-tip="Help &amp; support">${svg('<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/>')}</button>
@@ -177,10 +179,12 @@ export function buildWorkspaceBody(args: RenderArgs): string {
             <div id="wsxAssetMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="schedules">
+            ${siblingChips(AUTOMATION_VIEWS, 'schedules', args, canManage)}
             <h2 class="wsx__viewtitle" data-i18n="view.mySchedules">My Schedules</h2>
             <div id="wsxSchedMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="alerts">
+            ${siblingChips(AUTOMATION_VIEWS, 'alerts', args, canManage)}
             <h2 class="wsx__viewtitle" data-i18n="view.myAlerts">My Alerts</h2>
             <div id="wsxAlertMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
@@ -189,19 +193,23 @@ export function buildWorkspaceBody(args: RenderArgs): string {
             <div id="wsxAnalyticsMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="datasets">
+            ${siblingChips(DATA_VIEWS, 'datasets', args, canManage)}
             <h2 class="wsx__viewtitle"><span data-i18n="view.datasets">Datasets</span><button class="wsx-lens__q" type="button" data-i18n-tip="intro.datasets" data-i18n-aria="intro.datasets" data-tip="Tables that workspace pages have shared. Any page in the workspace can read them." aria-label="Tables that workspace pages have shared. Any page in the workspace can read them.">?</button></h2>
             <div id="wsxDatasetMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="catalog">
+            ${siblingChips(DATA_VIEWS, 'catalog', args, canManage)}
             <h2 class="wsx__viewtitle"><span data-i18n="view.catalog">Catalog</span><button class="wsx-lens__q" type="button" data-i18n-tip="intro.catalog" data-i18n-aria="intro.catalog" data-tip="Your workspace data map — sources, datasets, pipelines and terms, with lineage. Agents keep it current; search to trace where data comes from." aria-label="Your workspace data map — sources, datasets, pipelines and terms, with lineage. Agents keep it current; search to trace where data comes from.">?</button></h2>
             <div id="wsxCatMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="knowledge">
+            ${siblingChips(DATA_VIEWS, 'knowledge', args, canManage)}
             <div class="wsx-kn2__titlerow"><h2 class="wsx__viewtitle"><span data-i18n="view.knowledge">Knowledge</span><button class="wsx-lens__q" type="button" id="knHow" data-i18n-tip="intro.knowledge" data-i18n-aria="intro.knowledge" data-tip="What your workspace has learned from its pages — topics, clients and facts, kept up to date as you publish. Search it, or open a page to see where a fact came from." aria-label="What your workspace has learned from its pages — topics, clients and facts, kept up to date as you publish. Search it, or open a page to see where a fact came from.">?</button></h2>
             <div id="knStats"></div><div class="wsx-kn2__ctlright" id="knActions"></div></div>
             <div id="wsxKnMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="crew">
+            ${siblingChips(AUTOMATION_VIEWS, 'crew', args, canManage)}
             <h2 class="wsx__viewtitle"><span data-i18n="view.crew">Crew AI</span><button class="wsx-lens__q" type="button" data-i18n-tip="intro.crew" data-i18n-aria="intro.crew" data-tip="Autonomous agents that run on a schedule or an event, read your workspace data, and deliver a result. Run one now, pause it, or check its history." aria-label="Autonomous agents that run on a schedule or an event, read your workspace data, and deliver a result. Run one now, pause it, or check its history.">?</button></h2>
             <div id="wsxCrewMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
@@ -223,6 +231,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
             <div id="wsxCnMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="connectors">
+            ${siblingChips(DATA_VIEWS, 'connectors', args, canManage)}
             <h2 class="wsx__viewtitle"><span data-i18n="view.connectors">Connectors</span><button class="wsx-lens__q" type="button" data-i18n-tip="intro.connectors" data-i18n-aria="intro.connectors" data-tip="Data sources your workspace can query by name — bring your own credentials once, then use them from any page." aria-label="Data sources your workspace can query by name — bring your own credentials once, then use them from any page.">?</button></h2>
             <div id="wsxConnMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
