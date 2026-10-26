@@ -133,7 +133,7 @@ The calls, from broad to specific:
 GET /v1/workspaces/{workspaceId}/knowledge/entities?type=Organization&q=acme&limit=20
 ```
 
-Returns `types` (each entity type with its count) and `entities`, most-mentioned first. Each entity has `id`, `type`, `name`, `aliases`, `mentions` and up to five `sources`.
+Returns `types` (each entity type with its count) and `entities`, most-mentioned first. Each entity has `id`, `type`, `name`, `aliases`, `mentions` and up to five `sources`. `name` and `aliases` are only names that appear in a source you can open, and `q` matches only those — the same holds for the `other` entity in `relations` and for `graph` nodes.
 
 ```http
 GET /v1/workspaces/{workspaceId}/knowledge/entities/{entityId}?format=md

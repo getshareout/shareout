@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { env } from 'cloudflare:test';
+import { env, runInDurableObject } from 'cloudflare:test';
 import type { Env } from '../../../src/types';
 
 const validateToken = vi.hoisted(() => vi.fn());
@@ -17,6 +17,7 @@ import { queueKnowledgeSource } from '../../../src/knowledge/corpus/ingest';
 import { routeKnowledgeApi } from '../../../src/router/api/knowledge';
 import { createFetchContext } from '../../../src/router/context';
 import { setKnowledgeEnabled } from '../../../src/knowledge';
+import { corpusFor } from '../../../src/knowledge/corpus/client';
 
 const base = env as unknown as Env;
 let n = 0;
@@ -24,7 +25,9 @@ const nextWs = () => `wsp_graph_${++n}_${Date.now()}`;
 
 // A deterministic stand-in for the JSON-mode model: names it recognises become
 // entities, "X is a client of Y" a relation, "budget is N" a fact — each quoting
-// the sentence it came from, like the real prompt asks.
+// the sentence it came from, like the real prompt asks. "codename X" makes X an alias;
+// ALIAS-ECHO makes it repeat a name the sentence never says (the real model is shown
+// the workspace's known names and can echo one).
 const NAMES = ['Acme Inc.', 'ACME', 'Northwind', 'Contoso'];
 function fakeExtraction(user: string) {
   const out = { entities: [] as object[], relations: [] as object[], facts: [] as object[] };
@@ -32,7 +35,10 @@ function fakeExtraction(user: string) {
     const chunk = Number(/^\[(\d+)\]/.exec(block)?.[1]);
     for (const sentence of block.split(/(?<=\.)\s+(?=[A-Z])|\n/)) {
       for (const name of NAMES) {
-        if (sentence.includes(name)) out.entities.push({ chunk, name, type: 'organization', quote: sentence.trim() });
+        if (!sentence.includes(name)) continue;
+        const codename = /codename ([A-Z]\w*(?: [A-Z]\w*)*)/.exec(sentence)?.[1];
+        const aliases = codename ? [codename] : sentence.includes('ALIAS-ECHO') && name === 'Acme Inc.' ? ['Project Falcon'] : [];
+        out.entities.push({ chunk, name, type: 'organization', aliases, quote: sentence.trim() });
       }
       const rel = /(\w[\w.]*(?: Inc\.)?) is a client of (\w+)/.exec(sentence);
       if (rel) out.relations.push({ chunk, from: rel[1], type: 'client of', to: rel[2], quote: sentence.trim() });
@@ -197,6 +203,54 @@ describe('knowledge graph', () => {
     expect(after.sources.map((x) => x.id)).toEqual(['dlv_g4']);
     expect(await facts(after.id)).toEqual(['25k']);
     expect((await get<EntityList>(e, ws, 'entities')).body.entities.find((x) => x.name === 'Contoso')).toBeUndefined();
+  });
+
+  it('shows and matches an entity only under names that a source the reader may open uses', async () => {
+    const e = withModel();
+    const ws = nextWs();
+    await setKnowledgeEnabled(e, ws, true);
+    await putFile(e, ws, 'dlv_n1', 'Acme Inc. is a client of Northwind ALIAS-ECHO.');
+    await putFile(e, ws, 'dlv_n2', 'ACME, codename Project Falcon, is planning a merger.', { owner: 'u2', visibility: 'private' });
+    type Named = { entities: { id: string; name: string; aliases: string[] }[] };
+
+    // u1 may open dlv_n1 only.
+    const list = (await get<Named>(e, ws, 'entities')).body;
+    const acme = list.entities.find((x) => x.name === 'Acme Inc.')!;
+    expect(acme.aliases).toEqual([]);
+    expect(JSON.stringify(list)).not.toMatch(/Falcon|ACME/);
+    // A search can't confirm a name only the private File uses.
+    expect((await get<Named>(e, ws, 'entities?q=Falcon')).body.entities).toEqual([]);
+    expect((await get<Named>(e, ws, 'entities?q=Project%20Falcon')).body.entities).toEqual([]);
+    expect((await get<Named>(e, ws, 'entities?q=acme')).body.entities.map((x) => x.id)).toEqual([acme.id]);
+    for (const sub of [`entities/${acme.id}`, `entities/${acme.id}?format=md`, `graph?focus=${acme.id}`, 'graph']) {
+      expect(JSON.stringify((await get(e, ws, sub)).body)).not.toContain('Falcon');
+    }
+
+    // The owner of the private File sees and finds it under that name.
+    getSessionUser.mockResolvedValue({ id: 'u2', email: 'u2@example.com' });
+    const owner = (await get<Named>(e, ws, 'entities?q=Falcon')).body.entities;
+    expect(owner.map((x) => x.id)).toEqual([acme.id]);
+    expect(owner[0].aliases).toEqual(expect.arrayContaining(['ACME', 'Project Falcon']));
+  });
+
+  it('a store that learned names before they were kept per source gets them from the passages, once', async () => {
+    const e = withModel();
+    const ws = nextWs();
+    await setKnowledgeEnabled(e, ws, true);
+    await putFile(e, ws, 'dlv_n3', 'Acme Inc. is a client of Northwind ALIAS-ECHO.');
+    await putFile(e, ws, 'dlv_n4', 'ACME, codename Project Falcon, is planning a merger.', { owner: 'u2', visibility: 'private' });
+    // Back to how such a store looked: names only on the entity, merged from every source.
+    await runInDurableObject(corpusFor(e, ws)!, (_instance, state) => {
+      state.storage.sql.exec('DELETE FROM entity_names');
+      state.storage.sql.exec("DELETE FROM meta WHERE key = 'entity_names_v1'");
+    });
+    type Named = { entities: { id: string; name: string; aliases: string[] }[] };
+    const list = (await get<Named>(e, ws, 'entities')).body;
+    expect(list.entities.find((x) => x.name === 'Acme Inc.')).toBeTruthy();
+    expect(JSON.stringify(list)).not.toContain('Falcon');
+    expect((await get<Named>(e, ws, 'entities?q=Falcon')).body.entities).toEqual([]);
+    getSessionUser.mockResolvedValue({ id: 'u2', email: 'u2@example.com' });
+    expect((await get<Named>(e, ws, 'entities?q=Falcon')).body.entities).toHaveLength(1);
   });
 
   it('meters every extraction call at the model’s price', async () => {
