@@ -37,7 +37,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Editable spreadsheet grid in an artifact | [sdk/grid.md](sdk/grid.md) | [sdk/table.md](sdk/table.md), [integrations/google-sheets.md](integrations/google-sheets.md) |
 | Live Mixpanel / BigQuery / REST in HTML | [sdk/live-data.md](sdk/live-data.md) | [sdk/connections.md](sdk/connections.md), [integrations/overview.md](integrations/overview.md) |
 | Page reads each viewer's own Notion / Linear / any MCP server (members-only) | [sdk/mcp.md](sdk/mcp.md) | [team/workspace-connections.md](team/workspace-connections.md) |
-| Show viewers where data comes from / data sources drawer / how to replicate | [patterns/data-provenance.md](patterns/data-provenance.md) | [core/html-spec/manifest.md](core/html-spec/manifest.md#provenance-where-the-data-comes-from), [agents/crew.md](agents/crew.md) |
+| Show viewers where data comes from / Data button / sources API / how to replicate | [patterns/data-provenance.md](patterns/data-provenance.md) | [core/html-spec/manifest.md](core/html-spec/manifest.md#provenance-where-the-data-comes-from), [agents/crew.md](agents/crew.md) |
 | Data catalog / governance / lineage / glossary; ground the agent on real tables (catalog_search/catalog_get) | [team/catalog.md](team/catalog.md) | [team/workspace-connections.md](team/workspace-connections.md), [patterns/data-provenance.md](patterns/data-provenance.md) |
 | Presentation/slides | [modules/slides/overview.md](modules/slides/overview.md) | [modules/slides/sdk-api.md](modules/slides/sdk-api.md) |
 | Deck viewer analytics / tracked links / who opened my deck | [modules/slides/analytics.md](modules/slides/analytics.md) | [modules/slides/sdk-api.md](modules/slides/sdk-api.md) |
@@ -80,6 +80,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Run Python in-browser | [sdk/python.md](sdk/python.md) | [integrations/overview.md](integrations/overview.md) |
 | Scheduled notifications | [api/jobs.md](api/jobs.md) | [api/overview.md](api/overview.md) |
 | Deterministic warehouse/json snapshot refresh | [api/jobs.md](api/jobs.md#querysnapshotconfig) | [agents/crew.md](agents/crew.md), [sdk/connections.md](sdk/connections.md) |
+| Check a published page: what viewers see, what broke (desktop + phone) | [api/verify.md](api/verify.md) | [creating/pre-ship.md](creating/pre-ship.md) |
 | Add a safety net / test an artifact won't break on change | [api/tests.md](api/tests.md) | [sdk/table.md](sdk/table.md), [sdk/json.md](sdk/json.md) |
 | Alert when a metric/KPI crosses a threshold | [api/metric-alerts.md](api/metric-alerts.md) | [patterns/dashboards.md](patterns/dashboards.md#followable-kpis-metric-alerts) |
 | Watch a table metric for sharp moves (bell only) | [api/metric-watch.md](api/metric-watch.md) | [patterns/dashboards.md](patterns/dashboards.md#one-click-metric-watches-simpler) |

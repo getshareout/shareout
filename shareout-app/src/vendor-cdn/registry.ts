@@ -55,6 +55,8 @@ export const VENDOR_PACKAGES: ReadonlySet<string> = new Set([
   'three',
   'gsap',
   'zod',
+  // accessibility checks — the verify render injects it (src/verify/run.ts)
+  'axe-core',
 ]);
 
 export const VENDOR_PREFIX = '/vendor/';

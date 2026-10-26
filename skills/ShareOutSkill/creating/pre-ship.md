@@ -1,5 +1,12 @@
 # Pre-ship — the self-QA gate
 
+The loop is **publish → verify → fix**: tick this list, publish, then run
+[`POST /v1/artifacts/{id}/verify`](../api/verify.md) (MCP: `verify_artifact`) and fix what
+it reports before you hand over the link. Verify sees the page the way viewers get it —
+desktop and phone, with script errors, failed files, blocked CDNs, accessibility,
+overflow and tap targets — and catches most of the boxes below that can be checked by
+machine. The rest (states, copy, taste) stay your job.
+
 Run this before every publish. If a box can't be honestly ticked, it's not done. This catches the failures the build flow is meant to prevent: missing states, inaccessible UI, generic looks, SDK errors, moderation surprises. It consolidates the design pre-ship list in [../modules/ui/taste.md](../modules/ui/taste.md#pre-ship-checklist) with the platform gotchas from [stack.md](stack.md).
 
 ## States
@@ -60,12 +67,22 @@ Run this before every publish. If a box can't be honestly ticked, it's not done.
 
 ## Provenance & meta
 
-- [ ] Data-backed artifact declares its **sources** (label/description/query) so viewers can answer "where does this come from?" See [../patterns/data-provenance.md](../patterns/data-provenance.md).
+- [ ] Data-backed artifact declares its **sources** (label/description/query, `as_of`/`refresh`) and links charts/tables to them (`data-shareout-source` or `feeds`). Viewers see them automatically in the page's **Data** button — check it says where each number comes from. See [../patterns/data-provenance.md](../patterns/data-provenance.md).
 - [ ] Real `<title>`, meta description, and `og:image` for sharing; a favicon.
 
-## Then publish
+## Then publish → verify → fix
 
 Pipe the payload to `curl` (Cloudflare blocks Python `urllib` with `403 error code: 1010`). See [Publishing](../SKILL.md#publishing). Read back the advisory `editor_readiness` profile and share the one-line summary with the user — treat it as guidance, not a gate.
+
+Then verify the published page and look at its screenshots:
+
+```bash
+curl -sS -X POST "$ORIGIN/v1/artifacts/$ID/verify" -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{}'
+```
+
+Fix every `error` (each has `where` and a `hint`), then the warnings, publish again and
+verify again until `status` is `pass`. See [../api/verify.md](../api/verify.md).
 
 ## Related
 
@@ -73,3 +90,4 @@ Pipe the payload to `curl` (Cloudflare blocks Python `urllib` with `403 error co
 - [../modules/ui/taste.md](../modules/ui/taste.md#pre-ship-checklist) — the deep design checklist
 - [overview.md](overview.md) — the full build flow
 - [../api/artifacts.md](../api/artifacts.md) — publish + editor_readiness
+- [../api/verify.md](../api/verify.md) — verify a published page (desktop + phone)

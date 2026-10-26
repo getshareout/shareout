@@ -10,7 +10,7 @@ Copy-paste reference implementations with best practices baked in. Adapt librari
 | [Tables](tables.md) | Data display, filtering, sorting | `sdk.table()` |
 | [Dashboards](dashboards.md) | Charts, KPIs, metrics | `sdk.json` + data sources |
 | [Uploads](uploads.md) | File uploads, galleries | `sdk.blobs` |
-| [Data provenance](data-provenance.md) | "Where does this data come from?" drawer + badges | manifest + `so.sources` |
+| [Data provenance](data-provenance.md) | "Where does this data come from?" — the viewer's Data button, automatic | manifest provenance + `feeds` |
 | [Performance](performance.md) | Instant first paint, no blank screen | any |
 
 ## Best Practices (All Patterns)

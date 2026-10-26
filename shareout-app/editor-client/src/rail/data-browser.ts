@@ -10,6 +10,7 @@ import { syncHtmlFromCanvas } from '../history/html-sync';
 import { markDirty } from '../persistence/draft';
 import { pushUndo } from '../history/undo-redo';
 import { renderConnectPanel } from './connect-panel';
+import { renderSourcesSection } from './sources-section';
 
 const log = createLogger('data-browser');
 
@@ -82,6 +83,7 @@ export async function renderDataBrowser(ctx: EditorContext): Promise<void> {
   const rowCounts = await fetchTableRowCounts(ctx, dataModel?.tables ?? []);
 
   host.innerHTML = `
+    <div id="data-sources"></div>
     ${renderJsonSection(jsonKeys)}
     ${renderFilesSection(files)}
     ${renderDataModelMarkup(dataModel, rowCounts)}
@@ -90,6 +92,10 @@ export async function renderDataBrowser(ctx: EditorContext): Promise<void> {
 
   wireJson(ctx, host);
   wireFiles(ctx, host);
+
+  // Where the published page's data comes from, and what each source feeds.
+  const sourcesHost = host.querySelector<HTMLElement>('#data-sources');
+  if (sourcesHost) void renderSourcesSection(ctx, sourcesHost);
 
   // Connectors live inside Data now — same panel renderer, hosted in this section.
   const connHost = host.querySelector<HTMLElement>('#data-connectors');

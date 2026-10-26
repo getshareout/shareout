@@ -42,6 +42,8 @@ function load() {
     i18nLoad: () => '',
     fetchMeta: () => {},
     setEditMode: () => {}, publishEdit: () => {}, undoEdit: () => {}, redoEdit: () => {}, discardDraft: () => {},
+    // Soft export of the lazy 'data' chunk; the shell's chunk loader keeps it a no-op until the chunk loads.
+    dataClear: () => {},
     openComposer: () => composer.setAttribute('data-state', 'sheet'),
     setComposer: (s: string) => composer.setAttribute('data-state', s),
     scrollEnd: () => {},

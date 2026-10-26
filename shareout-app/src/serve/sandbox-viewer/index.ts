@@ -40,6 +40,7 @@ import { renderLoadingHideScript } from './loading';
 import { renderPageBridge } from '../page-agent';
 import { buildToolbarContext } from './toolbar/context';
 import { renderToolbar } from './toolbar';
+import { renderDataSourcesBridge, renderDataSourcesPanel } from './data-sources';
 import { getViewerConfig } from '../../data/viewer-config';
 import { isVisualEditorEnabled } from '../../editor/visual-editor-gate';
 import { localeForArtifactWorkspace, localeFromAcceptLanguage } from '../../i18n/locale';
@@ -243,6 +244,13 @@ export async function serveSandboxedViewer(
         locale,
       });
       const toolbar = toolbarContext ? renderToolbar(toolbarContext) : '';
+      // "Data" pill + Data sources panel for every viewer, toolbar or not. Hidden until
+      // the artifact frame says it shows data; follows the owner's hide-toolbar choice.
+      const dataSources = studioEmbed
+        ? renderDataSourcesBridge()
+        : viewerConfig.hide_toolbar ? '' : renderDataSourcesPanel({
+          artifactId, page: entrypoint, locale, visible: mcpPage, withVars: !toolbar,
+        });
       const bodyClass = viewerConfig.hide_toolbar
         ? ''
         : viewerConfig.show_on_mobile
@@ -260,7 +268,7 @@ export async function serveSandboxedViewer(
         ? `<script>document.body.className=${JSON.stringify(bodyClass)}</script>`
         : '') + (locale !== earlyLang ? `<script>document.documentElement.lang=${JSON.stringify(locale)}</script>` : '');
 
-      const restOfHtml = `${headLinks ? '  ' + headLinks + '\n' : ''}  ${inlinedStyleBlock}${initialDataScript}${mobileSdkScript}${bridgeScript}${bodyClassScript}${contentHost ? '' : '\n  ' + iframeHtml}${toolbar}
+      const restOfHtml = `${headLinks ? '  ' + headLinks + '\n' : ''}  ${inlinedStyleBlock}${initialDataScript}${mobileSdkScript}${bridgeScript}${bodyClassScript}${contentHost ? '' : '\n  ' + iframeHtml}${toolbar}${dataSources}
   ${renderLoadingHideScript()}
 </body>
 </html>`;

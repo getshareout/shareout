@@ -11,6 +11,7 @@ import { detectComponents } from './detector';
 import { getPlatformOrigin } from '../config/origins';
 import { openVisibilityDisabled } from '../visibility-config';
 import { getAIProvider } from '../data/agent/anthropic';
+import { getWorkspaceLocale } from '../i18n/locale';
 import { isHtmlDocument, markdownEditPayload, markdownEditShell } from './markdown-edit';
 
 /** Binary artifact types: served as files, never opened in an editor. */
@@ -148,7 +149,7 @@ async function handleLoadEditor(
     // Get artifact info
     const artifact = await env.DB.prepare(`
       SELECT a.id, a.name, a.slug, a.visibility, a.owner_id, a.artifact_type,
-             d.version_id, v.entrypoint, v.version_no
+             d.version_id, d.updated_at AS live_updated_at, v.entrypoint, v.version_no
       FROM artifacts a
       LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
       LEFT JOIN versions v ON v.id = d.version_id
@@ -161,6 +162,7 @@ async function handleLoadEditor(
       owner_id: string;
       artifact_type: ArtifactType | null;
       version_id: string | null;
+      live_updated_at: string | null;
       entrypoint: string | null;
       version_no: number | null;
     }>();
@@ -192,13 +194,15 @@ async function handleLoadEditor(
 
     // Get user's draft if exists
     const draft = await env.DB.prepare(`
-      SELECT id, html_content, updated_at
+      SELECT id, html_content, created_at, updated_at, base_live_at
       FROM artifact_drafts
       WHERE artifact_id = ? AND user_id = ?
     `).bind(artifactId, ctx.userId).first<{
       id: string;
       html_content: string;
+      created_at: string;
       updated_at: string;
+      base_live_at: string | null;
     }>();
 
     // Get active editor sessions (collaborators)
@@ -258,6 +262,9 @@ async function handleLoadEditor(
         versionNo: artifact.version_no || 0,
         hasDraft: !!usableDraft,
         draftUpdatedAt: usableDraft?.updated_at,
+        // The live page this edit builds on (the draft's base, else the live page now):
+        // sent back on publish, which refuses with STALE_BASE if someone published since.
+        baseLiveAt: usableDraft ? (usableDraft.base_live_at ?? usableDraft.created_at) : artifact.live_updated_at ?? undefined,
         assets: assetRefs,
         collaborators,
       },
@@ -371,6 +378,7 @@ export async function serveEditorPage(
   description?: string | null,
   user?: { userId: string; userName: string; userAvatar?: string }
 ): Promise<Response> {
+  const locale = await artifactWorkspaceLocale(env, artifactId);
   const html = generateEditorPage({
     artifactId,
     slug,
@@ -384,6 +392,7 @@ export async function serveEditorPage(
     openVisDisabled: openVisibilityDisabled(env),
     // Soft signal for the Agent pane — never send keys to the client.
     aiEnabled: !!getAIProvider(env),
+    locale: locale ?? undefined,
   });
   return new Response(html, {
     headers: {
@@ -391,6 +400,18 @@ export async function serveEditorPage(
       'Cache-Control': 'no-cache',
     },
   });
+}
+
+/** The workspace's language for editor copy that has one (Data → Sources); the client
+ *  falls back to the browser's when the page is personal or the workspace sets none. */
+async function artifactWorkspaceLocale(env: Env, artifactId: string): Promise<'en' | 'es' | null> {
+  try {
+    const ws = await env.DB.prepare('SELECT workspace_id FROM artifacts WHERE id = ?')
+      .bind(artifactId).first<{ workspace_id: string | null }>();
+    return await getWorkspaceLocale(env, ws?.workspace_id);
+  } catch {
+    return null;
+  }
 }
 
 function errorResponse(code: string, message: string, status: number): Response {

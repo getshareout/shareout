@@ -203,7 +203,7 @@ describe('email_sends log, crew repeat guard, and sent-by footer', () => {
     await e.DB.exec(`DELETE FROM crews`);
     await e.DB.exec(`INSERT INTO crews (id, name) VALUES ('crew_legal', 'Monitor de novedades legales')`);
   });
-  const rows = () => e.DB.prepare('SELECT recipient, subject, source_kind, source_id, status, message_id FROM email_sends ORDER BY created_at, id').all().then((r) => r.results);
+  const rows = () => e.DB.prepare('SELECT recipient, subject, source_kind, source_id, status, message_id FROM email_sends ORDER BY recipient, created_at, rowid').all().then((r) => r.results);
 
   it('logs one row per recipient with its source', async () => {
     await sendArtifactEmail(e, 'art_es', { recipients: ['Ana@x.com', 'bo@x.com'], subject: 'Hola', body: 'b' });

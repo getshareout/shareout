@@ -103,6 +103,8 @@ export interface Env {
   STORAGE_MAX_FILE_BYTES?: string;
   /** Max public artifacts per account (anti-abuse). Unset or 0 = unlimited. */
   PUBLIC_ARTIFACT_LIMIT?: string;
+  /** Verify runs (POST /v1/artifacts/:id/verify, MCP verify_artifact) per user per UTC hour. Unset = 30. */
+  VERIFY_RUNS_PER_HOUR?: string;
   /**
    * Daily estimated egress per owner, in bytes. Over it, that owner's public
    * artifacts are auto-paused. Unset or 0 = no cap, the default — the egress is

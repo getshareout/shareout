@@ -6,7 +6,7 @@ import type { EditorConfigScriptOptions } from '../types';
 export function renderEditorConfigScript(options: EditorConfigScriptOptions): string {
   const {
     artifactId, slug, theme, baseUrl, name, description, userId, userName, userAvatar,
-    openVisDisabled, aiEnabled,
+    openVisDisabled, aiEnabled, locale,
   } = options;
   const config: Record<string, string | boolean> = {
     artifactId,
@@ -22,6 +22,7 @@ export function renderEditorConfigScript(options: EditorConfigScriptOptions): st
   if (userId) config.userId = userId;
   if (userName) config.userName = userName;
   if (userAvatar) config.userAvatar = userAvatar;
+  if (locale) config.locale = locale;
 
   const lines = Object.entries(config).map(
     ([key, value]) => `      ${key}: ${JSON.stringify(value).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')}`

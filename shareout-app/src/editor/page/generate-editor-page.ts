@@ -19,7 +19,7 @@ export const EDITOR_CLIENT_SCRIPT_URL = versionedBundlePath('/sdk/editor.js');
 export function generateEditorPage(options: EditorPageOptions): string {
   const {
     artifactId, slug, theme = 'auto', name, description, userId, userName, userAvatar,
-    openVisDisabled, aiEnabled,
+    openVisDisabled, aiEnabled, locale,
   } = options;
   const baseUrl = getEditorBaseUrl(options.baseUrl);
 
@@ -38,7 +38,7 @@ ${getEditorStyles()}
 <body>
 ${renderEditorShell({ slug })}
 
-${renderEditorConfigScript({ artifactId, slug, theme, baseUrl, name, description, userId, userName, userAvatar, openVisDisabled, aiEnabled })}
+${renderEditorConfigScript({ artifactId, slug, theme, baseUrl, name, description, userId, userName, userAvatar, openVisDisabled, aiEnabled, locale })}
 
   <script>
   (function() {

@@ -1,6 +1,7 @@
 import type { HTTPRequest, HTTPResponse, Page } from '@cloudflare/puppeteer';
 import type { Env } from '../types';
 import { getPlatformHostname, getPlatformOrigin } from '../config/origins';
+import { cspAllows, directiveFor, type CspPolicy } from './csp';
 
 // Network policy for every headless capture render (thumbnails, image/PDF renders,
 // report captures, Artifact Tests, pilot_verify, slide export). The rendered HTML is
@@ -13,6 +14,8 @@ import { getPlatformHostname, getPlatformOrigin } from '../config/origins';
 // This instance's own hosts are exempt, so a local instance can render itself.
 // A read-only render's data session rides here too: the renderer attaches it to the
 // page's requests for that artifact's data, so page scripts never hold it.
+// A render can opt into stricter rules (verify, which reports what viewers see): the
+// main frame may load only the page itself, and the viewers' CSP is enforced.
 
 const LOCAL_SUFFIXES = ['localhost', 'local', 'internal', 'home.arpa', 'lan', 'home', 'corp', 'intranet', 'private'];
 const LOCAL_NAMES = new Set(['metadata.goog']);
@@ -45,20 +48,47 @@ export function isPrivateNetworkHost(hostname: string): boolean {
 
 export type CaptureRequestVerdict =
   | { allow: true }
-  | { allow: false; reason: 'private_network' | 'scheme' };
+  | { allow: false; reason: 'private_network' | 'scheme' | 'navigation' | 'csp'; directive?: string };
+
+/** Stricter rules a render can opt into. */
+export interface CaptureRules {
+  /** The only URL the main frame may load, so a page cannot take the render elsewhere. */
+  mainFrameUrl?: string;
+  /** The Content-Security-Policy the page's viewers get, enforced per resource type. */
+  csp?: { policy: CspPolicy; selfOrigin: string };
+}
+
+/** What a rule needs to know about the request beyond its URL. */
+export interface CaptureRequestKind {
+  resourceType: string;
+  mainFrameNavigation: boolean;
+}
 
 /** Decide one request of a capture render. `ownHosts` are lower-case host names. */
-export function decideCaptureRequest(rawUrl: string, ownHosts: ReadonlySet<string>): CaptureRequestVerdict {
+export function decideCaptureRequest(
+  rawUrl: string,
+  ownHosts: ReadonlySet<string>,
+  rules: CaptureRules = {},
+  kind?: CaptureRequestKind,
+): CaptureRequestVerdict {
   let url: URL;
   try {
     url = new URL(rawUrl);
   } catch {
     return { allow: false, reason: 'scheme' };
   }
+  if (kind?.mainFrameNavigation && rules.mainFrameUrl !== undefined && url.href !== new URL(rules.mainFrameUrl).href) {
+    return { allow: false, reason: 'navigation' };
+  }
   if (PASS_SCHEMES.has(url.protocol)) return { allow: true };
   if (!WEB_SCHEMES.has(url.protocol)) return { allow: false, reason: 'scheme' };
   const host = url.hostname.toLowerCase();
   if (!ownHosts.has(host) && isPrivateNetworkHost(host)) return { allow: false, reason: 'private_network' };
+  // CSP governs what a page loads, not the top-level document itself.
+  const directive = rules.csp && kind && !kind.mainFrameNavigation ? directiveFor(kind.resourceType) : null;
+  if (rules.csp && directive && !cspAllows(rules.csp.policy, directive, url, rules.csp.selfOrigin)) {
+    return { allow: false, reason: 'csp', directive };
+  }
   return { allow: true };
 }
 
@@ -120,6 +150,18 @@ function connectedDirectly(url: URL, port: number | undefined): boolean {
   return String(port) === expected;
 }
 
+export interface CaptureGuardOptions {
+  /** Attached to the page's requests for that artifact's data. */
+  dataSession?: CaptureDataSession;
+  /** Stricter rules (verify). */
+  rules?: CaptureRules;
+  /** A new URL for an allowed request, or null to send it as is (verify adds the capture
+   *  link to the page's own files). Never applied to the main frame's navigation. */
+  rewriteUrl?: (url: string) => string | null;
+  /** Sees every decision (verify reports what was refused and counts requests). */
+  onRequest?: (req: HTTPRequest, verdict: CaptureRequestVerdict) => void;
+}
+
 /**
  * Apply the capture policy to `page`. Call before the first navigation. With
  * `dataSession`, the page's requests for that artifact's data carry the session.
@@ -133,7 +175,7 @@ function connectedDirectly(url: URL, port: number | undefined): boolean {
 export async function guardCapturePage(
   page: Page,
   ownHosts: readonly string[],
-  opts: { dataSession?: CaptureDataSession } = {},
+  opts: CaptureGuardOptions = {},
 ): Promise<CaptureGuard> {
   const own = new Set(ownHosts.map((h) => h.toLowerCase()));
   let blocked = 0;
@@ -143,11 +185,22 @@ export async function guardCapturePage(
   // A service worker could answer requests without them reaching the interception.
   await page.setBypassServiceWorker(true).catch(noop);
   await page.setRequestInterception(true);
+  const strict = !!(opts.rules || opts.rewriteUrl);
   page.on('request', (req: HTTPRequest) => {
     if (req.isInterceptResolutionHandled()) return;
-    if (decideCaptureRequest(req.url(), own).allow) {
-      const headers = captureRequestHeaders(req.url(), req.headers(), opts.dataSession);
-      (headers ? req.continue({ headers }) : req.continue()).catch(noop);
+    const url = req.url();
+    // Only the stricter rules look at what the request is.
+    const kind = strict
+      ? { resourceType: req.resourceType(), mainFrameNavigation: req.isNavigationRequest() && req.frame() === page.mainFrame() }
+      : undefined;
+    const verdict = decideCaptureRequest(url, own, opts.rules, kind);
+    opts.onRequest?.(req, verdict);
+    if (verdict.allow) {
+      const headers = captureRequestHeaders(url, req.headers(), opts.dataSession);
+      const rewritten = opts.rewriteUrl && !kind?.mainFrameNavigation ? opts.rewriteUrl(url) : null;
+      (headers || rewritten
+        ? req.continue({ ...(headers ? { headers } : {}), ...(rewritten ? { url: rewritten } : {}) })
+        : req.continue()).catch(noop);
       return;
     }
     blocked++;

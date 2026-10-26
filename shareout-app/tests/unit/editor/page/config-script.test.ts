@@ -47,3 +47,10 @@ describe('renderEditorConfigScript embedding', () => {
     expect(value('userName')).toBe('</SCRIPT>');
   });
 });
+
+describe('renderEditorConfigScript locale', () => {
+  it('carries the workspace language when there is one', () => {
+    expect(renderEditorConfigScript({ ...baseOptions, locale: 'es' })).toContain('locale: "es"');
+    expect(renderEditorConfigScript(baseOptions)).not.toContain('locale:');
+  });
+});

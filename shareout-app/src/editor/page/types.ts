@@ -15,6 +15,8 @@ export interface EditorPageOptions {
   openVisDisabled?: boolean;
   /** When false, Agent pane shows a configure hint instead of accepting prompts. */
   aiEnabled?: boolean;
+  /** The artifact's workspace language, when it has one. */
+  locale?: 'en' | 'es';
 }
 
 export interface EditorConfigScriptOptions {
@@ -29,4 +31,5 @@ export interface EditorConfigScriptOptions {
   userAvatar?: string;
   openVisDisabled?: boolean;
   aiEnabled?: boolean;
+  locale?: 'en' | 'es';
 }

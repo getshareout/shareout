@@ -337,6 +337,10 @@ version with the old files; `/rollback` is deprecated). Several pages? Ship one 
 per page in `files[]` and link them with relative hrefs:
 [api/artifacts.md](api/artifacts.md#multi-page-sites-several-html-files).
 
+After publishing, verify it: `POST /v1/artifacts/{id}/verify` shows what viewers see on a
+desktop and a phone and what broke (errors with file:line, failed files, accessibility,
+overflow) — fix and publish again until it passes: [api/verify.md](api/verify.md).
+
 Full API: [api/overview.md](api/overview.md).
 
 ---

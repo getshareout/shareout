@@ -79,6 +79,16 @@ export const WORKSPACE_FORMS_EDIT_STYLES = `/* ---- Modal + native create forms 
 .wsx-live__msg { margin: 0; flex: 1; min-width: 0; }
 .wsx-live__retry { padding: 7px 16px; border: 0; border-radius: var(--radius-md); background: var(--color-primary); color: var(--color-text-inverse); font: 600 var(--text-sm) var(--font-body); cursor: pointer; }
 .wsx__editnote { flex: 1; display: grid; place-items: center; text-align: center; color: var(--color-text-tertiary); font-size: var(--text-sm); padding: 24px; }
+.wsx-editbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; flex: none; margin-bottom: 10px; padding: 9px 10px 9px 14px; border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent); border-radius: var(--radius-md); background: var(--color-warning-light); color: var(--color-text); font: 500 var(--text-sm) var(--font-body); }
+.wsx-editbar[hidden], .wsx__pane--art:not(.is-editing) .wsx-editbar { display: none; }
+.wsx-editbar__msg { flex: 1; min-width: 12em; }
+.wsx-editbar__btn { border: 0; background: transparent; padding: 5px 4px; border-radius: var(--radius-md); color: var(--color-primary); font: 600 var(--text-sm) var(--font-body); cursor: pointer; white-space: nowrap; }
+.wsx-editbar__btn:hover { text-decoration: underline; }
+.wsx-editbar__btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.wsx-editbar__btn.is-primary { padding: 5px 12px; background: var(--color-primary); color: var(--color-text-inverse); }
+.wsx-editbar__btn.is-primary:hover { text-decoration: none; }
+.wsx-editbar__btn.is-x { padding: 2px 8px; color: var(--color-text-tertiary); font-size: var(--text-base); }
+.wsx-editbar__btn.is-x:hover { color: var(--color-text); text-decoration: none; }
 .wsx__toast { position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%); z-index: 50; background: var(--color-text); color: var(--color-bg); padding: 10px 18px; border-radius: 999px; font: 600 var(--text-sm) var(--font-body); box-shadow: var(--shadow-xl); opacity: 0; transition: opacity var(--duration-fast); pointer-events: none; }
 .wsx__toast.is-show { opacity: 1; }
 /* Edit-Lite: right-rail property panel (context-sensitive, in Edit mode) */
@@ -123,6 +133,21 @@ export const WORKSPACE_FORMS_EDIT_STYLES = `/* ---- Modal + native create forms 
 .wsx-edit__airow input { flex: 1; min-width: 0; box-sizing: border-box; padding: 7px 10px; border: 1.5px solid var(--color-border-strong); border-radius: var(--radius-md); font-size: var(--text-sm); outline: none; }
 .wsx-edit__airow input:focus { border-color: var(--color-primary); }
 .wsx-edit__aistat { font-size: var(--text-xs); color: var(--color-primary); min-height: 1em; }
+.wsx-edit__aistat .is-err { color: var(--color-error); }
+.wsx-edit__aireply { position: relative; padding: 9px 30px 9px 11px; border-radius: var(--radius-md); background: var(--color-bg-elevated); color: var(--color-text); font-size: var(--text-sm); line-height: 1.5; white-space: pre-wrap; }
+.wsx-edit__aiwarn { margin-top: 6px; font-size: var(--text-xs); color: var(--color-warning); white-space: normal; }
+.wsx-edit__aix { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--color-text-tertiary); cursor: pointer; font-size: var(--text-base); }
+.wsx-edit__aix:hover { background: var(--color-surface); color: var(--color-text); }
+.wsx-prop { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1.5px solid var(--color-primary); border-radius: var(--radius-md); background: var(--color-primary-light); }
+.wsx-prop__lbl { font: 600 var(--text-xs) var(--font-body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-primary); }
+.wsx-prop__ask { font-size: var(--text-xs); color: var(--color-text-tertiary); overflow-wrap: anywhere; }
+.wsx-prop__reply { font-size: var(--text-sm); line-height: 1.5; color: var(--color-text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.wsx-prop__seg { display: inline-flex; align-self: flex-start; gap: 2px; padding: 3px; border-radius: var(--radius-md); background: var(--color-surface); }
+.wsx-prop__seg button { border: 0; background: transparent; padding: 4px 12px; border-radius: calc(var(--radius-md) - 3px); font: 600 var(--text-xs) var(--font-body); color: var(--color-text-secondary); cursor: pointer; }
+.wsx-prop__seg button[aria-pressed="true"] { background: var(--color-bg-elevated); color: var(--color-text); box-shadow: var(--shadow-sm); }
+.wsx-prop__acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.wsx-prop__keep { padding: 8px 14px; border: 0; border-radius: var(--radius-md); background: var(--color-primary); color: var(--color-text-inverse); font: 600 var(--text-sm) var(--font-body); cursor: pointer; }
+.wsx-prop button:focus-visible, .wsx-edit__ai button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .wsx-edit__fmt { display: flex; gap: 6px; }
 .wsx-edit__fmt button { width: 38px; height: 34px; border: 1.5px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elevated); color: var(--color-text); cursor: pointer; font-size: var(--text-base); }
 .wsx-edit__fmt button:hover { border-color: var(--color-primary); color: var(--color-primary); }

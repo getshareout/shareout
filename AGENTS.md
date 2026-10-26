@@ -78,6 +78,7 @@ tooling/scripts/       ← ci-check, gitleaks, boundary helpers
 | `SETUP_ADMIN_EMAIL` | Bootstrap admin when roster empty |
 | `STORAGE_QUOTA_BYTES` / `STORAGE_MAX_FILE_BYTES` | Optional storage caps; unset = unlimited |
 | `PUBLIC_ARTIFACT_LIMIT` | Optional per-account public-artifact cap; unset = unlimited |
+| `VERIFY_RUNS_PER_HOUR` | Verify runs per user per UTC hour (`POST /v1/artifacts/{id}/verify`, MCP `verify_artifact`); unset = 30 |
 | `GOOGLE_CLIENT_ID` / `SECRET` | Optional; email OTP always available |
 | `MICROSOFT_CLIENT_ID` / `SECRET` | Optional Sign in with Microsoft (personal + work/school); callback `/auth/microsoft/callback`. Work accounts need the `xms_edov` optional claim |
 | `MICROSOFT_TENANT` | Optional authority: `common` (default), `organizations`, `consumers`, or one tenant GUID |

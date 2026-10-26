@@ -3,8 +3,10 @@
 Most artifacts run on queries, connectors, snapshots, and scheduled deliveries.
 Viewers (and the people they forward a Slack/email to) constantly ask **where the
 numbers come from and how to reproduce them.** Answer it *at build time* — declare
-provenance in the manifest and ShareOut renders the UI for you. Don't make the
-viewer (or a future agent) reverse-engineer it.
+provenance in the manifest and **viewers see it automatically**: every page that shows
+data gets a **Data** button (shared links, guests and signed-in viewers alike) that
+lists each source, where it comes from, how fresh it is, and highlights the elements it
+feeds. You write no UI. Don't make the viewer (or a future agent) reverse-engineer it.
 
 > This is a strong recommendation, not a gate. ShareOut never blocks a publish for
 > missing provenance — but the publish readiness profile **warns** when a live
@@ -54,7 +56,8 @@ Every `sources.{connections,json,tables}` entry takes optional provenance fields
 | `query` | The exact SQL / API call / build step that produced the data |
 | `tables` | Underlying warehouse/source tables |
 | `refresh` | Cadence in words (`daily 12:00 UTC`, `manual`, `live`) |
-| `as_of` | Date/time the snapshot reflects — badges show **stale** once it's >7 days old, so whatever refreshes the data must rewrite it on every run |
+| `as_of` | Date/time the snapshot reflects — whatever refreshes the data must rewrite it on every run |
+| `freshness_sla` | Oldest the data may get before viewers see **may be out of date** (`24h`, `2d`, `PT6H`). Without it: twice the refresh job's schedule, else twice what `refresh` says, else a week |
 | `replication` | `{ build, publish, credentials, notes }` — how to rebuild from scratch |
 
 All optional, all backward-compatible. Keep `default` too — it powers editor preview.
@@ -80,28 +83,45 @@ Two ways; use either or both.
 
 `source` is a `kind:key` ref — `connection:warehouse`, `json:revenue`, `table:rooms`.
 
-## 3. Render the drawer (one line) — or zero lines
+## 3. Viewers see it automatically
 
-```js
-const so = await ShareOut.create();
-so.sources.mount();   // floating "Data sources" button + drawer + per-element badges
-```
+Nothing to mount. When the page shows data (declared sources or feeds, bound elements,
+or SDK data calls), the viewer gets a **Data / Datos** button next to the ShareOut
+toolbar. It opens **Data sources**: one row per source with
 
-Zero-JS auto-mount — add the attribute and the SDK mounts on DOM ready:
+- its label (yours, or the key) and where it comes from (`From BigQuery`),
+- freshness — what ShareOut saw (`Updated 2 h ago · by the job “Ads diario”`), else your
+  `as_of` / `refresh`, else an honest **not declared**; flagged **may be out of date**
+  past `freshness_sla` (or twice the schedule),
+- what it feeds (`Feeds: 3 elements`); hovering or picking a source outlines those
+  elements on the page.
 
-```html
-<body data-shareout-sources>
-```
+ShareOut also folds in what it knows server-side: the connections your names resolve to,
+`materialize` / `query_snapshot` jobs and crews that write your stores, sheet syncs,
+datasets, followable metrics and MCP connections — so even an undeclared source shows
+up, tagged **Not declared**. Declaring is what makes the row read well.
 
-What viewers get:
+Who sees what:
 
-- A **Data sources** drawer: one card per dataset with description, tables,
-  refresh, as-of, a collapsible **View query**, and a **Replicate** block
-  (build/publish/credentials).
-- A small **ⓘ source** badge on every element you tagged (or mapped via `feeds`);
-  clicking it opens the drawer at that dataset.
+| Viewer | Sees |
+|--------|------|
+| Anyone who can open the page (incl. a public link) | labels, kinds, where it comes from, freshness, what each source feeds — refreshes as "updated automatically, daily at 06:00 UTC" |
+| People tied to the page or its workspace (collaborators, members, guests) | + who refreshes it (`by the job “Ads diario”`) — name jobs and AI tasks so they read well to clients |
+| Editors / workspace admins | + `query`, `tables`, `replication`, the connection and its credential scope, every job/crew and its status |
+| Viewers under an [access policy](../core/access-policy.md) | only what the page source names; no job/crew names, no timing beyond scheduled refreshes |
 
-### SDK API
+The same list is an API: `GET /v1/artifacts/{id}/sources`
+([api/artifacts.md](../api/artifacts.md#get-v1artifactsidsources--where-a-pages-data-comes-from)),
+and Studio and the editor show it in their **Data** tabs.
+
+### In-page drawer (optional)
+
+`so.sources.mount()` still renders an in-page drawer and per-element **ⓘ source** badges
+(or `<body data-shareout-sources>` for zero JS). Use it only when you want badges inside
+the page itself; viewers no longer need it to see sources. Inside the ShareOut viewer (and
+Studio) its floating button stays hidden — the host's **Data** button replaces it; badges
+and `so.sources.open()` still work. Its **stale** tags read only the manifest: past
+`freshness_sla`, else a week after `as_of`.
 
 | Call | Returns |
 |------|---------|
@@ -146,10 +166,11 @@ job config — `tables`/`columns`/`filters` are resolved from the snapshot when 
 ## Checklist
 
 - [ ] Every connection/dataset declares `description` + `query` (+ `tables`)
-- [ ] `refresh` + `as_of` set so viewers know how fresh the data is
+- [ ] `refresh` + `as_of` set so viewers know how fresh the data is (`freshness_sla` when the
+      tolerance isn't twice the schedule)
 - [ ] `replication.{build,publish,credentials}` filled — the KEY "how to rebuild" answer
 - [ ] Each chart/table tagged `data-shareout-source` or mapped in `feeds`
-- [ ] `so.sources.mount()` (or `<body data-shareout-sources>`) so viewers see it
+- [ ] Open the page's **Data** button: every source has a label, a freshness line and the elements it feeds
 - [ ] Crew/job deliveries pass `source` to `notify_send`
 - [ ] Publish readiness profile shows no `provenance` warnings
 
