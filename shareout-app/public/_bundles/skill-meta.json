@@ -3,5 +3,5 @@
   "version": "2.60.0",
   "updated_at": "2026-10-17T18:00:00Z",
   "description": "Publish, update, inspect, and manage ShareOut artifacts on a self-hosted instance. Use when the user wants to build or publish a web artifact (HTML apps, dashboards, forms, or CSV/Markdown/JSON/TXT), wire SDK data stores, live data, schedules, sharing, analytics, or in-artifact AI. If the user wants to INSTALL or DEPLOY ShareOut on Cloudflare first, load deploy/SKILL.md immediately.",
-  "sha256": "865932938365c66d11cc9b55bf4fdd5376caa01372445c9300982d36643771ea"
+  "sha256": "f65aab873524069034fe4fc26ae0217a8d1990ff24a3dd22bd6845668f568aa2"
 }

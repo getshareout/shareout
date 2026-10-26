@@ -97,6 +97,7 @@ envelope `{ "success": true, "data": … }`. One crew per artifact.
 | GET | `/v1/data/{id}/crew` | `{ crew, grants[] }`; `404` if none defined |
 | DELETE | `/v1/data/{id}/crew` | Delete the crew and its grants, triggers, runs and approvals (`404` if none) |
 | POST | `/v1/data/{id}/crew/define` | Create or replace the crew (upsert). Body below. Grants are rewritten from `tools` |
+| PATCH | `/v1/data/{id}/crew` | Update only the fields sent (same body as define); grants kept unless `tools` is sent. `404` if none defined. SDK: `sdk.crew.update({...})` |
 | POST | `/v1/data/{id}/crew/run` | `{ "input": "…" }` (optional). Streams **SSE** events: `run_start`, `reasoning`, `tool_call`, `tool_result`, `finish`, `error`, `done`. `429 CONCURRENCY_LIMIT` when too many runs are active |
 | GET | `/v1/data/{id}/crew/runs` | Last 20 runs |
 | GET | `/v1/data/{id}/crew/runs/{runId}` | `{ run, events[] }` |
@@ -112,9 +113,10 @@ envelope `{ "success": true, "data": … }`. One crew per artifact.
   "name": "Daily narrator",
   "instructions": "Read json key `snapshot`, write a 3-line summary to `summary`, then notify Slack.",
   "model": "<optional; unsupported values fall back to the default>",
-  "maxIterations": 8,                 // clamped to the plan cap
+  "maxIterations": 8,                 // optional; 1–40 (or the plan cap), default 8, else 400
+  "maxTokensPerCall": 4096,           // optional; 256–16384, default 4096, else 400
   "runBudgetMicroUsd": 200000,        // optional
-  "maxRuntimeMs": 90000,              // optional; scheduled (cron/condition) runs only, max 120000. Manual, event and chat-triggered runs stay at 25000
+  "maxRuntimeMs": 240000,             // optional; scheduled (cron/condition) runs only, 5000–300000 (default 25000), else 400. Manual, event and chat-triggered runs stay at 25000
   "tools": {
     "read":  ["json_get", "table_query", "connection_query"],
     "write": ["json_set", "notify_send"],
@@ -132,7 +134,7 @@ the wrong mode, are ignored silently — check `grants` in `GET /crew` after def
 
 `email_send` (and every artifact email: scheduled jobs, `sdk.email`) sends one message per recipient with an unsubscribe footer link and RFC 8058 `List-Unsubscribe` / `List-Unsubscribe-Post` headers. A recipient who unsubscribes is stored per artifact (`artifact_email_optouts`), skipped on later sends, and reported back as `skipped_opted_out`; the owner can list them with `GET /v1/data/{id}/email/optouts`. The unsubscribe page is Spanish (es-AR) for Spanish workspaces, English otherwise, and can opt back in.
 
-Concurrency: an owner runs one crew at a time by default (`plan_crew_limits.max_concurrent_runs`, or 1 without a row). An **event** trigger that fires while the owner is busy is not dropped: it is queued (`crew_runs.status = 'queued'`, max 20 per owner, 24 h) and starts, oldest first, in the next hourly tick (at its start, and again after its due triggers if budget remains), so worst-case latency is about an hour. A run abandoned in `running` (worker killed) is reaped after 5 minutes, at the next dispatch or tick, and frees the slot; an event run killed before its first tool call is re-queued once. Cron triggers that find the owner busy retry hourly for 6 h.
+Concurrency: an owner runs one crew at a time by default (`plan_crew_limits.max_concurrent_runs`, or 1 without a row). An **event** trigger that fires while the owner is busy is not dropped: it is queued (`crew_runs.status = 'queued'`, max 20 per owner, 24 h) and starts, oldest first, in the next hourly tick (at its start, and again after its due triggers if budget remains), so worst-case latency is about an hour. A run abandoned in `running` (worker killed) is reaped after 7 minutes, at the next dispatch or tick, and frees the slot; an event run killed before its first tool call is re-queued once. Cron triggers that find the owner busy retry hourly for 6 h.
 
 Triggers (`POST /crew/triggers`):
 

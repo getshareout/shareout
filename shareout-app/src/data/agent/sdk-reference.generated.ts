@@ -158,6 +158,7 @@ export const SDK_SURFACE: Record<string, readonly string[]> = {
     "run",
     "runs",
     "triggers",
+    "update",
     "usage"
   ],
   "dashboards": [

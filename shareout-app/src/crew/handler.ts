@@ -18,7 +18,7 @@ import {
 } from './store';
 import { cronCadenceNotice } from '../scheduling/jobs/cron';
 import { runCrew } from './run-loop';
-import { resolveCrewLimits, countActiveRuns } from './limits';
+import { resolveCrewLimits, countActiveRuns, crewCapsError } from './limits';
 import { listApprovals, getApproval, approveAndExecute, rejectApproval } from './approvals';
 
 function methodNotAllowed(ctx: DataContext): Response {
@@ -41,9 +41,10 @@ export async function handleCrew(request: Request, ctx: DataContext, path: strin
     return errorResponse(DATA_ERRORS.FORBIDDEN, ctx.origin);
   }
 
-  // GET /crew  → crew config + grants
+  // GET /crew  → crew config + grants; PATCH /crew → update the given fields, grants kept unless `tools` is sent
   if (parts.length === 0) {
     if (request.method === 'DELETE') return handleDeleteCrew(ctx);
+    if (request.method === 'PATCH') return handleDefine(request, ctx, true);
     if (request.method !== 'GET') return methodNotAllowed(ctx);
     return getCrewConfig(ctx);
   }
@@ -154,14 +155,20 @@ async function handleDeleteCrew(ctx: DataContext): Promise<Response> {
   return successResponse({ deleted: true }, 200, ctx.origin);
 }
 
-async function handleDefine(request: Request, ctx: DataContext): Promise<Response> {
+async function handleDefine(request: Request, ctx: DataContext, patch = false): Promise<Response> {
   let body: DefineCrewBody;
   try {
     body = (await request.json()) as DefineCrewBody;
   } catch {
     return errorResponse(DATA_ERRORS.INVALID_JSON, ctx.origin);
   }
-  const crew = await defineCrew(ctx.env, ctx.artifactId, ctx.workspaceId, body);
+  const { max_iterations_cap } = await resolveCrewLimits(ctx.env, (await resolveOwnerId(ctx)) ?? '');
+  const capsError = crewCapsError(body as Record<string, unknown>, max_iterations_cap);
+  if (capsError) return errorResponse({ ...DATA_ERRORS.INVALID_REQUEST, message: capsError }, ctx.origin);
+  if (patch && !(await getCrew(ctx.env, ctx.artifactId))) {
+    return errorResponse({ ...DATA_ERRORS.NOT_FOUND, message: 'No crew defined. Call POST /crew/define first.' }, ctx.origin);
+  }
+  const crew = await defineCrew(ctx.env, ctx.artifactId, ctx.workspaceId, body, { keepGrants: patch && !body.tools });
   return successResponse({ crew }, 200, ctx.origin);
 }
 

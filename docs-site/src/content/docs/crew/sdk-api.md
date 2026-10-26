@@ -20,6 +20,7 @@ Base path: `https://shareout.site/v1/data/{artifactId}/crew`
 | --- | --- | --- |
 | `GET` | `/crew` | Get crew config + tool grants |
 | `POST` | `/crew/define` | Create or replace crew definition |
+| `PATCH` | `/crew` | Update only the fields sent (grants kept unless `tools` is sent) |
 | `POST` | `/crew/run` | Start a run (SSE stream) |
 | `GET` | `/crew/runs` | List runs |
 | `GET` | `/crew/runs/{runId}` | Run + events |
@@ -42,6 +43,8 @@ curl -X POST "https://shareout.site/v1/data/art_abc123/crew/define" \
     "instructions": "Read digest json and post summary to Slack.",
     "model": "claude-sonnet-5",
     "maxIterations": 6,
+    "maxRuntimeMs": 240000,
+    "maxTokensPerCall": 8192,
     "tools": { "read": ["json_get"], "write": ["notify_send"] }
   }'
 ```
@@ -53,6 +56,7 @@ Workspace admins list all crew triggers: `GET /v1/workspaces/{id}/automations`.
 ```typescript
 // Define / read
 define(config: CrewDefineConfig): Promise<{ crew: unknown }>
+update(patch: Partial<CrewDefineConfig>): Promise<{ crew: unknown }>
 get(): Promise<{ crew: unknown; grants: unknown[] }>
 
 // Run
@@ -85,8 +89,15 @@ interface CrewDefineConfig {
   name?: string;
   instructions: string;
   model?: 'claude-sonnet-5' | 'claude-haiku-4-5-20251001';
+  /** 1–40 (or the owner's plan cap), default 8. */
   maxIterations?: number;
   runBudgetMicroUsd?: number;
+  /** Scheduled (cron/condition) runs only: 5000–300000 ms, default 25000.
+   *  Manual, event and chat runs stay at 25000. */
+  maxRuntimeMs?: number;
+  /** Max output tokens per model call: 256–16384, default 4096. */
+  maxTokensPerCall?: number;
+  // A cap out of range → 400 INVALID_REQUEST naming the field and its bounds.
   tools?: CrewToolGrant;
 }
 
@@ -157,6 +168,8 @@ for await (const event of sdk.crew.run({ input: 'Check now.' })) {
 ### Cron trigger
 
 ```javascript
+// Give scheduled runs up to 4 minutes (grants unchanged)
+await sdk.crew.update({ maxRuntimeMs: 240_000 });
 await sdk.crew.triggers.create({ kind: 'cron', cron: '0 9 * * 1' });
 ```
 

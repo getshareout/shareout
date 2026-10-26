@@ -21,8 +21,9 @@ export interface DefineCrewBody {
   model?: string;
   maxIterations?: number;
   runBudgetMicroUsd?: number;
-  /** Wall-clock cap for scheduled runs, in ms; clamped to MAX_SCHEDULED_RUNTIME_MS. Other run contexts stay at 25 s. */
+  /** Wall-clock cap for scheduled runs, in ms. Other run contexts stay at 25 s. Bounds checked by crewCapsError in the handler. */
   maxRuntimeMs?: number;
+  maxTokensPerCall?: number;
   tools?: {
     read?: string[];
     write?: string[];
@@ -62,24 +63,25 @@ export async function defineCrew(
   env: Env,
   artifactId: string,
   workspaceId: string,
-  body: DefineCrewBody
+  body: DefineCrewBody,
+  opts: { keepGrants?: boolean } = {}
 ): Promise<CrewRow> {
   const ownerRow = await env.DB.prepare('SELECT owner_id FROM artifacts WHERE id = ?')
     .bind(artifactId)
     .first<{ owner_id: string | null }>();
   const ownerId = ownerRow?.owner_id ?? '';
 
-  const chosen = claudeModelById(body.model)?.id;
-  const model = chosen && ALLOWED_MODELS.has(chosen) ? chosen : DEFAULT_MODEL;
   const existing = await getCrew(env, artifactId);
+  const chosen = claudeModelById(body.model)?.id;
+  const model = body.model === undefined && existing ? existing.model : chosen && ALLOWED_MODELS.has(chosen) ? chosen : DEFAULT_MODEL;
   const crewId = existing?.id ?? generateId('crew');
 
-  // Plan-tier limits: clamp iterations to the cap; default the run budget per tier.
+  // Plan-tier limits: default iterations and the run budget per tier (caps are validated by the handler).
   const planLimits = await resolveCrewLimits(env, ownerId);
-  const clampedMaxIter =
-    body.maxIterations != null ? Math.min(body.maxIterations, planLimits.max_iterations_cap) : null;
+  const maxIter = body.maxIterations ?? null;
   const runBudget = body.runBudgetMicroUsd ?? null;
-  const maxRuntime = Number.isFinite(body.maxRuntimeMs) ? Math.min(Math.max(Math.floor(body.maxRuntimeMs!), 5_000), MAX_SCHEDULED_RUNTIME_MS) : null;
+  const maxRuntime = body.maxRuntimeMs ?? null;
+  const maxTokens = body.maxTokensPerCall ?? null;
 
   if (existing) {
     await env.DB.prepare(
@@ -87,6 +89,7 @@ export async function defineCrew(
          max_iterations = COALESCE(?, max_iterations),
          run_budget_micro_usd = COALESCE(?, run_budget_micro_usd),
          max_runtime_ms = COALESCE(?, max_runtime_ms),
+         max_tokens_per_call = COALESCE(?, max_tokens_per_call),
          updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
        WHERE id = ?`
     )
@@ -94,17 +97,18 @@ export async function defineCrew(
         body.name ?? existing.name,
         body.instructions ?? existing.instructions,
         model,
-        clampedMaxIter,
+        maxIter,
         runBudget,
         maxRuntime,
+        maxTokens,
         crewId
       )
       .run();
   } else {
     await env.DB.prepare(
       `INSERT INTO crews (id, artifact_id, workspace_id, owner_id, name, instructions, model,
-         max_iterations, run_budget_micro_usd, max_runtime_ms)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 25000))`
+         max_iterations, run_budget_micro_usd, max_runtime_ms, max_tokens_per_call)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 25000), COALESCE(?, 4096))`
     )
       .bind(
         crewId,
@@ -114,14 +118,16 @@ export async function defineCrew(
         body.name ?? null,
         body.instructions ?? null,
         model,
-        clampedMaxIter ?? Math.min(8, planLimits.max_iterations_cap),
+        maxIter ?? Math.min(8, planLimits.max_iterations_cap),
         runBudget ?? planLimits.default_run_budget_micro_usd,
-        maxRuntime
+        maxRuntime,
+        maxTokens
       )
       .run();
   }
 
   // Owner config is authoritative: wipe and rewrite grants from the request.
+  if (opts.keepGrants) return (await getCrew(env, artifactId))!;
   await env.DB.prepare('DELETE FROM crew_grants WHERE crew_id = ?').bind(crewId).run();
   const limits = body.tools?.limits ?? {};
   const approval = body.tools?.approval ?? {};
@@ -166,9 +172,9 @@ export async function createRun(
 
 // A run still 'running' this long after it started was killed by the platform
 // (worker eviction/CPU/OOM) before finalize could run — no legitimate run lives
-// past the ~30s worker wall. Such rows would otherwise count toward the owner's
+// past MAX_SCHEDULED_RUNTIME_MS plus one in-flight model call. Such rows would otherwise count toward the owner's
 // concurrency cap forever (countActiveRuns), silently deadlocking future runs.
-const STALE_RUN_SECONDS = 300;
+const STALE_RUN_SECONDS = MAX_SCHEDULED_RUNTIME_MS / 1000 + 120;
 
 /**
  * Free the slots of runs the platform killed. An EVENT run that never reached a tool call (so nothing it

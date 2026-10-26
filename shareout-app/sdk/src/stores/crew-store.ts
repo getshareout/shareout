@@ -14,8 +14,13 @@ export interface CrewDefineConfig {
   name?: string;
   instructions: string;
   model?: 'claude-sonnet-5' | 'claude-haiku-4-5-20251001';
+  /** Agent loop iterations per run: 1–40 (or the owner's plan cap), default 8. */
   maxIterations?: number;
   runBudgetMicroUsd?: number;
+  /** Wall-clock cap for scheduled (cron/condition) runs, in ms: 5000–300000, default 25000. Other runs stay at 25000. */
+  maxRuntimeMs?: number;
+  /** Max output tokens per model call: 256–16384, default 4096. */
+  maxTokensPerCall?: number;
   tools?: CrewToolGrant;
 }
 
@@ -69,6 +74,14 @@ export class CrewStore {
     return this.sdk._internalFetch('/crew/define', {
       method: 'POST',
       body: JSON.stringify(config),
+    });
+  }
+
+  /** Update only the given fields of this app's crew (owner only). Grants are kept unless `tools` is sent. */
+  async update(patch: Partial<CrewDefineConfig>): Promise<{ crew: unknown }> {
+    return this.sdk._internalFetch('/crew', {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
     });
   }
 

@@ -116,8 +116,12 @@ Stream live with `sdk.crew.run()` or replay from run history.
 
 | Control | What it does |
 | --- | --- |
-| `maxIterations` | Cap tool loops per run |
+| `maxIterations` | Cap tool loops per run: default 8, max 40 (or the owner's plan cap) |
+| `maxTokensPerCall` | Max output tokens per model call: default 4096, max 16384 |
 | `runBudgetMicroUsd` | Optional per-run spend cap |
+| `maxRuntimeMs` | Wall-clock cap for scheduled (cron/condition) runs: default 25000, max 300000 (5 min). Manual, event and chat runs stay at 25 s |
+
+A value outside its range is rejected with `400 INVALID_REQUEST` (not clamped) on `POST /crew/define` and `PATCH /crew`.
 | Workspace AI balance | Runs halt when credits are exhausted |
 | Concurrent runs | Capped server-side per artifact |
 

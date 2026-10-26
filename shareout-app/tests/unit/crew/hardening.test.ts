@@ -4,9 +4,11 @@
 //  #3a awaiting_approval — a run with queued approvals reports that, not goal_met
 //  #3b reapStaleApprovals — old pending approvals expire and can't be replayed
 import { env } from 'cloudflare:test';
-import { beforeAll, beforeEach, describe, it, expect } from 'vitest';
+import { beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 import { createMiniDb } from '../../../src/data/minidb-client';
-import { reapStaleRuns, defineCrew } from '../../../src/crew/store';
+import { reapStaleRuns } from '../../../src/crew/store';
+import { handleCrew } from '../../../src/crew/handler';
+import * as middleware from '../../../src/data/middleware';
 import { effectiveMaxRuntimeMs, MAX_SCHEDULED_RUNTIME_MS } from '../../../src/crew/limits';
 import { countActiveRuns } from '../../../src/crew/limits';
 import { runDueCrewTriggers, claimTrigger } from '../../../src/crew/triggers';
@@ -160,16 +162,92 @@ describe('crew max runtime (G13 25 s cap)', () => {
     expect(effectiveMaxRuntimeMs(10_000, 'cron')).toBe(10_000);
   });
 
-  it('define accepts maxRuntimeMs, clamped to the ceiling', async () => {
+  const call = async (method: string, path: string, body: unknown) => {
+    vi.spyOn(middleware, 'verifyOwner').mockResolvedValue(true);
+    const ctx = { env, artifactId: 'art_r', workspaceId: '', origin: null, artifact: { owner_id: 'usr_r' } } as never;
+    const res = await handleCrew(new Request('https://x/', { method, body: JSON.stringify(body) }), ctx, path);
+    const json = (await res.json()) as { data?: { crew?: CrewRow } };
+    return { status: res.status, json: { ...json, crew: json.data?.crew } };
+  };
+  const grants = async () =>
+    (await env.DB.prepare(`SELECT tool_name FROM crew_grants`).all<{ tool_name: string }>()).results.map((r) => r.tool_name);
+
+  beforeEach(async () => {
     await env.DB.prepare(`INSERT OR IGNORE INTO artifacts (id, owner_id, workspace_id) VALUES ('art_r', 'usr_r', NULL)`).run();
-    const a = await defineCrew(env as never, 'art_r', '', { name: 'n', maxRuntimeMs: 90_000 });
-    expect(a.max_runtime_ms).toBe(90_000);
-    const b = await defineCrew(env as never, 'art_r', '', { maxRuntimeMs: 9_999_999 });
-    expect(b.max_runtime_ms).toBe(MAX_SCHEDULED_RUNTIME_MS);
-    const c = await defineCrew(env as never, 'art_r', '', { name: 'x' });
-    expect(c.max_runtime_ms).toBe(MAX_SCHEDULED_RUNTIME_MS);
+  });
+
+  it('define defaults to 25 s and persists maxRuntimeMs up to the ceiling', async () => {
+    expect((await call('POST', 'define', { name: 'n' })).json.crew?.max_runtime_ms).toBe(25_000);
+    expect((await call('POST', 'define', { maxRuntimeMs: MAX_SCHEDULED_RUNTIME_MS })).json.crew?.max_runtime_ms).toBe(MAX_SCHEDULED_RUNTIME_MS);
+    expect((await call('POST', 'define', { name: 'x' })).json.crew?.max_runtime_ms).toBe(MAX_SCHEDULED_RUNTIME_MS);
+  });
+
+  it('rejects an out-of-range maxRuntimeMs with a 400 and leaves the crew untouched', async () => {
+    await call('POST', 'define', { maxRuntimeMs: 60_000 });
+    for (const bad of [MAX_SCHEDULED_RUNTIME_MS + 1, 900_000, 4_999, 1.5e4 + 0.5, '60000']) {
+      const r = await call('POST', 'define', { maxRuntimeMs: bad });
+      expect(r.status).toBe(400);
+      expect(JSON.stringify(r.json)).toContain('maxRuntimeMs must be an integer from 5000 to 300000');
+      expect((await call('PATCH', '', { maxRuntimeMs: bad })).status).toBe(400);
+    }
+    expect((await getCrewForTest()).max_runtime_ms).toBe(60_000);
+  });
+
+  it('PATCH /crew changes only the fields sent and keeps grants and model', async () => {
+    await call('POST', 'define', { name: 'n', instructions: 'i', model: 'claude-haiku-4-5-20251001', tools: { read: ['json_get', 'table_query'] } });
+    const r = await call('PATCH', '', { maxRuntimeMs: 240_000 });
+    expect(r.status).toBe(200);
+    expect(r.json.crew).toMatchObject({ name: 'n', instructions: 'i', model: 'claude-haiku-4-5-20251001', max_runtime_ms: 240_000 });
+    expect((await grants()).sort()).toEqual(['json_get', 'table_query']);
+    await call('PATCH', '', { tools: { read: ['json_get'] } });
+    expect(await grants()).toEqual(['json_get']);
+  });
+
+  it('maxIterations (≤40) and maxTokensPerCall (≤16384) persist; defaults stay 8 / 4096', async () => {
+    expect((await call('POST', 'define', { name: 'n' })).json.crew).toMatchObject({ max_iterations: 8, max_tokens_per_call: 4096 });
+    const r = await call('PATCH', '', { maxIterations: 30, maxTokensPerCall: 16_384, maxRuntimeMs: 300_000 });
+    expect(r.json.crew).toMatchObject({ max_iterations: 30, max_tokens_per_call: 16_384, max_runtime_ms: 300_000 });
+    expect((await call('POST', 'define', { maxIterations: 40 })).json.crew?.max_iterations).toBe(40);
+  });
+
+  it('rejects maxIterations and maxTokensPerCall out of range with a 400 naming the field', async () => {
+    await call('POST', 'define', { name: 'n' });
+    for (const [body, msg] of [
+      [{ maxIterations: 41 }, 'maxIterations must be an integer from 1 to 40.'],
+      [{ maxIterations: 0 }, 'maxIterations must be an integer from 1 to 40.'],
+      [{ maxTokensPerCall: 16_385 }, 'maxTokensPerCall must be an integer from 256 to 16384.'],
+      [{ maxTokensPerCall: 100 }, 'maxTokensPerCall must be an integer from 256 to 16384.'],
+    ] as const) {
+      for (const [method, path] of [['POST', 'define'], ['PATCH', '']] as const) {
+        const r = await call(method, path, body);
+        expect(r.status).toBe(400);
+        expect(JSON.stringify(r.json)).toContain(msg);
+      }
+    }
+    expect(await getCrewForTest()).toMatchObject({ max_iterations: 8, max_tokens_per_call: 4096 });
+  });
+
+  it("bounds maxIterations by the owner's plan cap when it is lower than 40", async () => {
+    await env.DB.prepare(`INSERT OR REPLACE INTO users (id, tier) VALUES ('usr_r', 'tight')`).run();
+    await env.DB.prepare(`INSERT OR REPLACE INTO plan_crew_limits VALUES ('tight', 1, 1, 1000, 12)`).run();
+    try {
+      const r = await call('POST', 'define', { maxIterations: 13 });
+      expect(r.status).toBe(400);
+      expect(JSON.stringify(r.json)).toContain("maxIterations must be an integer from 1 to 12 (this owner's plan cap).");
+      expect((await call('POST', 'define', { maxIterations: 12 })).json.crew?.max_iterations).toBe(12);
+    } finally {
+      await env.DB.prepare(`DELETE FROM users WHERE id = 'usr_r'`).run();
+    }
+  });
+
+  it('PATCH /crew 404s when no crew is defined', async () => {
+    expect((await call('PATCH', '', { maxRuntimeMs: 60_000 })).status).toBe(404);
   });
 });
+
+async function getCrewForTest(): Promise<CrewRow> {
+  return (await env.DB.prepare(`SELECT * FROM crews WHERE artifact_id = 'art_r'`).first<CrewRow>())!;
+}
 
 describe('reapStaleApprovals (#3b stale/zombie approvals)', () => {
   it('expires old pending approvals and blocks their replay; leaves fresh ones', async () => {
