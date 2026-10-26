@@ -190,3 +190,38 @@ describe('serveSandboxedViewer iframe origin (ADR 30)', () => {
     expect(html).not.toContain('shareoutcdn.site');
   });
 });
+
+describe('serveSandboxedViewer "Follow" metric button', () => {
+  const POLICY = JSON.stringify({ version: 1, field: 'client', default: 'deny', rules: [{ match: { email: 'a@x.test' }, values: ['A'] }] });
+  const metricsEnv = () => makeEnv(null, {
+    DB: {
+      prepare: vi.fn((sql: string) => ({
+        bind: vi.fn(() => ({
+          first: vi.fn(async () => (sql.includes('FROM artifact_metric_definitions') ? { 1: 1 } : null)),
+          all: vi.fn(async () => ({ results: [] })),
+          run: vi.fn(async () => ({})),
+        })),
+      })),
+    } as unknown as Env['DB'],
+  });
+  async function toolbarFor(email: string, accessPolicy: string | null, admin: { role: 'editor' | 'viewer'; canEdit: boolean } | null) {
+    const { getSessionUser } = await import('../../../src/auth/session');
+    vi.mocked(getSessionUser).mockResolvedValueOnce({ id: 'usr_follow', email } as never);
+    prefetchMocks.detectFavoriteState.mockResolvedValueOnce({ loggedIn: true, isFavorite: false });
+    prefetchMocks.detectAdminStatus.mockResolvedValueOnce(admin && { isOwner: false, ...admin });
+    return render(metricsEnv(), demoSocialPreview, 'public', accessPolicy);
+  }
+
+  it('is offered to a signed-in viewer when no row policy applies', async () => {
+    expect(await toolbarFor('a@x.test', null, null)).toContain('soOpenFollow()');
+  });
+
+  it('is hidden from a viewer the row policy scopes, matched by a rule or not', async () => {
+    expect(await toolbarFor('a@x.test', POLICY, null)).not.toContain('soOpenFollow()');
+    expect(await toolbarFor('b@x.test', POLICY, { role: 'viewer', canEdit: false })).not.toContain('soOpenFollow()');
+  });
+
+  it('stays for an editor, whom the policy does not scope', async () => {
+    expect(await toolbarFor('ed@x.test', POLICY, { role: 'editor', canEdit: true })).toContain('soOpenFollow()');
+  });
+});

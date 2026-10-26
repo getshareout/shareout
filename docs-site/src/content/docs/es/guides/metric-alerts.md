@@ -75,6 +75,10 @@ por defecto) evita que una métrica que sigue pasada del umbral alerte en cada c
 - **Viewers** solo pueden suscribirse a sí mismos — un DM de Slack o un email a su
   propia dirección. En un artefacto publicado lo hacen desde el botón **Follow
   metric** de la barra de herramientas.
+- En un artefacto con **política de acceso a nivel de fila**, solo el owner y los
+  editores pueden seguir sus métricas. Una métrica cuenta todas las filas, así que
+  quien ve solo algunas no tiene **Follow metric**, no puede crear ni ejecutar
+  alertas ahí y no ve sus valores.
 
 ## Ejecutar, pausar, inspeccionar
 

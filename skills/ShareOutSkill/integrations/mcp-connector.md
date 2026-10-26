@@ -29,9 +29,11 @@ your ShareOut account"). Allow, and the app is connected.
 | `whoami` | Connected account + workspaces |
 | `list_workspaces` | Workspaces and their ids |
 | `list_artifacts` | The person's pages across all their workspaces + personal space; `workspace_id` (id or slug) narrows to one; `search`, `limit` (1–50) |
-| `get_artifact` | One page; `include_content: true` adds the source. The result names the live version's change note (`live_message`) and, for a multi-page site, links every page (`?page=`) |
+| `get_artifact` | One page. `include_content: true` adds the main file's source (`content`, `truncated`, `size_bytes`, and `other_files` when the page has more); `include_files: true` adds every file, main file first (`path`, `mime`, `size_bytes`, `encoding`, `content`, `truncated`; binary as base64). Up to 512 KB of file content per answer, the `get_version_source` limit: a file that doesn't fit comes back cut or without `content`, marked `truncated`. Files come from the newest saved version, returned as `version` (pass it to `update_artifact` as `base_version`). The result names the live version's change note (`live_message`) and, for a multi-page site, links every page (`?page=`) |
 | `publish_artifact` | New page from `content` (HTML or Markdown) — or a multi-page site from `files` (see below) — `title`, optional `workspace_id`, `visibility` (`workspace` default, `private`, `public`), `folder` (name or id of a folder in that workspace), `message` (history note). For a site the result links every page (`?page=`) |
-| `update_artifact` | Replace a page's content, or with `files` a site's whole file set (same link, new version); optional `title` renames it, `folder` (name or id) moves it into a folder of its workspace, `message` is the change note (omit it and one is written automatically) |
+| `update_artifact` | Replace a page's content, or with `files` a site's whole file set (same link, new version, returned as `version`). `base_version` (the `version` `get_artifact` returned) makes it refuse the write if a newer version was saved since; a write that would remove files is refused unless `replace_all_files: true` (see **No silent loss** below). Optional `title` renames it, `folder` (name or id) moves it into a folder of its workspace, `message` is the change note (omit it and one is written automatically) |
+| `read_artifact` | A page's files exactly as stored. Without `path`: the newest version's file list (`path`, `mime`, `size_bytes`, `sha256`), its `version`, and `live_version` / `newest_version` (edit from `newest_version`). With `path`: that file from `offset`, at most `max_chars` (default 100 000) characters, and `next_offset` while more follows — any size comes back whole across calls; binary as base64. `version` reads an older one. Viewer+ |
+| `edit_artifact` | Change part of a page without re-sending it: `base_version` (from `read_artifact`) and `ops` — `replace {path, old, new, all?}` (literal; `old` must match once unless `all`), `write {path, content, encoding?}`, `delete {path}`, `rename {from, to}`. All ops or none; same rules and errors as `POST /v1/artifacts/{id}/edits` (`EDIT_NO_MATCH` with the closest line, `EDIT_AMBIGUOUS` with the lines, `VERSION_CONFLICT` with `current_version`). `dry_run` previews; `message` is the change note. Only changed files are saved again. Editor+. These two are the only tools a workspace Agent token (`sot_`) can call: `read_artifact` needs `artifacts:read`, `edit_artifact` `artifacts:publish`, both only in the token's workspace |
 | `list_versions` | A page's history, newest first: who, when, how (`api`/`agent`/`editor`/`restore`), change note, comment count, approvals, which one is live. Viewer+ |
 | `get_version_source` | One version's main file (`artifact_id`, `version_no`), up to 512 KB. Viewer+ |
 | `restore_version` | Brings `version_no` back as a **new** version (history kept), optional `message`. Editor+ |
@@ -74,7 +76,9 @@ Rules the tools follow:
 - **Folders** — `folder` takes a folder's name (case-insensitive) or id in the page's workspace.
   An unknown name, or one shared by several folders, is refused with the ids to pick from.
   Personal pages have no folders. There is no folder listing or delete tool; do those in ShareOut.
-- **Page and sharing tools reuse the REST gates** — `list_versions` / `get_version_source` /
+- **Page and sharing tools reuse the REST gates** — `get_artifact`'s `include_content` /
+  `include_files` read with the viewer gate of `GET /v1/artifacts/{id}/files` (owner or a
+  viewer/editor collaborator); `list_versions` / `get_version_source` /
   `restore_version` run the `/v1/artifacts/{id}/versions*` handlers (viewer / editor);
   `list_comments`, `resolve_comment`, `assign_comment` and `approve_version` run the same
   comment-access checks as the Home review endpoints; `list_jobs` runs `GET /v1/jobs`;
@@ -95,10 +99,22 @@ Rules the tools follow:
   allowed mime per file, no duplicate paths, `index.html` present when there is more than one
   file, 100 MB per file, 500 MB per publish, the instance storage quota
   (`STORAGE_QUOTA_BYTES`), the daily publish limit and moderation. On `update_artifact`, `files`
-  is the complete new set and replaces every file of the previous version. Send `content` or
-  `files`, not both.
+  is the complete set: every page and asset, changed or not. Send `content` or `files`, not both.
+- **No silent loss** — `get_artifact` marks every file it could not return whole
+  (`truncated`), and `update_artifact` refuses writes that would lose work, with nothing saved:
+  - a write that would remove files of the newest version — `content` alone on a page that
+    has more files, or `files` that leave some out — fails with `WOULD_REMOVE_FILES` and the
+    list (`would_remove`), unless `replace_all_files: true` says the person wants them gone.
+    `content` on a one-file page still replaces it, even in the other format;
+  - with `base_version`, a write fails with `VERSION_CONFLICT` when a newer version was
+    saved after that read. Read the page again and redo the change on what comes back.
+
+  To change part of a page or site, prefer `read_artifact` + `edit_artifact`: only the text
+  you name changes, and a file of any size can be read in pages. To replace a whole site:
+  `get_artifact` with `include_files: true`, edit, send every file back as `files` with
+  `base_version`. Never send a `truncated` file back.
 - **Never overwrites by name** — `publish_artifact` always creates a new page; changing an
-  existing one is `update_artifact`.
+  existing one is `edit_artifact` (part of it) or `update_artifact` (all of it).
 - **Plain results** — each result says the link, who can see it, and any notice
   (visibility downgraded, under review, approval needed) to relay to the person.
 - **Knowledge answers cite their sources** — the `knowledge_*` tools tell the model to answer

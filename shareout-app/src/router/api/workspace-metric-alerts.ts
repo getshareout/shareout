@@ -2,6 +2,7 @@ import type { Env, WorkspaceRole } from '../../types';
 import type { AuthUser } from '../../api-auth';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { getRuleById, evaluateAndDeliver, fetchHistories } from '../../metric-alerts/rules';
+import { isRowRestricted, rowScopedArtifacts, ROW_SCOPED_ERROR } from '../../metric-alerts/row-scope';
 import { jsonWithApiErrors } from '../../http/api-error';
 
 function json(data: unknown, status = 200): Response {
@@ -24,12 +25,12 @@ async function ruleInWorkspace(
   env: Env,
   workspaceId: string,
   ruleId: string
-): Promise<{ id: string } | null> {
+): Promise<{ id: string; artifact_id: string } | null> {
   return env.DB.prepare(
-    `SELECT mar.id FROM metric_alert_rules mar
+    `SELECT mar.id, mar.artifact_id FROM metric_alert_rules mar
        JOIN artifacts a ON a.id = mar.artifact_id
       WHERE mar.id = ? AND a.workspace_id = ?`
-  ).bind(ruleId, workspaceId).first<{ id: string }>();
+  ).bind(ruleId, workspaceId).first<{ id: string; artifact_id: string }>();
 }
 
 export async function handleListWorkspaceAlerts(
@@ -56,13 +57,18 @@ export async function handleListWorkspaceAlerts(
   ).bind(workspaceId).all();
 
   const histories = await fetchHistories(env, (rows.results || []).map((r) => r.id as string));
-  const alerts = (rows.results || []).map((r) => ({
-    ...r,
-    condition: JSON.parse((r.condition_json as string) || '{}'),
-    on_trigger: r.on_trigger_json ? JSON.parse(r.on_trigger_json as string) : null,
-    enabled: Boolean(r.enabled as number),
-    history: histories[r.id as string] || [],
-  }));
+  const scoped = await rowScopedArtifacts(env, user.id, (rows.results || []).map((r) => r.artifact_id as string));
+  const alerts = (rows.results || []).map((r) => {
+    const hide = scoped.has(r.artifact_id as string);
+    return {
+      ...r,
+      ...(hide ? { last_value: null } : {}),
+      condition: JSON.parse((r.condition_json as string) || '{}'),
+      on_trigger: r.on_trigger_json ? JSON.parse(r.on_trigger_json as string) : null,
+      enabled: Boolean(r.enabled as number),
+      history: hide ? [] : histories[r.id as string] || [],
+    };
+  });
   return json({ alerts });
 }
 
@@ -75,14 +81,17 @@ export async function handleGetWorkspaceAlertEvents(
   const forbidden = await requireAdmin(env, workspaceId, user.id);
   if (forbidden) return forbidden;
 
-  if (!(await ruleInWorkspace(env, workspaceId, ruleId))) {
+  const inWs = await ruleInWorkspace(env, workspaceId, ruleId);
+  if (!inWs) {
     return json({ error: 'Alert not found', code: 'NOT_FOUND' }, 404);
   }
   const result = await env.DB.prepare(
     `SELECT id, evaluated_at, value, matched, delivered, destination_kind, error, message
        FROM metric_alert_runs WHERE rule_id = ? ORDER BY evaluated_at DESC LIMIT 50`
   ).bind(ruleId).all();
-  return json({ events: result.results || [] });
+  const events = result.results || [];
+  if (!(await isRowRestricted(env, inWs.artifact_id, user.id))) return json({ events });
+  return json({ events: events.map((ev) => ({ ...ev, value: null, message: null })) });
 }
 
 export async function handleRunWorkspaceAlert(
@@ -94,8 +103,12 @@ export async function handleRunWorkspaceAlert(
   const forbidden = await requireAdmin(env, workspaceId, user.id);
   if (forbidden) return forbidden;
 
-  if (!(await ruleInWorkspace(env, workspaceId, ruleId))) {
+  const inWs = await ruleInWorkspace(env, workspaceId, ruleId);
+  if (!inWs) {
     return json({ error: 'Alert not found', code: 'NOT_FOUND' }, 404);
+  }
+  if (await isRowRestricted(env, inWs.artifact_id, user.id)) {
+    return json({ error: ROW_SCOPED_ERROR, code: 'FORBIDDEN' }, 403);
   }
   const rule = await getRuleById(env, ruleId);
   if (!rule) return json({ error: 'Alert not found', code: 'NOT_FOUND' }, 404);

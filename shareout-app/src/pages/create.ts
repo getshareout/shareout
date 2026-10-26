@@ -3,6 +3,7 @@ import { createPageStyles } from '../design-system/pages/create.css';
 import { brandLockupHtml } from '../brand';
 import { STARTER_PACKS } from './themes';
 import { versionedBundlePath } from '../bundle-versions';
+import { SRCDOC_THROTTLE_JS } from './srcdoc-throttle';
 
 const arrowSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 6l6 6-6 6"/></svg>`;
 const checkSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>`;
@@ -85,7 +86,7 @@ export function renderCreatePage(
   var ARROW_SVG = ${jsString(arrowSvg)};
   var CHECK_SVG = ${jsString(checkSvg)};
   var GOOGLE_SVG = ${jsString(googleSvg)};
-
+${SRCDOC_THROTTLE_JS}
   var bodyEl = document.getElementById('chatBody');
   var creator = document.querySelector('.creator');
   var input = document.getElementById('chatInput');
@@ -333,15 +334,12 @@ export function renderCreatePage(
     skeleton.hidden = false;
     previewEmpty.hidden = true;
     var full = '';
-    var lastFlush = 0;
     var firstByte = false;
-    function flush(){
-      lastFlush = Date.now();
+    var paint = srcdocThrottle(function(html){
       if (!firstByte){ firstByte = true; skeleton.hidden = true; frame.hidden = false; }
-      frame.srcdoc = full;
-      codeView.textContent = full;
-    }
-    function schedule(){ if (Date.now() - lastFlush > 240){ flush(); } }
+      frame.srcdoc = html;
+      codeView.textContent = html;
+    }, 240);
 
     return fetch('/v1/create/generate', {
       method: 'POST',
@@ -361,9 +359,9 @@ export function renderCreatePage(
         return it.next().then(function(r){
           if (r.done){ return result; }
           var evt = r.value;
-          if (evt.type === 'delta'){ full += evt.text; if (onDelta) onDelta(); schedule(); }
-          else if (evt.type === 'done'){ flush(); result = evt; }
-          else if (evt.type === 'error'){ throw { error: evt.error }; }
+          if (evt.type === 'delta'){ full += evt.text; if (onDelta) onDelta(); paint.push(full); }
+          else if (evt.type === 'done'){ paint.push(full); paint.flush(); result = evt; }
+          else if (evt.type === 'error'){ paint.cancel(); throw { error: evt.error }; }
           return pump();
         });
       }

@@ -73,6 +73,10 @@ day) stops a metric that stays past its threshold from alerting on every check.
 - **Viewers** can subscribe to themselves only — a Slack DM or an email to their
   own address. On a published page they can do this from the **Follow metric**
   button in the toolbar.
+- On an artifact with a **row-level access policy**, only the owner and editors
+  can follow its metrics. A metric counts every row, so anyone the policy limits
+  to some rows doesn't get **Follow metric**, can't create or run alerts there,
+  and doesn't see their values.
 
 ## Run, pause, inspect
 

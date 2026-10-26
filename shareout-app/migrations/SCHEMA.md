@@ -492,7 +492,7 @@ erDiagram
 | `file_artifact_usage` | Which artifacts consume which deliverable. |
 | `catalog_settings` | Enable flag for the per-workspace data catalogue. The files themselves are `workspace_files` rows with `namespace='catalog'`. |
 | `knowledge_ingest` | Queue of artifacts awaiting knowledge extraction, deduped by `content_hash`. |
-| `knowledge_settings` | Per-workspace enable flag and `last_consolidated_at`. |
+| `knowledge_settings` | Per-workspace enable flag, `last_consolidated_at`, and `rebuild_requested_at` — set when a page that notes may cite goes private or into the trash, cleared by the consolidator once every such note is rebuilt without it. |
 | `knowledge_tombstones` | Paths deliberately forgotten, so re-ingestion does not resurrect them. |
 | `file_import_connections` | *(0021)* One member's read-only consent to a cloud drive (`provider` Google Drive or Microsoft) inside one workspace — separate from signing in. Tokens are one AES-GCM blob in `encrypted_credentials` + `iv`; never returned to clients. |
 | `file_import_sources` | *(0021)* A remote folder mirrored into the workspace: where it lives (`remote_drive_id`, `remote_folder_id`), the ShareOut `target_folder_id`, `convert_enabled`, and the optional daily sync (`daily_sync_enabled`, `next_sync_at`). `connection_id` goes NULL on disconnect, which stops syncing. |

@@ -321,6 +321,9 @@ Minimal payload — publish into the user's team workspace so their team sees it
 
 Re-publishing the same `slug` adds a new version. Add `"message": "one line on what changed"`
 so the page history says why; leave it out and ShareOut writes a short note itself.
+To change part of an existing artifact, edit, don't rewrite: `POST /v1/artifacts/{id}/edits`
+with `base_version` and `ops` (`replace`/`write`/`delete`/`rename`) —
+[api/artifacts.md](api/artifacts.md#post-v1artifactsidedits--edit-dont-rewrite).
 To go back to an older version, `POST /v1/artifacts/{id}/versions/{no}/restore` (a new
 version with the old files; `/rollback` is deprecated). Several pages? Ship one HTML file
 per page in `files[]` and link them with relative hrefs:
@@ -394,7 +397,9 @@ of every fact — see [integrations/mcp-connector.md](integrations/mcp-connector
 
 Building a multi-page site through the connector? Pass `files: [{ path, content, encoding? }]`
 (with `index.html` as the first page) to `publish_artifact` or `update_artifact` instead of
-`content`; the result links each page with `?page=`. Same limits as `POST /v1/publish` — see
+`content`; the result links each page with `?page=`. To change one, read every file with
+`get_artifact` `include_files: true` and send them all back with `base_version`: a write that
+would drop a file or overwrite a newer version is refused. Same limits as `POST /v1/publish` — see
 [integrations/mcp-connector.md](integrations/mcp-connector.md) and
 [core/html-spec/pages.md](core/html-spec/pages.md#multiple-html-files-sites).
 

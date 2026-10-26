@@ -7,7 +7,8 @@ import { missingJobConnection } from '../../scheduling/jobs/connection-check';
 import type { ScheduledJob } from '../../scheduling/jobs';
 import { getCrewById, listRuns } from '../../crew/store';
 import { startCrewRunStream } from '../../crew/triggers';
-import { getRunDetail, listWorkspaceRuns, type RunSurface } from '../../runs/inspector';
+import { getRunDetail, listWorkspaceRuns, type RunDetail, type RunSurface } from '../../runs/inspector';
+import { isRowRestricted } from '../../metric-alerts/row-scope';
 import { jsonWithApiErrors } from '../../http/api-error';
 
 function json(data: unknown, status = 200): Response {
@@ -335,5 +336,17 @@ export async function handleGetWorkspaceRun(
   }
   const run = await getRunDetail(env, workspaceId, surface as RunSurface, runId);
   if (!run) return json({ error: 'Run not found', code: 'NOT_FOUND' }, 404);
+  if (run.surface === 'alert' && run.artifactId && (await isRowRestricted(env, run.artifactId, user.id))) {
+    return json({ run: withoutAlertValue(run) });
+  }
   return json({ run });
+}
+
+/** An alert run's value (and the message quoting it) is a whole-table number: blanked for a row-scoped admin. */
+function withoutAlertValue(run: RunDetail): RunDetail {
+  return {
+    ...run,
+    result: undefined,
+    steps: run.steps.map((s) => (s.type === 'evaluate' && s.output && typeof s.output === 'object' ? { ...s, output: { ...s.output, value: null } } : s)),
+  };
 }

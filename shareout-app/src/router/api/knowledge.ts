@@ -8,12 +8,12 @@ import { enqueueIngest } from '../../knowledge/ingest';
 import { parseKnowledge, parseNode } from '../../knowledge/parse';
 import { runKnowledgeDistill } from '../../knowledge/distill';
 import { startDistillDrain } from '../../knowledge/drain';
-import { NODE_KINDS, type KnowledgeNode } from '../../knowledge/types';
+import { INDEX_PATH, NODE_KINDS, type KnowledgeNode } from '../../knowledge/types';
 import { getAIProvider } from '../../data/agent/anthropic';
 import { corpusFor } from '../../knowledge/corpus/client';
 import { startIngest } from '../../knowledge/corpus/ingest';
 import { searchCorpus, searchResultMarkdown, visibleSources } from '../../knowledge/corpus/search';
-import { notesFromArtifact, readableNodes, sourceArtifacts } from '../../knowledge/source-links';
+import { DISPLAY_SOURCES, notesFromArtifact, readableNodes, sourceArtifacts } from '../../knowledge/source-links';
 import { knowledgeUsage } from '../../knowledge/corpus/usage';
 import { corpusStatus, reindexWorkspace, REINDEX_MAX } from '../../knowledge/corpus/reindex';
 import { isPlatformAdmin } from '../../superadmin/auth';
@@ -232,8 +232,8 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
     return cors(jsonResponse({ enabled: true, notes: artifactId ? await notesFromArtifact(ctx.env, workspaceId, auth.id, artifactId) : [] }));
   }
 
-  // /files/{path+} — one node: GET (member), PUT (member, human edit wins),
-  // DELETE (owner/admin, ?forget=1 tombstones so it isn't re-learned).
+  // /files/{path+} — one node: GET (member), PUT (member, human edit wins; the overview
+  // index.md is owner/admin), DELETE (owner/admin, ?forget=1 tombstones so it isn't re-learned).
   if (sub === 'files' || sub.startsWith('files/')) {
     if (!(await isKnowledgeEnabled(ctx.env, workspaceId))) {
       return cors(jsonError('Not found', 'NOT_FOUND', 404));
@@ -242,6 +242,16 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
 
     if (method === 'PUT') {
       if (!target) return cors(jsonError('path is required', 'BAD_REQUEST', 400));
+      // The overview is loaded into every member's assistant, so writing it is an owner/admin
+      // action — the same rule as the workspace's house-rules context files.
+      if (target === INDEX_PATH && !canManage) {
+        return cors(apiErrorResponse({
+          message: 'Only workspace owners and admins can edit the workspace overview',
+          code: 'FORBIDDEN',
+          status: 403,
+          hint: 'Ask an owner or admin to change index.md, or save your note under another path such as topics/<name>.md.',
+        }));
+      }
       let raw = await request.text();
       if ((request.headers.get('Content-Type') || '').includes('application/json')) {
         let content: unknown;
@@ -260,9 +270,9 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
       if (typeof raw !== 'string' || !raw.trim()) {
         return cors(jsonError('markdown body is required', 'BAD_REQUEST', 400));
       }
-      const { issue } = target.toLowerCase().endsWith('.md')
+      const { node, issue } = target.toLowerCase().endsWith('.md')
         ? parseNode(target, raw)
-        : { issue: { message: 'path must end in .md' } };
+        : { node: undefined, issue: { message: 'path must end in .md' } };
       if (issue) {
         return cors(apiErrorResponse({
           message: `Invalid knowledge note: ${issue.message}`,
@@ -270,6 +280,16 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
           status: 400,
           param: issue.message.startsWith('path') ? 'path' : 'content',
           hint: `Start the markdown with frontmatter: ---\nkind: topic\nid: topic.example\ntitle: Example\n---. kind is one of ${NODE_KINDS.join(', ')}.`,
+        }));
+      }
+      // Readers find the overview by kind or id too, so neither may be claimed by another path.
+      if (target !== INDEX_PATH && (node?.kind === 'overview' || node?.id === 'index')) {
+        return cors(apiErrorResponse({
+          message: 'The workspace overview lives at index.md',
+          code: 'VALIDATION_ERROR',
+          status: 400,
+          param: 'content',
+          hint: `Use another kind (${NODE_KINDS.filter((k) => k !== 'overview').join(', ')}) and id for this note.`,
         }));
       }
       await upsertKnowledgeFile(ctx.env, workspaceId, { path: target, content: raw, source: 'manual' });
@@ -291,10 +311,11 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
     if (!file) return cors(jsonError('Not found', 'NOT_FOUND', 404));
     const node = (await readableNodes(ctx.env, workspaceId, auth.id, parseKnowledge([file]).nodes))[0];
     if (!node) return cors(jsonError('Not found', 'NOT_FOUND', 404));
+    const shown = node.sources.slice(0, DISPLAY_SOURCES);
     return cors(
       jsonResponse({
         enabled: true,
-        node: { ...summarize(node, file), body: node.body, content: file.content, sources: node.sources, source_artifacts: await sourceArtifacts(ctx.env, workspaceId, auth.id, node.sources) },
+        node: { ...summarize(node, file), body: node.body, content: file.content, sources: shown, source_artifacts: await sourceArtifacts(ctx.env, workspaceId, auth.id, shown) },
       })
     );
   }

@@ -526,7 +526,7 @@ Opt-in learned library. Full guide: [knowledge.md](knowledge.md). On self-host, 
 | `GET` | `/v1/workspaces/{id}/knowledge/tree` | Member+ | Note summaries by kind. |
 | `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | One note (full body) + `source_artifacts` `[{ id, slug, title, url, available }]`. |
 | `GET` | `/v1/workspaces/{id}/knowledge/from/{artifactId}` | Member+ | Notes learned from one artifact `{ enabled, notes: [{ path, kind, id, title }] }`; empty when you can't open it. |
-| `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Upsert note markdown. |
+| `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ (`index.md`: Admin+) | Upsert note markdown. |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Delete; `forget=1` stops re-learn. |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | `{ "enabled": true }`. |
 | `POST` | `/v1/workspaces/{id}/knowledge/reindex` | Admin+ | Re-learn every page/File (or `{ "artifactIds": [...] }`) even at an unchanged version → `202 { queued, remaining, skipped }`. Once per workspace per 10 min (`429` + `Retry-After`). Instance admins too. |

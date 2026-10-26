@@ -72,6 +72,12 @@ export const WORKSPACE_FORMS_EDIT_STYLES = `/* ---- Modal + native create forms 
 .wsx__discard { border: 0; background: transparent; color: var(--color-text-tertiary); font: 600 var(--text-sm) var(--font-body); cursor: pointer; }
 .wsx__discard:hover { color: var(--color-error); }
 .wsx__discard[hidden] { display: none; }
+.wsx-live__status { margin: 0 0 var(--space-3); font-size: var(--text-sm); color: var(--color-text-secondary); }
+.wsx-live__status:empty { display: none; }
+.wsx-live__err { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-3); font-size: var(--text-sm); color: var(--color-text); }
+.wsx-live__err[hidden] { display: none; }
+.wsx-live__msg { margin: 0; flex: 1; min-width: 0; }
+.wsx-live__retry { padding: 7px 16px; border: 0; border-radius: var(--radius-md); background: var(--color-primary); color: var(--color-text-inverse); font: 600 var(--text-sm) var(--font-body); cursor: pointer; }
 .wsx__editnote { flex: 1; display: grid; place-items: center; text-align: center; color: var(--color-text-tertiary); font-size: var(--text-sm); padding: 24px; }
 .wsx__toast { position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%); z-index: 50; background: var(--color-text); color: var(--color-bg); padding: 10px 18px; border-radius: 999px; font: 600 var(--text-sm) var(--font-body); box-shadow: var(--shadow-xl); opacity: 0; transition: opacity var(--duration-fast); pointer-events: none; }
 .wsx__toast.is-show { opacity: 1; }

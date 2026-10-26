@@ -48,6 +48,14 @@ their own. A rule's creator **or** a manager may pause/delete/run it.
 If a creator loses access to the artifact, the rule fails closed: it is disabled
 on its next evaluation and stops delivering.
 
+**Row-level access policies.** A metric is evaluated over every row, so on an artifact
+with an `access_policy` only callers the policy does not scope (the owner and
+owner/editor collaborators) can create, change or run alerts and see their values.
+Anyone else gets `403` on create, change and run (pausing their own alert still
+works), and reads `last_value`, `last_triggered_value`, `history` and run-log values as
+`null`/empty. A rule whose creator the policy scopes is disabled on its next
+evaluation, and the viewer toolbar does not offer **Follow** to scoped viewers.
+
 ## Metric Definitions
 
 A definition names a number and says where to read it from. Define it once; many
@@ -240,7 +248,7 @@ Supports `enabled`, `schedule`, `condition`, `message`, `cooldown_seconds`, and 
 | Status | When |
 |--------|------|
 | 400 | Invalid cron, unknown `op`/`source.type`, undefined `metric_id`, bad destination config, quota reached |
-| 403 | Viewer using a non-self destination; non-manager defining a metric |
+| 403 | Viewer using a non-self destination; non-manager defining a metric; caller scoped by the artifact's row-level access policy |
 | 404 | Artifact, metric, or alert not found |
 
 ## Examples

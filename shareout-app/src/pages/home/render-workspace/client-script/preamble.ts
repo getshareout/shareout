@@ -32,7 +32,8 @@ export const workspace_client_preamble_JS = `
   function okOr(r) { return window.soOptimistic.check(r); }
   function failToast(e, msg, retry) { return window.soOptimistic.report(e, msg, retry); }
   function errReason(e, fallback) { return window.soOptimistic.text(e, fallback); }
-  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+  // Quotes included (attribute values use it too). The shell's only esc: a second declaration would hoist over this one.
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
   function i18nEmpty(k) { return '<div class="wsx-empty">' + esc(t(k)) + '</div>'; }
   // The one empty-state pattern for lenses (Design/system/components.md "Empty States"):
   // a plain title, one line on what happens next, and at most one action (pre-built HTML).

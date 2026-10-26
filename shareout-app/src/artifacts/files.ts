@@ -22,6 +22,41 @@ export function isTextMime(mime: string): boolean {
   return TEXT_MIME_TYPES.some(t => mime.startsWith(t) || mime === t);
 }
 
+/** UTF-8 text of stored bytes, byte-order mark kept, so writing it back changes nothing. */
+export function decodeText(bytes: Uint8Array, fatal = false): string {
+  return new TextDecoder('utf-8', { ignoreBOM: true, fatal }).decode(bytes);
+}
+
+export function toBase64(bytes: Uint8Array): string {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+/**
+ * `?paths=a,b` (or repeated `paths=`): the requested subset, null when none was asked.
+ * A value that is itself a file's path wins over splitting it, so paths with commas work.
+ */
+function selectPaths(values: string[], known: string[]): { paths: Set<string> | null; missing: string[] } {
+  if (!values.length) return { paths: null, missing: [] };
+  const all = new Set(known);
+  const wanted = values.flatMap((v) => (all.has(v) ? [v] : v.split(',').map((p) => p.trim()).filter(Boolean)));
+  return { paths: new Set(wanted), missing: [...new Set(wanted.filter((p) => !all.has(p)))] };
+}
+
+/**
+ * The live (production) version and the newest saved one. They differ while a version
+ * waits on blocking tests; edits must start from `newest_version`.
+ */
+export async function versionHeads(env: Env, artifactId: string): Promise<{ live_version: number | null; newest_version: number | null }> {
+  const row = await env.DB.prepare(`
+    SELECT (SELECT v.version_no FROM deployments d JOIN versions v ON v.id = d.version_id
+             WHERE d.artifact_id = ? AND d.channel = 'production') AS live,
+           (SELECT MAX(version_no) FROM versions WHERE artifact_id = ?) AS newest
+  `).bind(artifactId, artifactId).first<{ live: number | null; newest: number | null }>();
+  return { live_version: row?.live ?? null, newest_version: row?.newest ?? null };
+}
+
 export async function handleGetArtifactFiles(
   request: Request,
   env: Env,
@@ -71,41 +106,49 @@ export async function handleGetArtifactFiles(
     return json({ error: 'Version not found', code: 'VERSION_NOT_FOUND' }, 404);
   }
 
-  const assets = await env.DB.prepare(
-    'SELECT path, r2_key, mime, size_bytes FROM assets WHERE version_id = ?'
-  ).bind(version.id).all<{ path: string; r2_key: string; mime: string; size_bytes: number }>();
+  const { results: assets } = await env.DB.prepare(
+    'SELECT path, r2_key, mime, size_bytes, sha256 FROM assets WHERE version_id = ? ORDER BY path'
+  ).bind(version.id).all<{ path: string; r2_key: string; mime: string; size_bytes: number; sha256: string }>();
 
-  const files: ArtifactFile[] = [];
+  const picked = selectPaths(url.searchParams.getAll('paths'), (assets ?? []).map((a) => a.path));
+  if (picked.missing.length) {
+    return json({
+      success: false,
+      error: `No file ${picked.missing.map((p) => JSON.stringify(p)).join(', ')} in version ${version.version_no}`,
+      code: 'FILE_NOT_FOUND',
+      missing: picked.missing,
+      hint: 'List the files with ?manifest=1.',
+    }, 404);
+  }
+  const selected = (assets ?? []).filter((a) => !picked.paths || picked.paths.has(a.path));
 
-  for (const asset of assets.results || []) {
-    const obj = await env.ARTIFACTS.get(asset.r2_key);
-    if (!obj) continue;
-
-    let content: string;
-    let encoding: 'utf8' | 'base64';
-
-    if (isTextMime(asset.mime)) {
-      content = await obj.text();
-      encoding = 'utf8';
-    } else {
-      const buffer = await obj.arrayBuffer();
-      const bytes = new Uint8Array(buffer);
-      let binary = '';
-      for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      content = btoa(binary);
-      encoding = 'base64';
-    }
-
-    files.push({
-      path: asset.path,
-      content,
-      encoding,
-      mime: asset.mime,
-      size_bytes: asset.size_bytes,
+  if (url.searchParams.get('manifest') === '1') {
+    const heads = await versionHeads(env, artifactId);
+    return json({
+      artifact_id: artifactId,
+      version_id: version.id,
+      version_no: version.version_no,
+      entrypoint: version.entrypoint,
+      ...heads,
+      files: selected.map((a) => ({ path: a.path, mime: a.mime, size: a.size_bytes, sha256: a.sha256 })),
     });
   }
+
+  const read = await Promise.all(selected.map(async (asset): Promise<ArtifactFile | null> => {
+    const obj = await env.ARTIFACTS.get(asset.r2_key);
+    if (!obj) return null;
+    const bytes = new Uint8Array(await obj.arrayBuffer());
+    const text = isTextMime(asset.mime);
+    return {
+      path: asset.path,
+      content: text ? decodeText(bytes) : toBase64(bytes),
+      encoding: text ? 'utf8' : 'base64',
+      mime: asset.mime,
+      size_bytes: asset.size_bytes,
+    };
+  }));
+  const files = read.filter((f): f is ArtifactFile => f !== null);
+  const unreadable = selected.filter((_, i) => !read[i]).map((a) => a.path);
 
   const response: ArtifactFilesResponse = {
     artifact_id: artifactId,
@@ -113,6 +156,7 @@ export async function handleGetArtifactFiles(
     version_no: version.version_no,
     entrypoint: version.entrypoint,
     files,
+    ...(unreadable.length ? { unreadable } : {}),
   };
 
   return json(response);

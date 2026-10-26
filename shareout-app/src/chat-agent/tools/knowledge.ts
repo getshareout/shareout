@@ -6,7 +6,7 @@ import { corpusFor } from '../../knowledge/corpus/client';
 import { searchCorpus, visibleSources } from '../../knowledge/corpus/search';
 import { listVisibleEntities, visibleEntity } from '../../knowledge/corpus/graph';
 import { scopedWorkspaceId, selectedWorkspace } from '../scope';
-import { readableNodes, sourceArtifacts } from '../../knowledge/source-links';
+import { DISPLAY_SOURCES, readableNodes, sourceArtifacts } from '../../knowledge/source-links';
 
 const MAX_RESULTS = 20;
 const SEMANTIC_TOPK = 15;
@@ -189,7 +189,7 @@ export const knowledgeGetTool: AccountTool = {
     if (!node) return { error: `Nothing learned under “${key}” yet.` };
     return {
       enabled: true,
-      node: { ...summarize(node), body: node.body, sources: await sourceArtifacts(ctx.env, wsId, ctx.userId, node.sources) },
+      node: { ...summarize(node), body: node.body, sources: await sourceArtifacts(ctx.env, wsId, ctx.userId, node.sources.slice(0, DISPLAY_SOURCES)) },
     };
   },
 };

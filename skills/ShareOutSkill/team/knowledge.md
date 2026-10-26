@@ -133,7 +133,7 @@ The calls, from broad to specific:
 GET /v1/workspaces/{workspaceId}/knowledge/entities?type=Organization&q=acme&limit=20
 ```
 
-Returns `types` (each entity type with its count) and `entities`, most-mentioned first. Each entity has `id`, `type`, `name`, `aliases`, `mentions` and up to five `sources`.
+Returns `types` (each entity type with its count) and `entities`, most-mentioned first. Each entity has `id`, `type`, `name`, `aliases`, `mentions` and up to five `sources`. `name` and `aliases` are only names that appear in a source you can open, and `q` matches only those — the same holds for the `other` entity in `relations` and for `graph` nodes.
 
 ```http
 GET /v1/workspaces/{workspaceId}/knowledge/entities/{entityId}?format=md
@@ -259,7 +259,7 @@ All routes require workspace membership (`status` and `reindex` also accept an i
 | `GET` | `/v1/workspaces/{id}/knowledge/tree` | Member+ | All note summaries grouped by kind (no bodies) |
 | `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | One note — full markdown body, `sources` (artifact ids) and `source_artifacts` |
 | `GET` | `/v1/workspaces/{id}/knowledge/from/{artifactId}` | Member+ | Notes learned from one artifact (the reverse of `sources`) |
-| `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Replace markdown; marks hand-edited |
+| `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ (`index.md`: Admin+) | Replace markdown; marks hand-edited |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Delete; `forget=1` stops re-learn |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | Turn learning on/off |
 | `POST` | `/v1/workspaces/{id}/knowledge/reindex` | Admin+ (instance admin too) | Re-learn every page and File (or `{ "artifactIds": [...] }`) even when unchanged → `202 { queued, remaining, skipped }`; once per 10 min |
@@ -284,6 +284,10 @@ Retention overview.
 ```
 
 A note that wouldn't parse (no frontmatter, missing `kind`/`id`/`title`, unknown `kind`) or a JSON body without a string `content` is rejected with `400 VALIDATION_ERROR` (`param: "content"` or `"path"`) — nothing is stored.
+
+The overview, `index.md`, is loaded into every member's assistant, so only owners and admins can write it — a member gets `403 FORBIDDEN` with a hint. `kind: overview` and `id: index` belong to that path only (`400` elsewhere). Agents receive the overview quoted as workspace data inside `<workspace_knowledge>` tags, never as instructions.
+
+**A page that stops being open to everyone.** When a page goes private or into the trash, every note citing it in `sources` (topics, entities, the timeline, the overview) is withheld from other members and their assistants at once, and the next nightly consolidation rebuilds it from the pages still open to all (a note left with none is removed). Notes keep every source id; the API shows the newest 50.
 
 **Sources ↔ notes.** `GET …/knowledge/files/{path}` returns `source_artifacts`, one per id in `sources`: `{ id, slug, title, url, available }`, where `url` is the absolute `$ORIGIN/a/{slug}/` link. When the artifact is deleted, held, in another workspace or private to someone else, it comes back `available: false` with no title, slug or url. The reverse, `GET …/knowledge/from/{artifactId}`, returns `{ enabled, notes: [{ path, kind, id, title }] }` (max 50) — empty when you may not open that artifact, `enabled: false` when Knowledge is off. Home shows these as "Knowledge from this artifact" in the Inspector's Details.
 

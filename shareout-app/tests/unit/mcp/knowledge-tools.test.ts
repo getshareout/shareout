@@ -280,6 +280,7 @@ describe('knowledge_get / knowledge_from_artifact', () => {
       ('art_kmcp_private', 'Bo private draft', 'bo-draft', 'usr_bo', 'private', ?),
       ('art_kmcp_b', 'Contoso deck', 'contoso-deck', 'usr_bo', 'workspace', ?)`).bind(WS_A, WS_A, WS_B).run();
     await upsertKnowledgeFile(e, WS_A, { path: 'topics/renewals.md', content: note(['art_kmcp_open', 'art_kmcp_private']) });
+    await upsertKnowledgeFile(e, WS_A, { path: 'topics/plan.md', content: '---\nkind: topic\nid: topic.plan\ntitle: Plan\nsources: [art_kmcp_open]\n---\nRenewal plan notes.' });
     await upsertKnowledgeFile(e, WS_B, { path: 'topics/contoso.md', content: note(['art_kmcp_b']) });
   });
 
@@ -299,7 +300,8 @@ describe('knowledge_get / knowledge_from_artifact', () => {
   it('knowledge_from_artifact finds the notes learned from a page, in the page\'s own workspace', async () => {
     const r = await callTool(ana, 'knowledge_from_artifact', { artifact_id: 'art_kmcp_open' });
     expect(r!.structuredContent!.workspace_id).toBe(WS_A);
-    expect(r!.structuredContent!.notes).toEqual([expect.objectContaining({ path: 'topics/renewals.md', title: 'Renewals' })]);
+    // Renewals also draws on a private page she can't open, so it isn't listed — the same rule as knowledge_get.
+    expect(r!.structuredContent!.notes).toEqual([expect.objectContaining({ path: 'topics/plan.md', title: 'Plan' })]);
   });
 
   it("knowledge_from_artifact returns nothing for a page the person cannot open, and refuses another workspace's page", async () => {

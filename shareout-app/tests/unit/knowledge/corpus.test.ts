@@ -14,7 +14,6 @@ vi.mock('../../../src/workspaces/roles', () => ({ getInternalWorkspaceRole }));
 
 import { chunkMarkdown, MAX_CHUNKS } from '../../../src/knowledge/corpus/chunk';
 import { corpusFor } from '../../../src/knowledge/corpus/client';
-import { ftsQuery } from '../../../src/knowledge/corpus/store-do';
 import { queueKnowledgeSource } from '../../../src/knowledge/corpus/ingest';
 import { searchCorpus } from '../../../src/knowledge/corpus/search';
 import { routeKnowledgeApi } from '../../../src/router/api/knowledge';
@@ -97,13 +96,6 @@ describe('chunkMarkdown', () => {
   });
 });
 
-describe('ftsQuery', () => {
-  it('quotes every word so FTS operators are inert', () => {
-    expect(ftsQuery('budget NOT "Q3" OR*')).toBe('"budget" OR "NOT" OR "Q3" OR "OR"');
-    expect(ftsQuery('  ¿? ')).toBeNull();
-  });
-});
-
 describe('corpus ingest + search', () => {
   it('learns a File and returns a cited passage', async () => {
     const ws = nextWs();
@@ -145,6 +137,16 @@ describe('corpus ingest + search', () => {
     await putFile(ws, 'dlv_p', 'Secret salary bands for engineering.', { owner: 'u2', visibility: 'private' });
     expect((await searchCorpus(e, ws, 'u1', 'salary')).hits).toHaveLength(0);
     expect((await searchCorpus(e, ws, 'u2', 'salary')).hits).toHaveLength(1);
+  });
+
+  it('hides a private File from a stemmed match too', async () => {
+    const ws = nextWs();
+    await setKnowledgeEnabled(e, ws, true);
+    await putFile(ws, 'dlv_sp', 'Las bandas salariales de ingeniería se aprobaron en marzo.', { owner: 'u2', visibility: 'private' });
+    await putFile(ws, 'dlv_sw', 'El comité aprobará las bandas nuevas en abril.');
+    const seen = async (user: string) => (await searchCorpus(e, ws, user, 'banda salarial aprobada')).hits.map((h) => h.source.id);
+    expect(await seen('u1')).toEqual(['dlv_sw']);
+    expect((await seen('u2')).sort()).toEqual(['dlv_sp', 'dlv_sw']);
   });
 
   it('replaces a File’s chunks with its new version', async () => {

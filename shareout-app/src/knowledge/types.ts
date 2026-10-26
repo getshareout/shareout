@@ -64,3 +64,18 @@ export function artifactIdFromDigestPath(path: string): string {
 }
 
 export const INDEX_PATH = 'index.md';
+
+// A learned note's `sources` decide who may read it, so they must name every page the note
+// was built from. Notes written since that holds say `provenance: full`; older topic, entity
+// and timeline notes kept only their newest 50 sources, and older overviews listed none.
+export const PROVENANCE_LINE = 'provenance: full';
+export const LEGACY_SOURCES_CAP = 50;
+
+export function hasFullProvenance(node: { extra: Record<string, unknown> }): boolean {
+  return node.extra.provenance === 'full';
+}
+
+/** A learned (not hand-written) note whose sources may be incomplete. */
+export function provenanceIncomplete(node: { kind: string; sources: string[]; extra: Record<string, unknown> }): boolean {
+  return !hasFullProvenance(node) && (node.kind === 'overview' || node.sources.length >= LEGACY_SOURCES_CAP);
+}

@@ -762,12 +762,29 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     }
     clearDropBar();
   });
+  // Live tabs: a pane with no artifact behind it yet (a page still being built). Never
+  // saved, no View/Edit, no inspector; closing one calls its onClose.
+  var livePanes = {};        // key -> { pane, onClose }
+  function openLiveTab(key, label, pane, onClose) {
+    livePanes[key] = { pane: pane, onClose: onClose };
+    panesEl.appendChild(pane);
+    tabs.splice(1, 0, { key: key, label: label, live: true });
+    activateTab(key);
+  }
+  // Drop a live tab without firing onClose; returns the slot it held (-1 if gone).
+  function dropLiveTab(key) {
+    var live = livePanes[key], idx = keyIndex(key);
+    if (live) { live.pane.remove(); delete livePanes[key]; }
+    if (idx > 0) tabs.splice(idx, 1);
+    return idx;
+  }
   function activateTab(key) {
     activeKey = key;
     if (panes[key]) loadStage(panes[key]);
     homePane.classList.toggle('is-active', key === 'home');
     Object.keys(panes).forEach(function (k) { panes[k].pane.classList.toggle('is-active', k === key); });
-    activeArt = key === 'home' ? null : { key: key, id: panes[key].art.id, slug: panes[key].art.slug, name: panes[key].art.name, iframe: panes[key].iframe };
+    Object.keys(livePanes).forEach(function (k) { livePanes[k].pane.classList.toggle('is-active', k === key); });
+    activeArt = !panes[key] ? null : { key: key, id: panes[key].art.id, slug: panes[key].art.slug, name: panes[key].art.name, iframe: panes[key].iframe };
     paintRail();
     renderTabs();
     syncTabMode();
@@ -778,19 +795,23 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     if (idx <= 0) return;
     if (panes[key] && panes[key].dirty && !window.confirm(t('inspector.closeTabConfirm'))) return;
     if (panes[key]) { panes[key].pane.remove(); delete panes[key]; }
+    var live = livePanes[key];
+    if (live) { live.pane.remove(); delete livePanes[key]; if (live.onClose) live.onClose(); }
     tabs.splice(idx, 1);
     saveTabs();
     if (activeKey === key) activateTab(tabs[Math.max(0, idx - 1)].key);
     else renderTabs();
   }
-  function makeTab(key, art, first) {
+  function makeTab(key, art, first, at) {
     var made = makeArtifactPane(art);
-    panes[key] = made; panesEl.appendChild(made.pane); tabs.splice(first ? 1 : tabs.length, 0, { key: key, label: art.name });
+    panes[key] = made; panesEl.appendChild(made.pane); tabs.splice(at > 0 ? at : first ? 1 : tabs.length, 0, { key: key, label: art.name });
   }
-  function openArtifact(slug, name, id, type) {
+  // inPlaceOf: a live tab this artifact replaces, in the same slot.
+  function openArtifact(slug, name, id, type, inPlaceOf) {
     var key = id || slug;
+    var at = inPlaceOf ? dropLiveTab(inPlaceOf) : -1;
     if (!panes[key]) {
-      makeTab(key, { key: key, id: id || '', slug: slug, name: name || t('inspector.artifact'), type: type || '' }, true);
+      makeTab(key, { key: key, id: id || '', slug: slug, name: name || t('inspector.artifact'), type: type || '' }, true, at);
       saveTabs();
       if (id) fetch('/v1/home/viewed', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ artifactId: id }) }).catch(function () {});
     }
@@ -800,7 +821,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   // Persist open artifact tabs so they reopen next session.
   function saveTabs() {
     try {
-      var open = tabs.filter(function (t) { return !t.home && panes[t.key]; }).map(function (t) { var a = panes[t.key].art; return { key: t.key, label: t.label, id: a.id, slug: a.slug, type: a.type || '' }; });
+      var open = tabs.filter(function (t) { return !t.home && !t.live && panes[t.key]; }).map(function (t) { var a = panes[t.key].art; return { key: t.key, label: t.label, id: a.id, slug: a.slug, type: a.type || '' }; });
       localStorage.setItem(LS.tabs, JSON.stringify(open));
     } catch (e) {}
   }

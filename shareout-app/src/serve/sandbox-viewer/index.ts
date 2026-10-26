@@ -23,6 +23,7 @@ import {
   fetchAttachedSkills,
 } from '../prefetch';
 import { hasMetricDefinitions } from '../../metric-alerts/definitions';
+import { policyScopesViewer } from '../../metric-alerts/row-scope';
 import { renderSocialMetaTags, type SocialPreview } from '../social-meta';
 import { resolvePwa } from './pwa-tags';
 import { renderEarlyHead } from './early-head';
@@ -229,7 +230,8 @@ export async function serveSandboxedViewer(
         commentsIdentityMode: commentsInfo.identityMode,
         commentsGuest: commentsInfo.guest || (commentsInfo.enabled && !!spaceGuest && capabilitySatisfies(spaceGuest.capability, 'comment')),
         commentCount: commentsInfo.count,
-        hasMetrics,
+        // A followed metric reads every row, so "Follow" is not offered to a viewer the row policy scopes.
+        hasMetrics: hasMetrics && !policyScopesViewer(accessPolicy, user?.email ?? null, !!adminInfo?.canEdit),
         adminInfo,
         currentUser,
         hideToolbar: viewerConfig.hide_toolbar || studioEmbed,
