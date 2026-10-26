@@ -101,11 +101,11 @@ vitest's module graph. Force the whole suite with `SHAREOUT_FULL_TESTS=1`.
 `.git` dir, so it covers every worktree, and it configures the `generated` merge driver.
 Skip one push with `git push --no-verify` or `SHAREOUT_SKIP_HOOK=1`.
 
-- **Feature branches push light; the suite runs once on the integration.** Pushing a
-  feature branch runs static checks, typecheck, secret scan and bundle checks, but no
-  tests (`SHAREOUT_CHECK_MODE=light`). Many worktrees each running the suite on one
-  machine starve each other into timeout failures. Before landing, combine the branches
-  and run everything once:
+- **Feature branches push light; tests run on what lands.** Pushing a feature branch
+  runs static checks, eslint on changed files, the worker and workspace typechecks,
+  secret scan and bundle checks, but no tests (`SHAREOUT_CHECK_MODE=light`). Many
+  worktrees each running the suite on one machine starve each other into timeout
+  failures. To land several branches together, combine them and run everything once:
 
   ```bash
   ./tooling/scripts/integrate.sh -n <name> <branch-a> <branch-b> …
@@ -114,6 +114,15 @@ Skip one push with `git push --no-verify` or `SHAREOUT_SKIP_HOOK=1`.
   It merges them onto `origin/main` in a throwaway worktree on `integration/<name>`,
   regenerates bundles, and runs the full suite. Fix failures there, push it (pushes to
   `main` and `integration/*` run the tests), and land it as one PR.
+
+- **Landing a single PR (maintainers): `./tooling/scripts/land.sh <pr-number>`.** This
+  is the default way to merge one PR. Under a machine-wide lock it rebases the PR onto
+  `origin/main` in a throwaway worktree, regenerates and commits the bundles, runs the
+  light checks plus `test:affected` (affected root tests and touched workspace
+  suites), force-pushes the rebased head with `--force-with-lease`, then squash-merges
+  with `--match-head-commit` — and refuses if `main` moved during the run. What merges
+  is exactly what was tested. `--dry-run` prints the plan without changing anything.
+  Hooks are never bypassed; `integrate.sh` stays the tool for batches.
 
 - **Generated files.** Committed build outputs (`public/_bundles/*`, `src/discovery/*`,
   `src/official-skills/*.generated.ts`) are marked `merge=generated` in

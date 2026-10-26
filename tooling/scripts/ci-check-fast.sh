@@ -9,8 +9,8 @@
 # SHAREOUT_CHECK_MODE=light skips every test run: static checks + eslint on changed
 # files, worker + workspace typechecks, secrets and bundles only. The pre-push hook uses
 # it for feature branches: parallel agents each running suites on one machine starve
-# each other into timeouts. Tests run once, on the integrated result
-# (tooling/scripts/integrate.sh), before anything reaches main.
+# each other into timeouts. Tests run on the result that lands: tooling/scripts/land.sh
+# for one PR, integrate.sh for a batch.
 #
 # Independent checks run in parallel; each one's output is printed only if it fails.
 # check:bundles runs last, alone: it rewrites public/_bundles/ (as does the
@@ -108,7 +108,7 @@ LIGHT=0
 [ "${SHAREOUT_CHECK_MODE:-}" = "light" ] && LIGHT=1
 
 if [ "$LIGHT" = "1" ]; then
-  echo "==> Light checks (no tests; integrate.sh runs the suite once on the integrated branch)"
+  echo "==> Light checks (no tests; land.sh / integrate.sh test what lands)"
 else
   echo "==> Fast CI checks (parallel)"
 fi
