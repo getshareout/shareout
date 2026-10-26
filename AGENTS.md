@@ -8,7 +8,9 @@ that surface has to move here rather than be edited there.
 
 **Read this first.** This repo is the open-source ShareOut product: a Cloudflare Worker that publishes and hosts interactive HTML artifacts, plus the browser SDK, visual editor, agent skill docs, and design system.
 
-**Synced copies:** `AGENTS.md` and `CLAUDE.md` are identical.
+**One guide for every agent: this file.** `CLAUDE.md` is the single line `@AGENTS.md`,
+which Claude Code expands into this file. Edit here, never there — the pre-push check
+fails if `CLAUDE.md` becomes anything else.
 
 **Design system:** Any visual / UI / brand work MUST consult [Design/README.md](Design/README.md) first.
 
@@ -22,8 +24,6 @@ that surface has to move here rather than be edited there.
 2. **Simplicity first** — minimum code that solves the ask; no speculative features.
 3. **Surgical changes** — touch only what the request requires; match existing style.
 4. **Goal-driven** — define verifiable success criteria; loop until checked.
-
-Prefer the `ponytail` skill (lazy-senior / YAGNI) for coding tasks when available.
 
 ---
 
@@ -98,16 +98,48 @@ npm run dev   # http://localhost:55162
 
 Login: `/auth/dev?email=<you>&redirect=/home` (localhost only).
 
-Checks: `npm run test:affected`, `npm run typecheck`, `npm run check:domains`.
+Starting a task? `./tooling/scripts/new-worktree.sh <branch>` creates
+`../shareout-wt/<last part of the branch name>` (next to the primary checkout) off
+`origin/main`, installs the pre-push hook, and clones `node_modules` from the primary
+checkout — copy-on-write on APFS, so near-zero extra disk. When the lockfiles differ or
+the clone fails it runs `npm ci` instead (~5 s with a warm npm cache).
 
-`npm run test:affected` maps your changed files to tests through vitest's module graph
-and runs only those — seconds instead of the ~4m40s full suite. It falls back to the
-full suite when the lockfile or vitest config changed. Whole suite: `npm test`.
+Testing, pushing and landing: [Gate contract](#gate-contract).
 
-Starting a task? `./tooling/scripts/new-worktree.sh <branch>` creates the worktree and
-clones `node_modules` from the primary checkout (copy-on-write, ~4s) instead of `npm ci`.
+---
 
-Rebuild after SDK/editor changes: `npm run build:sdk` / `npm run build:editor`.
+## Gate contract
+
+There is no hosted CI, by design, and `main` has no branch protection: these local
+checks are the whole gate. `npm` commands run in `shareout-app/`; scripts run from the
+repo root.
+
+- **Pushing a feature branch runs light checks, no tests.** The pre-push hook runs the
+  static guards (`check:*`, plus the `CLAUDE.md` import check), the worker typecheck,
+  gitleaks over the branch's commits, then `check:bundles` and `check:bundle-size`.
+  Same run by hand: `SHAREOUT_CHECK_MODE=light ./tooling/scripts/ci-check-fast.sh`.
+- **While you work, test narrowly:** `npm run typecheck`, then
+  `TZ=UTC npx vitest run <test files>` or `npm run test:affected` (maps your diff to its
+  tests through vitest's module graph; when `package.json`, the lockfile or a test/TS
+  config changed it runs everything — name the files instead).
+- **Never run the full suite on a feature branch** — not `npm test`, `npm run coverage`,
+  `SHAREOUT_FULL_TESTS=1` or `ci-check.sh`. Parallel worktrees on one machine starve
+  each other into timeouts. The full suite runs once, on the integrated result:
+  `./tooling/scripts/integrate.sh -n <name> <branch> [<branch>…]` merges the branches
+  onto `origin/main` in a throwaway worktree, regenerates the bundles, then runs
+  typecheck, the full suite, the workspace suites and the bundle checks. Fix failures on
+  `integration/<name>`; pushing that branch runs the hook with tests.
+- **Landing:** push, open a PR against `main` that lists the checks you ran, and stop —
+  merging is the maintainer's call. A PR is squash-merged once its branch has been
+  through `integrate.sh`; a batch, or a branch that needed fixes there, lands as one
+  `integration/<name>` PR.
+- **Committed bundles:** build outputs (`public/_bundles/*`, `src/discovery/*`,
+  `src/official-skills/*.generated.ts`) live in git. After editing `sdk/`,
+  `editor-client/`, `chat-core/` or `skills/ShareOutSkill/`, run `npm run build:sdk` /
+  `build:editor` / `build:chat-core` / `build:skill` and commit the output.
+  `npm run check:bundles` rebuilds all of them and fails if a committed copy was stale;
+  commit what it rebuilt. They are marked `merge=generated` (a merge keeps one side), so
+  never hand-merge them — regenerate and commit.
 
 ---
 

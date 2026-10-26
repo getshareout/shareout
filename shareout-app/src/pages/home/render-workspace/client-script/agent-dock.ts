@@ -108,7 +108,6 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
   function setThread(id) { currentThreadId = id; try { if (id) localStorage.setItem(THREAD_LS, id); else localStorage.removeItem(THREAD_LS); } catch (e) {} }
 
   function el(tag, cls) { var d = document.createElement(tag); if (cls) d.className = cls; return d; }
-  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   var ICO = function (p, w) { return '<svg viewBox="0 0 24 24" width="' + (w || 18) + '" height="' + (w || 18) + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>'; };
   var SEND_SVG = ICO('<path d="M4 12h15M13 6l6 6-6 6"/>');
   var STOP_SVG = ICO('<rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor" stroke="none"/>');

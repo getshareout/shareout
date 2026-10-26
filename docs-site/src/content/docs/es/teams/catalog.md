@@ -184,6 +184,11 @@ DELETE /v1/workspaces/{workspaceId}/catalog/files?path=sources/orders.md
 Authorization: Bearer {token}
 ```
 
+`path` es una ruta relativa a un `.md`, como `sources/orders.md`: letras, dígitos, `.`,
+`_` y `-`, cada nombre empieza con letra o dígito, sin `..`, hasta 4 niveles y 200
+caracteres (si no, `400 INVALID_PATH`). `content` pesa como máximo 128 KB
+(`413 FILE_TOO_LARGE`).
+
 ## API REST
 
 Todas las rutas requieren membresía del workspace. Un catálogo desactivado devuelve

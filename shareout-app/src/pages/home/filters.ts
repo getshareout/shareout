@@ -65,10 +65,19 @@ export function homeScopeSql(scope: VisibilityScope, workspaceId: string | null)
   };
 }
 
+/** Membership rows for one of the caller's linked accounts. Binds: workspaceId, then userIds. */
+function linkedMemberRows(scope: VisibilityScope): string {
+  return `SELECT 1 FROM workspace_members WHERE workspace_id = ? AND member_class = 'internal' AND user_id IN (${placeholders(scope.userIds.length)})`;
+}
+
 /** True when one of the caller's linked accounts is an internal member of the workspace. */
 export async function isLinkedWorkspaceMember(env: Env, scope: VisibilityScope, workspaceId: string): Promise<boolean> {
-  const row = await env.DB.prepare(
-    `SELECT 1 FROM workspace_members WHERE workspace_id = ? AND member_class = 'internal' AND user_id IN (${placeholders(scope.userIds.length)}) LIMIT 1`,
-  ).bind(workspaceId, ...scope.userIds).first();
+  const row = await env.DB.prepare(`${linkedMemberRows(scope)} LIMIT 1`).bind(workspaceId, ...scope.userIds).first();
   return !!row;
+}
+
+/** isLinkedWorkspaceMember as a WHERE condition, so a query carries its own membership
+ *  check instead of waiting on a separate round trip. */
+export function linkedWorkspaceMemberSql(scope: VisibilityScope, workspaceId: string): { sql: string; binds: unknown[] } {
+  return { sql: `EXISTS (${linkedMemberRows(scope)})`, binds: [workspaceId, ...scope.userIds] };
 }

@@ -167,28 +167,58 @@ export async function setLastConsolidatedAt(
     .run();
 }
 
-// Enabled workspaces that are either dirty (a digest edited past the watermark) or
-// idle for >7 days (weekly maintenance sweep). Oldest-watermark-first = starvation-free.
+// Enabled workspaces that are dirty (a digest edited past the watermark), owe a rebuild
+// (a page their notes cite went private or into the trash), or have been idle for >7 days
+// (weekly maintenance sweep). Oldest-watermark-first = starvation-free.
 export async function listConsolidationCandidates(
   env: Env,
   limit: number
-): Promise<Array<{ workspaceId: string; lastConsolidatedAt: string | null }>> {
+): Promise<Array<{ workspaceId: string; lastConsolidatedAt: string | null; rebuildRequestedAt: string | null }>> {
   const rows = await env.DB.prepare(
-    `SELECT ks.workspace_id, ks.last_consolidated_at FROM knowledge_settings ks
+    `SELECT ks.workspace_id, ks.last_consolidated_at, ks.rebuild_requested_at FROM knowledge_settings ks
      WHERE ks.enabled = 1 AND (
        EXISTS (SELECT 1 FROM workspace_files kf
                WHERE kf.workspace_id = ks.workspace_id AND kf.namespace = 'knowledge'
                  AND kf.path LIKE 'artifacts/%'
                  AND kf.updated_at > COALESCE(ks.last_consolidated_at, '1970-01-01'))
+       OR ks.rebuild_requested_at IS NOT NULL
        OR COALESCE(ks.last_consolidated_at, '1970-01-01') < strftime('%Y-%m-%dT%H:%M:%fZ','now', '-7 days')
      )
      ORDER BY COALESCE(ks.last_consolidated_at, '1970-01-01') ASC
      LIMIT ?`
   )
     .bind(limit)
-    .all<{ workspace_id: string; last_consolidated_at: string | null }>();
+    .all<{ workspace_id: string; last_consolidated_at: string | null; rebuild_requested_at: string | null }>();
   return rows.results.map(r => ({
     workspaceId: r.workspace_id,
     lastConsolidatedAt: r.last_consolidated_at,
+    rebuildRequestedAt: r.rebuild_requested_at,
   }));
+}
+
+/**
+ * A page went private or into the trash: ask the next consolidation to rebuild the notes
+ * learned from it, instead of waiting for the weekly sweep. Best-effort — readers already
+ * stop seeing those notes, and the sweep would get to them anyway.
+ */
+export async function requestKnowledgeRebuild(env: Env, workspaceId: string | null): Promise<void> {
+  if (!workspaceId) return;
+  try {
+    await env.DB.prepare(
+      "UPDATE knowledge_settings SET rebuild_requested_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE workspace_id = ?"
+    )
+      .bind(workspaceId)
+      .run();
+  } catch {
+    // best-effort
+  }
+}
+
+/** Clear a request the consolidator has served — unless a newer one arrived meanwhile. */
+export async function clearKnowledgeRebuild(env: Env, workspaceId: string, requestedAt: string): Promise<void> {
+  await env.DB.prepare(
+    'UPDATE knowledge_settings SET rebuild_requested_at = NULL WHERE workspace_id = ? AND rebuild_requested_at = ?'
+  )
+    .bind(workspaceId, requestedAt)
+    .run();
 }

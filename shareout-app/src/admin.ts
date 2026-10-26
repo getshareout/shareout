@@ -245,7 +245,7 @@ function renderAdminPage(
   const baseUrl = env.SHAREOUT_BASE_URL.replace(/\/$/, '');
 
   return renderHtmlPage({
-    title: `Admin - ${escapeHtml(artifact.name)}`,
+    title: `Admin - ${artifact.name}`,
     pageStyles: adminPageStyles,
     body: `
   <header class="header">
@@ -466,7 +466,7 @@ function notFoundPage(): Response {
 
 function unauthorizedPage(slug: string, name: string): Response {
   return renderHtmlPage({
-    title: `Admin Access - ${escapeHtml(name)}`,
+    title: `Admin Access - ${name}`,
     pageStyles: authPageStyles,
     body: `
   <div class="card">

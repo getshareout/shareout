@@ -128,23 +128,13 @@ npm ci && npm run db:migrate && npm run dev
 
 ## See it
 
-**Ask your space** — search, open, and dig into artifacts in one conversation.
+*Screenshots coming soon.*
 
-<p align="center">
-  <img src="docs/readme/02-ask-space.png" alt="Ask your space chat over the all-artifacts gallery" width="900">
-</p>
+**Ask your space** — search, open, and dig into artifacts in one conversation.
 
 **Share & deliver** — private / workspace / public, invite by email, ship to Slack, Telegram, or email.
 
-<p align="center">
-  <img src="docs/readme/03-share.png" alt="Artifact sharing panel with visibility, comments, and deliver channels" width="900">
-</p>
-
 **Edit in the browser — or Ask AI** — rewrite, shorten, fix grammar, translate; publish when ready.
-
-<p align="center">
-  <img src="docs/readme/04-editor.png" alt="Visual editor with Ask AI panel on a living business plan artifact" width="900">
-</p>
 
 ---
 

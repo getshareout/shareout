@@ -3,7 +3,7 @@
 Pre-release process for maintainers. There is no automated ship pipeline in this
 public repo — self-hosters pull `main` and deploy with wrangler.
 
-Also see [MAINTAINING.md](MAINTAINING.md) (branch protection, merge style) and
+Also see [MAINTAINING.md](MAINTAINING.md) (who merges, merge style) and
 [ROADMAP.md](ROADMAP.md).
 
 ## Versioning
@@ -15,7 +15,9 @@ Also see [MAINTAINING.md](MAINTAINING.md) (branch protection, merge style) and
 
 ## Checklist before a tag
 
-1. `main` is green (CI: worker coverage floors, docs build, gitleaks).
+1. `main` is green locally — there is no hosted CI: on a clean `main` checkout,
+   `SHAREOUT_COVERAGE=1 ./tooling/scripts/ci-check.sh` passes (coverage floors, docs
+   build, gitleaks).
 2. CHANGELOG **Unreleased** is accurate; no private/founder paths remain.
 3. `./tooling/scripts/check-secrets.sh` is clean.
 4. Optional: Deploy-to-Cloudflare path verified on a fresh account (Workers Paid

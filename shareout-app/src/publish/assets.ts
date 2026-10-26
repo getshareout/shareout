@@ -5,7 +5,7 @@
 import type { Env, FileEntry } from '../types';
 import { sha256, generateId } from '../crypto-utils';
 import { determinePriority } from './manifest';
-import type { AssetMetadata } from './types';
+import type { AssetMetadata, CarriedAsset } from './types';
 
 export function getCacheControl(mime: string): string {
   if (mime.startsWith('image/') || mime.startsWith('video/') || mime.startsWith('audio/') || mime.startsWith('font/')) {
@@ -72,4 +72,17 @@ export async function storeVersionAssets(
   }
 
   return assetMetadata;
+}
+
+/** Rows for files carried unchanged from an earlier version: same R2 object, no upload. */
+export async function carryVersionAssets(env: Env, versionId: string, carried: CarriedAsset[]): Promise<AssetMetadata[]> {
+  if (!carried.length) return [];
+  await env.DB.batch(carried.map((c) => env.DB.prepare(`
+    INSERT INTO assets (id, version_id, path, r2_key, mime, size_bytes, sha256)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).bind(generateId('ast'), versionId, c.path, c.r2Key, c.mime, c.size, c.sha256)));
+  return carried.map((c) => ({
+    path: c.path, mime: c.mime, size: c.size,
+    priority: determinePriority(c.path, c.mime, c.size), inlineable: c.size < 4096,
+  }));
 }

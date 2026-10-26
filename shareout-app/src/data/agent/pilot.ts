@@ -249,6 +249,8 @@ export async function handlePilot(request: Request, ctx: DataContext): Promise<R
     if (!ip) {
       return errorResponse({ ...DATA_ERRORS.FORBIDDEN, message: 'Could not verify your network; request blocked.' }, origin);
     }
+    // As in visitor chat: anonymous callers spend the owner's AI budget, so these counter
+    // writes stay awaited (not deferred to waitUntil).
     const ipLimit = await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, `pilot:${ip}`, 'aiChat');
     if (!ipLimit.allowed) {
       return jsonError(

@@ -7,6 +7,8 @@ import type { Chunk } from './chunk';
 import type { ChunkHit, SourceKind, SourceMeta, SourceRow, SourceStats, SourceStatus } from './client';
 import type { Extraction } from './extract';
 import * as graphSql from './graph-store';
+import { dropStem, keywordSearch, STEM_SCHEMA, writeStem } from './keyword-index';
+import { STEM_VERSION } from './lexical';
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS sources (
@@ -42,14 +44,13 @@ const SCHEMA = [
   )`,
 ];
 
-/** FTS5 MATCH expression from free text: every word quoted (no operator injection), ORed. */
-export function ftsQuery(q: string): string | null {
-  const words = (q.match(/[\p{L}\p{N}]+/gu) || []).slice(0, 12);
-  return words.length ? words.map((w) => `"${w}"`).join(' OR ') : null;
-}
+/** Chunks stemmed per alarm while a store builds its stemmed index (~0.1 ms each). */
+const STEM_BATCH = 500;
 
 export class KnowledgeStore extends DurableObject<Env> {
   private sql: SqlStorage;
+  /** Stemmed-index backfill: chunks with a higher id are not in chunks_stem yet (null = all are). */
+  private stemCursor: number | null = null;
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
@@ -65,7 +66,61 @@ export class KnowledgeStore extends DurableObject<Env> {
       const srcCols = new Set(this.sql.exec('PRAGMA table_info(sources)').toArray().map((r) => r.name as string));
       if (!srcCols.has('chunker_version')) this.sql.exec('ALTER TABLE sources ADD COLUMN chunker_version INTEGER NOT NULL DEFAULT 0');
       if (!srcCols.has('fail_count')) this.sql.exec('ALTER TABLE sources ADD COLUMN fail_count INTEGER NOT NULL DEFAULT 0');
+      this.stemCursor = this.prepareStemIndex();
+      if (this.stemCursor !== null && (await state.storage.getAlarm()) === null) await state.storage.setAlarm(Date.now());
     });
+  }
+
+  /**
+   * The stemmed index arrived after the first stores were created, and changes with
+   * STEM_VERSION. A store without the current one gets it empty and re-stems its stored
+   * chunks in batches (alarm) — from `chunks`, so nothing is re-fetched or re-embedded.
+   * Until then search still runs on chunks_fts plus whatever is stemmed.
+   */
+  private prepareStemIndex(): number | null {
+    const meta = (key: string) => this.sql.exec('SELECT value FROM meta WHERE key = ?', key).toArray()[0]?.value as string | undefined;
+    if (meta('stem_version') !== String(STEM_VERSION)) {
+      this.ctx.storage.transactionSync(() => {
+        this.sql.exec('DROP TABLE IF EXISTS chunks_stem_vocab');
+        this.sql.exec('DROP TABLE IF EXISTS chunks_stem');
+        for (const stmt of STEM_SCHEMA) this.sql.exec(stmt);
+        this.setMeta('stem_version', String(STEM_VERSION));
+        if (this.sql.exec('SELECT 1 FROM chunks LIMIT 1').toArray().length) this.setMeta('stem_cursor', '0');
+        else this.sql.exec("DELETE FROM meta WHERE key = 'stem_cursor'");
+      });
+    }
+    const cursor = meta('stem_cursor');
+    return cursor === undefined ? null : Number(cursor);
+  }
+
+  private setMeta(key: string, value: string) {
+    this.sql.exec('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value', key, value);
+  }
+
+  /** Stem the next `max` chunks the backfill hasn't reached. True while more remain. */
+  private stemNext(max: number): boolean {
+    const from = this.stemCursor;
+    if (from === null) return false;
+    const next = this.ctx.storage.transactionSync(() => {
+      const rows = this.q('SELECT id, title, text FROM chunks WHERE id > ? ORDER BY id LIMIT ?', from, max).toArray();
+      for (const r of rows) writeStem(this.q.bind(this), r.id as number, r.title as string, r.text as string);
+      const last = rows.length < max ? null : (rows[rows.length - 1].id as number);
+      if (last === null) this.q("DELETE FROM meta WHERE key = 'stem_cursor'");
+      else this.setMeta('stem_cursor', String(last));
+      return last;
+    });
+    this.stemCursor = next;
+    return next !== null;
+  }
+
+  /** Whether chunk `id` belongs in chunks_stem now (the backfill adds the rest later). */
+  private stemmed(id: number): boolean {
+    return this.stemCursor === null || id <= this.stemCursor;
+  }
+
+  async alarm(): Promise<void> {
+    if (this.stemCursor === null) return;
+    if (this.metered(() => this.stemNext(STEM_BATCH))) await this.ctx.storage.setAlarm(Date.now());
   }
 
   // Every statement goes through q() so its rows read/written can be metered.
@@ -188,8 +243,9 @@ export class KnowledgeStore extends DurableObject<Env> {
           const id = this.q(
             'INSERT INTO chunks (ref_id, ord, locator, title, text, page, anchor) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id',
             meta.refId, c.ord, c.locator, meta.title, c.text, c.page ?? null, c.anchor ?? null,
-          ).one().id;
+          ).one().id as number;
           this.q('INSERT INTO chunks_fts (rowid, title, text) VALUES (?, ?, ?)', id, meta.title, c.text);
+          if (this.stemmed(id)) writeStem(this.q.bind(this), id, meta.title, c.text);
         }
         this.writeStatus(meta, 'processing', null, chunkerVersion);
         this.q('UPDATE sources SET chunk_count = ? WHERE ref_id = ?', chunks.length, meta.refId);
@@ -218,18 +274,7 @@ export class KnowledgeStore extends DurableObject<Env> {
   }
 
   search(q: string, limit: number): ChunkHit[] {
-    return this.metered(() => {
-      const match = ftsQuery(q);
-      if (!match) return [];
-      return this.q(
-          `SELECT c.ref_id, s.kind, c.title, c.ord, c.locator, c.text, c.page, c.anchor
-             FROM chunks_fts f JOIN chunks c ON c.id = f.rowid JOIN sources s ON s.ref_id = c.ref_id
-            WHERE chunks_fts MATCH ? ORDER BY bm25(chunks_fts, 2.0, 1.0) LIMIT ?`,
-          match, limit,
-        )
-        .toArray()
-        .map(toHit);
-    });
+    return this.metered(() => keywordSearch(this.q.bind(this), q, limit, this.stemCursor === null).map(toHit));
   }
 
   chunksByKey(keys: { refId: string; ord: number }[]): ChunkHit[] {
@@ -312,6 +357,7 @@ export class KnowledgeStore extends DurableObject<Env> {
     const rows = this.q('SELECT id, title, text FROM chunks WHERE ref_id = ?', refId).toArray();
     for (const r of rows) {
       this.q("INSERT INTO chunks_fts (chunks_fts, rowid, title, text) VALUES ('delete', ?, ?, ?)", r.id, r.title, r.text);
+      if (this.stemmed(r.id as number)) dropStem(this.q.bind(this), r.id as number);
     }
     this.q('DELETE FROM chunks WHERE ref_id = ?', refId);
     return rows.length;

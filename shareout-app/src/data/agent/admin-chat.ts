@@ -8,6 +8,7 @@ import { buildAttachedSkillsDoc } from '../../skill-marketplace';
 import { buildLibraryApiDoc } from '../../workspace-library';
 import { recordUsage, recordError } from './usage';
 import { resolveAgentAiConfig, recordAgentUsage } from './ai-config';
+import { replaceText } from '../../artifacts/apply-ops';
 import {
   logAgentChatFailure,
   userFacingAdminContextFailure,
@@ -384,11 +385,18 @@ export async function applyEditsToPending(
 
       let newContent: string;
       if (edit.type === 'replace' && edit.search && edit.replace !== undefined) {
-        if (!originalContent.includes(edit.search)) {
-          applied.push({ file: edit.file, success: false, error: 'Search text not found' });
+        const result = replaceText(originalContent, edit.search, edit.replace);
+        if (!result.ok) {
+          applied.push({
+            file: edit.file,
+            success: false,
+            error: result.code === 'EDIT_NO_MATCH'
+              ? 'Search text not found'
+              : `Search text matches ${result.lines.length} places (lines ${result.lines.join(', ')}); include more surrounding text`,
+          });
           continue;
         }
-        newContent = originalContent.replace(edit.search, edit.replace);
+        newContent = result.content;
       } else if (edit.replace !== undefined) {
         newContent = edit.replace;
       } else {

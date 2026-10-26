@@ -1,6 +1,8 @@
 // The knowledge graph inside a workspace's KnowledgeStore: entities, typed relations
 // and facts, each backed by `mentions` (source + chunk + quote). Every write is scoped
-// to one source, so re-learning a source replaces exactly its own evidence.
+// to one source, so re-learning a source replaces exactly its own evidence. The names an
+// entity goes by are kept per source too (`entity_names`), so a reader is only ever shown —
+// or matched against — names that appear in a source they may open.
 import { normalizeName, type Extraction } from './extract';
 import type { SourceKind } from './client';
 
@@ -49,16 +51,31 @@ export const GRAPH_SCHEMA = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_mentions_target ON mentions(target_id)`,
   `CREATE INDEX IF NOT EXISTS idx_mentions_ref ON mentions(ref_id)`,
+  // A name (canonical or alias) one source uses for an entity, kept only when it appears in
+  // the passage that source's mention quotes. `entities.name` / `.aliases` stay as the
+  // store-wide merge keys; readers get names from here.
+  `CREATE TABLE IF NOT EXISTS entity_names (
+    entity_id TEXT NOT NULL,
+    ref_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    norm TEXT NOT NULL,
+    UNIQUE(entity_id, ref_id, name)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_entity_names_ref ON entity_names(ref_id)`,
 ];
 
 export interface Ref { refId: string; kind: SourceKind }
-export interface EntityRow { id: string; type: string; name: string; aliases: string[]; status: string; mentions: number; refs: Ref[] }
+/** A name an entity goes by, and the source it appears in. */
+export interface EntityName { name: string; ref: Ref }
+export interface EntityRow { id: string; type: string; name: string; names: EntityName[]; status: string; mentions: number; refs: Ref[] }
 export interface RelationRow { id: string; from: string; type: string; to: string; mentions: number; refs: Ref[] }
 export interface FactRow { id: string; predicate: string; value: string; unit: string | null; validFrom: string | null; ref: Ref; ord: number; quote: string }
 export interface MentionRow { ref: Ref; ord: number; locator: string; quote: string }
 
 const newId = (prefix: string) => `${prefix}_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
 const MAX_REFS = 20;
+const NAME_REFS = 3; // sources returned per distinct name
+const MAX_NAMES = 40; // (name, source) pairs returned per entity
 
 /** Distinct sources behind a target, most recent first. */
 function refsOf(q: Q, targetId: string): Ref[] {
@@ -68,16 +85,66 @@ function refsOf(q: Q, targetId: string): Ref[] {
   ).toArray().map((r) => ({ refId: r.ref_id as string, kind: r.kind as SourceKind }));
 }
 
+/** The names an entity goes by, each with a source it appears in (a few sources per name). */
+function namesOf(q: Q, entityId: string): EntityName[] {
+  return q(
+    `SELECT name, ref_id, kind FROM (
+       SELECT n.name, n.ref_id, s.kind, n.rowid AS rid, ROW_NUMBER() OVER (PARTITION BY n.name ORDER BY n.rowid) AS rn
+         FROM entity_names n JOIN sources s ON s.ref_id = n.ref_id WHERE n.entity_id = ?)
+      WHERE rn <= ? ORDER BY rid LIMIT ?`,
+    entityId, NAME_REFS, MAX_NAMES,
+  ).toArray().map((r) => ({ name: r.name as string, ref: { refId: r.ref_id as string, kind: r.kind as SourceKind } }));
+}
+
 function toEntity(q: Q, r: Record<string, SqlStorageValue>): EntityRow {
   return {
     id: r.id as string,
     type: r.type as string,
     name: r.name as string,
-    aliases: JSON.parse((r.aliases as string) || '[]') as string[],
+    names: namesOf(q, r.id as string),
     status: r.status as string,
     mentions: r.mention_count as number,
     refs: refsOf(q, r.id as string),
   };
+}
+
+// Compared after `normalizeName` on both sides, so "ACME Inc." is in "… Acme reported …".
+function appearsIn(name: string, normText: string): boolean {
+  const n = normalizeName(name);
+  return !!n && normText.includes(n);
+}
+
+/** The passage a mention quotes, as the extractor saw it, normalized for appearsIn. */
+function passage(q: Q, refId: string, ord: number, fallback: string): string {
+  const c = q('SELECT title, locator, text FROM chunks WHERE ref_id = ? AND ord = ?', refId, ord).toArray()[0];
+  return normalizeName(c ? `${c.title}\n${c.locator}\n${c.text}` : fallback);
+}
+
+const NAMES_BACKFILLED = 'entity_names_v1';
+
+/**
+ * Stores that learned entities before names were kept per source: credit each source with the
+ * entity's names (canonical or alias) that appear in the passage its mention quotes. Once.
+ */
+export function ensureEntityNames(q: Q): void {
+  if (q('SELECT 1 AS x FROM meta WHERE key = ?', NAMES_BACKFILLED).toArray().length) return;
+  let key = '';
+  let text = '';
+  for (const m of q(
+    `SELECT m.target_id, m.ref_id, m.ord, m.quote, e.name, e.aliases FROM mentions m JOIN entities e ON e.id = m.target_id
+      ORDER BY m.ref_id, m.ord`,
+  ).toArray()) {
+    if (key !== `${m.ref_id}:${m.ord}`) {
+      key = `${m.ref_id}:${m.ord}`;
+      text = passage(q, m.ref_id as string, m.ord as number, m.quote as string);
+    }
+    for (const name of [m.name as string, ...(JSON.parse((m.aliases as string) || '[]') as string[])]) {
+      if (appearsIn(name, text)) {
+        q('INSERT OR IGNORE INTO entity_names (entity_id, ref_id, name, norm) VALUES (?, ?, ?, ?)', m.target_id, m.ref_id, name, normalizeName(name));
+      }
+    }
+  }
+  q("INSERT OR REPLACE INTO meta (key, value) VALUES (?, '1')", NAMES_BACKFILLED);
 }
 
 /** The most-mentioned entities, so the extractor reuses their canonical names. */
@@ -93,6 +160,7 @@ export function clearSourceGraph(q: Q, refId: string): void {
   q(`UPDATE relations SET mention_count = mention_count - (SELECT COUNT(*) FROM mentions m WHERE m.target_id = relations.id AND m.ref_id = ?)
       WHERE id IN (SELECT target_id FROM mentions WHERE ref_id = ?)`, refId, refId);
   q('DELETE FROM mentions WHERE ref_id = ?', refId);
+  q('DELETE FROM entity_names WHERE ref_id = ?', refId);
   q('DELETE FROM facts WHERE ref_id = ?', refId);
   q(`DELETE FROM entities WHERE status = 'draft' AND mention_count <= 0
        AND NOT EXISTS (SELECT 1 FROM facts f WHERE f.entity_id = entities.id)`);
@@ -103,7 +171,9 @@ export function clearSourceGraph(q: Q, refId: string): void {
 /** Merge one batch's extraction into the graph. Entities match on (type, normalized
  *  name); relation/fact endpoints match a batch entity first, then any type. */
 export function applyExtraction(q: Q, refId: string, x: Extraction): { entities: number; relations: number; facts: number } {
+  ensureEntityNames(q); // before any new names, so the backfill only ever sees older mentions
   const byNorm = new Map<string, string>();
+  const passages = new Map<number, string>();
 
   const resolve = (name: string): string | null => {
     const norm = normalizeName(name);
@@ -129,6 +199,15 @@ export function applyExtraction(q: Q, refId: string, x: Extraction): { entities:
     byNorm.set(norm, id);
     for (const a of e.aliases) if (normalizeName(a)) byNorm.set(normalizeName(a), id);
     q('INSERT INTO mentions (target_id, ref_id, ord, quote) VALUES (?, ?, ?, ?)', id, refId, e.ord, e.quote);
+    // A name counts for this source only if its text has it: the extractor is shown names from
+    // the whole workspace, and may echo one that this source never says.
+    const text = passages.get(e.ord) ?? passage(q, refId, e.ord, e.quote);
+    passages.set(e.ord, text);
+    for (const name of [e.name, ...e.aliases]) {
+      if (appearsIn(name, text)) {
+        q('INSERT OR IGNORE INTO entity_names (entity_id, ref_id, name, norm) VALUES (?, ?, ?, ?)', id, refId, name, normalizeName(name));
+      }
+    }
   }
 
   let relations = 0;
@@ -154,11 +233,16 @@ export function applyExtraction(q: Q, refId: string, x: Extraction): { entities:
   return { entities: x.entities.length, relations, facts };
 }
 
+/** Candidates only: the caller keeps those whose matching name appears in a source the reader may open. */
 export function listEntities(q: Q, opts: { type?: string; q?: string; limit: number }): EntityRow[] {
+  ensureEntityNames(q);
   const where: string[] = ['mention_count > 0'];
   const binds: unknown[] = [];
   if (opts.type) { where.push('type = ?'); binds.push(opts.type); }
-  if (opts.q) { where.push("(norm LIKE ? OR aliases LIKE ?)"); binds.push(`%${normalizeName(opts.q)}%`, `%${opts.q}%`); }
+  if (opts.q) {
+    where.push('id IN (SELECT entity_id FROM entity_names WHERE norm LIKE ? OR name LIKE ?)');
+    binds.push(`%${normalizeName(opts.q)}%`, `%${opts.q}%`);
+  }
   return q(`SELECT * FROM entities WHERE ${where.join(' AND ')} ORDER BY mention_count DESC LIMIT ?`, ...binds, opts.limit)
     .toArray().map((r) => toEntity(q, r));
 }
@@ -169,8 +253,9 @@ export function entityTypes(q: Q): { type: string; count: number }[] {
 }
 
 export function getEntity(q: Q, id: string): {
-  entity: EntityRow; facts: FactRow[]; relations: (RelationRow & { other: { id: string; name: string; type: string }; direction: 'out' | 'in' })[]; mentions: MentionRow[];
+  entity: EntityRow; facts: FactRow[]; relations: (RelationRow & { other: { id: string; type: string; name: string; names: EntityName[] }; direction: 'out' | 'in' })[]; mentions: MentionRow[];
 } | null {
+  ensureEntityNames(q);
   const row = q('SELECT * FROM entities WHERE id = ?', id).toArray()[0];
   if (!row) return null;
   const facts = q(
@@ -188,7 +273,7 @@ export function getEntity(q: Q, id: string): {
   ).toArray().map((r) => ({
     id: r.id as string, from: r.from_id as string, type: r.type as string, to: r.to_id as string,
     mentions: r.mention_count as number, refs: refsOf(q, r.id as string), direction: r.direction as 'out' | 'in',
-    other: { id: r.other_id as string, name: r.other_name as string, type: r.other_type as string },
+    other: { id: r.other_id as string, type: r.other_type as string, name: r.other_name as string, names: namesOf(q, r.other_id as string) },
   }));
   const mentions = q(
     `SELECT m.ref_id, s.kind, m.ord, m.quote, COALESCE(c.locator, '') AS locator
@@ -204,6 +289,7 @@ export function getEntity(q: Q, id: string): {
 /** A neighbourhood around `focus` (breadth-first up to `depth`), or the most-mentioned
  *  entities and the relations among them when there's no focus. */
 export function graph(q: Q, opts: { focus?: string; depth: number; limit: number }): { nodes: EntityRow[]; edges: RelationRow[] } {
+  ensureEntityNames(q);
   const ids = new Set<string>();
   if (opts.focus) {
     let frontier = [opts.focus];

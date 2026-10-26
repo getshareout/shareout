@@ -207,8 +207,8 @@ export async function handleRegister(request: Request, env: Env): Promise<Respon
     return oauthError('invalid_client_metadata', 'Unsupported token_endpoint_auth_method');
   }
 
-  const rawName = typeof body.client_name === 'string' ? body.client_name.trim() : '';
-  const clientName = (rawName || 'An AI app').replace(/\p{Cc}/gu, '').slice(0, 80);
+  const rawName = typeof body.client_name === 'string' ? body.client_name.replace(/[\p{Cc}<>]/gu, '').trim().slice(0, 80) : '';
+  const clientName = rawName || 'An AI app';
   const clientId = generateId('mcpc');
   const secret = authMethod === 'none' ? null : randomSecret('mcps_');
 

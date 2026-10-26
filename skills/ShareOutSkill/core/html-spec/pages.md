@@ -54,7 +54,8 @@ Publish a site by sending every file in one `POST /v1/publish` (`files[]`), or, 
 MCP connector, `publish_artifact` / `update_artifact` with
 `files: [{ path, content, encoding? }]` — see
 [integrations/mcp-connector.md](../../integrations/mcp-connector.md). An update replaces the
-whole file set.
+whole file set, so send every file each time; the connector's `update_artifact` refuses an
+update that would drop a file unless `replace_all_files: true`.
 
 ## Sections
 

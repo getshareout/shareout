@@ -47,6 +47,7 @@
     "build:official-skills": "node scripts/embed-official-skills.mjs",
     "build:skill": "TZ=UTC node scripts/stage-skill-bundle.mjs",
     "build:discovery": "node scripts/embed-discovery.mjs",
+    "build:sdk-reference": "node scripts/gen-sdk-reference.mjs",
     "build:brand": "python3 scripts/generate-brand-assets.py",
     "sync:skill": "node scripts/sync-skill-to-r2.mjs",
     "check:boundaries": "node ../tooling/scripts/check-boundaries.mjs",

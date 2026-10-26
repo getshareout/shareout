@@ -11,6 +11,7 @@ import { validateToken } from '../api-auth';
 import { checkKVRateLimit } from '../rate-limit';
 import { protectedResourceMetadataUrl, MCP_SCOPE } from './oauth';
 import { SERVER_INSTRUCTIONS, callTool, listTools } from './tools';
+import { AGENT_TOKEN_TOOLS } from './edit-tools';
 
 export const SUPPORTED_PROTOCOL_VERSIONS = ['2026-07-28', '2025-11-25', '2025-06-18', '2025-03-26'];
 const LEGACY_DEFAULT_VERSION = '2025-11-25';
@@ -72,10 +73,8 @@ export async function handleMcp(request: Request, env: Env, origin: string, exec
   if (!authorization.startsWith('Bearer ')) return unauthorized(origin);
   const user = await validateToken(request, env);
   if (!user) return unauthorized(origin, 'invalid_token');
-  // Workspace Agent tokens carry their own scope model this surface does not map.
-  if (user.service) return respond({ error: 'Workspace agent tokens cannot use the MCP connector; sign in as a person.' }, 403);
 
-  const limit = await checkKVRateLimit(env.RATE_LIMIT_KV, user.id, 'mcp');
+  const limit = await checkKVRateLimit(env.RATE_LIMIT_KV, user.id, 'mcp', executionCtx?.waitUntil.bind(executionCtx));
   if (!limit.allowed) {
     return respond({ error: 'Too many requests, try again shortly.' }, 429, { 'Retry-After': String(limit.retryAfter ?? 60) });
   }
@@ -123,13 +122,22 @@ export async function handleMcp(request: Request, env: Env, origin: string, exec
     case 'ping':
       return respond(rpcResult(id, {}));
     case 'tools/list':
-      return respond(rpcResult(id, { tools: listTools(), ttlMs: LIST_TTL_MS, cacheScope: 'public' }));
+      // Workspace Agent tokens carry their own scope model; only the tools that enforce it are theirs.
+      return respond(rpcResult(id, user.service
+        ? { tools: listTools().filter((t) => AGENT_TOKEN_TOOLS.has(t.name)), ttlMs: LIST_TTL_MS, cacheScope: 'private' }
+        : { tools: listTools(), ttlMs: LIST_TTL_MS, cacheScope: 'public' }));
     case 'resources/list':
     case 'prompts/list':
       return respond(rpcResult(id, { [msg.method === 'resources/list' ? 'resources' : 'prompts']: [], ttlMs: LIST_TTL_MS, cacheScope: 'public' }));
     case 'tools/call': {
       const name = typeof params.name === 'string' ? params.name : '';
       const args = (params.arguments && typeof params.arguments === 'object' ? params.arguments : {}) as Record<string, unknown>;
+      if (user.service && !AGENT_TOKEN_TOOLS.has(name)) {
+        return respond(rpcResult(id, {
+          content: [{ type: 'text', text: `Workspace agent tokens can use only ${[...AGENT_TOKEN_TOOLS].join(' and ')}; sign in as a person for the rest.` }],
+          isError: true,
+        }));
+      }
       const result = await callTool({ env, user, origin, authorization, executionCtx }, name, args);
       if (!result) return respond(rpcError(id, -32602, `Unknown tool: ${name}`));
       return respond(rpcResult(id, result as unknown as Record<string, unknown>));

@@ -122,6 +122,25 @@ describe('/mcp protocol', () => {
     const { body } = await rpc(token, 'tools/call', { name: 'nope', arguments: {} });
     expect(body!.error.code).toBe(-32602);
   });
+
+  it('answers without waiting on the rate-limit counter write', async () => {
+    const token = await personalToken();
+    const put = vi.fn(() => new Promise<void>(() => {})); // never settles
+    const deferred: Promise<unknown>[] = [];
+    const res = await handleMcp(
+      new Request(`${ORIGIN}/mcp`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }),
+      }),
+      { ...e, DB: e.DB, RATE_LIMIT_KV: { get: async () => null, put } } as never,
+      ORIGIN,
+      { waitUntil: (p: Promise<unknown>) => { deferred.push(p); } } as unknown as ExecutionContext,
+    );
+    expect(res.status).toBe(200);
+    expect(put).toHaveBeenCalledTimes(1);
+    expect(deferred).toContain(put.mock.results[0].value);
+  });
 });
 
 describe('publish_artifact', () => {

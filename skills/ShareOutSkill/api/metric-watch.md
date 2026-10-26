@@ -44,6 +44,8 @@ Returns `{ "watch": { … } }` with `201` on success.
 
 Anyone who can **access the artifact** (owner, editor, or workspace member with view) may create watches. Watches are per-user objects tied to the artifact — not workspace-wide alert rules.
 
+On an artifact with a row-level `access_policy`, only the owner and owner/editor collaborators may create watches, and the list returns `last_value: null` to anyone the policy scopes.
+
 ## List / delete
 
 ```http

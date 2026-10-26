@@ -190,7 +190,7 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
     + '<a class="wsx__fulledit js-fulledit" target="_blank" rel="noopener" hidden title="' + esc(t('tabs.editLiteHint')) + '">' + esc(t('tabs.openFullEditor')) + '</a>'
     + '</div>'
     + '<iframe class="wsx__stageframe" title="' + esc(t('tabs.frameArtifact')) + '" sandbox="' + STAGE_SANDBOX + '"></iframe>'
-    + '<iframe class="wsx__editframe" title="' + esc(t('tabs.edit')) + '" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>';
+    + '<iframe class="wsx__editframe" title="' + esc(t('tabs.edit')) + '" sandbox="allow-same-origin allow-scripts"></iframe>';
 
   function spark(daily) {
     if (!daily || !daily.length) return '';

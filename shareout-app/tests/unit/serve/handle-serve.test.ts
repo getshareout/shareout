@@ -335,6 +335,31 @@ describe('handleServe', () => {
     expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise));
   });
 
+  it('hands the edge-cache fill to waitUntil so the runtime keeps it alive past the response', async () => {
+    // A resolved record means no deploy: write, so the cache fill is the only background work.
+    const cached = { ...defaultDeployment, entry_asset: null, mobile_entry_asset: null } as unknown as CachedDeployment;
+    const { env } = createServeEnv({ deployment: null });
+    let finishPut!: () => void;
+    vi.mocked(caches.default.put).mockImplementation(() => new Promise<void>((resolve) => { finishPut = resolve; }));
+    const waitUntil = vi.fn();
+    const executionCtx = { waitUntil } as unknown as ExecutionContext;
+
+    const response = await handleServe(serveRequest('logo.png'), env, SLUG, 'logo.png', { executionCtx, cached });
+    expect(response.status).toBe(200);
+    expect(caches.default.put).toHaveBeenCalledTimes(1);
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+
+    // waitUntil holds the fill itself: pending until the put settles.
+    const fill = waitUntil.mock.calls[0][0] as Promise<unknown>;
+    let settled = false;
+    void fill.then(() => { settled = true; });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    finishPut();
+    await fill;
+    expect(settled).toBe(true);
+  });
+
   it('uses a record the route lookup already resolved without reading deploy: again', async () => {
     const { entry_asset, mobile_entry_asset, ...info } = {
       ...defaultDeployment,

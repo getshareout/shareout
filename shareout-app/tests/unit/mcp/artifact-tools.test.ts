@@ -40,6 +40,9 @@ beforeAll(async () => {
     'CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, name TEXT, display_slug TEXT, owner_id TEXT, workspace_id TEXT, visibility TEXT, artifact_type TEXT, deleted_at TEXT)'
   ).run();
   await e.DB.prepare('CREATE TABLE IF NOT EXISTS folders (id TEXT PRIMARY KEY, workspace_id TEXT, name TEXT)').run();
+  // update_artifact's lossless-write guard reads these; empty here, so it lets the write through.
+  await e.DB.prepare('CREATE TABLE IF NOT EXISTS versions (id TEXT PRIMARY KEY, artifact_id TEXT, version_no INTEGER, entrypoint TEXT, created_at TEXT, created_by TEXT)').run();
+  await e.DB.prepare('CREATE TABLE IF NOT EXISTS assets (id TEXT PRIMARY KEY, version_id TEXT, path TEXT)').run();
 });
 
 beforeEach(async () => {

@@ -43,8 +43,8 @@ export function fail(text: string, structured?: Record<string, unknown>): ToolRe
   return { ...ok(`${text}\n${ON_FAILURE}`, structured), isError: true };
 }
 
-export function invalid(text: string): ToolResult {
-  return { ...ok(text), isError: true };
+export function invalid(text: string, structured?: Record<string, unknown>): ToolResult {
+  return { ...ok(text, structured), isError: true };
 }
 
 export const NOT_MEMBER = 'The person is not a member of that workspace. Call list_workspaces to see the right ids.';

@@ -6,6 +6,25 @@ import type { ParseResult } from './types';
 export type CatalogFileSource = 'manual' | 'seed:connector' | 'seed:provenance';
 export type CatalogEditorKind = 'user' | 'agent';
 
+// Limits for files written through the API (`PUT …/catalog/files`). One asset per file.
+export const MAX_CATALOG_FILE_BYTES = 128 * 1024;
+const MAX_CATALOG_PATH_LENGTH = 200;
+const MAX_CATALOG_PATH_DEPTH = 4;
+const CATALOG_PATH_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+export const CATALOG_PATH_RULE =
+  `Use a relative path to a .md file, e.g. "sources/orders.md": letters, digits, ".", "_" and "-", each name starting with a letter or digit, no "..", at most ${MAX_CATALOG_PATH_DEPTH} levels and ${MAX_CATALOG_PATH_LENGTH} characters.`;
+
+export function isValidCatalogPath(path: unknown): path is string {
+  if (typeof path !== 'string' || path.length > MAX_CATALOG_PATH_LENGTH || path.includes('..') || !/\.md$/i.test(path)) return false;
+  const segments = path.split('/');
+  return segments.length <= MAX_CATALOG_PATH_DEPTH && segments.every((s) => CATALOG_PATH_SEGMENT.test(s));
+}
+
+export function catalogContentBytes(content: string): number {
+  return new TextEncoder().encode(content).byteLength;
+}
+
 export interface StoredCatalogFile extends CatalogFile {
   source: CatalogFileSource;
   updatedAt: string;

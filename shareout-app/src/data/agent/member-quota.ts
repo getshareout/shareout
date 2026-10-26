@@ -80,11 +80,20 @@ export const memberTokensToday = (env: Env, userId: string) => read(env, 'user',
 export const automationTokensToday = (env: Env, workspaceId: string) => read(env, 'artifact', automationKey(workspaceId));
 export const nextDailyReset = () => nextUtcMidnight().toISOString();
 
-/** Per-minute rate, workspace budget (when set), then a per-user daily token hold. A refused request holds nothing. */
-export async function reserveMemberQuota(env: Env, userId: string, workspaceId: string, reservedTokens: number): Promise<QuotaResult> {
-  const rate = await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, `agentmember:${userId}`, 'aiChatMember');
+/**
+ * Per-minute rate, workspace budget (when set), then a per-user daily token hold. A refused request holds nothing.
+ * The rate check and the budget read are independent, so they run together; `defer` takes the rate counter write
+ * off the response path.
+ */
+export async function reserveMemberQuota(
+  env: Env, userId: string, workspaceId: string, reservedTokens: number, defer?: (write: Promise<unknown>) => void,
+): Promise<QuotaResult> {
+  const [rate, overBudget] = await Promise.all([
+    checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, `agentmember:${userId}`, 'aiChatMember', defer),
+    workspaceOverBudget(env, workspaceId),
+  ]);
   if (!rate.allowed) return refused('member_rate', 'Too many AI requests. Slow down.', new Date(Date.now() + (rate.retryAfter || 60) * 1000));
-  if (await workspaceOverBudget(env, workspaceId)) return refused('workspace_budget', 'This workspace reached its monthly AI budget', nextMonthStart());
+  if (overBudget) return refused('workspace_budget', 'This workspace reached its monthly AI budget', nextMonthStart());
   await addMemberTokens(env, userId, reservedTokens);
   if ((await memberTokensToday(env, userId)) > MEMBER_TOKENS_PER_DAY) {
     await addMemberTokens(env, userId, -reservedTokens);
@@ -104,10 +113,12 @@ export async function reserveAutomationQuota(env: Env, workspaceId: string, rese
   return { allowed: true };
 }
 
-export function reserveAgentQuota(env: Env, caller: AgentCaller, workspaceId: string, reservedTokens: number): Promise<QuotaResult> {
+export function reserveAgentQuota(
+  env: Env, caller: AgentCaller, workspaceId: string, reservedTokens: number, defer?: (write: Promise<unknown>) => void,
+): Promise<QuotaResult> {
   return caller.kind === 'automation'
     ? reserveAutomationQuota(env, workspaceId, reservedTokens)
-    : reserveMemberQuota(env, caller.userId, workspaceId, reservedTokens);
+    : reserveMemberQuota(env, caller.userId, workspaceId, reservedTokens, defer);
 }
 
 /** Give back / charge the difference once the real usage is known. */

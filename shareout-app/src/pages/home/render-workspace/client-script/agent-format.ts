@@ -4,17 +4,36 @@
  * should see as a file chip. No DOM access — unit-tested by evaluating this fragment.
  */
 export const workspace_client_agent_format_JS = `  // ===== agent dock: text helpers (pure) =====
-  function mdEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function mdEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+  // http(s), mailto and relative targets only, read the way a browser reads a scheme (references decoded, whitespace dropped).
+  function mdSafeUrl(url) {
+    var u = String(url).replace(/&#(x[0-9a-f]+|\\d+);?/gi, function (m, n) {
+      var c = /^x/i.test(n) ? parseInt(n.slice(1), 16) : parseInt(n, 10);
+      return c > 0 && c < 0x110000 ? String.fromCodePoint(c) : '';
+    }).replace(/&(colon|tab|newline);/gi, function (m, n) { return n.toLowerCase() === 'colon' ? ':' : ''; });
+    var scheme = /^([a-z][a-z0-9+.-]*):/.exec(u.replace(/[\\u0000-\\u0020\\u007f]/g, '').toLowerCase());
+    return !scheme || scheme[1] === 'http' || scheme[1] === 'https' || scheme[1] === 'mailto';
+  }
+  function mdLink(html, url) { return '<a href="' + mdEsc(url) + '" target="_blank" rel="noopener noreferrer">' + html + '</a>'; }
+  function mdEmph(s) { return s.replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>').replace(/(^|[^*])\\*([^*\\n]+)\\*/g, '$1<em>$2</em>'); }
   // ----- safe Markdown: fenced code -> tables/headings/lists/quote/hr -> paragraphs, inline last -----
-  function mdInline(t) {
+  // Code spans, links and bare URLs are cut from the raw text first, so each URL is escaped once, as an attribute value.
+  function mdInline(t, linkText) {
     var BT = String.fromCharCode(96);
-    var s = mdEsc(t);
-    s = s.replace(new RegExp(BT + '([^' + BT + ']+)' + BT, 'g'), '<code>$1</code>');
-    s = s.replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>');
-    s = s.replace(/(^|[^*])\\*([^*\\n]+)\\*/g, '$1<em>$2</em>');
-    s = s.replace(/\\[([^\\]]+)\\]\\((https?:\\/\\/[^)\\s]+)\\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-    s = s.replace(/(^|\\s)(https?:\\/\\/[^\\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
-    return s;
+    var code = BT + '([^' + BT + ']+)' + BT;
+    var re = new RegExp(linkText ? code : code + '|\\\\[([^\\\\]]+)\\\\]\\\\(([^)\\\\s]+)\\\\)|(^|\\\\s)(https?:\\\\/\\\\/[^\\\\s<]+)', 'g');
+    var src = String(t == null ? '' : t).replace(/[\\u0001\\u0002]/g, '');
+    var kept = [], text = '', last = 0, m;
+    function keep(html) { kept.push(html); return '\\u0001' + (kept.length - 1) + '\\u0002'; }
+    while ((m = re.exec(src))) {
+      text += src.slice(last, m.index);
+      if (m[1] != null) text += keep('<code>' + mdEsc(m[1]) + '</code>');
+      else if (m[2] != null) text += mdSafeUrl(m[3]) ? keep(mdLink(mdInline(m[2], true), m[3])) : m[0];
+      else text += m[4] + keep(mdLink(mdEsc(m[5]), m[5]));
+      last = re.lastIndex;
+    }
+    text += src.slice(last);
+    return mdEmph(mdEsc(text)).replace(/\\u0001(\\d+)\\u0002/g, function (x, i) { return kept[+i]; });
   }
   function mdToHtml(raw) {
     var BT = String.fromCharCode(96);
