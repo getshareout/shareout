@@ -1,0 +1,200 @@
+[
+  {
+    "sku": "NW-COC-101",
+    "nombre": "Sartén antiadherente 28 cm",
+    "categoria": "Cocina",
+    "precio_uyu": 1650,
+    "stock": 70,
+    "peso_kg": 1.2,
+    "descripcion": "Aluminio forjado, apta para inducción."
+  },
+  {
+    "sku": "NW-COC-102",
+    "nombre": "Olla de hierro fundido 24 cm",
+    "categoria": "Cocina",
+    "precio_uyu": 5490,
+    "stock": 13,
+    "peso_kg": 5.2,
+    "descripcion": "Esmaltada, 4,7 litros, con tapa."
+  },
+  {
+    "sku": "NW-COC-103",
+    "nombre": "Juego de cuchillos 5 piezas",
+    "categoria": "Cocina",
+    "precio_uyu": 3290,
+    "stock": 27,
+    "peso_kg": 1.5,
+    "descripcion": "Acero inoxidable y taco de haya."
+  },
+  {
+    "sku": "NW-COC-104",
+    "nombre": "Tabla de cortar de bambú",
+    "categoria": "Cocina",
+    "precio_uyu": 790,
+    "stock": 81,
+    "peso_kg": 1,
+    "descripcion": "45 x 30 cm, con canaleta."
+  },
+  {
+    "sku": "NW-COC-105",
+    "nombre": "Batidora de mano 600 W",
+    "categoria": "Cocina",
+    "precio_uyu": 2290,
+    "stock": 31,
+    "peso_kg": 1.3,
+    "descripcion": "Con vaso medidor y picador."
+  },
+  {
+    "sku": "NW-COC-106",
+    "nombre": "Set de 6 frascos herméticos",
+    "categoria": "Cocina",
+    "precio_uyu": 1090,
+    "stock": 58,
+    "peso_kg": 2.4,
+    "descripcion": "Vidrio con tapa de bambú, 1 litro."
+  },
+  {
+    "sku": "NW-MES-201",
+    "nombre": "Vajilla de gres 16 piezas",
+    "categoria": "Mesa",
+    "precio_uyu": 4290,
+    "stock": 19,
+    "peso_kg": 7.5,
+    "descripcion": "Cuatro servicios, apta para lavavajillas."
+  },
+  {
+    "sku": "NW-MES-202",
+    "nombre": "Set de 6 copas de vino",
+    "categoria": "Mesa",
+    "precio_uyu": 1590,
+    "stock": 33,
+    "peso_kg": 1.8,
+    "descripcion": "Cristal sin plomo de 450 ml cada una."
+  },
+  {
+    "sku": "NW-MES-203",
+    "nombre": "Tazas de doble pared x2",
+    "categoria": "Mesa",
+    "precio_uyu": 990,
+    "stock": 72,
+    "peso_kg": 0.5,
+    "descripcion": "Vidrio borosilicato de 250 ml."
+  },
+  {
+    "sku": "NW-MES-204",
+    "nombre": "Mantel de lino 6 personas",
+    "categoria": "Mesa",
+    "precio_uyu": 1790,
+    "stock": 24,
+    "peso_kg": 0.6,
+    "descripcion": "150 x 220 cm, color arena."
+  },
+  {
+    "sku": "NW-HOG-301",
+    "nombre": "Manta tejida de algodón",
+    "categoria": "Hogar",
+    "precio_uyu": 2490,
+    "stock": 29,
+    "peso_kg": 1.4,
+    "descripcion": "130 x 170 cm, tejido trenzado."
+  },
+  {
+    "sku": "NW-HOG-302",
+    "nombre": "Vela aromática de soja",
+    "categoria": "Hogar",
+    "precio_uyu": 590,
+    "stock": 132,
+    "peso_kg": 0.35,
+    "descripcion": "Vainilla y café, 40 horas."
+  },
+  {
+    "sku": "NW-CAF-401",
+    "nombre": "Molinillo de café manual",
+    "categoria": "Café",
+    "precio_uyu": 1890,
+    "stock": 38,
+    "peso_kg": 0.6,
+    "descripcion": "Muelas cónicas de cerámica y 15 niveles de molienda."
+  },
+  {
+    "sku": "NW-CAF-402",
+    "nombre": "Cafetera italiana 6 tazas",
+    "categoria": "Café",
+    "precio_uyu": 1490,
+    "stock": 64,
+    "peso_kg": 0.7,
+    "descripcion": "Aluminio, para gas y vitrocerámica."
+  },
+  {
+    "sku": "NW-CAF-403",
+    "nombre": "Prensa francesa 1 litro",
+    "categoria": "Café",
+    "precio_uyu": 1350,
+    "stock": 51,
+    "peso_kg": 0.9,
+    "descripcion": "Vidrio borosilicato y filtro de acero."
+  },
+  {
+    "sku": "NW-CAF-404",
+    "nombre": "Cafetera de filtro programable 12 tazas",
+    "categoria": "Café",
+    "precio_uyu": 3990,
+    "stock": 22,
+    "peso_kg": 2.1,
+    "descripcion": "Jarra de vidrio y placa térmica."
+  },
+  {
+    "sku": "NW-CAF-405",
+    "nombre": "Hervidor cuello de cisne 1 litro",
+    "categoria": "Café",
+    "precio_uyu": 2790,
+    "stock": 17,
+    "peso_kg": 1.1,
+    "descripcion": "Temperatura regulable de 40 a 100 °C."
+  },
+  {
+    "sku": "NW-CAF-406",
+    "nombre": "Balanza digital para café",
+    "categoria": "Café",
+    "precio_uyu": 1190,
+    "stock": 45,
+    "peso_kg": 0.4,
+    "descripcion": "Precisión de 0,1 g y temporizador."
+  },
+  {
+    "sku": "NW-CAF-407",
+    "nombre": "Máquina espresso semiautomática",
+    "categoria": "Café",
+    "precio_uyu": 16490,
+    "stock": 9,
+    "peso_kg": 6.8,
+    "descripcion": "Bomba de 15 bar y vaporizador de leche."
+  },
+  {
+    "sku": "NW-GRA-501",
+    "nombre": "Café de especialidad Brasil 500 g",
+    "categoria": "Granos de café",
+    "precio_uyu": 890,
+    "stock": 120,
+    "peso_kg": 0.5,
+    "descripcion": "Tostado medio, notas a chocolate y nuez."
+  },
+  {
+    "sku": "NW-GRA-502",
+    "nombre": "Café de especialidad Colombia 500 g",
+    "categoria": "Granos de café",
+    "precio_uyu": 950,
+    "stock": 96,
+    "peso_kg": 0.5,
+    "descripcion": "Tostado medio, notas a caramelo."
+  },
+  {
+    "sku": "NW-GRA-503",
+    "nombre": "Café de especialidad Etiopía 250 g",
+    "categoria": "Granos de café",
+    "precio_uyu": 690,
+    "stock": 53,
+    "peso_kg": 0.25,
+    "descripcion": "Tostado claro, notas florales."
+  }
+]

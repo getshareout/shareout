@@ -1,0 +1,19 @@
+{ "docs": [
+  {"id": "fb-precios", "title": "Fabrikam — Lista de precios 2026.md", "kind": "file", "path": "fb-precios.md", "lang": "es", "genre": "pricing", "visibility": "workspace", "owner": "author"},
+  {"id": "fb-entregas-garantia", "title": "Fabrikam — Entregas, armado y garantía", "kind": "page", "path": "fb-entregas-garantia.html", "lang": "es", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "fb-reporte-2026-09", "title": "Fabrikam — Reporte de desempeño septiembre 2026", "kind": "page", "path": "fb-reporte-2026-09.html", "lang": "es", "genre": "report", "visibility": "workspace", "owner": "author"},
+  {"id": "ho-guidelines-en", "title": "Hooli Pay — Brand and Advertising Compliance Guidelines", "kind": "page", "path": "ho-guidelines-en.html", "lang": "en", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "ho-app-report-en", "title": "Hooli Pay — App Install Campaign Report Q3 2026", "kind": "page", "path": "ho-app-report-en.html", "lang": "en", "genre": "campaign-results", "visibility": "workspace", "owner": "author"},
+  {"id": "ho-brief-tarjeta", "title": "Hooli Pay — Brief campaña tarjeta sin anualidad.md", "kind": "file", "path": "ho-brief-tarjeta.md", "lang": "es", "genre": "brief", "visibility": "workspace", "owner": "author"},
+  {"id": "ho-minuta-2026-09-30", "title": "Minuta Hooli Pay 30-09-2026.txt", "kind": "file", "path": "ho-minuta-2026-09-30.txt", "lang": "es", "genre": "meeting-notes", "visibility": "workspace", "owner": "author"},
+  {"id": "ho-pricing-privado", "title": "Hooli — Notas internas de pricing y margen (confidencial).md", "kind": "file", "path": "ho-pricing-privado.md", "lang": "es", "genre": "pricing", "visibility": "private", "owner": "other"},
+  {"id": "um-lineamientos", "title": "Umbrella Salud — Lineamientos de publicidad en salud.md", "kind": "file", "path": "um-lineamientos.md", "lang": "es", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "um-turnos-online", "title": "Umbrella Salud — Resultados campaña turnos online julio–septiembre 2026", "kind": "page", "path": "um-turnos-online.html", "lang": "es", "genre": "campaign-results", "visibility": "workspace", "owner": "author"},
+  {"id": "um-datos-pacientes", "title": "Umbrella Salud — Protocolo de datos de pacientes para marketing.md", "kind": "file", "path": "um-datos-pacientes.md", "lang": "es", "genre": "procedure", "visibility": "workspace", "owner": "author"},
+  {"id": "va-propuesta", "title": "Propuesta comercial — Vandelay Importaciones", "kind": "page", "path": "va-propuesta.html", "lang": "es", "genre": "brief", "visibility": "workspace", "owner": "author"},
+  {"id": "va-propuesta-v2-privado", "title": "Vandelay — Propuesta v2 con descuentos (borrador interno).md", "kind": "file", "path": "va-propuesta-v2-privado.md", "lang": "es", "genre": "brief", "visibility": "private", "owner": "other"},
+  {"id": "va-descubrimiento", "title": "Vandelay — Notas de la reunión de descubrimiento 03-09-2026.md", "kind": "file", "path": "va-descubrimiento.md", "lang": "es", "genre": "meeting-notes", "visibility": "workspace", "owner": "author"},
+  {"id": "ta-summer-brief-en", "title": "Tailspin Travel — Summer 2027 Campaign Brief", "kind": "page", "path": "ta-summer-brief-en.html", "lang": "en", "genre": "brief", "visibility": "workspace", "owner": "author"},
+  {"id": "ta-invierno-2026", "title": "Tailspin Viajes — Resultados temporada de invierno 2026", "kind": "page", "path": "ta-invierno-2026.html", "lang": "es", "genre": "campaign-results", "visibility": "workspace", "owner": "author"},
+  {"id": "ta-cancelaciones", "title": "Tailspin Viajes — Política de cancelaciones y cambios.md", "kind": "file", "path": "ta-cancelaciones.md", "lang": "es", "genre": "policy", "visibility": "workspace", "owner": "author"}
+] }

@@ -1,0 +1,19 @@
+{ "docs": [
+  {"id": "co-tarifario-2026", "title": "Tarifario de servicios 2026", "kind": "page", "path": "co-tarifario-2026.html", "lang": "es", "genre": "pricing", "visibility": "workspace", "owner": "author"},
+  {"id": "co-tarifario-2025", "title": "Tarifario de servicios 2025 (versión anterior)", "kind": "page", "path": "co-tarifario-2025.html", "lang": "es", "genre": "pricing", "visibility": "workspace", "owner": "author"},
+  {"id": "co-tarifario-2027-borrador", "title": "Borrador — Tarifario 2027 (confidencial)", "kind": "page", "path": "co-tarifario-2027-borrador.html", "lang": "es", "genre": "pricing", "visibility": "private", "owner": "other"},
+  {"id": "co-condiciones-comerciales", "title": "Condiciones comerciales y facturación.md", "kind": "file", "path": "co-condiciones-comerciales.md", "lang": "es", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "co-plantilla-propuesta", "title": "Plantilla de propuesta comercial.md", "kind": "file", "path": "co-plantilla-propuesta.md", "lang": "es", "genre": "brief", "visibility": "workspace", "owner": "author"},
+  {"id": "co-manual-procedimientos", "title": "Manual de procedimientos operativos", "kind": "page", "path": "co-manual-procedimientos/index.html", "pages": ["procedimientos/alta-cliente.html", "procedimientos/lanzamiento-campana.html", "procedimientos/reporte-mensual.html", "procedimientos/aprobacion-creativos.html"], "lang": "es", "genre": "procedure", "visibility": "workspace", "owner": "author"},
+  {"id": "co-protocolo-crisis", "title": "Protocolo de crisis en redes sociales", "kind": "page", "path": "co-protocolo-crisis.html", "lang": "es", "genre": "procedure", "visibility": "workspace", "owner": "author"},
+  {"id": "co-inversion-medios", "title": "Política de aprobación de inversión en medios.md", "kind": "file", "path": "co-inversion-medios.md", "lang": "es", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "co-glosario-metricas", "title": "Glosario de métricas de marketing.md", "kind": "file", "path": "co-glosario-metricas.md", "lang": "es", "genre": "glossary", "visibility": "workspace", "owner": "author"},
+  {"id": "co-glossary-ecommerce-en", "title": "E-commerce and Analytics Glossary.md", "kind": "file", "path": "co-glossary-ecommerce-en.md", "lang": "en", "genre": "glossary", "visibility": "workspace", "owner": "author"},
+  {"id": "co-contractor-onboarding-en", "title": "Freelancer and Contractor Onboarding Checklist.md", "kind": "file", "path": "co-contractor-onboarding-en.md", "lang": "en", "genre": "onboarding", "visibility": "workspace", "owner": "author"},
+  {"id": "co-incident-runbook-en", "title": "Security Incident Response Runbook", "kind": "page", "path": "co-incident-runbook-en.html", "lang": "en", "genre": "procedure", "visibility": "workspace", "owner": "author"},
+  {"id": "co-dpa-en", "title": "Data Processing Addendum — Summary.md", "kind": "file", "path": "co-dpa-en.md", "lang": "en", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "co-checklist-qa-landing", "title": "Checklist QA de landing pages.md", "kind": "file", "path": "co-checklist-qa-landing.md", "lang": "es", "genre": "procedure", "visibility": "workspace", "owner": "author"},
+  {"id": "co-sla-soporte", "title": "Niveles de servicio para clientes (SLA).md", "kind": "file", "path": "co-sla-soporte.md", "lang": "es", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "co-presentacion-institucional", "title": "Presentación institucional Acme Digital", "kind": "page", "path": "co-presentacion-institucional.html", "lang": "es", "genre": "slides", "visibility": "workspace", "owner": "author"},
+  {"id": "co-report-guidelines-en", "title": "Client Report Writing Guidelines.md", "kind": "file", "path": "co-report-guidelines-en.md", "lang": "en", "genre": "procedure", "visibility": "workspace", "owner": "author"}
+] }

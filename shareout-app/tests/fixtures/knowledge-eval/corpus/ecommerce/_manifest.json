@@ -1,0 +1,21 @@
+{ "docs": [
+  {"id": "nw-catalogo", "title": "northwind-catalogo-productos-2026-10.json", "kind": "file", "path": "nw-catalogo.json", "lang": "es", "genre": "catalog", "visibility": "workspace", "owner": "author"},
+  {"id": "nw-envios-devoluciones", "title": "Northwind — Envíos y devoluciones", "kind": "page", "path": "nw-envios-devoluciones.html", "lang": "es", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "nw-devoluciones-2027-borrador", "title": "Northwind — Nueva política de devoluciones 2027 (borrador).md", "kind": "file", "path": "nw-devoluciones-2027-borrador.md", "lang": "es", "genre": "policy", "visibility": "private", "owner": "other"},
+  {"id": "nw-faq", "title": "Northwind — Preguntas frecuentes de atención al cliente.md", "kind": "file", "path": "nw-faq.md", "lang": "es", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "nw-calendario-promos", "title": "Northwind — Calendario promocional 2026", "kind": "page", "path": "nw-calendario-promos.html", "lang": "es", "genre": "table", "visibility": "workspace", "owner": "author"},
+  {"id": "nw-black-friday-2025", "title": "Northwind — Resultados Black Friday 2025", "kind": "page", "path": "nw-black-friday-2025.html", "lang": "es", "genre": "campaign-results", "visibility": "workspace", "owner": "author"},
+  {"id": "nw-kpis-2026-09", "title": "Northwind — KPIs e-commerce septiembre 2026.md", "kind": "file", "path": "nw-kpis-2026-09.md", "lang": "es", "genre": "table", "visibility": "workspace", "owner": "author"},
+  {"id": "nw-despacho", "title": "Northwind — Procedimiento de preparación y despacho de pedidos.md", "kind": "file", "path": "nw-despacho.md", "lang": "es", "genre": "procedure", "visibility": "workspace", "owner": "author"},
+  {"id": "nw-wholesale-en", "title": "Northwind Market — Wholesale Price List and Terms.md", "kind": "file", "path": "nw-wholesale-en.md", "lang": "en", "genre": "pricing", "visibility": "workspace", "owner": "author"},
+  {"id": "nw-margenes-privado", "title": "Northwind — Márgenes por categoría (confidencial).md", "kind": "file", "path": "nw-margenes-privado.md", "lang": "es", "genre": "table", "visibility": "private", "owner": "other"},
+  {"id": "ct-catalogo-oi", "title": "Contoso — Catálogo Otoño-Invierno 2026.md", "kind": "file", "path": "ct-catalogo-oi.md", "lang": "es", "genre": "catalog", "visibility": "workspace", "owner": "author"},
+  {"id": "ct-guia-tallas", "title": "Contoso — Guía de tallas", "kind": "page", "path": "ct-guia-tallas.html", "lang": "es", "genre": "reference", "visibility": "workspace", "owner": "author"},
+  {"id": "ct-cambios-devoluciones", "title": "Contoso — Cambios y devoluciones", "kind": "page", "path": "ct-cambios-devoluciones.html", "lang": "es", "genre": "policy", "visibility": "workspace", "owner": "author"},
+  {"id": "ct-cyberday-2026", "title": "Contoso — Resultados CyberDay 2026", "kind": "page", "path": "ct-cyberday-2026.html", "lang": "es", "genre": "campaign-results", "visibility": "workspace", "owner": "author"},
+  {"id": "ct-influencers", "title": "Contoso — Campaña con influencers primavera 2026.md", "kind": "file", "path": "ct-influencers.md", "lang": "es", "genre": "campaign-results", "visibility": "workspace", "owner": "author"},
+  {"id": "ct-supplier-en", "title": "Contoso Retail — Supplier Labeling and Packaging Guidelines.md", "kind": "file", "path": "ct-supplier-en.md", "lang": "en", "genre": "procedure", "visibility": "workspace", "owner": "author"},
+  {"id": "ct-minuta-2026-10-01", "title": "Minuta Contoso 01-10-2026.txt", "kind": "file", "path": "ct-minuta-2026-10-01.txt", "lang": "es", "genre": "meeting-notes", "visibility": "workspace", "owner": "author"},
+  {"id": "ec-benchmark", "title": "Benchmark de conversión e-commerce LatAm 2026 (interno)", "kind": "page", "path": "ec-benchmark.html", "lang": "es", "genre": "table", "visibility": "workspace", "owner": "author"},
+  {"id": "ec-checklist-eventos", "title": "Checklist de preparación para eventos de alto tráfico.md", "kind": "file", "path": "ec-checklist-eventos.md", "lang": "es", "genre": "procedure", "visibility": "workspace", "owner": "author"}
+] }

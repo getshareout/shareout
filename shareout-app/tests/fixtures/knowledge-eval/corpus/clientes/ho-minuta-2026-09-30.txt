@@ -1,0 +1,19 @@
+Minuta — Reunión de seguimiento Hooli Pay / Acme Digital
+Fecha: miércoles 30 de septiembre de 2026, 10:00 a 11:15 (hora del centro de México). Videollamada.
+Asistentes Hooli Pay: Renata Galindo (Marca), Héctor Villaseñor (Growth), Ximena Robles (Legal y Cumplimiento).
+Asistentes Acme Digital: Mariana Ochoa, Tomás Echeverry, Iván Cordero (compra de medios).
+
+Acuerdos
+1. Campañas de descarga de la app en el Q4: presupuesto de MXN 2.900.000 al mes de octubre a diciembre (en el Q3 eran MXN 2.640.000 al mes).
+2. Desde el 15 de octubre las campañas de la app optimizan al evento "KYC completado" y ya no a la instalación.
+3. Influencers para la tarjeta sin anualidad: 8 creadores de finanzas personales, con un tope de MXN 60.000 por creador. Los guiones llegan a Legal antes del 20 de octubre.
+4. El reporte semanal se entrega en Looker Studio todos los lunes antes de las 12:00.
+5. Hooli comparte la lista de usuarios con atraso para cargarla como audiencia excluida.
+
+Pendientes
+- Mariana Ochoa: enviar el calendario de piezas de la tarjeta, viernes 2 de octubre.
+- Héctor Villaseñor: compartir la lista de exclusión, 7 de octubre.
+- Iván Cordero: configurar el evento KYC completado en Meta y Google, 14 de octubre.
+- Ximena Robles: devolver comentarios de los guiones 5 días hábiles después de recibirlos.
+
+Próxima reunión: miércoles 14 de octubre de 2026, 10:00.

@@ -1,0 +1,23 @@
+Minuta de reunión: Contoso Retail y Acme Digital
+Tema: plan de Black Friday y Cyber Monday 2026
+Fecha: 01-10-2026, 10:00 a 11:15, videollamada
+Asistentes: Francisca Muñoz (gerenta de e-commerce, Contoso), Benjamín Soto (operaciones, Contoso), Matías Fuentes (TI, Contoso), Ignacio Lagos y Renata Gil (Acme Digital)
+
+Decisiones
+- Black Friday del 27 al 29 de noviembre y Cyber Monday el 30 de noviembre.
+- Descuentos: hasta 40% en parkas y abrigos, 30% en calzado y 3x2 en accesorios. Los cupones no se acumulan con el descuento del evento.
+- Presupuesto de medios: $52.000.000 (Google Ads 40%, Meta Ads 35%, TikTok Ads 15%, influencers 10%).
+- Prueba de carga el 3 de noviembre, simulando 4 veces el peak del CyberDay.
+- Congelamiento de cambios en el sitio del 20 de noviembre al 1 de diciembre.
+- Emails masivos escalonados por segmento, cada 15 minutos, para no repetir la caída del CyberDay.
+- Reposición de 1.800 parkas en tallas M y L, con llegada a bodega el 13 de noviembre.
+- Atención al cliente: 6 ejecutivos adicionales del 26 de noviembre al 4 de diciembre.
+
+Pendientes
+- Ignacio Lagos: plan de medios final, 9 de octubre.
+- Francisca Muñoz: reglas de cupones y tope por cliente, 16 de octubre.
+- Benjamín Soto: confirmar despacho del proveedor de parkas, 23 de octubre.
+- Matías Fuentes: informe de la prueba de carga, 5 de noviembre.
+- Catalina Rojas: piezas creativas aprobadas, 6 de noviembre.
+
+Próxima reunión: 15-10-2026.

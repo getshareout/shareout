@@ -40,6 +40,7 @@ fails if `CLAUDE.md` becomes anything else.
 | Workspace admin docs | `skills/ShareOutSkill/team/` | — |
 | Design / UI / brand | `Design/README.md` | ad-hoc example HTML |
 | Understand or change the database schema | `shareout-app/migrations/SCHEMA.md` then `CONVENTIONS.md` | hand-writing DDL without reading either |
+| Change how Knowledge finds things (chunking, keyword search, embeddings, ranking) | `shareout-app/src/knowledge/corpus/` + `npm run eval:knowledge` ([Knowledge retrieval eval](#knowledge-retrieval-eval)) | judging by a few hand-picked queries |
 
 **Skill source of truth:** [skills/README.md](skills/README.md) — monorepo wins;
 `shareout-skill` and `GET $ORIGIN/v1/skill` are load paths, not alternate edit trees.
@@ -159,3 +160,16 @@ shareout-app/          → ShareOut itself (platform)
 Use `src/http/api-error.ts` (`apiErrorResponse` / `simpleApiError`) for JSON errors.
 Envelope: `{ success: false, error, code, request_id?, hint?, … }`. Do not invent a
 third shape; do not put stack traces or secrets in client-facing messages.
+
+---
+
+## Knowledge retrieval eval
+
+Knowledge PRs must report eval deltas. A change to how Knowledge finds things — chunking,
+text extraction, the FTS tokenizer or query, embeddings, fusion, the permission filter
+(`shareout-app/src/knowledge/corpus/`) — runs `npm run eval:knowledge` on its branch
+(plus `-- --dense` when embeddings change) and pastes the "Δ vs baseline" table it prints
+into the PR. It ingests a synthetic Spanish-first corpus through the real code and scores
+~400 golden questions (recall@k, nDCG, MRR, permission starvation, latency). It is not part
+of `npm test` or the pre-push hook. Details, dense-mode credentials and re-baselining:
+[shareout-app/tests/eval/knowledge/README.md](shareout-app/tests/eval/knowledge/README.md).
