@@ -394,7 +394,9 @@ of every fact — see [integrations/mcp-connector.md](integrations/mcp-connector
 
 Building a multi-page site through the connector? Pass `files: [{ path, content, encoding? }]`
 (with `index.html` as the first page) to `publish_artifact` or `update_artifact` instead of
-`content`; the result links each page with `?page=`. Same limits as `POST /v1/publish` — see
+`content`; the result links each page with `?page=`. To change one, read every file with
+`get_artifact` `include_files: true` and send them all back with `base_version`: a write that
+would drop a file or overwrite a newer version is refused. Same limits as `POST /v1/publish` — see
 [integrations/mcp-connector.md](integrations/mcp-connector.md) and
 [core/html-spec/pages.md](core/html-spec/pages.md#multiple-html-files-sites).
 

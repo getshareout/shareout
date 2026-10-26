@@ -10,7 +10,6 @@ import type { Env, FileEntry } from '../types';
 import { hashToken } from '../api-auth';
 import { handlePublish } from '../publish/handle-publish';
 import { handleListArtifacts, handleGetArtifact, handleUpdateArtifact, listPages } from '../artifacts/crud';
-import { handleGetArtifactFiles } from '../artifacts/files';
 import { requireRole } from '../artifacts/roles';
 import { listWorkspacesForUser, type BotWorkspace } from '../chat-agent/access';
 import { quickSearch } from '../search/quick-search';
@@ -27,6 +26,7 @@ import { KNOWLEDGE_TOOLS } from './knowledge-tools';
 import { CONNECTOR_TOOLS } from './connector-tools';
 import { PAGE_TOOLS } from './page-tools';
 import { SHARING_TOOLS } from './sharing-tools';
+import { lossyWrite, mainText, readSource } from './page-source';
 
 export type { ToolContext, ToolResult } from './tool-kit';
 
@@ -37,7 +37,8 @@ export const SERVER_INSTRUCTIONS = [
   'To publish: write a complete, self-contained page and call publish_artifact. Afterwards always give the',
   'person the link and say who can see it. If the result carries a notice (visibility changed, under review,',
   'a warning), tell them plainly.',
-  'To change a page they already have: find it with list_artifacts, then call update_artifact (it replaces the whole page).',
+  'To change a page they already have: find it with list_artifacts, read it with get_artifact (include_files when it has several files),',
+  'then send the whole new page to update_artifact with base_version set to the version you read.',
   'For a site of several pages, send files instead of content: index.html plus the other pages and any css/js/images, linked with relative links.',
   'If they have several workspaces and did not say which one, ask them before publishing.',
   'A page\'s history is list_versions; restore_version brings an old one back as a new version (confirm first).',
@@ -53,8 +54,6 @@ export const SERVER_INSTRUCTIONS = [
   'If anything fails or behaves unexpectedly, call report_problem with what happened, then tell the person',
   'the ShareOut team was notified. For how-to questions about ShareOut, call get_help.',
 ].join(' ');
-
-const MAX_CONTENT_CHARS = 60_000;
 
 function artifactUrl(origin: string, routingSlug: string): string {
   return `${origin}/a/${routingSlug}/`;
@@ -182,9 +181,10 @@ function describePublish(
   if (Array.isArray(result.warnings)) notes.push(...result.warnings.map(String));
   const approval = result.approval_required as { required?: number } | undefined;
   if (approval?.required) notes.push('This workspace requires an admin to approve the page before it goes live.');
+  const version = (result.version as { version_no?: number } | undefined)?.version_no;
 
   const lines = [
-    `${verb} "${title}".`,
+    `${verb} "${title}"${version ? ` (version ${version})` : ''}.`,
     `Link: ${url}`,
     `Who can see it: ${audience(visibility, workspace)}.`,
     ...(pages.length ? [`Pages (${pages.length}): ${pages.map((p) => pageUrl(url, p)).join(', ')}`] : []),
@@ -194,21 +194,13 @@ function describePublish(
   return ok(lines.join('\n'), {
     url,
     artifact_id: (result.artifact as { id?: string } | undefined)?.id,
-    version: (result.version as { version_no?: number } | undefined)?.version_no,
+    version,
     visibility,
     workspace_id: workspace?.id ?? null,
     notices: notes,
     visibility_downgraded: Boolean(result.visibility_downgraded),
     ...(pages.length ? { pages: pages.map((path) => ({ path, url: pageUrl(url, path) })) } : {}),
   });
-}
-
-async function mainFileText(ctx: ToolContext, artifactId: string): Promise<string | null> {
-  const res = await handleGetArtifactFiles(getRequest(ctx, `/v1/artifacts/${artifactId}/files`), ctx.env, ctx.user, artifactId);
-  if (!res.ok) return null;
-  const body = (await readJson(res)) as { entrypoint?: string; files?: Array<{ path: string; content: string; encoding: string }> };
-  const main = body.files?.find((f) => f.path === body.entrypoint && f.encoding === 'utf8');
-  return main ? main.content.slice(0, MAX_CONTENT_CHARS) : null;
 }
 
 // ── tools ───────────────────────────────────────────────────────────────────
@@ -287,12 +279,18 @@ const listArtifacts: ToolDef = {
 const getArtifact: ToolDef = {
   name: 'get_artifact',
   title: 'Get a page',
-  description: 'Details of one page: name, link, who can see it, version. Set include_content to also get the page source (to edit it with update_artifact).',
+  description: [
+    'Details of one page: name, link, who can see it, version.',
+    'include_content adds the main file\'s source; include_files adds every file of the page (its pages, css, js, data; images and fonts as base64), main file first. Use include_files before changing a page that has more than one file.',
+    'One answer holds up to 512 KB of file content: a file that does not fit comes back cut or left out and marked truncated, and must never be sent back with update_artifact.',
+    'To change the page, edit what this returns and pass its version to update_artifact as base_version.',
+  ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
       artifact_id: { type: 'string' },
-      include_content: { type: 'boolean', default: false },
+      include_content: { type: 'boolean', default: false, description: 'Also return the main file\'s source (HTML or Markdown).' },
+      include_files: { type: 'boolean', default: false, description: 'Also return every file of the page (path, size, content, truncated), main file first. Includes the main file, so include_content is not needed with it.' },
     },
     required: ['artifact_id'],
     additionalProperties: false,
@@ -304,7 +302,10 @@ const getArtifact: ToolDef = {
     const res = await handleGetArtifact(getRequest(ctx, `/v1/artifacts/${id}`), ctx.env, ctx.user, id);
     const body = await readJson(res);
     if (!res.ok) return fail(`Could not open that page: ${errorText(body, res.status)}`);
-    const content = args.include_content === true ? await mainFileText(ctx, id) : null;
+    const live = Number(body.current_version) || 1;
+    const source = args.include_files === true || args.include_content === true
+      ? await readSource(ctx, String(body.id ?? id), { live, newest: Number(body.latest_version) || live }, args.include_files === true)
+      : null;
     const text = [
       `"${String(body.name)}" — ${String(body.url)}`,
       `Visibility: ${String(body.visibility)}. Version ${String(body.current_version)}. Updated ${String(body.updated_at ?? body.created_at)}.`,
@@ -312,9 +313,9 @@ const getArtifact: ToolDef = {
       ...(Array.isArray(body.pages) && body.pages.length > 1
         ? [`Pages (${body.pages.length}): ${body.pages.map((p) => pageUrl(String(body.url), String(p))).join(', ')}`]
         : []),
-      ...(content !== null ? ['Content:', content] : []),
+      ...(source?.lines ?? []),
     ].join('\n');
-    return ok(text, { artifact: body, ...(content !== null ? { content } : {}) });
+    return ok(text, { artifact: body, ...source?.data });
   },
 };
 
@@ -399,8 +400,10 @@ const updateArtifact: ToolDef = {
   description: [
     'Replaces the content of a page the person already has (keeps its link and who can see it) and saves it as a new version.',
     'title renames the page; folder moves it into a folder of its workspace (name or id).',
-    'Send the whole new page, not a fragment. Find the artifact_id with list_artifacts; get_artifact with include_content gives the current source.',
-    'For a multi-page site send files instead of content: the full new set (index.html plus every page and asset); it replaces all the files of the previous version.',
+    'Send the whole new page, not a fragment. Find the artifact_id with list_artifacts, read the page with get_artifact first (include_files when it has more than one file) and pass the version it reports as base_version: if someone saved a newer version since, nothing is changed and you are told to read it again.',
+    'For a multi-page site send files instead of content: every file (index.html plus every page and asset, changed or not).',
+    'An update that would remove a file of the current version (content alone on a site, or files that leave some out) is refused; set replace_all_files: true only when the person wants those files gone.',
+    'Never send back a file that get_artifact marked truncated.',
     'message: optional one-line note on what changed, shown in the page history.',
     'Afterwards give the person the link.',
     ON_FAILURE,
@@ -409,8 +412,10 @@ const updateArtifact: ToolDef = {
     type: 'object',
     properties: {
       artifact_id: { type: 'string' },
-      content: { type: 'string', description: 'The full new page: an HTML document or Markdown.' },
-      files: { ...FILES_SCHEMA, description: 'Instead of content: the complete new set of files of a multi-page site (replaces every file of the previous version). Same rules as publish_artifact.' },
+      content: { type: 'string', description: 'The full new page: an HTML document or Markdown. A page with several files takes files instead.' },
+      files: { ...FILES_SCHEMA, description: 'Instead of content: every file of a multi-page site, changed or not (index.html plus every page and asset). Leaving out a file of the current version is refused unless replace_all_files is true. Same rules as publish_artifact.' },
+      base_version: { type: 'integer', minimum: 1, description: 'The version you read with get_artifact. If the page has a newer one, nothing is changed.' },
+      replace_all_files: { type: 'boolean', default: false, description: 'true removes the files of the current version that content or files leaves out. Only when the person wants them gone.' },
       title: { type: 'string', description: 'New name, if it should change.' },
       format: { type: 'string', enum: ['html', 'markdown'] },
       folder: { type: 'string', description: 'Folder to move the page into: its name or id.' },
@@ -451,6 +456,13 @@ const updateArtifact: ToolDef = {
     if (folder?.error) return invalid(folder.error);
     const payload = publishFiles(args, row.artifact_type === 'markdown' ? 'markdown' : 'html');
     if (payload.error !== undefined) return invalid(`Nothing was changed: ${payload.error}`);
+    const lossy = await lossyWrite(ctx.env, id, {
+      base: typeof args.base_version === 'number' ? args.base_version : undefined,
+      paths: payload.files.map((f) => f.path),
+      viaContent: !Array.isArray(args.files),
+      replaceAll: args.replace_all_files === true,
+    });
+    if (lossy) return lossy;
     const { status, body } = await runPublish(ctx, {
       name: row.name,
       slug: row.display_slug,
@@ -582,7 +594,8 @@ const fetchTool: ToolDef = {
     const res = await handleGetArtifact(getRequest(ctx, `/v1/artifacts/${id}`), ctx.env, ctx.user, id);
     const body = await readJson(res);
     if (!res.ok) return fail(`Could not open that page: ${errorText(body, res.status)}`);
-    const raw = (await mainFileText(ctx, id)) ?? '';
+    const main = await mainText(ctx, String(body.id ?? id), Number(body.current_version) || 1);
+    const raw = main?.text ?? '';
     const text = body.artifact_type === 'html'
       ? raw.replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
       : raw;
@@ -591,7 +604,7 @@ const fetchTool: ToolDef = {
       title: String(body.name),
       text,
       url: String(body.url),
-      metadata: { visibility: body.visibility, updated_at: body.updated_at, type: body.artifact_type },
+      metadata: { visibility: body.visibility, updated_at: body.updated_at, type: body.artifact_type, ...(main?.truncated ? { truncated: true } : {}) },
     };
     return ok(JSON.stringify(doc), doc);
   },
