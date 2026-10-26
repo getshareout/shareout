@@ -1,0 +1,20 @@
+id: docs-site
+title: 5-page docs site
+lang: en
+suites: [core]
+fixtures: [docs-content.md]
+budget: { minutes: 25, usd: 8 }
+prompt: |
+  Turn docs-content.md into a small documentation website for Relay CLI with five pages:
+  Getting started, Configuration, Commands, Troubleshooting and FAQ. Sidebar navigation that
+  works on phones too, and code snippets people can copy with one click. Public.
+expect:
+  pages: 5
+  stores: []
+functional:
+  - { do: expect_text, text: "relay init" }
+  - { do: goto_page, name: "troubleshooting" }
+  - { do: expect_text, text: "AccessDenied" }
+  - { do: goto_page, name: "^\\s*faq|questions" }
+  - { do: expect_text, text: "delete_remote" }
+  - { do: rest, check: html_pages, min: 5, optional: true, label: five HTML pages }

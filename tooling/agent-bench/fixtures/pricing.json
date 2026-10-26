@@ -1,0 +1,15 @@
+{
+  "currency": "USD",
+  "plans": [
+    { "id": "starter", "name": "Starter", "monthly_per_seat": 9, "included_gb": 50, "min_seats": 1, "max_seats": 10 },
+    { "id": "team", "name": "Team", "monthly_per_seat": 19, "included_gb": 250, "min_seats": 3, "max_seats": 200 },
+    { "id": "business", "name": "Business", "monthly_per_seat": 35, "included_gb": 1000, "min_seats": 10, "max_seats": null }
+  ],
+  "extra_storage_per_100gb": 6,
+  "annual_discount_pct": 17,
+  "volume_discounts": [ { "min_seats": 50, "pct": 5 }, { "min_seats": 150, "pct": 10 } ],
+  "addons": [
+    { "id": "sso", "name": "SSO / SAML", "monthly_flat": 99, "plans": ["team", "business"] },
+    { "id": "priority_support", "name": "Priority support", "monthly_flat": 149, "plans": ["business"] }
+  ]
+}

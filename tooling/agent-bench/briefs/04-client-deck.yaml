@@ -1,0 +1,19 @@
+id: client-deck
+title: Branded client deck
+lang: en
+suites: [core]
+fixtures: [deck-content.md, brand-kit]
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  Please turn deck-content.md into a slide deck for Harbor Labs' leadership team, using our
+  brand kit in the brand-kit folder (colors, fonts, logo, tone). It should feel like a real
+  presentation: one idea per slide, arrow keys to move between slides, readable on a projector.
+  The client doesn't have an account with us, so anyone with the link should be able to view it.
+expect:
+  stores: []
+functional:
+  - { do: expect_text, text: "Q3" }
+  - { do: press, key: ArrowRight }
+  - { do: press, key: ArrowRight }
+  - { do: expect_text, text: "mobile conversion|activation|where we are", label: arrow keys reach the content slides }
+  - { do: rest, check: visibility, equals: "public|unlisted", label: viewable without an account }

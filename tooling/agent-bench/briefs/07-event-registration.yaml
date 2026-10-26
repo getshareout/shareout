@@ -1,0 +1,22 @@
+id: event-registration
+title: Event registration + email
+lang: es
+suites: [smoke, core]
+fixtures: []
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  Armame una página de inscripción para el Meetup de Datos Rosario: jueves 19 de noviembre a las
+  19 h en La Usina, Rosario. La gente deja nombre, mail, empresa y si viene presencial o remoto.
+  Hay cupo para 80 personas presenciales; cuando se llena, que los siga anotando en lista de
+  espera. Quiero que me llegue un mail con cada inscripción. Que la pueda abrir cualquiera con el
+  link, sin tener cuenta.
+expect:
+  stores: ["table", "email"]
+functional:
+  - { do: expect_text, text: "Rosario" }
+  - { do: expect_text, text: "19 de noviembre|19/11|nov" }
+  - { do: fill_form, prefs: { "modal|asist|presencial|remoto|formato": "presencial" }, label: inscribirse }
+  - { do: expect_text, text: "gracias|listo|confirm|inscript|anotad|registrad", label: confirmación visible }
+  - { do: rest, check: rows, min: 1, label: la inscripción quedó guardada }
+  - { do: rest, check: email_sent, min: 1, label: avisa por mail }
+  - { do: rest, check: visibility, equals: "public|unlisted", label: abre sin cuenta }

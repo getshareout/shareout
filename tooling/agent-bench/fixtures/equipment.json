@@ -1,0 +1,86 @@
+[
+  {
+    "asset_tag": "EQ-001",
+    "name": "Canon EOS R6 camera",
+    "category": "Camera",
+    "location": "Studio B",
+    "condition": "good"
+  },
+  {
+    "asset_tag": "EQ-002",
+    "name": "Sony A7 IV camera",
+    "category": "Camera",
+    "location": "Storage room",
+    "condition": "fair"
+  },
+  {
+    "asset_tag": "EQ-003",
+    "name": "Rode Wireless GO II mic",
+    "category": "Audio",
+    "location": "Studio A",
+    "condition": "good"
+  },
+  {
+    "asset_tag": "EQ-004",
+    "name": "Zoom H5 recorder",
+    "category": "Audio",
+    "location": "Storage room",
+    "condition": "good"
+  },
+  {
+    "asset_tag": "EQ-005",
+    "name": "Aputure 300d light",
+    "category": "Lighting",
+    "location": "Studio A",
+    "condition": "good"
+  },
+  {
+    "asset_tag": "EQ-006",
+    "name": "Godox SL60 light",
+    "category": "Lighting",
+    "location": "Storage room",
+    "condition": "good"
+  },
+  {
+    "asset_tag": "EQ-007",
+    "name": "Manfrotto tripod",
+    "category": "Grip",
+    "location": "Storage room",
+    "condition": "good"
+  },
+  {
+    "asset_tag": "EQ-008",
+    "name": "DJI RS 3 gimbal",
+    "category": "Grip",
+    "location": "Studio B",
+    "condition": "good"
+  },
+  {
+    "asset_tag": "EQ-009",
+    "name": "MacBook Pro 16\" (edit)",
+    "category": "Computer",
+    "location": "Storage room",
+    "condition": "good"
+  },
+  {
+    "asset_tag": "EQ-010",
+    "name": "Epson projector",
+    "category": "Presentation",
+    "location": "Studio A",
+    "condition": "good"
+  },
+  {
+    "asset_tag": "EQ-011",
+    "name": "Logitech conference cam",
+    "category": "Presentation",
+    "location": "Studio B",
+    "condition": "good"
+  },
+  {
+    "asset_tag": "EQ-012",
+    "name": "iPad Pro 12.9\"",
+    "category": "Computer",
+    "location": "Storage room",
+    "condition": "fair"
+  }
+]

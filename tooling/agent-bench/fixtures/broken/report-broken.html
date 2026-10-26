@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Reporte de ventas — octubre</title>
+<!-- fixture deliberadamente roto para el benchmark de agentes: no arreglar acá -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@9.9.9/dist/chart.umd.min.js"></script>
+<style>
+  body { font-family: Helvetica; margin: 0; padding: 20px; color: #777; }
+  .wrap { width: 1400px; }
+  h1 { font-size: 40px; color: #aaa; }
+  table { width: 1400px; border-collapse: collapse; }
+  td, th { border: 1px solid #ccc; padding: 2px 4px; font-size: 10px; white-space: nowrap; }
+  .kpi { display: inline-block; width: 330px; height: 90px; overflow: hidden; font-size: 28px; background: #ff00ff22; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Reporte de ventas — octubre 2026</h1>
+  <div class="kpi" id="k1"></div><div class="kpi" id="k2"></div><div class="kpi" id="k3"></div><div class="kpi" id="k4"></div>
+  <canvas id="chart" height="120"></canvas>
+  <table id="t"><thead><tr><th>Región</th><th>Producto</th><th>Ingresos (USD)</th><th>Unidades</th><th>Clientes nuevos</th><th>Bajas</th></tr></thead><tbody></tbody></table>
+</div>
+<script>
+  var raw = "[{'region':'Norte','producto':'Plan Equipo','ingresos':40210,'unidades':126,'nuevos':14,'bajas':3},{'region':'Sur','producto':'Plan Equipo','ingresos':45880,'unidades':143,'nuevos':19,'bajas':2},{'region':'Este','producto':'Plan Empresa','ingresos':52300,'unidades':58,'nuevos':6,'bajas':1},{'region':'Oeste','producto':'Plan Inicial','ingresos':11950,'unidades':133,'nuevos':15,'bajas':6},{'region':'Centro','producto':'Plan Empresa','ingresos':39100,'unidades':43,'nuevos':4,'bajas':2}]";
+  var rows = JSON.parse(raw);
+  var total = rows.reduce(function (a, r) { return a + r.ingresos; }, 0);
+  document.getElementById('k1').innerText = 'Ingresos totales del mes en dólares estadounidenses: ' + total;
+  document.getElementById('k2').innerText = 'Unidades vendidas: ' + rows.reduce(function (a, r) { return a + r.unidades; }, 0);
+  document.getElementById('k3').innerText = 'Clientes nuevos: ' + rows.reduce(function (a, r) { return a + r.nuevos; }, 0);
+  document.getElementById('k4').innerText = 'Bajas: ' + rows.reduce(function (a, r) { return a + r.bajas; }, 0);
+  rows.forEach(function (r) {
+    document.querySelector('#t tbody').insertAdjacentHTML('beforeend', '<tr><td>' + r.region + '</td><td>' + r.producto + '</td><td>' + r.ingresos + '</td><td>' + r.unidades + '</td><td>' + r.nuevos + '</td><td>' + r.bajas + '</td></tr>');
+  });
+  new Chart(document.getElementById('chart'), { type: 'bar', data: { labels: rows.map(function (r) { return r.region; }), datasets: [{ data: rows.map(function (r) { return r.ingresos; }) }] } });
+</script>
+</body>
+</html>

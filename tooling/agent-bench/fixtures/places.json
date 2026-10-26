@@ -1,0 +1,162 @@
+[
+  {
+    "name": "Bakery Lumen",
+    "neighborhood": "Almagro",
+    "lat": -34.5575,
+    "lng": -58.42609,
+    "rating": 4.4,
+    "wifi": true,
+    "opens": "07:30",
+    "closes": "20:00"
+  },
+  {
+    "name": "Bookshop Aster",
+    "neighborhood": "Belgrano",
+    "lat": -34.60504,
+    "lng": -58.42779,
+    "rating": 4.1,
+    "wifi": true,
+    "opens": "09:00",
+    "closes": "20:00"
+  },
+  {
+    "name": "Bakery Brisa",
+    "neighborhood": "San Telmo",
+    "lat": -34.61225,
+    "lng": -58.41077,
+    "rating": 3.9,
+    "wifi": false,
+    "opens": "09:00",
+    "closes": "19:00"
+  },
+  {
+    "name": "Café Ceibo",
+    "neighborhood": "San Telmo",
+    "lat": -34.59179,
+    "lng": -58.42712,
+    "rating": 4.8,
+    "wifi": false,
+    "opens": "08:00",
+    "closes": "19:00"
+  },
+  {
+    "name": "Coworking Duna",
+    "neighborhood": "Villa Crespo",
+    "lat": -34.59541,
+    "lng": -58.42003,
+    "rating": 4.7,
+    "wifi": false,
+    "opens": "07:30",
+    "closes": "19:00"
+  },
+  {
+    "name": "Bookshop Fresno",
+    "neighborhood": "Belgrano",
+    "lat": -34.61007,
+    "lng": -58.42612,
+    "rating": 4.9,
+    "wifi": true,
+    "opens": "08:00",
+    "closes": "22:00"
+  },
+  {
+    "name": "Bakery Jacarandá",
+    "neighborhood": "Almagro",
+    "lat": -34.61885,
+    "lng": -58.38404,
+    "rating": 4.7,
+    "wifi": true,
+    "opens": "07:30",
+    "closes": "22:00"
+  },
+  {
+    "name": "Café Laurel",
+    "neighborhood": "Colegiales",
+    "lat": -34.61869,
+    "lng": -58.44044,
+    "rating": 4.2,
+    "wifi": true,
+    "opens": "08:00",
+    "closes": "22:00"
+  },
+  {
+    "name": "Bookshop Mirlo",
+    "neighborhood": "Palermo",
+    "lat": -34.59236,
+    "lng": -58.40123,
+    "rating": 3.7,
+    "wifi": true,
+    "opens": "07:30",
+    "closes": "22:00"
+  },
+  {
+    "name": "Bakery Nogal",
+    "neighborhood": "Villa Crespo",
+    "lat": -34.59385,
+    "lng": -58.38222,
+    "rating": 4.8,
+    "wifi": true,
+    "opens": "08:00",
+    "closes": "20:00"
+  },
+  {
+    "name": "Bookshop Olmo",
+    "neighborhood": "Palermo",
+    "lat": -34.60696,
+    "lng": -58.38277,
+    "rating": 4.4,
+    "wifi": true,
+    "opens": "07:30",
+    "closes": "20:00"
+  },
+  {
+    "name": "Bakery Pampa",
+    "neighborhood": "Almagro",
+    "lat": -34.61323,
+    "lng": -58.41995,
+    "rating": 4.4,
+    "wifi": true,
+    "opens": "08:00",
+    "closes": "19:00"
+  },
+  {
+    "name": "Bakery Quebracho",
+    "neighborhood": "Almagro",
+    "lat": -34.6105,
+    "lng": -58.44046,
+    "rating": 3.6,
+    "wifi": true,
+    "opens": "09:00",
+    "closes": "20:00"
+  },
+  {
+    "name": "Café Sauce",
+    "neighborhood": "Villa Crespo",
+    "lat": -34.56817,
+    "lng": -58.45806,
+    "rating": 4.6,
+    "wifi": true,
+    "opens": "08:00",
+    "closes": "19:00"
+  },
+  {
+    "name": "Bookshop Tala",
+    "neighborhood": "San Telmo",
+    "lat": -34.57042,
+    "lng": -58.3886,
+    "rating": 4,
+    "wifi": true,
+    "opens": "07:30",
+    "closes": "19:00"
+  },
+  {
+    "name": "Bakery Tilo",
+    "neighborhood": "Colegiales",
+    "lat": -34.55786,
+    "lng": -58.39145,
+    "rating": 4.6,
+    "wifi": true,
+    "opens": "08:00",
+    "closes": "22:00"
+  }
+]

@@ -1,0 +1,18 @@
+{
+  "as_of": "2026-10-24",
+  "kpis": [
+    { "id": "mrr", "label": "MRR", "unit": "USD", "value": 284300, "previous": 271900, "target": 300000 },
+    { "id": "active_accounts", "label": "Active accounts", "unit": "count", "value": 1305, "previous": 1262, "target": 1400 },
+    { "id": "churn", "label": "Logo churn (monthly)", "unit": "pct", "value": 1.8, "previous": 2.3, "target": 1.5, "lower_is_better": true },
+    { "id": "nps", "label": "NPS", "unit": "score", "value": 41, "previous": 38, "target": 45 },
+    { "id": "support_frt", "label": "First response time", "unit": "hours", "value": 3.9, "previous": 6.2, "target": 4, "lower_is_better": true }
+  ],
+  "mrr_history": [
+    { "month": "2025-11", "value": 198400 }, { "month": "2025-12", "value": 204100 },
+    { "month": "2026-01", "value": 211800 }, { "month": "2026-02", "value": 219300 },
+    { "month": "2026-03", "value": 226000 }, { "month": "2026-04", "value": 234700 },
+    { "month": "2026-05", "value": 241200 }, { "month": "2026-06", "value": 249900 },
+    { "month": "2026-07", "value": 256300 }, { "month": "2026-08", "value": 263800 },
+    { "month": "2026-09", "value": 271900 }, { "month": "2026-10", "value": 284300 }
+  ]
+}

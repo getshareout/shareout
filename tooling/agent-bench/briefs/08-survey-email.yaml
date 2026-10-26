@@ -1,0 +1,19 @@
+id: survey-email
+title: Survey → email
+lang: en
+suites: [core]
+fixtures: []
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  Make a short customer satisfaction survey we send after onboarding calls. Five questions at
+  most: a 1–5 rating, what went well, what could be better, whether they'd recommend us, and an
+  optional email if they want us to follow up. Email me whenever someone rates us 2 or lower so I
+  can call them. Anyone with the link should be able to answer — no login.
+expect:
+  stores: ["table", "email"]
+functional:
+  - { do: fill_form, prefs: { "rating|score|rate": "^1$|1" }, label: answer the survey }
+  - { do: expect_text, text: "thank|received|appreciate", label: thank-you state }
+  - { do: rest, check: rows, min: 1 }
+  - { do: rest, check: email_sent, min: 1, label: low ratings email the owner }
+  - { do: rest, check: visibility, equals: "public|unlisted" }

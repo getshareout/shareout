@@ -1,0 +1,25 @@
+id: repair-report
+title: Repair a broken artifact (report)
+lang: es
+suites: [core]
+fixtures: []
+setup:
+  - key: report
+    file: broken/report-broken.html
+    name: Reporte de ventas — octubre
+    slug: reporte-ventas
+    visibility: private
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  El reporte de ventas ({{url:report}}) está roto: en el celular no se ve bien, el gráfico no
+  aparece y los números se cortan. ¿Me lo arreglás? Que quede en el mismo link y que se vea
+  prolijo, que lo mando a dirección.
+expect:
+  target: report
+  stores: []
+functional:
+  - { do: expect_text, text: "Norte" }
+  - { do: expect_selector, selector: "canvas, svg", min: 1, label: chart renders }
+  - { do: eval, js: "(() => [...document.querySelectorAll('canvas')].some(c => c.width > 0 && c.getContext && (() => { try { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 3; i < d.length; i += 4000) if (d[i]) return true; } catch (e) { return true; } return false; })()) || document.querySelectorAll('svg rect, svg path').length > 3)()", label: chart has content }
+  - { do: expect_text, text: "189[.,]?440|189[.,]4\\s?k|189\\s?k", label: total is right }
+  - { do: rest, check: versions, min: 2, label: same link updated }

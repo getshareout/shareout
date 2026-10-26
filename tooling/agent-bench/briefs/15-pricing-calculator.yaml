@@ -1,0 +1,20 @@
+id: pricing-calculator
+title: Pricing calculator
+lang: en
+suites: [core]
+fixtures: [pricing.json]
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  Our sales team needs a pricing calculator they can send to prospects: choose a plan, number of
+  seats, extra storage, add-ons, and monthly vs annual billing, and see the total with the
+  discounts from pricing.json applied. Show the breakdown line by line so nobody has to trust a
+  magic number. Anyone with the link can use it.
+expect:
+  stores: []
+functional:
+  - { do: expect_text, text: "Starter" }
+  - { do: expect_text, text: "Business" }
+  - { do: click, name: "^\\s*team\\b", label: pick the Team plan }
+  - { do: click, name: "^\\s*monthly", optional: true }
+  - { do: fill, field: "seat|users|members", value: "60", label: 60 seats }
+  - { do: expect_text, text: "1,?083|1\\.083", label: "60 Team seats monthly = $1,083 after 5% volume discount" }

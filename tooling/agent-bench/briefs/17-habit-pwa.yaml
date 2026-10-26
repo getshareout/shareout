@@ -1,0 +1,19 @@
+id: habit-pwa
+title: PWA habit tracker
+lang: es
+suites: [core]
+fixtures: []
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  Quiero una app para seguir mis hábitos (meditar, correr, leer y tomar agua) que pueda instalar
+  en el celular como si fuera una app. Cada día marco si lo hice, veo la racha de cada hábito y un
+  calendario del mes. Es solo para mí.
+expect:
+  stores: ["json|table"]
+functional:
+  - { do: expect_text, text: "meditar" }
+  - { do: expect_text, text: "racha" }
+  - { do: click, name: "meditar|correr|leer|agua", label: marcar un hábito }
+  - { do: rest, check: data, min: 1, label: se guarda }
+  - { do: rest, check: pwa_manifest, label: instalable }
+  - { do: rest, check: visibility, equals: "private" }
