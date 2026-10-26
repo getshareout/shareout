@@ -133,6 +133,21 @@ export const WORKSPACE_FORMS_EDIT_STYLES = `/* ---- Modal + native create forms 
 .wsx-edit__airow input { flex: 1; min-width: 0; box-sizing: border-box; padding: 7px 10px; border: 1.5px solid var(--color-border-strong); border-radius: var(--radius-md); font-size: var(--text-sm); outline: none; }
 .wsx-edit__airow input:focus { border-color: var(--color-primary); }
 .wsx-edit__aistat { font-size: var(--text-xs); color: var(--color-primary); min-height: 1em; }
+.wsx-edit__aistat .is-err { color: var(--color-error); }
+.wsx-edit__aireply { position: relative; padding: 9px 30px 9px 11px; border-radius: var(--radius-md); background: var(--color-bg-elevated); color: var(--color-text); font-size: var(--text-sm); line-height: 1.5; white-space: pre-wrap; }
+.wsx-edit__aiwarn { margin-top: 6px; font-size: var(--text-xs); color: var(--color-warning); white-space: normal; }
+.wsx-edit__aix { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--color-text-tertiary); cursor: pointer; font-size: var(--text-base); }
+.wsx-edit__aix:hover { background: var(--color-surface); color: var(--color-text); }
+.wsx-prop { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1.5px solid var(--color-primary); border-radius: var(--radius-md); background: var(--color-primary-light); }
+.wsx-prop__lbl { font: 600 var(--text-xs) var(--font-body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-primary); }
+.wsx-prop__ask { font-size: var(--text-xs); color: var(--color-text-tertiary); overflow-wrap: anywhere; }
+.wsx-prop__reply { font-size: var(--text-sm); line-height: 1.5; color: var(--color-text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.wsx-prop__seg { display: inline-flex; align-self: flex-start; gap: 2px; padding: 3px; border-radius: var(--radius-md); background: var(--color-surface); }
+.wsx-prop__seg button { border: 0; background: transparent; padding: 4px 12px; border-radius: calc(var(--radius-md) - 3px); font: 600 var(--text-xs) var(--font-body); color: var(--color-text-secondary); cursor: pointer; }
+.wsx-prop__seg button[aria-pressed="true"] { background: var(--color-bg-elevated); color: var(--color-text); box-shadow: var(--shadow-sm); }
+.wsx-prop__acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.wsx-prop__keep { padding: 8px 14px; border: 0; border-radius: var(--radius-md); background: var(--color-primary); color: var(--color-text-inverse); font: 600 var(--text-sm) var(--font-body); cursor: pointer; }
+.wsx-prop button:focus-visible, .wsx-edit__ai button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .wsx-edit__fmt { display: flex; gap: 6px; }
 .wsx-edit__fmt button { width: 38px; height: 34px; border: 1.5px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elevated); color: var(--color-text); cursor: pointer; font-size: var(--text-base); }
 .wsx-edit__fmt button:hover { border-color: var(--color-primary); color: var(--color-primary); }

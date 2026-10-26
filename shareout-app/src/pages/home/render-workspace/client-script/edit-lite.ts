@@ -83,6 +83,8 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
         rec.baseUpdatedAt = d.editor.draftUpdatedAt || null;
         rec.baseLiveAt = d.editor.baseLiveAt || null;
         rec.conflict = null; hideBar(rec);
+        if (rec.proposal) closeProposal(rec);
+        rec.aiNote = null;
         rec.loaded = true;
         rec.md = d.editor.kind === 'markdown' && d.editor.markdown ? d.editor.markdown : null;
         rec.srcDoc = new DOMParser().parseFromString(d.editor.html || '<!DOCTYPE html><html><head></head><body></body></html>', 'text/html');
@@ -95,7 +97,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
       .catch(function (e) { if (e !== 'forbidden') setSaveStatus(rec, t('edit.couldNotLoad'), 'warn'); });
   }
   // The policy is the first child of the parsed <head>, ahead of anything the page carries.
-  function editFrameHtml(srcDoc, slug) {
+  function editFrameHtml(srcDoc, slug, extraCss) {
     var root = srcDoc.documentElement.cloneNode(true), head = srcDoc.createElement('head');
     for (var c = root.firstElementChild; c; c = c.nextElementSibling) if (c.localName === 'head') { head = c; break; }
     root.insertBefore(head, root.firstChild);
@@ -104,7 +106,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
     csp.setAttribute('content', EDIT_CSP);
     base.setAttribute('href', '/a/' + slug + '/');
     css.setAttribute('data-wsx-edit', '1');
-    css.textContent = EDIT_CSS;
+    css.textContent = EDIT_CSS + (extraCss || '');
     head.insertBefore(css, head.firstChild);
     head.insertBefore(base, css);
     head.insertBefore(csp, base);
@@ -163,6 +165,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
     return rec.md ? null : el;
   }
   function editKeydown(rec, e) {
+    if (rec.proposal) { proposalKeydown(rec, e); return; }
     if (e.key === 'Escape') { var a = (rec.editframe.contentDocument || {}).activeElement; if (a && a.blur) a.blur(); setSel(rec, null); return; }
     var mod = e.metaKey || e.ctrlKey; if (!mod) return;
     var k = (e.key || '').toLowerCase();
@@ -196,89 +199,6 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
     s.parentNode.replaceChild(n, s);
     rec.pendingSel = n.getAttribute('data-wsx-id'); markDirty(rec); renderLive(rec);
   }
-  // ----- AI on selection (reuses the editor's /editor/chat/normal contract) -----
-  var AI_PRESET = {
-    rewrite: 'Rewrite the selected text to be clearer and more engaging. Keep the same meaning.',
-    shorten: 'Make the selected text shorter and punchier without losing the key point.',
-    grammar: 'Fix spelling and grammar in the selected text. Keep the wording and tone.',
-  };
-  function aiSectionHtml() {
-    return '<div class="wsx-edit__ai">'
-      + '<div class="lbl">\\u2728 ' + esc(t('edit.askAi')) + '</div>'
-      + '<div class="wsx-edit__aibtns"><button data-ai="rewrite" type="button">' + esc(t('edit.aiRewrite')) + '</button><button data-ai="shorten" type="button">' + esc(t('edit.aiShorten')) + '</button><button data-ai="grammar" type="button">' + esc(t('edit.aiGrammar')) + '</button><button data-ai="translate" type="button">' + esc(t('edit.aiTranslate')) + '</button></div>'
-      + '<div class="wsx-edit__airow"><input id="wsxAiPrompt" placeholder="' + esc(t('edit.aiPromptPh')) + '"><button class="wsx-edit__btn" id="wsxAiGo" type="button">' + esc(t('edit.aiGo')) + '</button></div>'
-      + '<div class="wsx-edit__aistat" id="wsxAiStat"></div></div>';
-  }
-  function wireAi(rec, el) {
-    rbodyEl.querySelectorAll('[data-ai]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var k = b.getAttribute('data-ai');
-        if (k === 'translate') { var lang = window.prompt(t('edit.translatePrompt'), t('edit.translateDefault')); if (!lang) return; aiAssist(rec, el, 'Translate the selected text to ' + lang + '. Keep its formatting.'); return; }
-        aiAssist(rec, el, AI_PRESET[k]);
-      });
-    });
-    var inp = document.getElementById('wsxAiPrompt'), go = document.getElementById('wsxAiGo');
-    function run() { var v = inp.value.trim(); if (v) aiAssist(rec, el, v); }
-    go.addEventListener('click', run);
-    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); run(); } });
-  }
-  var aiBusy = false;
-  function aiSetEnabled(on) { rbodyEl.querySelectorAll('[data-ai], #wsxAiGo').forEach(function (b) { try { b.disabled = !on; } catch (e) {} }); }
-  function aiAssist(rec, el, instruction) {
-    if (aiBusy) return;
-    if (!rec.srcDoc || !rec.art.id) return;
-    var src = srcOf(rec, el); if (!src) return;
-    aiBusy = true; aiSetEnabled(false);
-    var stat = document.getElementById('wsxAiStat'); if (stat) stat.textContent = t('edit.aiWorking');
-    var hadId = !!src.id; if (!src.id) src.id = 'wsxAiTarget';
-    var selector = '#' + src.id, meta = metaCache[rec.art.id] || {};
-    var body = { prompt: 'Only modify the selected element. ' + instruction, context: {
-      documentHtml: rec.srcDoc.documentElement.outerHTML,
-      artifact: { id: rec.art.id, name: rec.art.name || meta.name || 'Page', slug: rec.art.slug, description: meta.description || '' },
-      selection: { selector: selector, tagName: src.tagName.toLowerCase(), id: src.id, classes: [].slice.call(src.classList), textPreview: (src.textContent || '').slice(0, 200) },
-      selectedElements: [selector], htmlMode: 'full'
-    } };
-    function finish(msg) { aiBusy = false; var t = rec.srcDoc.getElementById('wsxAiTarget'); if (t && !hadId) t.removeAttribute('id'); if (msg) toast(msg); }
-    fetch('/v1/artifacts/' + encodeURIComponent(rec.art.id) + '/editor/chat/normal', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      .then(function (resp) {
-        if (!resp.ok || !resp.body) { if (stat) stat.textContent = t('edit.aiUnavailable'); aiBusy = false; aiSetEnabled(true); return; }
-        var applied = false, message = '';
-        return readStream(resp, function (ev) {
-          if (ev.type === 'done') {
-            applyAi(rec, ev.response); applied = true; message = (ev.response && ev.response.message) || '';
-            if (ev.changeId) fetch('/v1/artifacts/' + encodeURIComponent(rec.art.id) + '/editor/chat/apply', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ changeId: ev.changeId }) }).catch(function () {});
-          } else if (ev.type === 'error') { if (stat) stat.textContent = ev.message || t('edit.aiFailed'); }
-        }).then(function () { if (applied) { rec.pendingSel = null; markDirty(rec); pushHistory(rec); renderLive(rec); } finish(applied ? (message || t('edit.aiApplied')) : ''); });
-      })
-      .catch(function () { aiBusy = false; aiSetEnabled(true); if (stat) stat.textContent = t('create.connDropped'); });
-  }
-  // AI edits apply to the SOURCE doc; aiAssist re-renders the live preview after.
-  function applyAi(rec, resp) {
-    var sdoc = rec.srcDoc; if (!sdoc || !resp) return;
-    if (resp.html) {
-      try {
-        var parsed = new DOMParser().parseFromString(resp.html, 'text/html');
-        var pr = rec.md && parsed.querySelector('[data-md-root]');
-        if (rec.md) mdRoot(sdoc).innerHTML = pr ? pr.innerHTML : parsed.body.innerHTML;
-        else if (parsed.body) sdoc.body.innerHTML = parsed.body.innerHTML;
-      } catch (e) {}
-    } else if (resp.patches && resp.patches.length) {
-      resp.patches.forEach(function (p) {
-        var t = null; try { t = sdoc.querySelector(p.selector); } catch (e) {}
-        if (!t) t = sdoc.getElementById('wsxAiTarget');
-        if (!t) return;
-        try {
-          if (p.action === 'replace') t.outerHTML = p.content || '';
-          else if (p.action === 'insert') t.insertAdjacentHTML('beforeend', p.content || '');
-          else if (p.action === 'delete') t.remove();
-          else if (p.action === 'setAttribute') t.setAttribute(p.attribute, p.value);
-          else if (p.action === 'setStyle') t.style[p.attribute] = p.value;
-        } catch (e) {}
-      });
-    }
-    var tgt = sdoc.getElementById('wsxAiTarget'); if (tgt) tgt.removeAttribute('id');
-    rec.idCounter = stampTree(sdoc, rec.idCounter || 0); // stamp any AI-added nodes
-  }
   function boxSectionHtml(includeAlign) {
     return '<div class="wsx-edit__sec"><div class="lbl">' + esc(t('edit.background')) + '</div><div class="wsx-edit__inrow"><input type="color" id="wsxBg" title="' + esc(t('edit.backgroundColor')) + '"><button class="wsx-edit__btn" id="wsxBgClear" type="button">' + esc(t('edit.clear')) + '</button></div></div>'
       + '<div class="wsx-edit__sec"><div class="lbl">' + esc(t('edit.padding')) + '</div><select class="wsx-edit__sel" id="wsxPad"><option value="">' + esc(t('edit.default')) + '</option><option value="4px">XS</option><option value="8px">S</option><option value="16px">M</option><option value="24px">L</option><option value="40px">XL</option></select></div>'
@@ -300,9 +220,14 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
     if (panes[activeKey] === rec && rec.mode === 'edit') renderEditPanel(rec);
   }
   function renderEditPanel(rec) {
+    if (rec.proposal) { renderProposalPanel(rec); return; }
     var sel = rec.sel;
-    if (!sel) rbodyEl.innerHTML = '<div class="wsx-edit"><div class="wsx-edit__hint">' + t('edit.hintIdle') + '</div>'
-      + (rec.mdLocked ? '<div class="wsx-edit__hint">' + esc(t('edit.mdLocked')) + '</div>' : '') + '</div>';
+    if (!sel) {
+      rbodyEl.innerHTML = '<div class="wsx-edit"><div class="wsx-edit__hint">' + t('edit.hintIdle') + '</div>'
+        + aiSectionHtml(rec, 'page')
+        + (rec.mdLocked ? '<div class="wsx-edit__hint">' + esc(t('edit.mdLocked')) + '</div>' : '') + '</div>';
+      wireAi(rec, null);
+    }
     else if (sel.type === 'img') editPanelImg(rec, sel.el);
     else if (sel.type === 'link') editPanelLink(rec, sel.el);
     else if (sel.type === 'box') editPanelBox(rec, sel.el);
@@ -336,8 +261,8 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
     var on = rbodyEl.querySelector('.wsx-edit__node.is-on'); if (on) on.scrollIntoView({ block: 'nearest' });
   }
   function editPanelBox(rec, el) {
-    rbodyEl.innerHTML = '<div class="wsx-edit">' + editHeader(t('edit.block'), el.tagName.toLowerCase()) + boxSectionHtml(true) + EDIT_ACTIONS + '</div>';
-    wireBox(rec, el, true); wireEditActions(rec);
+    rbodyEl.innerHTML = '<div class="wsx-edit">' + editHeader(t('edit.block'), el.tagName.toLowerCase()) + aiSectionHtml(rec, 'box') + boxSectionHtml(true) + EDIT_ACTIONS + '</div>';
+    wireBox(rec, el, true); wireAi(rec, el); wireEditActions(rec);
   }
   var EDIT_ACTIONS = '<div class="wsx-edit__sec"><div class="lbl">' + esc(t('edit.element')) + '</div><div class="wsx-edit__inrow">'
     + '<button class="wsx-edit__btn sq" data-eact="up" title="' + esc(t('edit.moveUp')) + '" type="button">\\u2191</button>'
@@ -375,7 +300,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
       + (top ? '<div class="wsx-edit__sec"><div class="lbl">' + esc(t('edit.block')) + '</div><select class="wsx-edit__sel" id="wsxConv"><option value="">' + esc(t('edit.convertTo')) + '</option><option value="p">' + esc(t('edit.paragraph')) + '</option><option value="h1">' + esc(t('edit.heading')) + ' 1</option><option value="h2">' + esc(t('edit.heading')) + ' 2</option><option value="h3">' + esc(t('edit.heading')) + ' 3</option></select></div>' : '')
       + (md ? '' : '<div class="wsx-edit__sec"><div class="lbl">' + esc(t('edit.colorSize')) + '</div><div class="wsx-edit__inrow"><input type="color" id="wsxTxtColor" title="' + esc(t('edit.textColor')) + '"><select class="wsx-edit__sel" id="wsxTxtSize"><option value="">' + esc(t('edit.defaultSize')) + '</option><option value="0.85em">' + esc(t('edit.sizeS')) + '</option><option value="1em">' + esc(t('edit.sizeM')) + '</option><option value="1.25em">' + esc(t('edit.sizeL')) + '</option><option value="1.6em">' + esc(t('edit.sizeXL')) + '</option></select></div></div>')
       + '<div class="wsx-edit__hint">' + esc(t(md ? 'edit.hintTextMd' : 'edit.hintText')) + '</div>'
-      + aiSectionHtml()
+      + aiSectionHtml(rec, 'text')
       + (md ? '' : boxSectionHtml(true)) + EDIT_ACTIONS + '</div>';
     rbodyEl.querySelectorAll('[data-fmt]').forEach(function (b) {
       b.addEventListener('mousedown', function (e) { e.preventDefault(); });
@@ -407,6 +332,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
       + '<div class="wsx-edit__sec"><div class="lbl">URL</div><div class="wsx-edit__inrow"><input type="url" id="wsxLinkHref" placeholder="https://\\u2026"><button class="wsx-edit__btn" id="wsxLinkApply" type="button">' + esc(t('edit.apply')) + '</button></div></div>'
       + (rec.md ? '' : '<label class="wsx-edit__check"><input type="checkbox" id="wsxLinkBlank"' + (blank ? ' checked' : '') + '> ' + esc(t('edit.newTab')) + '</label>')
       + '<div class="wsx-edit__hint">' + esc(t('edit.hintLink')) + '</div>'
+      + aiSectionHtml(rec, 'link')
       + (rec.md ? '' : boxSectionHtml(false)) + EDIT_ACTIONS + '</div>';
     var inp = document.getElementById('wsxLinkHref'); inp.value = a.getAttribute('href') || '';
     function apply() { a.setAttribute('href', inp.value.trim()); markDirty(rec, a); }
@@ -416,7 +342,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
       document.getElementById('wsxLinkBlank').addEventListener('change', function (e) { if (e.target.checked) a.setAttribute('target', '_blank'); else a.removeAttribute('target'); markDirty(rec, a); });
       wireBox(rec, a, false);
     }
-    wireEditActions(rec);
+    wireAi(rec, a); wireEditActions(rec);
   }
   function editPanelImg(rec, img) {
     rbodyEl.innerHTML = '<div class="wsx-edit">'
@@ -425,6 +351,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
       + '<div class="wsx-edit__sec"><div class="lbl">' + esc(t('edit.imgSrc')) + '</div><div class="wsx-edit__inrow"><input type="url" id="wsxImgSrc" placeholder="' + esc(t('edit.imgUrlPh')) + '"><button class="wsx-edit__btn" id="wsxImgRep" type="button">' + esc(t('edit.set')) + '</button></div></div>'
       + '<button class="wsx-edit__btn full" id="wsxImgUp" type="button">' + esc(t('edit.uploadImg')) + '</button>'
       + '<div class="wsx-edit__sec"><div class="lbl">' + esc(t('edit.altText')) + '</div><input type="text" id="wsxImgAlt" placeholder="' + esc(t('edit.altPh')) + '"></div>'
+      + aiSectionHtml(rec, 'img')
       + (rec.md ? '' : boxSectionHtml(false)) + EDIT_ACTIONS + '</div>';
     var srcEl = document.getElementById('wsxImgSrc'); srcEl.value = img.getAttribute('src') || '';
     var thumb = rbodyEl.querySelector('.wsx-edit__thumb');
@@ -446,7 +373,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
       f.click();
     });
     if (!rec.md) wireBox(rec, img, false);
-    wireEditActions(rec);
+    wireAi(rec, img); wireEditActions(rec);
   }
   function markDirty(rec, el) {
     if (el) syncLiveToSource(rec, el);
@@ -493,6 +420,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
   }
   // opts.force: "Publish anyway" — skip the stale-base check, never the draft check.
   function publishEdit(rec, opts) {
+    if (rec.proposal) return;
     if (rec.conflict) { focusBar(rec); return; }
     var html = serializeClean(rec); if (html == null) return;
     if (rec.saveTimer) clearTimeout(rec.saveTimer);
