@@ -3,13 +3,10 @@ import './setup';
 import { describe, expect, it, vi } from 'vitest';
 import { handleTransferOwnership } from '../../../src/artifacts';
 import {
-  artifactRow,
   baseEnv,
   jsonBody,
   makeDbMock,
-  makeR2Mock,
   makeSlugsMock,
-  ownerRoleFirst,
   user,
 } from './shared';
 
@@ -137,7 +134,7 @@ describe('handleTransferOwnership', () => {
     const env = {
       ...baseEnv,
       DB: makeDbMock({
-        first: (sql, ...args) => {
+        first: (sql) => {
           if (sql.includes('owner_id FROM artifacts WHERE id = ?') && sql.includes('SELECT id')) {
             return { id: 'art_1', owner_id: 'usr_1' };
           }

@@ -6,14 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { HandlerMocks } from '../handlers';
 import worker from '../../../../src/index';
 import {
-  APEX,
-  SUB,
-  authed,
   createEnv,
-  fetchPath,
-  handlerTag,
-  githubState,
-  sheetsState,
 } from '../fixtures';
 
 export function registerScheduledCronTests(handlers: HandlerMocks): void {

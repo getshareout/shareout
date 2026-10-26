@@ -95,7 +95,7 @@ const SHARED_IMPORT = `import {
 } from './shared';`;
 
 for (let i = 0; i < SUITES.length; i++) {
-  const [label, file, handlerImport] = SUITES[i];
+  const [, file, handlerImport] = SUITES[i];
   const start = BOUNDARIES[i] - 1;
   const end = BOUNDARIES[i + 1] - 1;
   const body = lines.slice(start, end).join('\n');

@@ -169,7 +169,7 @@ function logProxyFailure(
 export async function handleProxy(
   request: Request,
   ctx: DataContext,
-  subPath: string
+  _subPath: string
 ): Promise<Response> {
   if (request.method !== 'GET') {
     return errorResponse({ ...DATA_ERRORS.METHOD_NOT_ALLOWED, message: 'Proxy only supports GET' }, ctx.origin);

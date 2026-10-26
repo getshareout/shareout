@@ -1,5 +1,5 @@
 import type { Env } from '../../types';
-import type { ArtifactCardItem, ChatReplyPort } from '../types';
+import type { ChatReplyPort } from '../types';
 import {
   MAX_MESSAGE_LEN,
   answerCallbackQuery,

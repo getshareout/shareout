@@ -11,8 +11,6 @@ import {
   createEnv,
   fetchPath,
   handlerTag,
-  githubState,
-  sheetsState,
 } from '../fixtures';
 
 export function registerJobsProxyLandingTests(handlers: HandlerMocks): void {

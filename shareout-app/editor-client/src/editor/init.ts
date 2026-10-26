@@ -22,9 +22,6 @@ import { openRailPanel } from '../rail/rail-panels';
 import { initPalette } from '../palette/palettes';
 import {
   markDirty,
-  saveDraft,
-  publish,
-  openPreview,
   setupDraftLifecycle,
 } from '../persistence/draft';
 import {
@@ -84,7 +81,6 @@ export function bootEditor(): void {
 
   let cleanupCanvasEvents: (() => void) | null = null;
   let cleanupCanvasResize: (() => void) | null = null;
-  let cleanupDraftLifecycle: (() => void) | null = null;
   let cleanupMutationObserver: (() => void) | null = null;
 
   // Yjs document for CRDT-based collaboration
@@ -211,7 +207,7 @@ export function bootEditor(): void {
         textCrdtManager.bindElement(el);
         mutationObserver.pause();
       },
-      onTextEditEnd: (el) => {
+      onTextEditEnd: () => {
         textCrdtManager.unbindElement();
         mutationObserver.resume();
       },
@@ -317,7 +313,7 @@ export function bootEditor(): void {
     runInitStep('Keyboard shortcuts', () => setupKeyboardShortcuts(ctx));
     runInitStep('Live collaboration', () => connectWebSocket(ctx));
 
-    cleanupDraftLifecycle = setupDraftLifecycle(ctx);
+    setupDraftLifecycle(ctx);
 
     log.info('init: complete');
   }

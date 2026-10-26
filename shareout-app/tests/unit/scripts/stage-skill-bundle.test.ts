@@ -29,7 +29,7 @@ describe('stage-skill-bundle determinism', () => {
 
     const withNonUtcTz = buildAndHash({ ...base, TZ: 'America/New_York' });
     const withNoTz = buildAndHash((() => {
-      const { TZ, ...rest } = base;
+      const { TZ: _TZ, ...rest } = base;
       return rest;
     })());
     const withUtcTz = buildAndHash({ ...base, TZ: 'UTC' });

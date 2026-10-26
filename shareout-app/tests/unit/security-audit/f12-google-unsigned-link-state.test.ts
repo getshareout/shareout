@@ -14,7 +14,7 @@ vi.mock('../../../src/starter-kit/schedule', () => ({ scheduleSeedStarterKit: vi
 import { applyMigrations, e as baseEnv } from '../helpers/migrated-db';
 import { handleGoogleCallback } from '../../../src/auth/google-oauth';
 import { COOKIE_NAME } from '../../../src/auth/constants';
-import { createSessionToken, verifySessionToken } from '../../../src/token';
+import { createSessionToken } from '../../../src/token';
 
 const e = {
   ...baseEnv,
@@ -36,12 +36,6 @@ function stubGoogle() {
 }
 const cb = (state?: Record<string, unknown>) =>
   new Request(`https://shareout.test/auth/callback?code=x${state ? `&state=${encodeURIComponent(btoa(JSON.stringify(state)))}` : ''}`);
-const cookieOf = (r: Response) => r.headers.getSetCookie().find((c) => c.startsWith(`${COOKIE_NAME}=`));
-async function sessionUser(r: Response) {
-  const c = cookieOf(r)!;
-  const tok = c.slice(COOKIE_NAME.length + 1).split(';')[0];
-  return verifySessionToken(tok, e as any);
-}
 
 beforeAll(applyMigrations);
 beforeEach(async () => {

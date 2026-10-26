@@ -1,6 +1,6 @@
 import type { ArtifactType, TypeMetadata } from '../types';
 import { brandFaviconHead } from '../brand';
-import { colors, fonts, radius, shadows, googleFontsPreconnect } from '../../packages/design-tokens/src/index';
+import { colors, radius, shadows, googleFontsPreconnect } from '../../packages/design-tokens/src/index';
 import { cssVariables } from '../design-system/base.css';
 import { componentStylesheet } from '../design-system/components/stylesheet';
 import { renderSocialMetaTags, type SocialPreview } from '../serve/social-meta';

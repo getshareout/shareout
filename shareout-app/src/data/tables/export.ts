@@ -1,4 +1,3 @@
-import { DATA_ERRORS } from '../../types';
 import { corsHeaders, errorResponse, type DataContext } from '../middleware';
 import { MAX_QUERY_LIMIT } from './constants';
 import { runScopedQuery } from './query';

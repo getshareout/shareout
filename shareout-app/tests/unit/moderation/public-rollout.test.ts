@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 
 import { isPublicRolloutKilled, setPublicRolloutKilled, checkPublicAutoRollback } from '../../../src/public-rollout';

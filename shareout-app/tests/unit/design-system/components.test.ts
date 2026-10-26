@@ -12,7 +12,7 @@ import {
   tableStyles,
   toastStyles,
 } from '../../../src/design-system/components';
-import { colors, fonts, layout, radius, spacing } from '../../../src/design-system/tokens';
+import { colors, fonts, layout, spacing } from '../../../src/design-system/tokens';
 
 describe('design-system components', () => {
   it('embeds token values in button styles', () => {

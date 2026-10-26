@@ -58,7 +58,6 @@ function loadLens(): Lens {
   });
   const names = ['kmState', 'kmLayout', 'kmPaintPanel', 'kmPaintFinder', 'kmRender', 'kmTypeLabel', 'kmRelLabel'];
   const body = 'with (scope) {\n' + mapJs + '\nreturn { ' + names.map((n) => n + ': ' + n).join(', ') + ' };\n}';
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval
   return new Function('scope', body)(scope) as Lens;
 }
 

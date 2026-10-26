@@ -248,6 +248,7 @@ describe('page agent: ?section= deep links (the frame #fragment)', () => {
   });
 
   it('the agent source is ASCII-only, so it survives pages of any charset', () => {
+    // eslint-disable-next-line no-control-regex
     expect(/^[\x00-\x7f]*$/.test(buildPageAgent('demo', BASE, 'a.html', 'index.html'))).toBe(true);
   });
 });

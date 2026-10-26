@@ -54,6 +54,7 @@ function cleanSegments(path: string): string[] {
 
 /** One stored path → a relative zip-safe path (safe paths come back unchanged). */
 export function exportPath(path: string): string {
+  // eslint-disable-next-line no-control-regex
   const stripped = path.replace(/\\/g, '/').replace(/[\u0000-\u001f\u007f-\u009f<>:"|?*]/g, '');
   let segs = cleanSegments(stripped);
   if (segs.join('/').length > MAX_PATH) segs = cleanSegments(clip(segs.join('/'), MAX_PATH));

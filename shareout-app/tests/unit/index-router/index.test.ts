@@ -284,7 +284,6 @@ vi.mock('../../../src/editor/index', () => ({
   serveEditorPage: handlers.serveEditorPage,
 }));
 
-import worker from '../../../src/index';
 import { registerAccountAuthTests } from './suites/account-auth';
 import { registerArtifactServingTests } from './suites/artifact-serving';
 import { registerBrowserAuthSdkTests } from './suites/browser-auth-sdk';

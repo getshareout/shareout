@@ -53,6 +53,6 @@ export function applyDragMove(
   return { state, moved: true };
 }
 
-export function endDrag(state: CanvasDragState): CanvasDragState {
+export function endDrag(_state: CanvasDragState): CanvasDragState {
   return createCanvasDragState();
 }

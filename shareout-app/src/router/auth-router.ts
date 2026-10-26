@@ -10,7 +10,6 @@ import {
   handleGetProfile,
   handleUpdateProfile,
   handleCreateAdminSession,
-  hashToken,
 } from '../api-auth';
 import { unauthorizedFor } from '../auth/unauthorized';
 import {

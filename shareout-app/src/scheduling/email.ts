@@ -190,7 +190,7 @@ export async function sendArtifactEmail(
   const artifactUrl = `${env.SHAREOUT_BASE_URL}/a/${artifact.slug || artifactId}/`;
   const copy = t(isLocale(artifact.locale) ? artifact.locale : 'en', DELIVERY_COPY);
 
-  let htmlContent = '';
+  let htmlContent: string;
   let textContent = '';
   let subjectContent = config.subject || '';
 

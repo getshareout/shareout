@@ -43,7 +43,6 @@ beforeEach(() => {
   } catch { /* storage unavailable */ }
   const { body, scripts } = buildWorkspaceView(args);
   document.body.innerHTML = body;
-  // eslint-disable-next-line no-eval
   (0, eval)(componentScripts);
   bootError = null;
   try { (0, eval)(scripts); } catch (e) { bootError = e; }

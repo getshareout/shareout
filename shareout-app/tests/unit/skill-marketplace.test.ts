@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { generateTypeMetadata, detectArtifactType } from '../../src/validation';
-import { handleAddDefaultSkill, skillPublishVisibility, handleListSkills, handleVoteSkill, workspaceHasTeamsPlan, handleAttachAgentSkill, buildAgentSkillsDoc } from '../../src/skill-marketplace';
+import { handleAddDefaultSkill, skillPublishVisibility, handleListSkills, handleVoteSkill, handleAttachAgentSkill, buildAgentSkillsDoc } from '../../src/skill-marketplace';
 import type { AuthUser } from '../../src/api-auth';
 import type { Env, FileEntry } from '../../src/types';
 

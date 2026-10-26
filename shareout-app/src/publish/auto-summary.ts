@@ -16,7 +16,6 @@ import { toMarkdown } from '../knowledge/corpus/ingest';
 import { localeForContent, summaryLanguageRule, type Locale } from '../i18n';
 
 const MAX_HTML_CHARS = 20_000; // keep the prompt bounded + cheap
-const MODEL_LABEL = 'artifact-summary';
 
 const SYSTEM = `You describe a published web page for a workspace's search index.
 Given its content (HTML, Markdown, CSV or text read from a PDF), respond with STRICT JSON only:

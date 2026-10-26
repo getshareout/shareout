@@ -21,7 +21,7 @@ function makeEnv(opts: {
   hasUserCreds?: boolean;
 }): Env {
   const prepare = vi.fn((sql: string) => ({
-    bind: (...bindings: unknown[]) => ({
+    bind: (..._bindings: unknown[]) => ({
       first: vi.fn(async () => {
         if (sql.includes('FROM workspace_members')) {
           const role = opts.role ?? 'member';

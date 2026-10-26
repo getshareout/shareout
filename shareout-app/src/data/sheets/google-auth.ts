@@ -12,12 +12,6 @@ interface TokenResponse {
   scope: string;
 }
 
-interface StoredTokens {
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: string;
-}
-
 export function getGoogleAuthUrl(env: Env, redirectPath: string, state: string): string {
   const params = new URLSearchParams({
     client_id: env.GOOGLE_CLIENT_ID || "",

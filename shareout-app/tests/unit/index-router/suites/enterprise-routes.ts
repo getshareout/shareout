@@ -2,20 +2,15 @@
  * Index router test suite: enterprise routes.
  * Registered from `index.test.ts` so Vitest hoists `vi.mock` in the entry file.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { HandlerMocks } from '../handlers';
 import {
-  APEX,
-  SUB,
   authed,
-  createEnv,
   fetchPath,
   handlerTag,
-  githubState,
-  sheetsState,
 } from '../fixtures';
 
-export function registerEnterpriseRoutesTests(handlers: HandlerMocks): void {
+export function registerEnterpriseRoutesTests(_handlers: HandlerMocks): void {
 describe('index router — enterprise routes', () => {
   // There are no plans in this build, so there is nothing to report or upgrade to.
   it('no longer routes account tier or upgrade', async () => {

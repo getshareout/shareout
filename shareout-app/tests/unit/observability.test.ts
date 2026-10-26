@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../src/types';
 
 const countExceededMemoryKills = vi.fn(async () => null as number | null);

@@ -83,6 +83,6 @@ export function migrateLegacyDataBinding(
     }
   }
 
-  const { dataBinding, ...rest } = config;
+  const { dataBinding: _dataBinding, ...rest } = config;
   return { config: rest, migrated: true };
 }

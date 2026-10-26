@@ -42,7 +42,7 @@ export async function getViewerConfig(env: Env, artifactId: string): Promise<Vie
     } catch {}
   }
 
-  let config = { ...DEFAULT_VIEWER_CONFIG };
+  let config: ViewerConfig;
   try {
     const row = await createMiniDb(env, artifactId, '').prepare(
       'SELECT value FROM artifact_json WHERE artifact_id = ? AND key = ?'

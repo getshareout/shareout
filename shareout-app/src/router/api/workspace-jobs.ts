@@ -72,7 +72,7 @@ export async function handleListWorkspaceSchedules(
   ).bind(workspaceId).all();
 
   const schedules = (rows.results || []).map((r) => {
-    let config: unknown = {};
+    let config: unknown;
     try { config = r.config ? JSON.parse(r.config as string) : {}; } catch { config = {}; }
     return { ...r, config, enabled: Boolean(r.enabled as number) };
   });
@@ -127,7 +127,7 @@ export async function handleToggleWorkspaceSchedule(
   const job = await jobInWorkspace(env, workspaceId, jobId);
   if (!job) return json({ error: 'Schedule not found', code: 'NOT_FOUND' }, 404);
 
-  let body: { enabled?: boolean; schedule?: string; title?: string | null; description?: string | null } = {};
+  let body: { enabled?: boolean; schedule?: string; title?: string | null; description?: string | null };
   try {
     body = (await request.json()) as { enabled?: boolean; schedule?: string; title?: string | null; description?: string | null };
   } catch {
@@ -263,7 +263,7 @@ export async function handleToggleWorkspaceAutomation(
   const trigger = await triggerInWorkspace(env, workspaceId, triggerId);
   if (!trigger) return json({ error: 'Automation not found', code: 'NOT_FOUND' }, 404);
 
-  let body: { enabled?: boolean } = {};
+  let body: { enabled?: boolean };
   try {
     body = (await request.json()) as { enabled?: boolean };
   } catch {

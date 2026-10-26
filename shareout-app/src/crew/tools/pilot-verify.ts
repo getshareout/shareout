@@ -13,7 +13,6 @@ const MAX_STEPS_CAP = 8;
 const RUN_TIMEOUT_MS = 90_000;
 const NAV_TIMEOUT_MS = 20_000;
 const CAPTURE_TTL_SEC = 300;
-const SESSION_TTL_SEC = 60 * 10;
 
 function clampSteps(raw: unknown): number {
   const n = typeof raw === 'number' && Number.isFinite(raw) ? Math.floor(raw) : MAX_STEPS_DEFAULT;

@@ -64,7 +64,7 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
   const { request, env, path, addCORS } = ctx;
 
   let workspaceId: string | null = null;
-  let rest = '';
+  let rest: string;
   let m = path.match(/^\/v1\/workspaces\/([^/]+)\/assets(\/.*)?$/);
   if (m) { workspaceId = m[1]; rest = m[2] || ''; }
   else {

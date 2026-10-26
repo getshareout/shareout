@@ -14,7 +14,7 @@ async function ownerRow(ctx: DataContext): Promise<PersonRow | null> {
 
 /** Artifact owner + workspace members + artifact collaborators, deduped by email. */
 export async function listPeople(ctx: DataContext): Promise<CommentPerson[]> {
-  let rows: PersonRow[] = [];
+  let rows: PersonRow[];
 
   if (ctx.workspaceId) {
     const result = await ctx.env.DB.prepare(`

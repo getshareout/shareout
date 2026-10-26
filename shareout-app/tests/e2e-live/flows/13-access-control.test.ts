@@ -54,7 +54,7 @@ describe(`13 agent access control @ ${baseUrl}`, () => {
   });
 
   it('owner lists both artifacts via API', async () => {
-    const { response, body } = await client.listArtifacts();
+    const { body } = await client.listArtifacts();
     const ids = body?.artifacts?.map((a) => a.id) ?? [];
     expect(ids).toContain(publicId);
     expect(ids).toContain(privateId);

@@ -350,7 +350,6 @@ describe('Phase 5 — file grants + portal files (work/042)', () => {
 describe('Client context notes (reuse Intelligence module, scoped to a sharee)', () => {
   const admin = { id: 'usr_owner', email: 'owner@x.com', username: null } as AuthUser;
   const member = { id: 'usr_mem', email: 'mem@x.com', username: null } as AuthUser;
-  const stranger = { id: 'usr_out', email: 'out@x.com', username: null } as AuthUser;
 
   beforeEach(async () => {
     await e.DB.exec(`INSERT INTO workspace_members (id, workspace_id, user_id, role, member_class) VALUES ('mo','${WS}','usr_owner','admin','internal'),('mm','${WS}','usr_mem','member','internal')`);

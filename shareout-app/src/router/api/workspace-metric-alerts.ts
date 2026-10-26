@@ -116,7 +116,7 @@ export async function handleToggleWorkspaceAlert(
   if (!(await ruleInWorkspace(env, workspaceId, ruleId))) {
     return json({ error: 'Alert not found', code: 'NOT_FOUND' }, 404);
   }
-  let body: { enabled?: boolean } = {};
+  let body: { enabled?: boolean };
   try {
     body = (await request.json()) as { enabled?: boolean };
   } catch {

@@ -1,7 +1,6 @@
-import { DATA_ERRORS } from '../../types';
 import { errorResponse, successResponse, type DataContext } from '../middleware';
 import { Errors } from '../errors';
-import { MAX_QUERY_LIMIT, MAX_ROW_SIZE, MAX_ROWS_PER_TABLE } from './constants';
+import { MAX_QUERY_LIMIT } from './constants';
 import { filterToSql } from './filter-sql';
 import { scopeClause } from './scope';
 import type { Filter, QueryBody, QueryResult } from './types';

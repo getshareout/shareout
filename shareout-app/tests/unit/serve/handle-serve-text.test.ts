@@ -1,16 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import './helpers/mocks';
 import {
-  ARTIFACT_ID,
-  BASE_URL,
   SLUG,
-  assetsEntry,
   createServeEnv,
   defaultDeployment,
-  readStreamResponse,
   serveRequest,
 } from './helpers/env';
-import { cacheStore, setupServeTestHooks } from './helpers/hooks';
+import { setupServeTestHooks } from './helpers/hooks';
 import { handleServeText } from '../../../src/serve';
 
 setupServeTestHooks();

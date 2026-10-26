@@ -464,7 +464,7 @@ export async function evaluateAndDeliver(
   const built = buildAlertText(rule, def, metric.value);
   const config = applyAlertMessage(rule.destination_kind, rule.destination_config, built);
   let delivered = false;
-  let error: string | null = null;
+  let error: string | null;
   try {
     const result = await destination.deliver(env, { artifactId: rule.artifact_id, createdBy: rule.owner_id, triggeredVia }, config);
     delivered = result.success;

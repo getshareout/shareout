@@ -57,6 +57,7 @@ export function normalizeGuestEmail(raw: unknown): string | null {
 }
 
 export function normalizeGuestName(raw: unknown): string | null {
+  // eslint-disable-next-line no-control-regex
   const name = typeof raw === 'string' ? raw.replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim() : '';
   return name ? name.slice(0, NAME_MAX) : null;
 }

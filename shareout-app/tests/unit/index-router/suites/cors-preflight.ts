@@ -2,20 +2,13 @@
  * Index router test suite: cors preflight.
  * Registered from `index.test.ts` so Vitest hoists `vi.mock` in the entry file.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { HandlerMocks } from '../handlers';
 import {
-  APEX,
-  SUB,
-  authed,
-  createEnv,
   fetchPath,
-  handlerTag,
-  githubState,
-  sheetsState,
 } from '../fixtures';
 
-export function registerCorsPreflightTests(handlers: HandlerMocks): void {
+export function registerCorsPreflightTests(_handlers: HandlerMocks): void {
 describe('index router — CORS and preflight', () => {
   it('handles OPTIONS preflight with wildcard when no Origin', async () => {
     const response = await fetchPath('/v1/artifacts', { method: 'OPTIONS' });

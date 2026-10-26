@@ -122,7 +122,7 @@ function generateIconList(baseUrl: string, slug: string): PWAManifest['icons'] {
   return icons;
 }
 
-function generateScreenshots(baseUrl: string, slug: string, themeColor: string): PWAManifest['screenshots'] {
+function generateScreenshots(baseUrl: string, slug: string, _themeColor: string): PWAManifest['screenshots'] {
   return [
     {
       src: `${baseUrl}/a/${slug}/_pwa/screenshot-mobile.png`,
@@ -307,7 +307,7 @@ self.addEventListener('message', event => {
 export async function handlePWAIcon(
   env: Env,
   slug: string,
-  size: number
+  _size: number
 ): Promise<Response> {
   // For now, we'll serve a placeholder or the original icon resized
   // In production, you'd want to pre-generate these or use a image processing service
@@ -405,7 +405,7 @@ function generatePlaceholderScreenshot(
   height: number,
   themeColor: string,
   bgColor: string,
-  appName: string
+  _appName: string
 ): Uint8Array {
   const rgb = hexToRgb(themeColor);
   const bgRgb = hexToRgb(bgColor);

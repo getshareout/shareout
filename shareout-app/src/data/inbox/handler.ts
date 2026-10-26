@@ -79,7 +79,7 @@ export async function handleInbox(
   }
 
   if (path === '/allowlist' && request.method === 'PUT') {
-    let allowlist: string[] | null = null;
+    let allowlist: string[] | null;
     try {
       const body = await request.json() as { allowlist?: string[] | null };
       allowlist = body?.allowlist ?? null;

@@ -1,15 +1,11 @@
 // @vitest-environment node
 import './setup';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { handleAddCollaborators } from '../../../src/artifacts';
 import {
-  artifactRow,
   baseEnv,
   jsonBody,
   makeDbMock,
-  makeR2Mock,
-  makeSlugsMock,
-  ownerRoleFirst,
   user,
 } from './shared';
 
@@ -169,7 +165,7 @@ describe('handleAddCollaborators', () => {
     const env = {
       ...baseEnv,
       DB: makeDbMock({
-        first: (sql, ...args) => {
+        first: (sql) => {
           if (sql.includes('auth_method FROM artifacts')) return { id: 'art_1', auth_method: 'google' };
           if (sql.includes('owner_id FROM artifacts')) return { owner_id: 'usr_1' };
           if (sql.includes('collaborators WHERE artifact_id = ? AND email = ?')) {

@@ -1,4 +1,3 @@
-import type { Env } from '../../types';
 import { DATA_ERRORS } from '../../types';
 import { generateId } from '../../crypto-utils';
 import { createLogger, logError } from '../../logging';
@@ -32,12 +31,6 @@ interface SecretRow {
   rate_limit_rpm: number;
   created_at: string;
   updated_at: string;
-}
-
-interface CredentialsRow {
-  id: string;
-  encrypted_data: string;
-  iv: string;
 }
 
 interface SecretConfig {
@@ -691,7 +684,7 @@ async function executeProxy(request: Request, ctx: DataContext, secretName: stri
 
   const start = Date.now();
   let statusCode: number | null = null;
-  let errorMsg: string | null = null;
+  let errorMsg: string | null;
 
   try {
     const response = await fetchCheckingRedirects(fetchUrl.toString(), {

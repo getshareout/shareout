@@ -204,7 +204,7 @@ import { makePresentation } from '../slides-mock-db';
 `;
 
 for (let i = 0; i < SUITES.length; i++) {
-  const [label, file, needsMocks] = SUITES[i];
+  const [, file, needsMocks] = SUITES[i];
   const start = BOUNDARIES[i] - 1;
   const end = BOUNDARIES[i + 1] - 1;
   let body = lines.slice(start, end).join('\n');

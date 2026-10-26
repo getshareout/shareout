@@ -55,6 +55,7 @@ function isTraversalOrAbsolute(path: string): boolean {
  */
 export function isSafeAssetPath(path: string): boolean {
   if (typeof path !== 'string' || !path || path.length > 512 || isTraversalOrAbsolute(path)) return false;
+  // eslint-disable-next-line no-control-regex
   if (path.includes('\\') || /[\u0000-\u001f\u007f]/.test(path)) return false;
   return !path.split('/').some((seg) => seg === '' || seg === '.');
 }

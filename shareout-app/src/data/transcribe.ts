@@ -58,7 +58,7 @@ export async function transcribeAudioBytes(
   }
   if (bytes.byteLength === 0) return { error: 'That recording was empty.' };
 
-  let text = '';
+  let text: string;
   try {
     const out = await env.AI.run(WHISPER_MODEL, { audio: bytesToBase64(bytes) } as never);
     text = extractText(out).trim();

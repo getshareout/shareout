@@ -1,16 +1,12 @@
 // @vitest-environment node
 import './setup';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { handleGetTags, handleAddTag, handleRemoveTag } from '../../../src/artifacts';
 import type { Env } from '../../../src/types';
 import {
-  artifactRow,
   baseEnv,
   jsonBody,
   makeDbMock,
-  makeR2Mock,
-  makeSlugsMock,
-  ownerRoleFirst,
   user,
 } from './shared';
 

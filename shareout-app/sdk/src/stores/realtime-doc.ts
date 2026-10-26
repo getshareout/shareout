@@ -111,12 +111,12 @@ export class RealtimeDoc {
     this.syncListeners.clear();
   }
 
-  array<T = unknown>(name: string): any {
+  array<_T = unknown>(name: string): any {
     this.ensureDoc();
     return this.doc.getArray(name);
   }
 
-  map<T = unknown>(name: string): any {
+  map<_T = unknown>(name: string): any {
     this.ensureDoc();
     return this.doc.getMap(name);
   }

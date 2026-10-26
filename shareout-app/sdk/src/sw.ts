@@ -19,11 +19,6 @@ const DATA_PATTERNS = [
 const MAX_CACHE_SIZE = 100;
 const DATA_MAX_AGE = 5 * 60 * 1000;
 
-interface CacheEntry {
-  response: Response;
-  timestamp: number;
-}
-
 sw.addEventListener('install', (event) => {
   event.waitUntil(
     Promise.all([

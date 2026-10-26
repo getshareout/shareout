@@ -64,6 +64,7 @@ function dropFieldCodes(s: string): string {
   return out;
 }
 
+/* eslint-disable no-control-regex -- .doc text uses control characters as structure marks */
 function clean(raw: string): string {
   return dropFieldCodes(raw)
     .replace(/\x07\x07/g, '\n') // end of a table row (cell mark + row mark)
@@ -76,6 +77,7 @@ function clean(raw: string): string {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
+/* eslint-enable no-control-regex */
 
 export const DOC_IMAGES_ONLY = 'Document has no extractable text (images/drawings only)';
 
@@ -163,6 +165,7 @@ function readDoc(bytes: Uint8Array): string {
     if (!STORIES[i].header) body = true;
   }
   // Body empty but anchors for pictures (0x01) or drawn objects (0x08): say why.
+  // eslint-disable-next-line no-control-regex
   if (!body && /[\x01\x08]/.test(all)) throw new DocReadError(DOC_IMAGES_ONLY);
   return stories.join('\n\n');
 }

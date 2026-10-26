@@ -27,11 +27,9 @@ import { handleUpdateArtifact } from '../../../src/artifacts';
 import { clearModerationHold } from '../../../src/moderation/check';
 import { MODERATION_PENDING_MESSAGE } from '../../../src/publish/deployment';
 import {
-  artifactRow,
   baseEnv,
   jsonBody,
   makeDbMock,
-  makeR2Mock,
   makeSlugsMock,
   ownerRoleFirst,
   user,

@@ -401,7 +401,7 @@ export async function buildLibraryApiDoc(
   targetArtifactId: string,
   targetWorkspaceId: string | null,
 ): Promise<string> {
-  let ownerId: string | null = null;
+  let ownerId: string | null;
   try {
     const art = await env.DB.prepare('SELECT owner_id FROM artifacts WHERE id = ?')
       .bind(targetArtifactId).first<{ owner_id: string | null }>();

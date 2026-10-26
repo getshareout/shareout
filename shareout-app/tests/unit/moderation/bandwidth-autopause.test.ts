@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { runBandwidthAutoPause } from '../../../src/moderation/maintenance';
 import type { Env } from '../../../src/types';
 

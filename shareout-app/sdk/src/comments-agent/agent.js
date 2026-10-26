@@ -38,7 +38,7 @@
   var rafScheduled = false;
 
   function send(msg) {
-    try { window.parent.postMessage(msg, '*'); } catch (e) {}
+    try { window.parent.postMessage(msg, '*'); } catch {}
   }
 
   // Build a CSS selector path to the nearest stable element.
@@ -106,7 +106,7 @@
     var x, y;
     var el = null;
     if (pos.selector) {
-      try { el = document.querySelector(pos.selector); } catch (e) { el = null; }
+      try { el = document.querySelector(pos.selector); } catch { el = null; }
     }
     if (el) {
       var rect = el.getBoundingClientRect();

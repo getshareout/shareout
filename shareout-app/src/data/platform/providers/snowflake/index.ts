@@ -1,7 +1,6 @@
 import { BaseProvider, type ProviderResponse } from '../base-provider';
 import type {
 	ProviderEndpoint,
-	AuthContext,
 	TokenResult,
 	ExecutionContext,
 	RequestParams,

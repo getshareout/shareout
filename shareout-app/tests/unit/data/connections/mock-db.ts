@@ -140,7 +140,7 @@ function dbFirst(
     cache: CacheRow[];
   },
 ): unknown {
-  const { connections, credentials, cache } = store;
+  const { connections, cache } = store;
 
   if (sql.includes('SELECT id FROM connections')) {
     const [artifactId, name] = args as [string, string];
@@ -192,7 +192,7 @@ function dbRun(
     cache: CacheRow[];
   },
 ): void {
-  const { connections, credentials, cache } = store;
+  const { connections, cache } = store;
 
   if (sql.includes('INSERT INTO connections')) {
     // (id, scope_id, name, provider, auth_type, config, encrypted, iv, ttl, rpm, created, updated)

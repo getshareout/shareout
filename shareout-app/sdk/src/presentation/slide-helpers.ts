@@ -279,7 +279,7 @@ export class SlideHelpers {
   spec(s: SlideSpec | string): string {
     if (typeof s === 'string') return s;
     if ('layout' in s) {
-      const { layout, notes, hidden, ...slots } = s;
+      const { layout, notes: _notes, hidden: _hidden, ...slots } = s;
       const fn = this.layout[layout] as ((opts: Record<string, unknown>) => string) | undefined;
       if (typeof fn !== 'function') throw new Error(`Unknown layout: ${String(layout)}`);
       return fn.call(this.layout, slots);

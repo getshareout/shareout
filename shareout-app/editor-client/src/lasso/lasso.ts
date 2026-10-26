@@ -73,7 +73,7 @@ export function activateLasso(ctx: EditorContext) {
     canvasCtx.stroke();
   });
 
-  overlay.addEventListener('mouseup', async (e) => {
+  overlay.addEventListener('mouseup', async () => {
     if (!isDrawing) return;
     isDrawing = false;
 

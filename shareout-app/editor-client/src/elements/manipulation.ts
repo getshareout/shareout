@@ -1,9 +1,4 @@
 import type { EditorContext } from '../editor/context';
-import { SDK_DETECTION_PATTERNS } from '../sdk-patterns';
-import { escapeHtml, rgbToHex } from '../utils';
-import { showToast } from '../toast';
-import { getElementSelector as buildElementSelector } from '../dom/element-selector';
-import { renderCanvas } from '../canvas/render-canvas';
 import { renderSelectionHandles } from '../canvas/selection';
 import { syncHtmlFromCanvas } from '../history/html-sync';
 import { pushUndo } from '../history/undo-redo';

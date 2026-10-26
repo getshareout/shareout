@@ -43,7 +43,7 @@ function browserData(canEditFolder: boolean) {
   };
 }
 
-async function openPanel(canEditFolder: boolean) {
+async function openPanel(_canEditFolder: boolean) {
   document.body.innerHTML = '<div id="wsx"><div id="home"></div><div id="wsxArtMount"></div></div><div id="modal"></div>';
   const base: Record<string, unknown> = {
     homePane: document.getElementById('home'), ws: document.getElementById('wsx'),

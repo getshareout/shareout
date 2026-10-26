@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Compute home CSS regression constants by reading generated section modules. */
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 

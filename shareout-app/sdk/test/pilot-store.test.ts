@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ShareOut, ShareOutError } from '../src/index';
+import { ShareOut } from '../src/index';
 import { _internal } from '../src/stores/pilot-store';
 
 function createSdk() {

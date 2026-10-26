@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { generateTypeMetadata, detectArtifactType, validatePublishRequest } from '../../src/validation';
-import { parseLibPath, handleServeLibModule, accountHasTeamsPlan, libModulePath, handleResolveLibrary, loadLibraryViewerMetrics, buildLibraryApiDoc } from '../../src/workspace-library';
+import { parseLibPath, handleServeLibModule, libModulePath, handleResolveLibrary, loadLibraryViewerMetrics, buildLibraryApiDoc } from '../../src/workspace-library';
 import { renderLibraryViewer } from '../../src/viewers/library-viewer';
 import { handleCreateLibraryModule } from '../../src/publish';
 import type { AuthUser } from '../../src/api-auth';

@@ -110,11 +110,11 @@ export class CommentsCoordinator implements DurableObject {
     }
   }
 
-  async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean): Promise<void> {
+  async webSocketClose(_ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): Promise<void> {
     this.broadcastPresence();
   }
 
-  async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
+  async webSocketError(_ws: WebSocket, _error: unknown): Promise<void> {
     // Error disconnect, no action needed
   }
 }

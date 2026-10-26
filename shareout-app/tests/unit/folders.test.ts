@@ -64,7 +64,7 @@ const folderRow = {
   subfolder_count: 0,
 };
 
-function folderDetailFirst(sql: string, ...args: unknown[]): unknown {
+function folderDetailFirst(sql: string, ..._args: unknown[]): unknown {
   if (sql.includes('FROM folders f') && sql.includes('JOIN workspaces')) {
     return folderRow;
   }
@@ -631,7 +631,7 @@ describe('handleUpdateFolder', () => {
     const env = {
       ...baseEnv,
       DB: makeDbMock({
-        first: (sql, ...args) => {
+        first: (sql) => {
           if (sql.includes('SELECT role FROM workspace_members')) return { role: 'member' };
           if (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?')) return { id: folderId, created_by: user.id };
           return null;
@@ -657,7 +657,7 @@ describe('handleUpdateFolder', () => {
     const env = {
       ...baseEnv,
       DB: makeDbMock({
-        first: (sql, ...args) => {
+        first: (sql) => {
           if (sql.includes('SELECT role FROM workspace_members')) return { role: 'member' };
           if (sql.includes('FROM folders WHERE id = ? AND workspace_id = ?') && !sql.includes('slug = ?')) {
             return { id: folderId, created_by: user.id };

@@ -276,7 +276,7 @@ function findNearestSelector(html: string, position: number): string {
 function extractSDKConfig(
   html: string,
   position: number,
-  type: SDKComponentType
+  _type: SDKComponentType
 ): Record<string, unknown> | undefined {
   // Extract configuration from SDK calls
   const after = html.substring(position, position + 1000);
@@ -311,7 +311,7 @@ function extractSDKConfig(
 function inferChartType(
   html: string,
   position: number,
-  library: ChartLibrary
+  _library: ChartLibrary
 ): string | undefined {
   const context = html.substring(Math.max(0, position - 100), position + 200);
 

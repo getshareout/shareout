@@ -1,8 +1,6 @@
 import type { EditorContext } from '../editor/context';
-import { SDK_DETECTION_PATTERNS } from '../sdk-patterns';
-import { escapeHtml, rgbToHex } from '../utils';
 import { showToast } from '../toast';
-import { getStableSelector, resolveElementBySelector, EDITOR_ID_ATTR } from '../dom/editor-ids';
+import { getStableSelector, resolveElementBySelector } from '../dom/editor-ids';
 import {
   createCollabConnectionIndicator,
   type CollabConnectionStatus,
@@ -295,7 +293,6 @@ export function renderInlineTextCursors(ctx: EditorContext, presences: CollabPre
     if (rects.length === 0) return;
 
     const rect = rects[0];
-    const frameRect = ctx.dom.canvasFrame.getBoundingClientRect();
 
     const cursor = doc.createElement('span');
     cursor.className = 'remote-text-cursor';

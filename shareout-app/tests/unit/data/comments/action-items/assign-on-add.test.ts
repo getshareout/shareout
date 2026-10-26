@@ -7,7 +7,7 @@ import '../setup';
 import { describe, expect, it } from 'vitest';
 import { handleComments } from '../../../../../src/data/comments';
 import { createSessionToken } from '../../../../../src/token';
-import { dispatchActionItemResolved, dispatchCommentNotify } from '../mocks';
+import { dispatchCommentNotify } from '../mocks';
 import { commentsRequest, createCommentsDb, ctxFromDb } from '../shared';
 
 describe('action items — assign on add', () => {

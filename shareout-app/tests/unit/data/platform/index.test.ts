@@ -10,7 +10,6 @@ import {
   BASE_URL,
   encryptTestCredentials,
   makeDataContext,
-  mockPlatformDb,
   parseJson,
   publicArtifactEnv,
   PLATFORM_OWNER_ID,

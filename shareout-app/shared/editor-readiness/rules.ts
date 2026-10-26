@@ -148,7 +148,7 @@ export const RULES: Rule[] = [
         const [type, name] = b.expr.split(':');
         if (!type || !name) return;
         const rootName = name.split('.')[0];
-        let exists = false;
+        let exists: boolean;
         switch (type) {
           case 'json': exists = m.manifest.jsonKeys.includes(rootName); break;
           case 'table': exists = m.manifest.tableNames.includes(rootName); break;

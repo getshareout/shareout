@@ -14,7 +14,6 @@ import { generateSlug } from '../validation';
 import { renderDeckHtml, type Deck, type DeckSlide } from './deck-template';
 
 const MAX_HTML_CHARS = 20_000; // keep the prompt bounded + cheap (matches auto-summary)
-const MODEL_LABEL = 'present-this';
 const MAX_SLIDES = 9;
 // Reasoning models spend max_tokens on thinking before the JSON; 1500 truncated the outline (502 PRESENT_FAILED).
 const MAX_OUTPUT_TOKENS = 8000;

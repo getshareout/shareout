@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { saveStatusView, type SaveState } from '../src/persistence/save-status';
+import { saveStatusView } from '../src/persistence/save-status';
 
 describe('saveStatusView (F4: classes must match CSS)', () => {
   it('maps each state to a distinct, CSS-backed class', () => {

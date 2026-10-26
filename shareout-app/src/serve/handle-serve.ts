@@ -143,7 +143,7 @@ export async function handleServe(
 
   // Combined query: artifact info + asset in single round-trip
   const targetPath = assetPath || null;
-  let result: ArtifactWithAsset | null = null;
+  let result: ArtifactWithAsset | null;
   // Mobile entrypoint asset, carried forward so the mobile branch below needs no
   // per-view query: from the cache on a hit, freshly fetched on a miss.
   let mobileEntryAsset: { r2_key: string; mime: string; size_bytes: number } | null = null;

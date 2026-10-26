@@ -1,28 +1,17 @@
 // @vitest-environment node
 import './sheets-test-setup';
-import { describe, expect, it, vi } from 'vitest';
-import * as auth from '../../../src/auth';
-import { decryptCredentials } from '../../../src/data/connections/credentials';
-import * as googleAuth from '../../../src/data/sheets/google-auth';
-import { handleSheets, handleSheetsOAuthCallback } from '../../../src/data/sheets/handler';
+import { describe, expect, it } from 'vitest';
+import { handleSheets } from '../../../src/data/sheets/handler';
 import {
   createSheetsDbState,
   makeSheetsTestEnv,
   sampleSheetConnection,
-  SHEETS_TEST_ARTIFACT_ID,
-  SHEETS_TEST_BASE_URL,
-  SHEETS_TEST_SPREADSHEET_ID,
 } from './sheets-mock-db';
 import {
-  ARTIFACT_ID,
-  BASE_URL,
   makeSheetsCtx,
-  mockFetchRouter,
   ownerAuthHeaders,
-  SHEETS_TEST_USER_ID as USER_ID,
   sheetsRequest,
   SPREADSHEET_ID,
-  storeArtifactToken,
 } from './sheets-test-helpers';
 
 const createDbState = createSheetsDbState;

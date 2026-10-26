@@ -7,7 +7,7 @@ import '../setup';
 import { describe, expect, it } from 'vitest';
 import { handleComments } from '../../../../../src/data/comments';
 import { createSessionToken } from '../../../../../src/token';
-import { dispatchActionItemResolved, dispatchCommentNotify } from '../mocks';
+import { dispatchActionItemResolved } from '../mocks';
 import { ARTIFACT_ID, ROOT_COMMENT, commentsRequest, createCommentsDb, ctxFromDb } from '../shared';
 
 describe('action items — resolve by assignee + notify', () => {

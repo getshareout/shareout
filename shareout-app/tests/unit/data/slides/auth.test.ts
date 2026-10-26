@@ -6,8 +6,8 @@ import * as middleware from '../../../../src/data/middleware';
 import { canEditPresentation, canEditSlide, getSession } from '../../../../src/data/slides/auth';
 import { makeSlide } from '../slides-mock-db';
 import type { Env } from '../../../../src/types';
-import { createSlidesDb, makePresentation } from '../slides-mock-db';
-import { ARTIFACT_ID, PRES_ID, makeCtx } from './shared';
+import { createSlidesDb } from '../slides-mock-db';
+import { PRES_ID, makeCtx } from './shared';
 
 
 describe('slides auth', () => {

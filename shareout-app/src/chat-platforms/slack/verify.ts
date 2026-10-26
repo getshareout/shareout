@@ -1,4 +1,3 @@
-import type { Env } from '../../types';
 
 const MAX_AGE_SECONDS = 60 * 5;
 

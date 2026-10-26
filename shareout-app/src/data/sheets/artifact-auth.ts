@@ -1,5 +1,4 @@
 import type { Env } from '../../types';
-import { DATA_ERRORS } from '../../types';
 import { createLogger, logError } from '../../logging';
 import { successResponse, errorResponse, verifyOwner, type DataContext } from '../middleware';
 import { getGoogleAuthUrl, exchangeCodeForTokens } from './google-auth';

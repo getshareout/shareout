@@ -486,7 +486,7 @@ function generateReadme(
   name: string,
   version: number,
   baseUrl: string,
-  artifactId: string
+  _artifactId: string
 ): string {
   const timestamp = new Date().toISOString();
   return `# ${name}

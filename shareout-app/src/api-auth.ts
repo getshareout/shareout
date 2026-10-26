@@ -8,7 +8,6 @@ import { jsonWithApiErrors } from './http/api-error';
 import { deferWork } from './kv-cache';
 import { evictUserTokens, isKnownBadToken, readCachedToken, rememberBadToken, writeCachedToken } from './auth/token-cache';
 
-const RATE_LIMIT_WINDOW = 60 * 60 * 24; // 24 hours in seconds
 export const RATE_LIMIT_MAX = 100; // publishes per day
 
 export type ServiceScope = 'artifacts:read' | 'artifacts:publish' | 'data:read' | 'data:write';
@@ -575,7 +574,6 @@ export async function handleCreateAdminSession(
 
   const sessionToken = generateAdminToken();
   const sessionId = generateId('adm');
-  const now = new Date().toISOString();
   const expiresAt = new Date(Date.now() + ADMIN_SESSION_EXPIRY * 1000).toISOString();
   const ip = request.headers.get('cf-connecting-ip') || null;
 

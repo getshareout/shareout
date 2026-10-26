@@ -17,7 +17,6 @@ import {
   ARTIFACT_ID,
   CREDENTIALS_KEY,
   encryptTestCredentials,
-  mockPlatformDb,
   publicArtifactEnv,
 } from './helpers';
 

@@ -1,7 +1,7 @@
 import type { Env, TypeMetadata } from '../types';
 import { trackPageView } from '../analytics';
 import { trackViewerView } from '../view-tracking';
-import { hasCustomViewer, renderViewer, viewerScriptCsp } from '../viewers';
+import { renderViewer, viewerScriptCsp } from '../viewers';
 import type { ViewerSource } from '../viewers/viewer-shell';
 import { generateTypeMetadata } from '../validation';
 import { loadSkillViewerMetrics } from '../skill-marketplace';

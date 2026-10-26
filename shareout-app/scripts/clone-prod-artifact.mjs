@@ -10,9 +10,6 @@
  * - The artifact's embedded bootstrap JSON contains a baseUrl; we rewrite it to point at your local worker.
  */
 import process from 'node:process';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 
 function arg(name) {
   const idx = process.argv.indexOf(name);
@@ -37,7 +34,6 @@ if (!token) {
 
 const sourceBase = 'https://shareout.site';
 const htmlUrl = `${sourceBase}/a/${encodeURIComponent(sourceSlug)}/`;
-const appUrl = `${sourceBase}/a/${encodeURIComponent(sourceSlug)}/js/app.js?_raw`;
 const rawIndexUrl = `${sourceBase}/a/${encodeURIComponent(sourceSlug)}/index.html?_raw`;
 
 async function fetchText(url) {
