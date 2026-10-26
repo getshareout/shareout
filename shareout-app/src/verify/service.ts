@@ -12,8 +12,10 @@ import { normalizeVisibility } from '../visibility-config';
 import { hasMcpCapability } from '../mcp-broker/capabilities';
 import { artifactContentHost, getArtifactCspOrigin, getSandboxedCSP } from '../serve/security';
 import { captureUrl } from '../screenshots';
+import { captureOwnHosts } from '../screenshots/request-policy';
+import { parseCsp } from '../screenshots/csp';
+import { mintCaptureCredentials } from '../auth/capture-session';
 import { checkVerifyLimit, incrementVerifyLimit } from './limits';
-import { parseCsp } from './request-policy';
 import { renderForVerify, type RenderPlan } from './run';
 import { buildResult } from './report';
 import { sourceIssues, type SourceFile } from './source-checks';
@@ -184,10 +186,14 @@ async function renderPlan(
     basePath = `/${ct}`;
     base = `https://${host}${basePath}`;
   }
-  const url = await captureUrl(env, artifact.id, artifact.slug, input.live ? undefined : version.id, base);
+  // A capture link (opens the capture view and, below, the page's own files — never a
+  // data credential) and the read-only session the renderer attaches to this artifact's
+  // data requests, both minted for one capture window (auth/capture-session.ts).
+  const { link, session } = await mintCaptureCredentials(env, artifact.id);
+  const url = captureUrl(link, base, input.live ? undefined : version.id);
   const pageOrigin = new URL(url).origin;
   const fileQuery = new URLSearchParams();
-  if (!input.live || (!host && !input.isPublic)) fileQuery.set('_capture', new URL(url).searchParams.get('_capture') ?? '');
+  if (!input.live || (!host && !input.isPublic)) fileQuery.set('_capture', link);
   if (!input.live) fileQuery.set('_ver', version.id);
   return {
     artifactId: artifact.id,
@@ -201,11 +207,9 @@ async function renderPlan(
     basePath,
     platformOrigin,
     fileQuery: fileQuery.toString() || null,
-    policy: {
-      pageOrigin,
-      ownHosts: [new URL(platformOrigin).hostname, new URL(url).hostname],
-      csp: parseCsp(getSandboxedCSP(getArtifactCspOrigin(env), !input.isPublic, env, input.lockCsp)),
-    },
+    ownHosts: [...new Set([...captureOwnHosts(env), new URL(url).hostname.toLowerCase()])],
+    csp: parseCsp(getSandboxedCSP(getArtifactCspOrigin(env), !input.isPublic, env, input.lockCsp)),
+    dataSession: { token: session, artifactId: artifact.id, origin: platformOrigin },
     viewports: input.viewports,
     fullPage: input.fullPage,
     refreshThumbnail: input.refreshThumbnail && input.live && input.viewports.includes('desktop'),

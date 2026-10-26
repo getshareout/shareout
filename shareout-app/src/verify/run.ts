@@ -1,15 +1,18 @@
 // The browser half of verify: one Browser Rendering session, one fresh browser context
 // per viewport (desktop 1280×800 @1x, phone 390×844 @2x), run side by side. Each
 // context opens the artifact's capture view on its content origin with no app session,
-// behaves like the viewer's sandbox (installViewerEmulation), enforces the viewer's
-// CSP (request-policy) and records what broke. Pure collection — report.ts classifies.
+// behaves like the viewer's sandbox (installViewerEmulation), runs under the shared
+// capture request policy with verify's stricter rules (the main frame stays on the page,
+// the viewers' CSP is enforced) and records what broke. Pure collection — report.ts
+// classifies.
 import type { Env } from '../types';
 import {
   captureThumbnailShots, growToContentHeight, storeThumbnail, THUMBNAIL_VIEWPORT, waitForArtifactReady, withArtifactBrowser,
   type RenderBrowser, type RenderPage,
 } from '../screenshots';
 import { collectPageSignals, installViewerEmulation, runAxe, type CollectedPage } from './in-page';
-import { decideRequest, isPrivateNetworkHost, type RequestPolicy } from './request-policy';
+import { guardCapturePage, type CaptureDataSession } from '../screenshots/request-policy';
+import type { CspPolicy } from '../screenshots/csp';
 import type { BlockedSignal, ConsoleSignal, PageErrorSignal, PageSignals, RequestSignal, Viewport, ViewportSpec } from './types';
 import { VIEWPORTS } from './types';
 
@@ -39,8 +42,12 @@ export interface RenderPlan {
   platformOrigin: string;
   /** Appended to the page's own file requests (capture token, pinned version), or null. */
   fileQuery: string | null;
-  /** Request policy; each viewport adds its own target URL. */
-  policy: Omit<RequestPolicy, 'targetUrl'>;
+  /** This instance's hosts, exempt from the private-network rule. */
+  ownHosts: string[];
+  /** The Content-Security-Policy this page's viewers get. */
+  csp: CspPolicy;
+  /** The read-only session attached to this artifact's data requests (never in the page). */
+  dataSession: CaptureDataSession;
   viewports: Viewport[];
   fullPage: boolean;
   refreshThumbnail: boolean;
@@ -145,13 +152,11 @@ interface Tracker {
   bytes(): number | null;
   requests: number;
   pending: Array<Promise<void>>;
-  /** A response came from a private address (a public name resolving inward). */
-  privateAddress: string | null;
 }
 
 /** Byte counts and exceptions (with url:line:col, syntax errors included) from a CDP session. */
-async function track(page: RenderPage, s: PageSignals, plan: PageView, ownHosts: string[], isTooling: (url: string) => boolean): Promise<Tracker> {
-  const tracker: Tracker = { bytes: () => null, requests: 0, pending: [], privateAddress: null };
+async function track(page: RenderPage, s: PageSignals, plan: PageView, isTooling: (url: string) => boolean): Promise<Tracker> {
+  const tracker: Tracker = { bytes: () => null, requests: 0, pending: [] };
   const addError = (raw: string, url: string | undefined, line?: number, col?: number) => {
     if (url && isTooling(url)) return;
     const message = scrub(raw).slice(0, 300);
@@ -164,12 +169,6 @@ async function track(page: RenderPage, s: PageSignals, plan: PageView, ownHosts:
     await cdp.send('Runtime.enable');
     let bytes = 0;
     cdp.on('Network.loadingFinished', (e: { encodedDataLength?: number }) => { bytes += e.encodedDataLength || 0; });
-    cdp.on('Network.responseReceived', (e: { response?: { url?: string; remoteIPAddress?: string } }) => {
-      const ip = e.response?.remoteIPAddress;
-      let host = '';
-      try { host = new URL(e.response?.url || '').hostname.toLowerCase(); } catch { /* not a URL */ }
-      if (ip && isPrivateNetworkHost(ip) && !ownHosts.includes(host)) tracker.privateAddress = ip;
-    });
     cdp.on('Runtime.exceptionThrown', (e: { exceptionDetails: any }) => {
       const d = e.exceptionDetails || {};
       const ex = d.exception || {};
@@ -272,7 +271,6 @@ interface InspectOptions {
 async function inspect(env: Env, browser: RenderBrowser, spec: ViewportSpec, plan: RenderPlan, opts: InspectOptions): Promise<PageSignals> {
   const target = plan.targets[spec.name];
   const view: PageView = { pageOrigin: plan.pageOrigin, basePath: plan.basePath, entrypoint: target.entrypoint, platformOrigin: plan.platformOrigin };
-  const policy: RequestPolicy = { ...plan.policy, targetUrl: target.url };
   const s = emptySignals(spec.name, target.entrypoint);
   const axeUrl = `${plan.pageOrigin}${AXE_PATH}`;
   // Our own injected script — also where /vendor redirects it (VENDOR_LIBS_DISABLED). Exact
@@ -287,29 +285,24 @@ async function inspect(env: Env, browser: RenderBrowser, spec: ViewportSpec, pla
       await page.setUserAgent(spec.mobile ? mobileUserAgent(opts.userAgent) : opts.userAgent.replace('HeadlessChrome', 'Chrome'));
     }
     await page.evaluateOnNewDocument(installViewerEmulation);
-    const tracker = await track(page, s, view, policy.ownHosts, isTooling);
+    const tracker = await track(page, s, view, isTooling);
     listen(page, s, view, tracker, isTooling);
-    await page.setRequestInterception(true);
-    page.on('request', (req) => {
-      if (req.isInterceptResolutionHandled()) return;
-      const url = req.url();
-      if (isTooling(url)) {
-        req.continue().catch(noop);
-        return;
-      }
-      const mainFrameNavigation = req.isNavigationRequest() && req.frame() === page.mainFrame();
-      const verdict = decideRequest(policy, { url, resourceType: req.resourceType(), mainFrameNavigation });
-      if (verdict.allow) {
-        if (!/^(data|blob):/.test(url)) tracker.requests++;
-        // The page's own files carry the capture token (and pinned version) the server needs
-        // to serve them from that version, or without a session cookie on a private page.
-        const own = mainFrameNavigation ? null : withFileQuery(url, plan);
-        req.continue(own ? { url: own } : undefined).catch(noop);
-        return;
-      }
-      const entry: BlockedSignal = { reason: verdict.reason, url: displayUrl(url, view), type: req.resourceType(), directive: verdict.directive, count: 1 };
-      bump(s.blocked, entry, (b) => b.reason === entry.reason && b.url === entry.url);
-      req.abort('blockedbyclient').catch(noop);
+    const guard = await guardCapturePage(page, plan.ownHosts, {
+      dataSession: plan.dataSession,
+      rules: { mainFrameUrl: target.url, csp: { policy: plan.csp, selfOrigin: plan.pageOrigin } },
+      // The page's own files carry the capture link (and pinned version) the server needs
+      // to serve them from that version, or without a session cookie on a private page.
+      rewriteUrl: (url) => withFileQuery(url, plan),
+      onRequest: (req, verdict) => {
+        const url = req.url();
+        if (isTooling(url)) return;
+        if (verdict.allow) {
+          if (!/^(data|blob):/.test(url)) tracker.requests++;
+          return;
+        }
+        const entry: BlockedSignal = { reason: verdict.reason, url: displayUrl(url, view), type: req.resourceType(), directive: verdict.directive, count: 1 };
+        bump(s.blocked, entry, (b) => b.reason === entry.reason && b.url === entry.url);
+      },
     });
 
     const t0 = Date.now();
@@ -342,7 +335,7 @@ async function inspect(env: Env, browser: RenderBrowser, spec: ViewportSpec, pla
           ?? { error: 'timed out' }
         : { error: 'axe-core could not be loaded' };
     }
-    if (spec.name === 'desktop' && plan.refreshThumbnail && !tracker.privateAddress) {
+    if (spec.name === 'desktop' && plan.refreshThumbnail && !guard.privateResponse()) {
       await page.setViewport(THUMBNAIL_VIEWPORT);
       await new Promise((r) => setTimeout(r, 300));
       await storeThumbnail(env, plan.artifactId, await captureThumbnailShots(page));
@@ -354,9 +347,10 @@ async function inspect(env: Env, browser: RenderBrowser, spec: ViewportSpec, pla
     }
     if (plan.fullPage) s.screenshot = await shoot(page, spec, true);
     await withTimeout(Promise.all(tracker.pending), 2000);
-    if (tracker.privateAddress) {
+    const privateAddress = guard.privateResponse();
+    if (privateAddress) {
       // Never hand back what a private-network response may have put on the page.
-      return { ...emptySignals(spec.name, target.entrypoint), renderError: `Results withheld: the page loaded content from a private network address (${tracker.privateAddress})` };
+      return { ...emptySignals(spec.name, target.entrypoint), renderError: `Results withheld: the page loaded content from a private network address (${privateAddress})` };
     }
     return s;
   } finally {

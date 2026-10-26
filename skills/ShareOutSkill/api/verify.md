@@ -103,8 +103,10 @@ Owners and editors of the page only. A workspace Agent token (`sot_`) needs
 ## How it renders (what is and is not a defect)
 
 - The page opens on its own content origin, in a fresh browser with **no ShareOut
-  session**, exactly as a viewer's sandboxed frame would load it; its data reads run as
-  the page owner, **read-only**.
+  session**, exactly as a viewer's sandboxed frame would load it. Its data reads carry a
+  short **read-only** session for this page alone, attached by the renderer (page
+  scripts never see it) and tied to no person: reads that depend on who the viewer is
+  do not resolve in the render.
 - Requests leave only for the page itself: no navigation to other sites, no private
   network addresses, no popups.
 - Writes and emails the page makes while loading are refused — a `write_skipped` note,

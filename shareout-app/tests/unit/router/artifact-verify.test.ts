@@ -324,10 +324,17 @@ describe('render plan', () => {
     expect(url.pathname).toMatch(/^\/c\/[^/]+\/$/);
     expect(url.searchParams.has('_capture')).toBe(true);
     expect(plan.basePath).toBe(url.pathname);
-    expect(plan.policy.csp.get('script-src')).toContain('https:');
+    expect(plan.csp.get('script-src')).toContain('https:');
     expect(plan.refreshThumbnail).toBe(true);
     expect(plan.fileQuery).toBeNull(); // the capability prefix already authorizes its files
     expect(plan.targets.mobile).toEqual(plan.targets.desktop);
+    expect(plan.ownHosts).toEqual(expect.arrayContaining(['shareout.test', url.hostname]));
+    // Data reads ride a read-only capture session the renderer attaches to this
+    // artifact's /v1/data requests; the page itself never holds it.
+    expect(plan.dataSession).toEqual({ token: expect.any(String), artifactId: ART, origin: 'https://shareout.test' });
+    const session = JSON.parse(atob(plan.dataSession.token.split('.')[0]));
+    expect(session).toMatchObject({ artifactId: ART, authType: 'owner_test' });
+    expect(session).not.toHaveProperty('email');
 
     const page = await handleFetch(new Request(plan.targets.desktop.url), cdnEnv());
     expect(page.status).toBe(200);
@@ -345,7 +352,7 @@ describe('render plan', () => {
     const url = new URL(plan.targets.desktop.url);
     expect(url.pathname).toBe('/');
     expect(url.searchParams.get('_ver')).toBe(`ver_${ART}_1`);
-    expect(plan.policy.csp.get('script-src')).not.toContain('https:');
+    expect(plan.csp.get('script-src')).not.toContain('https:');
     expect(plan.refreshThumbnail).toBe(false);
     const query = new URLSearchParams(plan.fileQuery!);
     expect(query.get('_ver')).toBe(`ver_${ART}_1`);

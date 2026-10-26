@@ -9,7 +9,10 @@ import type { Env } from '../../src/types';
 
 vi.mock('@cloudflare/puppeteer', () => ({ default: { launch: vi.fn() } }));
 // Keep every step on the fake clock: real HMAC signing would resolve outside it.
-vi.mock('../../src/token', () => ({ createAccessToken: async () => 'capture-token' }));
+vi.mock('../../src/auth/capture-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/auth/capture-session')>()),
+  mintCaptureCredentials: async () => ({ link: 'capture-link', session: 'capture-session' }),
+}));
 
 const IDLE_MS = 1000; // waitForNetworkIdle idleTime
 const THUMB_SETTLE_MS = 1500;
@@ -20,6 +23,10 @@ const CARD_PAUSE_MS = 200;
 function fakePage(flagAt: number | null) {
   return {
     setViewport: vi.fn(async () => {}),
+    // The capture request policy (no request is ever emitted here).
+    setBypassServiceWorker: vi.fn(async () => {}),
+    setRequestInterception: vi.fn(async () => {}),
+    on: vi.fn(),
     goto: vi.fn(async () => null),
     waitForFunction: vi.fn((_expr: string, { timeout }: { timeout: number }) => new Promise((resolve, reject) => {
       if (flagAt !== null && flagAt <= timeout) setTimeout(() => resolve(true), flagAt);

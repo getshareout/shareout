@@ -6,7 +6,9 @@ import {
   decideCaptureRequest,
   guardCapturePage,
   isPrivateNetworkHost,
+  type CaptureRules,
 } from '../../../src/screenshots/request-policy';
+import { parseCsp } from '../../../src/screenshots/csp';
 import type { Env } from '../../../src/types';
 
 describe('isPrivateNetworkHost', () => {
@@ -71,9 +73,12 @@ describe('captureOwnHosts', () => {
 
 type Handler = (arg: unknown) => void;
 
+const MAIN_FRAME = { name: 'main' };
+
 function fakePage() {
   const handlers: Record<string, Handler[]> = {};
   const page = {
+    mainFrame: () => MAIN_FRAME,
     setBypassServiceWorker: vi.fn(async () => {}),
     setRequestInterception: vi.fn(async () => {}),
     on: vi.fn((event: string, handler: Handler) => {
@@ -90,7 +95,7 @@ function fakeRequest(url: string, headers: Record<string, string> = {}) {
     url: () => url,
     headers: () => headers,
     isInterceptResolutionHandled: () => false,
-    continue: vi.fn(async (_overrides?: { headers?: Record<string, string> }) => {}),
+    continue: vi.fn(async (_overrides?: { headers?: Record<string, string>; url?: string }) => {}),
     abort: vi.fn(async () => {}),
   };
 }
@@ -198,5 +203,84 @@ describe('guardCapturePage with a data session', () => {
     emit('request', asset);
     expect(data.continue).toHaveBeenCalledWith({ headers: { authorization: 'Bearer sess.sig' } });
     expect(asset.continue).toHaveBeenCalledWith();
+  });
+});
+
+const PAGE = 'https://1abc2def3456789012345678.cdn.example';
+const TARGET = `${PAGE}/c/ct/?_capture=link`;
+const STRICT: CaptureRules = {
+  mainFrameUrl: TARGET,
+  csp: { policy: parseCsp("script-src 'self' https://cdn.jsdelivr.net; img-src https: data:"), selfOrigin: PAGE },
+};
+const kind = (resourceType: string, mainFrameNavigation = false) => ({ resourceType, mainFrameNavigation });
+
+describe('decideCaptureRequest with stricter rules', () => {
+  const own = new Set(['shareout.example', new URL(PAGE).hostname]);
+
+  it('lets the main frame load only the page itself', () => {
+    expect(decideCaptureRequest(TARGET, own, STRICT, kind('document', true))).toEqual({ allow: true });
+    expect(decideCaptureRequest('https://example.com/', own, STRICT, kind('document', true)))
+      .toEqual({ allow: false, reason: 'navigation' });
+  });
+
+  it("applies the viewers' CSP per resource type", () => {
+    expect(decideCaptureRequest('https://evil-cdn.example.net/lib.js', own, STRICT, kind('script')))
+      .toEqual({ allow: false, reason: 'csp', directive: 'script-src' });
+    expect(decideCaptureRequest('https://cdn.jsdelivr.net/npm/x@1/x.js', own, STRICT, kind('script'))).toEqual({ allow: true });
+    expect(decideCaptureRequest(`${PAGE}/c/ct/app.js`, own, STRICT, kind('script'))).toEqual({ allow: true });
+    expect(decideCaptureRequest('data:image/png;base64,AA==', own, STRICT, kind('image'))).toEqual({ allow: true });
+  });
+
+  it('keeps the base rules', () => {
+    expect(decideCaptureRequest('http://169.254.169.254/latest/meta-data', own, STRICT, kind('fetch')))
+      .toEqual({ allow: false, reason: 'private_network' });
+    expect(decideCaptureRequest('file:///etc/passwd', own, STRICT, kind('fetch'))).toEqual({ allow: false, reason: 'scheme' });
+  });
+});
+
+function strictRequest(url: string, resourceType: string, mainFrameNavigation = false) {
+  return {
+    ...fakeRequest(url),
+    resourceType: () => resourceType,
+    isNavigationRequest: () => mainFrameNavigation,
+    frame: () => (mainFrameNavigation ? MAIN_FRAME : null),
+  };
+}
+
+describe('guardCapturePage with stricter rules', () => {
+  const opts = (onRequest = vi.fn()) => ({
+    dataSession: { token: 'sess.sig', artifactId: 'art_1', origin: 'https://shareout.example' },
+    rules: STRICT,
+    rewriteUrl: (url: string) => (url.startsWith(`${PAGE}/c/ct/`) ? `${url}?_capture=link` : null),
+    onRequest,
+  });
+
+  it('rewrites allowed sub-requests, never the main frame, and still attaches the data session', async () => {
+    const { asPage, emit } = fakePage();
+    await guardCapturePage(asPage, ['shareout.example', new URL(PAGE).hostname], opts());
+    const nav = strictRequest(TARGET, 'document', true);
+    const file = strictRequest(`${PAGE}/c/ct/app.js`, 'script');
+    const data = strictRequest('https://shareout.example/v1/data/art_1/json', 'fetch');
+    for (const req of [nav, file, data]) emit('request', req);
+    expect(nav.continue).toHaveBeenCalledWith();
+    expect(file.continue).toHaveBeenCalledWith({ url: `${PAGE}/c/ct/app.js?_capture=link` });
+    expect(data.continue).toHaveBeenCalledWith({ headers: { authorization: 'Bearer sess.sig' } });
+  });
+
+  it('aborts what the rules refuse and reports every decision', async () => {
+    const onRequest = vi.fn();
+    const { asPage, emit } = fakePage();
+    const guard = await guardCapturePage(asPage, ['shareout.example'], opts(onRequest));
+    const script = strictRequest('https://evil-cdn.example.net/lib.js', 'script');
+    const away = strictRequest('https://example.com/', 'document', true);
+    emit('request', script);
+    emit('request', away);
+    expect(script.abort).toHaveBeenCalledWith('blockedbyclient');
+    expect(away.abort).toHaveBeenCalledWith('blockedbyclient');
+    expect(onRequest.mock.calls.map(([, verdict]) => verdict)).toEqual([
+      { allow: false, reason: 'csp', directive: 'script-src' },
+      { allow: false, reason: 'navigation' },
+    ]);
+    expect(guard.blocked()).toBe(2);
   });
 });
