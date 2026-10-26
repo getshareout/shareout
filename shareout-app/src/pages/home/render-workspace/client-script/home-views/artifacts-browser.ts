@@ -122,10 +122,11 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
   }
   function applyArt(f) {
     var d = artCache[artKey(f)]; if (!d) return;
-    var empty = curFolder ? t('artifacts.folderEmpty') : t('artifacts.nothingHere');
+    var root = f === 'all' || f === 'recent';
+    var empty = curFolder ? t('artifacts.folderEmpty') : t(root ? 'artifacts.nothingHere' : 'artifacts.noMatch');
     // Folders first (All only): own compact grid in tile view, first rows in the table.
     var fc = f === 'all' ? (d.foldersHtml || '') : '', fr = f === 'all' ? (d.folderRowsHtml || '') : '';
-    ART_DATA['wsxArtMount'] = { foldersHtml: fc, cardsHtml: d.cardsHtml || '', rowsHtml: fr + (d.rowsHtml || ''), count: (fc || d.count) ? 1 : 0, empty: empty, folderHead: folderHead(d, f) };
+    ART_DATA['wsxArtMount'] = { foldersHtml: fc, cardsHtml: d.cardsHtml || '', rowsHtml: fr + (d.rowsHtml || ''), count: (fc || d.count) ? 1 : 0, empty: empty, emptyCta: root && !curFolder, folderHead: folderHead(d, f) };
     renderArtView('wsxArtMount');
     hidePendingFolders();
     artChipCounts();

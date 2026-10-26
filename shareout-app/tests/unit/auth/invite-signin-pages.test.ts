@@ -102,6 +102,20 @@ describe('forgot password link', () => {
   });
 });
 
+describe('sign-in page has one visible email field', () => {
+  it('reuses the password form email for the code flow', async () => {
+    const h = await appLoginPage({ redirect: '/home', googleEnabled: true }).text();
+    const visible = [...h.matchAll(/<input [^>]*type="email"/g)];
+    expect(visible).toHaveLength(1);
+    expect(h).toContain('id="email-code-email" type="hidden"');
+    expect(h).toContain('id="password-code-link"');
+    expect(h).toContain('Email me a code instead');
+    expect(h).not.toContain('<details');
+    expect(h).toContain('so-c-btn so-c-btn--secondary so-c-btn--block');
+    expect(h).not.toContain('btn-google');
+  });
+});
+
 describe('device login success page', () => {
   it('speaks to chat users in their language and shows the token for copy-paste', async () => {
     const h = await deviceDonePage('ana@example.com', null, 'so_abc123', req('https://x/auth/device', 'es-AR')).text();

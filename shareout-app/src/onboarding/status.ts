@@ -128,7 +128,7 @@ export async function getOnboardingStatus(
   const state = await getState(env, workspaceId, userId);
   const signals = await getSignals(env, workspaceId, userId, !!state?.skill_ack_at);
   // The 14-day window starts when they accepted the invite, not when it was sent.
-  return buildStatus(track, signals as unknown as Record<string, boolean>, state, member.accepted_at || member.created_at, env);
+  return buildStatus(track, signals as unknown as Record<string, boolean>, state, member.accepted_at || member.created_at);
 }
 
 interface OnboardingState { skill_ack_at: string | null; dismissed_at: string | null; celebrated_at: string | null }
@@ -150,9 +150,8 @@ function buildStatus(
   signals: Record<string, boolean>,
   state: OnboardingState | null,
   joinedAtIso: string,
-  env?: Env,
 ): OnboardingStatus {
-  const tasks: OnboardingTaskView[] = tasksForTrack(track, env).map((d) => ({
+  const tasks: OnboardingTaskView[] = tasksForTrack(track).map((d) => ({
     key: d.key,
     done: !!signals[d.signal],
     action: d.action,
@@ -179,5 +178,5 @@ export async function getPersonalOnboardingStatus(env: Env, userId: string): Pro
   if (!user) return null;
   const state = await getState(env, PERSONAL_WS, userId);
   const signals = await getPersonalSignals(env, userId, !!state?.skill_ack_at);
-  return buildStatus('personal', signals as unknown as Record<string, boolean>, state, user.created_at, env);
+  return buildStatus('personal', signals as unknown as Record<string, boolean>, state, user.created_at);
 }

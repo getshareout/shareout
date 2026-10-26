@@ -19,7 +19,7 @@ const SIGN_IN_COPY = {
     introMicrosoft: 'Use your email and password, or Microsoft, to continue.',
     introSocial: 'Use your email and password, Google or Microsoft to continue.',
     or: 'or',
-    codeInstead: 'Email me a one-time code instead',
+    codeInstead: 'Email me a code instead',
     noEmailBinding: 'This instance has no email binding configured, so the code is written to the Worker log rather than sent.',
     emailLabel: 'Email address',
     passwordLabel: 'Password',
@@ -254,12 +254,9 @@ export function appLoginPage(opts: {
   // code needs mail delivery, and offering it as the primary route on an instance
   // with no EMAIL binding sends people to a code that only appears in a log.
   const otpSection = `
-    <details class="auth-alt"${emailConfigured ? ' open' : ''}>
-      <summary>${escapeHtml(c.codeInstead)}</summary>
-      ${emailConfigured ? '' : `<p class="auth-help">${escapeHtml(c.noEmailBinding)}</p>`}
-      ${emailOtpFormsHtml(opts.turnstileSiteKey, c)}
-      <div id="email-code-status" class="status" role="status" aria-live="polite" hidden></div>
-    </details>`;
+    ${emailConfigured ? '' : `<p class="auth-help">${escapeHtml(c.noEmailBinding)}</p>`}
+    ${emailOtpFormsHtml(opts.turnstileSiteKey, c, '', true)}
+    <div id="email-code-status" class="status" role="status" aria-live="polite" hidden></div>`;
 
   return renderAuthPage(c.pageTitle, `
   ${card}
@@ -295,8 +292,9 @@ function passwordFormHtml(c: SignInCopy = EN, canReset = false): string {
         <label class="field-label" for="password-value">${escapeHtml(c.passwordLabel)}</label>
         <input id="password-value" type="password" name="password" autocomplete="current-password" required>
       </div>
-      <button id="password-submit" type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(c.signIn)}</button>
+      <button id="password-submit" type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(c.continue)}</button>
       <div id="password-status" class="status" role="status" aria-live="polite" hidden></div>
+      <button id="password-code-link" type="button" class="auth-forgot">${escapeHtml(c.codeInstead)}</button>
       ${canReset ? `<a id="password-forgot" class="auth-forgot" href="#">${escapeHtml(c.forgot)}</a>` : ''}
     </form>`;
 }
@@ -373,7 +371,7 @@ function passwordLoginScript(redirectAfter: string, c: SignInCopy = EN): string 
 
 function googleButtonHtml(redirect: string, loginHint?: string | null, c: SignInCopy = EN): string {
   const hint = loginHint ? `&login_hint=${encodeURIComponent(loginHint)}` : '';
-  return `<a href="/auth/google?redirect=${encodeURIComponent(redirect)}${hint}" class="btn btn-google">
+  return `<a href="/auth/google?redirect=${encodeURIComponent(redirect)}${hint}" class="so-c-btn so-c-btn--secondary so-c-btn--block">
       <svg viewBox="0 0 24 24">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -386,7 +384,7 @@ function googleButtonHtml(redirect: string, loginHint?: string | null, c: SignIn
 
 function microsoftButtonHtml(redirect: string, loginHint?: string | null, c: SignInCopy = EN): string {
   const hint = loginHint ? `&login_hint=${encodeURIComponent(loginHint)}` : '';
-  return `<a href="/auth/microsoft?redirect=${encodeURIComponent(redirect)}${hint}" class="btn btn-google btn-microsoft">
+  return `<a href="/auth/microsoft?redirect=${encodeURIComponent(redirect)}${hint}" class="so-c-btn so-c-btn--secondary so-c-btn--block">
       <svg viewBox="0 0 23 23" aria-hidden="true">
         <path fill="#F25022" d="M1 1h10v10H1z"/>
         <path fill="#7FBA00" d="M12 1h10v10H12z"/>
@@ -397,14 +395,17 @@ function microsoftButtonHtml(redirect: string, loginHint?: string | null, c: Sig
     </a>`;
 }
 
-function emailOtpFormsHtml(turnstileSiteKey?: string, c: SignInCopy = EN, prefill = ''): string {
+function emailOtpFormsHtml(turnstileSiteKey?: string, c: SignInCopy = EN, prefill = '', sharedEmail = false): string {
   const value = prefill ? ` value="${escapeHtml(prefill)}"` : '';
-  return `<form id="email-code-start" class="email-code-form" novalidate>
-      <p id="email-code-reset-note" class="auth-help" hidden>${escapeHtml(c.resetIntro)}</p>
-      <div class="field">
+  const emailField = sharedEmail
+    ? '<input id="email-code-email" type="hidden" name="email">'
+    : `<div class="field">
         <label class="field-label" for="email-code-email">${escapeHtml(c.emailLabel)}</label>
         <input id="email-code-email" type="email" name="email" autocomplete="email" placeholder="you@company.com"${value} required>
-      </div>
+      </div>`;
+  return `<form id="email-code-start" class="email-code-form" novalidate${sharedEmail ? ' hidden' : ''}>
+      <p id="email-code-reset-note" class="auth-help" hidden>${escapeHtml(c.resetIntro)}</p>
+      ${emailField}
       ${turnstileWidgetHtml(turnstileSiteKey, c.lang)}
       <button id="email-code-send" type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(c.sendCode)}</button>
     </form>
@@ -444,6 +445,25 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
     var newPwField = document.getElementById('email-code-newpw');
     var newPwInput = document.getElementById('email-code-password');
     var forgotLink = document.getElementById('password-forgot');
+    var pwForm = document.getElementById('password-login');
+    var pwEmail = document.getElementById('password-email');
+    var codeLink = document.getElementById('password-code-link');
+    var shared = !!(pwForm && pwEmail && startForm && startForm.hidden);
+
+    // One email field: the sign-in form's address feeds the code flow. With a Turnstile
+    // widget the visitor has one more step (the challenge); otherwise it sends at once.
+    function startFromPassword() {
+      var typed = pwEmail.value.trim();
+      if (!typed) { setStatus(L.enterEmail, 'error'); pwEmail.focus(); return; }
+      emailInput.value = typed;
+      if (startForm.querySelector('.cf-turnstile')) {
+        startForm.hidden = false;
+        pwForm.hidden = true;
+        sendButton.focus();
+      } else {
+        startForm.requestSubmit();
+      }
+    }
 
     if (!startForm || !verifyForm || !emailInput || !codeInput || !sendButton || !continueButton || !changeButton || !statusBox || !target || !window.fetch) {
       return;
@@ -456,10 +476,11 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
         resetMode = true;
         var section = startForm.closest('details');
         if (section) section.open = true;
-        document.getElementById('email-code-reset-note').hidden = false;
+        document.getElementById('email-code-reset-note').hidden = shared;
         newPwField.hidden = false;
         newPwInput.required = true;
         continueButton.textContent = L.saveAndSignIn;
+        if (shared) { startFromPassword(); return; }
         var typed = document.getElementById('password-email');
         if (typed && typed.value.trim() && !emailInput.value.trim()) emailInput.value = typed.value.trim();
         verifyForm.hidden = true;
@@ -468,6 +489,8 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
         emailInput.focus();
       });
     }
+
+    if (shared && codeLink) codeLink.addEventListener('click', startFromPassword);
 
     function setStatus(message, kind) {
       statusBox.textContent = message || '';
@@ -518,6 +541,7 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
         pendingEmail = email;
         target.textContent = email;
         startForm.hidden = true;
+        if (shared) pwForm.hidden = true;
         verifyForm.hidden = false;
         setStatus(L.checkEmail, 'success');
         codeInput.focus();
@@ -573,8 +597,9 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
       pendingEmail = '';
       codeInput.value = '';
       verifyForm.hidden = true;
-      startForm.hidden = false;
       setStatus('', '');
+      if (shared) { pwForm.hidden = false; resetMode = false; pwEmail.focus(); return; }
+      startForm.hidden = false;
       emailInput.focus();
     });
   }());

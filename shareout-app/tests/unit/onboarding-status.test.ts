@@ -53,37 +53,45 @@ describe('getOnboardingStatus', () => {
     expect(await getOnboardingStatus(env, WS, U)).toBeNull();
   });
 
-  it('gives a fresh admin the 7-task admin track (invite_team is skippable) at 0% and eligible', async () => {
+  it('gives a fresh admin the 4-task admin track (invite_team is skippable) at 0% and eligible', async () => {
     const env = { ...INTEGRATIONS, DB: makeDb({
       member: { role: 'owner', created_at: nowIso, member_class: 'internal' },
       signals: NO_SIGNALS,
     }) } as Env;
     const s = await getOnboardingStatus(env, WS, U);
     expect(s?.track).toBe('admin');
-    expect(s?.tasks).toHaveLength(7);
+    expect(s?.tasks).toHaveLength(4);
     expect(s?.pct).toBe(0);
     expect(s?.eligible).toBe(true);
     expect(s?.celebrated).toBe(false);
   });
 
-  it('excludes skippable Slack from pct (3 of 5 required = 60%)', async () => {
+  it('measures pct over the required tasks only (2 of 3 = 67%)', async () => {
     const env = { ...INTEGRATIONS, DB: makeDb({
       member: { role: 'admin', created_at: nowIso, member_class: 'internal' },
-      signals: { ...NO_SIGNALS, firstArtifact: 1, dataSource: 1, telegram: 1, slack: 1 },
+      signals: { ...NO_SIGNALS, firstArtifact: 1, dataSource: 1 },
     }) } as Env;
     const s = await getOnboardingStatus(env, WS, U);
-    expect(s?.pct).toBe(60);
-    expect(s?.tasks.find((t) => t.key === 'slack')?.done).toBe(true);
+    expect(s?.pct).toBe(67);
   });
 
-  it('routes a plain member to the 5-task member track, a first page from the New menu first', async () => {
+  it('no longer lists Telegram, Slack or the skill', async () => {
+    const env = { DB: makeDb({
+      member: { role: 'owner', created_at: nowIso, member_class: 'internal' },
+      signals: NO_SIGNALS,
+    }) } as Env;
+    const s = await getOnboardingStatus(env, WS, U);
+    expect(s?.tasks.map((t) => t.key)).toEqual(['first_artifact', 'data_source', 'invite_team', 'alert']);
+  });
+
+  it('routes a plain member to the 4-task member track, a first page from the New menu first', async () => {
     const env = { ...INTEGRATIONS, DB: makeDb({
       member: { role: 'member', created_at: nowIso, member_class: 'internal' },
       signals: NO_SIGNALS,
     }) } as Env;
     const s = await getOnboardingStatus(env, WS, U);
     expect(s?.track).toBe('member');
-    expect(s?.tasks).toHaveLength(5);
+    expect(s?.tasks).toHaveLength(4);
     expect(s?.tasks[0]).toMatchObject({ key: 'first_artifact', done: false, action: { kind: 'new' } });
     // Connecting an external agent is a bonus, not a requirement for a member.
     expect(s?.tasks[1]).toMatchObject({ key: 'connect_agent', skippable: true, action: { kind: 'nav', target: 'connect' } });
@@ -126,16 +134,6 @@ describe('getOnboardingStatus', () => {
     const s = await getOnboardingStatus(env, WS, U);
     expect(s?.eligible).toBe(false);
   });
-
-  it('counts skill via explicit ack, not a live signal', async () => {
-    const env = { ...INTEGRATIONS, DB: makeDb({
-      member: { role: 'owner', created_at: nowIso, member_class: 'internal' },
-      state: { skill_ack_at: nowIso, dismissed_at: null, celebrated_at: null },
-      signals: NO_SIGNALS,
-    }) } as Env;
-    const s = await getOnboardingStatus(env, WS, U);
-    expect(s?.tasks.find((t) => t.key === 'skill')?.done).toBe(true);
-  });
 });
 
 describe('getPersonalOnboardingStatus', () => {
@@ -144,30 +142,19 @@ describe('getPersonalOnboardingStatus', () => {
     expect(await getPersonalOnboardingStatus(env, U)).toBeNull();
   });
 
-  it('gives a fresh personal user the 4-task track at 0% and eligible', async () => {
+  it('gives a fresh personal user the 3-task track at 0% and eligible', async () => {
     const env = { ...INTEGRATIONS, DB: makeDb({ user: { created_at: nowIso }, signals: { firstArtifact: 0, assistant: 0, shared: 0 } }) } as Env;
     const s = await getPersonalOnboardingStatus(env, U);
     expect(s?.track).toBe('personal');
-    expect(s?.tasks.map((t) => t.key)).toEqual(['first_artifact', 'try_assistant', 'share_page', 'skill']);
+    expect(s?.tasks.map((t) => t.key)).toEqual(['first_artifact', 'try_assistant', 'share_page']);
     expect(s?.pct).toBe(0);
     expect(s?.eligible).toBe(true);
   });
 
-  it('counts each done personal signal toward pct (2 of 4 = 50%)', async () => {
+  it('counts each done personal signal toward pct (2 of 3 = 67%)', async () => {
     const env = { ...INTEGRATIONS, DB: makeDb({ user: { created_at: nowIso }, signals: { firstArtifact: 1, assistant: 1, shared: 0 } }) } as Env;
     const s = await getPersonalOnboardingStatus(env, U);
-    expect(s?.pct).toBe(50);
-  });
-
-  it('counts the skill task from an explicit ack', async () => {
-    const env = { ...INTEGRATIONS, DB: makeDb({
-      user: { created_at: nowIso },
-      state: { skill_ack_at: nowIso, dismissed_at: null, celebrated_at: null },
-      signals: { firstArtifact: 0, assistant: 0, shared: 0 },
-    }) } as Env;
-    const s = await getPersonalOnboardingStatus(env, U);
-    expect(s?.tasks.find((t) => t.key === 'skill')?.done).toBe(true);
-    expect(s?.pct).toBe(25);
+    expect(s?.pct).toBe(67);
   });
 
   it('is not eligible for an account older than the 14-day window', async () => {

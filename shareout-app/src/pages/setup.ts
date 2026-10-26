@@ -174,19 +174,19 @@ export async function renderSetupPage(env: Env): Promise<Response> {
         hasSchema ? 'Set SESSION_SECRET first' : 'Apply the database schema first'
       }</button>`;
 
+  const problems = [
+    hasSchema ? '' : checkRow(false, 'Database schema', 'not applied — run the migration below'),
+    hasSessionSecret ? '' : checkRow(false, 'Session secret', 'missing — use the command below'),
+    hasBaseUrl ? '' : checkRow(false, 'Instance URL', 'unset — agents would publish to the hosted instance'),
+  ].join('');
+  const problemList = problems ? `<ul class="setup-checks">${problems}</ul>` : '';
+
   const body = `
   <div class="card">
     <div class="icon icon-primary">${brandMarkImg('setup-mark', 28)}</div>
     <h1>Set up ShareOut</h1>
     <p>Self-hosted instance with no users yet. Create the admin account to finish.</p>
-    <ul class="setup-checks">
-      ${checkRow(hasSchema, 'Database schema', hasSchema ? 'applied' : 'not applied — run the migration below')}
-      ${checkRow(hasSessionSecret, 'Session secret', hasSessionSecret ? 'configured' : 'missing — use the command below')}
-      ${checkRow(hasBaseUrl, 'Instance URL', hasBaseUrl ? origin : 'unset — agents would publish to the hosted instance')}
-      ${checkRow(true, 'Password sign-in', 'ready — no email or OAuth needed')}
-      ${checkRow(google, 'Google OAuth', google ? 'enabled' : 'optional — not configured')}
-      ${checkRow(Boolean(setupEmail), 'Admin email hint', setupEmail || 'optional SETUP_ADMIN_EMAIL')}
-    </ul>
+    ${problemList}
     ${schemaHelp}
     ${secretHelp}
     ${baseUrlHelp}

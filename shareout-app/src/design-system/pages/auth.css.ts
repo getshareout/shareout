@@ -92,40 +92,10 @@ p strong { color: var(--color-text); }
   border: 1px solid #fecaca;
 }
 
-/* Google OAuth — auth-specific, not a shared primitive */
-.btn-google {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  width: 100%;
-  min-height: var(--touch-target);
-  padding: 0 24px;
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-  font-size: 1rem;
-  font-weight: 500;
-  text-decoration: none;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all var(--duration-normal) var(--ease-out);
-}
-
-.btn-google:hover {
-  border-color: var(--color-primary);
-  box-shadow: 0 2px 8px rgba(37,99,235,0.15);
-}
-
-.btn-google svg {
-  width: 20px;
-  height: 20px;
-}
-
-.btn-google + .btn-google {
-  margin-top: var(--space-3);
-}
+/* Social sign-in buttons: so-c-btn secondary, sized to the card */
+.auth-methods .so-c-btn { min-height: var(--touch-target); gap: 12px; }
+.auth-methods .so-c-btn svg { width: 20px; height: 20px; }
+.auth-methods .so-c-btn + .so-c-btn { margin-top: var(--space-3); }
 
 .auth-divider {
   display: flex;
@@ -157,6 +127,13 @@ p strong { color: var(--color-text); }
 
 .auth-forgot {
   display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  font-family: inherit;
+  cursor: pointer;
   margin-top: var(--space-3);
   font-size: 0.9rem;
   text-align: center;
