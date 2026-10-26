@@ -1,5 +1,6 @@
 // Learn an Asset or page version into the workspace corpus: fetch → text → chunks →
-// FTS5 (KnowledgeStore) → embeddings (KNOWLEDGE_VECTORS, namespace = workspace).
+// FTS5 (KnowledgeStore) → embeddings (KNOWLEDGE_VECTORS, namespace = workspace; and the
+// multilingual KNOWLEDGE_VECTORS_V2 alongside when configured — vectors/models.ts).
 // Runs as a Workflow (one instance per source version, retried per step) when the
 // KNOWLEDGE_INGEST binding exists, else inline in waitUntil — same steps either way.
 import type { Env, TypeMetadata } from '../../types';
@@ -10,12 +11,13 @@ import { DocReadError, docToMarkdown } from '../../data/files/parse-doc';
 import { isKnowledgeEnabled } from '../store';
 import { chunkMarkdown, MAX_CHUNKS, type Chunk } from './chunk';
 import { CHUNKER_VERSION, chunkSections, htmlSections } from './sections';
-import { corpusFor, type SourceKind, type SourceMeta } from './client';
-import { estimateTokens, meterKnowledge, PRICING } from './usage';
+import { corpusFor, sourceAccess, type SourceAccess, type SourceKind, type SourceMeta } from './client';
+import { meterKnowledge, PRICING } from './usage';
 import { EXTRACT_BATCH, extractBatch } from './extract';
 import { workspaceBudgetBlock } from '../../data/ai-budget';
+import { EMBED_TEXT_CAP, embedTexts, writeTargets } from '../vectors/models';
+import { chunkVectorId, deleteIds, meterEmbedding, v2Metadata, warnV2 } from '../vectors/v2';
 
-const EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
 export const EMBED_BATCH = 50;
 // Same isolate-memory guard as assets/enrich.ts: never pull a huge blob into 128MB.
 const MAX_SOURCE_BYTES = 25_000_000;
@@ -146,13 +148,19 @@ export async function toMarkdown(env: Env, filename: string, mime: string, bytes
   return null;
 }
 
-async function embed(env: Env, texts: string[]): Promise<number[][]> {
-  const res = (await env.AI!.run(EMBED_MODEL, { text: texts })) as { data?: number[][] };
-  if (!res.data || res.data.length !== texts.length) throw new Error('embedding failed');
-  return res.data;
+/** The source's access per D1 (sourceAccess), or null when it can't be read: recording it is best-effort. */
+async function currentAccess(env: Env, p: IngestParams): Promise<SourceAccess | null> {
+  try {
+    const row = p.kind === 'page'
+      ? await env.DB.prepare(
+          "SELECT a.visibility, (SELECT status FROM artifact_moderation WHERE artifact_id = a.id) AS moderation FROM artifacts a WHERE a.id = ?",
+        ).bind(p.refId).first<{ visibility: string; moderation: string | null }>()
+      : await env.DB.prepare('SELECT visibility, NULL AS moderation FROM asset_deliverables WHERE id = ?').bind(p.refId).first<{ visibility: string; moderation: null }>();
+    return row ? sourceAccess(row.visibility, row.moderation ?? undefined) : null;
+  } catch {
+    return null;
+  }
 }
-
-const vectorId = (refId: string, ord: number) => `${refId}:${ord}`;
 
 export async function extractStep(env: Env, p: IngestParams): Promise<ExtractResult> {
   const store = corpusFor(env, p.workspaceId)!;
@@ -189,22 +197,42 @@ export async function extractStep(env: Env, p: IngestParams): Promise<ExtractRes
     return { status: 'unsupported', chunkCount: 0, previousCount: 0 };
   }
   const { previousCount } = await store.replaceChunks(loaded.meta, chunks, CHUNKER_VERSION);
+  // Who may see it now, so search starts from that instead of an unknown (search.ts). A hint
+  // for picking candidates, never an access decision: every hit is re-checked in D1.
+  const access = await currentAccess(env, p);
+  if (access) await store.recordAccess([{ refId: p.refId, access, ownerId: loaded.meta.ownerId }]).catch(() => {});
   return { status: 'chunked', chunkCount: chunks.length, previousCount };
 }
 
+/**
+ * Embed one batch of a source's chunks into every configured index (writeTargets): the one
+ * reads use first fails the step on error, as before; the other is best-effort and its gaps
+ * are what the backfill fills. v2 vectors carry their model, recorded per chunk in the store.
+ */
 export async function embedStep(env: Env, p: IngestParams, offset: number): Promise<number> {
-  if (!env.AI || !env.KNOWLEDGE_VECTORS) return 0;
-  const rows = await corpusFor(env, p.workspaceId)!.chunkTexts(p.refId, offset, EMBED_BATCH);
+  const targets = writeTargets(env, env.KNOWLEDGE_VECTORS);
+  if (!targets.length) return 0;
+  const store = corpusFor(env, p.workspaceId)!;
+  const rows = await store.chunkTexts(p.refId, offset, EMBED_BATCH);
   if (!rows.length) return 0;
-  const texts = rows.map((r) => r.text.slice(0, 2000));
-  const values = await embed(env, texts);
-  await env.KNOWLEDGE_VECTORS.upsert(
-    rows.map((r, i) => ({ id: vectorId(p.refId, r.ord), values: values[i], namespace: p.workspaceId })),
-  );
-  const tokens = estimateTokens(texts);
-  await meterKnowledge(env, p.workspaceId, 'knowledge_embedding', {
-    model: EMBED_MODEL, units: tokens, unitKind: 'tokens', costMicroUsd: tokens * PRICING.embedTokenMicroUsd, source: p.refId,
-  });
+  const texts = rows.map((r) => r.text.slice(0, EMBED_TEXT_CAP));
+  for (const [i, t] of targets.entries()) {
+    try {
+      const values = await embedTexts(env, t.model, texts, 'document');
+      await t.index.upsert(rows.map((r, j) => ({
+        id: chunkVectorId(p.refId, r.ord),
+        values: values[j],
+        namespace: p.workspaceId,
+        ...(t.version === 'v2' ? { metadata: v2Metadata(t.model, p.kind, p.refId) } : {}),
+      })));
+      if (t.version === 'v2') await store.markEmbedded(t.model.id, rows.map((r) => ({ refId: p.refId, ord: r.ord })));
+    } catch (err) {
+      if (i === 0) throw err;
+      warnV2(env, `${t.version} passage write failed`, err, { workspace_id: p.workspaceId, ref_id: p.refId });
+      continue;
+    }
+    await meterEmbedding(env, p.workspaceId, t.model, texts, p.refId);
+  }
   return rows.length;
 }
 
@@ -229,17 +257,20 @@ export async function graphStep(env: Env, p: IngestParams, offset: number): Prom
 /** Workflow steps one ingest takes: extract + finish, plus graph and embedding batches. */
 export function ingestSteps(env: Env, chunkCount: number): number {
   if (!chunkCount) return 2;
-  return 2 + (env.AI ? Math.ceil(chunkCount / EXTRACT_BATCH) : 0) + (env.AI && env.KNOWLEDGE_VECTORS ? Math.ceil(chunkCount / EMBED_BATCH) : 0);
+  return 2 + (env.AI ? Math.ceil(chunkCount / EXTRACT_BATCH) : 0) + (writeTargets(env, env.KNOWLEDGE_VECTORS).length ? Math.ceil(chunkCount / EMBED_BATCH) : 0);
 }
 
 /** Drop vectors past the new end (a shorter new version), then mark the source ready. */
 export async function finishStep(env: Env, p: IngestParams, r: ExtractResult, graphDeferred = false): Promise<void> {
   if (r.status === 'deferred') return;
-  if (env.KNOWLEDGE_VECTORS && r.previousCount > r.chunkCount) {
+  if (r.previousCount > r.chunkCount) {
     const stale = [];
-    for (let ord = r.chunkCount; ord < r.previousCount; ord++) stale.push(vectorId(p.refId, ord));
-    // Vectorize takes at most 100 ids per delete (error 40007 past that).
-    for (let i = 0; i < stale.length; i += 100) await env.KNOWLEDGE_VECTORS.deleteByIds(stale.slice(i, i + 100));
+    for (let ord = r.chunkCount; ord < r.previousCount; ord++) stale.push(chunkVectorId(p.refId, ord));
+    if (env.KNOWLEDGE_VECTORS) await deleteIds(env.KNOWLEDGE_VECTORS, stale);
+    // v2 is cleaned whenever it is bound, even with its model unset (vectors from before).
+    if (env.KNOWLEDGE_VECTORS_V2) {
+      await deleteIds(env.KNOWLEDGE_VECTORS_V2, stale).catch((err) => warnV2(env, 'v2 passage delete failed', err, { ref_id: p.refId }));
+    }
   }
   const steps = ingestSteps(env, r.status === 'chunked' ? r.chunkCount : 0);
   await meterKnowledge(env, p.workspaceId, 'knowledge_ingest', env.KNOWLEDGE_INGEST

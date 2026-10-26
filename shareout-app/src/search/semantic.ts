@@ -6,30 +6,33 @@
  * accessible subset from D1 (Vectorize is NEVER trusted for access control). When
  * the AI/VECTORIZE bindings are absent (local dev) or error, every function degrades
  * gracefully (null / no-op) and callers fall back to keyword search.
+ *
+ * Workspace pages are also written to the multilingual KNOWLEDGE_VECTORS_V2 index (the
+ * workspace's namespace, knowledge/vectors/v2.ts) and searched there once a workspace is
+ * covered and reads are cut over; pages outside a workspace stay on VECTORIZE only.
  */
 import type { Env } from '../types';
 import { listArtifactsForUser } from '../chat-agent/tools/artifacts';
 import type { WorkspaceSelection } from '../chat-platforms/types';
+import { selectedWorkspace } from '../chat-agent/scope';
+import { embedTexts, V1_MODEL } from '../knowledge/vectors/models';
+import { artifactIdsV2, artifactText, deleteArtifactV2, writeArtifactV2 } from '../knowledge/vectors/v2';
 
-const EMBED_MODEL = '@cf/baai/bge-base-en-v1.5'; // 768-dim, cosine
-const QUERY_TOPK = 40;
+// The v1 index is not split per workspace, so the caller's nearest artifacts compete with
+// everyone's: fetch Vectorize's maximum (100 without values or metadata) before the access cut.
+const QUERY_TOPK = 100;
 
 type Accessible = Awaited<ReturnType<typeof listArtifactsForUser>>;
 
-/** Embed one or more strings; null if AI is unavailable or errors. */
+/** Embed one or more strings with the v1 model (VECTORIZE is 768-d); null if AI is unavailable or errors. */
 async function embed(env: Env, texts: string[]): Promise<number[][] | null> {
   if (!env.AI || !texts.length) return null;
   try {
-    const res = await env.AI.run(EMBED_MODEL, { text: texts }) as { data?: number[][] };
-    return res.data && res.data.length ? res.data : null;
+    const data = await embedTexts(env, V1_MODEL, texts, 'document');
+    return data.length ? data : null;
   } catch {
     return null;
   }
-}
-
-/** The text we embed for an artifact: title + description + tags (concept-bearing fields). */
-function artifactText(row: { name: string; description: string | null; tags: string | null }): string {
-  return [row.name, row.description || '', (row.tags || '').replace(/\n/g, ', ')].filter(Boolean).join('\n').slice(0, 2000);
 }
 
 interface IndexRow {
@@ -55,16 +58,20 @@ function vectorOf(row: IndexRow, values: number[]) {
 
 /** Embed + upsert a single artifact. Best-effort: no-op when bindings missing. */
 export async function indexArtifactVector(env: Env, artifactId: string): Promise<void> {
-  if (!env.VECTORIZE || !env.AI) return;
+  if (!env.AI || (!env.VECTORIZE && !env.KNOWLEDGE_VECTORS_V2)) return;
   const row = await loadIndexRow(env, artifactId);
   if (!row) return;
-  const vecs = await embed(env, [artifactText(row)]);
+  const text = artifactText(row);
+  if (row.workspace_id) await writeArtifactV2(env, row.workspace_id, row.id, text);
+  if (!env.VECTORIZE) return;
+  const vecs = await embed(env, [text]);
   if (!vecs) return;
   await env.VECTORIZE.upsert([vectorOf(row, vecs[0])]);
 }
 
 /** Drop an artifact from the index (on delete). */
 export async function removeArtifactVector(env: Env, artifactId: string): Promise<void> {
+  await deleteArtifactV2(env, artifactId);
   if (!env.VECTORIZE) return;
   try { await env.VECTORIZE.deleteByIds([artifactId]); } catch { /* best-effort */ }
 }
@@ -94,11 +101,18 @@ export async function semanticSearchArtifacts(
   query: string,
   opts: { workspaceId?: WorkspaceSelection; limit?: number } = {},
 ): Promise<Accessible | null> {
-  const ids = await semanticSearchIds(env, query);
+  // One workspace selected: its own v2 namespace once covered (and cut over), else v1's global ranking.
+  const ws = selectedWorkspace(opts.workspaceId);
+  const fromV2 = ws && env.AI && query.trim() ? await artifactIdsV2(env, ws, query, QUERY_TOPK) : null;
+  const ids = fromV2 ?? await semanticSearchIds(env, query);
   if (!ids) return null;
-  const accessible = await listArtifactsForUser(env, userId, { limit: 500, workspaceId: opts.workspaceId });
+  // Access is checked for these candidates themselves, not looked up in the caller's most
+  // recent artifacts (an older page they can open would otherwise never come back).
+  const accessible = await listArtifactsForUser(env, userId, { limit: ids.length, workspaceId: opts.workspaceId, ids });
   const byId = new Map(accessible.map((a) => [a.id, a]));
   const ordered = ids.map((id) => byId.get(id)).filter((a): a is Accessible[number] => !!a);
+  // From v2 nothing readable is "no semantic answer": keyword search takes over.
+  if (fromV2 && !ordered.length) return null;
   return ordered.slice(0, opts.limit ?? 24);
 }
 

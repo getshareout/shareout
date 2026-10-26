@@ -5,3 +5,5 @@ node_modules/
 .credentials/
 *.log
 .DS_Store
+# npm run eval:knowledge results + embedding cache
+.eval/

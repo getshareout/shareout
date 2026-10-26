@@ -1,0 +1,22 @@
+id: approval-workflow
+title: Approval workflow
+lang: es
+suites: [core]
+fixtures: []
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  Necesito una página para pedir aprobación de gastos. Cualquiera del equipo carga un pedido
+  (concepto, monto en pesos, categoría y si quiere un comprobante) y yo, que soy la responsable,
+  lo apruebo o lo rechazo con un comentario. Que se vea clarito qué está pendiente, qué está
+  aprobado y qué no. La va a usar todo el equipo, muchos desde el celu.
+expect:
+  stores: ["table"]
+functional:
+  - { do: fill_form, submit: "enviar|pedir|cargar|solicitar|guardar|crear|agregar", label: cargar un pedido }
+  - { do: expect_text, text: "{{token}}" }
+  - { do: expect_text, text: "pendiente" }
+  - { do: click, name: "^\\s*(✓\\s*)?aprobar|^approve", label: aprobar }
+  - { do: expect_text, text: "aprobad" }
+  - { do: reload }
+  - { do: expect_text, text: "{{token}}", label: el pedido persiste }
+  - { do: rest, check: rows, min: 1 }

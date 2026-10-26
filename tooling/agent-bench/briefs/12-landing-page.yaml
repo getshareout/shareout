@@ -1,0 +1,19 @@
+id: landing-page
+title: Landing page
+lang: en
+suites: [core]
+fixtures: [brand-kit]
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  We're launching a newsletter called "Field Notes" from Lumen & Pine (our brand kit is in the
+  brand-kit folder). I need a one-page landing page: what it is, who it's for, teasers for the
+  three most recent issues, and an email signup that actually saves the address somewhere I can
+  see. Public link please.
+expect:
+  stores: ["table"]
+functional:
+  - { do: expect_text, text: "Field Notes" }
+  - { do: fill_form, submit: "subscribe|sign ?up|join|get", label: sign up }
+  - { do: expect_text, text: "thank|subscribed|you're in|you are in|check your|welcome", label: confirmation }
+  - { do: rest, check: rows, min: 1, label: address saved }
+  - { do: rest, check: visibility, equals: "public|unlisted" }

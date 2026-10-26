@@ -32,6 +32,8 @@ import { isKnownFeature } from '../../features/registry';
 import { setGlobalFlag, setWorkspaceFlag, GLOBAL_TARGET } from '../../features/flags';
 import { defaultReportDate, getDailyPlatformDigest } from '../../superadmin/digest';
 import { backfillVectors } from '../../search/semantic';
+import { startVectorBackfills, v2Problem } from '../../knowledge/vectors/backfill';
+import { v2Target } from '../../knowledge/vectors/models';
 import { runSummaryBackfill } from '../../publish/summary-backfill';
 import {
   dailyUsageCsv,
@@ -53,6 +55,22 @@ export async function routeAdminApi(ctx: FetchContext): Promise<Response | null>
   // POST /v1/admin/vectorize/backfill — embed all live artifacts into the semantic index.
   if (path === '/v1/admin/vectorize/backfill' && request.method === 'POST') {
     return jsonResponse(await backfillVectors(env));
+  }
+
+  // POST /v1/admin/knowledge/vectors/backfill?after=<workspace id>&limit=10[&reset=1] — start the
+  // multilingual-index backfill (a paced Workflow each) for the next `limit` workspaces by id.
+  // Call again with after=<next> until next is null; a rerun only embeds what is missing.
+  if (path === '/v1/admin/knowledge/vectors/backfill' && request.method === 'POST') {
+    if (!v2Target(env)) {
+      return apiErrorResponse({ message: 'The multilingual index is not configured', code: 'NOT_CONFIGURED', status: 501, hint: v2Problem(env) ?? 'Bind KNOWLEDGE_VECTORS_V2, a 1024-d cosine Vectorize index (see wrangler.toml), and redeploy.' });
+    }
+    if (!env.KNOWLEDGE_INGEST) {
+      return apiErrorResponse({ message: 'Instance-wide backfill needs Workflows (KNOWLEDGE_INGEST)', code: 'NOT_CONFIGURED', status: 501, hint: 'Call POST /v1/workspaces/{id}/knowledge/vectors/backfill per workspace instead.' });
+    }
+    const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 10, 1), 25);
+    const after = url.searchParams.get('after')?.trim() || '';
+    const r = await startVectorBackfills(env, { after, limit, reset: url.searchParams.get('reset') === '1' });
+    return jsonResponse({ started: r.instances.length, instances: r.instances, next: r.next }, 202);
   }
 
   // POST /v1/admin/summaries/backfill?workspace_id=…&limit=25 — one batch of the hourly

@@ -1,0 +1,28 @@
+id: repair-kanban
+title: Repair a broken artifact (kanban)
+lang: en
+suites: [smoke, core]
+fixtures: []
+setup:
+  - key: board
+    file: broken/kanban-broken.html
+    name: Team board
+    slug: team-board
+    visibility: private
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  Our team board ({{url:board}}) is broken. Nothing shows up, adding a card does nothing, and
+  back when it sort of worked, other people couldn't see my cards. Can you fix it so the whole
+  team can use it together? Keep it at the same link.
+expect:
+  target: board
+  stores: ["realtime|table"]
+functional:
+  - { do: add_item, value: "{{token}}", label: add a card }
+  - { do: reload }
+  - { do: expect_text, text: "{{token}}", label: card persists }
+  - { do: open_second }
+  - { do: expect_text, in: b, text: "{{token}}", label: a teammate sees it }
+  - { do: add_item, in: b, value: "{{token2}}", label: teammate adds a card }
+  - { do: expect_text, in: a, text: "{{token2}}", timeout: 10000, label: shows up live }
+  - { do: rest, check: versions, min: 2, label: same link updated }

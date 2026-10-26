@@ -13,6 +13,7 @@ import {
   type TelegramWorkspaceSelection,
 } from '../access';
 import { placeholders } from '../../account-links';
+import { JSON_IN, jsonList } from '../../sql-in';
 import { quickSearch, type SearchGroup, type SearchHit } from '../../search/quick-search';
 import type { AccountTool } from './types';
 import { artifactLink, livePages } from '../../artifacts/page-links';
@@ -40,7 +41,7 @@ interface ArtifactListItem {
 export async function listArtifactsForUser(
   env: Env,
   userId: string,
-  opts: { search?: string; limit: number; workspaceId?: TelegramWorkspaceSelection }
+  opts: { search?: string; limit: number; workspaceId?: TelegramWorkspaceSelection; ids?: string[] }
 ): Promise<ArtifactListItem[]> {
   const scope = await getTelegramVisibilityScope(env, userId);
   const idPh = placeholders(scope.userIds.length);
@@ -51,6 +52,9 @@ export async function listArtifactsForUser(
   const searchClause = opts.search
     ? ' AND (a.name LIKE ? OR a.slug LIKE ? OR a.description LIKE ? OR EXISTS (SELECT 1 FROM artifact_tags at WHERE at.artifact_id = a.id AND at.label LIKE ?))'
     : '';
+  // Only these artifacts (e.g. semantic-search candidates), so access is checked for each
+  // of them rather than for the most recent `limit`.
+  const idsClause = opts.ids ? ` AND a.id IN ${JSON_IN}` : '';
   let scopeClause: string;
   let scopeBinds: unknown[];
 
@@ -77,7 +81,7 @@ export async function listArtifactsForUser(
     FROM artifacts a
     LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
     LEFT JOIN collaborators c ON c.artifact_id = a.id AND c.email IN (${emailPh})
-    WHERE a.deleted_at IS NULL AND a.id NOT IN (SELECT artifact_id FROM asset_buckets) AND (${scopeClause})${searchClause}
+    WHERE a.deleted_at IS NULL AND a.id NOT IN (SELECT artifact_id FROM asset_buckets) AND (${scopeClause})${searchClause}${idsClause}
     ORDER BY COALESCE(d.updated_at, a.created_at) DESC
     LIMIT ?`;
 
@@ -86,6 +90,7 @@ export async function listArtifactsForUser(
     const like = `%${opts.search}%`;
     binds.push(like, like, like, like); // name, slug, description, tag label
   }
+  if (opts.ids) binds.push(jsonList(opts.ids));
   binds.push(opts.limit);
 
   const res = await env.DB.prepare(sql).bind(...binds).all<ArtifactListItem>();

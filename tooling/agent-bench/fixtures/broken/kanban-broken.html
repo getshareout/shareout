@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Team board</title>
+<!-- deliberately broken fixture for the agent bench: do not fix here -->
+<script src="/sdk/shareout.min.js"></script>
+<style>
+  body { font-family: Arial; background: #eee; margin: 0; }
+  .board { display: flex; gap: 12px; padding: 12px; width: 1100px; }
+  .col { background: #ddd; width: 360px; min-height: 400px; padding: 8px; }
+  .card { background: white; padding: 6px; margin: 6px 0; font-size: 11px; }
+  button { font-size: 10px; padding: 1px 3px; }
+</style>
+</head>
+<body>
+<h3>Team board</h3>
+<input id="newcard" placeholder="New card">
+<button onclick="addCard()">+</button>
+<div class="board">
+  <div class="col" id="todo"><b>To do</b></div>
+  <div class="col" id="doing"><b>Doing</b></div>
+  <div class="col" id="done"><b>Done</b></div>
+</div>
+<script>
+  var cards = JSON.parse(localStorage.getItem('cards') || '[]');
+  function render() {
+    ['todo', 'doing', 'done'].forEach(function (c) {
+      document.getElementById(c).innerHTML = '<b>' + c + '</b>';
+    });
+    cards.forEach(function (card, i) {
+      var el = document.createElement('div');
+      el.className = 'card';
+      el.innerHTML = card.text + ' <button onclick="move(' + i + ')">→</button>';
+      document.getElementById(card.col).appendChild(el);
+    });
+  }
+  function addCard() {
+    var text = document.getElementById('newcard').value;
+    cards.push({ text: text, col: 'todo' });
+    saveCards();
+    render();
+  }
+  function move(i) {
+    cards[i].col = cards[i].col == 'todo' ? 'doing' : 'done';
+    localStorage.setItem('cards', JSON.stringify(cards));
+    render();
+  }
+  render();
+  ShareOut.create().then(function (sdk) { window.sdk = sdk; syncFromServer(sdk); });
+</script>
+</body>
+</html>

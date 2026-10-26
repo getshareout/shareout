@@ -5,9 +5,11 @@
 // retried steps instead. No new binding: it reuses KNOWLEDGE_INGEST.
 import type { Env } from '../types';
 import type { IngestParams } from './corpus/ingest';
+import type { VectorBackfillParams } from './vectors/backfill';
 
 export interface DistillDrainParams { kind: 'distill'; workspaceId: string }
-export type KnowledgeWorkflowParams = IngestParams | DistillDrainParams;
+/** The KNOWLEDGE_INGEST Workflow's three modes: learn one source, drain the distill queue, backfill the v2 index. */
+export type KnowledgeWorkflowParams = IngestParams | DistillDrainParams | VectorBackfillParams;
 
 /** Pages per step: one step stays well inside a Workflow step's limits. */
 export const DRAIN_BATCH = 5;

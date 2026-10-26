@@ -1,4 +1,4 @@
-import { ShareOutError } from '../shareout-error';
+import { ConsentRequiredError, ShareOutError } from '../shareout-error';
 import type { ShareOutOptions, ViewerIdentity } from '../types/common';
 import { parseApiResponse, wrapNetworkError } from '../internal/parse-api-response';
 import { RequestDeduplicator } from '../internal/request-deduplicator';
@@ -25,7 +25,7 @@ import { RealtimeDoc } from '../stores/realtime-doc';
 import { Dataset } from '../stores/dataset';
 import { Connection } from '../stores/connection';
 import { SecretsProxy } from '../stores/secrets-proxy';
-import { McpStore } from '../stores/mcp-store';
+import { McpError, McpStore } from '../stores/mcp-store';
 import { CommentsStore } from '../stores/comments-store';
 import { SheetsStore } from '../stores/sheets-store';
 import { AgentStore } from '../stores/agent-store';
@@ -101,6 +101,12 @@ function noteRequestEnd(): void {
 }
 
 export class ShareOut {
+  // The script-tag build exposes `ShareOut` as this class, not the module namespace,
+  // so the error classes ride along as statics: `e instanceof ShareOut.ShareOutError`.
+  static readonly ShareOutError = ShareOutError;
+  static readonly ConsentRequiredError = ConsentRequiredError;
+  static readonly McpError = McpError;
+
   private artifactId: string;
   private baseUrl: string;
   private sessionToken?: string;
@@ -609,7 +615,8 @@ export class ShareOut {
       throw wrapNetworkError(err);
     }
 
-    return parseApiResponse<T>(response);
+    // Control-plane routes answer with a bare object more often than an envelope.
+    return parseApiResponse<T>(response, { bareBody: true });
   }
 
   get _artifactId(): string {

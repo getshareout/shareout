@@ -1,0 +1,17 @@
+id: weekly-report
+title: Weekly scheduled report
+lang: en
+suites: [core]
+fixtures: [sales-2026.csv]
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  Every Monday at 9am I'd like a short sales summary emailed to me: revenue by region, what
+  changed compared with the previous month, and the top product. Build the report from the
+  attached export (sales-2026.csv) and set it up so it goes out on its own every week — I
+  don't want to remember to send it.
+expect:
+  stores: []
+functional:
+  - { do: expect_text, text: "North" }
+  - { do: expect_text, text: "Team plan|Business plan" }
+  - { do: rest, check: jobs, min: 1, label: a weekly schedule exists }

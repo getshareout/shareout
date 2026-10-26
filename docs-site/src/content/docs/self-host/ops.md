@@ -155,6 +155,48 @@ Per-workspace keys are encrypted at rest and need `CREDENTIALS_KEY` set — the 
 refuses without it rather than storing something it cannot protect. The same secret
 encrypts stored connector credentials.
 
+### Multilingual Knowledge search
+
+The original Knowledge indexes (`KNOWLEDGE_VECTORS`, `VECTORIZE`) embed with an
+English-only model, so a Spanish question rarely finds an English document by meaning.
+The multilingual index, `KNOWLEDGE_VECTORS_V2`, embeds with `@cf/baai/bge-m3` (or
+`@cf/qwen/qwen3-embedding-0.6b` via `KNOWLEDGE_EMBED_MODEL`) and keeps one namespace per
+workspace. Switching is done per step, and each step can be undone:
+
+1. **Create** the index and its metadata indexes, in this order:
+
+   ```bash
+   npx wrangler vectorize create shareout-knowledge-v2 --dimensions=1024 --metric=cosine
+   npx wrangler vectorize create-metadata-index shareout-knowledge-v2 --property-name=source_kind --type=string
+   npx wrangler vectorize create-metadata-index shareout-knowledge-v2 --property-name=source_id --type=string
+   npx wrangler vectorize create-metadata-index shareout-knowledge-v2 --property-name=embed_model --type=string
+   ```
+
+2. **Bind** it (uncomment `KNOWLEDGE_VECTORS_V2` in `wrangler.toml`) and deploy. New and
+   changed passages, notes and pages are now written to both indexes; searches still read
+   the old ones.
+3. **Backfill** what already exists, from the stored text (nothing is re-fetched). One paced
+   Workflow per workspace; call again with `after=<next>` until `next` is `null`:
+
+   ```bash
+   curl -sS -X POST "$ORIGIN/v1/admin/knowledge/vectors/backfill?limit=10" \
+     -H "Authorization: Bearer $SHAREOUT_ADMIN_TOKEN"
+   ```
+
+   One workspace: `POST /v1/workspaces/{id}/knowledge/vectors/backfill`. Progress:
+   `GET /v1/workspaces/{id}/knowledge/vectors` — a workspace is covered when
+   `workspace.chunks.missing` is 0 and `workspace.passes` names the model. Reruns only embed
+   what is missing; the 03:00 UTC knowledge pass also starts a few for workspaces with gaps.
+   It is metered like ingest (`knowledge_embedding`, source `vectors-backfill`): bge-m3 costs
+   $0.012 per million tokens.
+4. **Cut over**: set `KNOWLEDGE_VECTORS_READ = "v2"` and deploy. Each workspace reads the new
+   index once it is covered and keeps reading the old one until then; an empty answer
+   from the new index also falls back. Unset the variable to roll back.
+
+Changing `KNOWLEDGE_EMBED_MODEL` later works the same way: deploy, backfill, and reads stay on
+the old index until the new model covers a workspace. If you recreate the index, backfill
+with `{"reset": true}` (per workspace) or `&reset=1` (admin) so every vector is written again.
+
 ## Upgrades
 
 1. Pull the latest public release (or re-export sync if you mirror privately).

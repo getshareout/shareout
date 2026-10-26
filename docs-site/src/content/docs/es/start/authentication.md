@@ -32,6 +32,9 @@ El CLI y los scripts de ejemplo leen desde `~/.shareout/credentials`:
 ```
 
 `$ORIGIN` es ese campo `origin` (sin slash final).
+
+¿Sin archivo? Los agentes y scripts también toman `SHAREOUT_TOKEN` y `SHAREOUT_ORIGIN` del
+entorno — cualquiera de las dos fuentes alcanza.
 ## Tokens de Agente del workspace (cuentas de servicio)
 
 Para un llamador no humano —el agente de IA de un cliente, un servicio backend o CI/CD—

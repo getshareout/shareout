@@ -1,4 +1,5 @@
 import type { CatalogEntry } from './types';
+import { effectiveStatus } from './certification';
 
 export interface CatalogQuery {
   q?: string;
@@ -27,6 +28,7 @@ function matchesText(entry: CatalogEntry, needle: string): boolean {
     entry.body,
     entry.domain ?? '',
     entry.fqn ?? '',
+    ...entry.aliases,
     ...entry.tags,
     ...entry.terms,
   ]
@@ -40,7 +42,7 @@ export function searchEntries(entries: CatalogEntry[], query: CatalogQuery): Cat
   return entries.filter(e => {
     if (query.kind && e.kind !== query.kind) return false;
     if (query.domain && e.domain !== query.domain) return false;
-    if (query.status && e.status !== query.status) return false;
+    if (query.status && effectiveStatus(e) !== query.status) return false;
     if (query.tag && !e.tags.includes(query.tag)) return false;
     if (q && !matchesText(e, q)) return false;
     return true;
@@ -59,7 +61,7 @@ export function buildFacets(entries: CatalogEntry[]): CatalogFacets {
   return {
     kind: tally(entries.map(e => e.kind)),
     domain: tally(entries.flatMap(e => (e.domain ? [e.domain] : []))),
-    status: tally(entries.flatMap(e => (e.status ? [e.status] : []))),
+    status: tally(entries.map(effectiveStatus)),
     tag: tally(entries.flatMap(e => e.tags)),
   };
 }

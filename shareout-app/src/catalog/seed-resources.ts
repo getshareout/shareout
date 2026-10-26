@@ -2,8 +2,15 @@ import type { Env } from '../types';
 import { PlatformEngine } from '../data/platform';
 import { parseSnowflakeRows } from '../data/connections/warehouse-exec';
 import { SQL_QUERY_ENDPOINT } from '../data/platform/providers/sql-endpoint';
-import { upsertCatalogFile, listCatalogFiles } from './store';
-import { buildConnectorEntry, slugifyName } from './seed';
+import { upsertCatalogFile, listCatalogFiles, type CatalogFileSource } from './store';
+import {
+  connectorEntryPath,
+  connectorSourceId,
+  legacyConnectorEntryPath,
+  slugifyName,
+  writeConnectorEntry,
+  yamlString,
+} from './seed';
 
 // Bounded per connect-time seed run: number of tables/sheets enumerated and written
 // as catalog dataset entries. Keeps a first connect to a workspace with thousands of
@@ -185,16 +192,16 @@ async function listResources(env: Env, workspaceId: string, conn: ConnectionRow)
   }
 }
 
-function buildDatasetEntry(conn: ConnectionRow, connSlug: string, resource: string) {
+function buildDatasetEntry(conn: ConnectionRow, connSlug: string, resource: string, sourceId: string) {
   const resourceSlug = slugifyName(resource);
   const id = `ds.${connSlug}.${resourceSlug}`;
   const content = `---
 kind: dataset
 id: ${id}
-title: ${resource}
+title: ${yamlString(resource)}
 status: draft
-connection: ${conn.name}
-upstream: [conn.${connSlug}]
+connection: ${yamlString(conn.name)}
+upstream: [${sourceId}]
 tags: [provider.${slugifyName(conn.provider)}]
 ---
 
@@ -230,10 +237,8 @@ export async function seedCatalogForConnection(
     if (!conn) return { seeded: 0, skipped: 0, provider: null };
 
     const existing = new Map((await listCatalogFiles(env, workspaceId)).map((f) => [f.path, f.source]));
-    const source = buildConnectorEntry(conn);
-    if (existing.get(source.path) !== 'manual') {
-      await upsertCatalogFile(env, workspaceId, { ...source, source: 'seed:connector' });
-    }
+    await writeConnectorEntry(env, workspaceId, conn, existing);
+    const sourceId = connectorSourceId(conn, existing);
 
     const resources = await listResources(env, workspaceId, conn);
     if (!resources.length) return { seeded: 0, skipped: 0, provider: conn.provider };
@@ -242,7 +247,7 @@ export async function seedCatalogForConnection(
     let seeded = 0;
     let skipped = 0;
     for (const resource of resources.slice(0, MAX_RESOURCES)) {
-      const entry = buildDatasetEntry(conn, connSlug, resource);
+      const entry = buildDatasetEntry(conn, connSlug, resource, sourceId);
       if (existing.get(entry.path) === 'manual') {
         skipped += 1;
         continue;
@@ -285,11 +290,11 @@ export async function recordDatasetLineage(
     const content = `---
 kind: dataset
 id: ${id}
-title: ${datasetName}
+title: ${yamlString(datasetName)}
 status: draft
-connection: ${connectionName}
+connection: ${yamlString(connectionName)}
 artifact: ${artifactId}
-upstream: [conn.${connSlug}]
+upstream: [${await sourceIdForConnectionName(env, workspaceId, connectionName)}]
 ---
 
 Auto-linked from **${connectionName}**, materialized into artifact \`${artifactId}\`.
@@ -300,18 +305,40 @@ Auto-linked from **${connectionName}**, materialized into artifact \`${artifactI
   }
 }
 
+// A workspace connection's `source` entry id, for lineage written by name (materialize
+// knows the connection by name). Unknown names keep the name-keyed id, an alias.
+async function sourceIdForConnectionName(env: Env, workspaceId: string, connectionName: string): Promise<string> {
+  const conn = await env.DB.prepare(
+    "SELECT id, name FROM connections WHERE scope_type = 'workspace' AND scope_id = ? AND name = ?"
+  )
+    .bind(workspaceId, connectionName)
+    .first<{ id: string; name: string }>();
+  if (!conn) return `conn.${slugifyName(connectionName)}`;
+  const rows = await env.DB.prepare(
+    "SELECT path, source FROM workspace_files WHERE workspace_id = ? AND namespace = 'catalog' AND path IN (?, ?)"
+  )
+    .bind(workspaceId, connectorEntryPath(conn.id), legacyConnectorEntryPath(conn.name))
+    .all<{ path: string; source: CatalogFileSource }>();
+  return connectorSourceId(conn, new Map(rows.results.map((r) => [r.path, r.source])));
+}
+
 /**
- * Drop the auto-seeded catalog entries of a deleted connection: its `source` entry and
- * the `dataset` entries seeded from its tables. Human-edited entries and dataset
- * provenance records are kept. Never throws — must not fail the connection delete.
+ * Drop the auto-seeded catalog entries of a deleted connection: its `source` entry (at
+ * its connection-id path, or the older name-keyed one) and the `dataset` entries seeded
+ * from its tables. Human-edited entries and dataset provenance records are kept. Never
+ * throws — must not fail the connection delete.
  */
-export async function removeCatalogForConnection(env: Env, workspaceId: string, connectionName: string): Promise<void> {
+export async function removeCatalogForConnection(
+  env: Env,
+  workspaceId: string,
+  conn: { id: string; name: string }
+): Promise<void> {
   try {
-    const slug = slugifyName(connectionName);
+    const slug = slugifyName(conn.name);
     await env.DB.prepare(
       `DELETE FROM workspace_files WHERE workspace_id = ? AND namespace = 'catalog' AND source = 'seed:connector'
-         AND (path = ? OR path LIKE ?)`
-    ).bind(workspaceId, `sources/${slug}.md`, `datasets/${slug}/%`).run();
+         AND (path = ? OR path = ? OR path LIKE ?)`
+    ).bind(workspaceId, connectorEntryPath(conn.id), legacyConnectorEntryPath(conn.name), `datasets/${slug}/%`).run();
   } catch {
     // Best-effort cleanup.
   }

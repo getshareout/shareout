@@ -122,7 +122,7 @@ device-flow clients keep working, and adds `code` + `hint`:
 | Code | Status | Description |
 |------|--------|-------------|
 | `EMAIL_RATE_LIMITED` | 429 | Daily email cap |
-| `CONFIG_ERROR` | 500 | Email binding missing |
+| `EMAIL_UNAVAILABLE` | 503 | Instance has no `EMAIL` binding (`notify-owner`, `send-report`) |
 | `INVALID_RECIPIENT` | 400 | Invalid email address |
 
 ## Job Errors

@@ -1,0 +1,22 @@
+id: kpi-dashboard
+title: Live KPI dashboard
+lang: en
+suites: [smoke, core]
+fixtures: [kpis.json]
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  I've attached kpis.json with our current company numbers. Can you make a KPI dashboard for
+  the leadership team? I update these numbers every week, so they shouldn't be baked into the
+  page — when I change a number, everyone who opens the link should see the new value without
+  me re-sending anything. For each KPI show it against last month and against the target, and
+  include the MRR trend for the last 12 months. Clean and calm, nothing flashy — it goes in
+  front of our CEO. Only people on my team should be able to open it.
+expect:
+  stores: ["json|table|dataset"]
+functional:
+  - { do: expect_text, text: "MRR" }
+  - { do: expect_text, text: "NPS" }
+  - { do: expect_text, text: "churn" }
+  - { do: expect_selector, selector: "canvas, svg", min: 1, label: chart present }
+  - { do: rest, check: data, min: 1, label: numbers live in a data store }
+  - { do: live_update, find: 284300, replace: 291234, expect: "291[,. ]?234|291(\\.2)?\\s?[kK]", label: changing the stored MRR updates the page }

@@ -1,16 +1,19 @@
 // Durable per-source ingest: one Workflow instance per Asset/page version, each step
 // retried on its own. The steps live in ingest.ts so the inline path runs the same code.
-// The same class drains a workspace's Knowledge learning queue (kind 'distill', drain.ts).
+// The same class drains a workspace's Knowledge learning queue (kind 'distill', drain.ts)
+// and backfills the multilingual v2 index (kind 'vectors', vectors/backfill.ts).
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers';
 import type { Env } from '../../types';
 import { EMBED_BATCH, GRAPH_DEFERRED, embedStep, extractStep, finishStep, graphStep, markFailed, type IngestParams } from './ingest';
 import { EXTRACT_BATCH } from './extract';
 import { runKnowledgeDistill } from '../distill';
 import { DRAIN_BATCH, DRAIN_MAX_STEPS, type KnowledgeWorkflowParams } from '../drain';
+import { runVectorBackfill } from '../vectors/backfill';
 
 export class KnowledgeIngestWorkflow extends WorkflowEntrypoint<Env, KnowledgeWorkflowParams> {
   async run(event: WorkflowEvent<KnowledgeWorkflowParams>, step: WorkflowStep): Promise<void> {
     const q = event.payload;
+    if (q.kind === 'vectors') return runVectorBackfill(this.env, q, step);
     if (q.kind === 'distill') {
       // Skipped pages (held, forgotten) still advance the queue; a failed model call leaves
       // its page queued, so two batches in a row that learn nothing end the drain.

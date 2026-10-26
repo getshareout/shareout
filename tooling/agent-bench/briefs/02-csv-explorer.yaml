@@ -1,0 +1,20 @@
+id: csv-explorer
+title: CSV explorer
+lang: en
+suites: [core]
+fixtures: [support-tickets.csv]
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  Here's our support ticket export for July to October (support-tickets.csv). I need a page
+  where our support leads can filter tickets by category, priority, status and assignee, search
+  for a ticket by its id, and see a few summary numbers at the top — open tickets, median first
+  response time, average CSAT — that update when they filter. They mostly use laptops but
+  sometimes check it on their phones. Share it with my team.
+expect:
+  stores: []
+functional:
+  - { do: expect_text, text: "CSAT" }
+  - { do: expect_text, text: "T-104\\d\\d" }
+  - { do: fill, field: "search|ticket|id|buscar", value: "T-10433", label: search by ticket id }
+  - { do: expect_text, text: "T-10433" }
+  - { do: expect_no_text, text: "T-10401\\b", label: search narrows the list }

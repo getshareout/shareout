@@ -16,6 +16,40 @@ export type EntryKind = (typeof ENTRY_KINDS)[number];
 export const ENTRY_STATUSES = ['draft', 'certified', 'deprecated'] as const;
 export type EntryStatus = (typeof ENTRY_STATUSES)[number];
 
+/** Owner/admin trust decisions, append-only in `catalog_certifications`. */
+export const CERT_DECISIONS = ['certified', 'revoked', 'deprecated'] as const;
+export type CertDecision = (typeof CERT_DECISIONS)[number];
+
+export interface CertificationActor {
+  id: string;
+  name: string | null;
+  email: string | null;
+}
+
+export interface CertificationRecord {
+  id: string;
+  entry_id: string;
+  content_hash: string;
+  decision: CertDecision;
+  note: string | null;
+  decided_by: CertificationActor;
+  decided_at: string;
+}
+
+/**
+ * The trust overlay on an entry. `status` is the effective status (the same value the
+ * entry's `status` carries once overlaid); `declared_status` is what the file says.
+ * `stale` = an owner/admin certified or deprecated an earlier version ("changed since
+ * certification"). `decision` is the record that explains `status`, when there is one.
+ */
+export interface CertificationView {
+  status: EntryStatus;
+  declared_status: EntryStatus | null;
+  content_hash: string;
+  stale: boolean;
+  decision: CertificationRecord | null;
+}
+
 export interface CatalogEntry {
   kind: EntryKind;
   id: string;
@@ -29,13 +63,16 @@ export interface CatalogEntry {
   upstream: string[];
   downstream: string[];
   aspects: string[];
+  aliases: string[];
   connection?: string;
+  connectionId?: string;
   fqn?: string;
   artifact?: string;
   store?: string;
   lastUpdated?: string;
   body: string;
   extra: Record<string, unknown>;
+  certification?: CertificationView;
 }
 
 export interface ParseIssue {

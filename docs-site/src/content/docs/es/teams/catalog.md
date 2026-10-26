@@ -7,7 +7,8 @@ El **Catálogo de datos** es un mapa opcional, por workspace, de tus datos: sus 
 datasets, pipelines, dashboards, modelos, métricas y términos de negocio**. Se escribe como
 archivos planos de markdown + YAML, lo mantienen al día sobre todo los agentes, y se lee de
 dos formas — las personas lo navegan y buscan; el asistente de autoría lo consulta para usar
-nombres de tabla reales, preferir datos **certificados** y evitar fuentes **obsoletas**.
+nombres de tabla reales, preferir datos **certificados** — avalados por un propietario o
+administrador del espacio — y evitar fuentes **obsoletas**.
 
 Es **opcional y orientativo**. Un workspace sin catálogo funciona igual que antes, y el
 catálogo nunca bloquea nada — informa. Actívalo cuando quieras sacarle más a tus datos.
@@ -39,6 +40,10 @@ Authorization: Bearer {token}
 
 Volver a sembrar es idempotente y **nunca pisa** una entrada editada a mano.
 
+Las entradas `source` sembradas usan el id de la conexión (`conn.<connectionId>`), así que
+renombrar un conector nunca rompe un enlace. Las que se sembraron antes usaban el nombre
+(`conn.<slug-del-nombre>`); ese id queda en la entrada como alias y sigue resolviendo.
+
 ## Qué contiene
 
 Un archivo markdown describe un activo. El frontmatter YAML guarda los metadatos; el cuerpo
@@ -50,7 +55,7 @@ es opcional, completado con el tiempo.
 kind: source              # source · event · dataset · table · view · pipeline · dashboard · model · metric · term
 id: events_silver.chat_sent
 title: Chat Sent
-status: certified         # draft · certified · deprecated
+status: deprecated        # opcional: draft · deprecated (la certificación no es un campo — ver abajo)
 owner: data-platform
 domain: chat
 tags: [tier.silver, PII.None]
@@ -75,7 +80,10 @@ Qué es, detalles a tener en cuenta, una consulta de ejemplo.
 | `term` | Entrada de glosario — otros activos enlazan con `terms: [active-user]` |
 
 Las aristas `upstream` / `downstream` cruzan planos libremente — por ejemplo un `dataset` de
-artefacto cuyo `upstream` es un `source` de conector.
+artefacto cuyo `upstream` es un `source` de conector. Declarás la arista en cualquiera de las
+dos puntas: el catálogo lee ambas, así que una fuente a la que solo apuntan sus datasets igual
+los muestra aguas abajo (y no cuenta como huérfana). `aliases: [id.anterior]` mantiene
+funcionando los enlaces al id viejo de una entrada.
 
 ### Mapea los dos tipos de datos
 
@@ -85,16 +93,109 @@ artefacto cuyo `upstream` es un `source` de conector.
   entradas `dataset`. El linaje une ambos, así podés ver los datos de un dashboard trazados
   hasta la tabla del warehouse que los alimenta.
 
+## Certificación
+
+**Certificada** quiere decir que un **propietario o administrador** del espacio avaló una
+versión exacta de la entrada. Es una decisión con nombre y fecha, no una línea del archivo:
+escribir `status: certified` por tu cuenta no certifica nada — la entrada sigue en borrador.
+
+En el lente **Catálogo**, abrí una entrada: propietarios y administradores ven **Certificar
+entrada**, **Revocar certificación** y **Marcar como obsoleta**, con una nota opcional
+("Coincide con la plataforma de anuncios en marzo"). Todos ven quién la certificó, cuándo y
+el historial completo.
+
+- **Si editás una entrada certificada**, aparece **cambió desde la certificación**: cuenta como
+  borrador hasta que alguien certifique la versión nueva.
+- **Las métricas** quedan atadas solo a su definición (qué calculan y cómo se muestran).
+  Corregir la descripción, los sinónimos, los ejemplos o las notas no les quita la
+  certificación.
+- **Obsoleta** se mantiene aunque edites la entrada, hasta que un propietario o administrador
+  la vuelva a certificar o la devuelva a borrador.
+- **Certificar es una decisión de una persona.** Hace falta un propietario o administrador
+  con la sesión iniciada en ShareOut. Los tokens — personales, de Agente o de MCP — reciben
+  `403 SESSION_REQUIRED`: un agente puede redactar y proponer, pero nunca certificar su
+  propio trabajo.
+
+Esta es la llamada que hace el lente Catálogo, desde la sesión de un propietario o
+administrador:
+
+```http
+POST /v1/workspaces/{workspaceId}/catalog/entries/{entryId}/certify
+Content-Type: application/json
+
+{ "decision": "certified", "note": "Coincide con la plataforma de anuncios en marzo", "content_hash": "…" }
+```
+
+`decision` es `certified`, `revoked` o `deprecated`. El `content_hash` es el
+`certification.content_hash` de la entrada que revisaste: si alguien la editó mientras
+tanto, recibís `409 CONFLICT` en lugar de certificar una versión que nadie miró. Los
+miembros reciben `403`.
+
+## Métricas que se calculan
+
+Una entrada `metric` puede llevar su definición completa — de dónde salen los datos, qué se
+suma, por qué períodos y aperturas se puede ver — y ShareOut la calcula por vos. Cada
+respuesta dice si la métrica está certificada y por quién, qué versión de la definición usó,
+de dónde salieron las filas y qué tan frescas son.
+
+```markdown
+---
+kind: metric
+id: metric.roas
+title: ROAS
+title_es: Retorno de la inversión publicitaria
+owner: ana@agencia.example
+source: { shared_table: ads_daily }     # o { connection: conn_…, fqn: dataset.tabla } / { connection: conn_…, sql: "SELECT …" }
+type: ratio                             # simple: una medida · ratio: numerador ÷ denominador
+numerator: { agg: sum, expr: Ingresos }
+denominator: { agg: sum, expr: Inversión }
+time: { dimension: Fecha, grains: [week, month] }
+dimensions: [{ name: cliente, column: cliente_id }, { name: canal, column: Canal }]
+filters: ["Estado = 'activo'"]
+format: { kind: ratio, decimals: 2, suffix: "x" }   # o currency (con currency: ARS / USD), percent, number
+freshness_sla: 26h
+---
+```
+
+- **¿No tenés warehouse?** Actualizá los datos de anuncios, analytics, tu tienda o una planilla
+  en una **tabla compartida** del espacio (con un job programado o un crew) y apuntá la métrica
+  a esa tabla con `source: { shared_table: … }`. Los warehouses funcionan directo: BigQuery,
+  Snowflake, Supabase, Redshift y Aurora PostgreSQL.
+- **Se revisa al guardar.** Una clave mal escrita ("numerador") se rechaza indicando la que
+  probablemente quisiste poner; las columnas son nombres simples; cada filtro es una condición.
+- **Quién la puede calcular.** Todo el espacio calcula una métrica certificada. Un borrador lo
+  calculan propietarios, administradores y quien lo escribió — y todo el equipo cuando los datos
+  ya están abiertos (una tabla compartida, o una conexión que el asistente puede consultar).
+
+Abrí una métrica en el lente **Catálogo** para ver su fórmula ("Σ Ingresos ÷ Σ Inversión"),
+períodos y dimensiones, y **Probala**: elegí período, fechas y apertura, y los números vuelven
+con el formato de tu idioma (`2,50x`, `$ 1.520,50`).
+
+```http
+POST /v1/workspaces/{workspaceId}/catalog/metrics/metric.roas/query
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{ "grain": "month", "by": ["canal"], "from": "2026-03-01", "to": "2026-03-31" }
+```
+
+La respuesta trae `rows` (`period`, cada apertura, `value`), más `status`, `certified_by`,
+`certified_at`, `spec_hash`, `format`, `source`, `freshness` y `computed_at`. Propietarios y
+administradores reciben también el SQL que se ejecutó.
+
 ## Navegar el catálogo
 
-El lente **Catálogo** es de solo lectura y está pensado para workspaces grandes (1.600+ entradas):
+El lente **Catálogo** está pensado para workspaces grandes (1.600+ entradas):
 
 - **Vista de lista** — franja de KPIs (entradas, eventos, % certificado, % documentado,
   huérfanos), búsqueda instantánea, filtros por kind/dominio/estado y una **tabla densa
   ordenable** (nombre, kind, dominio, estado, origen, conteos de linaje). Clic en el encabezado
-  de columna para ordenar.
-- **Vista de entrada** — grilla de metadatos, cuerpo de notas y **tablas de linaje navegables**
-  para vecinos upstream y downstream. Clic en cualquier vecino catalogado para saltar a su
+  de columna para ordenar. Las entradas editadas después de certificarse llevan la marca
+  **cambió**. El filtro **Métrica** muestra las métricas con su estado, dueño, fuente y
+  frescura.
+- **Vista de entrada** — estado, certificación (quién, cuándo, nota, historial), grilla de
+  metadatos, cuerpo de notas y **tablas de linaje navegables** para vecinos upstream y
+  downstream. Clic en cualquier vecino catalogado para saltar a su
   entrada; referencias sin catalogar aparecen como nodos punteados.
 
 ### Deep links
@@ -109,8 +210,9 @@ Marcá o compartí una vista del catálogo desde Home:
 ## Por qué ayuda al asistente
 
 Cuando un workspace tiene catálogo, el asistente de autoría lo consulta antes de construir —
-así usa los nombres de tabla correctos, prefiere los datos que marcaste **certificados** y te
-avisa antes de apoyarse en algo **obsoleto**. Es una pista, nunca una regla rígida: vos
+así usa los nombres de tabla correctos, prefiere los datos que un propietario o administrador
+**certificó** (y puede decirte quién y cuándo), y te avisa antes de apoyarse en algo
+**obsoleto** o que cambió desde su certificación. Es una pista, nunca una regla rígida: vos
 mantenés el control.
 
 El asistente tiene tools de solo lectura: **`catalog_search`** (filtrar por query, kind,
@@ -156,7 +258,12 @@ Todas las rutas requieren membresía del workspace. Un catálogo desactivado dev
 | --- | --- | --- | --- |
 | `GET` | `/v1/workspaces/{id}/catalog` | Member+ | Búsqueda (`q`, `kind`, `domain`, `status`, `tag`) + facetas |
 | `GET` | `/v1/workspaces/{id}/catalog/manifest` | Member+ | Conteos, KPIs de adopción, huérfanos, refs colgantes, staleness |
-| `GET` | `/v1/workspaces/{id}/catalog/entries/{entryId}` | Member+ | Una entrada + vecinos de linaje |
+| `GET` | `/v1/workspaces/{id}/catalog/entries/{entryId}` | Member+ | Una entrada + vecinos de linaje + historial de certificación |
+| `POST` | `/v1/workspaces/{id}/catalog/entries/{entryId}/certify` | Admin+, con sesión iniciada | `{ decision, note?, content_hash? }` — certificar, revocar o marcar obsoleta; los tokens reciben `403 SESSION_REQUIRED` |
+| `GET` | `/v1/workspaces/{id}/catalog/metrics` | Member+ | Métricas con estado, fórmula, fuente y frescura |
+| `GET` | `/v1/workspaces/{id}/catalog/metrics/{metricId}` | Member+ | Una métrica completa |
+| `POST` | `/v1/workspaces/{id}/catalog/metrics/{metricId}/query` | Member+ (certificada) | `{ grain?, by?, from?, to?, where? }` → filas con su procedencia |
+| `GET` | `/v1/workspaces/{id}/catalog/metrics/{metricId}/explain` | Member+ | Fórmula y consulta; el SQL para Admin+ |
 | `GET` | `/v1/workspaces/{id}/catalog/lineage` | Member+ | Grafo completo de nodos+aristas |
 | `POST` | `/v1/workspaces/{id}/catalog/enable` | Admin+ | Activar/desactivar |
 | `POST` | `/v1/workspaces/{id}/catalog/seed` | Admin+ | Sembrar entradas `source` desde conectores |

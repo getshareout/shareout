@@ -1,0 +1,41 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Security Incident Response Runbook</title><style>body{font-family:system-ui,sans-serif;max-width:880px;margin:2rem auto;padding:0 16px;color:#1d1d1f}table{border-collapse:collapse;width:100%;margin:1rem 0}td,th{border:1px solid #ccc;padding:6px 10px;text-align:left;vertical-align:top}th{background:#f3f3f3}blockquote{border-left:3px solid #999;margin:0;padding:4px 12px;color:#333}</style></head><body>
+<h1>Security Incident Response Runbook</h1>
+<p>What to do when something may have compromised Acme Digital or client data, accounts or devices. Owner: Nicolás Ferraro (IT and Security). If you are not sure whether it is an incident, report it anyway: a false alarm costs minutes, a late report can cost a client.</p>
+<h2>Severity levels</h2>
+<table>
+<tr><th>Severity</th><th>Typical cases</th></tr>
+<tr><td>SEV1 — Critical</td><td>Confirmed exposure of client or customer personal data, takeover of a client ad account or social profile, ransomware on any device</td></tr>
+<tr><td>SEV2 — High</td><td>Suspected compromise of a single account, phishing where someone entered credentials, loss of an unencrypted device with client files</td></tr>
+<tr><td>SEV3 — Low</td><td>Phishing reported with no clicks, lost device with full-disk encryption and remote wipe, malware blocked by the antivirus</td></tr>
+</table>
+<h2>Who to page</h2>
+<ul>
+<li>SEV1: page the IT on-call phone (+54 11 5555-0199) and Nicolás Ferraro directly. He brings in Martín Arrieta (COO) and Valeria Quiroga (CEO) within the first hour, and the account lead of every affected client joins the incident channel.</li>
+<li>SEV2: call the IT on-call phone and post in #it-seguridad; the account lead of the affected client is informed.</li>
+<li>SEV3: open a ticket at it@acme.example or post in #it-seguridad; IT picks it up the next business day.</li>
+</ul>
+<p>Never report an incident only in a group chat or by email to a single person: if nobody acknowledges within the target time, call the on-call phone again.</p>
+<h2>Response timelines</h2>
+<table>
+<tr><th>Severity</th><th>Acknowledge</th><th>Contain</th><th>Notify affected clients</th><th>Post-mortem</th></tr>
+<tr><td>SEV1</td><td>15 minutes, 24/7</td><td>Within 4 hours</td><td>Within 24 hours of confirmation</td><td>Within 5 business days</td></tr>
+<tr><td>SEV2</td><td>1 hour, 24/7</td><td>Within 24 hours</td><td>Within 48 hours, if client data or accounts are involved</td><td>Within 10 business days</td></tr>
+<tr><td>SEV3</td><td>Next business day</td><td>Within 5 business days</td><td>Not required</td><td>Not required (log only)</td></tr>
+</table>
+<h2>Evidence preservation</h2>
+<ul>
+<li>Do not wipe, reimage or factory-reset a device before IT says so; disconnect it from the network and leave it powered on.</li>
+<li>Export the relevant logs right away: Google Workspace audit log, Meta Business Suite and Google Ads change history, Litware Vault access log.</li>
+<li>Take timestamped screenshots and keep the original phishing email as an attachment, not forwarded inline.</li>
+<li>Store everything in a restricted Drive folder named IR-YYYY-NN (for example IR-2026-07) and keep it for 2 years.</li>
+<li>Log every action in the incident timeline document with the time (UTC-3) and the name of the person who did it.</li>
+</ul>
+<h2>Communication templates</h2>
+<p>Internal update, posted in the incident Slack channel:</p>
+<blockquote>SEV[n] declared at [time]. Incident lead: [name]. Affected: [systems or clients]. Next update at [time]. Do not discuss this outside this channel.</blockquote>
+<p>Client notification, sent by the account lead from their acme.example address after review by Nicolás Ferraro and Martín Arrieta:</p>
+<blockquote>We detected [what] on [date] affecting [scope]. We have already [containment steps] and will send the next update by [time]. Your contact for this incident is [name and email].</blockquote>
+<p>Do not speculate about causes or blame in any message. Only the CEO speaks to the press.</p>
+<h2>Post-mortem</h2>
+<p>Every SEV1 and SEV2 gets a blameless post-mortem led by Nicolás Ferraro, with summary, timeline, root cause, impact, what went well and action items with owners and due dates. It is shared with leadership, and a client version is sent when the client asks for it. Action items are tracked in Notion and reviewed at the monthly IT meeting until closed.</p>
+</body></html>

@@ -1,0 +1,20 @@
+id: per-viewer-tracker
+title: Per-viewer tracker
+lang: en
+suites: [core]
+fixtures: []
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  Build a reading tracker for our company book club. Everyone logs the books they finished this
+  year (title, author, rating, date finished) and only sees their own list — but there's a shared
+  leaderboard with how many books each person has read. People sign in with their work account,
+  so it should know who they are without asking for a name.
+expect:
+  stores: ["table"]
+functional:
+  - { do: fill_form, prefs: { "title|book": "{{token}}" }, label: log a book }
+  - { do: expect_text, text: "{{token}}" }
+  - { do: reload }
+  - { do: expect_text, text: "{{token}}", label: entry persists }
+  - { do: expect_text, text: "leaderboard|ranking|top readers" }
+  - { do: rest, check: source, pattern: "sdk\\.user|\\.user\\b|currentUser|viewer|access_policy|owner_email|\\$viewer|whoami|me\\(\\)", label: knows who the viewer is }

@@ -42,8 +42,11 @@ console.log('Staged public/_bundles/yjs.js', (yjs.contents.length / 1024).toFixe
 execSync('npm run build', { cwd: sdkDir, stdio: 'inherit' });
 
 const bundle = readFileSync(join(sdkDir, 'dist/index.global.js'), 'utf8');
-// tsup IIFE assigns a namespace; unwrap so `new ShareOut()` works in artifacts.
-const footer = `;if(typeof ShareOut==="object"&&ShareOut){var _ShareOutCtor=ShareOut.ShareOut||ShareOut.default;if(typeof _ShareOutCtor==="function")ShareOut=_ShareOutCtor;}`;
+// tsup IIFE assigns a namespace; unwrap so `new ShareOut()` works in artifacts. The
+// error classes stay reachable as statics (ShareOut.ShareOutError) and as the globals
+// the docs use (`e instanceof ShareOutError`), unless the page already defines them.
+const footer = `;if(typeof ShareOut==="object"&&ShareOut){var _ShareOutCtor=ShareOut.ShareOut||ShareOut.default;if(typeof _ShareOutCtor==="function")ShareOut=_ShareOutCtor;}` +
+  `;(function(g){if(!g||!ShareOut)return;["ShareOutError","ConsentRequiredError"].forEach(function(n){if(ShareOut[n]&&typeof g[n]==="undefined")g[n]=ShareOut[n];});})(typeof globalThis!=="undefined"?globalThis:typeof window!=="undefined"?window:undefined);`;
 
 for (const rel of ['_bundles/shareout-sdk.js', 'sdk/shareout.js', 'sdk/v1/shareout.js']) {
   const dest = join(root, 'public', rel);

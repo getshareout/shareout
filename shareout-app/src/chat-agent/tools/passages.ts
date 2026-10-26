@@ -69,10 +69,10 @@ export async function fromCorpus(env: Env, userId: string, wsIds: string[], quer
   const words = terms(query);
   const results = await Promise.all(wsIds.map(async (ws) => {
     if (!corpusFor(env, ws) || !(await isKnowledgeEnabled(env, ws).catch(() => false))) return [];
-    return (await searchCorpus(env, ws, userId, query, { limit: LIMIT }).catch(() => ({ hits: [] }))).hits;
+    // Pages only, picked before the cut: Files ranked above them don't use up the LIMIT.
+    return (await searchCorpus(env, ws, userId, query, { limit: LIMIT, kinds: ['page'] }).catch(() => ({ hits: [] }))).hits;
   }));
   return results.flat()
-    .filter((h) => h.source.kind === 'page')
     .sort((a, b) => b.score - a.score)
     .slice(0, LIMIT)
     .map((h) => {

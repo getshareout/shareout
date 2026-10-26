@@ -1,0 +1,18 @@
+id: leaflet-map
+title: Leaflet map
+lang: es
+suites: [core]
+fixtures: [places.json]
+budget: { minutes: 20, usd: 6 }
+prompt: |
+  Hacé un mapa con los cafés y lugares para trabajar que recomendamos en Buenos Aires (te paso
+  places.json). Que se puedan filtrar por barrio y por si tienen wifi, y que al tocar un punto se
+  vea el horario y el puntaje. Lo vamos a mandar por WhatsApp, así que tiene que andar bien en el
+  celular. Que lo pueda abrir cualquiera.
+expect:
+  stores: []
+functional:
+  - { do: expect_selector, selector: ".leaflet-container", label: map renders }
+  - { do: expect_selector, selector: ".leaflet-marker-icon, path.leaflet-interactive, .leaflet-marker-pane > *", min: 8, label: places plotted }
+  - { do: expect_text, text: "Palermo" }
+  - { do: expect_text, text: "wi-?fi" }
