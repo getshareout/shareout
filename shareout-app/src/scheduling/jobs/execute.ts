@@ -18,14 +18,17 @@ import type { RetryConfig, RunJobResult, ScheduledJob } from './types';
 
 /** Process due cron jobs (up to 50 per tick) with retry and artifact_test throttling. */
 export async function runScheduledJobs(env: Env): Promise<{ executed: number; failed: number }> {
-  const now = Math.floor(Date.now() / 1000);
+  const nowMs = Date.now();
+  const now = Math.floor(nowMs / 1000);
+  // next_run_at is ISO (getNextRunTime); comparing it to epoch seconds as text never matched.
+  const isoIn = (seconds: number) => new Date(nowMs + seconds * 1000).toISOString();
 
   const dueJobs = await env.DB.prepare(`
     SELECT * FROM scheduled_jobs
     WHERE enabled = 1 AND trigger_type = 'cron' AND next_run_at <= ?
     ORDER BY next_run_at ASC
     LIMIT 50
-  `).bind(now).all<ScheduledJob>();
+  `).bind(isoIn(0)).all<ScheduledJob>();
 
   let executed = 0;
   let failed = 0;
@@ -39,7 +42,7 @@ export async function runScheduledJobs(env: Env): Promise<{ executed: number; fa
       testJobsDeferred++;
       continue;
     }
-    const nextRunAt = job.schedule ? getNextRunTime(job.schedule) : now + 86400;
+    const nextRunAt = job.schedule ? getNextRunTime(job.schedule) : isoIn(86400);
     // Claim-and-advance (mirrors crew claimTrigger): move next_run_at off the value
     // we selected, conditioned on it being unchanged, so an overlapping tick that
     // saw the same due row can't run the job a second time.
@@ -95,7 +98,7 @@ export async function runScheduledJobs(env: Env): Promise<{ executed: number; fa
           UPDATE scheduled_jobs
           SET last_run_at = ?, last_status = 'failed', last_error = ?, retry_count = retry_count + 1, next_run_at = ?
           WHERE id = ?
-        `).bind(now, result.error || 'Unknown error', now + delay, job.id);
+        `).bind(now, result.error || 'Unknown error', isoIn(delay), job.id);
       } else {
         statusStmt = env.DB.prepare(`
           UPDATE scheduled_jobs
