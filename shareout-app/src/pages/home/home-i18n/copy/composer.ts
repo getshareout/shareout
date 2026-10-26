@@ -67,6 +67,10 @@ export const COMPOSER_COPY: HomeLocaleCopy = {
     'create.buildPrivate': 'Published privately — public links are turned off on this instance.',
     'create.buildFailed': 'Build failed: ',
     'create.connDroppedBuild': 'Connection dropped during build.',
+    'create.buildingTab': 'Building · {name}',
+    'create.buildingLive': 'Building your page. Watch it come together.',
+    'create.retry': 'Try again',
+    'create.buildStopped': 'Build stopped.',
   },
   es: {
     'composer.ask': 'Preguntale a tu espacio',
@@ -133,5 +137,9 @@ export const COMPOSER_COPY: HomeLocaleCopy = {
     'create.buildPrivate': 'Publicado en privado — los enlaces públicos están desactivados en esta instancia.',
     'create.buildFailed': 'Falló la creación: ',
     'create.connDroppedBuild': 'Se cortó la conexión durante la creación.',
+    'create.buildingTab': 'Creando · {name}',
+    'create.buildingLive': 'Creando tu artefacto. Miralo armarse.',
+    'create.retry': 'Probá de nuevo',
+    'create.buildStopped': 'Se frenó la creación.',
   },
 };
