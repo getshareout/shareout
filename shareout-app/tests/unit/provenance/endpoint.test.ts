@@ -220,21 +220,31 @@ describe('refresher names, cost limits and caching', () => {
     expect((await sources('art_ps_pub', { ip: '203.0.113.10' })).status).toBe(200);
   });
 
-  it('caches per caller class, so an editor\'s answer never reaches a viewer', async () => {
+  it('caches viewer answers per class and never stores an editor\'s', async () => {
+    const respKeys = async () => (await e.SLUGS!.list({ prefix: 'prov:v1:resp:art_ps_ws:' })).keys.map((k) => k.name);
     const full = await body(await sources('art_ps_ws', await session(U.owner)));
     expect(full.access).toBe('full');
+    expect(JSON.stringify(full)).toContain('conn_ps_wh');
     await new Promise((r) => setTimeout(r, 50));
-    const keys = (await e.SLUGS!.list({ prefix: 'prov:v1:resp:art_ps_ws:' })).keys.map((k) => k.name);
-    expect(keys.some((k) => k.endsWith(':full'))).toBe(true);
+    expect((await respKeys()).some((k) => k.endsWith(':full'))).toBe(false);
     const member = await body(await sources('art_ps_ws', await session(U.member)));
     expect(member.access).toBe('summary');
     expect(member.sources.every((src) => src.details === undefined)).toBe(true);
     expect(JSON.stringify(member)).not.toContain('SELECT');
     await new Promise((r) => setTimeout(r, 50));
-    const after = (await e.SLUGS!.list({ prefix: 'prov:v1:resp:art_ps_ws:' })).keys.map((k) => k.name);
+    const after = await respKeys();
     expect(after.some((k) => k.endsWith(':named'))).toBe(true);
-    // A version's page scan is cached once and reused by every caller class.
-    expect((await e.SLUGS!.list({ prefix: 'prov:v1:scan:ver_art_ps_ws:' })).keys).toHaveLength(1);
+    expect(after.some((k) => k.endsWith(':full'))).toBe(false);
+    for (const key of after) expect(await e.SLUGS!.get(key)).not.toMatch(/SELECT|conn_ps_/);
+    // An editor right after a member still gets the full answer, built fresh.
+    expect((await body(await sources('art_ps_ws', await session(U.owner)))).access).toBe('full');
+    // A version's page scan is cached once and reused by every caller class. It holds
+    // what the published files hold, and none of the server facts editors get.
+    const scanKeys = (await e.SLUGS!.list({ prefix: 'prov:v1:scan:ver_art_ps_ws:' })).keys;
+    expect(scanKeys).toHaveLength(1);
+    const scan = (await e.SLUGS!.get(scanKeys[0].name)) ?? '';
+    expect(scan).toContain('warehouse');
+    for (const fact of ['conn_ps_', 'credential_scope', 'job_ps_', 'crew_ps']) expect(scan).not.toContain(fact);
   });
 });
 

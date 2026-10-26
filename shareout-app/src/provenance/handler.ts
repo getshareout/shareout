@@ -6,8 +6,10 @@
  * live server facts. Unknown or unauthorized artifacts are 404, like the page itself.
  *
  * Cost control: anonymous callers share a per-IP budget; the page scan is cached per
- * version (immutable); the built answer is cached for a minute per caller class
- * (full / named / scoped / public), so a cached answer never crosses permission levels.
+ * version (immutable, and only what the published files hold); the built answer is
+ * cached for a minute per viewer class (named / scoped / public), so a cached answer
+ * never crosses permission levels. Editor answers carry queries and connection ids and
+ * editors are few: they are built every time and never stored.
  */
 import type { Env } from '../types';
 import type { FetchContext } from '../router/context';
@@ -74,7 +76,7 @@ export async function handleGetArtifactSources(ctx: FetchContext, artifactId: st
   }
 
   const page = url.searchParams.get('page')?.trim() || version.entrypoint;
-  const responseKey = cacheKey('resp', artifactId, version.id, page, callerClass(caller));
+  const responseKey = caller.full ? null : cacheKey('resp', artifactId, version.id, page, callerClass(caller));
   const cached = responseKey && env.SLUGS ? await kvCacheGet(env.SLUGS, responseKey) : null;
   if (cached) {
     return noStore(new Response(cached, { headers: { 'Content-Type': 'application/json' } }));
