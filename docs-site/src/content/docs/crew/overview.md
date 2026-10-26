@@ -118,6 +118,7 @@ Stream live with `sdk.crew.run()` or replay from run history.
 | --- | --- |
 | `maxIterations` | Cap tool loops per run |
 | `runBudgetMicroUsd` | Optional per-run spend cap |
+| `maxRuntimeMs` | Wall-clock cap for scheduled (cron/condition) runs: default 25000, max 300000 (5 min). Manual, event and chat runs stay at 25 s |
 | Workspace AI balance | Runs halt when credits are exhausted |
 | Concurrent runs | Capped server-side per artifact |
 

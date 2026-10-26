@@ -16,6 +16,8 @@ export interface CrewDefineConfig {
   model?: 'claude-sonnet-5' | 'claude-haiku-4-5-20251001';
   maxIterations?: number;
   runBudgetMicroUsd?: number;
+  /** Wall-clock cap for scheduled (cron/condition) runs, in ms: 5000–300000, default 25000. Other runs stay at 25000. */
+  maxRuntimeMs?: number;
   tools?: CrewToolGrant;
 }
 
@@ -69,6 +71,14 @@ export class CrewStore {
     return this.sdk._internalFetch('/crew/define', {
       method: 'POST',
       body: JSON.stringify(config),
+    });
+  }
+
+  /** Update only the given fields of this app's crew (owner only). Grants are kept unless `tools` is sent. */
+  async update(patch: Partial<CrewDefineConfig>): Promise<{ crew: unknown }> {
+    return this.sdk._internalFetch('/crew', {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
     });
   }
 

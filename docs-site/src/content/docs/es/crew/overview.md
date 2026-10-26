@@ -106,6 +106,7 @@ flowchart LR
 | --- | --- |
 | `maxIterations` | Tope de loops por run |
 | `runBudgetMicroUsd` | Tope de gasto por run |
+| `maxRuntimeMs` | Tope de duración de runs programados (cron/condition): 25000 por defecto, máximo 300000 (5 min). Runs manuales, por evento y de chat quedan en 25 s |
 | Balance AI del workspace | Detiene runs si se agota |
 
 Uso: `sdk.crew.usage(workspaceId)`.

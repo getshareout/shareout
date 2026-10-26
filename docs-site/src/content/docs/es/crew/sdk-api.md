@@ -20,6 +20,7 @@ Base: `https://shareout.site/v1/data/{artifactId}/crew`
 | --- | --- | --- |
 | `GET` | `/crew` | Config + grants |
 | `POST` | `/crew/define` | Crear o reemplazar crew |
+| `PATCH` | `/crew` | Actualizar solo los campos enviados (grants intactos salvo que mandes `tools`) |
 | `POST` | `/crew/run` | Iniciar run (SSE) |
 | `GET` | `/crew/runs` | Listar runs |
 | `GET` | `/crew/runs/{runId}` | Run + eventos |
@@ -38,6 +39,7 @@ curl -X POST "https://shareout.site/v1/data/art_abc123/crew/define" \
 
 ```typescript
 define(config): Promise<{ crew: unknown }>
+update(patch): Promise<{ crew: unknown }>
 get(): Promise<{ crew: unknown; grants: unknown[] }>
 run(options?): AsyncGenerator<CrewRunEvent>
 runs.list / runs.get / runs.stream
