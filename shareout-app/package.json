@@ -85,7 +85,7 @@
     "aws4fetch": "^1.0.20",
     "fflate": "^0.8.3",
     "postal-mime": "^4.0.7",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "yjs": "^13.6.33"
   },
   "overrides": {
