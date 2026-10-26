@@ -186,13 +186,15 @@ the per-note routes return `404` — never an error.
 | `GET` | `/v1/workspaces/{id}/knowledge/tree` | Member+ | All note summaries grouped by kind (no bodies) |
 | `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | One note — full markdown body + sources, with each source artifact's title, slug and link when you can open it |
 | `GET` | `/v1/workspaces/{id}/knowledge/from/{artifactId}` | Member+ | Notes learned from one artifact; empty when Knowledge is off or you can't open the artifact |
-| `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Replace a note's markdown; marks it as hand-edited |
+| `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ (`index.md`: Admin+) | Replace a note's markdown; marks it as hand-edited |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Delete a note; `forget=1` stops it being re-learned |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | Turn learning on or off (**paid plan** required to enable) |
 | `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 recent live pages; returns `{ queued, kicked }` (**paid plan**) |
 
 A hand-edited note (via `PUT`) is never overwritten by the learner — the same rule the edit
-control follows in the lens.
+control follows in the lens. The overview (`index.md`) is loaded into every member's assistant,
+so only owners and admins can edit it; agents receive it quoted as workspace data, never as
+instructions.
 
 ```http
 PUT /v1/workspaces/{workspaceId}/knowledge/files/topics/retention.md

@@ -162,7 +162,7 @@ las rutas requieren membresía del workspace.
 | `GET` | `/v1/workspaces/{id}/knowledge/tree` | Member+ | Resúmenes agrupados por kind |
 | `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Una nota — cuerpo markdown + sources, con título, slug y enlace de cada artefacto fuente cuando lo podés abrir |
 | `GET` | `/v1/workspaces/{id}/knowledge/from/{artifactId}` | Member+ | Notas aprendidas de un artefacto; vacío si Conocimiento está apagado o no podés abrir el artefacto |
-| `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Reemplazar markdown; marca como editada a mano |
+| `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ (`index.md`: Admin+) | Reemplazar markdown; marca como editada a mano |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Eliminar nota; `forget=1` evita re-aprendizaje |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | Activar/desactivar (**plan pago** para activar) |
 | `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Encolar hasta 200 artefactos; `{ queued, kicked }` (**plan pago**) |

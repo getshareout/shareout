@@ -5126,7 +5126,7 @@
           "Knowledge"
         ],
         "summary": "Write a knowledge note",
-        "description": "Any member. Send the markdown (with frontmatter `kind`, `id`, `title`) as `text/markdown`, or JSON `{ \"content\": \"...\" }`. Human edits win over learned ones.",
+        "description": "Any member, except the overview `index.md`, which is owner/admin (it is loaded into every member's assistant). Send the markdown (with frontmatter `kind`, `id`, `title`) as `text/markdown`, or JSON `{ \"content\": \"...\" }`. Human edits win over learned ones. `kind: overview` and `id: index` are only accepted at `index.md`.",
         "operationId": "putKnowledgeFile",
         "requestBody": {
           "required": true,
@@ -5157,6 +5157,9 @@
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         }
       },

@@ -602,10 +602,12 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     if (node.confidence) meta.push(t('knowledge.metaConfidence') + ': ' + node.confidence);
     var title = node.kind === 'overview' ? t('knowledge.overviewTitle') : (node.title || node.path);
     var backBtn = back ? knBackBtn() : '';
-    // Actions sit with the title they act on, as icons; Forget is admin-only.
+    // Actions sit with the title they act on, as icons; Forget is admin-only, and so is
+    // changing the overview (every member's assistant reads it).
+    var canWrite = node.kind !== 'overview' || window.WSX_ADMIN;
     var acts = '<div class="wsx-knd__acts">'
-      + knIconBtn('knPin', t(node.pinned ? 'knowledge.unpin' : 'knowledge.pin'), 'pin', node.pinned ? ' is-on' : '')
-      + knIconBtn('knEdit', t('knowledge.edit'), 'edit')
+      + (canWrite ? knIconBtn('knPin', t(node.pinned ? 'knowledge.unpin' : 'knowledge.pin'), 'pin', node.pinned ? ' is-on' : '')
+        + knIconBtn('knEdit', t('knowledge.edit'), 'edit') : '')
       + (window.WSX_ADMIN ? knIconBtn('knForget', t('knowledge.forget'), 'del', ' wsx-knd__act--danger') : '')
       + '</div>';
     function facet(label, kind, xs) {
@@ -635,8 +637,9 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
         openArtifact(slug, r.getAttribute('data-kn-src-title') || '', r.getAttribute('data-kn-src-id') || '');
       });
     });
-    document.getElementById('knPin').addEventListener('click', function () { knPin(node); });
-    document.getElementById('knEdit').addEventListener('click', function () { knEdit(node); });
+    var pin = document.getElementById('knPin'), ed = document.getElementById('knEdit');
+    if (pin) pin.addEventListener('click', function () { knPin(node); });
+    if (ed) ed.addEventListener('click', function () { knEdit(node); });
     var fg = document.getElementById('knForget');
     if (fg) fg.addEventListener('click', function () { knForget(node); });
   }
