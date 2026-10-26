@@ -22,7 +22,8 @@ export function publishSource(user: AuthUser): VersionSource {
   return user.service ? 'agent' : 'api';
 }
 
-const SOURCE_MAX_BYTES = 512 * 1024;
+/** Most source text one read returns, counted in characters (`text.length`). */
+export const SOURCE_MAX_BYTES = 512 * 1024;
 
 export async function handleGetVersions(
   request: Request,

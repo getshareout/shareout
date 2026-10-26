@@ -116,8 +116,8 @@ export async function handleServe(
   // (<hex>.shareoutcdn.site). There is no session cookie there, so private artifacts
   // are authorized by the path-prefix capability token (`ct`) instead of checkAccess,
   // and private bytes are served `no-store` (ADR 30).
-  // executionCtx: threaded so the viewers can register per-view analytics writes with
-  // waitUntil() instead of firing them detached (which the runtime may cancel).
+  // executionCtx: threaded so per-view analytics writes and the edge-cache fill register
+  // with waitUntil() instead of firing detached (which the runtime may cancel).
   // cached: the deployment record, when a route lookup (subdomain / content domain)
   // already resolved it this request — skips the `deploy:` read.
   opts: { contentOrigin?: boolean; ct?: string | null; executionCtx?: ExecutionContext; cached?: CachedDeployment } = {},
@@ -315,7 +315,7 @@ export async function handleServe(
     const filePath = original || result.entrypoint;
     const source = await fetchAssetRow(env, result.version_id, filePath);
     if (source) {
-      const resp = await serveAsset(request, env, source, slug, true, { noStore, relaxCsp: !isOpen, lockCsp, sandbox: !contentOrigin });
+      const resp = await serveAsset(request, env, source, slug, true, { noStore, relaxCsp: !isOpen, lockCsp, sandbox: !contentOrigin, executionCtx: opts.executionCtx });
       const out = new Response(resp.body, resp);
       let filename = filePath.split('/').pop()!;
       if (assetPath !== 'download') { try { filename = decodeURIComponent(assetPath); } catch { /* keep entrypoint name */ } }
@@ -388,6 +388,7 @@ export async function handleServe(
         sandbox: !contentOrigin,
         cacheHtml: true,
         cacheVariant: variant,
+        executionCtx: opts.executionCtx,
         transform: (resp) => {
           let out = injectPageAgent(injectPerfBeacon(resp, artifactId, baseUrl), pageAgent);
           out = injectPresenceBeacon(out, artifactId, baseUrl);
@@ -404,6 +405,7 @@ export async function handleServe(
       noStore,
       relaxCsp: !isOpen, lockCsp,
       sandbox: !contentOrigin,
+      executionCtx: opts.executionCtx,
       ...(asset.mime === 'text/html' && assetPath ? { transform: (resp: Response) => injectPageAgent(resp, pageAgent) } : {}),
     });
   }
@@ -416,7 +418,7 @@ export async function handleServe(
     `).bind(result.version_id).first<{ r2_key: string; mime: string; size_bytes: number }>();
 
     if (indexAsset) {
-      return serveAsset(request, env, indexAsset, slug, isRawRequest, { noStore, relaxCsp: !isOpen, lockCsp, sandbox: !contentOrigin });
+      return serveAsset(request, env, indexAsset, slug, isRawRequest, { noStore, relaxCsp: !isOpen, lockCsp, sandbox: !contentOrigin, executionCtx: opts.executionCtx });
     }
   }
 

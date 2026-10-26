@@ -162,7 +162,7 @@ las rutas requieren membresía del workspace.
 | `GET` | `/v1/workspaces/{id}/knowledge/tree` | Member+ | Resúmenes agrupados por kind |
 | `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Una nota — cuerpo markdown + sources, con título, slug y enlace de cada artefacto fuente cuando lo podés abrir |
 | `GET` | `/v1/workspaces/{id}/knowledge/from/{artifactId}` | Member+ | Notas aprendidas de un artefacto; vacío si Conocimiento está apagado o no podés abrir el artefacto |
-| `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Reemplazar markdown; marca como editada a mano |
+| `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ (`index.md`: Admin+) | Reemplazar markdown; marca como editada a mano |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Eliminar nota; `forget=1` evita re-aprendizaje |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | Activar/desactivar (**plan pago** para activar) |
 | `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Encolar hasta 200 artefactos; `{ queued, kicked }` (**plan pago**) |
@@ -172,6 +172,7 @@ las rutas requieren membresía del workspace.
 - **Solo miembros.** La biblioteca Knowledge es visible para miembros del workspace. Los sharees externos no ven Knowledge.
 - **Solo tus artefactos.** Las notas se derivan de los artefactos publicados de tu workspace.
 - **Opt-in.** Knowledge está apagado hasta que un owner o admin lo active.
+- **Desaprender.** Cuando una página pasa a privada o a la papelera, las notas aprendidas de ella (temas, entidades, la línea de tiempo y el overview) dejan de mostrarse al resto de los miembros y a sus asistentes en el momento, y la corrida nocturna siguiente las reconstruye con las páginas que siguen abiertas para todos.
 
 ## Relacionado
 

@@ -1,5 +1,7 @@
-# Keep deps current without flooding CI (first Dependabot wave opened ~15 PRs).
-# Prefer grouped PRs; keep open PR limits low so Actions runners stay free for product PRs.
+# Keep deps current without flooding the PR list (the first Dependabot wave opened ~15
+# PRs): grouped updates, low open-PR limits. npm only: there is no hosted CI and there are
+# no workflows, so no GitHub Actions to update. Check a Dependabot PR locally before
+# merging it (MAINTAINING.md).
 version: 2
 updates:
   - package-ecosystem: npm
@@ -38,18 +40,5 @@ updates:
       - docs
     groups:
       docs-deps:
-        patterns:
-          - "*"
-
-  - package-ecosystem: github-actions
-    directory: /
-    schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 2
-    labels:
-      - dependencies
-    groups:
-      actions:
         patterns:
           - "*"

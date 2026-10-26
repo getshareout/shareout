@@ -178,6 +178,17 @@ describe('branded folder landing', () => {
     expect(html).not.toContain('javascript:');
   });
 
+  it('renders the org and folder names as text in the page title', async () => {
+    await e.DB.prepare("UPDATE folders SET name = ? WHERE id = 'fld_fcp_q3'").bind('</title><script>x()</script>').run();
+    try {
+      const html = await portal('?folder=fld_fcp_q3');
+      expect(html).toContain('<title>Acme · &lt;/title&gt;&lt;script&gt;x()&lt;/script&gt;</title>');
+      expect(html).not.toContain('<script>x()</script>');
+    } finally {
+      await e.DB.prepare("UPDATE folders SET name = 'Q3 reports' WHERE id = 'fld_fcp_q3'").run();
+    }
+  });
+
   it('falls back to the full portal for a folder the person was not granted', async () => {
     const html = await portal('?folder=fld_fcp_other');
     expect(html).not.toContain('Board</h1>');

@@ -6,7 +6,8 @@ const countExceededMemoryKills = vi.fn(async () => null as number | null);
 vi.mock('../../src/observability/cf-worker-analytics', () => ({ countExceededMemoryKills: (...a: unknown[]) => countExceededMemoryKills(...a) }));
 
 import { recordRequestMetric, getWindowSummary } from '../../src/observability/store';
-import { observe, shouldSkipObservability } from '../../src/observability';
+import { countsInRequestMetrics, observe, shouldSkipObservability } from '../../src/observability';
+import { withRequestLogging } from '../../src/request-logging';
 
 interface DbCall {
   sql: string;
@@ -184,5 +185,93 @@ describe('observe — routing', () => {
     expect(shouldSkipObservability({ hostname: 'preview.localhost', path: '/home' })).toBe(true);
     expect(shouldSkipObservability({ hostname: 'shareout.site', path: '/auth/dev' })).toBe(true);
     expect(shouldSkipObservability({ hostname: 'shareout.site', path: '/home' })).toBe(false);
+  });
+
+  it('writes nothing for a preflight, a static asset or a beacon that succeeded', async () => {
+    const db = makeDb() as ReturnType<typeof makeDb>;
+    const { ctx, tasks } = ctxCapture();
+    const env = { DB: db, RATE_LIMIT_KV: makeKv() } as Env;
+    observe(env, ctx, { status: 204, durationMs: 1, outcome: 'success', method: 'OPTIONS', path: '/v1/data/art_1/json/k' });
+    observe(env, ctx, { status: 200, durationMs: 3, outcome: 'success', method: 'GET', path: '/sdk/shareout.js' });
+    observe(env, ctx, { status: 404, durationMs: 2, outcome: 'http_error', method: 'GET', path: '/t/art_gone.webp' });
+    observe(env, ctx, { status: 204, durationMs: 2, outcome: 'success', method: 'POST', path: '/v1/presence' });
+    await Promise.all(tasks);
+    expect(tasks).toHaveLength(0);
+    expect(db._calls).toHaveLength(0);
+  });
+
+  it('still counts and logs a static asset that fails', async () => {
+    const db = makeDb() as ReturnType<typeof makeDb>;
+    const { ctx, tasks } = ctxCapture();
+    observe({ DB: db, RATE_LIMIT_KV: makeKv() } as Env, ctx, {
+      status: 500, durationMs: 40, outcome: 'http_error', method: 'GET', path: '/t/art_abc.webp',
+    });
+    await Promise.all(tasks);
+    expect(db._calls.some((c) => c.sql.includes('health_metrics_hourly'))).toBe(true);
+    expect(db._calls.some((c) => c.sql.includes('ops_error_log'))).toBe(true);
+  });
+
+  it('counts page and API requests', async () => {
+    const db = makeDb() as ReturnType<typeof makeDb>;
+    const { ctx, tasks } = ctxCapture();
+    const env = { DB: db, RATE_LIMIT_KV: makeKv() } as Env;
+    observe(env, ctx, { status: 200, durationMs: 80, outcome: 'success', method: 'GET', path: '/home' });
+    observe(env, ctx, { status: 200, durationMs: 30, outcome: 'success', method: 'POST', path: '/v1/data/art_1/json/k' });
+    await Promise.all(tasks);
+    expect(db._calls.filter((c) => c.sql.includes('health_metrics_hourly'))).toHaveLength(2);
+  });
+});
+
+describe('countsInRequestMetrics', () => {
+  it('leaves out CORS preflights on any path', () => {
+    expect(countsInRequestMetrics({ method: 'OPTIONS', path: '/v1/data/art_1/json/k' })).toBe(false);
+    expect(countsInRequestMetrics({ method: 'OPTIONS', path: '/mcp' })).toBe(false);
+  });
+
+  it('leaves out the static and beacon routes the router serves', () => {
+    const staticPaths = [
+      // shared bundles (router/shared-bundles.ts)
+      '/sdk/shareout.js', '/sdk/v1/shareout.js', '/sdk/shareout.css', '/sdk/editor.js', '/sdk/comments-agent.js',
+      '/sdk/home-shell.js', '/sdk/home-lens-admin.js', '/lib/team/chart@1.2.0.js', '/vendor/chart.js@4.4.1/dist/chart.umd.js',
+      // brand images (brand/index.ts)
+      '/brand/logo-mark.png', '/favicon.ico', '/favicon-32.png', '/apple-touch-icon.png',
+      // thumbnails, workspace logos, app-shell files (router/serve-router.ts)
+      '/t/art_abc123.webp', '/t/art_abc123_card.webp', '/wl/wsp_abc.png', '/manifest.webmanifest', '/sw.js',
+    ];
+    for (const path of staticPaths) expect(countsInRequestMetrics({ method: 'GET', path }), path).toBe(false);
+    for (const path of ['/v1/perf', '/v1/presence', '/v1/funnel']) {
+      expect(countsInRequestMetrics({ method: 'POST', path }), path).toBe(false);
+    }
+  });
+
+  it('keeps pages, APIs and artifact routes', () => {
+    const counted: Array<[string, string]> = [
+      ['GET', '/'], ['GET', '/home'], ['GET', '/status'], ['GET', '/auth/login'],
+      ['GET', '/a/q3-report/'], ['GET', '/a/q3-report/app.js'], ['GET', '/v1/artifacts'],
+      ['GET', '/v1/artifacts/art_1/presence'], ['POST', '/v1/data/art_1/json/k'], ['POST', '/mcp'],
+      ['GET', '/sdk'], ['GET', '/teams/preview'],
+    ];
+    for (const [method, path] of counted) expect(countsInRequestMetrics({ method, path }), `${method} ${path}`).toBe(true);
+    expect(countsInRequestMetrics({})).toBe(true); // a failed cron run carries no path
+  });
+});
+
+describe('withRequestLogging → observe', () => {
+  it('keeps preflights and static assets off D1 and folds page requests in', async () => {
+    const db = makeDb() as ReturnType<typeof makeDb>;
+    const tasks: Promise<unknown>[] = [];
+    const ctx = { waitUntil: (p: Promise<unknown>) => tasks.push(p) } as ExecutionContext;
+    const env = { DB: db, LOG_LEVEL: 'error' } as Env;
+    const send = (path: string, method = 'GET', status = 200) =>
+      withRequestLogging(new Request(`https://shareout.example.com${path}`, { method }), env, ctx, async () => new Response(null, { status }));
+
+    await send('/v1/data/art_1/json/k', 'OPTIONS', 204);
+    await send('/sdk/shareout.js');
+    await Promise.all(tasks);
+    expect(db._calls).toHaveLength(0);
+
+    await send('/home');
+    await Promise.all(tasks);
+    expect(db._calls.filter((c) => c.sql.includes('health_metrics_hourly'))).toHaveLength(1);
   });
 });

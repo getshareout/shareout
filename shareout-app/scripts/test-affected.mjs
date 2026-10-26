@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Run only the unit tests affected by this branch's changes.
 //
-// The full suite is 466 files / ~4m40s, of which ~34s is actual assertions — the rest
-// is re-importing the module graph once per test file. For a small PR that is pure
-// waste, so this maps changed files to tests through vitest's module graph
+// The full suite is ~770 files (767 on 2026-10-25) and takes minutes: ~4m40s at 466
+// files, ~3m at 550 after #99 cut per-file module imports. A small PR reaches a handful
+// of those files, so this maps changed files to tests through vitest's module graph
 // (`vitest related`) and runs just those.
 //
 // Falls back to the whole suite when a change can plausibly affect everything

@@ -47,11 +47,38 @@ export function shouldSkipObservability(evt: Pick<ObserveEvent, 'hostname' | 'is
   );
 }
 
-// Fire-and-forget telemetry for one completed request. Always folds the request
-// into its hour bucket; on a server error (5xx / exception) also logs it.
-// Never blocks or throws into the request.
+// Left out of the hourly request metric: CORS preflights, static bytes and telemetry
+// beacons. Each counted request is an upsert on the single-writer D1 primary, and these
+// fire on every page load or on a timer. A failed one (5xx / exception) still counts and
+// is logged. The paths mirror the router's static and beacon routes:
+//   /sdk/ /lib/ /vendor/              shared bundles: SDK, editor and home-shell bundles,
+//                                     Workspace Library modules, vendored libraries
+//                                     (router/shared-bundles.ts)
+//   /brand/, root icons               brand images (brand/index.ts)
+//   /t/ /wl/                          artifact thumbnails, workspace logos (router/serve-router.ts)
+//   /manifest.webmanifest /sw.js      app-shell files (router/serve-router.ts)
+//   /v1/perf /v1/presence /v1/funnel  always-204 beacons (router/api/{perf,presence,funnel}.ts)
+const UNCOUNTED_PREFIXES = ['/sdk/', '/lib/', '/vendor/', '/brand/', '/t/', '/wl/'];
+const UNCOUNTED_PATHS = new Set([
+  '/favicon.ico', '/favicon-16.png', '/favicon-32.png', '/apple-touch-icon.png',
+  '/manifest.webmanifest', '/sw.js',
+  '/v1/perf', '/v1/presence', '/v1/funnel',
+]);
+
+/** False for requests the hourly request metric leaves out (see above). */
+export function countsInRequestMetrics(evt: Pick<ObserveEvent, 'method' | 'path'>): boolean {
+  if (evt.method === 'OPTIONS') return false;
+  const path = evt.path ?? '';
+  return !UNCOUNTED_PATHS.has(path) && !UNCOUNTED_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+
+// Fire-and-forget telemetry for one completed request. Folds the request into its
+// hour bucket unless countsInRequestMetrics leaves it out; a server error (5xx /
+// exception) always folds and is also logged. Never blocks or throws into the request.
 export function observe(env: Env, ctx: ExecutionContext | undefined, evt: ObserveEvent): void {
   if (shouldSkipObservability(evt)) return;
+  const serverError = evt.status >= 500 || evt.outcome === 'exception';
+  if (!serverError && !countsInRequestMetrics(evt)) return;
 
   const run = async () => {
     await recordRequestMetric(env, {
@@ -60,7 +87,7 @@ export function observe(env: Env, ctx: ExecutionContext | undefined, evt: Observ
       outcome: evt.outcome,
     }).catch(() => {});
 
-    if (evt.status >= 500 || evt.outcome === 'exception') {
+    if (serverError) {
       const errEvt: ErrorEvent = {
         ...evt,
         outcome: evt.outcome === 'exception' ? 'exception' : 'http_error',

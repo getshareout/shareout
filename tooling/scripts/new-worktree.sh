@@ -3,9 +3,10 @@
 #
 #   ./tooling/scripts/new-worktree.sh <branch> [dir]
 #
-# The slow part of a fresh worktree is `npm ci` (~450MB, minutes). node_modules is a
-# pure function of the lockfile, so when the lockfile matches the primary checkout we
-# clone it instead. On APFS `cp -c` is copy-on-write: seconds, and near-zero extra disk.
+# `npm ci` installs ~450 packages (~650MB): about 5s with a warm npm cache, but a full
+# extra copy on disk per worktree. node_modules is a pure function of the lockfile, so
+# when the lockfile matches the primary checkout we clone it instead. On APFS `cp -c` is
+# copy-on-write: seconds, and near-zero extra disk.
 # The workspace links inside node_modules are relative (@shareout/sdk -> ../../sdk), so
 # a copied tree points at THIS worktree's sources, not the primary's.
 #

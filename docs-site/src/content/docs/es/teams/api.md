@@ -280,7 +280,7 @@ Biblioteca aprendida opt-in. **Plan pago** requerido para `enable` y `backfill`.
 | `GET` | `/v1/workspaces/{id}/knowledge/status` | Member+ | Progreso de entrenamiento (ventana 24h). |
 | `GET` | `/v1/workspaces/{id}/knowledge/tree` | Member+ | Resúmenes por kind. |
 | `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Una nota (cuerpo completo). |
-| `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Upsert markdown. |
+| `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ (`index.md`: Admin+) | Upsert markdown. |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Eliminar; `forget=1` evita re-aprendizaje. |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | `{ "enabled": true }` — plan pago. |
 | `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Encolar hasta 200 artefactos → `{ queued, kicked }` — plan pago. |

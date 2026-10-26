@@ -26,7 +26,7 @@ vi.mock('../../../src/crew/provider', () => ({ getCrewProvider: () => ({ streamT
 import { routeHomeAgentApi } from '../../../src/router/api/home-agent';
 
 function ctx(qs: string): FetchContext {
-  const DB = { prepare: () => ({ bind: () => ({ first: async () => ({ name: 'Leonel Fernandez' }) }) }) };
+  const DB = { prepare: () => ({ bind: () => ({ first: async () => ({ name: 'Alex Rivera' }) }) }) };
   const url = new URL(`https://shareout.site/v1/home/agent/brief?${qs}`);
   return { request: new Request(url), env: { DB } as unknown as Env, path: url.pathname, url, addCORS: (r: Response) => r } as unknown as FetchContext;
 }
@@ -43,11 +43,11 @@ describe('home agent brief', () => {
 
   it('writes in the viewer language and greets by first name', async () => {
     feed.mockResolvedValue({ needs: [{ actor: 'Ana', summary: 'commented' }], pulse: [] });
-    streamTurn.mockImplementation(async function* () { yield { type: 'text_delta', text: 'Buen día, Leonel.' }; yield { type: 'message_stop' }; });
+    streamTurn.mockImplementation(async function* () { yield { type: 'text_delta', text: 'Buen día, Alex.' }; yield { type: 'message_stop' }; });
     const res = await routeHomeAgentApi(ctx('tod=morning&lang=es'));
-    expect(await res!.json()).toEqual({ text: 'Buen día, Leonel.' });
+    expect(await res!.json()).toEqual({ text: 'Buen día, Alex.' });
     const req = streamTurn.mock.calls[0][0];
     expect(req.system).toContain('Spanish as spoken in Argentina');
-    expect(req.transcript[0].text).toContain('User: Leonel');
+    expect(req.transcript[0].text).toContain('User: Alex');
   });
 });

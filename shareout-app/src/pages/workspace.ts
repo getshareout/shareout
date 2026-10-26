@@ -88,7 +88,7 @@ function renderNoAccessPage(workspace: { name: string }, origin: string): Respon
 </main>
 </div>`;
   return renderHtmlPage({
-    title: `${escapeHtml(workspace.name)} — ShareOut`,
+    title: `${workspace.name} — ShareOut`,
     pageStyles: workspacePageStyles,
     body,
     lang: 'en',

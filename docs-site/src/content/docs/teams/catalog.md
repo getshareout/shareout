@@ -233,6 +233,11 @@ DELETE /v1/workspaces/{workspaceId}/catalog/files?path=sources/orders.md
 Authorization: Bearer {token}
 ```
 
+`path` is a relative `.md` path such as `sources/orders.md`: letters, digits, `.`, `_`
+and `-`, each name starting with a letter or digit, no `..`, at most 4 levels and 200
+characters (`400 INVALID_PATH` otherwise). `content` is at most 128 KB
+(`413 FILE_TOO_LARGE`).
+
 ## REST API
 
 All routes require workspace membership. A disabled catalog returns `{ "enabled": false }`

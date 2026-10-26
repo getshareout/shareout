@@ -281,7 +281,7 @@ Opt-in learned library. **Paid plan** required for `enable` and `backfill`. See 
 | `GET` | `/v1/workspaces/{id}/knowledge/status` | Member+ | Training progress (24h window). |
 | `GET` | `/v1/workspaces/{id}/knowledge/tree` | Member+ | Note summaries by kind. |
 | `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | One note (full body). |
-| `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Upsert note markdown. |
+| `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ (`index.md`: Admin+) | Upsert note markdown. |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Delete; `forget=1` stops re-learn. |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | `{ "enabled": true }` — paid plan. |
 | `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 pages → `{ queued, kicked }` — paid plan. |

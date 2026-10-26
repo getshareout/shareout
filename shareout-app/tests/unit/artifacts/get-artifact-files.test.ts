@@ -82,7 +82,7 @@ describe('handleGetArtifactFiles', () => {
   });
 
   it('returns text and binary files for a production deployment', async () => {
-    const textObject = { text: vi.fn(async () => 'console.log("hi")'), arrayBuffer: vi.fn() };
+    const textObject = { arrayBuffer: vi.fn(async () => new TextEncoder().encode('\uFEFFconsole.log("hi")').buffer) };
     const binaryBytes = new Uint8Array([0, 1, 2]);
     const binaryObject = {
       text: vi.fn(),
@@ -138,7 +138,7 @@ describe('handleGetArtifactFiles', () => {
     expect(body.files).toEqual([
       {
         path: 'index.js',
-        content: 'console.log("hi")',
+        content: '\uFEFFconsole.log("hi")',
         encoding: 'utf8',
         mime: 'application/javascript',
         size_bytes: 20,
@@ -154,7 +154,7 @@ describe('handleGetArtifactFiles', () => {
   });
 
   it('loads a specific version by version number or version id', async () => {
-    const textObject = { text: vi.fn(async () => 'v2'), arrayBuffer: vi.fn() };
+    const textObject = { arrayBuffer: vi.fn(async () => new TextEncoder().encode('v2').buffer) };
     const makeEnv = (url: string) => ({
       ...baseEnv,
       ARTIFACTS: makeR2Mock(() => textObject),
@@ -245,7 +245,63 @@ describe('handleGetArtifactFiles', () => {
     );
 
     expect(response.status).toBe(200);
-    expect((await jsonBody(response)).files).toEqual([]);
+    const body = await jsonBody(response);
+    expect(body.files).toEqual([]);
+    expect(body.unreadable).toEqual(['missing.html']);
+  });
+
+  const threeFiles = () => {
+    const get = vi.fn(async (key: string) => ({ arrayBuffer: async () => new TextEncoder().encode(`bytes of ${key}`).buffer }));
+    const env = {
+      ...baseEnv,
+      ARTIFACTS: { get } as unknown as typeof baseEnv.ARTIFACTS,
+      DB: makeDbMock({
+        first: (sql) => {
+          if (sql.includes('SELECT id, owner_id FROM artifacts')) return { id: 'art_1', owner_id: 'usr_1' };
+          if (sql.includes('owner_id FROM artifacts')) return { owner_id: 'usr_1' };
+          if (sql.includes('version_id FROM deployments')) return { version_id: 'ver_3' };
+          if (sql.includes('entrypoint FROM versions WHERE id = ?')) return { id: 'ver_3', version_no: 3, entrypoint: 'index.html' };
+          if (sql.includes('AS newest')) return { live: 3, newest: 4 };
+          return null;
+        },
+        all: (sql) => (sql.includes('FROM assets WHERE version_id')
+          ? { results: ['a,b.css', 'index.html', 'styles.css'].map((path) => ({ path, r2_key: `k/${path}`, mime: path.endsWith('.css') ? 'text/css' : 'text/html', size_bytes: 9, sha256: `h-${path}` })) }
+          : { results: [] }),
+      }),
+    };
+    return { env, get };
+  };
+
+  it('manifest=1 lists path, mime, size and sha256 from D1 without reading R2', async () => {
+    const { env, get } = threeFiles();
+    const response = await handleGetArtifactFiles(new Request('https://shareout.example.com/v1/artifacts/art_1/files?manifest=1'), env, user, 'art_1');
+    expect(response.status).toBe(200);
+    const body = await jsonBody(response);
+    expect(body).toMatchObject({ version_no: 3, entrypoint: 'index.html', live_version: 3, newest_version: 4 });
+    expect(body.files).toEqual([
+      { path: 'a,b.css', mime: 'text/css', size: 9, sha256: 'h-a,b.css' },
+      { path: 'index.html', mime: 'text/html', size: 9, sha256: 'h-index.html' },
+      { path: 'styles.css', mime: 'text/css', size: 9, sha256: 'h-styles.css' },
+    ]);
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it('paths= reads only the files asked for (a path with a comma included)', async () => {
+    const { env, get } = threeFiles();
+    const response = await handleGetArtifactFiles(new Request('https://shareout.example.com/v1/artifacts/art_1/files?paths=styles.css&paths=a,b.css'), env, user, 'art_1');
+    const body = await jsonBody(response);
+    expect(body.files.map((f: { path: string; content: string }) => [f.path, f.content])).toEqual([
+      ['a,b.css', 'bytes of k/a,b.css'],
+      ['styles.css', 'bytes of k/styles.css'],
+    ]);
+    expect(get).toHaveBeenCalledTimes(2);
+  });
+
+  it('paths= naming a file the version lacks is a 404 that lists it', async () => {
+    const { env } = threeFiles();
+    const response = await handleGetArtifactFiles(new Request('https://shareout.example.com/v1/artifacts/art_1/files?paths=index.html,nope.js&manifest=1'), env, user, 'art_1');
+    expect(response.status).toBe(404);
+    expect(await jsonBody(response)).toMatchObject({ code: 'FILE_NOT_FOUND', missing: ['nope.js'] });
   });
 });
 

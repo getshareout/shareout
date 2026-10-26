@@ -221,6 +221,11 @@ PUT /v1/workspaces/{id}/catalog/files
 DELETE /v1/workspaces/{id}/catalog/files?path=sources/orders.md
 ```
 
+`path` is a relative `.md` path such as `sources/orders.md`: letters, digits, `.`, `_` and
+`-`, each name starting with a letter or digit, no `..`, at most 4 levels and 200
+characters (`400 INVALID_PATH` otherwise). `content` is at most 128 KB (`413
+FILE_TOO_LARGE`). `DELETE` accepts any stored path.
+
 ## Reading the catalog
 
 REST (auth = workspace member or agent token):

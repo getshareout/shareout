@@ -206,6 +206,38 @@ describe('knowledge routes', () => {
     expect(files.find(f => f.path === 'topics/retention.md')?.source).toBe('manual');
   });
 
+  // The overview is loaded into every member's assistant, so only owners/admins write it.
+  it('PUT index.md: a member gets 403 with a hint and nothing is stored; an admin saves it', async () => {
+    await setKnowledgeEnabled(e, WS, true);
+    const OVERVIEW = '---\nkind: overview\nid: index\ntitle: Workspace knowledge\n---\nWhat this workspace is about.';
+
+    getInternalWorkspaceRole.mockResolvedValue('member');
+    const denied = await call('PUT', '/files/index.md', OVERVIEW);
+    expect(denied?.status).toBe(403);
+    const body = (await denied!.json()) as { code: string; hint?: string };
+    expect(body.code).toBe('FORBIDDEN');
+    expect(body.hint).toMatch(/owner or admin/);
+    // Percent-encoding the path doesn't get around it.
+    expect((await call('PUT', '/files/index%2Emd', OVERVIEW))?.status).toBe(403);
+    expect(await listKnowledgeFiles(e, WS)).toEqual([]);
+
+    getInternalWorkspaceRole.mockResolvedValue('admin');
+    const ok = await call('PUT', '/files/index.md', OVERVIEW);
+    expect(ok?.status).toBe(200);
+    expect((await listKnowledgeFiles(e, WS)).map((f) => [f.path, f.source])).toEqual([['index.md', 'manual']]);
+  });
+
+  it('PUT refuses an overview (kind or id) at any path but index.md', async () => {
+    await setKnowledgeEnabled(e, WS, true);
+    getInternalWorkspaceRole.mockResolvedValue('member');
+    for (const fm of ['kind: overview\nid: topic.fake', 'kind: topic\nid: index']) {
+      const res = await call('PUT', '/files/topics/fake.md', `---\n${fm}\ntitle: Fake\n---\nbody`);
+      expect(res?.status).toBe(400);
+      expect(await res!.json()).toMatchObject({ code: 'VALIDATION_ERROR', param: 'content' });
+    }
+    expect(await listKnowledgeFiles(e, WS)).toEqual([]);
+  });
+
   it('PUT accepts JSON {content} and rejects malformed notes with 400 instead of storing them', async () => {
     await setKnowledgeEnabled(e, WS, true);
     const json = (body: unknown) => routeKnowledgeApi(createFetchContext(new Request(BASE + '/files/topics/retention.md', {

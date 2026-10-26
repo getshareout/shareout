@@ -29,7 +29,7 @@ export const workspace_client_home_views_catalogMetrics_JS = `  // ----- Catalog
     return d.measure ? catAggText(d.measure) : (d.formula || '');
   }
   function catGrainLabel(g) {
-    return ({ day: t('catalog.grainDay'), week: t('catalog.grainWeek'), month: t('catalog.grainMonth'), quarter: t('catalog.grainQuarter'), year: t('catalog.grainYear') })[g] || g;
+    return ({ day: t('admin.usageColDay'), week: t('catalog.grainWeek'), month: t('catalog.grainMonth'), quarter: t('catalog.grainQuarter'), year: t('catalog.grainYear') })[g] || g;
   }
   function catMetricTitle(x) {
     return (window.__SO_HOME_LOCALE && window.__SO_HOME_LOCALE() === 'es' && x.title_es) ? x.title_es : x.title;
@@ -43,7 +43,7 @@ export const workspace_client_home_views_catalogMetrics_JS = `  // ----- Catalog
 
   // ---- Métricas list: the metric kind segment shows these columns instead.
   function catMetricHeads() {
-    return ['catalog.colName', 'catalog.colStatus', 'catalog.mColOwner', 'catalog.mColSource', 'catalog.mColFreshness'].map(function (k) {
+    return ['catalog.colName', 'catalog.colStatus', 'catalog.mColOwner', 'catalog.kindSource', 'catalog.mColFreshness'].map(function (k) {
       return '<th>' + esc(t(k)) + '</th>';
     }).join('');
   }
@@ -102,7 +102,7 @@ export const workspace_client_home_views_catalogMetrics_JS = `  // ----- Catalog
   function catMetricHtml(x) {
     var rows = [];
     if (x.formula) rows.push([t('catalog.mFormula'), '<span class="wsx-cat__formula">' + esc(catFormula(x)) + '</span>']);
-    if (x.source) rows.push([t('catalog.mColSource'), esc(catSourceText(x.source))]);
+    if (x.source) rows.push([t('catalog.kindSource'), esc(catSourceText(x.source))]);
     if (x.grains && x.grains.length) rows.push([t('catalog.mGrains'), esc(x.grains.map(catGrainLabel).join(', '))]);
     if (x.dimensions && x.dimensions.length) rows.push([t('catalog.mDims'), esc(x.dimensions.join(', '))]);
     var fresh = catFreshText(x.freshness);
@@ -161,7 +161,7 @@ export const workspace_client_home_views_catalogMetrics_JS = `  // ----- Catalog
     var rows = d.rows || [], fmt = d.format;
     if (!rows.length) return '<p class="wsx-cat__hint">' + esc(t('catalog.mNoRows')) + '</p>';
     var dims = (d.query && d.query.by) || [], hasPeriod = rows[0] && Object.prototype.hasOwnProperty.call(rows[0], 'period');
-    var head = (hasPeriod ? '<th>' + esc(t('catalog.mPeriod')) + '</th>' : '') + dims.map(function (n) { return '<th>' + esc(n) + '</th>'; }).join('') + '<th class="wsx-atbl__num">' + esc(t('catalog.mValue')) + '</th>';
+    var head = (hasPeriod ? '<th>' + esc(t('catalog.mPeriod')) + '</th>' : '') + dims.map(function (n) { return '<th>' + esc(n) + '</th>'; }).join('') + '<th class="wsx-atbl__num">' + esc(t('autof.value')) + '</th>';
     var body = rows.map(function (r) {
       return '<tr>' + (hasPeriod ? '<td>' + esc(r.period) + '</td>' : '') + dims.map(function (n) { return '<td>' + esc(r[n] == null ? '\\u2014' : r[n]) + '</td>'; }).join('')
         + '<td class="wsx-atbl__num">' + esc(catFmtNumber(r.value, fmt)) + '</td></tr>';

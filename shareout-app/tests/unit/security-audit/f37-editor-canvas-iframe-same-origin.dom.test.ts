@@ -17,8 +17,11 @@ function frame(): HTMLIFrameElement {
 
 describe('f37 editor canvas iframe', () => {
   it('blocks: CSP meta is the first child of head in every written doc', () => {
-    expect(withCanvasCsp(PAGE)).toMatch(/<head><meta [^>]*content="script-src 'none'; object-src 'none'; base-uri 'none'">/);
-    expect(withCanvasCsp('<html><body>x</body></html>')).toContain(CSP);
+    expect(withCanvasCsp(PAGE)).toMatch(/<head><meta [^>]*content="script-src 'none'; object-src 'none'; base-uri 'none'"><title>/);
+    for (const html of ['<html><body>x</body></html>', '<header>x</header>', '<html><!--<head>--><head></head><body></body></html>']) {
+      const head = new DOMParser().parseFromString(withCanvasCsp(html), 'text/html').head;
+      expect((head.firstChild as Element).getAttribute('content')).toBe(CSP);
+    }
 
     const f = frame();
     const dom = { canvasFrame: f } as never;

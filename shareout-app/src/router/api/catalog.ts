@@ -2,7 +2,12 @@ import type { FetchContext } from '../context';
 import { jsonResponse, jsonError } from '../helpers/json-response';
 import { requireTokenOrSession, isAuthUser } from '../helpers/auth-guard';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
-import { isCatalogEnabled, setCatalogEnabled, upsertCatalogFile, deleteCatalogFile } from '../../catalog/store';
+import {
+  isCatalogEnabled, setCatalogEnabled, upsertCatalogFile, deleteCatalogFile, listCatalogFiles,
+  isValidCatalogPath, catalogContentBytes, CATALOG_PATH_RULE, MAX_CATALOG_FILE_BYTES,
+} from '../../catalog/store';
+import { apiErrorResponse } from '../../http/api-error';
+import { showPath } from '../../validation';
 import { searchEntries, buildFacets } from '../../catalog/search';
 import { buildManifest } from '../../catalog/manifest';
 import { buildLineage, findEntry } from '../../catalog/lineage';
@@ -10,10 +15,8 @@ import { loadGovernedCatalog } from '../../catalog/governed';
 import { seedConnectorsAsSources } from '../../catalog/seed';
 import { type CatalogEntry } from '../../catalog/types';
 import { certificationHistory, handleCatalogCertify } from './catalog-certify';
-import { apiErrorResponse } from '../../http/api-error';
 import { metricWriteIssue } from '../../catalog/metrics/spec';
 import { syncMetricIndex } from '../../catalog/metrics/index-sync';
-import { listCatalogFiles } from '../../catalog/store';
 
 const PREFIX_RE = /^\/v1\/workspaces\/([^/]+)\/catalog(?:\/(.*))?$/;
 const CERTIFY_RE = /^entries\/([^/]+)\/certify$/;
@@ -76,6 +79,24 @@ export async function routeCatalogApi(ctx: FetchContext): Promise<Response | nul
         | null;
       if (!body?.path || typeof body.content !== 'string') {
         return cors(jsonError('path and content are required', 'BAD_REQUEST', 400));
+      }
+      if (!isValidCatalogPath(body.path)) {
+        return cors(apiErrorResponse({
+          message: `Invalid catalog file path ${showPath(String(body.path))}`,
+          code: 'INVALID_PATH',
+          status: 400,
+          param: 'path',
+          hint: CATALOG_PATH_RULE,
+        }));
+      }
+      if (catalogContentBytes(body.content) > MAX_CATALOG_FILE_BYTES) {
+        return cors(apiErrorResponse({
+          message: `Catalog file content is larger than ${MAX_CATALOG_FILE_BYTES / 1024} KB`,
+          code: 'FILE_TOO_LARGE',
+          status: 413,
+          param: 'content',
+          hint: 'Keep one asset per file and its notes short; link to longer material instead.',
+        }));
       }
       // An executable `kind: metric` must be a valid spec (unknown keys refused with a hint).
       const specIssue = metricWriteIssue(body.path, body.content);

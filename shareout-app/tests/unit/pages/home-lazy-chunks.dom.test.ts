@@ -11,12 +11,9 @@ import type { RenderArgs } from '../../../src/pages/home/types';
 
 const args = {
   user: { id: 'usr_alice', email: 'alice@example.com' }, userInfo: { name: 'Alice', picture: null },
-  catalog: [], catalogTruncated: false, catalogTotal: 0, allCount: 0, favCount: 0, sharedCount: 0,
-  workspaces: [{ id: 'wsp_acme', name: 'Acme', slug: 'acme', branding: null, artifact_count: 0, can_manage: true }],
-  folders: [], teamFolders: [], personalFolders: [], filesScope: 'team', folderKind: '', folder: '', tags: [],
-  search: '', sort: 'recent', type: '', scope: 'all', workspace: 'wsp_acme', page: 1, openVisDisabled: false,
-  workspaceId: 'wsp_acme', workspaceRole: 'admin', wsTeamsPlan: true, wsKnowledgePaid: true, accessRequests: [],
-  hostname: 'acme.example.com', visualEditorOffWorkspaces: [], createEnabled: true, locale: null,
+  workspaces: [{ id: 'wsp_acme', name: 'Acme', slug: 'acme', branding: null }],
+  workspace: 'wsp_acme', workspaceId: 'wsp_acme', workspaceRole: 'admin', wsKnowledgePaid: true,
+  createEnabled: true, locale: null,
 } as unknown as RenderArgs;
 
 afterAll(() => { vi.unstubAllGlobals(); });

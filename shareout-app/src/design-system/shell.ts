@@ -7,6 +7,7 @@ import { baseStyles } from './base.css';
 import { componentStylesheet, componentScripts } from './components/stylesheet';
 import { googleFontsPreconnect } from '../../packages/design-tokens/src/index';
 import { brandFaviconHead } from '../brand';
+import { escapeHtml } from '../html/utils';
 import { notFoundStyles, renderStreamedPageErrorBody } from '../pages/not-found';
 
 export interface HtmlPageOptions {
@@ -36,10 +37,6 @@ export interface HtmlPageOptions {
   noSocial?: boolean;
 }
 
-function attr(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-}
-
 // Baseline security headers for server-rendered shell pages (marketing + app).
 // Conservative set — no CSP (these pages mix inline styles/scripts and the
 // platform serves user HTML elsewhere); just the safe, high-value headers.
@@ -57,15 +54,15 @@ function buildSocial(options: Omit<HtmlPageOptions, 'body' | 'scripts'>): string
   const socialDescription = ogDescription ?? description;
   const card = twitterCard ?? (ogImage ? 'summary_large_image' : 'summary');
   return [
-    `<meta property="og:type" content="${attr(ogType)}">`,
-    `<meta property="og:title" content="${attr(socialTitle)}">`,
-    socialDescription ? `<meta property="og:description" content="${attr(socialDescription)}">` : '',
-    ogUrl ? `<meta property="og:url" content="${attr(ogUrl)}">` : '',
-    ogImage ? `<meta property="og:image" content="${attr(ogImage)}">` : '',
+    `<meta property="og:type" content="${escapeHtml(ogType)}">`,
+    `<meta property="og:title" content="${escapeHtml(socialTitle)}">`,
+    socialDescription ? `<meta property="og:description" content="${escapeHtml(socialDescription)}">` : '',
+    ogUrl ? `<meta property="og:url" content="${escapeHtml(ogUrl)}">` : '',
+    ogImage ? `<meta property="og:image" content="${escapeHtml(ogImage)}">` : '',
     `<meta name="twitter:card" content="${card}">`,
-    `<meta name="twitter:title" content="${attr(socialTitle)}">`,
-    socialDescription ? `<meta name="twitter:description" content="${attr(socialDescription)}">` : '',
-    ogImage ? `<meta name="twitter:image" content="${attr(ogImage)}">` : '',
+    `<meta name="twitter:title" content="${escapeHtml(socialTitle)}">`,
+    socialDescription ? `<meta name="twitter:description" content="${escapeHtml(socialDescription)}">` : '',
+    ogImage ? `<meta name="twitter:image" content="${escapeHtml(ogImage)}">` : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -103,13 +100,13 @@ function renderHeadAndBodyOpen(options: Omit<HtmlPageOptions, 'body' | 'scripts'
     .map((block) => `<script type="application/ld+json">${block.replace(/</g, '\\u003c')}</script>`)
     .join('\n');
   return `<!DOCTYPE html>
-<html lang="${lang}">
+<html lang="${escapeHtml(lang)}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${title}</title>
-${description ? `<meta name="description" content="${description}">` : ''}
-${canonical ? `<link rel="canonical" href="${attr(canonical)}">` : ''}
+<title>${escapeHtml(title)}</title>
+${description ? `<meta name="description" content="${escapeHtml(description)}">` : ''}
+${canonical ? `<link rel="canonical" href="${escapeHtml(canonical)}">` : ''}
 ${social}
 ${jsonLdTags}
 ${brandFaviconHead}
@@ -121,7 +118,7 @@ ${pageStyles}
 </style>
 ${extraHead}
 </head>
-<body${bodyClass ? ` class="${bodyClass}"` : ''}>`;
+<body${bodyClass ? ` class="${escapeHtml(bodyClass)}"` : ''}>`;
 }
 
 export interface StreamedHtmlPageOptions extends Omit<HtmlPageOptions, 'body' | 'scripts'> {

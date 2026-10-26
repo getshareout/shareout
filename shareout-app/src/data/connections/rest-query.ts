@@ -6,6 +6,7 @@
  * Destinations are checked against the same SSRF blocklist as the secrets proxy.
  */
 import { fetchWithTimeout } from '../../fetch-utils';
+import { selfFetch } from '../../http/self-fetch';
 import { fetchCheckingRedirects, isBlockedDestination } from '../secrets/blocklist';
 import type { Env } from '../../types';
 import { UpstreamHttpError } from './errors';
@@ -188,7 +189,6 @@ export function selfFetcher(env: Env, url?: unknown, callerId?: string | null): 
     }
     // Per-caller marker: not an IP, never loopback; keeps per-IP limiters from sharing one bucket.
     headers.set('cf-connecting-ip', `crew-self:${callerId || 'unknown'}`);
-    const { handleFetch } = await import('../../router/handle-fetch');
-    return handleFetch(new Request(target.toString(), { ...init, headers }), env);
+    return selfFetch(new Request(target.toString(), { ...init, headers }), env);
   };
 }

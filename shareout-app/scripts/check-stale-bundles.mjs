@@ -13,6 +13,7 @@ const GENERATED = [
   'public/_bundles/',
   'src/discovery/',
   'src/official-skills/content.generated.ts',
+  'src/data/agent/sdk-reference.generated.ts',
 ];
 
 execSync('npm run build:editor', { stdio: 'inherit' });
@@ -22,6 +23,7 @@ execSync('npm run build:mobile', { stdio: 'inherit' });
 execSync('npm run build:skill', { stdio: 'inherit' });
 execSync('node scripts/stage-comments-agent.mjs && node scripts/stage-bundle-versions.mjs', { stdio: 'inherit' });
 execSync('npm run build:official-skills && npm run build:discovery', { stdio: 'inherit' });
+execSync('npm run build:sdk-reference', { stdio: 'inherit' });
 
 try {
   execSync(`git diff --exit-code --stat -- ${GENERATED.join(' ')}`, { stdio: 'inherit' });

@@ -1,4 +1,5 @@
-// Minimal baseline for contributor tooling. CI runs `npm run lint` (0 errors).
+// Minimal baseline for contributor tooling. Not part of the gate (no hosted CI; the
+// tooling/scripts/ci-check*.sh scripts don't lint): run `npx eslint <files>` on what you touch.
 import js from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';

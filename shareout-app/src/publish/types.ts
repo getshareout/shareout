@@ -96,6 +96,35 @@ export interface PublishParams {
   editGrant?: boolean;
   /** The publisher's change note for this version; null/absent → maybe an AI summary. */
   message?: string | null;
+  /**
+   * Edit path (src/artifacts/edits.ts): publish onto this artifact by id instead of
+   * matching by slug, and only when the new version gets `expectedVersionNo` — else
+   * {@link VersionConflictError}, before any version row is written.
+   */
+  artifactId?: string;
+  expectedVersionNo?: number;
+  /** Files of an earlier version of this artifact kept as they are: their rows are copied, their R2 objects shared. */
+  carried?: CarriedAsset[];
+  /** Text of the entrypoint when it is carried, so moderation and readiness still read it. */
+  mainText?: string;
+  /** The carried files include the version's mobile entrypoint (`mobileEntrypoint`). */
+  keepsMobile?: boolean;
+}
+
+/** One unchanged file carried into a new version by reference. */
+export interface CarriedAsset {
+  path: string;
+  r2Key: string;
+  mime: string;
+  size: number;
+  sha256: string;
+}
+
+/** The artifact got a version after the one an edit started from. */
+export class VersionConflictError extends Error {
+  constructor(readonly currentVersion: number) {
+    super('VERSION_CONFLICT');
+  }
 }
 
 /** Result of workspace publish-governance checks applied during publish. */

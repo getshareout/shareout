@@ -3,26 +3,18 @@
 Short operator notes for the person with write access to
 [getshareout/shareout](https://github.com/getshareout/shareout).
 
-## Branch protection (`main`)
+## `main` has no branch protection
 
 **Only the main maintainer merges to `main`.** Outside contributors open PRs from forks;
-they never push to `main` directly.
+they never push to `main` directly. Agents push feature branches and open PRs; they merge
+only when the maintainer says so.
 
-| Setting | Value |
-|---------|--------|
-| Require a pull request before merging | On |
-| Required approving reviews | **0** (solo maintainer; you review then merge) |
-| Require review from Code Owners | On (`.github/CODEOWNERS` → `@leorfer23`) |
-| Required status checks | None — there is no hosted CI; the pre-push hook is the gate |
-| Require branches to be up to date | On (**strict**) |
-| Restrict who can push / merge | **Only `@leorfer23`** |
-| Do not allow force pushes | On |
-| Do not allow deletions | On |
-| Require conversation resolution | On |
-| Enforce for admins | Off (emergency escape hatch only) |
-
-GitHub UI: **Settings → Branches → Branch protection rules** for `main`.
-API-applied 2026-07-25; re-check after org/team changes.
+That is a convention, not a GitHub setting: `main` has no branch protection and no
+rulesets, and there is no hosted CI whose checks could be required. The gate is local —
+see [CI truth](#ci-truth). Nothing on GitHub blocks a force-push to `main` or deleting
+it either: never do either. Re-check the setting with
+`gh api repos/getshareout/shareout/branches/main --jq .protected` (`false` as of
+2026-10-25).
 
 Also enable **Security → Code security → Private vulnerability reporting**
 (see [SECURITY.md](SECURITY.md)) if not already on.
@@ -31,16 +23,17 @@ Also enable **Security → Code security → Private vulnerability reporting**
 
 | Actor | Access |
 |-------|--------|
-| **@leorfer23** (you) | Admin; sole person allowed to push/merge to `main` under branch restrictions |
-| Outside contributors | Fork → PR only; no write on `main` |
-| Future co-maintainers | Add as org collaborator **and** to branch restriction users list + CODEOWNERS |
+| **@leorfer23** (you) | Admin; the only collaborator with write access, so the only one who can push or merge to `main` |
+| Outside contributors | Fork → PR only; no write access |
+| Future co-maintainers | Add as org collaborator **and** to CODEOWNERS |
 
 Do not grant write on this repo casually. Triage/read is enough for helpers who only comment.
 
 ## Merge style
 
-Prefer **merge commits** for OSS readiness / multi-commit history PRs (same as #1, #3, #22, #23).
-Squash is fine for tiny single-commit fixes.
+Squash-merge (`gh pr merge <n> --squash`): one commit per PR on `main`. An
+`integrate.sh` PR that carries other open PRs can land as a merge commit instead
+(`--merge`); that keeps their commits, so GitHub marks those PRs merged too.
 
 ## Dependabot
 
@@ -54,16 +47,22 @@ See [RELEASING.md](RELEASING.md). Pre-release tag: `v0.1.0-pre` after Deploy-but
 
 ## Worktrees
 
-Product work often uses git worktrees so agents do not stomp each other:
+Product work uses git worktrees so agents do not stomp each other:
 
 ```bash
-git fetch origin main
-git worktree add ../shareout-wt-<topic> -b chore/<topic> origin/main
+./tooling/scripts/new-worktree.sh <branch>   # → ../shareout-wt/<last part of the branch>, off origin/main
 ```
+
+It clones `node_modules` from the primary checkout (copy-on-write) and installs the
+shared pre-push hook.
 
 ## CI truth
 
-There is no hosted CI (no GitHub Actions). Checks run on the machine that pushes.
+There is no hosted CI (no GitHub Actions), by design. Checks run on the machine that
+pushes; [AGENTS.md → Gate contract](AGENTS.md#gate-contract) is the contract.
 
-- Full: `./tooling/scripts/ci-check.sh` (add `SHAREOUT_COVERAGE=1` for coverage floors)
-- Fast pre-push: `./tooling/scripts/ci-check-fast.sh` + `install-hooks.sh`
+- Pre-push hook (`./tooling/scripts/install-hooks.sh`, once per machine): light checks
+  (no tests) on feature branches; tests on pushes to `main` and `integration/*`
+- Full suite, once per landing: `./tooling/scripts/integrate.sh -n <name> <branch>…`
+- Everything, including audit and the docs build: `./tooling/scripts/ci-check.sh`
+  (add `SHAREOUT_COVERAGE=1` for coverage floors)

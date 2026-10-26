@@ -1,10 +1,13 @@
 // Read side of the knowledge graph for people and agents. The store returns every
 // source behind each entity/edge/fact; here they're cut down to what the caller may
 // see (same rule as search): an item with no visible source doesn't exist for them.
+// Names follow the same rule: an entity is shown, and matched, only under names that
+// appear in a source the caller may open.
 import type { Env } from '../../types';
 import { corpusFor, type SourceKind } from './client';
 import { visibleSources, type Visible } from './search';
-import type { EntityRow, Ref, RelationRow } from './graph-store';
+import { normalizeName } from './extract';
+import type { EntityName, EntityRow, Ref, RelationRow } from './graph-store';
 
 export interface SourceCite { kind: SourceKind; id: string; title: string; url: string | null }
 
@@ -16,24 +19,48 @@ async function visibility(env: Env, workspaceId: string, userId: string, refs: R
     const v: Visible | undefined = visible.get(r.refId);
     return v ? { kind: r.kind, id: r.refId, title: v.title, url: v.url } : null;
   };
-  const sources = (refs: Ref[]) => refs.map(cite).filter((c): c is SourceCite => !!c);
-  return { cite, sources };
+  const sources = (refs: Ref[]) => {
+    const seen = new Set<string>();
+    return refs.filter((r) => !seen.has(r.refId) && seen.add(r.refId)).map(cite).filter((c): c is SourceCite => !!c);
+  };
+  // The entity's own name when a visible source uses it, else the first name one does; null
+  // when no source the caller may open names it at all.
+  const naming = (e: { name: string; names: EntityName[] }): { name: string; aliases: string[] } | null => {
+    const shown = [...new Set(e.names.filter((n) => visible.has(n.ref.refId)).map((n) => n.name))];
+    if (!shown.length) return null;
+    const name = shown.includes(e.name) ? e.name : shown[0];
+    return { name, aliases: shown.filter((a) => a !== name) };
+  };
+  return { cite, sources, naming };
 }
 
-const entityOut = (e: EntityRow, sources: SourceCite[]) => ({
-  id: e.id, type: e.type, name: e.name, aliases: e.aliases, status: e.status, mentions: e.mentions, sources: sources.slice(0, 5),
+type Naming = { name: string; aliases: string[] };
+
+/** Every source behind an entity: the ones its mentions cite and the ones its names appear in. */
+const entityRefs = (e: EntityRow) => [...e.refs, ...e.names.map((n) => n.ref)];
+
+const entityOut = (e: EntityRow, sources: SourceCite[], naming: Naming) => ({
+  id: e.id, type: e.type, name: naming.name, aliases: naming.aliases, status: e.status, mentions: e.mentions, sources: sources.slice(0, 5),
 });
+
+const matches = (naming: Naming, q: string) => {
+  const nq = normalizeName(q);
+  const lq = q.toLowerCase();
+  return [naming.name, ...naming.aliases].some((n) => (nq && normalizeName(n).includes(nq)) || n.toLowerCase().includes(lq));
+};
 
 export async function listVisibleEntities(env: Env, store: Store, workspaceId: string, userId: string, opts: { type?: string; q?: string; limit: number }) {
   const { types, entities } = await store.listEntities({ ...opts, limit: Math.min(opts.limit * 2, 200) });
-  const v = await visibility(env, workspaceId, userId, entities.flatMap((e) => e.refs));
+  const v = await visibility(env, workspaceId, userId, entities.flatMap(entityRefs));
   return {
     types,
     entities: entities
-      .map((e) => ({ e, s: v.sources(e.refs) }))
-      .filter((x) => x.s.length)
+      .map((e) => ({ e, s: v.sources(entityRefs(e)), n: v.naming(e) }))
+      // The store matched `q` against every name; keep the entity only if a name the caller
+      // may see matches, so a search can't confirm a name that only a hidden source uses.
+      .filter((x): x is { e: EntityRow; s: SourceCite[]; n: Naming } => !!x.s.length && !!x.n && (!opts.q || matches(x.n, opts.q)))
       .slice(0, opts.limit)
-      .map((x) => entityOut(x.e, x.s)),
+      .map((x) => entityOut(x.e, x.s, x.n)),
   };
 }
 
@@ -41,19 +68,24 @@ export async function visibleEntity(env: Env, store: Store, workspaceId: string,
   const g = await store.getEntity(id);
   if (!g) return null;
   const v = await visibility(env, workspaceId, userId, [
-    ...g.entity.refs, ...g.facts.map((f) => f.ref), ...g.mentions.map((m) => m.ref), ...g.relations.flatMap((r) => r.refs),
+    ...entityRefs(g.entity), ...g.facts.map((f) => f.ref), ...g.mentions.map((m) => m.ref),
+    ...g.relations.flatMap((r) => [...r.refs, ...r.other.names.map((n) => n.ref)]),
   ]);
-  const sources = v.sources(g.entity.refs);
-  if (!sources.length) return null;
+  const sources = v.sources(entityRefs(g.entity));
+  const naming = v.naming(g.entity);
+  if (!sources.length || !naming) return null;
   return {
-    entity: entityOut(g.entity, sources),
+    entity: entityOut(g.entity, sources, naming),
     facts: g.facts.flatMap((f) => {
       const source = v.cite(f.ref);
       return source ? [{ id: f.id, predicate: f.predicate, value: f.value, unit: f.unit, validFrom: f.validFrom, quote: f.quote, source }] : [];
     }),
     relations: g.relations.flatMap((r) => {
       const s = v.sources(r.refs);
-      return s.length ? [{ id: r.id, type: r.type, direction: r.direction, other: r.other, mentions: r.mentions, sources: s.slice(0, 3) }] : [];
+      const other = v.naming(r.other);
+      return s.length && other
+        ? [{ id: r.id, type: r.type, direction: r.direction, other: { id: r.other.id, name: other.name, type: r.other.type }, mentions: r.mentions, sources: s.slice(0, 3) }]
+        : [];
     }),
     mentions: g.mentions.flatMap((m) => {
       const source = v.cite(m.ref);
@@ -64,11 +96,16 @@ export async function visibleEntity(env: Env, store: Store, workspaceId: string,
 
 export async function visibleGraph(env: Env, store: Store, workspaceId: string, userId: string, opts: { focus?: string; depth: number; limit: number }) {
   const { nodes, edges } = await store.graph(opts);
-  const v = await visibility(env, workspaceId, userId, [...nodes.flatMap((n) => n.refs), ...edges.flatMap((e) => e.refs)]);
-  const kept = new Map(nodes.map((n) => [n.id, v.sources(n.refs)] as const).filter(([, s]) => s.length));
+  const v = await visibility(env, workspaceId, userId, [...nodes.flatMap(entityRefs), ...edges.flatMap((e) => e.refs)]);
+  const kept = new Map<string, ReturnType<typeof entityOut>>();
+  for (const n of nodes) {
+    const s = v.sources(entityRefs(n));
+    const naming = v.naming(n);
+    if (s.length && naming) kept.set(n.id, entityOut(n, s, naming));
+  }
   const edgeOut = (e: RelationRow) => ({ id: e.id, from: e.from, to: e.to, type: e.type, mentions: e.mentions });
   return {
-    nodes: nodes.filter((n) => kept.has(n.id)).map((n) => entityOut(n, kept.get(n.id)!)),
+    nodes: [...kept.values()],
     edges: edges.filter((e) => kept.has(e.from) && kept.has(e.to) && v.sources(e.refs).length).map(edgeOut),
   };
 }
