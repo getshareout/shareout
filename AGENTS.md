@@ -101,8 +101,10 @@ Login: `/auth/dev?email=<you>&redirect=/home` (localhost only).
 Starting a task? `./tooling/scripts/new-worktree.sh <branch>` creates
 `../shareout-wt/<last part of the branch name>` (next to the primary checkout) off
 `origin/main`, installs the pre-push hook, and clones `node_modules` from the primary
-checkout — copy-on-write on APFS, so near-zero extra disk. When the lockfiles differ or
-the clone fails it runs `npm ci` instead (~5 s with a warm npm cache).
+checkout — copy-on-write on APFS, so near-zero extra disk — when what the primary has
+installed (`node_modules/.package-lock.json`) matches the new lockfile. Otherwise it runs
+`npm ci --prefer-offline` (~5 s with a warm npm cache). The gate scripts use the same
+installed-vs-lockfile test (`tooling/scripts/install-deps.sh`) before every run.
 
 Testing, pushing and landing: [Gate contract](#gate-contract).
 

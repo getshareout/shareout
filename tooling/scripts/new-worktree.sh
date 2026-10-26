@@ -4,13 +4,10 @@
 #   ./tooling/scripts/new-worktree.sh <branch> [dir]
 #
 # `npm ci` installs ~450 packages (~650MB): about 5s with a warm npm cache, but a full
-# extra copy on disk per worktree. node_modules is a pure function of the lockfile, so
-# when the lockfile matches the primary checkout we clone it instead. On APFS `cp -c` is
-# copy-on-write: seconds, and near-zero extra disk.
-# The workspace links inside node_modules are relative (@shareout/sdk -> ../../sdk), so
-# a copied tree points at THIS worktree's sources, not the primary's.
-#
-# Falls back to npm ci whenever the lockfile differs or the clone fails.
+# extra copy on disk per worktree. So install-deps.sh clones the primary checkout's
+# node_modules (copy-on-write on APFS: seconds, near-zero extra disk) when what the
+# primary has INSTALLED (node_modules/.package-lock.json) matches this worktree's
+# lockfile, and runs `npm ci --prefer-offline` otherwise.
 set -euo pipefail
 
 BRANCH="${1:-}"
@@ -36,27 +33,9 @@ git -C "$PRIMARY" worktree add -b "$BRANCH" "$DEST" origin/main
 
 DEST="$(cd "$DEST" && pwd)"
 
-link_deps() {
-  local name="$1" src="$2" dst="$3"
-  if [ ! -d "$src/node_modules" ]; then
-    echo "==> $name: primary has no node_modules — running npm ci"
-    (cd "$dst" && npm ci)
-    return
-  fi
-  if ! cmp -s "$src/package-lock.json" "$dst/package-lock.json"; then
-    echo "==> $name: lockfile differs from primary — running npm ci"
-    (cd "$dst" && npm ci)
-    return
-  fi
-  echo "==> $name: cloning node_modules from primary"
-  if ! cp -Rc "$src/node_modules" "$dst/node_modules" 2>/dev/null; then
-    echo "    (copy-on-write unavailable, falling back to npm ci)"
-    (cd "$dst" && npm ci)
-  fi
-}
-
-link_deps "worker" "$PRIMARY/shareout-app" "$DEST/shareout-app"
-[ -d "$PRIMARY/docs-site/node_modules" ] && link_deps "docs-site" "$PRIMARY/docs-site" "$DEST/docs-site"
+DEPS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/install-deps.sh"
+"$DEPS" "$DEST/shareout-app" worker
+[ -d "$PRIMARY/docs-site/node_modules" ] && "$DEPS" "$DEST/docs-site" docs-site
 
 # Gitignored local config. tooling/customer-names.local is not copied: check:customer-names
 # reads it from the main checkout.

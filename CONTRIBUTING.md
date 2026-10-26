@@ -29,8 +29,10 @@ npm run dev                      # http://localhost:55162
 
 Working on several branches at once? `./tooling/scripts/new-worktree.sh <branch>` adds a
 worktree off `origin/main` and clones `node_modules` from this checkout instead of
-installing a second copy — copy-on-write on APFS, so it costs almost no disk. It falls
-back to `npm ci` whenever the lockfiles differ (~5 s with a warm npm cache).
+installing a second copy — copy-on-write on APFS, so it costs almost no disk. It clones
+only when what this checkout has installed (`node_modules/.package-lock.json`) matches the
+new worktree's lockfile, and runs `npm ci --prefer-offline` otherwise (~5 s with a warm
+npm cache).
 
 No secrets to fill in: `npm run dev` creates `.dev.vars` from `.dev.vars.example` and
 generates a local `SESSION_SECRET` if there isn't one. Sessions are signed with that secret,

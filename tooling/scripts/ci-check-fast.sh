@@ -28,18 +28,13 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 WORKER="$REPO_ROOT/shareout-app"
 BASE="${SHAREOUT_TEST_BASE:-origin/main}"
 
-if [ ! -d "$WORKER/node_modules" ] && [ ! -f "$WORKER/package-lock.json" ]; then
-  echo "error: $WORKER not set up — run: cd shareout-app && npm ci" >&2
+if [ ! -f "$WORKER/package-lock.json" ]; then
+  echo "error: $WORKER/package-lock.json missing" >&2
   exit 1
 fi
 
+"$REPO_ROOT/tooling/scripts/install-deps.sh" "$WORKER" worker
 cd "$WORKER"
-if [ ! -d node_modules ] || [ package-lock.json -nt node_modules ]; then
-  echo "==> npm ci (worker)"
-  npm ci
-else
-  echo "==> Skipping npm ci (worker lockfile unchanged)"
-fi
 
 LOGS="$(mktemp -d)"
 trap 'rm -rf "$LOGS"' EXIT
