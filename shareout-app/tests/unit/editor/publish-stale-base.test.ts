@@ -20,6 +20,8 @@ const post = (body: unknown) => new Request('https://so.test/x', {
 });
 const versions = async (id: string) =>
   (await e.DB.prepare('SELECT COUNT(*) AS n FROM versions WHERE artifact_id = ?').bind(id).first<{ n: number }>())!.n;
+const draftRow = async (id: string) =>
+  (await e.DB.prepare('SELECT created_at, base_live_at FROM artifact_drafts WHERE artifact_id = ? AND user_id = ?').bind(id, ME).first<{ created_at: string; base_live_at: string | null }>())!;
 const load = async (id: string) =>
   ((await (await handleEditor(new Request('https://so.test/x'), ctx(id), '')).json()) as { editor: { baseLiveAt?: string } }).editor;
 
@@ -105,10 +107,37 @@ describe('the base an edit starts from', () => {
     ]);
     expect((await handleDraft(post({ html: '<p>a</p>', baseLiveAt: T0 }), ctx('art_base_b'), 'POST')).status).toBe(200);
     expect((await handleDraft(post({ html: '<p>b</p>', baseLiveAt: T1 }), ctx('art_base_b'), 'POST')).status).toBe(200);
+    const row = await draftRow('art_base_b');
+    expect(row.base_live_at).toBe(T0);
+    expect(Date.parse(row.created_at)).toBeGreaterThan(Date.parse(T1)); // still the real creation time
     const base = (await load('art_base_b')).baseLiveAt!;
     expect(base).toBe(T0);
     const res = await handlePublish(post({ html: '<p>b</p>', baseLiveAt: base }), ctx('art_base_b'));
     expect(res.status).toBe(409);
+  });
+
+  it('"Keep mine" after a conflict replaces the stored base with the kept copy\'s', async () => {
+    await seed('art_base_c');
+    await handleDraft(post({ html: '<p>other tab</p>', baseLiveAt: T0 }), ctx('art_base_c'), 'POST');
+    await handleDraft(post({ html: '<p>mine</p>', baseLiveAt: T1, resetBase: true }), ctx('art_base_c'), 'POST');
+    expect((await draftRow('art_base_c')).base_live_at).toBe(T1);
+    expect((await handlePublish(post({ html: '<p>mine</p>', baseLiveAt: T1 }), ctx('art_base_c'))).status).toBe(200);
+  });
+
+  it('a draft from before the column gets its base on the next save, and falls back to created_at until then', async () => {
+    await seed('art_base_d', 'html', false);
+    await e.DB.prepare("INSERT INTO artifact_drafts (id, artifact_id, user_id, html_content, created_at) VALUES ('draft_legacy', 'art_base_d', ?, '<p>old</p>', ?)").bind(ME, T1).run();
+    expect((await load('art_base_d')).baseLiveAt).toBe(T1);
+    await handleDraft(post({ html: '<p>new</p>', baseLiveAt: T0 }), ctx('art_base_d'), 'POST');
+    expect((await draftRow('art_base_d')).base_live_at).toBe(T0);
+  });
+
+  it('the publish check uses the earlier of the stored base and the client\'s', async () => {
+    await seed('art_base_e');
+    await handleDraft(post({ html: '<p>a</p>', baseLiveAt: T0 }), ctx('art_base_e'), 'POST');
+    const res = await handlePublish(post({ html: '<p>a</p>', baseLiveAt: T1 }), ctx('art_base_e'));
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { baseVersionNo: number }).baseVersionNo).toBe(1);
   });
 
   it('ignores a malformed or future base', () => {

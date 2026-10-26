@@ -151,16 +151,22 @@ export function parseBaseLiveAt(value: unknown): string | null {
   return Number.isFinite(ms) && ms <= Date.now() ? value : null;
 }
 
-/** 409 STALE_BASE when the live page changed after `baseLiveAt` (someone — a teammate, an
- *  agent, a crew — published since this edit started): publishing would silently revert
- *  their change. Says which version went live, by whom and when, and the version the edit
- *  started from so the client can show what changed. */
+/** 409 STALE_BASE when the live page changed after the edit's base (someone — a teammate,
+ *  an agent, a crew — published since this edit started): publishing would silently revert
+ *  their change. The base is the earlier of the client's and the stored draft's
+ *  `base_live_at`. Says which version went live, by whom and when, and the version the
+ *  edit started from so the client can show what changed. */
 export async function staleBaseConflict(
   env: Env,
   artifactId: string,
   userId: string,
-  baseLiveAt: string,
+  clientBase: string,
 ): Promise<Response | null> {
+  const draft = await env.DB.prepare(
+    'SELECT base_live_at FROM artifact_drafts WHERE artifact_id = ? AND user_id = ?'
+  ).bind(artifactId, userId).first<{ base_live_at: string | null }>();
+  const stored = parseBaseLiveAt(draft?.base_live_at);
+  const baseLiveAt = stored && stored < clientBase ? stored : clientBase;
   const live = await env.DB.prepare(`
     SELECT d.updated_at, v.version_no, v.source, v.created_by, u.name, u.email
     FROM deployments d
@@ -207,6 +213,7 @@ async function saveDraft(request: Request, ctx: EditorContext): Promise<Response
       cursorPosition?: { x: number; y: number };
       baseUpdatedAt?: string;
       baseLiveAt?: string;
+      resetBase?: boolean;
     };
 
     if (!body.html) {
@@ -223,16 +230,18 @@ async function saveDraft(request: Request, ctx: EditorContext): Promise<Response
 
     const draftId = `draft_${generateId('draft').slice(6)}`;
 
-    // A new draft's created_at is its base: when the live page it was opened on went live
-    // (the editor may have been open a while before this first save). Publish compares it
-    // with the live page to refuse a stale publish. An update keeps it.
+    // base_live_at: when the live page this draft builds on went live (the editor may have
+    // been open a while before the first save). Set on the first save and kept after;
+    // `resetBase` replaces it when the person keeps their copy after a conflict, since
+    // their content builds on their base, not the other session's.
     await env.DB.prepare(`
-      INSERT INTO artifact_drafts (id, artifact_id, user_id, html_content, created_at)
-      VALUES (?, ?, ?, ?, COALESCE(?, strftime('%Y-%m-%dT%H:%M:%fZ','now')))
+      INSERT INTO artifact_drafts (id, artifact_id, user_id, html_content, base_live_at)
+      VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(artifact_id, user_id) DO UPDATE SET
         html_content = excluded.html_content,
+        base_live_at = CASE WHEN ? THEN excluded.base_live_at ELSE COALESCE(base_live_at, excluded.base_live_at) END,
         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-    `).bind(draftId, artifactId, userId, body.html, parseBaseLiveAt(body.baseLiveAt)).run();
+    `).bind(draftId, artifactId, userId, body.html, parseBaseLiveAt(body.baseLiveAt), body.resetBase === true ? 1 : 0).run();
 
     // Read back the new timestamp so the client can advance its base for the next save.
     const saved = await env.DB.prepare(`

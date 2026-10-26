@@ -193,7 +193,7 @@ here would silently drop artifacts from listings.
 | `deployments` | Points a `channel` at a `version_id` under a `slug` — `production` is what visitors resolve to, `candidate` stages the next one. This is the table serving reads. |
 | `assets` | Files inside a version: `path`, `r2_key`, `mime`, `size_bytes`, `sha256`. |
 | `artifact_tags` | Freeform labels. |
-| `artifact_drafts` | Unsaved editor work, per artifact and user. |
+| `artifact_drafts` | Unsaved editor work, per artifact and user. `base_live_at` *(0029)* is the `deployments.updated_at` of the live page the draft builds on (set when the draft is created, or when the person keeps their copy after a conflict); publish refuses with `STALE_BASE` if the live page changed after it. NULL on older drafts, which fall back to `created_at`. |
 | `artifact_storage` | Per-artifact rollup of `used_bytes`/`blob_count` for quota checks. |
 | `artifact_libraries` | Which library artifacts an artifact imports, pinned to a `semver`. |
 | `library_versions` | Published version rows for an artifact acting as a library. |

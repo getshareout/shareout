@@ -479,7 +479,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
     if (rec.conflict) { setSaveStatus(rec, t('edit.notSaved'), 'warn'); return; } // the bar decides first
     var html = serializeClean(rec); if (html == null) return;
     setSaveStatus(rec, t('common.saving'));
-    fetch('/v1/artifacts/' + encodeURIComponent(rec.art.id) + '/editor/draft', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ html: html, baseUpdatedAt: rec.baseUpdatedAt || undefined, baseLiveAt: rec.baseLiveAt || undefined }) })
+    fetch('/v1/artifacts/' + encodeURIComponent(rec.art.id) + '/editor/draft', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ html: html, baseUpdatedAt: rec.baseUpdatedAt || undefined, baseLiveAt: rec.baseLiveAt || undefined, resetBase: rec.resetBase || undefined }) })
       .then(function (r) {
         if (r.status === 409) return heldJson(r).then(function (j) { showConflict(rec, j, 'save'); return { __held: true }; });
         return r.ok ? r.json() : null;
@@ -487,7 +487,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
       .then(function (j) {
         if (j && j.__held) return;
         if (!j) { if (rec.savestat.textContent === t('common.saving')) setSaveStatus(rec, t('edit.saveFailed'), 'warn'); return; }
-        rec.baseUpdatedAt = j.draftUpdatedAt || rec.baseUpdatedAt; rec.dirty = false; renderTabs(); setSaveStatus(rec, t('edit.savedDraft'), 'ok');
+        rec.baseUpdatedAt = j.draftUpdatedAt || rec.baseUpdatedAt; rec.resetBase = false; rec.dirty = false; renderTabs(); setSaveStatus(rec, t('edit.savedDraft'), 'ok');
       })
       .catch(function () { setSaveStatus(rec, t('edit.saveFailed'), 'warn'); });
   }
@@ -557,6 +557,7 @@ export const workspace_client_edit_lite_JS = `  // ===== Edit-Lite: single-playe
   function keepMine(rec) {
     var c = rec.conflict || {}; rec.conflict = null; hideBar(rec);
     if (c.at) rec.baseUpdatedAt = c.at;
+    rec.resetBase = true; // my copy builds on my base, not the other session's
     if (c.from === 'publish') publishEdit(rec); else autosaveDraft(rec);
   }
   function loadNewer(rec) {

@@ -59,6 +59,8 @@ export async function saveDraft(ctx: EditorContext, opts: { force?: boolean } = 
         // clobbering a save made in another tab/device. `force` re-saves after the user chooses.
         baseUpdatedAt: opts.force ? undefined : ctx.state.draftUpdatedAt,
         baseLiveAt: ctx.state.baseLiveAt,
+        // "Keep mine & overwrite": this copy builds on our base, not the other session's.
+        resetBase: opts.force || undefined,
       }),
       credentials: 'same-origin',
     });

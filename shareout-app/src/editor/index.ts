@@ -193,7 +193,7 @@ async function handleLoadEditor(
 
     // Get user's draft if exists
     const draft = await env.DB.prepare(`
-      SELECT id, html_content, created_at, updated_at
+      SELECT id, html_content, created_at, updated_at, base_live_at
       FROM artifact_drafts
       WHERE artifact_id = ? AND user_id = ?
     `).bind(artifactId, ctx.userId).first<{
@@ -201,6 +201,7 @@ async function handleLoadEditor(
       html_content: string;
       created_at: string;
       updated_at: string;
+      base_live_at: string | null;
     }>();
 
     // Get active editor sessions (collaborators)
@@ -260,9 +261,9 @@ async function handleLoadEditor(
         versionNo: artifact.version_no || 0,
         hasDraft: !!usableDraft,
         draftUpdatedAt: usableDraft?.updated_at,
-        // The live page this edit builds on (a draft's start, else the live page now):
+        // The live page this edit builds on (the draft's base, else the live page now):
         // sent back on publish, which refuses with STALE_BASE if someone published since.
-        baseLiveAt: usableDraft?.created_at ?? artifact.live_updated_at ?? undefined,
+        baseLiveAt: usableDraft ? (usableDraft.base_live_at ?? usableDraft.created_at) : artifact.live_updated_at ?? undefined,
         assets: assetRefs,
         collaborators,
       },

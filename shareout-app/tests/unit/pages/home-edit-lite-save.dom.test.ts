@@ -98,6 +98,7 @@ describe('a save conflict', () => {
     await flush();
     expect(calls[1].url).toBe('/v1/artifacts/art_1/editor/draft');
     expect(calls[1].body!.baseUpdatedAt).toBe('D9');
+    expect(calls[1].body!.resetBase).toBe(true);
     expect(calls[1].body!.html).toBe(before);
     expect(bar().hidden).toBe(true);
   });

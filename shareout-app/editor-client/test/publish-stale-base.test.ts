@@ -5,7 +5,7 @@ vi.mock('../src/ui/confirm-dialog', () => ({ showConfirmDialog: vi.fn() }));
 vi.mock('../src/toast', () => ({ showToast: vi.fn() }));
 
 import { showConfirmDialog } from '../src/ui/confirm-dialog';
-import { publish, staleBaseLine } from '../src/persistence/draft';
+import { publish, saveDraft, staleBaseLine } from '../src/persistence/draft';
 
 const STALE = {
   success: false,
@@ -66,5 +66,19 @@ describe('full editor publish over a newer live version', () => {
   it('speaks Spanish to a Spanish browser', () => {
     vi.spyOn(navigator, 'language', 'get').mockReturnValue('es-AR');
     expect(staleBaseLine({ live: { ...STALE.live, byYou: true } })).toMatch(/^v14 · vos · hace 2 horas$/);
+  });
+});
+
+describe('full editor keeps its copy after a draft conflict', () => {
+  it('"Keep mine & overwrite" resets the stored base to this copy\'s', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json({ code: 'DRAFT_CONFLICT', currentUpdatedAt: 'D9' }, 409))
+      .mockResolvedValueOnce(json({ success: true, draftUpdatedAt: 'D10' }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.mocked(showConfirmDialog).mockReset().mockResolvedValue(false);
+    const ctx = makeCtx();
+    expect(await saveDraft(ctx)).toBe(true);
+    expect(bodyOf(fetchMock.mock.calls[0]).resetBase).toBeUndefined();
+    expect(bodyOf(fetchMock.mock.calls[1])).toMatchObject({ resetBase: true, baseLiveAt: '2026-09-19T00:00:00.000Z' });
   });
 });
