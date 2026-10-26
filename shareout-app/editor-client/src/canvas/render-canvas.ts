@@ -196,7 +196,7 @@ export function renderCanvas(state: EditorState, dom: EditorDom, options?: Rende
 
   // Setup ready signal handling (skip for undo/redo to avoid jarring loading state)
   if (!options?.skipLoadingState) {
-    setupReadySignal(dom);
+    setupReadySignal(dom, doc);
   }
 
   return doc;
@@ -216,37 +216,35 @@ function hideCanvasLoading(dom: EditorDom): void {
   if (frame) frame.style.opacity = '1';
 }
 
-function setupReadySignal(dom: EditorDom): void {
-  // Cleanup previous listener if any
+// The canvas copy runs no page scripts (canvas CSP), so nothing ever posts a ready
+// message: it is ready once parsed. Waiting for one only showed a blank canvas until
+// the timeout.
+export function setupReadySignal(dom: EditorDom, doc: Document): void {
   if (readyCleanup) {
     readyCleanup();
     readyCleanup = null;
   }
 
+  if (doc.readyState !== 'loading') {
+    hideCanvasLoading(dom);
+    return;
+  }
+
   showCanvasLoading(dom);
-
-  const onReady = (e: MessageEvent) => {
-    if (e.data?.type === 'shareout:content-ready') {
-      log.info('Canvas content ready signal received');
-      hideCanvasLoading(dom);
-      cleanup();
-    }
-  };
-
-  // Timeout fallback - hide loading after READY_TIMEOUT_MS even if no signal
-  const timeout = setTimeout(() => {
-    log.warn('Canvas ready timeout - hiding loading state');
+  const onReady = () => {
     hideCanvasLoading(dom);
     cleanup();
+  };
+  const timeout = setTimeout(() => {
+    log.warn('Canvas ready timeout - hiding loading state');
+    onReady();
   }, READY_TIMEOUT_MS);
-
   const cleanup = () => {
-    window.removeEventListener('message', onReady);
+    doc.removeEventListener('DOMContentLoaded', onReady);
     clearTimeout(timeout);
     readyCleanup = null;
   };
-
-  window.addEventListener('message', onReady);
+  doc.addEventListener('DOMContentLoaded', onReady);
   readyCleanup = cleanup;
 }
 

@@ -254,6 +254,7 @@ export function bootEditor(): void {
           ctx.state.version = data.editor.versionNo || 0;
           // EDIT-09 F1: remember the draft timestamp we loaded for optimistic-concurrency saves.
           ctx.state.draftUpdatedAt = data.editor.draftUpdatedAt;
+          ctx.state.baseLiveAt = data.editor.baseLiveAt;
 
           // Parse manifest from HTML
           const manifest = parseManifest(ctx.state.html);
