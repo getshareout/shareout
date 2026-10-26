@@ -498,7 +498,7 @@ export async function evaluateAndDeliver(
   let delivered = false;
   let error: string | null = null;
   try {
-    const result = await destination.deliver(env, { artifactId: rule.artifact_id, createdBy: rule.owner_id, triggeredVia }, config);
+    const result = await destination.deliver(env, { artifactId: rule.artifact_id, createdBy: rule.owner_id, triggeredVia, source: { kind: 'alert', id: rule.id } }, config);
     delivered = result.success;
     error = result.success ? null : result.error || 'Delivery failed';
   } catch (err) {
@@ -526,7 +526,7 @@ export async function evaluateAndDeliver(
       const crewRes = await runCrewForArtifact(env, rule.artifact_id, instruction, rule.owner_id, 'metric_alert');
       if (crewRes.ok && crewRes.resultText && CREW_FOLLOWUP_KINDS.has(rule.destination_kind)) {
         const followup = crewFollowupConfig(rule.destination_kind, rule.destination_config, crewRes.resultText);
-        await destination.deliver(env, { artifactId: rule.artifact_id, createdBy: rule.owner_id, triggeredVia }, followup);
+        await destination.deliver(env, { artifactId: rule.artifact_id, createdBy: rule.owner_id, triggeredVia, source: { kind: 'alert', id: rule.id } }, followup);
       }
     } catch {
       // Swallow — the alert already delivered; the crew run + its summary are a bonus.

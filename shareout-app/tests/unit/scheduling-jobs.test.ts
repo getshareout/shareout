@@ -718,6 +718,7 @@ describe('runScheduledJobs', () => {
     expect(sendArtifactEmail).toHaveBeenCalledWith(env, artifactId, {
       recipients: ['a@example.com'],
       subject: 'Hi',
+      source: { kind: 'job' },
     });
     expect(incrementEmailCount).toHaveBeenCalledWith(env, userId, artifactId);
   });

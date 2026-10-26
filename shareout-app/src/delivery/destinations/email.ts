@@ -24,7 +24,8 @@ export const emailDestination: Destination<EmailConfig> = {
     if (!rateLimit.allowed) return { success: false, error: 'Email rate limit exceeded' };
 
     const started = Date.now();
-    const result = await sendArtifactEmail(env, ctx.artifactId, config);
+    const source = ctx.source ?? (ctx.triggeredVia === 'cron' || ctx.triggeredVia === 'event' ? { kind: 'job' as const } : undefined);
+    const result = await sendArtifactEmail(env, ctx.artifactId, { ...config, source });
     if (result.success) await incrementEmailCount(env, ctx.createdBy, ctx.artifactId);
     return {
       ...result,

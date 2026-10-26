@@ -12,6 +12,7 @@ import { countActiveRuns } from '../../../src/crew/limits';
 import { runDueCrewTriggers, claimTrigger } from '../../../src/crew/triggers';
 import { reapStaleApprovals, approveAndExecute } from '../../../src/crew/approvals';
 import { mockProvider, runEval } from '../../../src/crew/eval';
+import { executeCrewRun } from '../../../src/crew/run-loop';
 import type { CrewRow, CrewRunRow, CrewTriggerRow } from '../../../src/crew/types';
 import type { DataContext } from '../../../src/data/middleware';
 
@@ -320,5 +321,32 @@ describe('awaiting_approval termination (#3a)', () => {
       `SELECT status FROM crew_action_approvals WHERE crew_id = ? AND tool_name = 'email_send'`
     ).bind(crew.id).first<{ status: string }>();
     expect(appr?.status).toBe('pending');
+  });
+});
+
+describe('finish(nextRunInHours) self-pacing', () => {
+  it('stores an ISO next_run_at so the trigger is not due on every tick', async () => {
+    const { crew, run, ownerCtx } = await seedCrew([{ name: 'table_query', mode: 'read' }]);
+    await env.DB.prepare(
+      `INSERT INTO crew_triggers (id, crew_id, artifact_id, kind, cron, enabled, next_run_at)
+       VALUES ('ctrg_pace', ?, ?, 'cron', '0 10 * * 1', 1, '2030-01-07T10:00:00.000Z')`
+    ).bind(crew.id, crew.artifact_id).run();
+
+    await executeCrewRun(
+      {
+        env: env as never,
+        crew,
+        run,
+        ownerCtx,
+        input: 'Go.',
+        triggerId: 'ctrg_pace',
+        provider: mockProvider([{ toolCalls: [{ name: 'finish', input: { summary: 'done', nextRunInHours: 168 } }] }]),
+      },
+      () => {}
+    );
+
+    const row = await env.DB.prepare(`SELECT next_run_at FROM crew_triggers WHERE id='ctrg_pace'`).first<{ next_run_at: string }>();
+    expect(row!.next_run_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(row!.next_run_at > new Date(Date.now() + 167 * 3600_000).toISOString()).toBe(true);
   });
 });

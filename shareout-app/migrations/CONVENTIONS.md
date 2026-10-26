@@ -76,13 +76,16 @@ Consequences, all of them load-bearing:
   quoting.
 
 **One exception, and it is not a timestamp.** The scheduler cursors —
-`scheduled_jobs.next_run_at`, `scheduled_jobs.last_run_at`, `crew_triggers.next_run_at`,
+`scheduled_jobs.next_run_at`, `scheduled_jobs.last_run_at`,
 `metric_alert_rules.next_run_at`, and `job_runs.created_at` — hold **unix seconds** as
 TEXT. They are queue keys: the dispatch loop compares and advances them numerically, and
-`crew_triggers` does a compare-and-swap claim on the exact stored value. They are
-internally consistent, every reader treats them as epoch, and converting them is a
-dispatch-correctness change, not a formatting one. If you convert one, convert all five
-in the same commit, or the loop silently stops firing.
+converting them is a dispatch-correctness change, not a formatting one. If you convert one,
+convert all four in the same commit, or the loop silently stops firing.
+
+`crew_triggers.next_run_at` is **not** one of them: it is ISO like everything else, and the
+trigger loop compares it as a string. An epoch written there sorts before every ISO value,
+so the trigger is due on every hourly tick — that is how a weekly crew emailed four hours
+in a row (2026-10-26).
 
 Names are as fixed as the format:
 

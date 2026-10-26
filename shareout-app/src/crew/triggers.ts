@@ -182,7 +182,7 @@ async function runConditionTrigger(env: Env, trigger: CrewTriggerRow, now: strin
 
   const crew = await getCrewById(env, trigger.crew_id);
   if (!crew) {
-    await setNextRun(env, trigger.id, now + 86400);
+    await setNextRun(env, trigger.id, isoIn(86400));
     return false;
   }
 

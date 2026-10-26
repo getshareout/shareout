@@ -48,11 +48,19 @@ export const emailSendTool: CrewTool = {
       html,
       body: text,
       includeArtifactLink: false,
+      source: { kind: 'crew', id: ctx.principal.crewId },
     });
     if (!result.success) return { error: result.error || 'email send failed', ...(result.skippedOptedOut?.length ? { skipped_opted_out: result.skippedOptedOut } : {}) };
 
     if (owner) await incrementEmailCount(env, owner.ownerId, artifactId);
     const skipped = result.skippedOptedOut ?? [];
-    return { sent: true, to: recipients.filter((r) => !skipped.includes(r.toLowerCase().trim())), ...(skipped.length ? { skipped_opted_out: skipped } : {}), messageId: result.messageId };
+    const repeats = result.skippedDuplicate ?? [];
+    return {
+      sent: true,
+      to: recipients.filter((r) => ![...skipped, ...repeats].includes(r.toLowerCase().trim())),
+      ...(skipped.length ? { skipped_opted_out: skipped } : {}),
+      ...(repeats.length ? { skipped_already_sent: repeats } : {}),
+      messageId: result.messageId,
+    };
   },
 };

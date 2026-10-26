@@ -271,7 +271,7 @@ export async function createTrigger(
       `INSERT INTO crew_triggers (id, crew_id, artifact_id, kind, condition_json, next_run_at)
        VALUES (?, ?, ?, 'condition', ?, ?)`
     )
-      .bind(id, crew.id, crew.artifact_id, JSON.stringify(parsed.config), Math.floor(Date.now() / 1000))
+      .bind(id, crew.id, crew.artifact_id, JSON.stringify(parsed.config), new Date().toISOString())
       .run();
   } else {
     return { error: 'kind must be "cron", "event", or "condition"' };

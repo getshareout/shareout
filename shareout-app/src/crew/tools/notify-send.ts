@@ -69,6 +69,7 @@ export const notifySendTool: CrewTool = {
       artifactId: ctx.data.artifactId,
       createdBy: ctx.principal.ownerId,
       triggeredVia: 'crew' as const,
+      source: { kind: 'crew' as const, id: ctx.principal.crewId },
     };
 
     const validationError = await destination.validate(ctx.data.env, dctx, config);
