@@ -17,7 +17,7 @@ import { handleAbuseReport } from '../moderation/abuse-reports';
 import { routeSlack } from './slack-router';
 import { routeInternalAdmin } from './internal-admin';
 import { routeEmail } from '../email/routes';
-import { renderNotFoundPage } from '../pages/not-found';
+import { notFoundResponse } from '../pages/not-found';
 import { blockDisabledMarketingPages } from '../marketing-us-gate';
 import { asGetForHead, stripBodyForHead, wrongMethodOnKnownPath } from './method-policy';
 import { routeMcp } from '../mcp';
@@ -29,9 +29,7 @@ import { d1SessionStart, scopeRequest, timePhase, withD1Bookmark, withServerTimi
 // other data/asset requests keep the lightweight plain-text body.
 function notFound(request: Request, path: string): Response {
   if (path.startsWith('/v1/')) return simpleApiError(`No API route for ${request.method} ${path}`, 'ROUTE_NOT_FOUND', 404);
-  const accept = request.headers.get('Accept') || '';
-  const wantsHtml = request.method === 'GET' && accept.includes('text/html');
-  return wantsHtml ? renderNotFoundPage() : new Response('Not Found', { status: 404 });
+  return notFoundResponse(request);
 }
 
 // Re-point a context at a rewritten path while preserving method, query, headers,

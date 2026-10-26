@@ -27,6 +27,14 @@ describe('render-workspace module structure', () => {
     expect(WORKSPACE_STYLES).toContain('.wsx__composer');
   });
 
+  it('shows the build version in the Help panel, not the rail footer', () => {
+    const { body } = buildWorkspaceView({ ...args, appVersion: '509f91e' });
+    const foot = body.slice(body.indexOf('wsx__railfoot'), body.indexOf('</footer>'));
+    expect(foot).not.toContain('509f91e');
+    const help = body.slice(body.indexOf('id="wsxHelpPanel"'));
+    expect(help).toMatch(/data-i18n="help.version">Version<\/span> <span class="wsx__helpver-id">509f91e/);
+  });
+
   it('exports buildWorkspaceView and WORKSPACE_STYLES from the package entry', () => {
     const { body, scripts } = buildWorkspaceView(args);
     expect(body).toContain('id="wsx"');

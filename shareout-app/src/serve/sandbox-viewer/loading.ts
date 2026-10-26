@@ -13,8 +13,7 @@ export const LOADING_STYLES = `
     #so-loading {
       position: fixed; inset: 0; z-index: 2147483646;
       background: ${colors.bg};
-      display: flex; flex-direction: column;
-      gap: 16px; padding: clamp(16px, 4vw, 32px);
+      display: flex; flex-direction: column; align-items: center; padding: clamp(16px, 4vw, 32px);
       opacity: 1; transition: opacity .3s ease;
     }
     #so-loading.so-loaded { opacity: 0; pointer-events: none; }
@@ -24,10 +23,10 @@ export const LOADING_STYLES = `
       background: linear-gradient(90deg, transparent, rgba(255,255,255,.7), transparent);
       animation: so-shimmer 1.4s infinite;
     }
-    .so-sk-head { height: 40px; width: 36%; }
-    .so-sk-row { display: flex; gap: 16px; }
-    .so-sk-card { flex: 1; height: clamp(120px, 22vh, 200px); }
-    .so-sk-line { height: 16px; }
+    .so-sk-col { width: 100%; max-width: 960px; display: flex; flex-direction: column; gap: 16px; }
+    .so-sk-head { height: 32px; width: min(100%, 320px); }
+    .so-sk-card { height: clamp(120px, 24vh, 220px); }
+    .so-sk-line { height: 14px; }
     @keyframes so-shimmer { 100% { transform: translateX(100%); } }
     @media (prefers-reduced-motion: reduce) {
       .so-sk::after { animation: none; }
@@ -35,15 +34,12 @@ export const LOADING_STYLES = `
     }`;
 
 export const LOADING_MARKUP = `<div id="so-loading" role="status" aria-label="Loading content" aria-live="polite">
-    <div class="so-sk so-sk-head"></div>
-    <div class="so-sk-row">
+    <div class="so-sk-col">
+      <div class="so-sk so-sk-head"></div>
       <div class="so-sk so-sk-card"></div>
-      <div class="so-sk so-sk-card"></div>
-      <div class="so-sk so-sk-card"></div>
+      <div class="so-sk so-sk-line"></div>
+      <div class="so-sk so-sk-line" style="width:70%"></div>
     </div>
-    <div class="so-sk so-sk-line" style="width:92%"></div>
-    <div class="so-sk so-sk-line" style="width:78%"></div>
-    <div class="so-sk so-sk-line" style="width:85%"></div>
   </div>`;
 
 /**

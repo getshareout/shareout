@@ -10,24 +10,24 @@
 // already allowed).
 
 import type { Env } from '../types';
+import { colors } from '../../packages/design-tokens/src/index';
 
 function buildBadge(homeUrl: string, reportUrl: string): string {
   return `<style>
-.so-badge{position:fixed;right:12px;bottom:12px;z-index:2147483600;display:flex;align-items:center;gap:6px;
+.so-badge{position:fixed;right:12px;bottom:12px;z-index:2147483600;display:flex;align-items:center;gap:2px;
 font:500 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-background:rgba(255,255,255,.92);color:#1a1a2e;padding:6px 10px;border-radius:9999px;
-box-shadow:0 1px 4px rgba(0,0,0,.18);text-decoration:none;backdrop-filter:saturate(1.2) blur(4px);
-max-width:calc(100vw - 24px)}
-.so-badge a{color:inherit;text-decoration:none}
-.so-badge .so-dot{color:#e0245e}
-.so-badge .so-sep{opacity:.35}
-.so-badge .so-report{opacity:.6;font-size:11px}
-@media(max-width:480px){.so-badge .so-label{display:none}.so-badge{padding:7px 9px}}
+background:${colors.bgElevated};color:${colors.text};padding:0 6px;border-radius:9999px;
+border:1px solid ${colors.border};box-shadow:0 1px 4px rgba(0,0,0,.12);max-width:calc(100vw - 24px)}
+.so-badge a{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 6px;color:inherit;text-decoration:none;white-space:nowrap}
+.so-badge a:focus-visible{outline:2px solid ${colors.primary};outline-offset:-2px;border-radius:9999px}
+.so-badge .so-dot{color:${colors.primary}}
+.so-badge .so-report{color:${colors.textSecondary};font-size:11px}
+@media(max-width:480px){.so-badge{right:8px;bottom:8px}.so-badge .so-long{display:none}}
+@media(min-width:481px){.so-badge .so-short{display:none}}
 </style>
 <div class="so-badge" role="contentinfo">
-<a href="${homeUrl}" target="_blank" rel="noopener"><span class="so-dot">&hearts;</span> <span class="so-label">Made with ShareOut</span></a>
-<span class="so-sep so-label">&middot;</span>
-<a class="so-report so-label" href="${reportUrl}" target="_blank" rel="noopener">Report</a>
+<a href="${homeUrl}" target="_blank" rel="noopener" aria-label="Made with ShareOut"><span class="so-dot" aria-hidden="true">&hearts;</span><span class="so-long">Made with ShareOut</span><span class="so-short">ShareOut</span></a>
+<a class="so-report" href="${reportUrl}" target="_blank" rel="noopener">Report</a>
 </div>`;
 }
 

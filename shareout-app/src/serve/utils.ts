@@ -1,6 +1,7 @@
 import { googleFontsPreconnect } from '../../packages/design-tokens/src/index';
 import { standalonePageStyles } from '../design-system/standalone-page';
 import type { Locale, LocaleCopy } from '../i18n';
+import { notFoundResponse } from '../pages/not-found';
 
 // Mobile device detection regex
 const MOBILE_UA_REGEX = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i;
@@ -84,7 +85,8 @@ export function runBackground(
   }
 }
 
-export function notFound(): Response {
+export function notFound(request?: Request): Response {
+  if (request) return notFoundResponse(request);
   return new Response('Not Found', {
     status: 404,
     headers: { 'Content-Type': 'text/plain' },

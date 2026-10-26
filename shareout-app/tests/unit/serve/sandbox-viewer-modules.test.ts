@@ -18,6 +18,7 @@ describe('sandbox-viewer modules', () => {
     expect(head).toContain('<!DOCTYPE html>');
     expect(head).toContain('id="so-loading"');
     expect(head).toContain('so-sk-card');
+    expect(head).not.toContain('so-sk-row');
     expect(head).toContain('<body>');
     // Body stays open for the rest of the streamed body (iframe/toolbar/scripts).
     expect(head).not.toContain('</body>');
