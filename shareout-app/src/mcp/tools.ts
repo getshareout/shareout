@@ -39,6 +39,7 @@ export const SERVER_INSTRUCTIONS = [
   'To publish: write a complete, self-contained page and call publish_artifact. Afterwards always give the',
   'person the link and say who can see it. If the result carries a notice (visibility changed, under review,',
   'a warning), tell them plainly.',
+  'After publish_artifact, update_artifact or edit_artifact, call verify_artifact and fix what it reports (then verify again) before you hand over the link.',
   'To change a page they already have: find it with list_artifacts, read it with get_artifact (include_files when it has several files),',
   'then send the whole new page to update_artifact with base_version set to the version you read.',
   'For a small change (a word, a color, one section) use read_artifact and edit_artifact instead: they change only what you name, without sending the whole page again.',

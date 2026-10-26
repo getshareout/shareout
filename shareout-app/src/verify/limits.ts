@@ -6,7 +6,13 @@ import type { Env } from '../types';
 import { isSuperAdminEmail } from '../superadmin/recipients';
 
 const VERIFY_LIMIT_ACTION = 'verify';
-export const VERIFY_LIMIT_MAX = 30; // runs per user per UTC hour
+const DEFAULT_RUNS_PER_HOUR = 30;
+
+/** Runs per user per UTC hour: VERIFY_RUNS_PER_HOUR when it is a positive integer, else 30. */
+export function verifyRunsPerHour(env: Env): number {
+  const n = Number.parseInt((env.VERIFY_RUNS_PER_HOUR || '').trim(), 10);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_RUNS_PER_HOUR;
+}
 
 function hourWindow(): { key: string; reset: number } {
   const windowStart = new Date();
@@ -18,14 +24,15 @@ export async function checkVerifyLimit(
   env: Env,
   userId: string,
   email?: string | null,
-): Promise<{ allowed: boolean; remaining: number; reset: number }> {
+): Promise<{ allowed: boolean; limit: number; remaining: number; reset: number }> {
   const { key, reset } = hourWindow();
-  if (isSuperAdminEmail(email, env)) return { allowed: true, remaining: VERIFY_LIMIT_MAX, reset };
+  const limit = verifyRunsPerHour(env);
+  if (isSuperAdminEmail(email, env)) return { allowed: true, limit, remaining: limit, reset };
   const row = await env.DB.prepare(
     "SELECT count FROM rate_limits WHERE principal_type = 'user' AND principal_id = ? AND action = ? AND window_start = ?"
   ).bind(userId, VERIFY_LIMIT_ACTION, key).first<{ count: number }>();
   const used = row?.count || 0;
-  return { allowed: used < VERIFY_LIMIT_MAX, remaining: Math.max(0, VERIFY_LIMIT_MAX - used), reset };
+  return { allowed: used < limit, limit, remaining: Math.max(0, limit - used), reset };
 }
 
 export async function incrementVerifyLimit(env: Env, userId: string, email?: string | null): Promise<void> {

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { agentSummary, buildResult, type ReportInput } from '../../../src/verify/report';
-import { displayUrl, scrub } from '../../../src/verify/run';
+import { displayUrl, scrub, withFileQuery } from '../../../src/verify/run';
 import type { PageSignals, Viewport, VerifyIssue } from '../../../src/verify/types';
 
 function page(viewport: Viewport, over: Partial<PageSignals> = {}): PageSignals {
   return {
     viewport,
+    entrypoint: 'index.html',
     loadMs: 120,
     pageErrors: [],
     console: [],
@@ -62,9 +63,9 @@ describe('buildResult', () => {
     expect(r.status).toBe('pass');
     expect(r.summary).toBe('pass — no problems found');
     expect(r.issues).toEqual([]);
-    expect(r.viewports.map((v) => [v.viewport, v.width, v.height, v.dpr, v.screenshot?.width])).toEqual([
-      ['desktop', 1280, 800, 1, 800],
-      ['mobile', 390, 844, 2, 780],
+    expect(r.viewports.map((v) => [v.viewport, v.entrypoint, v.width, v.height, v.dpr, v.screenshot?.width])).toEqual([
+      ['desktop', 'index.html', 1280, 800, 1, 800],
+      ['mobile', 'index.html', 390, 844, 2, 780],
     ]);
     expect(r.duration_ms).toBe(8000);
   });
@@ -196,6 +197,20 @@ describe('credential scrubbing', () => {
     expect(displayUrl('https://abc.cdn.example/styles.css', plan)).toBe('/styles.css');
     expect(displayUrl('https://shareout.example/v1/data/art_1/json/x?token=abc&limit=5', plan)).toBe('/v1/data/art_1/json/x?token=…&limit=5');
     expect(displayUrl('https://img.example.org/a.png?sig=zz', plan)).toBe('img.example.org/a.png?sig=…');
+  });
+
+  it('adds the file query only to the page\'s own files', () => {
+    const files = { pageOrigin: 'https://shareout.example', basePath: '/a/demo/', fileQuery: '_capture=tok&_ver=ver_1' };
+    expect(withFileQuery('https://shareout.example/a/demo/css/site.css?v=2', files))
+      .toBe('https://shareout.example/a/demo/css/site.css?v=2&_capture=tok&_ver=ver_1');
+    expect(withFileQuery('https://shareout.example/sdk/shareout.js', files)).toBeNull();
+    expect(withFileQuery('https://shareout.example/v1/data/art_1/json/x', files)).toBeNull();
+    expect(withFileQuery('https://cdn.jsdelivr.net/npm/x@1/x.js', files)).toBeNull();
+    expect(withFileQuery('https://shareout.example/a/demo/app.js', { ...files, fileQuery: null })).toBeNull();
+    // A content host serving a public page at its root: shared bundles stay untouched.
+    const root = { pageOrigin: 'https://abc.cdn.example', basePath: '/', fileQuery: '_capture=tok' };
+    expect(withFileQuery('https://abc.cdn.example/vendor/d3@7/dist/d3.min.js', root)).toBeNull();
+    expect(withFileQuery('https://abc.cdn.example/app.js', root)).toBe('https://abc.cdn.example/app.js?_capture=tok');
   });
 
   it('removes capture tokens, content capabilities and access tokens from page text', () => {

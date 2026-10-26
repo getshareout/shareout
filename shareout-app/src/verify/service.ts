@@ -12,7 +12,7 @@ import { normalizeVisibility } from '../visibility-config';
 import { hasMcpCapability } from '../mcp-broker/capabilities';
 import { artifactContentHost, getArtifactCspOrigin, getSandboxedCSP } from '../serve/security';
 import { captureUrl } from '../screenshots';
-import { checkVerifyLimit, incrementVerifyLimit, VERIFY_LIMIT_MAX } from './limits';
+import { checkVerifyLimit, incrementVerifyLimit } from './limits';
 import { parseCsp } from './request-policy';
 import { renderForVerify, type RenderPlan } from './run';
 import { buildResult } from './report';
@@ -26,6 +26,8 @@ export interface VerifyInput {
   version?: number;
   viewports?: Viewport[];
   fullPage?: boolean;
+  /** Verifying the live version also refreshes its thumbnail; the MCP tool opts out. Default true. */
+  refreshThumbnail?: boolean;
 }
 
 export interface VerifyFailure {
@@ -56,12 +58,14 @@ interface ArtifactRow {
   slug: string | null;
   live_version_id: string | null;
   moderation_status: string;
+  has_mobile: number;
 }
 
 interface VersionRow {
   id: string;
   version_no: number;
   entrypoint: string;
+  mobile_entrypoint: string | null;
   manifest_json: string | null;
 }
 
@@ -84,10 +88,12 @@ async function loadArtifact(env: Env, artifactId: string): Promise<ArtifactRow |
   return env.DB.prepare(`
     SELECT a.id, a.name, a.owner_id, a.workspace_id, a.visibility, a.paused,
            d.slug AS slug, d.version_id AS live_version_id,
-           COALESCE(m.status, 'approved') AS moderation_status
+           COALESCE(m.status, 'approved') AS moderation_status,
+           COALESCE(p.has_mobile, 0) AS has_mobile
       FROM artifacts a
       LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
       LEFT JOIN artifact_moderation m ON m.artifact_id = a.id
+      LEFT JOIN artifact_presentation p ON p.artifact_id = a.id
      WHERE a.id = ? AND a.deleted_at IS NULL
   `).bind(artifactId).first<ArtifactRow>();
 }
@@ -115,11 +121,22 @@ async function authorize(env: Env, user: AuthUser, artifact: ArtifactRow, action
 }
 
 async function loadVersion(env: Env, artifact: ArtifactRow, versionNo?: number): Promise<VersionRow | null> {
+  const cols = 'id, version_no, entrypoint, mobile_entrypoint, manifest_json';
   return versionNo === undefined
-    ? env.DB.prepare('SELECT id, version_no, entrypoint, manifest_json FROM versions WHERE id = ?')
+    ? env.DB.prepare(`SELECT ${cols} FROM versions WHERE id = ?`)
       .bind(artifact.live_version_id).first<VersionRow>()
-    : env.DB.prepare('SELECT id, version_no, entrypoint, manifest_json FROM versions WHERE artifact_id = ? AND version_no = ?')
+    : env.DB.prepare(`SELECT ${cols} FROM versions WHERE artifact_id = ? AND version_no = ?`)
       .bind(artifact.id, versionNo).first<VersionRow>();
+}
+
+/**
+ * The file a phone viewer of this version gets instead of the main entrypoint, or null —
+ * the rule handleServe applies: the version has a mobile entrypoint (and, for the live
+ * version, the artifact still serves it).
+ */
+function phoneEntrypoint(version: VersionRow, assets: AssetRow[], live: boolean, hasMobile: boolean): string | null {
+  const path = version.mobile_entrypoint;
+  return path && assets.some((a) => a.path === path) && (!live || hasMobile) ? path : null;
 }
 
 /** The version's own HTML/CSS/JS text, entrypoint first, bounded. */
@@ -146,13 +163,17 @@ async function readSources(env: Env, assets: AssetRow[], entrypoint: string): Pr
  * content origin when the instance has one (a separate registrable domain — no app
  * cookies, no app pages), else the same-zone /a/{slug}/ path. Private pages get the
  * same short-lived content capability (`/c/<ct>/`) a viewer's iframe gets, so their
- * relative files load. The CSP enforced is the one this page's viewers receive.
+ * relative files load. The phone opens the mobile entrypoint when a phone viewer would
+ * get it (`?v=mobile`). A pinned version, and a private page on a same-zone instance,
+ * add the capture token (and the version) to the page's own file requests, so every
+ * file comes from that version without a session cookie. The CSP enforced is the one
+ * this page's viewers receive.
  */
 async function renderPlan(
   env: Env,
   artifact: ArtifactRow & { slug: string },
   version: VersionRow,
-  input: { viewports: Viewport[]; fullPage: boolean; live: boolean; isPublic: boolean; lockCsp: boolean },
+  input: { viewports: Viewport[]; fullPage: boolean; live: boolean; isPublic: boolean; lockCsp: boolean; mobileEntry: string | null; refreshThumbnail: boolean },
 ): Promise<RenderPlan> {
   const platformOrigin = getPlatformOrigin(env);
   const host = artifactContentHost(env, artifact.id);
@@ -165,22 +186,29 @@ async function renderPlan(
   }
   const url = await captureUrl(env, artifact.id, artifact.slug, input.live ? undefined : version.id, base);
   const pageOrigin = new URL(url).origin;
+  const fileQuery = new URLSearchParams();
+  if (!input.live || (!host && !input.isPublic)) fileQuery.set('_capture', new URL(url).searchParams.get('_capture') ?? '');
+  if (!input.live) fileQuery.set('_ver', version.id);
   return {
     artifactId: artifact.id,
-    url,
+    targets: {
+      desktop: { url, entrypoint: version.entrypoint },
+      mobile: input.mobileEntry
+        ? { url: `${url}&v=mobile`, entrypoint: input.mobileEntry }
+        : { url, entrypoint: version.entrypoint },
+    },
     pageOrigin,
     basePath,
-    entrypoint: version.entrypoint,
     platformOrigin,
+    fileQuery: fileQuery.toString() || null,
     policy: {
-      targetUrl: url,
       pageOrigin,
       ownHosts: [new URL(platformOrigin).hostname, new URL(url).hostname],
       csp: parseCsp(getSandboxedCSP(getArtifactCspOrigin(env), !input.isPublic, env, input.lockCsp)),
     },
     viewports: input.viewports,
     fullPage: input.fullPage,
-    refreshThumbnail: input.live && input.viewports.includes('desktop'),
+    refreshThumbnail: input.refreshThumbnail && input.live && input.viewports.includes('desktop'),
   };
 }
 
@@ -212,9 +240,9 @@ export async function runVerify(
 
   const limit = await checkVerifyLimit(env, user.id, user.email);
   if (!limit.allowed) {
-    return fail(429, 'RATE_LIMIT_EXCEEDED', `Verify limit reached (${VERIFY_LIMIT_MAX} runs per hour). It resets at ${new Date(limit.reset * 1000).toISOString().slice(11, 16)} UTC.`, {
+    return fail(429, 'RATE_LIMIT_EXCEEDED', `Verify limit reached (${limit.limit} runs per hour). It resets at ${new Date(limit.reset * 1000).toISOString().slice(11, 16)} UTC.`, {
       hint: 'Batch your fixes and verify once per change set.',
-      limit: { limit: VERIFY_LIMIT_MAX, reset: limit.reset },
+      limit: { limit: limit.limit, reset: limit.reset },
     });
   }
   await incrementVerifyLimit(env, user.id, user.email);
@@ -225,21 +253,16 @@ export async function runVerify(
   const viewports = VIEWPORT_NAMES.filter((v) => !input.viewports || input.viewports.includes(v));
   const files = await readSources(env, assets, version.entrypoint);
   const found: VerifyIssue[] = sourceIssues(files, { env, isPublic });
-  if (!live && assets.length > 1) {
-    found.push({
-      check: 'render',
-      rule: 'pinned_version_files',
-      severity: 'info',
-      message: `v${version.version_no} is not live: its HTML was rendered, but its other files load from the live version`,
-    });
-  }
+  const mobileEntry = phoneEntrypoint(version, assets, live, artifact.has_mobile === 1);
 
   let outcome = null;
   let partialReason: 'no_browser' | 'render_failed' | undefined;
   if (!env.BROWSER) {
     partialReason = 'no_browser';
   } else {
-    const plan = await renderPlan(env, { ...artifact, slug: artifact.slug }, version, { viewports, fullPage: input.fullPage === true, live, isPublic, lockCsp });
+    const plan = await renderPlan(env, { ...artifact, slug: artifact.slug }, version, {
+      viewports, fullPage: input.fullPage === true, live, isPublic, lockCsp, mobileEntry, refreshThumbnail: input.refreshThumbnail !== false,
+    });
     outcome = await renderForVerify(env, plan);
     if (!outcome) partialReason = 'render_failed';
   }
@@ -303,7 +326,7 @@ export async function verifyScreenshot(
 }
 
 // Exposed for unit tests; not part of the request-handling surface.
-export const _internal = { renderPlan };
+export const _internal = { renderPlan, phoneEntrypoint };
 
 /** The stored result with absolute screenshot URLs for `origin`. */
 export function presentResult(result: VerifyResult, origin: string): VerifyResult & { viewports: Array<VerifyResult['viewports'][number] & { screenshot: (ScreenshotInfo & { url: string }) | null }> } {

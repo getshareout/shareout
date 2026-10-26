@@ -23,19 +23,35 @@ const SESSION_BUDGET_MS = 50_000;
 const MAX_SHOT_PX = 4000;
 const MAX_ENTRIES = 20;
 
+/** What one viewport opens: the capture URL (its main frame may load nothing else) and the file it renders. */
+export interface ViewTarget {
+  url: string;
+  entrypoint: string;
+}
+
 export interface RenderPlan {
   artifactId: string;
-  /** Capture URL the main frame opens. */
-  url: string;
+  /** Desktop renders the main entrypoint; the phone the mobile one when the version has it. */
+  targets: Record<Viewport, ViewTarget>;
   pageOrigin: string;
   /** The artifact's folder on pageOrigin: /a/{slug}/, /c/{ct}/ or /. */
   basePath: string;
-  entrypoint: string;
   platformOrigin: string;
-  policy: RequestPolicy;
+  /** Appended to the page's own file requests (capture token, pinned version), or null. */
+  fileQuery: string | null;
+  /** Request policy; each viewport adds its own target URL. */
+  policy: Omit<RequestPolicy, 'targetUrl'>;
   viewports: Viewport[];
   fullPage: boolean;
   refreshThumbnail: boolean;
+}
+
+/** How a viewport names the URLs it reports. */
+interface PageView {
+  pageOrigin: string;
+  basePath: string;
+  entrypoint: string;
+  platformOrigin: string;
 }
 
 export interface RenderOutcome {
@@ -68,7 +84,7 @@ export function scrub(text: string): string {
 }
 
 /** Readable, credential-free form of a URL the page touched. */
-export function displayUrl(raw: string, plan: Pick<RenderPlan, 'pageOrigin' | 'basePath' | 'entrypoint' | 'platformOrigin'>): string {
+export function displayUrl(raw: string, plan: PageView): string {
   let u: URL;
   try {
     u = new URL(raw);
@@ -93,17 +109,31 @@ function bump<T extends { count: number }>(list: T[], entry: T, same: (a: T) => 
   else if (list.length < MAX_ENTRIES) list.push(entry);
 }
 
-function emptySignals(viewport: Viewport): PageSignals {
+/** The page's own file URL with the plan's file query added, or null to leave the request alone. */
+export function withFileQuery(raw: string, plan: Pick<RenderPlan, 'pageOrigin' | 'basePath' | 'fileQuery'>): string | null {
+  if (!plan.fileQuery) return null;
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (u.origin !== plan.pageOrigin || !u.pathname.startsWith(plan.basePath) || /^\/(sdk|vendor|lib)\//.test(u.pathname)) return null;
+  for (const [k, v] of new URLSearchParams(plan.fileQuery)) u.searchParams.set(k, v);
+  return u.toString();
+}
+
+function emptySignals(viewport: Viewport, entrypoint: string): PageSignals {
   return {
-    viewport, loadMs: 0, pageErrors: [], console: [], requests: [], blocked: [], dialogs: [], storage: [], popups: 0,
+    viewport, entrypoint, loadMs: 0, pageErrors: [], console: [], requests: [], blocked: [], dialogs: [], storage: [], popups: 0,
     layout: null, design: null, axe: null, metrics: { lcpMs: null, cls: null, bytes: null, requests: 0 }, screenshot: null,
   };
 }
 
-function failedSignals(viewport: Viewport, err: unknown): PageSignals {
+function failedSignals(viewport: Viewport, entrypoint: string, err: unknown): PageSignals {
   const message = String((err as Error)?.message || err).split('\n')[0];
   const timedOut = /timeout|timed out/i.test(message);
-  return { ...emptySignals(viewport), renderError: `Could not open the page: ${timedOut ? `it did not finish loading within ${NAV_TIMEOUT_MS / 1000} s` : message.slice(0, 200)}` };
+  return { ...emptySignals(viewport, entrypoint), renderError: `Could not open the page: ${timedOut ? `it did not finish loading within ${NAV_TIMEOUT_MS / 1000} s` : message.slice(0, 200)}` };
 }
 
 function mobileUserAgent(ua: string): string {
@@ -120,7 +150,7 @@ interface Tracker {
 }
 
 /** Byte counts and exceptions (with url:line:col, syntax errors included) from a CDP session. */
-async function track(page: RenderPage, s: PageSignals, plan: RenderPlan, isTooling: (url: string) => boolean): Promise<Tracker> {
+async function track(page: RenderPage, s: PageSignals, plan: PageView, ownHosts: string[], isTooling: (url: string) => boolean): Promise<Tracker> {
   const tracker: Tracker = { bytes: () => null, requests: 0, pending: [], privateAddress: null };
   const addError = (raw: string, url: string | undefined, line?: number, col?: number) => {
     if (url && isTooling(url)) return;
@@ -138,7 +168,7 @@ async function track(page: RenderPage, s: PageSignals, plan: RenderPlan, isTooli
       const ip = e.response?.remoteIPAddress;
       let host = '';
       try { host = new URL(e.response?.url || '').hostname.toLowerCase(); } catch { /* not a URL */ }
-      if (ip && isPrivateNetworkHost(ip) && !plan.policy.ownHosts.includes(host)) tracker.privateAddress = ip;
+      if (ip && isPrivateNetworkHost(ip) && !ownHosts.includes(host)) tracker.privateAddress = ip;
     });
     cdp.on('Runtime.exceptionThrown', (e: { exceptionDetails: any }) => {
       const d = e.exceptionDetails || {};
@@ -156,7 +186,7 @@ async function track(page: RenderPage, s: PageSignals, plan: RenderPlan, isTooli
   return tracker;
 }
 
-function listen(page: RenderPage, s: PageSignals, plan: RenderPlan, tracker: Tracker, isTooling: (url: string) => boolean): void {
+function listen(page: RenderPage, s: PageSignals, plan: PageView, tracker: Tracker, isTooling: (url: string) => boolean): void {
   page.on('console', (msg) => {
     const type = msg.type() as string;
     if (type !== 'error' && type !== 'warn' && type !== 'warning') return;
@@ -240,7 +270,10 @@ interface InspectOptions {
 }
 
 async function inspect(env: Env, browser: RenderBrowser, spec: ViewportSpec, plan: RenderPlan, opts: InspectOptions): Promise<PageSignals> {
-  const s = emptySignals(spec.name);
+  const target = plan.targets[spec.name];
+  const view: PageView = { pageOrigin: plan.pageOrigin, basePath: plan.basePath, entrypoint: target.entrypoint, platformOrigin: plan.platformOrigin };
+  const policy: RequestPolicy = { ...plan.policy, targetUrl: target.url };
+  const s = emptySignals(spec.name, target.entrypoint);
   const axeUrl = `${plan.pageOrigin}${AXE_PATH}`;
   // Our own injected script — also where /vendor redirects it (VENDOR_LIBS_DISABLED). Exact
   // URLs only: anything looser would let a page route requests past the guards below.
@@ -254,8 +287,8 @@ async function inspect(env: Env, browser: RenderBrowser, spec: ViewportSpec, pla
       await page.setUserAgent(spec.mobile ? mobileUserAgent(opts.userAgent) : opts.userAgent.replace('HeadlessChrome', 'Chrome'));
     }
     await page.evaluateOnNewDocument(installViewerEmulation);
-    const tracker = await track(page, s, plan, isTooling);
-    listen(page, s, plan, tracker, isTooling);
+    const tracker = await track(page, s, view, policy.ownHosts, isTooling);
+    listen(page, s, view, tracker, isTooling);
     await page.setRequestInterception(true);
     page.on('request', (req) => {
       if (req.isInterceptResolutionHandled()) return;
@@ -264,23 +297,23 @@ async function inspect(env: Env, browser: RenderBrowser, spec: ViewportSpec, pla
         req.continue().catch(noop);
         return;
       }
-      const verdict = decideRequest(plan.policy, {
-        url,
-        resourceType: req.resourceType(),
-        mainFrameNavigation: req.isNavigationRequest() && req.frame() === page.mainFrame(),
-      });
+      const mainFrameNavigation = req.isNavigationRequest() && req.frame() === page.mainFrame();
+      const verdict = decideRequest(policy, { url, resourceType: req.resourceType(), mainFrameNavigation });
       if (verdict.allow) {
         if (!/^(data|blob):/.test(url)) tracker.requests++;
-        req.continue().catch(noop);
+        // The page's own files carry the capture token (and pinned version) the server needs
+        // to serve them from that version, or without a session cookie on a private page.
+        const own = mainFrameNavigation ? null : withFileQuery(url, plan);
+        req.continue(own ? { url: own } : undefined).catch(noop);
         return;
       }
-      const entry: BlockedSignal = { reason: verdict.reason, url: displayUrl(url, plan), type: req.resourceType(), directive: verdict.directive, count: 1 };
+      const entry: BlockedSignal = { reason: verdict.reason, url: displayUrl(url, view), type: req.resourceType(), directive: verdict.directive, count: 1 };
       bump(s.blocked, entry, (b) => b.reason === entry.reason && b.url === entry.url);
       req.abort('blockedbyclient').catch(noop);
     });
 
     const t0 = Date.now();
-    const response = await page.goto(plan.url, { waitUntil: 'load', timeout: NAV_TIMEOUT_MS });
+    const response = await page.goto(target.url, { waitUntil: 'load', timeout: NAV_TIMEOUT_MS });
     s.loadMs = Date.now() - t0;
     if (!response || response.status() >= 400) {
       s.renderError = `Could not open the page: ${response ? `it answered HTTP ${response.status()}` : 'it did not respond'}`;
@@ -323,7 +356,7 @@ async function inspect(env: Env, browser: RenderBrowser, spec: ViewportSpec, pla
     await withTimeout(Promise.all(tracker.pending), 2000);
     if (tracker.privateAddress) {
       // Never hand back what a private-network response may have put on the page.
-      return { ...emptySignals(spec.name), renderError: `Results withheld: the page loaded content from a private network address (${tracker.privateAddress})` };
+      return { ...emptySignals(spec.name, target.entrypoint), renderError: `Results withheld: the page loaded content from a private network address (${tracker.privateAddress})` };
     }
     return s;
   } finally {
@@ -349,7 +382,7 @@ export async function renderForVerify(env: Env, plan: RenderPlan): Promise<Rende
       });
       return attempt()
         .catch((err) => (TRANSIENT.test(String((err as Error)?.message)) ? attempt() : Promise.reject(err)))
-        .catch((err) => failedSignals(vp, err));
+        .catch((err) => failedSignals(vp, plan.targets[vp].entrypoint, err));
     })), SESSION_BUDGET_MS);
     return signals ? { signals, thumbnailRefreshed } : null;
   });

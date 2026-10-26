@@ -48,3 +48,16 @@ export async function saveRun(
 export function readShot(env: Env, artifactId: string, runId: string, viewport: Viewport): Promise<R2ObjectBody | null> {
   return env.ARTIFACTS.get(shotKey(artifactId, runId, viewport));
 }
+
+/** Everything verify stored for an artifact (purge). Lists the prefix, so stray runs go too. */
+export async function deleteVerifyRuns(env: Env, artifactId: string): Promise<void> {
+  const prefix = `${artifactId}/verify/`;
+  let cursor: string | undefined;
+  for (let page = 0; page < 10; page++) {
+    const listed = await env.ARTIFACTS.list({ prefix, cursor });
+    const keys = listed.objects.map((o) => o.key);
+    if (keys.length) await env.ARTIFACTS.delete(keys);
+    if (!listed.truncated) return;
+    cursor = listed.cursor;
+  }
+}

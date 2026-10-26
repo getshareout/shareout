@@ -56,6 +56,8 @@ export interface ViewportMetrics {
 
 export interface ViewportReport {
   viewport: Viewport;
+  /** The file this view rendered. */
+  entrypoint: string;
   width: number;
   height: number;
   dpr: number;
@@ -164,6 +166,8 @@ export interface AxeViolation {
 
 export interface PageSignals {
   viewport: Viewport;
+  /** The file this view rendered (the phone renders the mobile entrypoint when there is one). */
+  entrypoint: string;
   /** A full sentence, set when this view has no results (navigation or HTTP error, or withheld). */
   renderError?: string;
   loadMs: number;

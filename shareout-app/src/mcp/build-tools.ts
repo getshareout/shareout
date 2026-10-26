@@ -31,13 +31,16 @@ const verifyArtifact: ToolDef = {
     required: ['artifact_id'],
     additionalProperties: false,
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  // Read-only for the agent: it changes nothing on the page (the run is kept as the page's
+  // latest verify result), so clients can call it in a fix loop without asking each time.
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   async run(ctx, args): Promise<ToolResult> {
     const id = str(args.artifact_id, 100);
     if (!id) return invalid('artifact_id is needed.');
     const outcome = await runVerify(ctx.env, ctx.user, id, {
       ...(typeof args.version === 'number' ? { version: args.version } : {}),
       fullPage: args.full_page === true,
+      refreshThumbnail: false,
     });
     if (!outcome.ok) {
       const text = `The page was not checked: ${outcome.error}${outcome.hint ? ` ${outcome.hint}` : ''}`;

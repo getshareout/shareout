@@ -391,6 +391,7 @@ export function buildResult(input: ReportInput): VerifyResult {
     const spec = VIEWPORTS[s.viewport];
     return {
       viewport: s.viewport,
+      entrypoint: s.entrypoint,
       width: spec.width,
       height: spec.height,
       dpr: spec.dpr,

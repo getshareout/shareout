@@ -6,6 +6,8 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyMigrations, e } from '../helpers/migrated-db';
 import { handleFetch } from '../../../src/router/handle-fetch';
 import { hashToken } from '../../../src/api-auth';
+import { createAccessToken } from '../../../src/token';
+import { purgeArtifact } from '../../../src/artifacts/crud';
 import { withArtifactBrowser } from '../../../src/screenshots';
 import { _internal } from '../../../src/verify/service';
 import type { PageSignals, Viewport, VerifyResult } from '../../../src/verify/types';
@@ -23,6 +25,9 @@ const AGENT_ART = 'art_1a2b3c4d5e6f708192a3b4c5';
 const MD_ART = 'art_2b3c4d5e6f708192a3b4c5d6';
 const DRAFT_ART = 'art_3c4d5e6f708192a3b4c5d6e7';
 const CLEAN_ART = 'art_4d5e6f708192a3b4c5d6e7f8';
+const MOBILE_ART = 'art_5f708192a3b4c5d6e7f8091a';
+const LIMIT_ART = 'art_708192a3b4c5d6e7f8091a2b';
+const PURGE_ART = 'art_8192a3b4c5d6e7f8091a2b3c';
 const HTML = '<!doctype html>\n<html>\n<head>\n<link rel="stylesheet" href="/styles.css">\n</head><body><h1>Hi</h1></body></html>';
 const CLEAN_HTML = '<!doctype html>\n<html lang="en"><head><link rel="stylesheet" href="styles.css"></head><body><h1>Hi</h1></body></html>';
 const tokens = {
@@ -33,11 +38,12 @@ const tokens = {
   agentPublish: 'sot_' + 'e5'.repeat(32),
   agentRead: 'sot_' + 'f6'.repeat(32),
   agentOther: 'sot_' + '07'.repeat(32),
+  limit: 'so_' + '18'.repeat(32),
 };
 
 function signals(viewport: Viewport): PageSignals {
   return {
-    viewport, loadMs: 100, pageErrors: [], console: [], requests: [], blocked: [], dialogs: [], storage: [], popups: 0,
+    viewport, entrypoint: 'index.html', loadMs: 100, pageErrors: [], console: [], requests: [], blocked: [], dialogs: [], storage: [], popups: 0,
     layout: {
       viewportWidth: viewport === 'desktop' ? 1280 : 390, scrollWidth: viewport === 'desktop' ? 1280 : 390, overflow: [],
       smallTargets: { count: 0, examples: [] }, brokenImages: [], textLength: 2, visibleMedia: 0, readyFlag: null,
@@ -92,7 +98,8 @@ beforeAll(async () => {
     e.DB.prepare(`INSERT INTO users (id, email, name, is_service) VALUES
       ('usr_vfy_owner', 'owner@example.com', 'o', 0), ('usr_vfy_editor', 'editor@example.com', 'e', 0),
       ('usr_vfy_viewer', 'viewer@example.com', 'v', 0), ('usr_vfy_stranger', 'stranger@example.com', 's', 0),
-      ('usr_vfy_agent', NULL, 'agent', 1), ('usr_vfy_agent2', NULL, 'agent2', 1), ('usr_vfy_agent3', NULL, 'agent3', 1)`),
+      ('usr_vfy_agent', NULL, 'agent', 1), ('usr_vfy_agent2', NULL, 'agent2', 1), ('usr_vfy_agent3', NULL, 'agent3', 1),
+      ('usr_vfy_limit', 'limit@example.com', 'l', 0)`),
     e.DB.prepare("INSERT INTO workspaces (id, name, slug, owner_id) VALUES (?, 'V', 'vfy', 'usr_vfy_owner'), (?, 'O', 'vfy-other', 'usr_vfy_stranger')").bind(WS, OTHER_WS),
     e.DB.prepare(`INSERT INTO workspace_members (id, workspace_id, user_id, role, member_class) VALUES
       ('wm_vfy_1', ?, 'usr_vfy_owner', 'owner', 'internal'), ('wm_vfy_2', ?, 'usr_vfy_agent', 'member', 'internal'),
@@ -104,6 +111,24 @@ beforeAll(async () => {
   await seedArtifact(MD_ART, 'usr_vfy_owner', 'vfy-notes', { entry: 'index.md', mime: 'text/markdown' });
   await seedArtifact(DRAFT_ART, 'usr_vfy_owner', 'vfy-draft', { live: false });
   await seedArtifact(CLEAN_ART, 'usr_vfy_owner', 'vfy-clean', { html: CLEAN_HTML });
+  await seedArtifact(LIMIT_ART, 'usr_vfy_limit', 'vfy-limit', { html: CLEAN_HTML });
+  await seedArtifact(PURGE_ART, 'usr_vfy_owner', 'vfy-purge', { html: CLEAN_HTML });
+  // Two versions, each with its own main page, mobile page and stylesheet; private.
+  for (const v of [1, 2]) {
+    for (const [path, body] of [['index.html', `<h1>DESKTOP v${v}</h1>`], ['mobile.html', `<h1>MOBILE v${v}</h1>`], ['styles.css', `/* v${v} css */`]]) {
+      await e.ARTIFACTS.put(`${MOBILE_ART}/mv${v}/${path}`, body);
+    }
+  }
+  await e.DB.batch([
+    e.DB.prepare("INSERT INTO artifacts (id, owner_id, name, slug, visibility, workspace_id) VALUES (?, 'usr_vfy_owner', 'Mobile page', 'vfy-mobile', 'private', ?)").bind(MOBILE_ART, WS),
+    e.DB.prepare(`INSERT INTO versions (id, artifact_id, version_no, entrypoint, mobile_entrypoint, manifest_json) VALUES
+      ('mv1', ?, 1, 'index.html', 'mobile.html', '{}'), ('mv2', ?, 2, 'index.html', 'mobile.html', '{}')`).bind(MOBILE_ART, MOBILE_ART),
+    ...[1, 2].flatMap((v) => [['index.html', 'text/html'], ['mobile.html', 'text/html'], ['styles.css', 'text/css']].map(([path, mime]) =>
+      e.DB.prepare("INSERT INTO assets (id, version_id, path, r2_key, mime, size_bytes, sha256) VALUES (?, ?, ?, ?, ?, 20, 'h')")
+        .bind(`ast_m${v}_${path}`, `mv${v}`, path, `${MOBILE_ART}/mv${v}/${path}`, mime))),
+    e.DB.prepare("INSERT INTO deployments (id, artifact_id, version_id, channel, slug) VALUES ('dep_mobile', ?, 'mv2', 'production', 'vfy-mobile')").bind(MOBILE_ART),
+    e.DB.prepare("INSERT INTO artifact_presentation (artifact_id, has_mobile) VALUES (?, 1)").bind(MOBILE_ART),
+  ]);
   await e.DB.prepare("INSERT INTO collaborators (id, artifact_id, email, role) VALUES ('col_vfy_1', ?, 'editor@example.com', 'editor'), ('col_vfy_2', ?, 'viewer@example.com', 'viewer')")
     .bind(ART, ART).run();
   const personal = async (id: string, user: string, token: string) =>
@@ -117,6 +142,7 @@ beforeAll(async () => {
     await personal('tok_vfy_e', 'usr_vfy_editor', tokens.editor),
     await personal('tok_vfy_v', 'usr_vfy_viewer', tokens.viewer),
     await personal('tok_vfy_s', 'usr_vfy_stranger', tokens.stranger),
+    await personal('tok_vfy_l', 'usr_vfy_limit', tokens.limit),
     await agent('sot_vfy_p', 'usr_vfy_agent', WS, tokens.agentPublish, 'artifacts:read,artifacts:publish'),
     await agent('sot_vfy_r', 'usr_vfy_agent2', WS, tokens.agentRead, 'artifacts:read'),
     await agent('sot_vfy_x', 'usr_vfy_agent3', OTHER_WS, tokens.agentOther, 'artifacts:read,artifacts:publish'),
@@ -215,6 +241,24 @@ describe('POST /v1/artifacts/:id/verify', () => {
     expect(vi.mocked(withArtifactBrowser)).not.toHaveBeenCalled();
   });
 
+  it('VERIFY_RUNS_PER_HOUR sets the hourly cap', async () => {
+    const one = { ...e, VERIFY_RUNS_PER_HOUR: '1' } as Env;
+    expect((await verify(tokens.limit, LIMIT_ART, {}, one)).status).toBe(200);
+    const res = await verify(tokens.limit, LIMIT_ART, {}, one);
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ code: 'RATE_LIMIT_EXCEEDED', limit: 1 });
+    // Unset or invalid falls back to 30, so the same user may run again.
+    expect((await verify(tokens.limit, LIMIT_ART, {}, { ...e, VERIFY_RUNS_PER_HOUR: 'lots' } as Env)).status).toBe(200);
+  });
+
+  it('purging the artifact deletes its verify results', async () => {
+    const run = (await (await verify(tokens.owner, PURGE_ART)).json()) as VerifyResult;
+    expect((await e.ARTIFACTS.list({ prefix: `${PURGE_ART}/verify/` })).objects.length).toBe(3);
+    await purgeArtifact(e, PURGE_ART, 'vfy-purge');
+    expect((await e.ARTIFACTS.list({ prefix: `${PURGE_ART}/verify/` })).objects).toEqual([]);
+    expect(await e.ARTIFACTS.get(`${PURGE_ART}/verify/${run.id}/desktop.webp`)).toBeNull();
+  });
+
   it('a session that cannot start → partial (render_failed)', async () => {
     vi.mocked(withArtifactBrowser).mockResolvedValue(null);
     const body = await (await verify(tokens.owner)).json() as VerifyResult;
@@ -267,43 +311,99 @@ describe('workspace Agent (sot_) tokens', () => {
   });
 });
 
-describe('content-origin render target (hosted instances)', () => {
+describe('render plan', () => {
   const cdnEnv = () => ({ ...e, ARTIFACT_ORIGIN: 'https://cdn.example' }) as Env;
-  const artifact = { id: ART, name: 'Page', owner_id: 'usr_vfy_owner', workspace_id: WS, visibility: 'workspace', paused: 0, slug: 'vfy-page', live_version_id: `ver_${ART}_2`, moderation_status: 'approved' };
-  const version = { id: `ver_${ART}_2`, version_no: 2, entrypoint: 'index.html', manifest_json: '{}' };
+  const artifact = { id: ART, name: 'Page', owner_id: 'usr_vfy_owner', workspace_id: WS, visibility: 'workspace', paused: 0, slug: 'vfy-page', live_version_id: `ver_${ART}_2`, moderation_status: 'approved', has_mobile: 0 };
+  const version = { id: `ver_${ART}_2`, version_no: 2, entrypoint: 'index.html', mobile_entrypoint: null, manifest_json: '{}' };
+  const flags = { viewports: ['desktop', 'mobile'] as Viewport[], fullPage: false, live: true, isPublic: false, lockCsp: false, mobileEntry: null, refreshThumbnail: true };
 
   it('renders a private page on its content host with a content capability, and serves it', async () => {
-    const plan = await _internal.renderPlan(cdnEnv(), artifact, version, { viewports: ['desktop', 'mobile'], fullPage: false, live: true, isPublic: false, lockCsp: false });
-    const url = new URL(plan.url);
+    const plan = await _internal.renderPlan(cdnEnv(), artifact, version, flags);
+    const url = new URL(plan.targets.desktop.url);
     expect(url.host).toBe(`${ART.slice(4)}.cdn.example`);
     expect(url.pathname).toMatch(/^\/c\/[^/]+\/$/);
     expect(url.searchParams.has('_capture')).toBe(true);
     expect(plan.basePath).toBe(url.pathname);
     expect(plan.policy.csp.get('script-src')).toContain('https:');
     expect(plan.refreshThumbnail).toBe(true);
+    expect(plan.fileQuery).toBeNull(); // the capability prefix already authorizes its files
+    expect(plan.targets.mobile).toEqual(plan.targets.desktop);
 
-    const page = await handleFetch(new Request(plan.url), cdnEnv());
+    const page = await handleFetch(new Request(plan.targets.desktop.url), cdnEnv());
     expect(page.status).toBe(200);
     expect(page.headers.get('Set-Cookie')).toBeNull();
     const html = await page.text();
     expect(html).toContain('shareout-initial-data');
     expect(html).toContain('<h1>Hi</h1>');
     // Relative files resolve under the same capability.
-    const css = await handleFetch(new Request(new URL('styles.css', plan.url).toString()), cdnEnv());
+    const css = await handleFetch(new Request(new URL('styles.css', plan.targets.desktop.url).toString()), cdnEnv());
     expect(css.status).toBe(200);
   });
 
-  it('public pages enforce the tight allowlist; pinned versions never refresh the thumbnail', async () => {
-    const plan = await _internal.renderPlan(cdnEnv(), artifact, { ...version, id: `ver_${ART}_1` }, { viewports: ['desktop'], fullPage: false, live: false, isPublic: true, lockCsp: false });
-    expect(new URL(plan.url).pathname).toBe('/');
-    expect(new URL(plan.url).searchParams.get('_ver')).toBe(`ver_${ART}_1`);
+  it('public pages enforce the tight allowlist; pinned versions pin every file and never refresh the thumbnail', async () => {
+    const plan = await _internal.renderPlan(cdnEnv(), artifact, { ...version, id: `ver_${ART}_1` }, { ...flags, live: false, isPublic: true });
+    const url = new URL(plan.targets.desktop.url);
+    expect(url.pathname).toBe('/');
+    expect(url.searchParams.get('_ver')).toBe(`ver_${ART}_1`);
     expect(plan.policy.csp.get('script-src')).not.toContain('https:');
     expect(plan.refreshThumbnail).toBe(false);
+    const query = new URLSearchParams(plan.fileQuery!);
+    expect(query.get('_ver')).toBe(`ver_${ART}_1`);
+    expect(query.get('_capture')).toBe(url.searchParams.get('_capture'));
   });
 
-  it('same-zone instances render the /a/{slug}/ capture view on the app origin', async () => {
-    const plan = await _internal.renderPlan(e, artifact, version, { viewports: ['desktop'], fullPage: false, live: true, isPublic: false, lockCsp: false });
-    expect(plan.url).toMatch(/^https:\/\/shareout\.test\/a\/vfy-page\/\?_capture=/);
+  it('same-zone instances render the /a/{slug}/ capture view, and a private page passes the capture token to its files', async () => {
+    const plan = await _internal.renderPlan(e, artifact, version, flags);
+    expect(plan.targets.desktop.url).toMatch(/^https:\/\/shareout\.test\/a\/vfy-page\/\?_capture=/);
     expect(plan.basePath).toBe('/a/vfy-page/');
+    expect(new URLSearchParams(plan.fileQuery!).has('_capture')).toBe(true);
+    expect(new URLSearchParams(plan.fileQuery!).has('_ver')).toBe(false);
+    expect((await _internal.renderPlan(e, artifact, version, { ...flags, isPublic: true })).fileQuery).toBeNull();
+  });
+
+  it('the phone opens the mobile entrypoint when a phone viewer would get it', async () => {
+    const plan = await _internal.renderPlan(e, artifact, version, { ...flags, mobileEntry: 'mobile.html' });
+    expect(plan.targets.mobile).toEqual({ url: `${plan.targets.desktop.url}&v=mobile`, entrypoint: 'mobile.html' });
+    expect(plan.targets.desktop.entrypoint).toBe('index.html');
+    const assets = [{ path: 'index.html' }, { path: 'mobile.html' }] as never;
+    const v = { ...version, mobile_entrypoint: 'mobile.html' };
+    expect(_internal.phoneEntrypoint(v, assets, true, true)).toBe('mobile.html');
+    expect(_internal.phoneEntrypoint(v, assets, true, false)).toBeNull(); // live page no longer serves it
+    expect(_internal.phoneEntrypoint(v, assets, false, false)).toBe('mobile.html'); // pinned version keeps its own
+    expect(_internal.phoneEntrypoint(v, [{ path: 'index.html' }] as never, false, true)).toBeNull(); // file missing
+  });
+
+  it('the MCP path can ask for no thumbnail refresh', async () => {
+    expect((await _internal.renderPlan(e, artifact, version, { ...flags, refreshThumbnail: false })).refreshThumbnail).toBe(false);
+  });
+});
+
+describe('capture view: mobile entrypoint and pinned files (served by the real router)', () => {
+  const get = (path: string) => handleFetch(new Request(`https://shareout.test${path}`), e);
+  const token = () => createAccessToken(MOBILE_ART, 'capture', e, 300);
+
+  it('?v=mobile renders the mobile entrypoint, of the live or of a pinned version', async () => {
+    const t = encodeURIComponent(await token());
+    expect(await (await get(`/a/vfy-mobile/?_capture=${t}`)).text()).toContain('DESKTOP v2');
+    expect(await (await get(`/a/vfy-mobile/?_capture=${t}&v=mobile`)).text()).toContain('MOBILE v2');
+    expect(await (await get(`/a/vfy-mobile/?_capture=${t}&_ver=mv1`)).text()).toContain('DESKTOP v1');
+    expect(await (await get(`/a/vfy-mobile/?_capture=${t}&_ver=mv1&v=mobile`)).text()).toContain('MOBILE v1');
+  });
+
+  it('the page\'s own files come from the pinned version, and load for a private page without a session', async () => {
+    const t = encodeURIComponent(await token());
+    const pinned = await get(`/a/vfy-mobile/styles.css?_capture=${t}&_ver=mv1`);
+    expect(pinned.status).toBe(200);
+    expect(pinned.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(await pinned.text()).toBe('/* v1 css */');
+    expect(await (await get(`/a/vfy-mobile/styles.css?_capture=${t}`)).text()).toBe('/* v2 css */');
+    // Without the capture token a private page's file is not served to an anonymous caller,
+    // and a token for another artifact (or a bad one) is refused.
+    expect((await get('/a/vfy-mobile/styles.css')).status).not.toBe(200);
+    expect((await get('/a/vfy-mobile/styles.css?_capture=bogus')).status).toBe(403);
+    const other = encodeURIComponent(await createAccessToken(ART, 'capture', e, 300));
+    expect((await get(`/a/vfy-mobile/styles.css?_capture=${other}`)).status).toBe(403);
+    // A pinned file that is not part of this artifact's version is a 404.
+    expect((await get(`/a/vfy-mobile/styles.css?_capture=${t}&_ver=ver_${ART}_1`)).status).toBe(404);
   });
 });

@@ -1,16 +1,16 @@
 // verify_artifact over MCP: same check as POST /v1/artifacts/{id}/verify, answered as a
-// short report plus the desktop and phone screenshots. Browser mocked at the
-// screenshots boundary.
+// short report plus the desktop and phone screenshots. The browser half (renderForVerify)
+// is mocked so the plan the tool asks for can be inspected.
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthUser } from '../../../src/api-auth';
 import { callTool, listTools } from '../../../src/mcp/tools';
-import { withArtifactBrowser } from '../../../src/screenshots';
+import { renderForVerify } from '../../../src/verify/run';
 import type { PageSignals, Viewport } from '../../../src/verify/types';
 import { applyMigrations, e } from '../helpers/migrated-db';
 
-vi.mock('../../../src/screenshots', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('../../../src/screenshots')>();
-  return { ...mod, withArtifactBrowser: vi.fn() };
+vi.mock('../../../src/verify/run', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('../../../src/verify/run')>();
+  return { ...mod, renderForVerify: vi.fn() };
 });
 
 const ART = 'art_5e6f708192a3b4c5d6e7f809';
@@ -21,7 +21,7 @@ const ctx = (user: AuthUser) => ({ env: e, user, origin: 'https://shareout.test'
 
 function signals(viewport: Viewport, over: Partial<PageSignals> = {}): PageSignals {
   return {
-    viewport, loadMs: 90, pageErrors: [], console: [], requests: [], blocked: [], dialogs: [], storage: [], popups: 0,
+    viewport, entrypoint: 'index.html', loadMs: 90, pageErrors: [], console: [], requests: [], blocked: [], dialogs: [], storage: [], popups: 0,
     layout: { viewportWidth: viewport === 'desktop' ? 1280 : 390, scrollWidth: viewport === 'desktop' ? 1280 : 390, overflow: [], smallTargets: { count: 0, examples: [] }, brokenImages: [], textLength: 10, visibleMedia: 0, readyFlag: null },
     design: null, axe: null, metrics: { lcpMs: 400, cls: 0, bytes: 1000, requests: 1 },
     screenshot: { bytes: new Uint8Array([82, 73, 70, 70, viewport === 'desktop' ? 1 : 2]), width: viewport === 'desktop' ? 800 : 780, height: 500, fullPage: false },
@@ -46,19 +46,19 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  vi.mocked(withArtifactBrowser).mockReset();
+  vi.mocked(renderForVerify).mockReset();
 });
 
 describe('verify_artifact', () => {
-  it('is listed with an artifact_id-only required input', () => {
+  it('is listed as a read-only, idempotent tool with an artifact_id-only required input', () => {
     const tool = listTools().find((t) => t.name === 'verify_artifact');
     expect(tool?.inputSchema).toMatchObject({ required: ['artifact_id'] });
-    expect(tool?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+    expect(tool?.annotations).toMatchObject({ readOnlyHint: true, idempotentHint: true });
   });
 
   it('returns a short report and two screenshots (desktop, then phone)', async () => {
     const err = { message: 'TypeError: rows is undefined', where: 'index.html:12:7', count: 1 };
-    vi.mocked(withArtifactBrowser).mockResolvedValue({ signals: [signals('desktop', { pageErrors: [err] }), signals('mobile', { pageErrors: [err] })], thumbnailRefreshed: true });
+    vi.mocked(renderForVerify).mockResolvedValue({ signals: [signals('desktop', { pageErrors: [err] }), signals('mobile', { pageErrors: [err] })], thumbnailRefreshed: false });
     const r = (await callTool(ctx(owner), 'verify_artifact', { artifact_id: ART }))!;
     expect(r.isError).toBeUndefined();
     const [text, desktop, phone] = r.content;
@@ -70,6 +70,8 @@ describe('verify_artifact', () => {
     expect(desktop).toEqual({ type: 'image', data: 'UklGRgE=', mimeType: 'image/webp' });
     expect(phone).toEqual({ type: 'image', data: 'UklGRgI=', mimeType: 'image/webp' });
     expect(r.structuredContent).toMatchObject({ status: 'fail', version: 1, live: true, counts: { error: 1, warning: 0, info: 0 } });
+    // An agent's fix loop must not churn the page's thumbnail: only REST refreshes it.
+    expect(vi.mocked(renderForVerify).mock.calls[0][1]).toMatchObject({ refreshThumbnail: false, viewports: ['desktop', 'mobile'] });
   });
 
   it('a viewer of the page gets a plain refusal and no browser runs', async () => {
@@ -77,7 +79,7 @@ describe('verify_artifact', () => {
     expect(r.isError).toBe(true);
     expect(r.content).toHaveLength(1);
     expect((r.content[0] as { text: string }).text).toContain('The page was not checked: Only owners and editors');
-    expect(vi.mocked(withArtifactBrowser)).not.toHaveBeenCalled();
+    expect(vi.mocked(renderForVerify)).not.toHaveBeenCalled();
   });
 
   it('without a browser binding it still reports the source checks, without images', async () => {
