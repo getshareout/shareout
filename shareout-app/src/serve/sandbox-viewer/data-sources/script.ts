@@ -83,11 +83,15 @@ export function renderDataSourcesScript(cfg: DataSourcesScriptConfig): string {
   function show() { pill.hidden = false; }
   function say(text) { if (status) status.textContent = text; }
 
-  // The frame announces that it shows data; only our own artifact frame counts.
+  // The frame announces that it shows data; only our own artifact frame counts. The
+  // answer tells the page this host shows its sources, so so.sources.mount() drops its
+  // own floating button.
   window.addEventListener('message', function(e) {
     var f = frame();
     if (!f || e.source !== f.contentWindow) return;
-    if (e.data && e.data.type === 'shareout:sources:hint') show();
+    if (!e.data || e.data.type !== 'shareout:sources:hint') return;
+    show();
+    f.contentWindow.postMessage({ type: 'shareout:sources:host', panel: true }, '*');
   });
   function ping() { var f = frame(); if (f && f.contentWindow) f.contentWindow.postMessage({ type: 'shareout:sources:ping' }, '*'); }
   if (CFG.visible) show();

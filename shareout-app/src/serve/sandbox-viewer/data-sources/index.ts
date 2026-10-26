@@ -61,6 +61,12 @@ export function renderDataSourcesBridge(): string {
       f.contentWindow.postMessage({ type: 'shareout:sources:highlight', ref: ref || null, selectors: Array.isArray(selectors) ? selectors : [], scroll: !!scroll }, '*');
     }
   };
+  // The Studio's Data tab shows this page's sources: the page needs no button of its own.
+  window.addEventListener('message', function(e) {
+    var f = document.querySelector('iframe');
+    if (!f || e.source !== f.contentWindow || !e.data || e.data.type !== 'shareout:sources:hint') return;
+    f.contentWindow.postMessage({ type: 'shareout:sources:host', panel: true }, '*');
+  });
 })();
 </script>`;
 }

@@ -14,6 +14,8 @@ declare global {
     openVisDisabled?: boolean;
     /** False when this instance has no AI API key configured. */
     aiEnabled?: boolean;
+    /** The artifact's workspace language (`en` / `es`), when it sets one. */
+    locale?: string;
   }
 
   interface Window {

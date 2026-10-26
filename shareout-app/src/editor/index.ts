@@ -11,6 +11,7 @@ import { detectComponents } from './detector';
 import { getPlatformOrigin } from '../config/origins';
 import { openVisibilityDisabled } from '../visibility-config';
 import { getAIProvider } from '../data/agent/anthropic';
+import { getWorkspaceLocale } from '../i18n/locale';
 import { isHtmlDocument, markdownEditPayload, markdownEditShell } from './markdown-edit';
 
 /** Binary artifact types: served as files, never opened in an editor. */
@@ -371,6 +372,7 @@ export async function serveEditorPage(
   description?: string | null,
   user?: { userId: string; userName: string; userAvatar?: string }
 ): Promise<Response> {
+  const locale = await artifactWorkspaceLocale(env, artifactId);
   const html = generateEditorPage({
     artifactId,
     slug,
@@ -384,6 +386,7 @@ export async function serveEditorPage(
     openVisDisabled: openVisibilityDisabled(env),
     // Soft signal for the Agent pane — never send keys to the client.
     aiEnabled: !!getAIProvider(env),
+    locale: locale ?? undefined,
   });
   return new Response(html, {
     headers: {
@@ -391,6 +394,18 @@ export async function serveEditorPage(
       'Cache-Control': 'no-cache',
     },
   });
+}
+
+/** The workspace's language for editor copy that has one (Data → Sources); the client
+ *  falls back to the browser's when the page is personal or the workspace sets none. */
+async function artifactWorkspaceLocale(env: Env, artifactId: string): Promise<'en' | 'es' | null> {
+  try {
+    const ws = await env.DB.prepare('SELECT workspace_id FROM artifacts WHERE id = ?')
+      .bind(artifactId).first<{ workspace_id: string | null }>();
+    return await getWorkspaceLocale(env, ws?.workspace_id);
+  } catch {
+    return null;
+  }
 }
 
 function errorResponse(code: string, message: string, status: number): Response {

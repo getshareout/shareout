@@ -40,7 +40,9 @@ close(): void
 ### `mount(options?)`
 
 Renders the floating toggle button, slide-out drawer, and per-element badges.
-Returns `{ open(ref?), close(), destroy() }`.
+Returns `{ open(ref?), close(), destroy() }`. Inside the ShareOut viewer and Studio the
+floating button stays hidden: the host's **Data** button replaces it (the drawer, badges
+and `open()` still work).
 
 | Option | Default | Purpose |
 | --- | --- | --- |
@@ -66,6 +68,7 @@ interface SourceEntry {
   tables?: string[];
   refresh?: string;
   asOf?: string;
+  freshnessSla?: string; // manifest `freshness_sla` ("24h", "PT6H"): stale after this, else 7 days
   replication?: {
     build?: string;
     publish?: string;

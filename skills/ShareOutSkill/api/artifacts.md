@@ -287,7 +287,9 @@ knows (connections, refresh jobs, crews, sheet syncs, datasets, metrics, MCP con
 
 Anyone who can open the page may call it (session, password, guest, public link, or a
 personal API token); everyone else gets `404`. Query params: `page=<html path>` for one
-page of a multi-page site; `version=<no|id>` is editors-only (`403` otherwise).
+page of a multi-page site; `version=<no|id>` is editors-only (`403` otherwise). Signed-out
+callers share a per-IP budget (`429 RATE_LIMIT_EXCEEDED`); answers are cached for about a
+minute.
 
 ```json
 {
@@ -310,6 +312,10 @@ page of a multi-page site; `version=<no|id>` is editors-only (`403` otherwise).
 - `declared: false` means the page uses it but the manifest doesn't describe it — say
   "not declared" rather than guessing. Freshness fields are absent when unknown.
 - `refresher.type`: `job | crew | manual | live` (`live` = read when the page loads).
+  `refresher.name` only reaches editors and people tied to the page or its workspace
+  (collaborators, members, guests); a public link gets the type and `schedule`.
+- `stale`: older than the source's `freshness_sla`, else twice its refresh schedule,
+  else a week.
 - `direct: false` sources only feed another one (see `upstream`).
 - Editors and workspace admins get `access: "full"` and a `details` object per source:
   `query`, `tables`, `replication`, `connection {id, name, scope, kind, credential_scope}`

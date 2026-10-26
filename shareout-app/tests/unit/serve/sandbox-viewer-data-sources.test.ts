@@ -80,6 +80,7 @@ describe('Data sources in the shared-link viewer', () => {
     expect(html).not.toContain('so-ds-pill');
     expect(html).toContain('window.soDataSources = {');
     expect(html).toContain("type: 'shareout:sources:highlight'");
+    expect(html).toContain("type: 'shareout:sources:host', panel: true");
   });
 
   it('stays out of pages whose owner hid the ShareOut toolbar', async () => {

@@ -56,7 +56,8 @@ Every `sources.{connections,json,tables}` entry takes optional provenance fields
 | `query` | The exact SQL / API call / build step that produced the data |
 | `tables` | Underlying warehouse/source tables |
 | `refresh` | Cadence in words (`daily 12:00 UTC`, `manual`, `live`) |
-| `as_of` | Date/time the snapshot reflects — badges show **stale** once it's >7 days old, so whatever refreshes the data must rewrite it on every run |
+| `as_of` | Date/time the snapshot reflects — whatever refreshes the data must rewrite it on every run |
+| `freshness_sla` | Oldest the data may get before viewers see **may be out of date** (`24h`, `2d`, `PT6H`). Without it: twice the refresh job's schedule, else twice what `refresh` says, else a week |
 | `replication` | `{ build, publish, credentials, notes }` — how to rebuild from scratch |
 
 All optional, all backward-compatible. Keep `default` too — it powers editor preview.
@@ -90,7 +91,8 @@ toolbar. It opens **Data sources**: one row per source with
 
 - its label (yours, or the key) and where it comes from (`From BigQuery`),
 - freshness — what ShareOut saw (`Updated 2 h ago · by the job “Ads diario”`), else your
-  `as_of` / `refresh`, else an honest **not declared**,
+  `as_of` / `refresh`, else an honest **not declared**; flagged **may be out of date**
+  past `freshness_sla` (or twice the schedule),
 - what it feeds (`Feeds: 3 elements`); hovering or picking a source outlines those
   elements on the page.
 
@@ -103,7 +105,8 @@ Who sees what:
 
 | Viewer | Sees |
 |--------|------|
-| Anyone who can open the page | labels, kinds, where it comes from, freshness, what each source feeds |
+| Anyone who can open the page (incl. a public link) | labels, kinds, where it comes from, freshness, what each source feeds — refreshes as "updated automatically, daily at 06:00 UTC" |
+| People tied to the page or its workspace (collaborators, members, guests) | + who refreshes it (`by the job “Ads diario”`) — name jobs and AI tasks so they read well to clients |
 | Editors / workspace admins | + `query`, `tables`, `replication`, the connection and its credential scope, every job/crew and its status |
 | Viewers under an [access policy](../core/access-policy.md) | only what the page source names; no job/crew names, no timing beyond scheduled refreshes |
 
@@ -115,7 +118,10 @@ and Studio and the editor show it in their **Data** tabs.
 
 `so.sources.mount()` still renders an in-page drawer and per-element **ⓘ source** badges
 (or `<body data-shareout-sources>` for zero JS). Use it only when you want badges inside
-the page itself; viewers no longer need it to see sources.
+the page itself; viewers no longer need it to see sources. Inside the ShareOut viewer (and
+Studio) its floating button stays hidden — the host's **Data** button replaces it; badges
+and `so.sources.open()` still work. Its **stale** tags read only the manifest: past
+`freshness_sla`, else a week after `as_of`.
 
 | Call | Returns |
 |------|---------|
@@ -160,7 +166,8 @@ job config — `tables`/`columns`/`filters` are resolved from the snapshot when 
 ## Checklist
 
 - [ ] Every connection/dataset declares `description` + `query` (+ `tables`)
-- [ ] `refresh` + `as_of` set so viewers know how fresh the data is
+- [ ] `refresh` + `as_of` set so viewers know how fresh the data is (`freshness_sla` when the
+      tolerance isn't twice the schedule)
 - [ ] `replication.{build,publish,credentials}` filled — the KEY "how to rebuild" answer
 - [ ] Each chart/table tagged `data-shareout-source` or mapped in `feeds`
 - [ ] Open the page's **Data** button: every source has a label, a freshness line and the elements it feeds

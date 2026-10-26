@@ -88,7 +88,8 @@ const CACHE_MS = 60_000;
 let cache: { id: string; at: number; data: SourcesResponse } | null = null;
 
 export async function renderSourcesSection(ctx: EditorContext, host: HTMLElement): Promise<void> {
-  const lang = sourcesLocale();
+  // The workspace's language first (EDITOR_CONFIG.locale), then the browser's.
+  const lang = sourcesLocale(ctx.config.locale || undefined);
   const c = DATA_SOURCES_COPY[lang];
   const id = ctx.config.artifactId;
   const fresh = cache && cache.id === id && Date.now() - cache.at < CACHE_MS ? cache.data : null;

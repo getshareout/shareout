@@ -111,6 +111,17 @@ describe('Sources in the editor Data tab', () => {
     expect(ctx.selected.map((el) => el.id)).toEqual(['kpi']);
   });
 
+  it('speaks the workspace language from EDITOR_CONFIG, whatever the browser says', async () => {
+    const ctx = editorCtx();
+    (ctx.config as { locale?: string }).locale = 'es';
+    vi.stubGlobal('navigator', { language: 'en-US' });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(RESPONSE), { status: 200 })));
+    const host = document.createElement('div');
+    await renderSourcesSection(ctx, host);
+    expect(host.textContent).toContain('Fuentes de datos');
+    expect(host.textContent).toContain('Alimenta: 3 elementos');
+  });
+
   it('stays quiet for a page that was never published, and says so when loading fails', async () => {
     const ctx = editorCtx();
     const host = document.createElement('div');

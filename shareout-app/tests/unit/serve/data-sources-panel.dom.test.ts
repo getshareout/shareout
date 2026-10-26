@@ -92,9 +92,12 @@ describe('Data pill', () => {
     fromFrame({ type: 'shareout:sources:hint' }, window);
     fromFrame({ type: 'shareout:sources:hint' }, {});
     expect(pill().hidden).toBe(true);
+    expect(frameWin.postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'shareout:sources:host' }), '*');
     fromFrame({ type: 'shareout:sources:hint' });
     expect(pill().hidden).toBe(false);
     expect(pill().textContent?.trim()).toBe('Data');
+    // The page learns this host shows its sources, so its own drawer button can go.
+    expect(frameWin.postMessage).toHaveBeenCalledWith({ type: 'shareout:sources:host', panel: true }, '*');
   });
 
   it('shows at once on pages that declare live connections', () => {

@@ -45,6 +45,7 @@ interface SourceProvenance {
   tables?: string[];         // underlying source tables
   refresh?: string;          // "daily 12:00 UTC" | "manual" | "live"
   as_of?: string;            // date/time the snapshot reflects
+  freshness_sla?: string;    // "24h" | "2d" | "PT6H": stale after this (default: 2× the refresh schedule)
   replication?: { build?: string; publish?: string; credentials?: string; notes?: string };
 }
 
@@ -217,7 +218,7 @@ Workspace connection names used with `sdk.connection()`. Each connection may inc
 
 Any `json`, `table`, or `connection` source can carry the optional
 `SourceProvenance` fields shown in the Schema above (`label`, `description`,
-`query`, `tables`, `refresh`, `as_of`, `replication`) so viewers can answer "where
+`query`, `tables`, `refresh`, `as_of`, `freshness_sla`, `replication`) so viewers can answer "where
 does this data come from?" Link each chart/table to its source via a
 `data-shareout-source="connection:NAME"` attribute or a `feeds` entry. Viewers see it
 automatically: the page's **Data** button lists every source with its freshness and

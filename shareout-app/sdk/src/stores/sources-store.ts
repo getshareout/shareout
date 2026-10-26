@@ -1,4 +1,9 @@
 import type { SdkClient } from '../core/sdk-client';
+import { hostShowsSources, onHostShowsSources } from '../internal/source-highlight';
+
+// Inside the ShareOut viewer the page's sources already have a Data button outside the
+// frame; a framed page waits this long for the host to say so before showing its own.
+const HOST_WAIT_MS = 2500;
 
 /**
  * Sources — turns the artifact's `shareout/manifest` provenance into UI so viewers
@@ -32,6 +37,8 @@ export interface SourceEntry {
   tables?: string[];
   refresh?: string;
   asOf?: string;
+  /** Oldest `asOf` may get before the source reads as stale (`24h`, `2d`, `PT6H`). */
+  freshnessSla?: string;
   replication?: SourceReplication;
 }
 
@@ -109,12 +116,27 @@ const CSS = `
 // Stale-data sentinel (server-side sweep, see src/data/sheets/stale-sweep.ts) uses a
 // 7-day threshold against real sync timestamps. This client-side check only has the
 // author-declared `as_of` string to go on (the manifest has no live connection link),
-// so it's a best-effort visual echo, not the source of truth for the sweep/bell.
+// so it's a best-effort visual echo, not the source of truth for the sweep/bell. An
+// author-declared `freshness_sla` replaces the 7 days, as in the viewer's Data panel.
 const STALE_DAYS = 7;
-function isStaleAsOf(asOf?: string): boolean {
-  if (!asOf) return false;
-  const t = Date.parse(asOf);
-  return !Number.isNaN(t) && Date.now() - t > STALE_DAYS * 86_400_000;
+const DAY_MS = 86_400_000;
+const UNIT_MS: Record<string, number> = { m: 60_000, h: 3_600_000, d: DAY_MS, w: 7 * DAY_MS };
+
+/** `24h`, `90m`, `2d`, `1w` or ISO 8601 (`PT6H`, `P1DT12H`), read like the server does. */
+function slaMs(text?: string): number | null {
+  const s = (text || '').trim();
+  const plain = s.match(/^(\d+(?:\.\d+)?)\s*(m|mins?|minutes?|h|hrs?|hours?|d|days?|w|weeks?)$/i);
+  if (plain) return Number(plain[1]) * UNIT_MS[plain[2][0].toLowerCase()] || null;
+  const iso = s.match(/^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?$/i);
+  if (!iso || s.length < 2 || /T$/i.test(s)) return null;
+  const [, w, d, h, m] = iso.map((v) => Number(v || 0));
+  return w * 7 * DAY_MS + d * DAY_MS + h * 3_600_000 + m * 60_000 || null;
+}
+
+function isStale(s?: SourceEntry | null): boolean {
+  if (!s?.asOf) return false;
+  const t = Date.parse(s.asOf);
+  return !Number.isNaN(t) && Date.now() - t > (slaMs(s.freshnessSla) ?? STALE_DAYS * DAY_MS);
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -168,6 +190,7 @@ export class SourcesStore {
           tables: Array.isArray(s.tables) ? (s.tables as string[]) : undefined,
           refresh: typeof s.refresh === 'string' ? s.refresh : undefined,
           asOf: typeof s.as_of === 'string' ? s.as_of : undefined,
+          freshnessSla: typeof s.freshness_sla === 'string' ? s.freshness_sla : undefined,
           replication:
             s.replication && typeof s.replication === 'object'
               ? (s.replication as SourceReplication)
@@ -254,12 +277,14 @@ export class SourcesStore {
     x.addEventListener('click', close);
 
     let button: HTMLButtonElement | undefined;
+    let stopWaiting: (() => void) | undefined;
     if (opts.button !== false) {
       button = el('button', 'so-src-btn');
       button.dataset.side = side;
       button.innerHTML = `<span aria-hidden="true">🗃️</span><span>${opts.buttonLabel ?? title}</span>`;
       button.addEventListener('click', () => open());
       root.append(button);
+      stopWaiting = hideWhenHosted(button);
     }
 
     const badges: HTMLElement[] = [];
@@ -269,6 +294,7 @@ export class SourcesStore {
       open,
       close,
       destroy: () => {
+        stopWaiting?.();
         badges.forEach((b) => b.remove());
         root.remove();
         this.controller = null;
@@ -286,7 +312,7 @@ export class SourcesStore {
       if (seen.has(target)) return;
       seen.add(target);
       const src = this.get(ref);
-      const stale = isStaleAsOf(src?.asOf);
+      const stale = isStale(src);
       const badge = el('button', stale ? 'so-src-badge stale' : 'so-src-badge');
       badge.type = 'button';
       badge.innerHTML = `<span aria-hidden="true">ⓘ</span><span>${stale ? 'stale' : 'source'}</span>`;
@@ -324,12 +350,34 @@ export class SourcesStore {
   }
 }
 
+/**
+ * The floating button is for pages viewed on their own. When the page runs inside the
+ * ShareOut viewer, the host's Data button replaces it (badges and the drawer stay).
+ * A framed page keeps it hidden until the host speaks up or HOST_WAIT_MS passes.
+ */
+function hideWhenHosted(button: HTMLButtonElement): () => void {
+  if (typeof window === 'undefined' || window.parent === window) return () => {};
+  button.style.display = 'none';
+  if (hostShowsSources()) return () => {};
+  const timer = setTimeout(() => {
+    if (!hostShowsSources()) button.style.display = '';
+  }, HOST_WAIT_MS);
+  const off = onHostShowsSources(() => {
+    clearTimeout(timer);
+    button.style.display = 'none';
+  });
+  return () => {
+    clearTimeout(timer);
+    off();
+  };
+}
+
 function renderCard(s: SourceEntry): HTMLElement {
   const card = el('div', 'so-src-card');
   const h = el('h3');
   h.append(document.createTextNode(s.label || s.key));
   h.append(el('span', 'so-src-tag', s.kind));
-  if (isStaleAsOf(s.asOf)) h.append(el('span', 'so-src-tag stale', 'stale'));
+  if (isStale(s)) h.append(el('span', 'so-src-tag stale', 'stale'));
   card.append(h);
 
   if (s.description) card.append(el('div', 'so-src-desc', s.description));

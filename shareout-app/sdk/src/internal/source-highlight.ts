@@ -15,6 +15,8 @@ import { getInitOrigin, getPostMessageData } from './embedded-init';
 const HINT = 'shareout:sources:hint';
 const PING = 'shareout:sources:ping';
 const HIGHLIGHT = 'shareout:sources:highlight';
+// The host answers a hint with this when it shows its own Data sources button/tab.
+const HOST = 'shareout:sources:host';
 
 const CLASS = 'so-src-hl';
 const STYLE_ID = 'so-src-hl-css';
@@ -35,6 +37,19 @@ transition:outline-color var(--so-duration-fast,100ms) ease-out,box-shadow var(-
 let lit: Element[] = [];
 let hinted = false;
 let activity = false;
+let hostPanel = false;
+const hostPanelListeners = new Set<() => void>();
+
+/** The framing ShareOut page shows its own Data sources entry (viewer pill, Studio tab). */
+export function hostShowsSources(): boolean {
+  return hostPanel;
+}
+
+/** Called once the host says it shows sources; returns an unsubscribe. */
+export function onHostShowsSources(fn: () => void): () => void {
+  hostPanelListeners.add(fn);
+  return () => hostPanelListeners.delete(fn);
+}
 
 function embedded(): boolean {
   return typeof window !== 'undefined' && window.parent !== window;
@@ -185,10 +200,15 @@ if (embedded()) {
       setTimeout(() => announceSources(), 0);
       return;
     }
-    if (d.type !== PING && d.type !== HIGHLIGHT) return;
+    if (d.type !== PING && d.type !== HIGHLIGHT && d.type !== HOST) return;
     if (!isTrustedHostMessage(e)) return;
     if (d.type === PING) announceSources(true);
-    else highlightSources(d.ref, d.selectors, d.scroll);
+    else if (d.type === HOST) {
+      if ((d as { panel?: unknown }).panel === true && !hostPanel) {
+        hostPanel = true;
+        hostPanelListeners.forEach((fn) => fn());
+      }
+    } else highlightSources(d.ref, d.selectors, d.scroll);
   });
   if (typeof document !== 'undefined' && document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => announceSources(), { once: true });
