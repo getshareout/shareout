@@ -294,6 +294,12 @@ describe('Okta-only enforcement', () => {
     return { request, env: e, url: new URL(request.url) } as unknown as FetchContext;
   }
 
+  it('answers a bad email with a stable code and keeps ok:false for older clients', async () => {
+    const res = await handleEmailOtpStart(otp('/v1/auth/email/start', { email: 'nope' }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ ok: false, success: false, code: 'INVALID_EMAIL', error: expect.stringContaining('valid email') });
+  });
+
   it('sends an enforced domain to SSO instead of emailing a code', async () => {
     await upsertSsoConfig(e, 'ws_acme', 'u', { ...acmeInput, enforced: true });
     const res = await handleEmailOtpStart(otp('/v1/auth/email/start', { email: 'ana@acme.com' }));

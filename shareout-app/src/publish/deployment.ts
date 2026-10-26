@@ -1,7 +1,7 @@
 /**
  * Deployment promotion, URL building, and publish response assembly.
  */
-import type { Env, PublishResponse, PWAConfig, ArtifactType } from '../types';
+import type { Env, PublishResponse, PWAConfig, ArtifactType, Visibility } from '../types';
 import type { AuthUser } from '../api-auth';
 import { generateId } from '../crypto-utils';
 import { dispatchLifecycleEmail } from '../email/gateway';
@@ -102,6 +102,8 @@ export async function isFirstPublishForUser(env: Env, userId: string): Promise<b
 }
 
 export interface AssembleResponseInput {
+  /** What was actually stored (after the launch gate, workspace policy and moderation). */
+  visibility: Visibility;
   artifactId: string;
   artifactType: ArtifactType;
   versionId: string;
@@ -129,6 +131,7 @@ export function assemblePublishResponse(env: Env, input: AssembleResponseInput):
 
   const response: PublishResponse = {
     artifact: { id: input.artifactId, type: input.artifactType },
+    visibility: input.visibility,
     version: { id: input.versionId, version_no: input.versionNo },
     deployment: {
       slug: input.routingSlug,

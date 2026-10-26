@@ -52,18 +52,20 @@ export const workspace_client_home_views_cardActions_JS = `  // ===== artifact c
   // ── Visibility ──
   var VIS_LOCK_ICON = '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>';
   var VIS_PEOPLE_ICON = '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>';
+  var VIS_GLOBE_ICON = '<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>';
   function applyVisibilityDom(id, vis) {
-    var isWs = vis === 'workspace';
-    var label = isWs ? t('cards.visWorkspace') : t('inspector.visName.private');
-    var icon = isWs ? VIS_PEOPLE_ICON : VIS_LOCK_ICON;
+    var kind = vis === 'workspace' ? 'workspace' : (vis === 'public' || vis === 'unlisted') ? 'public' : 'private';
+    var isWs = kind === 'workspace', toPrivate = kind !== 'private';
+    var label = isWs ? t('cards.visWorkspace') : t('inspector.visName.' + kind);
+    var icon = isWs ? VIS_PEOPLE_ICON : kind === 'public' ? VIS_GLOBE_ICON : VIS_LOCK_ICON;
     cardEls(id).forEach(function (card) {
       card.dataset.visibility = vis;
       card.querySelectorAll('.card-badge').forEach(function (badge) {
         badge.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' + icon + '</svg>' + esc(label);
-        var cls = 'card-badge card-preview-badge ' + (isWs ? 'badge-workspace' : 'badge-private');
+        var cls = 'card-badge card-preview-badge ' + (isWs ? 'badge-workspace' : kind === 'public' ? 'badge-public' : 'badge-private');
         if (badge.tagName === 'BUTTON') {
-          var nextVis = isWs ? 'private' : 'workspace';
-          var title = isWs ? t('cards.makePrivateTip') : t('cards.shareWsTip');
+          var nextVis = toPrivate ? 'private' : 'workspace';
+          var title = toPrivate ? t('cards.makePrivateTip') : t('cards.shareWsTip');
           badge.className = cls + ' vis-toggle';
           badge.title = title; badge.setAttribute('aria-label', title);
           badge.setAttribute('onclick', "event.stopPropagation();event.preventDefault();toggleVisibility('" + id + "','" + nextVis + "')");

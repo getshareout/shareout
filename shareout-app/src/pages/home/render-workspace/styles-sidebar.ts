@@ -137,6 +137,7 @@ export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspect
 .wsx-vis-seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1.5px solid var(--color-border); border-radius: 999px; overflow: hidden; background: var(--color-surface); }
 .wsx-vis-seg button { border: 0; background: transparent; padding: 5px 4px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font: 600 var(--text-xs) var(--font-body); color: var(--color-text-secondary); cursor: pointer; transition: background var(--duration-fast), color var(--duration-fast); }
 .wsx-vis-seg button:hover { color: var(--color-text); }
+.wsx-vis-seg button:disabled { opacity: .45; cursor: not-allowed; }
 .wsx-vis-seg button:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--color-primary); }
 .wsx-vis-seg .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0; flex: none; }
 .wsx-vis-seg .is-sel { color: var(--color-text); } .wsx-vis-seg .is-sel .dot { opacity: 1; }

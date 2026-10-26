@@ -152,6 +152,15 @@ body.selecting .card-actions { opacity: 0 !important; pointer-events: none; }
   color: var(--color-primary-hover);
   border: 1px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
 }
+.card-preview-badge.badge-public {
+  background: var(--color-success-light);
+  color: var(--color-success);
+  border: 1px solid color-mix(in srgb, var(--color-success) 35%, transparent);
+}
+button.card-preview-badge.vis-toggle.badge-public:hover {
+  background: var(--color-success-light);
+  border-color: color-mix(in srgb, var(--color-success) 55%, transparent);
+}
 button.card-badge.vis-toggle {
   cursor: pointer;
   transition: transform var(--duration-fast), box-shadow var(--duration-fast), background var(--duration-fast), border-color var(--duration-fast);

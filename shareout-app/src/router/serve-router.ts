@@ -48,7 +48,8 @@ import { parseNamespacedPath } from './helpers/parse-namespaced-path';
 import { handleBrandAsset, handleRootBrandAsset } from '../brand';
 import { serveSharedBundle } from './shared-bundles';
 import { handleShareTarget } from '../serve/share-target';
-import { normalizeVisibility } from '../visibility-config';
+import { normalizeVisibility, openVisibilityDisabled } from '../visibility-config';
+import { resolveAllowOpen } from '../access/allow-open';
 import type { Env } from '../types';
 
 // Edge-cache a stable-keyed R2 image (thumbnails, workspace logos) via the Cache API.
@@ -409,7 +410,8 @@ export async function routeServe(ctx: FetchContext): Promise<Response | null> {
       return createDisabledPage(sessionUser ? '/home' : '/auth/login?redirect=/home');
     }
     const sessionUser = await getSessionUser(request, env);
-    return renderCreatePage(url.searchParams.get('prompt') ?? '', sessionUser, env.TURNSTILE_CLOUDFLARE_SITEKEY, getPlatformHostname(env));
+    const openAllowed = sessionUser ? !!sessionUser.email && (await resolveAllowOpen(env, sessionUser.id, null)) : !openVisibilityDisabled(env);
+    return renderCreatePage(url.searchParams.get('prompt') ?? '', sessionUser, env.TURNSTILE_CLOUDFLARE_SITEKEY, getPlatformHostname(env), openAllowed);
   }
 
   if (path === '/teams/preview' || path === '/teams/preview/') {

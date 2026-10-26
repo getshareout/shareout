@@ -173,6 +173,7 @@ export async function publishArtifact(
   if (versionNo > 1) scheduleVersionSummary(env, executionCtx?.waitUntil.bind(executionCtx), versionId, message);
 
   return assemblePublishResponse(env, {
+    visibility: moderation.status === 'approved' ? effectiveVisibility : 'private',
     artifactId, artifactType, versionId, versionNo, routingSlug,
     humanSlug: slug, name, hasMobile, pwa, workspaceUrls,
     editorReadiness,

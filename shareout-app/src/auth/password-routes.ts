@@ -21,6 +21,7 @@ import { ssoRequiredFor, ssoRequiredBody } from './sso-config';
 import { needsSetup, schemaReady } from '../pages/setup';
 import { checkEmailOtpVerifyLimit, checkPasswordLoginLimit, rateLimitResponse } from '../rate-limit';
 import { scheduleFirstActivation, verifyEmailOtp } from '../auth-otp';
+import { otpFailureBody } from './failure-body';
 import { scheduleSeedStarterKit } from '../starter-kit/schedule';
 import { scheduleWelcomeEmail, scheduleWorkspaceWelcome } from '../onboarding/welcome-email';
 import { generateId } from '../crypto-utils';
@@ -115,7 +116,7 @@ export async function handlePasswordLogin(ctx: FetchContext): Promise<Response> 
 
   // One message for every failure — unknown address, no password set, wrong
   // password. Anything more specific is an account-enumeration oracle.
-  if (!user) return json({ ok: false, error: 'That email and password do not match.' }, 401);
+  if (!user) return json({ ok: false, success: false, error: 'That email and password do not match.', code: 'INVALID_CREDENTIALS' }, 401);
 
   if (user.firstActivation) {
     scheduleWorkspaceWelcome(ctx.env, user.id, user.email, ctx.executionCtx);
@@ -167,7 +168,7 @@ export async function handlePasswordReset(ctx: FetchContext): Promise<Response> 
   if (problem) return json({ ok: false, error: problem }, 400);
 
   const result = await verifyEmailOtp(ctx.env, body.email || '', body.code || '');
-  if (!result.ok || !result.user) return json({ ok: false, error: result.error }, 400);
+  if (!result.ok || !result.user) return json(otpFailureBody(result), 400);
 
   await setUserPassword(ctx.env, result.user.id, password);
   scheduleFirstActivation(ctx, result.user);

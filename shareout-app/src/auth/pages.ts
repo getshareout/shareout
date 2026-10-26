@@ -48,6 +48,20 @@ const SIGN_IN_COPY = {
     newPasswordLabel: 'New password',
     passwordTooShort: 'Use at least 12 characters.',
     saveAndSignIn: 'Save and sign in',
+    errors: {
+      INVALID_EMAIL: 'That doesn’t look like a valid email — mind checking it?',
+      OTP_RESEND_TOO_SOON: 'Just sent one — give it a few seconds before asking for another.',
+      OTP_HOURLY_LIMIT: 'Too many codes for this email. Try again in a bit.',
+      OTP_CODE_FORMAT: 'Enter the 6-digit code from your email.',
+      OTP_NOT_FOUND: 'No active code. Ask for a new one.',
+      OTP_EXPIRED: 'That code expired. Ask for a new one.',
+      OTP_TOO_MANY_ATTEMPTS: 'Too many tries. Ask for a new code.',
+      OTP_MISMATCH: 'That code didn’t match. Try again.',
+      SIGNUPS_PAUSED: 'New sign-ups are paused right now. Check back soon.',
+      TURNSTILE_FAILED: 'We couldn’t check that you’re a person. Try again.',
+      INVALID_CREDENTIALS: 'That email and password don’t match.',
+      RATE_LIMIT_EXCEEDED: 'Too many tries. Try again in about {n} min.',
+    } as Record<string, string>,
   },
   es: {
     lang: 'es' as PageLocale,
@@ -89,6 +103,20 @@ const SIGN_IN_COPY = {
     newPasswordLabel: 'Contraseña nueva',
     passwordTooShort: 'Usá al menos 12 caracteres.',
     saveAndSignIn: 'Guardar y entrar',
+    errors: {
+      INVALID_EMAIL: 'Ese email no parece válido. ¿Lo revisás?',
+      OTP_RESEND_TOO_SOON: 'Ya te mandamos uno. Esperá unos segundos antes de pedir otro.',
+      OTP_HOURLY_LIMIT: 'Pediste demasiados códigos para este email. Probá de nuevo en un rato.',
+      OTP_CODE_FORMAT: 'Escribí el código de 6 dígitos que te llegó por email.',
+      OTP_NOT_FOUND: 'No hay un código activo. Pedí uno nuevo.',
+      OTP_EXPIRED: 'Ese código venció. Pedí uno nuevo.',
+      OTP_TOO_MANY_ATTEMPTS: 'Probaste demasiadas veces. Pedí un código nuevo.',
+      OTP_MISMATCH: 'Ese código no coincide. Probá de nuevo.',
+      SIGNUPS_PAUSED: 'Los registros nuevos están pausados por ahora. Volvé a probar más tarde.',
+      TURNSTILE_FAILED: 'No pudimos comprobar que sos una persona. Probá de nuevo.',
+      INVALID_CREDENTIALS: 'El email y la contraseña no coinciden.',
+      RATE_LIMIT_EXCEEDED: 'Demasiados intentos. Probá de nuevo en unos {n} min.',
+    } as Record<string, string>,
   },
 };
 type SignInCopy = (typeof SIGN_IN_COPY)['en'];
@@ -314,11 +342,22 @@ function passwordFormHtml(c: SignInCopy = EN, canReset = false, turnstileSiteKey
     </form>`;
 }
 
+// Message by stable error code in the page's language; unknown codes fall back to the server's text.
+function errTextJs(c: SignInCopy): string {
+  return `var ERRS = ${JSON.stringify(c.errors).replace(/</g, '\\u003c')};
+  function errText(d, fallback) {
+    var m = d && d.code && ERRS[d.code];
+    if (!m) return (d && d.error) || fallback;
+    return m.replace('{n}', Math.max(1, Math.ceil(((d && d.retryAfter) || 60) / 60)));
+  }`;
+}
+
 function passwordLoginScript(redirectAfter: string, c: SignInCopy = EN): string {
   const dest = JSON.stringify(redirectAfter).replace(/</g, '\\u003c');
   const msg = (s: string) => JSON.stringify(s).replace(/</g, '\\u003c');
   return `<script>
 (function () {
+  ${errTextJs(c)}
   var form = document.getElementById('password-login');
   var status = document.getElementById('password-status');
   if (!form) return;
@@ -372,7 +411,7 @@ function passwordLoginScript(redirectAfter: string, c: SignInCopy = EN): string 
       btn.disabled = false;
       status.hidden = false;
       status.className = 'status status--error';
-      status.textContent = res.data.error || ${msg(c.signInFailed)};
+      status.textContent = errText(res.data, ${msg(c.signInFailed)});
     }).catch(function () {
       btn.disabled = false;
       status.hidden = false;
@@ -444,6 +483,7 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
   return `<script>
   (function () {
     var L = ${L};
+    ${errTextJs(c)}
     var startForm = document.getElementById('email-code-start');
     var verifyForm = document.getElementById('email-code-verify');
     var emailInput = document.getElementById('email-code-email');
@@ -572,7 +612,7 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
           return;
         }
         if (!response.ok || !data.ok) {
-          throw new Error(data.error || L.couldNotSend);
+          throw new Error(errText(data, L.couldNotSend));
         }
 
         pendingEmail = email;
@@ -618,7 +658,7 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
         });
         var data = await readJson(response);
         if (!response.ok || !data.ok) {
-          throw new Error(data.error || L.badCode);
+          throw new Error(errText(data, L.badCode));
         }
 
         setStatus(L.signedIn, 'success');

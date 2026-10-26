@@ -231,7 +231,7 @@ export async function handlePublish(
       // to parse `notice` prose (and doesn't announce a private link as public).
       // A moderation hold flips the row private *inside* publishArtifact after
       // `visibility` was resolved, so report the EFFECTIVE visibility, not the request.
-      const effectiveVisibility = result.moderation ? 'private' : visibility;
+      const effectiveVisibility = result.moderation ? 'private' : (result.visibility ?? visibility);
       result.visibility = effectiveVisibility;
       if (requestedVisibility === 'public' && effectiveVisibility !== requestedVisibility) {
         result.visibility_downgraded = true;

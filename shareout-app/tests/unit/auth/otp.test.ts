@@ -37,7 +37,7 @@ const iso = (ms: number) => new Date(ms).toISOString();
 describe('startEmailOtp', () => {
   it('rejects invalid email', async () => {
     const r = await startEmailOtp(e, 'not-an-email');
-    expect(r).toEqual({ ok: false, error: expect.stringContaining('valid email') });
+    expect(r).toEqual({ ok: false, code: 'INVALID_EMAIL', error: expect.stringContaining('valid email') });
   });
 
   it('sends once then blocks resend inside the 30s window', async () => {
@@ -45,6 +45,7 @@ describe('startEmailOtp', () => {
     const again = await startEmailOtp(e, 'a@example.com');
     expect(again.ok).toBe(false);
     expect(again.error).toMatch(/few seconds/i);
+    expect(again.code).toBe('OTP_RESEND_TOO_SOON');
   });
 
   it('caps hourly sends', async () => {
@@ -58,19 +59,21 @@ describe('startEmailOtp', () => {
     const r = await startEmailOtp(e, email);
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/Too many codes/i);
+    expect(r.code).toBe('OTP_HOURLY_LIMIT');
   });
 });
 
 describe('verifyEmailOtp', () => {
   it('rejects non-6-digit codes', async () => {
     const r = await verifyEmailOtp(e, 'a@example.com', '12');
-    expect(r).toEqual({ ok: false, error: expect.stringContaining('6-digit') });
+    expect(r).toEqual({ ok: false, code: 'OTP_CODE_FORMAT', error: expect.stringContaining('6-digit') });
   });
 
   it('rejects when no active code', async () => {
     const r = await verifyEmailOtp(e, 'a@example.com', '123456');
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/No active code/i);
+    expect(r.code).toBe('OTP_NOT_FOUND');
   });
 
   it('rejects wrong code and increments attempts; locks after 5', async () => {
@@ -90,6 +93,7 @@ describe('verifyEmailOtp', () => {
     const locked = await verifyEmailOtp(e, email, '999999');
     expect(locked.ok).toBe(false);
     expect(locked.error).toMatch(/Too many tries/i);
+    expect(locked.code).toBe('OTP_TOO_MANY_ATTEMPTS');
   });
 
   it('accepts the correct code for an existing user and consumes it', async () => {
@@ -127,6 +131,7 @@ describe('verifyEmailOtp', () => {
     const r = await verifyEmailOtp(e, email, code);
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/paused/i);
+    expect(r.code).toBe('SIGNUPS_PAUSED');
   });
 
   it('rejects expired codes', async () => {
@@ -140,5 +145,6 @@ describe('verifyEmailOtp', () => {
     const r = await verifyEmailOtp(e, email, '111111');
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/expired/i);
+    expect(r.code).toBe('OTP_EXPIRED');
   });
 });

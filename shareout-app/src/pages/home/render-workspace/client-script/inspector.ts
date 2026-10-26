@@ -90,11 +90,13 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   // "Shared with" empty-state title tracks visibility so it never contradicts the badge (Public but "only you see").
   function shareEmptyTitle(v) { return v === 'private' ? t('inspector.onlyYouSee') : visCaption(v === 'unlisted' ? 'public' : v); }
   // Visibility segmented control — shared by the Details rail and the Share popover.
-  function visBlockHtml(editable, visOpts, visCur) {
+  // "Anyone with the link" is shown but off when this instance/workspace can't honor it (never offer what won't happen).
+  function visSubOff(k, noPub) { return visSub(k) + (noPub && k !== 'public' ? ' ' + t('inspector.visPublicOff') : ''); }
+  function visBlockHtml(editable, visOpts, visCur, noPub) {
     return editable
-      ? '<div class="wsx-vis-seg" id="wsxVisSeg" role="radiogroup" aria-label="' + esc(t('inspector.visibility')) + '">'
-        + visOpts.map(function (o) { return '<button data-vis="' + o + '" role="radio" aria-checked="' + (o === visCur ? 'true' : 'false') + '" type="button" class="' + (o === visCur ? 'is-sel vk-' + o : '') + '"><span class="dot"></span>' + esc(visName(o)) + '</button>'; }).join('')
-        + '</div><div class="wsx-vis-seg__sub" id="wsxVisSub">' + esc(visSub(visCur)) + '</div>'
+      ? '<div class="wsx-vis-seg" id="wsxVisSeg"' + (noPub ? ' data-nopub="1"' : '') + ' role="radiogroup" aria-label="' + esc(t('inspector.visibility')) + '">'
+        + visOpts.map(function (o) { var off = noPub && o === 'public' && o !== visCur; return '<button data-vis="' + o + '" role="radio" aria-checked="' + (o === visCur ? 'true' : 'false') + '" type="button" class="' + (o === visCur ? 'is-sel vk-' + o : '') + '"' + (off ? ' disabled title="' + esc(t('inspector.visPublicOff')) + '"' : '') + '><span class="dot"></span>' + esc(visName(o)) + '</button>'; }).join('')
+        + '</div><div class="wsx-vis-seg__sub" id="wsxVisSub">' + esc(visSubOff(visCur, noPub)) + '</div>'
       : '<span class="wsx-det__type">' + esc(visName(visCur)) + '</span>';
   }
   function wireVis(root, art, visCur) {
@@ -103,7 +105,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       var subEl = root.querySelector('#wsxVisSub');
       var applyVis = function (v) {
         seg.querySelectorAll('[data-vis]').forEach(function (b) { var o = b.getAttribute('data-vis'), on = o === v; b.setAttribute('aria-checked', on ? 'true' : 'false'); b.className = on ? 'is-sel vk-' + o : ''; });
-        if (subEl) subEl.textContent = visSub(v);
+        if (subEl) subEl.textContent = visSubOff(v, !!seg.getAttribute('data-nopub'));
         var etEl = root.querySelector('#wsxShareEmptyT');
         if (etEl) etEl.textContent = shareEmptyTitle(v);
         if (metaCache[art.id]) metaCache[art.id].visibility = v;
@@ -149,7 +151,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
 
     var favTip = fav ? t('inspector.favRemove') : t('inspector.favAdd');
     var star = meta ? '<button class="wsx-det__star' + (fav ? ' is-on' : '') + '" data-iact="fav" type="button" data-tip="' + esc(favTip) + '" aria-label="' + esc(favTip) + '">' + isvg(SVG_STAR) + '</button>' : '';
-    var visBlock = visBlockHtml(editable, visOpts, visCur);
+    var visBlock = visBlockHtml(editable, visOpts, visCur, !!(meta && meta.can_open_public === false));
 
     // 1 identity (title, description, meta) → 2 actions → 3 held notice → 4 sections.
     var h = '<div class="wsx__details"><div class="wsx-det__head">';

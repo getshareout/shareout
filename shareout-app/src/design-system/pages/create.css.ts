@@ -244,6 +244,7 @@ body { overflow: hidden; background: var(--color-bg); color: var(--color-text); 
 .tp-vis { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; margin: 16px auto 0; }
 .tp-vis-label { font: 600 0.85rem var(--font-body); color: var(--color-text-secondary); }
 .tp-vis-opts { display: flex; flex-wrap: wrap; gap: 7px; }
+.tp-vis-note { flex-basis: 100%; text-align: center; font: 500 0.78rem var(--font-body); color: var(--color-text-tertiary); }
 .tp-name { font: 700 0.98rem var(--font-display); color: var(--color-text); }
 .tp-blurb { font: 400 0.82rem/1.4 var(--font-body); color: var(--color-text-secondary); }
 
@@ -255,6 +256,7 @@ body { overflow: hidden; background: var(--color-bg); color: var(--color-text); 
 .clarify-opts { display: flex; flex-wrap: wrap; gap: 7px; }
 .clarify-opt { padding: 7px 12px; border-radius: var(--radius-full); font: 600 0.8rem var(--font-body); color: var(--color-text); background: rgba(255, 255, 255, 0.8); box-shadow: inset 0 0 0 1px var(--color-border); cursor: pointer; transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out); }
 .clarify-opt:hover { color: var(--color-primary); }
+.clarify-opt:disabled { opacity: 0.5; cursor: not-allowed; color: var(--color-text-secondary); }
 .clarify-opt.selected { color: var(--color-text-inverse); background: var(--color-primary); box-shadow: 0 6px 14px -6px var(--color-primary-glow); }
 
 /* ===================== Responsive ===================== */

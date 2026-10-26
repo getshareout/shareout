@@ -24,7 +24,7 @@ export const workspace_client_share_popover_JS = `  // ===== Share popover (arti
       var opts = ['private'].concat(meta.workspace_id ? ['workspace'] : [], ['public']);
       sharePopEl = document.createElement('div');
       sharePopEl.className = 'wsx-sharepop'; sharePopEl.setAttribute('role', 'dialog'); sharePopEl.setAttribute('aria-label', t('share.button'));
-      sharePopEl.innerHTML = '<div class="wsx-sharepop__title">' + esc(t('share.title')) + '</div>' + visBlockHtml(true, opts, vis)
+      sharePopEl.innerHTML = '<div class="wsx-sharepop__title">' + esc(t('share.title')) + '</div>' + visBlockHtml(true, opts, vis, meta.can_open_public === false)
         + '<div class="wsx-det__chips wsx-det__sharecard wsx-sharepop__people"></div>'
         + '<button class="wsx-abtn wsx-sharepop__copy" type="button" data-share-copy>' + isvg(SVG_LINK) + esc(t('share.copyLink')) + '</button>';
       shareWrapEl.appendChild(sharePopEl);

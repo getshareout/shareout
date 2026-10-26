@@ -58,7 +58,8 @@ export const workspace_client_create_ai_JS = `  // ===== Create with AI (in-Stud
     var wrap = document.createElement('div'); wrap.className = 'wsx-confirm__who';
     var opts = ['private'].concat(window.WSX_WS ? ['workspace'] : [], ['public']), names = { private: 'create.visPrivate', workspace: 'create.visTeam', public: 'create.visPublic' };
     wrap.innerHTML = '<div class="wsx-confirm__p">' + esc(t('create.whoCanSee')) + '</div><div class="wsx-confirm__row" role="radiogroup">'
-      + opts.map(function (o) { return '<button class="wsx-chip' + (o === createVis ? ' is-on' : '') + '" data-cv="' + o + '" role="radio" aria-checked="' + (o === createVis) + '" type="button">' + esc(t(names[o])) + '</button>'; }).join('') + '</div>';
+      + opts.map(function (o) { var off = o === 'public' && window.WSX_OPEN_VIS === false; return '<button class="wsx-chip' + (o === createVis ? ' is-on' : '') + '" data-cv="' + o + '" role="radio" aria-checked="' + (o === createVis) + '" type="button"' + (off ? ' disabled title="' + esc(t('create.visPublicOff')) + '"' : '') + '>' + esc(t(names[o])) + '</button>'; }).join('') + '</div>'
+      + (window.WSX_OPEN_VIS === false ? '<div class="wsx-confirm__p">' + esc(t('create.visPublicOff')) + '</div>' : '');
     wrap.querySelectorAll('[data-cv]').forEach(function (b) {
       b.addEventListener('click', function () {
         createVis = b.getAttribute('data-cv');
@@ -171,7 +172,7 @@ export const workspace_client_create_ai_JS = `  // ===== Create with AI (in-Stud
             if (!ev.slug) { fail(t('create.buildUnavailable')); return; }
             job.settled = true; paint.cancel();
             var mod = ev.moderation;
-            prog.textContent = t(mod ? (mod.status === 'blocked' ? 'create.buildBlocked' : 'create.buildHeld') : (ev.visibility === 'private' ? 'create.buildPrivate' : 'create.buildDone'));
+            prog.textContent = t(mod ? (mod.status === 'blocked' ? 'create.buildBlocked' : 'create.buildHeld') : (ev.visibility_downgraded ? 'create.buildPrivate' : 'create.buildDone'));
             setPillStep(null);
             openArtifact(ev.slug, '\\u2728 ' + String(prompt).slice(0, 28), ev.artifactId, 'html', job.view ? job.view.key : null);
             setComposer('resting');

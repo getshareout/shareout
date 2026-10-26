@@ -15,6 +15,7 @@ import { checkStorageQuota } from '../../quota';
 import { rateLimitExceededResponse, storageLimitMessage } from '../../publish/limits';
 import type { PublishResponse, Visibility } from '../../types';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
+import { resolveAllowOpen } from '../../access/allow-open';
 
 // The builder runs on a stronger model and produces a full document — give it room.
 // It streams (see chatComplete), so a slow full-page generation isn't bound by a read timeout.
@@ -119,12 +120,12 @@ function json(data: unknown, status = 200): Response {
 
 type Env = FetchContext['env'];
 type SessionUser = { id: string; email: string };
-type Share = { visibility: Visibility; workspaceId: string | null };
+type Share = { visibility: Visibility; workspaceId: string | null; allowOpen?: boolean };
 
 // Who can see the page the moment it goes live. Private unless the builder asked otherwise;
 // "workspace" needs a workspace the user belongs to, else it stays private.
 async function resolveShare(env: Env, user: SessionUser, body: { visibility?: unknown; workspace_id?: unknown }, hostWs: string | null): Promise<Share> {
-  if (body.visibility === 'public') return { visibility: 'public', workspaceId: null };
+  if (body.visibility === 'public') return { visibility: 'public', workspaceId: null, allowOpen: !!user.email && (await resolveAllowOpen(env, user.id, null)) };
   if (body.visibility === 'workspace') {
     const ws = hostWs || (typeof body.workspace_id === 'string' ? body.workspace_id.trim() : '');
     if (ws && (await getInternalWorkspaceRole(env, ws, user.id))) return { visibility: 'workspace', workspaceId: ws };
@@ -269,7 +270,7 @@ function streamGenerate(opts: {
             if ('error' in outcome) {
               send({ type: 'error', error: outcome.error, code: outcome.code });
             } else {
-              send({ type: 'done', mode: 'build', html, ...publishedFields(outcome), capabilities });
+              send({ type: 'done', mode: 'build', html, ...publishedFields(outcome, publish.share), capabilities });
             }
           } catch (err) {
             logError(createLogger(env, { scope: 'create', event: 'publish.failed' }), 'create publish failed', err);
@@ -320,7 +321,7 @@ async function handlePublish(
     ok: true,
     type: 'build',
     html,
-    ...publishedFields(outcome),
+    ...publishedFields(outcome, share),
     capabilities: detectCapabilities(html),
   });
 }
@@ -340,12 +341,13 @@ async function publishWithLimits(
 
 // What the client needs to render an honest result: a held or private page must not
 // be announced as "Live".
-function publishedFields(published: PublishResponse) {
+function publishedFields(published: PublishResponse, share: Share) {
   return {
     url: published.deployment.url,
     slug: published.deployment.slug,
     artifactId: published.artifact.id,
-    visibility: published.visibility ?? 'public',
+    visibility: published.visibility ?? 'private',
+    ...(published.visibility === 'private' && share.visibility === 'public' && !published.moderation ? { visibility_downgraded: true } : {}),
     ...(published.moderation
       ? { moderation: { status: published.moderation.status, message: published.moderation.message } }
       : {}),

@@ -5,13 +5,12 @@
  */
 import type { Env, PublishResponse, FileEntry, Visibility } from '../types';
 import { resolveNameSlug } from './artifact-upsert';
-import { coerceVisibility } from '../visibility-config';
 import { publishArtifact } from './publish-artifact';
 
 export async function publishGeneratedHtml(
   env: Env,
   user: { id: string; email: string },
-  opts: { name: string; slug?: string; html: string; workspaceId?: string | null; visibility: Visibility },
+  opts: { name: string; slug?: string; html: string; workspaceId?: string | null; visibility: Visibility; allowOpen?: boolean },
 ): Promise<PublishResponse> {
   const slug = opts.slug || (await resolveNameSlug(env, opts.name, opts.workspaceId ?? null, user.id));
   const visibility = opts.visibility;
@@ -29,9 +28,7 @@ export async function publishGeneratedHtml(
     workspaceId: opts.workspaceId ?? null,
     folderId: null,
     artifactType: 'html',
+    allowOpen: opts.allowOpen,
   });
-  // Report what actually went live: a moderation hold (or public links being off on
-  // this instance) keeps the page private even though the builder asked for public.
-  result.visibility = result.moderation ? 'private' : coerceVisibility(env, visibility);
   return result;
 }

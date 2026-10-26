@@ -334,7 +334,14 @@ export async function handleGetArtifact(
   // What the caller may do, so clients hide controls the API would refuse
   // (PATCH/editor need editor+; trash needs owner or workspace owner/admin; comment
   // settings such as guest comments need the owner).
-  const permissions = { can_edit: role === 'owner' || role === 'editor', can_delete: canDelete, can_manage_comments: role === 'owner' };
+  const canEdit = role === 'owner' || role === 'editor';
+  const permissions = {
+    can_edit: canEdit,
+    can_delete: canDelete,
+    can_manage_comments: role === 'owner',
+    // Whether "Anyone with the link" can actually take effect here, so the UI never offers it when it can't.
+    ...(canEdit ? { can_open_public: await resolveAllowOpen(env, user.id, artifact.workspace_id) } : {}),
+  };
 
   // An imported Office file / slide deck kept its original (served at /a/{slug}/download).
   let original: string | undefined;
