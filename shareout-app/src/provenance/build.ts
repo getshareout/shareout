@@ -8,9 +8,9 @@ import type { ManifestProvenance } from '../../shared/editor-readiness/manifest'
 import type { PageScan } from './scan';
 import type { ConnectionFact, SourceFacts } from './facts';
 import { normalizeRef, refKind, refName } from './refs';
+import { staleAfterMs } from './staleness';
 import {
   MAX_FEEDS_PER_SOURCE,
-  STALE_AFTER_DAYS,
   type DataSource,
   type SourceDetails,
   type SourceFeed,
@@ -23,6 +23,8 @@ export interface BuildAccess {
   full: boolean;
   /** Data filtered by the artifact's access policy: page-source names only. */
   scoped: boolean;
+  /** May see job / crew / sync names (see SourcesCaller.named). Implied by `full`. */
+  named: boolean;
 }
 
 export interface BuildContext {
@@ -361,11 +363,12 @@ function freshnessOf(d: Draft, access: BuildAccess, now: number): SourceFreshnes
     .filter((x) => x.at)
     .sort((a, b) => (a.at! < b.at! ? 1 : -1));
   const best = timed[0]?.r ?? (access.scoped ? d.refreshers.find((r) => r.schedule) : d.refreshers[0]);
+  const named = (access.full || access.named) && !access.scoped;
   if (best) {
     if (timed[0]) f.last_refresh_at = timed[0].at;
     f.refresher = {
       type: best.type === 'crew' ? 'crew' : 'job',
-      ...(access.scoped ? {} : { name: best.name }),
+      ...(named ? { name: best.name } : {}),
       ...(best.schedule ? { schedule: best.schedule } : {}),
     };
   } else if (d.live) {
@@ -377,7 +380,13 @@ function freshnessOf(d: Draft, access: BuildAccess, now: number): SourceFreshnes
 
   if (!d.live || f.last_refresh_at) {
     const newest = Math.max(dateOf(f.last_refresh_at), dateOf(f.as_of));
-    if (newest > 0 && now - newest > STALE_AFTER_DAYS * 86_400_000) f.stale = true;
+    const limit = staleAfterMs({
+      sla: p?.freshness_sla,
+      // The schedule that produced the time shown, else every schedule that writes it.
+      schedules: best?.schedule ? [best.schedule] : d.refreshers.map((r) => r.schedule),
+      refresh: f.refresh,
+    }, now);
+    if (newest > 0 && now - newest > limit) f.stale = true;
   }
   return f;
 }

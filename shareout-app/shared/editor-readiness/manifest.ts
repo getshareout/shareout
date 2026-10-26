@@ -27,6 +27,8 @@ export interface ManifestProvenance {
   refresh?: string;
   /** As-of timestamp/date for the current snapshot (ISO or human). */
   as_of?: string;
+  /** Oldest the data may be before viewers see it as stale: `24h`, `2d`, `P1D`. */
+  freshness_sla?: string;
   /** How to rebuild this dataset from scratch. */
   replication?: ManifestReplication;
 }

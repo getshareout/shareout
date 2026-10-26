@@ -35,14 +35,37 @@ export const DATA_SOURCES_FORMAT_JS = `
       }
       return s.label;
     }
+    // A 5-field cron (UTC) in words, or '' when it reads better unsaid. Schedules run on
+    // an hourly tick, so anything finer than an hour is "every hour".
+    function schedule(cron) {
+      var p = String(cron || '').trim().split(/\\s+/);
+      if (p.length !== 5 || p[3] !== '*') return '';
+      var mi = p[0], h = p[1], dom = p[2], dow = p[4], num = /^\\d+$/;
+      if (h === '*' && dom === '*' && dow === '*') return (mi === '*' || /^\\*\\/\\d+$/.test(mi) || num.test(mi)) ? C.cronHourly : '';
+      if (!num.test(mi)) return '';
+      var hs = /^\\*\\/(\\d+)$/.exec(h);
+      if (hs && dom === '*' && dow === '*') return fill(C.cronEveryHours, { n: hs[1] });
+      if (!num.test(h)) return '';
+      var time = ('0' + h).slice(-2) + ':' + ('0' + mi).slice(-2);
+      if (dom === '*' && dow === '*') return fill(C.cronDaily, { time: time });
+      if (dom === '*' && dow === '1-5') return fill(C.cronWeekdays, { time: time });
+      if (dom === '*' && /^[0-6]$/.test(dow)) return fill(C.cronWeekly, { day: C.cronDays.split(',')[+dow], time: time });
+      if (num.test(dom) && dow === '*') return fill(C.cronMonthly, { d: dom, time: time });
+      return '';
+    }
     function freshness(s) {
       var f = s.freshness || {}, r = f.refresher;
       if (r && r.type === 'live') return s.kind === 'mcp' ? C.liveAsYou : C.live;
+      var auto = !!r && (r.type === 'job' || r.type === 'crew') && !r.name;
+      var sched = auto ? schedule(r.schedule) : '';
       if (f.last_refresh_at) {
-        var by = r ? (r.name ? fill(r.type === 'crew' ? C.byCrew : C.byJob, { name: r.name }) : (r.type === 'job' || r.type === 'crew' ? C.bySchedule : '')) : '';
+        var by = r ? (r.name ? fill(r.type === 'crew' ? C.byCrew : C.byJob, { name: r.name }) : auto ? (sched ? fill(C.autoSchedule, { schedule: sched }) : C.bySchedule) : '') : '';
         return fill(C.updated, { when: ago(f.last_refresh_at) }) + (by ? DOT + by : '');
       }
-      if (r && (r.type === 'job' || r.type === 'crew')) return r.name ? fill(r.type === 'crew' ? C.keptByCrew : C.keptByJob, { name: r.name }) : C.keptBySchedule;
+      if (r && (r.type === 'job' || r.type === 'crew')) {
+        if (r.name) return fill(r.type === 'crew' ? C.keptByCrew : C.keptByJob, { name: r.name });
+        return sched ? fill(C.keptByScheduleAt, { schedule: sched }) : C.keptBySchedule;
+      }
       if (f.as_of) return fill(C.asOf, { date: date(f.as_of) });
       if (f.refresh) return fill(C.refreshes, { text: f.refresh });
       if (r && r.type === 'manual') return C.manual;

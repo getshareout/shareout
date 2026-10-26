@@ -182,6 +182,28 @@ describe('Data sources panel', () => {
     expect(pill().getAttribute('aria-expanded')).toBe('false');
   });
 
+  it('without names, says when and how often a source refreshes (EN/ES)', async () => {
+    const generic = { ...RESPONSE, sources: [
+      source({ freshness: { last_refresh_at: new Date(Date.now() - 2 * HOUR - 60_000).toISOString(), refresher: { type: 'job', schedule: '0 6 * * *' } } }),
+      source({ key: 'table:a', kind: 'table', label: 'a', freshness: { refresher: { type: 'crew', schedule: '0 9 * * 1' } } }),
+      source({ key: 'table:b', kind: 'table', label: 'b', freshness: { refresher: { type: 'job', schedule: '30 7,19 * * *' } } }),
+    ] };
+    boot();
+    await openPanel(generic);
+    let [a, b, c] = rows();
+    expect(a.textContent).toContain('Updated 2 h ago · automatically, daily at 06:00 UTC');
+    expect(b.textContent).toContain('Updated automatically, every Monday at 09:00 UTC');
+    expect(c.textContent).toContain('Updated automatically');
+    for (const [type, fn] of added.splice(0)) window.removeEventListener(type, fn);
+    delete (window as { soDataSources?: unknown }).soDataSources;
+    boot({ locale: 'es' });
+    await openPanel(generic);
+    [a, b, c] = rows();
+    expect(a.textContent).toContain('Actualizado hace 2 h · automáticamente, todos los días a las 06:00 UTC');
+    expect(b.textContent).toContain('Actualizado automáticamente, los lunes a las 09:00 UTC');
+    expect(c.textContent).toContain('Actualizado automáticamente');
+  });
+
   it('says so when the page uses no connected data', async () => {
     boot({ locale: 'es' });
     await openPanel({ ...RESPONSE, sources: [] });

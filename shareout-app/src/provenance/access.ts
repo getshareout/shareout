@@ -16,6 +16,7 @@ import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { canAccess } from '../access/can-access';
 import { normalizeVisibility } from '../visibility-config';
 import { parseAccessPolicy } from '../data/access-policy';
+import { spaceGuestFor } from '../sharees/space-guest';
 
 export interface ProvenanceArtifact {
   id: string;
@@ -29,8 +30,19 @@ export interface ProvenanceArtifact {
 }
 
 export interface SourcesCaller {
+  /** Editor/manager: queries, connection identifiers, credential hints. */
   full: boolean;
+  /** Rows filtered by the artifact's access policy. */
   scoped: boolean;
+  /** May see who refreshes the data (job / crew names): editors, and people tied to the
+   *  page or its workspace (collaborators, members, grant holders, space guests). An
+   *  anonymous public-link or password viewer sees "updated automatically" instead. */
+  named: boolean;
+}
+
+/** The cache partition a caller's response belongs to; never shared across classes. */
+export function callerClass(c: SourcesCaller): 'full' | 'named' | 'scoped' | 'public' {
+  return c.full ? 'full' : c.scoped ? 'scoped' : c.named ? 'named' : 'public';
 }
 
 export async function loadProvenanceArtifact(env: Env, artifactId: string): Promise<ProvenanceArtifact | null> {
@@ -42,15 +54,42 @@ export async function loadProvenanceArtifact(env: Env, artifactId: string): Prom
   ).bind(artifactId).first<ProvenanceArtifact>();
 }
 
+/** The signed-in caller (session or personal API token), or null. Agent tokens don't count. */
+export function sourcesUser(ctx: FetchContext): Promise<AuthUser | null> {
+  return getTokenOrSessionUser(ctx);
+}
+
 /** The caller's view of this page's sources, or null when they may not see the page. */
-export async function resolveSourcesCaller(ctx: FetchContext, art: ProvenanceArtifact): Promise<SourcesCaller | null> {
-  const user = await getTokenOrSessionUser(ctx);
+export async function resolveSourcesCaller(ctx: FetchContext, art: ProvenanceArtifact, user: AuthUser | null): Promise<SourcesCaller | null> {
   const editor = user ? (await resolveArtifactEditorAccess(ctx.env, art.id, user)).ok : false;
-  if (!editor) {
-    if (art.paused === 1 || art.moderation_status === 'blocked') return null;
-    if (!(await canView(ctx, art, user))) return null;
+  if (editor) return { full: true, scoped: false, named: true };
+  if (art.paused === 1 || art.moderation_status === 'blocked') return null;
+  if (!(await canView(ctx, art, user))) return null;
+  const scoped = parseAccessPolicy(art.access_policy) !== null;
+  return { full: false, scoped, named: !scoped && (await isRelated(ctx, art, user)) };
+}
+
+/**
+ * Tied to the page or its workspace by identity: owner, collaborator, internal member of
+ * its workspace, a view grant, or a space-guest session that reaches it. Password
+ * possession and a public link are not an identity.
+ */
+async function isRelated(ctx: FetchContext, art: ProvenanceArtifact, user: AuthUser | null): Promise<boolean> {
+  if (user) {
+    const { userIds, emails } = await getVisibilityScope(ctx.env, user);
+    if (art.owner_id && userIds.includes(art.owner_id)) return true;
+    if (emails.length) {
+      const collab = await ctx.env.DB.prepare(
+        `SELECT 1 FROM collaborators WHERE artifact_id = ? AND email IN (${placeholders(emails.length)})`,
+      ).bind(art.id, ...emails).first();
+      if (collab) return true;
+    }
+    if (art.workspace_id) {
+      for (const id of userIds) if (await getInternalWorkspaceRole(ctx.env, art.workspace_id, id)) return true;
+    }
+    if (await canAccess(ctx.env, { userIds, emails }, 'artifact', art.id, 'view')) return true;
   }
-  return { full: editor, scoped: !editor && parseAccessPolicy(art.access_policy) !== null };
+  return !!(await spaceGuestFor(ctx.request, ctx.env, 'artifact', art.id, 'view'));
 }
 
 async function canView(ctx: FetchContext, art: ProvenanceArtifact, user: AuthUser | null): Promise<boolean> {

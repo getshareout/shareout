@@ -27,6 +27,15 @@ const SOURCES: DataSource[] = [
   base({ key: 'mcp:hub', kind: 'mcp', label: 'hub', provider: 'mcp', provider_label: 'MCP', freshness: { refresher: { type: 'live' } } }),
   base({ key: 'knowledge:workspace', kind: 'knowledge', label: 'knowledge' }),
   base({ key: 'file:uploads', kind: 'file', label: 'uploads' }),
+  // Public-link viewers: no names, the schedule in words when it reads well.
+  base({ key: 'json:g1', freshness: { last_refresh_at: '2026-10-25T09:40:00Z', refresher: { type: 'job', schedule: '0 6 * * *' } } }),
+  base({ key: 'json:g2', freshness: { refresher: { type: 'crew', schedule: '0 9 * * 1' } } }),
+  base({ key: 'json:g3', freshness: { refresher: { type: 'job', schedule: '15 8 * * 1-5' } } }),
+  base({ key: 'json:g4', freshness: { refresher: { type: 'job', schedule: '*/10 * * * *' } } }),
+  base({ key: 'json:g5', freshness: { refresher: { type: 'job', schedule: '0 */6 * * *' } } }),
+  base({ key: 'json:g6', freshness: { refresher: { type: 'job', schedule: '0 7 1 * *' } } }),
+  base({ key: 'json:g7', freshness: { refresher: { type: 'job', schedule: '0 7,19 * * *' } } }),
+  base({ key: 'json:g8', freshness: { refresher: { type: 'job' } } }),
 ];
 const byKey = Object.fromEntries(SOURCES.map((s) => [s.key, s]));
 const DETAILS: DataSource['details'][] = [
@@ -98,5 +107,21 @@ describe('the words themselves', () => {
     expect(en.details(DETAILS[2])?.rows).toContainEqual(['Connection', 'warehouse · only this page · shared credentials']);
     expect(en.details(DETAILS[3])?.rows).toEqual([['Connection', 'No connection named “gone” here']]);
     expect(en.details({})).toBeNull();
+  });
+
+  it('says when a public-link viewer\'s data refreshes, never who refreshes it', () => {
+    const es = createSourceFormatter(DATA_SOURCES_COPY.es, 'es');
+    const en = createSourceFormatter(DATA_SOURCES_COPY.en, 'en');
+    const g = (k: string) => byKey[`json:${k}`];
+    expect(es.meta(g('g1'), byKey)).toBe('Actualizado hace 2 h · automáticamente, todos los días a las 06:00 UTC');
+    expect(en.meta(g('g1'), byKey)).toBe('Updated 2 h ago · automatically, daily at 06:00 UTC');
+    expect(es.meta(g('g2'), byKey)).toBe('Actualizado automáticamente, los lunes a las 09:00 UTC');
+    expect(en.meta(g('g2'), byKey)).toBe('Updated automatically, every Monday at 09:00 UTC');
+    expect(es.meta(g('g3'), byKey)).toBe('Actualizado automáticamente, de lunes a viernes a las 08:15 UTC');
+    expect(en.meta(g('g4'), byKey)).toBe('Updated automatically, every hour');
+    expect(es.meta(g('g5'), byKey)).toBe('Actualizado automáticamente, cada 6 horas');
+    expect(en.meta(g('g6'), byKey)).toBe('Updated automatically, monthly on day 1 at 07:00 UTC');
+    expect(es.meta(g('g7'), byKey)).toBe('Actualizado automáticamente');
+    expect(en.meta(g('g8'), byKey)).toBe('Updated automatically');
   });
 });

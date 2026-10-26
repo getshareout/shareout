@@ -65,15 +65,41 @@ export function createSourceFormatter(c: DataSourcesCopy, lang: string, now: () 
     }
     return s.label;
   };
+  // A 5-field cron (UTC) in words, or '' when it reads better unsaid. Schedules run on
+  // an hourly tick, so anything finer than an hour is "every hour".
+  const schedule = (cron: string | undefined): string => {
+    const p = String(cron || '').trim().split(/\s+/);
+    if (p.length !== 5 || p[3] !== '*') return '';
+    const [mi, h, dom, , dow] = p;
+    const num = /^\d+$/;
+    if (h === '*' && dom === '*' && dow === '*') return (mi === '*' || /^\*\/\d+$/.test(mi) || num.test(mi)) ? c.cronHourly : '';
+    if (!num.test(mi)) return '';
+    const hs = /^\*\/(\d+)$/.exec(h);
+    if (hs && dom === '*' && dow === '*') return fill(c.cronEveryHours, { n: hs[1] });
+    if (!num.test(h)) return '';
+    const time = `${('0' + h).slice(-2)}:${('0' + mi).slice(-2)}`;
+    if (dom === '*' && dow === '*') return fill(c.cronDaily, { time });
+    if (dom === '*' && dow === '1-5') return fill(c.cronWeekdays, { time });
+    if (dom === '*' && /^[0-6]$/.test(dow)) return fill(c.cronWeekly, { day: c.cronDays.split(',')[Number(dow)], time });
+    if (num.test(dom) && dow === '*') return fill(c.cronMonthly, { d: dom, time });
+    return '';
+  };
   const freshness = (s: DataSource): string => {
     const f = s.freshness ?? {};
     const r = f.refresher;
     if (r?.type === 'live') return s.kind === 'mcp' ? c.liveAsYou : c.live;
+    const auto = !!r && (r.type === 'job' || r.type === 'crew') && !r.name;
+    const sched = auto ? schedule(r?.schedule) : '';
     if (f.last_refresh_at) {
-      const by = r ? (r.name ? fill(r.type === 'crew' ? c.byCrew : c.byJob, { name: r.name }) : (r.type === 'job' || r.type === 'crew' ? c.bySchedule : '')) : '';
+      const by = r
+        ? (r.name ? fill(r.type === 'crew' ? c.byCrew : c.byJob, { name: r.name }) : auto ? (sched ? fill(c.autoSchedule, { schedule: sched }) : c.bySchedule) : '')
+        : '';
       return fill(c.updated, { when: ago(f.last_refresh_at) }) + (by ? DOT + by : '');
     }
-    if (r && (r.type === 'job' || r.type === 'crew')) return r.name ? fill(r.type === 'crew' ? c.keptByCrew : c.keptByJob, { name: r.name }) : c.keptBySchedule;
+    if (r && (r.type === 'job' || r.type === 'crew')) {
+      if (r.name) return fill(r.type === 'crew' ? c.keptByCrew : c.keptByJob, { name: r.name });
+      return sched ? fill(c.keptByScheduleAt, { schedule: sched }) : c.keptBySchedule;
+    }
     if (f.as_of) return fill(c.asOf, { date: date(f.as_of) });
     if (f.refresh) return fill(c.refreshes, { text: f.refresh });
     if (r?.type === 'manual') return c.manual;

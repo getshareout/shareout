@@ -38,7 +38,8 @@ export interface SourceFreshness {
   /** Last time ShareOut saw this source written (ISO 8601). */
   last_refresh_at?: string;
   refresher?: SourceRefresher;
-  /** Newest known date is older than {@link STALE_AFTER_DAYS}. */
+  /** Older than the declared `freshness_sla`, else twice the refresh schedule's interval,
+   *  else a week (see src/provenance/staleness.ts). */
   stale?: boolean;
 }
 
@@ -119,9 +120,6 @@ export interface SourcesResponse {
   scoped: boolean;
   sources: DataSource[];
 }
-
-/** Mirrors the SDK badge and the stale-data sweep. */
-export const STALE_AFTER_DAYS = 7;
 
 /** Per-source cap on listed feed selectors (feed_count keeps the true number). */
 export const MAX_FEEDS_PER_SOURCE = 50;
