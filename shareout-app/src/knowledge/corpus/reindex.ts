@@ -9,6 +9,8 @@ import { forceIngest, type IngestParams } from './ingest';
 import { CHUNKER_VERSION } from './sections';
 import { visibleSources } from './search';
 import { workspaceOverBudget } from '../../data/ai-budget';
+import { v2Target } from '../vectors/models';
+import { needsBackfill, startVectorBackfill } from '../vectors/backfill';
 
 export const REINDEX_WINDOW_MS = 10 * 60 * 1000;
 export const REINDEX_MAX = 300;
@@ -131,19 +133,24 @@ export const REFRESH_MAX_PER_WS = 10;
 export const REFRESH_MAX_PER_RUN = 60;
 export const REFRESH_MAX_WORKSPACES = 50;
 export const REFRESH_MAX_FAILS = 5;
+/** Multilingual-index backfills a night starts (each a paced Workflow, vectors/backfill.ts). */
+export const REFRESH_MAX_VECTOR_BACKFILLS = 5;
 
-export interface RefreshResult { workspaces: number; queued: number; outdated: number; failed: number }
+export interface RefreshResult { workspaces: number; queued: number; outdated: number; failed: number; vectorBackfills: number }
 
 /**
  * Re-learn sources chunked by an older CHUNKER_VERSION, and failed ones past their
  * backoff, across Knowledge-enabled workspaces. Runs from the 03:00 UTC knowledge pass.
+ * Where the v2 index is configured it also converges: a workspace with v2 gaps (created
+ * since the last backfill, a failed write, a model switch) gets a backfill.
  */
 export async function runCorpusRefresh(
   env: Env,
   opts: { perWorkspace?: number; perRun?: number; maxWorkspaces?: number } = {},
 ): Promise<RefreshResult> {
-  const result: RefreshResult = { workspaces: 0, queued: 0, outdated: 0, failed: 0 };
+  const result: RefreshResult = { workspaces: 0, queued: 0, outdated: 0, failed: 0, vectorBackfills: 0 };
   if (!env.KNOWLEDGE_STORE) return result;
+  const v2 = env.KNOWLEDGE_INGEST ? v2Target(env) : null;
   const perWs = opts.perWorkspace ?? REFRESH_MAX_PER_WS;
   const perRun = opts.perRun ?? REFRESH_MAX_PER_RUN;
   const wsRows = (await env.DB.prepare(
@@ -154,6 +161,10 @@ export async function runCorpusRefresh(
     if (budget <= 0) break;
     if (await workspaceOverBudget(env, workspaceId).catch(() => false)) continue;
     const store = corpusFor(env, workspaceId)!;
+    if (v2 && result.vectorBackfills < REFRESH_MAX_VECTOR_BACKFILLS) {
+      const state = await store.vectorState().catch(() => null);
+      if (state && needsBackfill(state, v2.model.id) && (await startVectorBackfill(env, workspaceId)).started) result.vectorBackfills++;
+    }
     const stale = await store.staleSources(CHUNKER_VERSION, budget, REFRESH_MAX_FAILS).catch(() => []);
     if (!stale.length) continue;
     const items: IngestParams[] = stale.map((s) => ({ workspaceId, kind: s.kind, refId: s.refId }));

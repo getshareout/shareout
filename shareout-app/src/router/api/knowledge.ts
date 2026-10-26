@@ -18,6 +18,7 @@ import { knowledgeUsage } from '../../knowledge/corpus/usage';
 import { corpusStatus, reindexWorkspace, REINDEX_MAX } from '../../knowledge/corpus/reindex';
 import { isPlatformAdmin } from '../../superadmin/auth';
 import { entityMarkdown, listVisibleEntities, visibleEntity, visibleGraph } from '../../knowledge/corpus/graph';
+import { startVectorBackfill, v2Problem, vectorStatus } from '../../knowledge/vectors/backfill';
 
 const PREFIX_RE = /^\/v1\/workspaces\/([^/]+)\/knowledge(?:\/(.*))?$/;
 const BACKFILL_LIMIT = 200;
@@ -113,10 +114,32 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
   const role = await getInternalWorkspaceRole(ctx.env, workspaceId, auth.id);
   // Instance admins may reindex and read status of any workspace (support / migrations);
   // a workspace agent (sot_) token never counts, as on /v1/admin/*.
-  const superadmin = !role && (sub === 'reindex' || sub === 'status') && !auth.service
+  const superadmin = !role && ['reindex', 'status', 'vectors', 'vectors/backfill'].includes(sub) && !auth.service
     && (await isPlatformAdmin(ctx.env, auth.email, auth.id));
   if (!role && !superadmin) return cors(jsonError('Forbidden', 'FORBIDDEN', 403));
   const canManage = superadmin || role === 'owner' || role === 'admin';
+
+  // GET /vectors — the multilingual (v2) index for this workspace: what is configured, how many
+  // passages carry a vector of which model, which index each search reads now (owner/admin, or
+  // an instance admin). POST /vectors/backfill {reset?} — embed what is missing into v2.
+  if (sub === 'vectors' || sub === 'vectors/backfill') {
+    if (!canManage) return cors(jsonError('Forbidden', 'FORBIDDEN', 403));
+    if (sub === 'vectors') {
+      if (method !== 'GET') return cors(jsonError('Method not allowed', 'METHOD_NOT_ALLOWED', 405));
+      return cors(jsonResponse(await vectorStatus(ctx.env, workspaceId)));
+    }
+    if (method !== 'POST') return cors(jsonError('Method not allowed', 'METHOD_NOT_ALLOWED', 405));
+    const body = (await request.json().catch(() => null)) as { reset?: unknown } | null;
+    const r = await startVectorBackfill(ctx.env, workspaceId, { reset: body?.reset === true });
+    if (r.started) return cors(jsonResponse({ started: true, instance: r.instance }, 202));
+    if (r.inline) return cors(jsonResponse({ started: false, inline: true, ...r.inline }));
+    return cors(apiErrorResponse({
+      message: 'The multilingual index is not configured on this instance',
+      code: 'NOT_CONFIGURED',
+      status: 501,
+      hint: v2Problem(ctx.env) ?? 'Bind KNOWLEDGE_VECTORS_V2, a 1024-d cosine Vectorize index (see wrangler.toml), and redeploy.',
+    }));
+  }
 
   // POST /reindex — re-learn the corpus even at unchanged versions (owner/admin, or an
   // instance admin). Body { artifactIds?: string[] }; once per workspace per 10 minutes.
