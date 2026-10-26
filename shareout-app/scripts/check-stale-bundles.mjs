@@ -11,6 +11,8 @@ import { execSync } from 'node:child_process';
 
 const GENERATED = [
   'public/_bundles/',
+  'public/sdk/',
+  'sdk/src/stores/yjs-path.generated.ts',
   'src/discovery/',
   'src/official-skills/content.generated.ts',
   'src/data/agent/sdk-reference.generated.ts',
