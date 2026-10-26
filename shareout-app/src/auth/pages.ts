@@ -15,7 +15,6 @@ const SIGN_IN_COPY = {
     signInTo: 'Sign in to {name}',
     ssoOnly: 'Your organization signs in with single sign-on.',
     welcome: 'Welcome back.',
-    codeSubtitle: 'Enter the code we emailed you.',
     privateTitle: 'Private content',
     privateSubtitle: 'This content is private. Sign in to continue.',
     sharedBy: 'Shared with you by <strong>{name}</strong>. Sign in to view it.',
@@ -35,7 +34,6 @@ const SIGN_IN_COPY = {
     enterEmail: 'Enter your email address.',
     sending: 'Sending...',
     couldNotSend: "Couldn't send a code. Try again.",
-    checkEmail: 'Check your email for the code.',
     enterCode: 'Enter the 6-digit code from your email.',
     checking: 'Checking...',
     badCode: "That code didn't work. Try again.",
@@ -58,7 +56,6 @@ const SIGN_IN_COPY = {
     signInTo: 'Iniciá sesión en {name}',
     ssoOnly: 'Tu organización inicia sesión con inicio de sesión único (SSO).',
     welcome: 'Bienvenido de nuevo.',
-    codeSubtitle: 'Escribí el código que te mandamos.',
     privateTitle: 'Contenido privado',
     privateSubtitle: 'Este contenido es privado. Iniciá sesión para seguir.',
     sharedBy: '<strong>{name}</strong> compartió esto con vos. Iniciá sesión para verlo.',
@@ -78,7 +75,6 @@ const SIGN_IN_COPY = {
     enterEmail: 'Escribí tu email.',
     sending: 'Enviando...',
     couldNotSend: 'No pudimos mandar el código. Probá de nuevo.',
-    checkEmail: 'Revisá tu email: ahí está el código.',
     enterCode: 'Escribí el código de 6 dígitos que te llegó por email.',
     checking: 'Verificando...',
     badCode: 'Ese código no funcionó. Probá de nuevo.',
@@ -165,7 +161,7 @@ export function loginPage(
   <div class="card">
     <div class="icon icon-primary">${LOCK_ICON}</div>
     <h1>${escapeHtml(c.privateTitle)}</h1>
-    <p id="auth-subtitle" data-code="${escapeHtml(c.codeSubtitle)}">${subtitle}</p>
+    <p id="auth-subtitle">${subtitle}</p>
     ${signInMethodsHtml({ c, redirect, googleEnabled, microsoftEnabled, turnstileSiteKey, emailConfigured: true })}
     ${poweredByHtml()}
   </div>
@@ -287,7 +283,7 @@ export function appLoginPage(opts: {
   ${card}
     ${mark}
     <h1>${escapeHtml(signInTitle)}</h1>
-    <p id="auth-subtitle" data-code="${escapeHtml(c.codeSubtitle)}">${escapeHtml(c.welcome)}</p>
+    <p id="auth-subtitle">${escapeHtml(c.welcome)}</p>
     ${signInMethodsHtml({ c, redirect, googleEnabled, microsoftEnabled, turnstileSiteKey: opts.turnstileSiteKey, emailConfigured, loginHint: opts.loginHint, sso })}
     ${footer}
   </div>
@@ -469,13 +465,12 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
     var shared = !!(pwForm && pwEmail && startForm && startForm.hidden);
     var subtitle = document.getElementById('auth-subtitle');
     var alt = document.getElementById('auth-alt');
-    var subtitleHtml = subtitle ? subtitle.innerHTML : '';
     var tsBox = document.querySelector('.cf-turnstile');
     var tsPending = false;
 
-    // Code step: the page says so (subtitle) and drops the other methods; Change brings them back.
+    // Code step: the "sent to <email>" line is the one message; subtitle and other methods step aside until Change.
     function codeMode(on) {
-      if (subtitle) subtitle.innerHTML = on ? subtitle.getAttribute('data-code') : subtitleHtml;
+      if (subtitle) subtitle.hidden = on;
       if (alt) alt.hidden = on;
     }
 
@@ -586,7 +581,7 @@ function emailOtpScript(redirectAfter: string, c: SignInCopy = EN): string {
         if (shared) pwForm.hidden = true;
         verifyForm.hidden = false;
         codeMode(true);
-        setStatus(L.checkEmail, 'success');
+        setStatus('', '');
         codeInput.focus();
       } catch (err) {
         setStatus(err && err.message ? err.message : L.couldNotSend, 'error');

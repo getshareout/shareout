@@ -50,12 +50,12 @@ describe('login page polish', () => {
     expect(es).toContain('Bienvenido de nuevo.');
   });
 
-  it('code mode keeps the chosen email visible with a way back, and swaps the subtitle', async () => {
+  it('code mode keeps the chosen email visible with a way back, and hides the subtitle', async () => {
     const h = await appLoginPage({ redirect: '/home', locale: 'es' }).text();
     expect(h).toContain('id="email-code-target"');
     expect(h).toContain('id="email-code-change"');
     expect(h).toContain('>Cambiar</button>');
-    expect(h).toContain('data-code="Escribí el código que te mandamos."');
-    expect(h).toContain("subtitle.innerHTML = on ? subtitle.getAttribute('data-code') : subtitleHtml");
+    expect(h).toContain('subtitle.hidden = on');
+    expect(h).not.toContain('ahí está el código');
   });
 });
