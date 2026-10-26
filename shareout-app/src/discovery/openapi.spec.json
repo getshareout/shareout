@@ -10066,10 +10066,13 @@
                 "properties": {
                   "path": {
                     "type": "string",
+                    "maxLength": 200,
+                    "description": "Relative `.md` path of letters, digits, `.`, `_` and `-` (each name starting with a letter or digit), no `..`, at most 4 levels.",
                     "example": "sources/orders.md"
                   },
                   "content": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Markdown with YAML frontmatter, at most 128 KB (UTF-8)."
                   }
                 }
               }
@@ -10079,6 +10082,19 @@
         "responses": {
           "200": {
             "description": "Saved"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "413": {
+            "description": "Content larger than 128 KB (`FILE_TOO_LARGE`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       },
