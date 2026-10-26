@@ -194,7 +194,7 @@ export interface Env {
    *  out of the worker script bundle (plan §19 Phase 4). */
   ASSETS: Fetcher;
   /** Cloudflare deployment version metadata — surfaces the current release id in the UI footer. */
-  CF_VERSION_METADATA?: { id: string; tag?: string };
+  CF_VERSION_METADATA?: { id: string; tag?: string; timestamp?: string };
   /** Workers AI — text embeddings for semantic artifact search. Optional: code falls back to keyword search when absent. */
   AI?: Ai;
   /** Vectorize index over artifact embeddings. Optional: semantic search degrades to keyword when absent. */

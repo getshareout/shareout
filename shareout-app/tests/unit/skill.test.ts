@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { unzipSync, zipSync } from 'fflate';
 import { handleGetSkill, handleGetSkillVersion, handleGetSkillMeta, handleGetSkillFile, SKILL_BUNDLE_KEY } from '../../src/skill';
 import type { Env } from '../../src/types';
@@ -41,11 +41,20 @@ const SKILL_BUNDLE = zipSync({
   'team/SKILL.md': new TextEncoder().encode(TEAM_SKILL_MD),
 });
 
-const bundleBuffer = (): ArrayBuffer =>
-  SKILL_BUNDLE.buffer.slice(
-    SKILL_BUNDLE.byteOffset,
-    SKILL_BUNDLE.byteOffset + SKILL_BUNDLE.byteLength,
-  ) as ArrayBuffer;
+const toBuffer = (zip: Uint8Array): ArrayBuffer =>
+  zip.buffer.slice(zip.byteOffset, zip.byteOffset + zip.byteLength) as ArrayBuffer;
+const bundleBuffer = (): ArrayBuffer => toBuffer(SKILL_BUNDLE);
+
+async function sha256Hex(zip: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', toBuffer(zip));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Served version: frontmatter version + first 8 hex of the zip's sha256.
+let SERVED = '';
+beforeAll(async () => {
+  SERVED = `${SKILL_VERSION}+${(await sha256Hex(SKILL_BUNDLE)).slice(0, 8)}`;
+});
 
 /**
  * @param overrides R2 keys to replace (set to `undefined` to simulate a miss).
@@ -53,7 +62,14 @@ const bundleBuffer = (): ArrayBuffer =>
  */
 function makeEnv(
   overrides: Record<string, unknown> = {},
-  opts: { assets?: boolean; vars?: Record<string, string> } = {},
+  opts: {
+    assets?: boolean;
+    vars?: Record<string, string>;
+    assetMeta?: Record<string, unknown>;
+    assetBundle?: Uint8Array;
+    r2Uploaded?: string;
+    deployedAt?: string;
+  } = {},
 ): Env {
   const files: Record<string, unknown> = {
     'skill/_meta.json': { json: async () => META, text: async () => JSON.stringify(META), body: JSON.stringify(META) },
@@ -65,6 +81,7 @@ function makeEnv(
       text: async () => '',
       body: SKILL_BUNDLE,
       arrayBuffer: bundleBuffer,
+      ...(opts.r2Uploaded ? { uploaded: new Date(opts.r2Uploaded) } : {}),
     },
     ...overrides,
   };
@@ -75,14 +92,15 @@ function makeEnv(
     fetch: async (input: string | URL) => {
       const path = new URL(String(input)).pathname;
       if (!opts.assets) return new Response('not found', { status: 404 });
-      if (path === '/_bundles/skill.zip') return new Response(bundleBuffer(), { status: 200 });
-      if (path === '/_bundles/skill-meta.json') return new Response(JSON.stringify(META), { status: 200 });
+      if (path === '/_bundles/skill.zip') return new Response(toBuffer(opts.assetBundle ?? SKILL_BUNDLE), { status: 200 });
+      if (path === '/_bundles/skill-meta.json') return new Response(JSON.stringify(opts.assetMeta ?? META), { status: 200 });
       return new Response('not found', { status: 404 });
     },
   };
 
   return {
     ...opts.vars,
+    ...(opts.deployedAt ? { CF_VERSION_METADATA: { id: 'v1', timestamp: opts.deployedAt } } : {}),
     ARTIFACTS: { get: async (key: string) => files[key] ?? null },
     ASSETS: assets,
   } as unknown as Env;
@@ -104,9 +122,9 @@ function makeAssetOnlyEnv(vars: Record<string, string> = {}): Env {
 
 function expectSkillHeaders(response: Response, contentType: string, expectDisposition = false): void {
   expect(response.headers.get('Content-Type')).toBe(contentType);
-  expect(response.headers.get('X-Skill-Version')).toBe(SKILL_VERSION);
+  expect(response.headers.get('X-Skill-Version')).toBe(SERVED);
   expect(response.headers.get('X-Skill-Updated-At')).toBe(SKILL_UPDATED_AT);
-  expect(response.headers.get('ETag')).toBe(`"${SKILL_VERSION}"`);
+  expect(response.headers.get('ETag')).toBe(`"${SERVED}"`);
   expect(response.headers.get('Cache-Control')).toBe('public, max-age=3600');
   expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
   expect(response.headers.get('Access-Control-Expose-Headers')).toBe(
@@ -151,7 +169,7 @@ describe('skill handlers', () => {
       const response = await handleGetSkill(
         new Request('https://shareout.example.com/v1/skill', {
           method: 'GET',
-          headers: { 'If-None-Match': `"${SKILL_VERSION}"` },
+          headers: { 'If-None-Match': `"${SERVED}"` },
         }),
         makeEnv(),
       );
@@ -210,7 +228,7 @@ describe('skill handlers', () => {
       const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
 
       expect(response.status).toBe(200);
-      expect(response.headers.get('X-Skill-Version')).toBe(SKILL_VERSION);
+      expect(response.headers.get('X-Skill-Version')).toBe(SERVED);
       expect(new TextDecoder().decode(entries['SKILL.md'])).toContain('POST /v1/publish');
     });
 
@@ -258,7 +276,7 @@ describe('skill handlers', () => {
 
       expect(response.status).toBe(200);
       expectSkillHeaders(response, 'application/json');
-      expect(body).toEqual({ version: SKILL_VERSION, updated_at: SKILL_UPDATED_AT });
+      expect(body).toEqual({ version: SERVED, semver: SKILL_VERSION, updated_at: SKILL_UPDATED_AT });
     });
   });
 
@@ -279,7 +297,7 @@ describe('skill handlers', () => {
       expect(response.status).toBe(200);
       expectSkillHeaders(response, 'application/json');
       expect(body.name).toBe('shareout-skill');
-      expect(body.version).toBe(SKILL_VERSION);
+      expect(body.version).toBe(SERVED);
       expect(body.updated_at).toBe(SKILL_UPDATED_AT);
       expect(body.description).toContain('ShareOut HTML artifacts');
       expect(body.format).toBe('zip');
@@ -335,6 +353,103 @@ describe('skill handlers', () => {
     it('404s when the file exists in neither R2 nor the staged asset', async () => {
       const response = await handleGetSkillFile('nope/missing.md', makeAssetOnlyEnv());
       expect(response.status).toBe(404);
+    });
+  });
+
+  // The frontmatter version rarely moves; the served one must move with the content.
+  describe('content-addressed version', () => {
+    const EDITED = zipSync({
+      'SKILL.md': new TextEncoder().encode(SKILL_MD + '\nOne more line.\n'),
+      'INDEX.md': new TextEncoder().encode(INDEX_MD),
+    });
+    const editedEnv = (extra: Parameters<typeof makeEnv>[1] = {}) =>
+      makeEnv(
+        { [SKILL_BUNDLE_KEY]: { body: EDITED, arrayBuffer: () => toBuffer(EDITED), json: async () => ({}), text: async () => '' } },
+        extra,
+      );
+
+    it('changes X-Skill-Version, ETag and /v1/skill/version when content changes under the same frontmatter version', async () => {
+      const before = await handleGetSkillVersion(makeEnv());
+      const after = await handleGetSkillVersion(editedEnv());
+      const a = (await before.json()) as { version: string; semver: string };
+      const b = (await after.json()) as { version: string; semver: string };
+
+      expect(a.semver).toBe(SKILL_VERSION);
+      expect(b.semver).toBe(SKILL_VERSION);
+      expect(b.version).toBe(`${SKILL_VERSION}+${(await sha256Hex(EDITED)).slice(0, 8)}`);
+      expect(b.version).not.toBe(a.version);
+      expect(after.headers.get('ETag')).toBe(`"${b.version}"`);
+    });
+
+    it('answers 200 (not 304) to a client still holding the bare-semver ETag', async () => {
+      const response = await handleGetSkill(
+        new Request('https://shareout.example.com/v1/skill', { headers: { 'If-None-Match': `"${SKILL_VERSION}"` } }),
+        makeEnv(),
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get('ETag')).toBe(`"${SERVED}"`);
+    });
+
+    it('uses the hash staged in skill-meta.json for the asset copy', async () => {
+      const sha = 'ab'.repeat(32);
+      const env = makeEnv(
+        { 'skill/_meta.json': undefined, [SKILL_BUNDLE_KEY]: undefined },
+        { assets: true, assetMeta: { ...META, sha256: sha } },
+      );
+      const response = await handleGetSkill(new Request('https://x.test/v1/skill', { method: 'HEAD' }), env);
+      expect(response.headers.get('X-Skill-Version')).toBe(`${SKILL_VERSION}+abababab`);
+    });
+
+    it('keeps workspace-context ETags distinct, as semver build metadata', async () => {
+      const response = await handleGetSkill(new Request('https://x.test/v1/skill', { method: 'HEAD' }), makeEnv(), '# ctx');
+      expect(response.headers.get('X-Skill-Version')).toMatch(new RegExp(`^${SERVED.replace('+', '\\+')}\\.ws\\.[0-9a-z]+$`));
+    });
+  });
+
+  // R2 used to win unconditionally, so a stale sync shadowed every redeploy.
+  describe('R2 vs. deployed asset', () => {
+    const ASSET = zipSync({
+      'SKILL.md': new TextEncoder().encode(SKILL_MD + '\nFrom the deploy.\n'),
+      'INDEX.md': new TextEncoder().encode(INDEX_MD),
+    });
+    const both = (opts: Parameters<typeof makeEnv>[1]) => makeEnv({}, { assets: true, assetBundle: ASSET, ...opts });
+    const skillMdOf = async (res: Response) => new TextDecoder().decode(unzipSync(new Uint8Array(await res.arrayBuffer()))['SKILL.md']);
+
+    it('serves the asset when this Worker version was deployed after the R2 sync', async () => {
+      const env = both({ r2Uploaded: '2026-10-01T00:00:00Z', deployedAt: '2026-10-20T00:00:00Z' });
+      const res = await handleGetSkill(new Request('https://x.test/v1/skill'), env);
+      expect(await skillMdOf(res)).toContain('From the deploy.');
+      expect(res.headers.get('X-Skill-Version')).toBe(`${SKILL_VERSION}+${(await sha256Hex(ASSET)).slice(0, 8)}`);
+      const file = await handleGetSkillFile('SKILL.md', env);
+      expect(await file.text()).toContain('From the deploy.');
+    });
+
+    it('serves R2 when it was synced after the deploy', async () => {
+      const env = both({ r2Uploaded: '2026-10-21T00:00:00Z', deployedAt: '2026-10-20T00:00:00Z' });
+      const res = await handleGetSkill(new Request('https://x.test/v1/skill'), env);
+      expect(await skillMdOf(res)).not.toContain('From the deploy.');
+      expect(res.headers.get('X-Skill-Version')).toBe(SERVED);
+    });
+
+    it('serves the higher frontmatter version regardless of timestamps', async () => {
+      const env = both({
+        assetMeta: { ...META, version: '1.6.0' },
+        r2Uploaded: '2026-10-21T00:00:00Z',
+        deployedAt: '2026-10-20T00:00:00Z',
+      });
+      const body = (await (await handleGetSkillVersion(env)).json()) as { semver: string };
+      expect(body.semver).toBe('1.6.0');
+    });
+
+    it('serves the later updated_at when versions tie', async () => {
+      const env = both({ assetMeta: { ...META, updated_at: '2026-01-01T00:00:00Z' } });
+      const res = await handleGetSkill(new Request('https://x.test/v1/skill'), env);
+      expect(await skillMdOf(res)).toContain('From the deploy.');
+    });
+
+    it('keeps preferring R2 when neither copy has a timestamp', async () => {
+      const res = await handleGetSkill(new Request('https://x.test/v1/skill'), both({}));
+      expect(await skillMdOf(res)).not.toContain('From the deploy.');
     });
   });
 });
