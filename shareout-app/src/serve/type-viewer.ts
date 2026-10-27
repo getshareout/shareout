@@ -13,7 +13,7 @@ import { getSecurityHeaders } from './security';
 import { notFound, runBackground, NOINDEX_ROBOTS } from './utils';
 import type { SocialPreview } from './social-meta';
 import { normalizeVisibility } from '../visibility-config';
-import { localeForArtifactWorkspace } from '../i18n/locale';
+import { localeForViewer } from '../i18n/locale';
 import { servingOrigin } from '../workspaces/domains/host-binding';
 
 /** A PDF original can be shown inline (?show=original); other originals only download. */
@@ -76,7 +76,7 @@ export async function serveTypeViewer(
   const [adminInfo, favInfo, locale] = await Promise.all([
     detectAdminStatus(sessionUser, env, artifact.artifact_id, artifact.owner_id),
     detectFavoriteState(sessionUser, env, artifact.artifact_id),
-    localeForArtifactWorkspace(env, artifact.workspace_id, request),
+    localeForViewer(env, { workspaceId: artifact.workspace_id, request }),
   ]);
   const isAdmin = !!adminInfo;
 

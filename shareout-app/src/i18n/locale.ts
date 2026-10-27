@@ -49,16 +49,15 @@ export async function getWorkspaceLocale(env: Env, workspaceId: string | null | 
   return isLocale(row?.locale) ? row.locale : null;
 }
 
-/** Locale for a shared page: its workspace's language, else the viewer's browser. */
-export async function localeForArtifactWorkspace(
+/** Locale for what a visitor sees on a shared page (viewer chrome, paused/gate pages): their own choice → their browser → the workspace's language → English. */
+export async function localeForViewer(
   env: Env,
-  workspaceId: string | null | undefined,
-  request: Request,
+  opts: { workspaceId?: string | null; user?: string | null; request: Request },
 ): Promise<Locale> {
-  return resolveLocale({
-    workspace: await getWorkspaceLocale(env, workspaceId).catch(() => null),
-    acceptLanguage: request.headers.get('Accept-Language'),
-  });
+  if (isLocale(opts.user)) return opts.user;
+  const browser = localeFromAcceptLanguage(opts.request.headers.get('Accept-Language'));
+  if (browser) return browser;
+  return (await getWorkspaceLocale(env, opts.workspaceId).catch(() => null)) ?? 'en';
 }
 
 /**

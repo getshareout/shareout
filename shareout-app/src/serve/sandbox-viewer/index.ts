@@ -43,7 +43,7 @@ import { renderToolbar } from './toolbar';
 import { renderDataSourcesBridge, renderDataSourcesPanel } from './data-sources';
 import { getViewerConfig } from '../../data/viewer-config';
 import { isVisualEditorEnabled } from '../../editor/visual-editor-gate';
-import { localeForArtifactWorkspace, localeFromAcceptLanguage } from '../../i18n/locale';
+import { localeForViewer, localeFromAcceptLanguage } from '../../i18n/locale';
 import { spaceGuestFor } from '../../sharees/space-guest';
 import { capabilitySatisfies } from '../../access/can-access';
 import { servingOrigin } from '../../workspaces/domains/host-binding';
@@ -155,7 +155,7 @@ export async function serveSandboxedViewer(
       // No account, but a space-guest session reaching this artifact (checkAccess let it in).
       const spaceGuest = user ? null : await spaceGuestFor(request, env, 'artifact', artifactId, 'view');
 
-      const [initialJsonData, initialTableData, adminInfo, favInfo, commentsInfo, hasMetrics, viewerConfig, visualEditorEnabled, attachedSkills, profile, locale] = await Promise.all([
+      const [initialJsonData, initialTableData, adminInfo, favInfo, commentsInfo, hasMetrics, viewerConfig, visualEditorEnabled, attachedSkills, profile] = await Promise.all([
         initialJsonPromise,
         initialTablePromise,
         detectAdminStatus(user, env, artifactId, ownerId),
@@ -169,12 +169,12 @@ export async function serveSandboxedViewer(
         // Folded into the batch so the viewer's profile no longer adds a
         // sequential D1 round-trip after this Promise.all resolves.
         user
-          ? env.DB.prepare('SELECT name, picture FROM users WHERE id = ?')
+          ? env.DB.prepare('SELECT name, picture, locale FROM users WHERE id = ?')
               .bind(user.id)
-              .first<{ name: string | null; picture: string | null }>()
+              .first<{ name: string | null; picture: string | null; locale: string | null }>()
           : null,
-        localeForArtifactWorkspace(env, workspaceId, request),
       ]);
+      const locale = await localeForViewer(env, { workspaceId, user: profile?.locale, request });
 
       // Cross-origin (cdn) viewers can't use the parent's preload cache or inlined
       // CSS, so skip the manifest preload's KV/D1/R2 reads entirely; the preconnect
