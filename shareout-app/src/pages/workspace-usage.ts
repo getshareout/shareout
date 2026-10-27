@@ -242,7 +242,7 @@ const pageScript = `
       if (!d.events.length) { tb.innerHTML = '<tr><td colspan="8" class="muted">No usage yet.</td></tr>'; return; }
       tb.innerHTML = d.events.map(function (e) {
         return '<tr>' +
-          '<td>' + new Date(e.createdAt + 'Z').toLocaleString() + '</td>' +
+          '<td data-sort="' + Date.parse(e.createdAt + 'Z') + '">' + new Date(e.createdAt + 'Z').toLocaleString() + '</td>' +
           '<td>' + (e.artifactName || e.artifactId || '—') + '</td>' +
           '<td>' + e.mode + '</td>' +
           '<td>' + e.model + '</td>' +

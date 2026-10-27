@@ -10,16 +10,21 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
   // Shared with me / Mine list every artifact flat, whatever folder it sits in. Each chip
   // shows its workspace-wide total; pages of HOME_PAGE_SIZE load on demand (Load more).
   // Cache each filter's payload on first fetch so re-selecting is instant (no reload);
-  // prefetch the rest in the background after the first paint.
+  // prefetch the rest in the background after the first paint. Pages load 24 at a time, so a
+  // column header sorts on the server: the sort is part of the URL and of the cache key.
   var artFilter = 'recent';
   var curFolder = '';        // '' = root; otherwise the open folder id
   var curFolderName = '';
   var artSearch = '';        // '' = no filter; otherwise a client-side substring filter over the loaded cards/rows (name + tags)
-  var ART_URL = { recent: '/v1/home/browser?sort=recent', all: '/v1/home/browser?sort=name&level=1', favorites: '/v1/home/browser?scope=favorites', shared: '/v1/home/browser?scope=shared', mine: '/v1/home/browser?scope=owned' };
+  var ART_URL = { recent: '/v1/home/browser?scope=all', all: '/v1/home/browser?level=1', favorites: '/v1/home/browser?scope=favorites', shared: '/v1/home/browser?scope=shared', mine: '/v1/home/browser?scope=owned' };
+  var ART_SORT = { all: 'name:asc' };  // each chip's default 'col:dir'; the rest: last updated first
+  var artSort = '';          // '' = the chip's default; otherwise the clicked column, 'col:dir'
   var artCache = {};
   var artPending = {};
-  function artKey(f, fld) { return f + '|' + (fld == null ? curFolder : fld); }
-  function artUrl(f, fld) { var fo = (fld == null ? curFolder : fld); return ART_URL[f] + wsq + (fo ? '&folder=' + encodeURIComponent(fo) : ''); }
+  var artTotals = {};        // each chip's workspace-wide total, whatever the sort
+  function artSortOf(f) { return artSort || ART_SORT[f] || 'date:desc'; }
+  function artKey(f, fld) { return f + '|' + (fld == null ? curFolder : fld) + '|' + artSortOf(f); }
+  function artUrl(f, fld) { var fo = (fld == null ? curFolder : fld), so = artSortOf(f).split(':'); return ART_URL[f] + '&sort=' + so[0] + '&dir=' + so[1] + wsq + (fo ? '&folder=' + encodeURIComponent(fo) : ''); }
   function folderApiBase() { return window.WSX_WS ? '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/folders' : '/v1/folders'; }
   function newFolderBtn() { return '<button type="button" class="wsx-folder-new" onclick="newFolder(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>' + esc(t('artifacts.newFolder')) + '</span></button>'; }
   function escAttr(s) { return esc(s).replace(/"/g, '&quot;'); }
@@ -126,7 +131,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     var empty = curFolder ? t('artifacts.folderEmpty') : t(root ? 'artifacts.nothingHere' : 'artifacts.noMatch');
     // Folders first (All only): own compact grid in tile view, first rows in the table.
     var fc = f === 'all' ? (d.foldersHtml || '') : '', fr = f === 'all' ? (d.folderRowsHtml || '') : '';
-    ART_DATA['wsxArtMount'] = { foldersHtml: fc, cardsHtml: d.cardsHtml || '', rowsHtml: fr + (d.rowsHtml || ''), count: (fc || d.count) ? 1 : 0, empty: empty, emptyCta: root && !curFolder, folderHead: folderHead(d, f) };
+    ART_DATA['wsxArtMount'] = { foldersHtml: fc, cardsHtml: d.cardsHtml || '', rowsHtml: fr + (d.rowsHtml || ''), count: (fc || d.count) ? 1 : 0, empty: empty, emptyCta: root && !curFolder, folderHead: folderHead(d, f), sort: artSortOf(f) };
     renderArtView('wsxArtMount');
     hidePendingFolders();
     artChipCounts();
@@ -153,8 +158,8 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
   function artChipCounts() {
     ws.querySelectorAll('[data-art-filter] .wsx-chip__n').forEach(function (el) {
       var f = el.parentNode.getAttribute('data-art-filter');
-      var c = artCache[artKey(f === 'all' ? 'recent' : f, '')];
-      el.textContent = c ? String(c.total) : '';
+      var n = artTotals[f === 'all' ? 'recent' : f];
+      el.textContent = n == null ? '' : String(n);
     });
   }
   // Folders deleted optimistically whose DELETE hasn't landed (undo window / in flight).
@@ -165,7 +170,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     var k = artKey(f, fld);
     if (!artPending[k]) {
       artPending[k] = fetch(artUrl(f, fld), { credentials: 'same-origin' }).then(function (r) { return r.json(); })
-        .then(function (d) { artCache[k] = { total: (d && d.total) || 0, page: (d && d.page) || 1, hasMore: !!(d && d.hasMore), cardsHtml: d && d.cardsHtml, rowsHtml: d && d.rowsHtml, count: (d && d.cardsHtml) ? 1 : 0, foldersHtml: d && d.foldersHtml, folderRowsHtml: d && d.folderRowsHtml, folderName: d && d.folderName, folderPath: d && d.folderPath, canManageFolders: d && d.canManageFolders, canEditFolder: d && d.canEditFolder, folderScope: d && d.folderScope, folderAccess: d && d.folderAccess, folderReadme: d && d.folderReadme, folderReadmeHtml: d && d.folderReadmeHtml }; })
+        .then(function (d) { if ((fld == null ? curFolder : fld) === '') artTotals[f] = (d && d.total) || 0; artCache[k] = { total: (d && d.total) || 0, page: (d && d.page) || 1, hasMore: !!(d && d.hasMore), cardsHtml: d && d.cardsHtml, rowsHtml: d && d.rowsHtml, count: (d && d.cardsHtml) ? 1 : 0, foldersHtml: d && d.foldersHtml, folderRowsHtml: d && d.folderRowsHtml, folderName: d && d.folderName, folderPath: d && d.folderPath, canManageFolders: d && d.canManageFolders, canEditFolder: d && d.canEditFolder, folderScope: d && d.folderScope, folderAccess: d && d.folderAccess, folderReadme: d && d.folderReadme, folderReadmeHtml: d && d.folderReadmeHtml }; })
         .catch(function () {})
         .then(function () { delete artPending[k]; });
     }
@@ -178,10 +183,25 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     var id = el.getAttribute('data-folder-id');
     if (id && !artCache[artKey(artFilter, id)]) fetchArt(artFilter, null, id);
   }
+  // Column header: first click A→Z, again Z→A. The table stays until the sorted page lands;
+  // if it can't load, the sort goes back to what is on screen.
+  function sortArt(e) {
+    var h = e.target.closest && e.target.closest('[data-artsort]'); if (!h) return;
+    var prev = artSort, col = h.getAttribute('data-artsort'), cur = artSortOf(artFilter).split(':');
+    artSort = col + ':' + (cur[0] === col && cur[1] === 'asc' ? 'desc' : 'asc');
+    var k = artKey(artFilter);
+    if (artCache[k]) { applyArt(artFilter); return; }
+    fetchArt(artFilter, function () {
+      if (artCache[k]) { if (k === artKey(artFilter)) applyArt(artFilter); return; }
+      if (k === artKey(artFilter)) artSort = prev;
+      if (typeof window.showToast === 'function') window.showToast(t('common.couldNotLoad'), 'error');
+    });
+  }
   (function () {
     var m = document.getElementById('wsxArtMount'); if (!m) return;
     m.addEventListener('pointerover', warmFolder);
     m.addEventListener('focusin', warmFolder);
+    m.addEventListener('click', sortArt);
   })();
   function loadArtifacts() {
     if (typeof syncHash === 'function') syncHash();
@@ -189,8 +209,8 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
     var m = document.getElementById('wsxArtMount'); m.innerHTML = i18nLoad();
     fetchArt(artFilter, function () {
       if (artCache[artKey(artFilter)]) applyArt(artFilter); else m.innerHTML = i18nEmpty('common.couldNotLoad');
-      // warm the other root filters once so chip switches are instant (skip while searching)
-      ['recent', 'all', 'favorites', 'shared', 'mine'].forEach(function (f) { if (!artCache[artKey(f, '')]) fetchArt(f, artChipCounts, ''); });
+      // warm the other root filters once so chip switches are instant (a chip opens on its own sort)
+      if (!artSort) ['recent', 'all', 'favorites', 'shared', 'mine'].forEach(function (f) { if (!artCache[artKey(f, '')]) fetchArt(f, artChipCounts, ''); });
     });
   }
   // Silent refresh after a folder mutation: refetch the active view and swap it
@@ -200,7 +220,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
   ws.querySelectorAll('[data-art-filter]').forEach(function (c) {
     c.addEventListener('click', function () {
       ws.querySelectorAll('[data-art-filter]').forEach(function (x) { x.classList.remove('is-on'); });
-      c.classList.add('is-on'); artFilter = c.getAttribute('data-art-filter'); curFolder = ''; curFolderName = ''; loadArtifacts();
+      c.classList.add('is-on'); artFilter = c.getAttribute('data-art-filter'); artSort = ''; curFolder = ''; curFolderName = ''; loadArtifacts();
     });
   });
   // Filter box: pure client-side substring match over the cards/rows already in the

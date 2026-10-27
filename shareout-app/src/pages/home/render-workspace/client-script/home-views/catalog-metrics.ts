@@ -164,7 +164,7 @@ export const workspace_client_home_views_catalogMetrics_JS = `  // ----- Catalog
     var head = (hasPeriod ? '<th>' + esc(t('catalog.mPeriod')) + '</th>' : '') + dims.map(function (n) { return '<th>' + esc(n) + '</th>'; }).join('') + '<th class="wsx-atbl__num">' + esc(t('catalog.mValue')) + '</th>';
     var body = rows.map(function (r) {
       return '<tr>' + (hasPeriod ? '<td>' + esc(r.period) + '</td>' : '') + dims.map(function (n) { return '<td>' + esc(r[n] == null ? '\\u2014' : r[n]) + '</td>'; }).join('')
-        + '<td class="wsx-atbl__num">' + esc(catFmtNumber(r.value, fmt)) + '</td></tr>';
+        + '<td class="wsx-atbl__num" data-sort="' + esc(r.value == null ? '' : r.value) + '">' + esc(catFmtNumber(r.value, fmt)) + '</td></tr>';
     }).join('');
     var trust = d.status === 'certified' && d.certified_by
       ? t('catalog.certBy').replace('{who}', d.certified_by.name || d.certified_by.email || '').replace('{when}', fmtDay(d.certified_at, true))

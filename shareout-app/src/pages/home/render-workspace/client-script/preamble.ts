@@ -104,5 +104,10 @@ export const workspace_client_preamble_JS = `
     if (abs < 86400000) { var hrs = Math.round(abs / 3600000); return past ? t('time.hoursAgo').replace('{n}', String(hrs)) : t('time.inHours').replace('{n}', String(hrs)); }
     var days = Math.round(abs / 86400000); return past ? t('time.daysAgo').replace('{n}', String(days)) : t('time.inDays').replace('{n}', String(days));
   }
+  // A→Z for the tables that sort their own data: numbers as numbers, text ignoring case and accents.
+  function sortCmp(a, b) {
+    return typeof a === 'number' && typeof b === 'number' ? a - b
+      : String(a == null ? '' : a).localeCompare(String(b == null ? '' : b), undefined, { numeric: true, sensitivity: 'base' });
+  }
 
 `;

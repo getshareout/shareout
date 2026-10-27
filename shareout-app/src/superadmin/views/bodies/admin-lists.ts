@@ -37,7 +37,7 @@ export function moderationBody(rows: ModerationQueueRow[]): string {
         <td class="sa-muted">${escapeHtml(r.workspace || '—')}</td>
         <td>${badge}</td>
         <td class="sa-muted">${escapeHtml(r.moderation_reason || '—')}</td>
-        <td class="sa-muted">${escapeHtml(fmtDate(r.moderation_checked_at))}</td>
+        <td class="sa-muted" data-sort="${escapeHtml(r.moderation_checked_at ?? '')}">${escapeHtml(fmtDate(r.moderation_checked_at))}</td>
         <td><div class="sa-actions">
           <button class="so-c-btn so-c-btn--secondary so-c-btn--sm" onclick="saModerate('${escapeHtml(r.id)}', 'approve')">Approve</button>
           <button class="so-c-btn so-c-btn--danger-outline so-c-btn--sm" onclick="saModerate('${escapeHtml(r.id)}', 'block')">Block</button>
@@ -66,7 +66,7 @@ export function auditBody(rows: AdminAuditRow[]): string {
       const target = [r.target_type, r.target_id].filter(Boolean).join(':');
       const detail = r.detail ? escapeHtml(r.detail) : '';
       return `<tr>
-        <td class="sa-muted">${escapeHtml(fmtDate(r.created_at))}</td>
+        <td class="sa-muted" data-sort="${escapeHtml(r.created_at ?? '')}">${escapeHtml(fmtDate(r.created_at))}</td>
         <td>${ws}</td>
         <td class="sa-muted">${escapeHtml(r.actor_email || r.actor_id || '—')}</td>
         <td><code>${escapeHtml(r.action)}</code></td>

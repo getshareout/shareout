@@ -124,3 +124,38 @@ describe('handleHomeBrowserApi — Team Space folder rights for a member', () =>
     expect(body.foldersHtml).not.toContain('wsx-folder-card__actions');
   });
 });
+
+describe('handleHomeBrowserApi — column sort', () => {
+  async function orderBy(qs: string): Promise<string> {
+    let page = '';
+    const DB = {
+      prepare: (sql: string) => ({
+        bind: () => ({
+          first: async () => (sql.includes('COUNT(DISTINCT a.id) as total') ? { total: 0 } : null),
+          all: async () => { if (sql.includes('LIMIT ? OFFSET ?')) page = sql; return { results: [] }; },
+          run: async () => ({ success: true }),
+        }),
+      }),
+    };
+    await handleHomeBrowserApi(req('https://shareout.site/v1/home/browser' + qs), { DB } as unknown as Env, user);
+    return page.slice(page.lastIndexOf('ORDER BY'), page.lastIndexOf('LIMIT')).replace(/\s+/g, ' ').trim();
+  }
+
+  it('sorts by the requested column and direction, newest first on ties', async () => {
+    expect(await orderBy('?sort=name&dir=desc')).toBe('ORDER BY a.name COLLATE NOCASE DESC, a.created_at DESC, a.id');
+    expect(await orderBy('?sort=views&dir=asc')).toBe('ORDER BY total_views ASC, a.created_at DESC, a.id');
+    expect(await orderBy('?sort=tags&dir=desc')).toBe('ORDER BY tags IS NULL, tags COLLATE NOCASE DESC, a.created_at DESC, a.id');
+  });
+
+  it('keeps each chip sort’s direction when no dir is given', async () => {
+    expect(await orderBy('?sort=name')).toBe('ORDER BY a.name COLLATE NOCASE ASC, a.created_at DESC, a.id');
+    expect(await orderBy('?sort=views')).toBe('ORDER BY total_views DESC, a.created_at DESC, a.id');
+    expect(await orderBy('')).toBe('ORDER BY COALESCE(d.updated_at, a.created_at) DESC, a.created_at DESC, a.id');
+  });
+
+  it('falls back to recent for unknown keys and ignores a bad dir', async () => {
+    const recent = 'ORDER BY COALESCE(d.updated_at, a.created_at) DESC, a.created_at DESC, a.id';
+    expect(await orderBy('?sort=__proto__')).toBe(recent);
+    expect(await orderBy('?sort=a.id;DROP&dir=sideways')).toBe(recent);
+  });
+});

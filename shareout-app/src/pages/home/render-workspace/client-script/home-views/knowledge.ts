@@ -229,8 +229,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     return '<select class="so-c-select wsx-kn2__kind" id="knKind" aria-label="' + esc(t('knowledge.colKind')) + '">' + opts + '</select>';
   }
 
-  var KN_COLS = [['title', 'knowledge.colTitle', 1], ['kind', 'knowledge.colKind', 1], ['topics', 'knowledge.colTopics', 0], ['sources', 'knowledge.colSources', 0], ['learned', 'knowledge.colLearned', 1]];
-  function knArrow(k) { return knState.sort === k ? (knState.asc ? ' \\u25B2' : ' \\u25BC') : ''; }
+  var KN_COLS = [['title', 'knowledge.colTitle'], ['kind', 'knowledge.colKind'], ['topics', 'knowledge.colTopics'], ['sources', 'knowledge.colSources'], ['learned', 'knowledge.colLearned']];
 
   function knTopicsCell(n) {
     var ts = (n.topics || []).slice(0, 3);
@@ -249,24 +248,27 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
       + '<td class="wsx-atbl__date">' + (n.learned_at ? esc(adRelDate(n.learned_at)) : '\\u2014') + '</td></tr>';
   }
 
+  function knSortVal(n, k) {
+    if (k === 'learned') return n.learned_at || '';
+    if (k === 'kind') return knKindLabel(n.kind);
+    if (k === 'topics') return (n.topics || []).join(', ');
+    if (k === 'sources') return Number(n.sourcesCount || 0);
+    return n.title || n.path || '';
+  }
+
   function knSortedRows() {
     var k = knState.sort, asc = knState.asc;
     return knState.nodes.filter(function (n) { return n.kind !== 'overview'; }).slice().sort(function (a, b) {
-      var av, bv;
-      if (k === 'learned') { av = a.learned_at || ''; bv = b.learned_at || ''; }
-      else if (k === 'kind') { av = knKindLabel(a.kind); bv = knKindLabel(b.kind); }
-      else { av = a.title || a.path || ''; bv = b.title || b.path || ''; }
-      av = String(av).toLowerCase(); bv = String(bv).toLowerCase();
-      var c = av < bv ? -1 : av > bv ? 1 : 0; return asc ? c : -c;
+      var c = sortCmp(knSortVal(a, k), knSortVal(b, k)); return asc ? c : -c;
     });
   }
 
   function knTableBody() {
     var heads = KN_COLS.map(function (c) {
-      if (!c[2]) return '<th>' + esc(t(c[1])) + '</th>';
-      return '<th class="' + (knState.sort === c[0] ? 'is-sort' : '') + '" data-knsort="' + c[0] + '">' + esc(t(c[1])) + knArrow(c[0]) + '</th>';
+      var on = knState.sort === c[0];
+      return '<th class="' + (on ? 'is-sort' : '') + '" data-knsort="' + c[0] + '"' + (on ? ' aria-sort="' + (knState.asc ? 'ascending' : 'descending') + '"' : '') + '>' + esc(t(c[1])) + '</th>';
     }).join('');
-    return '<div class="wsx-atbl__wrap"><table class="wsx-atbl wsx-cat__table"><thead><tr>' + heads + '</tr></thead>'
+    return '<div class="wsx-atbl__wrap"><table class="wsx-atbl wsx-cat__table"><thead><tr data-sort-own>' + heads + '</tr></thead>'
       + '<tbody id="knList">' + knSortedRows().map(knRow).join('') + '</tbody></table></div>'
       + '<div class="wsx-empty" id="knNone" style="display:none">' + esc(t('knowledge.noMatch')) + '</div>';
   }

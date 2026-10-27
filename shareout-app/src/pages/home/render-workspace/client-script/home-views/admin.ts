@@ -167,7 +167,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
         var artSort = 'created'; var artAsc = false; var artVis = '';
         var VIS_LABEL = { public: t('admin.visPublic'), unlisted: t('admin.visUnlisted'), private: t('admin.visPrivate') };
         var VIS_CLS = { public: 'is-on', unlisted: '', private: 'is-off' };
-        var SORT_KEY = { name: 'name', created: 'created_at', updated: 'updated_at', views: 'views', visitors: 'unique_visitors', size: 'size_bytes', load: 'avg_lcp' };
+        var SORT_KEY = { name: 'name', owner: 'owner', created: 'created_at', updated: 'updated_at', views: 'views', visitors: 'unique_visitors', size: 'size_bytes', load: 'avg_lcp', visibility: 'visibility', status: 'paused' };
         var fmtBytes = adBytes;
         // Unused = nothing has ever viewed it and it has had time to be seen (>30d old).
         function isUnused(a) {
@@ -180,11 +180,10 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
           var filtered = arts.slice();
           if (artVis === 'unused') filtered = filtered.filter(isUnused);
           else if (artVis) filtered = filtered.filter(function (a) { return a.visibility === artVis; });
-          var numeric = key === 'views' || key === 'unique_visitors' || key === 'size_bytes' || key === 'avg_lcp';
+          var numeric = key === 'views' || key === 'unique_visitors' || key === 'size_bytes' || key === 'avg_lcp' || key === 'paused';
+          function val(a) { return numeric ? (Number(a[key]) || 0) : key === 'owner' ? (a.owner_name || a.owner_email || '') : (a[key] || ''); }
           return filtered.sort(function (a, b) {
-            var av = numeric ? (Number(a[key]) || 0) : (a[key] || '');
-            var bv = numeric ? (Number(b[key]) || 0) : (b[key] || '');
-            var cmp = av < bv ? -1 : av > bv ? 1 : 0;
+            var cmp = sortCmp(val(a), val(b));
             return artAsc ? cmp : -cmp;
           });
         }
@@ -235,8 +234,8 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
               var lbl = v ? (VIS_LABEL[v] || (v === 'unused' ? t('admin.visUnused') : v)) : t('admin.visAll');
               return '<button class="wsx-chip' + (artVis === v ? ' is-on' : '') + '" data-avis="' + v + '" type="button">' + lbl + '</button>';
             }).join('') + '</div>';
-          var thEl = function (k, lbl) { return '<th class="' + (artSort === k ? 'is-sort' : '') + '" data-asort="' + k + '">' + lbl + (artSort === k ? (artAsc ? ' \\u2191' : ' \\u2193') : '') + '</th>'; };
-          var thead = '<thead><tr>' + thEl('name', t('widget.colName')) + '<th>' + esc(t('admin.colOwner')) + '</th>' + thEl('created', t('admin.colCreated')) + thEl('updated', t('widget.colUpdated')) + thEl('views', t('widget.colViews')) + thEl('visitors', t('tabs.visitors')) + thEl('size', t('admin.colSize')) + thEl('load', t('admin.colLoad')) + '<th>' + esc(t('admin.colVisibility')) + '</th><th>' + esc(t('admin.colStatus')) + '</th><th>' + esc(t('admin.colActions')) + '</th></tr></thead>';
+          var thEl = function (k, lbl) { return '<th class="' + (artSort === k ? 'is-sort' : '') + '" data-asort="' + k + '"' + (artSort === k ? ' aria-sort="' + (artAsc ? 'ascending' : 'descending') + '"' : '') + '>' + lbl + '</th>'; };
+          var thead = '<thead><tr data-sort-own>' + thEl('name', t('widget.colName')) + thEl('owner', esc(t('admin.colOwner'))) + thEl('created', t('admin.colCreated')) + thEl('updated', t('widget.colUpdated')) + thEl('views', t('widget.colViews')) + thEl('visitors', t('tabs.visitors')) + thEl('size', t('admin.colSize')) + thEl('load', t('admin.colLoad')) + thEl('visibility', esc(t('admin.colVisibility'))) + thEl('status', esc(t('admin.colStatus'))) + '<th data-nosort>' + esc(t('admin.colActions')) + '</th></tr></thead>';
           m.innerHTML = filterBtns + '<div class="wsx-atbl__wrap"><table class="wsx-atbl">' + thead + '<tbody>' + sortedList().map(artRow).join('') + '</tbody></table></div>';
           m.querySelectorAll('[data-avis]').forEach(function (b) {
             b.addEventListener('click', function () { artVis = b.getAttribute('data-avis') || ''; renderTable(); });
@@ -244,7 +243,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
           m.querySelectorAll('[data-asort]').forEach(function (th) {
             th.addEventListener('click', function () {
               var k = th.getAttribute('data-asort');
-              if (artSort === k) { artAsc = !artAsc; } else { artSort = k; artAsc = false; }
+              if (artSort === k) { artAsc = !artAsc; } else { artSort = k; artAsc = true; }
               renderTable();
             });
           });
@@ -354,7 +353,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
           if (numeric) { av = Number(a[key]) || 0; bv = Number(b[key]) || 0; }
           else if (dateKey) { av = a[key] ? new Date(a[key]).getTime() : 0; bv = b[key] ? new Date(b[key]).getTime() : 0; if (isNaN(av)) av = 0; if (isNaN(bv)) bv = 0; }
           else { av = a[key] || ''; bv = b[key] || ''; }
-          var cmp = av < bv ? -1 : av > bv ? 1 : 0;
+          var cmp = sortCmp(av, bv);
           return memAsc ? cmp : -cmp;
         });
       }
@@ -381,8 +380,8 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
           + '</tr>';
       }
       function renderMembers() {
-        var thEl = function (k, lbl) { return '<th class="' + (memSort === k ? 'is-sort' : '') + '" data-msort="' + k + '">' + lbl + (memSort === k ? (memAsc ? ' \\u2191' : ' \\u2193') : '') + '</th>'; };
-        var thead = '<thead><tr>' + thEl('name', esc(t('admin.colMember'))) + thEl('role', esc(t('admin.colRole'))) + thEl('joined', esc(t('admin.colJoined'))) + thEl('login', esc(t('admin.colLastLogin'))) + thEl('active', esc(t('admin.colLastActive'))) + thEl('arts', esc(t('admin.colArtifacts'))) + thEl('views', esc(t('widget.colViews'))) + thEl('tokens', esc(t('admin.colAiTokens'))) + thEl('comments', esc(t('admin.colComments'))) + '<th></th></tr></thead>';
+        var thEl = function (k, lbl) { return '<th class="' + (memSort === k ? 'is-sort' : '') + '" data-msort="' + k + '"' + (memSort === k ? ' aria-sort="' + (memAsc ? 'ascending' : 'descending') + '"' : '') + '>' + lbl + '</th>'; };
+        var thead = '<thead><tr data-sort-own>' + thEl('name', esc(t('admin.colMember'))) + thEl('role', esc(t('admin.colRole'))) + thEl('joined', esc(t('admin.colJoined'))) + thEl('login', esc(t('admin.colLastLogin'))) + thEl('active', esc(t('admin.colLastActive'))) + thEl('arts', esc(t('admin.colArtifacts'))) + thEl('views', esc(t('widget.colViews'))) + thEl('tokens', esc(t('admin.colAiTokens'))) + thEl('comments', esc(t('admin.colComments'))) + '<th></th></tr></thead>';
         var table = '<div class="wsx-atbl__wrap"><table class="wsx-atbl">' + thead + '<tbody>' + sortedMembers().map(memRow).join('') + '</tbody></table></div>';
         m.innerHTML = seatUtil + invite + table + invitesSection + '<div id="wsxInvTeam"></div>';
         invTeamAccess(document.getElementById('wsxInvTeam'), list);
@@ -392,7 +391,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
         m.querySelectorAll('[data-msort]').forEach(function (th) {
           th.addEventListener('click', function () {
             var k = th.getAttribute('data-msort');
-            if (memSort === k) { memAsc = !memAsc; } else { memSort = k; memAsc = false; }
+            if (memSort === k) { memAsc = !memAsc; } else { memSort = k; memAsc = true; }
             renderMembers();
           });
         });
@@ -546,7 +545,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
         var revoked = !!tok.revoked_at;
         return '<tr' + (revoked ? ' class="is-paused"' : '') + '><td><span class="wsx-atbl__link">' + esc(tok.name || t('admin.tokenDefault')) + '</span>' + (revoked ? '<span class="wsx-atbl__flag">' + esc(t('admin.revoked')) + '</span>' : '') + '</td>'
           + '<td class="wsx-atbl__owner">' + esc(((tok.scopes || []).join ? (tok.scopes || []).join(', ') : String(tok.scopes || ''))) + '</td>'
-          + '<td class="wsx-atbl__date">' + (tok.last_used_at ? adRelDate(tok.last_used_at) : esc(t('common.never'))) + '</td>'
+          + '<td class="wsx-atbl__date" data-sort="' + esc(tok.last_used_at || '') + '">' + (tok.last_used_at ? adRelDate(tok.last_used_at) : esc(t('common.never'))) + '</td>'
           + '<td class="wsx-atbl__actions">' + (revoked ? '' : '<button class="wsx-conn__del" data-tok-rm="' + esc(tok.id) + '" title="' + esc(t('admin.revoke')) + '" type="button">\\u00D7</button>') + '</td></tr>';
       }).join('');
       var tokensSection = '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.agentTokens')) + '</div>'
@@ -956,19 +955,19 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
         return '<tr><td><span class="wsx-atbl__link">' + esc(c.name || c.provider || t('admin.connectionDefault')) + '</span></td>'
           + '<td><span class="wsx-atbl__type">' + esc(c.provider || c.kind || '\\u2014') + '</span></td>'
           + '<td class="wsx-atbl__num">' + used + '</td>'
-          + '<td class="wsx-atbl__date">' + adRelDate(c.created_at) + '</td></tr>';
+          + '<td class="wsx-atbl__date" data-sort="' + esc(c.created_at || '') + '">' + adRelDate(c.created_at) + '</td></tr>';
       }).join('');
       var jobRows = jobs.map(function (j) {
         return '<tr><td><span class="wsx-atbl__link">' + esc(j.title || j.action || t('admin.jobDefault')) + '</span>' + (j.last_error ? '<span class="wsx-atbl__flag" title="' + esc(String(j.last_error)) + '">' + esc(t('admin.errorFlag')) + '</span>' : '') + '</td>'
           + '<td><span class="wsx-atbl__type">' + esc(j.schedule || j.trigger_type || '\\u2014') + '</span></td>'
-          + '<td class="wsx-atbl__date">' + (j.last_run_at ? adRelDate(j.last_run_at) : '\\u2014') + '</td>'
+          + '<td class="wsx-atbl__date" data-sort="' + esc(j.last_run_at || '') + '">' + (j.last_run_at ? adRelDate(j.last_run_at) : '\\u2014') + '</td>'
           + '<td>' + statusBadge(j.last_status, j.enabled) + '</td></tr>';
       }).join('');
       var crewRows = crews.map(function (c) {
         return '<tr><td><span class="wsx-atbl__link">' + esc(c.crew_name || t('admin.crewDefault')) + '</span></td>'
           + '<td><span class="wsx-atbl__type">' + esc(c.cron || c.kind || '\\u2014') + '</span></td>'
           + '<td class="wsx-atbl__owner">' + esc(c.crew_model || '\\u2014') + '</td>'
-          + '<td class="wsx-atbl__date">' + (c.last_run_at ? adRelDate(c.last_run_at) : '\\u2014') + '</td>'
+          + '<td class="wsx-atbl__date" data-sort="' + esc(c.last_run_at || '') + '">' + (c.last_run_at ? adRelDate(c.last_run_at) : '\\u2014') + '</td>'
           + '<td>' + statusBadge(c.crew_status, c.enabled) + '</td></tr>';
       }).join('');
       m.innerHTML = adTableSection('admin.autoConnectors', 'admin.autoConnectorsIntro', ['admin.colName', 'admin.colProvider', 'admin.colUsedBy', 'admin.colCreated'], connRows, 'admin.noConnectors')

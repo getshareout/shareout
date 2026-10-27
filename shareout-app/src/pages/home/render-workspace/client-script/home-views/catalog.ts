@@ -108,7 +108,7 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
     return '<select class="wsx-admin__role wsx-cat__sel" id="' + id + '">' + opts + '</select>';
   }
 
-  var CAT_COLS = [['title', 'catalog.colName', 1], ['kind', 'catalog.colKind', 1], ['domain', 'catalog.colDomain', 1], ['status', 'catalog.colStatus', 1], ['origin', 'catalog.colOrigin', 0], ['lineage', 'catalog.colLineage', 0]];
+  var CAT_COLS = [['title', 'catalog.colName'], ['kind', 'catalog.colKind'], ['domain', 'catalog.colDomain'], ['status', 'catalog.colStatus'], ['origin', 'catalog.colOrigin'], ['lineage', 'catalog.colLineage']];
 
   function catRow(e) {
     var text = [e.id, e.title, e.domain || '', e.fqn || ''].concat(e.tags || []).join(' ').toLowerCase();
@@ -125,14 +125,16 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
       + '<td class="wsx-atbl__num wsx-cat__clin">' + lc + '</td></tr>';
   }
 
-  function catArrow(k) { return catState.sort === k ? (catState.asc ? ' \\u25B2' : ' \\u25BC') : ''; }
+  function catSortVal(e, k) {
+    if (k === 'origin') return catOrigin(e);
+    if (k === 'lineage') return (e.upstream || []).length + (e.downstream || []).length;
+    return e[k] || '';
+  }
 
   function catSortedEntries() {
     var k = catState.sort, asc = catState.asc;
     return catState.entries.slice().sort(function (a, b) {
-      var av = String(k === 'title' ? (a.title || '') : (a[k] || '')).toLowerCase();
-      var bv = String(k === 'title' ? (b.title || '') : (b[k] || '')).toLowerCase();
-      var c = av < bv ? -1 : av > bv ? 1 : 0; return asc ? c : -c;
+      var c = sortCmp(catSortVal(a, k), catSortVal(b, k)); return asc ? c : -c;
     });
   }
 
@@ -143,8 +145,8 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
     // The metric segment lists metrics with their own columns (catalog-metrics.ts).
     var metricsView = catState.kind === 'metric';
     var heads = metricsView ? catMetricHeads() : CAT_COLS.map(function (c) {
-      if (!c[2]) return '<th>' + esc(t(c[1])) + '</th>';
-      return '<th class="' + (catState.sort === c[0] ? 'is-sort' : '') + '" data-asort="' + c[0] + '">' + esc(t(c[1])) + catArrow(c[0]) + '</th>';
+      var on = catState.sort === c[0];
+      return '<th class="' + (on ? 'is-sort' : '') + '" data-asort="' + c[0] + '"' + (on ? ' aria-sort="' + (catState.asc ? 'ascending' : 'descending') + '"' : '') + '>' + esc(t(c[1])) + '</th>';
     }).join('');
     m.innerHTML = catKpiTiles()
       + '<div class="wsx-cat__controls wsx-ttool"><div class="wsx-cat__bar">'
@@ -152,7 +154,7 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
       + catSeg(f.kind) + catSelect('catDom', 'catalog.filterDomain', 'domain', f.domain) + catSelect('catStat', 'catalog.filterStatus', 'status', f.status)
       + '<span class="wsx-cat__count" id="catCount"></span>'
       + '</div></div>'
-      + '<div class="wsx-atbl__wrap"><table class="wsx-atbl wsx-cat__table"><thead><tr>' + heads + '</tr></thead>'
+      + '<div class="wsx-atbl__wrap"><table class="wsx-atbl wsx-cat__table"><thead><tr' + (metricsView ? '' : ' data-sort-own') + '>' + heads + '</tr></thead>'
       + '<tbody id="catList">' + (metricsView ? catMetricRows(m) : catSortedEntries().map(catRow).join('')) + '</tbody></table></div>'
       + '<div class="wsx-empty" id="catNone" style="display:none">' + esc(t('catalog.noMatch')) + '</div>';
     var s = document.getElementById('catSearch'); if (s) s.value = catState.q;

@@ -5,6 +5,7 @@
 
 import { baseStyles } from './base.css';
 import { componentStylesheet, componentScripts } from './components/stylesheet';
+import { tableSortClasses, tableSortScript } from './components/table-sort';
 import { googleFontsPreconnect } from '../../packages/design-tokens/src/index';
 import { brandFaviconHead } from '../brand';
 import { escapeHtml } from '../html/utils';
@@ -74,7 +75,8 @@ export function renderHtmlPage(options: HtmlPageOptions): Response {
 
   const html = `${renderHeadAndBodyOpen(options, social)}
 ${body}
-<script>${componentScripts}</script>
+<script>${componentScripts}
+${tableSortScript}</script>
 ${scripts ? `<script>${scripts}</script>` : ''}
 </body>
 </html>`;
@@ -114,6 +116,7 @@ ${googleFontsPreconnect}
 <style>
 ${baseStyles}
 ${componentStylesheet()}
+${tableSortClasses}
 ${pageStyles}
 </style>
 ${extraHead}
@@ -151,7 +154,8 @@ export function renderHtmlPageStreamed(options: StreamedHtmlPageOptions): Respon
     try {
       const { body, scripts = '' } = await options.body();
       await writer.write(enc.encode(`${body}
-<script>${componentScripts}</script>
+<script>${componentScripts}
+${tableSortScript}</script>
 ${scripts ? `<script>${scripts}</script>` : ''}
 ${options.afterScripts ?? ''}
 </body>

@@ -14,10 +14,12 @@ export function artifactTypeGroup(artifactType: string): string {
 }
 
 export function parseHomeFilters(url: URL): HomeFilters {
+  const dir = url.searchParams.get('dir');
   return {
     page: Math.max(1, parseInt(url.searchParams.get('page') || '1', 10)),
     search: url.searchParams.get('q')?.trim() || '',
     sort: url.searchParams.get('sort') || 'recent',
+    dir: dir === 'asc' || dir === 'desc' ? dir : undefined,
     type: url.searchParams.get('type') || '',
     scope: url.searchParams.get('scope') || 'all',
     workspace: url.searchParams.get('workspace')?.trim() || '',
