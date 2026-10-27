@@ -248,12 +248,17 @@ export const WORKSPACE_AGENT_COMPOSER_STYLES = `/* ---- agent dock (inside canva
 .wsx__ai-live { position: absolute; right: 0; bottom: 1px; width: 11px; height: 11px; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 0 2px var(--color-bg-elevated); }
 .wsx__ai-id { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
 .wsx__ai-name { font: 800 var(--text-base) var(--font-display, var(--font-body)); color: var(--color-text); letter-spacing: -0.01em; }
-.wsx__ai-sub { font: 500 var(--text-xs) var(--font-body); color: var(--color-text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wsx__composer-btns { margin-left: auto; display: flex; gap: 2px; }
 .wsx__composer-btns button { width: 32px; height: 32px; display: grid; place-items: center; border: 0; background: transparent; border-radius: 999px; color: var(--color-text-tertiary); cursor: pointer; transition: background var(--duration-fast), color var(--duration-fast); }
 .wsx__composer-btns button:hover { background: var(--color-surface); color: var(--color-text); }
 .wsx__composer-btns .wsx__composer-new { width: auto; display: inline-flex; gap: 5px; padding: 0 13px 0 10px; border: 0; background: var(--color-surface); color: var(--color-text); font: 600 var(--text-xs) var(--font-body); }
 .wsx__composer-new svg { width: 15px; height: 15px; }
+.wsx__composer-more { position: relative; display: flex; }
+.wsx__composer-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 6; min-width: 190px; display: flex; flex-direction: column; gap: 2px; padding: 6px; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
+.wsx__composer-menu[hidden] { display: none; }
+.wsx__composer-btns .wsx__composer-menu button { width: 100%; height: auto; display: flex; align-items: center; justify-content: flex-start; gap: 10px; padding: 9px 10px; border-radius: var(--radius-md); color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); text-align: left; white-space: nowrap; }
+.wsx__composer-btns .wsx__composer-menu button[hidden] { display: none; }
+.wsx__composer-menu svg { width: 16px; height: 16px; flex: none; }
 .wsx__composer-btns button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
 .wsx__threadpane { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
 .wsx__composer .wsx__thread { flex: 1; min-height: 0; max-height: none; max-width: none; margin: 0; border: 0; border-radius: 0; background: transparent; overflow-y: auto; padding: 6px 18px 22px; }

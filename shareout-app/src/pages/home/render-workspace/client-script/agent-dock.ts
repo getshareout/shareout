@@ -46,12 +46,21 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
     if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   }
+  // "⋯" menu: search + history live behind one button; the items keep their own handlers.
+  var moreBtn = document.getElementById('wsxMoreBtn'), moreMenu = document.getElementById('wsxMoreMenu');
+  function setMore(on) { if (!moreMenu || !moreBtn) return; moreMenu.hidden = !on; moreBtn.setAttribute('aria-expanded', on ? 'true' : 'false'); }
+  if (moreBtn && moreMenu) {
+    moreBtn.addEventListener('click', function (e) { e.stopPropagation(); setMore(moreMenu.hidden); });
+    moreMenu.addEventListener('click', function () { setMore(false); });
+    document.addEventListener('click', function (e) { if (!moreMenu.hidden && !moreMenu.contains(e.target)) setMore(false); });
+  }
   composer.addEventListener('keydown', function (e) {
     if (!isSheet() || e.defaultPrevented) return;
     if (e.key === 'Tab') { trapTab(e); return; }
     if (e.key !== 'Escape') return;
     e.preventDefault();
-    if (threadsPanel && !threadsPanel.hidden) { threadsPanel.hidden = true; if (threadsBtn) threadsBtn.focus(); }
+    if (moreMenu && !moreMenu.hidden) { setMore(false); if (moreBtn) moreBtn.focus(); }
+    else if (threadsPanel && !threadsPanel.hidden) { threadsPanel.hidden = true; if (threadsBtn) threadsBtn.focus(); }
     else closeComposer();
   });
   document.addEventListener('keydown', function (e) {

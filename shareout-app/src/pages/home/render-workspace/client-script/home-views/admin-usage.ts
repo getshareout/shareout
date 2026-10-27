@@ -2,7 +2,7 @@
 export const workspace_client_home_views_adminUsage_JS = `  // Usage: this month or last, from the nightly per-workspace usage ledger.
   var adUsageMonth = null;
   function adUsage() {
-    var m = document.getElementById('wsxAdminMount'); if (needWs(m)) return;
+    var m = adM('usage'); if (needWs(m)) return;
     var groups = [
       ['storage', ['storage_bytes'], function (q) { return (q.storage_bytes || 0).toFixed(2) + ' GB-mo'; }],
       ['serving', ['serving_requests'], function (q) { return adCompact(q.serving_requests) + ' req'; }],

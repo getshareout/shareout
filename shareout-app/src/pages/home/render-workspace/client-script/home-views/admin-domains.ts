@@ -1,7 +1,7 @@
 /** Admin → Custom domain (add, DNS records, refresh, primary, remove). Shares the admin lens IIFE scope. */
 export const workspace_client_home_views_adminDomains_JS = `  // Custom domains: add a hostname, show the DNS records to set, refresh status, set primary, remove.
   function adDomains() {
-    var m = document.getElementById('wsxAdminMount'); if (needWs(m)) return;
+    var m = adM('domains'); if (needWs(m)) return;
     function cdReq(suffix, init) {
       return fetch(wsUrl('/domains' + suffix), Object.assign({ credentials: 'same-origin', headers: { 'Content-Type': 'application/json' } }, init || {}))
         .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) { var e = new Error('x'); e.userMessage = (j && (j.error + (j.hint ? ' ' + j.hint : ''))) || t('admin.saveFailed'); throw e; } return j; }); });

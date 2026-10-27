@@ -4,7 +4,18 @@ import { colors } from '@shareout/design-tokens';
 /** Shared admin helpers (members, clients, invite, assets use them) + the tab bar. Stays in the boot shell. */
 export const workspace_client_home_views_adminCore_JS = `  // ----- Admin — Overview / Artifacts / Members / Billing / Security / Settings -----
   function wsUrl(suffix) { return '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + suffix; }
-  var adminTab = 'overview';
+  var adminTab = 'overview', adFocus = null;
+  // Five chips, each a stack of the original panels; old tab keys still resolve (deep links, attention rows, search).
+  var AD_GROUPS = { overview: ['overview', 'usage', 'support'], people: ['members', 'clients'], artifacts: ['artifacts'], automation: ['automation', 'ai'], settings: ['settings', 'security', 'domains'] };
+  var AD_LABEL = { usage: 'admin.usage', support: 'admin.support', members: 'admin.members', clients: 'admin.clients', ai: 'admin.ai', security: 'admin.security', domains: 'admin.cdTab', automation: 'admin.automation', settings: 'admin.settings' };
+  function adGroupOf(k) { if (AD_GROUPS[k]) return k; for (var g in AD_GROUPS) { if (AD_GROUPS[g].indexOf(k) >= 0) return g; } return 'overview'; }
+  function adHas(k) { return AD_GROUPS[adminTab].indexOf(k) >= 0; }
+  function adM(k) { return document.getElementById('wsxAdSec_' + k) || document.getElementById('wsxAdminMount'); }
+  function adSetTab(k) {
+    adminTab = adGroupOf(k); adFocus = k;
+    ws.querySelectorAll('[data-admin-tab]').forEach(function (x) { x.classList.toggle('is-on', x.getAttribute('data-admin-tab') === adminTab); });
+  }
+  function adOpen(k) { adSetTab(k); loadAdmin(); }
   // Branded loading + busy-button affordances (design-system spinner).
   function adLoading(m) { m.innerHTML = i18nSpin(); }
   function adBusy(b) { if (b) { b.disabled = true; b.classList.add('is-busy'); } }
@@ -20,7 +31,7 @@ export const workspace_client_home_views_adminCore_JS = `  // ----- Admin — Ov
     return optimistic({
       key: key, undo: true,
       apply: function () { adPending[key] = true; if (row) h = window.soOptimistic.leave(row); },
-      rollback: function () { delete adPending[key]; if (h) h.restore(); if (row && !row.isConnected && cacheKey) { delete adDataCache[cacheKey]; if (adminTab === cacheKey) loadAdmin(); } },
+      rollback: function () { delete adPending[key]; if (h) h.restore(); if (row && !row.isConnected && cacheKey) { delete adDataCache[cacheKey]; if (adHas(cacheKey)) loadAdmin(); } },
       request: function () { return adReq(url, { method: opts.method || 'DELETE', credentials: 'same-origin', keepalive: true }); },
       success: okMsg, error: adErr(failMsg),
       done: function () { delete adPending[key]; if (h && !opts.keepRow) h.commit(); if (cacheKey) delete adDataCache[cacheKey]; if (opts.after) opts.after(); },
@@ -39,9 +50,9 @@ export const workspace_client_home_views_adminCore_JS = `  // ----- Admin — Ov
   // revisit, refetch in the background, repaint only if the data changed (so
   // in-progress form edits aren't clobbered). Cache drops on workspace switch.
   var adDataCache = {}, adCacheWs = null;
-  function adReload() { delete adDataCache[adminTab]; loadAdmin(); }
+  function adReload() { AD_GROUPS[adminTab].forEach(function (k) { delete adDataCache[k]; }); loadAdmin(); }
   function swr(key, painter, fetcher) {
-    var m = document.getElementById('wsxAdminMount'); if (!m) return;
+    var m = adM(key.split(':')[0]); if (!m) return;
     if (adCacheWs !== window.WSX_WS) { adDataCache = {}; adCacheWs = window.WSX_WS; }
     var tabAtCall = adminTab, cached = adDataCache[key];
     if (cached !== undefined) { try { painter(cached); } catch (e) {} } else { adLoading(m); }
@@ -68,16 +79,13 @@ export const workspace_client_home_views_adminCore_JS = `  // ----- Admin — Ov
   }
 
   ws.querySelectorAll('[data-admin-tab]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      ws.querySelectorAll('[data-admin-tab]').forEach(function (x) { x.classList.remove('is-on'); });
-      b.classList.add('is-on'); adminTab = b.getAttribute('data-admin-tab'); loadAdmin();
-    });
+    b.addEventListener('click', function () { adOpen(b.getAttribute('data-admin-tab')); });
   });
 `;
 
 /** The admin lens views. Lazily loaded (lazy-chunks.ts); shares the shell scope. */
 export const workspace_client_home_views_admin_JS = `  function adOverview() {
-    var m = document.getElementById('wsxAdminMount'); if (needWs(m)) return;
+    var m = adM('overview'); if (needWs(m)) return;
     var run = function () { return Promise.all([
       Promise.resolve(null), // no billing in this build — seat/plan data is gone
       fetch(wsUrl('/members/metrics'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
@@ -144,16 +152,14 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
       document.getElementById('wsxOvInvite').addEventListener('click', function () { wsxInvite(adReload); });
       m.querySelectorAll('[data-admin-goto]').forEach(function (b) {
         b.addEventListener('click', function () {
-          var gotoTab = b.getAttribute('data-admin-goto');
-          ws.querySelectorAll('[data-admin-tab]').forEach(function (x) { x.classList.toggle('is-on', x.getAttribute('data-admin-tab') === gotoTab); });
-          adminTab = gotoTab; loadAdmin();
+          adOpen(b.getAttribute('data-admin-goto'));
         });
       });
     }, run);
   }
 
   function adArtifacts() {
-    var m = document.getElementById('wsxAdminMount'); if (needWs(m)) return;
+    var m = adM('artifacts'); if (needWs(m)) return;
     var run = function () { return fetch(wsUrl('/admin/artifacts'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }); };
     swr('artifacts', function (d) {
         var arts = (d && d.artifacts) || [];
@@ -280,7 +286,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
   }
 
   function adMembers() {
-    var m = document.getElementById('wsxAdminMount'); if (needWs(m)) return;
+    var m = adM('members'); if (needWs(m)) return;
     var run = function () { return Promise.all([
       fetch(wsUrl('/members/metrics'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
       Promise.resolve(null), // no billing in this build — seat/plan data is gone
@@ -470,7 +476,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
   }
 
   function adSecurity() {
-    var m = document.getElementById('wsxAdminMount'); if (needWs(m)) return;
+    var m = adM('security'); if (needWs(m)) return;
     var run = function () { return Promise.all([
       fetch(wsUrl('/audit?limit=50'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
       fetch(wsUrl('/access-policy'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
@@ -596,7 +602,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
         b.addEventListener('click', function () {
           if (!window.confirm(t('admin.revokeTokenConfirm'))) return;
           var id = b.getAttribute('data-tok-rm');
-          adRemoveRow('tok:' + id, b.closest('tr'), wsUrl('/agent-tokens/' + encodeURIComponent(id)), t('admin.tokenRevoked'), t('admin.tokenRevokeFailed'), 'security', { keepRow: true, after: function () { if (adminTab === 'security') loadAdmin(); } });
+          adRemoveRow('tok:' + id, b.closest('tr'), wsUrl('/agent-tokens/' + encodeURIComponent(id)), t('admin.tokenRevoked'), t('admin.tokenRevokeFailed'), 'security', { keepRow: true, after: function () { if (adHas('security')) loadAdmin(); } });
         });
       });
       m.querySelectorAll('[data-appr]').forEach(function (b) {
@@ -657,7 +663,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
   }
   var POLICIES = [['allow', 'admin.policy.allow', 'admin.policy.allowDesc'], ['require_approval', 'admin.policy.approval', 'admin.policy.approvalDesc'], ['prohibit', 'admin.policy.prohibit', 'admin.policy.prohibitDesc']];
   function adSettings() {
-    var m = document.getElementById('wsxAdminMount'); if (needWs(m)) return;
+    var m = adM('settings'); if (needWs(m)) return;
     var run = function () { return Promise.all([
       fetch(wsUrl('/publish-policy'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
       fetch(wsUrl('/branding'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
@@ -818,7 +824,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
 
   // AI — token usage, cost, model breakdown, and bring-your-own key.
   function adAI() {
-    var m = document.getElementById('wsxAdminMount'); if (needWs(m)) return;
+    var m = adM('ai'); if (needWs(m)) return;
     var run = function () { return Promise.all([
       fetch(wsUrl('/llm'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
       fetch(wsUrl('/usage?limit=200'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
@@ -918,7 +924,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
       var bdel = document.getElementById('wsxByoDel');
       if (bdel) bdel.addEventListener('click', function () {
         if (!window.confirm(t('admin.aiRemoveKeyConfirm'))) return;
-        adRemoveRow('byo-key', bdel.closest('.wsx-admin__row'), wsUrl('/llm'), t('admin.keyRemoved'), t('admin.actionFailed'), 'ai', { keepRow: true, after: function () { if (adminTab === 'ai') loadAdmin(); } });
+        adRemoveRow('byo-key', bdel.closest('.wsx-admin__row'), wsUrl('/llm'), t('admin.keyRemoved'), t('admin.actionFailed'), 'ai', { keepRow: true, after: function () { if (adHas('ai')) loadAdmin(); } });
       });
     }, run);
   }
@@ -930,7 +936,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
       + '<p class="wsx-lens__intro">' + esc(t(introKey)) + '</p>' + body + '</div>';
   }
   function adAutomation() {
-    var m = document.getElementById('wsxAdminMount'); if (needWs(m)) return;
+    var m = adM('automation'); if (needWs(m)) return;
     var run = function () { return Promise.all([
       fetch(wsUrl('/connections'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
       fetch(wsUrl('/schedules'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
@@ -970,5 +976,15 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
         + adTableSection('admin.autoCrewAutomations', 'admin.autoCrewIntro', ['admin.colCrew', 'admin.colTrigger', 'admin.colModel', 'admin.colLastRun', 'admin.lblStatus'], crewRows, 'admin.noAutomations');
     }, run);
   }
-  function loadAdmin() { if (adminTab === 'intelligence') { location.hash = '#l/knowledge'; return; } var fn = { overview: adOverview, artifacts: adArtifacts, members: adMembers, clients: adClients, automation: adAutomation, ai: adAI, security: adSecurity, usage: adUsage, support: adSupport, settings: adSettings, domains: adDomains }[adminTab]; if (fn) fn(); }
+  function loadAdmin() {
+    var fnMap = { overview: adOverview, artifacts: adArtifacts, members: adMembers, clients: adClients, automation: adAutomation, ai: adAI, security: adSecurity, usage: adUsage, support: adSupport, settings: adSettings, domains: adDomains };
+    var keys = AD_GROUPS[adminTab], focus = adFocus; adFocus = null;
+    var mount = document.getElementById('wsxAdminMount'); if (!mount) return;
+    mount.innerHTML = keys.length < 2 ? '<div id="wsxAdSec_' + keys[0] + '"></div>' : keys.map(function (k, i) {
+      return '<section class="wsx-admin__sec" id="wsxAdSecWrap_' + k + '">' + (i ? '<h3 class="wsx-admin__sectitle">' + esc(t(AD_LABEL[k])) + '</h3>' : '') + '<div id="wsxAdSec_' + k + '"></div></section>';
+    }).join('');
+    keys.forEach(function (k) { var fn = fnMap[k]; if (fn) fn(); });
+    var tgt = focus && focus !== adminTab && document.getElementById('wsxAdSecWrap_' + focus);
+    if (tgt && tgt.scrollIntoView) tgt.scrollIntoView({ block: 'start' });
+  }
 `;

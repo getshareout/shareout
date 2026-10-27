@@ -63,7 +63,7 @@ export const workspace_client_command_palette_JS = `
         if (h.url) location.href = h.url;
       } else if (h.kind === 'folder') {
         openView('artifacts'); if (window.enterFolder) window.enterFolder(h.id, h.title);
-      } else if (LENS_FOR[h.kind]) { openView(LENS_FOR[h.kind]); }
+      } else if (LENS_FOR[h.kind]) { if (h.kind === 'person' && typeof adSetTab === 'function') adSetTab('members'); openView(LENS_FOR[h.kind]); }
     }
 
     // ---- rich row pieces (shared by palette + inline dropdown) ----

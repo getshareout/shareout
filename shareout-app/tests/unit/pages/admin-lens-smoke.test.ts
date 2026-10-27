@@ -17,7 +17,7 @@ import { workspace_client_home_views_admin_JS as adminTs } from '../../../src/pa
 
 /** Pull the real tab→painter entry points out of the loadAdmin dispatch map. */
 function tabPainterNames(src: string): string[] {
-  const map = src.match(/var fn = \{([^}]*)\}\[adminTab\]/);
+  const map = src.match(/var fnMap = \{([^}]*)\}/);
   if (!map) throw new Error('could not locate loadAdmin dispatch map in admin.ts');
   return [...map[1].matchAll(/:\s*(ad[A-Za-z0-9]+)/g)].map((m) => m[1]);
 }

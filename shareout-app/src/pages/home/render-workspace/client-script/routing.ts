@@ -49,6 +49,7 @@ export const workspace_client_routing_JS = `  // ===== deep-link routing (hash) 
       lenses.forEach(function (x) { x.classList.toggle('is-active', x.getAttribute('data-lens') === lens); });
       if (typeof exitCreate === 'function') exitCreate();
       if (lens === 'artifacts' && typeof artRoute === 'function') artRoute(decodeURIComponent(sub));
+      if (lens === 'admin' && sub && typeof adSetTab === 'function') adSetTab(decodeURIComponent(sub));
       openView(lens);
       if (lens === 'catalog' && typeof catRoute === 'function') catRoute(decodeURIComponent(sub));
       if (lens === 'knowledge' && typeof knRoute === 'function') knRoute(decodeURIComponent(sub));
@@ -63,6 +64,7 @@ export const workspace_client_routing_JS = `  // ===== deep-link routing (hash) 
     var qb = /^[a-z]+$/.test(qv) ? ws.querySelector('[data-lens="' + qv + '"]') : null;
     if (qb) {
       if (qv === 'connect' && /^(claude|chatgpt|code)$/.test(qt)) cnTab = qt;
+      if (qv === 'admin' && /^[a-z]+$/.test(qt) && typeof adSetTab === 'function') adSetTab(qt);
       qb.click();
     }
   }

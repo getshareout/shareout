@@ -37,6 +37,10 @@ export const WORKSPACE_NAV_STYLES = `/* ===== account menu: workspace switcher +
 .wsx-accbtn { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); text-decoration: none; cursor: pointer; text-align: left; }
 .wsx-accbtn:hover { background: var(--color-surface); color: var(--color-text); }
 .wsx-accbtn svg { flex: none; color: var(--color-text-tertiary); width: 17px; height: 17px; }
+.wsx-accbtn__chev { margin-left: auto; display: grid; }
+.wsx-accbtn--back { color: var(--color-text); margin-bottom: 4px; }
+.wsx__accscreen { display: flex; flex-direction: column; gap: 3px; }
+.wsx__accscreen[hidden] { display: none; }
 .wsx-accbtn--out:hover, .wsx-accbtn--out:hover svg { color: var(--color-error); }
 .wsx__trash { position: absolute; inset: 0; z-index: 50; display: grid; place-items: center; background: color-mix(in srgb, var(--color-text) 18%, transparent); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); padding: 20px; }
 .wsx__trash[hidden] { display: none; }

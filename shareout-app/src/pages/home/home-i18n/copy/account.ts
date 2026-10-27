@@ -3,7 +3,11 @@ import type { HomeLocaleCopy } from '../types';
 /** Account menu, linked accounts, and trash copy. */
 export const ACCOUNT_COPY: HomeLocaleCopy = {
   en: {
+    'account.connections': 'Connections & settings',
     'account.couldNotLoadAccounts': 'Could not load accounts.',
+    'account.grpAccounts': 'Accounts',
+    'account.grpAgent': 'Your agent',
+    'account.grpInsights': 'Insights',
     'account.language': 'Language',
     'account.linkGoogle': 'Link Google account',
     'account.linkedAccounts': 'Linked accounts',
@@ -37,7 +41,11 @@ export const ACCOUNT_COPY: HomeLocaleCopy = {
     'trash.untitled': 'Untitled',
   },
   es: {
+    'account.connections': 'Conexiones y ajustes',
     'account.couldNotLoadAccounts': 'No se pudieron cargar las cuentas.',
+    'account.grpAccounts': 'Cuentas',
+    'account.grpAgent': 'Tu agente',
+    'account.grpInsights': 'Métricas',
     'account.language': 'Idioma',
     'account.linkGoogle': 'Vincular cuenta de Google',
     'account.linkedAccounts': 'Cuentas vinculadas',
