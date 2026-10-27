@@ -3,7 +3,7 @@
  *  so it must be composed alongside inspector.ts (see client-script/index.ts). */
 export const workspace_client_inspector_details_JS = `  // ===== Inspector Details helpers =====
   // Sections: fixed most→least important order, collapsible, open state remembered per user.
-  var SEC_OPEN_KEY = 'wsx.inspector.open', SEC_OPEN = ['share', 'approvals', 'pages'];
+  var SEC_OPEN_KEY = 'wsx.inspector.open', SEC_OPEN = ['share', 'pages'];
   try { var so = JSON.parse(localStorage.getItem(SEC_OPEN_KEY) || 'null'); if (Array.isArray(so)) SEC_OPEN = so; } catch (e) {}
   // [icon path, tone] — tone colors the section chip (p primary, s success, w warning, n neutral).
   var SEC_IC = {
