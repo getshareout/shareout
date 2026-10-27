@@ -1,5 +1,14 @@
 /** Activity feed, Brief widgets, and tile/table artifact widgets. */
 export const workspace_client_activity_feed_JS = `  // ===== activity feed + brief widgets =====
+  var recentItems = [], homeLoaded = {};
+  // Whole Home empty: one sentence + one action, only once every source has answered.
+  function syncHomeEmpty() {
+    var em = document.getElementById('wsxHomeEmpty'); if (!em) return;
+    var allIn = homeLoaded.foryou && homeLoaded.recent && homeLoaded.feed;
+    var any = document.querySelector('#wsxBrief .wsx-widget:not(.is-empty-hidden)');
+    em.hidden = !(allIn && !any);
+    var b = em.querySelector('[data-art-first]'); if (b) b.hidden = !(typeof newBtn !== 'undefined' && newBtn);
+  }
   // Grouped row: same event repeated (kind|artifact|actor) collapses to one with an Nx count.
   function evRow(g, dismissable) {
     var e = g.e || g; var count = g.count || 1; var ids = g.ids ? g.ids.join(',') : e.id; var ts = g.ts || e.ts;
@@ -26,8 +35,6 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
   function fill(id, rows, empty, dismissable) {
     var el = document.getElementById(id); if (!el) return;
     var groups = groupFeed(rows);
-    var cEl = document.getElementById(id + 'Count');
-    if (cEl) cEl.textContent = groups.length ? String(groups.length) : '';
     var wdg = el.closest('.wsx-widget'); if (wdg) wdg.classList.toggle('is-empty-hidden', !groups.length);
     el.innerHTML = groups.length ? groups.map(function (g) { return evRow(g, dismissable); }).join('') : '<div class="wsx-empty">' + empty + '</div>';
   }
@@ -47,8 +54,7 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
         pulseEvents = (d && d.pulse) || [];
         renderActivity();
         fill('wsxNeedsYou', needsEvents, t('activity.nothingNeedsYou'), true);
-        var runs = pulseEvents.filter(function (e) { return e.kind === 'run'; });
-        fill('wsxRuns', runs, t('activity.noRecentRuns'), false);
+        homeLoaded.feed = true; syncHomeEmpty();
         var nEl = document.getElementById('wsxNarration');
         if (nEl) {
           var bits = [];
@@ -59,9 +65,10 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
             : '<span class="muted">' + esc(t('activity.allCaughtUp')) + '</span>';
         }
       })
-      .catch(function () {});
+      .catch(function () { homeLoaded.feed = true; syncHomeEmpty(); });
   }
   loadFeed();
+  wireActivityControls();
 
   // Janitor "Archive all": soft-delete the workspace's unopened pages into the 30-day
   // trash (recoverable). Recomputed server-side, admin-gated. Confirm before swiping.
@@ -113,7 +120,7 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
     var mode = widgetView(id);
     seg.querySelectorAll('[data-vw]').forEach(function (x) { x.classList.toggle('is-on', x.getAttribute('data-vw') === mode); });
   }
-  ['wsxRecentW', 'wsxForYou', 'wsxArtMount', 'wsxAssetMount'].forEach(syncViewSeg);
+  ['wsxForYou', 'wsxArtMount', 'wsxAssetMount'].forEach(syncViewSeg);
   ws.addEventListener('click', function (e) {
     if (e.target.closest('[data-art-first]')) { newDoc('blank'); return; }
     var btn = e.target.closest('[data-vw]'); if (!btn) return;
@@ -127,28 +134,19 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
     fetch(url, { credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        var cEl = document.getElementById(id + 'Count');
         ART_DATA[id] = { cardsHtml: d && d.cardsHtml, rowsHtml: d && d.rowsHtml, count: (d && d.count) || 0, empty: empty };
-        if (cEl) cEl.textContent = ART_DATA[id].count ? String(ART_DATA[id].count) : '';
+        var wdg = document.getElementById(id).closest('.wsx-widget'); if (wdg) wdg.classList.toggle('is-empty-hidden', !ART_DATA[id].count);
         renderArtView(id);
+        homeLoaded.foryou = true; syncHomeEmpty();
       })
-      .catch(function () {});
+      .catch(function () { homeLoaded.foryou = true; syncHomeEmpty(); });
   }
   var homeWsq = window.WSX_WS ? '&workspace=' + encodeURIComponent(window.WSX_WS) : '';
-  fillCardWidget('wsxForYou', '/v1/home/for-you?limit=12' + homeWsq, t('activity.nothingForYou'));
-  (function () {
-    var id = 'wsxRecentW';
-    fetch('/v1/home/recent?limit=8' + homeWsq, { credentials: 'same-origin' })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        var el = document.getElementById(id); var cEl = document.getElementById(id + 'Count');
-        var n = (d && d.count) || 0;
-        var wdg = el && el.closest('.wsx-widget'); if (wdg) wdg.classList.toggle('is-empty-hidden', !n);
-        if (cEl) cEl.textContent = n ? String(n) : '';
-        ART_DATA[id] = { cardsHtml: d && d.cardsHtml, rowsHtml: d && d.rowsHtml, count: n, empty: t('activity.recentEmpty') };
-        renderArtView(id);
-      })
-      .catch(function () {});
-  })();
+  fillCardWidget('wsxForYou', '/v1/home/for-you?limit=8' + homeWsq, t('activity.nothingForYou'));
+  fetch('/v1/home/recent?limit=8' + homeWsq, { credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) { recentItems = (d && d.items) || []; })
+    .catch(function () {})
+    .then(function () { homeLoaded.recent = true; renderActivity(); });
 
 `;

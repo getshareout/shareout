@@ -16,61 +16,68 @@ export const workspace_client_inspector_activity_JS = `
     order.sort(function (a, b) { return b.ts - a.ts; });
     return order;
   }
-  function tlRow(g) {
-    var e = g.e;
-    var title = e.actor ? esc(e.actor) : esc(e.artifact_name);
-    var detail;
-    if (e.kind === 'view') detail = g.count > 1 ? 'viewed ' + g.count + ' times' : feedText(e.summary);
-    else { detail = feedText(e.summary); if (e.actor) detail += ' \\u00B7 ' + esc(e.artifact_name); if (g.count > 1) detail += ' \\u00B7 ' + g.count + '\\u00D7'; }
-    var dot = e.actor_picture ? '<img class="wsx-tl__av" src="' + esc(e.actor_picture) + '" alt="">' : '<span class="wsx-tl__dot k-' + esc(e.kind) + '"></span>';
-    var x = '<button class="wsx-tl__x" data-eids="' + esc(g.ids.join(',')) + '" type="button" title="' + esc(t('inspector.dismiss')) + '" aria-label="' + esc(t('inspector.dismiss')) + '">\\u00D7</button>';
-    return '<a class="wsx-tl" data-kind="' + esc(e.kind) + '" data-name="' + esc(e.artifact_name) + '" data-id="' + esc(e.artifact_id) + '" href="/a/' + encodeURIComponent(e.slug) + '/">'
-      + '<span class="wsx-tl__rail">' + dot + '</span>'
-      + '<span class="wsx-tl__main"><span class="wsx-tl__top">' + title + '</span><span class="wsx-tl__sum">' + detail + '</span></span>'
-      + '<span class="wsx-tl__time">' + timeAgo(g.ts) + '</span>' + x + '</a>';
+  // One "Recent" list: artifacts I opened + activity pulse (incl. runs), newest first.
+  var SOFT_KINDS = { viewed: 1, create: 1, view: 1, publish: 1 };
+  function recentLabel(k) {
+    if (k === 'viewed') return t('recent.t.viewed');
+    if (k === 'run') return t('recent.t.run');
+    if (k === 'create' || k === 'publish') return t('recent.t.new');
+    if (k === 'comment' || k === 'reply') return t('recent.t.comment');
+    return t('recent.t.update');
   }
-  // Aggregated Pulse row: server already collapsed it to a count, so don't re-group.
-  function pulseTlRow(e) {
-    var title = e.artifact_name ? esc(e.artifact_name) : feedText(e.summary);
-    var detail = e.artifact_name ? feedText(e.summary) : '';
-    var dot = '<span class="wsx-tl__dot k-' + esc(e.kind) + '"></span>';
-    var tail = e.count > 1 ? '<span class="wsx-ev__cnt">' + e.count + '</span>' : '<span class="wsx-tl__time">' + timeAgo(e.ts) + '</span>';
-    var inner = '<span class="wsx-tl__rail">' + dot + '</span>'
-      + '<span class="wsx-tl__main"><span class="wsx-tl__top">' + title + '</span><span class="wsx-tl__sum">' + detail + '</span></span>' + tail;
-    return e.slug
-      ? '<a class="wsx-tl wsx-ev--pulse" data-kind="' + esc(e.kind) + '" data-name="' + esc(e.artifact_name || '') + '" data-id="' + esc(e.artifact_id || '') + '" href="/a/' + encodeURIComponent(e.slug) + '/">' + inner + '</a>'
-      : '<div class="wsx-tl wsx-ev--pulse" data-kind="' + esc(e.kind) + '">' + inner + '</div>';
+  function recentRows() {
+    var rows = [], seen = {};
+    function ms(ts) { return ts < 1e12 ? ts * 1000 : ts; }
+    recentItems.forEach(function (it) { rows.push({ kind: 'viewed', id: it.id, slug: it.slug, name: it.name, ts: it.ts ? Date.parse(it.ts) : 0, sum: '', count: 1 }); });
+    pulseEvents.forEach(function (e) { rows.push({ kind: e.kind, id: e.artifact_id, slug: e.slug, name: e.artifact_name, ts: ms(e.ts), sum: e.summary, count: e.count || 1 }); });
+    rows.sort(function (a, b) { return b.ts - a.ts; });
+    return rows.filter(function (r) {
+      var k = (SOFT_KINDS[r.kind] ? 'soft|' : r.kind + '|') + (r.id || r.sum);
+      if (seen[k]) return false; seen[k] = 1; return true;
+    }).slice(0, 10);
+  }
+  function recentRow(r) {
+    var title = r.name ? esc(r.name) : feedText(r.sum);
+    var detail = (!SOFT_KINDS[r.kind] && r.name && r.sum) ? '<span class="wsx-rc__sum">' + feedText(r.sum) + (r.count > 1 ? ' \\u00B7 ' + r.count + '\\u00D7' : '') + '</span>' : '';
+    var inner = '<span class="wsx-rc__main"><span class="wsx-rc__name">' + title + '</span>' + detail + '</span>'
+      + '<span class="wsx-rc__tag">' + esc(recentLabel(r.kind)) + '</span><span class="wsx-rc__time">' + (r.ts ? timeAgo(r.ts) : '') + '</span>';
+    return r.slug
+      ? '<a class="wsx-rc" data-kind="' + esc(r.kind) + '" data-name="' + esc(r.name || '') + '" data-id="' + esc(r.id || '') + '" href="/a/' + encodeURIComponent(r.slug) + '/">' + inner + '</a>'
+      : '<div class="wsx-rc" data-kind="' + esc(r.kind) + '">' + inner + '</div>';
   }
   function renderActivity() {
-    var host0 = document.getElementById('wsxActBody'); if (!host0) return;
-    var wdg = document.getElementById('wsxActWidget');
-    if (wdg) wdg.classList.toggle('is-empty-hidden', !(needsEvents.length || pulseEvents.length));
-    var gear = (window.WSX_ADMIN && window.WSX_WS) ? '<button class="wsx__actgear" id="wsxActGear" type="button" title="' + esc(t('inspector.activityVisibility')) + '">' + GEAR_SVG + '</button>' : '';
-    host0.innerHTML = '<div class="wsx__actbar"><div class="wsx__winseg" id="wsxWin">'
-      + '<button data-win="today" type="button"' + (WSX_WIN === 'today' ? ' class="is-on"' : '') + '>' + esc(t('inspector.today')) + '</button>'
-      + '<button data-win="7d" type="button"' + (WSX_WIN === '7d' ? ' class="is-on"' : '') + '>' + esc(t('inspector.win7d')) + '</button>'
-      + '<button data-win="30d" type="button"' + (WSX_WIN === '30d' ? ' class="is-on"' : '') + '>' + esc(t('inspector.win30d')) + '</button>'
-      + '</div>' + gear + '</div>'
-      + '<div class="wsx-tl-wrap" id="wsxActivity"></div>'
-      + '<div class="wsx__evsettings" id="wsxEvSettings" hidden></div>';
-    var host = document.getElementById('wsxActivity');
-    var html = needsEvents.length ? groupFeed(needsEvents).map(tlRow).join('') : '';
-    if (pulseEvents.length) html += '<div class="wsx__pulsehead">' + esc(t('inspector.pulse')) + '</div>' + pulseEvents.map(pulseTlRow).join('');
-    host.innerHTML = html || i18nEmpty('inspector.quiet');
-    wireActivityControls();
+    var host = document.getElementById('wsxRecentW'); if (!host) return;
+    var rows = recentRows();
+    var wdg = host.closest('.wsx-widget'); if (wdg) wdg.classList.toggle('is-empty-hidden', !rows.length);
+    host.innerHTML = rows.map(recentRow).join('');
+    if (typeof syncHomeEmpty === 'function') syncHomeEmpty();
   }
-  // Bind window segments + admin gear (re-run after each renderActivity innerHTML swap).
+  // Home "more" menu: customize, activity window, admin event visibility. Bound once.
   function wireActivityControls() {
-    var winEl = document.getElementById('wsxWin');
-    if (winEl) winEl.addEventListener('click', function (ev) {
+    var btn = document.getElementById('wsxHomeMore'), menu = document.getElementById('wsxHomeMenu');
+    if (!btn || !menu) return;
+    function setOpen(o) { menu.hidden = !o; btn.setAttribute('aria-expanded', o ? 'true' : 'false'); }
+    function syncWin() { menu.querySelectorAll('[data-win]').forEach(function (b) { var on = b.getAttribute('data-win') === WSX_WIN; b.classList.toggle('is-on', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); }); }
+    syncWin();
+    btn.addEventListener('click', function (ev) { ev.stopPropagation(); if (menu.hidden) syncWin(); setOpen(menu.hidden); });
+    document.addEventListener('click', function (ev) { if (!menu.hidden && !ev.target.closest('.wsx__more')) setOpen(false); });
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !menu.hidden) { setOpen(false); btn.focus(); } });
+    var custom = document.getElementById('wsxCustomize'), brief = document.getElementById('wsxBrief');
+    if (custom && brief) custom.addEventListener('click', function () {
+      var on = brief.classList.toggle('is-customizing');
+      custom.textContent = t(on ? 'home.customizeDone' : 'home.customize'); setOpen(false);
+    });
+    menu.addEventListener('click', function (ev) {
       var b = ev.target.closest('[data-win]'); if (!b) return;
-      WSX_WIN = b.getAttribute('data-win'); loadFeed();
+      WSX_WIN = b.getAttribute('data-win'); syncWin(); setOpen(false); loadFeed();
     });
     var gear = document.getElementById('wsxActGear');
     var panel = document.getElementById('wsxEvSettings');
     if (!gear || !panel) return;
+    if (window.WSX_ADMIN && window.WSX_WS) gear.hidden = false;
     var AUD = [['self', t('inspector.audSelf')], ['members', t('inspector.audMembers')], ['admins', t('inspector.audAdmins')], ['off', t('inspector.audOff')]];
     gear.addEventListener('click', function () {
+      setOpen(false);
       if (!panel.hidden) { panel.hidden = true; return; }
       panel.hidden = false;
       panel.innerHTML = '<div class="wsx__evhead"><b>' + esc(t('inspector.whoSees')) + '</b><button class="wsx__evclose" id="wsxEvClose" type="button">\\u2715</button></div>' + i18nLoad();

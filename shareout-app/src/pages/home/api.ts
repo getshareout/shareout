@@ -163,6 +163,7 @@ export async function handleHomeRecentApi(
   return Response.json({
     cardsHtml: artifacts.map((a) => renderArtifactCard(a, url.hostname, env)).join(''),
     rowsHtml: artifacts.map((a) => renderArtifactRow(a, url.hostname, env)).join(''),
+    items: artifacts.map((a) => ({ id: a.id, slug: a.slug, name: a.name, ts: (a as { viewed_at?: string }).viewed_at ?? null })),
     count: artifacts.length,
   });
 }

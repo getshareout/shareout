@@ -6,7 +6,7 @@ import { brandLockupHtml, brandMarkImg } from '../../../brand';
 import { parseBranding } from '../../../workspaces/branding';
 import type { RenderArgs } from '../types';
 import { ICON } from './constants';
-import { railNav, svg, widget, viewSeg, GRIP_SVG } from './helpers';
+import { railNav, svg, widget, viewSeg } from './helpers';
 import { homeLangSwitchHtml } from '../home-i18n/lang-switch';
 import type { NavItem, NavGroup } from './constants';
 
@@ -127,18 +127,27 @@ export function buildWorkspaceBody(args: RenderArgs): string {
       <div class="wsx__panes" id="wsxPanes">
         <div class="wsx__pane is-active" data-pane="home" id="wsxHomePane">
           <div class="wsx__view is-active" data-view="brief">
-            <p class="wsx__narration" id="wsxNarration"><span class="muted" data-i18n="narration.reading">Reading your workspace…</span></p>
-            <div class="wsx__brief">
-              ${widget('wsxForYou', 'widget.forYou', 'For you', 'foryou', true, true)}
-              ${widget('wsxRecentW', 'widget.recentlyViewed', 'Recently viewed', 'recent', true, true)}
-              ${widget('wsxNeedsYou', 'widget.needsYou', 'Needs you', 'shared')}
-              ${widget('wsxRuns', 'widget.runs', 'Runs', 'recent')}
-              <section class="wsx-widget wsx-widget--wide wsx-actwidget" id="wsxActWidget" data-wid="wsxActWidget">
-                <div class="wsx-widget__head"><button class="wsx-widget__grip" type="button" data-i18n-aria="widget.drag" data-i18n-title="widget.drag" aria-label="Drag to reorder" title="Drag to reorder">${GRIP_SVG}</button><span class="wsx__live-dot"></span><span data-i18n="widget.activity">Activity</span></div>
-                <div class="wsx-widget__body" id="wsxActBody"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
-                <span class="wsx-widget__rz" aria-hidden="true"></span>
-              </section>
+            <div class="wsx__homehead">
+              <p class="wsx__narration" id="wsxNarration"><span class="muted" data-i18n="narration.reading">Reading your workspace…</span></p>
+              <div class="wsx__more">
+                <button class="wsx__morebtn" id="wsxHomeMore" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="wsxHomeMenu" data-i18n-title="home.more" data-i18n-aria="home.more" title="More" aria-label="More">${svg('<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>')}</button>
+                <div class="wsx__morem" id="wsxHomeMenu" role="menu" hidden>
+                  <button type="button" role="menuitem" id="wsxCustomize" data-i18n="home.customize">Customize</button>
+                  <div class="wsx__morehd" data-i18n="widget.activity">Activity</div>
+                  <button type="button" role="menuitemradio" data-win="today" data-i18n="inspector.today">Today</button>
+                  <button type="button" role="menuitemradio" data-win="7d" data-i18n="inspector.win7d">7d</button>
+                  <button type="button" role="menuitemradio" data-win="30d" data-i18n="inspector.win30d">30d</button>
+                  <button type="button" role="menuitem" id="wsxActGear" hidden data-i18n="inspector.activityVisibility">Activity visibility</button>
+                </div>
+              </div>
             </div>
+            <div class="wsx__evsettings" id="wsxEvSettings" hidden></div>
+            <div class="wsx__brief" id="wsxBrief">
+              ${widget('wsxNeedsYou', 'widget.needsYou', 'Needs you', 'shared', true)}
+              ${widget('wsxForYou', 'widget.forYou', 'For you', 'foryou', true, true)}
+              ${widget('wsxRecentW', 'widget.recent', 'Recent', 'recent', true)}
+            </div>
+            <div class="wsx-empty wsx-empty--first" id="wsxHomeEmpty" hidden><p data-i18n="artifacts.emptyFirst">Nothing here yet. Make one page and it lives here.</p><button type="button" class="so-c-btn so-c-btn--primary" data-art-first data-i18n="artifacts.createFirst">Create your first page</button></div>
           </div>
           <div class="wsx__view" data-view="artifacts">
             <h2 class="wsx__viewtitle" data-i18n="view.allArtifacts">All Artifacts</h2>

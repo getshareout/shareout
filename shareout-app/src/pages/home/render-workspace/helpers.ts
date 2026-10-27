@@ -25,8 +25,8 @@ export function viewSeg(id: string): string {
 
 
 export function widget(id: string, titleKey: string, title: string, icon: keyof typeof ICON, wide = false, artifacts = false): string {
-  return `<section class="wsx-widget${wide ? ' wsx-widget--wide' : ''}" data-wid="${id}">
-    <div class="wsx-widget__head"><button class="wsx-widget__grip" type="button" data-i18n-aria="widget.drag" data-i18n-title="widget.drag" aria-label="Drag to reorder" title="Drag to reorder">${GRIP_SVG}</button>${svg(ICON[icon])}<span data-i18n="${titleKey}">${title}</span><span class="wsx-widget__count" id="${id}Count"></span>${artifacts ? viewSeg(id) : ''}</div>
+  return `<section class="wsx-widget${wide ? ' wsx-widget--wide' : ''} is-empty-hidden" data-wid="${id}">
+    <div class="wsx-widget__head"><button class="wsx-widget__grip" type="button" data-i18n-aria="widget.drag" data-i18n-title="widget.drag" aria-label="Drag to reorder" title="Drag to reorder">${GRIP_SVG}</button>${svg(ICON[icon])}<span data-i18n="${titleKey}">${title}</span>${artifacts ? viewSeg(id) : ''}</div>
     <div class="wsx-widget__body" id="${id}"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
     <span class="wsx-widget__rz" aria-hidden="true"></span>
   </section>`;
