@@ -32,6 +32,7 @@ export const workspace_client_inspector_activity_JS = `
     pulseEvents.forEach(function (e) { rows.push({ kind: e.kind, id: e.artifact_id, slug: e.slug, name: e.artifact_name, ts: ms(e.ts), sum: e.summary, count: e.count || 1 }); });
     rows.sort(function (a, b) { return b.ts - a.ts; });
     return rows.filter(function (r) {
+      if (SOFT_KINDS[r.kind] && r.id && forYouIds[r.id]) return false;
       var k = (SOFT_KINDS[r.kind] ? 'soft|' : r.kind + '|') + (r.id || r.sum);
       if (seen[k]) return false; seen[k] = 1; return true;
     }).slice(0, 10);

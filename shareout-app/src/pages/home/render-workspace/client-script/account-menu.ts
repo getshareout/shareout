@@ -19,6 +19,7 @@ export const workspace_client_account_menu_JS = `
     function showSub(on) {
       if (!accMain || !accSub) return;
       accMain.hidden = on; accSub.hidden = !on;
+      accMain.parentNode.classList.toggle('is-sub', on);
       if (on && !linkedLoaded) { linkedLoaded = true; loadLinked(); }
     }
     var moreBtn = document.getElementById('wsxAccMore'), backBtn = document.getElementById('wsxAccBack');
