@@ -21,6 +21,7 @@ import { versionedBundlePath } from '../../bundle-versions';
 import { createLogger, logError } from '../../logging';
 import { getWorkspaceLocale, localeFromAcceptLanguage, resolveLocale, type Locale } from '../../i18n/locale';
 import { serverTimingValue, timeSync } from '../../http/request-scope';
+import { resolveAllowOpen } from '../../access/allow-open';
 
 /** Head options for the streamed workspace home shell. The page + workspace styles, the
  *  static client script and one locale's copy are cached files (shell-assets), linked from
@@ -143,6 +144,7 @@ async function buildHomeBody(
     inboxDomain,
     isInstanceAdmin,
     slidesImport: !!env.SLIDES_CONVERTER,
+    openVisibilityAllowed: !!user.email && (await resolveAllowOpen(env, user.id, null)),
     fileImportProviders: configuredProviders(env),
     platformOrigin: getPlatformOrigin(env),
     appVersion: env.CF_VERSION_METADATA?.id?.slice(0, 7) || '',

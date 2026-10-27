@@ -23,7 +23,7 @@ export function buildWorkspaceView(args: RenderArgs): { body: string; scripts: s
   const canManage = canManageWorkspace(args);
   const firstName = (args.userInfo?.name || '').trim().split(/\s+/)[0] || '';
   const body = buildWorkspaceBody(args);
-  const globals = `window.WSX_WS=${JSON.stringify(wsParam)};window.WSX_SLUG=${JSON.stringify(wsSlug)};window.WSX_ADMIN=${canManage ? 'true' : 'false'};window.WSX_NAME=${JSON.stringify(firstName)};window.WSX_UK=${JSON.stringify(args.user?.id || '')};window.WSX_KNOWLEDGE_PAID=${args.wsKnowledgePaid ? 'true' : 'false'};window.WSX_INBOX_DOMAIN=${JSON.stringify(args.inboxDomain || '')};window.WSX_INSTANCE_ADMIN=${args.isInstanceAdmin ? 'true' : 'false'};window.WSX_ORIGIN=${JSON.stringify(args.platformOrigin || '')};window.WSX_SLIDES=${args.slidesImport ? 'true' : 'false'};window.WSX_FILE_IMPORT=${JSON.stringify(wsParam ? args.fileImportProviders || [] : [])};\n`;
+  const globals = `window.WSX_WS=${JSON.stringify(wsParam)};window.WSX_SLUG=${JSON.stringify(wsSlug)};window.WSX_ADMIN=${canManage ? 'true' : 'false'};window.WSX_NAME=${JSON.stringify(firstName)};window.WSX_UK=${JSON.stringify(args.user?.id || '')};window.WSX_KNOWLEDGE_PAID=${args.wsKnowledgePaid ? 'true' : 'false'};window.WSX_INBOX_DOMAIN=${JSON.stringify(args.inboxDomain || '')};window.WSX_INSTANCE_ADMIN=${args.isInstanceAdmin ? 'true' : 'false'};window.WSX_ORIGIN=${JSON.stringify(args.platformOrigin || '')};window.WSX_SLIDES=${args.slidesImport ? 'true' : 'false'};window.WSX_OPEN_VIS=${args.openVisibilityAllowed === false ? 'false' : 'true'};window.WSX_FILE_IMPORT=${JSON.stringify(wsParam ? args.fileImportProviders || [] : [])};\n`;
   return {
     body,
     // Built on read: the page only uses bootScript, and this is ~1 MB of concatenation.

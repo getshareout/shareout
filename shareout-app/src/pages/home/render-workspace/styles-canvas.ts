@@ -139,6 +139,7 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 .wsx-chip { padding: 6px 13px; border-radius: 999px; border: 1.5px solid var(--color-border); background: var(--color-bg-elevated); color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); cursor: pointer; transition: border-color var(--duration-fast), color var(--duration-fast), background var(--duration-fast); }
 .wsx-art-more { display: flex; justify-content: center; margin: var(--space-4) 0; }
 .wsx-chip:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.wsx-chip:disabled { opacity: .45; cursor: not-allowed; border-color: var(--color-border); color: var(--color-text-secondary); }
 .wsx-chip.is-on { border-color: var(--color-primary); background: var(--color-primary-light); color: var(--color-primary); }
 /* Quick Search input (artifacts lens) — right-aligned control cluster in the chips row */
 .wsx__chips-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }

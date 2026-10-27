@@ -148,6 +148,7 @@ describe('POST /v1/auth/password/login', () => {
       ctxFor({ email: 'nobody@example.com', password: GOOD }),
     );
     expect(wrongPassword.status).toBe(401);
+    expect(await wrongPassword.clone().json()).toMatchObject({ ok: false, code: 'INVALID_CREDENTIALS' });
     expect(unknownAccount.status).toBe(401);
     expect(await wrongPassword.json()).toEqual(await unknownAccount.json());
   });
@@ -198,12 +199,13 @@ describe('POST /v1/auth/password/reset (forgot password)', () => {
   });
 
   it('does not touch the password when the code is wrong', async () => {
-    verifyEmailOtp.mockResolvedValue({ ok: false, error: 'That code didn’t match. Try again.' });
+    verifyEmailOtp.mockResolvedValue({ ok: false, code: 'OTP_MISMATCH', error: 'That code didn’t match. Try again.' });
     const ran: string[] = [];
     const res = await handlePasswordReset(
       ctxFor({ email: 'a@example.com', code: '000000', password: GOOD }, {}, { onRun: (sql) => ran.push(sql) }),
     );
     expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ ok: false, code: 'OTP_MISMATCH' });
     expect(res.headers.get('Set-Cookie')).toBeNull();
     expect(ran).toHaveLength(0);
   });

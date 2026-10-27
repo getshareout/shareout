@@ -18,6 +18,7 @@ import {
 import { scheduleSeedStarterKit } from './starter-kit/schedule';
 import { scheduleWelcomeEmail, scheduleWorkspaceWelcome } from './onboarding/welcome-email';
 import { jsonWithApiErrors } from './http/api-error';
+import { otpFailureBody } from './auth/failure-body';
 import { ssoRequiredFor, ssoRequiredBody } from './auth/sso-config';
 
 const OTP_TTL_MS = 10 * 60 * 1000; // codes valid for 10 minutes
@@ -43,14 +44,24 @@ async function hashCode(email: string, code: string): Promise<string> {
   return sha256(bytes.buffer as ArrayBuffer);
 }
 
+/** Stable codes so clients (the sign-in page) can show the message in the visitor's language. */
+export type OtpErrorCode =
+  | 'INVALID_EMAIL' | 'OTP_RESEND_TOO_SOON' | 'OTP_HOURLY_LIMIT'
+  | 'OTP_CODE_FORMAT' | 'OTP_NOT_FOUND' | 'OTP_EXPIRED' | 'OTP_TOO_MANY_ATTEMPTS' | 'OTP_MISMATCH'
+  | 'SIGNUPS_PAUSED';
+
 interface StartResult {
   ok: boolean;
   error?: string;
+  code?: OtpErrorCode;
 }
+
+const fail = (code: OtpErrorCode, error: string) => ({ ok: false as const, code, error });
+
 
 export async function startEmailOtp(env: Env, emailRaw: string): Promise<StartResult> {
   const email = normalizeEmail(emailRaw);
-  if (!isValidEmail(email)) return { ok: false, error: 'That doesn’t look like a valid email — mind checking it?' };
+  if (!isValidEmail(email)) return fail('INVALID_EMAIL', 'That doesn’t look like a valid email — mind checking it?');
 
   const now = Date.now();
   const nowIso = new Date(now).toISOString();
@@ -59,14 +70,14 @@ export async function startEmailOtp(env: Env, emailRaw: string): Promise<StartRe
     'SELECT created_at FROM email_otp_codes WHERE email = ? ORDER BY created_at DESC LIMIT 1'
   ).bind(email).first<{ created_at: string }>();
   if (recent && now - Date.parse(recent.created_at) < OTP_RESEND_WINDOW_MS) {
-    return { ok: false, error: 'Just sent one — give it a few seconds before requesting another.' };
+    return fail('OTP_RESEND_TOO_SOON', 'Just sent one — give it a few seconds before requesting another.');
   }
 
   const count = await env.DB.prepare(
     'SELECT COUNT(*) AS c FROM email_otp_codes WHERE email = ? AND created_at > ?'
   ).bind(email, new Date(now - 60 * 60 * 1000).toISOString()).first<{ c: number }>();
   if (count && count.c >= OTP_MAX_PER_HOUR) {
-    return { ok: false, error: 'Too many codes for this email today. Try again later.' };
+    return fail('OTP_HOURLY_LIMIT', 'Too many codes for this email today. Try again later.');
   }
 
   const code = generateOtp();
@@ -99,27 +110,28 @@ export async function startEmailOtp(env: Env, emailRaw: string): Promise<StartRe
 interface VerifyResult {
   ok: boolean;
   error?: string;
+  code?: OtpErrorCode;
   user?: { id: string; email: string; isNew: boolean; firstActivation: boolean; autoJoined?: boolean };
 }
 
 export async function verifyEmailOtp(env: Env, emailRaw: string, codeRaw: string): Promise<VerifyResult> {
   const email = normalizeEmail(emailRaw);
   const code = (codeRaw || '').trim();
-  if (!/^\d{6}$/.test(code)) return { ok: false, error: 'Enter the 6-digit code from your email.' };
+  if (!/^\d{6}$/.test(code)) return fail('OTP_CODE_FORMAT', 'Enter the 6-digit code from your email.');
 
   const nowIso = new Date().toISOString();
   const row = await env.DB.prepare(
     'SELECT id, code_hash, expires_at, attempts FROM email_otp_codes WHERE email = ? AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1'
   ).bind(email).first<{ id: string; code_hash: string; expires_at: string; attempts: number }>();
 
-  if (!row) return { ok: false, error: 'No active code — request a fresh one.' };
-  if (row.expires_at < nowIso) return { ok: false, error: 'That code expired. Request a new one.' };
-  if (row.attempts >= OTP_MAX_ATTEMPTS) return { ok: false, error: 'Too many tries. Request a new code.' };
+  if (!row) return fail('OTP_NOT_FOUND', 'No active code — request a fresh one.');
+  if (row.expires_at < nowIso) return fail('OTP_EXPIRED', 'That code expired. Request a new one.');
+  if (row.attempts >= OTP_MAX_ATTEMPTS) return fail('OTP_TOO_MANY_ATTEMPTS', 'Too many tries. Request a new code.');
 
   const candidate = await hashCode(email, code);
   if (candidate !== row.code_hash) {
     await env.DB.prepare('UPDATE email_otp_codes SET attempts = attempts + 1 WHERE id = ?').bind(row.id).run();
-    return { ok: false, error: 'That code didn’t match. Try again.' };
+    return fail('OTP_MISMATCH', 'That code didn’t match. Try again.');
   }
 
   await env.DB.prepare('UPDATE email_otp_codes SET consumed_at = ? WHERE id = ?').bind(nowIso, row.id).run();
@@ -128,7 +140,7 @@ export async function verifyEmailOtp(env: Env, emailRaw: string, codeRaw: string
   try {
     user = await upsertUserByEmail(env, email);
   } catch (e: any) {
-    if (e?.message === SIGNUPS_PAUSED_MSG) return { ok: false, error: SIGNUPS_PAUSED_MSG };
+    if (e?.message === SIGNUPS_PAUSED_MSG) return fail('SIGNUPS_PAUSED', SIGNUPS_PAUSED_MSG);
     throw e;
   }
   const joined = await autoJoinWorkspacesByDomain(env, user.id, user.email);
@@ -148,12 +160,12 @@ export async function handleEmailOtpStart(ctx: FetchContext): Promise<Response> 
   // not configured. Fail closed (verifier outage) on this protected endpoint.
   const human = await verifyTurnstile(ctx.env, body.turnstileToken, getClientIp(ctx.request));
   if (!human) {
-    return json({ ok: false, error: 'Bot check failed. Please retry.', code: 'TURNSTILE_FAILED' }, 403);
+    return json({ ok: false, success: false, error: 'Bot check failed. Please retry.', code: 'TURNSTILE_FAILED' }, 403);
   }
   const sso = await ssoRequiredFor(ctx.env, body.email || '');
   if (sso) return json(ssoRequiredBody(sso, body.email || ''), 403);
   const result = await startEmailOtp(ctx.env, body.email || '');
-  return json(result, result.ok ? 200 : 400);
+  return json(result.ok ? result : otpFailureBody(result), result.ok ? 200 : 400);
 }
 
 // First-ever activation (parity with Google OAuth). Self-signup gets personal kit;
@@ -176,7 +188,7 @@ export async function handleEmailOtpVerify(ctx: FetchContext): Promise<Response>
   if (sso) return json(ssoRequiredBody(sso, body.email || ''), 403);
   const result = await verifyEmailOtp(ctx.env, body.email || '', body.code || '');
   if (!result.ok || !result.user) {
-    return json({ ok: false, error: result.error }, 400);
+    return json(otpFailureBody(result), 400);
   }
   scheduleFirstActivation(ctx, result.user);
   const cookie = await createSessionCookieForUser(ctx.env, ctx.url, result.user.id, result.user.email);
@@ -205,7 +217,7 @@ export async function handleLinkEmailOtpStart(ctx: FetchContext): Promise<Respon
   const sso = await ssoRequiredFor(ctx.env, email);
   if (sso) return json(ssoRequiredBody(sso, email), 403);
   const result = await startEmailOtp(ctx.env, email);
-  return json(result, result.ok ? 200 : 400);
+  return json(result.ok ? result : otpFailureBody(result), result.ok ? 200 : 400);
 }
 
 export async function handleLinkEmailOtpVerify(ctx: FetchContext): Promise<Response> {
@@ -218,7 +230,7 @@ export async function handleLinkEmailOtpVerify(ctx: FetchContext): Promise<Respo
   if (sso) return json(ssoRequiredBody(sso, body.email || ''), 403);
   const result = await verifyEmailOtp(ctx.env, body.email || '', body.code || '');
   if (!result.ok || !result.user) {
-    return json({ ok: false, error: result.error }, 400);
+    return json(otpFailureBody(result), 400);
   }
   const link = await linkIdentity(ctx.env, user.id, result.user.id);
   if (!link.success) return json({ ok: false, error: link.error }, 400);

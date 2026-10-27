@@ -15,6 +15,7 @@ const checkRateLimit = vi.hoisted(() => vi.fn());
 const incrementRateLimit = vi.hoisted(() => vi.fn());
 const checkStorageQuota = vi.hoisted(() => vi.fn());
 const getInternalWorkspaceRole = vi.hoisted(() => vi.fn());
+const resolveAllowOpen = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../src/auth/session', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -39,6 +40,7 @@ vi.mock('../../../src/publish/publish-generated-html', async (importOriginal) =>
 vi.mock('../../../src/api-auth', () => ({ checkRateLimit, incrementRateLimit, RATE_LIMIT_MAX: 100 }));
 vi.mock('../../../src/quota', () => ({ checkStorageQuota }));
 vi.mock('../../../src/workspaces/roles', () => ({ getInternalWorkspaceRole }));
+vi.mock('../../../src/access/allow-open', () => ({ resolveAllowOpen }));
 vi.mock('../../../src/logging', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
   logError: vi.fn(),
@@ -212,6 +214,7 @@ describe('routeCreateApi', () => {
     beforeEach(() => {
       getSessionUser.mockResolvedValue({ id: 'u1', email: 'a@x.com' });
       publishGeneratedHtml.mockResolvedValue({ ...deployed, visibility: 'private' });
+      resolveAllowOpen.mockResolvedValue(true);
     });
 
     it('publishes private when the client says nothing', async () => {
@@ -226,11 +229,23 @@ describe('routeCreateApi', () => {
 
     it('passes public through on publish and on the streamed build', async () => {
       await post({ phase: 'publish', prompt: 'hi page', html, visibility: 'public' });
-      expect(lastOpts()).toMatchObject({ visibility: 'public', workspaceId: null });
+      expect(lastOpts()).toMatchObject({ visibility: 'public', workspaceId: null, allowOpen: true });
       streamChat.mockImplementation(async function* () { yield { type: 'content', content: html }; });
       extractHtml.mockReturnValue(html);
       await sseEvents(await post({ phase: 'build', prompt: 'hi page', visibility: 'public' }));
       expect(lastOpts()).toMatchObject({ visibility: 'public' });
+    });
+
+    it('does not let public through when open visibility is off, and says it was downgraded', async () => {
+      resolveAllowOpen.mockResolvedValue(false);
+      const res = await post({ phase: 'publish', prompt: 'hi page', html, visibility: 'public' });
+      expect(lastOpts()).toMatchObject({ visibility: 'public', allowOpen: false });
+      expect(await res!.json()).toMatchObject({ visibility: 'private', visibility_downgraded: true });
+    });
+
+    it('does not call a chosen-private page downgraded', async () => {
+      const res = await post({ phase: 'publish', prompt: 'hi page', html, visibility: 'private' });
+      expect(await res!.json()).not.toHaveProperty('visibility_downgraded');
     });
 
     it('team needs a workspace the user belongs to', async () => {

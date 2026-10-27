@@ -97,18 +97,29 @@ function renderOwnerAvatar(a: ArtifactRow): string {
   return `<span class="card-owner" title="${escapeHtml(label)}"><span class="owner-avatar">${inner}</span><span class="owner-name"${i18n}>${escapeHtml(label)}</span></span>`;
 }
 
+const VIS_GLOBE_ICON = '<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>';
+
+// What the card says is what is stored: public is public, never folded into "Private".
+const VIS_KINDS = {
+  workspace: { label: 'All Workspace', key: 'cards.visWorkspace', cls: 'badge-workspace', icon: VIS_PEOPLE_ICON },
+  public: { label: 'Public', key: 'inspector.visName.public', cls: 'badge-public', icon: VIS_GLOBE_ICON },
+  private: { label: 'Private', key: 'inspector.visName.private', cls: 'badge-private', icon: VIS_LOCK_ICON },
+};
+function visKind(visibility: string): keyof typeof VIS_KINDS {
+  return visibility === 'workspace' ? 'workspace' : visibility === 'public' || visibility === 'unlisted' ? 'public' : 'private';
+}
+
 function renderVisibilityBadge(a: ArtifactRow): string {
-  const isWs = a.visibility === 'workspace';
-  const visLabel = isWs ? 'All Workspace' : 'Private';
-  const visClass = isWs ? 'badge-workspace' : 'badge-private';
-  const visIcon = isWs ? VIS_PEOPLE_ICON : VIS_LOCK_ICON;
+  const kind = visKind(a.visibility);
+  const toPrivate = kind !== 'private';
+  const { label: visLabel, cls: visClass, icon: visIcon, key: visKey } = VIS_KINDS[kind];
   const id = escapeHtml(a.id);
-  const inner = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${visIcon}</svg><span data-i18n="${isWs ? 'cards.visWorkspace' : 'inspector.visName.private'}">${escapeHtml(visLabel)}</span>`;
+  const inner = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${visIcon}</svg><span data-i18n="${visKey}">${escapeHtml(visLabel)}</span>`;
   const canToggle = a.user_role === 'owner' && !!a.workspace_id;
   if (canToggle) {
-    const nextVis = isWs ? 'private' : 'workspace';
-    const title = isWs ? 'Make private — click to toggle' : 'Share with workspace — click to toggle';
-    const titleKey = isWs ? 'cards.makePrivateTip' : 'cards.shareWsTip';
+    const nextVis = toPrivate ? 'private' : 'workspace';
+    const title = toPrivate ? 'Make private — click to toggle' : 'Share with workspace — click to toggle';
+    const titleKey = toPrivate ? 'cards.makePrivateTip' : 'cards.shareWsTip';
     return `<button type="button" class="card-badge card-preview-badge vis-toggle ${visClass}" id="badge-${id}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}" data-i18n-title="${titleKey}" data-i18n-aria="${titleKey}" onclick="event.stopPropagation();event.preventDefault();toggleVisibility('${id}','${nextVis}')">${inner}</button>`;
   }
   return `<span class="card-badge card-preview-badge ${visClass}" id="badge-${id}">${inner}</span>`;
@@ -240,8 +251,9 @@ function renderSharedCell(a: ArtifactRow): string {
 }
 
 function renderAccessCell(a: ArtifactRow): string {
-  const isWs = a.visibility === 'workspace';
-  return `<span class="wsx-tr__vis${isWs ? ' is-ws' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${isWs ? VIS_PEOPLE_ICON : VIS_LOCK_ICON}</svg><span data-i18n="${isWs ? 'cards.visWorkspace' : 'inspector.visName.private'}">${isWs ? 'All Workspace' : 'Private'}</span></span>`;
+  const kind = visKind(a.visibility);
+  const { label, key, icon } = VIS_KINDS[kind];
+  return `<span class="wsx-tr__vis${kind === 'workspace' ? ' is-ws' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg><span data-i18n="${key}">${label}</span></span>`;
 }
 
 function renderFeaturesCell(a: ArtifactRow): string {

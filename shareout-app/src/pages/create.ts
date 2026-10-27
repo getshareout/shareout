@@ -30,6 +30,7 @@ export function renderCreatePage(
   // The mock URL bar shows where the page being built will live. Hardcoded to the
   // hosted domain it told every self-hoster their work would land somewhere else.
   platformHost = 'shareout.site',
+  openAllowed = true,
 ): Response {
   const prompt = (rawPrompt || 'Build me something with my data').trim().slice(0, 400);
   const safe = escapeHtml(prompt);
@@ -80,7 +81,7 @@ export function renderCreatePage(
   const clientPacks = STARTER_PACKS.map((p) => ({ id: p.id, name: p.name, blurb: p.blurb, swatch: p.swatch }));
 
   const scripts = `(function(){
-  var S = { prompt: ${jsString(prompt)}, loggedIn: ${loggedIn ? 'true' : 'false'} };
+  var S = { prompt: ${jsString(prompt)}, loggedIn: ${loggedIn ? 'true' : 'false'}, openAllowed: ${openAllowed ? 'true' : 'false'} };
   var TS_KEY = ${jsString(turnstileSiteKey || '')};
   var PACKS = ${JSON.stringify(clientPacks).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')};
   var ARROW_SVG = ${jsString(arrowSvg)};
@@ -234,8 +235,8 @@ ${SRCDOC_THROTTLE_JS}
       '</button></div>' +
       '<div class="tp-vis"><span class="tp-vis-label">Who can see it?</span><div class="tp-vis-opts" role="radiogroup">' +
       '<button type="button" class="clarify-opt selected" role="radio" aria-checked="true" data-vis="private">Private</button>' +
-      '<button type="button" class="clarify-opt" role="radio" aria-checked="false" data-vis="public">Anyone with the link</button>' +
-      '</div></div>';
+      '<button type="button" class="clarify-opt" role="radio" aria-checked="false" data-vis="public"' + (S.openAllowed ? '' : ' disabled title="Public links are turned off here."') + '>Anyone with the link</button>' +
+      '</div>' + (S.openAllowed ? '' : '<span class="tp-vis-note">Public links are turned off here.</span>') + '</div>';
     wrap.innerHTML = html;
     var visBtns = wrap.querySelectorAll('[data-vis]');
     for (var vi = 0; vi < visBtns.length; vi++){
@@ -312,7 +313,7 @@ ${SRCDOC_THROTTLE_JS}
     var note = mod ? (mod.status === 'blocked'
       ? 'Automated safety checks blocked this page, so it stays private.'
       : 'Published. It’s under a quick safety review, so only you can see it for now. It goes public automatically once the review clears.')
-      : (d.visibility === 'private' ? 'Published privately. Public links are turned off on this instance.' : '');
+      : (d.visibility_downgraded ? 'Published privately. Public links are turned off here.' : '');
     var card = document.createElement('div');
     card.className = 'result-card';
     card.innerHTML =

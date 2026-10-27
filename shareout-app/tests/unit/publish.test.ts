@@ -955,6 +955,36 @@ describe('handlePublish auth visibility and collaborators', () => {
   });
 });
 
+describe('handlePublish effective visibility', () => {
+  it('reports public (and no downgrade) when open visibility is allowed', async () => {
+    const env = await makePublishEnv();
+    const res = await handlePublish(publishRequest(validBody({ slug: 'open-ok', visibility: 'public' })), env);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.visibility).toBe('public');
+    expect(body).not.toHaveProperty('visibility_downgraded');
+  });
+
+  it('reports private with a downgrade signal when open visibility is disabled', async () => {
+    const env = await makePublishEnv();
+    env.OPEN_VISIBILITY_DISABLED = '1';
+    const res = await handlePublish(publishRequest(validBody({ slug: 'open-off', visibility: 'public' })), env);
+    await expect(res.json()).resolves.toMatchObject({
+      visibility: 'private',
+      visibility_downgraded: true,
+      requested_visibility: 'public',
+    });
+  });
+
+  it('does not flag a downgrade when private was asked for', async () => {
+    const env = await makePublishEnv();
+    env.OPEN_VISIBILITY_DISABLED = '1';
+    const res = await handlePublish(publishRequest(validBody({ slug: 'asked-private', visibility: 'private' })), env);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.visibility).toBe('private');
+    expect(body).not.toHaveProperty('visibility_downgraded');
+  });
+});
+
 describe('handlePublish error paths', () => {
   it('returns 500 when R2 storage fails', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
