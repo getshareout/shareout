@@ -15,3 +15,4 @@ export * from './toast';
 export * from './optimistic';
 export { themeClasses } from './themes';
 export { componentStylesheet, componentScripts } from './stylesheet';
+export { tableSortClasses, tableSortScript } from './table-sort';

@@ -44,7 +44,7 @@ export function supportBody(tickets: Ticket[]): string {
       <td>${scope}</td>
       <td>${escapeHtml(t.priority || '—')}</td>
       <td><span class="sa-pill">${escapeHtml(t.status)}</span></td>
-      <td class="sa-muted">${fmtEpoch(Math.floor(Date.parse(t.last_msg_at) / 1000))}</td>
+      <td class="sa-muted" data-sort="${escapeHtml(t.last_msg_at ?? '')}">${fmtEpoch(Math.floor(Date.parse(t.last_msg_at) / 1000))}</td>
     </tr>`;
   }).join('');
 

@@ -27,7 +27,7 @@ export function recentTable(items: PlatformMetrics['artifacts']['recent']): stri
       (a) => `<tr>
         <td><a href="/a/${escapeHtml(a.slug)}/" style="color:var(--color-primary)">${escapeHtml(a.name || a.slug)}</a></td>
         <td class="sa-muted">${escapeHtml(a.owner)}</td>
-        <td class="sa-muted">${escapeHtml(fmtDate(a.createdAt))}</td>
+        <td class="sa-muted" data-sort="${escapeHtml(a.createdAt ?? '')}">${escapeHtml(fmtDate(a.createdAt))}</td>
       </tr>`
     )
     .join('');

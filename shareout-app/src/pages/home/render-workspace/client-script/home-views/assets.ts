@@ -9,6 +9,7 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
   var assetFolder = '';
   var assetsWired = false;
   var assetSelect = false;
+  var assetSort = '', assetAsc = true;  // '' = as listed; otherwise the clicked table column
   var assetSel = {};
   // Files deleted optimistically whose DELETE hasn't landed — a reload keeps them hidden.
   var assetPendingDel = {};
@@ -241,6 +242,13 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
     var nf = m.querySelector('#wsxFolderNew'); if (nf) nf.addEventListener('click', newAssetFolder);
     var fs = m.querySelector('#wsxFolderShare'); if (fs) fs.addEventListener('click', function () { openSharePerson(assetFolder, 'folder'); });
   }
+  var ASSET_COLS = [['', ''], ['name', 'widget.colName'], ['by', 'assets.colBy'], ['updated', 'assets.colUpdated'], ['access', 'assets.colAccess'], ['', '']];
+  function assetSortVal(a) {
+    if (assetSort === 'by') return a.ownerName || '';
+    if (assetSort === 'updated') return a.updatedAt || '';
+    if (assetSort === 'access') { var o = window.WSX_WS && a.type === 'deliverable' ? visInfo(a.visibility) : null; return o ? t(o.label) : ''; }
+    return a.name || '';
+  }
   function renderAssets() {
     var m = document.getElementById('wsxAssetMount'); if (!m) return;
     var all = assetItems();
@@ -258,7 +266,10 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
     var bar = assetSelect
       ? '<div class="wsx-asset-bar"><span>' + esc(selLbl.replace('{n}', String(n))) + '</span><div class="wsx-asset-bar__r"><button class="wsx-abtn" id="wsxAssetCancel" type="button">' + esc(t('assets.cancel')) + '</button><button class="wsx-abtn wsx-abtn--primary" id="wsxAssetShare" type="button">' + esc(t('assets.createDelivery')) + '</button></div></div>'
       : (items.length ? '<div class="wsx-asset-bar">' + total + '<button class="wsx-abtn" id="wsxAssetSelect" type="button">' + esc(t('assets.bundleFiles')) + '</button></div>' : '');
-    var head = '<div class="wsx-tbl__head wsx-asset-tbl__head"><span></span><span>' + esc(t('widget.colName')) + '</span><span>' + esc(t('assets.colBy')) + '</span><span>' + esc(t('assets.colUpdated')) + '</span><span>' + esc(t('assets.colAccess')) + '</span><span></span></div>';
+    if (assetSort) items = items.slice().sort(function (a, b) { var c = sortCmp(assetSortVal(a), assetSortVal(b)); return assetAsc ? c : -c; });
+    var head = '<div class="wsx-tbl__head wsx-asset-tbl__head" data-sort-own>' + ASSET_COLS.map(function (c) {
+      return c[0] ? '<span data-asset-sort="' + c[0] + '"' + (assetSort === c[0] ? ' aria-sort="' + (assetAsc ? 'ascending' : 'descending') + '"' : '') + '>' + esc(t(c[1])) + '</span>' : '<span></span>';
+    }).join('') + '</div>';
     var grid = !items.length ? i18nEmpty(assetFolder ? 'assets.folderEmpty' : 'assets.empty')
       : widgetView('wsxAssetMount') === 'table' ? '<div class="wsx-tbl wsx-asset-tbl">' + head + items.map(assetRow).join('') + '</div>'
       : '<div class="wsx-asset-grid">' + items.map(assetTile).join('') + '</div>';
@@ -267,6 +278,9 @@ export const workspace_client_home_views_assets_JS = `  // ----- Assets — deli
     wireFolderBar(m);
     m.querySelectorAll('[data-asset-sel]').forEach(function (b) {
       b.addEventListener('click', function () { var id = b.getAttribute('data-asset-sel'); assetSel[id] = !assetSel[id]; renderAssets(); });
+    });
+    m.querySelectorAll('[data-asset-sort]').forEach(function (h) {
+      h.addEventListener('click', function () { var k = h.getAttribute('data-asset-sort'); if (assetSort === k) assetAsc = !assetAsc; else { assetSort = k; assetAsc = true; } renderAssets(); });
     });
     m.querySelectorAll('.wsx-asset[data-asset-id], .wsx-asset-row[data-asset-id]').forEach(function (card) {
       var id = card.getAttribute('data-asset-id');

@@ -384,9 +384,9 @@ function renderViewerTracking(
     return `<tr>
       <td title="${escapeHtml(v.email)}">${who}</td>
       <td class="${statusClass}">${statusLabel}</td>
-      <td>${first}</td>
+      <td data-sort="${escapeHtml(v.firstViewedAt ?? '')}">${first}</td>
       <td>${v.viewCount}</td>
-      <td>${last}</td>
+      <td data-sort="${escapeHtml(v.lastViewedAt ?? '')}">${last}</td>
     </tr>`;
   }).join('');
 

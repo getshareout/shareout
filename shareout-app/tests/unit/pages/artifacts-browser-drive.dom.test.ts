@@ -26,7 +26,8 @@ function boot() {
     const u = new URL(url, 'https://x.test');
     const level = u.searchParams.get('level') === '1';
     const page = Number(u.searchParams.get('page') || 1);
-    const scope = u.searchParams.get('scope') || 'recent';
+    const sc = u.searchParams.get('scope');
+    const scope = !sc || sc === 'all' ? 'recent' : sc;
     if (level) return Promise.resolve(res({ cardsHtml: card('root-art'), rowsHtml: '', foldersHtml: '<article class="wsx-folder-card" data-folder-id="fld_1"></article>', folderRowsHtml: '', total: 1, page: 1, hasMore: false }));
     return Promise.resolve(res({ cardsHtml: card(`${scope}-p${page}`), rowsHtml: '', foldersHtml: '<article class="wsx-folder-card" data-folder-id="fld_1"></article>', total: TOTALS[scope], page, hasMore: scope === 'recent' && page === 1 }));
   });
@@ -83,6 +84,13 @@ describe('All Artifacts, Drive-style', () => {
     more.click(); await settle();
     expect(grid()).toEqual(['recent-p1', 'recent-p2']);
     expect(document.querySelector('.wsx-art-more')).toBeNull();
+  });
+
+  it('asks the server for each chip’s sort: Recent by last update, All A→Z', async () => {
+    const w = boot();
+    w.exitFolder(); await settle();
+    expect(urls[0]).toContain('scope=all&sort=date&dir=desc');
+    expect(urls.some((u) => u.includes('level=1&sort=name&dir=asc'))).toBe(true);
   });
 
   it('opening a folder switches to All', async () => {

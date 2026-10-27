@@ -88,6 +88,24 @@ export async function queryRecentlyViewed(
   return rows.results || [];
 }
 
+/** ORDER BY per sort key — the chips' sorts plus one per Artifacts-table column — and the
+ *  key's default direction. Untagged artifacts sort after tagged ones either way. */
+const HOME_SORT_SQL: Record<string, [string, 'asc' | 'desc']> = {
+  recent: ['COALESCE(d.updated_at, a.created_at) {dir}', 'desc'],
+  date: ['COALESCE(d.updated_at, a.created_at) {dir}', 'desc'],
+  oldest: ['a.created_at {dir}', 'asc'],
+  created: ['a.created_at {dir}', 'desc'],
+  name: ['a.name COLLATE NOCASE {dir}', 'asc'],
+  owner: ["COALESCE(NULLIF(u.name, ''), u.email) COLLATE NOCASE {dir}", 'asc'],
+  shared: ['shared_count {dir}', 'desc'],
+  access: ['a.visibility {dir}', 'asc'],
+  type: ['a.artifact_type {dir}', 'asc'],
+  feat: ['(f_blobs + f_datasets + f_connections + f_platform + f_jobs + COALESCE(f_agent, 0) + f_tests + f_skills) {dir}', 'desc'],
+  tags: ['tags IS NULL, tags COLLATE NOCASE {dir}', 'asc'],
+  views: ['total_views {dir}', 'desc'],
+  visitors: ['unique_visitors {dir}', 'desc'],
+};
+
 export async function queryHomeArtifacts(
   env: Env,
   user: { id: string; email: string | null },
@@ -138,10 +156,8 @@ export async function queryHomeArtifacts(
     filterParams.push(...vis.userIds);
   }
 
-  let orderBy = 'COALESCE(d.updated_at, a.created_at) DESC';
-  if (sort === 'name') orderBy = 'a.name ASC';
-  else if (sort === 'views') orderBy = 'total_views DESC, a.created_at DESC';
-  else if (sort === 'oldest') orderBy = 'a.created_at ASC';
+  const [sortSql, defaultDir] = HOME_SORT_SQL[Object.hasOwn(HOME_SORT_SQL, sort) ? sort : 'recent'];
+  const orderBy = `${sortSql.replace('{dir}', (filters.dir || defaultDir).toUpperCase())}, a.created_at DESC, a.id`;
 
   // The page and its total are independent reads: one wave, not two.
   const [countResult, artifacts] = await Promise.all([

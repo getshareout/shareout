@@ -60,6 +60,8 @@ export interface HomeFilters {
   page: number;
   search: string;
   sort: string;
+  /** Overrides the sort key's default direction (column-header sorting). */
+  dir?: 'asc' | 'desc';
   type: string;
   scope: string;
   workspace: string;

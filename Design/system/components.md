@@ -240,6 +240,14 @@ Max-width 560px. Section titles with bottom border. Actions right-aligned with C
 
 Row: title + meta (mono URL) + ghost action buttons. Actions fade in on hover (always visible on touch).
 
+### Sortable table
+
+Every table header sorts: first click A→Z (smallest / oldest first), second click Z→A, with a ▲/▼ on the sorted column (`aria-sort`). Blank cells stay last. `src/design-system/components/table-sort.ts` does this for any `<table>` with a `<thead>` and any div table (`.wsx-tbl__head`) on a platform page — no wiring.
+
+- Text that isn't the value (relative dates, localized numbers): put the raw value in `data-sort` on the cell.
+- A column that can't sort (actions, icons): leave the header empty or add `data-nosort`.
+- A view that keeps its own sort (paged on the server, or re-rendered from data): mark the header row `data-sort-own` and set `aria-sort` itself.
+
 ---
 
 ## States & Feedback

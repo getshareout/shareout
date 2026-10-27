@@ -152,27 +152,27 @@ function clientScript(artifactId: string, presId: string): string {
   function renderSessions(rows){
     var el=document.getElementById('sa-sessions');
     if(!rows||!rows.length){el.innerHTML='<div class="sa-empty">No sessions yet.</div>';return;}
-    var head='<tr><th>Viewer</th><th>Where</th><th>Slides</th><th>Time</th><th>Done</th><th>When</th></tr>';
+    var head='<thead><tr><th>Viewer</th><th>Where</th><th>Slides</th><th>Time</th><th>Done</th><th>When</th></tr></thead>';
     var body=rows.map(function(s){
       var who=esc(s.viewerEmail||'Anonymous');
       var where=[s.device,s.country].filter(Boolean).map(esc).join(' · ')||'—';
       var done=s.completed?'<span class="sa-pill ok">yes</span>':'—';
       var when=new Date(s.startedAt).toLocaleString();
-      return '<tr><td>'+who+'</td><td>'+where+'</td><td>'+esc(s.slidesSeen)+'</td><td>'+fmtDur(s.durationMs)+'</td><td>'+done+'</td><td>'+esc(when)+'</td></tr>';
+      return '<tr><td>'+who+'</td><td>'+where+'</td><td>'+esc(s.slidesSeen)+'</td><td data-sort="'+esc(s.durationMs)+'">'+fmtDur(s.durationMs)+'</td><td>'+done+'</td><td data-sort="'+esc(s.startedAt)+'">'+esc(when)+'</td></tr>';
     }).join('');
-    el.innerHTML='<table class="sa-tbl">'+head+body+'</table>';
+    el.innerHTML='<table class="sa-tbl">'+head+'<tbody>'+body+'</tbody></table>';
   }
   function renderLinks(rows){
     var el=document.getElementById('sa-links');
     if(!rows||!rows.length){el.innerHTML='<div class="sa-empty">No tracked links yet. Create one to attribute views to a recipient.</div>';return;}
-    var head='<tr><th>Recipient</th><th>Gate</th><th>Views</th><th>Link</th><th></th></tr>';
+    var head='<thead><tr><th>Recipient</th><th>Gate</th><th>Views</th><th>Link</th><th></th></tr></thead>';
     var body=rows.map(function(l){
       var rev=l.revoked?' (revoked)':'';
       var copy=l.revoked?'':'<button class="sa-copy" data-url="'+esc(l.url)+'">Copy</button>';
       var revoke=l.revoked?'':'<button class="sa-revoke" data-id="'+esc(l.id)+'">Revoke</button>';
       return '<tr><td>'+esc(l.recipientLabel||'—')+rev+'</td><td>'+esc(l.gate)+'</td><td>'+esc(l.views)+'</td><td>'+copy+'</td><td>'+revoke+'</td></tr>';
     }).join('');
-    el.innerHTML='<table class="sa-tbl">'+head+body+'</table>';
+    el.innerHTML='<table class="sa-tbl">'+head+'<tbody>'+body+'</tbody></table>';
     el.querySelectorAll('.sa-copy').forEach(function(b){b.onclick=function(){navigator.clipboard.writeText(b.getAttribute('data-url'));b.textContent='Copied';setTimeout(function(){b.textContent='Copy';},1200);};});
     // Revoke is optimistic: the row reads "revoked" now and Undo holds the DELETE.
     el.querySelectorAll('.sa-revoke').forEach(function(b){b.onclick=function(){

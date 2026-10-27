@@ -28,7 +28,7 @@ export function userRow(u: UserRow): string {
     <td><select class="so-c-select" onchange="saTier('${escapeHtml(u.id)}', this.value)">${tierOptions}</select>${teamViaWorkspace}</td>
     <td class="sa-num">${fmt(u.artifactCount)}</td>
     <td class="sa-num">${fmt(u.workspaceCount)}</td>
-    <td class="sa-muted">${escapeHtml(fmtDate(u.lastLoginAt))}</td>
+    <td class="sa-muted" data-sort="${escapeHtml(u.lastLoginAt ?? '')}">${escapeHtml(fmtDate(u.lastLoginAt))}</td>
     <td><div class="sa-actions">
       <button class="so-c-btn so-c-btn--secondary so-c-btn--sm" onclick="saView('${escapeHtml(u.id)}')">View</button>
       <button class="so-c-btn so-c-btn--secondary so-c-btn--sm" onclick="saRevoke('${escapeHtml(u.id)}', ${u.disabled ? 0 : 1})">${u.disabled ? 'Enable' : 'Disable'}</button>

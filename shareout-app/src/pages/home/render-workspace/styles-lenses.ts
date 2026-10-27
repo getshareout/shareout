@@ -209,7 +209,7 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 .wsx-atbl { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
 .wsx-atbl th, .wsx-atbl td { padding: 8px 10px; border-bottom: 1px solid var(--color-border); text-align: left; white-space: nowrap; }
 .wsx-atbl tr:last-child td { border-bottom: 0; }
-.wsx-atbl th { font: 600 var(--text-xs) var(--font-body); color: var(--color-text-secondary); background: var(--color-surface); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; user-select: none; }
+.wsx-atbl th { font: 600 var(--text-xs) var(--font-body); color: var(--color-text-secondary); background: var(--color-surface); text-transform: uppercase; letter-spacing: .04em; }
 .wsx-atbl th:hover { color: var(--color-text); }
 .wsx-atbl th.is-sort { color: var(--color-primary); }
 .wsx-atbl tbody tr:hover { background: var(--color-surface); }

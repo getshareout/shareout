@@ -71,7 +71,7 @@ export const workspace_client_home_views_adminSupport_JS = `  function supPriori
             + '<td>' + supPriorityBadge(tk.priority) + '</td>'
             + '<td class="wsx-atbl__date">' + esc(tk.status) + '</td>'
             + '<td>' + esc(tk.channel) + '</td>'
-            + '<td class="wsx-atbl__date">' + adRelDate(tk.last_msg_at) + '</td></tr>';
+            + '<td class="wsx-atbl__date" data-sort="' + esc(tk.last_msg_at || '') + '">' + adRelDate(tk.last_msg_at) + '</td></tr>';
         }).join('');
         m.innerHTML = adTableSection('admin.supportTickets', 'admin.supportIntro', ['admin.colSubject', 'admin.colPriority', 'admin.lblStatus', 'admin.colChannel', 'admin.colUpdated'], rows, 'admin.noTickets');
         m.querySelectorAll('[data-sup-id]').forEach(function (row) {
