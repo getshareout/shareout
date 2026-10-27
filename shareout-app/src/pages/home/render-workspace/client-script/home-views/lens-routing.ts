@@ -1,7 +1,7 @@
 /** Lens tab routing, lazy view loading, and help panel. */
 export const workspace_client_home_views_lensRouting_JS = `  var lenses = ws.querySelectorAll('[data-lens]');
   var loaded = {};
-  var LENS_PARENT = { alerts: 'schedules', crew: 'schedules', datasets: 'connectors', knowledge: 'connectors', catalog: 'connectors' };
+  var LENS_PARENT = { alerts: 'schedules', datasets: 'connectors' };
   function openView(key) {
     lenses.forEach(function (x) { x.classList.toggle('is-parent', !!LENS_PARENT[key] && x.getAttribute('data-lens') === LENS_PARENT[key]); });
     if (key !== 'knowledge' && typeof knStopPoll === 'function') knStopPoll();
