@@ -65,7 +65,7 @@ describe('inspector Data tab', () => {
     expect(LAZY_CHUNKS.data.soft).toEqual(['dataClear']);
     expect(() => new Function(lazyChunkBody('data'))).not.toThrow();
     expect(WORKSPACE_CLIENT).toContain("function renderData() { return wsxLazy('data', 'renderData', arguments); }");
-    expect(WORKSPACE_CLIENT).toContain("{ key: 'data', label: t('inspector.data') }");
+    expect(WORKSPACE_CLIENT).toContain("moreRow('data', t('inspector.data'))");
     expect(() => new Function(WORKSPACE_CLIENT)).not.toThrow();
   });
 

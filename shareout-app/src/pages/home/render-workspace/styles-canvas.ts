@@ -38,7 +38,8 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 .wsx__artbar > .wsx__stagebar2 + .wsx__tabmode { margin-left: 10px; }
 .wsx__tabmode { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--radius-md); background: var(--color-surface); flex: none; }
 .wsx__tabmode[hidden] { display: none; }
-.wsx__tabmode button { display: grid; place-items: center; border: 0; background: transparent; padding: 5px 9px; border-radius: calc(var(--radius-md) - 3px); font: 600 var(--text-sm) var(--font-body); color: var(--color-text-secondary); cursor: pointer; transition: background var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
+.wsx__tabreq[hidden] { display: none; }
+.wsx__tabmode button { display: grid; place-items: center; min-height: 28px; border: 0; background: transparent; padding: 5px 9px; border-radius: calc(var(--radius-md) - 3px); font: 600 var(--text-sm) var(--font-body); color: var(--color-text-secondary); cursor: pointer; transition: background var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
 .wsx__tabmode button:hover { color: var(--color-text); }
 .wsx__tabmode svg { width: 16px; height: 16px; }
 .wsx__tabmode button.is-on { background: var(--color-bg-elevated); color: var(--color-text); box-shadow: var(--shadow-sm); }

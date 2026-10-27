@@ -25,27 +25,42 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
   // just before this module (split out for the client-script size cap).
   function renderRTabs(items) {
     rtabsEl.innerHTML = items.map(function (t) {
-      return '<button class="wsx__rtab' + (t.key === rActive ? ' is-active' : '') + '" data-rtab="' + t.key + '" type="button" title="' + esc(t.label) + '">' + (t.dot ? '<span class="wsx__live-dot"></span>' : '') + esc(t.label) + '</button>';
+      return '<button class="wsx__rtab' + (t.key === (rActive === 'data' || rActive === 'history' ? 'details' : rActive) ? ' is-active' : '') + '" data-rtab="' + t.key + '" type="button" title="' + esc(t.label) + '">' + (t.dot ? '<span class="wsx__live-dot"></span>' : '') + esc(t.label) + '</button>';
     }).join('');
     var on = rtabsEl.querySelector('.is-active'); if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     rtabsEl.querySelectorAll('[data-rtab]').forEach(function (b) { b.addEventListener('click', function () { rActive = b.getAttribute('data-rtab'); paintRail(); }); });
+  }
+  var rbackEl = null;
+  function paintSubBack() {
+    var sub = rActive === 'data' || rActive === 'history';
+    if (!rbackEl) {
+      rbackEl = document.createElement('button');
+      rbackEl.type = 'button'; rbackEl.className = 'wsx-det__back'; rbackEl.hidden = true;
+      rbackEl.addEventListener('click', function () { rActive = 'details'; paintRail(); });
+      rbodyEl.parentNode.insertBefore(rbackEl, rbodyEl);
+    }
+    rbackEl.hidden = !sub;
+    if (sub) rbackEl.textContent = '\\u2190 ' + t('inspector.details') + ' \\u00B7 ' + t(rActive === 'data' ? 'inspector.data' : 'inspector.versions');
   }
   function paintRail() {
     if (!activeArt) {
       // Home: nothing to inspect — hide the right rail; Activity lives in a canvas widget.
       ws.classList.add('is-home');
+      if (rbackEl) rbackEl.hidden = true;
       return;
     }
     ws.classList.remove('is-home');
     if (panes[activeKey] && panes[activeKey].mode === 'edit') {
       rActive = 'edit';
+      if (rbackEl) rbackEl.hidden = true;
       renderRTabs([{ key: 'edit', label: t('inspector.editing') }]);
       renderEditPanel(panes[activeKey]);
     } else {
-      // Data: what the page reads and where it comes from (lazy chunk 'data'); HTML pages only.
+      // Data + History are sub-views of Details (reached from its "More" row), not tabs.
       var withData = !activeArt.type || activeArt.type === 'html';
       if (['details', 'comments', 'automate', 'history'].concat(withData ? ['data'] : []).indexOf(rActive) < 0) rActive = 'details';
-      renderRTabs([{ key: 'details', label: t('inspector.details') }].concat(withData ? [{ key: 'data', label: t('inspector.data') }] : [], [{ key: 'comments', label: t('inspector.comments') }, { key: 'automate', label: t('inspector.automate') }, { key: 'history', label: t('inspector.history') }]));
+      renderRTabs([{ key: 'details', label: t('inspector.details') }, { key: 'comments', label: t('inspector.comments') }, { key: 'automate', label: t('inspector.automate') }]);
+      paintSubBack();
       if (rActive !== 'data') dataClear();
       if (rActive === 'data') renderData(activeArt);
       else if (rActive === 'comments') renderComments(activeArt);
@@ -79,8 +94,8 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       if (d) paintDetails(art, d); else railRetry('inspector.detailsFailed', function () { renderDetails(art); });
     });
   }
-  function iconBtn(act, title, path, extra) {
-    return '<button class="wsx-det__icon ' + (extra || '') + '" data-iact="' + act + '" type="button" data-tip="' + esc(title) + '" aria-label="' + esc(title) + '">' + isvg(path) + '</button>';
+  function iconBtn(act, title, path, extra, label) {
+    return '<button class="wsx-det__icon ' + (extra || '') + (label ? ' wsx-det__act' : '') + '" data-iact="' + act + '" type="button" data-tip="' + esc(title) + '" aria-label="' + esc(title) + '">' + isvg(path) + (label ? '<span>' + esc(label) + '</span>' : '') + '</button>';
   }
   function fmtDate(s) { if (!s) return '\\u2014'; var ts = Date.parse(s); if (!ts) return '\\u2014'; var d = new Date(ts); return d.toLocaleDateString(locTag(), { year: 'numeric', month: 'short', day: 'numeric' }); }
   function visName(k) { return t('inspector.visName.' + k); }
@@ -160,12 +175,12 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     if (meta) h += aboutHtml(meta, type, vis);
     if (!editable) h += visBlock;
     h += '<div class="wsx-det__acts">'
-      + iconBtn('open', t('inspector.act.open'), SVG_OPEN)
-      + (editable ? iconBtn('edit', t('inspector.act.edit'), SVG_EDIT) : '')
-      + iconBtn('copy', t('inspector.act.copy'), SVG_LINK)
+      + iconBtn('open', t('inspector.act.open'), SVG_OPEN, '', t('inspector.actl.open'))
+      + (editable ? iconBtn('edit', t('inspector.act.edit'), SVG_EDIT, '', t('inspector.actl.edit')) : '')
+      + iconBtn('copy', t('inspector.act.copy'), SVG_LINK, '', t('inspector.actl.copy'))
       // A PDF has no viewer shell, so a converted deck's "Download original" lives here.
-      + (meta && meta.original && type === 'pdf' ? iconBtn('original', t('inspector.act.original'), SVG_DOWNLOAD) : '')
-      + (meta && meta.can_delete ? iconBtn('trash', t('inspector.act.trash'), SVG_TRASH, 'is-danger') : '')
+      + (meta && meta.original && type === 'pdf' ? iconBtn('original', t('inspector.act.original'), SVG_DOWNLOAD, '', t('inspector.actl.original')) : '')
+      + (meta && meta.can_delete ? iconBtn('trash', t('inspector.act.trash'), SVG_TRASH, 'is-danger', t('inspector.actl.trash')) : '')
       + '</div></div>';
     // Held banner: meta.moderation reaches only the owner/admin of a held page.
     if (meta && meta.moderation) {
@@ -173,15 +188,23 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       h += '<div class="wsx-det__modnote' + (mod.status === 'blocked' ? ' is-err' : '') + '"><strong>' + esc(mod.status === 'blocked' ? t('inspector.modBlocked') : t('cards.underReview')) + '</strong>'
         + (mod.reason ? ' \\u00B7 ' + esc(mod.reason) : '') + '<div>' + esc(mod.message) + '</div></div>';
     }
+    var withData = !type || type === 'html';
+    var moreRow = function (k, label) { return '<button class="wsx-det__morerow" type="button" data-rsub="' + k + '"><span>' + esc(label) + '</span><span class="wsx-det__chev" aria-hidden="true"></span></button>'; };
+    var moreOpen = SEC_OPEN.indexOf('more') >= 0;
     h += '<div class="wsx-det__secs" id="wsxSecs">'
-      + sec('share', t('inspector.sharedWith'), t('inspector.sharedWithHelp'), (editable ? visBlock : '') + '<div class="wsx-det__chips wsx-det__sharecard" id="wsxShare"></div>')
-      + sec('approvals', t('review.approvals'), t('review.approvalsHelp'), '<div id="wsxApprove"></div>')
+      + (editable
+        ? '<div class="wsx-det__sharesum"><span class="wsx-det__sharedot vk-' + visCur + '"></span><span class="wsx-det__sharetxt">' + esc(t('inspector.shareSum.' + visCur)) + '</span><button class="wsx-link" type="button" data-open-share>' + esc(t('share.button')) + '</button></div>'
+        : sec('share', t('inspector.sharedWith'), t('inspector.sharedWithHelp'), '<div class="wsx-det__chips wsx-det__sharecard" id="wsxShare"></div>'))
       + pagesHtml(meta, art)
       + (editable ? sec('organize', t('inspector.organize'), t('inspector.organizeHelp'), '<div id="wsxFolder"></div><div class="wsx-det__chips" id="wsxTags"></div>') : '')
+      + '<details class="wsx-det__more" data-sec="more"' + (moreOpen ? ' open' : '') + '><summary class="wsx-det__morehead">' + esc(t('inspector.more')) + '</summary><div class="wsx-det__morebody">'
+      + sec('approvals', t('review.approvals'), t('review.approvalsHelp'), '<div id="wsxApprove"></div>')
       + (editable ? sec('analytics', t('inspector.analytics'), t('inspector.analyticsHelp'), '<div id="wsxDetStats" class="wsx-det__stats"></div>') : '')
       + (editable ? sec('tests', t('inspector.tests'), t('inspector.testsHelp'), '<div id="wsxTests"></div>') : '')
       + sec('knowledge', t('inspector.knowledgeFrom'), t('inspector.knowledgeFromHelp'), '<div id="wsxKnFrom"></div>')
-      + '</div></div>';
+      + (withData ? moreRow('data', t('inspector.data')) : '')
+      + moreRow('history', t('inspector.versions'))
+      + '</div></details></div></div>';
     rbodyEl.innerHTML = h;
     var root = rbodyEl.querySelector('.wsx__details');
     paintApprovals(art);
@@ -230,11 +253,13 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       });
     });
 
-    wireVis(root, art, visCur);
+    root.querySelectorAll('[data-rsub]').forEach(function (b) { b.addEventListener('click', function () { rActive = b.getAttribute('data-rsub'); paintRail(); }); });
+    var shareOpen = root.querySelector('[data-open-share]');
+    if (shareOpen) shareOpen.addEventListener('click', function () { if (shareBtnEl && !sharePopEl) shareBtnEl.click(); });
 
     wireSecs(root);
 
-    renderShare(art, meta, editable);
+    if (!editable) renderShare(art, meta, editable);
     renderKnowledgeFrom(art, meta);
     if (editable) { renderTags(art, (meta.tags || []).slice()); renderFolder(art, meta); renderTests(art); }
     var statsEl = root.querySelector('#wsxDetStats');

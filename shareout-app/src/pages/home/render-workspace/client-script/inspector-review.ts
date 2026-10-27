@@ -94,7 +94,7 @@ export const workspace_client_inspector_review_JS = `  // ----- Review (/v1/home
       if (secEl) secEl.hidden = false;
       box.innerHTML = '<div class="wsx-det__apst' + (on.length ? ' is-ok' : '') + (flash ? ' is-flash' : '') + '"><span class="wsx-det__apchip">' + (on.length ? '\\u2713 v' + r.live_version_no : 'v' + r.live_version_no) + '</span>'
         + '<span class="wsx-row__sub">' + esc(on.length ? t('review.approvedBy').replace('{who}', names) : t('review.notApproved').replace('{n}', String(r.live_version_no))) + '</span></div>'
-        + (r.can_review ? '<button class="wsx-abtn' + (me ? '' : ' wsx-abtn--primary') + ' wsx-det__approve" type="button" data-approve="' + (me ? '0' : '1') + '">' + esc(t(me ? 'review.withdraw' : 'review.approve')) + '</button>' : '');
+        + (r.can_review ? '<button class="wsx-abtn wsx-det__approve" type="button" data-approve="' + (me ? '0' : '1') + '">' + esc(t(me ? 'review.withdraw' : 'review.approve')) + '</button>' : '');
       var b = box.querySelector('[data-approve]');
       if (b) b.addEventListener('click', function () {
         var yes = b.getAttribute('data-approve') === '1';
