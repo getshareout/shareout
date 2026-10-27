@@ -19,7 +19,7 @@ function mount(lang: 'en' | 'es', responses: Record<string, unknown>) {
     return Promise.resolve({ ok: !!key, json: () => Promise.resolve(key ? responses[key] : null) });
   };
   const t = (k: string) => copy[lang]?.[k] ?? k;
-  const run = new Function('document', 'fetch', 'esc', 't', 'tOr', 'needWs', 'wsUrl', 'swr', 'i18nEmpty', 'adCompact', 'showToast',
+  const run = new Function('document', 'fetch', 'esc', 't', 'tOr', 'needWs', 'wsUrl', 'swr', 'i18nEmpty', 'adCompact', 'showToast', 'adM',
     `${USAGE}; return adUsage;`);
   const painted: Promise<unknown>[] = [];
   const swr = (_k: string, paint: (d: unknown) => void, fetcher: () => Promise<unknown>) => { painted.push(fetcher().then(paint)); };
@@ -27,7 +27,7 @@ function mount(lang: 'en' | 'es', responses: Record<string, unknown>) {
     { getElementById: (id: string) => (id === 'wsxAdminMount' || els[id] ? el(id) : (el(id) as unknown)) },
     fetchStub, esc, t, (k: string, d: string) => (t(k) === k ? d : t(k)), () => false,
     (p: string) => `/v1/workspaces/w/${p.replace(/^\//, '')}`, swr, (k: string) => `<empty>${t(k)}</empty>`,
-    (n: number) => String(n), (m: string) => toasts.push(m));
+    (n: number) => String(n), (m: string) => toasts.push(m), () => el('wsxAdminMount'));
   return { adUsage, el, els, calls, toasts, done: () => Promise.all(painted) };
 }
 

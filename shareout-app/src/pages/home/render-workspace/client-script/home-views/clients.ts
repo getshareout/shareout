@@ -56,7 +56,7 @@ export const workspace_client_home_views_clients_JS = `  // ----- Admin — Clie
   }
 
   function adClients() {
-    var m = document.getElementById('wsxAdminMount'); if (needWs(m)) return;
+    var m = adM('clients'); if (needWs(m)) return;
     adLoading(m);
     fetch(wsUrl('/sharees'), { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : { sharees: [] }; })
@@ -141,7 +141,7 @@ export const workspace_client_home_views_clients_JS = `  // ----- Admin — Clie
   }
 
   function adClientDetail(client) {
-    var m = document.getElementById('wsxAdminMount'); if (!m) return;
+    var m = adM('clients'); if (!m) return;
     var sid = client.id;
     adLoading(m);
     Promise.all([

@@ -18,7 +18,7 @@ export const workspace_client_home_views_lensRouting_JS = `  var lenses = ws.que
     else if (key === 'connect') loadConnect();
     else if (key === 'catalog' && !loaded.catalog) { loaded.catalog = 1; loadCatalog(); }
     else if (key === 'knowledge' && !loaded.knowledge) { loaded.knowledge = 1; loadKnowledge(); }
-    else if (key === 'admin' && !loaded.admin) { loaded.admin = 1; loadAdmin(); }
+    else if (key === 'admin' && (!loaded.admin || adFocus)) { loaded.admin = 1; loadAdmin(); }
     if (typeof syncHash === 'function') syncHash();
   }
   lenses.forEach(function (b) {

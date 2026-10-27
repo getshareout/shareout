@@ -238,16 +238,10 @@ export function buildWorkspaceBody(args: RenderArgs): string {
             <h2 class="wsx__viewtitle" data-i18n="view.admin">Admin</h2>
             <div class="wsx__chips" id="wsxAdminTabs">
               <button class="wsx-chip is-on" data-admin-tab="overview" type="button" data-i18n="admin.overview">Overview</button>
+              <button class="wsx-chip" data-admin-tab="people" type="button" data-i18n="admin.people">People</button>
               <button class="wsx-chip" data-admin-tab="artifacts" type="button" data-i18n="admin.artifacts">Artifacts</button>
-              <button class="wsx-chip" data-admin-tab="members" type="button" data-i18n="admin.members">Members</button>
-              <button class="wsx-chip" data-admin-tab="clients" type="button" data-i18n="admin.clients">Sharing</button>
               <button class="wsx-chip" data-admin-tab="automation" type="button" data-i18n="admin.automation">Automation</button>
-              <button class="wsx-chip" data-admin-tab="ai" type="button" data-i18n="admin.ai">AI</button>
-              <button class="wsx-chip" data-admin-tab="security" type="button" data-i18n="admin.security">Security</button>
-              <button class="wsx-chip" data-admin-tab="usage" type="button" data-i18n="admin.usage">Usage</button>
-              <button class="wsx-chip" data-admin-tab="support" type="button" data-i18n="admin.support">Support</button>
               <button class="wsx-chip" data-admin-tab="settings" type="button" data-i18n="admin.settings">Settings</button>
-              <button class="wsx-chip" data-admin-tab="domains" type="button" data-i18n="admin.cdTab">Custom domain</button>
             </div>
             <div id="wsxAdminMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
@@ -274,11 +268,16 @@ export function buildWorkspaceBody(args: RenderArgs): string {
     <button type="button" class="wsx__pill" id="wsxPill" aria-haspopup="dialog"><span class="wsx__pill-text" data-i18n="composer.pill">Ask your workspace…</span><span class="wsx__pill-dot" id="wsxPillDot" hidden><span class="wsx-sr" data-i18n="composer.unread">New message</span></span></button>
     <div class="wsx__composer-grip" id="wsxComposerGrip" data-i18n-title="widget.resize" title="Drag to resize" aria-hidden="true"></div>
     <header class="wsx__composer-bar">
-      <h2 class="wsx__composer-title" id="wsxComposerTitle"><span class="wsx__ai-av">${brandMarkImg('wsx__ai-mark', 22)}<i class="wsx__ai-live" aria-hidden="true"></i></span><span class="wsx__ai-id"><span class="wsx__ai-name" data-i18n="composer.chat">Chat</span><span class="wsx__ai-sub" data-i18n="composer.status">Watching your workspace</span></span></h2>
+      <h2 class="wsx__composer-title" id="wsxComposerTitle"><span class="wsx__ai-av">${brandMarkImg('wsx__ai-mark', 22)}<i class="wsx__ai-live" aria-hidden="true"></i></span><span class="wsx__ai-id"><span class="wsx__ai-name" data-i18n="composer.chat">Assistant</span></span></h2>
       <div class="wsx__composer-btns">
         <button type="button" class="wsx__composer-new" id="wsxNewChat" data-i18n-title="composer.newChat" title="New chat">${svg('<path d="M12 5v14M5 12h14"/>')}<span data-i18n="composer.newChat">New chat</span></button>
-        <button type="button" id="wsxSearchBtn" data-i18n-title="composer.search" data-i18n-aria="composer.search" title="Search this chat" aria-label="Search this chat">${svg('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>')}</button>
-        <button type="button" id="wsxThreadsBtn" data-i18n-title="composer.history" data-i18n-aria="composer.history" title="Chat history" aria-label="Chat history" aria-expanded="false" aria-controls="wsxThreads">${svg('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/>')}</button>
+        <div class="wsx__composer-more">
+          <button type="button" id="wsxMoreBtn" data-i18n-title="composer.more" data-i18n-aria="composer.more" title="More" aria-label="More" aria-haspopup="menu" aria-expanded="false" aria-controls="wsxMoreMenu">${svg('<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>')}</button>
+          <div class="wsx__composer-menu" id="wsxMoreMenu" role="menu" hidden>
+            <button type="button" id="wsxSearchBtn" role="menuitem" data-i18n-aria="composer.search" aria-label="Search this chat">${svg('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>')}<span data-i18n="composer.search">Search this chat</span></button>
+            <button type="button" id="wsxThreadsBtn" role="menuitem" data-i18n-aria="composer.history" aria-label="Chat history" aria-expanded="false" aria-controls="wsxThreads">${svg('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/>')}<span data-i18n="composer.history">Chat history</span></button>
+          </div>
+        </div>
         <button type="button" id="wsxComposerMin" data-i18n-title="composer.minimize" data-i18n-aria="composer.minimize" title="Minimize" aria-label="Minimize">${svg('<path d="M6 9l6 6 6-6"/>')}</button>
       </div>
     </header>
@@ -301,7 +300,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
     </div>
     <div class="wsx__attachchip" id="wsxAttachChip" hidden></div>
     <form class="wsx__dockbar" id="wsxDock">
-      <textarea class="wsx__dockinput" id="wsxAsk" rows="1" data-i18n-placeholder="composer.placeholder" placeholder="Ask your workspace — “show me my CPM pages”…" data-i18n-aria="composer.ask" aria-label="Ask your workspace" autocomplete="off" enterkeyhint="send"></textarea>
+      <textarea class="wsx__dockinput" id="wsxAsk" rows="1" data-i18n-placeholder="composer.placeholder" placeholder="Ask your workspace…" data-i18n-aria="composer.ask" aria-label="Ask your workspace" autocomplete="off" enterkeyhint="send"></textarea>
       <input type="file" id="wsxAttachInput" hidden accept=".xlsx,.xls,.pptx,.csv,.pdf,image/*">
       <button class="wsx__dockattach" id="wsxAttach" type="button" data-i18n-aria="composer.attach" data-i18n-title="composer.attach" aria-label="Attach file" title="Attach file">${svg('<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>')}</button>
       <button class="wsx__dockmic" id="wsxMic" type="button" data-i18n-aria="composer.voice" data-i18n-title="composer.voice" aria-label="Voice message" title="Voice message" hidden>${svg('<path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/>')}</button>
@@ -364,16 +363,25 @@ export function buildWorkspaceBody(args: RenderArgs): string {
       <div class="wsx__accsec-title" data-i18n="account.language">Language</div>
       ${langSwitch}
       <div class="wsx__accdiv"></div>
-      <div class="wsx__accsec-title" data-i18n="account.linkedAccounts">Linked accounts</div>
-      <p class="wsx__accsub" data-i18n="account.linkedDesc">Link your other emails to see all their workspaces from one login.</p>
-      <div class="wsx__linked" id="wsxLinked"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
-      <div class="wsx__accactions">
+      <div class="wsx__accscreen" id="wsxAccMain">
+        <div class="wsx__accactions">
+          <button class="wsx-accbtn wsx-accbtn--go" id="wsxAccMore" type="button">${svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>')}<span data-i18n="account.connections">Connections &amp; settings</span><span class="wsx-accbtn__chev" aria-hidden="true">${svg('<path d="M9 18l6-6-6-6"/>')}</span></button>
+          <a class="wsx-accbtn wsx-accbtn--out" href="/auth/logout">${svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>')}<span data-i18n="account.signOut">Sign out</span></a>
+        </div>
+      </div>
+      <div class="wsx__accscreen" id="wsxAccSub" hidden>
+        <button class="wsx-accbtn wsx-accbtn--back" id="wsxAccBack" type="button">${svg('<path d="M15 18l-6-6 6-6"/>')}<span data-i18n="account.connections">Connections &amp; settings</span></button>
+        <div class="wsx__accsec-title" data-i18n="account.grpAgent">Your agent</div>
         <a class="wsx-accbtn" href="/home?view=connect" data-cn-open="claude">${svg(ICON.link)}<span data-i18n="nav.connect">Connect your agent</span></a>
-        <a class="wsx-accbtn" href="/home?view=analytics" data-acc-lens="analytics">${svg(ICON.chart)}<span data-i18n="nav.analytics">Analytics</span></a>
 ${!(args.workspaceId || args.workspace) || canManage ? `        <a class="wsx-accbtn" href="/home?view=connect&amp;tab=code" data-cn-open="code">${svg('<circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 19 4M18 5l2 2M15 8l2 2"/>')}<span data-i18n="account.apiToken">Key for your agent</span></a>
-` : ''}        <a class="wsx-accbtn" href="/settings/telegram?go=1" target="_blank" rel="noopener">${svg('<path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>')}<span data-i18n="account.telegram">Connect Telegram</span></a>
+` : ''}        <div class="wsx__accsec-title" data-i18n="account.grpInsights">Insights</div>
+        <a class="wsx-accbtn" href="/home?view=analytics" data-acc-lens="analytics">${svg(ICON.chart)}<span data-i18n="nav.analytics">Analytics</span></a>
+        <div class="wsx__accsec-title" data-i18n="account.grpAccounts">Accounts</div>
+        <a class="wsx-accbtn" href="/settings/telegram?go=1" target="_blank" rel="noopener">${svg('<path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>')}<span data-i18n="account.telegram">Connect Telegram</span></a>
         <a class="wsx-accbtn" href="/v1/auth/link-google?redirect=%2Fhome%3Fnext%3D1">${svg('<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>')}<span data-i18n="account.linkGoogle">Link Google account</span></a>
-        <a class="wsx-accbtn wsx-accbtn--out" href="/auth/logout">${svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>')}<span data-i18n="account.signOut">Sign out</span></a>
+        <div class="wsx__accsec-title" data-i18n="account.linkedAccounts">Linked accounts</div>
+        <p class="wsx__accsub" data-i18n="account.linkedDesc">Link your other emails to see all their workspaces from one login.</p>
+        <div class="wsx__linked" id="wsxLinked"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
       </div>
     </div>
   </div>

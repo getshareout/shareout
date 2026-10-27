@@ -1,7 +1,7 @@
 /** Admin → Support tickets (list + detail). Shares the admin lens IIFE scope. */
 export const workspace_client_home_views_adminSupport_JS = `  function supPriorityBadge(p) { var c = { urgent: 'var(--color-error)', high: 'var(--color-warning)', normal: 'var(--color-primary)', low: 'var(--color-text-tertiary)' }[p] || 'var(--color-text-tertiary)'; return p ? '<span class="wsx-atbl__badge" style="background:color-mix(in srgb,' + c + ' 10%,transparent);color:' + c + '">' + esc(p) + '</span>' : ''; }
   function adSupportDetail(id) {
-    var m = document.getElementById('wsxAdminMount'); if (!m) return;
+    var m = adM('support'); if (!m) return;
     adLoading(m);
     fetch('/v1/support/tickets/' + encodeURIComponent(id), { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
@@ -59,7 +59,7 @@ export const workspace_client_home_views_adminSupport_JS = `  function supPriori
       }).catch(function () { m.innerHTML = i18nEmpty('common.couldNotLoad'); });
   }
   function adSupport() {
-    var m = document.getElementById('wsxAdminMount'); if (needWs(m)) return;
+    var m = adM('support'); if (needWs(m)) return;
     adLoading(m);
     fetch('/v1/support/tickets?scope=workspace&workspace=' + encodeURIComponent(window.WSX_WS), { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })

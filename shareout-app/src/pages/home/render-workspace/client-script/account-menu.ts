@@ -13,8 +13,17 @@ export const workspace_client_account_menu_JS = `
     function open() {
       menu.hidden = false; root.classList.add('is-account-open');
       btn.setAttribute('aria-expanded', 'true');
-      if (!linkedLoaded) { linkedLoaded = true; loadLinked(); }
+      showSub(false);
     }
+    var accMain = document.getElementById('wsxAccMain'), accSub = document.getElementById('wsxAccSub');
+    function showSub(on) {
+      if (!accMain || !accSub) return;
+      accMain.hidden = on; accSub.hidden = !on;
+      if (on && !linkedLoaded) { linkedLoaded = true; loadLinked(); }
+    }
+    var moreBtn = document.getElementById('wsxAccMore'), backBtn = document.getElementById('wsxAccBack');
+    if (moreBtn) moreBtn.addEventListener('click', function () { showSub(true); });
+    if (backBtn) backBtn.addEventListener('click', function () { showSub(false); moreBtn && moreBtn.focus(); });
     function close() {
       menu.hidden = true; root.classList.remove('is-account-open');
       btn.setAttribute('aria-expanded', 'false');
