@@ -199,7 +199,7 @@ export const WORKSPACE_AGENT_COMPOSER_STYLES = `/* ---- agent dock (inside canva
 
 @keyframes wsx-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 45%, transparent); } 70% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-success) 0%, transparent); } 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 0%, transparent); } }
 @media (max-width: 1100px) { .wsx__body { grid-template-columns: var(--wsx-rail) minmax(0,1fr); } .wsx__activity { display: none; } }
-@media (max-width: 720px) { .wsx__body { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .wsx__body { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .wsx__live-dot { animation: none; } }
 
 /* ===== Home: contextual inspector hidden — canvas gets the room ===== */

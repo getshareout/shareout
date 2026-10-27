@@ -145,6 +145,7 @@ export async function handleHomeForYouApi(
     cardsHtml: artifacts.map((a) => renderArtifactCard(a, url.hostname, env)).join(''),
     rowsHtml: artifacts.map((a) => renderArtifactRow(a, url.hostname, env)).join(''),
     count: artifacts.length,
+    ids: artifacts.map((a) => a.id),
   });
 }
 

@@ -1,6 +1,6 @@
 /** Activity feed, Brief widgets, and tile/table artifact widgets. */
 export const workspace_client_activity_feed_JS = `  // ===== activity feed + brief widgets =====
-  var recentItems = [], homeLoaded = {};
+  var recentItems = [], homeLoaded = {}, forYouIds = {};
   // Whole Home empty: one sentence + one action, only once every source has answered.
   function syncHomeEmpty() {
     var em = document.getElementById('wsxHomeEmpty'); if (!em) return;
@@ -135,6 +135,7 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
       .then(function (r) { return r.json(); })
       .then(function (d) {
         ART_DATA[id] = { cardsHtml: d && d.cardsHtml, rowsHtml: d && d.rowsHtml, count: (d && d.count) || 0, empty: empty };
+        if (id === 'wsxForYou') { forYouIds = {}; ((d && d.ids) || []).forEach(function (x) { forYouIds[x] = 1; }); if (typeof renderActivity === 'function') renderActivity(); }
         var wdg = document.getElementById(id).closest('.wsx-widget'); if (wdg) wdg.classList.toggle('is-empty-hidden', !ART_DATA[id].count);
         renderArtView(id);
         homeLoaded.foryou = true; syncHomeEmpty();
