@@ -16,11 +16,17 @@ describe('parseHomeFilters', () => {
       filesScope: 'team',
       folderKind: '',
       level: false,
+      favFirst: false,
     });
   });
 
   it('reads the Drive-style level view flag', () => {
     expect(parseHomeFilters(new URL('https://shareout.site/home?level=1')).level).toBe(true);
+  });
+
+  it('reads favorites-first (a chip\'s default order)', () => {
+    expect(parseHomeFilters(new URL('https://shareout.site/home?sort=name&favfirst=1')).favFirst).toBe(true);
+    expect(parseHomeFilters(new URL('https://shareout.site/home?sort=name')).favFirst).toBe(false);
   });
 
   it('parses query params', () => {

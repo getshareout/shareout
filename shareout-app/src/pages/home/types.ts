@@ -72,6 +72,8 @@ export interface HomeFilters {
   folderKind: HomeFilesScope | '';
   /** Drive-style level view: only the artifacts directly in `folder` (the root when empty). */
   level: boolean;
+  /** The viewer's favorites before everything else (a chip's default order, not a column sort). */
+  favFirst?: boolean;
 }
 
 export interface RenderArgs {

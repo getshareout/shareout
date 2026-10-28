@@ -28,6 +28,7 @@ export function parseHomeFilters(url: URL): HomeFilters {
     folderKind: url.searchParams.get('folderKind') === 'personal' ? 'personal'
       : url.searchParams.get('folderKind') === 'team' ? 'team' : '',
     level: url.searchParams.get('level') === '1',
+    favFirst: url.searchParams.get('favfirst') === '1',
   };
 }
 

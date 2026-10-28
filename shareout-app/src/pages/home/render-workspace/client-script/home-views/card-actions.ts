@@ -255,8 +255,16 @@ export const workspace_client_home_views_cardActions_JS = `  // ===== artifact c
   }
   function updateCmdbar() {
     var bar = cmdbar(); var n = selectedIds.size;
-    document.getElementById('cmdbarCount').textContent = String(n);
+    var countEl = bar.querySelector('#cmdbarCount');
+    countEl.textContent = String(n);
+    countEl.nextSibling.nodeValue = ' ' + t(n === 1 ? 'cards.selectedOne' : 'cards.selected');
     document.body.classList.toggle('selecting', n > 0);
+    // A view with a slot (Artifacts) shows the bar over its chips row, under the title;
+    // anywhere else it floats at the bottom, where the resting composer pill steps aside.
+    var slot = n > 0 && document.querySelector('.wsx__view.is-active [data-cmdbar-slot]');
+    var host = slot || document.body;
+    if (n > 0 && bar.parentNode !== host) host.appendChild(bar);
+    document.body.classList.toggle('selecting-float', n > 0 && !slot);
     if (n > 0) { bar.hidden = false; requestAnimationFrame(function () { bar.classList.add('show'); }); }
     else { bar.classList.remove('show'); bar.hidden = true; }
   }

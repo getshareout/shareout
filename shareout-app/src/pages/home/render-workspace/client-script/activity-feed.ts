@@ -99,12 +99,13 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
   // Header cells carry the row cell classes so narrow containers hide header + cells together.
   // A widget sorted on the server (the paged Artifacts lens) passes its sort, 'col:dir': its
   // header is data-sort-own and each column carries data-artsort; other widgets sort in place.
-  var TBL_COLS = [['icon', ''], ['name', 'widget.colName'], ['owner', 'widget.colCreatedBy'], ['shared', 'widget.colShared'], ['access', 'widget.colAccess'], ['type', 'widget.colType'], ['feat', 'widget.colFeatures'], ['tags', 'widget.colTags'], ['views', 'widget.colViews'], ['visitors', 'widget.colVisitors'], ['created', 'widget.colCreated'], ['date', 'widget.colUpdated']];
+  var TBL_COLS = [['icon', ''], ['name', 'widget.colName'], ['owner', 'widget.colCreatedBy'], ['shared', 'widget.colShared'], ['access', 'widget.colAccess'], ['type', 'widget.colType'], ['feat', 'widget.colFeatures'], ['tags', 'widget.colTags'], ['views', 'widget.colViews'], ['visitors', 'widget.colVisitors'], ['created', 'widget.colCreated'], ['date', 'widget.colUpdated'], ['acts', '']];
   function tblHead(sort) {
     var s = sort ? sort.split(':') : [];
     return '<div class="wsx-tbl__head"' + (sort ? ' data-sort-own' : '') + '>' + TBL_COLS.map(function (c) {
       var own = sort && c[1] ? ' data-artsort="' + c[0] + '"' + (s[0] === c[0] ? ' aria-sort="' + (s[1] === 'asc' ? 'ascending' : 'descending') + '"' : '') : '';
-      return '<span class="wsx-tr__' + c[0] + '"' + own + '>' + (c[1] ? esc(t(c[1])) : '') + '</span>';
+      var tip = c[0] === 'feat' ? ' data-tip="' + esc(t('widget.colFeaturesTip')) + '"' : '';
+      return '<span class="wsx-tr__' + c[0] + '"' + own + tip + '>' + (c[1] ? esc(t(c[1])) : '') + '</span>';
     }).join('') + '</div>';
   }
   function widgetView(id) { try { return localStorage.getItem(VIEW_LS + id) === 'table' ? 'table' : 'tile'; } catch (e) { return 'tile'; } }

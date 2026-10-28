@@ -28,7 +28,7 @@ describe('artifact table row', () => {
   it('renders every column the header declares, in order', () => {
     const html = renderArtifactRow(row(), 'shareout.site');
     const cols = [...html.matchAll(/\n {4}<span class="wsx-tr__([a-z]+)"/g)].map((m) => m[1]);
-    expect(cols).toEqual(['icon', 'name', 'owner', 'shared', 'access', 'type', 'feat', 'tags', 'views', 'visitors', 'created', 'date']);
+    expect(cols).toEqual(['icon', 'name', 'owner', 'shared', 'access', 'type', 'feat', 'tags', 'views', 'visitors', 'created', 'date', 'acts']);
   });
 
   it('shows who it is shared with to the owner, with a +N overflow', () => {
@@ -49,10 +49,20 @@ describe('artifact table row', () => {
     expect(cell(html, 'shared')).toContain('wsx-tr__none');
   });
 
-  it('caps tags at two with a +N, and shows capability icons', () => {
+  it('caps tags at two with a +N, lists every tag on hover, and shows capability icons', () => {
     const html = renderArtifactRow(row(), 'shareout.site');
     expect((html.match(/class="wsx-tr__tag"/g) || []).length).toBe(2);
-    expect(html).toContain('title="reports">+1</span>');
+    expect(html).toContain('<span class="wsx-tr__more">+1</span>');
+    expect(html).toContain('<span class="wsx-tr__tags" data-tip="safety, hse, reports">');
     expect((cell(html, 'feat').match(/class="feature"/g) || []).length).toBe(2);
+  });
+
+  it('ends with a star + delete column; delete only for the owner, as on cards', () => {
+    const acts = (r: Partial<ArtifactRow>) => cell(renderArtifactRow(row(r), 'shareout.site'), 'acts');
+    expect(acts({ is_favorite: 1 })).toContain('class="wsx-tr__star is-on"');
+    expect(acts({})).toContain("confirmDelete('art1')");
+    expect(acts({ user_role: 'viewer' })).toContain('class="wsx-tr__star"');
+    expect(acts({ user_role: 'viewer' })).not.toContain('wsx-tr__del');
+    expect(cell(renderArtifactRow(row(), 'shareout.site'), 'name')).not.toContain('wsx-tr__star');
   });
 });

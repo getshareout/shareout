@@ -149,9 +149,9 @@ export function buildWorkspaceBody(args: RenderArgs): string {
           </div>
           <div class="wsx__view" data-view="artifacts">
             <h2 class="wsx__viewtitle" data-i18n="view.allArtifacts">All Artifacts</h2>
-            <div class="wsx__chips wsx-ttool" id="wsxArtChips">
-              <button class="wsx-chip is-on" data-art-filter="recent" type="button"><span data-i18n="filter.recent">Recent</span><span class="wsx-chip__n"></span></button>
-              <button class="wsx-chip" data-art-filter="all" type="button"><span data-i18n="filter.all">All</span><span class="wsx-chip__n"></span></button>
+            <div class="wsx__chips wsx-ttool" id="wsxArtChips" data-cmdbar-slot>
+              <button class="wsx-chip" data-art-filter="recent" type="button"><span data-i18n="filter.recent">Recent</span><span class="wsx-chip__n"></span></button>
+              <button class="wsx-chip is-on" data-art-filter="all" type="button"><span data-i18n="filter.all">All</span><span class="wsx-chip__n"></span></button>
               <button class="wsx-chip" data-art-filter="favorites" type="button"><span data-i18n="filter.favorites">Favorites</span><span class="wsx-chip__n"></span></button>
               <button class="wsx-chip" data-art-filter="shared" type="button"><span data-i18n="filter.shared">Shared with me</span><span class="wsx-chip__n"></span></button>
               <button class="wsx-chip" data-art-filter="mine" type="button"><span data-i18n="filter.mine">Mine</span><span class="wsx-chip__n"></span></button>

@@ -266,7 +266,7 @@ function renderTagsCell(a: ArtifactRow): string {
   const tags = a.tags ? a.tags.split('\n').filter(Boolean) : [];
   if (!tags.length) return DASH;
   const more = tags.length - 2;
-  return tags.slice(0, 2).map(t => `<span class="wsx-tr__tag">${escapeHtml(t)}</span>`).join('') + (more > 0 ? `<span class="wsx-tr__more" title="${escapeHtml(tags.slice(2).join(', '))}">+${more}</span>` : '');
+  return tags.slice(0, 2).map(t => `<span class="wsx-tr__tag">${escapeHtml(t)}</span>`).join('') + (more > 0 ? `<span class="wsx-tr__more">+${more}</span>` : '');
 }
 
 function fmtDate(d: string): string {
@@ -283,17 +283,18 @@ export function renderArtifactRow(a: ArtifactRow, hostname: string, env?: Env): 
   const pageUrl = buildArtifactShareUrl(hostname, a.slug, a.display_slug, undefined, undefined, env);
   return `<a class="wsx-tr" href="/a/${escapeHtml(a.slug)}/" data-id="${escapeHtml(a.id)}" data-slug="${escapeHtml(a.slug)}" data-name="${escapeHtml(a.name)}" data-type="${escapeHtml(a.artifact_type)}" data-url="${escapeHtml(pageUrl)}" data-role="${escapeHtml(a.user_role)}" data-favorite="${a.is_favorite ? '1' : '0'}" data-visibility="${escapeHtml(a.visibility)}" data-workspace="${escapeHtml(a.workspace_id || '')}">
     <span class="wsx-tr__icon" style="--type-color:${tm.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${tm.svg}</svg><button type="button" class="wsx-tr__sel" onclick="event.stopPropagation();event.preventDefault();toggleSelect('${escapeHtml(a.id)}',event)" aria-label="Select" title="Select" data-i18n-aria="assets.select" data-i18n-title="assets.select"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button></span>
-    <span class="wsx-tr__name"><span class="wsx-tr__nm">${escapeHtml(a.name)}</span><button type="button" class="wsx-tr__star${a.is_favorite ? ' is-on' : ''}" onclick="event.stopPropagation();event.preventDefault();toggleFavorite('${escapeHtml(a.id)}')" aria-pressed="${a.is_favorite ? 'true' : 'false'}" aria-label="${a.is_favorite ? 'Remove from favorites' : 'Add to favorites'}" title="${a.is_favorite ? 'Remove from favorites' : 'Add to favorites'}" data-i18n-aria="${a.is_favorite ? 'inspector.favRemove' : 'inspector.favAdd'}" data-i18n-title="${a.is_favorite ? 'inspector.favRemove' : 'inspector.favAdd'}"><svg viewBox="0 0 24 24" fill="${a.is_favorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></button></span>
+    <span class="wsx-tr__name"><span class="wsx-tr__nm">${escapeHtml(a.name)}</span></span>
     <span class="wsx-tr__owner">${renderOwnerAvatar(a)}</span>
     <span class="wsx-tr__shared">${renderSharedCell(a)}</span>
     <span class="wsx-tr__access">${renderAccessCell(a)}</span>
     <span class="wsx-tr__type" data-i18n="cards.type.${typeKey}">${escapeHtml(tm.label)}</span>
     <span class="wsx-tr__feat">${renderFeaturesCell(a)}</span>
-    <span class="wsx-tr__tags">${renderTagsCell(a)}</span>
+    <span class="wsx-tr__tags"${a.tags ? ` data-tip="${escapeHtml(a.tags.split('\n').filter(Boolean).join(', '))}"` : ''}>${renderTagsCell(a)}</span>
     <span class="wsx-tr__views">${fmtCount(a.total_views)}</span>
     <span class="wsx-tr__visitors">${fmtCount(a.unique_visitors)}</span>
     <span class="wsx-tr__created" data-date="${escapeHtml(a.created_at)}" data-date-y="1">${fmtDate(a.created_at)}</span>
     <span class="wsx-tr__date" data-date="${escapeHtml(date)}" data-date-y="1">${fmtDate(date)}</span>
+    <span class="wsx-tr__acts"><button type="button" class="wsx-tr__star${a.is_favorite ? ' is-on' : ''}" onclick="event.stopPropagation();event.preventDefault();toggleFavorite('${escapeHtml(a.id)}')" aria-pressed="${a.is_favorite ? 'true' : 'false'}" aria-label="${a.is_favorite ? 'Remove from favorites' : 'Add to favorites'}" title="${a.is_favorite ? 'Remove from favorites' : 'Add to favorites'}" data-i18n-aria="${a.is_favorite ? 'inspector.favRemove' : 'inspector.favAdd'}" data-i18n-title="${a.is_favorite ? 'inspector.favRemove' : 'inspector.favAdd'}"><svg viewBox="0 0 24 24" fill="${a.is_favorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></button>${a.user_role === 'owner' ? `<button type="button" class="wsx-tr__del" onclick="event.stopPropagation();event.preventDefault();confirmDelete('${escapeHtml(a.id)}')" aria-label="Delete" title="Delete" data-i18n-aria="common.delete" data-i18n-title="common.delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>` : ''}</span>
   </a>`;
 }
 
@@ -326,6 +327,7 @@ export function renderFolderRow(f: HomeFolder): string {
     <span class="wsx-tr__visitors"></span>
     <span class="wsx-tr__created"></span>
     <span class="wsx-tr__date"></span>
+    <span class="wsx-tr__acts"></span>
   </div>`;
 }
 

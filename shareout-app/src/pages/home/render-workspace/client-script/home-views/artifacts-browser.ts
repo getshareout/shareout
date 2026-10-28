@@ -12,19 +12,19 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
   // Cache each filter's payload on first fetch so re-selecting is instant (no reload);
   // prefetch the rest in the background after the first paint. Pages load 24 at a time, so a
   // column header sorts on the server: the sort is part of the URL and of the cache key.
-  var artFilter = 'recent';
+  var artFilter = 'all';
   var curFolder = '';        // '' = root; otherwise the open folder id
   var curFolderName = '';
   var artSearch = '';        // '' = no filter; otherwise a client-side substring filter over the loaded cards/rows (name + tags)
   var ART_URL = { recent: '/v1/home/browser?scope=all', all: '/v1/home/browser?level=1', favorites: '/v1/home/browser?scope=favorites', shared: '/v1/home/browser?scope=shared', mine: '/v1/home/browser?scope=owned' };
   var ART_SORT = { all: 'name:asc' };  // each chip's default 'col:dir'; the rest: last updated first
-  var artSort = '';          // '' = the chip's default; otherwise the clicked column, 'col:dir'
+  var artSort = '';          // '' = the chip's default (favorites first); otherwise the clicked column, 'col:dir'
   var artCache = {};
   var artPending = {};
   var artTotals = {};        // each chip's workspace-wide total, whatever the sort
   function artSortOf(f) { return artSort || ART_SORT[f] || 'date:desc'; }
-  function artKey(f, fld) { return f + '|' + (fld == null ? curFolder : fld) + '|' + artSortOf(f); }
-  function artUrl(f, fld) { var fo = (fld == null ? curFolder : fld), so = artSortOf(f).split(':'); return ART_URL[f] + '&sort=' + so[0] + '&dir=' + so[1] + wsq + (fo ? '&folder=' + encodeURIComponent(fo) : ''); }
+  function artKey(f, fld) { return f + '|' + (fld == null ? curFolder : fld) + '|' + (artSort || '*' + artSortOf(f)); }
+  function artUrl(f, fld) { var fo = (fld == null ? curFolder : fld), so = artSortOf(f).split(':'); return ART_URL[f] + '&sort=' + so[0] + '&dir=' + so[1] + (artSort ? '' : '&favfirst=1') + wsq + (fo ? '&folder=' + encodeURIComponent(fo) : ''); }
   function folderApiBase() { return window.WSX_WS ? '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/folders' : '/v1/folders'; }
   function newFolderBtn() { return '<button type="button" class="wsx-folder-new" onclick="newFolder(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>' + esc(t('artifacts.newFolder')) + '</span></button>'; }
   function escAttr(s) { return esc(s).replace(/"/g, '&quot;'); }
@@ -268,7 +268,7 @@ export const workspace_client_home_views_artifactsBrowser_JS = `  // ===== rail 
   // Warm the default Artifacts payload during idle so the first rail click is instant
   // (a click before this lands coalesces onto the same in-flight fetch via artPending).
   (function () {
-    var warm = function () { if (!artCache[artKey('recent', '')]) fetchArt('recent'); };
+    var warm = function () { if (!artCache[artKey('all', '')]) fetchArt('all'); };
     if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 2500 }); else setTimeout(warm, 800);
   })();
   // ===== folder navigation + management (Drive-style drill-in) =====

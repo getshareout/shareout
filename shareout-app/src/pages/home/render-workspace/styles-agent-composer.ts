@@ -233,6 +233,7 @@ export const WORKSPACE_AGENT_COMPOSER_STYLES = `/* ---- agent dock (inside canva
 .wsx__composer.is-resizing { transition: none; user-select: none; } /* drag grip resizes the open panel height */
 .wsx__composer[data-state="resting"] { left: calc(50% + (var(--wsx-rail) - var(--wsx-rightcol)) / 2); transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); width: min(680px, 92%); max-height: 60px; border-radius: 999px; box-shadow: var(--shadow-lg); }
 /* resting = one pill button; everything else lives in the open sheet */
+body.selecting-float .wsx__composer[data-state="resting"] { visibility: hidden; }
 .wsx__pill { display: none; }
 .wsx__composer[data-state="resting"] .wsx__pill { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 0 20px; border: 0; background: transparent; color: var(--color-text-tertiary); font: 400 var(--text-base) var(--font-body); text-align: left; cursor: text; border-radius: 999px; }
 .wsx__pill-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -301,7 +302,7 @@ export const WORKSPACE_AGENT_COMPOSER_STYLES = `/* ---- agent dock (inside canva
    template drops the same tracks. */
 .wsx-tbl--art { container-type: inline-size; overflow-x: auto; }
 .wsx-tbl--art .wsx-tbl__head, .wsx-tbl--art .wsx-tr { display: grid; gap: 12px; min-width: min-content;
-  grid-template-columns: 22px minmax(200px,1fr) 150px 116px 124px 84px 96px 160px 64px 84px 112px 112px; }
+  grid-template-columns: 22px minmax(200px,1fr) 150px 116px 124px 84px 96px 160px 64px 84px 112px 112px 60px; }
 .wsx-tbl--art :is(.wsx-tbl__head, .wsx-tr) > * { min-width: 0; overflow: hidden; }
 .wsx-tbl--art .wsx-tbl__head > * { font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; white-space: nowrap; text-overflow: ellipsis; }
 .wsx-tbl--art .wsx-tr__feat { display: flex; gap: 3px; }
@@ -326,6 +327,12 @@ export const WORKSPACE_AGENT_COMPOSER_STYLES = `/* ---- agent dock (inside canva
 .wsx-tr__star svg { width: 14px; height: 14px; }
 .wsx-tr:hover .wsx-tr__star, .wsx-tr__star:focus-visible, .wsx-tr__star.is-on { opacity: 1; }
 .wsx-tr__star:hover { color: var(--color-text); background: var(--color-surface); }
+.wsx-tr__acts { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
+.wsx-tr__acts .wsx-tr__star:not(.is-on) { opacity: .45; }
+.wsx-tr__del { flex: none; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text-tertiary); cursor: pointer; opacity: .45; transition: opacity var(--duration-fast), color var(--duration-fast); }
+.wsx-tr__del svg { width: 14px; height: 14px; }
+.wsx-tr:hover :is(.wsx-tr__acts .wsx-tr__star, .wsx-tr__del), .wsx-tr__del:focus-visible { opacity: 1; }
+.wsx-tr__del:hover { color: var(--color-error); background: var(--color-error-light); }
 .wsx-tr__star.is-on { color: var(--color-warning); }
 .wsx-tr__stack { display: inline-flex; align-items: center; }
 .wsx-tr__stack .owner-avatar { box-shadow: 0 0 0 2px var(--color-bg-elevated); }
@@ -335,17 +342,21 @@ export const WORKSPACE_AGENT_COMPOSER_STYLES = `/* ---- agent dock (inside canva
 .wsx-tr__vis svg { width: 13px; height: 13px; flex: none; }
 .wsx-tr__vis.is-ws { color: var(--color-primary); }
 .wsx-tr__tag { padding: 2px 8px; border-radius: 999px; background: var(--color-surface); font-size: var(--text-xs); color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 72px; }
-@container (max-width: 1380px) {
-  .wsx-tbl--art :is(.wsx-tr__tags, .wsx-tr__feat, .wsx-tr__created) { display: none; }
-  .wsx-tbl--art :is(.wsx-tbl__head, .wsx-tr) { grid-template-columns: 22px minmax(200px,1fr) 150px 116px 124px 84px 64px 84px 112px; }
+@container (max-width: 1540px) {
+  .wsx-tbl--art :is(.wsx-tr__created, .wsx-tr__visitors) { display: none; }
+  .wsx-tbl--art :is(.wsx-tbl__head, .wsx-tr) { grid-template-columns: 22px minmax(200px,1fr) 150px 116px 124px 84px 96px 150px 64px 112px 60px; }
+}
+@container (max-width: 1300px) {
+  .wsx-tbl--art :is(.wsx-tr__tags, .wsx-tr__feat) { display: none; }
+  .wsx-tbl--art :is(.wsx-tbl__head, .wsx-tr) { grid-template-columns: 22px minmax(200px,1fr) 150px 116px 124px 84px 64px 112px 60px; }
 }
 @container (max-width: 1000px) {
   .wsx-tbl--art :is(.wsx-tr__shared, .wsx-tr__visitors, .wsx-tr__access) { display: none; }
-  .wsx-tbl--art :is(.wsx-tbl__head, .wsx-tr) { grid-template-columns: 22px minmax(160px,1fr) 150px 84px 64px 112px; }
+  .wsx-tbl--art :is(.wsx-tbl__head, .wsx-tr) { grid-template-columns: 22px minmax(160px,1fr) 150px 84px 64px 112px 60px; }
 }
 @container (max-width: 680px) {
   .wsx-tbl--art :is(.wsx-tr__owner, .wsx-tr__type, .wsx-tr__views) { display: none; }
-  .wsx-tbl--art :is(.wsx-tbl__head, .wsx-tr) { grid-template-columns: 22px minmax(120px,1fr) 104px; }
+  .wsx-tbl--art :is(.wsx-tbl__head, .wsx-tr) { grid-template-columns: 22px minmax(120px,1fr) 104px 60px; }
 }
 @media (max-width: 560px) {
   .wsx-tbl__head, .wsx-tr { grid-template-columns: 22px minmax(0,1fr) 88px; }

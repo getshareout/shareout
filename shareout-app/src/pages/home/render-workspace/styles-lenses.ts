@@ -206,6 +206,11 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 .wsx-ttool > .wsx-kn2__prog { flex-basis: 100%; margin-top: 4px; }
 .wsx-ttool + .wsx-atbl__wrap, .wsx-ttool + #wsxArtMount > .wsx-tbl:first-child { border-top: 0; border-radius: 0 0 var(--radius-md) var(--radius-md); }
 #wsxArtMount > .wsx-tbl:first-child { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 0; }
+/* Bulk bar in a view with a slot (Artifacts): covers the chips row under the title instead of floating at the bottom. */
+[data-cmdbar-slot] { position: relative; }
+.wsx [data-cmdbar-slot] > .cmdbar { position: absolute; inset: 0; transform: none; z-index: 5; padding: 0 6px 0 14px; border: 1px solid var(--color-primary); border-radius: var(--radius-md); background: var(--color-bg-elevated); box-shadow: var(--shadow-sm); }
+.wsx [data-cmdbar-slot] > .cmdbar[hidden] { display: none; }
+.wsx [data-cmdbar-slot] > .cmdbar .cmdbar-actions { margin-right: auto; }
 .wsx-atbl { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
 .wsx-atbl th, .wsx-atbl td { padding: 8px 10px; border-bottom: 1px solid var(--color-border); text-align: left; white-space: nowrap; }
 .wsx-atbl tr:last-child td { border-bottom: 0; }
