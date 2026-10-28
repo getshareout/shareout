@@ -1,5 +1,5 @@
 export * from './types';
-export { parseCatalog, parseEntry, extractFrontmatter, type CatalogFile } from './parse';
+export { parseCatalog, parseEntry, extractFrontmatter, splitFrontmatter, type CatalogFile } from './parse';
 export {
   buildLineage,
   traverseLineage,
@@ -44,6 +44,15 @@ export {
   resolveCertification,
 } from './certification';
 export { loadGovernedCatalog, type GovernedCatalog } from './governed';
+export {
+  applyEntryEdit,
+  normalizeEntryEdit,
+  updateCatalogEntry,
+  EDITABLE_FIELDS,
+  type CatalogEntryEdit,
+  type CatalogEditResult,
+  type EditableField,
+} from './edit';
 export {
   seedConnectorsAsSources,
   buildConnectorEntry,

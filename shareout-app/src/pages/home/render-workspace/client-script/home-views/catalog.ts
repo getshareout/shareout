@@ -1,5 +1,5 @@
 /** Data Catalog lens — workspace data map (sources, datasets, pipelines, terms) with lineage. */
-export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — workspace data map (read-only browse + lineage) -----
+export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — workspace data map (browse, lineage, edit) -----
   var catState = { entries: [], byId: {}, facets: { kind: [], domain: [], status: [] }, q: '', kind: '', domain: '', status: '', sort: 'title', asc: true };
   var catCurrentId = '', catReady = false, catPendingId = '';
   // Deep-link entry point — called by the hash router for #l/catalog/<id> (and '' = list).
@@ -226,7 +226,8 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
     var meta = rows.map(function (r) { return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('');
     var up = e.upstream || [], down = e.downstream || [];
     m.innerHTML = '<button class="wsx-cat__back" id="catBack" type="button">' + esc(t('catalog.back')) + '</button>'
-      + '<div class="wsx-cat__dhead"><span class="wsx-atbl__type">' + esc(catKindLabel(e.kind)) + '</span><h3>' + esc(e.title) + '</h3><span id="catDetailBadge">' + catBadge(e.status) + catStaleChip(e) + '</span></div>'
+      + '<div class="wsx-cat__dhead"><span class="wsx-atbl__type">' + esc(catKindLabel(e.kind)) + '</span><h3>' + esc(e.title) + '</h3><span id="catDetailBadge">' + catBadge(e.status) + catStaleChip(e) + '</span>'
+      + '<button class="so-c-btn so-c-btn--secondary so-c-btn--sm wsx-cat__editbtn" id="catEditBtn" type="button">' + esc(t('catalog.editBtn')) + '</button></div>'
       + '<div class="wsx-sched__meta">' + esc(e.id) + '</div>'
       + '<section class="wsx-cat__cert" id="catCert" aria-label="' + esc(t('catalog.certTitle')) + '"></section>'
       + (e.kind === 'metric' ? '<section class="wsx-cat__metric" id="catMetric" aria-label="' + esc(t('catalog.kindMetric')) + '"></section>' : '')
@@ -237,6 +238,7 @@ export const workspace_client_home_views_catalog_JS = `  // ----- Catalog — wo
       + '<div class="wsx-cat__linhead">' + esc(t('catalog.linDownstream')) + ' <span class="wsx-cat__lcount">' + down.length + '</span><span class="wsx-cat__linhint">' + esc(t('catalog.linDownstreamHint')) + '</span></div>' + catLinTable(down)
       + '</div>';
     document.getElementById('catBack').addEventListener('click', function () { catCurrentId = ''; catRenderList(m); });
+    document.getElementById('catEditBtn').addEventListener('click', function () { catEdit(m, id); });
     m.querySelectorAll('[data-cat-goto]').forEach(function (b) {
       b.addEventListener('click', function () { catDetail(m, b.getAttribute('data-cat-goto')); });
     });

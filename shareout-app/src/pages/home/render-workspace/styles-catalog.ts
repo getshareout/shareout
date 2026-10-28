@@ -66,6 +66,13 @@ export const WORKSPACE_CATALOG_STYLES = WORKSPACE_ONBOARDING_STYLES + WORKSPACE_
 .wsx-cat__certin { width: 100%; box-sizing: border-box; min-height: 56px; resize: vertical; }
 .wsx-cat__certbtns { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .wsx-cat__certerr { color: var(--color-error); font-size: var(--text-xs); }
+.wsx-cat__dhead .wsx-cat__editbtn { margin-left: auto; }
+.wsx-cat__edit { max-width: 760px; margin-top: 12px; display: flex; flex-direction: column; gap: 4px; }
+.wsx-cat__edrow { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.wsx-cat__edbody { font-family: var(--font-mono, ui-monospace, monospace); line-height: 1.55; }
+.wsx-cat__edit .wsx-cat__certbtns { margin-top: 12px; }
+.wsx-cat__edwarn { max-width: none; margin: 0 0 4px; color: var(--color-text-secondary); }
+@media (max-width: 560px) { .wsx-cat__edrow { grid-template-columns: 1fr; } }
 .wsx-cat__hist { margin-top: 10px; }
 .wsx-cat__hist summary { cursor: pointer; color: var(--color-text-secondary); font-weight: 600; }
 .wsx-cat__hist ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }

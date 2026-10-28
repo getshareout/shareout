@@ -27,6 +27,7 @@ import { fileInUserBuckets } from './tools/files';
 import { executeReviewAction } from './review-actions';
 import { upsertShareeContextFile } from '../workspace-context';
 import { isKnownShareeContextUpsertError, logAgentToolFailure, userFacingClientNotesError } from './errors';
+import { updateCatalogEntry, type CatalogEntryEdit } from '../catalog/edit';
 
 export type PendingAction =
   | { kind: 'alert_pause' | 'alert_resume' | 'alert_delete'; ruleId: string; label: string }
@@ -47,7 +48,8 @@ export type PendingAction =
   | { kind: 'comment_assign'; artifactId: string; artifactName: string; commentId: string; excerpt: string; assignee: string | null }
   | { kind: 'watch_metric'; artifactId: string; artifactName: string; spec: Record<string, unknown> }
   | { kind: 'present_artifact'; artifactId: string; artifactName: string }
-  | { kind: 'client_notes'; workspaceId: string; clientId: string; clientName: string; note: string; content: string };
+  | { kind: 'client_notes'; workspaceId: string; clientId: string; clientName: string; note: string; content: string }
+  | { kind: 'catalog_edit'; workspaceId: string; entryId: string; entryTitle: string; edit: CatalogEntryEdit; certified: boolean };
 
 // Staged-edit diff for plain-text prompts, trimmed so it can't blow past Telegram's message limit.
 function diffText(diff: string[], max = 2000): string {
@@ -83,6 +85,16 @@ function kv(obj: Record<string, unknown>, max = 6): string[] {
   return Object.entries(obj).slice(0, max).map(([k, v]) => `${k}: ${preview(v, 80)}`);
 }
 
+// One line per field a catalog edit sets, for the confirmation card and prompt.
+function catalogEditLines(edit: CatalogEntryEdit, removed: string): string[] {
+  return Object.entries(edit).map(([k, v]) => {
+    if (v === null || (Array.isArray(v) && !v.length)) return `${k}: ${removed}`;
+    if (Array.isArray(v)) return `${k}: ${v.join(', ')}`;
+    const s = String(v);
+    return `${k}: ${s.length > 200 ? s.slice(0, 200) + '…' : s}`;
+  });
+}
+
 export function describeActionRich(a: PendingAction, locale: Locale = 'en'): ActionCard {
   if (locale === 'es') return describeActionRichEs(a);
   switch (a.kind) {
@@ -115,6 +127,7 @@ export function describeActionRich(a: PendingAction, locale: Locale = 'en'): Act
     case 'watch_metric': return { kind: a.kind, title: 'Watch a metric', subject: a.artifactName, lines: kv(a.spec) };
     case 'present_artifact': return { kind: a.kind, title: 'Make a deck', subject: a.artifactName, detail: 'Generates a private slides artifact from this page with AI.' };
     case 'client_notes': return { kind: a.kind, title: `Save notes on ${a.clientName}`, subject: a.note, detail: 'Replaces the file. Every workspace member’s assistant reads these notes.', lines: [a.content.slice(0, 300) + (a.content.length > 300 ? '…' : '')] };
+    case 'catalog_edit': return { kind: a.kind, title: 'Edit catalog entry', subject: a.entryTitle, detail: a.certified ? 'It is certified: after this edit it shows as changed since certification.' : undefined, lines: catalogEditLines(a.edit, '(removed)') };
   }
 }
 
@@ -153,6 +166,7 @@ function describeActionRichEs(a: PendingAction): ActionCard {
     case 'watch_metric': return { kind: a.kind, title: 'Vigilar una métrica', subject: a.artifactName, lines: kv(a.spec) };
     case 'present_artifact': return { kind: a.kind, title: 'Armar una presentación', subject: a.artifactName, detail: 'Genera con IA una presentación privada a partir de este artefacto.' };
     case 'client_notes': return { kind: a.kind, title: `Guardar notas sobre ${a.clientName}`, subject: a.note, detail: 'Reemplaza el archivo. El asistente de todos los miembros del espacio lee estas notas.', lines: [a.content.slice(0, 300) + (a.content.length > 300 ? '…' : '')] };
+    case 'catalog_edit': return { kind: a.kind, title: 'Editar entrada del catálogo', subject: a.entryTitle, detail: a.certified ? 'Está certificada: después de este cambio figura como modificada desde la certificación.' : undefined, lines: catalogEditLines(a.edit, '(se quita)') };
   }
 }
 
@@ -196,6 +210,8 @@ function describeActionEs(a: PendingAction): string {
     case 'present_artifact': return `¿Genero con IA una presentación privada a partir de “${a.artifactName}”?`;
     case 'client_notes':
       return `¿Guardo estas notas de “${a.note}” sobre ${a.clientName}? Reemplazan el archivo y las lee el asistente de todo el espacio.\n\n${a.content.slice(0, 600)}${a.content.length > 600 ? '…' : ''}`;
+    case 'catalog_edit':
+      return `¿Edito la entrada del catálogo “${a.entryTitle}”?${a.certified ? ' Está certificada: va a figurar como modificada desde la certificación.' : ''}\n\n${catalogEditLines(a.edit, '(se quita)').join('\n')}`;
   }
 }
 
@@ -294,6 +310,8 @@ export function describeAction(a: PendingAction, locale: Locale = 'en'): string 
     case 'present_artifact': return `Generate a private slides deck from “${a.artifactName}” with AI?`;
     case 'client_notes':
       return `Save these notes (“${a.note}”) on ${a.clientName}? They replace the file and every workspace member’s assistant reads them.\n\n${a.content.slice(0, 600)}${a.content.length > 600 ? '…' : ''}`;
+    case 'catalog_edit':
+      return `Edit the catalog entry “${a.entryTitle}”?${a.certified ? ' It is certified: it will show as changed since certification.' : ''}\n\n${catalogEditLines(a.edit, '(removed)').join('\n')}`;
   }
 }
 
@@ -397,7 +415,16 @@ export async function executeAction(env: Env, userId: string, a: PendingAction):
       return await executeReviewAction(env, userId, a);
     case 'client_notes':
       return await executeClientNotes(env, userId, a);
+    case 'catalog_edit':
+      return await executeCatalogEdit(env, userId, a);
   }
+}
+
+async function executeCatalogEdit(env: Env, userId: string, a: Extract<PendingAction, { kind: 'catalog_edit' }>): Promise<string> {
+  if (!(await getInternalWorkspaceRole(env, a.workspaceId, userId))) return 'Only a member of this workspace can edit its catalog.';
+  const r = await updateCatalogEntry(env, a.workspaceId, a.entryId, a.edit, { id: userId, kind: 'agent' });
+  if (!r.ok) return `Couldn’t save that: ${r.message}`;
+  return r.changed.length ? `Done — updated ${r.changed.join(', ')} on “${r.entry.title}”.` : 'Nothing changed — the entry already says that.';
 }
 
 async function executeClientNotes(env: Env, userId: string, a: Extract<PendingAction, { kind: 'client_notes' }>): Promise<string> {

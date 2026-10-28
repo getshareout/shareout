@@ -190,6 +190,10 @@ The **Catalog** lens is built for large workspaces (1,600+ entries):
   notes body, and **navigable lineage tables** for upstream and downstream neighbors. Click
   any catalogued neighbor to jump to its entry; uncatalogued refs show as dashed placeholders
   so gaps are obvious.
+- **Edit** — any member can click **Edit** on an entry to change its name, domain, owner,
+  tags, other names (aliases), related terms and description (markdown). The id, kind and
+  status stay fixed; status only moves through certification. Saving a certified entry marks
+  it changed since certification until an owner or admin certifies it again.
 
 ### Deep links
 
@@ -208,9 +212,11 @@ building — so it uses the correct table names, prefers data an owner or admin
 on something **deprecated** or changed since its certification. It's a hint, never a hard
 rule: you stay in control.
 
-The assistant has read-only tools: **`catalog_search`** (filter by query, kind, domain,
-status, tag) and **`catalog_get`** (full entry + lineage). Both return `{ enabled: false }`
-when the catalog is off.
+The assistant reads the catalog with **`catalog_search`** (filter by query, kind, domain,
+status, tag) and **`catalog_get`** (full entry + lineage), and edits an entry with
+**`catalog_update`** when you ask it to ("add CPR as an alias of the risk matrix entry").
+The edit shows as a card you confirm before anything is saved. All three return
+`{ enabled: false }` when the catalog is off.
 
 ## Keeping it fresh
 
@@ -237,6 +243,19 @@ DELETE /v1/workspaces/{workspaceId}/catalog/files?path=sources/orders.md
 Authorization: Bearer {token}
 ```
 
+To change some fields of an existing entry without rewriting its file, send only those
+fields. Lists and `body` replace the current value; an empty `domain`, `owner` or list
+removes it. The id, kind and status can't change here, and every other frontmatter key is
+kept:
+
+```http
+PATCH /v1/workspaces/{workspaceId}/catalog/entries/{entryId}
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{ "owner": "data-team", "aliases": ["orders", "pedidos"] }
+```
+
 `path` is a relative `.md` path such as `sources/orders.md`: letters, digits, `.`, `_`
 and `-`, each name starting with a letter or digit, no `..`, at most 4 levels and 200
 characters (`400 INVALID_PATH` otherwise). `content` is at most 128 KB
@@ -260,6 +279,7 @@ All routes require workspace membership. A disabled catalog returns `{ "enabled"
 | `GET` | `/v1/workspaces/{id}/catalog/lineage` | Member+ | Full node+edge graph |
 | `POST` | `/v1/workspaces/{id}/catalog/enable` | Admin+ | Opt in/out |
 | `POST` | `/v1/workspaces/{id}/catalog/seed` | Admin+ | Seed `source` entries from connectors |
+| `PATCH` | `/v1/workspaces/{id}/catalog/entries/{entryId}` | Member+ | Edit an entry's title, domain, owner, tags, aliases, terms or body |
 | `PUT` | `/v1/workspaces/{id}/catalog/files` | Member+ | Upsert a catalog markdown file |
 | `DELETE` | `/v1/workspaces/{id}/catalog/files?path=` | Member+ | Delete a file |
 

@@ -267,6 +267,7 @@ Mapa de datos opcional por workspace. Ver [Catálogo de datos](/es/teams/catalog
 | `GET` | `/v1/workspaces/{id}/catalog/lineage` | Member+ | Grafo completo (`nodes`, `edges`). |
 | `POST` | `/v1/workspaces/{id}/catalog/enable` | Admin+ | `{ "enabled": true \| false }`. |
 | `POST` | `/v1/workspaces/{id}/catalog/seed` | Admin+ | Seed idempotente desde conectores. |
+| `PATCH` | `/v1/workspaces/{id}/catalog/entries/{entryId}` | Member+ | `{ "title"?, "domain"?, "owner"?, "tags"?, "aliases"?, "terms"?, "body"? }` — editar una entrada en el lugar; id, kind y estado no cambian. |
 | `PUT` | `/v1/workspaces/{id}/catalog/files` | Member+ | `{ "path", "content" }` — upsert de archivo markdown. |
 | `DELETE` | `/v1/workspaces/{id}/catalog/files?path=` | Member+ | Eliminar un archivo. |
 

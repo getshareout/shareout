@@ -23,8 +23,8 @@ export const TOOLKITS: Record<string, { summary: string; tools: string[] }> = {
     tools: ['list_versions', 'restore_version', 'approve_version', 'list_comments', 'resolve_comment', 'assign_comment'],
   },
   knowledge: {
-    summary: 'data catalog, workspace knowledge (what uploaded files and pages say: passages, clients, people, facts), uploaded files, client notes',
-    tools: ['catalog_search', 'catalog_get', 'knowledge_search', 'knowledge_get', 'knowledge_entity', 'knowledge_facts', 'knowledge_status', 'list_files', 'read_file', 'set_client_notes'],
+    summary: 'data catalog (read and edit entries), workspace knowledge (what uploaded files and pages say: passages, clients, people, facts), uploaded files, client notes',
+    tools: ['catalog_search', 'catalog_get', 'catalog_update', 'knowledge_search', 'knowledge_get', 'knowledge_entity', 'knowledge_facts', 'knowledge_status', 'list_files', 'read_file', 'set_client_notes'],
   },
   skills: {
     summary: 'read and save skills (reusable instructions) in the Library',
