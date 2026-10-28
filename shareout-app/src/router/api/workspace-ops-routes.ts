@@ -7,7 +7,7 @@ import {
   handleListWorkspaceAutomations,
   handleGetWorkspaceAutomationRuns,
   handleRunWorkspaceAutomation,
-  handleToggleWorkspaceAutomation,
+  handleUpdateWorkspaceAutomation,
   handleDeleteWorkspaceAutomation,
   handleListWorkspaceRuns,
   handleGetWorkspaceRun,
@@ -94,7 +94,7 @@ export async function routeWorkspaceOps(ctx: FetchContext): Promise<Response | n
     const user = await requireTokenOrSession(ctx);
     if (!isAuthUser(user)) return user;
     if (request.method === 'PATCH' || request.method === 'PUT') {
-      return addCORS(await handleToggleWorkspaceAutomation(request, env, user, workspaceId, triggerId));
+      return addCORS(await handleUpdateWorkspaceAutomation(request, env, user, workspaceId, triggerId));
     }
     if (request.method === 'DELETE') {
       return addCORS(await handleDeleteWorkspaceAutomation(env, user, workspaceId, triggerId));

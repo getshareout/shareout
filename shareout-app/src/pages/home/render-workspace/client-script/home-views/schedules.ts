@@ -94,9 +94,12 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
   function whenAgo(ms) { if (!ms) return ''; try { return timeAgo(typeof ms === 'string' && isNaN(ms) ? Date.parse(ms) : ms); } catch (e) { return ''; } }
   // One run-history bar. Clickable (opens the Run Inspector drawer) only inside a
   // Team Space, where the workspace-scoped run-detail endpoint is reachable.
-  function runBar(status, surface, runId, note) {
-    var c = (status === 'success' || status === 'completed' || status === 'done' || status === 'delivered' || status === 'ok') ? 'ok'
+  function runCls(status) {
+    return (status === 'success' || status === 'completed' || status === 'done' || status === 'delivered' || status === 'ok') ? 'ok'
       : (status === 'failed' || status === 'error' || status === 'errored') ? 'fail' : 'pend';
+  }
+  function runBar(status, surface, runId, note) {
+    var c = runCls(status);
     var click = (window.WSX_WS && runId) ? ' so-runbar is-click" data-run-surface="' + esc(surface) + '" data-run-id="' + esc(runId) : '';
     return '<span class="wsx-runbar is-' + c + click + '" title="' + esc((status || '') + (note ? ' \\u2014 ' + note : '')) + '"></span>';
   }
@@ -119,11 +122,32 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
         wireBars(host);
       }).catch(function () { host.innerHTML = ''; });
   }
+  // Detail page (#l/schedules/<jobId>): the list's jobs are kept so a card opens at once;
+  // the page itself is the lazy 'jobdetail' chunk (openJobDetail).
+  var schedDetail = '';
+  var schedJobs = null;
+  function schedRoute(id) {
+    schedDetail = id || '';
+    if (!loaded.schedules) return;
+    if (schedDetail) openJobDetail(schedDetail); else loadSchedules();
+  }
+  function schedOpen(id) { schedRoute(id); syncHash(); }
+  function wireOpenCards(m, attr, open) {
+    m.querySelectorAll('[' + attr + ']').forEach(function (card) {
+      card.classList.add('is-openable');
+      card.addEventListener('click', function (e) {
+        if (e.target.closest('button, a, input, select, textarea, [data-run-id]')) return;
+        open(card.getAttribute(attr));
+      });
+    });
+  }
   function loadSchedules() {
     var m = document.getElementById('wsxSchedMount'); m.innerHTML = i18nLoad();
     fetch('/v1/jobs' + (window.WSX_WS ? '?workspace_id=' + encodeURIComponent(window.WSX_WS) : ''), { credentials: 'same-origin' }).then(function (r) { return r.json(); })
       .then(function (d) {
         var jobs = (d && (d.jobs || d.items)) || [];
+        schedJobs = jobs;
+        if (schedDetail) { openJobDetail(schedDetail); return; }
         if (!jobs.length) {
           m.innerHTML = '<p class="wsx-lens__intro">' + esc(t('autof.schedEmpty')) + '</p><div class="wsx-qa-grid wsx-qa-grid--lens">'
             + '<button class="wsx-qa" data-autoform="schedule" type="button"><span class="wsx-qa__ic">' + isvg(SCHED_ICON.check) + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(t('sched.emptyStep')) + '</span><span class="wsx-qa__s">' + esc(t('sched.emptyStepSub')) + '</span></span></button>'
@@ -143,7 +167,7 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
           flow += '<span class="wsx-sched__arrow">' + isvg('<path d="M5 12h14M13 6l6 6-6 6"/>') + '</span>' + schedChip(meta[0], meta[1], 'is-dest');
           var paused = j.enabled === false;
           return '<div class="wsx-sched" data-job="' + esc(j.id) + '" data-af-id="' + esc(j.id) + '" data-af-on="' + (paused ? '0' : '1') + '">'
-            + '<div class="wsx-sched__head"><div class="wsx-sched__title">' + esc(title) + '</div>'
+            + '<div class="wsx-sched__head"><button class="wsx-sched__title wsx-sched__open" type="button" data-sched-open>' + esc(title) + '</button>'
             +   (st && !paused ? '<span class="wsx-sched__badge ' + cls + '">' + esc(st) + '</span>' : '<span class="wsx-sched__badge">' + esc(paused ? t('sched.badgePaused') : t('sched.badgeIdle')) + '</span>') + '</div>'
             + '<div class="wsx-sched__flow">' + flow + '</div>'
             + '<div class="wsx-sched__meta"><span class="wsx-sched__when">' + isvg(SCHED_ICON.clock) + esc(cronHuman(j.schedule)) + '</span>'
@@ -156,6 +180,8 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
         }).join('');
         m.querySelectorAll('[data-runs]').forEach(function (host) { loadJobLogs(host.getAttribute('data-runs'), host); });
         m.querySelectorAll('[data-sched-run]').forEach(function (b) { b.addEventListener('click', function () { runJobNow(b); }); });
+        m.querySelectorAll('[data-sched-open]').forEach(function (b) { b.addEventListener('click', function () { schedOpen(b.closest('[data-job]').getAttribute('data-job')); }); });
+        wireOpenCards(m, 'data-job', schedOpen);
         wireNewAuto(m); wireAutoForm(m); wireAutoCardActions(m, 'schedule');
       }).catch(function () { m.innerHTML = i18nError('common.couldNotLoad'); });
   }
