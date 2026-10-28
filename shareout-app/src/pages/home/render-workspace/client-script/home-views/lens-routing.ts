@@ -26,7 +26,11 @@ export const workspace_client_home_views_lensRouting_JS = `  var lenses = ws.que
       exitCreate();
       lenses.forEach(function (x) { x.classList.remove('is-active'); });
       b.classList.add('is-active');
-      openView(b.getAttribute('data-lens'));
+      // The rail item always lands on the list, even when a detail page was open.
+      var key = b.getAttribute('data-lens');
+      if (key === 'schedules' && schedDetail) schedRoute('');
+      if (key === 'crew' && wsxChunkGet('crew', 'crewDetail')) crewRoute('');
+      openView(key);
     });
   });
 

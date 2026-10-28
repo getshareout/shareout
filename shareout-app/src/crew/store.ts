@@ -14,6 +14,8 @@ const CREW_EVENT_TYPES = new Set(['table.row.inserted']);
 
 const ALLOWED_MODELS = new Set<string>([DEFAULT_CLAUDE_MODEL.id, CLAUDE_HAIKU.id]);
 const DEFAULT_MODEL = DEFAULT_CLAUDE_MODEL.id;
+/** The models a crew may run on, default first (offered by the AI tasks editor). */
+export const CREW_MODEL_IDS: readonly string[] = [...ALLOWED_MODELS];
 
 export interface DefineCrewBody {
   name?: string;

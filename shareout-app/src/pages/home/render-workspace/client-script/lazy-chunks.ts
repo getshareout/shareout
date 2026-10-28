@@ -21,6 +21,8 @@ import { workspace_client_home_views_catalog_JS } from './home-views/catalog';
 import { workspace_client_home_views_catalogCert_JS } from './home-views/catalog-cert';
 import { workspace_client_home_views_catalogMetrics_JS } from './home-views/catalog-metrics';
 import { workspace_client_home_views_crew_JS } from './home-views/crew';
+import { workspace_client_home_views_jobDetail_JS } from './home-views/job-detail';
+import { workspace_client_home_views_autoDetailShared_JS } from './home-views/automation-detail-shared';
 import { workspace_client_home_views_library_JS } from './home-views/library';
 import { workspace_client_inspector_history_JS } from './inspector-history';
 import { workspace_client_inspector_deliver_JS } from './inspector-deliver';
@@ -48,7 +50,8 @@ export const LAZY_CHUNKS: Record<string, ChunkDef> = {
     exports: ['loadCatalog', 'catRoute'],
     vars: ['catCurrentId'],
   },
-  crew: { src: workspace_client_home_views_crew_JS, exports: ['loadCrew'] },
+  crew: { src: workspace_client_home_views_autoDetailShared_JS + workspace_client_home_views_crew_JS, exports: ['loadCrew', 'crewRoute'], vars: ['crewDetail'] },
+  jobdetail: { src: workspace_client_home_views_autoDetailShared_JS + workspace_client_home_views_jobDetail_JS, exports: ['openJobDetail'] },
   library: { src: workspace_client_home_views_library_JS, exports: ['loadLibrary'] },
   history: { src: workspace_client_inspector_history_JS, exports: ['renderHistory', 'openVersionDiff'] },
   deliver: { src: workspace_client_inspector_deliver_JS, exports: ['renderDeliver', 'renderWatches'] },

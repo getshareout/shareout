@@ -10,8 +10,16 @@ vi.mock('../../../src/scheduling/jobs/execute', async (importOriginal) => ({
 }));
 
 vi.mock('../../../src/crew/store', () => ({
-  getCrewById: vi.fn().mockResolvedValue({ id: 'crew1', status: 'active' }),
+  getCrewById: vi.fn().mockResolvedValue({ id: 'crew1', status: 'active', owner_id: 'usr_admin' }),
   listRuns: vi.fn().mockResolvedValue([{ id: 'run1' }]),
+  updateTrigger: vi.fn().mockResolvedValue({ id: 'trg1' }),
+  defineCrew: vi.fn().mockResolvedValue({ id: 'crew1' }),
+  CREW_MODEL_IDS: ['claude-sonnet', 'claude-haiku'],
+}));
+
+vi.mock('../../../src/crew/limits', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  resolveCrewLimits: vi.fn().mockResolvedValue({ max_iterations_cap: 20 }),
 }));
 
 vi.mock('../../../src/crew/triggers', () => ({
@@ -34,13 +42,14 @@ import {
   handleListWorkspaceAutomations,
   handleGetWorkspaceAutomationRuns,
   handleRunWorkspaceAutomation,
-  handleToggleWorkspaceAutomation,
+  handleUpdateWorkspaceAutomation,
   handleDeleteWorkspaceAutomation,
   handleListWorkspaceRuns,
   handleGetWorkspaceRun,
 } from '../../../src/router/api/workspace-jobs';
 import { executeJobNow } from '../../../src/scheduling/jobs';
 import { startCrewRunStream } from '../../../src/crew/triggers';
+import { updateTrigger, defineCrew } from '../../../src/crew/store';
 import { listWorkspaceRuns, getRunDetail } from '../../../src/runs/inspector';
 
 const e = env as unknown as Env;
@@ -58,7 +67,7 @@ beforeAll(async () => {
     `CREATE TABLE IF NOT EXISTS scheduled_jobs (id TEXT PRIMARY KEY, artifact_id TEXT, owner_id TEXT, title TEXT, description TEXT, action TEXT, schedule TEXT, config TEXT, trigger_type TEXT, event_type TEXT, enabled INTEGER, next_run_at TEXT, last_run_at TEXT, last_status TEXT, last_error TEXT, created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))`,
     `CREATE TABLE IF NOT EXISTS job_runs (id TEXT PRIMARY KEY, job_id TEXT, created_at TEXT, status TEXT, duration_ms INTEGER, error TEXT)`,
     `CREATE TABLE IF NOT EXISTS connections (id TEXT PRIMARY KEY, scope_type TEXT, scope_id TEXT, name TEXT, kind TEXT, provider TEXT)`,
-    `CREATE TABLE IF NOT EXISTS crews (id TEXT PRIMARY KEY, name TEXT, status TEXT, model TEXT, instructions TEXT, owner_id TEXT)`,
+    `CREATE TABLE IF NOT EXISTS crews (id TEXT PRIMARY KEY, name TEXT, status TEXT, model TEXT, instructions TEXT, owner_id TEXT, max_iterations INTEGER, run_budget_micro_usd INTEGER)`,
     `CREATE TABLE IF NOT EXISTS crew_triggers (id TEXT PRIMARY KEY, crew_id TEXT, artifact_id TEXT, kind TEXT, cron TEXT, event_type TEXT, enabled INTEGER, next_run_at TEXT, last_run_at TEXT, created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), updated_at TEXT)`,
   ]) await e.DB.exec(sql);
 });
@@ -154,8 +163,45 @@ describe('workspace automations + runs', () => {
     expect(busy.status).toBe(409);
     expect((await busy.json() as { code: string }).code).toBe('NOT_DISPATCHED');
 
-    expect((await handleToggleWorkspaceAutomation(jsonReq({ enabled: false }), e, admin, WS, 'trg1')).status).toBe(200);
+    expect((await handleUpdateWorkspaceAutomation(jsonReq({ enabled: false }), e, admin, WS, 'trg1')).status).toBe(200);
     expect((await handleDeleteWorkspaceAutomation(e, admin, WS, 'trg1')).status).toBe(200);
+  });
+
+  it('edits the task and its schedule from the detail page; only the fields sent change', async () => {
+    vi.mocked(updateTrigger).mockClear(); vi.mocked(defineCrew).mockClear();
+    const patch = (b: unknown) => handleUpdateWorkspaceAutomation(jsonReq(b), e, admin, WS, 'trg1');
+
+    expect((await patch({})).status).toBe(200);
+    expect(updateTrigger).not.toHaveBeenCalled();
+    expect(defineCrew).not.toHaveBeenCalled();
+
+    expect((await patch({ name: '  ' })).status).toBe(400);
+    expect((await patch({ instructions: '' })).status).toBe(400);
+    expect((await patch({ model: 'gpt-4' })).status).toBe(400);
+    expect((await patch({ enabled: 'yes' })).status).toBe(400);
+    const caps = await patch({ maxIterations: 999 });
+    expect(caps.status).toBe(400);
+    expect((await caps.json() as { error: string }).error).toContain('maxIterations');
+    expect(defineCrew).not.toHaveBeenCalled();
+
+    const ok = await patch({ cron: '0 9 * * 1', name: ' Weekly digest ', instructions: 'Summarise the week', model: 'claude-haiku', maxIterations: 6, runBudgetMicroUsd: 500000 });
+    expect(ok.status).toBe(200);
+    expect(updateTrigger).toHaveBeenCalledWith(e, 'crew1', 'trg1', { enabled: undefined, cron: '0 9 * * 1' });
+    expect(defineCrew).toHaveBeenCalledWith(e, 'art1', WS, { name: 'Weekly digest', instructions: 'Summarise the week', model: 'claude-haiku', maxIterations: 6, runBudgetMicroUsd: 500000 }, { keepGrants: true });
+  });
+
+  it('a bad schedule saves nothing', async () => {
+    vi.mocked(defineCrew).mockClear();
+    vi.mocked(updateTrigger).mockResolvedValueOnce({ error: 'Invalid cron expression' });
+    const res = await handleUpdateWorkspaceAutomation(jsonReq({ cron: 'nope', name: 'X' }), e, admin, WS, 'trg1');
+    expect(res.status).toBe(400);
+    expect((await res.json() as { error: string }).error).toBe('Invalid cron expression');
+    expect(defineCrew).not.toHaveBeenCalled();
+  });
+
+  it('is admin-only and scoped to the workspace', async () => {
+    expect((await handleUpdateWorkspaceAutomation(jsonReq({ name: 'X' }), e, member, WS, 'trg1')).status).toBe(403);
+    expect((await handleUpdateWorkspaceAutomation(jsonReq({ name: 'X' }), e, admin, WS, 'nope')).status).toBe(404);
   });
 
   it('validates run inspector surface', async () => {
