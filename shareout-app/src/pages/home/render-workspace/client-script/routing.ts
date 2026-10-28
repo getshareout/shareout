@@ -12,6 +12,9 @@ export const workspace_client_routing_JS = `  // ===== deep-link routing (hash) 
     if (lens === 'artifacts' && typeof curFolder === 'string' && curFolder) return 'l/artifacts/' + encodeURIComponent(curFolder);
     var knPath = lens === 'knowledge' && wsxChunkGet('knowledge', 'knCurrentPath');
     if (knPath) return 'l/knowledge/' + encodeURIComponent(knPath);
+    if (lens === 'schedules' && schedDetail) return 'l/schedules/' + encodeURIComponent(schedDetail);
+    var crewId = lens === 'crew' && wsxChunkGet('crew', 'crewDetail');
+    if (crewId) return 'l/crew/' + encodeURIComponent(crewId);
     return 'l/' + lens;
   }
   function syncHash() {
@@ -50,6 +53,8 @@ export const workspace_client_routing_JS = `  // ===== deep-link routing (hash) 
       if (typeof exitCreate === 'function') exitCreate();
       if (lens === 'artifacts' && typeof artRoute === 'function') artRoute(decodeURIComponent(sub));
       if (lens === 'admin' && sub && typeof adSetTab === 'function') adSetTab(decodeURIComponent(sub));
+      if (lens === 'schedules' && (sub || schedDetail)) schedRoute(decodeURIComponent(sub));
+      if (lens === 'crew' && (sub || wsxChunkGet('crew', 'crewDetail'))) crewRoute(decodeURIComponent(sub));
       openView(lens);
       if (lens === 'catalog' && typeof catRoute === 'function') catRoute(decodeURIComponent(sub));
       if (lens === 'knowledge' && typeof knRoute === 'function') knRoute(decodeURIComponent(sub));

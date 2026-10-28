@@ -5,7 +5,8 @@ import { executeJobNow } from '../../scheduling/jobs/execute';
 import { parseCronSchedule, getNextRunTime } from '../../scheduling/jobs/cron';
 import { missingJobConnection } from '../../scheduling/jobs/connection-check';
 import type { ScheduledJob } from '../../scheduling/jobs';
-import { getCrewById, listRuns } from '../../crew/store';
+import { getCrewById, listRuns, defineCrew, updateTrigger, CREW_MODEL_IDS, type DefineCrewBody } from '../../crew/store';
+import { crewCapsError, resolveCrewLimits } from '../../crew/limits';
 import { startCrewRunStream } from '../../crew/triggers';
 import { getRunDetail, listWorkspaceRuns, type RunDetail, type RunSurface } from '../../runs/inspector';
 import { isRowRestricted } from '../../metric-alerts/row-scope';
@@ -195,6 +196,7 @@ export async function handleListWorkspaceAutomations(
             ct.enabled, ct.next_run_at, ct.last_run_at, ct.created_at,
             c.name AS crew_name, c.status AS crew_status, c.model AS crew_model,
             c.instructions AS crew_instructions, c.owner_id,
+            c.max_iterations AS crew_max_iterations, c.run_budget_micro_usd AS crew_run_budget_micro_usd,
             a.name AS artifact_name, COALESCE(d.slug, a.slug) AS artifact_slug,
             u.email AS owner_email, u.name AS owner_name
        FROM crew_triggers ct
@@ -210,7 +212,7 @@ export async function handleListWorkspaceAutomations(
     ...r,
     enabled: Boolean(r.enabled as number),
   }));
-  return json({ automations });
+  return json({ automations, models: CREW_MODEL_IDS });
 }
 
 export async function handleGetWorkspaceAutomationRuns(
@@ -251,7 +253,10 @@ export async function handleRunWorkspaceAutomation(
   return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } });
 }
 
-export async function handleToggleWorkspaceAutomation(
+/** PATCH an automation from the AI tasks detail page: the trigger (enabled, schedule) and
+ *  the task it runs (name, instructions, model, run caps). Every field is optional; only
+ *  the ones sent change. Caps are bounded as on PATCH /crew (plan cap included). */
+export async function handleUpdateWorkspaceAutomation(
   request: Request,
   env: Env,
   user: AuthUser,
@@ -264,16 +269,59 @@ export async function handleToggleWorkspaceAutomation(
   const trigger = await triggerInWorkspace(env, workspaceId, triggerId);
   if (!trigger) return json({ error: 'Automation not found', code: 'NOT_FOUND' }, 404);
 
-  let body: { enabled?: boolean } = {};
+  let body: Record<string, unknown>;
   try {
-    body = (await request.json()) as { enabled?: boolean };
+    body = (await request.json()) as Record<string, unknown>;
   } catch {
     return json({ error: 'Invalid JSON', code: 'INVALID_JSON' }, 400);
   }
-  const enabled = body.enabled ? 1 : 0;
-  await env.DB.prepare("UPDATE crew_triggers SET enabled = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
-    .bind(enabled, triggerId).run();
-  return json({ success: true, enabled: Boolean(enabled) });
+  if (!body || typeof body !== 'object') return json({ error: 'Invalid JSON', code: 'INVALID_JSON' }, 400);
+
+  const bad = (error: string) => json({ error, code: 'INVALID_REQUEST' }, 400);
+  if (body.enabled !== undefined && typeof body.enabled !== 'boolean') return bad('enabled must be true or false');
+  if (body.cron !== undefined && typeof body.cron !== 'string') return bad('cron must be a string');
+  if (body.name !== undefined && (typeof body.name !== 'string' || !body.name.trim() || body.name.length > 120)) {
+    return bad('name must be 1 to 120 characters');
+  }
+  if (body.instructions !== undefined && (typeof body.instructions !== 'string' || !body.instructions.trim() || body.instructions.length > 20000)) {
+    return bad('instructions must be 1 to 20000 characters');
+  }
+  if (body.model !== undefined && (typeof body.model !== 'string' || !CREW_MODEL_IDS.includes(body.model))) {
+    return bad(`model must be one of: ${CREW_MODEL_IDS.join(', ')}`);
+  }
+
+  const crew = await getCrewById(env, trigger.crew_id);
+  if (!crew) return json({ error: 'Crew not found', code: 'NOT_FOUND' }, 404);
+
+  const caps: Record<string, unknown> = {};
+  if (body.maxIterations !== undefined) caps.maxIterations = body.maxIterations;
+  if (body.runBudgetMicroUsd !== undefined) caps.runBudgetMicroUsd = body.runBudgetMicroUsd;
+  if (Object.keys(caps).length) {
+    const { max_iterations_cap } = await resolveCrewLimits(env, crew.owner_id);
+    const capsError = crewCapsError(caps, max_iterations_cap);
+    if (capsError) return bad(capsError);
+  }
+
+  // Trigger first: a bad cron must not leave the task half-saved.
+  if (body.enabled !== undefined || body.cron !== undefined) {
+    const t = await updateTrigger(env, trigger.crew_id, triggerId, {
+      enabled: body.enabled as boolean | undefined,
+      cron: body.cron as string | undefined,
+    });
+    if ('error' in t) return bad(t.error);
+  }
+
+  const crewPatch: DefineCrewBody = {};
+  if (body.name !== undefined) crewPatch.name = (body.name as string).trim();
+  if (body.instructions !== undefined) crewPatch.instructions = body.instructions as string;
+  if (body.model !== undefined) crewPatch.model = body.model as string;
+  if (caps.maxIterations !== undefined) crewPatch.maxIterations = caps.maxIterations as number;
+  if (caps.runBudgetMicroUsd !== undefined) crewPatch.runBudgetMicroUsd = caps.runBudgetMicroUsd as number;
+  if (Object.keys(crewPatch).length) await defineCrew(env, trigger.artifact_id, workspaceId, crewPatch, { keepGrants: true });
+
+  const row = await env.DB.prepare('SELECT enabled, cron, next_run_at FROM crew_triggers WHERE id = ?')
+    .bind(triggerId).first<{ enabled: number; cron: string | null; next_run_at: string | null }>();
+  return json({ success: true, enabled: Boolean(row?.enabled), cron: row?.cron ?? null, next_run_at: row?.next_run_at ?? null });
 }
 
 export async function handleDeleteWorkspaceAutomation(
