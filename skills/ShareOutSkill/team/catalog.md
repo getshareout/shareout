@@ -232,6 +232,20 @@ DELETE /v1/workspaces/{id}/catalog/files?path=sources/orders.md
 characters (`400 INVALID_PATH` otherwise). `content` is at most 128 KB (`413
 FILE_TOO_LARGE`). `DELETE` accepts any stored path.
 
+To change a few fields of an existing entry, prefer `PATCH` over rewriting the file — it keeps
+every other frontmatter key and works by id or alias:
+
+```
+PATCH /v1/workspaces/{id}/catalog/entries/{entryId}
+{ "aliases": ["orders", "pedidos"], "body": "One row per confirmed order." }
+```
+
+Editable: `title`, `domain`, `owner`, `tags`, `aliases`, `terms`, `body`. Send only what
+changes; lists and `body` replace the current value, an empty `domain`/`owner`/list removes
+it. `id`, `kind` and `status` are refused (`400 INVALID_EDIT`, `param` names the field) —
+status moves only through certification. Editing a certified entry marks it changed since
+certification.
+
 ## Reading the catalog
 
 REST (auth = workspace member or agent token):

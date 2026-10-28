@@ -20,6 +20,7 @@ import { workspace_client_home_views_knowledgeMap_JS } from './home-views/knowle
 import { workspace_client_home_views_catalog_JS } from './home-views/catalog';
 import { workspace_client_home_views_catalogCert_JS } from './home-views/catalog-cert';
 import { workspace_client_home_views_catalogMetrics_JS } from './home-views/catalog-metrics';
+import { workspace_client_home_views_catalogEdit_JS } from './home-views/catalog-edit';
 import { workspace_client_home_views_crew_JS } from './home-views/crew';
 import { workspace_client_home_views_jobDetail_JS } from './home-views/job-detail';
 import { workspace_client_home_views_autoDetailShared_JS } from './home-views/automation-detail-shared';
@@ -46,7 +47,7 @@ export const LAZY_CHUNKS: Record<string, ChunkDef> = {
     vars: ['knCurrentPath'],
   },
   catalog: {
-    src: workspace_client_home_views_catalog_JS + workspace_client_home_views_catalogCert_JS + workspace_client_home_views_catalogMetrics_JS,
+    src: workspace_client_home_views_catalog_JS + workspace_client_home_views_catalogCert_JS + workspace_client_home_views_catalogMetrics_JS + workspace_client_home_views_catalogEdit_JS,
     exports: ['loadCatalog', 'catRoute'],
     vars: ['catCurrentId'],
   },

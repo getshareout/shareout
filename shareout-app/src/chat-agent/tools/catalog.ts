@@ -5,6 +5,8 @@ import { loadGovernedCatalog } from '../../catalog/governed';
 import { searchEntries } from '../../catalog/search';
 import { findEntry, traverseLineage } from '../../catalog/lineage';
 import { type CatalogEntry } from '../../catalog/types';
+import { normalizeEntryEdit } from '../../catalog/edit';
+import type { PendingAction } from '../actions';
 
 const MAX_RESULTS = 50;
 
@@ -80,6 +82,53 @@ export const catalogSearchTool: AccountTool = {
   },
 };
 
+const LIST = { type: 'array', items: { type: 'string' } };
+
+export const catalogUpdateTool: AccountTool = {
+  name: 'catalog_update',
+  description:
+    "Edit an existing entry in this workspace's data catalog: its title, domain, owner, tags, aliases, related terms (term ids) or prose (body, markdown). Read it with catalog_get first and send only the fields to change — a list or the body replaces the current value, so include what should stay. The entry's id, kind and certification status can't change here. The user confirms before anything is saved; editing a certified entry marks it changed since certification.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', description: 'The catalog entry id (from catalog_search or catalog_get).' },
+      title: { type: 'string' },
+      domain: { type: 'string', description: 'Empty string removes it.' },
+      owner: { type: 'string', description: 'Empty string removes it.' },
+      tags: { ...LIST, description: 'The full new list of tags.' },
+      aliases: { ...LIST, description: 'The full new list of other names, acronyms or codes.' },
+      terms: { ...LIST, description: 'The full new list of related term ids.' },
+      body: { type: 'string', description: 'The full new prose (markdown).' },
+    },
+    required: ['id'],
+  },
+  async execute(ctx, input): Promise<{ __propose: PendingAction } | { error: string } | { enabled: false; message: string }> {
+    const wsId = await workspaceId(ctx);
+    if (!wsId) return { error: 'The catalog is only available inside a workspace.' };
+    if (!(await isCatalogEnabled(ctx.env, wsId))) {
+      return { enabled: false, message: 'This workspace has no data catalog.' };
+    }
+    const { id: rawId, ...fields } = input;
+    const id = typeof rawId === 'string' ? rawId.trim() : '';
+    if (!id) return { error: 'Tell me which entry to edit (id).' };
+    const normalized = normalizeEntryEdit(fields);
+    if ('ok' in normalized) return { error: normalized.message };
+    const { entries } = await loadGovernedCatalog(ctx.env, wsId);
+    const entry = findEntry(entries, id);
+    if (!entry) return { error: `No catalog entry with id “${id}”.` };
+    return {
+      __propose: {
+        kind: 'catalog_edit',
+        workspaceId: wsId,
+        entryId: entry.id,
+        entryTitle: entry.title,
+        edit: normalized.edit,
+        certified: entry.certification?.status === 'certified',
+      },
+    };
+  },
+};
+
 export const catalogGetTool: AccountTool = {
   name: 'catalog_get',
   description:
@@ -105,7 +154,14 @@ export const catalogGetTool: AccountTool = {
     const note = entry.certification?.status === 'certified' ? entry.certification.decision?.note : null;
     return {
       enabled: true,
-      entry: { ...summarize(entry), ...(note ? { certification_note: note } : {}), owner: entry.owner, body: entry.body },
+      entry: {
+        ...summarize(entry),
+        ...(note ? { certification_note: note } : {}),
+        owner: entry.owner,
+        aliases: entry.aliases,
+        terms: entry.terms,
+        body: entry.body,
+      },
       upstreamAll: traverseLineage(entries, entry.id, 'upstream'),
       downstreamAll: traverseLineage(entries, entry.id, 'downstream'),
     };

@@ -197,6 +197,11 @@ El lente **Catálogo** está pensado para workspaces grandes (1.600+ entradas):
   metadatos, cuerpo de notas y **tablas de linaje navegables** para vecinos upstream y
   downstream. Clic en cualquier vecino catalogado para saltar a su
   entrada; referencias sin catalogar aparecen como nodos punteados.
+- **Editar** — cualquier miembro puede tocar **Editar** en una entrada para cambiar el nombre,
+  el dominio, el responsable, las etiquetas, otros nombres (alias), los términos relacionados
+  y la descripción (markdown). El id, el kind y el estado no cambian: el estado solo se mueve
+  con la certificación. Guardar una entrada certificada la deja como modificada desde la
+  certificación hasta que un propietario o administrador la vuelva a certificar.
 
 ### Deep links
 
@@ -215,9 +220,11 @@ así usa los nombres de tabla correctos, prefiere los datos que un propietario o
 **obsoleto** o que cambió desde su certificación. Es una pista, nunca una regla rígida: vos
 mantenés el control.
 
-El asistente tiene tools de solo lectura: **`catalog_search`** (filtrar por query, kind,
-dominio, estado, tag) y **`catalog_get`** (entrada completa + linaje). Ambos devuelven
-`{ enabled: false }` cuando el catálogo está apagado.
+El asistente lee el catálogo con **`catalog_search`** (filtrar por query, kind, dominio,
+estado, tag) y **`catalog_get`** (entrada completa + linaje), y edita una entrada con
+**`catalog_update`** cuando se lo pedís ("agregá CPR como alias de la matriz de riesgos").
+El cambio aparece como una tarjeta que confirmás antes de que se guarde nada. Los tres
+devuelven `{ enabled: false }` cuando el catálogo está apagado.
 
 ## Mantenerlo al día
 
@@ -267,6 +274,7 @@ Todas las rutas requieren membresía del workspace. Un catálogo desactivado dev
 | `GET` | `/v1/workspaces/{id}/catalog/lineage` | Member+ | Grafo completo de nodos+aristas |
 | `POST` | `/v1/workspaces/{id}/catalog/enable` | Admin+ | Activar/desactivar |
 | `POST` | `/v1/workspaces/{id}/catalog/seed` | Admin+ | Sembrar entradas `source` desde conectores |
+| `PATCH` | `/v1/workspaces/{id}/catalog/entries/{entryId}` | Member+ | Editar título, dominio, responsable, etiquetas, alias, términos o cuerpo de una entrada |
 | `PUT` | `/v1/workspaces/{id}/catalog/files` | Member+ | Upsert de un archivo markdown |
 | `DELETE` | `/v1/workspaces/{id}/catalog/files?path=` | Member+ | Borrar un archivo |
 

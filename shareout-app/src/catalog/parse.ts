@@ -37,6 +37,12 @@ const KNOWN_KEYS = new Set([
   'last_updated',
 ]);
 
+/** The raw YAML between the `---` fences and the body after them, untouched. */
+export function splitFrontmatter(raw: string): { yaml: string; body: string } | null {
+  const match = raw.match(FRONTMATTER_RE);
+  return match ? { yaml: match[1], body: match[2] ?? '' } : null;
+}
+
 export function extractFrontmatter(raw: string): {
   data: Record<string, unknown>;
   body: string;

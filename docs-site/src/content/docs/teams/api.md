@@ -268,6 +268,7 @@ Optional per-workspace data map. See [Data Catalog](/teams/catalog/).
 | `GET` | `/v1/workspaces/{id}/catalog/lineage` | Member+ | Full graph (`nodes`, `edges`). |
 | `POST` | `/v1/workspaces/{id}/catalog/enable` | Admin+ | `{ "enabled": true \| false }`. |
 | `POST` | `/v1/workspaces/{id}/catalog/seed` | Admin+ | Idempotent connector seed. |
+| `PATCH` | `/v1/workspaces/{id}/catalog/entries/{entryId}` | Member+ | `{ "title"?, "domain"?, "owner"?, "tags"?, "aliases"?, "terms"?, "body"? }` — edit an entry in place; id, kind and status stay fixed. |
 | `PUT` | `/v1/workspaces/{id}/catalog/files` | Member+ | `{ "path", "content" }` — upsert markdown file. |
 | `DELETE` | `/v1/workspaces/{id}/catalog/files?path=` | Member+ | Remove a file. |
 

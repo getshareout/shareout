@@ -16,7 +16,7 @@ import { setClientNotesTool } from './client-notes';
 import { browseStorageTool, listConnectionsTool, queryConnectionTool } from './connection-query';
 import { createScheduleTool } from './create-schedule';
 import { createArtifactTool } from './build';
-import { catalogSearchTool, catalogGetTool } from './catalog';
+import { catalogSearchTool, catalogGetTool, catalogUpdateTool } from './catalog';
 import { knowledgeSearchTool, knowledgeGetTool, knowledgeEntityTool, knowledgeFactsTool, knowledgeStatusTool } from './knowledge';
 import { listFilesTool, readFileTool } from './files';
 import { watchMetricTool } from './watch-metric';
@@ -64,6 +64,7 @@ export const ACCOUNT_TOOLS: AccountTool[] = [
   setClientNotesTool,
   catalogSearchTool,
   catalogGetTool,
+  catalogUpdateTool,
   knowledgeSearchTool,
   knowledgeGetTool,
   knowledgeEntityTool,
@@ -114,7 +115,7 @@ export function defaultCapabilities(_platform: PlatformId): Capabilities {
 const WRITE_TOOLS = new Set([
   'manage_alert', 'manage_job', 'share_artifact', 'ask_crew', 'edit_page',
   'add_table_row', 'update_table_row', 'set_json_value', 'set_client_notes',
-  'watch_metric', 'present_artifact', 'report_problem', 'save_skill', 'invite_members',
+  'watch_metric', 'present_artifact', 'report_problem', 'save_skill', 'invite_members', 'catalog_update',
   'restore_version', 'approve_version', 'resolve_comment', 'assign_comment',
 ]);
 

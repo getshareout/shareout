@@ -17,9 +17,15 @@ import { type CatalogEntry } from '../../catalog/types';
 import { certificationHistory, handleCatalogCertify, isBearer, isSignedInPerson, sessionRequiredResponse } from './catalog-certify';
 import { metricWriteIssue } from '../../catalog/metrics/spec';
 import { syncMetricIndex } from '../../catalog/metrics/index-sync';
+import { normalizeEntryEdit, updateCatalogEntry, type CatalogEditError } from '../../catalog/edit';
 
 const PREFIX_RE = /^\/v1\/workspaces\/([^/]+)\/catalog(?:\/(.*))?$/;
 const CERTIFY_RE = /^entries\/([^/]+)\/certify$/;
+const ENTRY_RE = /^entries\/([^/]+)$/;
+
+function editErrorResponse(err: CatalogEditError): Response {
+  return apiErrorResponse({ message: err.message, code: err.code, status: err.status, ...(err.param ? { param: err.param } : {}) });
+}
 
 function neighbors(entries: CatalogEntry[], ids: string[]) {
   const byId = new Map(entries.map(e => [e.id, e]));
@@ -122,6 +128,23 @@ export async function routeCatalogApi(ctx: FetchContext): Promise<Response | nul
       return cors(jsonResponse({ ok: true }));
     }
     return cors(jsonError('Method not allowed', 'METHOD_NOT_ALLOWED', 405));
+  }
+
+  // PATCH /entries/{id} — edit an entry in place (any member, like PUT /files). id, kind
+  // and status stay fixed; the response carries the entry as everyone now reads it.
+  const entryMatch = sub.match(ENTRY_RE);
+  if (entryMatch && method === 'PATCH') {
+    const entryId = decodeURIComponent(entryMatch[1]);
+    const normalized = normalizeEntryEdit(await request.json().catch(() => null));
+    if ('ok' in normalized) return cors(editErrorResponse(normalized));
+    const result = await updateCatalogEntry(ctx.env, workspaceId, entryId, normalized.edit, {
+      id: auth.id,
+      // A bearer-token write is an agent's; the Home lens writes with the session cookie.
+      kind: isBearer(request) ? 'agent' : 'user',
+    });
+    if (!result.ok) return cors(editErrorResponse(result));
+    const { entries } = await loadGovernedCatalog(ctx.env, workspaceId);
+    return cors(jsonResponse({ ok: true, changed: result.changed, entry: findEntry(entries, result.entry.id) ?? result.entry }));
   }
 
   // POST /entries/{id}/certify — certify, revoke or deprecate the current version (owner/admin).

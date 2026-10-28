@@ -10623,6 +10623,82 @@
             "$ref": "#/components/responses/NotFound"
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Edit a catalog entry",
+        "operationId": "updateWorkspaceCatalogEntry",
+        "description": "Any workspace member. Send only the fields to change; lists and `body` replace the current value, and an empty `domain`/`owner` or list removes it. `id`, `kind` and `status` can't change here (status moves through certification); every other frontmatter key is kept, and the file is stored as manual so connector re-seeds never overwrite it. Editing a certified entry marks it changed since certification.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "maxLength": 300
+                  },
+                  "domain": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 300
+                  },
+                  "owner": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 300
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "terms": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Related glossary term ids."
+                  },
+                  "body": {
+                    "type": "string",
+                    "description": "Markdown prose after the frontmatter."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved: `{ ok, changed, entry }` with the entry as everyone now reads it"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "413": {
+            "description": "The entry would be larger than 128 KB"
+          }
+        }
       }
     },
     "/v1/workspaces/{workspaceId}/catalog/entries/{entryId}/certify": {
