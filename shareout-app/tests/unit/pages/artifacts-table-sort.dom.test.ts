@@ -55,19 +55,27 @@ describe('Artifacts table column sort', () => {
     await flush();
     const head = () => document.querySelector('#wsxArtMount .wsx-tbl__head')!;
     expect(head().hasAttribute('data-sort-own')).toBe(true);
-    expect(head().querySelector('[data-artsort="date"]')!.getAttribute('aria-sort')).toBe('descending');
-
-    click(head().querySelector('[data-artsort="name"]'));
-    await flush();
-    expect(browserUrls().at(-1)).toContain('sort=name&dir=asc');
+    // Opens on All: A→Z with the viewer's favorites first.
+    expect(browserUrls().some((u) => u.includes('level=1&sort=name&dir=asc&favfirst=1'))).toBe(true);
     expect(head().querySelector('[data-artsort="name"]')!.getAttribute('aria-sort')).toBe('ascending');
-    expect(head().querySelector('[data-artsort="date"]')!.hasAttribute('aria-sort')).toBe(false);
 
     click(head().querySelector('[data-artsort="name"]'));
     await flush();
     expect(browserUrls().at(-1)).toContain('sort=name&dir=desc');
+    expect(browserUrls().at(-1)).not.toContain('favfirst');
     expect([...document.querySelectorAll('#wsxArtMount .wsx-tr')].map((r) => r.getAttribute('data-name'))).toEqual(['beta', 'Alpha']);
     expect(head().querySelector('[data-artsort="name"]')!.getAttribute('aria-sort')).toBe('descending');
+
+    click(head().querySelector('[data-artsort="date"]'));
+    await flush();
+    expect(browserUrls().at(-1)).toContain('sort=date&dir=asc');
+    expect(head().querySelector('[data-artsort="date"]')!.getAttribute('aria-sort')).toBe('ascending');
+    expect(head().querySelector('[data-artsort="name"]')!.hasAttribute('aria-sort')).toBe(false);
+
+    click(head().querySelector('[data-artsort="date"]'));
+    await flush();
+    expect(browserUrls().at(-1)).toContain('sort=date&dir=desc');
+    expect(head().querySelector('[data-artsort="date"]')!.getAttribute('aria-sort')).toBe('descending');
   });
 
   it('sorts the For you table in place', async () => {
