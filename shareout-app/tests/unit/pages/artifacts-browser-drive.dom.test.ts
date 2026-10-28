@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 //
-// All Artifacts, Drive-style: All lists the level's folders first, then its artifacts, in
-// one grid; the other chips list every artifact flat. Chips carry workspace totals, and
-// pages past the first load with "Load more".
+// All Artifacts, Drive-style: All (the default chip) lists the level's folders first, then
+// its artifacts, in one grid; the other chips list every artifact flat. Chips carry workspace
+// totals, and pages past the first load with "Load more".
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { workspace_client_home_views_artifactsBrowser_JS as BROWSER } from '../../../src/pages/home/render-workspace/client-script/home-views/artifacts-browser';
 import { HOME_COPY } from '../../../src/pages/home/home-i18n/merge-copy';
@@ -18,7 +18,7 @@ const TOTALS: Record<string, number> = { recent: 30, favorites: 2, shared: 5, ow
 
 function boot() {
   document.body.innerHTML = '<div id="wsx"><div id="home"></div><div id="wsxArtChips">'
-    + ['recent', 'all', 'favorites', 'shared', 'mine'].map((f) => `<button class="wsx-chip${f === 'recent' ? ' is-on' : ''}" data-art-filter="${f}"><span></span><span class="wsx-chip__n"></span></button>`).join('')
+    + ['recent', 'all', 'favorites', 'shared', 'mine'].map((f) => `<button class="wsx-chip${f === 'all' ? ' is-on' : ''}" data-art-filter="${f}"><span></span><span class="wsx-chip__n"></span></button>`).join('')
     + '</div><div id="wsxArtMount"></div></div>';
   urls = [];
   const fetchMock = vi.fn((url: string) => {
@@ -61,24 +61,25 @@ const chip = (f: string) => document.querySelector(`[data-art-filter="${f}"]`)!;
 beforeEach(() => { document.body.innerHTML = ''; });
 
 describe('All Artifacts, Drive-style', () => {
-  it('lists every artifact flat under Recent, with workspace totals on the chips', async () => {
+  it('opens on All: the level, folders first, then artifacts, with workspace totals on the chips', async () => {
     const w = boot();
     w.exitFolder(); await settle();
-    expect(grid()).toEqual(['recent-p1']);
+    expect(urls[0]).toContain('level=1');
+    expect(grid()).toEqual(['fld_1', 'root-art']);
     expect(['recent', 'all', 'favorites', 'shared', 'mine'].map((f) => chip(f).querySelector('.wsx-chip__n')!.textContent)).toEqual(['30', '30', '2', '5', '9']);
   });
 
-  it('All shows the level: folders first, then artifacts', async () => {
+  it('Recent lists every artifact flat', async () => {
     const w = boot();
     w.exitFolder(); await settle();
-    (chip('all') as HTMLButtonElement).click(); await settle();
-    expect(urls.some((u) => u.includes('level=1'))).toBe(true);
-    expect(grid()).toEqual(['fld_1', 'root-art']);
+    (chip('recent') as HTMLButtonElement).click(); await settle();
+    expect(grid()).toEqual(['recent-p1']);
   });
 
   it('Load more appends the next page', async () => {
     const w = boot();
     w.exitFolder(); await settle();
+    (chip('recent') as HTMLButtonElement).click(); await settle();
     const more = document.querySelector('.wsx-art-more button') as HTMLButtonElement;
     expect(more.textContent).toBe(t('artifacts.loadMore').replace('{n}', '6'));
     more.click(); await settle();
@@ -86,11 +87,22 @@ describe('All Artifacts, Drive-style', () => {
     expect(document.querySelector('.wsx-art-more')).toBeNull();
   });
 
-  it('asks the server for each chip’s sort: Recent by last update, All A→Z', async () => {
+  it('asks the server for each chip’s sort, favorites first: All A→Z, Recent by last update', async () => {
     const w = boot();
     w.exitFolder(); await settle();
-    expect(urls[0]).toContain('scope=all&sort=date&dir=desc');
-    expect(urls.some((u) => u.includes('level=1&sort=name&dir=asc'))).toBe(true);
+    expect(urls[0]).toContain('level=1&sort=name&dir=asc&favfirst=1');
+    expect(urls.some((u) => u.includes('scope=all&sort=date&dir=desc&favfirst=1'))).toBe(true);
+  });
+
+  it('a column header sorts by that column alone, folders still first', async () => {
+    const w = boot();
+    w.exitFolder(); await settle();
+    const h = document.createElement('span'); h.setAttribute('data-artsort', 'date');
+    document.getElementById('wsxArtMount')!.appendChild(h);
+    h.click(); await settle();
+    expect(urls.at(-1)).toContain('level=1&sort=date&dir=asc&workspace=');
+    expect(urls.at(-1)).not.toContain('favfirst');
+    expect(grid()).toEqual(['fld_1', 'root-art']);
   });
 
   it('opening a folder switches to All', async () => {

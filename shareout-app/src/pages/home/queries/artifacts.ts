@@ -157,7 +157,7 @@ export async function queryHomeArtifacts(
   }
 
   const [sortSql, defaultDir] = HOME_SORT_SQL[Object.hasOwn(HOME_SORT_SQL, sort) ? sort : 'recent'];
-  const orderBy = `${sortSql.replace('{dir}', (filters.dir || defaultDir).toUpperCase())}, a.created_at DESC, a.id`;
+  const orderBy = `${filters.favFirst ? 'is_favorite > 0 DESC, ' : ''}${sortSql.replace('{dir}', (filters.dir || defaultDir).toUpperCase())}, a.created_at DESC, a.id`;
 
   // The page and its total are independent reads: one wave, not two.
   const [countResult, artifacts] = await Promise.all([

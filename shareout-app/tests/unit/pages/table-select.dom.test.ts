@@ -8,7 +8,8 @@ import { renderArtifactRow } from '../../../src/pages/home/render-cards';
 import type { ArtifactRow } from '../../../src/pages/home/types';
 import { HOME_COPY } from '../../../src/pages/home/home-i18n/merge-copy';
 
-const t = (k: string) => HOME_COPY.en[k] ?? k;
+let lang: 'en' | 'es' = 'en';
+const t = (k: string) => HOME_COPY[lang][k] ?? k;
 const esc = (s: unknown) => (s == null ? '' : String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'));
 const art = (id: string, o: Partial<ArtifactRow> = {}): ArtifactRow => ({
   id, name: id, slug: id, display_slug: id, description: null, artifact_type: 'html', visibility: 'workspace', workspace_id: 'wsp_1',
@@ -76,6 +77,31 @@ describe('table multi-select', () => {
     expect(requests).toHaveLength(1);
     expect(row('a1').getAttribute('data-favorite')).toBe('1');
     expect(selected()).toEqual([]);
+  });
+});
+
+describe('bulk bar placement', () => {
+  const label = () => document.getElementById('cmdbar')!.querySelector('.cmdbar-count')!.textContent!.trim();
+  it('sits in the active view\'s slot (under the title) and counts in the singular', () => {
+    lang = 'es';
+    const view = document.createElement('div'); view.className = 'wsx__view is-active';
+    const slot = document.createElement('div'); slot.setAttribute('data-cmdbar-slot', ''); view.appendChild(slot);
+    document.getElementById('root')!.appendChild(view);
+    sel('a1');
+    expect(document.getElementById('cmdbar')!.parentNode).toBe(slot);
+    expect(label()).toBe('1 seleccionado');
+    sel('a2');
+    expect(label()).toBe('2 seleccionados');
+    expect(document.body.classList.contains('selecting-float')).toBe(false);
+    lang = 'en';
+  });
+
+  it('floats at the bottom where there is no slot, and the composer pill steps aside', () => {
+    sel('a1');
+    expect(document.getElementById('cmdbar')!.parentNode).toBe(document.body);
+    expect(document.body.classList.contains('selecting-float')).toBe(true);
+    document.getElementById('cmdbarClear')!.click();
+    expect(document.body.classList.contains('selecting-float')).toBe(false);
   });
 });
 
