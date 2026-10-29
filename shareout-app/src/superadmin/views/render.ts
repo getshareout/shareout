@@ -15,6 +15,7 @@ import { getPlatformMetrics, getAiUsageMetrics } from '../metrics';
 import { listModerationQueue } from '../artifacts-admin';
 import { listUsers } from '../users';
 import { renderFeaturesBody } from '../features-view';
+import { getRecentBuildTraces } from '../../build-agent/trace-store';
 import { getHourlySeries, getWindowSummary, getRecentErrors } from '../../observability/store';
 import type { RangeDef } from './config';
 import { auditBody, moderationBody, usersBody } from './bodies/admin-lists';
@@ -57,13 +58,14 @@ export async function renderView(env: Env, view: string, range: RangeDef): Promi
       return tokensBody(m, ai);
     }
     case 'health': {
-      const [w24, w1, series, errors] = await Promise.all([
+      const [w24, w1, series, errors, builds] = await Promise.all([
         getWindowSummary(env, 24),
         getWindowSummary(env, 1),
         getHourlySeries(env, 48),
         getRecentErrors(env, 50),
+        getRecentBuildTraces(env, 25),
       ]);
-      return healthBody(w24, w1, series, errors);
+      return healthBody(w24, w1, series, errors, builds);
     }
     case 'operations':
       return opsBody(await getOpsMetrics(env));

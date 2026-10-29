@@ -12,6 +12,7 @@ import { agentSummary } from '../verify/report';
 import { runVerify } from '../verify/service';
 import { ENTRYPOINT } from './page-files';
 import { runBuildAgent, type BuildAgentDeps, type BuildAgentResult } from './agent';
+import { startBuildTrace, traceProvider, type BuildTrace } from './trace';
 
 /** `BUILD_AGENT=on` turns AI page builds into the tool-using agent. Anything else keeps the one-shot builder. */
 export function buildAgentEnabled(env: Env): boolean {
@@ -41,26 +42,58 @@ function pageTest(env: Env, user: PageBuildRequest['user']): BuildAgentDeps['ver
   };
 }
 
+/** Records the page test and each publish in the trace, leaving what the agent sees untouched. */
+function tracedDeps(trace: BuildTrace, verify: BuildAgentDeps['verify'], publish: BuildAgentDeps['publish']): Pick<BuildAgentDeps, 'verify' | 'publish'> {
+  return {
+    publish: async (files, opts) => {
+      const outcome = await publish(files, opts);
+      trace.publish(outcome.ok, opts.draft);
+      return outcome;
+    },
+    verify: verify && (async (page) => {
+      const report = await verify(page);
+      if (report) trace.verify(report.status, report.errors);
+      return report;
+    }),
+  };
+}
+
+/** How a finished agent run is filed in its trace. */
+function agentTraceOutcome(result: BuildAgentResult): Parameters<BuildTrace['finish']> {
+  if (result.ok) return ['published', { artifactId: result.page.artifactId }];
+  if (result.reason === 'provider_error' || result.reason === 'budget') return ['failed', { errorCode: result.reason, errorMessage: result.detail }];
+  if (result.reason === 'publish_failed') return ['failed', { errorCode: result.code ?? result.reason, errorMessage: result.detail }];
+  return ['gave_up', { errorCode: result.reason, errorMessage: result.detail, artifactId: result.draft?.artifactId }];
+}
+
 /** Runs the build agent, or returns null when no AI provider is configured (callers fall back to the one-shot builder). */
 export async function runPageBuild(req: PageBuildRequest): Promise<BuildAgentResult | null> {
   const provider = getCrewProvider(req.env);
   if (!provider) return null;
-  return runBuildAgent(
-    {
-      env: req.env,
-      provider,
-      meter: { ...req.meter, kind: 'page_build' },
-      locale: req.locale,
-      isPublic: req.isPublic,
-      publish: req.publish,
-      verify: pageTest(req.env, req.user),
-      onProgress: req.onProgress,
-    },
-    {
-      prompt: req.prompt,
-      previousFiles: req.previousHtml ? [{ path: ENTRYPOINT, content: req.previousHtml, mime: 'text/html' }] : undefined,
-    },
-  );
+  const meter = { ...req.meter, kind: 'page_build' };
+  const trace = startBuildTrace(req.env, meter, 'agent');
+  try {
+    const result = await runBuildAgent(
+      {
+        env: req.env,
+        provider: traceProvider(provider, trace),
+        meter,
+        locale: req.locale,
+        isPublic: req.isPublic,
+        ...tracedDeps(trace, pageTest(req.env, req.user), req.publish),
+        onProgress: req.onProgress,
+      },
+      {
+        prompt: req.prompt,
+        previousFiles: req.previousHtml ? [{ path: ENTRYPOINT, content: req.previousHtml, mime: 'text/html' }] : undefined,
+      },
+    );
+    await trace.finish(...agentTraceOutcome(result));
+    return result;
+  } catch (err) {
+    await trace.finish('failed', { errorCode: 'EXCEPTION', errorMessage: err instanceof Error ? err.message : String(err) });
+    throw err;
+  }
 }
 
 /** What to tell the user about a build that did not produce a passing page. */

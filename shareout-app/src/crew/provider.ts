@@ -1,7 +1,8 @@
 import type { Env } from '../types';
 import { meterAiCall, type AiMeter } from '../data/ai-usage';
 import { workspaceBudgetBlock } from '../data/ai-budget';
-import { getBuildChain, isProviderLevelStatus, providerHeaders, type AIConfig } from '../data/agent/anthropic';
+import { reportProviderBilling } from '../data/agent/ai-ops-alerts';
+import { getBuildChain, isEnvProvider, isProviderLevelStatus, providerHeaders, type AIConfig } from '../data/agent/anthropic';
 import { logCrewProviderFailure, userFacingCrewProviderError } from './errors';
 import { GATEWAY_CACHING_PARAMS, gatewayReasoningParams, thinkingOffParams } from '../data/agent/models';
 
@@ -133,6 +134,7 @@ async function openTurn(
       { ...fields, httpStatus: response.status },
       new Error(`AI provider HTTP ${response.status}: ${text.slice(0, 2000)}`),
     );
+    if (isEnvProvider(env, cfg)) await reportProviderBilling(env, cfg.provider, cfg.model, response.status, text);
     return {
       status: response.status,
       event: { type: 'error', error: userFacingCrewProviderError(undefined, response.status), retryable: isProviderLevelStatus(response.status) },

@@ -6,6 +6,7 @@ import type { Env } from '../types';
 import { fetchWithTimeout } from '../fetch-utils';
 import { createLogger } from '../logging';
 import { priceCall } from './agent/model-costs';
+import { alertLowGatewayCredit } from './agent/ai-ops-alerts';
 
 const GATEWAY = 'https://ai-gateway.vercel.sh/v1';
 const BATCH = 300;
@@ -57,7 +58,10 @@ export async function reconcileAiUsage(env: Env): Promise<{ actual: number; repr
       if (res.ok) {
         creditUsd = Number(((await res.json()) as { balance?: string }).balance);
         const floor = Number(env.AI_CREDIT_ALERT_USD) || DEFAULT_CREDIT_ALERT_USD;
-        if (Number.isFinite(creditUsd) && creditUsd < floor) log.error('AI gateway credit low', { balanceUsd: creditUsd, alertBelowUsd: floor });
+        if (Number.isFinite(creditUsd) && creditUsd < floor) {
+          log.error('AI gateway credit low', { balanceUsd: creditUsd, alertBelowUsd: floor });
+          await alertLowGatewayCredit(env, creditUsd, floor);
+        }
       }
     } catch (err) {
       log.warn('AI gateway credit check failed', { error: String(err) });

@@ -4,6 +4,7 @@ import { meterAiCall, type AiMeter } from '../ai-usage';
 import { BUDGET_CODE, WorkspaceBudgetError, workspaceBudgetBlock } from '../ai-budget';
 import { fetchWithTimeout, FetchTimeoutError } from '../../fetch-utils';
 import { createLogger } from '../../logging';
+import { reportProviderBilling } from './ai-ops-alerts';
 import { DEFAULT_CLAUDE_MODEL, OPENAI_CHAT_MODEL, gatewayReasoningParams, temperatureParams, thinkingOffParams } from './models';
 
 const AI_TIMEOUT_MS = 30000;
@@ -314,6 +315,7 @@ export async function* streamChat(
           error: `AI API error: ${response.status} ${error}`,
           retryable: isProviderLevelStatus(response.status),
         };
+        if (isEnvProvider(env, cfg)) await reportProviderBilling(env, cfg.provider, cfg.model, response.status, error);
       } else {
         const reader = response.body?.getReader();
         if (!reader) {
@@ -435,6 +437,7 @@ export async function chat(
 
   if (!response.ok) {
     const error = await response.text();
+    if (isEnvProvider(env, aiConfig)) await reportProviderBilling(env, aiConfig.provider, aiConfig.model, response.status, error);
     throw new Error(`AI API error: ${response.status} ${error}`);
   }
 
