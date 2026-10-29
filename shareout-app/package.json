@@ -86,7 +86,7 @@
     "acorn": "^8.19.0",
     "aws4fetch": "^1.0.20",
     "fflate": "^0.8.3",
-    "postal-mime": "^4.0.7",
+    "postal-mime": "^4.1.4",
     "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz",
     "yjs": "^13.6.33"
   },
