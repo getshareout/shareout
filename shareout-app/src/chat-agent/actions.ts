@@ -11,7 +11,8 @@ import { botInsertRows, botUpdateRowById, botUpdateRowsByFilter } from '../data/
 import { botSetJson } from '../data/json-store';
 import { buildBotDataContext } from './data-write';
 import { BUILD_FAILURE_COPY, BuildTruncatedError, generateArtifactHtml } from '../data/agent/build-page';
-import { publishGeneratedHtml } from '../publish/publish-generated-html';
+import { publishGeneratedFiles, publishGeneratedHtml } from '../publish/publish-generated-html';
+import { agentFailureText, buildAgentEnabled, runPageBuild } from '../build-agent/run';
 import { checkRateLimit, incrementRateLimit } from '../api-auth';
 import { checkStorageQuota } from '../quota';
 import { rateLimitMessage, storageLimitMessage } from '../publish/limits';
@@ -257,6 +258,10 @@ export async function executeBuildArtifact(
   if (!u?.email) return failed(copy.noAccount);
   const rate = await checkRateLimit(env, userId, 'publish', u.email);
   if (!rate.allowed) return failed(rateLimitMessage(rate.reset));
+  if (buildAgentEnabled(env)) {
+    const built = await executeBuildArtifactWithAgent(env, userId, u.email, a, onProgress, locale);
+    if (built) return built;
+  }
   onProgress?.(copy.designing);
   let html: string;
   try {
@@ -272,11 +277,7 @@ export async function executeBuildArtifact(
     const workspaceId = a.workspace_id && await getInternalWorkspaceRole(env, a.workspace_id, userId) ? a.workspace_id : null;
     const published = await publishGeneratedHtml(env, { id: userId, email: u.email }, { name: a.name, html, workspaceId, visibility: 'private' });
     await incrementRateLimit(env, userId, 'publish', u.email);
-    if (a.source_file_id && await fileInUserBuckets(env, userId, workspaceId, a.source_file_id)) {
-      await env.DB.prepare(
-        'INSERT INTO blob_artifact_links (blob_id, artifact_id, created_at) VALUES (?, ?, ?)'
-      ).bind(a.source_file_id, published.artifact.id, new Date().toISOString()).run();
-    }
+    await linkSourceFile(env, userId, workspaceId, a.source_file_id, published.artifact.id);
     return {
       ok: true,
       text: copy.published(published.deployment.url),
@@ -288,6 +289,48 @@ export async function executeBuildArtifact(
   } catch {
     return failed(fail.publishFailed);
   }
+}
+
+async function linkSourceFile(env: Env, userId: string, workspaceId: string | null, fileId: string | undefined, artifactId: string): Promise<void> {
+  if (!fileId || !(await fileInUserBuckets(env, userId, workspaceId, fileId))) return;
+  await env.DB.prepare('INSERT INTO blob_artifact_links (blob_id, artifact_id, created_at) VALUES (?, ?, ?)')
+    .bind(fileId, artifactId, new Date().toISOString()).run();
+}
+
+/** BUILD_AGENT=on: the page is written, checked and fixed by a tool-using agent. Null when no AI provider is configured (the one-shot builder takes over). */
+async function executeBuildArtifactWithAgent(
+  env: Env,
+  userId: string,
+  email: string,
+  a: Extract<PendingAction, { kind: 'build_artifact' }>,
+  onProgress: ((label: string) => void) | undefined,
+  locale: Locale,
+): Promise<BuildResult | null> {
+  const copy = t(locale, BUILD_ACTION_COPY);
+  const fail = t(locale, BUILD_FAILURE_COPY);
+  const workspaceId = a.workspace_id && await getInternalWorkspaceRole(env, a.workspace_id, userId) ? a.workspace_id : null;
+  let counted = false;
+  const result = await runPageBuild({
+    env, user: { id: userId, email }, locale, prompt: a.prompt, isPublic: false, onProgress,
+    meter: { workspaceId: a.workspace_id ?? null, userId, kind: 'page_build', source: 'assistant' },
+    // Assistant builds are always private, so there is no draft stage: the same publish serves every round.
+    publish: async (files, o) => {
+      const quota = await checkStorageQuota(env, userId, files.map(({ path, content, mime }) => ({ path, content, mime })));
+      if (!quota.allowed) return { ok: false, error: storageLimitMessage(quota) };
+      try {
+        const published = await publishGeneratedFiles(env, { id: userId, email }, { name: a.name, files, slug: o.slug, workspaceId, visibility: 'private' });
+        if (!counted) await incrementRateLimit(env, userId, 'publish', email);
+        counted = true;
+        return { ok: true, page: { url: published.deployment.url, slug: published.deployment.slug, artifactId: published.artifact.id, extra: published.deployment.subdomain_url } };
+      } catch {
+        return { ok: false, error: fail.publishFailed };
+      }
+    },
+  });
+  if (!result) return null;
+  if (!result.ok) return { ok: false, text: agentFailureText(result, locale), name: a.name };
+  await linkSourceFile(env, userId, workspaceId, a.source_file_id, result.page.artifactId);
+  return { ok: true, text: copy.published(result.page.url), url: (result.page.extra as string | undefined) || result.page.url, slug: result.page.slug, artifactId: result.page.artifactId, name: a.name };
 }
 
 /** The human-readable confirmation prompt shown above the ✅/❌ buttons. */

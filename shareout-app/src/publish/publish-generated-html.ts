@@ -12,9 +12,19 @@ export async function publishGeneratedHtml(
   user: { id: string; email: string },
   opts: { name: string; slug?: string; html: string; workspaceId?: string | null; visibility: Visibility; allowOpen?: boolean },
 ): Promise<PublishResponse> {
+  const { html, ...rest } = opts;
+  return publishGeneratedFiles(env, user, { ...rest, files: [{ path: 'index.html', content: html, mime: 'text/html' }] });
+}
+
+/** Same, for a page of several files (the build agent's output). `index.html` is the entry. Publishing an existing slug again adds a version. */
+export async function publishGeneratedFiles(
+  env: Env,
+  user: { id: string; email: string },
+  opts: { name: string; slug?: string; files: FileEntry[]; workspaceId?: string | null; visibility: Visibility; allowOpen?: boolean },
+): Promise<PublishResponse> {
   const slug = opts.slug || (await resolveNameSlug(env, opts.name, opts.workspaceId ?? null, user.id));
   const visibility = opts.visibility;
-  const files: FileEntry[] = [{ path: 'index.html', content: opts.html, mime: 'text/html' }];
+  const files = opts.files;
 
   const result = await publishArtifact(env, { id: user.id, email: user.email, username: null }, {
     name: opts.name,

@@ -6,7 +6,9 @@ import { BUILD_FAILURE_COPY, BUILD_TRUNCATED_CODE, buildSystemPrompt, extractHtm
 import { localeForRecipient, t, type Locale } from '../../i18n';
 import { pageLocale } from '../../i18n/accept-language';
 import { getPackDirective } from '../../pages/themes';
-import { publishGeneratedHtml } from '../../publish/publish-generated-html';
+import { publishGeneratedFiles, publishGeneratedHtml } from '../../publish/publish-generated-html';
+import { agentFailureText, buildAgentEnabled, runPageBuild } from '../../build-agent/run';
+import type { BuildAgentDeps } from '../../build-agent/agent';
 import { checkSlidingWindowRateLimit, getClientIp } from '../../rate-limit';
 import { createLogger, logError } from '../../logging';
 import { requireCreateEnabled } from '../../pages/create-gate';
@@ -15,7 +17,7 @@ import { jsonWithApiErrors } from '../../http/api-error';
 import { checkRateLimit, incrementRateLimit } from '../../api-auth';
 import { checkStorageQuota } from '../../quota';
 import { rateLimitExceededResponse, storageLimitMessage } from '../../publish/limits';
-import type { PublishResponse, Visibility } from '../../types';
+import type { FileEntry, PublishResponse, Visibility } from '../../types';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { resolveAllowOpen } from '../../access/allow-open';
 
@@ -238,6 +240,11 @@ function streamGenerate(opts: {
     async start(controller) {
       const send = (obj: unknown) => controller.enqueue(encoder.encode(sseLine(obj)));
       try {
+        // BUILD_AGENT=on: the page is written, checked and fixed by a tool-using agent, then published.
+        if (publish && buildAgentEnabled(env) && (await agentBuild(env, { ...opts, publish }, send))) {
+          controller.close();
+          return;
+        }
         const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
         if (previousHtml) {
           messages.push({ role: 'user', content: `Here is the current page you built:\n\n${previousHtml}` });
@@ -311,6 +318,48 @@ function streamGenerate(opts: {
   });
 }
 
+// The agent build: streams `step` events (what the agent is doing, in the user's language),
+// then `done` with the published page or `error`. False when no AI provider is configured,
+// so the caller falls back to the one-shot builder.
+async function agentBuild(
+  env: Env,
+  opts: { prompt: string; previousHtml: string; theme?: string; locale: Locale; publish: { user: SessionUser; slug?: string; share: Share }; meter: AiMeter },
+  send: (obj: unknown) => void,
+): Promise<boolean> {
+  const { publish, locale } = opts;
+  const copy = t(locale, BUILD_FAILURE_COPY);
+  const name = deriveName(opts.prompt);
+  let counted = false;
+  const publishFiles: BuildAgentDeps['publish'] = async (files, o) => {
+    // A page still being tested stays private; it goes out as asked once it passed.
+    const share: Share = o.draft ? { visibility: 'private', workspaceId: publish.share.workspaceId } : publish.share;
+    try {
+      const outcome = await publishFilesWithLimits(env, publish.user, { name, slug: o.slug ?? publish.slug, files, ...share }, !counted);
+      if ('error' in outcome) return { ok: false, error: outcome.error, code: outcome.code };
+      counted = true;
+      return { ok: true, page: { url: outcome.deployment.url, slug: outcome.deployment.slug, artifactId: outcome.artifact.id, extra: publishedFields(outcome, publish.share) } };
+    } catch (err) {
+      logError(createLogger(env, { scope: 'create', event: 'publish.failed' }), 'create publish failed', err);
+      return { ok: false, error: copy.publishFailed };
+    }
+  };
+  const userPrompt = opts.previousHtml ? opts.prompt : `${opts.prompt}\n\nDesign direction: ${getPackDirective(opts.theme)}`;
+  const result = await runPageBuild({
+    env, user: publish.user, meter: opts.meter, locale, prompt: userPrompt, previousHtml: opts.previousHtml,
+    isPublic: publish.share.visibility === 'public',
+    publish: publishFiles,
+    onProgress: (label) => send({ type: 'step', label }),
+  });
+  if (!result) return false;
+  if (!result.ok) {
+    send({ type: 'error', error: agentFailureText(result, locale), ...(result.reason === 'publish_failed' && result.code ? { code: result.code } : {}) });
+    return true;
+  }
+  const html = result.files.find((f) => f.path === 'index.html')?.content ?? '';
+  send({ type: 'done', mode: 'build', html, ...(result.page.extra as object), capabilities: detectCapabilities(html) });
+  return true;
+}
+
 // Publish HTML the user already previewed — persist it exactly as shown.
 async function handlePublish(
   env: Env,
@@ -350,6 +399,20 @@ async function publishWithLimits(
   return published;
 }
 
+// `countPublish: false` for a republish of the same page (the build agent's draft → live), so one build is one publish.
+async function publishFilesWithLimits(
+  env: Env,
+  user: SessionUser,
+  opts: { name: string; slug?: string; files: FileEntry[] } & Share,
+  countPublish = true
+): Promise<PublishResponse | { error: string; code: 'STORAGE_LIMIT_EXCEEDED' }> {
+  const quota = await checkStorageQuota(env, user.id, opts.files.map(({ path, content, mime }) => ({ path, content, mime })));
+  if (!quota.allowed) return { error: storageLimitMessage(quota), code: 'STORAGE_LIMIT_EXCEEDED' };
+  const published = await publishGeneratedFiles(env, user, opts);
+  if (countPublish) await incrementRateLimit(env, user.id, 'publish', user.email);
+  return published;
+}
+
 // What the client needs to render an honest result: a held or private page must not
 // be announced as "Live".
 function publishedFields(published: PublishResponse, share: Share) {
@@ -368,7 +431,7 @@ function publishedFields(published: PublishResponse, share: Share) {
 // Phase 1: route the request to a reply, a confirmation, or a build.
 async function handlePlan(env: Env, prompt: string, hasPage: boolean, meter: AiMeter): Promise<Response> {
   const context = (hasPage ? 'The user already has a published page. ' : 'No page exists yet. ') + `Request: ${prompt}`;
-  let raw = '';
+  let raw: string;
   try {
     const res = await chat(env, meter, [{ role: 'user', content: context }], PLANNER_SYSTEM_PROMPT, getAgentChatModel(env), 500);
     raw = res.content;

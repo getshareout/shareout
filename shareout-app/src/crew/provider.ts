@@ -14,6 +14,8 @@ export interface ProviderTool {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
+  /** Stream the tool's arguments as they are written (Anthropic route); the caller validates the parsed input. */
+  eagerInput?: boolean;
 }
 
 export interface NeutralToolCall {
@@ -24,8 +26,22 @@ export interface NeutralToolCall {
 
 export type NeutralTurn =
   | { role: 'user'; text: string }
-  | { role: 'assistant'; text: string; toolCalls: NeutralToolCall[] }
+  /** `compaction`: a server-side summary block (Anthropic route only), sent back verbatim ahead of the text. */
+  | { role: 'assistant'; text: string; toolCalls: NeutralToolCall[]; compaction?: string }
   | { role: 'tool'; results: Array<{ id: string; content: string }> };
+
+/**
+ * Anthropic-native harness features. Honoured only by AnthropicCrewProvider (a direct
+ * ANTHROPIC_API_KEY call); every other route ignores them and the caller trims its own transcript.
+ */
+export interface NativeHarness {
+  /** Server-side compaction once the prompt passes this many tokens (min 50k). */
+  compactAtTokens?: number;
+  /** Clear old tool results once the prompt passes `triggerTokens`, keeping the last `keep` pairs. */
+  clearToolUses?: { triggerTokens: number; keep: number; clearInputs?: boolean };
+  /** Advisory token budget for the whole agentic loop (min 20k). */
+  taskBudgetTokens?: number;
+}
 
 export interface ProviderTurnArgs {
   system: string;
@@ -34,11 +50,15 @@ export interface ProviderTurnArgs {
   maxTokens: number;
   /** Whom each model turn is metered to (ai_usage_events). */
   meter: AiMeter;
+  native?: NativeHarness;
 }
 
 export type ProviderEvent =
   | { type: 'text_delta'; text: string }
+  /** A server-side compaction summary; keep it on the assistant turn so the next request carries it back. */
+  | { type: 'compaction'; content: string }
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
+  /** stopReason: 'tool_use' | 'max_tokens' (output cut off at the cap; a tool call may be half-written) | 'end_turn'. */
   | { type: 'message_stop'; stopReason: string; usage: { inputTokens: number; outputTokens: number } }
   | { type: 'error'; error: string; retryable?: boolean; code?: string };
 
@@ -90,21 +110,21 @@ function parseToolInput(raw: string): Record<string, unknown> {
   }
 }
 
-/** Shared HTTP/transport failure handling: log for /admin health, yield a safe error. */
-async function* requestTurn(
+/** Opens the provider's SSE stream, or says why not (logged for /admin health, safe to show). */
+async function openTurn(
   env: Env,
   cfg: AIConfig,
   url: string,
   body: Record<string, unknown>,
-): AsyncGenerator<ProviderEvent, ReadableStream<Uint8Array> | null> {
+  extraHeaders?: Record<string, string>,
+): Promise<{ body: ReadableStream<Uint8Array> } | { event: ProviderEvent; status?: number }> {
   const fields = { provider: cfg.provider, model: cfg.model };
   let response: Response;
   try {
-    response = await fetch(url, { method: 'POST', headers: providerHeaders(cfg), body: JSON.stringify(body) });
+    response = await fetch(url, { method: 'POST', headers: { ...providerHeaders(cfg), ...extraHeaders }, body: JSON.stringify(body) });
   } catch (err) {
     logCrewProviderFailure(env, fields, err);
-    yield { type: 'error', error: userFacingCrewProviderError(err), retryable: true };
-    return null;
+    return { event: { type: 'error', error: userFacingCrewProviderError(err), retryable: true } };
   }
   if (!response.ok) {
     const text = await response.text().catch(() => '');
@@ -113,19 +133,29 @@ async function* requestTurn(
       { ...fields, httpStatus: response.status },
       new Error(`AI provider HTTP ${response.status}: ${text.slice(0, 2000)}`),
     );
-    yield {
-      type: 'error',
-      error: userFacingCrewProviderError(undefined, response.status),
-      retryable: isProviderLevelStatus(response.status),
+    return {
+      status: response.status,
+      event: { type: 'error', error: userFacingCrewProviderError(undefined, response.status), retryable: isProviderLevelStatus(response.status) },
     };
-    return null;
   }
   if (!response.body) {
     logCrewProviderFailure(env, fields, new Error('No response body from AI provider'));
-    yield { type: 'error', error: userFacingCrewProviderError(), retryable: true };
-    return null;
+    return { event: { type: 'error', error: userFacingCrewProviderError(), retryable: true } };
   }
-  return response.body;
+  return { body: response.body };
+}
+
+/** Shared HTTP/transport failure handling: yields a safe error event, or hands back the stream. */
+async function* requestTurn(
+  env: Env,
+  cfg: AIConfig,
+  url: string,
+  body: Record<string, unknown>,
+): AsyncGenerator<ProviderEvent, ReadableStream<Uint8Array> | null> {
+  const opened = await openTurn(env, cfg, url, body);
+  if ('body' in opened) return opened.body;
+  yield opened.event;
+  return null;
 }
 
 export class OpenAICompatCrewProvider implements CrewProvider {
@@ -225,7 +255,7 @@ export class OpenAICompatCrewProvider implements CrewProvider {
     await meterAiCall(this.env, args.meter, this.model, inputTokens, outputTokens, providerRef);
     yield {
       type: 'message_stop',
-      stopReason: stopReason === 'tool_calls' || sawTool ? 'tool_use' : 'end_turn',
+      stopReason: stopReason === 'length' ? 'max_tokens' : stopReason === 'tool_calls' || sawTool ? 'tool_use' : 'end_turn',
       usage: { inputTokens, outputTokens },
     };
   }
@@ -251,6 +281,7 @@ export class AnthropicCrewProvider implements CrewProvider {
         msgs.push({ role: 'user', content: turn.text });
       } else if (turn.role === 'assistant') {
         const content: unknown[] = [];
+        if (turn.compaction) content.push({ type: 'compaction', content: turn.compaction });
         if (turn.text) content.push({ type: 'text', text: turn.text });
         for (const tc of turn.toolCalls) {
           content.push({ type: 'tool_use', id: tc.id, name: tc.name, input: tc.input });
@@ -266,22 +297,69 @@ export class AnthropicCrewProvider implements CrewProvider {
     return msgs;
   }
 
+  /** Set once the API refuses the beta features, so later turns skip the failed attempt. */
+  private nativeOff = false;
+
+  /** Request fields + beta headers for the native harness features that were asked for. */
+  private nativeParts(native: NativeHarness | undefined): { body: Record<string, unknown>; betas: string[] } | null {
+    if (!native) return null;
+    const edits: Record<string, unknown>[] = [];
+    const betas: string[] = [];
+    const body: Record<string, unknown> = {};
+    if (native.clearToolUses) {
+      edits.push({
+        type: 'clear_tool_uses_20250919',
+        trigger: { type: 'input_tokens', value: native.clearToolUses.triggerTokens },
+        keep: { type: 'tool_uses', value: native.clearToolUses.keep },
+        ...(native.clearToolUses.clearInputs ? { clear_tool_inputs: true } : {}),
+      });
+      betas.push('context-management-2025-06-27');
+    }
+    if (native.compactAtTokens) {
+      edits.push({ type: 'compact_20260112', trigger: { type: 'input_tokens', value: Math.max(50_000, native.compactAtTokens) } });
+      betas.push('compact-2026-01-12');
+    }
+    if (edits.length) body.context_management = { edits };
+    if (native.taskBudgetTokens) {
+      body.output_config = { task_budget: { type: 'tokens', total: Math.max(20_000, native.taskBudgetTokens) } };
+      betas.push('task-budgets-2026-03-13');
+    }
+    return betas.length ? { body, betas } : null;
+  }
+
   async *streamTurn(args: ProviderTurnArgs): AsyncGenerator<ProviderEvent> {
     const refused = await budgetRefusal(this.env, args.meter);
     if (refused) { yield refused; return; }
-    const body = yield* requestTurn(this.env, this.cfg, `${this.cfg.baseUrl}/messages`, {
+    const plain: Record<string, unknown> = {
       model: this.model,
       max_tokens: args.maxTokens,
       system: args.system,
       messages: this.toWireMessages(args.transcript),
       ...(args.tools.length
-        ? { tools: args.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema })) }
+        ? {
+            tools: args.tools.map((t) => ({
+              name: t.name, description: t.description, input_schema: t.input_schema,
+              ...(t.eagerInput ? { eager_input_streaming: true } : {}),
+            })),
+          }
         : {}),
       ...thinkingOffParams(this.model),
       cache_control: { type: 'ephemeral' },
       stream: true,
-    });
-    if (!body) return;
+    };
+    const url = `${this.cfg.baseUrl}/messages`;
+    // Beta features can be refused (model or account without access): retry once on a plain
+    // request rather than fail the build over an optimisation.
+    const native = this.nativeOff ? null : this.nativeParts(args.native);
+    let opened = native
+      ? await openTurn(this.env, this.cfg, url, { ...plain, ...native.body }, { 'anthropic-beta': native.betas.join(',') })
+      : await openTurn(this.env, this.cfg, url, plain);
+    if (native && !('body' in opened) && opened.status === 400) {
+      this.nativeOff = true;
+      opened = await openTurn(this.env, this.cfg, url, plain);
+    }
+    if (!('body' in opened)) { yield opened.event; return; }
+    const body = opened.body;
 
     const toolAcc = new Map<number, { id: string; name: string; json: string }>();
     let stopReason = 'end_turn';
@@ -305,6 +383,8 @@ export class AnthropicCrewProvider implements CrewProvider {
       } else if (event.type === 'content_block_delta') {
         if (event.delta?.type === 'text_delta' && event.delta.text) {
           yield { type: 'text_delta', text: event.delta.text };
+        } else if (event.delta?.type === 'compaction_delta' && typeof event.delta.content === 'string') {
+          yield { type: 'compaction', content: event.delta.content };
         } else if (event.delta?.type === 'input_json_delta') {
           const acc = toolAcc.get(event.index);
           if (acc) acc.json += event.delta.partial_json ?? '';
@@ -312,6 +392,12 @@ export class AnthropicCrewProvider implements CrewProvider {
       } else if (event.type === 'message_delta') {
         if (event.delta?.stop_reason) stopReason = event.delta.stop_reason;
         outputTokens = event.usage?.output_tokens ?? outputTokens;
+        // Compaction runs its own model call; the top-level counts leave it out, so add it for the meter.
+        for (const it of Array.isArray(event.usage?.iterations) ? event.usage.iterations : []) {
+          if (it?.type !== 'compaction') continue;
+          inputTokens += it.input_tokens ?? 0;
+          outputTokens += it.output_tokens ?? 0;
+        }
       }
     }
 
@@ -322,7 +408,7 @@ export class AnthropicCrewProvider implements CrewProvider {
     await meterAiCall(this.env, args.meter, this.model, inputTokens, outputTokens);
     yield {
       type: 'message_stop',
-      stopReason: stopReason === 'tool_use' ? 'tool_use' : 'end_turn',
+      stopReason: stopReason === 'tool_use' || stopReason === 'max_tokens' ? stopReason : 'end_turn',
       usage: { inputTokens, outputTokens },
     };
   }
