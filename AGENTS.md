@@ -41,6 +41,7 @@ fails if `CLAUDE.md` becomes anything else.
 | Design / UI / brand | `Design/README.md` | ad-hoc example HTML |
 | Understand or change the database schema | `shareout-app/migrations/SCHEMA.md` then `CONVENTIONS.md` | hand-writing DDL without reading either |
 | Change how Knowledge finds things (chunking, keyword search, embeddings, ranking) | `shareout-app/src/knowledge/corpus/` + `npm run eval:knowledge` ([Knowledge retrieval eval](#knowledge-retrieval-eval)) | judging by a few hand-picked queries |
+| Change how AI builds pages (model, prompt, `src/build-agent/`, `BUILD_AGENT`) | `npm run eval:builds` ([Page-build eval](#page-build-eval)) | judging by one or two pages you tried by hand |
 
 **Skill source of truth:** [skills/README.md](skills/README.md) — monorepo wins;
 `shareout-skill` and `GET $ORIGIN/v1/skill` are load paths, not alternate edit trees.
@@ -174,3 +175,14 @@ into the PR. It ingests a synthetic Spanish-first corpus through the real code a
 ~400 golden questions (recall@k, nDCG, MRR, permission starvation, latency). It is not part
 of `npm test` or the pre-push hook. Details, dense-mode credentials and re-baselining:
 [shareout-app/tests/eval/knowledge/README.md](shareout-app/tests/eval/knowledge/README.md).
+
+---
+
+## Page-build eval
+
+A change to how AI builds pages (model, reasoning effort, prompts, `src/build-agent/`, the
+`BUILD_AGENT` default) is judged by `npm run eval:builds`: 24 English and Spanish requests run
+against a live instance through its public API, scored on the static check, browser verify and
+per-item expectations. It spends the instance's AI budget (one real build per item), so it is never
+part of `npm test`, CI or the pre-push hook. How to run, cost and compare:
+[shareout-app/evals/page-build/README.md](shareout-app/evals/page-build/README.md).

@@ -7,3 +7,6 @@ node_modules/
 .DS_Store
 # npm run eval:knowledge results + embedding cache
 .eval/
+
+# npm run eval:builds results
+evals/results/
