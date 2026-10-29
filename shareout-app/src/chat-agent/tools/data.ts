@@ -100,6 +100,36 @@ export const updateTableRowTool: AccountTool = {
   },
 };
 
+export const deleteTableRowTool: AccountTool = {
+  name: 'delete_table_row',
+  description:
+    'Delete one record (row) from a page’s data table by its id. Find the id with read_artifact / the query API first. Owner/editor only. Asks the user to confirm before deleting.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      artifact_id: { type: 'string' },
+      table: { type: 'string' },
+      row_id: { type: 'string', description: 'The id of the row to delete.' },
+    },
+    required: ['artifact_id', 'table', 'row_id'],
+  },
+  async execute(ctx, input) {
+    const artifactId = typeof input.artifact_id === 'string' ? input.artifact_id : '';
+    const table = typeof input.table === 'string' ? input.table.trim() : '';
+    const rowId = typeof input.row_id === 'string' ? input.row_id.trim() : '';
+    if (!table) return { error: 'Tell me which table to delete from.' };
+    if (!rowId) return { error: 'Give me the id of the row to delete.' };
+
+    const g = await gate(ctx, artifactId);
+    if ('error' in g) return { error: g.error };
+
+    const names = await tableNames(g.dataCtx, artifactId);
+    if (!names.includes(table)) return { error: `Table "${table}" not found.`, available_tables: names };
+
+    return propose({ kind: 'data_table_delete', artifactId, artifactName: g.dataCtx.artifact.name, table, rowId });
+  },
+};
+
 export const setJsonValueTool: AccountTool = {
   name: 'set_json_value',
   description:

@@ -7,6 +7,7 @@ import { generateId } from '../crypto-utils';
 import { requireSharingRole } from './roles';
 import { json } from './json-response';
 import { invalidateDeploymentCacheById } from '../serve/deployment-cache';
+import { emailNewCollaborators } from './share-email';
 
 /** Upsert collaborator rows; returns emails that were added or role-updated. */
 export async function addCollaboratorEmails(
@@ -101,7 +102,8 @@ export async function handleAddCollaborators(
   const forbidden = await requireSharingRole(env, artifactId, user.id, 'editor');
   if (forbidden) return forbidden;
 
-  let body: { emails: string[]; role?: CollaboratorRole };
+  // notify: email the people this call newly adds (the Studio share panel sets it).
+  let body: { emails: string[]; role?: CollaboratorRole; notify?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -122,6 +124,9 @@ export async function handleAddCollaborators(
     .map(e => e.toLowerCase().trim());
 
   const added = await addCollaboratorEmails(env, artifactId, validEmails, role, user.id);
+  const notified = body.notify === true
+    ? await emailNewCollaborators(env, user.id, artifactId, added, role as 'viewer' | 'editor')
+    : undefined;
 
   const allCollaborators = await env.DB.prepare(
     'SELECT email, role, added_at FROM collaborators WHERE artifact_id = ?'
@@ -130,6 +135,7 @@ export async function handleAddCollaborators(
   return json({
     success: true,
     added,
+    ...(notified ? { notified } : {}),
     collaborators: (allCollaborators.results || []).map(c => ({
       email: c.email,
       role: c.role,

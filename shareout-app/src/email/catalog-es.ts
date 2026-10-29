@@ -156,10 +156,14 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
     const intro = d.sharerName ? `${d.sharerName} compartió un artefacto con vos.` : 'Compartieron un artefacto con vos.';
     const desc = d.artifactDescription?.trim();
     const msg = d.customMessage?.trim();
-    const role =
+    const access =
       d.role === 'editor' ? 'Te sumaron como editor: abrilo para empezar a editarlo en equipo.'
       : d.role === 'viewer' ? 'Ya tenés acceso para ver este artefacto.'
       : '';
+    const signIn = d.role !== 'none' && d.recipientEmail
+      ? `Entrá con ${d.recipientEmail}: te mandamos un código por mail, sin contraseña.`
+      : '';
+    const role = [access, signIn].filter(Boolean).join(' ');
     return {
       subject: d.sharerName ? `${d.sharerName} compartió: ${d.artifactName}` : `Compartieron con vos: ${d.artifactName}`,
       preheader: desc || intro,

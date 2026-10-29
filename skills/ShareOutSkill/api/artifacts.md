@@ -339,12 +339,15 @@ List all collaborators.
 
 ### POST /v1/artifacts/{id}/collaborators
 
-Add collaborators.
+Add collaborators. Pass `"notify": true` to email each newly added person the link
+and how to sign in (an emailed code, no password; no account needed). The share
+happens even when the daily email limit is reached; `notified` says who got the email.
 
 ```json
 {
   "emails": ["user@example.com"],
-  "role": "editor"
+  "role": "editor",
+  "notify": true
 }
 ```
 

@@ -1,6 +1,10 @@
 // @vitest-environment node
 import './setup';
 import { describe, expect, it, vi } from 'vitest';
+
+const emailNewCollaborators = vi.hoisted(() => vi.fn());
+vi.mock('../../../src/artifacts/share-email', () => ({ emailNewCollaborators }));
+
 import { handleAddCollaborators } from '../../../src/artifacts';
 import {
   artifactRow,
@@ -196,5 +200,51 @@ describe('handleAddCollaborators', () => {
     expect(response.status).toBe(200);
     expect((await jsonBody(response)).added).toEqual([]);
   });
-});
 
+  describe('notify', () => {
+    function notifyEnv() {
+      return {
+        ...baseEnv,
+        DB: makeDbMock({
+          first: (sql, ...args) => {
+            if (sql.includes('auth_method FROM artifacts')) return { id: 'art_1', auth_method: 'google' };
+            if (sql.includes('owner_id FROM artifacts')) return { owner_id: 'usr_1' };
+            if (sql.includes('collaborators WHERE artifact_id = ? AND email = ?')) {
+              return args[1] === 'already@example.com' ? { id: 'col_1', role: 'viewer' } : null;
+            }
+            return null;
+          },
+          all: () => ({ results: [] }),
+          run: () => ({ success: true, meta: { changes: 0 } }),
+        }),
+      };
+    }
+    const post = (body: unknown) => new Request('https://shareout.example.com/v1/artifacts/art_1/collaborators', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+
+    it('emails only the people this call newly added and reports it', async () => {
+      emailNewCollaborators.mockReset().mockResolvedValue({ sent: ['new@example.com'], failed: [], rate_limited: false, url: 'https://acme.shareout.site/demo/' });
+
+      const response = await handleAddCollaborators(
+        post({ emails: ['new@example.com', 'already@example.com'], role: 'viewer', notify: true }),
+        notifyEnv(), user, 'art_1',
+      );
+
+      expect(response.status).toBe(200);
+      expect(emailNewCollaborators).toHaveBeenCalledWith(expect.anything(), user.id, 'art_1', ['new@example.com'], 'viewer');
+      expect((await jsonBody(response)).notified).toMatchObject({ sent: ['new@example.com'], rate_limited: false });
+    });
+
+    it('sends nothing without notify (API callers keep the old behaviour)', async () => {
+      emailNewCollaborators.mockReset();
+
+      const response = await handleAddCollaborators(post({ emails: ['new@example.com'], role: 'viewer' }), notifyEnv(), user, 'art_1');
+
+      expect(response.status).toBe(200);
+      expect(emailNewCollaborators).not.toHaveBeenCalled();
+      expect((await jsonBody(response)).notified).toBeUndefined();
+    });
+  });
+});

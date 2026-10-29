@@ -14,6 +14,7 @@ vi.mock('../../../src/scheduling/email', () => ({
 }));
 
 import { handleShareArtifact } from '../../../src/artifacts/share';
+import { emailNewCollaborators } from '../../../src/artifacts/share-email';
 import { checkEmailRateLimit } from '../../../src/scheduling/email';
 import { dispatchLifecycleEmail } from '../../../src/email/gateway';
 
@@ -98,5 +99,36 @@ describe('handleShareArtifact', () => {
     const res = await handleShareArtifact(req({ recipients: ['a@b.com'] }), e, owner, 'art1');
     expect(res.status).toBe(429);
     expect((await res.json() as { code: string }).code).toBe('RATE_LIMITED');
+  });
+});
+
+describe('emailNewCollaborators', () => {
+  it('emails each new person with the clean workspace link and their address for the sign-in line', async () => {
+    const out = await emailNewCollaborators(e, 'usr_owner', 'art1', ['ana@contractor.com'], 'viewer');
+
+    expect(out).toMatchObject({ sent: ['ana@contractor.com'], failed: [], rate_limited: false });
+    expect(out.url).toContain('acme.');
+    expect(dispatchLifecycleEmail).toHaveBeenCalledWith(e, expect.objectContaining({
+      type: 'artifact_share',
+      toEmail: 'ana@contractor.com',
+      data: expect.objectContaining({ role: 'viewer', recipientEmail: 'ana@contractor.com', sharerName: 'Owner' }),
+    }));
+  });
+
+  it('skips the email, not the share, when the daily limit is reached', async () => {
+    vi.mocked(checkEmailRateLimit).mockResolvedValue({ allowed: false, remaining: 0, resetAt: 1 } as never);
+    vi.mocked(dispatchLifecycleEmail).mockClear();
+
+    const out = await emailNewCollaborators(e, 'usr_owner', 'art1', ['ana@contractor.com'], 'viewer');
+
+    expect(out.rate_limited).toBe(true);
+    expect(out.failed).toEqual([{ email: 'ana@contractor.com', error: 'rate_limited' }]);
+    expect(dispatchLifecycleEmail).not.toHaveBeenCalled();
+  });
+
+  it('does nothing for an empty list', async () => {
+    vi.mocked(dispatchLifecycleEmail).mockClear();
+    expect(await emailNewCollaborators(e, 'usr_owner', 'art1', [], 'viewer')).toMatchObject({ sent: [], failed: [] });
+    expect(dispatchLifecycleEmail).not.toHaveBeenCalled();
   });
 });

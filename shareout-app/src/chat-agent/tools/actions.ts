@@ -100,7 +100,7 @@ export const manageJobTool: AccountTool = {
 
 export const shareArtifactTool: AccountTool = {
   name: 'share_artifact',
-  description: 'Share a page with one or more people by email (owner only). Asks the user to confirm before inviting.',
+  description: 'Share a page with one or more people by email (owner or editor). They get an email with the link and how to sign in — no account needed. Viewer is enough to open the page and fill in its forms; editor also lets them change the page. Asks the user to confirm before inviting.',
   input_schema: {
     type: 'object',
     properties: {
@@ -120,9 +120,63 @@ export const shareArtifactTool: AccountTool = {
 
     const access = await resolveArtifactAccessForUser(ctx.env, artifactId, ctx.userId);
     if (!access) return { error: 'You don’t have access to that page (or it doesn’t exist).' };
-    if (access.role !== 'owner') return { error: 'Only the page’s owner can share it.' };
+    if (access.role !== 'owner' && access.role !== 'editor') return { error: 'Only the page’s owner or an editor can share it.' };
 
     return propose({ kind: 'share', artifactId, artifactName: await artifactName(ctx.env, artifactId), emails, role });
+  },
+};
+
+export const unshareArtifactTool: AccountTool = {
+  name: 'unshare_artifact',
+  description: 'Stop sharing a page with one or more people (owner or editor): they can no longer open it unless the page is visible to the whole workspace and they are a member. Asks the user to confirm first.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      artifact_id: { type: 'string' },
+      emails: { type: 'array', items: { type: 'string' }, description: 'Email addresses to remove.' },
+    },
+    required: ['artifact_id', 'emails'],
+  },
+  async execute(ctx, input) {
+    const artifactId = typeof input.artifact_id === 'string' ? input.artifact_id : '';
+    const emails = Array.isArray(input.emails)
+      ? input.emails.filter((e): e is string => typeof e === 'string').map((e) => e.trim().toLowerCase()).filter((e) => EMAIL_RE.test(e))
+      : [];
+    if (!emails.length) return { error: 'Give me at least one valid email address.' };
+
+    const access = await resolveArtifactAccessForUser(ctx.env, artifactId, ctx.userId);
+    if (!access) return { error: 'You don’t have access to that page (or it doesn’t exist).' };
+    if (access.role !== 'owner' && access.role !== 'editor') return { error: 'Only the page’s owner or an editor can change who it is shared with.' };
+
+    return propose({ kind: 'unshare', artifactId, artifactName: await artifactName(ctx.env, artifactId), emails });
+  },
+};
+
+export const setPageVisibilityTool: AccountTool = {
+  name: 'set_page_visibility',
+  description: 'Choose who can open a page: "private" (the owner plus people it is shared with) or "workspace" (every member of its workspace). Owner or editor. Public links are not set here. Asks the user to confirm first.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      artifact_id: { type: 'string' },
+      visibility: { type: 'string', enum: ['private', 'workspace'] },
+    },
+    required: ['artifact_id', 'visibility'],
+  },
+  async execute(ctx, input) {
+    const artifactId = typeof input.artifact_id === 'string' ? input.artifact_id : '';
+    const visibility = input.visibility === 'workspace' ? 'workspace' : input.visibility === 'private' ? 'private' : null;
+    if (!visibility) return { error: 'Visibility must be "private" or "workspace".' };
+
+    const access = await resolveArtifactAccessForUser(ctx.env, artifactId, ctx.userId);
+    if (!access) return { error: 'You don’t have access to that page (or it doesn’t exist).' };
+    if (access.role !== 'owner' && access.role !== 'editor') return { error: 'Only the page’s owner or an editor can change who can open it.' };
+    const row = await ctx.env.DB.prepare('SELECT name, visibility, workspace_id FROM artifacts WHERE id = ?')
+      .bind(artifactId).first<{ name: string | null; visibility: string; workspace_id: string | null }>();
+    if (visibility === 'workspace' && !row?.workspace_id) return { error: 'That page is not in a workspace, so it can only be private or shared with people.' };
+    if (row?.visibility === visibility) return { error: `It is already ${visibility === 'workspace' ? 'visible to the whole workspace' : 'private'}.` };
+
+    return propose({ kind: 'visibility', artifactId, artifactName: row?.name?.trim() || 'page', visibility });
   },
 };
 

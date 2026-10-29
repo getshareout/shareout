@@ -18,6 +18,10 @@ const botUpdateRowById = vi.hoisted(() => vi.fn());
 const botUpdateRowsByFilter = vi.hoisted(() => vi.fn());
 const botSetJson = vi.hoisted(() => vi.fn());
 const buildBotDataContext = vi.hoisted(() => vi.fn());
+const botDeleteRowById = vi.hoisted(() => vi.fn());
+const handleRemoveCollaborator = vi.hoisted(() => vi.fn());
+const handleUpdateArtifact = vi.hoisted(() => vi.fn());
+const emailNewCollaborators = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../src/data/agent/headless-edit', () => ({ proposeEdit, publishEdits }));
 vi.mock('../../../src/data/tables/bot', async (importOriginal) => ({
@@ -25,6 +29,7 @@ vi.mock('../../../src/data/tables/bot', async (importOriginal) => ({
   botInsertRows,
   botUpdateRowById,
   botUpdateRowsByFilter,
+  botDeleteRowById,
 }));
 vi.mock('../../../src/data/json-store', () => ({ botSetJson }));
 vi.mock('../../../src/chat-agent/data-write', () => ({ buildBotDataContext }));
@@ -36,15 +41,17 @@ vi.mock('../../../src/scheduling/jobs/crud', async (importOriginal) => ({
   deleteJob,
   listJobs,
 }));
-vi.mock('../../../src/artifacts/collaborators', () => ({ addCollaboratorEmails }));
+vi.mock('../../../src/artifacts/collaborators', () => ({ addCollaboratorEmails, handleRemoveCollaborator }));
+vi.mock('../../../src/artifacts/share-email', () => ({ emailNewCollaborators }));
+vi.mock('../../../src/artifacts/crud', () => ({ handleUpdateArtifact }));
 vi.mock('../../../src/crew/store', () => ({ getCrew, createRun: vi.fn(), getRun: vi.fn() }));
 vi.mock('../../../src/crew/limits', () => ({ resolveCrewLimits: vi.fn(), countActiveRuns: vi.fn() }));
 vi.mock('../../../src/crew/principal', () => ({ buildOwnerDataContextForCrew: vi.fn() }));
 vi.mock('../../../src/crew/run-loop', () => ({ runCrewToCompletion: vi.fn() }));
 
 import { describeAction, executeAction, type PendingAction } from '../../../src/chat-agent/actions';
-import { shareArtifactTool, manageAlertTool, askCrewTool, editPageTool } from '../../../src/chat-agent/tools/actions';
-import { addTableRowTool, updateTableRowTool, setJsonValueTool } from '../../../src/chat-agent/tools/data';
+import { shareArtifactTool, unshareArtifactTool, setPageVisibilityTool, manageAlertTool, askCrewTool, editPageTool } from '../../../src/chat-agent/tools/actions';
+import { addTableRowTool, updateTableRowTool, deleteTableRowTool, setJsonValueTool } from '../../../src/chat-agent/tools/data';
 
 const env = {
   DB: { prepare: () => ({ bind: () => ({ first: async () => ({ name: 'Sales Dashboard' }) }) }) },
@@ -70,7 +77,7 @@ function mockDataCtx(opts: { tables?: string[]; jsonExists?: boolean; viewerScop
 }
 
 beforeEach(() => {
-  [resolveArtifactAccessForUser, updateRule, deleteRule, getRule, listRulesForOwner, updateJob, deleteJob, listJobs, addCollaboratorEmails, getCrew, proposeEdit, publishEdits, botInsertRows, botUpdateRowById, botUpdateRowsByFilter, botSetJson, buildBotDataContext].forEach((m) => m.mockReset());
+  [resolveArtifactAccessForUser, updateRule, deleteRule, getRule, listRulesForOwner, updateJob, deleteJob, listJobs, addCollaboratorEmails, getCrew, proposeEdit, publishEdits, botInsertRows, botUpdateRowById, botUpdateRowsByFilter, botSetJson, buildBotDataContext, botDeleteRowById, handleRemoveCollaborator, handleUpdateArtifact, emailNewCollaborators].forEach((m) => m.mockReset());
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -79,6 +86,9 @@ describe('describeAction', () => {
     expect(describeAction({ kind: 'alert_delete', ruleId: 'r', label: 'Rev' })).toMatch(/Delete the alert/);
     expect(describeAction({ kind: 'share', artifactId: 'a', artifactName: 'Dash', emails: ['x@y.com'], role: 'viewer' })).toMatch(/Share .*Dash.* x@y.com .*viewer/);
     expect(describeAction({ kind: 'crew', artifactId: 'a', artifactName: 'Dash', instruction: 'refresh' })).toMatch(/crew on .*Dash.*refresh/);
+    expect(describeAction({ kind: 'unshare', artifactId: 'a', artifactName: 'Dash', emails: ['x@y.com'] })).toMatch(/Stop sharing .*Dash.* x@y.com/);
+    expect(describeAction({ kind: 'visibility', artifactId: 'a', artifactName: 'Dash', visibility: 'workspace' }, 'es')).toMatch(/todos los miembros del espacio/);
+    expect(describeAction({ kind: 'data_table_delete', artifactId: 'a', artifactName: 'Dash', table: 't', rowId: 'r1' })).toMatch(/Delete row r1/);
   });
 });
 
@@ -96,19 +106,72 @@ describe('executeAction', () => {
     expect(out).toMatch(/Permission denied/);
   });
 
-  it('refuses to share when the caller is not the owner', async () => {
-    resolveArtifactAccessForUser.mockResolvedValue({ role: 'editor' });
+  it('refuses to share for a viewer', async () => {
+    resolveArtifactAccessForUser.mockResolvedValue({ role: 'viewer' });
     const out = await executeAction(env, 'user_1', { kind: 'share', artifactId: 'a1', artifactName: 'D', emails: ['x@y.com'], role: 'viewer' });
-    expect(out).toMatch(/owner/i);
+    expect(out).toMatch(/owner or an editor/i);
     expect(addCollaboratorEmails).not.toHaveBeenCalled();
   });
 
-  it('shares for an owner', async () => {
+  it('shares for an owner and emails the new people', async () => {
     resolveArtifactAccessForUser.mockResolvedValue({ role: 'owner' });
     addCollaboratorEmails.mockResolvedValue(['x@y.com']);
+    emailNewCollaborators.mockResolvedValue({ sent: ['x@y.com'], failed: [], rate_limited: false, url: 'https://acme.shareout.site/d/' });
     const out = await executeAction(env, 'user_1', { kind: 'share', artifactId: 'a1', artifactName: 'D', emails: ['x@y.com'], role: 'editor' });
     expect(addCollaboratorEmails).toHaveBeenCalledWith(env, 'a1', ['x@y.com'], 'editor', 'user_1');
+    expect(emailNewCollaborators).toHaveBeenCalledWith(env, 'user_1', 'a1', ['x@y.com'], 'editor');
     expect(out).toMatch(/shared with x@y.com/);
+    expect(out).toMatch(/emailed them the link/);
+  });
+
+  it('shares for an editor, like the Studio panel', async () => {
+    resolveArtifactAccessForUser.mockResolvedValue({ role: 'editor' });
+    addCollaboratorEmails.mockResolvedValue(['x@y.com']);
+    emailNewCollaborators.mockResolvedValue({ sent: ['x@y.com'], failed: [], rate_limited: false, url: null });
+    expect(await executeAction(env, 'user_1', { kind: 'share', artifactId: 'a1', artifactName: 'D', emails: ['x@y.com'], role: 'viewer' })).toMatch(/shared with x@y.com/);
+  });
+
+  it('gives the link to send by hand when the email limit is reached', async () => {
+    resolveArtifactAccessForUser.mockResolvedValue({ role: 'owner' });
+    addCollaboratorEmails.mockResolvedValue(['x@y.com']);
+    emailNewCollaborators.mockResolvedValue({ sent: [], failed: [{ email: 'x@y.com', error: 'rate_limited' }], rate_limited: true, url: 'https://acme.shareout.site/d/' });
+    const out = await executeAction(env, 'user_1', { kind: 'share', artifactId: 'a1', artifactName: 'D', emails: ['x@y.com'], role: 'viewer' });
+    expect(out).toMatch(/shared with x@y.com/);
+    expect(out).toMatch(/email limit/);
+    expect(out).toContain('https://acme.shareout.site/d/');
+  });
+
+  it('does not email anyone when nobody new was added', async () => {
+    resolveArtifactAccessForUser.mockResolvedValue({ role: 'owner' });
+    addCollaboratorEmails.mockResolvedValue([]);
+    expect(await executeAction(env, 'user_1', { kind: 'share', artifactId: 'a1', artifactName: 'D', emails: ['x@y.com'], role: 'viewer' })).toMatch(/already have access/);
+    expect(emailNewCollaborators).not.toHaveBeenCalled();
+  });
+
+  it('stops sharing through the same handler as the panel', async () => {
+    handleRemoveCollaborator.mockResolvedValue(new Response(JSON.stringify({ success: true, removed: true }), { status: 200 }));
+    const out = await executeAction(env, 'user_1', { kind: 'unshare', artifactId: 'a1', artifactName: 'D', emails: ['x@y.com'] });
+    expect(handleRemoveCollaborator).toHaveBeenCalledWith(expect.any(Request), env, expect.objectContaining({ id: 'user_1' }), 'a1', 'x@y.com');
+    expect(out).toMatch(/x@y.com can no longer open it/);
+  });
+
+  it('relays a refused unshare', async () => {
+    handleRemoveCollaborator.mockResolvedValue(new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 }));
+    expect(await executeAction(env, 'user_1', { kind: 'unshare', artifactId: 'a1', artifactName: 'D', emails: ['x@y.com'] })).toMatch(/owner or an editor/);
+  });
+
+  it('changes visibility through the artifact PATCH handler', async () => {
+    handleUpdateArtifact.mockResolvedValue(new Response(JSON.stringify({ visibility: 'workspace' }), { status: 200 }));
+    const out = await executeAction(env, 'user_1', { kind: 'visibility', artifactId: 'a1', artifactName: 'D', visibility: 'workspace' });
+    const req = handleUpdateArtifact.mock.calls[0][0] as Request;
+    expect(req.method).toBe('PATCH');
+    expect(await req.json()).toEqual({ visibility: 'workspace' });
+    expect(out).toMatch(/every member of the workspace/);
+  });
+
+  it('relays the handler’s message when the change is held', async () => {
+    handleUpdateArtifact.mockResolvedValue(new Response(JSON.stringify({ visibility: 'private', message: 'Kept private.', code: 'VISIBILITY_HELD' }), { status: 202 }));
+    expect(await executeAction(env, 'user_1', { kind: 'visibility', artifactId: 'a1', artifactName: 'D', visibility: 'workspace' })).toBe('Kept private.');
   });
 });
 
@@ -117,6 +180,40 @@ describe('propose tools', () => {
     resolveArtifactAccessForUser.mockResolvedValue({ role: 'owner' });
     const out = await shareArtifactTool.execute(ctx, { artifact_id: 'a1', emails: ['Sam@Example.com'], role: 'editor' }) as { __propose?: PendingAction };
     expect(out.__propose).toMatchObject({ kind: 'share', artifactId: 'a1', emails: ['sam@example.com'], role: 'editor' });
+  });
+
+  it('share_artifact proposes for an editor', async () => {
+    resolveArtifactAccessForUser.mockResolvedValue({ role: 'editor' });
+    const out = await shareArtifactTool.execute(ctx, { artifact_id: 'a1', emails: ['sam@example.com'] }) as { __propose?: PendingAction };
+    expect(out.__propose).toMatchObject({ kind: 'share', role: 'viewer' });
+  });
+
+  it('unshare_artifact proposes for an editor and rejects a viewer', async () => {
+    resolveArtifactAccessForUser.mockResolvedValue({ role: 'editor' });
+    const ok = await unshareArtifactTool.execute(ctx, { artifact_id: 'a1', emails: ['Sam@Example.com'] }) as { __propose?: PendingAction };
+    expect(ok.__propose).toMatchObject({ kind: 'unshare', artifactId: 'a1', emails: ['sam@example.com'] });
+    resolveArtifactAccessForUser.mockResolvedValue({ role: 'viewer' });
+    expect(((await unshareArtifactTool.execute(ctx, { artifact_id: 'a1', emails: ['sam@example.com'] })) as { error?: string }).error).toMatch(/owner or an editor/);
+  });
+
+  it('set_page_visibility only offers private or workspace', async () => {
+    const out = await setPageVisibilityTool.execute(ctx, { artifact_id: 'a1', visibility: 'public' }) as { error?: string };
+    expect(out.error).toMatch(/private.*workspace/);
+    expect(resolveArtifactAccessForUser).not.toHaveBeenCalled();
+  });
+
+  it('set_page_visibility proposes a change for an editor', async () => {
+    resolveArtifactAccessForUser.mockResolvedValue({ role: 'editor' });
+    const vEnv = { DB: { prepare: () => ({ bind: () => ({ first: async () => ({ name: 'HSE', visibility: 'private', workspace_id: 'ws1' }) }) }) } } as unknown as Env;
+    const out = await setPageVisibilityTool.execute({ ...ctx, env: vEnv }, { artifact_id: 'a1', visibility: 'workspace' }) as { __propose?: PendingAction };
+    expect(out.__propose).toEqual({ kind: 'visibility', artifactId: 'a1', artifactName: 'HSE', visibility: 'workspace' });
+  });
+
+  it('set_page_visibility refuses workspace for a page outside any workspace', async () => {
+    resolveArtifactAccessForUser.mockResolvedValue({ role: 'owner' });
+    const vEnv = { DB: { prepare: () => ({ bind: () => ({ first: async () => ({ name: 'Mine', visibility: 'private', workspace_id: null }) }) }) } } as unknown as Env;
+    const out = await setPageVisibilityTool.execute({ ...ctx, env: vEnv }, { artifact_id: 'a1', visibility: 'workspace' }) as { error?: string };
+    expect(out.error).toMatch(/not in a workspace/);
   });
 
   it('share_artifact rejects a non-owner', async () => {
@@ -234,6 +331,31 @@ describe('data-write propose tools', () => {
     buildBotDataContext.mockResolvedValue(mockDataCtx({ viewerScope: { field: 'email', values: ['x@y.com'] } }));
     const out = await setJsonValueTool.execute(ctx, { artifact_id: 'a1', key: 'config', value: 1 }) as { error?: string };
     expect(out.error).toMatch(/access policy/i);
+  });
+});
+
+describe('delete_table_row', () => {
+  it('proposes a delete for an editor when the table exists', async () => {
+    resolveArtifactAccessForUser.mockResolvedValue({ role: 'editor' });
+    buildBotDataContext.mockResolvedValue(mockDataCtx({ tables: ['usuarios'] }));
+    const out = await deleteTableRowTool.execute(ctx, { artifact_id: 'a1', table: 'usuarios', row_id: 'row_1' }) as { __propose?: PendingAction };
+    expect(out.__propose).toMatchObject({ kind: 'data_table_delete', table: 'usuarios', rowId: 'row_1' });
+  });
+
+  it('rejects a viewer before touching data', async () => {
+    resolveArtifactAccessForUser.mockResolvedValue({ role: 'viewer' });
+    const out = await deleteTableRowTool.execute(ctx, { artifact_id: 'a1', table: 'usuarios', row_id: 'row_1' }) as { error?: string };
+    expect(out.error).toMatch(/owner or an editor/);
+    expect(buildBotDataContext).not.toHaveBeenCalled();
+  });
+
+  it('deletes the row once confirmed', async () => {
+    resolveArtifactAccessForUser.mockResolvedValue({ role: 'owner' });
+    buildBotDataContext.mockResolvedValue(mockDataCtx());
+    botDeleteRowById.mockResolvedValue({ deleted: 1 });
+    const out = await executeAction(env, 'user_1', { kind: 'data_table_delete', artifactId: 'a1', artifactName: 'D', table: 'usuarios', rowId: 'row_1' });
+    expect(botDeleteRowById).toHaveBeenCalledWith(expect.anything(), 'usuarios', 'row_1');
+    expect(out).toMatch(/deleted the row/);
   });
 });
 

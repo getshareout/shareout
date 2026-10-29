@@ -1,5 +1,6 @@
 import type { DataContext } from '../middleware';
 import {
+  deleteRowById,
   insertRows,
   updateRowById,
   updateRows,
@@ -54,4 +55,16 @@ export async function botUpdateRowsByFilter(
   );
   if (out.error || !out.data) return { error: out.error || 'Update failed.' };
   return { updated: out.data.updated };
+}
+
+export async function botDeleteRowById(
+  ctx: DataContext,
+  tableName: string,
+  rowId: string,
+): Promise<{ deleted?: number; error?: string; tables?: string[] }> {
+  const t = await resolveTable(ctx, tableName);
+  if ('error' in t) return { error: t.error, tables: t.tables };
+  const out = await unwrap(await deleteRowById(ctx, tableName, rowId));
+  if (out.error) return { error: out.error };
+  return { deleted: 1 };
 }

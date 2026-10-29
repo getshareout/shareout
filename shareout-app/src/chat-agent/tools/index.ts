@@ -8,10 +8,12 @@ import {
   manageAlertTool,
   manageJobTool,
   shareArtifactTool,
+  unshareArtifactTool,
+  setPageVisibilityTool,
   askCrewTool,
   editPageTool,
 } from './actions';
-import { addTableRowTool, updateTableRowTool, setJsonValueTool } from './data';
+import { addTableRowTool, updateTableRowTool, deleteTableRowTool, setJsonValueTool } from './data';
 import { setClientNotesTool } from './client-notes';
 import { browseStorageTool, listConnectionsTool, queryConnectionTool } from './connection-query';
 import { createScheduleTool } from './create-schedule';
@@ -56,10 +58,13 @@ export const ACCOUNT_TOOLS: AccountTool[] = [
   manageAlertTool,
   manageJobTool,
   shareArtifactTool,
+  unshareArtifactTool,
+  setPageVisibilityTool,
   askCrewTool,
   editPageTool,
   addTableRowTool,
   updateTableRowTool,
+  deleteTableRowTool,
   setJsonValueTool,
   setClientNotesTool,
   catalogSearchTool,
@@ -113,8 +118,8 @@ export function defaultCapabilities(_platform: PlatformId): Capabilities {
 }
 
 const WRITE_TOOLS = new Set([
-  'manage_alert', 'manage_job', 'share_artifact', 'ask_crew', 'edit_page',
-  'add_table_row', 'update_table_row', 'set_json_value', 'set_client_notes',
+  'manage_alert', 'manage_job', 'share_artifact', 'unshare_artifact', 'set_page_visibility', 'ask_crew', 'edit_page',
+  'add_table_row', 'update_table_row', 'delete_table_row', 'set_json_value', 'set_client_notes',
   'watch_metric', 'present_artifact', 'report_problem', 'save_skill', 'invite_members', 'catalog_update',
   'restore_version', 'approve_version', 'resolve_comment', 'assign_comment',
 ]);
