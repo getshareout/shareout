@@ -65,6 +65,12 @@ de la instancia, luego `BUILD_MODEL`) y reciben el color de marca, el logo, el i
 archivo de contexto de estilo del workspace. El agente también puede consultar la guía de
 artefactos de ShareOut mientras construye.
 
+El mismo interruptor pasa al agente los cambios de páginas que hace el asistente: modifica los
+archivos que ya tiene una página HTML en pasos chicos, revisa que el cambio no rompa nada
+que la página no tuviera roto antes, y le muestra el cambio al usuario para que lo confirme
+antes de publicar nada. Los otros tipos de página, y los workspaces donde está apagado,
+siguen con el editor de una sola respuesta.
+
 ## Configurarlo
 
 ```bash

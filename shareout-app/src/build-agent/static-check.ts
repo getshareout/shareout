@@ -199,15 +199,19 @@ function refIssues(files: PageFiles): CheckIssue[] {
   return out;
 }
 
-/** Everything wrong with the page as it stands; errors block publishing, warnings do not. */
-export function checkPage(files: PageFiles, opts: { env: Env; isPublic: boolean }): CheckIssue[] {
+/**
+ * Everything wrong with the page as it stands; errors block publishing, warnings do not.
+ * `entrypoint`: the page's main file when it is not index.html (an existing page being edited).
+ */
+export function checkPage(files: PageFiles, opts: { env: Env; isPublic: boolean; entrypoint?: string }): CheckIssue[] {
   const issues: CheckIssue[] = [];
-  const main = files.text(ENTRYPOINT);
+  const entry = opts.entrypoint ?? ENTRYPOINT;
+  const main = files.text(entry);
   if (main === undefined) {
-    return [{ rule: 'no_entrypoint', severity: 'error', message: `There is no ${ENTRYPOINT}`, hint: `Write ${ENTRYPOINT} first: it is the page people open.` }];
+    return [{ rule: 'no_entrypoint', severity: 'error', message: `There is no ${entry}`, hint: `Write ${entry} first: it is the page people open.` }];
   }
   if (!/<html[\s>]/i.test(main) || !/<body[\s>]/i.test(main)) {
-    issues.push({ rule: 'html_shell', severity: 'error', message: `${ENTRYPOINT} is missing <html> or <body>`, hint: 'Start with <!DOCTYPE html> and include <html>, <head> and <body>.' });
+    issues.push({ rule: 'html_shell', severity: 'error', message: `${entry} is missing <html> or <body>`, hint: 'Start with <!DOCTYPE html> and include <html>, <head> and <body>.' });
   }
 
   const scripts = files.entries().filter((f) => isHtml(f.path)).flatMap((f) => inlineScripts(f.path, f.text));
@@ -221,7 +225,7 @@ export function checkPage(files: PageFiles, opts: { env: Env; isPublic: boolean 
     if (i) issues.push(i);
   }
 
-  const manifest = manifestTables(ENTRYPOINT, main);
+  const manifest = manifestTables(entry, main);
   if (manifest.issue) issues.push(manifest.issue);
   else issues.push(...tableIssues(files, scripts, manifest.tables));
 
