@@ -214,6 +214,8 @@ export interface Env {
   VERCEL_AI_GATEWAY?: string;
   /** Gateway credit (USD) below which the hourly reconcile logs an error to /admin health. Default 20. */
   AI_CREDIT_ALERT_USD?: string;
+  /** Daily AI spend (USD, UTC day, from ai_usage_events) above which the operator gets one Telegram alert. Unset = off. */
+  AI_SPEND_ALERT_USD_PER_DAY?: string;
   /** Comma-separated failover order over configured AI providers (`vercel-gateway`, `anthropic`, `openai`). Unlisted configured providers follow in the default order. */
   AI_PROVIDER_ORDER?: string;
   /** Model for the build agent and chat agent. Gateway slug (`anthropic/claude-sonnet-5`) or first-party id. Defaults to Claude Sonnet 5. */

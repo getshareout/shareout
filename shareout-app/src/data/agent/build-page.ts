@@ -15,6 +15,7 @@ import { resolveGatewayModel } from './ai-config';
 import type { LocaleCopy } from '../../i18n';
 import { createLogger } from '../../logging';
 import { alertOps } from '../../support/alert';
+import type { BuildTrace } from '../../build-agent/trace';
 
 /** Output cap per build turn. Typical AI-built pages run 9–12k tokens (2026-10: 2 of 4 prod builds hit the old 12k cap). */
 export const BUILD_MAX_TOKENS = 32000;
@@ -77,6 +78,8 @@ const DOC_START = /^\s*(<!doctype html|<html[\s>])/i;
  * button dead and no error shown. Yields deltas as they arrive (continuations included),
  * then `done` with the whole raw text, or `error` (BUILD_TRUNCATED_CODE when it is still
  * cut off after the last turn). Every turn goes through streamChat, so each is metered.
+ * `trace` records the turns and closes itself on a failure; the caller closes it on success,
+ * once it knows whether the page was published.
  */
 export async function* streamBuild(
   env: Env,
@@ -84,6 +87,7 @@ export async function* streamBuild(
   messages: BuildMessage[],
   systemPrompt: string,
   config: AIConfig | null,
+  trace?: BuildTrace,
 ): AsyncGenerator<BuildChunk> {
   let raw = '';
   for (let turn = 0; turn <= BUILD_CONTINUATIONS; turn++) {
@@ -97,10 +101,19 @@ export async function* streamBuild(
       if (chunk.type === 'error') {
         // A workspace over its AI budget is the workspace's limit, not a broken build.
         if (chunk.code !== BUDGET_CODE) await reportBuildFailure(env, meter, 'snag', messages, chunk.error);
+        await trace?.finish('failed', { errorCode: chunk.code ?? 'MODEL_ERROR', errorMessage: chunk.error });
         yield { type: 'error', error: chunk.error || 'AI stream error', code: chunk.code, resets_at: chunk.resets_at };
         return;
       }
-      if (chunk.type === 'done') { truncated = !!chunk.truncated; continue; }
+      if (chunk.type === 'done') {
+        truncated = !!chunk.truncated;
+        trace?.turn({
+          model: config?.model ?? null, provider: config?.provider ?? null,
+          stopReason: truncated ? 'max_tokens' : 'end_turn',
+          inputTokens: chunk.usage?.input_tokens ?? 0, outputTokens: chunk.usage?.output_tokens ?? 0,
+        });
+        continue;
+      }
       if (!chunk.content) continue;
       part += chunk.content;
       if (!decided) {
@@ -127,6 +140,7 @@ export async function* streamBuild(
     }
   }
   await reportBuildFailure(env, meter, 'truncated', messages, `still cut off after ${BUILD_CONTINUATIONS} continuations (${raw.length} chars)`);
+  await trace?.finish('truncated', { errorCode: BUILD_TRUNCATED_CODE, errorMessage: `still cut off after ${BUILD_CONTINUATIONS} continuations (${raw.length} chars)` });
   yield { type: 'error', error: BUILD_TRUNCATED_MESSAGE, code: BUILD_TRUNCATED_CODE };
 }
 
@@ -246,12 +260,12 @@ export async function resolveBuildGatewayModel(env: Env, workspaceId: string | n
 /**
  * Generate one self-contained HTML document for a build prompt and return it.
  * Whole-page (non-streaming) — used where there's no live stream to the client
- * (the chat assistant's create_artifact confirm step).
+ * (the chat assistant's create_artifact confirm step). `trace` is closed by the caller on success.
  */
-export async function generateArtifactHtml(env: Env, prompt: string, meter: AiMeter, briefWorkspaceId?: string | null): Promise<string> {
+export async function generateArtifactHtml(env: Env, prompt: string, meter: AiMeter, briefWorkspaceId?: string | null, trace?: BuildTrace): Promise<string> {
   const [brief, gatewayModel] = await Promise.all([loadWorkspaceBrief(env, briefWorkspaceId), resolveBuildGatewayModel(env, meter.workspaceId)]);
   const system = await buildSystemPrompt(env, brief);
-  for await (const chunk of streamBuild(env, meter, [{ role: 'user', content: prompt }], system, getBuildConfig(env, gatewayModel))) {
+  for await (const chunk of streamBuild(env, meter, [{ role: 'user', content: prompt }], system, getBuildConfig(env, gatewayModel), trace)) {
     if (chunk.type === 'done') return extractHtml(chunk.raw);
     if (chunk.type === 'error') {
       if (chunk.code === BUDGET_CODE) throw new WorkspaceBudgetError(chunk.resets_at ?? '');
