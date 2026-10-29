@@ -2,7 +2,9 @@ import type { FetchContext } from '../context';
 import { getSessionUser } from '../../auth/session';
 import type { AiMeter } from '../../data/ai-usage';
 import { chat, getAgentChatModel, getBuildConfig } from '../../data/agent/anthropic';
-import { BUILD_TRUNCATED_CODE, buildSystemPrompt, extractHtml, deriveName, streamBuild } from '../../data/agent/build-page';
+import { BUILD_FAILURE_COPY, BUILD_TRUNCATED_CODE, buildSystemPrompt, extractHtml, deriveName, streamBuild } from '../../data/agent/build-page';
+import { localeForRecipient, t, type Locale } from '../../i18n';
+import { pageLocale } from '../../i18n/accept-language';
 import { getPackDirective } from '../../pages/themes';
 import { publishGeneratedHtml } from '../../publish/publish-generated-html';
 import { checkSlidingWindowRateLimit, getClientIp } from '../../rate-limit';
@@ -142,6 +144,10 @@ export async function routeCreateApi(ctx: FetchContext): Promise<Response | null
   if (blocked) return addCORS(blocked);
 
   const user = await getSessionUser(request, env);
+  // Build failures are told in the reader's language: their own setting, else the browser's.
+  const locale: Locale = user
+    ? await localeForRecipient(env, { userId: user.id, workspaceId: hostWs }).catch(() => pageLocale(request))
+    : pageLocale(request);
   // Page building is metered to the host workspace (if any) and the signed-in user (if any).
   const meter = (kind: string): AiMeter => ({ workspaceId: hostWs ?? null, userId: user?.id ?? null, kind, source: 'create' });
 
@@ -184,7 +190,7 @@ export async function routeCreateApi(ctx: FetchContext): Promise<Response | null
       const rl = await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, user.id, 'createPreviewUser');
       if (!rl.allowed) return addCORS(json({ ok: false, error: 'Too many previews this hour. Try again in a while.', code: 'PREVIEW_LIMIT' }, 429));
     }
-    return addCORS(streamGenerate({ env, prompt, previousHtml, theme, meter: meter('page_build') }));
+    return addCORS(streamGenerate({ env, prompt, previousHtml, theme, locale, meter: meter('page_build') }));
   }
 
   // Publishing (build / publish) writes to the account — requires auth.
@@ -205,7 +211,7 @@ export async function routeCreateApi(ctx: FetchContext): Promise<Response | null
     return addCORS(await handlePublish(env, user, prompt, previousHtml, slug, share));
   }
 
-  return addCORS(streamGenerate({ env, prompt, previousHtml, theme, publish: { user, slug, share }, meter: meter('page_build') }));
+  return addCORS(streamGenerate({ env, prompt, previousHtml, theme, locale, publish: { user, slug, share }, meter: meter('page_build') }));
 }
 
 function sseLine(obj: unknown): string {
@@ -220,10 +226,12 @@ function streamGenerate(opts: {
   prompt: string;
   previousHtml: string;
   theme?: string;
+  locale: Locale;
   publish?: { user: SessionUser; slug?: string; share: Share };
   meter: AiMeter;
 }): Response {
   const { env, prompt, previousHtml, theme, publish } = opts;
+  const copy = t(opts.locale, BUILD_FAILURE_COPY);
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -248,7 +256,7 @@ function streamGenerate(opts: {
           } else {
             // A page still cut off after its continuations is never published: say why.
             const truncated = chunk.code === BUILD_TRUNCATED_CODE;
-            send({ type: 'error', error: truncated ? chunk.error : 'The builder hit a snag — try again.', ...(truncated ? { code: chunk.code } : {}) });
+            send({ type: 'error', error: truncated ? copy.truncated : copy.snag, ...(truncated ? { code: chunk.code } : {}) });
             controller.close();
             return;
           }
@@ -256,7 +264,7 @@ function streamGenerate(opts: {
 
         const html = extractHtml(full);
         if (!html || html.length < 40) {
-          send({ type: 'error', error: 'I couldn’t build that — try rephrasing.' });
+          send({ type: 'error', error: copy.empty });
           controller.close();
           return;
         }
@@ -277,7 +285,7 @@ function streamGenerate(opts: {
             }
           } catch (err) {
             logError(createLogger(env, { scope: 'create', event: 'publish.failed' }), 'create publish failed', err);
-            send({ type: 'error', error: 'Built it, but publishing failed. Try again.' });
+            send({ type: 'error', error: copy.publishFailed });
           }
         } else {
           send({ type: 'done', mode: 'preview', html, capabilities });
@@ -285,7 +293,7 @@ function streamGenerate(opts: {
         controller.close();
       } catch {
         try {
-          controller.enqueue(encoder.encode(sseLine({ type: 'error', error: 'Something went wrong — try again.' })));
+          controller.enqueue(encoder.encode(sseLine({ type: 'error', error: copy.generic })));
         } catch {
           // Stream already closed.
         }

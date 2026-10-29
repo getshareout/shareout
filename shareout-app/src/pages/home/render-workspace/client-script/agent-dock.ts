@@ -308,6 +308,7 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
           else if (ev.type === 'build_done') {
             w.spin.classList.add('is-done'); w.ttl.textContent = ev.name || t('agent.pageBuilt');
             w.step.textContent = ''; w.box.classList.add('is-done');
+            if (ev.ok === false) w.box.classList.add('is-error');
             var line = el('div', 'wsx-build__line'); line.innerHTML = mdToHtml(ev.text || t('agent.done')); w.box.appendChild(line);
             if (ev.slug) {
               var open = el('button', 'wsx-build__open'); open.type = 'button'; open.textContent = t('agent.openPage');

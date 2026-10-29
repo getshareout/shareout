@@ -58,10 +58,10 @@ import { routeCreateApi } from '../../../src/router/api/create';
 
 const env = { RATE_LIMIT_KV: {} } as Env;
 
-function post(body: unknown) {
+function post(body: unknown, headers: Record<string, string> = {}) {
   const req = new Request('https://shareout.site/v1/create/generate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
   return routeCreateApi(createFetchContext(req, env));
@@ -221,6 +221,17 @@ describe('routeCreateApi', () => {
     expect(events.at(-1)).toMatchObject({ type: 'error', code: 'BUILD_TRUNCATED' });
     expect(events.at(-1).error).toMatch(/too long to finish/);
     expect(publishGeneratedHtml).not.toHaveBeenCalled();
+  });
+
+  it('says it in the reader\'s language', async () => {
+    getSessionUser.mockResolvedValue({ id: 'u1', email: 'a@x.com' });
+    streamChat.mockImplementation(async function* () {
+      yield { type: 'content', content: '<!doctype html><html><body><script>toast(\'No se pud' };
+      yield { type: 'done', truncated: true };
+    });
+    const events = await sseEvents(await post({ phase: 'build', prompt: 'hi page' }, { 'Accept-Language': 'es-AR,es;q=0.9' }));
+    expect(events.at(-1)).toMatchObject({ type: 'error', code: 'BUILD_TRUNCATED' });
+    expect(events.at(-1).error).toMatch(/demasiado larga/);
   });
 
   describe('who can see it', () => {

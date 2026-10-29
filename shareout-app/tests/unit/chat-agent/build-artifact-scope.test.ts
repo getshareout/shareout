@@ -84,8 +84,22 @@ describe('executeBuildArtifact — same daily publish cap and storage quota as P
     generateArtifactHtml.mockRejectedValue(new BuildTruncatedError());
     const r = await executeBuildArtifact(env, 'u1', build);
     expect(r.text).toMatch(/too long to finish/);
+    expect(r.ok).toBe(false);
     expect(r.url).toBeUndefined();
     expect(publishGeneratedHtml).not.toHaveBeenCalled();
     expect(incrementRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('tells a Spanish speaker in Spanish, progress included', async () => {
+    generateArtifactHtml.mockRejectedValue(new BuildTruncatedError());
+    const steps: string[] = [];
+    const r = await executeBuildArtifact(env, 'u1', build, (s) => steps.push(s), 'es');
+    expect(steps).toEqual(['Diseñando tu página…']);
+    expect(r).toMatchObject({ ok: false, text: expect.stringMatching(/demasiado larga/) });
+  });
+
+  it('marks a published build ok', async () => {
+    const r = await executeBuildArtifact(env, 'u1', build, undefined, 'es');
+    expect(r).toMatchObject({ ok: true, slug: 'p', text: 'Lista y publicada ✅ https://x/a/p/' });
   });
 });

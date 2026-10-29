@@ -8,18 +8,25 @@ import type { Ticket } from './store';
  * No-op unless SUPPORT_ALERT_TELEGRAM_CHAT_ID and TELEGRAM_BOT_TOKEN are set. Never throws.
  */
 export async function alertOperator(env: Env, ticket: Ticket, body: string): Promise<boolean> {
-  const chatId = Number(env.SUPPORT_ALERT_TELEGRAM_CHAT_ID);
-  if (!env.SUPPORT_ALERT_TELEGRAM_CHAT_ID || !Number.isFinite(chatId) || !env.TELEGRAM_BOT_TOKEN) return false;
-  const header = [
-    `🆘 New support ticket ${ticket.id}`,
+  const excerpt = body.length > 1500 ? `${body.slice(0, 1500)}…` : body;
+  return alertOps(env, `🆘 New support ticket ${ticket.id}`, [
     `Subject: ${ticket.subject}`,
     `From: ${ticket.requester_email ?? ticket.requester_user_id ?? 'unknown'}`,
     `Workspace: ${ticket.workspace_id ?? '—'} · via ${ticket.client ?? ticket.channel}`,
     ticket.severity ? `Severity: ${ticket.severity}` : '',
-  ].filter(Boolean).join('\n');
-  const excerpt = body.length > 1500 ? `${body.slice(0, 1500)}…` : body;
+  ], excerpt);
+}
+
+/**
+ * Ping the instance operator's Telegram chat (SUPPORT_ALERT_TELEGRAM_CHAT_ID) with a title,
+ * a few detail lines and an optional body. No-op without the chat id and bot token. Never throws.
+ */
+export async function alertOps(env: Env, title: string, lines: string[], body?: string): Promise<boolean> {
+  const chatId = Number(env.SUPPORT_ALERT_TELEGRAM_CHAT_ID);
+  if (!env.SUPPORT_ALERT_TELEGRAM_CHAT_ID || !Number.isFinite(chatId) || !env.TELEGRAM_BOT_TOKEN) return false;
+  const header = [title, ...lines].filter(Boolean).join('\n');
   try {
-    await sendTelegram(env, chatId, `${header}\n\n${excerpt}`);
+    await sendTelegram(env, chatId, body ? `${header}\n\n${body}` : header);
     return true;
   } catch {
     return false;

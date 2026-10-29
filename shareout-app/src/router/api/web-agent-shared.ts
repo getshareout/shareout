@@ -139,9 +139,10 @@ export async function confirmAgentAction(env: Env, scopeKey: string, user: AuthU
   if (rec.action.kind === 'build_artifact') {
     const action = rec.action;
     return sseResp(async (send) => {
-      const r = await executeBuildArtifact(env, user.id, action, (label) => send({ type: 'build_step', label }));
+      const locale = await localeForRecipient(env, { userId: user.id, workspaceId: action.workspace_id ?? null }).catch((): Locale => 'en');
+      const r = await executeBuildArtifact(env, user.id, action, (label) => send({ type: 'build_step', label }), locale);
       await remember(r.url ? `${r.text}\n${r.url}` : r.text);
-      send({ type: 'build_done', text: r.text, url: r.url, slug: r.slug, artifactId: r.artifactId, name: r.name });
+      send({ type: 'build_done', ok: r.ok, text: r.text, url: r.url, slug: r.slug, artifactId: r.artifactId, name: r.name });
       send({ type: 'done' });
     });
   }
