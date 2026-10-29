@@ -1955,6 +1955,10 @@
                   },
                   "role": {
                     "$ref": "#/components/schemas/Role"
+                  },
+                  "notify": {
+                    "type": "boolean",
+                    "description": "Email each person this call newly adds: the link and how to sign in (an emailed code, no password). Counts toward the daily share-email limit; when it is reached the share still happens and the response says who was not emailed."
                   }
                 }
               }
@@ -1963,7 +1967,7 @@
         },
         "responses": {
           "200": {
-            "description": "Added"
+            "description": "Added. With notify, `notified` lists `sent`, `failed` and `rate_limited`."
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"

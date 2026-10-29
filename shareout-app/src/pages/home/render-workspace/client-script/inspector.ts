@@ -282,6 +282,11 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
         .then(function (d) { memberCache[wsId] = (d && d.members) || []; cb(memberCache[wsId]); })
         .catch(function () { memberCache[wsId] = []; cb([]); });
     }
+    // Say what happened to the email too, not just the grant (notify:true).
+    function shareToast(d, em) {
+      var n = (d && d.notified) || {};
+      return t(n.rate_limited ? 'inspector.shareEmailLimit' : (n.failed || []).length ? 'inspector.shareNoEmail' : (n.sent || []).length ? 'inspector.shareEmailed' : 'inspector.shareAlready').replace('{email}', em);
+    }
     function addEmails(emails) {
       if (!emails.length) return;
       var last = emails[emails.length - 1], r0 = role, added = [];
@@ -293,12 +298,11 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
         },
         rollback: function () { list = list.filter(function (c) { return added.indexOf(c.email) < 0; }); added = []; paint(); },
         request: function () {
-          return fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/collaborators', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emails: emails, role: r0 }) })
+          return fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/collaborators', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emails: emails, role: r0, notify: true }) })
             .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
         },
-        success: t('inspector.inviteSent').replace('{email}', last),
         error: t('inspector.inviteFailed'),
-        done: function (d) { if (d && d.collaborators) { list = d.collaborators; paint(); } metaCache[art.id] = undefined; },
+        done: function (d) { if (d && d.collaborators) { list = d.collaborators; paint(); } metaCache[art.id] = undefined; wsxToast(shareToast(d, last)); },
       });
     }
     function paint() {

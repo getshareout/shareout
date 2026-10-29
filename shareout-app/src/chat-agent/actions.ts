@@ -2,12 +2,14 @@ import type { Env } from '../types';
 import { resolveArtifactAccessForUser } from './access';
 import { updateRule, deleteRule } from '../metric-alerts/rules';
 import { updateJob, deleteJob, createJob } from '../scheduling/jobs/crud';
-import { addCollaboratorEmails } from '../artifacts/collaborators';
+import { addCollaboratorEmails, handleRemoveCollaborator } from '../artifacts/collaborators';
+import { emailNewCollaborators } from '../artifacts/share-email';
+import { handleUpdateArtifact } from '../artifacts/crud';
 import { runCrewForArtifact } from '../crew/dispatch';
 import { publishEdits } from '../data/agent/headless-edit';
 import { createWatch } from '../metric-watch/watches';
 import { presentArtifact } from '../present/present-artifact';
-import { botInsertRows, botUpdateRowById, botUpdateRowsByFilter } from '../data/tables/bot';
+import { botInsertRows, botUpdateRowById, botUpdateRowsByFilter, botDeleteRowById } from '../data/tables/bot';
 import { botSetJson } from '../data/json-store';
 import { buildBotDataContext } from './data-write';
 import { BUILD_FAILURE_COPY, BuildTruncatedError, generateArtifactHtml } from '../data/agent/build-page';
@@ -34,10 +36,13 @@ export type PendingAction =
   | { kind: 'alert_pause' | 'alert_resume' | 'alert_delete'; ruleId: string; label: string }
   | { kind: 'job_pause' | 'job_resume' | 'job_delete'; jobId: string; label: string }
   | { kind: 'share'; artifactId: string; artifactName: string; emails: string[]; role: 'viewer' | 'editor' }
+  | { kind: 'unshare'; artifactId: string; artifactName: string; emails: string[] }
+  | { kind: 'visibility'; artifactId: string; artifactName: string; visibility: 'private' | 'workspace' }
   | { kind: 'crew'; artifactId: string; artifactName: string; instruction: string }
   | { kind: 'edit_publish'; artifactId: string; artifactName: string; conversationId: string; stagedHash: string; summary: string; files: string[]; diff?: string[] }
   | { kind: 'data_table_insert'; artifactId: string; artifactName: string; table: string; row: Record<string, unknown> }
   | { kind: 'data_table_update'; artifactId: string; artifactName: string; table: string; rowId?: string; filter?: Record<string, unknown>; changes: Record<string, unknown> }
+  | { kind: 'data_table_delete'; artifactId: string; artifactName: string; table: string; rowId: string }
   | { kind: 'data_json_set'; artifactId: string; artifactName: string; key: string; value: unknown; exists: boolean }
   | { kind: 'job_create'; artifactId: string; artifactName: string; schedule: string; recipients: string[]; subject: string; includePdf: boolean }
   | { kind: 'build_artifact'; name: string; prompt: string; source_file_id?: string; workspace_id?: string }
@@ -105,11 +110,14 @@ export function describeActionRich(a: PendingAction, locale: Locale = 'en'): Act
     case 'job_pause': return { kind: a.kind, title: 'Pause schedule', subject: a.label };
     case 'job_resume': return { kind: a.kind, title: 'Resume schedule', subject: a.label };
     case 'job_delete': return { kind: a.kind, title: 'Delete schedule', subject: a.label, detail: 'This can’t be undone.', danger: true };
-    case 'share': return { kind: a.kind, title: 'Share page', subject: a.artifactName, detail: `As ${a.role}`, lines: a.emails };
+    case 'share': return { kind: a.kind, title: 'Share page', subject: a.artifactName, detail: `As ${a.role} · they get an email with the link`, lines: a.emails };
+    case 'unshare': return { kind: a.kind, title: 'Stop sharing', subject: a.artifactName, lines: a.emails, danger: true };
+    case 'visibility': return { kind: a.kind, title: a.visibility === 'workspace' ? 'Open to the whole workspace' : 'Make private', subject: a.artifactName, detail: a.visibility === 'workspace' ? 'Every workspace member can open it.' : 'Only you and the people it is shared with can open it.' };
     case 'crew': return { kind: a.kind, title: 'Ask the crew', subject: a.artifactName, detail: a.instruction };
     case 'edit_publish': return { kind: a.kind, title: 'Edit & publish', subject: a.artifactName, detail: a.summary, lines: a.files.length ? [`Files: ${a.files.join(', ')}`, ...(a.diff ?? [])] : undefined };
     case 'data_table_insert': return { kind: a.kind, title: `Add row to “${a.table}”`, subject: a.artifactName, lines: kv(a.row) };
     case 'data_table_update': return { kind: a.kind, title: `Update “${a.table}”`, subject: a.artifactName, detail: a.rowId ? `row ${a.rowId}` : `rows matching ${preview(a.filter, 80)}`, lines: kv(a.changes) };
+    case 'data_table_delete': return { kind: a.kind, title: `Delete a row from “${a.table}”`, subject: a.artifactName, detail: `row ${a.rowId} · This can’t be undone.`, danger: true };
     case 'data_json_set': return { kind: a.kind, title: `Set “${a.key}”`, subject: a.artifactName, detail: a.exists ? 'Replaces the current value.' : undefined, lines: [preview(a.value, 160)] };
     case 'job_create': return { kind: a.kind, title: 'Schedule email', subject: a.artifactName, detail: `cron ${a.schedule}${a.includePdf ? ' · PDF attached' : ''}`, lines: a.recipients };
     case 'build_artifact': return { kind: a.kind, title: 'Build a new page', subject: a.name, detail: a.prompt.length > 280 ? a.prompt.slice(0, 280) + '…' : a.prompt };
@@ -144,11 +152,14 @@ function describeActionRichEs(a: PendingAction): ActionCard {
     case 'job_pause': return { kind: a.kind, title: 'Pausar envío programado', subject: a.label };
     case 'job_resume': return { kind: a.kind, title: 'Reactivar envío programado', subject: a.label };
     case 'job_delete': return { kind: a.kind, title: 'Borrar envío programado', subject: a.label, detail: NO_UNDO_ES, danger: true };
-    case 'share': return { kind: a.kind, title: 'Compartir artefacto', subject: a.artifactName, detail: `Como ${ROLE_ES[a.role]}`, lines: a.emails };
+    case 'share': return { kind: a.kind, title: 'Compartir artefacto', subject: a.artifactName, detail: `Como ${ROLE_ES[a.role]} · les llega un mail con el link`, lines: a.emails };
+    case 'unshare': return { kind: a.kind, title: 'Dejar de compartir', subject: a.artifactName, lines: a.emails, danger: true };
+    case 'visibility': return { kind: a.kind, title: a.visibility === 'workspace' ? 'Abrir a todo el espacio' : 'Hacer privado', subject: a.artifactName, detail: a.visibility === 'workspace' ? 'Todos los miembros del espacio pueden abrirlo.' : 'Solo vos y las personas con las que lo compartiste pueden abrirlo.' };
     case 'crew': return { kind: a.kind, title: 'Pedirle al agente', subject: a.artifactName, detail: a.instruction };
     case 'edit_publish': return { kind: a.kind, title: 'Cambiar y publicar', subject: a.artifactName, detail: a.summary, lines: a.files.length ? [`Archivos: ${a.files.join(', ')}`, ...(a.diff ?? [])] : undefined };
     case 'data_table_insert': return { kind: a.kind, title: `Agregar fila a “${a.table}”`, subject: a.artifactName, lines: kv(a.row) };
     case 'data_table_update': return { kind: a.kind, title: `Actualizar “${a.table}”`, subject: a.artifactName, detail: a.rowId ? `fila ${a.rowId}` : `filas que coinciden con ${preview(a.filter, 80)}`, lines: kv(a.changes) };
+    case 'data_table_delete': return { kind: a.kind, title: `Borrar una fila de “${a.table}”`, subject: a.artifactName, detail: `fila ${a.rowId} · ${NO_UNDO_ES}`, danger: true };
     case 'data_json_set': return { kind: a.kind, title: `Guardar “${a.key}”`, subject: a.artifactName, detail: a.exists ? 'Reemplaza el valor actual.' : undefined, lines: [preview(a.value, 160)] };
     case 'job_create': return { kind: a.kind, title: 'Programar mail', subject: a.artifactName, detail: `cron ${a.schedule}${a.includePdf ? ' · con PDF adjunto' : ''}`, lines: a.recipients };
     case 'build_artifact': return { kind: a.kind, title: 'Armar un artefacto nuevo', subject: a.name, detail: a.prompt.length > 280 ? a.prompt.slice(0, 280) + '…' : a.prompt };
@@ -179,7 +190,12 @@ function describeActionEs(a: PendingAction): string {
     case 'job_pause': return `¿Pauso el envío programado “${a.label}”?`;
     case 'job_resume': return `¿Reactivo el envío programado “${a.label}”?`;
     case 'job_delete': return `¿Borro el envío programado “${a.label}”? ${NO_UNDO_ES}`;
-    case 'share': return `¿Comparto “${a.artifactName}” con ${a.emails.join(', ')} como ${ROLE_ES[a.role]}?`;
+    case 'share': return `¿Comparto “${a.artifactName}” con ${a.emails.join(', ')} como ${ROLE_ES[a.role]}? Les llega un mail con el link.`;
+    case 'unshare': return `¿Dejo de compartir “${a.artifactName}” con ${a.emails.join(', ')}?`;
+    case 'visibility':
+      return a.visibility === 'workspace'
+        ? `¿Dejo que todos los miembros del espacio abran “${a.artifactName}”?`
+        : `¿Hago privado “${a.artifactName}”? Solo vos y las personas con las que lo compartiste van a poder abrirlo.`;
     case 'crew': return `¿Le pido al agente de “${a.artifactName}” que haga esto: ${a.instruction}?`;
     case 'edit_publish':
       return `${a.summary}\n\n¿Aplico esto en “${a.artifactName}” y lo publico?${a.files.length ? `\n\nArchivos: ${a.files.join(', ')}` : ''}${a.diff?.length ? `\n\nCambios:\n${diffText(a.diff)}` : ''}`;
@@ -189,6 +205,8 @@ function describeActionEs(a: PendingAction): string {
       const target = a.rowId ? `la fila ${a.rowId}` : `las filas que coinciden con ${preview(a.filter)}`;
       return `¿Actualizo ${target} de “${a.table}” en “${a.artifactName}” con esto?\n\n${preview(a.changes)}`;
     }
+    case 'data_table_delete':
+      return `¿Borro la fila ${a.rowId} de “${a.table}” en “${a.artifactName}”? ${NO_UNDO_ES}`;
     case 'data_json_set':
       return `¿Guardo “${a.key}” en “${a.artifactName}” con este valor?\n\n${preview(a.value)}${a.exists ? '\n\nReemplaza el valor actual.' : ''}`;
     case 'job_create':
@@ -343,7 +361,12 @@ export function describeAction(a: PendingAction, locale: Locale = 'en'): string 
     case 'job_pause': return `Pause the schedule “${a.label}”?`;
     case 'job_resume': return `Resume the schedule “${a.label}”?`;
     case 'job_delete': return `Delete the schedule “${a.label}”? This can’t be undone.`;
-    case 'share': return `Share “${a.artifactName}” with ${a.emails.join(', ')} as ${a.role}?`;
+    case 'share': return `Share “${a.artifactName}” with ${a.emails.join(', ')} as ${a.role}? They get an email with the link.`;
+    case 'unshare': return `Stop sharing “${a.artifactName}” with ${a.emails.join(', ')}?`;
+    case 'visibility':
+      return a.visibility === 'workspace'
+        ? `Let every member of the workspace open “${a.artifactName}”?`
+        : `Make “${a.artifactName}” private? Only you and the people it is shared with can open it.`;
     case 'crew': return `Ask the crew on “${a.artifactName}” to: ${a.instruction}?`;
     case 'edit_publish':
       return `${a.summary}\n\nApply this to “${a.artifactName}” and publish it live?${a.files.length ? `\n\nFiles: ${a.files.join(', ')}` : ''}${a.diff?.length ? `\n\nChanges:\n${diffText(a.diff)}` : ''}`;
@@ -353,6 +376,8 @@ export function describeAction(a: PendingAction, locale: Locale = 'en'): string 
       const target = a.rowId ? `row ${a.rowId}` : `rows matching ${preview(a.filter)}`;
       return `Update ${target} in “${a.table}” on “${a.artifactName}” with:\n\n${preview(a.changes)}?`;
     }
+    case 'data_table_delete':
+      return `Delete row ${a.rowId} from “${a.table}” on “${a.artifactName}”? This can’t be undone.`;
     case 'data_json_set':
       return `Set “${a.key}” on “${a.artifactName}” to:\n\n${preview(a.value)}${a.exists ? '\n\nThis replaces the current value.' : ''}?`;
     case 'job_create':
@@ -378,6 +403,13 @@ export function describeAction(a: PendingAction, locale: Locale = 'en'): string 
     case 'catalog_edit':
       return `Edit the catalog entry “${a.entryTitle}”?${a.certified ? ' It is certified: it will show as changed since certification.' : ''}\n\n${catalogEditLines(a.edit, '(removed)').join('\n')}`;
   }
+}
+
+// The linked user as the REST handlers expect it, so a confirmed action runs the same
+// permission checks as the Studio panel.
+async function linkedUser(env: Env, userId: string) {
+  const row = await env.DB.prepare('SELECT email, username FROM users WHERE id = ?').bind(userId).first<{ email: string | null; username: string | null }>();
+  return { id: userId, email: row?.email ?? null, username: row?.username ?? null };
 }
 
 /**
@@ -407,9 +439,38 @@ export async function executeAction(env: Env, userId: string, a: PendingAction, 
     }
     case 'share': {
       const access = await resolveArtifactAccessForUser(env, a.artifactId, userId);
-      if (!access || access.role !== 'owner') return 'Only the page’s owner can share it.';
+      if (!access || (access.role !== 'owner' && access.role !== 'editor')) return 'Only the page’s owner or an editor can share it.';
       const added = await addCollaboratorEmails(env, a.artifactId, a.emails, a.role, userId);
-      return added.length ? `Done — shared with ${added.join(', ')}.` : 'No one new was added.';
+      if (!added.length) return 'No one new was added — they already have access.';
+      const mail = await emailNewCollaborators(env, userId, a.artifactId, added, a.role);
+      const done = `Done — shared with ${added.join(', ')}.`;
+      if (!mail.failed.length) return `${done} I emailed them the link and how to sign in.`;
+      const why = mail.rate_limited ? 'this page reached today’s email limit' : 'the email didn’t go out';
+      const unsent = mail.failed.map((f) => f.email).join(', ');
+      return `${done} I couldn’t email ${unsent} (${why}) — send them the link yourself${mail.url ? `: ${mail.url}` : '.'}`;
+    }
+    case 'unshare': {
+      const user = await linkedUser(env, userId);
+      const removed: string[] = [];
+      for (const email of a.emails) {
+        const res = await handleRemoveCollaborator(new Request(`https://internal/v1/artifacts/${a.artifactId}/collaborators/${encodeURIComponent(email)}`, { method: 'DELETE' }), env, user, a.artifactId, email);
+        if (res.status === 403) return 'Only the page’s owner or an editor can change who it is shared with.';
+        const body = (await res.json().catch(() => ({}))) as { removed?: boolean; error?: string };
+        if (!res.ok) return `Couldn’t remove ${email}: ${body.error ?? `HTTP ${res.status}`}.`;
+        if (body.removed) removed.push(email);
+      }
+      return removed.length ? `Done — ${removed.join(', ')} can no longer open it through a share.` : 'None of them had it shared with them.';
+    }
+    case 'visibility': {
+      const user = await linkedUser(env, userId);
+      const res = await handleUpdateArtifact(new Request(`https://internal/v1/artifacts/${a.artifactId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visibility: a.visibility }),
+      }), env, user, a.artifactId);
+      const body = (await res.json().catch(() => ({}))) as { visibility?: string; message?: string; error?: string };
+      if (res.status === 403) return body.error && body.error !== 'Forbidden' ? `Couldn’t change it: ${body.error}.` : 'Only the page’s owner or an editor can change who can open it.';
+      if (!res.ok) return `Couldn’t change it: ${body.error ?? `HTTP ${res.status}`}.`;
+      if (res.status === 202 && body.message) return body.message;
+      return a.visibility === 'workspace' ? 'Done — every member of the workspace can open it now.' : 'Done — it’s private: only you and the people it is shared with can open it.';
     }
     case 'crew': {
       const access = await resolveArtifactAccessForUser(env, a.artifactId, userId);
@@ -434,6 +495,7 @@ export async function executeAction(env: Env, userId: string, a: PendingAction, 
     }
     case 'data_table_insert':
     case 'data_table_update':
+    case 'data_table_delete':
     case 'data_json_set': {
       const access = await resolveArtifactAccessForUser(env, a.artifactId, userId);
       if (!access || (access.role !== 'owner' && access.role !== 'editor')) return 'Only the owner or an editor can change a page’s data.';
@@ -450,6 +512,10 @@ export async function executeAction(env: Env, userId: string, a: PendingAction, 
           : await botUpdateRowsByFilter(ctx, a.table, a.filter ?? {}, a.changes);
         if (r.error) return `Couldn’t update that: ${r.error}`;
         return `Done — updated ${r.updated} row${r.updated === 1 ? '' : 's'} in “${a.table}”.`;
+      }
+      if (a.kind === 'data_table_delete') {
+        const r = await botDeleteRowById(ctx, a.table, a.rowId);
+        return r.error ? `Couldn’t delete that row: ${r.error}` : `Done — deleted the row from “${a.table}”.`;
       }
       const r = await botSetJson(ctx, a.key, a.value);
       return r.error ? `Couldn’t save that: ${r.error}` : `Done — saved “${a.key}”.`;

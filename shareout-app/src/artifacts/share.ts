@@ -3,14 +3,13 @@
  */
 import type { Env, CollaboratorRole } from '../types';
 import type { AuthUser } from '../api-auth';
-import { checkEmailRateLimit, incrementEmailCount } from '../scheduling/email';
-import { dispatchLifecycleEmail } from '../email/gateway';
+import { checkEmailRateLimit } from '../scheduling/email';
 import { addCollaboratorEmails } from './collaborators';
 import { requireSharingRole } from './roles';
 import { json } from './json-response';
-import { workspaceArtifactUrl } from '../workspaces/domains/links';
+import { deliverShareEmails, loadShareArtifact, type ShareEmailRole } from './share-email';
 
-type ShareRole = 'none' | 'viewer' | 'editor';
+type ShareRole = ShareEmailRole;
 
 export async function handleShareArtifact(
   request: Request,
@@ -18,23 +17,7 @@ export async function handleShareArtifact(
   user: AuthUser,
   artifactId: string
 ): Promise<Response> {
-  const artifact = await env.DB.prepare(
-    `SELECT a.id, a.name, a.description, a.slug, a.display_slug, a.auth_method, d.slug AS prod_slug, w.slug AS workspace_slug, a.workspace_id
-     FROM artifacts a
-     LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
-     LEFT JOIN workspaces w ON w.id = a.workspace_id
-     WHERE a.id = ?`
-  ).bind(artifactId).first<{
-    id: string;
-    name: string;
-    description: string | null;
-    slug: string;
-    display_slug: string | null;
-    auth_method: string;
-    prod_slug: string | null;
-    workspace_slug: string | null;
-    workspace_id: string | null;
-  }>();
+  const artifact = await loadShareArtifact(env, artifactId);
 
   if (!artifact) {
     return json({ error: 'Artifact not found', code: 'NOT_FOUND' }, 404);
@@ -99,47 +82,11 @@ export async function handleShareArtifact(
     added = await addCollaboratorEmails(env, artifactId, recipients, role, user.id);
   }
 
-  const sender = await env.DB.prepare(
-    'SELECT email, username FROM users WHERE id = ?'
-  ).bind(user.id).first<{ email: string | null; username: string | null }>();
-
-  const slug = artifact.prod_slug || artifact.slug;
-  // Workspace artifacts share their clean subdomain URL, not the apex /a/ routing key.
-  const viewUrl = artifact.workspace_slug
-    ? await workspaceArtifactUrl(env, env.SHAREOUT_BASE_URL, artifact.workspace_slug, artifact.display_slug || slug)
-    : `${env.SHAREOUT_BASE_URL}/a/${slug}/`;
-  const shareData = {
-    artifactName: artifact.name,
-    artifactDescription: artifact.description,
-    viewUrl,
-    thumbnailUrl: `${env.SHAREOUT_BASE_URL}/t/${artifactId}.webp`,
-    sharerName: sender?.username || sender?.email || undefined,
-    customMessage: message,
-    role,
-  };
-
-  let remaining = rate.remaining;
-
-  for (const recipient of recipients) {
-    if (remaining <= 0) {
-      failed.push({ email: recipient, error: 'rate_limited' });
-      continue;
-    }
-    const result = await dispatchLifecycleEmail(env, {
-      type: 'artifact_share',
-      toEmail: recipient,
-      workspaceId: artifact.workspace_id ?? undefined,
-      replyTo: sender?.email || undefined,
-      data: shareData,
-    });
-    if (result.sent) {
-      sent.push(recipient);
-      await incrementEmailCount(env, user.id, artifactId);
-      remaining--;
-    } else {
-      failed.push({ email: recipient, error: result.error || 'send_failed' });
-    }
-  }
+  const { sent: delivered, failed: undelivered, remaining } = await deliverShareEmails(env, {
+    artifact, senderId: user.id, recipients, role, message, remaining: rate.remaining,
+  });
+  sent.push(...delivered);
+  failed.push(...undelivered);
 
   return json({ success: sent.length > 0, sent, failed, added, role, remaining });
 }

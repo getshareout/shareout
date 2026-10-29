@@ -38,6 +38,22 @@ describe('catalog: artifact_share', () => {
     expect(bodyHtml).toContain('added as an editor');
     expect(bodyText).toContain('added as an editor');
   });
+  it('tells a person who was given access how to sign in, without a password', () => {
+    const { bodyHtml, bodyText } = build({ ...base, role: 'viewer', recipientEmail: 'ana@contractor.com' }, ctx);
+    expect(bodyText).toContain('Sign in with ana@contractor.com');
+    expect(bodyText).toContain('no password needed');
+    expect(bodyHtml).toContain('ana@contractor.com');
+  });
+
+  it('skips the sign-in line when the share grants no access', () => {
+    expect(build({ ...base, role: 'none', recipientEmail: 'ana@contractor.com' }, ctx).bodyText).not.toContain('Sign in');
+  });
+
+  it('says it in Spanish too', () => {
+    const b = EMAILS_ES.artifact_share({ ...base, role: 'viewer', recipientEmail: 'ana@contratista.com' });
+    expect(b.bodyText).toContain('Entrá con ana@contratista.com');
+    expect(b.bodyText).toContain('sin contraseña');
+  });
 });
 
 describe('catalog: other templates', () => {

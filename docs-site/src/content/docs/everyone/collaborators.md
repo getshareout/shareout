@@ -12,6 +12,15 @@ Add someone with their email address and pick what they're allowed to do:
 - **Can edit** — they can change and update the page with you. Great for a teammate, a partner, or a co-organizer.
 - **Can view** — they can see it (even if it's private), but not change it. Great for a client reviewing, or a boss signing off.
 
+Each new person gets an email with the link and how to get in: they sign in with that
+email address and a code we send them — no account to set up, no password. If the page
+already sent its daily allowance of emails, they're still added; ShareOut tells you to
+send them the link yourself.
+
+You can also ask the assistant: "share this page with ana@example.com", "stop sharing it
+with ana@example.com", or "make it visible to the whole workspace". It asks you to
+confirm first.
+
 You're always the **owner** — only you can delete the page or hand it over to someone else.
 
 **Workspace owners and admins** can also edit any page in the workspace (Live Studio

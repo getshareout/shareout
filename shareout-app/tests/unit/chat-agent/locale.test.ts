@@ -19,8 +19,8 @@ describe('chat agent in Spanish', () => {
     expect(toolProgressLabel('query_connection', { connection: 'ventas' }, 'es')).toBe('Consultando ventas…');
     expect(toolProgressLabel('nope', {}, 'es')).toBe('Estoy en eso…');
     const share = { kind: 'share', artifactId: 'a', artifactName: 'Ventas', emails: ['x@y.com'], role: 'viewer' } as const;
-    expect(describeAction(share, 'es')).toBe('¿Comparto “Ventas” con x@y.com como lector?');
-    expect(describeActionRich(share, 'es')).toMatchObject({ title: 'Compartir artefacto', detail: 'Como lector' });
+    expect(describeAction(share, 'es')).toBe('¿Comparto “Ventas” con x@y.com como lector? Les llega un mail con el link.');
+    expect(describeActionRich(share, 'es')).toMatchObject({ title: 'Compartir artefacto', detail: 'Como lector · les llega un mail con el link' });
     expect(agentFallbackReplies('es').errored).toMatch(/^Uy/);
     expect(agentFallbackReplies().errored).toBe('Hmm, something went wrong on my end. Mind trying again?');
   });

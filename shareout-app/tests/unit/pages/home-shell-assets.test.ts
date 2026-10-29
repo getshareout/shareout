@@ -100,13 +100,14 @@ describe('home shell assets', () => {
     }
   });
 
-  it('perf budget: the boot shell script stays under 573 KB (572.2 KB measured; 718 KB with both locales inlined)', async () => {
+  it('perf budget: the boot shell script stays under 575 KB (572.5 KB measured; 718 KB with both locales inlined)', async () => {
     const { js } = await homeShellUrls();
     const text = await (await serveHomeShellAsset(HOME_SHELL_JS, new URL(js, 'https://x.test').searchParams.get('v')))!.text();
     // Raised from 566 KB for sortable table headers (Artifacts server sort, Assets column
     // sort): 569.1 KB measured, budget = that + ~0.5%. Raised to 573 KB for the build agent's
-    // `step` progress event in the create client (+0.2 KB).
-    expect(new TextEncoder().encode(text).length).toBeLessThan(573_000);
+    // `step` progress event in the create client (+0.2 KB). Raised for the share panel's
+    // email-outcome toast: 572.5 KB measured, budget = that + ~0.5%.
+    expect(new TextEncoder().encode(text).length).toBeLessThan(575_000);
     for (const l of ['en', 'es'] as const) {
       const u = new URL(await homeI18nUrl(l), 'https://x.test');
       const copy = await (await serveHomeShellAsset(u.pathname, u.searchParams.get('v')))!.text();

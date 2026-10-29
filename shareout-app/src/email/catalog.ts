@@ -81,6 +81,8 @@ export interface ShareData {
   sharerName?: string | null;
   customMessage?: string | null;
   role: 'none' | 'viewer' | 'editor';
+  /** The recipient: shown in the sign-in line when the share grants access. */
+  recipientEmail?: string | null;
 }
 export interface FirstPublishData { pageName: string; url: string }
 export interface MemberJoinedData { memberName: string; workspaceName: string }
@@ -148,6 +150,13 @@ function shareRoleLine(role: ShareData['role']): string {
   if (role === 'editor') return "You've been added as an editor — open it to start co-editing.";
   if (role === 'viewer') return "You've been given access to view this page.";
   return '';
+}
+
+// A person who was just given access may have no account: the sign-in page always
+// offers an emailed code, so tell them that is all it takes.
+function shareSignInLine(d: ShareData): string {
+  if (d.role === 'none' || !d.recipientEmail) return '';
+  return `Sign in with ${d.recipientEmail} — we email you a code, no password needed.`;
 }
 
 // ── THE CATALOG ──────────────────────────────────────────────────────────────
@@ -455,7 +464,7 @@ export const EMAILS = {
       const intro = d.sharerName ? `${d.sharerName} shared a page with you.` : 'A page was shared with you.';
       const desc = d.artifactDescription?.trim();
       const msg = d.customMessage?.trim();
-      const role = shareRoleLine(d.role);
+      const role = [shareRoleLine(d.role), shareSignInLine(d)].filter(Boolean).join(' ');
       return {
         subject: d.sharerName ? `${d.sharerName} shared: ${d.artifactName}` : `Shared with you: ${d.artifactName}`,
         preheader: desc || intro,
