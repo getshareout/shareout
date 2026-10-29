@@ -218,6 +218,8 @@ export interface Env {
   AI_PROVIDER_ORDER?: string;
   /** Model for the build agent and chat agent. Gateway slug (`anthropic/claude-sonnet-5`) or first-party id. Defaults to Claude Sonnet 5. */
   BUILD_MODEL?: string;
+  /** `on` runs AI page builds as a tool-using agent (writes files, checks, fixes, publishes). Default off: the one-shot builder. */
+  BUILD_AGENT?: string;
   /** Server-side model override for the in-page pilot LLM proxy. Defaults to the provider config model. */
   PILOT_MODEL?: string;
   /** Optional Brave Search API key for the Crew web_search tool. When unset, web_search falls back to keyless DuckDuckGo. */

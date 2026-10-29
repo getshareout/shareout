@@ -168,6 +168,9 @@ export const workspace_client_create_ai_JS = `  // ===== Create with AI (in-Stud
             full += ev.text || '';
             if (!job.armed) arm();
             paint.push(full);
+          } else if (ev.type === 'step') {
+            // BUILD_AGENT: what the agent is doing now, already in the user's language.
+            if (ev.label) prog.textContent = ev.label;
           } else if (ev.type === 'done') {
             if (!ev.slug) { fail(t('create.buildUnavailable')); return; }
             job.settled = true; paint.cancel();

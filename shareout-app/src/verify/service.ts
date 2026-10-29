@@ -30,6 +30,11 @@ export interface VerifyInput {
   fullPage?: boolean;
   /** Verifying the live version also refreshes its thumbnail; the MCP tool opts out. Default true. */
   refreshThumbnail?: boolean;
+  /**
+   * The platform's own run (the build agent testing a page it just published), not the person's.
+   * Not charged to their hourly verify quota: the daily publish cap already bounds how often it runs.
+   */
+  system?: boolean;
 }
 
 export interface VerifyFailure {
@@ -242,14 +247,14 @@ export async function runVerify(
     return fail(400, 'VERIFY_UNSUPPORTED', 'Verify checks HTML pages; this version\'s main file is not HTML', { hint: 'Markdown, CSV and other file pages are rendered by ShareOut\'s own viewers.' });
   }
 
-  const limit = await checkVerifyLimit(env, user.id, user.email);
+  const limit = input.system ? { allowed: true, limit: 0, reset: 0 } : await checkVerifyLimit(env, user.id, user.email);
   if (!limit.allowed) {
     return fail(429, 'RATE_LIMIT_EXCEEDED', `Verify limit reached (${limit.limit} runs per hour). It resets at ${new Date(limit.reset * 1000).toISOString().slice(11, 16)} UTC.`, {
       hint: 'Batch your fixes and verify once per change set.',
       limit: { limit: limit.limit, reset: limit.reset },
     });
   }
-  await incrementVerifyLimit(env, user.id, user.email);
+  if (!input.system) await incrementVerifyLimit(env, user.id, user.email);
 
   const isPublic = (normalizeVisibility(artifact.visibility) || 'public') === 'public';
   const lockCsp = hasMcpCapability(version.manifest_json);

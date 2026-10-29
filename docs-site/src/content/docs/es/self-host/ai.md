@@ -44,6 +44,19 @@ En Anthropic directo todo usa Claude Sonnet 5.5 (`claude-sonnet-5-5`); en OpenAI
 `gpt-4o`. `BUILD_MODEL` sigue siendo un fallback solo para el agente de build, por debajo
 de eso. Los ids de modelo viven en `src/data/agent/models.ts`.
 
+## Agente de build (opcional)
+
+Con `BUILD_AGENT=on`, los builds de páginas con IA corren como un agente con herramientas
+en vez de una sola respuesta larga. Escribe la página como archivos en pasos chicos,
+revisa su propio trabajo (sintaxis de JavaScript, manifiesto, archivos faltantes, tablas
+sin declarar, reglas de publicación de ShareOut), corrige lo que encuentra y recién ahí
+publica. Con un binding `BROWSER` también prueba la página publicada y corrige hasta dos
+rondas de problemas; sin él, publica después de la revisión estática. Si aun así no logra
+una página que pase, no se anuncia nada como terminado: se le avisa al usuario y, si hay
+alertas por Telegram configuradas, al operador. Apagado por defecto. Funciona en todas las
+rutas de arriba; en Anthropic directo usa además compactación del lado del servidor,
+edición de contexto y presupuesto de tarea.
+
 ## Configurarlo
 
 ```bash

@@ -19,7 +19,7 @@ export const BUILD_MAX_TOKENS = 32000;
 export const BUILD_CONTINUATIONS = 2;
 export const BUILD_TRUNCATED_CODE = 'BUILD_TRUNCATED';
 
-export type BuildFailure = 'truncated' | 'snag' | 'empty' | 'publishFailed' | 'generic';
+export type BuildFailure = 'truncated' | 'snag' | 'empty' | 'publishFailed' | 'generic' | 'gaveUp' | 'gaveUpDraft';
 
 /** What a failed page build tells the person who asked for it. */
 export const BUILD_FAILURE_COPY: LocaleCopy<Record<BuildFailure, string>> = {
@@ -29,6 +29,8 @@ export const BUILD_FAILURE_COPY: LocaleCopy<Record<BuildFailure, string>> = {
     empty: 'I couldn’t build that — try rephrasing.',
     publishFailed: 'Built it, but publishing failed. Try again.',
     generic: 'Something went wrong — try again.',
+    gaveUp: 'I couldn’t get this page to pass its own checks after several tries, so I didn’t publish it. Try a simpler version, or tell me what matters most.',
+    gaveUpDraft: 'I built it but it still has errors after several fixes, so I kept it private and didn’t call it done. Try a simpler version, or tell me what matters most.',
   },
   es: {
     truncated: 'La página salió demasiado larga para terminarla, así que no se publicó nada. Pedí una versión más simple o armala por partes.',
@@ -36,6 +38,8 @@ export const BUILD_FAILURE_COPY: LocaleCopy<Record<BuildFailure, string>> = {
     empty: 'No pude armar eso. Probá contándolo de otra forma.',
     publishFailed: 'La armé, pero no se pudo publicar. Probá de nuevo.',
     generic: 'Algo salió mal. Probá de nuevo.',
+    gaveUp: 'No logré que la página pase sus propias revisiones después de varios intentos, así que no la publiqué. Probá con una versión más simple o decime qué es lo más importante.',
+    gaveUpDraft: 'La armé pero sigue con errores después de varios arreglos, así que la dejé privada y no la doy por terminada. Probá con una versión más simple o decime qué es lo más importante.',
   },
 };
 
@@ -145,7 +149,7 @@ async function reportBuildFailure(
   ]);
 }
 
-const BASE_SYSTEM_PROMPT = `You are ShareOut's build agent. You turn a user's request into ONE complete, self-contained HTML document that gets published live on ShareOut.
+const OUTPUT_CONTRACT = `You are ShareOut's build agent. You turn a user's request into ONE complete, self-contained HTML document that gets published live on ShareOut.
 
 Output contract:
 - Output ONLY the HTML document. No markdown, no code fences, no commentary.
@@ -154,7 +158,10 @@ Output contract:
 - Third-party libraries load root-relative from this instance, never a public CDN: /vendor/<npm package>@<version>/<file in the package> (jsDelivr's layout without the host and /npm), e.g. <script src="/vendor/d3@7/dist/d3.min.js"></script>. This works on private, workspace and public pages alike.
 - Make it polished, modern, and responsive. Use real, sensible placeholder content — never lorem ipsum.
 - When the user asks for a change, return the FULL updated document, not a diff.
+`;
 
+/** What ShareOut pages can do (the SDK): shared by the one-shot builder and the tool-using build agent. */
+export const CAPABILITIES_PROMPT = `
 ShareOut capabilities — what turns a static page into a live app:
 Pages you publish run on ShareOut and can use the ShareOut SDK to persist data, store structured records, collaborate in real time, upload files, send email, and run an AI chat — with no backend to set up.
 
@@ -172,7 +179,7 @@ When you DO use it:
 // Distilled from the design skills in .agents/skills (frontend-design,
 // premium-frontend-ui, designing-beautiful-websites). Baked into every build so the
 // agent designs with a strong point of view instead of generic "AI slop".
-const DESIGN_SYSTEM_PROMPT = `
+export const DESIGN_SYSTEM_PROMPT = `
 Design standards — every page must look intentionally designed, not template-generated:
 
 Commit to a direction. Pick ONE clear aesthetic (e.g. editorial brutalism, organic fluidity, cyber/technical, cinematic, refined minimal, playful) and execute it with precision. Bold maximalism and refined minimalism both work — intentionality matters more than intensity. If the user picked a design direction, honor it fully.
@@ -198,7 +205,7 @@ export async function buildSystemPrompt(env: Env): Promise<string> {
   // Every URL in the prompt is root-relative; the rewrite keeps any founder-host
   // literal from pointing a self-hosted instance's pages at someone else's server.
   cachedSystemPrompt = rewriteSkillOrigin(
-    `${BASE_SYSTEM_PROMPT}${DESIGN_SYSTEM_PROMPT}\n${SDK_REFERENCE}`,
+    `${OUTPUT_CONTRACT}${CAPABILITIES_PROMPT}${DESIGN_SYSTEM_PROMPT}\n${SDK_REFERENCE}`,
     env,
   );
   return cachedSystemPrompt;
