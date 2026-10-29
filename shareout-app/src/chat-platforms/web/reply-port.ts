@@ -26,7 +26,7 @@ export type WebAgentEvent =
   /** A confirmed build's progress step (emitted on the /confirm SSE stream). */
   | { type: 'build_step'; label: string }
   /** A confirmed build finished — identity for the "Open page" affordance. */
-  | { type: 'build_done'; text: string; url?: string; slug?: string; artifactId?: string; name: string };
+  | { type: 'build_done'; ok: boolean; text: string; url?: string; slug?: string; artifactId?: string; name: string };
 
 /**
  * A ChatReplyPort for the web home assistant. Side outputs (typing, media, cards,

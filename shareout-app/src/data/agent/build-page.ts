@@ -9,13 +9,37 @@ import { BUDGET_CODE, WorkspaceBudgetError } from '../ai-budget';
 import type { Env } from '../../types';
 import { SDK_REFERENCE } from './sdk-reference.generated';
 import { streamChat, getBuildConfig, type AIConfig } from './anthropic';
+import type { LocaleCopy } from '../../i18n';
+import { createLogger } from '../../logging';
+import { alertOps } from '../../support/alert';
 
-export const BUILD_MAX_TOKENS = 12000;
+/** Output cap per build turn. Typical AI-built pages run 9–12k tokens (2026-10: 2 of 4 prod builds hit the old 12k cap). */
+export const BUILD_MAX_TOKENS = 32000;
 /** Extra turns a build may take when the model stops at BUILD_MAX_TOKENS mid-page. */
 export const BUILD_CONTINUATIONS = 2;
 export const BUILD_TRUNCATED_CODE = 'BUILD_TRUNCATED';
-export const BUILD_TRUNCATED_MESSAGE =
-  'That page came out too long to finish in one go, so nothing was published. Ask for a simpler version, or build it in parts.';
+
+export type BuildFailure = 'truncated' | 'snag' | 'empty' | 'publishFailed' | 'generic';
+
+/** What a failed page build tells the person who asked for it. */
+export const BUILD_FAILURE_COPY: LocaleCopy<Record<BuildFailure, string>> = {
+  en: {
+    truncated: 'That page came out too long to finish in one go, so nothing was published. Ask for a simpler version, or build it in parts.',
+    snag: 'The builder hit a snag — try again.',
+    empty: 'I couldn’t build that — try rephrasing.',
+    publishFailed: 'Built it, but publishing failed. Try again.',
+    generic: 'Something went wrong — try again.',
+  },
+  es: {
+    truncated: 'La página salió demasiado larga para terminarla, así que no se publicó nada. Pedí una versión más simple o armala por partes.',
+    snag: 'Falló el armado de la página. Probá de nuevo.',
+    empty: 'No pude armar eso. Probá contándolo de otra forma.',
+    publishFailed: 'La armé, pero no se pudo publicar. Probá de nuevo.',
+    generic: 'Algo salió mal. Probá de nuevo.',
+  },
+};
+
+export const BUILD_TRUNCATED_MESSAGE = BUILD_FAILURE_COPY.en.truncated;
 
 const CONTINUE_PROMPT =
   'Your output was cut off at the length limit. Continue exactly where you stopped: output only the rest of the document, starting with the very next character. No repetition, no commentary, no code fences.';
@@ -64,6 +88,8 @@ export async function* streamBuild(
     let truncated = false;
     for await (const chunk of streamChat(env, meter, convo, systemPrompt, '', BUILD_MAX_TOKENS, config)) {
       if (chunk.type === 'error') {
+        // A workspace over its AI budget is the workspace's limit, not a broken build.
+        if (chunk.code !== BUDGET_CODE) await reportBuildFailure(env, meter, 'snag', messages, chunk.error);
         yield { type: 'error', error: chunk.error || 'AI stream error', code: chunk.code, resets_at: chunk.resets_at };
         return;
       }
@@ -93,7 +119,30 @@ export async function* streamBuild(
       return;
     }
   }
+  await reportBuildFailure(env, meter, 'truncated', messages, `still cut off after ${BUILD_CONTINUATIONS} continuations (${raw.length} chars)`);
   yield { type: 'error', error: BUILD_TRUNCATED_MESSAGE, code: BUILD_TRUNCATED_CODE };
+}
+
+/**
+ * A build that failed for the builder's own reasons (cut off, model error) is ours to fix,
+ * not only the user's: log it and ping the operator. Never throws.
+ */
+async function reportBuildFailure(
+  env: Env,
+  meter: AiMeter,
+  failure: 'truncated' | 'snag',
+  messages: BuildMessage[],
+  detail?: string,
+): Promise<void> {
+  const prompt = [...messages].reverse().find((m) => m.role === 'user')?.content ?? '';
+  createLogger(env, { scope: 'page_build', event: `build.${failure}` }).warn('page build failed', {
+    workspaceId: meter.workspaceId, userId: meter.userId, source: meter.source, detail,
+  });
+  await alertOps(env, `⚠️ Page build failed: ${failure === 'truncated' ? 'cut off at the output cap' : 'model error'}`, [
+    `From: ${meter.userId ?? 'anonymous'} · workspace ${meter.workspaceId ?? '—'} · via ${meter.source ?? 'build'}`,
+    detail ? `Detail: ${detail}` : '',
+    `Asked for: ${prompt.slice(0, 200)}${prompt.length > 200 ? '…' : ''}`,
+  ]);
 }
 
 const BASE_SYSTEM_PROMPT = `You are ShareOut's build agent. You turn a user's request into ONE complete, self-contained HTML document that gets published live on ShareOut.

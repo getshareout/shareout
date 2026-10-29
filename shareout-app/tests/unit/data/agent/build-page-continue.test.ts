@@ -4,6 +4,8 @@ import type { Env } from '../../../../src/types';
 import type { ChatChunk } from '../../../../src/data/agent/types';
 
 const streamChat = vi.hoisted(() => vi.fn());
+const alertOps = vi.hoisted(() => vi.fn(async () => true));
+vi.mock('../../../../src/support/alert', () => ({ alertOps }));
 vi.mock('../../../../src/data/agent/anthropic', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   streamChat,
@@ -34,7 +36,7 @@ async function collect(gen: AsyncGenerator<BuildChunk>) {
 
 const PROMPT = [{ role: 'user' as const, content: 'build me a page' }];
 
-beforeEach(() => streamChat.mockReset());
+beforeEach(() => { streamChat.mockReset(); alertOps.mockClear(); });
 
 describe('streamBuild', () => {
   it('a page that fits takes one call', async () => {
@@ -75,6 +77,9 @@ describe('streamBuild', () => {
     expect(streamChat).toHaveBeenCalledTimes(BUILD_CONTINUATIONS + 1);
     expect(out.some((c) => c.type === 'done')).toBe(false);
     expect(out.at(-1)).toMatchObject({ type: 'error', code: BUILD_TRUNCATED_CODE });
+    expect(alertOps).toHaveBeenCalledTimes(1);
+    expect(alertOps.mock.calls[0][1]).toMatch(/cut off/);
+    expect((alertOps.mock.calls[0][2] as string[]).join('\n')).toMatch(/Asked for: build me a page/);
   });
 
   it('passes a provider error straight through without continuing', async () => {
@@ -82,6 +87,16 @@ describe('streamBuild', () => {
     const out = await collect(streamBuild(env, meter, PROMPT, 'sys', null));
     expect(streamChat).toHaveBeenCalledTimes(1);
     expect(out).toEqual([{ type: 'error', error: 'boom', code: 'workspace_budget', resets_at: 'x' }]);
+    // The workspace's own AI budget is not a broken build: no alert.
+    expect(alertOps).not.toHaveBeenCalled();
+  });
+
+  it('alerts the operator when the model itself fails mid-build', async () => {
+    streamChat.mockImplementationOnce(async function* () { yield { type: 'error', error: 'gateway 502' }; });
+    const out = await collect(streamBuild(env, meter, PROMPT, 'sys', null));
+    expect(out.at(-1)).toMatchObject({ type: 'error', error: 'gateway 502' });
+    expect(alertOps).toHaveBeenCalledTimes(1);
+    expect(alertOps.mock.calls[0][1]).toMatch(/model error/);
   });
 });
 

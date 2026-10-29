@@ -234,7 +234,8 @@ export class ChatSessionDO implements DurableObject {
       return;
     }
 
-    const copy = t(await botLocale(this.env, b.userId), BOT_COPY);
+    const locale = await botLocale(this.env, b.userId);
+    const copy = t(locale, BOT_COPY);
     const [decision, token] = (b.data || '').split(':');
     const rec = await this.store.takePending(token || '');
 
@@ -255,7 +256,7 @@ export class ChatSessionDO implements DurableObject {
 
     let resultText: string;
     try {
-      resultText = await executeAction(this.env, b.userId, rec.action);
+      resultText = await executeAction(this.env, b.userId, rec.action, locale);
     } catch {
       resultText = copy.failed;
     }

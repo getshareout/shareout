@@ -127,7 +127,7 @@ describe('ChatSessionDO', () => {
       const token = h.port.askConfirmation.mock.calls[0][1] as string;
 
       await send(callback(21, `ok:${token}`));
-      expect(h.executeAction).toHaveBeenCalledWith({}, 'u1', action);
+      expect(h.executeAction).toHaveBeenCalledWith({}, 'u1', action, 'en');
       expect(h.port.editConfirmation).toHaveBeenCalledWith('777', '✅ Confirmed.');
       expect(h.port.sendText).toHaveBeenLastCalledWith('Shared ✅');
 

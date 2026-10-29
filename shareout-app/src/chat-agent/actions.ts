@@ -10,13 +10,13 @@ import { presentArtifact } from '../present/present-artifact';
 import { botInsertRows, botUpdateRowById, botUpdateRowsByFilter } from '../data/tables/bot';
 import { botSetJson } from '../data/json-store';
 import { buildBotDataContext } from './data-write';
-import { BuildTruncatedError, generateArtifactHtml } from '../data/agent/build-page';
+import { BUILD_FAILURE_COPY, BuildTruncatedError, generateArtifactHtml } from '../data/agent/build-page';
 import { publishGeneratedHtml } from '../publish/publish-generated-html';
 import { checkRateLimit, incrementRateLimit } from '../api-auth';
 import { checkStorageQuota } from '../quota';
 import { rateLimitMessage, storageLimitMessage } from '../publish/limits';
 import { getInternalWorkspaceRole } from '../workspaces/roles';
-import type { Locale } from '../i18n';
+import { t, type Locale, type LocaleCopy } from '../i18n';
 
 // A write the bot proposes and the user confirms with a button tap. Kept small
 // and serializable — stored as JSON until the user approves it.
@@ -217,12 +217,29 @@ function describeActionEs(a: PendingAction): string {
 
 /** Result of a confirmed build, for the streaming build widget. */
 export interface BuildResult {
+  /** false when nothing was published — the client shows the card as failed. */
+  ok: boolean;
   text: string;
   url?: string;
   slug?: string;
   artifactId?: string;
   name: string;
 }
+
+const BUILD_ACTION_COPY: LocaleCopy<{ noAccount: string; designing: string; publishing: string; published: (url: string) => string }> = {
+  en: {
+    noAccount: 'Couldn’t find your account to publish under.',
+    designing: 'Designing your page…',
+    publishing: 'Publishing it live…',
+    published: (url) => `Built and published ✅ ${url}`,
+  },
+  es: {
+    noAccount: 'No encontré tu cuenta para publicar la página.',
+    designing: 'Diseñando tu página…',
+    publishing: 'Publicándola…',
+    published: (url) => `Lista y publicada ✅ ${url}`,
+  },
+};
 
 /** Execute a confirmed build with progress callbacks, returning the published
  *  page's identity so the client can render an "Open page" affordance. */
@@ -231,23 +248,26 @@ export async function executeBuildArtifact(
   userId: string,
   a: Extract<PendingAction, { kind: 'build_artifact' }>,
   onProgress?: (label: string) => void,
+  locale: Locale = 'en',
 ): Promise<BuildResult> {
+  const copy = t(locale, BUILD_ACTION_COPY);
+  const fail = t(locale, BUILD_FAILURE_COPY);
+  const failed = (text: string): BuildResult => ({ ok: false, text, name: a.name });
   const u = await env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first<{ email: string | null }>();
-  if (!u?.email) return { text: 'Couldn’t find your account to publish under.', name: a.name };
+  if (!u?.email) return failed(copy.noAccount);
   const rate = await checkRateLimit(env, userId, 'publish', u.email);
-  if (!rate.allowed) return { text: rateLimitMessage(rate.reset), name: a.name };
-  onProgress?.('Designing your page…');
+  if (!rate.allowed) return failed(rateLimitMessage(rate.reset));
+  onProgress?.(copy.designing);
   let html: string;
   try {
     html = await generateArtifactHtml(env, a.prompt, { workspaceId: a.workspace_id ?? null, userId, kind: 'page_build', source: 'assistant' });
   } catch (err) {
-    if (err instanceof BuildTruncatedError) return { text: err.message, name: a.name };
-    return { text: 'The builder hit a snag generating that page. Try again?', name: a.name };
+    return failed(err instanceof BuildTruncatedError ? fail.truncated : fail.snag);
   }
-  if (!html || html.length < 40) return { text: 'I couldn’t build that one — try rephrasing what you want.', name: a.name };
+  if (!html || html.length < 40) return failed(fail.empty);
   const quota = await checkStorageQuota(env, userId, [{ path: 'index.html', content: html, mime: 'text/html' }]);
-  if (!quota.allowed) return { text: storageLimitMessage(quota), name: a.name };
-  onProgress?.('Publishing it live…');
+  if (!quota.allowed) return failed(storageLimitMessage(quota));
+  onProgress?.(copy.publishing);
   try {
     const workspaceId = a.workspace_id && await getInternalWorkspaceRole(env, a.workspace_id, userId) ? a.workspace_id : null;
     const published = await publishGeneratedHtml(env, { id: userId, email: u.email }, { name: a.name, html, workspaceId, visibility: 'private' });
@@ -258,14 +278,15 @@ export async function executeBuildArtifact(
       ).bind(a.source_file_id, published.artifact.id, new Date().toISOString()).run();
     }
     return {
-      text: `Built and published ✅ ${published.deployment.url}`,
+      ok: true,
+      text: copy.published(published.deployment.url),
       url: published.deployment.subdomain_url || published.deployment.url,
       slug: published.deployment.slug,
       artifactId: published.artifact.id,
       name: a.name,
     };
   } catch {
-    return { text: 'Generated the page but publishing failed. Try again?', name: a.name };
+    return failed(fail.publishFailed);
   }
 }
 
@@ -321,7 +342,7 @@ export function describeAction(a: PendingAction, locale: Locale = 'en'): string 
  * execution time (defense in depth — never trust the stored proposal alone).
  * Returns a short user-facing result line.
  */
-export async function executeAction(env: Env, userId: string, a: PendingAction): Promise<string> {
+export async function executeAction(env: Env, userId: string, a: PendingAction, locale: Locale = 'en'): Promise<string> {
   switch (a.kind) {
     case 'alert_pause':
     case 'alert_resume': {
@@ -402,7 +423,7 @@ export async function executeAction(env: Env, userId: string, a: PendingAction):
       return r.error ? `Couldn’t create that schedule: ${r.error}` : `Done — scheduled. I’ll send “${a.artifactName}” on \`${a.schedule}\`.`;
     }
     case 'build_artifact': {
-      const r = await executeBuildArtifact(env, userId, a);
+      const r = await executeBuildArtifact(env, userId, a, undefined, locale);
       return r.text;
     }
     case 'save_skill':
