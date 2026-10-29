@@ -142,7 +142,7 @@ function runBridge(opts: { inShell: boolean; entry?: string; active?: boolean; h
     win, loc, { state: null, replaceState }, doc, nav, (_t: string, fn: Listener) => listeners.push(fn),
   );
   const send = (data: unknown, source: unknown = contentWin) => listeners.forEach((f) => f({ source, data }));
-  return { send, parentPosts, replaceState, contentWin };
+  return { send, parentPosts, replaceState, contentWin, win: win as typeof win & { __soErrors?: unknown[] } };
 }
 
 describe('viewer page bridge', () => {
@@ -180,6 +180,59 @@ describe('viewer page bridge', () => {
     expect(b.replaceState).toHaveBeenCalledWith(null, '', `${BASE}/a/demo/?page=docs%2Fb.html`);
     b.send({ type: 'shareout:open-artifact', slug: 'other' });
     expect(b.parentPosts).toEqual([]);
+  });
+});
+
+describe('page agent: error reports', () => {
+  const errorsPosted = (posted: unknown[]) => posted.filter((m) => (m as { type: string }).type === 'shareout:error');
+  const fireError = (a: ReturnType<typeof runAgent>, e: Record<string, unknown>) => (a.fire as (t: string, e: unknown) => void)('error', e);
+
+  it('posts an uncaught error (a SyntaxError from a later script) without the capability token', () => {
+    const a = runAgent({ href: `${CDN}/c/tok123/index.html` });
+    fireError(a, {
+      message: 'SyntaxError: Invalid or unexpected token',
+      filename: `${CDN}/c/tok123/index.html`, lineno: 125, colno: 30,
+      error: { stack: `SyntaxError: Invalid or unexpected token\n    at ${CDN}/c/tok123/index.html:125:30` },
+    });
+    const [m] = errorsPosted(a.posted) as Array<Record<string, string>>;
+    expect(m).toMatchObject({ type: 'shareout:error', kind: 'error', message: 'SyntaxError: Invalid or unexpected token', where: '/index.html:125:30', path: 'index.html' });
+    expect(JSON.stringify(a.posted)).not.toContain('tok123');
+    expect(JSON.stringify(a.posted)).not.toContain('cdn.example');
+  });
+
+  it('posts an unhandled rejection with the reason message', () => {
+    const a = runAgent({ href: `${CDN}/index.html` });
+    (a.fire as (t: string, e: unknown) => void)('unhandledrejection', { reason: new Error('HTTP 403 on insert') });
+    (a.fire as (t: string, e: unknown) => void)('unhandledrejection', { reason: { code: 'FORBIDDEN' } });
+    expect(errorsPosted(a.posted)).toMatchObject([
+      { kind: 'rejection', message: 'HTTP 403 on insert' },
+      { kind: 'rejection', message: '{"code":"FORBIDDEN"}' },
+    ]);
+  });
+
+  it('dedupes, caps at 5 per page, and skips opaque or benign errors', () => {
+    const a = runAgent({ href: `${CDN}/index.html` });
+    fireError(a, { message: 'boom' });
+    fireError(a, { message: 'boom' });
+    fireError(a, { message: 'Script error.' });
+    fireError(a, { message: 'ResizeObserver loop completed with undelivered notifications.' });
+    for (let i = 0; i < 10; i++) fireError(a, { message: `err ${i}` });
+    const msgs = errorsPosted(a.posted).map((m) => (m as { message: string }).message);
+    expect(msgs).toEqual(['boom', 'err 0', 'err 1', 'err 2', 'err 3']);
+  });
+});
+
+describe('viewer page bridge: error reports', () => {
+  it('queues errors from its content frame and announces them; ignores other sources', () => {
+    const heard = vi.fn();
+    window.addEventListener('shareout:error', heard);
+    const b = runBridge({ inShell: false });
+    b.send({ type: 'shareout:error', kind: 'error', message: 'boom', where: '/index.html:1:2', stack: 's', path: 'index.html' }, {});
+    expect(b.win.__soErrors).toEqual([]);
+    b.send({ type: 'shareout:error', kind: 'weird', message: 'boom', where: '/index.html:1:2', stack: 's', path: 'index.html', extra: 1 });
+    expect(b.win.__soErrors).toEqual([{ kind: 'error', message: 'boom', where: '/index.html:1:2', stack: 's', path: 'index.html' }]);
+    expect(heard).toHaveBeenCalledTimes(1);
+    window.removeEventListener('shareout:error', heard);
   });
 });
 

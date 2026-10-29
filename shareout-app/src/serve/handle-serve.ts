@@ -18,7 +18,7 @@ import { injectPresenceBeacon } from './presence-beacon';
 import { badgeEnabled, injectBadge } from './badge';
 import { versionedBundlePath } from '../bundle-versions';
 import { localeForViewer } from '../i18n/locale';
-import { injectPageAgent, isSafePagePath, isSafeSectionId } from './page-agent';
+import { PAGE_AGENT_REV, injectPageAgent, isSafePagePath, isSafeSectionId } from './page-agent';
 import { hasMcpCapability } from '../mcp-broker/capabilities';
 import { servingOrigin } from '../workspaces/domains/host-binding';
 
@@ -408,8 +408,9 @@ export async function handleServe(
       const showBadge = isOpen && badgeEnabled(env);
       // The perf beacon (opt-017) is unconditional, so it rides every cache variant
       // without adding a key. Comments + badge injection chain after it when enabled.
-      // Capture-mode renders never reach this raw path, so they self-exclude.
-      const variant = `${commentsEnabled ? 'cmt' : 'raw'}${showBadge ? '-b' : ''}`;
+      // Capture-mode renders never reach this raw path, so they self-exclude. The page
+      // agent's revision rides the variant so a change to it reaches already-cached pages.
+      const variant = `${commentsEnabled ? 'cmt' : 'raw'}${showBadge ? '-b' : ''}-pa${PAGE_AGENT_REV}`;
       return serveAsset(request, env, asset, slug, isRawRequest, {
         noStore,
         relaxCsp: !isOpen, lockCsp,
