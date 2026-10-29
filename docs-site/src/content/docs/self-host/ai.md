@@ -68,6 +68,18 @@ existing files in small steps, checks that the change broke nothing the page did
 already have, and shows the change for the user to confirm before anything is published.
 Other page types, and workspaces where it is off, keep the one-shot editor.
 
+### Builds that outlive the tab
+
+With the `BUILD_JOBS` Durable Object bound (it is in the default `wrangler.toml`), a page
+build from Create or from a confirmed assistant build runs as a job on the server instead of
+inside the browser's request. Closing the tab doesn't stop it: the page is still published,
+the assistant's result still lands in its thread, and a build that ends while nobody is
+watching shows up in the bell and on Home ("Needs you"), in the user's language. A client
+that loses its connection reattaches with `GET /v1/builds/{id}/events` and gets the steps so
+far. Each user runs one build at a time (a double click joins the running one), and a job
+still running after 12 minutes is stopped. Without the binding, builds run inline as before.
+Adding the class needs a `wrangler deploy` (not `versions upload`) the first time.
+
 ## Set it
 
 ```bash

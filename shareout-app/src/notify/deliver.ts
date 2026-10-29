@@ -1,6 +1,6 @@
 /**
  * One path for the review and sharing notifications: a feed row on the recipient's Home
- * (optional), the catalog email, and their linked Telegram. Preferences: the email
+ * (optional), the catalog email (optional), and their linked Telegram. Preferences: the email
  * gateway enforces the 'product' opt-out, the suppression list and the unsubscribe
  * header; Telegram follows the same opt-out, so unsubscribing silences both. The actor
  * is never a recipient (callers pass `actorIds`). Best-effort; never throws.
@@ -14,14 +14,15 @@ import { sendMessage } from '../telegram/client';
 import { localeForRecipient } from '../i18n/locale';
 import { generateId } from '../crypto-utils';
 
-export const NOTIFY_KINDS = ['version_approved', 'folder_first_open', 'version_published'] as const;
+export const NOTIFY_KINDS = ['version_approved', 'folder_first_open', 'version_published', 'page_build'] as const;
 export type NotifyKind = (typeof NOTIFY_KINDS)[number];
 
 export interface NotifyInput {
   userId: string;
   /** Who caused it. A recipient in this list is skipped. */
   actorIds: string[];
-  email: { type: EmailType; data: Record<string, unknown> };
+  /** Absent: no email (a feed-only notice, e.g. a page build that finished while you were away). */
+  email?: { type: EmailType; data: Record<string, unknown> };
   telegram?: (locale: Locale) => string;
   feed?: { kind: NotifyKind; subjectType: string; subjectId: string; payload: Record<string, unknown> };
   workspaceId?: string | null;
@@ -36,11 +37,12 @@ export async function notifyUser(env: Env, input: NotifyInput): Promise<void> {
          VALUES (?, 'user', ?, ?, ?, ?, ?)`,
       ).bind(generateId('ntf'), input.userId, input.feed.kind, input.feed.subjectType, input.feed.subjectId, JSON.stringify(input.feed.payload)).run();
     }
-    const tasks: Promise<unknown>[] = [
-      dispatchLifecycleEmail(env, {
+    const tasks: Promise<unknown>[] = [];
+    if (input.email) {
+      tasks.push(dispatchLifecycleEmail(env, {
         type: input.email.type, toUserId: input.userId, workspaceId: input.workspaceId ?? undefined, data: input.email.data,
-      }).catch(() => undefined),
-    ];
+      }).catch(() => undefined));
+    }
     if (input.telegram && env.TELEGRAM_BOT_TOKEN && (await isCategoryAllowed(env, input.userId, 'product'))) {
       const line = input.telegram;
       tasks.push((async () => {

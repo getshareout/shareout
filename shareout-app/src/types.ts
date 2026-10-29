@@ -184,6 +184,8 @@ export interface Env {
   KNOWLEDGE_STORE?: DurableObjectNamespace<import('./knowledge/corpus/store-do').KnowledgeStore>;
   /** LibreOffice container: slide decks (.pptx/.ppt/.odp) → PDF on import. Optional: decks stay in Assets without it. */
   SLIDES_CONVERTER?: DurableObjectNamespace<import('./pages/home/slides-converter-do').SlidesConverter>;
+  /** Per-user AI page builds as durable jobs (src/build-jobs): they outlive the tab and notify when done. Optional: builds run inline in their request when absent. */
+  BUILD_JOBS?: DurableObjectNamespace;
   /** Durable per-source ingest. Optional: ingest runs inline in waitUntil when absent. */
   KNOWLEDGE_INGEST?: Workflow<import('./knowledge/drain').KnowledgeWorkflowParams>;
   /** Durable folder import (src/file-imports). Optional: imports run inline in waitUntil when absent (small folders only). */

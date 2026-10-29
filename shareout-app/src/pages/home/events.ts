@@ -14,7 +14,7 @@ import type { WorkspaceRole } from '../../types';
 
 export type ActivityKind =
   | 'comment' | 'reply' | 'mention' | 'share' | 'access' | 'alert' | 'test' | 'file' | 'stale_data' | 'metric_watch' | 'unused_artifacts' | 'moderation' | 'support_reply' | 'admin_request'  // actionable
-  | 'version_approved' | 'folder_first_open' | 'version_published'                                   // actionable, directed at you
+  | 'version_approved' | 'folder_first_open' | 'version_published' | 'page_build'                    // actionable, directed at you
   | 'run' | 'publish' | 'create' | 'favorite' | 'view'
   | 'connection' | 'skill' | 'member' | 'agent';                  // ambient
 
@@ -59,6 +59,7 @@ export const EVENT_DEFS: Record<ActivityKind, EventDef> = {
   version_approved:  { tier: 'actionable', defaultAudience: 'self', label: 'Approvals',     hint: 'Someone approved a version of your artifact' },
   folder_first_open: { tier: 'actionable', defaultAudience: 'self', label: 'Client opens',  hint: 'An outside person opened something in a folder you shared (once a day per person)' },
   version_published: { tier: 'actionable', defaultAudience: 'self', label: 'New versions',  hint: 'New versions of artifacts you follow or collaborate on' },
+  page_build:        { tier: 'actionable', defaultAudience: 'self', label: 'Page builds',   hint: 'An AI page build you started finished while you were away' },
   run:        { tier: 'ambient',    defaultAudience: 'members', label: 'Job & crew runs',   hint: 'Scheduled job and crew executions' },
   publish:    { tier: 'ambient',    defaultAudience: 'members', label: 'Publishes',         hint: 'New versions published' },
   create:     { tier: 'ambient',    defaultAudience: 'members', label: 'New artifacts',     hint: 'Artifacts created' },

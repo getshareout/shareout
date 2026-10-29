@@ -9,8 +9,13 @@ import type { AuthUser } from '../../api-auth';
 import type { WorkspaceSelection } from '../../chat-platforms/types';
 import type { AccountTool } from '../../chat-agent/tools/index';
 import { runAgentTurn } from '../../chat-agent/agent-loop';
-import { executeAction, executeBuildArtifact, describeAction, describeActionRich } from '../../chat-agent/actions';
+import { executeAction, describeAction, describeActionRich } from '../../chat-agent/actions';
 import { D1ConversationStore } from '../../chat-agent/store/d1-store';
+import { attachBuildJobByKey, startBuildJob } from '../../build-jobs/client';
+import { BUILD_JOB_COPY } from '../../build-jobs/copy';
+import { runAssistantBuild } from '../../build-jobs/assistant';
+import type { AssistantBuildSpec } from '../../build-jobs/types';
+import { t } from '../../i18n';
 import { WebThreadStore } from '../../chat-agent/store/d1-threads';
 import { createWebReplyPort, agentMediaKey, type WebAgentEvent } from '../../chat-platforms/web/reply-port';
 import { generateId } from '../../crypto-utils';
@@ -123,7 +128,8 @@ export function streamAgentChat(env: Env, cfg: ChatTurnConfig): Response {
 }
 
 /** Confirm a pending action. Builds stream their progress (SSE); everything else
- *  returns a one-shot JSON result. */
+ *  returns a one-shot JSON result. With BUILD_JOBS bound a build is a durable job keyed
+ *  by the token: it outlives the tab, and a second click rejoins it. */
 export async function confirmAgentAction(env: Env, scopeKey: string, user: AuthUser, token: string): Promise<Response> {
   if (!env.RATE_LIMIT_KV) return jsonResp({ error: 'Confirmations are unavailable.' }, 503);
   if (!token) return jsonResp({ error: 'Missing token' }, 400);
@@ -131,20 +137,27 @@ export async function confirmAgentAction(env: Env, scopeKey: string, user: AuthU
   // Confirmation only touches the KV-backed pending record, never a thread's messages.
   const store = new D1ConversationStore(env, scopeKey, user.id, '');
   const rec = await store.takePending(token);
-  if (!rec) return jsonResp({ error: 'That confirmation expired. Ask again?' }, 410);
+  if (!rec) {
+    const rejoined = env.BUILD_JOBS ? await attachBuildJobByKey(env, user.id, token) : null;
+    return rejoined ?? jsonResp({ error: 'That confirmation expired. Ask again?' }, 410);
+  }
   const remember = (text: string) => rec.threadId
     ? new D1ConversationStore(env, scopeKey, user.id, rec.threadId).appendMessage('assistant', text)
     : Promise.resolve();
 
   if (rec.action.kind === 'build_artifact') {
     const action = rec.action;
-    return sseResp(async (send) => {
-      const locale = await localeForRecipient(env, { userId: user.id, workspaceId: action.workspace_id ?? null }).catch((): Locale => 'en');
-      const r = await executeBuildArtifact(env, user.id, action, (label) => send({ type: 'build_step', label }), locale);
-      await remember(r.url ? `${r.text}\n${r.url}` : r.text);
-      send({ type: 'build_done', ok: r.ok, text: r.text, url: r.url, slug: r.slug, artifactId: r.artifactId, name: r.name });
-      send({ type: 'done' });
-    });
+    const locale = await localeForRecipient(env, { userId: user.id, workspaceId: action.workspace_id ?? null }).catch((): Locale => 'en');
+    const spec: AssistantBuildSpec = { kind: 'assistant', scopeKey, userId: user.id, threadId: rec.threadId ?? null, action, locale };
+    if (env.BUILD_JOBS) {
+      const started = await startBuildJob(env, { userId: user.id, spec, key: token, name: action.name });
+      if ('stream' in started) return started.stream;
+      return sseResp(async (send) => {
+        send({ type: 'build_done', ok: false, text: t(locale, BUILD_JOB_COPY).busy, name: action.name });
+        send({ type: 'done' });
+      });
+    }
+    return sseResp(async (send) => { await runAssistantBuild(env, spec, (ev) => send(ev as ControlEvent)); });
   }
 
   const resultText = await executeAction(env, user.id, rec.action);

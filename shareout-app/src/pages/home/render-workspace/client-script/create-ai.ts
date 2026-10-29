@@ -119,7 +119,7 @@ export const workspace_client_create_ai_JS = `  // ===== Create with AI (in-Stud
     var label = t('create.buildingTab').replace('{name}', function () { return liveName(prompt); });
     var prog = addMsg('bot', t('create.buildingPage'));
     var ctl = typeof AbortController === 'function' ? new AbortController() : null;
-    var job = { view: view || null, armed: false, stopped: false, settled: false };
+    var job = { view: view || null, armed: false, stopped: false, settled: false, id: null, tries: 0 };
     var full = '';
     var paint = srcdocThrottle(function (html) { if (job.view) job.view.frame.srcdoc = html; }, 250);
     function live() { return job.view && livePanes[job.view.key]; }
@@ -127,6 +127,8 @@ export const workspace_client_create_ai_JS = `  // ===== Create with AI (in-Stud
       if (job.settled) return;
       job.stopped = true; paint.cancel();
       if (ctl) ctl.abort();
+      // Closing the live tab stops the build; closing the browser does not (it runs on as a job).
+      if (job.id) fetch('/v1/builds/' + encodeURIComponent(job.id) + '/cancel', { method: 'POST', credentials: 'same-origin' }).catch(function () {});
       prog.textContent = t('create.buildStopped');
       setPillStep(null);
     }
@@ -162,27 +164,41 @@ export const workspace_client_create_ai_JS = `  // ===== Create with AI (in-Stud
             fail(d && d.error ? t('create.buildFailed') + d.error : t('create.buildUnavailable'));
           });
         }
-        return readStream(resp, function (ev) {
-          if (job.stopped || job.settled) return;
-          if (ev.type === 'delta') {
-            full += ev.text || '';
-            if (!job.armed) arm();
-            paint.push(full);
-          } else if (ev.type === 'step') {
-            // BUILD_AGENT: what the agent is doing now, already in the user's language.
-            if (ev.label) prog.textContent = ev.label;
-          } else if (ev.type === 'done') {
-            if (!ev.slug) { fail(t('create.buildUnavailable')); return; }
-            job.settled = true; paint.cancel();
-            var mod = ev.moderation;
-            prog.textContent = t(mod ? (mod.status === 'blocked' ? 'create.buildBlocked' : 'create.buildHeld') : (ev.visibility_downgraded ? 'create.buildPrivate' : 'create.buildDone'));
-            setPillStep(null);
-            openArtifact(ev.slug, '\\u2728 ' + String(prompt).slice(0, 28), ev.artifactId, 'html', job.view ? job.view.key : null);
-            setComposer('resting');
-            exitCreate();
-          } else if (ev.type === 'error') { fail(t('create.buildFailed') + (ev.error || 'unknown')); }
-        }).then(function () { fail(t('create.connDroppedBuild')); });
+        return readStream(resp, onEv).then(dropped);
       })
-      .catch(function () { fail(t('create.connDroppedBuild')); });
+      .catch(dropped);
+    function onEv(ev) {
+      if (job.stopped || job.settled) return;
+      if (ev.type === 'job') { job.id = ev.id; }
+      else if (ev.type === 'delta') {
+        full += ev.text || '';
+        if (!job.armed) arm();
+        paint.push(full);
+      } else if (ev.type === 'step') {
+        // BUILD_AGENT: what the agent is doing now, already in the user's language.
+        if (ev.label) prog.textContent = ev.label;
+      } else if (ev.type === 'done') {
+        if (!ev.slug) { fail(t('create.buildUnavailable')); return; }
+        job.settled = true; paint.cancel();
+        var mod = ev.moderation;
+        prog.textContent = t(mod ? (mod.status === 'blocked' ? 'create.buildBlocked' : 'create.buildHeld') : (ev.visibility_downgraded ? 'create.buildPrivate' : 'create.buildDone'));
+        setPillStep(null);
+        openArtifact(ev.slug, '\\u2728 ' + String(prompt).slice(0, 28), ev.artifactId, 'html', job.view ? job.view.key : null);
+        setComposer('resting');
+        exitCreate();
+      } else if (ev.type === 'error') { fail(t('create.buildFailed') + (ev.error || 'unknown')); }
+    }
+    // The stream ended before the build did. A durable job keeps building on the server: reattach
+    // (it replays the steps and the page so far) a few times before giving up.
+    function dropped() {
+      if (job.stopped || job.settled) return;
+      if (!job.id || ++job.tries > 3) { fail(t('create.connDroppedBuild')); return; }
+      setTimeout(function () {
+        full = '';
+        fetch('/v1/builds/' + encodeURIComponent(job.id) + '/events', { credentials: 'same-origin', signal: ctl ? ctl.signal : undefined })
+          .then(function (r) { if (!r.ok || !r.body) throw new Error('reattach ' + r.status); return readStream(r, onEv).then(dropped); })
+          .catch(dropped);
+      }, 1500);
+    }
   }
 ${SRCDOC_THROTTLE_JS}`;

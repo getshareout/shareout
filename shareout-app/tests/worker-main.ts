@@ -12,6 +12,7 @@ export { CommentsCoordinator } from '../src/realtime/comments-coordinator';
 export { MiniDB } from '../src/data/minidb';
 export { PresenceCoordinator } from '../src/realtime/presence-coordinator';
 export { KnowledgeStore } from '../src/knowledge/corpus/store-do';
+export { BuildJobs } from '../src/build-jobs/do';
 
 export class ChatDO extends DurableObject {}
 export class Showtime extends DurableObject {}

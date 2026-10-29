@@ -9,6 +9,7 @@ import { KnowledgeStore } from './knowledge/corpus/store-do';
 import { KnowledgeIngestWorkflow } from './knowledge/corpus/workflow';
 import { FileImportWorkflow } from './file-imports/workflow';
 import { SlidesConverter } from './pages/home/slides-converter-do';
+import { BuildJobs } from './build-jobs/do';
 import { handleScheduledEvent } from './scheduling/handler';
 import { handleViewEventBatch } from './analytics';
 import { logScheduledRun, withRequestLogging } from './request-logging';
@@ -16,7 +17,7 @@ import { handleFetch } from './router/handle-fetch';
 import { setSelfFetch } from './http/self-fetch';
 import { handleInboundEmail } from './email/inbound';
 
-export { RealtimeCoordinator, CommentsCoordinator, MiniDB, ChatDO, PresenceCoordinator, Showtime, KnowledgeStore, KnowledgeIngestWorkflow, FileImportWorkflow, SlidesConverter };
+export { RealtimeCoordinator, CommentsCoordinator, MiniDB, ChatDO, PresenceCoordinator, Showtime, KnowledgeStore, KnowledgeIngestWorkflow, FileImportWorkflow, SlidesConverter, BuildJobs };
 
 // The router is reachable from src/ only through this registration; see http/self-fetch.ts.
 setSelfFetch(handleFetch);

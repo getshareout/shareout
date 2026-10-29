@@ -85,6 +85,10 @@ class_name = "Showtime"
 name = "KNOWLEDGE_STORE"
 class_name = "KnowledgeStore"
 
+[[durable_objects.bindings]]
+name = "BUILD_JOBS"
+class_name = "BuildJobs"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["RealtimeCoordinator"]
@@ -116,6 +120,10 @@ new_sqlite_classes = ["Showtime"]
 [[migrations]]
 tag = "v8"
 new_sqlite_classes = ["KnowledgeStore"]
+
+[[migrations]]
+tag = "v9"
+new_sqlite_classes = ["BuildJobs"]
 
 [triggers]
 crons = ["0 * * * *"]

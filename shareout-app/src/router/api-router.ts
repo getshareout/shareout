@@ -14,6 +14,7 @@ import { routeMetricAlertsApi } from './api/metric-alerts';
 import { routeMetricWatchApi } from './api/metric-watch';
 import { routeMiscApi } from './api/misc';
 import { routeCreateApi } from './api/create';
+import { routeBuildJobsApi } from '../build-jobs/client';
 import { routeFunnelApi } from './api/funnel';
 import { routePerfApi } from './api/perf';
 import { routePresenceApi } from './api/presence';
@@ -37,6 +38,7 @@ export async function routeApi(ctx: FetchContext): Promise<Response | null> {
       (await routePerfApi(ctx)) ??
       (await routePresenceApi(ctx)) ??
       (await routeCreateApi(ctx)) ??
+      (await routeBuildJobsApi(ctx)) ??
       (await routeMiscApi(ctx)) ??
       (await routeHomeApi(ctx)) ??
       (await routeHomeAgentApi(ctx)) ??
