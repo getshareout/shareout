@@ -15,10 +15,21 @@
 //    A real id wins (the browser already jumped there); an `h-` anchor is a heading
 //    without an id, found by the same text slug the corpus chunker gave it
 //    (heading-anchors.ts). The target is scrolled to and briefly highlighted.
+// 4. Error reports. Uncaught errors (a SyntaxError in a later <script> included — the
+//    agent sits at the end of <head>, before the page's own scripts) and unhandled
+//    promise rejections are posted to the wrapper, which tells the viewer something
+//    broke and lets them report it (sandbox-viewer/error-bar.ts). URLs are cut to their
+//    path minus the `/c/<capability>` prefix so a report never carries the token.
+//    Deduped, at most 5 per page; opaque "Script error." and the benign ResizeObserver
+//    loop warning are skipped.
 //
 // The constants are per (artifact, version, path) — the raw HTML edge cache key is the
-// r2_key, which already encodes all three — so the cached body stays correct.
+// r2_key, which already encodes all three — so the cached body stays correct. Changing
+// the agent itself: bump PAGE_AGENT_REV, which rides the cache variant.
 import { headingAnchors } from './heading-anchors';
+
+/** Revision of the injected agent; part of the raw-HTML cache variant so edits reach cached pages. */
+export const PAGE_AGENT_REV = '2';
 
 export function buildPageAgent(slug: string, baseOrigin: string, pagePath: string, entrypoint: string): string {
   const j = (v: string) => JSON.stringify(v).replace(/</g, '\\u003c');
@@ -26,6 +37,17 @@ export function buildPageAgent(slug: string, baseOrigin: string, pagePath: strin
 if(window.parent===window)return;
 var S=${j(slug)},B=${j(baseOrigin)},P=${j(pagePath)},E=${j(entrypoint)},shell=false;
 function post(m){try{parent.postMessage(m,'*');}catch(e){}}
+var nE=0,seenE={};
+function cut(s,n){s=s==null?'':String(s);s=s.replace(/https?:\\/\\/[^\\s)'"]*/g,function(u){return u.replace(/^https?:\\/\\/[^\\/]+/,'').replace(/^\\/c\\/[^\\/]+/,'');});return s.length>n?s.slice(0,n)+'...':s;}
+function oops(kind,msg,where,stack){msg=cut(msg,500);
+if(!msg||/^Script error\\.?$/.test(msg)||/ResizeObserver loop/.test(msg))return;
+var k=kind+'|'+msg+'|'+where;if(seenE[k]||nE>=5)return;seenE[k]=1;nE++;
+post({type:'shareout:error',kind:kind,message:msg,where:cut(where,300),stack:cut(stack,2000),path:P});}
+addEventListener('error',function(e){if(!e||typeof e.message!=='string')return;
+oops('error',e.message,(e.filename||'')+(e.lineno?':'+e.lineno+':'+(e.colno||0):''),e.error&&e.error.stack);});
+addEventListener('unhandledrejection',function(e){var r=e&&e.reason,m;
+if(r&&typeof r.message==='string')m=r.message;else if(typeof r==='string')m=r;else{try{m=JSON.stringify(r);}catch(x){m=String(r);}}
+oops('rejection',m,'',r&&r.stack);});
 addEventListener('pageshow',function(){post({type:'shareout:page',path:P});});
 addEventListener('message',function(e){if(e.source===parent&&e.data&&e.data.type==='shareout:shell')shell=true;});
 function root(){var p=location.pathname,d;try{d=decodeURI(p);}catch(e){d=p;}
@@ -102,14 +124,23 @@ export function isSafeSectionId(id: string): boolean {
 // the viewer URL (`?page=`) so a reload or a copied link lands on the same page.
 // Only the content frame's own window is trusted as a source, and an open-artifact
 // request is only honored during a user gesture (the click activates ancestors too).
+// Error reports from the frame are queued on `window.__soErrors` (this bridge streams
+// before the error bar exists — a broken page errors right away) and announced with a
+// `shareout:error` event the error bar listens for.
 export function renderPageBridge(slug: string, entrypoint: string, inShell: boolean): string {
   const j = (v: string) => JSON.stringify(v).replace(/</g, '\\u003c');
   return `<script>(function(){
 var S=${j(slug)},E=${j(entrypoint)},shell=${inShell ? 'true' : 'false'}&&window.parent!==window;
+var errs=window.__soErrors=window.__soErrors||[];
+function str(v,n){return typeof v==='string'?v.slice(0,n):'';}
 addEventListener('message',function(e){
 var f=document.querySelector('iframe');if(!f||e.source!==f.contentWindow)return;
 var d=e.data;if(!d||typeof d.type!=='string')return;
-if(d.type==='shareout:page'&&typeof d.path==='string'&&d.path.length<=512){
+if(d.type==='shareout:error'&&typeof d.message==='string'&&d.message){
+if(errs.length>=5)return;
+errs.push({kind:d.kind==='rejection'?'rejection':'error',message:str(d.message,500),where:str(d.where,300),stack:str(d.stack,2000),path:str(d.path,512)});
+try{dispatchEvent(new Event('shareout:error'));}catch(x){}
+}else if(d.type==='shareout:page'&&typeof d.path==='string'&&d.path.length<=512){
 var pg=d.path===E?'':d.path;
 if(shell){try{f.contentWindow.postMessage({type:'shareout:shell'},'*');}catch(x){}
 window.parent.postMessage({type:'shareout:page',slug:S,page:pg},location.origin);return;}

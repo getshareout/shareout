@@ -1,8 +1,8 @@
 import type { FetchContext } from '../context';
 import { getSessionUser } from '../../auth/session';
 import type { AiMeter } from '../../data/ai-usage';
-import { chat, streamChat, getAgentChatModel, getBuildConfig } from '../../data/agent/anthropic';
-import { BUILD_MAX_TOKENS, buildSystemPrompt, extractHtml, deriveName } from '../../data/agent/build-page';
+import { chat, getAgentChatModel, getBuildConfig } from '../../data/agent/anthropic';
+import { BUILD_TRUNCATED_CODE, buildSystemPrompt, extractHtml, deriveName, streamBuild } from '../../data/agent/build-page';
 import { getPackDirective } from '../../pages/themes';
 import { publishGeneratedHtml } from '../../publish/publish-generated-html';
 import { checkSlidingWindowRateLimit, getClientIp } from '../../rate-limit';
@@ -240,12 +240,15 @@ function streamGenerate(opts: {
 
         const systemPrompt = await buildSystemPrompt(env);
         let full = '';
-        for await (const chunk of streamChat(env, opts.meter, messages, systemPrompt, '', BUILD_MAX_TOKENS, getBuildConfig(env))) {
-          if (chunk.type === 'content' && chunk.content) {
-            full += chunk.content;
-            send({ type: 'delta', text: chunk.content });
-          } else if (chunk.type === 'error') {
-            send({ type: 'error', error: 'The builder hit a snag — try again.' });
+        for await (const chunk of streamBuild(env, opts.meter, messages, systemPrompt, getBuildConfig(env))) {
+          if (chunk.type === 'delta') {
+            send({ type: 'delta', text: chunk.text });
+          } else if (chunk.type === 'done') {
+            full = chunk.raw;
+          } else {
+            // A page still cut off after its continuations is never published: say why.
+            const truncated = chunk.code === BUILD_TRUNCATED_CODE;
+            send({ type: 'error', error: truncated ? chunk.error : 'The builder hit a snag — try again.', ...(truncated ? { code: chunk.code } : {}) });
             controller.close();
             return;
           }

@@ -10,7 +10,7 @@ import { presentArtifact } from '../present/present-artifact';
 import { botInsertRows, botUpdateRowById, botUpdateRowsByFilter } from '../data/tables/bot';
 import { botSetJson } from '../data/json-store';
 import { buildBotDataContext } from './data-write';
-import { generateArtifactHtml } from '../data/agent/build-page';
+import { BuildTruncatedError, generateArtifactHtml } from '../data/agent/build-page';
 import { publishGeneratedHtml } from '../publish/publish-generated-html';
 import { checkRateLimit, incrementRateLimit } from '../api-auth';
 import { checkStorageQuota } from '../quota';
@@ -240,7 +240,8 @@ export async function executeBuildArtifact(
   let html: string;
   try {
     html = await generateArtifactHtml(env, a.prompt, { workspaceId: a.workspace_id ?? null, userId, kind: 'page_build', source: 'assistant' });
-  } catch {
+  } catch (err) {
+    if (err instanceof BuildTruncatedError) return { text: err.message, name: a.name };
     return { text: 'The builder hit a snag generating that page. Try again?', name: a.name };
   }
   if (!html || html.length < 40) return { text: 'I couldn’t build that one — try rephrasing what you want.', name: a.name };

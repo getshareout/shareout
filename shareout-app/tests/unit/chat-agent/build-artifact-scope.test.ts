@@ -8,13 +8,14 @@ const checkRateLimit = vi.hoisted(() => vi.fn());
 const incrementRateLimit = vi.hoisted(() => vi.fn());
 const checkStorageQuota = vi.hoisted(() => vi.fn());
 
-vi.mock('../../../src/data/agent/build-page', () => ({ generateArtifactHtml }));
+vi.mock('../../../src/data/agent/build-page', async (importOriginal) => ({ ...(await importOriginal<object>()), generateArtifactHtml }));
 vi.mock('../../../src/publish/publish-generated-html', () => ({ publishGeneratedHtml }));
 vi.mock('../../../src/workspaces/roles', () => ({ getInternalWorkspaceRole }));
 vi.mock('../../../src/api-auth', () => ({ checkRateLimit, incrementRateLimit, RATE_LIMIT_MAX: 100 }));
 vi.mock('../../../src/quota', () => ({ checkStorageQuota }));
 
 import { executeBuildArtifact } from '../../../src/chat-agent/actions';
+import { BuildTruncatedError } from '../../../src/data/agent/build-page';
 
 const env = {
   DB: { prepare: () => ({ bind: () => ({ first: async () => ({ email: 'me@example.com' }) }) }) },
@@ -75,6 +76,15 @@ describe('executeBuildArtifact — same daily publish cap and storage quota as P
     checkStorageQuota.mockResolvedValue({ allowed: false, used: 50_000_000, incoming: 10, max: 50_000_000 });
     const r = await executeBuildArtifact(env, 'u1', build);
     expect(r.text).toMatch(/Storage limit reached: 50 MB of 50 MB/);
+    expect(publishGeneratedHtml).not.toHaveBeenCalled();
+    expect(incrementRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('never publishes a page the builder could not finish, and says why', async () => {
+    generateArtifactHtml.mockRejectedValue(new BuildTruncatedError());
+    const r = await executeBuildArtifact(env, 'u1', build);
+    expect(r.text).toMatch(/too long to finish/);
+    expect(r.url).toBeUndefined();
     expect(publishGeneratedHtml).not.toHaveBeenCalled();
     expect(incrementRateLimit).not.toHaveBeenCalled();
   });

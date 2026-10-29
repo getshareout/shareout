@@ -41,6 +41,7 @@ import { renderPageBridge } from '../page-agent';
 import { buildToolbarContext } from './toolbar/context';
 import { renderToolbar } from './toolbar';
 import { renderDataSourcesBridge, renderDataSourcesPanel } from './data-sources';
+import { renderErrorBar } from './error-bar';
 import { getViewerConfig } from '../../data/viewer-config';
 import { isVisualEditorEnabled } from '../../editor/visual-editor-gate';
 import { localeForViewer, localeFromAcceptLanguage } from '../../i18n/locale';
@@ -251,6 +252,13 @@ export async function serveSandboxedViewer(
         : viewerConfig.hide_toolbar ? '' : renderDataSourcesPanel({
           artifactId, page: entrypoint, locale, visible: mcpPage, withVars: !toolbar,
         });
+      // Tells the viewer when the page itself broke, and lets a signed-in one report it.
+      // Shown even with the toolbar hidden; ships the tokens when nothing else above did.
+      const errorBar = renderErrorBar({
+        artifactId, versionId, workspaceId, slug, baseUrl, locale,
+        canReport: !!user,
+        withVars: !toolbar && (studioEmbed || viewerConfig.hide_toolbar),
+      });
       const bodyClass = viewerConfig.hide_toolbar
         ? ''
         : viewerConfig.show_on_mobile
@@ -268,7 +276,7 @@ export async function serveSandboxedViewer(
         ? `<script>document.body.className=${JSON.stringify(bodyClass)}</script>`
         : '') + (locale !== earlyLang ? `<script>document.documentElement.lang=${JSON.stringify(locale)}</script>` : '');
 
-      const restOfHtml = `${headLinks ? '  ' + headLinks + '\n' : ''}  ${inlinedStyleBlock}${initialDataScript}${mobileSdkScript}${bridgeScript}${bodyClassScript}${contentHost ? '' : '\n  ' + iframeHtml}${toolbar}${dataSources}
+      const restOfHtml = `${headLinks ? '  ' + headLinks + '\n' : ''}  ${inlinedStyleBlock}${initialDataScript}${mobileSdkScript}${bridgeScript}${bodyClassScript}${contentHost ? '' : '\n  ' + iframeHtml}${toolbar}${dataSources}${errorBar}
   ${renderLoadingHideScript()}
 </body>
 </html>`;
