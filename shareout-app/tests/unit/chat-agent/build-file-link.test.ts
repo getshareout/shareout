@@ -3,7 +3,10 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 let n = 0;
-vi.mock('../../../src/data/agent/build-page', () => ({ generateArtifactHtml: async () => '<!doctype html><html><body>generated page body</body></html>' }));
+vi.mock('../../../src/data/agent/build-page', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  generateArtifactHtml: async () => '<!doctype html><html><body>generated page body</body></html>',
+}));
 vi.mock('../../../src/publish/publish-generated-html', () => ({
   publishGeneratedHtml: async (env: import('../../../src/types').Env, user: { id: string }) => {
     const id = `art_bfl_pub_${++n}`;

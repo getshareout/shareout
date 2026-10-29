@@ -45,7 +45,8 @@ vi.mock('../../../src/logging', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
   logError: vi.fn(),
 }));
-vi.mock('../../../src/data/agent/build-page', () => ({
+vi.mock('../../../src/data/agent/build-page', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   BUILD_MAX_TOKENS: 100,
   buildSystemPrompt: vi.fn(),
   extractHtml,
@@ -207,6 +208,19 @@ describe('routeCreateApi', () => {
     const done = (await sseEvents(await post({ phase: 'build', prompt: 'hi page' }))).at(-1);
     expect(done).toMatchObject({ type: 'done', visibility: 'public' });
     expect(done).not.toHaveProperty('moderation');
+  });
+
+  it('never publishes a build the model could not finish, and says why', async () => {
+    getSessionUser.mockResolvedValue({ id: 'u1', email: 'a@x.com' });
+    streamChat.mockImplementation(async function* () {
+      yield { type: 'content', content: '<!doctype html><html><body><script>toast(\'No se pud' };
+      yield { type: 'done', truncated: true };
+    });
+    extractHtml.mockReturnValue(html);
+    const events = await sseEvents(await post({ phase: 'build', prompt: 'hi page' }));
+    expect(events.at(-1)).toMatchObject({ type: 'error', code: 'BUILD_TRUNCATED' });
+    expect(events.at(-1).error).toMatch(/too long to finish/);
+    expect(publishGeneratedHtml).not.toHaveBeenCalled();
   });
 
   describe('who can see it', () => {

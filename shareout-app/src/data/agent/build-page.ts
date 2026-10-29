@@ -5,11 +5,96 @@
  */
 import { rewriteSkillOrigin } from '../../skill-origin';
 import type { AiMeter } from '../ai-usage';
+import { BUDGET_CODE, WorkspaceBudgetError } from '../ai-budget';
 import type { Env } from '../../types';
 import { SDK_REFERENCE } from './sdk-reference.generated';
-import { chatComplete, getBuildConfig } from './anthropic';
+import { streamChat, getBuildConfig, type AIConfig } from './anthropic';
 
 export const BUILD_MAX_TOKENS = 12000;
+/** Extra turns a build may take when the model stops at BUILD_MAX_TOKENS mid-page. */
+export const BUILD_CONTINUATIONS = 2;
+export const BUILD_TRUNCATED_CODE = 'BUILD_TRUNCATED';
+export const BUILD_TRUNCATED_MESSAGE =
+  'That page came out too long to finish in one go, so nothing was published. Ask for a simpler version, or build it in parts.';
+
+const CONTINUE_PROMPT =
+  'Your output was cut off at the length limit. Continue exactly where you stopped: output only the rest of the document, starting with the very next character. No repetition, no commentary, no code fences.';
+
+/** The page was still cut off after the last continuation — publishing it would ship broken markup/JS. */
+export class BuildTruncatedError extends Error {
+  readonly code = BUILD_TRUNCATED_CODE;
+  constructor() {
+    super(BUILD_TRUNCATED_MESSAGE);
+  }
+}
+
+export type BuildChunk =
+  | { type: 'delta'; text: string }
+  | { type: 'done'; raw: string }
+  | { type: 'error'; error: string; code?: string; resets_at?: string };
+
+type BuildMessage = { role: 'user' | 'assistant'; content: string };
+
+const START_FENCE = /^\s*```[\w-]*[^\S\n]*\n?/;
+const END_FENCE = /\n?```\s*$/;
+const DOC_START = /^\s*(<!doctype html|<html[\s>])/i;
+
+/**
+ * Stream one page build. When the model stops at the output cap, ask it to continue
+ * (up to BUILD_CONTINUATIONS more turns) and stitch the parts, so a long page is never
+ * published cut off mid-<script> — a page like that is one big SyntaxError with every
+ * button dead and no error shown. Yields deltas as they arrive (continuations included),
+ * then `done` with the whole raw text, or `error` (BUILD_TRUNCATED_CODE when it is still
+ * cut off after the last turn). Every turn goes through streamChat, so each is metered.
+ */
+export async function* streamBuild(
+  env: Env,
+  meter: AiMeter,
+  messages: BuildMessage[],
+  systemPrompt: string,
+  config: AIConfig | null,
+): AsyncGenerator<BuildChunk> {
+  let raw = '';
+  for (let turn = 0; turn <= BUILD_CONTINUATIONS; turn++) {
+    const convo = turn === 0 ? messages : [...messages, { role: 'assistant' as const, content: raw }, { role: 'user' as const, content: CONTINUE_PROMPT }];
+    let part = '';
+    // Continuations hold back their head until we know whether they append or restart.
+    let decided = turn === 0;
+    let restart = false;
+    let truncated = false;
+    for await (const chunk of streamChat(env, meter, convo, systemPrompt, '', BUILD_MAX_TOKENS, config)) {
+      if (chunk.type === 'error') {
+        yield { type: 'error', error: chunk.error || 'AI stream error', code: chunk.code, resets_at: chunk.resets_at };
+        return;
+      }
+      if (chunk.type === 'done') { truncated = !!chunk.truncated; continue; }
+      if (!chunk.content) continue;
+      part += chunk.content;
+      if (!decided) {
+        const head = part.replace(START_FENCE, '');
+        if (head.trim().length < 16) continue;
+        decided = true;
+        restart = DOC_START.test(head);
+        if (!restart) yield { type: 'delta', text: head };
+        continue;
+      }
+      if (!restart) yield { type: 'delta', text: chunk.content };
+    }
+    if (turn === 0) raw = part;
+    else {
+      let cont = part.replace(START_FENCE, '');
+      // A fenced first turn keeps its closing fence for extractHtml; otherwise drop a stray one.
+      if (!raw.trimStart().startsWith('```')) cont = cont.replace(END_FENCE, '');
+      if (!decided && cont) yield { type: 'delta', text: cont };
+      raw = restart ? cont : raw + cont;
+    }
+    if (!truncated) {
+      yield { type: 'done', raw };
+      return;
+    }
+  }
+  yield { type: 'error', error: BUILD_TRUNCATED_MESSAGE, code: BUILD_TRUNCATED_CODE };
+}
 
 const BASE_SYSTEM_PROMPT = `You are ShareOut's build agent. You turn a user's request into ONE complete, self-contained HTML document that gets published live on ShareOut.
 
@@ -93,13 +178,13 @@ export function deriveName(prompt: string): string {
  */
 export async function generateArtifactHtml(env: Env, prompt: string, meter: AiMeter): Promise<string> {
   const system = await buildSystemPrompt(env);
-  const full = await chatComplete(
-    env,
-    meter,
-    [{ role: 'user', content: prompt }],
-    system,
-    BUILD_MAX_TOKENS,
-    getBuildConfig(env)
-  );
-  return extractHtml(full);
+  for await (const chunk of streamBuild(env, meter, [{ role: 'user', content: prompt }], system, getBuildConfig(env))) {
+    if (chunk.type === 'done') return extractHtml(chunk.raw);
+    if (chunk.type === 'error') {
+      if (chunk.code === BUDGET_CODE) throw new WorkspaceBudgetError(chunk.resets_at ?? '');
+      if (chunk.code === BUILD_TRUNCATED_CODE) throw new BuildTruncatedError();
+      throw new Error(chunk.error);
+    }
+  }
+  throw new Error('AI stream ended without a page');
 }
