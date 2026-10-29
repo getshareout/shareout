@@ -9,6 +9,7 @@ import { pageLocale } from '../../i18n/accept-language';
 import { getPackDirective } from '../../pages/themes';
 import { publishGeneratedFiles, publishGeneratedHtml } from '../../publish/publish-generated-html';
 import { agentFailureText, buildAgentEnabled, runPageBuild } from '../../build-agent/run';
+import { startBuildTrace } from '../../build-agent/trace';
 import type { BuildAgentDeps } from '../../build-agent/agent';
 import { checkSlidingWindowRateLimit, getClientIp } from '../../rate-limit';
 import { createLogger, logError } from '../../logging';
@@ -272,7 +273,8 @@ export function streamGenerate(opts: { env: Env } & GenerateRequest): Response {
         const [brief, gatewayModel] = await Promise.all([loadWorkspaceBrief(env, opts.briefWorkspaceId), resolveBuildGatewayModel(env, opts.meter.workspaceId)]);
         const systemPrompt = await buildSystemPrompt(env, brief);
         let full = '';
-        for await (const chunk of streamBuild(env, opts.meter, messages, systemPrompt, getBuildConfig(env, gatewayModel))) {
+        const trace = startBuildTrace(env, opts.meter, 'one_shot');
+        for await (const chunk of streamBuild(env, opts.meter, messages, systemPrompt, getBuildConfig(env, gatewayModel), trace)) {
           if (chunk.type === 'delta') {
             send({ type: 'delta', text: chunk.text });
           } else if (chunk.type === 'done') {
@@ -288,6 +290,7 @@ export function streamGenerate(opts: { env: Env } & GenerateRequest): Response {
 
         const html = extractHtml(full);
         if (!html || html.length < 40) {
+          await trace.finish('failed', { errorCode: 'EMPTY', errorMessage: 'the model returned no page' });
           send({ type: 'error', error: copy.empty });
           controller.close();
           return;
@@ -303,15 +306,19 @@ export function streamGenerate(opts: { env: Env } & GenerateRequest): Response {
               ...publish.share,
             });
             if ('error' in outcome) {
+              await trace.finish('failed', { errorCode: outcome.code ?? 'PUBLISH_REFUSED', errorMessage: outcome.error });
               send({ type: 'error', error: outcome.error, code: outcome.code });
             } else {
+              await trace.finish('published', { artifactId: outcome.artifact.id });
               send({ type: 'done', mode: 'build', html, ...publishedFields(outcome, publish.share), capabilities });
             }
           } catch (err) {
             logError(createLogger(env, { scope: 'create', event: 'publish.failed' }), 'create publish failed', err);
+            await trace.finish('failed', { errorCode: 'PUBLISH_FAILED', errorMessage: err instanceof Error ? err.message : String(err) });
             send({ type: 'error', error: copy.publishFailed });
           }
         } else {
+          await trace.finish('previewed');
           send({ type: 'done', mode: 'preview', html, capabilities });
         }
         controller.close();

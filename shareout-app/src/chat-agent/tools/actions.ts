@@ -6,7 +6,7 @@ import { listJobs } from '../../scheduling/jobs/crud';
 import { PERSONAL_SCOPE } from '../../chat-platforms/types';
 import { resolveArtifactAccessForUser } from '../access';
 import { getCrew } from '../../crew/store';
-import { proposeEdit } from '../../data/agent/headless-edit';
+import { proposeEdit, proposeEditInPieces } from '../../data/agent/headless-edit';
 
 // A tool that returns this asks the agent loop to halt and show the user a
 // ✅/❌ confirmation for `action` — nothing mutates until they tap Confirm.
@@ -226,7 +226,11 @@ export const editPageTool: AccountTool = {
     if (!access) return { error: 'You don’t have access to that page (or it doesn’t exist).' };
     if (access.role !== 'owner' && access.role !== 'editor') return { error: 'Only the owner or an editor can change a page.' };
 
-    const res = await proposeEdit(ctx.env, artifactId, instruction);
+    // Where the build agent is on: the tool-using editor (edits in pieces, checked before it is
+    // proposed). Anywhere it does not apply, the one-shot diff editor.
+    const onProgress = (label: string) => { ctx.reply?.sendToolProgress?.(label)?.catch(() => {}); };
+    const res = await proposeEditInPieces(ctx.env, artifactId, instruction, { userId: ctx.userId, onProgress })
+      ?? await proposeEdit(ctx.env, artifactId, instruction);
     if (!res.ok) return { error: res.error };
     // The agent answered without staging an edit (asked a question, declined, etc.) — relay it.
     if (!res.files.length) return { note: res.explanation };

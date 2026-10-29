@@ -23,8 +23,8 @@ import { jsonWithApiErrors } from '../../http/api-error';
 import { localeForRecipient, type Locale } from '../../i18n/locale';
 import { PERSONAL_SCOPE } from '../../chat-platforms/types';
 import type { AgentScope } from '../../chat-agent/scope';
+import { HISTORY_WINDOW } from '../../chat-agent/history';
 
-const HISTORY_LIMIT = 20;
 const THREAD_PAGE = 50;
 
 type ControlEvent = WebAgentEvent | { type: 'done' } | { type: 'error'; message: string };
@@ -85,7 +85,7 @@ export function streamAgentChat(env: Env, cfg: ChatTurnConfig): Response {
           send({ type: 'thread', id: t.id, title: t.title });
           return t.id;
         }),
-      cfg.threadId ? new D1ConversationStore(env, cfg.scopeKey, cfg.user.id, cfg.threadId).loadHistory(HISTORY_LIMIT) : [],
+      cfg.threadId ? new D1ConversationStore(env, cfg.scopeKey, cfg.user.id, cfg.threadId).loadHistory(HISTORY_WINDOW) : [],
       cfg.buildSnapshot(),
       localeForRecipient(env, { userId: cfg.user.id, workspaceId: ws }).catch((): Locale => 'en'),
     ]);

@@ -63,6 +63,11 @@ default `medium`), use the workspace's model choice (then the instance's, then
 `BUILD_MODEL`), and are given the workspace's brand accent, logo, language and house-style
 context file. The agent can also look up ShareOut's artifact guide while it builds.
 
+The same switch moves the assistant's page edits onto the agent: it changes an HTML page's
+existing files in small steps, checks that the change broke nothing the page did not
+already have, and shows the change for the user to confirm before anything is published.
+Other page types, and workspaces where it is off, keep the one-shot editor.
+
 ### Builds that outlive the tab
 
 With the `BUILD_JOBS` Durable Object bound (it is in the default `wrangler.toml`), a page

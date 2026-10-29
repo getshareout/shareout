@@ -387,6 +387,7 @@ erDiagram
 | `funnel_events` | Product funnel instrumentation keyed by session id. |
 | `health_metrics_hourly` | Hourly request counts by status class, plus duration sum/max and latency buckets. |
 | `ops_error_log` | Sampled request errors with route, status, and `request_id`. |
+| `page_build_traces` | One row per AI page build (agent or one-shot): outcome, turns, tool calls, check rounds, tokens, error, and a capped step list. Shown in admin Health; pruned after 90 days. |
 | `audit_log` | Security-relevant workspace actions: actor, action, target, detail. |
 
 ## 10 Metrics, alerts & watches

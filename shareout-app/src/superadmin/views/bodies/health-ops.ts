@@ -6,13 +6,69 @@ import { escapeHtml } from '../../../html/utils';
 import type { NameCount } from '../../metrics';
 import type { OpsMetrics } from '../../insights';
 import type { ErrorRow, HourRow, WindowSummary } from '../../../observability';
-import { barChart, card, distribution, fmt, fmtEpoch, fmtIso, stat, stat2 } from '../components';
+import type { BuildTraceRow } from '../../../build-agent/trace-store';
+import type { TraceStep } from '../../../build-agent/trace';
+import { barChart, card, distribution, fmt, fmtEpoch, fmtIso, money, stat, stat2 } from '../components';
+
+const OUTCOME_CLASS: Record<string, string> = { published: 'sa-pos', previewed: 'sa-muted', gave_up: 'sa-neg', failed: 'sa-neg', truncated: 'sa-neg' };
+
+function stepLine(s: TraceStep): string {
+  switch (s.k) {
+    case 'turn': return `model call ${s.n}: ${fmt(s.in)} in / ${fmt(s.out)} out, stopped: ${s.stop}`;
+    case 'tool': return `tool ${s.name}: ${s.ok === null ? 'no result' : s.ok ? 'ok' : 'error'}`;
+    case 'check': return `static check: ${s.errors} error${s.errors === 1 ? '' : 's'}`;
+    case 'verify': return `page test: ${s.status}, ${s.errors} error${s.errors === 1 ? '' : 's'}`;
+    case 'publish': return `publish${s.draft ? ' (private draft)' : ''}: ${s.ok ? 'ok' : 'refused'}`;
+    case 'note': return s.text;
+    case 'dropped': return `… ${s.count} more steps not stored`;
+  }
+}
+
+function buildDetail(b: BuildTraceRow): string {
+  const facts = [
+    `path ${b.path === 'agent' ? 'agent' : 'one-shot'}`,
+    `source ${b.source ?? '—'}`,
+    `model ${b.model ?? '—'}${b.effort ? ` (effort ${b.effort})` : ''}`,
+    `${b.turns} model calls`,
+    `${b.tool_calls} tool calls (${b.tool_errors} errors)`,
+    `${b.check_rounds} failed check rounds`,
+    b.verify_status ? `page test ${b.verify_status}` : '',
+    b.artifact_id ? `artifact ${b.artifact_id}${b.version_no ? ` v${b.version_no}` : ''}` : '',
+    `build ${b.id}`,
+  ].filter(Boolean);
+  const err = b.error_code || b.error_message
+    ? `<p class="sa-neg" style="font-size:12px">${escapeHtml([b.error_code, b.error_message].filter(Boolean).join(': '))}</p>`
+    : '';
+  return `<details><summary class="sa-muted" style="cursor:pointer">steps</summary>
+    <p class="sa-muted" style="font-size:12px">${escapeHtml(facts.join(' · '))}</p>${err}
+    <ol style="font-size:12px;margin:4px 0 0 18px">${b.steps.map((s) => `<li>${escapeHtml(stepLine(s))}</li>`).join('')}</ol></details>`;
+}
+
+/** Recent AI page builds, each expandable to its steps. Platform admins only (the Health view's callers gate it). */
+export function buildsTable(builds: BuildTraceRow[]): string {
+  if (!builds.length) return `<div class="sa-empty">No page builds recorded yet.</div>`;
+  return `<table class="sa-table"><thead><tr><th>When</th><th>Outcome</th><th>Workspace</th><th>Path</th><th>Duration</th><th>Tokens in / out</th><th>Cost</th><th>Detail</th></tr></thead><tbody>${builds
+    .map(
+      (b) => `<tr>
+        <td class="sa-muted" title="${escapeHtml(b.started_at)}">${escapeHtml(fmtIso(b.started_at))}</td>
+        <td><span class="${OUTCOME_CLASS[b.outcome] ?? 'sa-muted'}">${escapeHtml(b.outcome)}</span></td>
+        <td title="${escapeHtml(b.workspace_id ?? '')}">${escapeHtml((b.workspace_name ?? (b.workspace_id ? b.workspace_id : 'personal')).slice(0, 32))}</td>
+        <td class="sa-muted">${b.path === 'agent' ? 'agent' : 'one-shot'}</td>
+        <td class="sa-muted">${(b.duration_ms / 1000).toFixed(1)}s</td>
+        <td class="sa-muted">${fmt(b.input_tokens)} / ${fmt(b.output_tokens)}</td>
+        <td class="sa-muted">${b.cost_micro_usd ? money(b.cost_micro_usd / 1e6) : '—'}</td>
+        <td>${buildDetail(b)}</td>
+      </tr>`
+    )
+    .join('')}</tbody></table>`;
+}
 
 export function healthBody(
   w24: WindowSummary,
   w1: WindowSummary,
   series: HourRow[],
-  errors: ErrorRow[]
+  errors: ErrorRow[],
+  builds: BuildTraceRow[] = [],
 ): string {
   const errClass = w24.status5xx + w24.exceptions > 0 ? 'sa-neg' : 'sa-pos';
   const reqChart = barChart(series.map((r) => ({ date: `${r.hour.slice(11)}:00`, value: r.requests })));
@@ -67,6 +123,9 @@ export function healthBody(
     <div class="sa-grid-3" style="margin-top:var(--space-4)">
       ${card('Errors', `<p class="sa-muted" style="font-size:12px">5xx responses and unhandled exceptions are recorded here and in the Worker logs. No out-of-band alerting — this page is the surface.</p>`)}
       ${card('Live logs', `<p class="sa-muted" style="font-size:12px;line-height:1.6">Stream live: <code>wrangler tail shareout --format json</code><br>Or Cloudflare Dashboard → Workers → shareout → Logs.</p>`)}
+    </div>
+    <div style="margin-top:var(--space-4)">
+      ${card('Page builds (latest 25, kept 90 days)', buildsTable(builds))}
     </div>
     <div style="margin-top:var(--space-4)">
       ${card('Recent server errors (7-day log)', errorsTable)}

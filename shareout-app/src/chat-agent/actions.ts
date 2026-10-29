@@ -15,6 +15,7 @@ import { buildBotDataContext } from './data-write';
 import { BUILD_FAILURE_COPY, BuildTruncatedError, generateArtifactHtml } from '../data/agent/build-page';
 import { publishGeneratedFiles, publishGeneratedHtml } from '../publish/publish-generated-html';
 import { agentFailureText, buildAgentEnabled, runPageBuild } from '../build-agent/run';
+import { startBuildTrace } from '../build-agent/trace';
 import { checkRateLimit, incrementRateLimit } from '../api-auth';
 import { checkStorageQuota } from '../quota';
 import { rateLimitMessage, storageLimitMessage } from '../publish/limits';
@@ -282,20 +283,31 @@ export async function executeBuildArtifact(
   }
   onProgress?.(copy.designing);
   let html: string;
+  const meter = { workspaceId: a.workspace_id ?? null, userId, kind: 'page_build', source: 'assistant' };
+  const trace = startBuildTrace(env, meter, 'one_shot');
   try {
     // The workspace's brand and house style only reach the page when the user is a member of it.
     const briefWs = a.workspace_id && await getInternalWorkspaceRole(env, a.workspace_id, userId) ? a.workspace_id : null;
-    html = await generateArtifactHtml(env, a.prompt, { workspaceId: a.workspace_id ?? null, userId, kind: 'page_build', source: 'assistant' }, briefWs);
+    html = await generateArtifactHtml(env, a.prompt, meter, briefWs, trace);
   } catch (err) {
+    // A model error or a cut-off page already closed the trace; this covers the rest.
+    await trace.finish('failed', { errorCode: 'EXCEPTION', errorMessage: err instanceof Error ? err.message : String(err) });
     return failed(err instanceof BuildTruncatedError ? fail.truncated : fail.snag);
   }
-  if (!html || html.length < 40) return failed(fail.empty);
+  if (!html || html.length < 40) {
+    await trace.finish('failed', { errorCode: 'EMPTY', errorMessage: 'the model returned no page' });
+    return failed(fail.empty);
+  }
   const quota = await checkStorageQuota(env, userId, [{ path: 'index.html', content: html, mime: 'text/html' }]);
-  if (!quota.allowed) return failed(storageLimitMessage(quota));
+  if (!quota.allowed) {
+    await trace.finish('failed', { errorCode: 'STORAGE_QUOTA', errorMessage: 'the page did not fit the storage quota' });
+    return failed(storageLimitMessage(quota));
+  }
   onProgress?.(copy.publishing);
   try {
     const workspaceId = a.workspace_id && await getInternalWorkspaceRole(env, a.workspace_id, userId) ? a.workspace_id : null;
     const published = await publishGeneratedHtml(env, { id: userId, email: u.email }, { name: a.name, html, workspaceId, visibility: 'private' });
+    await trace.finish('published', { artifactId: published.artifact.id });
     await incrementRateLimit(env, userId, 'publish', u.email);
     await linkSourceFile(env, userId, workspaceId, a.source_file_id, published.artifact.id);
     return {
@@ -306,7 +318,8 @@ export async function executeBuildArtifact(
       artifactId: published.artifact.id,
       name: a.name,
     };
-  } catch {
+  } catch (err) {
+    await trace.finish('failed', { errorCode: 'PUBLISH_FAILED', errorMessage: err instanceof Error ? err.message : String(err) });
     return failed(fail.publishFailed);
   }
 }

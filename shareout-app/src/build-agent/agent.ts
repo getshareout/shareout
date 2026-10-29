@@ -1,16 +1,19 @@
 /**
- * The page-build agent loop. The model writes the page as files through tools, runs the
+ * The page-build agent. The model writes the page as files through tools, runs the
  * static check, fixes what it reports, publishes, and (when the instance has a browser)
  * has the published page tested and fixes that too, each in bounded rounds. A page is
  * only ever reported done when it passed; anything else comes back as a give-up the
- * caller tells the user about. Every model turn goes through the metered crew provider.
+ * caller tells the user about. The loop itself (metered calls, budgets, cut-off replies,
+ * context management) is the shared agent engine.
  */
 import type { Env, FileEntry } from '../types';
 import type { AiMeter } from '../data/ai-usage';
 import { BUDGET_CODE } from '../data/ai-budget';
 import { createLogger } from '../logging';
 import { alertOps } from '../support/alert';
-import type { CrewProvider, NativeHarness, NeutralToolCall, NeutralTurn, ProviderEvent } from '../crew/provider';
+import type { CrewProvider, NativeHarness } from '../crew/provider';
+import { newStats, runEngine, type StopStep, type ToolStep } from '../agent-runtime/engine';
+import { DEFAULT_TRIM } from '../agent-runtime/transcript';
 import type { Locale } from '../i18n';
 import { t } from '../i18n';
 import { AGENT_PROGRESS_COPY } from './copy';
@@ -101,8 +104,7 @@ export interface BuildAgentInput {
   previousFiles?: Array<{ path: string; content: string; mime?: string }>;
 }
 
-const KEEP_RECENT_TURNS = 8;
-const TRIM_AT_CHARS = 120_000;
+const KEEP_RECENT_TURNS = DEFAULT_TRIM.keepRecent;
 /** Direct-Anthropic harness: the server compacts and clears old tool use, the loop only sets the thresholds. */
 const NATIVE: NativeHarness = {
   compactAtTokens: 100_000,
@@ -110,64 +112,8 @@ const NATIVE: NativeHarness = {
   taskBudgetTokens: 120_000,
 };
 
-const weight = (turn: NeutralTurn): number =>
-  turn.role === 'user' ? turn.text.length
-    : turn.role === 'assistant' ? turn.text.length + JSON.stringify(turn.toolCalls).length
-      : turn.results.reduce((n, r) => n + r.content.length, 0);
-
-/**
- * Provider-neutral stand-in for the Anthropic harness's context editing: once the transcript
- * is big, older file contents and tool results are replaced by a stub (the model can read_file
- * again). The first message and the newest turns stay as they are.
- */
-export function trimTranscript(transcript: NeutralTurn[]): NeutralTurn[] {
-  if (transcript.reduce((n, turn) => n + weight(turn), 0) < TRIM_AT_CHARS) return transcript;
-  const assistantIdx = transcript.flatMap((turn, i) => (turn.role === 'assistant' ? [i] : []));
-  const cut = assistantIdx[assistantIdx.length - KEEP_RECENT_TURNS];
-  if (cut === undefined) return transcript;
-  return transcript.map((turn, i) => {
-    if (i === 0 || i >= cut) return turn;
-    if (turn.role === 'assistant') {
-      return {
-        ...turn,
-        toolCalls: turn.toolCalls.map((tc) =>
-          typeof tc.input.content === 'string' && tc.input.content.length > 300
-            ? { ...tc, input: { ...tc.input, content: `[${tc.input.content.length} chars written; read_file to see them]` } }
-            : typeof tc.input.old === 'string' && tc.input.old.length + String(tc.input.new ?? '').length > 600
-              ? { ...tc, input: { ...tc.input, old: '[trimmed]', new: '[trimmed]' } }
-              : tc),
-      };
-    }
-    if (turn.role === 'tool') return { ...turn, results: turn.results.map((r) => (r.content.length > 200 ? { ...r, content: `${r.content.slice(0, 120)}… [trimmed]` } : r)) };
-    return turn;
-  });
-}
-
-interface TurnOutcome {
-  text: string;
-  toolCalls: NeutralToolCall[];
-  compaction?: string;
-  stopReason: string;
-  outputTokens: number;
-  error?: Extract<ProviderEvent, { type: 'error' }>;
-}
-
-async function takeTurn(deps: BuildAgentDeps, system: string, transcript: NeutralTurn[], maxTokens: number): Promise<TurnOutcome> {
-  const out: TurnOutcome = { text: '', toolCalls: [], stopReason: 'end_turn', outputTokens: 0 };
-  for await (const ev of deps.provider.streamTurn({ system, transcript, tools: BUILD_TOOLS, maxTokens, meter: deps.meter, native: NATIVE, effort: parseBuildEffort(deps.env.BUILD_EFFORT) })) {
-    if (ev.type === 'text_delta') out.text += ev.text;
-    else if (ev.type === 'compaction') out.compaction = ev.content;
-    else if (ev.type === 'tool_use') out.toolCalls.push({ id: ev.id, name: ev.name, input: ev.input });
-    else if (ev.type === 'message_stop') {
-      out.stopReason = ev.stopReason;
-      out.outputTokens = ev.usage.outputTokens;
-    } else if (ev.type === 'error') {
-      out.error = ev;
-      return out;
-    }
-  }
-  return out;
-}
+/** Moved to the agent engine; re-exported for existing callers. */
+export { trimTranscript } from '../agent-runtime/transcript';
 
 function initialMessage(input: BuildAgentInput): string {
   if (!input.previousFiles?.length) return input.prompt;
@@ -193,10 +139,8 @@ export async function runBuildAgent(deps: BuildAgentDeps, input: BuildAgentInput
   const progress = (label: string) => deps.onProgress?.(label);
   const system = buildAgentSystemPrompt(deps.env, deps.brief);
   const files = PageFiles.from(input.previousFiles ?? []);
-  const startedAt = Date.now();
+  const stats = newStats();
 
-  let transcript: NeutralTurn[] = [{ role: 'user', text: initialMessage(input) }];
-  let outputTokens = 0;
   let checkFails = 0;
   let verifyFails = 0;
   let nudges = 0;
@@ -249,73 +193,62 @@ export async function runBuildAgent(deps: BuildAgentDeps, input: BuildAgentInput
     return { ok: true, page, files: files.toFileEntries(), tested: !!report && report.status !== 'partial' };
   };
 
+  const runTool = async (call: { name: string; input: Record<string, unknown> }): Promise<ToolStep<BuildAgentResult>> => {
+    if (call.name === TOOL.check) {
+      progress(copy.checking);
+      const round = staticRound();
+      if (round.errors) {
+        progress(copy.fixing(round.errors));
+        if (round.exhausted) return { end: await giveUp('check_failed', `${round.errors} static errors after ${checkFails} rounds:\n${round.text}`) };
+      }
+      return { content: round.errors ? `${round.errors} error${round.errors === 1 ? '' : 's'} to fix:\n${round.text}` : `No errors.${round.text ? `\nWarnings (fix if cheap):\n${round.text}` : ''}` };
+    }
+    if (call.name === TOOL.publish) {
+      const res = await publishRound();
+      if (typeof res === 'string') return { content: res };
+      return res.ok ? { content: 'Published.', finish: res } : { end: res };
+    }
+    const reply = call.name === TOOL.guide ? readGuide(deps.env, call.input) : runFileTool(files, call.name, call.input);
+    if (!reply) return { content: `ERROR: unknown tool "${call.name}". Tools: ${BUILD_TOOLS.map((x) => x.name).join(', ')}.` };
+    if (!reply.isError && reply.path) progress(call.name === TOOL.edit ? copy.editing(reply.path) : copy.writing(reply.path));
+    return { content: reply.isError ? `ERROR ${reply.content}` : reply.content };
+  };
+
+  const onStop = async (): Promise<StopStep<BuildAgentResult>> => {
+    if (++nudges > limits.nudges) return { end: await giveUp('no_publish', 'the model stopped without publishing') };
+    return { nudge: `You have not published the page yet. Write the files, run ${TOOL.check}, then call ${TOOL.publish}.` };
+  };
+
   progress(copy.planning);
-  for (let turn = 0; turn < limits.maxTurns; turn++) {
-    if (Date.now() - startedAt > limits.wallMs) return giveUp('time', `over ${Math.round(limits.wallMs / 1000)}s`);
-    if (outputTokens > limits.maxOutputTokens) return giveUp('tokens', `${outputTokens} output tokens`);
+  const run = await runEngine<BuildAgentResult>({
+    provider: deps.provider,
+    meter: deps.meter,
+    system,
+    transcript: [{ role: 'user', text: initialMessage(input) }],
+    tools: BUILD_TOOLS,
+    limits,
+    native: NATIVE,
+    turnArgs: { effort: parseBuildEffort(deps.env.BUILD_EFFORT) },
+    stats,
+    runTool,
+    onStop,
+    cutOff: {
+      reply: `Your reply was cut off at the length limit. Use the tools in smaller pieces: ${TOOL.write} the first part of a file, then ${TOOL.append} the rest.`,
+      invalidCall: (call) => `ERROR: this ${call.name} call was cut off or was not valid JSON, so it did nothing. Send it again in smaller pieces: ${TOOL.write} the first part of the file, then ${TOOL.append} the rest.`,
+      note: '\n(Your last reply hit the length limit: keep each tool call smaller.)',
+    },
+    skipped: 'Skipped: the page is already published.',
+  });
 
-    // On the direct Anthropic route the server edits the context; everywhere else we do.
-    if (deps.provider.provider !== 'anthropic') transcript = trimTranscript(transcript);
-    const r = await takeTurn(deps, system, transcript, limits.turnTokens);
-    if (r.error) {
-      if (r.error.code === BUDGET_CODE) return { ok: false, reason: 'budget', detail: r.error.error };
-      await reportGiveUp(deps, input, 'model error', r.error.error);
-      return { ok: false, reason: 'provider_error', detail: r.error.error };
-    }
-    outputTokens += r.outputTokens;
-    transcript = [...transcript, { role: 'assistant', text: r.text, toolCalls: r.toolCalls, ...(r.compaction ? { compaction: r.compaction } : {}) }];
-
-    if (!r.toolCalls.length) {
-      if (r.stopReason === 'max_tokens') {
-        transcript.push({ role: 'user', text: `Your reply was cut off at the length limit. Use the tools in smaller pieces: ${TOOL.write} the first part of a file, then ${TOOL.append} the rest.` });
-        continue;
-      }
-      if (++nudges > limits.nudges) return giveUp('no_publish', 'the model stopped without publishing');
-      transcript.push({ role: 'user', text: `You have not published the page yet. Write the files, run ${TOOL.check}, then call ${TOOL.publish}.` });
-      continue;
-    }
-
-    const results: Array<{ id: string; content: string }> = [];
-    let finished: BuildAgentResult | null = null;
-    for (const call of r.toolCalls) {
-      if (finished) {
-        results.push({ id: call.id, content: 'Skipped: the page is already published.' });
-        continue;
-      }
-      if (typeof call.input.__invalid_json === 'string') {
-        results.push({
-          id: call.id,
-          content: `ERROR: this ${call.name} call was cut off or was not valid JSON, so it did nothing. Send it again in smaller pieces: ${TOOL.write} the first part of the file, then ${TOOL.append} the rest.`,
-        });
-        continue;
-      }
-      if (call.name === TOOL.check) {
-        progress(copy.checking);
-        const round = staticRound();
-        if (round.errors) {
-          progress(copy.fixing(round.errors));
-          if (round.exhausted) return giveUp('check_failed', `${round.errors} static errors after ${checkFails} rounds:\n${round.text}`);
-        }
-        results.push({ id: call.id, content: round.errors ? `${round.errors} error${round.errors === 1 ? '' : 's'} to fix:\n${round.text}` : `No errors.${round.text ? `\nWarnings (fix if cheap):\n${round.text}` : ''}` });
-      } else if (call.name === TOOL.publish) {
-        const res = await publishRound();
-        if (typeof res === 'string') results.push({ id: call.id, content: res });
-        else if (res.ok) {
-          finished = res;
-          results.push({ id: call.id, content: 'Published.' });
-        } else return res;
-      } else {
-        const reply = call.name === TOOL.guide ? readGuide(deps.env, call.input) : runFileTool(files, call.name, call.input);
-        if (!reply) results.push({ id: call.id, content: `ERROR: unknown tool "${call.name}". Tools: ${BUILD_TOOLS.map((x) => x.name).join(', ')}.` });
-        else {
-          if (!reply.isError && reply.path) progress(call.name === TOOL.edit ? copy.editing(reply.path) : copy.writing(reply.path));
-          results.push({ id: call.id, content: reply.isError ? `ERROR ${reply.content}` : reply.content });
-        }
-      }
-    }
-    if (finished) return finished;
-    if (r.stopReason === 'max_tokens' && results.length) results[results.length - 1].content += '\n(Your last reply hit the length limit: keep each tool call smaller.)';
-    transcript = [...transcript, { role: 'tool', results }];
+  if (run.kind === 'end') return run.result;
+  if (run.kind === 'error') {
+    if (run.error.code === BUDGET_CODE) return { ok: false, reason: 'budget', detail: run.error.error };
+    await reportGiveUp(deps, input, 'model error', run.error.error);
+    return { ok: false, reason: 'provider_error', detail: run.error.error };
   }
-  return giveUp('turns', `${limits.maxTurns} model calls without a passing page`);
+  switch (run.limit) {
+    case 'time': return giveUp('time', `over ${Math.round(limits.wallMs / 1000)}s`);
+    case 'tokens': return giveUp('tokens', `${stats.outputTokens} output tokens`);
+    default: return giveUp('turns', `${limits.maxTurns} model calls without a passing page`);
+  }
 }

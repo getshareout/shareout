@@ -20,10 +20,12 @@ import { reapStaleApprovals } from '../crew/approvals';
 import { autoCloseIdleTickets } from '../support/store';
 import { runDueMetricAlerts } from '../metric-alerts/rules';
 import { cleanupObservability } from '../observability/store';
+import { cleanupBuildTraces } from '../build-agent/trace';
 import { cleanupAuditLog } from '../audit';
 import { createLogger } from '../logging';
 import { runStorageSnapshots } from '../storage-snapshots';
 import { reconcileAiUsage } from '../data/ai-usage-reconcile';
+import { checkDailyAiSpend } from '../data/agent/ai-ops-alerts';
 import { rollupWorkspaceUsage, utcDay } from '../workspaces/usage-ledger';
 import { runLifecycleEmails } from '../email/lifecycle-cron';
 import { runWeeklyWorkspaceDigest } from '../email/weekly-digest';
@@ -305,6 +307,8 @@ export async function handleScheduledEvent(env: Env, scheduledTime?: number): Pr
   if (aiUsage && aiUsage.actual + aiUsage.repriced > 0) {
     logger.info('AI usage reconciled', aiUsage);
   }
+  // Daily spend line (AI_SPEND_ALERT_USD_PER_DAY): one Telegram alert per UTC day once crossed.
+  await checkDailyAiSpend(env).catch((err) => { logger.error('AI spend check failed', { error: String(err) }); });
   // Never-viewed janitor: flag workspaces with 3+ published pages nobody's opened in
   // 90+ days. Self-gated to at most once/30 days per workspace (last_janitor_at), so
   // safe to call every hour — it's a cheap no-op SELECT when nothing is due.
@@ -457,6 +461,7 @@ export async function handleScheduledEvent(env: Env, scheduledTime?: number): Pr
     await cleanupExpiredDeviceCodes(env).catch(() => 0);
     await cleanupMcpOAuth(env).catch(() => undefined);
     const obs = await cleanupObservability(env).catch(() => ({ errors: 0, hours: 0 }));
+    const buildTraces = await cleanupBuildTraces(env).catch(() => 0);
     const audit = await cleanupAuditLog(env).catch(() => ({ rows: 0 }));
     const approvalsExpired = await reapStaleApprovals(env).catch(() => 0);
     const artifactsPurged = await purgeSoftDeleted(env).catch(() => 0);
@@ -467,6 +472,7 @@ export async function handleScheduledEvent(env: Env, scheduledTime?: number): Pr
       rate_limits_pruned: rateLimitsPruned,
       obs_errors_pruned: obs.errors,
       obs_hours_pruned: obs.hours,
+      build_traces_pruned: buildTraces,
       audit_rows_pruned: audit.rows,
       crew_approvals_expired: approvalsExpired,
       artifacts_purged: artifactsPurged,
