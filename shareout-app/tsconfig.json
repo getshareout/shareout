@@ -13,6 +13,6 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*", "superadmin-recipients.json"],
+  "include": ["src/**/*", "evals/**/*", "superadmin-recipients.json"],
   "exclude": ["node_modules"]
 }
