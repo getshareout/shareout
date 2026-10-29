@@ -2,6 +2,7 @@ import type { Env } from '../types';
 import { rewriteSkillOrigin } from '../skill-origin';
 import { SDK_REFERENCE } from '../data/agent/sdk-reference.generated';
 import { CAPABILITIES_PROMPT, DESIGN_SYSTEM_PROMPT } from '../data/agent/build-page';
+import { workspaceBriefSection, type WorkspaceBrief } from '../data/agent/workspace-brief';
 import { TOOL } from './tools';
 
 const AGENT_CONTRACT = `You are ShareOut's build agent. You build the user's request as a small set of FILES with tools, check your own work, fix what the checks find, and publish it live on ShareOut. Work like an engineer shipping code: small steps, verify, fix.
@@ -18,13 +19,14 @@ Page rules:
 - If the page uses sdk.table(name), declare EVERY table in a <script type="shareout/manifest"> JSON block in index.html <head> (version "2.0", sources.tables.<name>.schema: columns with name and type string|number|boolean|date). Valid JSON only.
 - Third-party libraries load root-relative from this instance, never a public CDN: /vendor/<npm package>@<version>/<file in the package>. Never use localStorage, sessionStorage, alert, confirm or prompt: viewers run the page sandboxed.
 - Design loading, empty and error states on purpose; a rejected SDK call must never blank the page. Make it polished, responsive, with real placeholder content, never lorem ipsum.
+- When unsure of an exact rule (a manifest field, a .so- class, a publishing gotcha), look it up with ${TOOL.guide} instead of guessing: topics stack, pre-ship, manifest, classes, taste, access-policy, table.
 - If the user gave you an existing page, it is already in the files: read what you need and edit it. Do not start over unless asked.
 `;
 
 let cached: string | null = null;
 
-/** The build agent's system prompt: the agent contract + what pages can do + design standards + the SDK reference. */
-export function buildAgentSystemPrompt(env: Env): string {
+/** The build agent's system prompt: the agent contract + what pages can do + design standards + the SDK reference, then the workspace's own brand and house style. */
+export function buildAgentSystemPrompt(env: Env, brief?: WorkspaceBrief | null): string {
   if (!cached) cached = rewriteSkillOrigin(`${AGENT_CONTRACT}${CAPABILITIES_PROMPT}${DESIGN_SYSTEM_PROMPT}\n${SDK_REFERENCE}`, env);
-  return cached;
+  return `${cached}${workspaceBriefSection(brief ?? null)}`;
 }

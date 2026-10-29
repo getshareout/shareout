@@ -46,8 +46,10 @@ de eso. Los ids de modelo viven en `src/data/agent/models.ts`.
 
 ## Agente de build (opcional)
 
-Con `BUILD_AGENT=on`, los builds de páginas con IA corren como un agente con herramientas
-en vez de una sola respuesta larga. Escribe la página como archivos en pasos chicos,
+Activá **Page build agent** en Admin → Features (por workspace, o para toda la instancia)
+y los builds de páginas con IA corren como un agente con herramientas en vez de una sola
+respuesta larga. `BUILD_AGENT=on` lo fuerza en todos los workspaces; `BUILD_AGENT=off` es un
+interruptor de emergencia que gana sobre el flag. Escribe la página como archivos en pasos chicos,
 revisa su propio trabajo (sintaxis de JavaScript, manifiesto, archivos faltantes, tablas
 sin declarar, reglas de publicación de ShareOut), corrige lo que encuentra y recién ahí
 publica. Con un binding `BROWSER` también prueba la página publicada y corrige hasta dos
@@ -56,6 +58,12 @@ una página que pase, no se anuncia nada como terminado: se le avisa al usuario 
 alertas por Telegram configuradas, al operador. Apagado por defecto. Funciona en todas las
 rutas de arriba; en Anthropic directo usa además compactación del lado del servidor,
 edición de contexto y presupuesto de tarea.
+
+Todos los builds de páginas con IA (con agente o sin él) razonan con `BUILD_EFFORT` (`low`,
+`medium` o `high`; por defecto `medium`), usan el modelo elegido para el workspace (luego el
+de la instancia, luego `BUILD_MODEL`) y reciben el color de marca, el logo, el idioma y el
+archivo de contexto de estilo del workspace. El agente también puede consultar la guía de
+artefactos de ShareOut mientras construye.
 
 ## Configurarlo
 

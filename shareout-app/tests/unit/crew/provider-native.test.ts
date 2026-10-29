@@ -137,3 +137,37 @@ describe('Anthropic-native harness (direct route only)', () => {
     expect((fetchMock.mock.calls[2][1] as RequestInit).headers).not.toHaveProperty('anthropic-beta');
   });
 });
+
+describe('reasoning effort per turn', () => {
+  it('Anthropic: effort rides next to the task budget in one output_config', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(sse([]));
+    await collect(new AnthropicCrewProvider(anthropic, env).streamTurn({ ...args, native, effort: 'medium' }));
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.output_config).toEqual({ effort: 'medium', task_budget: { type: 'tokens', total: 120_000 } });
+    expect(body.thinking).toEqual({ type: 'between_tools' });
+  });
+
+  it('Anthropic: effort survives the retry without the beta features', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('no', { status: 400 }))
+      .mockResolvedValueOnce(sse([]));
+    await collect(new AnthropicCrewProvider(anthropic, env).streamTurn({ ...args, native, effort: 'high' }));
+    const retry = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
+    expect(retry.output_config).toEqual({ effort: 'high' });
+  });
+
+  it('Anthropic: no effort, no output_config (chat and crew are unchanged)', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(sse([]));
+    await collect(new AnthropicCrewProvider(anthropic, env).streamTurn(args));
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string).output_config).toBeUndefined();
+  });
+
+  it('gateway: a build turn asks for its effort, any other turn for low', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(sse([]));
+    await collect(new OpenAICompatCrewProvider(gateway, env).streamTurn({ ...args, effort: 'medium' }));
+    await collect(new OpenAICompatCrewProvider(gateway, env).streamTurn(args));
+    const [a, b] = fetchMock.mock.calls.map((c) => JSON.parse((c[1] as RequestInit).body as string));
+    expect(a.reasoning).toEqual({ effort: 'medium' });
+    expect(b.reasoning).toEqual({ effort: 'low' });
+  });
+});

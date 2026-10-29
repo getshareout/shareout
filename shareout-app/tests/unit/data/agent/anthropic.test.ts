@@ -235,6 +235,36 @@ describe('getAIProviderChain', () => {
   });
 });
 
+describe('streamChat reasoning effort', () => {
+  const body = (env: Env, effort?: 'low' | 'medium' | 'high') => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(openAIStreamBody(['x'], { prompt_tokens: 1, completion_tokens: 1 }), { status: 200 }));
+    return (async () => {
+      for await (const _ of streamChat(env, METER, [{ role: 'user', content: 'Hi' }], 'sys', '', 100, null, effort ? { effort } : {})) { /* drain */ }
+      return JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    })();
+  };
+
+  it('gateway: chat keeps low, a build asks for its effort', async () => {
+    expect((await body(gatewayEnv())).reasoning).toEqual({ effort: 'low' });
+    vi.restoreAllMocks();
+    expect((await body(gatewayEnv(), 'medium')).reasoning).toEqual({ effort: 'medium' });
+  });
+
+  it('direct Anthropic: nothing for chat, output_config.effort next to between_tools thinking for a build', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(anthropicStreamBody(['x'], { input_tokens: 1, output_tokens: 1 }), { status: 200 }));
+    const run = async (effort?: 'high') => {
+      fetchMock.mockClear();
+      for await (const _ of streamChat(anthropicEnv(), METER, [{ role: 'user', content: 'Hi' }], 'sys', '', 100, null, effort ? { effort } : {})) { /* drain */ }
+      return JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    };
+    const chat = await run();
+    expect(chat.output_config).toBeUndefined();
+    const build = await run('high');
+    expect(build.output_config).toEqual({ effort: 'high' });
+    expect(build.thinking).toEqual({ type: 'between_tools' });
+  });
+});
+
 describe('getBuildConfig', () => {
   it('routes the gateway to the default gateway model', () => {
     expect(getBuildConfig(gatewayEnv())?.model).toBe('anthropic/claude-sonnet-5.5');

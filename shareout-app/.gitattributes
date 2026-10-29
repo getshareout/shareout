@@ -27,3 +27,4 @@ src/discovery/openapi.*.json merge=generated linguist-generated=true
 src/discovery/*.generated.ts merge=generated
 src/official-skills/*.generated.ts merge=generated
 src/data/agent/sdk-reference.generated.ts merge=generated
+src/build-agent/guide.generated.ts merge=generated

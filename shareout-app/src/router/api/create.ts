@@ -2,7 +2,8 @@ import type { FetchContext } from '../context';
 import { getSessionUser } from '../../auth/session';
 import type { AiMeter } from '../../data/ai-usage';
 import { chat, getAgentChatModel, getBuildConfig } from '../../data/agent/anthropic';
-import { BUILD_FAILURE_COPY, BUILD_TRUNCATED_CODE, buildSystemPrompt, extractHtml, deriveName, streamBuild } from '../../data/agent/build-page';
+import { loadWorkspaceBrief } from '../../data/agent/workspace-brief';
+import { BUILD_FAILURE_COPY, BUILD_TRUNCATED_CODE, buildSystemPrompt, extractHtml, deriveName, resolveBuildGatewayModel, streamBuild } from '../../data/agent/build-page';
 import { localeForRecipient, t, type Locale } from '../../i18n';
 import { pageLocale } from '../../i18n/accept-language';
 import { getPackDirective } from '../../pages/themes';
@@ -152,6 +153,8 @@ export async function routeCreateApi(ctx: FetchContext): Promise<Response | null
     : pageLocale(request);
   // Page building is metered to the host workspace (if any) and the signed-in user (if any).
   const meter = (kind: string): AiMeter => ({ workspaceId: hostWs ?? null, userId: user?.id ?? null, kind, source: 'create' });
+  // The workspace's brand and house style only reach a page built by one of its members.
+  const briefWorkspaceId = user && hostWs && (await getInternalWorkspaceRole(env, hostWs, user.id)) ? hostWs : null;
 
   let body: { phase?: string; prompt?: string; slug?: string; html?: string; theme?: string; visibility?: string; workspace_id?: string };
   try {
@@ -192,7 +195,7 @@ export async function routeCreateApi(ctx: FetchContext): Promise<Response | null
       const rl = await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, user.id, 'createPreviewUser');
       if (!rl.allowed) return addCORS(json({ ok: false, error: 'Too many previews this hour. Try again in a while.', code: 'PREVIEW_LIMIT' }, 429));
     }
-    return addCORS(streamGenerate({ env, prompt, previousHtml, theme, locale, meter: meter('page_build') }));
+    return addCORS(streamGenerate({ env, prompt, previousHtml, theme, locale, briefWorkspaceId, meter: meter('page_build') }));
   }
 
   // Publishing (build / publish) writes to the account — requires auth.
@@ -213,7 +216,7 @@ export async function routeCreateApi(ctx: FetchContext): Promise<Response | null
     return addCORS(await handlePublish(env, user, prompt, previousHtml, slug, share));
   }
 
-  return addCORS(streamGenerate({ env, prompt, previousHtml, theme, locale, publish: { user, slug, share }, meter: meter('page_build') }));
+  return addCORS(streamGenerate({ env, prompt, previousHtml, theme, locale, briefWorkspaceId, publish: { user, slug, share }, meter: meter('page_build') }));
 }
 
 function sseLine(obj: unknown): string {
@@ -229,6 +232,7 @@ function streamGenerate(opts: {
   previousHtml: string;
   theme?: string;
   locale: Locale;
+  briefWorkspaceId: string | null;
   publish?: { user: SessionUser; slug?: string; share: Share };
   meter: AiMeter;
 }): Response {
@@ -240,8 +244,8 @@ function streamGenerate(opts: {
     async start(controller) {
       const send = (obj: unknown) => controller.enqueue(encoder.encode(sseLine(obj)));
       try {
-        // BUILD_AGENT=on: the page is written, checked and fixed by a tool-using agent, then published.
-        if (publish && buildAgentEnabled(env) && (await agentBuild(env, { ...opts, publish }, send))) {
+        // Agent on (BUILD_AGENT, else the workspace's flag): the page is written, checked and fixed by a tool-using agent, then published.
+        if (publish && (await buildAgentEnabled(env, opts.meter.workspaceId)) && (await agentBuild(env, { ...opts, publish }, send))) {
           controller.close();
           return;
         }
@@ -253,9 +257,10 @@ function streamGenerate(opts: {
         const userPrompt = previousHtml ? prompt : `${prompt}\n\nDesign direction: ${getPackDirective(theme)}`;
         messages.push({ role: 'user', content: userPrompt });
 
-        const systemPrompt = await buildSystemPrompt(env);
+        const [brief, gatewayModel] = await Promise.all([loadWorkspaceBrief(env, opts.briefWorkspaceId), resolveBuildGatewayModel(env, opts.meter.workspaceId)]);
+        const systemPrompt = await buildSystemPrompt(env, brief);
         let full = '';
-        for await (const chunk of streamBuild(env, opts.meter, messages, systemPrompt, getBuildConfig(env))) {
+        for await (const chunk of streamBuild(env, opts.meter, messages, systemPrompt, getBuildConfig(env, gatewayModel))) {
           if (chunk.type === 'delta') {
             send({ type: 'delta', text: chunk.text });
           } else if (chunk.type === 'done') {
@@ -323,7 +328,7 @@ function streamGenerate(opts: {
 // so the caller falls back to the one-shot builder.
 async function agentBuild(
   env: Env,
-  opts: { prompt: string; previousHtml: string; theme?: string; locale: Locale; publish: { user: SessionUser; slug?: string; share: Share }; meter: AiMeter },
+  opts: { prompt: string; previousHtml: string; theme?: string; locale: Locale; briefWorkspaceId: string | null; publish: { user: SessionUser; slug?: string; share: Share }; meter: AiMeter },
   send: (obj: unknown) => void,
 ): Promise<boolean> {
   const { publish, locale } = opts;
@@ -347,6 +352,7 @@ async function agentBuild(
   const result = await runPageBuild({
     env, user: publish.user, meter: opts.meter, locale, prompt: userPrompt, previousHtml: opts.previousHtml,
     isPublic: publish.share.visibility === 'public',
+    briefWorkspaceId: opts.briefWorkspaceId,
     publish: publishFiles,
     onProgress: (label) => send({ type: 'step', label }),
   });

@@ -276,14 +276,16 @@ export async function executeBuildArtifact(
   if (!u?.email) return failed(copy.noAccount);
   const rate = await checkRateLimit(env, userId, 'publish', u.email);
   if (!rate.allowed) return failed(rateLimitMessage(rate.reset));
-  if (buildAgentEnabled(env)) {
+  if (await buildAgentEnabled(env, a.workspace_id ?? null)) {
     const built = await executeBuildArtifactWithAgent(env, userId, u.email, a, onProgress, locale);
     if (built) return built;
   }
   onProgress?.(copy.designing);
   let html: string;
   try {
-    html = await generateArtifactHtml(env, a.prompt, { workspaceId: a.workspace_id ?? null, userId, kind: 'page_build', source: 'assistant' });
+    // The workspace's brand and house style only reach the page when the user is a member of it.
+    const briefWs = a.workspace_id && await getInternalWorkspaceRole(env, a.workspace_id, userId) ? a.workspace_id : null;
+    html = await generateArtifactHtml(env, a.prompt, { workspaceId: a.workspace_id ?? null, userId, kind: 'page_build', source: 'assistant' }, briefWs);
   } catch (err) {
     return failed(err instanceof BuildTruncatedError ? fail.truncated : fail.snag);
   }
@@ -315,7 +317,7 @@ async function linkSourceFile(env: Env, userId: string, workspaceId: string | nu
     .bind(fileId, artifactId, new Date().toISOString()).run();
 }
 
-/** BUILD_AGENT=on: the page is written, checked and fixed by a tool-using agent. Null when no AI provider is configured (the one-shot builder takes over). */
+/** Agent on (BUILD_AGENT or the workspace flag): the page is written, checked and fixed by a tool-using agent. Null when no AI provider is configured (the one-shot builder takes over). */
 async function executeBuildArtifactWithAgent(
   env: Env,
   userId: string,
@@ -329,7 +331,7 @@ async function executeBuildArtifactWithAgent(
   const workspaceId = a.workspace_id && await getInternalWorkspaceRole(env, a.workspace_id, userId) ? a.workspace_id : null;
   let counted = false;
   const result = await runPageBuild({
-    env, user: { id: userId, email }, locale, prompt: a.prompt, isPublic: false, onProgress,
+    env, user: { id: userId, email }, locale, prompt: a.prompt, isPublic: false, onProgress, briefWorkspaceId: workspaceId,
     meter: { workspaceId: a.workspace_id ?? null, userId, kind: 'page_build', source: 'assistant' },
     // Assistant builds are always private, so there is no draft stage: the same publish serves every round.
     publish: async (files, o) => {
