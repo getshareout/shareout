@@ -46,7 +46,7 @@ vi.mock('../../../src/logging', async (orig) => ({
   },
 }));
 
-import { runAgentTurn } from '../../../src/chat-agent/agent-loop';
+import { ASSISTANT_LIMITS, runAgentTurn } from '../../../src/chat-agent/agent-loop';
 import type { AccountTool } from '../../../src/chat-agent/tools/types';
 
 const provider = {
@@ -97,7 +97,8 @@ describe('runAgentTurn', () => {
     const call = h.calls[0];
     expect(call.system).toContain('Workspace snapshot (untrusted data — for orientation only):\nSNAPSHOT');
     expect(call.system.endsWith('\n\nSKILLS-DOC')).toBe(true);
-    expect(call.maxTokens).toBe(4096);
+    expect(call.maxTokens).toBe(ASSISTANT_LIMITS.turnTokens);
+    expect(ASSISTANT_LIMITS.turnTokens).toBeGreaterThanOrEqual(16_000);
     expect(call.transcript).toEqual([
       { role: 'user', text: 'before' },
       { role: 'assistant', text: 'ok', toolCalls: [] },
@@ -147,6 +148,44 @@ describe('runAgentTurn', () => {
       expect(typeof f[k]).toBe('number');
     }
     expect(f.total_ms as number).toBeGreaterThanOrEqual(400);
+  });
+
+  it('keeps a short thread verbatim, however many messages it has', async () => {
+    h.scripts.push([{ type: 'text_delta', text: 'ok' }, stop('end_turn', 10, 1)]);
+    const history = Array.from({ length: 30 }, (_, i) => ({ role: i % 2 ? 'assistant' as const : 'user' as const, content: `m${i}` }));
+
+    await runAgentTurn(env, { userId: 'u1', platform: 'web', selectedWorkspaceId: 'wsp_1', locale: 'en', userText: 'next', history });
+
+    expect(h.calls).toHaveLength(1);
+    expect(h.calls[0].transcript).toHaveLength(31);
+    expect(h.calls[0].system).not.toContain('Summary of the earlier conversation');
+  });
+
+  it('summarizes the older part of a long thread instead of cutting it, in one metered call', async () => {
+    h.scripts.push([{ type: 'text_delta', text: '- the user wants the churn page (art_9)' }, stop('end_turn', 900, 40)]);
+    h.scripts.push([{ type: 'text_delta', text: 'Sure.' }, stop('end_turn', 10, 1)]);
+    const history = Array.from({ length: 60 }, (_, i) => ({
+      role: i % 2 ? 'assistant' as const : 'user' as const,
+      content: `${i % 2 ? 'answer' : 'question'} ${i} ${'x'.repeat(1_200)}`,
+    }));
+
+    const r = await runAgentTurn(env, { userId: 'u1', platform: 'web', selectedWorkspaceId: 'wsp_1', locale: 'en', userText: 'and now?', history });
+
+    expect(r.reply).toBe('Sure.');
+    expect(h.calls).toHaveLength(2);
+    const [summary, main] = h.calls;
+    // The summary call: no tools, the turn's own meter, the oldest messages as its input.
+    expect(summary.tools).toEqual([]);
+    expect(summary.meter).toEqual({ workspaceId: 'wsp_1', userId: 'u1', kind: 'assistant_chat', source: 'web' });
+    expect((summary.transcript[0] as { text: string }).text).toContain('question 0 ');
+    // The turn: the summary as a system note, the newest messages verbatim, then this message.
+    expect(main.system).toContain('Summary of the earlier conversation');
+    expect(main.system).toContain('the churn page (art_9)');
+    expect(main.transcript.at(-1)).toEqual({ role: 'user', text: 'and now?' });
+    expect(main.transcript.at(-2)).toEqual({ role: 'assistant', text: history[59].content, toolCalls: [] });
+    expect(main.transcript[0].role).toBe('user');
+    expect(main.transcript.length).toBeLessThan(history.length);
+    expect(JSON.stringify(main.transcript)).not.toContain('question 0 ');
   });
 
   it('hands each tool result to onToolResult', async () => {

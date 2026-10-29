@@ -23,7 +23,8 @@ const handleRemoveCollaborator = vi.hoisted(() => vi.fn());
 const handleUpdateArtifact = vi.hoisted(() => vi.fn());
 const emailNewCollaborators = vi.hoisted(() => vi.fn());
 
-vi.mock('../../../src/data/agent/headless-edit', () => ({ proposeEdit, publishEdits }));
+// proposeEditInPieces → null: the piecewise editor does not apply, so edit_page uses the one-shot editor.
+vi.mock('../../../src/data/agent/headless-edit', () => ({ proposeEdit, publishEdits, proposeEditInPieces: async () => null }));
 vi.mock('../../../src/data/tables/bot', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   botInsertRows,
