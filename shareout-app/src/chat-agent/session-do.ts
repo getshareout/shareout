@@ -5,6 +5,7 @@ import { createSlackReplyPort } from '../chat-platforms/slack/reply-port';
 import { parseSlackSessionKey } from '../chat-platforms/slack/linking';
 import { resolveAgentScope } from './scope';
 import { runAgentTurn } from './agent-loop';
+import { HISTORY_WINDOW } from './history';
 import { agentFallbackReplies } from './replies';
 import { executeAction, describeAction } from './actions';
 import { DoConversationStore } from './store/do-store';
@@ -58,8 +59,6 @@ const SCHEMA = [
      created_at INTEGER NOT NULL
    )`,
 ];
-
-const HISTORY_LIMIT = 20;
 
 export interface SessionTurnBody {
   platform: PlatformId;
@@ -184,7 +183,7 @@ export class ChatSessionDO implements DurableObject {
     }
 
     const [history, workspaceContext] = await Promise.all([
-      this.store.loadHistory(HISTORY_LIMIT),
+      this.store.loadHistory(HISTORY_WINDOW),
       workspaceSnapshot(this.env, b.userId, b.selectedWorkspaceId),
     ]);
 

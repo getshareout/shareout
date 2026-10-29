@@ -65,7 +65,7 @@ vi.mock('../../../src/logging', async (orig) => {
   return { ...actual, createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: h.logError }) };
 });
 
-import { runAgentTurn, NO_PROVIDER_ADMIN_REPLY, NO_PROVIDER_MEMBER_REPLY } from '../../../src/chat-agent/agent-loop';
+import { runAgentTurn, ASSISTANT_LIMITS, NO_PROVIDER_ADMIN_REPLY, NO_PROVIDER_MEMBER_REPLY } from '../../../src/chat-agent/agent-loop';
 import type { AccountTool } from '../../../src/chat-agent/tools/index';
 import type { ChatReplyPort } from '../../../src/chat-platforms/types';
 
@@ -246,7 +246,7 @@ describe('runAgentTurn memory and budgets', () => {
   });
 
   it('wraps up with a tool-less answer when it runs out of steps', async () => {
-    h.script = Array.from({ length: 12 }, (_, i) => [call(`t${i}`, 'echo_tool'), stop('tool_use')]);
+    h.script = Array.from({ length: ASSISTANT_LIMITS.maxTurns }, (_, i) => [call(`t${i}`, 'echo_tool'), stop('tool_use')]);
     h.script.push([{ type: 'text_delta', text: 'Here is what I found so far.' }, stop('end_turn')]);
 
     const res = await runAgentTurn({} as Env, { ...input('dig'), extraTools: [echoTool] });

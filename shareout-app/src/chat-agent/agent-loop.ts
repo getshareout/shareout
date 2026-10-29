@@ -1,5 +1,8 @@
 import type { Env } from '../types';
-import { crewProviderFor, getCrewProvider, type NeutralTurn, type NeutralToolCall, type ProviderTool } from '../crew/provider';
+import { crewProviderFor, getCrewProvider, type NativeHarness, type NeutralTurn, type ProviderTool } from '../crew/provider';
+import { callModel, newStats, runEngine, type EngineLimits, type ToolStep } from '../agent-runtime/engine';
+import { foldHistory } from '../agent-runtime/history';
+import { ASSISTANT_HISTORY, historyTurns, summaryNote } from './history';
 import { resolveWorkspaceAi } from '../data/agent/ai-config';
 import type { ChatReplyPort, PlatformId, WorkspaceSelection } from '../chat-platforms/types';
 import { PERSONAL_SCOPE } from '../chat-platforms/types';
@@ -46,7 +49,7 @@ export interface TurnInput {
   selectedWorkspaceId?: WorkspaceSelection;
   /** The selection already verified by the caller (resolveAgentScope); re-checked here when absent or stale. */
   scope?: AgentScope;
-  /** Prior conversation, oldest first (already bounded by the caller). */
+  /** Prior conversation, oldest first: up to HISTORY_WINDOW messages. Past the history budget the older part is summarized. */
   history: ChatMessage[];
   /** Optional pre-built context (e.g. a workspace snapshot) appended to the system prompt. */
   workspaceContext?: string;
@@ -64,10 +67,23 @@ export interface TurnInput {
   onToolResult?: (name: string, input: Record<string, unknown>, output: unknown) => void;
 }
 
-const MAX_ITERATIONS = 12;
-const TURN_DEADLINE_MS = 60_000;
-const MAX_TOKENS = 4096;
-const MAX_TOOL_RESULT_CHARS = 12_000;
+/**
+ * One assistant turn's budget. Web turns stream (SSE) and bot turns run in their session's
+ * Durable Object, so neither is bound by a request timeout; the deadline is how long a person
+ * waits before the assistant wraps up with what it found.
+ */
+export const ASSISTANT_LIMITS: EngineLimits = {
+  maxTurns: 24,
+  wallMs: 150_000,
+  maxOutputTokens: 64_000,
+  turnTokens: 16_000,
+};
+/** Direct Anthropic: the server compacts a long turn and clears old tool results. */
+const ASSISTANT_NATIVE: NativeHarness = {
+  compactAtTokens: 80_000,
+  clearToolUses: { triggerTokens: 50_000, keep: 6 },
+};
+const MAX_TOOL_RESULT_CHARS = 16_000;
 const NOTE_RESULT_CHARS = 300;
 const MAX_NOTES_CHARS = 2_000;
 const WRAP_UP_PROMPT = 'You are out of steps for this turn. Answer now with what you found so far, and say briefly what is still missing. Do not call tools.';
@@ -239,30 +255,22 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
     const closed = Object.keys(TOOLKITS).filter((k) => !openKits.has(k) && TOOLKITS[k].tools.some((n) => available.has(n)));
     return closed.length ? [...visible, openToolkitTool(closed, available)] : visible;
   };
-  const system = systemPrompt(platform, caps, input.selectedWorkspaceId, input.workspaceContext, locale)
+  const baseSystem = systemPrompt(platform, caps, input.selectedWorkspaceId, input.workspaceContext, locale)
     + (agentSkillsDoc ? '\n\n' + agentSkillsDoc : '');
 
-  const transcript: NeutralTurn[] = [];
-  let priorNotes = '';
-  for (const m of input.history) {
-    if (m.role === 'notes') priorNotes = m.content;
-    else if (m.role === 'user') transcript.push({ role: 'user', text: m.content });
-    else {
-      const text = priorNotes ? `${m.content}\n\nTool notes:\n${priorNotes}` : m.content;
-      transcript.push({ role: 'assistant', text, toolCalls: [] });
-      priorNotes = '';
-    }
+  const meter = { workspaceId: selectedWs, userId: input.userId, kind: input.usageKind ?? 'assistant_chat', source: platform };
+  const historyAt = Date.now();
+  const history = await foldHistory({ provider, meter, turns: historyTurns(input.history), budget: ASSISTANT_HISTORY });
+  if (history.failed) {
+    createLogger(env, { scope: 'chat-agent' }).warn('history summary failed; older messages dropped', { platform, folded: history.folded, error: history.failed });
   }
-  transcript.push({ role: 'user', text: input.userText });
+  const system = baseSystem + (history.summary ? `\n\n${summaryNote(history.summary, history.folded)}` : '');
+  const historyMs = Date.now() - historyAt;
+  const transcript: NeutralTurn[] = [...history.recent, { role: 'user', text: input.userText }];
 
-  const deadline = Date.now() + TURN_DEADLINE_MS;
+  const stats = newStats();
   const notes: string[] = [];
   const toolsUsed: string[] = [];
-  let iterations = 0;
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let firstTokenMs: number | null = null;
-  let llmMs = 0;
   let toolsMs = 0;
 
   const finish = async (r: TurnResult): Promise<TurnResult> => {
@@ -271,11 +279,12 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
       platform,
       provider: provider.provider,
       model: provider.model,
-      iterations,
+      iterations: stats.calls,
       tools: toolsUsed.join(','),
       ms: Date.now() - started,
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
+      input_tokens: stats.inputTokens,
+      output_tokens: stats.outputTokens,
+      history_folded: history.folded,
       proposal: r.proposal?.kind ?? null,
     });
     createLogger(env, { scope: 'chat.timing' }).info('agent turn timing', {
@@ -284,10 +293,11 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
       ...input.timing,
       workspace_ms: wsAt - started,
       setup_ms: setupAt - wsAt,
-      ttft_ms: firstTokenMs,
-      llm_ms: llmMs,
+      history_ms: historyMs,
+      ttft_ms: stats.firstTokenMs,
+      llm_ms: stats.llmMs,
       tools_ms: toolsMs,
-      rounds: iterations,
+      rounds: stats.calls,
       tools: toolsUsed.length,
       system_chars: system.length,
       total_ms: totalMs + (input.timing ? Object.values(input.timing).reduce((a, b) => a + b, 0) : 0),
@@ -297,98 +307,74 @@ export async function runAgentTurn(env: Env, input: TurnInput): Promise<TurnResu
     return toolNotes ? { ...r, toolNotes } : r;
   };
 
-  const callModel = async (callTools: ProviderTool[]) => {
-    iterations++;
-    const callAt = Date.now();
-    let text = '';
-    const toolCalls: NeutralToolCall[] = [];
-    let stopReason = 'end_turn';
-    let errored = false;
-    for await (const ev of provider.streamTurn({ system, transcript, tools: callTools, maxTokens: MAX_TOKENS, meter: { workspaceId: selectedWs, userId: input.userId, kind: input.usageKind ?? 'assistant_chat', source: platform } })) {
-      if (firstTokenMs === null && ev.type !== 'error') firstTokenMs = Date.now() - callAt;
-      if (ev.type === 'text_delta') { text += ev.text; await input.reply?.sendTextDelta?.(ev.text); }
-      else if (ev.type === 'tool_use') toolCalls.push({ id: ev.id, name: ev.name, input: ev.input });
-      else if (ev.type === 'message_stop') {
-        stopReason = ev.stopReason;
-        inputTokens += ev.usage.inputTokens;
-        outputTokens += ev.usage.outputTokens;
-      }
-      else if (ev.type === 'error') errored = true;
+  const onTextDelta = async (text: string) => { await input.reply?.sendTextDelta?.(text); };
+
+  const runTool = async (tc: { id: string; name: string; input: Record<string, unknown> }, turnText: string): Promise<ToolStep<TurnResult>> => {
+    if (tc.name === OPEN_TOOLKIT) {
+      const asked = (Array.isArray(tc.input.toolkits) ? tc.input.toolkits : [])
+        .filter((k): k is string => typeof k === 'string' && k in TOOLKITS);
+      asked.forEach((k) => openKits.add(k));
+      const unlocked = asked.flatMap((k) => TOOLKITS[k].tools.filter((n) => available.has(n)));
+      return { content: JSON.stringify({ opened: asked, tools: unlocked }) };
     }
-    llmMs += Date.now() - callAt;
-    return { text, toolCalls, stopReason, errored };
+    const tool = toolMap.get(tc.name);
+    if (!tool) return { content: JSON.stringify({ error: `unknown tool ${tc.name}` }) };
+    // A model may call a tool it remembers without opening its toolkit — allow it.
+    const kit = toolkitOf(tc.name);
+    if (kit) openKits.add(kit);
+    toolsUsed.push(tc.name);
+    const toolAt = Date.now();
+    let content: string;
+    try {
+      await announceTool(input.reply, tc.name, tc.input, locale);
+      const out = await tool.execute({
+        env,
+        userId: input.userId,
+        chatId: input.chatId,
+        reply: input.reply,
+        platform,
+        selectedWorkspaceId: input.selectedWorkspaceId,
+        scope,
+      }, tc.input);
+      if (out && typeof out === 'object' && '__propose' in out) {
+        toolsMs += Date.now() - toolAt;
+        return { end: await finish({ reply: turnText, proposal: (out as { __propose: PendingAction }).__propose }) };
+      }
+      input.onToolResult?.(tc.name, tc.input, out);
+      content = JSON.stringify(out);
+    } catch (err) {
+      logAgentToolFailure(env, { tool: tc.name, userId: input.userId, platform }, err);
+      content = JSON.stringify({ error: userFacingAgentToolError(err) });
+    }
+    toolsMs += Date.now() - toolAt;
+    notes.push(`- ${tc.name} ${JSON.stringify(tc.input).slice(0, 200)} → ${content.slice(0, NOTE_RESULT_CHARS)}`);
+    return { content: truncate(content) };
   };
 
-  // Out of steps or time: one last tool-less call so the user gets what was found, not a canned line.
-  const wrapUp = async (): Promise<TurnResult> => {
-    transcript.push({ role: 'user', text: WRAP_UP_PROMPT });
-    const r = await callModel([]);
-    return finish({ reply: !r.errored && r.text ? r.text : replies.gaveUp });
-  };
+  const run = await runEngine<TurnResult>({
+    provider,
+    meter,
+    system,
+    transcript,
+    tools: providerTools,
+    limits: ASSISTANT_LIMITS,
+    native: ASSISTANT_NATIVE,
+    stats,
+    onTextDelta,
+    runTool: (call, turn) => runTool(call, turn.text),
+    onStop: async (turn) => ({ end: await finish({ reply: turn.text || replies.empty }) }),
+    cutOff: {
+      invalidCall: () => JSON.stringify({ error: 'Arguments were not valid JSON (the reply may have been cut off). Call the tool again with valid, shorter JSON arguments.' }),
+      note: '\n(Your last reply hit the length limit: keep each tool call smaller.)',
+    },
+  });
+  if (run.kind === 'end') return run.result;
+  if (run.kind === 'error') return finish({ reply: replies.errored });
 
-  for (let i = 0; i < MAX_ITERATIONS; i++) {
-    if (Date.now() > deadline) return wrapUp();
-
-    const { text, toolCalls, stopReason, errored } = await callModel(providerTools());
-
-    if (errored) return finish({ reply: replies.errored });
-
-    transcript.push({ role: 'assistant', text, toolCalls });
-
-    if (stopReason !== 'tool_use' || toolCalls.length === 0) {
-      return finish({ reply: text || replies.empty });
-    }
-
-    const toolsAt = Date.now();
-    const results: Array<{ id: string; content: string }> = [];
-    for (const tc of toolCalls) {
-      if (tc.name === OPEN_TOOLKIT) {
-        const asked = (Array.isArray(tc.input.toolkits) ? tc.input.toolkits : [])
-          .filter((k): k is string => typeof k === 'string' && k in TOOLKITS);
-        asked.forEach((k) => openKits.add(k));
-        const unlocked = asked.flatMap((k) => TOOLKITS[k].tools.filter((n) => available.has(n)));
-        results.push({ id: tc.id, content: JSON.stringify({ opened: asked, tools: unlocked }) });
-        continue;
-      }
-      const tool = toolMap.get(tc.name);
-      let content: string;
-      if (!tool) {
-        content = JSON.stringify({ error: `unknown tool ${tc.name}` });
-      } else if ('__invalid_json' in tc.input) {
-        content = JSON.stringify({ error: 'Arguments were not valid JSON. Call the tool again with valid JSON arguments.' });
-      } else {
-        // A model may call a tool it remembers without opening its toolkit — allow it.
-        const kit = toolkitOf(tc.name);
-        if (kit) openKits.add(kit);
-        toolsUsed.push(tc.name);
-        await announceTool(input.reply, tc.name, tc.input, locale);
-        try {
-          const out = await tool.execute({
-            env,
-            userId: input.userId,
-            chatId: input.chatId,
-            reply: input.reply,
-            platform,
-            selectedWorkspaceId: input.selectedWorkspaceId,
-            scope,
-          }, tc.input);
-          if (out && typeof out === 'object' && '__propose' in out) {
-            toolsMs += Date.now() - toolsAt;
-            return finish({ reply: text, proposal: (out as { __propose: PendingAction }).__propose });
-          }
-          input.onToolResult?.(tc.name, tc.input, out);
-          content = JSON.stringify(out);
-        } catch (err) {
-          logAgentToolFailure(env, { tool: tc.name, userId: input.userId, platform }, err);
-          content = JSON.stringify({ error: userFacingAgentToolError(err) });
-        }
-        notes.push(`- ${tc.name} ${JSON.stringify(tc.input).slice(0, 200)} → ${content.slice(0, NOTE_RESULT_CHARS)}`);
-      }
-      results.push({ id: tc.id, content: truncate(content) });
-    }
-    toolsMs += Date.now() - toolsAt;
-    transcript.push({ role: 'tool', results });
-  }
-
-  return wrapUp();
+  // Out of steps, time or tokens: one last tool-less call so the user gets what was found, not a canned line.
+  const wrap = await callModel({
+    provider, meter, system, transcript: [...run.transcript, { role: 'user', text: WRAP_UP_PROMPT }], tools: [],
+    maxTokens: ASSISTANT_LIMITS.turnTokens, onTextDelta, stats,
+  });
+  return finish({ reply: !wrap.error && wrap.text ? wrap.text : replies.gaveUp });
 }
