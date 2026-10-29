@@ -5,6 +5,7 @@
  */
 import type { ProviderTool } from '../crew/provider';
 import type { EditError } from '../artifacts/apply-ops';
+import { guideMenu } from './guide';
 import { ENTRYPOINT, type FileResult, type PageFiles } from './page-files';
 
 export const TOOL = {
@@ -16,6 +17,7 @@ export const TOOL = {
   del: 'delete_file',
   check: 'check_page',
   publish: 'publish_page',
+  guide: 'read_guide',
 } as const;
 
 const str = (description: string) => ({ type: 'string', description });
@@ -59,6 +61,11 @@ export const BUILD_TOOLS: ProviderTool[] = [
     name: TOOL.publish,
     description: 'Publish the page. It re-runs the checks first and refuses while errors remain. Once published the page is opened and tested the way a visitor sees it; any problems found come back to you to fix with edit_file, then call publish_page again. You are done when this reports success.',
     input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: TOOL.guide,
+    description: `Read a page of ShareOut's own artifact guide when you need the exact rule (a manifest field, a class, a publishing gotcha) rather than guessing. Read-only. Long topics come in parts: pass part to read on. Topics:\n${guideMenu()}`,
+    input_schema: { type: 'object', properties: { topic: str('One of the topics listed'), part: { type: 'integer', description: 'Which part of a long topic, from 1' } }, required: ['topic'] },
   },
 ];
 

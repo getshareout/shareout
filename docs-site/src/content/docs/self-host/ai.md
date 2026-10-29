@@ -46,8 +46,10 @@ Anthropic direct, everything uses Claude Sonnet 5.5 (`claude-sonnet-5-5`); on Op
 
 ## Build agent (optional)
 
-Set `BUILD_AGENT=on` and AI page builds run as a tool-using agent instead of one long
-completion. It writes the page as files in small steps, checks its own work (JavaScript
+Turn on **Page build agent** under Admin → Features (per workspace, or for the whole
+instance) and AI page builds run as a tool-using agent instead of one long completion.
+`BUILD_AGENT=on` forces it for every workspace; `BUILD_AGENT=off` is a kill switch that
+wins over the flag. It writes the page as files in small steps, checks its own work (JavaScript
 syntax, manifest, missing files, undeclared tables, ShareOut's publishing rules), fixes
 what the check finds, and only then publishes. With a `BROWSER` binding it also tests the
 published page and fixes up to two rounds of problems; without one, it publishes after the
@@ -55,6 +57,11 @@ static check. If it still can't produce a passing page, nothing is announced as 
 user is told, and the operator gets an alert when Telegram alerts are configured. Default
 off. It works on every route above; on direct Anthropic it also uses server-side
 compaction, context editing and a task budget.
+
+All AI page builds (agent or not) think at `BUILD_EFFORT` (`low`, `medium` or `high`;
+default `medium`), use the workspace's model choice (then the instance's, then
+`BUILD_MODEL`), and are given the workspace's brand accent, logo, language and house-style
+context file. The agent can also look up ShareOut's artifact guide while it builds.
 
 ## Set it
 

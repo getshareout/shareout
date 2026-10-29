@@ -15,6 +15,9 @@ import type { Locale } from '../i18n';
 import { t } from '../i18n';
 import { AGENT_PROGRESS_COPY } from './copy';
 import { PageFiles } from './page-files';
+import { parseBuildEffort } from '../data/agent/models';
+import type { WorkspaceBrief } from '../data/agent/workspace-brief';
+import { readGuide } from './guide';
 import { buildAgentSystemPrompt } from './prompt';
 import { checkPage, errorsOf, formatIssues } from './static-check';
 import { BUILD_TOOLS, TOOL, runFileTool } from './tools';
@@ -78,6 +81,8 @@ export interface BuildAgentDeps {
   /** Test the published page. Absent when the instance has no browser: the page is then published once, on its static check. */
   verify?(page: PublishedPage): Promise<TestReport | null>;
   onProgress?(label: string): void;
+  /** The workspace's brand, language and house style, put in front of the model. */
+  brief?: WorkspaceBrief | null;
   limits?: Partial<BuildAgentLimits>;
 }
 
@@ -149,7 +154,7 @@ interface TurnOutcome {
 
 async function takeTurn(deps: BuildAgentDeps, system: string, transcript: NeutralTurn[], maxTokens: number): Promise<TurnOutcome> {
   const out: TurnOutcome = { text: '', toolCalls: [], stopReason: 'end_turn', outputTokens: 0 };
-  for await (const ev of deps.provider.streamTurn({ system, transcript, tools: BUILD_TOOLS, maxTokens, meter: deps.meter, native: NATIVE })) {
+  for await (const ev of deps.provider.streamTurn({ system, transcript, tools: BUILD_TOOLS, maxTokens, meter: deps.meter, native: NATIVE, effort: parseBuildEffort(deps.env.BUILD_EFFORT) })) {
     if (ev.type === 'text_delta') out.text += ev.text;
     else if (ev.type === 'compaction') out.compaction = ev.content;
     else if (ev.type === 'tool_use') out.toolCalls.push({ id: ev.id, name: ev.name, input: ev.input });
@@ -186,7 +191,7 @@ export async function runBuildAgent(deps: BuildAgentDeps, input: BuildAgentInput
   const limits = { ...DEFAULT_BUILD_LIMITS, ...deps.limits };
   const copy = t(deps.locale, AGENT_PROGRESS_COPY);
   const progress = (label: string) => deps.onProgress?.(label);
-  const system = buildAgentSystemPrompt(deps.env);
+  const system = buildAgentSystemPrompt(deps.env, deps.brief);
   const files = PageFiles.from(input.previousFiles ?? []);
   const startedAt = Date.now();
 
@@ -300,7 +305,7 @@ export async function runBuildAgent(deps: BuildAgentDeps, input: BuildAgentInput
           results.push({ id: call.id, content: 'Published.' });
         } else return res;
       } else {
-        const reply = runFileTool(files, call.name, call.input);
+        const reply = call.name === TOOL.guide ? readGuide(deps.env, call.input) : runFileTool(files, call.name, call.input);
         if (!reply) results.push({ id: call.id, content: `ERROR: unknown tool "${call.name}". Tools: ${BUILD_TOOLS.map((x) => x.name).join(', ')}.` });
         else {
           if (!reply.isError && reply.path) progress(call.name === TOOL.edit ? copy.editing(reply.path) : copy.writing(reply.path));

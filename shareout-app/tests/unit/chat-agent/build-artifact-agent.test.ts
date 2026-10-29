@@ -99,3 +99,32 @@ describe('executeBuildArtifact with BUILD_AGENT=on', () => {
     expect(generateArtifactHtml).toHaveBeenCalled();
   });
 });
+
+describe('the per-workspace agent flag on assistant builds', () => {
+  const withFlags = (flags: Record<string, string>) => env({
+    BUILD_AGENT: undefined,
+    DB: { prepare: (sql: string) => ({ bind: (id: string) => ({ first: async () => (sql.includes('feature_flags') ? (flags[id] ? { feature_flags: flags[id] } : null) : { email: 'me@example.com' }) }) }) },
+  } as unknown as Partial<Env>);
+
+  it('uses the agent for the action\'s workspace when its flag is on, and the one-shot builder elsewhere', async () => {
+    getCrewProvider.mockReturnValue(scriptedProvider([good, publish]).provider);
+    generateArtifactHtml.mockResolvedValue('<!doctype html><h1>A generated page</h1>');
+    publishGeneratedHtml.mockResolvedValue({ artifact: { id: 'a' }, deployment: { url: 'https://x/', slug: 'p' } });
+    const e = withFlags({ wsp_1: '{"ai.build_agent":true}' });
+    await executeBuildArtifact(e, 'u1', build);
+    expect(getCrewProvider).toHaveBeenCalledTimes(1);
+    expect(generateArtifactHtml).not.toHaveBeenCalled();
+    await executeBuildArtifact(e, 'u1', { ...build, workspace_id: 'wsp_2' });
+    expect(generateArtifactHtml).toHaveBeenCalledTimes(1);
+    expect(getCrewProvider).toHaveBeenCalledTimes(1);
+  });
+
+  it('BUILD_AGENT=off wins over the flag', async () => {
+    generateArtifactHtml.mockResolvedValue('<!doctype html><h1>A generated page</h1>');
+    publishGeneratedHtml.mockResolvedValue({ artifact: { id: 'a' }, deployment: { url: 'https://x/', slug: 'p' } });
+    const e = { ...withFlags({ wsp_1: '{"ai.build_agent":true}' }), BUILD_AGENT: 'off' } as Env;
+    await executeBuildArtifact(e, 'u1', build);
+    expect(getCrewProvider).not.toHaveBeenCalled();
+    expect(generateArtifactHtml).toHaveBeenCalled();
+  });
+});

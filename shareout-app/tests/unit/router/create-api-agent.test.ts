@@ -17,7 +17,8 @@ const incrementRateLimit = vi.hoisted(() => vi.fn());
 const checkStorageQuota = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../src/auth/session', async (importOriginal) => ({ ...(await importOriginal<object>()), getSessionUser }));
-vi.mock('../../../src/pages/home/host', () => ({ hostWorkspaceId: vi.fn(async () => null) }));
+const hostWorkspaceId = vi.hoisted(() => vi.fn(async (): Promise<string | null> => null));
+vi.mock('../../../src/pages/home/host', () => ({ hostWorkspaceId }));
 vi.mock('../../../src/pages/create-gate', () => ({ requireCreateEnabled: vi.fn(async () => null) }));
 vi.mock('../../../src/data/agent/anthropic', () => ({ chat: vi.fn(), streamChat, getAgentChatModel: vi.fn(() => 'm'), getBuildConfig: vi.fn(() => ({})) }));
 vi.mock('../../../src/rate-limit', () => ({ checkSlidingWindowRateLimit: vi.fn(async () => ({ allowed: true })), getClientIp: vi.fn(() => '1.2.3.4') }));
@@ -54,6 +55,7 @@ async function events(res: Response | null) {
 const published = (visibility = 'private') => ({ artifact: { id: 'art1' }, deployment: { url: 'https://shareout.site/a/s/', slug: 's' }, visibility });
 
 beforeEach(() => {
+  hostWorkspaceId.mockReset().mockResolvedValue(null);
   getSessionUser.mockReset().mockResolvedValue({ id: 'u1', email: 'a@x.com' });
   publishGeneratedFiles.mockReset().mockResolvedValue(published());
   publishGeneratedHtml.mockReset();
@@ -130,5 +132,39 @@ describe('/v1/create/generate build phase with BUILD_AGENT=on', () => {
     const evs = await events(await post({ BUILD_AGENT: 'on' }, { phase: 'preview', prompt: 'a page' }));
     expect(getCrewProvider).not.toHaveBeenCalled();
     expect(evs.at(-1)).toMatchObject({ type: 'done', mode: 'preview' });
+  });
+});
+
+describe('/v1/create/generate with the per-workspace agent flag', () => {
+  /** A DB where the build_agent flag is on for wsA only. */
+  const DB = {
+    prepare: (sql: string) => ({
+      bind: (id: string) => ({
+        first: async () => (sql.includes('feature_flags') ? (id === 'wsA' ? { feature_flags: '{"ai.build_agent":true}' } : null) : null),
+      }),
+    }),
+  } as unknown as Env['DB'];
+
+  it('runs the agent on the workspace that has the flag on', async () => {
+    hostWorkspaceId.mockResolvedValue('wsA');
+    getCrewProvider.mockReturnValue(scriptedProvider([good, publish]).provider);
+    const evs = await events(await post({ DB }, { phase: 'build', prompt: 'a page' }));
+    expect(getCrewProvider).toHaveBeenCalled();
+    expect(streamChat).not.toHaveBeenCalled();
+    expect(evs.at(-1)).toMatchObject({ type: 'done', mode: 'build' });
+  });
+
+  it('keeps the one-shot builder on a workspace without it', async () => {
+    hostWorkspaceId.mockResolvedValue('wsB');
+    await events(await post({ DB }, { phase: 'build', prompt: 'a page' }));
+    expect(getCrewProvider).not.toHaveBeenCalled();
+    expect(streamChat).toHaveBeenCalled();
+  });
+
+  it('BUILD_AGENT=off wins over the workspace flag', async () => {
+    hostWorkspaceId.mockResolvedValue('wsA');
+    await events(await post({ DB, BUILD_AGENT: 'off' }, { phase: 'build', prompt: 'a page' }));
+    expect(getCrewProvider).not.toHaveBeenCalled();
+    expect(streamChat).toHaveBeenCalled();
   });
 });

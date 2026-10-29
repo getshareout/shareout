@@ -12,6 +12,8 @@ vi.mock('../../../../src/data/agent/anthropic', async (importOriginal) => ({
   getBuildConfig: vi.fn(() => null),
 }));
 
+import { getBuildConfig } from '../../../../src/data/agent/anthropic';
+import { makeDbMock } from './helpers';
 import {
   BUILD_CONTINUATIONS, BUILD_TRUNCATED_CODE, BuildTruncatedError, generateArtifactHtml, streamBuild,
   type BuildChunk,
@@ -109,5 +111,40 @@ describe('generateArtifactHtml', () => {
   it('throws BuildTruncatedError when the page never finishes', async () => {
     for (let i = 0; i <= BUILD_CONTINUATIONS; i++) streamChat.mockImplementationOnce(turn('<!DOCTYPE html><html><body><p>more and more text', true));
     await expect(generateArtifactHtml(env, 'p', meter)).rejects.toBeInstanceOf(BuildTruncatedError);
+  });
+});
+
+describe('build effort and model', () => {
+  it('every streamBuild turn asks for BUILD_EFFORT (medium by default)', async () => {
+    streamChat.mockImplementation(turn('<!doctype html><html></html>', false));
+    await collect(streamBuild(env, meter, PROMPT, 'sys', null));
+    expect(streamChat.mock.calls[0][7]).toEqual({ effort: 'medium' });
+    streamChat.mockClear();
+    await collect(streamBuild({ ...env, BUILD_EFFORT: 'high' } as Env, meter, PROMPT, 'sys', null));
+    expect(streamChat.mock.calls[0][7]).toEqual({ effort: 'high' });
+  });
+});
+
+describe('generateArtifactHtml honours the workspace model', () => {
+  it('builds with the workspace\'s gateway model, else the instance default', async () => {
+    streamChat.mockImplementation(turn('<!doctype html><html></html>', false));
+    const db = (llm: string | null, instance: string | null) => makeDbMock({
+      first: (sql) => (sql.includes('workspace_llm_config') ? (llm ? { gateway_model: llm } : null) : sql.includes('instance_ai_settings') ? { default_gateway_model: instance } : null),
+    });
+    await generateArtifactHtml({ ...env, DB: db('anthropic/claude-opus-5', 'anthropic/claude-haiku-4.5') } as Env, 'p', { ...meter, workspaceId: 'wsA' });
+    expect(vi.mocked(getBuildConfig).mock.lastCall?.[1]).toBe('anthropic/claude-opus-5');
+    await generateArtifactHtml({ ...env, DB: db(null, 'anthropic/claude-haiku-4.5') } as Env, 'p', { ...meter, workspaceId: 'wsA' });
+    expect(vi.mocked(getBuildConfig).mock.lastCall?.[1]).toBe('anthropic/claude-haiku-4.5');
+    await generateArtifactHtml({ ...env, DB: db(null, null) } as Env, 'p', { ...meter, workspaceId: null });
+    expect(vi.mocked(getBuildConfig).mock.lastCall?.[1]).toBeNull();
+  });
+
+  it('puts the brief of the brief workspace in the system prompt', async () => {
+    streamChat.mockImplementation(turn('<!doctype html><html></html>', false));
+    const DB = makeDbMock({ first: (sql) => (sql.includes('FROM workspaces WHERE id') ? { branding: '{"accent_color":"#0156a4"}', locale: 'en' } : null) });
+    await generateArtifactHtml({ ...env, DB } as Env, 'p', { ...meter, workspaceId: 'wsA' }, 'wsA');
+    expect(streamChat.mock.lastCall?.[3]).toContain('--so-color-primary:#0156a4');
+    await generateArtifactHtml({ ...env, DB } as Env, 'p', { ...meter, workspaceId: 'wsA' }, null);
+    expect(streamChat.mock.lastCall?.[3]).not.toContain('#0156a4');
   });
 });
