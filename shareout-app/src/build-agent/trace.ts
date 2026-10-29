@@ -13,7 +13,7 @@ import { generateId } from '../crypto-utils';
 import { createLogger } from '../logging';
 import type { AiMeter } from '../data/ai-usage';
 import type { CrewProvider, NeutralToolCall, ProviderEvent, ProviderTurnArgs } from '../crew/provider';
-import { gatewayReasoningParams } from '../data/agent/models';
+import { anthropicEffortParams, gatewayReasoningParams, parseBuildEffort } from '../data/agent/models';
 import { TOOL } from './tools';
 
 export type BuildPath = 'agent' | 'one_shot';
@@ -91,7 +91,11 @@ export class BuildTrace {
   turn(info: { model: string | null; provider: string | null; stopReason: string; inputTokens: number; outputTokens: number }): void {
     this.turns++;
     this.model = info.model;
-    this.effort = info.provider === 'vercel-gateway' && info.model ? gatewayReasoningParams(info.model).reasoning?.effort ?? null : null;
+    // Builds send BUILD_EFFORT on the models that take one (both stacks send the same value).
+    const effort = parseBuildEffort(this.env.BUILD_EFFORT);
+    const sent = info.model && info.provider === 'vercel-gateway' ? gatewayReasoningParams(info.model, effort).reasoning?.effort
+      : info.model && info.provider === 'anthropic' ? anthropicEffortParams(info.model, effort).output_config?.effort : undefined;
+    this.effort = sent ?? null;
     this.inputTokens += info.inputTokens;
     this.outputTokens += info.outputTokens;
     this.push({ k: 'turn', n: this.turns, stop: info.stopReason, in: info.inputTokens, out: info.outputTokens });

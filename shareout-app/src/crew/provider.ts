@@ -4,7 +4,7 @@ import { workspaceBudgetBlock } from '../data/ai-budget';
 import { reportProviderBilling } from '../data/agent/ai-ops-alerts';
 import { getBuildChain, isEnvProvider, isProviderLevelStatus, providerHeaders, type AIConfig } from '../data/agent/anthropic';
 import { logCrewProviderFailure, userFacingCrewProviderError } from './errors';
-import { GATEWAY_CACHING_PARAMS, gatewayReasoningParams, thinkingOffParams } from '../data/agent/models';
+import { GATEWAY_CACHING_PARAMS, anthropicEffortParams, gatewayReasoningParams, thinkingOffParams, type ReasoningEffort } from '../data/agent/models';
 
 // Provider-neutral tool-calling turn. The run loop keeps a neutral transcript;
 // each provider serializes it to its own wire format: the OpenAI-compatible
@@ -52,6 +52,8 @@ export interface ProviderTurnArgs {
   /** Whom each model turn is metered to (ai_usage_events). */
   meter: AiMeter;
   native?: NativeHarness;
+  /** Reasoning effort for this turn (page builds). Unset: the gateway's lowest, nothing sent to Anthropic. */
+  effort?: ReasoningEffort;
 }
 
 export type ProviderEvent =
@@ -160,6 +162,12 @@ async function* requestTurn(
   return null;
 }
 
+/** Both the request's own output_config (effort) and the native harness's (task budget), as one field. */
+function mergedOutputConfig(plain: Record<string, unknown>, extra: Record<string, unknown>): { output_config?: Record<string, unknown> } {
+  if (!plain.output_config && !extra.output_config) return {};
+  return { output_config: { ...(plain.output_config as object | undefined), ...(extra.output_config as object | undefined) } };
+}
+
 export class OpenAICompatCrewProvider implements CrewProvider {
   readonly provider: string;
   readonly model: string;
@@ -209,7 +217,7 @@ export class OpenAICompatCrewProvider implements CrewProvider {
       max_tokens: args.maxTokens,
       messages: this.toWireMessages(args.system, args.transcript),
       ...(wireTools.length ? { tools: wireTools } : {}),
-      ...(this.provider === 'vercel-gateway' ? { ...gatewayReasoningParams(this.model), ...GATEWAY_CACHING_PARAMS } : {}),
+      ...(this.provider === 'vercel-gateway' ? { ...gatewayReasoningParams(this.model, args.effort), ...GATEWAY_CACHING_PARAMS } : {}),
       stream: true,
       stream_options: { include_usage: true },
     });
@@ -323,6 +331,7 @@ export class AnthropicCrewProvider implements CrewProvider {
     }
     if (edits.length) body.context_management = { edits };
     if (native.taskBudgetTokens) {
+      // Merged with `plain`'s output_config (effort) in streamTurn: the spread there would replace it.
       body.output_config = { task_budget: { type: 'tokens', total: Math.max(20_000, native.taskBudgetTokens) } };
       betas.push('task-budgets-2026-03-13');
     }
@@ -346,6 +355,7 @@ export class AnthropicCrewProvider implements CrewProvider {
           }
         : {}),
       ...thinkingOffParams(this.model),
+      ...(args.effort ? anthropicEffortParams(this.model, args.effort) : {}),
       cache_control: { type: 'ephemeral' },
       stream: true,
     };
@@ -354,7 +364,7 @@ export class AnthropicCrewProvider implements CrewProvider {
     // request rather than fail the build over an optimisation.
     const native = this.nativeOff ? null : this.nativeParts(args.native);
     let opened = native
-      ? await openTurn(this.env, this.cfg, url, { ...plain, ...native.body }, { 'anthropic-beta': native.betas.join(',') })
+      ? await openTurn(this.env, this.cfg, url, { ...plain, ...native.body, ...mergedOutputConfig(plain, native.body) }, { 'anthropic-beta': native.betas.join(',') })
       : await openTurn(this.env, this.cfg, url, plain);
     if (native && !('body' in opened) && opened.status === 400) {
       this.nativeOff = true;

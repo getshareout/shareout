@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { claudeModelById, gatewayReasoningParams, thinkingOffParams, temperatureParams } from '../../../../src/data/agent/models';
+import { anthropicEffortParams, claudeModelById, gatewayReasoningParams, parseBuildEffort, thinkingOffParams, temperatureParams } from '../../../../src/data/agent/models';
 
 describe('thinkingOffParams', () => {
   it('uses between_tools on Sonnet 5.5, which rejects disabled', () => {
@@ -23,6 +23,25 @@ describe('gatewayReasoningParams', () => {
   it('leaves other models alone', () => {
     expect(gatewayReasoningParams('anthropic/claude-haiku-4.5')).toEqual({});
     expect(gatewayReasoningParams('openai/gpt-4o')).toEqual({});
+  });
+});
+
+describe('build effort', () => {
+  it('lets the caller pick the gateway effort; the default stays low for chat and crew', () => {
+    expect(gatewayReasoningParams('anthropic/claude-sonnet-5.5', 'medium')).toEqual({ reasoning: { effort: 'medium' } });
+    expect(gatewayReasoningParams('anthropic/claude-opus-5', 'high')).toEqual({ reasoning: { effort: 'high' } });
+    expect(gatewayReasoningParams('openai/gpt-4o', 'high')).toEqual({});
+  });
+  it('sends output_config.effort on direct Anthropic Sonnet/Opus 5.x only', () => {
+    expect(anthropicEffortParams('claude-sonnet-5-5', 'medium')).toEqual({ output_config: { effort: 'medium' } });
+    expect(anthropicEffortParams('claude-opus-5', 'high')).toEqual({ output_config: { effort: 'high' } });
+    expect(anthropicEffortParams('claude-haiku-4-5-20251001', 'high')).toEqual({});
+  });
+  it('validates BUILD_EFFORT: low, medium, high, else medium', () => {
+    expect(parseBuildEffort('low')).toBe('low');
+    expect(parseBuildEffort(' HIGH ')).toBe('high');
+    expect(parseBuildEffort(undefined)).toBe('medium');
+    expect(parseBuildEffort('max')).toBe('medium');
   });
 });
 

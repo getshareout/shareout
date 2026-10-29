@@ -9,6 +9,9 @@ import { BUDGET_CODE, WorkspaceBudgetError } from '../ai-budget';
 import type { Env } from '../../types';
 import { SDK_REFERENCE } from './sdk-reference.generated';
 import { streamChat, getBuildConfig, type AIConfig } from './anthropic';
+import { parseBuildEffort } from './models';
+import { loadWorkspaceBrief, workspaceBriefSection, type WorkspaceBrief } from './workspace-brief';
+import { resolveGatewayModel } from './ai-config';
 import type { LocaleCopy } from '../../i18n';
 import { createLogger } from '../../logging';
 import { alertOps } from '../../support/alert';
@@ -94,7 +97,7 @@ export async function* streamBuild(
     let decided = turn === 0;
     let restart = false;
     let truncated = false;
-    for await (const chunk of streamChat(env, meter, convo, systemPrompt, '', BUILD_MAX_TOKENS, config)) {
+    for await (const chunk of streamChat(env, meter, convo, systemPrompt, '', BUILD_MAX_TOKENS, config, { effort: parseBuildEffort(env.BUILD_EFFORT) })) {
       if (chunk.type === 'error') {
         // A workspace over its AI budget is the workspace's limit, not a broken build.
         if (chunk.code !== BUDGET_CODE) await reportBuildFailure(env, meter, 'snag', messages, chunk.error);
@@ -213,8 +216,12 @@ Never ship AI-slop defaults: no Inter/Roboto/Arial/system-font-only type, no pur
 
 let cachedSystemPrompt: string | null = null;
 
-/** The full build-agent system prompt: contract + design standards + generated SDK reference. */
-export async function buildSystemPrompt(env: Env): Promise<string> {
+/** The full build-agent system prompt: contract + design standards + generated SDK reference, then the workspace's brand and house style when it has them. */
+export async function buildSystemPrompt(env: Env, brief?: WorkspaceBrief | null): Promise<string> {
+  return `${await baseSystemPrompt(env)}${workspaceBriefSection(brief ?? null)}`;
+}
+
+async function baseSystemPrompt(env: Env): Promise<string> {
   if (cachedSystemPrompt) return cachedSystemPrompt;
   // Every URL in the prompt is root-relative; the rewrite keeps any founder-host
   // literal from pointing a self-hosted instance's pages at someone else's server.
@@ -241,14 +248,24 @@ export function deriveName(prompt: string): string {
   return name || 'My Project';
 }
 
+/** The workspace's (else the instance's) chosen gateway model for a build, as the id getBuildConfig/getCrewProvider take. Null: BUILD_MODEL, then the default. Never throws. */
+export async function resolveBuildGatewayModel(env: Env, workspaceId: string | null | undefined): Promise<string | null> {
+  try {
+    return await resolveGatewayModel(env, workspaceId ?? null);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Generate one self-contained HTML document for a build prompt and return it.
  * Whole-page (non-streaming) — used where there's no live stream to the client
  * (the chat assistant's create_artifact confirm step). `trace` is closed by the caller on success.
  */
-export async function generateArtifactHtml(env: Env, prompt: string, meter: AiMeter, trace?: BuildTrace): Promise<string> {
-  const system = await buildSystemPrompt(env);
-  for await (const chunk of streamBuild(env, meter, [{ role: 'user', content: prompt }], system, getBuildConfig(env), trace)) {
+export async function generateArtifactHtml(env: Env, prompt: string, meter: AiMeter, briefWorkspaceId?: string | null, trace?: BuildTrace): Promise<string> {
+  const [brief, gatewayModel] = await Promise.all([loadWorkspaceBrief(env, briefWorkspaceId), resolveBuildGatewayModel(env, meter.workspaceId)]);
+  const system = await buildSystemPrompt(env, brief);
+  for await (const chunk of streamBuild(env, meter, [{ role: 'user', content: prompt }], system, getBuildConfig(env, gatewayModel), trace)) {
     if (chunk.type === 'done') return extractHtml(chunk.raw);
     if (chunk.type === 'error') {
       if (chunk.code === BUDGET_CODE) throw new WorkspaceBudgetError(chunk.resets_at ?? '');

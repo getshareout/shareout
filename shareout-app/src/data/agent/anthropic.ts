@@ -5,7 +5,7 @@ import { BUDGET_CODE, WorkspaceBudgetError, workspaceBudgetBlock } from '../ai-b
 import { fetchWithTimeout, FetchTimeoutError } from '../../fetch-utils';
 import { createLogger } from '../../logging';
 import { reportProviderBilling } from './ai-ops-alerts';
-import { DEFAULT_CLAUDE_MODEL, OPENAI_CHAT_MODEL, gatewayReasoningParams, temperatureParams, thinkingOffParams } from './models';
+import { DEFAULT_CLAUDE_MODEL, OPENAI_CHAT_MODEL, anthropicEffortParams, gatewayReasoningParams, type ReasoningEffort, temperatureParams, thinkingOffParams } from './models';
 
 const AI_TIMEOUT_MS = 30000;
 const AI_STREAM_TIMEOUT_MS = 60000;
@@ -76,6 +76,8 @@ interface ChatMessage {
 export interface StreamChatOptions {
   /** Sampling temperature; omitted from the request when undefined. */
   temperature?: number;
+  /** Reasoning effort for this call (page builds). Unset keeps the default: lowest on the gateway, none sent to Anthropic. */
+  effort?: ReasoningEffort;
 }
 
 interface StreamEvent {
@@ -118,6 +120,7 @@ function completionRequest(
           }
           : { role: m.role, content: m.content }),
         ...thinkingOffParams(cfg.model),
+        ...(options.effort ? anthropicEffortParams(cfg.model, options.effort) : {}),
         ...temperature,
         ...(stream ? { stream: true } : {}),
       },
@@ -142,7 +145,7 @@ function completionRequest(
           }
           : { role: m.role, content: m.content }),
       ],
-      ...(cfg.provider === 'vercel-gateway' ? gatewayReasoningParams(cfg.model) : {}),
+      ...(cfg.provider === 'vercel-gateway' ? gatewayReasoningParams(cfg.model, options.effort) : {}),
       ...temperature,
       ...(stream ? { stream: true, stream_options: { include_usage: true } } : {}),
     },

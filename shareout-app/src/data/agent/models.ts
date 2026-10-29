@@ -26,11 +26,30 @@ export function thinkingOffParams(model: string): { thinking?: { type: string } 
   return { thinking: { type: 'disabled' } };
 }
 
+/** How hard a model thinks on a call. Chat and crew run at the lowest; page builds choose (BUILD_EFFORT). */
+export type ReasoningEffort = 'low' | 'medium' | 'high';
+
+export const DEFAULT_BUILD_EFFORT: ReasoningEffort = 'medium';
+
+/** BUILD_EFFORT (low | medium | high). Anything else is a typo: fall back to the default rather than fail a build. */
+export function parseBuildEffort(raw: string | undefined): ReasoningEffort {
+  const v = (raw ?? '').trim().toLowerCase();
+  return v === 'low' || v === 'medium' || v === 'high' ? v : DEFAULT_BUILD_EFFORT;
+}
+
 /** The Vercel AI Gateway counterpart of thinkingOffParams on its OpenAI-compatible
  *  endpoint: with no `reasoning` field Claude 5.x thinks at its default effort on every
- *  turn. They can't turn thinking off there, so ask for the lowest effort. */
-export function gatewayReasoningParams(model: string): { reasoning?: { effort: string } } {
-  return /claude-(sonnet|opus)-5/.test(model) ? { reasoning: { effort: 'low' } } : {};
+ *  turn. They can't turn thinking off there, so ask for the lowest effort unless the
+ *  caller picks one. */
+export function gatewayReasoningParams(model: string, effort: ReasoningEffort = 'low'): { reasoning?: { effort: string } } {
+  return /claude-(sonnet|opus)-5/.test(model) ? { reasoning: { effort } } : {};
+}
+
+/** The direct-Anthropic equivalent: `output_config.effort`, valid next to the `between_tools`
+ *  thinking field thinkingOffParams sends (Sonnet 5.5 allows low..high with it). Models
+ *  outside Sonnet/Opus 5 (Haiku) reject the field, so they get none. */
+export function anthropicEffortParams(model: string, effort: ReasoningEffort): { output_config?: { effort: string } } {
+  return /claude-(sonnet|opus)-5/.test(model) ? { output_config: { effort } } : {};
 }
 
 /** Vercel AI Gateway prompt caching: the gateway adds Anthropic cache markers itself
