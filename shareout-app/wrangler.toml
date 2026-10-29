@@ -158,6 +158,13 @@ class_name = "Showtime"
 name = "KNOWLEDGE_STORE"
 class_name = "KnowledgeStore"
 
+# Durable AI page builds (src/build-jobs): one object per user runs that user's builds, so a
+# build outlives the tab that started it and the user is told when it ends unwatched.
+# Optional: without it a build runs inline in its request and dies with the tab.
+[[durable_objects.bindings]]
+name = "BUILD_JOBS"
+class_name = "BuildJobs"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["RealtimeCoordinator"]
@@ -190,6 +197,8 @@ new_sqlite_classes = ["KnowledgeStore"]
 # in a Cloudflare Container (containers/slides/). Needs Workers Paid and Docker on the machine
 # that runs `wrangler deploy` (it builds and pushes the image). Without it, decks stay in
 # Assets and POST /v1/home/import answers 422 CONVERT_UNAVAILABLE. Uncomment all three.
+# Already deployed v10 (BuildJobs, below)? Wrangler only applies tags after the deployed one:
+# give this migration the next unused tag (v11) and move it after the last [[migrations]].
 # [[containers]]
 # class_name = "SlidesConverter"
 # image = "./containers/slides/Dockerfile"
@@ -203,6 +212,11 @@ new_sqlite_classes = ["KnowledgeStore"]
 # [[migrations]]
 # tag = "v9"
 # new_sqlite_classes = ["SlidesConverter"]
+
+# BuildJobs (above). A new class: deploy it with `wrangler deploy`, not `versions upload`.
+[[migrations]]
+tag = "v10"
+new_sqlite_classes = ["BuildJobs"]
 
 # Optional hourly cron — disable on free accounts if undesired
 [triggers]

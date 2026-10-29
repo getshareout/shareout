@@ -63,6 +63,18 @@ default `medium`), use the workspace's model choice (then the instance's, then
 `BUILD_MODEL`), and are given the workspace's brand accent, logo, language and house-style
 context file. The agent can also look up ShareOut's artifact guide while it builds.
 
+### Builds that outlive the tab
+
+With the `BUILD_JOBS` Durable Object bound (it is in the default `wrangler.toml`), a page
+build from Create or from a confirmed assistant build runs as a job on the server instead of
+inside the browser's request. Closing the tab doesn't stop it: the page is still published,
+the assistant's result still lands in its thread, and a build that ends while nobody is
+watching shows up in the bell and on Home ("Needs you"), in the user's language. A client
+that loses its connection reattaches with `GET /v1/builds/{id}/events` and gets the steps so
+far. Each user runs one build at a time (a double click joins the running one), and a job
+still running after 12 minutes is stopped. Without the binding, builds run inline as before.
+Adding the class needs a `wrangler deploy` (not `versions upload`) the first time.
+
 ## Set it
 
 ```bash

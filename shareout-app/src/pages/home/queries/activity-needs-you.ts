@@ -302,6 +302,27 @@ export async function queryNeedsYou(
       })));
   }
 
+  // A page build you started that ended while you were away (src/build-jobs): the line was
+  // written in your language when it ended; it links to the page when there is one.
+  if (on('page_build')) {
+    push(env.DB.prepare(`
+      SELECT e.id AS id,
+             json_extract(e.payload, '$.artifact_id') AS artifact_id,
+             json_extract(e.payload, '$.artifact_name') AS artifact_name,
+             json_extract(e.payload, '$.slug') AS slug,
+             json_extract(e.payload, '$.summary') AS summary,
+             CAST(strftime('%s', e.created_at) AS INTEGER) AS ts
+      FROM notifications e
+      WHERE e.recipient_type = 'user' AND e.recipient_id IN (${idPh}) AND e.kind = 'page_build'
+        AND e.created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now', '-14 days')
+      ORDER BY e.created_at DESC LIMIT ?
+    `).bind(...vis.userIds, limit),
+      (rows) => rows.map((r) => ({
+        kind: 'page_build' as const, id: r.id, artifact_id: r.artifact_id, artifact_name: r.artifact_name,
+        slug: r.slug, actor: null, actor_picture: null, summary: r.summary || '', ts: r.ts,
+      })));
+  }
+
   // Failed / errored test runs.
   if (on('test')) {
     push(env.DB.prepare(`

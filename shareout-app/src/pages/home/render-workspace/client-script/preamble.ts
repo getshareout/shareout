@@ -81,6 +81,7 @@ export const workspace_client_preamble_JS = `
     _: { c: 'var(--color-text-secondary)', i: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/>' }
   };
   KIND_META.admin_request = KIND_META.access; KIND_ICON.admin_request = KIND_ICON.access;
+  KIND_META.page_build = KIND_META.create; KIND_ICON.page_build = KIND_ICON.create;
   // Icon chip for an event: actor avatar if present, else the kind's tinted line icon.
   function iconChip(e, cls) {
     if (e.actor_picture) return '<span class="' + cls + '"><img src="' + esc(e.actor_picture) + '" alt=""></span>';

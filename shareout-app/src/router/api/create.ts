@@ -21,6 +21,8 @@ import { rateLimitExceededResponse, storageLimitMessage } from '../../publish/li
 import type { FileEntry, PublishResponse, Visibility } from '../../types';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { resolveAllowOpen } from '../../access/allow-open';
+import { buildJobKey, startBuildJob } from '../../build-jobs/client';
+import { BUILD_JOB_COPY } from '../../build-jobs/copy';
 
 // The builder runs on a stronger model and produces a full document — give it room.
 // It streams (see chatComplete), so a slow full-page generation isn't bound by a read timeout.
@@ -124,8 +126,8 @@ function json(data: unknown, status = 200): Response {
 }
 
 type Env = FetchContext['env'];
-type SessionUser = { id: string; email: string };
-type Share = { visibility: Visibility; workspaceId: string | null; allowOpen?: boolean };
+export type SessionUser = { id: string; email: string };
+export type Share = { visibility: Visibility; workspaceId: string | null; allowOpen?: boolean };
 
 // Who can see the page the moment it goes live. Private unless the builder asked otherwise;
 // "workspace" needs a workspace the user belongs to, else it stays private.
@@ -156,7 +158,7 @@ export async function routeCreateApi(ctx: FetchContext): Promise<Response | null
   // The workspace's brand and house style only reach a page built by one of its members.
   const briefWorkspaceId = user && hostWs && (await getInternalWorkspaceRole(env, hostWs, user.id)) ? hostWs : null;
 
-  let body: { phase?: string; prompt?: string; slug?: string; html?: string; theme?: string; visibility?: string; workspace_id?: string };
+  let body: { phase?: string; prompt?: string; slug?: string; html?: string; theme?: string; visibility?: string; workspace_id?: string; job_key?: string };
   try {
     body = await request.json();
   } catch {
@@ -216,18 +218,23 @@ export async function routeCreateApi(ctx: FetchContext): Promise<Response | null
     return addCORS(await handlePublish(env, user, prompt, previousHtml, slug, share));
   }
 
-  return addCORS(streamGenerate({ env, prompt, previousHtml, theme, locale, briefWorkspaceId, publish: { user, slug, share }, meter: meter('page_build') }));
+  const build: GenerateRequest = { prompt, previousHtml, theme, locale, briefWorkspaceId, publish: { user, slug, share }, meter: meter('page_build') };
+  // BUILD_JOBS bound: the build runs as a durable job that outlives this tab (src/build-jobs).
+  if (env.BUILD_JOBS) {
+    const key = typeof body.job_key === 'string' && body.job_key ? body.job_key.slice(0, 100) : await buildJobKey(['create', prompt, previousHtml, slug, theme, share]);
+    const started = await startBuildJob(env, { userId: user.id, spec: { kind: 'create', ...build }, key, name: deriveName(prompt) });
+    if ('busy' in started) return addCORS(json({ ok: false, error: t(locale, BUILD_JOB_COPY).busy, code: 'BUILD_IN_PROGRESS' }, 409));
+    return addCORS(started.stream);
+  }
+  return addCORS(streamGenerate({ env, ...build }));
 }
 
 function sseLine(obj: unknown): string {
   return `data: ${JSON.stringify(obj)}\n\n`;
 }
 
-// Stream the build token-by-token over SSE so the client can render the page as it's written,
-// then finalize: publish (build phase) or just return the HTML (preview phase). Generation streams
-// at first byte, so the slow full-page build shows live instead of blocking behind a spinner.
-function streamGenerate(opts: {
-  env: Env;
+/** A build as streamGenerate runs it (and a build job replays it): everything but env. */
+export interface GenerateRequest {
   prompt: string;
   previousHtml: string;
   theme?: string;
@@ -235,7 +242,12 @@ function streamGenerate(opts: {
   briefWorkspaceId: string | null;
   publish?: { user: SessionUser; slug?: string; share: Share };
   meter: AiMeter;
-}): Response {
+}
+
+// Stream the build token-by-token over SSE so the client can render the page as it's written,
+// then finalize: publish (build phase) or just return the HTML (preview phase). Generation streams
+// at first byte, so the slow full-page build shows live instead of blocking behind a spinner.
+export function streamGenerate(opts: { env: Env } & GenerateRequest): Response {
   const { env, prompt, previousHtml, theme, publish } = opts;
   const copy = t(opts.locale, BUILD_FAILURE_COPY);
   const encoder = new TextEncoder();

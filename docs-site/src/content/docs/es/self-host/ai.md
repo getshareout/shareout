@@ -65,6 +65,18 @@ de la instancia, luego `BUILD_MODEL`) y reciben el color de marca, el logo, el i
 archivo de contexto de estilo del workspace. El agente también puede consultar la guía de
 artefactos de ShareOut mientras construye.
 
+### Builds que sobreviven a la pestaña
+
+Con el Durable Object `BUILD_JOBS` (viene en el `wrangler.toml` por defecto), un build desde
+Create o un build confirmado en el asistente corre como un trabajo en el servidor y no dentro
+del pedido del navegador. Cerrar la pestaña no lo frena: el artefacto se publica igual, el
+resultado del asistente queda en su conversación, y si termina sin nadie mirando aparece en la
+campana y en Home ("Needs you"), en el idioma del usuario. Un cliente que pierde la conexión
+se vuelve a enganchar con `GET /v1/builds/{id}/events` y recibe los pasos hechos hasta ahí.
+Cada usuario corre un build a la vez (un doble clic se suma al que ya corre) y un trabajo que
+sigue corriendo a los 12 minutos se frena. Sin el binding, los builds corren en línea como
+antes. Agregar la clase pide un `wrangler deploy` (no `versions upload`) la primera vez.
+
 ## Configurarlo
 
 ```bash

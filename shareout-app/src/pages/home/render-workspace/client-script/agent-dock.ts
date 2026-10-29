@@ -300,26 +300,39 @@ export const workspace_client_agent_dock_JS = `  // ===== composer states: resti
   function runBuildConfirm(token, name) {
     var col = makeCol('bot');
     var w = buildWidget(col, name); scrollEnd(true);
+    var job = { id: null, done: false, tries: 0 };
+    function follow(resp) {
+      if (!resp.ok || !resp.body) throw new Error('confirm ' + resp.status);
+      return readStream(resp, onEv).then(dropped);
+    }
+    // The stream ended before the build did. A durable job keeps building on the server: reattach a few times.
+    function dropped() {
+      if (job.done) return;
+      if (!job.id || ++job.tries > 3) throw new Error('build stream dropped');
+      return new Promise(function (r) { setTimeout(r, 1500); }).then(function () {
+        return fetch('/v1/builds/' + encodeURIComponent(job.id) + '/events', { credentials: 'same-origin' }).then(follow);
+      });
+    }
+    function onEv(ev) {
+      if (ev.type === 'job') job.id = ev.id;
+      else if (ev.type === 'build_step') { w.step.textContent = ev.label; scrollEnd(); }
+      else if (ev.type === 'build_done') {
+        job.done = true;
+        w.spin.classList.add('is-done'); w.ttl.textContent = ev.name || t('agent.pageBuilt');
+        w.step.textContent = ''; w.box.classList.add('is-done');
+        if (ev.ok === false) w.box.classList.add('is-error');
+        var line = el('div', 'wsx-build__line'); line.innerHTML = mdToHtml(ev.text || t('agent.done')); w.box.appendChild(line);
+        if (ev.slug) {
+          var open = el('button', 'wsx-build__open'); open.type = 'button'; open.textContent = t('agent.openPage');
+          open.addEventListener('click', function () { if (typeof openArtifact === 'function') openArtifact(ev.slug, ev.name, ev.artifactId); });
+          w.box.appendChild(open);
+          refreshActiveArtifact();
+        }
+        scrollEnd(); markUnread();
+      }
+    }
     fetch(API + '/confirm', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token }) })
-      .then(function (resp) {
-        if (!resp.ok || !resp.body) throw new Error('confirm ' + resp.status);
-        return readStream(resp, function (ev) {
-          if (ev.type === 'build_step') { w.step.textContent = ev.label; scrollEnd(); }
-          else if (ev.type === 'build_done') {
-            w.spin.classList.add('is-done'); w.ttl.textContent = ev.name || t('agent.pageBuilt');
-            w.step.textContent = ''; w.box.classList.add('is-done');
-            if (ev.ok === false) w.box.classList.add('is-error');
-            var line = el('div', 'wsx-build__line'); line.innerHTML = mdToHtml(ev.text || t('agent.done')); w.box.appendChild(line);
-            if (ev.slug) {
-              var open = el('button', 'wsx-build__open'); open.type = 'button'; open.textContent = t('agent.openPage');
-              open.addEventListener('click', function () { if (typeof openArtifact === 'function') openArtifact(ev.slug, ev.name, ev.artifactId); });
-              w.box.appendChild(open);
-              refreshActiveArtifact();
-            }
-            scrollEnd(); markUnread();
-          }
-        });
-      })
+      .then(follow)
       .catch(function (e) { console.warn('[agent] build confirm failed', e); w.box.classList.add('is-done', 'is-error'); w.spin.classList.add('is-done'); w.step.textContent = t('agent.err.action'); markUnread(); });
   }
   function addConfirm(prompt, token, card) {
