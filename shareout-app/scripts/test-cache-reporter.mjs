@@ -24,9 +24,13 @@ export default class TestCacheReporter {
       const test = toRel(m.moduleId);
       if (!test) continue;
       const deps = new Set(staticClosure(test));
-      for (const id of Object.keys(m.diagnostic().importDurations)) {
-        const rel = toRel(id);
-        if (rel && rel !== test) deps.add(rel);
+      // Files sharing an isolate are pure by construction (tests/isolation.ts), and their
+      // import list mixes in whatever ran earlier in that worker: the static graph is theirs.
+      if (m.project.config.isolate !== false) {
+        for (const id of Object.keys(m.diagnostic().importDurations)) {
+          const rel = toRel(id);
+          if (rel && rel !== test) deps.add(rel);
+        }
       }
       if (deps.has('src/router/handle-fetch.ts') || /\bASSETS\b/.test(readFileSync(m.moduleId, 'utf8'))) deps.add(ASSETS_DIR);
       // Test code that reads the disk has inputs we can't see: it always runs.
