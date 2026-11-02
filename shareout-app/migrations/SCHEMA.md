@@ -440,11 +440,17 @@ flow that never shipped.
 What remains is **usage metering**, which matters whether or not anyone is billed: knowing
 what a workspace spends on model calls is how you set a budget and notice a runaway agent.
 
+An operator who does bill a workspace — a fee, a setup, a closed month of AI usage at metered
+cost — records it in `workspace_invoices` (0034). It is a ledger, not a paywall: nothing is
+charged by ShareOut and nothing is gated on it. The workspace pays outside (a bank transfer),
+the operator attaches the receipt and marks the invoice paid.
+
 ```mermaid
 erDiagram
     workspaces ||--o| workspace_llm_config : "configures AI"
     workspaces ||--o{ ai_usage_events      : "meters"
     workspaces ||--o{ agent_usage_events   : "costs"
+    workspaces ||--o{ workspace_invoices   : "is billed"
 ```
 
 | Table | Holds |
@@ -452,6 +458,7 @@ erDiagram
 | `ai_usage_events` | Metered AI usage, one row per model call (every LLM call is metered at the provider layer): `kind`, `model`, `units`, `unit_kind`, `input_tokens`, `output_tokens`, `base_cost_micro_usd`, `source`. |
 | `agent_usage_events` | Per-call cost ledger for agent and crew work — documented under [07 Agents](#07-agents-crews--skills). |
 | `workspace_llm_config` | Provider credentials, balance, markup and monthly budget — documented under [02 Workspaces](#02-workspaces--access-control), where it sits in the baseline. |
+| `workspace_invoices` | Invoices the instance operator issues to a workspace by hand: `number`, `status` (`draft` → `open` → `paid`, or `void`), `total_cents` in `currency`, and `lines_json` — a snapshot of the line items, including a usage line that freezes a closed month of `ai_usage_events` by kind, model and member. The operator's receipt and the workspace's transfer proof live in R2 (`receipt_r2_key`, `proof_r2_key`). Drafts are visible only to platform admins; workspace owners/admins see the rest under Admin → Overview → Billing. |
 | `workspace_usage_daily` | What each workspace cost per UTC `day`, one row per `metric` (storage measured from R2, serving, jobs, AI, email, browser) with `quantity` and `cost_micro_usd` at list price. The history behind the admin Usage ledger and its CSV. |
 
 Cost is stored in **`_micro_usd`** — millionths of a dollar, as `INTEGER`. Per-token amounts

@@ -5,6 +5,7 @@ import { routeWorkspaceFolders } from './workspace-folders';
 import { routeWorkspaceVendorPackages } from './workspace-vendor-packages';
 import { routeWorkspaceSharees } from './workspace-sharees-routes';
 import { routeWorkspaceSettings } from './workspace-settings-routes';
+import { routeWorkspaceInvoices } from './workspace-invoices';
 import { routeWorkspaceMembers } from './workspace-members-routes';
 import { routeWorkspaceConnections } from './workspace-connections-routes';
 import { routeWorkspaceOps } from './workspace-ops-routes';
@@ -79,6 +80,7 @@ export async function routeWorkspaceApi(ctx: FetchContext): Promise<Response | n
     (await routeWorkspaceConnections(ctx)) ??
     (await routeWorkspaceSharees(ctx)) ??
     (await routeWorkspaceSettings(ctx)) ??
+    (await routeWorkspaceInvoices(ctx)) ??
     (await routeWorkspaceMembers(ctx)) ??
     (await routeWorkspaceFolders(ctx)) ??
     (await routeWorkspaceVendorPackages(ctx)) ??
