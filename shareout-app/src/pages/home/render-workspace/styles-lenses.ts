@@ -291,6 +291,17 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 .wsx-admin__settings-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--color-border); }
 .wsx-admin__settings-section:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
 .wsx-admin__sec { display: block; }
+.wsx-admin__sec[hidden] { display: none; }
+/* Billing: one collapsible card per invoice */
+.wsx-bill__list { display: flex; flex-direction: column; gap: 8px; }
+.wsx-bill { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elevated); }
+.wsx-bill[open] { border-color: var(--color-primary); }
+.wsx-bill__sum { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 12px; padding: 10px 14px; cursor: pointer; list-style: none; }
+.wsx-bill__sum::-webkit-details-marker { display: none; }
+.wsx-bill__amt { font: 700 var(--text-sm) var(--font-body); font-variant-numeric: tabular-nums; color: var(--color-text); }
+.wsx-bill__body { padding: 4px 14px 16px; }
+.wsx-bill__notes { white-space: pre-wrap; font-size: var(--text-sm); color: var(--color-text-secondary); }
+.wsx-bill__files { display: flex; flex-direction: column; gap: 8px; font-size: var(--text-sm); color: var(--color-text-secondary); }
 .wsx-admin__sec + .wsx-admin__sec { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--color-border); }
 .wsx-admin__sectitle { margin: 0 0 14px; font: 700 var(--text-lg) var(--font-display, var(--font-body)); letter-spacing: -0.01em; color: var(--color-text); }
 .wsx-admin__settings-title { font: 700 var(--text-sm) var(--font-body); color: var(--color-text); margin-bottom: 14px; }

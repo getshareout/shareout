@@ -6,8 +6,8 @@ export const workspace_client_home_views_adminCore_JS = `  // ----- Admin — Ov
   function wsUrl(suffix) { return '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + suffix; }
   var adminTab = 'overview', adFocus = null;
   // Five chips, each a stack of the original panels; old tab keys still resolve (deep links, attention rows, search).
-  var AD_GROUPS = { overview: ['overview', 'usage', 'support'], people: ['members', 'clients'], artifacts: ['artifacts'], automation: ['automation', 'ai'], settings: ['settings', 'security', 'domains'] };
-  var AD_LABEL = { usage: 'admin.usage', support: 'admin.support', members: 'admin.members', clients: 'admin.clients', ai: 'admin.ai', security: 'admin.security', domains: 'admin.cdTab', automation: 'admin.automation', settings: 'admin.settings' };
+  var AD_GROUPS = { overview: ['overview', 'usage', 'billing', 'support'], people: ['members', 'clients'], artifacts: ['artifacts'], automation: ['automation', 'ai'], settings: ['settings', 'security', 'domains'] };
+  var AD_LABEL = { usage: 'admin.usage', billing: 'admin.billing', support: 'admin.support', members: 'admin.members', clients: 'admin.clients', ai: 'admin.ai', security: 'admin.security', domains: 'admin.cdTab', automation: 'admin.automation', settings: 'admin.settings' };
   function adGroupOf(k) { if (AD_GROUPS[k]) return k; for (var g in AD_GROUPS) { if (AD_GROUPS[g].indexOf(k) >= 0) return g; } return 'overview'; }
   function adHas(k) { return AD_GROUPS[adminTab].indexOf(k) >= 0; }
   function adM(k) { return document.getElementById('wsxAdSec_' + k) || document.getElementById('wsxAdminMount'); }
@@ -976,7 +976,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
     }, run);
   }
   function loadAdmin() {
-    var fnMap = { overview: adOverview, artifacts: adArtifacts, members: adMembers, clients: adClients, automation: adAutomation, ai: adAI, security: adSecurity, usage: adUsage, support: adSupport, settings: adSettings, domains: adDomains };
+    var fnMap = { overview: adOverview, artifacts: adArtifacts, members: adMembers, clients: adClients, automation: adAutomation, ai: adAI, security: adSecurity, usage: adUsage, billing: adBilling, support: adSupport, settings: adSettings, domains: adDomains };
     var keys = AD_GROUPS[adminTab], focus = adFocus; adFocus = null;
     var mount = document.getElementById('wsxAdminMount'); if (!mount) return;
     mount.innerHTML = keys.length < 2 ? '<div id="wsxAdSec_' + keys[0] + '"></div>' : keys.map(function (k, i) {
