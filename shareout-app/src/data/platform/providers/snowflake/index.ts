@@ -37,8 +37,12 @@ interface SnowflakeStatementBody {
 	parameters?: Record<string, string>;
 }
 
-const ASYNC_POLL_ATTEMPTS = 20;
 const ASYNC_POLL_DELAY_MS = 2000;
+// Poll until Snowflake's own statement timeout has passed, plus slack for queueing and round
+// trips. A fixed 20-poll window gave up on statements Snowflake was still allowed to finish.
+const ASYNC_POLL_GRACE_MS = 30_000;
+// Stays well inside the 15-minute wall clock of a cron invocation.
+const ASYNC_POLL_MAX_MS = 10 * 60_000;
 
 // JWT account defaults to the host account with any region/cloud suffix dropped
 // (locator accounts) — overridable via config.accountIdentifier for edge cases.
@@ -150,9 +154,10 @@ class SnowflakeProvider extends BaseProvider {
 		}
 
 		const body = (params.body as SnowflakeStatementBody) || {};
+		const timeoutSec = body.timeout ?? 60;
 		const requestBody: Record<string, unknown> = {
 			statement: sql,
-			timeout: body.timeout ?? 60,
+			timeout: timeoutSec,
 			...(cfg.database ? { database: cfg.database } : {}),
 			...(cfg.schema ? { schema: cfg.schema } : {}),
 			...(cfg.warehouse ? { warehouse: cfg.warehouse } : {}),
@@ -161,6 +166,7 @@ class SnowflakeProvider extends BaseProvider {
 			...(body.parameters ? { parameters: body.parameters } : {}),
 		};
 
+		const deadline = Date.now() + Math.min(ASYNC_POLL_MAX_MS, timeoutSec * 1000 + ASYNC_POLL_GRACE_MS);
 		const first = await this.fetchJson<T>(`${host}/api/v2/statements`, {
 			method: 'POST',
 			headers,
@@ -171,7 +177,7 @@ class SnowflakeProvider extends BaseProvider {
 		if (first.status === 202) {
 			const handle = (first.data as { statementHandle?: string } | undefined)?.statementHandle;
 			if (!handle) return first;
-			return this.pollStatement<T>(host, handle, headers, ctx.env);
+			return this.pollStatement<T>(host, handle, headers, ctx.env, deadline);
 		}
 
 		return first;
@@ -222,10 +228,11 @@ class SnowflakeProvider extends BaseProvider {
 		host: string,
 		handle: string,
 		headers: Record<string, string>,
-		env: Env
+		env: Env,
+		deadline: number
 	): Promise<ProviderResponse<T>> {
 		const url = `${host}/api/v2/statements/${encodeURIComponent(handle)}`;
-		for (let attempt = 0; attempt < ASYNC_POLL_ATTEMPTS; attempt++) {
+		while (Date.now() < deadline) {
 			await new Promise((resolve) => setTimeout(resolve, ASYNC_POLL_DELAY_MS));
 			const res = await this.fetchJson<T>(url, { method: 'GET', headers }, env);
 			if (res.status !== 202) return res;
