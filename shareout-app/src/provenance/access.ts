@@ -17,6 +17,7 @@ import { canAccess } from '../access/can-access';
 import { normalizeVisibility } from '../visibility-config';
 import { parseAccessPolicy } from '../data/access-policy';
 import { spaceGuestFor } from '../sharees/space-guest';
+import { isOneTimeView } from '../artifacts/view-codes/tokens';
 
 export interface ProvenanceArtifact {
   id: string;
@@ -93,7 +94,7 @@ async function isRelated(ctx: FetchContext, art: ProvenanceArtifact, user: AuthU
 }
 
 async function canView(ctx: FetchContext, art: ProvenanceArtifact, user: AuthUser | null): Promise<boolean> {
-  if ((normalizeVisibility(art.visibility) || 'public') === 'public') return true;
+  if ((normalizeVisibility(art.visibility) || 'public') === 'public' && !isOneTimeView(art.auth_method)) return true;
   const info = {
     artifact_id: art.id,
     owner_id: art.owner_id,

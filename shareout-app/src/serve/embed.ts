@@ -7,6 +7,7 @@ import { googleFontsPreconnect } from '../../packages/design-tokens/src/index';
 import { standalonePageStyles } from '../design-system/standalone-page';
 import { hasCustomViewer, renderViewer, viewerScriptCsp } from '../viewers';
 import { getPlatformOrigin } from '../config/origins';
+import { isOneTimeView } from '../artifacts/view-codes/tokens';
 
 export async function handleServeEmbed(
   request: Request,
@@ -48,7 +49,7 @@ export async function handleServeEmbed(
     });
   }
 
-  if (result.visibility === 'private' || result.visibility === 'workspace') {
+  if (result.visibility === 'private' || result.visibility === 'workspace' || isOneTimeView(result.auth_method)) {
     return embedPrivateNotAllowed(slug, env);
   }
 

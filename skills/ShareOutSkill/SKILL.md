@@ -1,7 +1,7 @@
 ---
 name: "shareout-skill"
-version: "2.60.0"
-updated_at: "2026-10-17T18:00:00Z"
+version: "2.61.0"
+updated_at: "2026-11-02T22:00:00Z"
 description: "Publish, update, inspect, and manage ShareOut artifacts on a self-hosted instance. Use when the user wants to build or publish a web artifact (HTML apps, dashboards, forms, or CSV/Markdown/JSON/TXT), wire SDK data stores, live data, schedules, sharing, analytics, or in-artifact AI. If the user wants to INSTALL or DEPLOY ShareOut on Cloudflare first, load deploy/SKILL.md immediately."
 skill_endpoint: "/v1/skill"
 ---
@@ -98,7 +98,7 @@ load [deploy/SKILL.md](deploy/SKILL.md).
 
 ## Version check (against **their** origin)
 
-Frontmatter `version` is this file (`2.60.0`).
+Frontmatter `version` is this file (`2.61.0`).
 
 1. `GET $ORIGIN/v1/skill/version` → `{ "version", "semver", "updated_at" }`. `version` is
    `<frontmatter>+<content hash>` (e.g. `2.60.0+18c8deb6`).
@@ -347,8 +347,11 @@ Full API: [api/overview.md](api/overview.md).
 
 ## Workspace boundary
 
-Personal artifacts can be private, collaborator-shared, or public. Load **team/** docs when
-doing workspace administration or workspace-scoped features:
+Personal artifacts can be private, collaborator-shared, or public. To show a confidential
+page to a few named people **once** (link + a personal code each, no sign-in, closes by
+itself, watermark with their name), see [team/one-time-view.md](team/one-time-view.md).
+
+Load **team/** docs when doing workspace administration or workspace-scoped features:
 
 - Members, roles, domain allowlists  
 - `visibility: "workspace"`  

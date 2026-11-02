@@ -3,6 +3,7 @@ import { getAnalytics } from '../../analytics';
 import { handleEditor } from '../../editor/index';
 import { handleListArtifacts, handleGetArtifact, handleUpdateArtifact, handleDeleteArtifact, handleListDeletedArtifacts, handleRestoreArtifact, handleRestoreAllDeleted } from '../../artifacts/crud';
 import { handleGetCollaborators, handleAddCollaborators, handleRemoveCollaborator, handleTransferOwnership } from '../../artifacts/collaborators';
+import { handleCreateViewCodes, handleDisableViewCodes, handleListViewCodes, handleRevokeViewCode } from '../../artifacts/view-codes/api';
 import { handleShareArtifact } from '../../artifacts/share';
 import { handleGetVersions, handleGetVersionSource, handleRestoreVersion, handleRollback } from '../../artifacts/versions';
 import { handleGetArtifactFiles } from '../../artifacts/files';
@@ -249,6 +250,25 @@ export async function routeArtifactApi(ctx: FetchContext): Promise<Response | nu
     const user = await requireAuthUser(ctx);
     if (!isAuthUser(user)) return user;
     return addCORS(await handleRemoveCollaborator(request, env, user, artifactId, decodeURIComponent(email)));
+  }
+
+  // One-time view codes: link + a personal code, one look each (artifacts/view-codes).
+  const viewCodesMatch = path.match(/^\/v1\/artifacts\/([^/]+)\/view-codes$/);
+  if (viewCodesMatch) {
+    const [, artifactId] = viewCodesMatch;
+    const user = await requireAuthUser(ctx);
+    if (!isAuthUser(user)) return user;
+    if (request.method === 'GET') return addCORS(await handleListViewCodes(env, user, artifactId));
+    if (request.method === 'POST') return addCORS(await handleCreateViewCodes(request, env, user, artifactId));
+    if (request.method === 'DELETE') return addCORS(await handleDisableViewCodes(env, user, artifactId));
+  }
+
+  const viewCodeMatch = path.match(/^\/v1\/artifacts\/([^/]+)\/view-codes\/([^/]+)$/);
+  if (viewCodeMatch && request.method === 'DELETE') {
+    const [, artifactId, codeId] = viewCodeMatch;
+    const user = await requireAuthUser(ctx);
+    if (!isAuthUser(user)) return user;
+    return addCORS(await handleRevokeViewCode(env, user, artifactId, decodeURIComponent(codeId)));
   }
 
   const shareMatch = path.match(/^\/v1\/artifacts\/([^/]+)\/share$/);
