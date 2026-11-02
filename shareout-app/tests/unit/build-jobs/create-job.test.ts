@@ -99,7 +99,9 @@ beforeEach(() => {
   h.publishGeneratedHtml.mockReset().mockResolvedValue({ artifact: { id: 'art_cj' }, deployment: { url: 'https://shareout.test/a/team/', slug: 'team' }, visibility: 'private' });
 });
 
-describe('/v1/create/generate build phase as a durable job', () => {
+// Each test waits on a Durable Object alarm round trip (~0.5s idle); a full run on a busy
+// machine stretched that past the default 5s.
+describe('/v1/create/generate build phase as a durable job', { timeout: 30_000 }, () => {
   it('opens with the job id, then streams today\'s delta/done events; the job records the published page', async () => {
     asUser('usr_cj_watch');
     const res = (await post({ phase: 'build', prompt: 'a page about the team' }))!;

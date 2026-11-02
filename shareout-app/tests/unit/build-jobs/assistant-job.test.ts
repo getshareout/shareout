@@ -68,7 +68,9 @@ beforeEach(() => {
   });
 });
 
-describe('assistant build confirm as a durable job', () => {
+// Each test waits on a Durable Object alarm round trip (~0.5s idle); a full run on a busy
+// machine stretched that past the default 5s.
+describe('assistant build confirm as a durable job', { timeout: 30_000 }, () => {
   it('streams job → build_step → build_done → done, and appends the result to the thread', async () => {
     const { token, threadId } = await proposeBuild('usr_aj_watch', 'Roster');
     const res = await confirmAgentAction(testEnv, SCOPE, user('usr_aj_watch'), token);

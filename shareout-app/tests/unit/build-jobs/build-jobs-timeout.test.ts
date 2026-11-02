@@ -39,7 +39,9 @@ beforeAll(async () => {
   await testEnv.DB.prepare("INSERT OR IGNORE INTO users (id, email, name) VALUES ('usr_bj_slow', 'slow@studio.test', 'Slow')").run();
 });
 
-describe('BuildJobs timeout', () => {
+// Each test waits on a Durable Object alarm round trip (~0.5s idle); a full run on a busy
+// machine stretched that past the default 5s.
+describe('BuildJobs timeout', { timeout: 30_000 }, () => {
   it('fails a build that runs too long, tells its client, and stops the build at its next step', async () => {
     const user = 'usr_bj_slow';
     const stub = testEnv.BUILD_JOBS!.get(testEnv.BUILD_JOBS!.idFromName(user));
