@@ -1,23 +1,29 @@
 #!/usr/bin/env node
-// Run only the unit tests affected by this branch's changes.
+// Run only the unit tests a change can affect.
 //
-// The full suite is ~770 files (767 on 2026-10-25) and takes minutes: ~4m40s at 466
-// files, ~3m at 550 after #99 cut per-file module imports. A small PR reaches a handful
-// of those files, so this maps changed files to tests through vitest's module graph
-// (`vitest related`) and runs just those.
+// The full suite is ~860 files and takes minutes. By default this runs the files whose
+// inputs changed since they last passed — anywhere in this clone, any worktree — and skips
+// the rest (scripts/test-cache.mjs). Every run records what passed, so a second gate over
+// the same code (integrate.sh, then its pre-push hook) re-runs nothing.
 //
-// Falls back to the whole suite when a change can plausibly affect everything
-// (config, lockfile, test setup). Force it with --full or SHAREOUT_FULL_TESTS=1.
-//
-// Base ref: SHAREOUT_TEST_BASE (default origin/main).
+// --full / SHAREOUT_FULL_TESTS=1 runs every file (and records them).
+// SHAREOUT_TEST_CACHE=0 falls back to the module-graph mapping below: changed files vs
+// SHAREOUT_TEST_BASE (default origin/main) through `vitest related`.
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { isGreen, listTests, load } from './test-cache.mjs';
 
 const APP_DIR = path.resolve(import.meta.dirname, '..');
 const BASE = process.env.SHAREOUT_TEST_BASE || 'origin/main';
 const passthrough = process.argv.slice(2).filter((a) => a !== '--full');
 const forceFull = process.argv.includes('--full') || process.env.SHAREOUT_FULL_TESTS === '1';
+const useCache = process.env.SHAREOUT_TEST_CACHE !== '0';
+const RECORD = useCache
+  ? ['--reporter=./scripts/test-cache-reporter.mjs', '--experimental.importDurations.limit=100000']
+  : [];
+// A custom reporter replaces the default one: keep the console output the caller asked for.
+const reporters = passthrough.some((a) => a.startsWith('--reporter')) ? [] : ['--reporter=default'];
 
 // Changing any of these invalidates the module-graph mapping itself.
 const FULL_SUITE_TRIGGERS = [
@@ -35,7 +41,7 @@ function git(...args) {
 }
 
 function runVitest(args) {
-  const r = spawnSync('npx', ['vitest', ...args], {
+  const r = spawnSync('npx', ['vitest', ...args, ...reporters, ...RECORD], {
     cwd: APP_DIR,
     stdio: 'inherit',
     env: { ...process.env, TZ: process.env.TZ || 'UTC' },
@@ -45,6 +51,22 @@ function runVitest(args) {
 
 if (forceFull) {
   console.log('==> Full unit suite (forced)');
+  runVitest(['run', '--maxWorkers=8', ...passthrough]);
+}
+
+if (useCache) {
+  const cache = load();
+  if (Object.keys(cache.files).length) {
+    const tests = listTests();
+    const stale = tests.filter((t) => !isGreen(cache, t));
+    if (!stale.length) {
+      console.log(`==> All ${tests.length} unit test files passed on exactly this code — nothing to run`);
+      process.exit(0);
+    }
+    console.log(`==> ${stale.length} of ${tests.length} unit test files changed inputs since they last passed`);
+    runVitest(['run', '--maxWorkers=8', ...passthrough, ...stale]);
+  }
+  console.log('==> Test cache is empty in this clone — running the full suite once to fill it');
   runVitest(['run', '--maxWorkers=8', ...passthrough]);
 }
 

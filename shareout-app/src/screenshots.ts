@@ -1,4 +1,4 @@
-import puppeteer from '@cloudflare/puppeteer';
+import { launchBrowser, type LaunchedBrowser } from './screenshots/launch';
 import type { Env } from './types';
 import { mintCaptureCredentials } from './auth/capture-session';
 import { getPlatformOrigin } from './config/origins';
@@ -15,7 +15,7 @@ const THUMB_HEIGHT = 750;
 const CARD_SCALE = 0.6;
 const NAV_TIMEOUT = 20000;
 
-export type RenderBrowser = Awaited<ReturnType<typeof puppeteer.launch>>;
+export type RenderBrowser = LaunchedBrowser;
 export type RenderPage = Awaited<ReturnType<RenderBrowser['newPage']>>;
 
 export interface WaitOptions {
@@ -58,7 +58,7 @@ export async function withArtifactBrowser<T>(
   let browser: RenderBrowser | null = null;
   const startedAt = Date.now();
   try {
-    browser = await puppeteer.launch(env.BROWSER as Parameters<typeof puppeteer.launch>[0]);
+    browser = await launchBrowser(env.BROWSER);
     return await session(browser);
   } catch (err) {
     console.error('withArtifactPage failed', { artifactId, error_stack: (err as Error)?.stack || String(err) });
@@ -454,9 +454,9 @@ export async function renderHtmlToPng(
   if (!env.BROWSER) return null;
   const width = opts.width ?? 920;
   const height = opts.height ?? 1100;
-  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
+  let browser: RenderBrowser | null = null;
   try {
-    browser = await puppeteer.launch(env.BROWSER as Parameters<typeof puppeteer.launch>[0]);
+    browser = await launchBrowser(env.BROWSER);
     const page = await browser.newPage();
     await page.setViewport({ width, height, deviceScaleFactor: 2 });
     const guard = await guardCapturePage(page, captureOwnHosts(env));

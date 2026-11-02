@@ -1,4 +1,3 @@
-import puppeteer from '@cloudflare/puppeteer';
 import type { CrewTool } from '../types';
 import type { Env } from '../../types';
 import { createAccessToken } from '../../token';
@@ -6,6 +5,7 @@ import { getPlatformOrigin } from '../../config/origins';
 import { logCrewToolFailure, userFacingPilotVerifyToolError } from '../errors';
 import { recordBrowserSince } from '../../workspaces/usage-ledger';
 import { captureOwnHosts, guardCapturePage } from '../../screenshots/request-policy';
+import { launchBrowser, type LaunchedBrowser } from '../../screenshots/launch';
 
 // Verify runs are short and cheap: cap steps low and wall-clock the whole in-page
 // run so a stuck agent can never burn budget or hold the browser open.
@@ -147,10 +147,10 @@ export const pilotVerifyTool: CrewTool = {
     const captureToken = await createAccessToken(artifactId, 'capture_verify', env, CAPTURE_TTL_SEC);
     const url = `${base}/a/${resolved.slug}/?_capture=${encodeURIComponent(captureToken)}`;
 
-    let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
+    let browser: LaunchedBrowser | null = null;
     const startedAt = Date.now();
     try {
-      browser = await puppeteer.launch(env.BROWSER as Parameters<typeof puppeteer.launch>[0]);
+      browser = await launchBrowser(env.BROWSER);
       const page = await browser.newPage();
       await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
       const guard = await guardCapturePage(page, captureOwnHosts(env));

@@ -2,8 +2,9 @@
 # Full local check (worker + docs). There is no hosted CI; this is the complete gate.
 # Prefer this before opening a PR. Fast subset: ci-check-fast.sh
 #
-# Runs the whole unit suite. Istanbul instrumentation more than doubles that, so
-# coverage floors are opt-in: SHAREOUT_COVERAGE=1 ./tooling/scripts/ci-check.sh
+# Runs every unit test whose inputs changed since it last passed (scripts/test-cache.mjs);
+# SHAREOUT_FULL_TESTS=1 runs them all. Istanbul instrumentation more than doubles a full
+# run, so coverage floors are opt-in: SHAREOUT_COVERAGE=1 ./tooling/scripts/ci-check.sh
 set -euo pipefail
 
 # Production (Cloudflare Workers) runs in UTC — pin tests so non-UTC contributors
@@ -37,7 +38,7 @@ npm run typecheck
 if [ "${SHAREOUT_COVERAGE:-}" = "1" ]; then
   npm run coverage -- --reporter=dot
 else
-  npm test -- --reporter=dot
+  npm run test:affected
 fi
 
 echo "==> CI checks (chat-core workspace)"
