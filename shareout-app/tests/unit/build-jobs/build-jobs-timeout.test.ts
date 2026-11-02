@@ -39,9 +39,7 @@ beforeAll(async () => {
   await testEnv.DB.prepare("INSERT OR IGNORE INTO users (id, email, name) VALUES ('usr_bj_slow', 'slow@studio.test', 'Slow')").run();
 });
 
-// Each test waits on a Durable Object alarm round trip (~0.5s idle); a full run on a busy
-// machine stretched that past the default 5s.
-describe('BuildJobs timeout', { timeout: 30_000 }, () => {
+describe('BuildJobs timeout', () => {
   it('fails a build that runs too long, tells its client, and stops the build at its next step', async () => {
     const user = 'usr_bj_slow';
     const stub = testEnv.BUILD_JOBS!.get(testEnv.BUILD_JOBS!.idFromName(user));
@@ -58,7 +56,7 @@ describe('BuildJobs timeout', { timeout: 30_000 }, () => {
     expect(v).toMatchObject({ status: 'failed', outcome: { ok: false, reason: 'timeout' }, steps: ['Planning your page…'] });
 
     gate.open = true;
-    for (let i = 0; i < 2000 && !after.length; i++) await new Promise((r) => setTimeout(r, 5));
+    for (let i = 0; i < 100 && !after.length; i++) await new Promise((r) => setTimeout(r, 5));
     expect(after).toEqual(['build job already ended']);
     expect((await (await stub.fetch(`https://build-jobs/job?id=${id}`)).json<BuildJobView>()).status).toBe('failed');
   });

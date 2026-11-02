@@ -47,7 +47,7 @@ async function firstEventThenClose(res: Response): Promise<BuildEvent> {
 }
 
 async function waitFor(check: () => Promise<boolean>): Promise<void> {
-  for (let i = 0; i < 2000; i++) {
+  for (let i = 0; i < 400; i++) {
     if (await check()) return;
     await new Promise((r) => setTimeout(r, 5));
   }
@@ -100,9 +100,7 @@ beforeEach(() => {
   h.alertOps.mockClear();
 });
 
-// Each test waits on a Durable Object alarm round trip (~0.5s idle); a full run on a busy
-// machine stretched that past the default 5s.
-describe('BuildJobs', { timeout: 30_000 }, () => {
+describe('BuildJobs', () => {
   it('runs a build start → progress → done, streams today\'s event shapes, records it, and does not notify a user who watched', async () => {
     const user = 'usr_bj_life';
     h.run.mockImplementation(scripted(['Planning your page…', 'Publishing it…'], { ok: true, url: 'https://shareout.test/a/roster/', slug: 'roster', artifactId: 'art_bj_1' }));

@@ -70,7 +70,7 @@ async function firstEventThenClose(res: Response): Promise<BuildEvent> {
 const stubFor = (userId: string) => testEnv.BUILD_JOBS!.get(testEnv.BUILD_JOBS!.idFromName(userId));
 async function settle(userId: string, id: string): Promise<BuildJobView> {
   await runDurableObjectAlarm(stubFor(userId));
-  for (let i = 0; i < 2000; i++) {
+  for (let i = 0; i < 200; i++) {
     const v = await (await builds(`/v1/builds/${id}`))!.json<BuildJobView>();
     if (v.status !== 'queued' && v.status !== 'running') return v;
     await new Promise((r) => setTimeout(r, 5));
@@ -99,9 +99,7 @@ beforeEach(() => {
   h.publishGeneratedHtml.mockReset().mockResolvedValue({ artifact: { id: 'art_cj' }, deployment: { url: 'https://shareout.test/a/team/', slug: 'team' }, visibility: 'private' });
 });
 
-// Each test waits on a Durable Object alarm round trip (~0.5s idle); a full run on a busy
-// machine stretched that past the default 5s.
-describe('/v1/create/generate build phase as a durable job', { timeout: 30_000 }, () => {
+describe('/v1/create/generate build phase as a durable job', () => {
   it('opens with the job id, then streams today\'s delta/done events; the job records the published page', async () => {
     asUser('usr_cj_watch');
     const res = (await post({ phase: 'build', prompt: 'a page about the team' }))!;
@@ -132,7 +130,7 @@ describe('/v1/create/generate build phase as a durable job', { timeout: 30_000 }
 
     expect(v.status).toBe('published');
     expect(h.publishGeneratedHtml).toHaveBeenCalledTimes(1);
-    for (let i = 0; i < 2000 && !(await testEnv.DB.prepare("SELECT 1 FROM notifications WHERE recipient_id = 'usr_cj_gone'").first()); i++) await new Promise((r) => setTimeout(r, 5));
+    for (let i = 0; i < 400 && !(await testEnv.DB.prepare("SELECT 1 FROM notifications WHERE recipient_id = 'usr_cj_gone'").first()); i++) await new Promise((r) => setTimeout(r, 5));
     const row = await testEnv.DB.prepare("SELECT payload FROM notifications WHERE recipient_id = 'usr_cj_gone' AND kind = 'page_build'").first<{ payload: string }>();
     expect(JSON.parse(row!.payload)).toMatchObject({ ok: true, summary: 'Tu artefacto está listo', slug: 'team' });
 
