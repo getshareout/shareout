@@ -11,6 +11,8 @@ import {
   handleCreateViewCodes, handleDisableViewCodes, handleListViewCodes, handleRevokeViewCode,
 } from '../../../src/artifacts/view-codes/api';
 import { checkAccess } from '../../../src/serve/access';
+import { dataMiddleware } from '../../../src/data/middleware';
+import { createAccessToken } from '../../../src/token';
 import type { ArtifactInfo } from '../../../src/serve/types';
 
 const store = new Map<string, string>();
@@ -223,6 +225,22 @@ describe('view codes: the gate', () => {
     const list = await listViewCodes(e, ART);
     expect(list.find((c) => c.label === 'Ana')!.status).toBe('viewed');
     expect(list.find((c) => c.label === 'Ana')!.closed_at).not.toBeNull();
+  });
+});
+
+describe('view codes: never a data credential', () => {
+  it('neither the pass nor the frame token reads the page data, even if the page is later marked public', async () => {
+    const { codes } = await newCodes(['Ana']);
+    const pass = passCookie(await handleViewCodeAuth(codeForm(codes[0].code), e)).split('=').slice(1).join('=');
+    const frame = await createAccessToken(ART, 'content_otv', e, 60);
+    for (const visibility of ['private', 'public']) {
+      await e.DB.prepare('UPDATE artifacts SET visibility = ? WHERE id = ?').bind(visibility, ART).run();
+      for (const token of [pass, frame]) {
+        const res = await dataMiddleware(new Request(`https://shareout.test/v1/data/${ART}/json/x`, { headers: { Authorization: `Bearer ${token}` } }), e, ART);
+        expect(res).toBeInstanceOf(Response);
+        expect([401, 403]).toContain((res as Response).status);
+      }
+    }
   });
 });
 

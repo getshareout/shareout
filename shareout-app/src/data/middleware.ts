@@ -17,6 +17,7 @@ import {
   SPACE_GUEST_AUTH_PREFIX, isTrustedInstanceOrigin, spaceGuestCovers, spaceGuestFor, spaceGuestFromGrant, spaceGuestTokenName,
   type SpaceGuest,
 } from '../sharees/space-guest';
+import { isViewCodeToken } from '../artifacts/view-codes/tokens';
 
 export interface DataContext {
   artifactId: string;
@@ -193,7 +194,8 @@ export async function dataMiddleware(
   // own artifact's data and so we can derive write capability. For a truly
   // anonymous public viewer (no Authorization header, no session cookie) it
   // returns `deny` after cheap header checks with zero DB queries.
-  const requiresAuth = artifact.visibility === 'private' || artifact.visibility === 'workspace';
+  // A one-time view page is closed whatever its visibility says (as on the serve path).
+  const requiresAuth = artifact.visibility === 'private' || artifact.visibility === 'workspace' || artifact.auth_method === 'onetime';
   const authResult = await checkDataAuth(request, env, artifact);
   if (requiresAuth && !authResult.authorized) {
     return errorResponse(
@@ -310,8 +312,9 @@ async function checkDataAuth(
     if (payload?.authType === 'owner_test' && !isCaptureSession(payload)) return deny;
     // 'content' tokens authorize loading static artifact bytes on the content domain
     // ONLY (ADR 30) — they carry no viewer identity and must never grant data access.
-    // Capture links likewise only open the capture view.
-    if (payload && payload.authType !== 'content' && !isCaptureLink(payload.authType)) {
+    // Capture links likewise only open the capture view, and a one-time code's pass and
+    // frame token only open the page itself.
+    if (payload && payload.authType !== 'content' && !isCaptureLink(payload.authType) && !isViewCodeToken(payload.authType)) {
       // Artifact-scoped access token (password/credentials/owner/viewer-minted).
       // 'owner_test' is the read-only session of a capture render: it reads this
       // artifact as the owner but flags the request so the router blocks every mutation.

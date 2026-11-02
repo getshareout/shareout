@@ -12,8 +12,9 @@ import {
   type LiveViewCode,
 } from './store';
 
-/** authType prefix of the pass a redeemed code buys: `otv:<code id>`. */
-export const VIEW_PASS_PREFIX = 'otv:';
+import { VIEW_PASS_PREFIX } from './tokens';
+
+export { VIEW_PASS_PREFIX };
 
 const passCookieName = (artifactId: string) => `shareout_access_${artifactId}`;
 

@@ -13,8 +13,9 @@ import { pageLocale } from '../../i18n/accept-language';
 import type { LiveViewCode } from './store';
 import { VIEW_CODE_EVENT_KINDS } from './store';
 
-/** authType of the content-domain token minted for a code holder's frame. */
-export const VIEW_CONTENT_AUTH = 'content_otv';
+import { VIEW_CONTENT_AUTH } from './tokens';
+
+export { VIEW_CONTENT_AUTH };
 
 // No same-origin, popups, modals or downloads: the frame can run the page and nothing else.
 export const VIEW_SANDBOX = 'allow-scripts allow-forms';
