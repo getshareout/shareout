@@ -43,17 +43,20 @@ const invoice = {
 };
 
 describe('Admin Billing section', () => {
-  it('stays hidden for a workspace admin with no invoices', async () => {
+  it('always shows the invoices card — an empty state before the first invoice', async () => {
     const m = mount('en', { invoices: [], can_manage: false });
     await m.run();
-    expect(m.wrap.hidden).toBe(true);
-    expect(m.mountEl.innerHTML).toBe('');
+    expect(m.wrap.hidden).toBe(false);
+    expect(m.mountEl.innerHTML).toContain('Invoices');
+    expect(m.mountEl.innerHTML).toContain('admin.billNone');
+    expect(m.mountEl.innerHTML).not.toContain('wsxBillForm');
   });
 
-  it('stays hidden when the list is refused (a member)', async () => {
+  it('says it could not load when the list is refused, instead of vanishing', async () => {
     const m = mount('en', null);
     await m.run();
-    expect(m.wrap.hidden).toBe(true);
+    expect(m.wrap.hidden).toBe(false);
+    expect(m.mountEl.innerHTML).toContain('common.couldNotLoad');
   });
 
   it('shows a workspace admin the bill, the usage breakdown, the receipt and the proof upload — no operator actions', async () => {
