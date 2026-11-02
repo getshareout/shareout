@@ -30,13 +30,6 @@ const NOT_WORKERS_FILES = [
 const NOT_WORKERS = ['tests/unit/**/*.dom.test.ts', ...NOT_WORKERS_FILES];
 const isNotWorkers = (rel: string) => rel.endsWith('.dom.test.ts') || NOT_WORKERS_FILES.includes(rel);
 
-// The workers pool inlines every npm dependency, so each test file loaded yaml, xlsx, yjs… one
-// module at a time (~200 npm modules a file). Pre-bundled, each package is a single module.
-// Puppeteer can't be (it imports node: builtins); src/screenshots/launch.ts loads it lazily instead.
-const WORKERS_DEPS = {
-  optimizer: { ssr: { enabled: true, include: ['yaml', 'xlsx', 'yjs', 'acorn', 'fflate', 'aws4fetch', 'postal-mime'] } },
-};
-
 // Workers-pool files that can share one isolate — see tests/isolation.ts.
 const SHARED = sharedIsolateFiles(fileURLToPath(new URL('.', import.meta.url)), 'tests/unit', isNotWorkers);
 
@@ -66,7 +59,6 @@ export default defineConfig({
         ],
         test: {
           name: 'workers',
-          deps: WORKERS_DEPS,
           include: ['tests/unit/**/*.test.ts'],
           exclude: [...NOT_WORKERS, ...SHARED],
         },
@@ -75,7 +67,6 @@ export default defineConfig({
         plugins: [cloudflareTest({ wrangler: { configPath: './wrangler.test.toml' } })],
         test: {
           name: 'workers-shared',
-          deps: WORKERS_DEPS,
           include: SHARED,
           isolate: false,
         },
@@ -89,7 +80,6 @@ export default defineConfig({
         ],
         test: {
           name: 'workers-chat',
-          deps: WORKERS_DEPS,
           include: ['tests/unit/chat-agent/session-do.test.ts'],
         },
       },
