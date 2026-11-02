@@ -11,6 +11,7 @@
 //   Workflows   $0.80 / 100k steps
 import type { Env } from '../../types';
 import { recordAiUsage } from '../../data/ai-usage';
+import { resell, workspaceMarkup } from '../../data/ai-markup';
 import { V1_MODEL, v2Target } from '../vectors/models';
 
 export { estimateTokens } from '../vectors/models';
@@ -83,7 +84,9 @@ export async function knowledgeUsage(
   ).bind(workspaceId, ...KNOWLEDGE_USAGE_KINDS, `-${days} days`).all<{
     kind: string; unit_kind: string; units: number; events: number; cost: number;
   }>()).results || [];
-  const ai = rows.map((r) => ({ kind: r.kind, unitKind: r.unit_kind, units: r.units, events: r.events, costMicroUsd: r.cost }));
+  // AI is shown at the workspace's price (cost × its AI markup); storage and vectors at list price.
+  const { bps } = await workspaceMarkup(env, workspaceId);
+  const ai = rows.map((r) => ({ kind: r.kind, unitKind: r.unit_kind, units: r.units, events: r.events, costMicroUsd: resell(r.cost, bps) }));
 
   const s = await store.usage(days);
   // Round each part, then sum, so the total always equals the breakdown shown.

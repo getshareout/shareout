@@ -61,6 +61,22 @@ describe('Admin Usage: AI budget', () => {
     expect(html).toContain('Automations (API and agent tokens)');
   });
 
+  it('adds cost, margin and markup for a platform admin (the API sends operator only to them)', async () => {
+    const m = mount('en', { '/spend': { totalMicroUsd: 0, days: [] }, '/ai-limits': { ...adminLimits, operator: { cost_usd: 55, margin_usd: 27.5, markup: 1.5 } } });
+    m.adUsage();
+    await m.done();
+    const html = m.els.wsxAdminMount.innerHTML!;
+    expect(html).toContain('data-op-note');
+    expect(html).toContain('AI cost $55.00 · margin $27.50 · markup 1.5×');
+  });
+
+  it('shows no cost line without operator data', async () => {
+    const m = mount('en', { '/spend': { totalMicroUsd: 0, days: [] }, '/ai-limits': adminLimits });
+    m.adUsage();
+    await m.done();
+    expect(m.els.wsxAdminMount.innerHTML!).not.toContain('data-op-note');
+  });
+
   it('shows a member only their own row, no edit control and no per-kind table', async () => {
     const m = mount('es', { '/spend': { days: [] }, '/ai-limits': limits });
     m.adUsage();

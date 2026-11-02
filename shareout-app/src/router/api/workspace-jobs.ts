@@ -11,6 +11,7 @@ import { startCrewRunStream } from '../../crew/triggers';
 import { getRunDetail, listWorkspaceRuns, type RunDetail, type RunSurface } from '../../runs/inspector';
 import { isRowRestricted } from '../../metric-alerts/row-scope';
 import { jsonWithApiErrors } from '../../http/api-error';
+import { priceRuns, workspaceMarkup } from '../../data/ai-markup';
 
 function json(data: unknown, status = 200): Response {
   return jsonWithApiErrors(data, status);
@@ -227,7 +228,7 @@ export async function handleGetWorkspaceAutomationRuns(
   const trigger = await triggerInWorkspace(env, workspaceId, triggerId);
   if (!trigger) return json({ error: 'Automation not found', code: 'NOT_FOUND' }, 404);
 
-  const runs = await listRuns(env, trigger.crew_id);
+  const runs = priceRuns(await listRuns(env, trigger.crew_id), (await workspaceMarkup(env, workspaceId)).bps);
   return json({ runs });
 }
 

@@ -6,11 +6,14 @@ import {
   AUTOMATION_TOKENS_PER_DAY, MEMBER_TOKENS_PER_DAY, automationTokensToday, memberTokensToday, nextDailyReset,
 } from '../../data/agent/member-quota';
 import { budgetState } from '../../data/ai-budget';
+import { multiplier } from '../../data/ai-markup';
+import { isPlatformAdmin } from '../../superadmin/auth';
 
 /**
  * GET /v1/workspaces/{id}/ai-limits — today's in-artifact agent usage. Every member sees their own counter and the
  * workspace automation total; owners/admins also see each member and this month's spend by kind. Per-member counters are per person, not per
  * workspace (the cap follows the person); automation (API/agent tokens) is the workspace's own counter.
+ * Money is at the workspace's price (cost × its AI markup); platform admins also get `operator` (cost, margin).
  */
 export async function handleGetWorkspaceAiLimits(env: Env, user: AuthUser, workspaceId: string): Promise<Response> {
   const role = await getInternalWorkspaceRole(env, workspaceId, user.id);
@@ -33,6 +36,10 @@ export async function handleGetWorkspaceAiLimits(env: Env, user: AuthUser, works
     me: { tokens_today: await memberTokensToday(env, user.id) },
     automation: { tokens_today: await automationTokensToday(env, workspaceId), daily_cap: AUTOMATION_TOKENS_PER_DAY },
   };
+  // Spend above is the workspace's price (cost × markup). Only the instance operator sees what it cost.
+  if (!user.service && (await isPlatformAdmin(env, user.email, user.id))) {
+    body.operator = { cost_usd: usd(month.costMicro), margin_usd: usd(month.spentMicro - month.costMicro), markup: multiplier(month.markupBps) };
+  }
   if (isAdmin) {
     body.spend_by_kind = Object.entries(month.byKind)
       .map(([kind, micro]) => ({ kind, usd: usd(micro) }))

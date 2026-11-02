@@ -31,20 +31,28 @@ export const workspace_client_home_views_adminBilling_JS = `  // Billing: the op
         });
       }).catch(function (e) { adIdle(btn); showToast(String((e && e.message) || bt('admin.actionFailed')), 'error'); });
     }
-    function usageTable(titleKey, rows, label) {
+    // The workspace sees the price; the operator (op) also sees cost and margin per row.
+    function usageTable(titleKey, rows, label, op) {
       if (!rows || !rows.length) return '';
       return '<div class="wsx-admin__settings-title" style="margin-top:14px">' + esc(bt(titleKey)) + '</div><div class="wsx-atbl__wrap"><table class="wsx-atbl"><thead><tr><th></th>'
-        + '<th>' + esc(bt('admin.billColCalls')) + '</th><th>' + esc(bt('admin.billColTokIn')) + '</th><th>' + esc(bt('admin.billColTokOut')) + '</th><th>' + esc(bt('admin.colCost')) + '</th></tr></thead><tbody>'
-        + rows.map(function (r) { return '<tr><td>' + esc(label(r.key)) + '</td><td class="wsx-atbl__num">' + adCompact(r.calls) + '</td><td class="wsx-atbl__num">' + adCompact(r.input_tokens) + '</td><td class="wsx-atbl__num">' + adCompact(r.output_tokens) + '</td><td class="wsx-atbl__num">' + micro(r.cost_micro_usd) + '</td></tr>'; }).join('')
+        + '<th>' + esc(bt('admin.billColCalls')) + '</th><th>' + esc(bt('admin.billColTokIn')) + '</th><th>' + esc(bt('admin.billColTokOut')) + '</th><th>' + esc(bt('admin.billColAmount')) + '</th>'
+        + (op ? '<th>' + esc(bt('admin.billColCost')) + '</th><th>' + esc(bt('admin.billColMargin')) + '</th>' : '') + '</tr></thead><tbody>'
+        + rows.map(function (r) {
+          var cells = '<td class="wsx-atbl__num">' + micro(r.price_micro_usd) + '</td>';
+          if (op) cells += '<td class="wsx-atbl__num" data-op-cost>' + micro(r.cost_micro_usd) + '</td><td class="wsx-atbl__num">' + micro((r.price_micro_usd || 0) - (r.cost_micro_usd || 0)) + '</td>';
+          return '<tr><td>' + esc(label(r.key)) + '</td><td class="wsx-atbl__num">' + adCompact(r.calls) + '</td><td class="wsx-atbl__num">' + adCompact(r.input_tokens) + '</td><td class="wsx-atbl__num">' + adCompact(r.output_tokens) + '</td>' + cells + '</tr>';
+        }).join('')
         + '</tbody></table></div>';
     }
-    function usageHtml(u) {
+    function usageHtml(u, manage) {
       if (!u) return '';
+      var op = manage && u.cost_micro_usd != null;
       return '<div class="wsx-admin__settings-section" data-inv-usage><div class="wsx-admin__settings-title">' + esc(bt('admin.billUsageTitle').replace('{month}', monthName(u.month))) + '</div>'
-        + '<p class="wsx-lens__intro">' + esc(bt('admin.billUsageIntro').replace('{calls}', adCompact(u.calls)).replace('{total}', micro(u.total_micro_usd))) + '</p>'
-        + usageTable('admin.billByKind', u.by_kind, function (k) { return tOr('admin.aiKind_' + k, k); })
-        + usageTable('admin.billByModel', u.by_model, function (k) { return k; })
-        + usageTable('admin.billByMember', u.by_member, function (k) { return k || bt('admin.billNoMember'); })
+        + '<p class="wsx-lens__intro">' + esc(bt('admin.billUsageIntro').replace('{calls}', adCompact(u.calls)).replace('{total}', micro(u.price_micro_usd))) + '</p>'
+        + (op ? '<p class="wsx-field__note" data-op-note>' + esc(bt('admin.billOpCost').replace('{cost}', micro(u.cost_micro_usd)).replace('{markup}', String((u.markup_bps || 10000) / 10000)).replace('{margin}', micro(u.price_micro_usd - u.cost_micro_usd))) + '</p>' : '')
+        + usageTable('admin.billByKind', u.by_kind, function (k) { return tOr('admin.aiKind_' + k, k); }, op)
+        + usageTable('admin.billByModel', u.by_model, function (k) { return k; }, op)
+        + usageTable('admin.billByMember', u.by_member, function (k) { return k || bt('admin.billNoMember'); }, op)
         + '</div>';
     }
     function invoiceHtml(inv, manage) {
@@ -74,7 +82,7 @@ export const workspace_client_home_views_adminBilling_JS = `  // Billing: the op
         + '<span class="wsx-bill__amt">' + money(inv.total_cents, inv.currency) + '</span>' + badge(st) + '</summary><div class="wsx-bill__body">'
         + '<div class="wsx-atbl__date" style="margin-bottom:10px">' + esc(meta.join(' \\u00b7 ')) + '</div>'
         + '<div class="wsx-atbl__wrap"><table class="wsx-atbl"><thead><tr><th>' + esc(bt('admin.billColItem')) + '</th><th>' + esc(bt('admin.billColQty')) + '</th><th>' + esc(bt('admin.billColUnit')) + '</th><th>' + esc(bt('admin.billColAmount')) + '</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-        + usageHtml(usage)
+        + usageHtml(usage, manage)
         + (inv.notes ? '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(bt('admin.billHowToPay')) + '</div><div class="wsx-bill__notes">' + esc(inv.notes) + '</div></div>' : '')
         + files + acts + '</div></details>';
     }
@@ -113,7 +121,8 @@ export const workspace_client_home_views_adminBilling_JS = `  // Billing: the op
           if (!j) { prev.textContent = bt('admin.actionFailed'); return; }
           prev.textContent = j.already_billed_in
             ? bt('admin.billUsageBilled').replace('{number}', j.already_billed_in)
-            : bt('admin.billUsagePreview').replace('{month}', monthName(ym)).replace('{total}', micro(j.usage.total_micro_usd)).replace('{calls}', adCompact(j.usage.calls));
+            : bt('admin.billUsagePreview').replace('{month}', monthName(ym)).replace('{total}', micro(j.usage.price_micro_usd)).replace('{calls}', adCompact(j.usage.calls))
+              .replace('{cost}', micro(j.usage.cost_micro_usd)).replace('{markup}', String((j.usage.markup_bps || 10000) / 10000));
         }).catch(function () { prev.textContent = bt('admin.actionFailed'); });
       }
       sel.addEventListener('change', preview); preview();
@@ -135,6 +144,22 @@ export const workspace_client_home_views_adminBilling_JS = `  // Billing: the op
       document.getElementById('wsxBillDraft').addEventListener('click', function () { submit('draft', this); });
       document.getElementById('wsxBillIssue').addEventListener('click', function () { submit('open', this); });
     }
+    // Operator only: this workspace's AI resale markup (empty = the instance default).
+    function markupHtml(mk) {
+      mk = mk || {};
+      var def = mk.instance_default || 1;
+      return '<div class="wsx-admin__budget" id="wsxBillMarkupBox"><div class="wsx-admin__budgethead"><div class="wsx-admin__cardlbl">' + esc(bt('admin.billMarkup')) + '</div>'
+        + '<div class="wsx-admin__cardval">' + esc(bt('admin.billMarkupInForce').replace('{markup}', String(mk.markup || def))) + '</div></div>'
+        + '<p class="wsx-field__note" style="margin:6px 0 10px">' + esc(bt('admin.billMarkupIntro').replace('{default}', String(def))) + '</p>'
+        + '<div class="wsx-admin__domain-add"><input class="wsx-field__in" style="width:110px" type="number" min="1" max="10" step="0.05" id="wsxBillMarkup" value="' + esc(mk.workspace_markup != null ? String(mk.workspace_markup) : '') + '" placeholder="' + esc(String(def)) + '"> \u00d7'
+        + '<button class="wsx-abtn" type="button" id="wsxBillMarkupSave">' + esc(bt('common.save')) + '</button>'
+        + (mk.workspace_markup != null ? '<button class="wsx-abtn" type="button" id="wsxBillMarkupReset">' + esc(bt('admin.billMarkupReset')) + '</button>' : '') + '</div></div>';
+    }
+    function saveMarkup(value, btn) {
+      // Usage numbers change with the markup: drop their cached copies too.
+      Object.keys(adDataCache).forEach(function (k) { if (k.indexOf('usage') === 0) delete adDataCache[k]; });
+      call(wsUrl('/ai-markup'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markup: value }) }, bt('admin.billMarkupSaved'), btn);
+    }
     function paint(res) {
       var invoices = (res && res.invoices) || [], manage = !!(res && res.can_manage);
       if (wrap) wrap.hidden = false;
@@ -145,8 +170,17 @@ export const workspace_client_home_views_adminBilling_JS = `  // Billing: the op
       var owedTxt = Object.keys(owed).map(function (c) { return money(owed[c], c); }).join(' + ');
       m.innerHTML = '<div class="wsx-admin__settings-section">' + head + '<p class="wsx-lens__intro">' + esc(bt(manage ? 'admin.billIntroManage' : 'admin.billIntro')) + '</p>'
         + (due.length ? '<div class="wsx-admin__cards"><div class="wsx-admin__card"><div class="wsx-admin__cardlbl">' + esc(bt('admin.billOwed')) + '</div><div class="wsx-admin__cardval">' + esc(owedTxt) + '</div><div class="wsx-admin__cardsub">' + esc(bt('admin.billOwedSub').replace('{n}', String(due.length))) + '</div></div></div>' : '')
-        + (manage ? '<div class="wsx-auto-bar"><button class="wsx-abtn" type="button" id="wsxBillNewBtn">' + esc(bt('admin.billNew')) + '</button></div>' + formHtml() : '')
+        + (manage ? markupHtml(res.markup) + '<div class="wsx-auto-bar"><button class="wsx-abtn" type="button" id="wsxBillNewBtn">' + esc(bt('admin.billNew')) + '</button></div>' + formHtml() : '')
         + (invoices.length ? '<div class="wsx-bill__list">' + invoices.map(function (i) { return invoiceHtml(i, manage); }).join('') + '</div>' : i18nEmpty('admin.billNone')) + '</div>';
+      var ms = document.getElementById('wsxBillMarkupSave'), mr = document.getElementById('wsxBillMarkupReset');
+      if (ms) ms.addEventListener('click', function () {
+        var raw = document.getElementById('wsxBillMarkup').value.trim();
+        if (raw === '') { saveMarkup(null, ms); return; }
+        var v = Number(raw);
+        if (!isFinite(v) || v < 1 || v > 10) { showToast(bt('admin.billMarkupInvalid'), 'error'); return; }
+        saveMarkup(v, ms);
+      });
+      if (mr) mr.addEventListener('click', function () { saveMarkup(null, mr); });
       var nb = document.getElementById('wsxBillNewBtn');
       if (nb) nb.addEventListener('click', function () { var f = document.getElementById('wsxBillForm'); if (f) { f.hidden = !f.hidden; if (!f.hidden && !f.getAttribute('data-wired')) { f.setAttribute('data-wired', '1'); wireForm(); } } });
       m.querySelectorAll('details[data-inv]').forEach(function (d) { d.addEventListener('toggle', function () { if (d.open) adBillOpenId = d.getAttribute('data-inv'); }); });

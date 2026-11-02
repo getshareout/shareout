@@ -130,7 +130,7 @@ The five paths: **membership** (`workspace_members`), **per-artifact invite**
 | `workspaces` | The tenant. Carries its own policy: `allowed_email_domains`/`allowed_emails` gate joining, `session_max_days` caps session life, `public_publish_policy` + `public_publish_approvals_required` govern publishing, `branding` and `feature_flags` are JSON. `locale` (`en`/`es`) is the language emails, the agent, the home shell and shared pages speak to its people. `member_folders_enabled` (default 1) lets plain members create Team Space folders and rename/delete the ones they created. |
 | `workspace_members` | Membership and `role` (`owner`/`admin`/`member`). `member_class` separates internal staff from external collaborators. |
 | `workspace_invite_claims` | Pending invites. `code_hash` only; `expires_at` and `claimed_at` make each single-use. `email_status` (`sent`/`failed`/`skipped`/`link_only`) with `email_sent_at` and `email_error` record whether the invite mail actually went out — null on rows minted before that was tracked. |
-| `workspace_llm_config` | Per-workspace AI settings: bring-your-own provider credentials (encrypted), `balance_micro_usd`, `markup_multiplier`, monthly budget, `gateway_model` override. |
+| `workspace_llm_config` | Per-workspace AI settings: bring-your-own provider credentials (encrypted), `balance_micro_usd`, monthly budget, `gateway_model` override, `ai_markup_bps` (AI resale markup; NULL = instance default). `markup_multiplier` is legacy and unread. |
 | `workspace_sso_config` | The workspace's own OIDC sign-in (Okta, Entra ID, …): `issuer`, `client_id`, the client secret encrypted with `CREDENTIALS_KEY`, and `email_domains` — the only addresses this IdP may sign in, each claimed by at most one workspace. `is_enforced` makes it the only sign-in method for those domains. Written by the instance owner only. |
 | `workspace_domains` | *(0020)* Customer-owned hostnames a workspace serves on (`portal.acme.example`), besides `<slug>.<apex>`. `hostname` is normalized (lowercase, punycode) and globally unique. Only `status = 'active'` routes; it takes a verified ownership check — `provider = 'cloudflare'` (a Cloudflare for SaaS custom hostname, `provider_id` its id, `ssl_status` its certificate) or `'manual'` (a DNS TXT record `verification_name` = `verification_token`). `is_primary` marks the one hostname links and emails use. |
 | `workspace_domain_handoffs` | *(0020)* One-time sign-in codes that carry an apex login to a custom hostname (whose cookie cannot be the apex's). `code_hash` only; bound to one `hostname`, `expires_at` a minute out, spent by `used_at`. |
@@ -322,7 +322,7 @@ erDiagram
 | `agent_messages` | Turns, with `suggested_edits` and `applied_at` when a turn proposed a change. |
 | `agent_usage` | Aggregated per-artifact, per-period agent usage. |
 | `agent_usage_events` | Per-call cost ledger: provider, model, tokens, `base_cost_micro_usd` vs `billed_cost_micro_usd`, `byo` flag. |
-| `instance_ai_settings` | Singleton (`id = 1`) instance-wide AI defaults: `default_gateway_model`, the fallback when a workspace has no `gateway_model` override. |
+| `instance_ai_settings` | Singleton (`id = 1`) instance-wide AI defaults: `default_gateway_model`, the fallback when a workspace has no `gateway_model` override; `default_markup_bps`, the AI resale markup for workspaces with none (NULL = at cost). |
 | `crews` | An autonomous agent: `instructions`, `model`, and hard limits (`max_iterations`, `run_budget_micro_usd`, `max_runtime_ms`). |
 | `crew_runs` | One execution: `status`, `termination_reason`, iterations, tokens, cost. |
 | `crew_run_events` | Ordered trace of a run — tool calls, inputs, outputs, latency. The debugging surface. |
@@ -444,6 +444,12 @@ An operator who does bill a workspace — a fee, a setup, a closed month of AI u
 cost — records it in `workspace_invoices` (0034). It is a ledger, not a paywall: nothing is
 charged by ShareOut and nothing is gated on it. The workspace pays outside (a bank transfer),
 the operator attaches the receipt and marks the invoice paid.
+
+AI usage is resold at **cost × a markup** in basis points (0035): `workspace_llm_config.ai_markup_bps`,
+else `instance_ai_settings.default_markup_bps`, else 10000 (at cost). Every AI amount a workspace
+sees — the monthly budget, the Usage tab, invoices, crew and Knowledge costs — is at that price;
+only platform admins see cost and margin (`src/data/ai-markup.ts`). The older
+`workspace_llm_config.markup_multiplier` (REAL, default 1.30) is not read by anything.
 
 ```mermaid
 erDiagram

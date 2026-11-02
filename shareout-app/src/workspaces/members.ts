@@ -7,6 +7,7 @@ import { getWorkspaceInviteContext, inviteMany, inviteOrAddMember, MAX_BULK_INVI
 import { parseEmails } from './parse-emails';
 import { logAudit } from '../audit';
 import { evictReturnedTokens } from '../auth/token-cache';
+import { resell, workspaceMarkup } from '../data/ai-markup';
 
 export async function handleListWorkspaceMembers(
   request: Request,
@@ -183,6 +184,7 @@ export async function handleListWorkspaceMemberMetrics(
     ai_cost_micro_usd: number; comment_count: number; last_view_ts: number | null;
   }>();
 
+  const { bps } = await workspaceMarkup(env, workspaceId); // AI cost is shown at the workspace's price
   const members = (rows.results || []).map((r) => {
     const lastLoginMs = r.last_login_at ? new Date(r.last_login_at).getTime() : 0;
     const lastViewMs = r.last_view_ts ? r.last_view_ts * 1000 : 0;
@@ -201,7 +203,7 @@ export async function handleListWorkspaceMemberMetrics(
       view_count: r.view_count,
       views_30d: r.views_30d,
       ai_tokens: r.ai_tokens,
-      ai_cost_usd: (r.ai_cost_micro_usd || 0) / 1_000_000,
+      ai_cost_usd: resell(r.ai_cost_micro_usd || 0, bps) / 1_000_000,
       comment_count: r.comment_count,
     };
   });

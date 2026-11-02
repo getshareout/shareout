@@ -31,10 +31,10 @@ const invoice = {
     { kind: 'item', description: 'Platform setup', quantity: 1, unit_cents: 30_000, amount_cents: 30_000 },
     { kind: 'item', description: 'Platform fee', quantity: 1, unit_cents: 5_000, amount_cents: 5_000 },
     { kind: 'usage', description: 'AI usage — October 2026', quantity: 1, unit_cents: 1_575, amount_cents: 1_575, usage: {
-      month: '2026-10', total_micro_usd: 15_750_000, calls: 3, input_tokens: 509_000, output_tokens: 71_000,
-      by_kind: [{ key: 'assistant_chat', calls: 2, input_tokens: 409_000, output_tokens: 51_000, cost_micro_usd: 12_250_000 }],
-      by_model: [{ key: 'anthropic/claude-sonnet-5', calls: 2, input_tokens: 409_000, output_tokens: 51_000, cost_micro_usd: 12_250_000 }],
-      by_member: [{ key: '', calls: 1, input_tokens: 100_000, output_tokens: 20_000, cost_micro_usd: 3_500_000 }],
+      month: '2026-10', price_micro_usd: 23_625_000, cost_micro_usd: 15_750_000, markup_bps: 15_000, calls: 3, input_tokens: 509_000, output_tokens: 71_000,
+      by_kind: [{ key: 'assistant_chat', calls: 2, input_tokens: 409_000, output_tokens: 51_000, price_micro_usd: 18_375_000, cost_micro_usd: 12_250_000 }],
+      by_model: [{ key: 'anthropic/claude-sonnet-5', calls: 2, input_tokens: 409_000, output_tokens: 51_000, price_micro_usd: 18_375_000, cost_micro_usd: 12_250_000 }],
+      by_member: [{ key: '', calls: 1, input_tokens: 100_000, output_tokens: 20_000, price_micro_usd: 5_250_000, cost_micro_usd: 3_500_000 }],
     } },
   ],
   notes: 'Bank X <b>CBU</b> 000123', due_at: '2026-11-10T00:00:00.000Z', issued_at: '2026-11-02T12:00:00.000Z',
@@ -76,10 +76,16 @@ describe('Admin Billing section', () => {
     expect(html).toContain('Bank X &lt;b&gt;CBU&lt;/b&gt; 000123');
     expect(html).not.toContain('data-inv-act=');
     expect(html).not.toContain('wsxBillForm');
+    // Sale prices only: no cost column, no margin note, no markup control.
+    expect(html).toContain('$18.38');
+    expect(html).not.toContain('Our cost');
+    expect(html).not.toContain('data-op-note');
+    expect(html).not.toContain('$12.25');
+    expect(html).not.toContain('wsxBillMarkupBox');
   });
 
   it('gives the operator the form and the paid/void actions', async () => {
-    const m = mount('en', { invoices: [invoice], can_manage: true });
+    const m = mount('en', { invoices: [invoice], can_manage: true, markup: { markup: 1.5, workspace_markup: null, instance_default: 1.5 } });
     await m.run();
     const html = m.mountEl.innerHTML;
     expect(html).toContain('id="wsxBillNewBtn"');
@@ -87,6 +93,13 @@ describe('Admin Billing section', () => {
     expect(html).toContain('data-inv-act="paid"');
     expect(html).toContain('data-inv-act="void"');
     expect(html).toContain('data-inv-up="receipt"');
+    // The operator sees cost, margin and the markup control.
+    expect(html).toContain('Our cost');
+    expect(html).toContain('$12.25');
+    expect(html).toContain('data-op-note');
+    expect(html).toContain('markup 1.5×');
+    expect(html).toContain('id="wsxBillMarkupBox"');
+    expect(html).toContain('In force: 1.5×');
   });
 
   it('speaks Spanish', async () => {
