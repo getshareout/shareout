@@ -21,6 +21,8 @@ import { localeForViewer } from '../i18n/locale';
 import { PAGE_AGENT_REV, injectPageAgent, isSafePagePath, isSafeSectionId } from './page-agent';
 import { hasMcpCapability } from '../mcp-broker/capabilities';
 import { servingOrigin } from '../workspaces/domains/host-binding';
+import { readViewPass } from '../artifacts/view-codes/gate';
+import { VIEW_CONTENT_AUTH, injectViewGuard, isTopLevelVisit, serveOneTimeViewer } from '../artifacts/view-codes/viewer';
 
 function injectCommentsAgent(resp: Response, baseUrl: string): Response {
   const tag = `<script src="${baseUrl}${versionedBundlePath('/sdk/comments-agent.js')}" defer></script>`;
@@ -97,7 +99,7 @@ export async function gateArtifactSideAsset(
   if ((result.moderation_status ?? 'approved') === 'blocked') {
     return takedownPage(undefined, await localeForViewer(env, { workspaceId: result.workspace_id, request }));
   }
-  if ((normalizeVisibility(result.visibility) || 'public') === 'public') return { isOpen: true };
+  if ((normalizeVisibility(result.visibility) || 'public') === 'public' && result.auth_method !== 'onetime') return { isOpen: true };
   return (await checkAccess(request, env, slug, result)) ?? { isOpen: false };
 }
 
@@ -275,10 +277,16 @@ export async function handleServe(
   }
 
   const visibility = normalizeVisibility(result.visibility) || 'public';
+  // One-time view pages are closed whatever their visibility says.
+  const oneTime = result.auth_method === 'onetime';
   // Only explicitly open artifacts skip the content-domain capability gate. Everything
   // else — private, the legacy 'workspace' value, and any unknown future value — is
   // treated as protected (fail-closed), so the content domain never leaks gated bytes.
-  const isOpen = visibility === 'public';
+  const isOpen = visibility === 'public' && !oneTime;
+  // codeFrame: this request is a one-time code holder's view of the page — the content
+  // domain says so by its token, an app origin by the code's pass cookie.
+  let codeFrame = false;
+  let viewPass: Awaited<ReturnType<typeof readViewPass>> = null;
 
   if (contentOrigin) {
     // On the content domain there is no session cookie. The trusted shell already
@@ -287,15 +295,16 @@ export async function handleServe(
     // token can never double as a data-API credential — see checkDataAuth).
     if (!isOpen) {
       const payload = opts.ct ? await verifyAccessToken(opts.ct, result.artifact_id, env) : null;
-      if (!payload || payload.authType !== 'content') {
+      if (!payload || (payload.authType !== 'content' && payload.authType !== VIEW_CONTENT_AUTH)) {
         return new Response('Forbidden', { status: 403 });
       }
+      codeFrame = payload.authType === VIEW_CONTENT_AUTH;
     }
-  } else if (visibility === 'private' || visibility === 'workspace') {
+  } else if (visibility === 'private' || visibility === 'workspace' || oneTime) {
     // Private/workspace is closed: no social-crawler OG bypass (that used to serve
     // title/description/thumbnail to Googlebot, Slackbot, etc. without auth). Unauthorized
     // callers get a generic login/denied gate with no artifact metadata.
-    const accessResult = await checkAccess(request, env, slug, result);
+    const accessResult = await checkAccess(request, env, slug, result, { viewPass: true });
     if (accessResult) {
       // Held-from-public page: the publish was public but the safety check forced it
       // private (moderation_held_visibility set). An anon/unauthorized visitor gets a
@@ -329,6 +338,27 @@ export async function handleServe(
     asset = mobileEntryAsset;
   } else if (result.r2_key && result.mime && result.size_bytes) {
     asset = { r2_key: result.r2_key, mime: result.mime, size_bytes: result.size_bytes };
+  }
+
+  // A code holder gets the locked-down viewer and the page's own files with the guard
+  // in — never the toolbar, the page agent, a download, or the frame URL in a tab.
+  if (oneTime && !contentOrigin) {
+    viewPass = await readViewPass(request, env, result.artifact_id);
+    codeFrame = !!viewPass && (isRawRequest || !!assetPath);
+  }
+  if (codeFrame || viewPass) {
+    if (!codeFrame) {
+      if (asset?.mime !== 'text/html') return notFound(request);
+      return serveOneTimeViewer(request, env, {
+        slug, artifactId: result.artifact_id, entrypoint: effectiveEntrypoint, live: viewPass!,
+      });
+    }
+    if (isTopLevelVisit(request)) return new Response('Forbidden', { status: 403 });
+    if (!asset) return notFound(request);
+    return serveAsset(request, env, asset, slug, true, {
+      noStore: true, relaxCsp: true, lockCsp, sandbox: !contentOrigin, executionCtx: opts.executionCtx,
+      ...(asset.mime === 'text/html' ? { transform: injectViewGuard } : {}),
+    });
   }
 
   const baseUrl = servingOrigin(env);

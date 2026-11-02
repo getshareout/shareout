@@ -1,6 +1,6 @@
 import type { Env } from '../types';
 import { getSessionUser } from '../auth/session';
-import { loginPage, accessDeniedPage, passwordLoginPage, credentialsLoginPage } from '../auth/pages';
+import { loginPage, accessDeniedPage, passwordLoginPage, credentialsLoginPage, viewCodeLoginPage } from '../auth/pages';
 import { verifyAccessToken } from '../auth/artifact-auth';
 import { microsoftOAuthConfigured } from '../config/auth-providers';
 import { getVisibilityScope, placeholders } from '../account-links';
@@ -11,6 +11,7 @@ import { recordSpaceGuestView, spaceGuestFor } from '../sharees/space-guest';
 import { getPendingAccessRequest } from '../artifacts/access-requests';
 import type { ArtifactInfo } from './types';
 import { pageLocale } from '../i18n/accept-language';
+import { readViewPass } from '../artifacts/view-codes/gate';
 
 // The name to attribute a share to on the sign-in screen — the page owner, but only
 // when the page is actually meant for others (has collaborators or workspace visibility).
@@ -46,12 +47,29 @@ export async function checkAccess(
   request: Request,
   env: Env,
   slug: string,
-  artifact: ArtifactInfo
+  artifact: ArtifactInfo,
+  // viewPass: a one-time code's pass counts. Only the page itself (the viewer and its
+  // own frame) opts in — thumbnails, the text version, side assets and every other
+  // surface stay closed to a code holder, or a code would buy a copy of the page.
+  opts: { viewPass?: boolean } = {},
 ): Promise<Response | null> {
   // 'google' is the historical name for "any signed-in ShareOut session" — the sign-in
   // page falls back to email OTP when the instance has no Google credentials. It is not
   // a Google-only gate.
   const authMethod = artifact.auth_method || 'google';
+
+  // One-time view: a redeemed code's pass, for its window only. The owner and named
+  // collaborators still get in with their session (to preview and manage it). Nothing
+  // else — no workspace visibility, grant or space-guest — opens a one-time page.
+  if (authMethod === 'onetime') {
+    if (opts.viewPass && await readViewPass(request, env, artifact.artifact_id)) return null;
+    const sessionUser = await getSessionUser(request, env);
+    if (sessionUser) {
+      const scope = await getVisibilityScope(env, sessionUser);
+      if (await ownerOrCollaborator(env, artifact, scope.userIds, scope.emails)) return null;
+    }
+    return viewCodeLoginPage(slug, artifact.artifact_id, pageLocale(request));
+  }
 
   if (authMethod === 'password' || authMethod === 'credentials') {
     const hasAccess = await verifyAccessToken(request, env, artifact.artifact_id);

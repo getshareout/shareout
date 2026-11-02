@@ -26,6 +26,28 @@ Siempre tenés el control de quién puede abrir tu artefacto:
 
 Podés cambiar de idea cuando quieras — hacer pública un artefacto privado cuando esté listo, o volver a cerrar uno.
 
+## Mostralo una sola vez
+
+Para algo confidencial — precios nuevos, un objetivo, un aviso para tus encargados de
+sucursal — podés darle a cada persona **el link más su propio código** en vez de invitarla:
+
+- Abre el link, escribe su código y ve la página. **Sin cuenta, sin iniciar sesión.**
+- Cada código funciona **una sola vez**. La página se cierra sola después del tiempo que
+  elijas (90 segundos si no elegís otro), sin cuenta regresiva en pantalla.
+- **Su nombre aparece escrito sobre la página**, así cualquier captura o foto muestra de quién salió.
+- Copiar, imprimir, guardar y descargar están bloqueados.
+- Ves quién lo abrió, cuándo, desde qué tipo de dispositivo y qué intentó hacer (copiar,
+  imprimir, salir de la página).
+
+Pedíselo a un agente de IA que use la skill de ShareOut (Claude Code, por ejemplo): *"Hacé
+esta página de vista única para Ana, Luis y Marta, 90 segundos cada uno"*. Te da un mensaje
+listo para mandarle a cada persona. Para desarrolladores: [la API](/es/start/introduction/) (`/v1/artifacts/{id}/view-codes`).
+
+:::caution[Lo que ninguna página web puede impedir]
+Nadie puede bloquear una captura de pantalla, ni que alguien le saque una foto a la pantalla
+con otro celular. El nombre sobre la página es lo que hace que eso sea un riesgo para quien lo haga.
+:::
+
 ## Pedí acceso
 
 Si alguien te manda un link a un **artefacto privado** al que todavía no tenés acceso,

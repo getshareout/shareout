@@ -1,0 +1,253 @@
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { Env } from '../../../src/types';
+import type { AuthUser } from '../../../src/api-auth';
+import { applyMigrations, e as baseEnv } from '../helpers/migrated-db';
+import {
+  MAX_EVENTS_PER_CODE, VIEW_SECONDS_DEFAULT, generateViewCode, normalizeViewCode, redeemViewCode,
+  createViewCodes, getLiveViewCode, recordViewCodeEvent, listViewCodes,
+} from '../../../src/artifacts/view-codes/store';
+import { handleViewCodeAuth, handleViewCodeEvent, readViewPass } from '../../../src/artifacts/view-codes/gate';
+import {
+  handleCreateViewCodes, handleDisableViewCodes, handleListViewCodes, handleRevokeViewCode,
+} from '../../../src/artifacts/view-codes/api';
+import { checkAccess } from '../../../src/serve/access';
+import type { ArtifactInfo } from '../../../src/serve/types';
+
+const store = new Map<string, string>();
+const kv = {
+  get: async (k: string) => store.get(k) ?? null,
+  put: async (k: string, v: string) => void store.set(k, v),
+  delete: async (k: string) => void store.delete(k),
+};
+const SLUGS = { get: async () => null, put: async () => undefined, delete: async () => undefined };
+const e = {
+  ...baseEnv, SESSION_SECRET: 'test-session-secret', RATE_LIMIT_KV: kv, SLUGS,
+  SHAREOUT_BASE_URL: 'https://shareout.test',
+} as unknown as Env;
+
+const ART = 'art_vcd';
+const owner: AuthUser = { id: 'usr_vcd_owner', email: 'owner@vcd.test', username: null };
+const stranger: AuthUser = { id: 'usr_vcd_other', email: 'other@vcd.test', username: null };
+
+const api = (method: string, body?: unknown) =>
+  new Request(`https://shareout.test/v1/artifacts/${ART}/view-codes`, {
+    method, ...(body === undefined ? {} : { body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }),
+  });
+
+function codeForm(code: string, ip = '203.0.113.20', ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile') {
+  const fd = new FormData();
+  fd.set('slug', 'vcd');
+  fd.set('artifact_id', ART);
+  fd.set('code', code);
+  return new Request('https://shareout.test/auth/view-code', {
+    method: 'POST', body: fd, headers: { 'cf-connecting-ip': ip, 'User-Agent': ua },
+  });
+}
+
+const passCookie = (res: Response) => (res.headers.get('Set-Cookie') || '').split(';')[0];
+
+function artifactInfo(): ArtifactInfo {
+  return {
+    version_id: 'ver_vcd', entrypoint: 'index.html', mobile_entrypoint: null, artifact_id: ART,
+    artifact_name: 'Secret', description: null, social_title: null, social_description: null,
+    social_image_url: null, thumbnail_ext: null, visibility: 'private', auth_method: 'onetime',
+    owner_id: owner.id, workspace_id: null, paused: 0, has_mobile: 0, pwa_config: null,
+    artifact_type: 'html', type_metadata: null, access_policy: null, manifest_json: null,
+  } as ArtifactInfo;
+}
+
+async function newCodes(labels: string[], seconds?: number) {
+  const res = await handleCreateViewCodes(api('POST', { recipients: labels, view_seconds: seconds }), e, owner, ART);
+  expect(res.status).toBe(201);
+  return (await res.json()) as { url: string; view_seconds: number; codes: { id: string; label: string; code: string }[] };
+}
+
+beforeAll(applyMigrations);
+beforeEach(async () => {
+  store.clear();
+  await e.DB.prepare('DELETE FROM artifact_view_code_events').run();
+  await e.DB.prepare('DELETE FROM artifact_view_codes').run();
+  await e.DB.prepare('DELETE FROM artifacts WHERE id = ?').bind(ART).run();
+  await e.DB.prepare('INSERT OR IGNORE INTO users (id, email) VALUES (?, ?), (?, ?)')
+    .bind(owner.id, owner.email, stranger.id, stranger.email).run();
+  await e.DB.prepare(
+    "INSERT INTO artifacts (id, name, slug, owner_id, visibility, auth_method) VALUES (?, 'Secret', 'vcd', ?, 'public', 'google')",
+  ).bind(ART, owner.id).run();
+});
+
+describe('view codes: format', () => {
+  it('generates XXXX-XXXX codes without look-alike characters', () => {
+    for (let i = 0; i < 200; i++) {
+      const c = generateViewCode();
+      expect(c).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
+    }
+  });
+
+  it('accepts what people type: lower case, spaces, dashes', () => {
+    expect(normalizeViewCode(' k7m4 - qp9x ')).toBe('K7M4QP9X');
+    expect(normalizeViewCode('K7M4QP9')).toBeNull();
+    expect(normalizeViewCode('K7M4QP90')).toBeNull(); // 0 is never in a code
+    expect(normalizeViewCode(null)).toBeNull();
+  });
+});
+
+describe('view codes: API', () => {
+  it('creates one code per person and makes the page private and one-time', async () => {
+    const out = await newCodes(['Ana Gómez', 'Luis · Sucursal Centro']);
+    expect(out.view_seconds).toBe(VIEW_SECONDS_DEFAULT);
+    expect(out.codes.map((c) => c.label)).toEqual(['Ana Gómez', 'Luis · Sucursal Centro']);
+    expect(out.url).toContain('/a/vcd/');
+    const row = await e.DB.prepare('SELECT visibility, auth_method FROM artifacts WHERE id = ?').bind(ART)
+      .first<{ visibility: string; auth_method: string }>();
+    expect(row).toEqual({ visibility: 'private', auth_method: 'onetime' });
+    // Only the hash is stored.
+    const stored = await e.DB.prepare('SELECT code_hash FROM artifact_view_codes WHERE artifact_id = ?').bind(ART).all<{ code_hash: string }>();
+    for (const r of stored.results) expect(out.codes.some((c) => r.code_hash.includes(c.code))).toBe(false);
+  });
+
+  it('validates recipients and view_seconds', async () => {
+    expect((await handleCreateViewCodes(api('POST', { recipients: [] }), e, owner, ART)).status).toBe(400);
+    expect((await handleCreateViewCodes(api('POST', { recipients: ['  '] }), e, owner, ART)).status).toBe(400);
+    expect((await handleCreateViewCodes(api('POST', { recipients: ['Ana'], view_seconds: 5 }), e, owner, ART)).status).toBe(400);
+    expect((await handleCreateViewCodes(api('POST', { recipients: ['Ana'], view_seconds: 1.5 }), e, owner, ART)).status).toBe(400);
+    expect((await handleCreateViewCodes(api('POST', { recipients: [{ label: 'Ana' }], view_seconds: 120 }), e, owner, ART)).status).toBe(201);
+  });
+
+  it('refuses people without a sharing role, and non-HTML pages', async () => {
+    const res = await handleCreateViewCodes(api('POST', { recipients: ['Ana'] }), e, stranger, ART);
+    expect(res.status).toBe(403);
+    await e.DB.prepare("UPDATE artifacts SET artifact_type = 'csv' WHERE id = ?").bind(ART).run();
+    const csv = await handleCreateViewCodes(api('POST', { recipients: ['Ana'] }), e, owner, ART);
+    expect(csv.status).toBe(400);
+    expect(await csv.json()).toMatchObject({ code: 'ONETIME_HTML_ONLY' });
+  });
+
+  it('lists who opened, from what device, and what they tried — never the codes', async () => {
+    const { codes } = await newCodes(['Ana', 'Luis']);
+    await handleViewCodeAuth(codeForm(codes[0].code), e);
+    const open = await getLiveViewCode(e, ART, codes[0].id);
+    await recordViewCodeEvent(e, open!.id, 'copy');
+    await recordViewCodeEvent(e, open!.id, 'copy');
+    await recordViewCodeEvent(e, open!.id, 'left_page');
+
+    const res = await handleListViewCodes(e, owner, ART);
+    const body = await res.json() as { enabled: boolean; view_codes: Record<string, unknown>[] };
+    expect(body.enabled).toBe(true);
+    const ana = body.view_codes.find((c) => c.label === 'Ana')!;
+    const luis = body.view_codes.find((c) => c.label === 'Luis')!;
+    expect(ana).toMatchObject({ status: 'open', opened_device: 'phone', attempts: { copy: 2, left_page: 1 } });
+    expect(luis).toMatchObject({ status: 'unused', opened_at: null, attempts: {} });
+    expect(JSON.stringify(body)).not.toContain(codes[0].code);
+    expect((await handleListViewCodes(e, stranger, ART)).status).toBe(403);
+  });
+
+  it('revokes one code, and turning it off revokes all and goes back to sign-in', async () => {
+    const { codes } = await newCodes(['Ana', 'Luis']);
+    expect((await handleRevokeViewCode(e, owner, ART, codes[0].id)).status).toBe(200);
+    expect((await handleRevokeViewCode(e, owner, ART, 'vcd_nope')).status).toBe(404);
+    expect((await handleViewCodeAuth(codeForm(codes[0].code), e)).status).toBe(401);
+
+    expect((await handleDisableViewCodes(e, owner, ART)).status).toBe(200);
+    const row = await e.DB.prepare('SELECT visibility, auth_method FROM artifacts WHERE id = ?').bind(ART)
+      .first<{ visibility: string; auth_method: string }>();
+    expect(row).toEqual({ visibility: 'private', auth_method: 'google' });
+    expect((await handleViewCodeAuth(codeForm(codes[1].code), e)).status).toBe(404);
+  });
+});
+
+describe('view codes: the gate', () => {
+  it('a code opens the page once, with a pass that lasts exactly its window', async () => {
+    const { codes } = await newCodes(['Ana'], 90);
+    const first = await handleViewCodeAuth(codeForm(codes[0].code.toLowerCase()), e);
+    expect(first.status).toBe(302);
+    expect(first.headers.get('Location')).toBe('/a/vcd/');
+    const cookie = first.headers.get('Set-Cookie')!;
+    expect(cookie).toContain(`shareout_access_${ART}=`);
+    expect(cookie).toMatch(/Max-Age=(89|90)\b/);
+    expect(cookie).toContain('HttpOnly');
+
+    const again = await handleViewCodeAuth(codeForm(codes[0].code, '198.51.100.4'), e);
+    expect(again.status).toBe(401);
+    expect(again.headers.get('Set-Cookie')).toBeNull();
+    expect(await again.text()).toMatch(/already used|ya se usó/);
+  });
+
+  it('two devices racing the same code: exactly one wins', async () => {
+    const { codes } = await newCodes(['Ana']);
+    const results = await Promise.all([1, 2, 3].map(() => redeemViewCode(e, ART, codes[0].code, 'computer')));
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+  });
+
+  it('a wrong code says so, and guessing is throttled', async () => {
+    await newCodes(['Ana']);
+    const wrong = await handleViewCodeAuth(codeForm('AAAA-BBBB'), e);
+    expect(wrong.status).toBe(401);
+    expect(await wrong.text()).toMatch(/doesn’t work|no funciona/);
+    let last = wrong;
+    for (let i = 0; i < 25; i++) last = await handleViewCodeAuth(codeForm('AAAA-BBBB'), e);
+    expect(last.status).toBe(429);
+  });
+
+  it('the gate page never tells the viewer the page is one-time or timed', async () => {
+    await newCodes(['Ana']);
+    const res = await checkAccess(new Request('https://shareout.test/a/vcd/', { headers: { 'Accept-Language': 'es' } }), e, 'vcd', artifactInfo(), { viewPass: true });
+    expect(res!.status).toBe(401);
+    const html = await res!.text();
+    const card = html.slice(html.indexOf('<div class="card">'), html.indexOf('</form>'));
+    expect(card).toContain('Ingresá tu código');
+    expect(card).not.toMatch(/una vez|segundos|expira|vence|once|seconds|expire/i);
+  });
+
+  it('the pass opens the page itself only — every other surface stays closed to it', async () => {
+    const { codes } = await newCodes(['Ana']);
+    const cookie = passCookie(await handleViewCodeAuth(codeForm(codes[0].code), e));
+    const req = new Request('https://shareout.test/a/vcd/', { headers: { Cookie: cookie } });
+    expect(await checkAccess(req, e, 'vcd', artifactInfo(), { viewPass: true })).toBeNull();
+    expect((await checkAccess(req, e, 'vcd', artifactInfo()))!.status).toBe(401);
+    expect(await readViewPass(req, e, ART)).toMatchObject({ label: 'Ana' });
+  });
+
+  it('the pass dies when the window ends, or the code is revoked', async () => {
+    const { codes } = await newCodes(['Ana', 'Luis'], 60);
+    const cookie = passCookie(await handleViewCodeAuth(codeForm(codes[0].code), e));
+    const req = new Request('https://shareout.test/a/vcd/', { headers: { Cookie: cookie } });
+    await e.DB.prepare('UPDATE artifact_view_codes SET opened_at = ? WHERE id = ?')
+      .bind(new Date(Date.now() - 61_000).toISOString(), codes[0].id).run();
+    expect(await readViewPass(req, e, ART)).toBeNull();
+
+    const cookie2 = passCookie(await handleViewCodeAuth(codeForm(codes[1].code), e));
+    const req2 = new Request('https://shareout.test/a/vcd/', { headers: { Cookie: cookie2 } });
+    expect(await readViewPass(req2, e, ART)).not.toBeNull();
+    await handleRevokeViewCode(e, owner, ART, codes[1].id);
+    expect(await readViewPass(req2, e, ART)).toBeNull();
+    const list = await listViewCodes(e, ART);
+    expect(list.find((c) => c.label === 'Ana')!.status).toBe('viewed');
+    expect(list.find((c) => c.label === 'Ana')!.closed_at).not.toBeNull();
+  });
+});
+
+describe('view codes: attempt log', () => {
+  const event = (cookie: string | null, body: unknown, origin = 'https://shareout.test') =>
+    new Request('https://shareout.test/auth/view-code/event', {
+      method: 'POST', body: JSON.stringify(body),
+      headers: { 'Content-Type': 'text/plain', Origin: origin, ...(cookie ? { Cookie: cookie } : {}) },
+    });
+
+  it('logs attempts for a live pass only, from this origin only, known kinds only', async () => {
+    const { codes } = await newCodes(['Ana']);
+    const cookie = passCookie(await handleViewCodeAuth(codeForm(codes[0].code), e));
+    expect((await handleViewCodeEvent(event(cookie, { artifact_id: ART, kind: 'print' }), e)).status).toBe(204);
+    expect((await handleViewCodeEvent(event(null, { artifact_id: ART, kind: 'print' }), e)).status).toBe(403);
+    expect((await handleViewCodeEvent(event(cookie, { artifact_id: ART, kind: 'print' }, 'https://evil.test'), e)).status).toBe(403);
+    expect((await handleViewCodeEvent(event(cookie, { artifact_id: ART, kind: 'rm -rf' }), e)).status).toBe(400);
+    const rows = await e.DB.prepare('SELECT kind FROM artifact_view_code_events WHERE code_id = ?').bind(codes[0].id).all<{ kind: string }>();
+    expect(rows.results.map((r) => r.kind)).toEqual(['print']);
+  });
+
+  it('caps the log per code', async () => {
+    const [code] = await createViewCodes(e, ART, ['Ana'], 90, owner.id);
+    for (let i = 0; i < MAX_EVENTS_PER_CODE + 10; i++) await recordViewCodeEvent(e, code.id, 'left_page');
+    const n = await e.DB.prepare('SELECT COUNT(*) AS n FROM artifact_view_code_events WHERE code_id = ?').bind(code.id).first<{ n: number }>();
+    expect(n!.n).toBe(MAX_EVENTS_PER_CODE);
+  });
+});

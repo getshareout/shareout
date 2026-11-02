@@ -28,6 +28,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Email files to workspace / workspace file inbox / share from phone | [team/assets.md](team/assets.md#add-files-without-opening-assets) | [team/workspace-assistant.md](team/workspace-assistant.md#file-attachments), [team/admin-portal.md](team/admin-portal.md) |
 | Build a page from an uploaded/emailed file (assistant) | [team/workspace-assistant.md](team/workspace-assistant.md#file-attachments) | [team/assets.md](team/assets.md) |
 | Share folders/artifacts OUTSIDE the team (clients, partners, investors) | [team/external-sharing.md](team/external-sharing.md) | [team/SKILL.md](team/SKILL.md), [team/admin-portal.md](team/admin-portal.md) |
+| Show a confidential page to named people ONCE — link + personal code, no sign-in, closes by itself, watermark, no copy/download | [team/one-time-view.md](team/one-time-view.md) | [team/external-sharing.md](team/external-sharing.md) |
 | Share one folder with an outside person (expiry, client portal link, who opened what) | [team/external-sharing.md](team/external-sharing.md#share-with-one-person-api) | [team/folders.md](team/folders.md#who-can-see-a-folder) |
 | Scoped external API token (client reads only granted data) | [team/external-sharing.md](team/external-sharing.md#scoped-api-tokens) | [team/agent-tokens.md](team/agent-tokens.md) |
 | Private notes ABOUT a client (AI auto-reads + updates) | [team/external-sharing.md](team/external-sharing.md#client-notes-ai-memory-about-a-client) | [team/workspace-assistant.md](team/workspace-assistant.md) |
@@ -149,6 +150,7 @@ ShareOutSkill/
 │   ├── assets.md                 # Asset library — folders, visibility, deliverables, gated links
 │   ├── knowledge.md              # Workspace Knowledge — learned library, Guidance, consolidator
 │   ├── external-sharing.md       # Share OUTSIDE the team — clients, grants, /shared portal, scoped tokens
+│   ├── one-time-view.md          # Link + personal code, one look each: watermark, silent close, attempt log
 │   ├── admin-portal.md           # Admin lens — members, roles, governance
 │   ├── agent-tokens.md           # Workspace Agent tokens (sot_ service accounts)
 │   ├── folders.md                # Team Space folders

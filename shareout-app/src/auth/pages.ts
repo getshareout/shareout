@@ -814,3 +814,66 @@ export function credentialsLoginPage(
     </div>
   </div>`, 401);
 }
+
+const VIEW_CODE_COPY = {
+  en: {
+    pageTitle: 'Enter your code - ShareOut',
+    title: 'Enter your code',
+    body: 'Type the code you were sent to open this content.',
+    label: 'Code',
+    open: 'Open',
+    invalid: 'That code doesn’t work. Check it and try again.',
+    used: 'This code was already used. Ask whoever sent it for a new one.',
+    throttled: 'Too many tries. Try again in a few minutes.',
+    goneTitle: 'No longer available',
+    goneBody: 'This content is no longer available.',
+  },
+  es: {
+    pageTitle: 'Ingresá tu código - ShareOut',
+    title: 'Ingresá tu código',
+    body: 'Escribí el código que te enviaron para ver este contenido.',
+    label: 'Código',
+    open: 'Abrir',
+    invalid: 'Ese código no funciona. Revisalo y probá de nuevo.',
+    used: 'Este código ya se usó. Pedile uno nuevo a quien te lo envió.',
+    throttled: 'Demasiados intentos. Probá de nuevo en unos minutos.',
+    goneTitle: 'Ya no está disponible',
+    goneBody: 'Este contenido ya no está disponible.',
+  },
+} satisfies Record<PageLocale, Record<string, string>>;
+export type ViewCodeError = 'invalid' | 'used' | 'throttled';
+
+/** The one-time view gate: link + a personal code, no account. Says nothing about the
+ *  code being single-use or the page closing — the viewer finds out when it closes. */
+export function viewCodeLoginPage(
+  slug: string,
+  artifactId: string,
+  lang: PageLocale = 'en',
+  error?: ViewCodeError,
+  status = 401,
+): Response {
+  const c = VIEW_CODE_COPY[lang] ?? VIEW_CODE_COPY.en;
+  return renderAuthPage(c.pageTitle, `
+  <div class="card">
+    <div class="icon icon-primary">${LOCK_ICON}</div>
+    <h1>${escapeHtml(c.title)}</h1>
+    <p>${escapeHtml(c.body)}</p>
+    ${error ? `<div class="error-box" role="alert">${escapeHtml(c[error])}</div>` : ''}
+    <form method="POST" action="/auth/view-code">
+      <input type="hidden" name="slug" value="${escapeHtml(slug)}">
+      <input type="hidden" name="artifact_id" value="${escapeHtml(artifactId)}">
+      <input type="text" name="code" placeholder="XXXX-XXXX" aria-label="${escapeHtml(c.label)}" required autofocus
+        autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="16">
+      <button type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(c.open)}</button>
+    </form>
+    <div class="footer">
+      Powered by <a href="/" class="footer-brand">${brandMarkImg('footer-mark', 16)}ShareOut</a>
+    </div>
+  </div>`, status, { lang });
+}
+
+/** Shown in place of a one-time page once its time is up. */
+export function viewCodeGoneCopy(lang: PageLocale = 'en'): { title: string; body: string } {
+  const c = VIEW_CODE_COPY[lang] ?? VIEW_CODE_COPY.en;
+  return { title: c.goneTitle, body: c.goneBody };
+}

@@ -47,7 +47,7 @@ async function gateThrottled(request: Request, env: Env, artifactId: string, slu
  * and the redirect went to the apex path `/a/{slug}/` — which that host does not
  * serve. Entering the password on a protected artifact left you somewhere else.
  */
-function artifactLocation(request: Request, slug: string, env: Env): string {
+export function artifactLocation(request: Request, slug: string, env: Env): string {
   const host = new URL(request.url).hostname;
   return parseSubdomainFromEnv(host, env).isSubdomain ? `/${slug}` : `/a/${slug}/`;
 }

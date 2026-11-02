@@ -450,10 +450,10 @@ async function checkDataAuth(
     }
   }
 
-  // A space-guest cookie whose grant reaches this artifact. Never on a password or
-  // credentials page (the password is that page's only way in). A cookie-authenticated
+  // A space-guest cookie whose grant reaches this artifact. Never on a password,
+  // credentials or one-time page (the password / code is that page's only way in). A cookie-authenticated
   // write must come from this instance (CSRF).
-  if (artifact.auth_method !== 'password' && artifact.auth_method !== 'credentials' &&
+  if (artifact.auth_method !== 'password' && artifact.auth_method !== 'credentials' && artifact.auth_method !== 'onetime' &&
       (!MUTATING.has(request.method.toUpperCase()) || isTrustedInstanceOrigin(request, env))) {
     const guest = await spaceGuestFor(request, env, 'artifact', artifact.id, 'view');
     if (guest) return { authorized: true, needsAuth: false, viewer: { email: null, isOwner: false }, isArtifactOwner: false, spaceGuest: guest };

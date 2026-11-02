@@ -2013,6 +2013,224 @@
         }
       }
     },
+    "/v1/artifacts/{id}/view-codes": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ArtifactId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Collaborators"
+        ],
+        "summary": "List one-time view codes",
+        "description": "Every code on the page: who it is for, whether it was opened, from what kind of device, and what the viewer tried while it was open (copy, print, save, right-click, the screenshot key, leaving the page). The codes themselves are never returned again. Owner or editor.",
+        "operationId": "listViewCodes",
+        "responses": {
+          "200": {
+            "description": "The page's codes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "description": "The page opens with a code (auth_method `onetime`)."
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "view_codes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ViewCode"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Collaborators"
+        ],
+        "summary": "Create one-time view codes",
+        "description": "One personal code per person: the page link plus that code opens the page once, with no sign-in, for `view_seconds`, then it closes by itself and the code never works again. The viewer's name is written across the page; copy, print, save and download are blocked. Turns the page private; the owner and named collaborators keep their own access. Web pages only. The codes are in this response only. A browser cannot block a screenshot or a photo of the screen — the watermark is what names the person on any capture.",
+        "operationId": "createViewCodes",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "recipients"
+                ],
+                "properties": {
+                  "recipients": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "description": "Who each code is for — the name is the watermark they see.",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 80
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "label"
+                          ],
+                          "properties": {
+                            "label": {
+                              "type": "string",
+                              "maxLength": 80
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "view_seconds": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 600,
+                    "default": 90
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created. Hand each person the link and their code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "view_seconds": {
+                      "type": "integer"
+                    },
+                    "codes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "example": "vcd_3f9a2b"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string",
+                            "example": "K7M4-QP9X"
+                          },
+                          "view_seconds": {
+                            "type": "integer"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid recipients or view_seconds, not a web page (`ONETIME_HTML_ONLY`), or too many codes (`VIEW_CODE_LIMIT`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Collaborators"
+        ],
+        "summary": "Turn one-time view off",
+        "description": "Every code stops working; the page stays private behind sign-in.",
+        "operationId": "disableViewCodes",
+        "responses": {
+          "200": {
+            "description": "Turned off"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/artifacts/{id}/view-codes/{codeId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ArtifactId"
+        },
+        {
+          "name": "codeId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "delete": {
+        "tags": [
+          "Collaborators"
+        ],
+        "summary": "Revoke a one-time view code",
+        "description": "That code no longer opens the page; a page it already opened loses its pass at once.",
+        "operationId": "revokeViewCode",
+        "responses": {
+          "200": {
+            "description": "Revoked"
+          },
+          "404": {
+            "description": "No such code on this page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/artifacts/{id}/transfer-ownership": {
       "parameters": [
         {
@@ -14056,6 +14274,69 @@
               "null"
             ],
             "format": "date-time"
+          }
+        }
+      },
+      "ViewCode": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string",
+            "description": "Who the code is for (their watermark)."
+          },
+          "view_seconds": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unused",
+              "open",
+              "viewed",
+              "revoked"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "opened_device": {
+            "type": "string",
+            "enum": [
+              "phone",
+              "tablet",
+              "computer"
+            ],
+            "nullable": true
+          },
+          "revoked_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "attempts": {
+            "type": "object",
+            "description": "What the viewer tried while it was open, by kind. Signals, not proof.",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "example": {
+              "copy": 2,
+              "left_page": 1
+            }
           }
         }
       },

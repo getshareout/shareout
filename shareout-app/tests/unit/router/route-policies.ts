@@ -79,6 +79,8 @@ export const OPEN_ROUTES: Record<string, string> = {
   '/auth/device/done': SIGN_IN,
   '/auth/password': 'artifact password gate',
   '/auth/credentials': 'artifact credentials gate',
+  '/auth/view-code': 'artifact one-time code gate: rate-limited like the password gate, a code works once',
+  '/auth/view-code/event': 'one-time view attempt log: needs the live pass cookie a redeemed code set, else 403',
   '/v1/auth/session': 'reports whether the caller is signed in',
   '/v1/auth/sso/lookup': SIGN_IN,
   '/v1/auth/email/start': SIGN_IN,

@@ -26,6 +26,28 @@ You're always in control of who can open your page:
 
 You can change your mind any time — make a private page public when it's ready, or lock one back down.
 
+## Show it once
+
+For something confidential — new prices, a target, a notice for your branch managers —
+you can give each person **the link plus their own code** instead of an invite:
+
+- They open the link, type their code, and see the page. **No account, no sign-in.**
+- Each code works **once**. The page closes by itself after the time you chose (90 seconds
+  unless you pick another), with no countdown on screen.
+- Their **name is written across the page**, so any screenshot or photo shows who it came from.
+- Copying, printing, saving and downloading are blocked.
+- You see who opened it, when, on what kind of device, and what they tried (copy, print,
+  leaving the page).
+
+Ask an AI agent that uses the ShareOut skill (Claude Code, for example): *"Make this page
+one-time for Ana, Luis and Marta, 90 seconds each"*. It gives you a ready-to-send message
+for each person. Developers: [the API](/start/introduction/) (`/v1/artifacts/{id}/view-codes`).
+
+:::caution[What no website can stop]
+Nobody can block a screenshot, or someone taking a photo of the screen with another phone.
+The name on the page is what makes that risky for them.
+:::
+
 ## Ask for access
 
 If someone sends you a link to a **private page** you're not on yet, ShareOut shows a
