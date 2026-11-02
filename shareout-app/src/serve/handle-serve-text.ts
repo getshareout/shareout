@@ -4,6 +4,7 @@ import { getCachedDeployment, cacheDeployment, buildCacheRecord, fetchAssetRow }
 import { checkAccess } from './access';
 import { extractTextFromHtml } from './utils';
 import { normalizeVisibility } from '../visibility-config';
+import { isOneTimeView } from '../artifacts/view-codes/tokens';
 
 export async function handleServeText(
   request: Request,
@@ -66,7 +67,8 @@ export async function handleServeText(
   }
 
   const visibility = result.visibility || 'public';
-  if (visibility === 'private' || visibility === 'workspace') {
+  // A one-time page's text never goes out: only its owner and collaborators read it here.
+  if (visibility === 'private' || visibility === 'workspace' || isOneTimeView(result.auth_method)) {
     const accessResult = await checkAccess(request, env, slug, result);
     if (accessResult) {
       return new Response('Unauthorized', { status: 401, headers: { 'Content-Type': 'text/plain' } });

@@ -4,6 +4,7 @@ import { ARTIFACT_ID, SLUG, createServeEnv, defaultDeployment, serveRequest } fr
 import { setupServeTestHooks } from './helpers/hooks';
 import { handleServe } from '../../../src/serve';
 import { gateArtifactSideAsset } from '../../../src/serve/handle-serve';
+import { handleServeText } from '../../../src/serve/handle-serve-text';
 import { createAccessToken } from '../../../src/token';
 import type { Env } from '../../../src/types';
 
@@ -81,6 +82,18 @@ describe('one-time view: serving', () => {
 
     const tab = await handleServe(serveRequest('?_raw', { headers: { Cookie: cookie, 'Sec-Fetch-Dest': 'document' } }), env, SLUG, '');
     expect(tab.status).toBe(403);
+    // fetch() from the console is no frame either.
+    const fetched = await handleServe(serveRequest('?_raw', { headers: { Cookie: cookie, 'Sec-Fetch-Dest': 'empty' } }), env, SLUG, '');
+    expect(fetched.status).toBe(403);
+    // The page's own images still load inside the frame.
+    const img = await handleServe(serveRequest('logo.png', { headers: { Cookie: cookie, 'Sec-Fetch-Dest': 'image' } }), env, SLUG, 'logo.png');
+    expect(img.status).toBe(200);
+  });
+
+  it('the text version, embed and thumbnails stay closed, even when the page is marked public', async () => {
+    const env = oneTimeEnv({ visibility: 'public' });
+    const text = await handleServeText(new Request(`https://shareout.example.com/a/${SLUG}/index.md`, { headers: { Cookie: await passCookie(env) } }), env, SLUG);
+    expect(text.status).toBe(401);
   });
 
   it('a code holder cannot download the page source', async () => {

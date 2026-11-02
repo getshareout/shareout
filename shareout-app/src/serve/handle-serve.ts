@@ -22,7 +22,7 @@ import { PAGE_AGENT_REV, injectPageAgent, isSafePagePath, isSafeSectionId } from
 import { hasMcpCapability } from '../mcp-broker/capabilities';
 import { servingOrigin } from '../workspaces/domains/host-binding';
 import { readViewPass } from '../artifacts/view-codes/gate';
-import { VIEW_CONTENT_AUTH, injectViewGuard, isTopLevelVisit, serveOneTimeViewer } from '../artifacts/view-codes/viewer';
+import { VIEW_CONTENT_AUTH, injectViewGuard, isFrameRequestAllowed, serveOneTimeViewer } from '../artifacts/view-codes/viewer';
 
 function injectCommentsAgent(resp: Response, baseUrl: string): Response {
   const tag = `<script src="${baseUrl}${versionedBundlePath('/sdk/comments-agent.js')}" defer></script>`;
@@ -353,8 +353,8 @@ export async function handleServe(
         slug, artifactId: result.artifact_id, entrypoint: effectiveEntrypoint, live: viewPass!,
       });
     }
-    if (isTopLevelVisit(request)) return new Response('Forbidden', { status: 403 });
     if (!asset) return notFound(request);
+    if (!isFrameRequestAllowed(request, asset.mime)) return new Response('Forbidden', { status: 403 });
     return serveAsset(request, env, asset, slug, true, {
       noStore: true, relaxCsp: true, lockCsp, sandbox: !contentOrigin, executionCtx: opts.executionCtx,
       ...(asset.mime === 'text/html' ? { transform: injectViewGuard } : {}),

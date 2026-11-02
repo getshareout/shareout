@@ -173,9 +173,16 @@ export function injectViewGuard(resp: Response): Response {
   return new HTMLRewriter().on('head', put).on('body', put).transform(resp);
 }
 
-/** A code holder's frame request that is a top-level visit — the frame's URL opened in a
- *  tab of its own, outside the wrapper's watermark and close. Browsers without
- *  Sec-Fetch-Dest (pre-2023 Safari) are let through. */
-export function isTopLevelVisit(request: Request): boolean {
-  return request.headers.get('Sec-Fetch-Dest') === 'document';
+/**
+ * Whether a code holder's request for the page's own files may be answered: never as a
+ * tab of its own (outside the wrapper's watermark and close), and an HTML page only into
+ * a frame — not a fetch() from the console. Requests without Sec-Fetch-Dest (pre-2023
+ * Safari, scripts) are let through: the bytes are the viewer's for the window anyway; this
+ * only keeps the page from being pulled out by hand in an ordinary browser.
+ */
+export function isFrameRequestAllowed(request: Request, mime: string): boolean {
+  const dest = request.headers.get('Sec-Fetch-Dest');
+  if (!dest) return true;
+  if (dest === 'document') return false;
+  return mime.split(';')[0].trim().toLowerCase() === 'text/html' ? dest === 'iframe' : true;
 }

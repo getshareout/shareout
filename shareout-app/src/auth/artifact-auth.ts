@@ -10,6 +10,7 @@ import { isCaptureCredential } from './capture-session';
 import { credentialsLoginPage, passwordLoginPage } from './pages';
 import { hashPassword, verifyPassword } from './password';
 import { checkArtifactGateLimit, rateLimitHeaders } from '../rate-limit';
+import { isViewCodeToken } from '../artifacts/view-codes/tokens';
 
 const LEGACY_HASH = /^[0-9a-f]{64}$/;
 
@@ -49,7 +50,9 @@ async function gateThrottled(request: Request, env: Env, artifactId: string, slu
  */
 export function artifactLocation(request: Request, slug: string, env: Env): string {
   const host = new URL(request.url).hostname;
-  return parseSubdomainFromEnv(host, env).isSubdomain ? `/${slug}` : `/a/${slug}/`;
+  // The slug comes from the form: encode it so `/evil.com` can't become `//evil.com`.
+  const s = encodeURIComponent(slug);
+  return parseSubdomainFromEnv(host, env).isSubdomain ? `/${s}` : `/a/${s}/`;
 }
 
 export async function handlePasswordAuth(request: Request, env: Env): Promise<Response> {
@@ -166,5 +169,6 @@ export async function verifyAccessToken(
   if (!token) return false;
 
   const payload = await verifyAccessTokenRaw(token, artifactId, env);
-  return payload !== null && !isCaptureCredential(payload.authType);
+  // A one-time code's pass is no password pass, even if the page's gate changed since.
+  return payload !== null && !isCaptureCredential(payload.authType) && !isViewCodeToken(payload.authType);
 }

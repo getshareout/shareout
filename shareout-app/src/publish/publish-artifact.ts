@@ -58,7 +58,7 @@ export async function publishArtifact(
   executionCtx?: ExecutionContext,
 ): Promise<PublishResponse> {
   const {
-    name, slug, entrypoint, authMethod, shareWith, password, credentials,
+    name, slug, entrypoint, shareWith, password, credentials,
     workspaceId, folderId, mobileEntrypoint, pwa, embed, accessPolicy,
     agent, artifactType, attachedSkillIds, isExample, library,
   } = params;
@@ -97,9 +97,21 @@ export async function publishArtifact(
   const { existing, globalExisting } = params.artifactId
     ? { existing: await targetArtifact(env, params.artifactId), globalExisting: null }
     : await findExistingArtifacts(env, slug, workspaceId, user.id);
-  const { effectiveVisibility, policyNotice, approvalRequired } = await applyWorkspaceVisibilityPolicy(
+  const policy = await applyWorkspaceVisibilityPolicy(
     env, visibility, workspaceId, existing, globalExisting, mainFile,
   );
+  const { policyNotice, approvalRequired } = policy;
+  // One-time view survives a republish that picks no other gate: the page stays private
+  // and its codes keep working. Turning it off is DELETE /v1/artifacts/{id}/view-codes.
+  const target = existing ?? globalExisting;
+  const keepOneTime = !!target && params.authMethod !== 'password' && params.authMethod !== 'credentials' &&
+    (await env.DB.prepare('SELECT auth_method FROM artifacts WHERE id = ?').bind(target.id)
+      .first<{ auth_method: string | null }>())?.auth_method === 'onetime';
+  const authMethod = keepOneTime ? 'onetime' as const : params.authMethod;
+  const effectiveVisibility = keepOneTime ? 'private' as const : policy.effectiveVisibility;
+  if (keepOneTime && params.visibility && normalizeVisibility(params.visibility) !== 'private') {
+    warnings.push('This page opens with one-time codes only, so it stays private. Turn one-time view off first to change who can see it.');
+  }
 
   const firstPublish = await isFirstPublishForUser(env, user.id);
 

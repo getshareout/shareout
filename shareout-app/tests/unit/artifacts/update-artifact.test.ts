@@ -175,7 +175,7 @@ describe('handleUpdateArtifact', () => {
       ...baseEnv,
       DB: makeDbMock({
         first: (sql) => {
-          if (sql.includes('SELECT id, workspace_id, owner_id FROM artifacts')) {
+          if (sql.includes('SELECT id, workspace_id, auth_method, owner_id FROM artifacts')) {
             return { id: 'art_1', workspace_id: null, owner_id: 'usr_1' };
           }
           if (sql.includes('owner_id FROM artifacts')) return { owner_id: 'usr_1' };

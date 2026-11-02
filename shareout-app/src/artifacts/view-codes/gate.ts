@@ -6,7 +6,7 @@ import { artifactLocation } from '../../auth/artifact-auth';
 import { viewCodeLoginPage } from '../../auth/pages';
 import { cookieSecureAttr } from '../../auth/cookies';
 import { pageLocale } from '../../i18n/accept-language';
-import { checkArtifactGateLimit, rateLimitHeaders } from '../../rate-limit';
+import { checkViewCodeGateLimit, rateLimitHeaders } from '../../rate-limit';
 import {
   deviceClass, getLiveViewCode, isViewCodeEventKind, recordViewCodeEvent, redeemViewCode,
   type LiveViewCode,
@@ -41,7 +41,7 @@ export async function handleViewCodeAuth(request: Request, env: Env): Promise<Re
   if (!artifact || artifact.auth_method !== 'onetime') return new Response('Not Found', { status: 404 });
 
   const lang = pageLocale(request);
-  const rl = await checkArtifactGateLimit(env, request, artifact.id);
+  const rl = await checkViewCodeGateLimit(env, request, artifact.id);
   if (!rl.allowed) {
     const page = viewCodeLoginPage(slug, artifact.id, lang, 'throttled', 429);
     return new Response(page.body, { status: 429, headers: { ...Object.fromEntries(page.headers), ...rateLimitHeaders(rl) } });

@@ -359,8 +359,8 @@ export async function handleUpdateArtifact(
   artifactId: string
 ): Promise<Response> {
   const artifact = await env.DB.prepare(
-    'SELECT id, workspace_id, owner_id FROM artifacts WHERE id = ?'
-  ).bind(artifactId).first<{ id: string; workspace_id: string | null; owner_id: string | null }>();
+    'SELECT id, workspace_id, auth_method, owner_id FROM artifacts WHERE id = ?'
+  ).bind(artifactId).first<{ id: string; workspace_id: string | null; owner_id: string | null; auth_method: string | null }>();
 
   if (!artifact) {
     return json({ error: 'Artifact not found', code: 'NOT_FOUND' }, 404);
@@ -426,6 +426,12 @@ export async function handleUpdateArtifact(
     const requested = normalizeVisibility(body.visibility) as Visibility;
     if (!['public', 'workspace', 'private'].includes(requested)) {
       return json({ error: 'Invalid visibility', code: 'INVALID_VISIBILITY' }, 400);
+    }
+    if (requested !== 'private' && artifact.auth_method === 'onetime') {
+      return json({
+        error: 'This page opens with one-time codes only. Turn one-time view off first (DELETE /v1/artifacts/{id}/view-codes).',
+        code: 'ONETIME_VIEW_ON',
+      }, 409);
     }
     if (requested !== 'private' && artifact.workspace_id &&
         !(await getInternalWorkspaceRole(env, artifact.workspace_id, user.id))) {

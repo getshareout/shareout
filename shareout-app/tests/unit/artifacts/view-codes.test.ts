@@ -12,6 +12,9 @@ import {
 } from '../../../src/artifacts/view-codes/api';
 import { checkAccess } from '../../../src/serve/access';
 import { dataMiddleware } from '../../../src/data/middleware';
+import { handleUpdateArtifact } from '../../../src/artifacts/crud';
+import { publishArtifact } from '../../../src/publish/publish-artifact';
+import { artifactLocation, verifyAccessToken as passGateAccepts } from '../../../src/auth/artifact-auth';
 import { createAccessToken } from '../../../src/token';
 import type { ArtifactInfo } from '../../../src/serve/types';
 
@@ -69,6 +72,10 @@ beforeEach(async () => {
   store.clear();
   await e.DB.prepare('DELETE FROM artifact_view_code_events').run();
   await e.DB.prepare('DELETE FROM artifact_view_codes').run();
+  // A republish test leaves versions/deployments behind; they hold the artifact by FK.
+  await e.DB.prepare('DELETE FROM deployments WHERE artifact_id = ?').bind(ART).run();
+  await e.DB.prepare('DELETE FROM assets WHERE version_id IN (SELECT id FROM versions WHERE artifact_id = ?)').bind(ART).run();
+  await e.DB.prepare('DELETE FROM versions WHERE artifact_id = ?').bind(ART).run();
   await e.DB.prepare('DELETE FROM artifacts WHERE id = ?').bind(ART).run();
   await e.DB.prepare('INSERT OR IGNORE INTO users (id, email) VALUES (?, ?), (?, ?)')
     .bind(owner.id, owner.email, stranger.id, stranger.email).run();
@@ -241,6 +248,49 @@ describe('view codes: never a data credential', () => {
         expect([401, 403]).toContain((res as Response).status);
       }
     }
+  });
+});
+
+describe('view codes: the page stays closed', () => {
+  it('refuses opening a one-time page until one-time view is off', async () => {
+    await newCodes(['Ana']);
+    const patch = (visibility: string) => new Request(`https://shareout.test/v1/artifacts/${ART}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visibility }),
+    });
+    const res = await handleUpdateArtifact(patch('public'), e, owner, ART);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'ONETIME_VIEW_ON' });
+    const row = await e.DB.prepare('SELECT visibility FROM artifacts WHERE id = ?').bind(ART).first<{ visibility: string }>();
+    expect(row!.visibility).toBe('private');
+  });
+
+  it('a republish keeps one-time view on and the page private, and says so', async () => {
+    const { codes } = await newCodes(['Ana']);
+    const out = await publishArtifact(e, owner, {
+      name: 'Secret', slug: 'vcd', entrypoint: 'index.html', visibility: 'public', authMethod: 'google',
+      files: [{ path: 'index.html', content: '<h1>v2</h1>', mime: 'text/html' }],
+      shareWith: [], credentials: [], workspaceId: null, folderId: null, artifactType: 'html', artifactId: ART,
+    } as unknown as Parameters<typeof publishArtifact>[2]);
+    const row = await e.DB.prepare('SELECT visibility, auth_method FROM artifacts WHERE id = ?').bind(ART)
+      .first<{ visibility: string; auth_method: string }>();
+    expect(row).toEqual({ visibility: 'private', auth_method: 'onetime' });
+    expect((out as unknown as { visibility: string }).visibility).toBe('private');
+    expect(JSON.stringify(out)).toContain('one-time codes only');
+    // The codes still work.
+    expect((await handleViewCodeAuth(codeForm(codes[0].code), e)).status).toBe(302);
+  });
+
+  it('a pass is never a password pass, and the redirect slug cannot leave the host', async () => {
+    const { codes } = await newCodes(['Ana']);
+    const cookie = passCookie(await handleViewCodeAuth(codeForm(codes[0].code), e));
+    expect(await passGateAccepts(new Request('https://shareout.test/', { headers: { Cookie: cookie } }), e, ART)).toBe(false);
+    expect(artifactLocation(new Request('https://shareout.test/auth/view-code'), '/evil.com', e)).toBe('/a/%2Fevil.com/');
+  });
+
+  it('bad guesses from many places do not lock out a real holder', async () => {
+    const { codes } = await newCodes(['Ana']);
+    for (let i = 0; i < 220; i++) await handleViewCodeAuth(codeForm('AAAA-BBBB', `10.9.${Math.floor(i / 200)}.${i % 200}`), e);
+    expect((await handleViewCodeAuth(codeForm(codes[0].code, '198.51.100.99'), e)).status).toBe(302);
   });
 });
 

@@ -431,8 +431,8 @@ async function checkDataAuth(
     if (token) {
       const payload = await verifyAccessToken(token, artifact.id, env);
       // A capture credential is no password-gate cookie: as one it would skip the
-      // read-only flag its Bearer use carries.
-      if (payload && !isCaptureCredential(payload.authType)) {
+      // read-only flag its Bearer use carries. Nor is a one-time code's pass.
+      if (payload && !isCaptureCredential(payload.authType) && !isViewCodeToken(payload.authType)) {
         const owns = payload.authType === 'owner';
         return {
           authorized: true,
