@@ -2,6 +2,7 @@ import type { Env } from '../../types';
 import type { AuthUser } from '../../api-auth';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { jsonWithApiErrors } from '../../http/api-error';
+import { resell, workspaceMarkup } from '../../data/ai-markup';
 
 function json(data: unknown, status = 200): Response {
   return jsonWithApiErrors(data, status);
@@ -14,7 +15,8 @@ function microToUsd(micro: number): number {
 /**
  * GET /v1/workspaces/{id}/crew-usage — crew runs × cost × tools × errors × approvals.
  * Mirrors the LLM usage endpoint (member-gated). All cost from crew_runs /
- * agent_usage_events (mode='crew'), which the runtime attributes per run.
+ * agent_usage_events (mode='crew'), which the runtime attributes per run, shown at the
+ * workspace's price (cost × its AI markup).
  */
 export async function handleGetWorkspaceCrewUsage(
   request: Request,
@@ -75,12 +77,14 @@ export async function handleGetWorkspaceCrewUsage(
        FROM crew_runs cr JOIN crews c ON c.id = cr.crew_id WHERE c.workspace_id = ?`
   ).bind(workspaceId).first<{ runs: number; cost_micro_usd: number; errors: number }>();
 
+  const { bps } = await workspaceMarkup(env, workspaceId);
+  const price = (micro: unknown) => microToUsd(resell(Number(micro) || 0, bps));
   return json({
     summary: {
       runs: grand?.runs ?? 0,
       errors: grand?.errors ?? 0,
       errorRate: grand && grand.runs ? Math.round((grand.errors / grand.runs) * 1000) / 1000 : 0,
-      costUsd: microToUsd(grand?.cost_micro_usd ?? 0),
+      costUsd: price(grand?.cost_micro_usd ?? 0),
     },
     runs: runs.results.map((r) => ({
       runId: r.id,
@@ -94,7 +98,7 @@ export async function handleGetWorkspaceCrewUsage(
       iterations: r.iterations,
       tokenInput: r.token_input,
       tokenOutput: r.token_output,
-      costUsd: microToUsd((r.cost_micro_usd as number) || 0),
+      costUsd: price(r.cost_micro_usd),
       pendingApprovals: r.pending_approvals,
       startedAt: r.started_at,
       endedAt: r.ended_at,
@@ -105,7 +109,7 @@ export async function handleGetWorkspaceCrewUsage(
       runCount: t.run_count,
       inputTokens: t.input_tokens,
       outputTokens: t.output_tokens,
-      costUsd: microToUsd((t.cost_micro_usd as number) || 0),
+      costUsd: price(t.cost_micro_usd),
     })),
     toolBreakdown: toolBreakdown.results,
     approvalStats: approvalStats.results,

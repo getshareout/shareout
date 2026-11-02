@@ -93,6 +93,15 @@ export function instanceBody(cfg: InstanceConfig): string {
       </select>
       <button id="sa-ai-model-save" class="so-c-btn so-c-btn--primary so-c-btn--sm" type="button">Save</button>
       <span id="sa-ai-model-result" class="sa-muted"></span>
+    </div>
+    <p class="sa-muted" style="margin:var(--space-4) 0 var(--space-3)">
+      AI resale markup: workspaces see and are invoiced AI usage at cost × this, unless one has its own
+      (set in its Admin → Billing). Workspaces never see the markup. 1 = at cost.
+    </p>
+    <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;align-items:center">
+      <input id="sa-ai-markup" class="so-c-input" type="number" min="1" max="10" step="0.05" style="width:110px" value="${escapeHtml(String(cfg.ai.default_markup))}"> ×
+      <button id="sa-ai-markup-save" class="so-c-btn so-c-btn--primary so-c-btn--sm" type="button">Save</button>
+      <span id="sa-ai-markup-result" class="sa-muted"></span>
     </div>`;
 
   const email = settingsTable(
@@ -198,7 +207,7 @@ export function instanceBody(cfg: InstanceConfig): string {
     <div style="margin-top:var(--space-4)">${gapsCard(cfg)}</div>
     ${pair(createWorkspace, appointAdmin)}
     ${pair(card('Identity', identity), card('Sign-in', signIn))}
-    ${pair(card('AI', ai), card('Default AI model', aiModel))}
+    ${pair(card('AI', ai), card('AI defaults', aiModel))}
     <div style="margin-top:var(--space-4)">${card('Email', email)}</div>
     ${pair(card('Sharing', sharing), card('Storage limits', storage))}
     ${pair(card('Bindings', bindings), card('Instance admins', admins))}`;

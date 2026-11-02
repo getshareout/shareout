@@ -1,6 +1,7 @@
 import type { Env } from '../types';
 import { createLogger } from '../logging';
 import { priceCall } from './agent/model-costs';
+import { resell, workspaceMarkup } from './ai-markup';
 
 // The workspace's monthly AI budget: one number (workspace_llm_config.monthly_budget_micro_usd) against one
 // sum (every ai_usage_events row of the workspace since the start of the UTC month). The provider layer
@@ -12,6 +13,9 @@ import { priceCall } from './agent/model-costs';
 //
 // Rows are written `pending` with cost 0 until the hourly reconcile prices them, so the sum adds a list-price
 // estimate for pending rows; otherwise the last hour of spend would be invisible to the ceiling.
+//
+// The budget is what the workspace pays, so spend is measured at its price: cost × its markup (ai-markup.ts).
+// `costMicro` keeps the raw cost for platform admins.
 
 export const BUDGET_NEAR_PCT = 80;
 export const BUDGET_CODE = 'workspace_budget';
@@ -21,7 +25,11 @@ export type BudgetLevel = 'none' | 'ok' | 'near' | 'reached';
 
 export interface BudgetState {
   budgetMicro: number | null;
+  /** This month's spend at the workspace's price (cost × markup). */
   spentMicro: number;
+  /** The same spend at cost — for platform admins only, never for the workspace. */
+  costMicro: number;
+  markupBps: number;
   /** Whole percent of the budget used (can pass 100); null when no budget is set. */
   pct: number | null;
   state: BudgetLevel;
@@ -89,11 +97,16 @@ export async function budgetState(env: Env, workspaceId: string, opts: { fresh?:
   if (!opts.fresh && hit && Date.now() - hit.at < CACHE_MS) return hit.state;
   const cfg = await env.DB.prepare('SELECT monthly_budget_micro_usd AS b FROM workspace_llm_config WHERE workspace_id = ?')
     .bind(workspaceId).first<{ b: number | null }>();
-  const { total, byKind } = await readSpend(env, workspaceId, monthStart().toISOString());
+  const [{ total: cost, byKind: costByKind }, { bps }] = await Promise.all([
+    readSpend(env, workspaceId, monthStart().toISOString()),
+    workspaceMarkup(env, workspaceId),
+  ]);
+  const total = resell(cost, bps);
+  const byKind = Object.fromEntries(Object.entries(costByKind).map(([k, micro]) => [k, resell(micro, bps)]));
   const budgetMicro = cfg?.b ?? null;
   const pct = budgetMicro ? Math.floor((total / budgetMicro) * 100) : null;
   const state: BudgetState = {
-    budgetMicro, spentMicro: total, pct, byKind, resetsAt: nextMonthStartIso(),
+    budgetMicro, spentMicro: total, costMicro: cost, markupBps: bps, pct, byKind, resetsAt: nextMonthStartIso(),
     state: budgetMicro == null ? 'none' : total >= budgetMicro ? 'reached' : pct! >= BUDGET_NEAR_PCT ? 'near' : 'ok',
   };
   cache.set(workspaceId, { at: Date.now(), state });

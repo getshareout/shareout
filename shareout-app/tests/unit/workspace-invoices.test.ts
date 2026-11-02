@@ -4,8 +4,10 @@
 import { env } from 'cloudflare:workers';
 import { beforeAll, describe, expect, it } from 'vitest';
 import initSql from '../../migrations/0000_init.sql?raw';
+import gatewaySql from '../../migrations/0003_ai_gateway_model.sql?raw';
 import tokensSql from '../../migrations/0024_ai_usage_tokens.sql?raw';
 import invoicesSql from '../../migrations/0034_workspace_invoices.sql?raw';
+import markupSql from '../../migrations/0035_ai_markup.sql?raw';
 import {
   handleCreateInvoice, handleDeleteInvoice, handleDownloadInvoiceFile, handleListInvoices, handlePreviewUsage,
   handleUpdateInvoice, handleUploadInvoiceFile,
@@ -45,7 +47,7 @@ async function usage(ws: string, user: string | null, kind: string, model: strin
 }
 
 beforeAll(async () => {
-  for (const sql of [initSql, tokensSql, invoicesSql]) {
+  for (const sql of [initSql, gatewaySql, tokensSql, invoicesSql, markupSql]) {
     const stmts = sql.replace(/--[^\n]*/g, '').split(/;\s*\n/).map((x) => x.trim()).filter(Boolean);
     for (let i = 0; i < stmts.length; i += 50) await e.DB.batch(stmts.slice(i, i + 50).map((x) => e.DB.prepare(x)));
   }
@@ -97,9 +99,9 @@ describe('workspace invoices', () => {
     expect(inv.lines.map((l: any) => l.amount_cents)).toEqual([30_000, 5_000, 1_575]);
     expect(inv.total_cents).toBe(36_575);
     const u = inv.lines[2].usage;
-    expect(u.total_micro_usd).toBe(15_750_000);
+    expect(u).toMatchObject({ price_micro_usd: 15_750_000, cost_micro_usd: 15_750_000, markup_bps: 10_000 }); // no markup set: at cost
     expect(u.calls).toBe(3);
-    expect(u.by_kind.map((r: any) => [r.key, r.cost_micro_usd])).toEqual([['assistant_chat', 12_250_000], ['crew_run', 3_500_000]]);
+    expect(u.by_kind.map((r: any) => [r.key, r.price_micro_usd])).toEqual([['assistant_chat', 12_250_000], ['crew_run', 3_500_000]]);
     expect(u.by_model[0]).toMatchObject({ key: 'anthropic/claude-sonnet-5', calls: 2, input_tokens: 409_000, output_tokens: 51_000 });
     expect(u.by_member.map((r: any) => r.key)).toEqual(['admin@acme.test', '', 'member@acme.test']);
   });
@@ -113,7 +115,7 @@ describe('workspace invoices', () => {
     expect(JSON.stringify(twice.body)).toContain('USAGE_ALREADY_BILLED');
     const preview = await read(await handlePreviewUsage(req('GET', `/usage?month=${LAST}`), e, OP, WS));
     expect(preview.body.already_billed_in).toMatch(/^INV-/);
-    expect(preview.body.usage.total_micro_usd).toBe(15_750_000);
+    expect(preview.body.usage.price_micro_usd).toBe(15_750_000);
     expect((await handlePreviewUsage(req('GET', `/usage?month=${LAST}`), e, ADMIN, WS)).status).toBe(403);
   });
 

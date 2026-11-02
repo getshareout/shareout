@@ -6,6 +6,9 @@ import { jsonWithApiErrors as json } from '../../http/api-error';
 import { requireWorkspaceRole } from '../../workspaces/roles';
 import { isPlatformAdmin } from '../../superadmin/auth';
 import { logAudit } from '../../audit';
+import { createLogger } from '../../logging';
+import { resetBudgetCache } from '../../data/ai-budget';
+import { bpsFromMultiplier, multiplier, workspaceMarkup, type Markup } from '../../data/ai-markup';
 import {
   InvoiceInputError, MAX_FILE_BYTES, fileProblem, getInvoice, invoiceFileKey, invoiceView, isClosedMonth, isMonth, listInvoices,
   nextInvoiceNumber, parseCreateInvoice, safeFileName, totalCents, usageAlreadyBilled, usageForMonth, usageLine,
@@ -24,6 +27,8 @@ import {
 //   PUT    /v1/workspaces/{ws}/invoices/{id}/receipt       the operator's receipt
 //   PUT    /v1/workspaces/{ws}/invoices/{id}/proof         the workspace's transfer proof (admin+)
 //   GET    /v1/workspaces/{ws}/invoices/{id}/receipt|proof download
+//   GET    /v1/workspaces/{ws}/ai-markup                   the workspace's AI markup (operator)
+//   PUT    /v1/workspaces/{ws}/ai-markup                   { markup: 1.5 | null } (operator)
 
 const FORBIDDEN = { error: 'Forbidden', code: 'FORBIDDEN' };
 const NOT_FOUND = { error: 'Invoice not found', code: 'NOT_FOUND' };
@@ -60,7 +65,9 @@ export async function handleListInvoices(env: Env, user: AuthUser, workspaceId: 
   if (gate) return gate;
   const rows = await listInvoices(env, workspaceId, manage);
   const emails = await emailsFor(env, rows);
-  return json({ invoices: rows.map((r) => invoiceView(r, emails)), can_manage: manage });
+  const body: Record<string, unknown> = { invoices: rows.map((r) => invoiceView(r, emails, manage)), can_manage: manage };
+  if (manage) body.markup = markupView(await workspaceMarkup(env, workspaceId));
+  return json(body);
 }
 
 export async function handlePreviewUsage(request: Request, env: Env, user: AuthUser, workspaceId: string): Promise<Response> {
@@ -68,7 +75,7 @@ export async function handlePreviewUsage(request: Request, env: Env, user: AuthU
   const month = new URL(request.url).searchParams.get('month');
   if (!isMonth(month)) return json({ error: 'month must be YYYY-MM', code: 'INVALID_MONTH' }, 400);
   if (!isClosedMonth(month)) return json({ error: `${month} has not closed yet`, code: 'USAGE_MONTH_OPEN' }, 400);
-  const usage = await usageForMonth(env, workspaceId, month);
+  const usage = await usageForMonth(env, workspaceId, month, (await workspaceMarkup(env, workspaceId)).bps);
   return json({ usage, line: usageLine(usage), already_billed_in: await usageAlreadyBilled(env, workspaceId, month) });
 }
 
@@ -90,7 +97,7 @@ export async function handleCreateInvoice(request: Request, env: Env, user: Auth
     }
     const prior = await usageAlreadyBilled(env, workspaceId, input.usage_month);
     if (prior) return json({ error: `${input.usage_month} usage is already on invoice ${prior}; void it first`, code: 'USAGE_ALREADY_BILLED' }, 409);
-    lines.push(usageLine(await usageForMonth(env, workspaceId, input.usage_month)));
+    lines.push(usageLine(await usageForMonth(env, workspaceId, input.usage_month, (await workspaceMarkup(env, workspaceId)).bps)));
   }
   const total = totalCents(lines);
   if (total < 0) return json({ error: 'The invoice total cannot be negative', code: 'VALIDATION_ERROR' }, 400);
@@ -115,7 +122,7 @@ export async function handleCreateInvoice(request: Request, env: Env, user: Auth
     }
     await audit(env, user, workspaceId, input.status === 'open' ? 'invoice.issue' : 'invoice.create', { id, number }, { total_cents: total, currency: input.currency });
     const row = await getInvoice(env, workspaceId, id);
-    return json({ invoice: invoiceView(row!) }, 201);
+    return json({ invoice: invoiceView(row!, {}, true) }, 201);
   }
   return json({ error: 'Could not allocate an invoice number; try again', code: 'NUMBER_TAKEN' }, 409);
 }
@@ -179,14 +186,14 @@ export async function handleUpdateInvoice(request: Request, env: Env, user: Auth
   } else if (inv.status === 'void' && sets.length) {
     return json({ error: 'A void invoice cannot be changed', code: 'INVALID_TRANSITION' }, 409);
   }
-  if (!sets.length) return json({ invoice: invoiceView(inv) });
+  if (!sets.length) return json({ invoice: invoiceView(inv, {}, true) });
 
   set('updated_at', now);
   await env.DB.prepare(`UPDATE workspace_invoices SET ${sets.join(', ')} WHERE id = ? AND workspace_id = ?`)
     .bind(...binds, id, workspaceId).run();
   await audit(env, user, workspaceId, action ?? 'invoice.update', inv);
   const row = await getInvoice(env, workspaceId, id);
-  return json({ invoice: invoiceView(row!, await emailsFor(env, [row!])) });
+  return json({ invoice: invoiceView(row!, await emailsFor(env, [row!]), true) });
 }
 
 export async function handleDeleteInvoice(env: Env, user: AuthUser, workspaceId: string, id: string): Promise<Response> {
@@ -238,7 +245,7 @@ export async function handleUploadInvoiceFile(
   }
   await audit(env, user, workspaceId, `invoice.${which}`, inv, { name });
   const row = await getInvoice(env, workspaceId, id);
-  return json({ invoice: invoiceView(row!, await emailsFor(env, [row!])) });
+  return json({ invoice: invoiceView(row!, await emailsFor(env, [row!]), manage) });
 }
 
 export async function handleDownloadInvoiceFile(env: Env, user: AuthUser, workspaceId: string, id: string, which: 'receipt' | 'proof'): Promise<Response> {
@@ -266,9 +273,50 @@ export async function handleDownloadInvoiceFile(env: Env, user: AuthUser, worksp
   });
 }
 
-/** Router for /v1/workspaces/{ws}/invoices… — null when the path is not ours. */
+const markupView = (m: Markup) => ({
+  markup: multiplier(m.bps),
+  workspace_markup: multiplier(m.workspaceBps),
+  instance_default: multiplier(m.instanceBps) ?? 1,
+});
+
+export async function handleGetMarkup(env: Env, user: AuthUser, workspaceId: string): Promise<Response> {
+  if (!(await canManage(env, user))) return json(FORBIDDEN, 403);
+  return json(markupView(await workspaceMarkup(env, workspaceId)));
+}
+
+/** Set (1–10×) or clear (null → the instance default) the workspace's AI markup. Not written to the
+ *  workspace audit log on purpose: its admins can read that log, and the markup is not theirs to see. */
+export async function handleSetMarkup(request: Request, env: Env, user: AuthUser, workspaceId: string): Promise<Response> {
+  if (!(await canManage(env, user))) return json(FORBIDDEN, 403);
+  if (!(await workspaceExists(env, workspaceId))) return json({ error: 'Workspace not found', code: 'NOT_FOUND' }, 404);
+  const body = (await request.json().catch(() => null)) as { markup?: unknown } | null;
+  if (!body || !('markup' in body)) return json({ error: 'Send { "markup": 1.5 } or { "markup": null }', code: 'VALIDATION_ERROR' }, 400);
+  const bps = body.markup === null ? null : bpsFromMultiplier(body.markup);
+  if (body.markup !== null && bps === null) {
+    return json({ error: 'markup must be a multiplier from 1 (at cost) to 10', code: 'VALIDATION_ERROR' }, 400);
+  }
+  await env.DB.prepare(
+    `INSERT INTO workspace_llm_config (workspace_id, ai_markup_bps, updated_at)
+     VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+     ON CONFLICT(workspace_id) DO UPDATE SET ai_markup_bps = excluded.ai_markup_bps, updated_at = excluded.updated_at`,
+  ).bind(workspaceId, bps).run();
+  resetBudgetCache(workspaceId);
+  createLogger(env, { scope: 'ai-markup' }).info('Workspace AI markup set', { workspace_id: workspaceId, markup_bps: bps, by: user.id });
+  return json(markupView(await workspaceMarkup(env, workspaceId)));
+}
+
+/** Router for /v1/workspaces/{ws}/invoices… and /ai-markup — null when the path is not ours. */
 export async function routeWorkspaceInvoices(ctx: FetchContext): Promise<Response | null> {
   const { request, env, path, addCORS } = ctx;
+  const mk = path.match(/^\/v1\/workspaces\/([^/]+)\/ai-markup$/);
+  if (mk) {
+    const user = await requireTokenOrSession(ctx);
+    if (!isAuthUser(user)) return user;
+    const ws = decodeURIComponent(mk[1]!);
+    if (request.method === 'GET') return addCORS(await handleGetMarkup(env, user, ws));
+    if (request.method === 'PUT') return addCORS(await handleSetMarkup(request, env, user, ws));
+    return addCORS(json({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405));
+  }
   const m = path.match(/^\/v1\/workspaces\/([^/]+)\/invoices(?:\/([^/]+))?(?:\/(receipt|proof))?$/);
   if (!m) return null;
   const user = await requireTokenOrSession(ctx);

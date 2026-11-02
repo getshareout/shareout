@@ -38,6 +38,7 @@ describe('buildInstanceConfig', () => {
       byo_keys: true,
       default_gateway_model: null,
       default_gateway_model_fallback: 'anthropic/claude-sonnet-5.5',
+      default_markup: 1,
     });
     expect(cfg.auth).toMatchObject({ password: true, google: false, email_otp_delivery: 'email' });
     expect(cfg.gaps).toEqual([]);

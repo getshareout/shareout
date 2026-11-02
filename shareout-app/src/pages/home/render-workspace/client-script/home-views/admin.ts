@@ -833,7 +833,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
       var llm = res[0] || {};
       var usage = res[1] || {};
       var crew = res[2] || {};
-      var totals = usage.totals || { requests: 0, inputTokens: 0, outputTokens: 0, billedUsd: 0 };
+      var totals = usage.totals || { requests: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 };
       var events = usage.events || [];
       // Aggregate model breakdown client-side from the recent event window.
       var byModel = {};
@@ -841,7 +841,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
         var k = e.model || 'unknown';
         if (!byModel[k]) byModel[k] = { model: k, requests: 0, input: 0, output: 0, cost: 0, byo: 0 };
         byModel[k].requests++; byModel[k].input += Number(e.inputTokens) || 0; byModel[k].output += Number(e.outputTokens) || 0;
-        byModel[k].cost += Number(e.billedCostUsd) || 0; if (e.byo) byModel[k].byo++;
+        byModel[k].cost += Number(e.costUsd) || 0; if (e.byo) byModel[k].byo++;
       });
       var models = Object.keys(byModel).map(function (k) { return byModel[k]; }).sort(function (a, b) { return b.requests - a.requests; });
       function card(lbl, val, sub2) { return '<div class="wsx-admin__card"><div class="wsx-admin__cardlbl">' + lbl + '</div><div class="wsx-admin__cardval">' + val + '</div>' + (sub2 ? '<div class="wsx-admin__cardsub">' + sub2 + '</div>' : '') + '</div>'; }
@@ -851,7 +851,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
         + (llm.hasByoKey ? card(t('admin.aiBilling'), t('admin.aiYourKey'), esc(llm.byoProvider || 'BYO') + ' \\u00B7 ' + t('admin.aiNotMetered')) : card(t('admin.aiBalance'), balUsd != null ? '$' + Number(balUsd).toFixed(2) : '\\u2014', t('admin.aiPlatformKey') + (llm.markup ? ' \\u00B7 ' + llm.markup + t('admin.aiMarkup') : '')))
         + card(t('admin.aiRequests'), adCompact(totals.requests), t('admin.aiRecentWindow'))
         + card(t('admin.aiTokens'), adCompact((Number(totals.inputTokens) || 0) + (Number(totals.outputTokens) || 0)), t('admin.aiTokensInOut').replace('{in}', adCompact(totals.inputTokens)).replace('{out}', adCompact(totals.outputTokens)))
-        + card(t('admin.aiBilled'), '$' + Number(totals.billedUsd || 0).toFixed(2), t('admin.aiRecentWindow'))
+        + card(t('admin.aiBilled'), '$' + Number(totals.costUsd || 0).toFixed(2), t('admin.aiRecentWindow'))
         + (crew.summary ? card(t('admin.aiCrewRuns'), adCompact(crew.summary.runs), t('admin.aiErrorsCost').replace('{errors}', String(crew.summary.errors || 0)).replace('{cost}', Number(crew.summary.costUsd || 0).toFixed(2))) : '');
       var modelRows = models.map(function (mm) {
         return '<tr><td><span class="wsx-atbl__link">' + esc(mm.model) + '</span>' + (mm.byo ? '<span class="wsx-atbl__flag" title="' + esc(t('admin.aiByoFlag')) + '">' + esc(t('admin.aiByo')) + '</span>' : '') + '</td>'
