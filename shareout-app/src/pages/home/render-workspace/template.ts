@@ -8,6 +8,7 @@ import type { RenderArgs } from '../types';
 import { ICON } from './constants';
 import { railNav, svg, widget, viewSeg } from './helpers';
 import { homeLangSwitchHtml } from '../home-i18n/lang-switch';
+import { adminNavHtml } from './admin-nav';
 import type { NavItem, NavGroup } from './constants';
 
 /** True when the viewer can open workspace admin surfaces. */
@@ -240,14 +241,10 @@ export function buildWorkspaceBody(args: RenderArgs): string {
           </div>
           <div class="wsx__view" data-view="admin">
             <h2 class="wsx__viewtitle" data-i18n="view.admin">Admin</h2>
-            <div class="wsx__chips" id="wsxAdminTabs">
-              <button class="wsx-chip is-on" data-admin-tab="overview" type="button" data-i18n="admin.overview">Overview</button>
-              <button class="wsx-chip" data-admin-tab="people" type="button" data-i18n="admin.people">People</button>
-              <button class="wsx-chip" data-admin-tab="artifacts" type="button" data-i18n="admin.artifacts">Artifacts</button>
-              <button class="wsx-chip" data-admin-tab="automation" type="button" data-i18n="admin.automation">Automation</button>
-              <button class="wsx-chip" data-admin-tab="settings" type="button" data-i18n="admin.settings">Settings</button>
+            <div class="wsx-adm">
+              <nav class="wsx-adm__nav" id="wsxAdminTabs" aria-label="Admin" data-i18n-aria="view.admin">${adminNavHtml()}</nav>
+              <div class="wsx-adm__main" id="wsxAdminMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
             </div>
-            <div id="wsxAdminMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
           </div>
           <div class="wsx__view" data-view="agent">
             <h2 class="wsx__viewtitle" id="wsxAgentTitle" data-i18n="view.results">Results</h2>

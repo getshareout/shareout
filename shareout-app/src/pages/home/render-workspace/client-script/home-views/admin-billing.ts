@@ -1,7 +1,7 @@
 import { BILLING_COPY } from './admin-billing-copy';
 
-/** Admin → Overview → Billing: invoices the instance operator issues to this workspace (src/router/api/workspace-invoices.ts).
- *  Hidden unless the workspace has an invoice or the viewer is the operator. Shares the admin lens IIFE scope. */
+/** Admin → Billing, bottom half: invoices the instance operator issues to this workspace (src/router/api/workspace-invoices.ts).
+ *  Always shown (an empty state until the first one is issued). Shares the admin lens IIFE scope. */
 export const workspace_client_home_views_adminBilling_JS = `  // Billing: the operator creates/issues/marks paid; workspace admins download the receipt and attach transfer proof.
   var adBillOpenId = null;
   var BILL_COPY = ${JSON.stringify(BILLING_COPY).replace(/</g, '\\u003c')};
@@ -137,16 +137,16 @@ export const workspace_client_home_views_adminBilling_JS = `  // Billing: the op
     }
     function paint(res) {
       var invoices = (res && res.invoices) || [], manage = !!(res && res.can_manage);
-      // Nothing to show and nothing to do: the section (and its title) stays out of the way.
-      if (!res || (!invoices.length && !manage)) { if (wrap) wrap.hidden = true; m.innerHTML = ''; return; }
       if (wrap) wrap.hidden = false;
+      var head = '<div class="wsx-admin__settings-title">' + esc(bt('admin.billInvoices')) + '</div>';
+      if (!res) { m.innerHTML = '<div class="wsx-admin__settings-section">' + head + i18nEmpty('common.couldNotLoad') + '</div>'; return; }
       var due = invoices.filter(function (i) { return i.status === 'open'; });
       var owed = {}; due.forEach(function (i) { owed[i.currency] = (owed[i.currency] || 0) + i.total_cents; });
       var owedTxt = Object.keys(owed).map(function (c) { return money(owed[c], c); }).join(' + ');
-      m.innerHTML = '<p class="wsx-lens__intro">' + esc(bt(manage ? 'admin.billIntroManage' : 'admin.billIntro')) + '</p>'
+      m.innerHTML = '<div class="wsx-admin__settings-section">' + head + '<p class="wsx-lens__intro">' + esc(bt(manage ? 'admin.billIntroManage' : 'admin.billIntro')) + '</p>'
         + (due.length ? '<div class="wsx-admin__cards"><div class="wsx-admin__card"><div class="wsx-admin__cardlbl">' + esc(bt('admin.billOwed')) + '</div><div class="wsx-admin__cardval">' + esc(owedTxt) + '</div><div class="wsx-admin__cardsub">' + esc(bt('admin.billOwedSub').replace('{n}', String(due.length))) + '</div></div></div>' : '')
         + (manage ? '<div class="wsx-auto-bar"><button class="wsx-abtn" type="button" id="wsxBillNewBtn">' + esc(bt('admin.billNew')) + '</button></div>' + formHtml() : '')
-        + (invoices.length ? '<div class="wsx-bill__list">' + invoices.map(function (i) { return invoiceHtml(i, manage); }).join('') + '</div>' : i18nEmpty('admin.billNone'));
+        + (invoices.length ? '<div class="wsx-bill__list">' + invoices.map(function (i) { return invoiceHtml(i, manage); }).join('') + '</div>' : i18nEmpty('admin.billNone')) + '</div>';
       var nb = document.getElementById('wsxBillNewBtn');
       if (nb) nb.addEventListener('click', function () { var f = document.getElementById('wsxBillForm'); if (f) { f.hidden = !f.hidden; if (!f.hidden && !f.getAttribute('data-wired')) { f.setAttribute('data-wired', '1'); wireForm(); } } });
       m.querySelectorAll('details[data-inv]').forEach(function (d) { d.addEventListener('toggle', function () { if (d.open) adBillOpenId = d.getAttribute('data-inv'); }); });
