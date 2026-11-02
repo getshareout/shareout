@@ -1,7 +1,7 @@
 // Records each test file that passed, keyed by what it loaded (see test-cache.mjs).
 // scripts/test-affected.mjs adds it, with --experimental.importDurations.limit so vitest
 // reports every module a file imported.
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { APP_DIR, ASSETS_DIR, READS_DISK, keyFor, record, staticClosure, toRel } from './test-cache.mjs';
 
@@ -9,7 +9,7 @@ const readsDisk = new Map();
 function touchesDisk(rel) {
   if (!readsDisk.has(rel)) {
     const abs = path.join(APP_DIR, rel);
-    readsDisk.set(rel, existsSync(abs) && READS_DISK.test(readFileSync(abs, 'utf8')));
+    readsDisk.set(rel, existsSync(abs) && statSync(abs).isFile() && READS_DISK.test(readFileSync(abs, 'utf8')));
   }
   return readsDisk.get(rel);
 }
