@@ -229,7 +229,7 @@ const pageScript = `
         st.textContent = 'Using your own ' + (c.byoProvider === 'vercel-gateway' ? 'Vercel AI Gateway' : 'OpenAI') + ' key — usage is not billed to your balance.';
       } else {
         st.className = 'byo-status platform';
-        st.textContent = 'Using the platform key — usage draws from your balance (incl. ' + Math.round((c.markup - 1) * 100) + '% service fee).';
+        st.textContent = 'Using the platform key — usage draws from your balance.';
       }
     });
   }

@@ -1,19 +1,24 @@
-/** Admin lens — overview, members, security, settings. */
+/** Admin lens — a sidebar of pages (members, billing, access, …), each painting one or more panels. */
 import { colors } from '@shareout/design-tokens';
+import { ADMIN_PAGE_COPY } from './admin-page-copy';
 
-/** Shared admin helpers (members, clients, invite, assets use them) + the tab bar. Stays in the boot shell. */
-export const workspace_client_home_views_adminCore_JS = `  // ----- Admin — Overview / Artifacts / Members / Billing / Security / Settings -----
+/** Shared admin helpers (members, clients, invite, assets use them) + the sidebar. Stays in the boot shell. */
+export const workspace_client_home_views_adminCore_JS = `  // ----- Admin — sidebar pages (admin-nav.ts) → the panels each one paints -----
   function wsUrl(suffix) { return '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + suffix; }
-  var adminTab = 'overview', adFocus = null;
-  // Five chips, each a stack of the original panels; old tab keys still resolve (deep links, attention rows, search).
-  var AD_GROUPS = { overview: ['overview', 'usage', 'billing', 'support'], people: ['members', 'clients'], artifacts: ['artifacts'], automation: ['automation', 'ai'], settings: ['settings', 'security', 'domains'] };
-  var AD_LABEL = { usage: 'admin.usage', billing: 'admin.billing', support: 'admin.support', members: 'admin.members', clients: 'admin.clients', ai: 'admin.ai', security: 'admin.security', domains: 'admin.cdTab', automation: 'admin.automation', settings: 'admin.settings' };
-  function adGroupOf(k) { if (AD_GROUPS[k]) return k; for (var g in AD_GROUPS) { if (AD_GROUPS[g].indexOf(k) >= 0) return g; } return 'overview'; }
-  function adHas(k) { return AD_GROUPS[adminTab].indexOf(k) >= 0; }
+  var adminTab = 'members', adFocus = null;
+  // One sidebar entry = one page = the panels it paints. Old tab keys still resolve (deep links, ⌘K, emails).
+  var AD_SECTIONS = { members: ['members'], clients: ['clients'], support: ['support'], artifacts: ['artifacts'], automation: ['automation'], billing: ['usage', 'billing'], ai: ['ai'], access: ['security'], publishing: ['security', 'settings'], tokens: ['security'], audit: ['security'], general: ['settings'], branding: ['settings'], domains: ['domains'] };
+  var AD_ALIAS = { overview: 'members', people: 'members', usage: 'billing', security: 'access', settings: 'general' };
+  function adGroupOf(k) { return AD_SECTIONS[k] ? k : (AD_ALIAS[k] || 'members'); }
+  function adHas(k) { return AD_SECTIONS[adminTab].indexOf(k) >= 0; }
   function adM(k) { return document.getElementById('wsxAdSec_' + k) || document.getElementById('wsxAdminMount'); }
   function adSetTab(k) {
     adminTab = adGroupOf(k); adFocus = k;
-    ws.querySelectorAll('[data-admin-tab]').forEach(function (x) { x.classList.toggle('is-on', x.getAttribute('data-admin-tab') === adminTab); });
+    ws.querySelectorAll('[data-admin-tab]').forEach(function (x) {
+      var on = x.getAttribute('data-admin-tab') === adminTab;
+      x.classList.toggle('is-on', on);
+      if (on) x.setAttribute('aria-current', 'page'); else x.removeAttribute('aria-current');
+    });
   }
   function adOpen(k) { adSetTab(k); loadAdmin(); }
   // Branded loading + busy-button affordances (design-system spinner).
@@ -50,7 +55,7 @@ export const workspace_client_home_views_adminCore_JS = `  // ----- Admin — Ov
   // revisit, refetch in the background, repaint only if the data changed (so
   // in-progress form edits aren't clobbered). Cache drops on workspace switch.
   var adDataCache = {}, adCacheWs = null;
-  function adReload() { AD_GROUPS[adminTab].forEach(function (k) { delete adDataCache[k]; }); loadAdmin(); }
+  function adReload() { AD_SECTIONS[adminTab].forEach(function (k) { delete adDataCache[k]; }); delete adDataCache._needs; loadAdmin(); }
   function swr(key, painter, fetcher) {
     var m = adM(key.split(':')[0]); if (!m) return;
     if (adCacheWs !== window.WSX_WS) { adDataCache = {}; adCacheWs = window.WSX_WS; }
@@ -84,86 +89,22 @@ export const workspace_client_home_views_adminCore_JS = `  // ----- Admin — Ov
 `;
 
 /** The admin lens views. Lazily loaded (lazy-chunks.ts); shares the shell scope. */
-export const workspace_client_home_views_admin_JS = `  function adOverview() {
-    var m = adM('overview'); if (needWs(m)) return;
-    var run = function () { return Promise.all([
-      Promise.resolve(null), // no billing in this build — seat/plan data is gone
-      fetch(wsUrl('/members/metrics'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      fetch(wsUrl('/admin/artifacts'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      fetch(wsUrl('/invites'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      fetch(wsUrl('/schedules'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      fetch(wsUrl('/automations'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
-    ]); };
-    swr('overview', function (res) {
-      var sub = res[0] && res[0].subscription;
-      var mlist = (res[1] && res[1].members) || [];
-      var alist = (res[2] && res[2].artifacts) || [];
-      var invites = (res[3] && res[3].invites) || [];
-      var jobs = (res[4] && res[4].schedules) || [];
-      var crews = (res[5] && res[5].automations) || [];
-      var storageBytes = alist.reduce(function (s, a) { return s + (Number(a.size_bytes) || 0); }, 0);
-      var totalViews = alist.reduce(function (s, a) { return s + (Number(a.views) || 0); }, 0);
-      var totalVisitors = alist.reduce(function (s, a) { return s + (Number(a.unique_visitors) || 0); }, 0);
-      var publicCount = alist.filter(function (a) { return a.visibility === 'public'; }).length;
-      var pausedCount = alist.filter(function (a) { return a.paused; }).length;
-      function inactive30(mem) {
-        if (mem.pending) return false;
-        var j = new Date(mem.joined_at); if (isNaN(j.getTime()) || (Date.now() - j.getTime()) < 2592000000) return false;
-        if (!mem.last_active) return true;
-        var la = new Date(mem.last_active); return isNaN(la.getTime()) ? true : (Date.now() - la.getTime()) > 2592000000;
-      }
-      var pendingCount = mlist.filter(function (x) { return x.pending; }).length;
-      var inactiveCount = mlist.filter(inactive30).length;
-      var failingJobs = jobs.filter(function (j) { return j.last_status === 'error' || j.last_status === 'failed'; }).length
-        + crews.filter(function (c) { return c.crew_status === 'error' || c.crew_status === 'failed'; }).length;
-      var automationsOn = jobs.filter(function (j) { return j.enabled !== false; }).length + crews.filter(function (c) { return c.enabled !== false; }).length;
-      var plan = (sub && sub.plan_name) || t('admin.statusFree');
-      var seatsTotal = sub ? sub.seats : null;
-      var seatsUsed = mlist.length;
-      var status = (sub && sub.status) || 'free';
-      var statusLabel = { active: t('admin.statusActive'), trialing: t('admin.statusTrial'), past_due: t('admin.statusPastDue'), cancelled: t('admin.statusCancelled'), expired: t('admin.statusExpired'), free: t('admin.statusFree') }[status] || status;
-      var statusCls = { active: 'is-on', trialing: 'is-trial', past_due: 'is-warn', cancelled: 'is-off', expired: 'is-off', free: '' }[status] || '';
-      var pct = seatsTotal ? Math.min(100, Math.round(seatsUsed / seatsTotal * 100)) : 0;
-      function card(lbl, val, sub2, extra) { return '<div class="wsx-admin__card"><div class="wsx-admin__cardlbl">' + lbl + '</div><div class="wsx-admin__cardval">' + val + '</div>' + (sub2 ? '<div class="wsx-admin__cardsub">' + sub2 + '</div>' : '') + (extra || '') + '</div>'; }
-      var planSub = (sub && sub.trial_ends_at) ? t('admin.trialEnds') + ' ' + adRelDate(sub.trial_ends_at) : (sub && sub.current_period_end) ? t('admin.renews') + ' ' + adRelDate(sub.current_period_end) : '';
-      var membersSub = seatsTotal ? t('admin.seatsUsed').replace('{pct}', String(pct)) : (pendingCount ? t('admin.pendingCount').replace('{n}', String(pendingCount)) : '');
-      var artsSub = adBytes(storageBytes) + ' ' + t('admin.stored') + (pausedCount ? ' \\u00B7 ' + pausedCount + ' ' + t('admin.pausedCount') : '');
-      var viewsSub = totalVisitors.toLocaleString() + ' ' + t('admin.uniqueVisitors');
-      var publicSub = publicCount ? t('admin.artifactsPublic') : t('admin.nothingPublic');
-      var autoSub = (jobs.length + crews.length) + ' ' + t('admin.automationTotal') + (failingJobs ? ' \\u00B7 ' + failingJobs + ' ' + t('admin.automationFailing') : '');
-      var cards = card(t('admin.cardPlan'), esc(plan) + ' <span class="wsx-admin__rolebadge ' + statusCls + '">' + esc(statusLabel) + '</span>', planSub)
-        + card(t('admin.cardMembers'), seatsUsed + (seatsTotal ? ' / ' + seatsTotal : ''), membersSub, (seatsTotal ? '<div class="wsx-admin__seatbar"><div class="wsx-admin__seatfill" style="width:' + pct + '%"></div></div>' : '') + '<button class="wsx-atbl__act" id="wsxOvInvite" type="button">' + esc(t('invite.cta')) + '</button>')
-        + card(t('admin.cardArtifacts'), String(alist.length), artsSub)
-        + card(t('admin.cardViews'), totalViews.toLocaleString(), viewsSub)
-        + card(t('admin.cardPublic'), String(publicCount), publicSub)
-        + card(t('admin.cardAutomations'), String(automationsOn), autoSub);
-      // Actionable items — only what needs the admin's attention, each deep-links to its tab.
-      var attn = [];
-      if (pendingCount) attn.push(['members', t(pendingCount === 1 ? 'admin.pendingInvites' : 'admin.pendingInvitesPlural').replace('{n}', String(pendingCount)), 'is-trial']);
-      if (inactiveCount) attn.push(['members', t(inactiveCount === 1 ? 'admin.inactiveMembers' : 'admin.inactiveMembersPlural').replace('{n}', String(inactiveCount)), '']);
-      if (publicCount) attn.push(['artifacts', t(publicCount === 1 ? 'admin.publicArtifacts' : 'admin.publicArtifactsPlural').replace('{n}', String(publicCount)), '']);
-      if (failingJobs) attn.push(['automation', t(failingJobs === 1 ? 'admin.failingAutomations' : 'admin.failingAutomationsPlural').replace('{n}', String(failingJobs)), 'is-off']);
-      var attnSection = attn.length
-        ? '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.needsAttention')) + '</div><div class="wsx-admin__attn">'
-          + attn.map(function (a) { return '<button class="wsx-admin__attnrow" data-admin-goto="' + a[0] + '" type="button"><span class="wsx-admin__rolebadge ' + a[2] + '">!</span><span>' + a[1] + '</span><span class="wsx-admin__attngo">\\u2192</span></button>'; }).join('')
-          + '</div></div>'
-        : '';
-      m.innerHTML = '<div class="wsx-admin__cards">' + cards + '</div>' + attnSection;
-      document.getElementById('wsxOvInvite').addEventListener('click', function () { wsxInvite(adReload); });
-      m.querySelectorAll('[data-admin-goto]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          adOpen(b.getAttribute('data-admin-goto'));
-        });
-      });
-    }, run);
-  }
-
+export const workspace_client_home_views_admin_JS = `  var AD_COPY = ${JSON.stringify(ADMIN_PAGE_COPY).replace(/</g, '\\u003c')};
+  // Admin page strings first (in the page's current language), then the shell's copy.
+  function at(k) { var de = document.documentElement, l = de && de.lang === 'es' ? 'es' : 'en'; return AD_COPY[l][k] || AD_COPY.en[k] || t(k); }
   function adArtifacts() {
     var m = adM('artifacts'); if (needWs(m)) return;
     var run = function () { return fetch(wsUrl('/admin/artifacts'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }); };
     swr('artifacts', function (d) {
         var arts = (d && d.artifacts) || [];
         if (!arts.length) { m.innerHTML = i18nEmpty('admin.noArtifacts'); return; }
+        var storageBytes = 0, totalViews = 0, totalVisitors = 0, publicCount = 0, pausedCount = 0;
+        arts.forEach(function (a) { storageBytes += Number(a.size_bytes) || 0; totalViews += Number(a.views) || 0; totalVisitors += Number(a.unique_visitors) || 0; if (a.visibility === 'public') publicCount++; if (a.paused) pausedCount++; });
+        var kpis = '<div class="wsx-admin__cards">'
+          + adCard(t('admin.cardArtifacts'), String(arts.length), adBytes(storageBytes) + ' ' + t('admin.stored') + (pausedCount ? ' \\u00B7 ' + pausedCount + ' ' + t('admin.pausedCount') : ''))
+          + adCard(t('admin.cardViews'), totalViews.toLocaleString(), totalVisitors.toLocaleString() + ' ' + t('admin.uniqueVisitors'))
+          + adCard(t('admin.cardPublic'), String(publicCount), publicCount ? t('admin.artifactsPublic') : t('admin.nothingPublic'), publicCount ? 'warn' : '')
+          + '</div>';
         var artSort = 'created'; var artAsc = false; var artVis = '';
         var VIS_LABEL = { public: t('admin.visPublic'), unlisted: t('admin.visUnlisted'), private: t('admin.visPrivate') };
         var VIS_CLS = { public: 'is-on', unlisted: '', private: 'is-off' };
@@ -236,7 +177,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
             }).join('') + '</div>';
           var thEl = function (k, lbl) { return '<th class="' + (artSort === k ? 'is-sort' : '') + '" data-asort="' + k + '"' + (artSort === k ? ' aria-sort="' + (artAsc ? 'ascending' : 'descending') + '"' : '') + '>' + lbl + '</th>'; };
           var thead = '<thead><tr data-sort-own>' + thEl('name', t('widget.colName')) + thEl('owner', esc(t('admin.colOwner'))) + thEl('created', t('admin.colCreated')) + thEl('updated', t('widget.colUpdated')) + thEl('views', t('widget.colViews')) + thEl('visitors', t('tabs.visitors')) + thEl('size', t('admin.colSize')) + thEl('load', t('admin.colLoad')) + thEl('visibility', esc(t('admin.colVisibility'))) + thEl('status', esc(t('admin.colStatus'))) + '<th data-nosort>' + esc(t('admin.colActions')) + '</th></tr></thead>';
-          m.innerHTML = filterBtns + '<div class="wsx-atbl__wrap"><table class="wsx-atbl">' + thead + '<tbody>' + sortedList().map(artRow).join('') + '</tbody></table></div>';
+          m.innerHTML = kpis + '<div class="wsx-admin__settings-section">' + filterBtns + '<div class="wsx-atbl__wrap"><table class="wsx-atbl">' + thead + '<tbody>' + sortedList().map(artRow).join('') + '</tbody></table></div></div>';
           m.querySelectorAll('[data-avis]').forEach(function (b) {
             b.addEventListener('click', function () { artVis = b.getAttribute('data-avis') || ''; renderTable(); });
           });
@@ -304,7 +245,6 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
           + '</div><div class="wsx-admin__seatbar" style="width:80px"><div class="wsx-admin__seatfill" style="width:'
           + Math.min(100, Math.round(list.length / seatsTotal * 100)) + '%"></div></div></div>'
         : '';
-      var invite = '<div class="wsx-admin__invite"><button class="wsx-abtn wsx-abtn--primary" id="wsxInviteBtn" type="button"' + (atLimit ? ' disabled title="' + esc(t('admin.seatLimitTitle')) + '"' : '') + '>' + esc(t('invite.cta')) + '</button></div>';
       // Inactive = joined >30d ago and no activity in the last 30d (reclaim candidate).
       function memInactive(mem) {
         if (mem.pending) return false;
@@ -329,7 +269,8 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
       }
       var invitesSection = '';
       if (invites.length) {
-        invitesSection = '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.pendingInvitesTitle')) + '</div>'
+        invitesSection = '<div class="wsx-admin__settings-section" id="wsxAdInvites"><div class="wsx-admin__settings-title">' + esc(t('admin.pendingInvitesTitle')) + '</div>'
+          + '<p class="wsx-lens__intro">' + esc(at('admin.pendingInvitesIntro')) + '</p>'
           + '<div class="wsx-admin__list">' + invites.map(function (iv) {
             var expired = iv.expired ? '<span class="wsx-atbl__flag" title="' + esc(t('admin.inviteExpired')) + '">' + esc(t('admin.expired')) + '</span>' : '';
             var invitedSub = t('admin.invitedAt').replace('{when}', adRelDate(iv.created_at)) + (iv.invited_by_email ? ' ' + t('admin.invitedBy').replace('{email}', esc(iv.invited_by_email)) : '');
@@ -382,8 +323,14 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
       function renderMembers() {
         var thEl = function (k, lbl) { return '<th class="' + (memSort === k ? 'is-sort' : '') + '" data-msort="' + k + '"' + (memSort === k ? ' aria-sort="' + (memAsc ? 'ascending' : 'descending') + '"' : '') + '>' + lbl + '</th>'; };
         var thead = '<thead><tr data-sort-own>' + thEl('name', esc(t('admin.colMember'))) + thEl('role', esc(t('admin.colRole'))) + thEl('joined', esc(t('admin.colJoined'))) + thEl('login', esc(t('admin.colLastLogin'))) + thEl('active', esc(t('admin.colLastActive'))) + thEl('arts', esc(t('admin.colArtifacts'))) + thEl('views', esc(t('widget.colViews'))) + thEl('tokens', esc(t('admin.colAiTokens'))) + thEl('comments', esc(t('admin.colComments'))) + '<th></th></tr></thead>';
-        var table = '<div class="wsx-atbl__wrap"><table class="wsx-atbl">' + thead + '<tbody>' + sortedMembers().map(memRow).join('') + '</tbody></table></div>';
-        m.innerHTML = seatUtil + invite + table + invitesSection + '<div id="wsxInvTeam"></div>';
+        var table = '<div class="wsx-admin__settings-section"><div class="wsx-atbl__wrap"><table class="wsx-atbl">' + thead + '<tbody>' + sortedMembers().map(memRow).join('') + '</tbody></table></div></div>';
+        var admins = list.filter(function (x) { return x.role === 'owner' || x.role === 'admin'; }).length, inactive = list.filter(memInactive).length;
+        var kpis = '<div class="wsx-admin__cards">'
+          + adCard(t('admin.cardMembers'), String(list.length) + (seatsTotal ? ' / ' + seatsTotal : ''), esc(at('admin.membersSplit').replace('{admins}', String(admins)).replace('{members}', String(list.length - admins))))
+          + adCard(at('admin.cardActive30'), String(list.length - inactive), inactive ? esc(t(inactive === 1 ? 'admin.inactiveMembers' : 'admin.inactiveMembersPlural').replace('{n}', String(inactive))) : '')
+          + adCard(t('admin.pendingInvitesTitle'), String(invites.length), '', invites.length ? 'warn' : '')
+          + '</div>';
+        m.innerHTML = kpis + seatUtil + table + invitesSection + '<div id="wsxInvTeam"></div>';
         invTeamAccess(document.getElementById('wsxInvTeam'), list);
         bindMembers();
       }
@@ -396,7 +343,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
           });
         });
         var ib = document.getElementById('wsxInviteBtn');
-        if (ib) ib.addEventListener('click', function () { wsxInvite(adReload); });
+        if (ib) { ib.disabled = atLimit; ib.title = atLimit ? t('admin.seatLimitTitle') : ''; }
         m.querySelectorAll('[data-inv-resend]').forEach(function (b) {
           b.addEventListener('click', function () {
             var id = b.getAttribute('data-inv-resend'), tmr = null;
@@ -565,7 +512,9 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
               + (a.viewer_can_decide ? '<button class="wsx-atbl__act" data-appr="' + esc(a.id) + '" data-appr-art="' + esc(a.artifact_id) + '" type="button">' + esc(t('common.approve')) + '</button>' : '<span class="wsx-admin__rolebadge">' + esc(a.status || t('admin.pending')) + '</span>') + '</div>';
           }).join('') + '</div></div>';
       }
-      m.innerHTML = reqSection + apprSection + policySection + sessionSection + tokensSection + auditSection;
+      // One painter, four pages: each shows only its own blocks (no page = all, for tests and old links).
+      var parts = { access: reqSection + policySection + sessionSection, publishing: apprSection, tokens: tokensSection, audit: auditSection }[adminTab];
+      m.innerHTML = parts != null ? parts : reqSection + apprSection + policySection + sessionSection + tokensSection + auditSection;
       // Session policy save.
       var sessSave = document.getElementById('wsxSessSave');
       if (sessSave) sessSave.addEventListener('click', function () {
@@ -654,7 +603,8 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
         });
       }
       bindDomainRm();
-      document.getElementById('wsxDomainAdd').addEventListener('click', function () {
+      var domAdd = document.getElementById('wsxDomainAdd');
+      if (domAdd) domAdd.addEventListener('click', function () {
         var inp = document.getElementById('wsxDomainInput'); var v = (inp.value || '').trim().toLowerCase().replace(/^@/, '');
         if (!v || domains.indexOf(v) !== -1) return; inp.value = ''; saveDomains(domains.concat([v]));
       });
@@ -697,13 +647,15 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
       var cat = (feat && feat.catalog) || [];
       var groups = {}, order = [];
       cat.forEach(function (f) { var c = f.category || t('admin.categoryOther'); if (!groups[c]) { groups[c] = []; order.push(c); } groups[c].push(f); });
-      var featSection = '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.features')) + '</div>'
-        + '<p class="wsx-lens__intro">' + esc(t('admin.featuresIntro')) + '</p>'
+      // A long, read-only list: folded behind "n of m on" so General stays one screen.
+      var featOn = cat.filter(function (f) { return f.enabled; }).length;
+      var featSection = '<details class="wsx-admin__settings-section wsx-adm__fold"><summary class="wsx-adm__foldsum"><span class="wsx-admin__settings-title">' + esc(t('admin.features')) + '</span>'
+        + '<span class="wsx-lens__intro">' + esc(t('admin.featuresIntro')) + (cat.length ? ' ' + esc(at('admin.featuresOn').replace('{on}', String(featOn)).replace('{n}', String(cat.length))) : '') + '</span></summary>'
         + (cat.length ? order.map(function (c) {
           return '<div class="wsx-conn__cat">' + esc(c) + '</div>' + groups[c].map(function (f) {
             return '<div class="wsx-admin__row"><div class="wsx-admin__who"><span class="wsx-admin__nm">' + esc(f.label) + '</span><span class="wsx-admin__sub">' + esc(f.description || '') + '</span></div><span class="wsx-admin__rolebadge ' + (f.enabled ? 'is-on' : 'is-off') + '">' + esc(f.enabled ? t('admin.on') : t('admin.off')) + '</span></div>';
           }).join('');
-        }).join('') : i18nEmpty('admin.noFeatures')) + '</div>';
+        }).join('') : i18nEmpty('admin.noFeatures')) + '</details>';
       var slug = window.WSX_SLUG || '';
       // Domain comes from the instance; empty when it has no email binding, in which
       // case there is no address to show rather than one that cannot receive.
@@ -720,12 +672,14 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
           + '<p class="wsx-lens__intro">' + esc(t('admin.instanceIntro')) + '</p>'
           + '<div class="wsx-admin__row"><a class="wsx-abtn" href="/admin?view=instance">' + esc(t('admin.instanceOpen')) + '</a></div></div>'
         : '';
-      m.innerHTML = instanceSection + inboxSection + '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title" data-i18n="settings.language">Language</div>'
+      var langSection = '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title" data-i18n="settings.language">Language</div>'
         + '<p class="wsx-lens__intro" data-i18n="settings.languageIntro">Choose the language for menus, labels, and messages in your workspace home.</p>'
         + '<div class="wsx-home-lang" role="group" aria-label="Language" data-i18n-aria="settings.language">'
         + '<button class="home-lang-btn" type="button" data-scope="workspace" data-lang="en" aria-selected="true" title="English" data-i18n-title="settings.languageEn">\\uD83C\\uDDFA\\uD83C\\uDDF8 EN</button>'
         + '<button class="home-lang-btn" type="button" data-scope="workspace" data-lang="es" aria-selected="false" title="Espa\\u00f1ol" data-i18n-title="settings.languageEs">\\uD83C\\uDDE6\\uD83C\\uDDF7 ES</button>'
-        + '</div></div>' + pubSection + folderSection + brdSection + featSection;
+        + '</div></div>';
+      var parts = { general: instanceSection + langSection + folderSection + inboxSection + featSection, publishing: pubSection, branding: brdSection }[adminTab];
+      m.innerHTML = parts != null ? parts : instanceSection + inboxSection + langSection + pubSection + folderSection + brdSection + featSection;
       if (typeof window.__SO_APPLY_HOME_I18N === 'function') window.__SO_APPLY_HOME_I18N();
       if (typeof window.__SO_WIRE_HOME_LANG === 'function') window.__SO_WIRE_HOME_LANG(m);
       var copyBtn = document.getElementById('wsxInboxCopy');
@@ -761,7 +715,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
       });
       if (nn) nn.addEventListener('change', function () { savePol(cur); });
       var mfEl = document.getElementById('wsxMemberFolders');
-      mfEl.addEventListener('change', function () {
+      if (mfEl) mfEl.addEventListener('change', function () {
         var next = mfEl.checked;
         optimistic({
           key: 'member-folders',
@@ -775,6 +729,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
       });
       var bmsg = document.getElementById('wsxBrandMsg');
       var accEl = document.getElementById('wsxBrandAccent'), footEl = document.getElementById('wsxBrandFooter');
+      if (!accEl || !footEl) return;
       var savedBrand = { a: accEl.value, f: footEl.checked };
       document.getElementById('wsxBrandSave').addEventListener('click', function () {
         var next = { a: accEl.value, f: footEl.checked }, prev = savedBrand;
@@ -848,7 +803,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
       var balUsd = (llm.balanceUsd != null) ? llm.balanceUsd : (llm.balanceMicroUsd != null ? llm.balanceMicroUsd / 1e6 : null);
       var spend = (llm.currentMonthSpendUsd != null) ? llm.currentMonthSpendUsd : 0;
       var cards = card(t('admin.aiMonthSpend'), '$' + Number(spend).toFixed(2), llm.period ? esc(String(llm.period)) : '')
-        + (llm.hasByoKey ? card(t('admin.aiBilling'), t('admin.aiYourKey'), esc(llm.byoProvider || 'BYO') + ' \\u00B7 ' + t('admin.aiNotMetered')) : card(t('admin.aiBalance'), balUsd != null ? '$' + Number(balUsd).toFixed(2) : '\\u2014', t('admin.aiPlatformKey') + (llm.markup ? ' \\u00B7 ' + llm.markup + t('admin.aiMarkup') : '')))
+        + (llm.hasByoKey ? card(t('admin.aiBilling'), t('admin.aiYourKey'), esc(llm.byoProvider || 'BYO') + ' \\u00B7 ' + t('admin.aiNotMetered')) : card(t('admin.aiBalance'), balUsd != null ? '$' + Number(balUsd).toFixed(2) : '\\u2014', t('admin.aiPlatformKey')))
         + card(t('admin.aiRequests'), adCompact(totals.requests), t('admin.aiRecentWindow'))
         + card(t('admin.aiTokens'), adCompact((Number(totals.inputTokens) || 0) + (Number(totals.outputTokens) || 0)), t('admin.aiTokensInOut').replace('{in}', adCompact(totals.inputTokens)).replace('{out}', adCompact(totals.outputTokens)))
         + card(t('admin.aiBilled'), '$' + Number(totals.costUsd || 0).toFixed(2), t('admin.aiRecentWindow'))
@@ -927,11 +882,13 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
       });
     }, run);
   }
-  function adTableSection(titleKey, introKey, headKeys, rowsHtml, emptyKey) {
+  // One KPI tile; rows of them sit at the top of a page, above its cards.
+  function adCard(lbl, val, sub2, tone) { return '<div class="wsx-admin__card' + (tone ? ' is-' + tone : '') + '"><div class="wsx-admin__cardlbl">' + esc(lbl) + '</div><div class="wsx-admin__cardval">' + val + '</div>' + (sub2 ? '<div class="wsx-admin__cardsub">' + sub2 + '</div>' : '') + '</div>'; }
+  function adTableSection(titleKey, introKey, headKeys, rowsHtml, emptyKey, id) {
     var body = rowsHtml
       ? '<div class="wsx-atbl__wrap"><table class="wsx-atbl"><thead><tr>' + headKeys.map(function (k) { return '<th>' + esc(t(k)) + '</th>'; }).join('') + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>'
       : i18nEmpty(emptyKey);
-    return '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t(titleKey)) + '</div>'
+    return '<div class="wsx-admin__settings-section"' + (id ? ' id="' + id + '"' : '') + '><div class="wsx-admin__settings-title">' + esc(t(titleKey)) + '</div>'
       + '<p class="wsx-lens__intro">' + esc(t(introKey)) + '</p>' + body + '</div>';
   }
   function adAutomation() {
@@ -947,7 +904,7 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
       var crews = (res[2] && res[2].automations) || [];
       function statusBadge(st, enabled) {
         if (enabled === false) return '<span class="wsx-admin__rolebadge is-off">' + esc(t('admin.autoPaused')) + '</span>';
-        var cls = st === 'error' || st === 'failed' ? 'is-off' : st === 'ok' || st === 'success' ? 'is-on' : '';
+        var cls = st === 'error' || st === 'failed' ? 'is-bad' : st === 'ok' || st === 'success' ? 'is-on' : '';
         return '<span class="wsx-admin__rolebadge ' + cls + '">' + esc(st || 'idle') + '</span>';
       }
       var connRows = conns.map(function (c) {
@@ -970,20 +927,35 @@ export const workspace_client_home_views_admin_JS = `  function adOverview() {
           + '<td class="wsx-atbl__date" data-sort="' + esc(c.last_run_at || '') + '">' + (c.last_run_at ? adRelDate(c.last_run_at) : '\\u2014') + '</td>'
           + '<td>' + statusBadge(c.crew_status, c.enabled) + '</td></tr>';
       }).join('');
-      m.innerHTML = adTableSection('admin.autoConnectors', 'admin.autoConnectorsIntro', ['admin.colName', 'admin.colProvider', 'admin.colUsedBy', 'admin.colCreated'], connRows, 'admin.noConnectors')
-        + adTableSection('admin.autoScheduledJobs', 'admin.autoScheduledIntro', ['admin.colName', 'admin.colSchedule', 'admin.colLastRun', 'admin.lblStatus'], jobRows, 'admin.noScheduledJobs')
-        + adTableSection('admin.autoCrewAutomations', 'admin.autoCrewIntro', ['admin.colCrew', 'admin.colTrigger', 'admin.colModel', 'admin.colLastRun', 'admin.lblStatus'], crewRows, 'admin.noAutomations');
+      var failing = jobs.filter(function (j) { return j.last_status === 'error' || j.last_status === 'failed'; }).length
+        + crews.filter(function (c) { return c.crew_status === 'error' || c.crew_status === 'failed'; }).length;
+      var on = jobs.filter(function (j) { return j.enabled !== false; }).length + crews.filter(function (c) { return c.enabled !== false; }).length;
+      var kpis = '<div class="wsx-admin__cards">'
+        + adCard(t('admin.cardAutomations'), String(on), (jobs.length + crews.length) + ' ' + t('admin.automationTotal'))
+        + adCard(at('admin.automationFailingCard'), String(failing), '', failing ? 'bad' : '')
+        + adCard(t('admin.autoConnectors'), String(conns.length), '')
+        + '</div>';
+      // Failing work first: the scheduled jobs and AI tasks, then the connections they use.
+      m.innerHTML = kpis
+        + adTableSection('admin.autoScheduledJobs', 'admin.autoScheduledIntro', ['admin.colName', 'admin.colSchedule', 'admin.colLastRun', 'admin.lblStatus'], jobRows, 'admin.noScheduledJobs', 'wsxAdAutoJobs')
+        + adTableSection('admin.autoCrewAutomations', 'admin.autoCrewIntro', ['admin.colCrew', 'admin.colTrigger', 'admin.colModel', 'admin.colLastRun', 'admin.lblStatus'], crewRows, 'admin.noAutomations')
+        + adTableSection('admin.autoConnectors', 'admin.autoConnectorsIntro', ['admin.colName', 'admin.colProvider', 'admin.colUsedBy', 'admin.colCreated'], connRows, 'admin.noConnectors');
     }, run);
   }
   function loadAdmin() {
-    var fnMap = { overview: adOverview, artifacts: adArtifacts, members: adMembers, clients: adClients, automation: adAutomation, ai: adAI, security: adSecurity, usage: adUsage, billing: adBilling, support: adSupport, settings: adSettings, domains: adDomains };
-    var keys = AD_GROUPS[adminTab], focus = adFocus; adFocus = null;
+    var fnMap = { artifacts: adArtifacts, members: adMembers, clients: adClients, automation: adAutomation, ai: adAI, security: adSecurity, usage: adUsage, billing: adBilling, support: adSupport, settings: adSettings, domains: adDomains };
+    var keys = AD_SECTIONS[adminTab], focus = adFocus; adFocus = null;
     var mount = document.getElementById('wsxAdminMount'); if (!mount) return;
-    mount.innerHTML = keys.length < 2 ? '<div id="wsxAdSec_' + keys[0] + '"></div>' : keys.map(function (k, i) {
-      return '<section class="wsx-admin__sec" id="wsxAdSecWrap_' + k + '">' + (i ? '<h3 class="wsx-admin__sectitle">' + esc(t(AD_LABEL[k])) + '</h3>' : '') + '<div id="wsxAdSec_' + k + '"></div></section>';
-    }).join('');
+    var act = adminTab === 'members' ? '<div class="wsx-adm__act"><button class="wsx-abtn wsx-abtn--primary" id="wsxInviteBtn" type="button">' + esc(t('invite.cta')) + '</button></div>' : '';
+    mount.innerHTML = '<header class="wsx-adm__ph"><div><h3 class="wsx-adm__title">' + esc(t('admin.sec_' + adminTab)) + '</h3><p class="wsx-adm__desc">' + esc(at('admin.secd_' + adminTab)) + '</p></div>' + act + '</header>'
+      + '<div id="wsxAdAlert"></div>'
+      + keys.map(function (k) { return '<section class="wsx-admin__sec" id="wsxAdSecWrap_' + k + '"><div id="wsxAdSec_' + k + '"></div></section>'; }).join('');
+    var ib = document.getElementById('wsxInviteBtn');
+    if (ib) ib.addEventListener('click', function () { wsxInvite(adReload); });
+    adWatchFold(mount);
     keys.forEach(function (k) { var fn = fnMap[k]; if (fn) fn(); });
-    var tgt = focus && focus !== adminTab && document.getElementById('wsxAdSecWrap_' + focus);
+    adNeeds();
+    var tgt = focus && focus !== adminTab && keys.length > 1 && document.getElementById('wsxAdSecWrap_' + focus);
     if (tgt && tgt.scrollIntoView) tgt.scrollIntoView({ block: 'start' });
   }
 `;

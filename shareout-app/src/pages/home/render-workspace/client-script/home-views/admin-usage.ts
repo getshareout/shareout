@@ -1,4 +1,5 @@
-/** Admin → Usage (what the workspace cost per day and category, month-end pace, CSV). Shares the admin lens IIFE scope. */
+/** Admin → Billing, top half: this month's spend and pace, the AI budget, where the spend went (category, AI kind,
+ *  member today, day), CSV. Invoices follow (admin-billing.ts). Shares the admin lens IIFE scope. */
 export const workspace_client_home_views_adminUsage_JS = `  // Usage: this month or last, from the nightly per-workspace usage ledger.
   var adUsageMonth = null;
   function adUsage() {
@@ -16,9 +17,10 @@ export const workspace_client_home_views_adminUsage_JS = `  // Usage: this month
     var month = adUsageMonth || new Date().toISOString().slice(0, 7);
     function fmtUsd(n) { return '$' + (Number(n) || 0).toFixed(2); }
     function fmtDate(iso) { try { return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }); } catch (e) { return iso || ''; } }
-    // The monthly AI ceiling (every metered AI call), spend by kind, and today's per-member caps.
+    // The monthly AI ceiling (every metered AI call), spend by kind, and today's per-member caps — three blocks.
     function aiBudgetHtml(lim) {
-      if (!lim || lim.month_spend_usd == null) return '';
+      var out = { budget: '', kinds: '', today: '' };
+      if (!lim || lim.month_spend_usd == null) return out;
       var isAdmin = !!lim.members, st = lim.budget_state || 'none', has = lim.budget_usd != null;
       var pct = has ? Math.min(100, lim.pct || 0) : 0;
       var head = '<div class="wsx-admin__budgethead"><div class="wsx-admin__cardlbl">' + esc(t('admin.budgetTitle')) + '</div>'
@@ -32,10 +34,11 @@ export const workspace_client_home_views_adminUsage_JS = `  // Usage: this month
         + (has ? '<button class="wsx-abtn" id="wsxBudgetClear" type="button">' + esc(t('admin.budgetRemove')) + '</button>' : '') + '</div>' : '';
       // Platform admins only (the API sends operator to no one else): what this spend cost us.
       var op = lim.operator ? '<div class="wsx-admin__budgetstate" data-op-note style="margin-top:8px">' + esc(t('admin.usageOperator').replace('{cost}', fmtUsd(lim.operator.cost_usd)).replace('{margin}', fmtUsd(lim.operator.margin_usd)).replace('{markup}', String(lim.operator.markup))) + '</div>' : '';
-      var html = '<div class="wsx-admin__budget is-' + esc(st) + '">' + head + bar + note + op + edit + '</div>';
+      out.budget = '<div class="wsx-admin__budget is-' + esc(st) + '">' + head + bar + note + op + edit + '</div>';
       if (isAdmin) {
         var kinds = lim.spend_by_kind || [];
-        html += '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.aiByKind')) + '</div>'
+        out.kinds = '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.aiByKind')) + '</div>'
+          + '<p class="wsx-lens__intro">' + esc(t('admin.aiByKindIntro')) + '</p>'
           + (kinds.length ? '<div class="wsx-atbl__wrap"><table class="wsx-atbl"><thead><tr><th>' + esc(t('admin.usageColCategory')) + '</th><th>' + esc(t('admin.colCost')) + '</th></tr></thead><tbody>'
             + kinds.map(function (k) { return '<tr><td>' + esc(tOr('admin.aiKind_' + k.kind, k.kind)) + '</td><td class="wsx-atbl__num">' + fmtUsd(k.usd) + '</td></tr>'; }).join('') + '</tbody></table></div>' : i18nEmpty('admin.aiByKindNone')) + '</div>';
       }
@@ -44,9 +47,9 @@ export const workspace_client_home_views_adminUsage_JS = `  // Usage: this month
         return '<tr><td>' + esc(r.email || r.user_id) + '</td><td class="wsx-atbl__num">' + adCompact(r.tokens_today) + '</td><td class="wsx-atbl__num">' + adCompact(cap) + '</td></tr>';
       }).join('')
         + '<tr><td>' + esc(t('admin.aiTodayAuto')) + '</td><td class="wsx-atbl__num">' + adCompact(auto.tokens_today || 0) + '</td><td class="wsx-atbl__num">' + adCompact(auto.daily_cap || 0) + '</td></tr>';
-      html += '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.aiToday')) + '</div><p class="wsx-lens__intro">' + esc(t('admin.aiTodayIntro')) + '</p>'
-        + '<div class="wsx-atbl__wrap"><table class="wsx-atbl"><thead><tr><th>' + esc(t('admin.colMember')) + '</th><th>' + esc(t('admin.aiTodayTokens')) + '</th><th>' + esc(t('admin.aiTodayCap')) + '</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
-      return html;
+      out.today = '<details class="wsx-admin__settings-section wsx-adm__fold"><summary class="wsx-adm__foldsum"><span class="wsx-admin__settings-title">' + esc(t('admin.aiToday')) + '</span><span class="wsx-lens__intro">' + esc(t('admin.aiTodayIntro')) + '</span></summary>'
+        + '<div class="wsx-atbl__wrap"><table class="wsx-atbl"><thead><tr><th>' + esc(t('admin.colMember')) + '</th><th>' + esc(t('admin.aiTodayTokens')) + '</th><th>' + esc(t('admin.aiTodayCap')) + '</th></tr></thead><tbody>' + rows + '</tbody></table></div></details>';
+      return out;
     }
     function saveBudget(value) {
       return fetch(wsUrl('/llm/budget'), { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ monthlyBudgetUsd: value }) })
@@ -62,10 +65,10 @@ export const workspace_client_home_views_adminUsage_JS = `  // Usage: this month
       var bm = res.byMetric || {};
       var q = {}; Object.keys(bm).forEach(function (k) { q[k] = bm[k].quantity; });
       var days = res.days || [];
-      var chips = '<div class="wsx__chips">'
+      var chips = '<div class="wsx-adm__tools"><div class="wsx-admin__artfilter wsx__chips">'
         + '<button class="wsx-chip' + (month === cur ? ' is-on' : '') + '" data-us-month="' + esc(cur) + '" type="button">' + esc(t('admin.usageThisMonth')) + '</button>'
         + '<button class="wsx-chip' + (month !== cur ? ' is-on' : '') + '" data-us-month="' + esc(month === cur ? prevMonth : month) + '" type="button">' + esc(t('admin.usageLastMonth')) + '</button>'
-        + '<a class="wsx-abtn" href="' + esc(wsUrl('/spend?month=' + encodeURIComponent(month) + '&format=csv')) + '" download>' + esc(t('admin.usageCsv')) + '</a></div>';
+        + '</div><a class="wsx-abtn" href="' + esc(wsUrl('/spend?month=' + encodeURIComponent(month) + '&format=csv')) + '" download>' + esc(t('admin.usageCsv')) + '</a></div>';
       var cards = card(t('admin.usageSpend') + ' · ' + month, usd(res.totalMicroUsd), days.length ? t('admin.usageThrough').replace('{day}', days[days.length - 1].day) : '')
         + (res.projectedMicroUsd != null ? card(t('admin.usageProjected'), usd(res.projectedMicroUsd), '') : '')
         + card(t('admin.usagePrev') + (prevMonth ? ' · ' + prevMonth : ''), usd(res.previous && res.previous.totalMicroUsd), '');
@@ -76,14 +79,18 @@ export const workspace_client_home_views_adminUsage_JS = `  // Usage: this month
       var dayRows = days.slice().reverse().map(function (d) {
         return '<tr><td>' + esc(d.day) + '</td><td class="wsx-atbl__num">' + usd(d.costMicroUsd) + '</td></tr>';
       }).join('');
-      m.innerHTML = aiBudgetHtml(lim) + '<p class="wsx-lens__intro">' + esc(t('admin.usageIntro')) + '</p>' + chips
-        + '<div class="wsx-admin__cards">' + cards + '</div>'
-        + (days.length
-          ? '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.usageByCategory')) + '</div>'
-            + '<div class="wsx-atbl__wrap"><table class="wsx-atbl"><thead><tr><th>' + esc(t('admin.usageColCategory')) + '</th><th>' + esc(t('admin.usageColUsage')) + '</th><th>' + esc(t('admin.colCost')) + '</th></tr></thead><tbody>' + catRows + '</tbody></table></div></div>'
-            + '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.usageByDay')) + '</div>'
-            + '<div class="wsx-atbl__wrap"><table class="wsx-atbl"><thead><tr><th>' + esc(t('admin.usageColDay')) + '</th><th>' + esc(t('admin.colCost')) + '</th></tr></thead><tbody>' + dayRows + '</tbody></table></div></div>'
-          : i18nEmpty('admin.usageNone'));
+      var ai = aiBudgetHtml(lim);
+      var byCat = days.length
+        ? '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.usageByCategory')) + '</div><p class="wsx-lens__intro">' + esc(t('admin.usageIntro')) + '</p>'
+          + '<div class="wsx-atbl__wrap"><table class="wsx-atbl"><thead><tr><th>' + esc(t('admin.usageColCategory')) + '</th><th>' + esc(t('admin.usageColUsage')) + '</th><th>' + esc(t('admin.colCost')) + '</th></tr></thead><tbody>' + catRows + '</tbody></table></div></div>'
+        : '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.usageByCategory')) + '</div>' + i18nEmpty('admin.usageNone') + '</div>';
+      var byDay = days.length
+        ? '<details class="wsx-admin__settings-section wsx-adm__fold"><summary class="wsx-adm__foldsum"><span class="wsx-admin__settings-title">' + esc(t('admin.usageByDay')) + '</span><span class="wsx-lens__intro">' + esc(t('admin.usageByDayIntro')) + '</span></summary>'
+          + '<div class="wsx-atbl__wrap"><table class="wsx-atbl"><thead><tr><th>' + esc(t('admin.usageColDay')) + '</th><th>' + esc(t('admin.colCost')) + '</th></tr></thead><tbody>' + dayRows + '</tbody></table></div></details>'
+        : '';
+      // This month at a glance, the budget, then where it went (category beside AI kind); detail stays folded.
+      m.innerHTML = chips + '<div class="wsx-admin__cards">' + cards + '</div>' + ai.budget
+        + '<div class="wsx-adm__two">' + byCat + ai.kinds + '</div>' + ai.today + byDay;
       var bSave = document.getElementById('wsxBudgetSave'), bClear = document.getElementById('wsxBudgetClear');
       if (bSave) bSave.addEventListener('click', function () {
         var v = Number(document.getElementById('wsxBudgetUsd').value);

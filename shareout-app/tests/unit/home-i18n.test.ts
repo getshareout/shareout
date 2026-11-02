@@ -29,7 +29,7 @@ describe('home i18n', () => {
 
   it('merged copy includes keys from domain modules', () => {
     expect(HOME_COPY.en['nav.brief']).toBe(SHELL_COPY.en['nav.brief']);
-    expect(HOME_COPY.es['admin.settings']).toBe(ADMIN_COPY.es['admin.settings']);
+    expect(HOME_COPY.es['admin.sec_general']).toBe(ADMIN_COPY.es['admin.sec_general']);
   });
 
   it('wires the Knowledge lens into the workspace shell (view, nav, loader, deep-link)', () => {
@@ -56,7 +56,7 @@ describe('home i18n', () => {
     expect(scripts).toContain('__SO_HOME_T');
     expect(scripts).toContain('shareout_lang');
     expect(body).toContain('data-i18n="nav.brief"');
-    expect(body).toContain('data-i18n="admin.settings"');
+    expect(body).toContain('data-i18n="admin.sec_general"');
     expect(body).toContain('home-lang-btn');
     expect(homeLangSwitchHtml()).toContain('data-lang="es"');
     expect(() => new Function(getHomeI18nScript())).not.toThrow();
