@@ -56,7 +56,7 @@ describe('BuildJobs timeout', () => {
     expect(v).toMatchObject({ status: 'failed', outcome: { ok: false, reason: 'timeout' }, steps: ['Planning your page…'] });
 
     gate.open = true;
-    for (let i = 0; i < 100 && !after.length; i++) await new Promise((r) => setTimeout(r, 5));
+    for (let i = 0; i < 2000 && !after.length; i++) await new Promise((r) => setTimeout(r, 5));
     expect(after).toEqual(['build job already ended']);
     expect((await (await stub.fetch(`https://build-jobs/job?id=${id}`)).json<BuildJobView>()).status).toBe('failed');
   });

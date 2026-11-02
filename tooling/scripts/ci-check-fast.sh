@@ -3,8 +3,9 @@
 #
 # There is no hosted CI: this script is what stands between a change and main.
 #
-# Tests run as critical-path + whatever the change actually touches (vitest module
-# graph). Force the whole suite with SHAREOUT_FULL_TESTS=1.
+# Tests run only where a change reaches: every test file whose loaded code changed since
+# it last passed in this clone (scripts/test-cache.mjs). Force the whole suite with
+# SHAREOUT_FULL_TESTS=1; SHAREOUT_TEST_CACHE=0 restores critical-path + `vitest related`.
 #
 # SHAREOUT_CHECK_MODE=light skips every test run (static, typecheck, secrets, bundles
 # only). The pre-push hook uses it for feature branches: parallel agents each running
@@ -61,10 +62,13 @@ static_checks() {
 }
 
 app_tests() {
-  if [ "${SHAREOUT_FULL_TESTS:-}" = "1" ]; then
-    npm test -- --reporter=dot
-  else
+  if [ "${SHAREOUT_TEST_CACHE:-}" = "0" ]; then
+    if [ "${SHAREOUT_FULL_TESTS:-}" = "1" ]; then npm test -- --reporter=dot; return; fi
     npm run test:critical -- --reporter=dot
+    npm run test:affected
+  else
+    # Every test file whose inputs changed since it last passed, critical ones included
+    # (scripts/test-cache.mjs); SHAREOUT_FULL_TESTS=1 runs all of them.
     npm run test:affected
   fi
 }

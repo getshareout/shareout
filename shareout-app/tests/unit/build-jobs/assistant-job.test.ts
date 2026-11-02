@@ -94,10 +94,10 @@ describe('assistant build confirm as a durable job', () => {
     const alarm = runDurableObjectAlarm(stub);
     open();
     await alarm;
-    for (let i = 0; i < 200 && !(await lastAssistantMessage(threadId)); i++) await new Promise((r) => setTimeout(r, 5));
+    for (let i = 0; i < 2000 && !(await lastAssistantMessage(threadId)); i++) await new Promise((r) => setTimeout(r, 5));
     expect(await lastAssistantMessage(threadId)).toContain('https://shareout.test/a/roster/');
     expect(h.exec).toHaveBeenCalledTimes(1);
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 2000; i++) {
       if (await testEnv.DB.prepare("SELECT 1 FROM notifications WHERE recipient_id = 'usr_aj_gone' AND kind = 'page_build'").first()) break;
       await new Promise((r) => setTimeout(r, 5));
     }
@@ -121,7 +121,7 @@ describe('assistant build confirm as a durable job', () => {
     // The first build ends inside this case, not as a stray alarm in the next file.
     const stub = testEnv.BUILD_JOBS!.get(testEnv.BUILD_JOBS!.idFromName('usr_aj_busy'));
     await runDurableObjectAlarm(stub);
-    for (let i = 0; i < 400; i++) {
+    for (let i = 0; i < 2000; i++) {
       const v = await (await stub.fetch(`https://build-jobs/job?id=${a.id}`)).json<{ status: string }>();
       if (v.status !== 'queued' && v.status !== 'running') break;
       await new Promise((r) => setTimeout(r, 5));

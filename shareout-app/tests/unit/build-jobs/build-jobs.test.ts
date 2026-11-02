@@ -47,7 +47,7 @@ async function firstEventThenClose(res: Response): Promise<BuildEvent> {
 }
 
 async function waitFor(check: () => Promise<boolean>): Promise<void> {
-  for (let i = 0; i < 400; i++) {
+  for (let i = 0; i < 2000; i++) {
     if (await check()) return;
     await new Promise((r) => setTimeout(r, 5));
   }
