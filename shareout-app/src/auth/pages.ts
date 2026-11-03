@@ -125,7 +125,7 @@ const LOCK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const EN = SIGN_IN_COPY.en;
 
 /** Auth/access gates for private content: never index, never emit OG of the page or artifact. */
-function renderAuthPage(title: string, body: string, status = 200, opts?: { noindex?: boolean; lang?: PageLocale }): Response {
+function renderAuthPage(title: string, body: string, status = 200, opts?: { noindex?: boolean; lang?: PageLocale; head?: string }): Response {
   const noindex = opts?.noindex !== false;
   return renderHtmlPage({
     title,
@@ -133,10 +133,11 @@ function renderAuthPage(title: string, body: string, status = 200, opts?: { noin
     pageStyles: authPageStyles,
     body,
     status,
-    // No OG/Twitter tags at all — unfurlers must not advertise private gates.
+    // No default OG/Twitter tags — unfurlers must not advertise private gates. A page whose
+    // owner turned its link preview on passes its own in `head`.
     noSocial: true,
     // Explicit robots meta + header so scrapers that ignore one still see the other.
-    extraHead: noindex ? `<meta name="robots" content="${NOINDEX_ROBOTS}">` : '',
+    extraHead: (noindex ? `<meta name="robots" content="${NOINDEX_ROBOTS}">` : '') + (opts?.head || ''),
     extraHeaders: noindex ? { 'X-Robots-Tag': NOINDEX_ROBOTS } : undefined,
   });
 }
@@ -855,7 +856,9 @@ export type ViewCodeError = 'invalid' | 'used' | 'throttled';
  *  A personal link (`…#code=XXXX-XXXX`) fills the code in and hides the field, so the
  *  person only taps Open. The fragment never reaches a server, and the code is not
  *  sent until that tap, so a link preview cannot spend it. `look` puts the workspace's
- *  logo, name and color on the card, and the page's own title, message and button. */
+ *  logo, name and color on the card, and the page's own title, message and button. With the
+ *  owner's link preview on, the page answers 200 (unfurlers skip anything else) and carries
+ *  Open Graph tags built from that same public text and the preview image. */
 export function viewCodeLoginPage(
   slug: string,
   artifactId: string,
@@ -863,6 +866,7 @@ export function viewCodeLoginPage(
   error?: ViewCodeError,
   status = 401,
   look?: ViewGateLook,
+  origin?: string,
 ): Response {
   const c = VIEW_CODE_COPY[lang] ?? VIEW_CODE_COPY.en;
   const js = (v: string) => JSON.stringify(v).replace(/</g, '\\u003c');
@@ -881,6 +885,7 @@ export function viewCodeLoginPage(
   const body = t?.message || c.body;
   const linkBody = t?.message || c.linkBody;
   const hint = t?.message ? `<p id="vcHint" style="font-size:14px;margin-top:-4px">${escapeHtml(c.body)}</p>` : '';
+  const preview = !!look?.preview && !error && !!origin;
   return renderAuthPage(t?.title || c.pageTitle, `
   ${card}
     ${mark}
@@ -912,7 +917,25 @@ export function viewCodeLoginPage(
     document.getElementById('vcTitle').textContent = ${js(linkTitle)};
     document.getElementById('vcBody').textContent = ${js(linkBody)};
   })();
-  </script>`, status, { lang });
+  </script>`, preview ? 200 : status, { lang, head: preview ? gatePreviewTags(look!, origin!, t?.title || c.title) : '' });
+}
+
+/** Open Graph / Twitter tags for a one-time page whose owner turned its link preview on. */
+function gatePreviewTags(look: ViewGateLook, origin: string, title: string): string {
+  const image = look.imageUrl || look.brand?.logoUrl;
+  const tags: [string, string, string | null | undefined][] = [
+    ['property', 'og:type', 'website'],
+    ['property', 'og:site_name', look.brand?.name || null],
+    ['property', 'og:title', title],
+    ['property', 'og:description', look.text.message],
+    ['name', 'description', look.text.message],
+    ['property', 'og:image', image ? `${origin}${image}` : null],
+    ['name', 'twitter:card', look.imageUrl ? 'summary_large_image' : 'summary'],
+    ['name', 'twitter:title', title],
+    ['name', 'twitter:description', look.text.message],
+    ['name', 'twitter:image', image ? `${origin}${image}` : null],
+  ];
+  return tags.filter(([, , v]) => v).map(([attr, key, v]) => `<meta ${attr}="${key}" content="${escapeHtml(v!)}">`).join('');
 }
 
 /** Shown in place of a one-time page once its time is up. */

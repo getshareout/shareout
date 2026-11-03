@@ -252,6 +252,14 @@ export async function routeServe(ctx: FetchContext): Promise<Response | null> {
     return serveCachedR2Image(env, r2Key, contentType, ctx.executionCtx);
   }
 
+  // A one-time page's link-preview image, made public by its owner (artifacts/view-codes/gate-look).
+  const gateImageMatch = path.match(/^\/vg\/(art_[A-Za-z0-9]+-[0-9a-f]{12})\.(webp|png|jpg)$/);
+  if (gateImageMatch && request.method === 'GET') {
+    const [, name, ext] = gateImageMatch;
+    const contentType = ext === 'webp' ? 'image/webp' : ext === 'png' ? 'image/png' : 'image/jpeg';
+    return serveCachedR2Image(env, `view-gates/${name}.${ext}`, contentType, ctx.executionCtx);
+  }
+
   if (path === '/setup' || path === '/setup/') {
     if (!(await needsSetup(env))) {
       return Response.redirect(new URL('/home', url.origin).toString(), 302);
