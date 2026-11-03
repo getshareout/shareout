@@ -8581,6 +8581,24 @@ components:
           type: string
           enum: [phone, tablet, computer]
           nullable: true
+        opened_browser:
+          type: string
+          nullable: true
+          description: Browser and system, from the user agent.
+          example: Chrome · Android
+        opened_city:
+          type: string
+          nullable: true
+          description: Approximate city it was opened from, as Cloudflare reports it. The IP is never stored.
+        opened_region:
+          type: string
+          nullable: true
+          example: Santa Fe
+        opened_country:
+          type: string
+          nullable: true
+          description: ISO 3166-1 alpha-2 country code.
+          example: AR
         revoked_at:
           type: string
           format: date-time

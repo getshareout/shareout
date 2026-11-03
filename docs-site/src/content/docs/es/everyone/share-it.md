@@ -38,7 +38,8 @@ sucursal — podés darle a cada persona **el link más su propio código** en v
   elijas (90 segundos si no elegís otro), sin cuenta regresiva en pantalla.
 - **Su nombre aparece escrito sobre la página**, así cualquier captura o foto muestra de quién salió.
 - Copiar, imprimir, guardar y descargar están bloqueados.
-- Ves quién lo abrió, cuándo, desde qué tipo de dispositivo y qué intentó hacer (copiar,
+- Ves quién lo abrió, cuándo, con qué dispositivo y navegador, desde qué ciudad aproximada
+  (nunca su IP) y qué intentó hacer (copiar,
   imprimir, salir de la página).
 
 Pedíselo a un agente de IA que use la skill de ShareOut (Claude Code, por ejemplo): *"Hacé

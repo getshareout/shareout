@@ -38,7 +38,8 @@ you can give each person **the link plus their own code** instead of an invite:
   unless you pick another), with no countdown on screen.
 - Their **name is written across the page**, so any screenshot or photo shows who it came from.
 - Copying, printing, saving and downloading are blocked.
-- You see who opened it, when, on what kind of device, and what they tried (copy, print,
+- You see who opened it, when, on what device and browser, from roughly which city (never
+  their IP), and what they tried (copy, print,
   leaving the page).
 
 Ask an AI agent that uses the ShareOut skill (Claude Code, for example): *"Make this page

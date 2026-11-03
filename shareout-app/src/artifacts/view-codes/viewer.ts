@@ -8,8 +8,9 @@ import type { Env } from '../../types';
 import { createAccessToken } from '../../token';
 import { artifactContentHost, artifactContentUrl, getSecurityHeaders } from '../../serve/security';
 import { escapeHtml, NOINDEX_ROBOTS } from '../../serve/utils';
-import { viewCodeGoneCopy } from '../../auth/pages';
+import { viewCodeGoneCopy, viewCodeOwnerNotice } from '../../auth/pages';
 import { pageLocale } from '../../i18n/accept-language';
+import type { PageLocale } from '../../i18n/accept-language';
 import type { LiveViewCode } from './store';
 import { VIEW_CODE_EVENT_KINDS } from './store';
 
@@ -62,9 +63,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:#fff}
 body.so-otv-blur #so-otv-frame{filter:blur(32px)}
 #so-otv-mark{position:fixed;inset:0;pointer-events:none;z-index:2147483646;opacity:.2}
 #so-otv-mark svg{display:block}
-#so-otv-gone{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;color:#1f2328;text-align:center}
+#so-otv-gone{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;font:17px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;color:#1f2328;text-align:center;background:#fff}
 #so-otv-gone[hidden]{display:none}
-#so-otv-gone h1{font-size:20px;margin:0 0 8px}
+#so-otv-gone .ok{width:56px;height:56px;margin:0 auto 16px;border-radius:50%;background:#e8f5ec;display:flex;align-items:center;justify-content:center}
+#so-otv-gone .ok svg{width:28px;height:28px;stroke:#1a7f37;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+#so-otv-gone h1{font-size:24px;margin:0 0 8px}
 #so-otv-gone p{margin:0;color:#57606a}
 @media print{html,body{display:none!important}}
 </style>
@@ -73,7 +76,7 @@ body.so-otv-blur #so-otv-frame{filter:blur(32px)}
 <body>
 <iframe id="so-otv-frame" src="${escapeHtml(src)}" sandbox="${VIEW_SANDBOX}" referrerpolicy="no-referrer" title="ShareOut"></iframe>
 <div id="so-otv-mark" aria-hidden="true"></div>
-<div id="so-otv-gone" hidden><div><h1>${escapeHtml(gone.title)}</h1><p>${escapeHtml(gone.body)}</p></div></div>
+<div id="so-otv-gone" hidden><div><div class="ok" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7"/></svg></div><h1>${escapeHtml(gone.title)}</h1><p>${escapeHtml(gone.body)}</p></div></div>
 <script>${viewerScript(json(cfg))}</script>
 </body>
 </html>`;
@@ -161,6 +164,28 @@ if(m&&k==='p'){e.preventDefault();s('print')}else if(m&&k==='s'){e.preventDefaul
 document.addEventListener('keyup',function(e){if(e.key==='PrintScreen')s('screenshot_key')},true);
 addEventListener('beforeprint',function(){s('print')});addEventListener('blur',function(){s('blur')});addEventListener('focus',function(){s('focus')});
 })();</script>`;
+
+/**
+ * The owner (or a collaborator) opening a one-time page with their account sees it as
+ * usual — not locked — so they can check and edit it. Say so on screen, or the open page
+ * reads as "the lock doesn't work". Pure CSS to dismiss: no script in the shell.
+ */
+export function withOneTimeOwnerNotice(resp: Response, lang: PageLocale): Response {
+  const text = escapeHtml(viewCodeOwnerNotice(lang));
+  const notice = `<input type="checkbox" id="so-otv-owner-x" hidden><div id="so-otv-owner" role="status">`
+    + `<span>${text}</span><label for="so-otv-owner-x" aria-label="${lang === 'es' ? 'Cerrar' : 'Close'}">×</label></div>`
+    + `<style>#so-otv-owner{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:2147483000;display:flex;gap:12px;align-items:center;`
+    + `max-width:min(640px,calc(100vw - 24px));padding:10px 12px 10px 16px;border-radius:12px;background:#1f2328;color:#fff;`
+    + `font:500 14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.18)}`
+    + `#so-otv-owner label{cursor:pointer;font-size:20px;line-height:1;padding:4px 6px;opacity:.8}`
+    + `#so-otv-owner-x:checked+#so-otv-owner{display:none}</style>`;
+  let done = false;
+  return new HTMLRewriter().on('body', { element(e) {
+    if (done) return;
+    done = true;
+    e.append(notice, { html: true });
+  } }).transform(resp);
+}
 
 /** Put the guard first in <head> (or <body> when the page has no head). */
 export function injectViewGuard(resp: Response): Response {

@@ -8,7 +8,7 @@ import { cookieSecureAttr } from '../../auth/cookies';
 import { pageLocale } from '../../i18n/accept-language';
 import { checkViewCodeGateLimit, rateLimitHeaders } from '../../rate-limit';
 import {
-  deviceClass, getLiveViewCode, isViewCodeEventKind, recordViewCodeEvent, redeemViewCode,
+  getLiveViewCode, isViewCodeEventKind, openedFrom, recordViewCodeEvent, redeemViewCode,
   type LiveViewCode,
 } from './store';
 
@@ -47,7 +47,7 @@ export async function handleViewCodeAuth(request: Request, env: Env): Promise<Re
     return new Response(page.body, { status: 429, headers: { ...Object.fromEntries(page.headers), ...rateLimitHeaders(rl) } });
   }
 
-  const result = await redeemViewCode(env, artifact.id, code, deviceClass(request.headers.get('User-Agent')));
+  const result = await redeemViewCode(env, artifact.id, code, openedFrom(request));
   if (!result.ok) return viewCodeLoginPage(slug, artifact.id, lang, result.reason);
 
   const seconds = Math.max(1, Math.ceil((Date.parse(result.openedAt) + result.viewSeconds * 1000 - Date.now()) / 1000));

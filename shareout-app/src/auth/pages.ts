@@ -825,10 +825,11 @@ const VIEW_CODE_COPY = {
     label: 'Code',
     open: 'Open',
     invalid: 'That code doesn’t work. Check it and try again.',
-    used: 'This code was already used. Ask whoever sent it for a new one.',
+    used: 'This access was already used. If it wasn’t you, let whoever sent it know.',
     throttled: 'Too many tries. Try again in a few minutes.',
-    goneTitle: 'No longer available',
+    goneTitle: 'Thanks for reading',
     goneBody: 'This content is no longer available.',
+    ownerNotice: 'You’re viewing with your account, so it isn’t locked. Anyone opening it with their one-time link sees it locked, for the time you set.',
   },
   es: {
     pageTitle: 'Ingresá tu código - ShareOut',
@@ -839,10 +840,11 @@ const VIEW_CODE_COPY = {
     label: 'Código',
     open: 'Abrir',
     invalid: 'Ese código no funciona. Revisalo y probá de nuevo.',
-    used: 'Este código ya se usó. Pedile uno nuevo a quien te lo envió.',
+    used: 'Este acceso ya se usó. Si no fuiste vos, avisale a quien te lo envió.',
     throttled: 'Demasiados intentos. Probá de nuevo en unos minutos.',
-    goneTitle: 'Ya no está disponible',
+    goneTitle: '¡Gracias por leerlo!',
     goneBody: 'Este contenido ya no está disponible.',
+    ownerNotice: 'Estás viendo con tu cuenta, por eso no está bloqueado. Quien lo abre con su link lo ve bloqueado y por el tiempo que elegiste.',
   },
 } satisfies Record<PageLocale, Record<string, string>>;
 export type ViewCodeError = 'invalid' | 'used' | 'throttled';
@@ -897,4 +899,9 @@ export function viewCodeLoginPage(
 export function viewCodeGoneCopy(lang: PageLocale = 'en'): { title: string; body: string } {
   const c = VIEW_CODE_COPY[lang] ?? VIEW_CODE_COPY.en;
   return { title: c.goneTitle, body: c.goneBody };
+}
+
+/** Told to the owner (or a collaborator) who opens a one-time page with their account. */
+export function viewCodeOwnerNotice(lang: PageLocale = 'en'): string {
+  return (VIEW_CODE_COPY[lang] ?? VIEW_CODE_COPY.en).ownerNotice;
 }
