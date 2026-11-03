@@ -35,7 +35,8 @@ export async function handleListViewCodes(env: Env, user: AuthUser, artifactId: 
 }
 
 /**
- * POST `{ recipients: ["Ana", …] | [{ label }], view_seconds? }` — one code per person.
+ * POST `{ recipients: ["Ana", …] | [{ label }], view_seconds? }` — one code per person,
+ * each with a personal `link` that opens the gate with the code already filled in.
  * Turns the gate on: the page becomes private and opens only with a code (the owner and
  * named collaborators keep their own access). The codes are in this response only.
  */
@@ -79,10 +80,13 @@ export async function handleCreateViewCodes(request: Request, env: Env, user: Au
     await invalidateDeploymentCacheById(env, artifactId);
   }
 
-  const [codes, url] = await Promise.all([
+  const [created, url] = await Promise.all([
     createViewCodes(env, artifactId, labels, viewSeconds, user.id),
     pageUrl(env, artifactId),
   ]);
+  // The personal link carries the code in the fragment: browsers never send it to a server,
+  // so link previews and logs never see it, and nothing opens until the person taps Open.
+  const codes = created.map((c) => ({ ...c, link: url ? `${url}#code=${c.code}` : null }));
   return json({ enabled: true, url, view_seconds: viewSeconds, codes }, 201);
 }
 

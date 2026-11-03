@@ -4,8 +4,9 @@ Use this when the user wants to show something confidential to a few named peopl
 "send the new prices to the branch managers, they can only see it once", "make it disappear
 after they read it", "no screenshots, no downloads".
 
-Each person gets the page link plus their own code (the user sends both, e.g. over
-WhatsApp). No account, no sign-in. The code opens the page **once**, for a set number of
+Each person gets their own link with their code already in it (the user sends it, e.g.
+over WhatsApp). They open it and tap **Open** — no account, no sign-in, nothing to type. The
+plain page link plus the code works too. The code opens the page **once**, for a set number of
 seconds (default 90), then the page closes by itself and the code never works again.
 
 What the viewer sees and does not see:
@@ -24,7 +25,7 @@ Be straight with the user about the limits — say it in plain words before they
   phone.** The watermark is the defence: any capture carries the person's name.
 - The log shows **attempts**, not proof: copy, print, save, right-click, the screenshot key
   on a computer, leaving the page. A phone screenshot sends no signal at all.
-- If someone forwards their link + code, whoever opens it first uses it up — the real
+- If someone forwards their link (or link + code), whoever opens it first uses it up — the real
   person then sees "this code was already used", and the log shows the device it opened on.
 
 ## Rules for the page
@@ -53,14 +54,18 @@ curl -s -X POST "$ORIGIN/v1/artifacts/$ARTIFACT_ID/view-codes" \
   "url": "https://acme.shareout.site/precios-noviembre/",
   "view_seconds": 90,
   "codes": [
-    { "id": "vcd_…", "label": "Ana Gómez · Sucursal Centro", "code": "K7M4-QP9X", "view_seconds": 90, "created_at": "…" }
+    { "id": "vcd_…", "label": "Ana Gómez · Sucursal Centro", "code": "K7M4-QP9X",
+      "link": "https://acme.shareout.site/precios-noviembre/#code=K7M4-QP9X", "view_seconds": 90, "created_at": "…" }
   ]
 }
 ```
 
 - `recipients`: names (strings, or `{ "label": "…" }`), 1–100 per call. The name is the
   watermark, so use something that identifies the person.
-- `view_seconds`: 10–600, default 90.
+- `view_seconds`: 10–600, default 90. Pick it for how long the page takes to read: 90 s is
+  a short notice; a long letter needs 5–10 minutes.
+- `link`: the person's own link — the page URL with `#code=…`. It fills the code in on the
+  code page; nothing is spent until they tap Open, so a WhatsApp link preview is safe.
 - More people later? Call it again — existing codes are untouched. Someone lost theirs or
   opened it by accident? Create a new code for them.
 
@@ -84,13 +89,15 @@ curl -s -X DELETE "$ORIGIN/v1/artifacts/$ARTIFACT_ID/view-codes" -H "Authorizati
 
 ## Handing the codes to the user
 
-Give one ready-to-send message per person, in the user's language, so they can paste each
-into WhatsApp as is:
+Give one ready-to-send message per person, in the user's language, with their personal
+`link`, so they can paste each into WhatsApp as is:
 
 ```
-Ana: https://acme.shareout.site/precios-noviembre/  Código: K7M4-QP9X
-Luis: https://acme.shareout.site/precios-noviembre/  Código: 8RWD-2HNE
+Ana: https://acme.shareout.site/precios-noviembre/#code=K7M4-QP9X
+Luis: https://acme.shareout.site/precios-noviembre/#code=8RWD-2HNE
 ```
+
+Each link is personal: send it only to that person, never to a group.
 
 Do not tell the recipients the page closes, or that the code works once, unless the user
 asks you to — that is the point.

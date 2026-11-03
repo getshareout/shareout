@@ -31,7 +31,9 @@ You can change your mind any time — make a private page public when it's ready
 For something confidential — new prices, a target, a notice for your branch managers —
 you can give each person **the link plus their own code** instead of an invite:
 
-- They open the link, type their code, and see the page. **No account, no sign-in.**
+- Each person gets **their own link** with the code already in it. They open it, tap
+  **Open**, and see the page. **No account, no sign-in, nothing to type.** (The plain link
+  plus the code works too, if you'd rather send them apart.)
 - Each code works **once**. The page closes by itself after the time you chose (90 seconds
   unless you pick another), with no countdown on screen.
 - Their **name is written across the page**, so any screenshot or photo shows who it came from.

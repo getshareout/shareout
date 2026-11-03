@@ -31,7 +31,9 @@ Podés cambiar de idea cuando quieras — hacer pública un artefacto privado cu
 Para algo confidencial — precios nuevos, un objetivo, un aviso para tus encargados de
 sucursal — podés darle a cada persona **el link más su propio código** en vez de invitarla:
 
-- Abre el link, escribe su código y ve la página. **Sin cuenta, sin iniciar sesión.**
+- Cada persona recibe **su propio link** con el código ya puesto. Lo abre, toca **Abrir**
+  y ve la página. **Sin cuenta, sin iniciar sesión, sin escribir nada.** (El link común más
+  el código también funciona, si preferís mandarlos por separado.)
 - Cada código funciona **una sola vez**. La página se cierra sola después del tiempo que
   elijas (90 segundos si no elegís otro), sin cuenta regresiva en pantalla.
 - **Su nombre aparece escrito sobre la página**, así cualquier captura o foto muestra de quién salió.

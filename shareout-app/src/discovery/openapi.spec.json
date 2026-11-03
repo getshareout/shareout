@@ -2114,7 +2114,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created. Hand each person the link and their code.",
+            "description": "Created. Hand each person their `link` (or the page link and their code).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2145,6 +2145,12 @@
                           "code": {
                             "type": "string",
                             "example": "K7M4-QP9X"
+                          },
+                          "link": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "The person's own link: the page URL with the code in the fragment (`#code=…`). It opens the code page with the code filled in, so they only tap Open. The fragment never reaches a server; nothing is spent until that tap.",
+                            "example": "https://acme.shareout.site/precios-noviembre/#code=K7M4-QP9X"
                           },
                           "view_seconds": {
                             "type": "integer"
