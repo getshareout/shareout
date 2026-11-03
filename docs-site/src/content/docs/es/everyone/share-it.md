@@ -44,7 +44,9 @@ sucursal — podés darle a cada persona **el link más su propio código** en v
 
 Pedíselo a un agente de IA que use la skill de ShareOut (Claude Code, por ejemplo): *"Hacé
 esta página de vista única para Ana, Luis y Marta, 90 segundos cada uno"*. Te da un mensaje
-listo para mandarle a cada persona. Para desarrolladores: [la API](/es/start/introduction/) (`/v1/artifacts/{id}/view-codes`).
+listo para mandarle a cada persona. La pantalla de entrada puede llevar el logo y el color de tu
+workspace y tus propias palabras ("Carta del socio fundador · Abrir la carta"). Cualquiera con el
+link ve esa pantalla, así que no pongas ahí lo confidencial. Para desarrolladores: [la API](/es/start/introduction/) (`/v1/artifacts/{id}/view-codes`).
 
 :::caution[Lo que ninguna página web puede impedir]
 Nadie puede bloquear una captura de pantalla, ni que alguien le saque una foto a la pantalla

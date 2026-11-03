@@ -2,6 +2,7 @@ import type { Env } from '../types';
 import { getSessionUser } from '../auth/session';
 import { loginPage, accessDeniedPage, passwordLoginPage, credentialsLoginPage, viewCodeLoginPage } from '../auth/pages';
 import { verifyAccessToken } from '../auth/artifact-auth';
+import { loadViewGateLook } from '../artifacts/view-codes/gate-look';
 import { microsoftOAuthConfigured } from '../config/auth-providers';
 import { getVisibilityScope, placeholders } from '../account-links';
 import { getInternalWorkspaceRole } from '../workspaces/roles';
@@ -68,7 +69,7 @@ export async function checkAccess(
       const scope = await getVisibilityScope(env, sessionUser);
       if (await ownerOrCollaborator(env, artifact, scope.userIds, scope.emails)) return null;
     }
-    return viewCodeLoginPage(slug, artifact.artifact_id, pageLocale(request));
+    return viewCodeLoginPage(slug, artifact.artifact_id, pageLocale(request), undefined, 401, await loadViewGateLook(env, artifact.artifact_id));
   }
 
   if (authMethod === 'password' || authMethod === 'credentials') {

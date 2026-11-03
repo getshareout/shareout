@@ -86,6 +86,20 @@ never stored), and `attempts`, e.g.
 `screenshot_key`, `left_page`. Codes are never returned again.
 
 ```bash
+# What the code page says (title, message, button) — the page's own words, not "Enter your code · Open"
+curl -s -X PUT "$ORIGIN/v1/artifacts/$ARTIFACT_ID/view-codes/gate" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"title": "Precios de noviembre", "message": "Ana te comparte la lista nueva.", "button": "Ver los precios"}'
+```
+
+- Set it every time: a gate that names the document and who sends it is what makes people open
+  it. Also accepted as `gate` on the create call. Limits: title 80, message 200, button 30.
+- **Anyone holding the link sees it**, before any code is checked — name the document, never
+  put the confidential part (no figures, no names of who is affected).
+- The workspace's logo, name and color show on it (and on the closing screen) when the workspace
+  has branding; `hide_footer` drops "Powered by ShareOut".
+
+```bash
 # Revoke one code (an open page loses its pass at once)
 curl -s -X DELETE "$ORIGIN/v1/artifacts/$ARTIFACT_ID/view-codes/$CODE_ID" -H "Authorization: Bearer $TOKEN"
 

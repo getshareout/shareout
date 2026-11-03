@@ -2042,6 +2042,9 @@
                       "type": "string",
                       "format": "uri"
                     },
+                    "gate": {
+                      "$ref": "#/components/schemas/ViewGate"
+                    },
                     "view_codes": {
                       "type": "array",
                       "items": {
@@ -2106,6 +2109,9 @@
                     "minimum": 10,
                     "maximum": 600,
                     "default": 90
+                  },
+                  "gate": {
+                    "$ref": "#/components/schemas/ViewGate"
                   }
                 }
               }
@@ -2192,6 +2198,54 @@
         "responses": {
           "200": {
             "description": "Turned off"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/artifacts/{id}/view-codes/gate": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ArtifactId"
+        }
+      ],
+      "put": {
+        "tags": [
+          "Collaborators"
+        ],
+        "summary": "Set what the code page says",
+        "description": "The page's own title, message and button on its code page, instead of the generic \"Enter your code · Open\". A missing or empty field goes back to the default. The workspace's logo, name and color (workspace branding) show there too. Anyone holding the link sees this page, so never put the confidential part here. Owner or editor.",
+        "operationId": "setViewGate",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ViewGate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "gate": {
+                      "$ref": "#/components/schemas/ViewGate"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
@@ -14280,6 +14334,36 @@
               "null"
             ],
             "format": "date-time"
+          }
+        }
+      },
+      "ViewGate": {
+        "type": "object",
+        "description": "What the code page says before anything opens. Null fields use the defaults.",
+        "properties": {
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 80,
+            "example": "Carta del socio fundador"
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200,
+            "example": "Roberto te comparte el cierre de octubre."
+          },
+          "button": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 30,
+            "example": "Abrir la carta"
           }
         }
       },

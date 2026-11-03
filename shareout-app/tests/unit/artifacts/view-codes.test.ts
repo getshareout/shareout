@@ -10,7 +10,7 @@ import { withOneTimeOwnerNotice } from '../../../src/artifacts/view-codes/viewer
 import { viewCodeGoneCopy } from '../../../src/auth/pages';
 import { handleViewCodeAuth, handleViewCodeEvent, readViewPass } from '../../../src/artifacts/view-codes/gate';
 import {
-  handleCreateViewCodes, handleDisableViewCodes, handleListViewCodes, handleRevokeViewCode,
+  handleCreateViewCodes, handleDisableViewCodes, handleListViewCodes, handleRevokeViewCode, handleSetViewGate,
 } from '../../../src/artifacts/view-codes/api';
 import { checkAccess } from '../../../src/serve/access';
 import { dataMiddleware } from '../../../src/data/middleware';
@@ -74,6 +74,7 @@ beforeEach(async () => {
   store.clear();
   await e.DB.prepare('DELETE FROM artifact_view_code_events').run();
   await e.DB.prepare('DELETE FROM artifact_view_codes').run();
+  await e.DB.prepare('DELETE FROM artifact_view_gates').run();
   // A republish test leaves versions/deployments behind; they hold the artifact by FK.
   await e.DB.prepare('DELETE FROM deployments WHERE artifact_id = ?').bind(ART).run();
   await e.DB.prepare('DELETE FROM assets WHERE version_id IN (SELECT id FROM versions WHERE artifact_id = ?)').bind(ART).run();
@@ -84,6 +85,47 @@ beforeEach(async () => {
   await e.DB.prepare(
     "INSERT INTO artifacts (id, name, slug, owner_id, visibility, auth_method) VALUES (?, 'Secret', 'vcd', ?, 'public', 'google')",
   ).bind(ART, owner.id).run();
+});
+
+describe('view codes: the code page look', () => {
+  const GATE = { title: 'Carta del socio fundador', message: 'Roberto te comparte el cierre de octubre.', button: 'Abrir la carta' };
+  const gatePage = async () => {
+    const res = await checkAccess(new Request('https://shareout.test/a/vcd/', { headers: { 'Accept-Language': 'es' } }), e, 'vcd', artifactInfo(), { viewPass: true });
+    expect(res!.status).toBe(401);
+    return res!.text();
+  };
+
+  it("shows the page's own words and the workspace's logo, name and color, and no ShareOut footer when the workspace hides it", async () => {
+    await e.DB.prepare("INSERT OR REPLACE INTO workspaces (id, name, slug, owner_id, branding) VALUES ('wsp_vcd', 'Santa Elena', 'vcd-ws', ?, ?)")
+      .bind(owner.id, JSON.stringify({ logo_ext: 'png', accent_color: '#D6202A', hide_footer: true })).run();
+    await e.DB.prepare("UPDATE artifacts SET workspace_id = 'wsp_vcd' WHERE id = ?").bind(ART).run();
+    await newCodes(['Ana']);
+    expect((await handleSetViewGate(api('PUT', GATE), e, owner, ART)).status).toBe(200);
+
+    const html = await gatePage();
+    for (const text of [GATE.title, GATE.message, GATE.button, 'Santa Elena', '/wl/wsp_vcd.png', '--color-primary:#D6202A']) expect(html).toContain(text);
+    expect(html).not.toContain('Powered by');
+    expect(html).not.toContain('Ingresá tu código</h1>');
+    // A typed code still gets the instruction; a personal link drops it.
+    expect(html).toContain('id="vcHint"');
+
+    const list = await (await handleListViewCodes(e, owner, ART)).json() as { gate: unknown };
+    expect(list.gate).toEqual(GATE);
+    // Empty puts the defaults back.
+    expect((await handleSetViewGate(api('PUT', {}), e, owner, ART)).status).toBe(200);
+    expect(await gatePage()).toContain('Ingresá tu código');
+  });
+
+  it('can be set with the codes, and is checked', async () => {
+    const res = await handleCreateViewCodes(api('POST', { recipients: ['Ana'], gate: { title: 'Precios' } }), e, owner, ART);
+    expect(res.status).toBe(201);
+    expect(await gatePage()).toContain('Precios');
+    expect((await handleSetViewGate(api('PUT', { title: 'x'.repeat(81) }), e, owner, ART)).status).toBe(400);
+    expect((await handleSetViewGate(api('PUT', { button: 12 }), e, owner, ART)).status).toBe(400);
+    expect((await handleSetViewGate(api('PUT', ['x']), e, owner, ART)).status).toBe(400);
+    expect((await handleSetViewGate(api('PUT', GATE), e, stranger, ART)).status).toBe(403);
+    expect((await handleCreateViewCodes(api('POST', { recipients: ['Ana'], gate: { message: 'y'.repeat(201) } }), e, owner, ART)).status).toBe(400);
+  });
 });
 
 describe('view codes: format', () => {

@@ -44,7 +44,9 @@ you can give each person **the link plus their own code** instead of an invite:
 
 Ask an AI agent that uses the ShareOut skill (Claude Code, for example): *"Make this page
 one-time for Ana, Luis and Marta, 90 seconds each"*. It gives you a ready-to-send message
-for each person. Developers: [the API](/start/introduction/) (`/v1/artifacts/{id}/view-codes`).
+for each person. The page people land on can carry your workspace's logo and color and your
+own words ("Carta del socio fundador · Abrir la carta") — anyone with the link sees that page,
+so keep the confidential part out of it. Developers: [the API](/start/introduction/) (`/v1/artifacts/{id}/view-codes`).
 
 :::caution[What no website can stop]
 Nobody can block a screenshot, or someone taking a photo of the screen with another phone.
