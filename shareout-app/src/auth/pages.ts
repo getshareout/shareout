@@ -820,6 +820,8 @@ const VIEW_CODE_COPY = {
     pageTitle: 'Enter your code - ShareOut',
     title: 'Enter your code',
     body: 'Type the code you were sent to open this content.',
+    linkTitle: 'Ready to open',
+    linkBody: 'Tap Open to see this content.',
     label: 'Code',
     open: 'Open',
     invalid: 'That code doesn’t work. Check it and try again.',
@@ -832,6 +834,8 @@ const VIEW_CODE_COPY = {
     pageTitle: 'Ingresá tu código - ShareOut',
     title: 'Ingresá tu código',
     body: 'Escribí el código que te enviaron para ver este contenido.',
+    linkTitle: 'Listo para abrir',
+    linkBody: 'Tocá Abrir para ver este contenido.',
     label: 'Código',
     open: 'Abrir',
     invalid: 'Ese código no funciona. Revisalo y probá de nuevo.',
@@ -844,7 +848,10 @@ const VIEW_CODE_COPY = {
 export type ViewCodeError = 'invalid' | 'used' | 'throttled';
 
 /** The one-time view gate: link + a personal code, no account. Says nothing about the
- *  code being single-use or the page closing — the viewer finds out when it closes. */
+ *  code being single-use or the page closing — the viewer finds out when it closes.
+ *  A personal link (`…#code=XXXX-XXXX`) fills the code in and hides the field, so the
+ *  person only taps Open. The fragment never reaches a server, and the code is not
+ *  sent until that tap, so a link preview cannot spend it. */
 export function viewCodeLoginPage(
   slug: string,
   artifactId: string,
@@ -853,11 +860,12 @@ export function viewCodeLoginPage(
   status = 401,
 ): Response {
   const c = VIEW_CODE_COPY[lang] ?? VIEW_CODE_COPY.en;
+  const js = (v: string) => JSON.stringify(v).replace(/</g, '\\u003c');
   return renderAuthPage(c.pageTitle, `
   <div class="card">
     <div class="icon icon-primary">${LOCK_ICON}</div>
-    <h1>${escapeHtml(c.title)}</h1>
-    <p>${escapeHtml(c.body)}</p>
+    <h1 id="vcTitle">${escapeHtml(c.title)}</h1>
+    <p id="vcBody">${escapeHtml(c.body)}</p>
     ${error ? `<div class="error-box" role="alert">${escapeHtml(c[error])}</div>` : ''}
     <form method="POST" action="/auth/view-code">
       <input type="hidden" name="slug" value="${escapeHtml(slug)}">
@@ -869,7 +877,20 @@ export function viewCodeLoginPage(
     <div class="footer">
       Powered by <a href="/" class="footer-brand">${brandMarkImg('footer-mark', 16)}ShareOut</a>
     </div>
-  </div>`, status, { lang });
+  </div>
+  <script>
+  (function () {
+    var m = /(?:^#|&)code=([A-Za-z0-9-]{4,20})(?:&|$)/.exec(location.hash || '');
+    var input = document.querySelector('input[name="code"]');
+    if (!m || !input) return;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (_e) {}
+    input.value = m[1].toUpperCase();
+    input.style.display = 'none';
+    input.blur();
+    document.getElementById('vcTitle').textContent = ${js(c.linkTitle)};
+    document.getElementById('vcBody').textContent = ${js(c.linkBody)};
+  })();
+  </script>`, status, { lang });
 }
 
 /** Shown in place of a one-time page once its time is up. */

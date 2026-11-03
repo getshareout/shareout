@@ -64,7 +64,7 @@ function artifactInfo(): ArtifactInfo {
 async function newCodes(labels: string[], seconds?: number) {
   const res = await handleCreateViewCodes(api('POST', { recipients: labels, view_seconds: seconds }), e, owner, ART);
   expect(res.status).toBe(201);
-  return (await res.json()) as { url: string; view_seconds: number; codes: { id: string; label: string; code: string }[] };
+  return (await res.json()) as { url: string; view_seconds: number; codes: { id: string; label: string; code: string; link: string }[] };
 }
 
 beforeAll(applyMigrations);
@@ -106,6 +106,8 @@ describe('view codes: API', () => {
     expect(out.view_seconds).toBe(VIEW_SECONDS_DEFAULT);
     expect(out.codes.map((c) => c.label)).toEqual(['Ana Gómez', 'Luis · Sucursal Centro']);
     expect(out.url).toContain('/a/vcd/');
+    // Each person gets a personal link: the page URL with their code in the fragment.
+    for (const c of out.codes) expect(c.link).toBe(`${out.url}#code=${c.code}`);
     const row = await e.DB.prepare('SELECT visibility, auth_method FROM artifacts WHERE id = ?').bind(ART)
       .first<{ visibility: string; auth_method: string }>();
     expect(row).toEqual({ visibility: 'private', auth_method: 'onetime' });
@@ -205,6 +207,20 @@ describe('view codes: the gate', () => {
     const card = html.slice(html.indexOf('<div class="card">'), html.indexOf('</form>'));
     expect(card).toContain('Ingresá tu código');
     expect(card).not.toMatch(/una vez|segundos|expira|vence|once|seconds|expire/i);
+  });
+
+  it('a personal link fills the code in from the fragment and leaves only Open', async () => {
+    await newCodes(['Ana']);
+    const res = await checkAccess(new Request('https://shareout.test/a/vcd/', { headers: { 'Accept-Language': 'es' } }), e, 'vcd', artifactInfo(), { viewPass: true });
+    const html = await res!.text();
+    const script = html.slice(html.indexOf('<script>', html.indexOf('</form>')), html.lastIndexOf('</script>'));
+    expect(script).toContain('location.hash');
+    expect(script).toContain('history.replaceState');
+    expect(script).toContain('Listo para abrir');
+    expect(script).toContain('Tocá Abrir para ver este contenido.');
+    expect(script).not.toMatch(/una vez|segundos|expira|vence/i);
+    // It never submits on its own: a link preview or scanner that runs scripts cannot spend the code.
+    expect(script).not.toMatch(/\.submit\(|requestSubmit|\.click\(/);
   });
 
   it('the pass opens the page itself only — every other surface stays closed to it', async () => {
