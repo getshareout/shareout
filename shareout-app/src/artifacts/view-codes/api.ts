@@ -9,7 +9,7 @@ import {
   MAX_CODES_PER_ARTIFACT, MAX_CODES_PER_REQUEST, cleanLabel, countViewCodes, createViewCodes,
   listViewCodes, parseViewSeconds, revokeAllViewCodes, revokeViewCode,
 } from './store';
-import { loadViewGateLook, parseGateText, saveGateText } from './gate-look';
+import { deleteGateImage, gateImageProblem, gateResponse, loadViewGateLook, parseGate, saveGate, storeGateImage } from './gate-look';
 
 interface ArtifactRow { id: string; artifact_type: string | null; auth_method: string | null; visibility: string | null }
 
@@ -32,7 +32,7 @@ export async function handleListViewCodes(env: Env, user: AuthUser, artifactId: 
   const forbidden = await requireSharingRole(env, artifactId, user.id, 'editor');
   if (forbidden) return forbidden;
   const [codes, url, look] = await Promise.all([listViewCodes(env, artifactId), pageUrl(env, artifactId), loadViewGateLook(env, artifactId)]);
-  return json({ enabled: artifact.auth_method === 'onetime', url, gate: look.text, view_codes: codes });
+  return json({ enabled: artifact.auth_method === 'onetime', url, gate: gateResponse(look), view_codes: codes });
 }
 
 /**
@@ -62,7 +62,7 @@ export async function handleCreateViewCodes(request: Request, env: Env, user: Au
   }
   const viewSeconds = parseViewSeconds(body.view_seconds);
   if (typeof viewSeconds !== 'number') return json({ error: viewSeconds.error, code: 'VALIDATION_ERROR', param: 'view_seconds' }, 400);
-  const gate = body.gate === undefined ? null : parseGateText(body.gate);
+  const gate = body.gate === undefined ? null : parseGate(body.gate);
   if (gate && 'error' in gate) return json({ error: gate.error, code: 'VALIDATION_ERROR', param: gate.param }, 400);
 
   const artifact = await loadArtifact(env, artifactId);
@@ -83,7 +83,7 @@ export async function handleCreateViewCodes(request: Request, env: Env, user: Au
     await invalidateDeploymentCacheById(env, artifactId);
   }
 
-  if (gate) await saveGateText(env, artifactId, gate.text);
+  if (gate) await saveGate(env, artifactId, gate);
   const [created, url] = await Promise.all([
     createViewCodes(env, artifactId, labels, viewSeconds, user.id),
     pageUrl(env, artifactId),
@@ -95,9 +95,10 @@ export async function handleCreateViewCodes(request: Request, env: Env, user: Au
 }
 
 /**
- * PUT /view-codes/gate `{ title?, message?, button? }` — what the code page says before
- * anything opens (a missing or empty field goes back to the default). Anyone holding the link
- * sees it: never put the confidential part here.
+ * PUT /view-codes/gate `{ title?, message?, button?, preview? }` — what the code page says
+ * before anything opens (a missing or empty field goes back to the default), and whether the
+ * link draws a preview card in WhatsApp and the like. Anyone holding the link sees all of it:
+ * never put the confidential part here.
  */
 export async function handleSetViewGate(request: Request, env: Env, user: AuthUser, artifactId: string): Promise<Response> {
   let body: unknown;
@@ -108,10 +109,36 @@ export async function handleSetViewGate(request: Request, env: Env, user: AuthUs
   if (!artifact) return notFound();
   const forbidden = await requireSharingRole(env, artifactId, user.id, 'editor');
   if (forbidden) return forbidden;
-  const parsed = parseGateText(body);
+  const parsed = parseGate(body);
   if ('error' in parsed) return json({ error: parsed.error, code: 'VALIDATION_ERROR', param: parsed.param }, 400);
-  await saveGateText(env, artifactId, parsed.text);
-  return json({ gate: parsed.text });
+  await saveGate(env, artifactId, parsed);
+  return json({ gate: gateResponse(await loadViewGateLook(env, artifactId)) });
+}
+
+/**
+ * PUT /view-codes/gate/image (the image bytes, PNG/JPG/WEBP up to 1 MB) — the link preview's
+ * picture, 1200×630 reads best. Public once uploaded; DELETE removes it.
+ */
+export async function handleSetViewGateImage(request: Request, env: Env, user: AuthUser, artifactId: string): Promise<Response> {
+  const artifact = await loadArtifact(env, artifactId);
+  if (!artifact) return notFound();
+  const forbidden = await requireSharingRole(env, artifactId, user.id, 'editor');
+  if (forbidden) return forbidden;
+  const contentType = request.headers.get('Content-Type') || '';
+  const bytes = await request.arrayBuffer();
+  const problem = gateImageProblem(contentType, bytes.byteLength);
+  if (problem) return json(problem, 400);
+  await storeGateImage(env, artifactId, bytes, contentType);
+  return json({ gate: gateResponse(await loadViewGateLook(env, artifactId)) });
+}
+
+export async function handleDeleteViewGateImage(env: Env, user: AuthUser, artifactId: string): Promise<Response> {
+  const artifact = await loadArtifact(env, artifactId);
+  if (!artifact) return notFound();
+  const forbidden = await requireSharingRole(env, artifactId, user.id, 'editor');
+  if (forbidden) return forbidden;
+  await deleteGateImage(env, artifactId);
+  return json({ gate: gateResponse(await loadViewGateLook(env, artifactId)) });
 }
 
 /** DELETE /view-codes/{codeId} — that code no longer opens the page. One already open

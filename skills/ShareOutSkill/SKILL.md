@@ -1,6 +1,6 @@
 ---
 name: "shareout-skill"
-version: "2.64.0"
+version: "2.65.0"
 updated_at: "2026-11-02T22:00:00Z"
 description: "Publish, update, inspect, and manage ShareOut artifacts on a self-hosted instance. Use when the user wants to build or publish a web artifact (HTML apps, dashboards, forms, or CSV/Markdown/JSON/TXT), wire SDK data stores, live data, schedules, sharing, analytics, or in-artifact AI. If the user wants to INSTALL or DEPLOY ShareOut on Cloudflare first, load deploy/SKILL.md immediately."
 skill_endpoint: "/v1/skill"
@@ -98,7 +98,7 @@ load [deploy/SKILL.md](deploy/SKILL.md).
 
 ## Version check (against **their** origin)
 
-Frontmatter `version` is this file (`2.64.0`).
+Frontmatter `version` is this file (`2.65.0`).
 
 1. `GET $ORIGIN/v1/skill/version` → `{ "version", "semver", "updated_at" }`. `version` is
    `<frontmatter>+<content hash>` (e.g. `2.60.0+18c8deb6`).

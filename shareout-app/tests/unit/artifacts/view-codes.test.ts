@@ -11,6 +11,7 @@ import { viewCodeGoneCopy } from '../../../src/auth/pages';
 import { handleViewCodeAuth, handleViewCodeEvent, readViewPass } from '../../../src/artifacts/view-codes/gate';
 import {
   handleCreateViewCodes, handleDisableViewCodes, handleListViewCodes, handleRevokeViewCode, handleSetViewGate,
+  handleSetViewGateImage, handleDeleteViewGateImage,
 } from '../../../src/artifacts/view-codes/api';
 import { checkAccess } from '../../../src/serve/access';
 import { dataMiddleware } from '../../../src/data/middleware';
@@ -27,8 +28,14 @@ const kv = {
   delete: async (k: string) => void store.delete(k),
 };
 const SLUGS = { get: async () => null, put: async () => undefined, delete: async () => undefined };
+const r2 = new Map<string, ArrayBuffer>();
+const ARTIFACTS = {
+  put: async (k: string, v: ArrayBuffer) => void r2.set(k, v),
+  delete: async (k: string) => void r2.delete(k),
+  get: async (k: string) => (r2.has(k) ? { body: r2.get(k) } : null),
+};
 const e = {
-  ...baseEnv, SESSION_SECRET: 'test-session-secret', RATE_LIMIT_KV: kv, SLUGS,
+  ...baseEnv, SESSION_SECRET: 'test-session-secret', RATE_LIMIT_KV: kv, SLUGS, ARTIFACTS,
   SHAREOUT_BASE_URL: 'https://shareout.test',
 } as unknown as Env;
 
@@ -110,10 +117,51 @@ describe('view codes: the code page look', () => {
     expect(html).toContain('id="vcHint"');
 
     const list = await (await handleListViewCodes(e, owner, ART)).json() as { gate: unknown };
-    expect(list.gate).toEqual(GATE);
+    expect(list.gate).toEqual({ ...GATE, preview: false, image_url: null });
     // Empty puts the defaults back.
     expect((await handleSetViewGate(api('PUT', {}), e, owner, ART)).status).toBe(200);
     expect(await gatePage()).toContain('Ingresá tu código');
+  });
+
+  it('draws a link preview only when the owner turns it on: 200, Open Graph tags, a public image', async () => {
+    await newCodes(['Ana']);
+    expect(await gatePage()).not.toContain('og:title');
+    expect((await handleSetViewGate(api('PUT', { ...GATE, preview: true }), e, owner, ART)).status).toBe(200);
+    const png = (bytes: number[]) => new Request(`https://shareout.test/v1/artifacts/${ART}/view-codes/gate/image`, {
+      method: 'PUT', body: new Uint8Array(bytes), headers: { 'Content-Type': 'image/png' },
+    });
+    const up = await handleSetViewGateImage(png([137, 80, 78, 71, 1]), e, owner, ART);
+    expect(up.status).toBe(200);
+    const { gate } = await up.json() as { gate: { image_url: string; preview: boolean } };
+    expect(gate.preview).toBe(true);
+    expect(gate.image_url).toMatch(/^\/vg\/art_vcd-[0-9a-f]{12}\.png$/);
+    expect(r2.has(`view-gates/${gate.image_url.slice(4)}`)).toBe(true);
+
+    const res = await checkAccess(new Request('https://santaelena.shareout.test/carta/', { headers: { 'Accept-Language': 'es' } }), e, 'vcd', artifactInfo(), { viewPass: true });
+    expect(res!.status).toBe(200);
+    const html = await res!.text();
+    expect(html).toContain(`<meta property="og:title" content="${GATE.title}">`);
+    expect(html).toContain(`<meta property="og:description" content="${GATE.message}">`);
+    expect(html).toContain(`<meta property="og:image" content="https://santaelena.shareout.test${gate.image_url}">`);
+    expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
+    expect(html).toContain('noindex');
+    // Still the code page: nothing of the page itself.
+    expect(html).toContain('name="code"');
+
+    // A new upload takes a new name and drops the old file; delete removes it.
+    const up2 = await (await handleSetViewGateImage(png([137, 80, 78, 71, 2]), e, owner, ART)).json() as { gate: { image_url: string } };
+    expect(up2.gate.image_url).not.toBe(gate.image_url);
+    expect(r2.has(`view-gates/${gate.image_url.slice(4)}`)).toBe(false);
+    expect((await handleDeleteViewGateImage(e, owner, ART)).status).toBe(200);
+    expect(r2.has(`view-gates/${up2.gate.image_url.slice(4)}`)).toBe(false);
+
+    // Checked, owner-only, and off again means closed again.
+    const gif = new Request('https://shareout.test/x', { method: 'PUT', body: 'GIF89a', headers: { 'Content-Type': 'image/gif' } });
+    expect((await handleSetViewGateImage(gif, e, owner, ART)).status).toBe(400);
+    expect((await handleSetViewGateImage(png([1]), e, stranger, ART)).status).toBe(403);
+    expect((await handleSetViewGate(api('PUT', { ...GATE, preview: 'yes' }), e, owner, ART)).status).toBe(400);
+    expect((await handleSetViewGate(api('PUT', GATE), e, owner, ART)).status).toBe(200);
+    expect(await gatePage()).not.toContain('og:title');
   });
 
   it('can be set with the codes, and is checked', async () => {

@@ -46,7 +46,9 @@ Pedíselo a un agente de IA que use la skill de ShareOut (Claude Code, por ejemp
 esta página de vista única para Ana, Luis y Marta, 90 segundos cada uno"*. Te da un mensaje
 listo para mandarle a cada persona. La pantalla de entrada puede llevar el logo y el color de tu
 workspace y tus propias palabras ("Carta del socio fundador · Abrir la carta"). Cualquiera con el
-link ve esa pantalla, así que no pongas ahí lo confidencial. Para desarrolladores: [la API](/es/start/introduction/) (`/v1/artifacts/{id}/view-codes`).
+link ve esa pantalla, así que no pongas ahí lo confidencial. También podés encender la **vista
+previa del link**, para que WhatsApp o Slack muestren una portada, el título y el mensaje en vez
+del link pelado; está apagada hasta que la encendés, y la portada es pública. Para desarrolladores: [la API](/es/start/introduction/) (`/v1/artifacts/{id}/view-codes`).
 
 :::caution[Lo que ninguna página web puede impedir]
 Nadie puede bloquear una captura de pantalla, ni que alguien le saque una foto a la pantalla

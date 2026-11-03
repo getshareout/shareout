@@ -99,6 +99,25 @@ curl -s -X PUT "$ORIGIN/v1/artifacts/$ARTIFACT_ID/view-codes/gate" \
 - The workspace's logo, name and color show on it (and on the closing screen) when the workspace
   has branding; `hide_footer` drops "Powered by ShareOut".
 
+**Link preview** (the card WhatsApp, Slack or iMessage draws for the link) — off by default, so a
+closed page advertises nothing. Turn it on when the user wants the link to look good in chat:
+
+```bash
+# 1) the picture (1200×630 reads best): PNG/JPG/WEBP up to 1 MB, raw body
+curl -s -X PUT "$ORIGIN/v1/artifacts/$ARTIFACT_ID/view-codes/gate/image" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: image/png" --data-binary @cover.png
+# 2) the words + the switch (send the full gate: a missing field goes back to the default, a missing preview is off)
+curl -s -X PUT "$ORIGIN/v1/artifacts/$ARTIFACT_ID/view-codes/gate" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"title": "Precios de noviembre", "message": "Ana te comparte la lista nueva.", "button": "Ver los precios", "preview": true}'
+```
+
+- The preview shows the gate's title and message and the picture (else the workspace logo).
+  **The picture is public** — a cover (title, logo, colors), never a capture of the content.
+- A good cover: the page's own hero at 1200×630 without the watermark — render it and screenshot it.
+- Apps cache previews per URL for a while: a link pasted before the preview was on may keep
+  showing a bare URL in that chat; a new paste of a new personal link picks it up.
+
 ```bash
 # Revoke one code (an open page loses its pass at once)
 curl -s -X DELETE "$ORIGIN/v1/artifacts/$ARTIFACT_ID/view-codes/$CODE_ID" -H "Authorization: Bearer $TOKEN"

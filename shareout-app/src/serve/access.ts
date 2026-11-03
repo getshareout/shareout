@@ -69,7 +69,10 @@ export async function checkAccess(
       const scope = await getVisibilityScope(env, sessionUser);
       if (await ownerOrCollaborator(env, artifact, scope.userIds, scope.emails)) return null;
     }
-    return viewCodeLoginPage(slug, artifact.artifact_id, pageLocale(request), undefined, 401, await loadViewGateLook(env, artifact.artifact_id));
+    return viewCodeLoginPage(
+      slug, artifact.artifact_id, pageLocale(request), undefined, 401,
+      await loadViewGateLook(env, artifact.artifact_id), new URL(request.url).origin,
+    );
   }
 
   if (authMethod === 'password' || authMethod === 'credentials') {

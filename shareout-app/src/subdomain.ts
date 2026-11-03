@@ -85,6 +85,7 @@ const PASSTHROUGH_PREFIXES = [
   '/@',
   '/brand/',
   '/wl/',
+  '/vg/',
   '/settings/',
   '/app/',
 ];

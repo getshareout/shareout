@@ -2253,6 +2253,82 @@
         }
       }
     },
+    "/v1/artifacts/{id}/view-codes/gate/image": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ArtifactId"
+        }
+      ],
+      "put": {
+        "tags": [
+          "Collaborators"
+        ],
+        "summary": "Upload the link-preview image",
+        "description": "The picture a link preview shows (1200×630 reads best). PNG, JPG or WEBP up to 1 MB, sent as the raw body with its Content-Type. It is public as soon as it is uploaded — never a picture of the confidential part. Each upload gets a new URL, so no cache keeps the old one. Owner or editor.",
+        "operationId": "setViewGateImage",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "gate": {
+                      "$ref": "#/components/schemas/ViewGate"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Collaborators"
+        ],
+        "summary": "Remove the link-preview image",
+        "operationId": "deleteViewGateImage",
+        "responses": {
+          "200": {
+            "description": "Removed"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
     "/v1/artifacts/{id}/view-codes/{codeId}": {
       "parameters": [
         {
@@ -14364,6 +14440,19 @@
             ],
             "maxLength": 30,
             "example": "Abrir la carta"
+          },
+          "preview": {
+            "type": "boolean",
+            "default": false,
+            "description": "Draw a link preview (WhatsApp, Slack, iMessage…): the code page answers 200 with Open Graph tags made of this title, message and the preview image (or the workspace logo). Off, a one-time page advertises nothing. Missing on PUT means off."
+          },
+          "image_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "readOnly": true,
+            "description": "Public path of the preview image (`/vg/…`); set with PUT …/view-codes/gate/image."
           }
         }
       },
