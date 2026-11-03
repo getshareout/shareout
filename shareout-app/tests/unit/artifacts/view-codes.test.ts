@@ -242,7 +242,7 @@ describe('view codes: the gate', () => {
     const res = withOneTimeOwnerNotice(new Response('<html><body><p id="page">carta</p></body></html>', { headers: { 'Content-Type': 'text/html' } }), 'es');
     const html = await res.text();
     expect(html).toContain('<p id="page">carta</p>');
-    expect(html).toContain('Estás viendo con tu cuenta, por eso no está bloqueado.');
+    expect(html).toContain('Lo ves con tu cuenta, por eso sin bloqueo.');
     expect(html.indexOf('so-otv-owner')).toBeGreaterThan(html.indexOf('id="page"'));
   });
 

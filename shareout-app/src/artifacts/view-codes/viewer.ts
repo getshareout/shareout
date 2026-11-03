@@ -174,8 +174,8 @@ export function withOneTimeOwnerNotice(resp: Response, lang: PageLocale): Respon
   const text = escapeHtml(viewCodeOwnerNotice(lang));
   const notice = `<input type="checkbox" id="so-otv-owner-x" hidden><div id="so-otv-owner" role="status">`
     + `<span>${text}</span><label for="so-otv-owner-x" aria-label="${lang === 'es' ? 'Cerrar' : 'Close'}">×</label></div>`
-    + `<style>#so-otv-owner{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:2147483000;display:flex;gap:12px;align-items:center;`
-    + `max-width:min(640px,calc(100vw - 24px));padding:10px 12px 10px 16px;border-radius:12px;background:#1f2328;color:#fff;`
+    + `<style>#so-otv-owner{position:fixed;left:0;right:0;top:12px;margin:0 auto;width:fit-content;z-index:2147483000;display:flex;gap:12px;align-items:center;`
+    + `max-width:min(640px,calc(100vw - 24px));box-sizing:border-box;padding:10px 12px 10px 16px;border-radius:12px;background:#1f2328;color:#fff;`
     + `font:500 14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.18)}`
     + `#so-otv-owner label{cursor:pointer;font-size:20px;line-height:1;padding:4px 6px;opacity:.8}`
     + `#so-otv-owner-x:checked+#so-otv-owner{display:none}</style>`;

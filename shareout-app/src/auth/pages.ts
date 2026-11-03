@@ -829,7 +829,7 @@ const VIEW_CODE_COPY = {
     throttled: 'Too many tries. Try again in a few minutes.',
     goneTitle: 'Thanks for reading',
     goneBody: 'This content is no longer available.',
-    ownerNotice: 'You’re viewing with your account, so it isn’t locked. Anyone opening it with their one-time link sees it locked, for the time you set.',
+    ownerNotice: 'You’re signed in, so this isn’t locked. Anyone opening it with their link sees it locked.',
   },
   es: {
     pageTitle: 'Ingresá tu código - ShareOut',
@@ -844,7 +844,7 @@ const VIEW_CODE_COPY = {
     throttled: 'Demasiados intentos. Probá de nuevo en unos minutos.',
     goneTitle: '¡Gracias por leerlo!',
     goneBody: 'Este contenido ya no está disponible.',
-    ownerNotice: 'Estás viendo con tu cuenta, por eso no está bloqueado. Quien lo abre con su link lo ve bloqueado y por el tiempo que elegiste.',
+    ownerNotice: 'Lo ves con tu cuenta, por eso sin bloqueo. Quien entra con su link lo ve bloqueado.',
   },
 } satisfies Record<PageLocale, Record<string, string>>;
 export type ViewCodeError = 'invalid' | 'used' | 'throttled';
