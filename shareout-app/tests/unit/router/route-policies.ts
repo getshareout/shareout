@@ -125,6 +125,7 @@ export const OPEN_ROUTES: Record<string, string> = {
   [String.raw`^\/embed\/([^/]+)\/?(.*)$`]: CONTENT,
   [String.raw`^\/t\/([^.]+)\.(webp|png|jpg)$`]: CONTENT,
   [String.raw`^\/wl\/([^.]+)\.(webp|png|jpg|svg)$`]: 'workspace logo; public by design',
+  [String.raw`^\/vg\/([^/.]+)\.(webp|png|jpg)$`]: 'one-time page link-preview cover; its owner made it public (gate/image)',
   [String.raw`^\/v1\/artifacts\/([^/]+)\/sources$`]: 'page data sources: the page\'s own view gate decides (public, session, password, guest, grant); editor detail only for editors; unknown ids are 404',
   [String.raw`^\/v1\/files\/([^/]+)$`]: CONTENT,
   [String.raw`^\/v1\/files\/([^/]+)\/content$`]: CONTENT,
