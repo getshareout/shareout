@@ -18,11 +18,14 @@ import { injectPresenceBeacon } from './presence-beacon';
 import { badgeEnabled, injectBadge } from './badge';
 import { versionedBundlePath } from '../bundle-versions';
 import { localeForViewer } from '../i18n/locale';
+import { pageLocale } from '../i18n/accept-language';
 import { PAGE_AGENT_REV, injectPageAgent, isSafePagePath, isSafeSectionId } from './page-agent';
 import { hasMcpCapability } from '../mcp-broker/capabilities';
 import { servingOrigin } from '../workspaces/domains/host-binding';
 import { readViewPass } from '../artifacts/view-codes/gate';
-import { VIEW_CONTENT_AUTH, injectViewGuard, isFrameRequestAllowed, serveOneTimeViewer } from '../artifacts/view-codes/viewer';
+import {
+  VIEW_CONTENT_AUTH, injectViewGuard, isFrameRequestAllowed, serveOneTimeViewer, withOneTimeOwnerNotice,
+} from '../artifacts/view-codes/viewer';
 
 function injectCommentsAgent(resp: Response, baseUrl: string): Response {
   const tag = `<script src="${baseUrl}${versionedBundlePath('/sdk/comments-agent.js')}" defer></script>`;
@@ -399,7 +402,7 @@ export async function handleServe(
         const row = await fetchAssetRow(env, result.version_id, pageParam);
         if (row?.mime === 'text/html') viewerPage = pageParam;
       }
-      return serveSandboxedViewer(
+      const viewer = await serveSandboxedViewer(
         request,
         env,
         slug,
@@ -417,6 +420,8 @@ export async function handleServe(
         effectiveEntrypoint,
         sectionParam(url),
       );
+      // A one-time page opened with an account (owner, collaborator) is not locked: say so.
+      return oneTime ? withOneTimeOwnerNotice(viewer, pageLocale(request)) : viewer;
     }
 
     const pageAgent = { slug, baseUrl, pagePath: resolvedPath, entrypoint: result.entrypoint };

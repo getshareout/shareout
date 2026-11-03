@@ -38,12 +38,15 @@ you can give each person **the link plus their own code** instead of an invite:
   unless you pick another), with no countdown on screen.
 - Their **name is written across the page**, so any screenshot or photo shows who it came from.
 - Copying, printing, saving and downloading are blocked.
-- You see who opened it, when, on what kind of device, and what they tried (copy, print,
+- You see who opened it, when, on what device and browser, from roughly which city (never
+  their IP), and what they tried (copy, print,
   leaving the page).
 
 Ask an AI agent that uses the ShareOut skill (Claude Code, for example): *"Make this page
 one-time for Ana, Luis and Marta, 90 seconds each"*. It gives you a ready-to-send message
-for each person. Developers: [the API](/start/introduction/) (`/v1/artifacts/{id}/view-codes`).
+for each person. The page people land on can carry your workspace's logo and color and your
+own words ("Carta del socio fundador · Abrir la carta") — anyone with the link sees that page,
+so keep the confidential part out of it. Developers: [the API](/start/introduction/) (`/v1/artifacts/{id}/view-codes`).
 
 :::caution[What no website can stop]
 Nobody can block a screenshot, or someone taking a photo of the screen with another phone.

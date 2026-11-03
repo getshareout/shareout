@@ -4,11 +4,12 @@ import type { Env } from '../../types';
 import { createAccessToken, verifyAccessToken, extractTokenFromCookie } from '../../token';
 import { artifactLocation } from '../../auth/artifact-auth';
 import { viewCodeLoginPage } from '../../auth/pages';
+import { loadViewGateLook } from './gate-look';
 import { cookieSecureAttr } from '../../auth/cookies';
 import { pageLocale } from '../../i18n/accept-language';
 import { checkViewCodeGateLimit, rateLimitHeaders } from '../../rate-limit';
 import {
-  deviceClass, getLiveViewCode, isViewCodeEventKind, recordViewCodeEvent, redeemViewCode,
+  getLiveViewCode, isViewCodeEventKind, openedFrom, recordViewCodeEvent, redeemViewCode,
   type LiveViewCode,
 } from './store';
 
@@ -43,12 +44,12 @@ export async function handleViewCodeAuth(request: Request, env: Env): Promise<Re
   const lang = pageLocale(request);
   const rl = await checkViewCodeGateLimit(env, request, artifact.id);
   if (!rl.allowed) {
-    const page = viewCodeLoginPage(slug, artifact.id, lang, 'throttled', 429);
+    const page = viewCodeLoginPage(slug, artifact.id, lang, 'throttled', 429, await loadViewGateLook(env, artifact.id));
     return new Response(page.body, { status: 429, headers: { ...Object.fromEntries(page.headers), ...rateLimitHeaders(rl) } });
   }
 
-  const result = await redeemViewCode(env, artifact.id, code, deviceClass(request.headers.get('User-Agent')));
-  if (!result.ok) return viewCodeLoginPage(slug, artifact.id, lang, result.reason);
+  const result = await redeemViewCode(env, artifact.id, code, openedFrom(request));
+  if (!result.ok) return viewCodeLoginPage(slug, artifact.id, lang, result.reason, 401, await loadViewGateLook(env, artifact.id));
 
   const seconds = Math.max(1, Math.ceil((Date.parse(result.openedAt) + result.viewSeconds * 1000 - Date.now()) / 1000));
   const pass = await createAccessToken(artifact.id, `${VIEW_PASS_PREFIX}${result.codeId}`, env, seconds);

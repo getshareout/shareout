@@ -4,11 +4,13 @@ import type { AuthUser } from '../../../src/api-auth';
 import { applyMigrations, e as baseEnv } from '../helpers/migrated-db';
 import {
   MAX_EVENTS_PER_CODE, VIEW_SECONDS_DEFAULT, generateViewCode, normalizeViewCode, redeemViewCode,
-  createViewCodes, getLiveViewCode, recordViewCodeEvent, listViewCodes,
+  createViewCodes, getLiveViewCode, recordViewCodeEvent, listViewCodes, browserSummary,
 } from '../../../src/artifacts/view-codes/store';
+import { withOneTimeOwnerNotice } from '../../../src/artifacts/view-codes/viewer';
+import { viewCodeGoneCopy } from '../../../src/auth/pages';
 import { handleViewCodeAuth, handleViewCodeEvent, readViewPass } from '../../../src/artifacts/view-codes/gate';
 import {
-  handleCreateViewCodes, handleDisableViewCodes, handleListViewCodes, handleRevokeViewCode,
+  handleCreateViewCodes, handleDisableViewCodes, handleListViewCodes, handleRevokeViewCode, handleSetViewGate,
 } from '../../../src/artifacts/view-codes/api';
 import { checkAccess } from '../../../src/serve/access';
 import { dataMiddleware } from '../../../src/data/middleware';
@@ -72,6 +74,7 @@ beforeEach(async () => {
   store.clear();
   await e.DB.prepare('DELETE FROM artifact_view_code_events').run();
   await e.DB.prepare('DELETE FROM artifact_view_codes').run();
+  await e.DB.prepare('DELETE FROM artifact_view_gates').run();
   // A republish test leaves versions/deployments behind; they hold the artifact by FK.
   await e.DB.prepare('DELETE FROM deployments WHERE artifact_id = ?').bind(ART).run();
   await e.DB.prepare('DELETE FROM assets WHERE version_id IN (SELECT id FROM versions WHERE artifact_id = ?)').bind(ART).run();
@@ -82,6 +85,47 @@ beforeEach(async () => {
   await e.DB.prepare(
     "INSERT INTO artifacts (id, name, slug, owner_id, visibility, auth_method) VALUES (?, 'Secret', 'vcd', ?, 'public', 'google')",
   ).bind(ART, owner.id).run();
+});
+
+describe('view codes: the code page look', () => {
+  const GATE = { title: 'Carta del socio fundador', message: 'Roberto te comparte el cierre de octubre.', button: 'Abrir la carta' };
+  const gatePage = async () => {
+    const res = await checkAccess(new Request('https://shareout.test/a/vcd/', { headers: { 'Accept-Language': 'es' } }), e, 'vcd', artifactInfo(), { viewPass: true });
+    expect(res!.status).toBe(401);
+    return res!.text();
+  };
+
+  it("shows the page's own words and the workspace's logo, name and color, and no ShareOut footer when the workspace hides it", async () => {
+    await e.DB.prepare("INSERT OR REPLACE INTO workspaces (id, name, slug, owner_id, branding) VALUES ('wsp_vcd', 'Santa Elena', 'vcd-ws', ?, ?)")
+      .bind(owner.id, JSON.stringify({ logo_ext: 'png', accent_color: '#D6202A', hide_footer: true })).run();
+    await e.DB.prepare("UPDATE artifacts SET workspace_id = 'wsp_vcd' WHERE id = ?").bind(ART).run();
+    await newCodes(['Ana']);
+    expect((await handleSetViewGate(api('PUT', GATE), e, owner, ART)).status).toBe(200);
+
+    const html = await gatePage();
+    for (const text of [GATE.title, GATE.message, GATE.button, 'Santa Elena', '/wl/wsp_vcd.png', '--color-primary:#D6202A']) expect(html).toContain(text);
+    expect(html).not.toContain('Powered by');
+    expect(html).not.toContain('Ingresá tu código</h1>');
+    // A typed code still gets the instruction; a personal link drops it.
+    expect(html).toContain('id="vcHint"');
+
+    const list = await (await handleListViewCodes(e, owner, ART)).json() as { gate: unknown };
+    expect(list.gate).toEqual(GATE);
+    // Empty puts the defaults back.
+    expect((await handleSetViewGate(api('PUT', {}), e, owner, ART)).status).toBe(200);
+    expect(await gatePage()).toContain('Ingresá tu código');
+  });
+
+  it('can be set with the codes, and is checked', async () => {
+    const res = await handleCreateViewCodes(api('POST', { recipients: ['Ana'], gate: { title: 'Precios' } }), e, owner, ART);
+    expect(res.status).toBe(201);
+    expect(await gatePage()).toContain('Precios');
+    expect((await handleSetViewGate(api('PUT', { title: 'x'.repeat(81) }), e, owner, ART)).status).toBe(400);
+    expect((await handleSetViewGate(api('PUT', { button: 12 }), e, owner, ART)).status).toBe(400);
+    expect((await handleSetViewGate(api('PUT', ['x']), e, owner, ART)).status).toBe(400);
+    expect((await handleSetViewGate(api('PUT', GATE), e, stranger, ART)).status).toBe(403);
+    expect((await handleCreateViewCodes(api('POST', { recipients: ['Ana'], gate: { message: 'y'.repeat(201) } }), e, owner, ART)).status).toBe(400);
+  });
 });
 
 describe('view codes: format', () => {
@@ -152,6 +196,30 @@ describe('view codes: API', () => {
     expect((await handleListViewCodes(e, stranger, ART)).status).toBe(403);
   });
 
+  it('records the city, region, country and browser it was opened from — never the IP', async () => {
+    const { codes } = await newCodes(['Ana']);
+    const req = codeForm(codes[0].code, '203.0.113.77',
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36');
+    Object.defineProperty(req, 'cf', { value: { city: 'Rosario', region: 'Santa Fe', country: 'AR' } });
+    expect((await handleViewCodeAuth(req, e)).status).toBe(302);
+    const body = await (await handleListViewCodes(e, owner, ART)).json() as { view_codes: Record<string, unknown>[] };
+    expect(body.view_codes[0]).toMatchObject({
+      opened_device: 'phone', opened_browser: 'Chrome · Android', opened_city: 'Rosario', opened_region: 'Santa Fe', opened_country: 'AR',
+    });
+    expect(JSON.stringify(body)).not.toContain('203.0.113.77');
+    const row = await e.DB.prepare('SELECT * FROM artifact_view_codes WHERE id = ?').bind(codes[0].id).first();
+    expect(JSON.stringify(row)).not.toContain('203.0.113.77');
+  });
+
+  it('names the browser and system from the user agent', () => {
+    expect(browserSummary('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1')).toBe('Safari · iOS');
+    expect(browserSummary('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0 Mobile/15E148 Safari/604.1')).toBe('Chrome · iOS');
+    expect(browserSummary('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0')).toBe('Edge · Windows');
+    expect(browserSummary('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36')).toBe('Chrome · macOS');
+    expect(browserSummary('Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/121.0 Mobile Safari/537.36')).toBe('Samsung Internet · Android');
+    expect(browserSummary(null)).toBeNull();
+  });
+
   it('revokes one code, and turning it off revokes all and goes back to sign-in', async () => {
     const { codes } = await newCodes(['Ana', 'Luis']);
     expect((await handleRevokeViewCode(e, owner, ART, codes[0].id)).status).toBe(200);
@@ -185,7 +253,8 @@ describe('view codes: the gate', () => {
 
   it('two devices racing the same code: exactly one wins', async () => {
     const { codes } = await newCodes(['Ana']);
-    const results = await Promise.all([1, 2, 3].map(() => redeemViewCode(e, ART, codes[0].code, 'computer')));
+    const from = { device: 'computer' as const, browser: null, city: null, region: null, country: null };
+    const results = await Promise.all([1, 2, 3].map(() => redeemViewCode(e, ART, codes[0].code, from)));
     expect(results.filter((r) => r.ok)).toHaveLength(1);
   });
 
@@ -207,6 +276,16 @@ describe('view codes: the gate', () => {
     const card = html.slice(html.indexOf('<div class="card">'), html.indexOf('</form>'));
     expect(card).toContain('Ingresá tu código');
     expect(card).not.toMatch(/una vez|segundos|expira|vence|once|seconds|expire/i);
+  });
+
+  it('the page closes with a thank-you, and the owner is told their view is not locked', async () => {
+    expect(viewCodeGoneCopy('es').title).toBe('¡Gracias por leerlo!');
+    expect(viewCodeGoneCopy('en').title).toBe('Thanks for reading');
+    const res = withOneTimeOwnerNotice(new Response('<html><body><p id="page">carta</p></body></html>', { headers: { 'Content-Type': 'text/html' } }), 'es');
+    const html = await res.text();
+    expect(html).toContain('<p id="page">carta</p>');
+    expect(html).toContain('Lo ves con tu cuenta, por eso sin bloqueo.');
+    expect(html.indexOf('so-otv-owner')).toBeGreaterThan(html.indexOf('id="page"'));
   });
 
   it('a personal link fills the code in from the fragment and leaves only Open', async () => {

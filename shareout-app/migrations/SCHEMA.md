@@ -94,7 +94,8 @@ erDiagram
 | `email_otp_codes` | One-time login codes. `code_hash` only, with `attempts` and `consumed_at` to stop replay and brute force. Guest comment codes share the table under the key `guest:<artifact_id>:<email_hash>` in `email`, so they never match a sign-in code and store no address. |
 | `google_oauth_tokens` | Per-user Google tokens for Sheets access, encrypted (`access_token_encrypted` + `iv`). |
 | `artifact_passwords` | Per-artifact username/password for password-gated artifacts. |
-| `artifact_view_codes` | One-time view codes (`auth_method = 'onetime'`): who each is for (the watermark), the code's hash, its window, when and on what device it was opened. |
+| `artifact_view_codes` | One-time view codes (`auth_method = 'onetime'`): who each is for (the watermark), the code's hash, its window, when and on what device it was opened. *(0037)* Where and in what browser: `opened_city`, `opened_region`, `opened_country` (Cloudflare's coarse location, never the IP) and `opened_browser`. |
+| `artifact_view_gates` | *(0037)* A one-time page's own words on its code page: `title`, `message`, `button` (defaults when NULL). Shown before any code is checked, so never confidential. Logo and color come from `workspaces.branding`. |
 | `artifact_view_code_events` | What a one-time viewer tried while the page was open (copy, print, save, right-click, screenshot key, leaving the page). Capped per code. |
 | `rate_limits` | Every rate limit in the product: one counter per (`principal_type`+`principal_id`, `action`, `window_start`). Principals are users and artifacts; the window string carries its own granularity (ISO day, ISO hour, `YYYY-MM-DD`, or `YYYY-MM-DDTHH:MM`). The ceilings live in code. Pruned nightly. |
 | `onboarding_state` | Per-workspace first-run progress: skill acknowledged, dismissed, celebrated. |

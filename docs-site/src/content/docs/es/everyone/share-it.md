@@ -38,12 +38,15 @@ sucursal — podés darle a cada persona **el link más su propio código** en v
   elijas (90 segundos si no elegís otro), sin cuenta regresiva en pantalla.
 - **Su nombre aparece escrito sobre la página**, así cualquier captura o foto muestra de quién salió.
 - Copiar, imprimir, guardar y descargar están bloqueados.
-- Ves quién lo abrió, cuándo, desde qué tipo de dispositivo y qué intentó hacer (copiar,
+- Ves quién lo abrió, cuándo, con qué dispositivo y navegador, desde qué ciudad aproximada
+  (nunca su IP) y qué intentó hacer (copiar,
   imprimir, salir de la página).
 
 Pedíselo a un agente de IA que use la skill de ShareOut (Claude Code, por ejemplo): *"Hacé
 esta página de vista única para Ana, Luis y Marta, 90 segundos cada uno"*. Te da un mensaje
-listo para mandarle a cada persona. Para desarrolladores: [la API](/es/start/introduction/) (`/v1/artifacts/{id}/view-codes`).
+listo para mandarle a cada persona. La pantalla de entrada puede llevar el logo y el color de tu
+workspace y tus propias palabras ("Carta del socio fundador · Abrir la carta"). Cualquiera con el
+link ve esa pantalla, así que no pongas ahí lo confidencial. Para desarrolladores: [la API](/es/start/introduction/) (`/v1/artifacts/{id}/view-codes`).
 
 :::caution[Lo que ninguna página web puede impedir]
 Nadie puede bloquear una captura de pantalla, ni que alguien le saque una foto a la pantalla

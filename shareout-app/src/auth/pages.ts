@@ -1,6 +1,7 @@
 import { renderHtmlPage } from '../design-system/shell';
 import { authPageStyles } from '../design-system/pages/auth.css';
 import { brandMarkImg } from '../brand';
+import type { ViewGateLook } from '../artifacts/view-codes/gate-look';
 import { escapeHtml } from '../html/utils';
 import { NOINDEX_ROBOTS } from '../serve/utils';
 import { turnstileWidgetHtml } from '../turnstile';
@@ -825,10 +826,11 @@ const VIEW_CODE_COPY = {
     label: 'Code',
     open: 'Open',
     invalid: 'That code doesn’t work. Check it and try again.',
-    used: 'This code was already used. Ask whoever sent it for a new one.',
+    used: 'This access was already used. If it wasn’t you, let whoever sent it know.',
     throttled: 'Too many tries. Try again in a few minutes.',
-    goneTitle: 'No longer available',
+    goneTitle: 'Thanks for reading',
     goneBody: 'This content is no longer available.',
+    ownerNotice: 'You’re signed in, so this isn’t locked. Anyone opening it with their link sees it locked.',
   },
   es: {
     pageTitle: 'Ingresá tu código - ShareOut',
@@ -839,10 +841,11 @@ const VIEW_CODE_COPY = {
     label: 'Código',
     open: 'Abrir',
     invalid: 'Ese código no funciona. Revisalo y probá de nuevo.',
-    used: 'Este código ya se usó. Pedile uno nuevo a quien te lo envió.',
+    used: 'Este acceso ya se usó. Si no fuiste vos, avisale a quien te lo envió.',
     throttled: 'Demasiados intentos. Probá de nuevo en unos minutos.',
-    goneTitle: 'Ya no está disponible',
+    goneTitle: '¡Gracias por leerlo!',
     goneBody: 'Este contenido ya no está disponible.',
+    ownerNotice: 'Lo ves con tu cuenta, por eso sin bloqueo. Quien entra con su link lo ve bloqueado.',
   },
 } satisfies Record<PageLocale, Record<string, string>>;
 export type ViewCodeError = 'invalid' | 'used' | 'throttled';
@@ -851,32 +854,49 @@ export type ViewCodeError = 'invalid' | 'used' | 'throttled';
  *  code being single-use or the page closing — the viewer finds out when it closes.
  *  A personal link (`…#code=XXXX-XXXX`) fills the code in and hides the field, so the
  *  person only taps Open. The fragment never reaches a server, and the code is not
- *  sent until that tap, so a link preview cannot spend it. */
+ *  sent until that tap, so a link preview cannot spend it. `look` puts the workspace's
+ *  logo, name and color on the card, and the page's own title, message and button. */
 export function viewCodeLoginPage(
   slug: string,
   artifactId: string,
   lang: PageLocale = 'en',
   error?: ViewCodeError,
   status = 401,
+  look?: ViewGateLook,
 ): Response {
   const c = VIEW_CODE_COPY[lang] ?? VIEW_CODE_COPY.en;
   const js = (v: string) => JSON.stringify(v).replace(/</g, '\\u003c');
-  return renderAuthPage(c.pageTitle, `
-  <div class="card">
-    <div class="icon icon-primary">${LOCK_ICON}</div>
-    <h1 id="vcTitle">${escapeHtml(c.title)}</h1>
-    <p id="vcBody">${escapeHtml(c.body)}</p>
+  const t = look?.text;
+  const brand = look?.brand ?? null;
+  const accent = brand?.accent ? escapeHtml(brand.accent) : '';
+  const card = accent
+    ? `<div class="card" style="--color-primary:${accent};--color-primary-hover:${accent};--color-primary-light:color-mix(in srgb, ${accent} 12%, transparent)">`
+    : '<div class="card">';
+  const mark = brand?.logoUrl
+    ? `<img class="auth-logo" src="${escapeHtml(brand.logoUrl)}" alt="${escapeHtml(brand.name)}">`
+    : `<div class="icon icon-primary">${LOCK_ICON}</div>`;
+  // The page's own words win; a personal link swaps the "type your code" copy for "tap Open".
+  const title = t?.title || c.title;
+  const linkTitle = t?.title || c.linkTitle;
+  const body = t?.message || c.body;
+  const linkBody = t?.message || c.linkBody;
+  const hint = t?.message ? `<p id="vcHint" style="font-size:14px;margin-top:-4px">${escapeHtml(c.body)}</p>` : '';
+  return renderAuthPage(t?.title || c.pageTitle, `
+  ${card}
+    ${mark}
+    ${brand?.name ? `<p style="margin:0 0 6px;font-weight:600;letter-spacing:.02em">${escapeHtml(brand.name)}</p>` : ''}
+    <h1 id="vcTitle">${escapeHtml(title)}</h1>
+    <p id="vcBody">${escapeHtml(body)}</p>
+    ${hint}
     ${error ? `<div class="error-box" role="alert">${escapeHtml(c[error])}</div>` : ''}
     <form method="POST" action="/auth/view-code">
       <input type="hidden" name="slug" value="${escapeHtml(slug)}">
       <input type="hidden" name="artifact_id" value="${escapeHtml(artifactId)}">
       <input type="text" name="code" placeholder="XXXX-XXXX" aria-label="${escapeHtml(c.label)}" required autofocus
         autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="16">
-      <button type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(c.open)}</button>
+      <button type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(t?.button || c.open)}</button>
     </form>
-    <div class="footer">
-      Powered by <a href="/" class="footer-brand">${brandMarkImg('footer-mark', 16)}ShareOut</a>
-    </div>
+    ${brand?.hideFooter ? '' : poweredByHtml()}
   </div>
   <script>
   (function () {
@@ -887,8 +907,10 @@ export function viewCodeLoginPage(
     input.value = m[1].toUpperCase();
     input.style.display = 'none';
     input.blur();
-    document.getElementById('vcTitle').textContent = ${js(c.linkTitle)};
-    document.getElementById('vcBody').textContent = ${js(c.linkBody)};
+    var hint = document.getElementById('vcHint');
+    if (hint) hint.remove();
+    document.getElementById('vcTitle').textContent = ${js(linkTitle)};
+    document.getElementById('vcBody').textContent = ${js(linkBody)};
   })();
   </script>`, status, { lang });
 }
@@ -897,4 +919,9 @@ export function viewCodeLoginPage(
 export function viewCodeGoneCopy(lang: PageLocale = 'en'): { title: string; body: string } {
   const c = VIEW_CODE_COPY[lang] ?? VIEW_CODE_COPY.en;
   return { title: c.goneTitle, body: c.goneBody };
+}
+
+/** Told to the owner (or a collaborator) who opens a one-time page with their account. */
+export function viewCodeOwnerNotice(lang: PageLocale = 'en'): string {
+  return (VIEW_CODE_COPY[lang] ?? VIEW_CODE_COPY.en).ownerNotice;
 }

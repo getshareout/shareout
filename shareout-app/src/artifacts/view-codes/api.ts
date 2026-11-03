@@ -9,6 +9,7 @@ import {
   MAX_CODES_PER_ARTIFACT, MAX_CODES_PER_REQUEST, cleanLabel, countViewCodes, createViewCodes,
   listViewCodes, parseViewSeconds, revokeAllViewCodes, revokeViewCode,
 } from './store';
+import { loadViewGateLook, parseGateText, saveGateText } from './gate-look';
 
 interface ArtifactRow { id: string; artifact_type: string | null; auth_method: string | null; visibility: string | null }
 
@@ -30,8 +31,8 @@ export async function handleListViewCodes(env: Env, user: AuthUser, artifactId: 
   if (!artifact) return notFound();
   const forbidden = await requireSharingRole(env, artifactId, user.id, 'editor');
   if (forbidden) return forbidden;
-  const [codes, url] = await Promise.all([listViewCodes(env, artifactId), pageUrl(env, artifactId)]);
-  return json({ enabled: artifact.auth_method === 'onetime', url, view_codes: codes });
+  const [codes, url, look] = await Promise.all([listViewCodes(env, artifactId), pageUrl(env, artifactId), loadViewGateLook(env, artifactId)]);
+  return json({ enabled: artifact.auth_method === 'onetime', url, gate: look.text, view_codes: codes });
 }
 
 /**
@@ -41,7 +42,7 @@ export async function handleListViewCodes(env: Env, user: AuthUser, artifactId: 
  * named collaborators keep their own access). The codes are in this response only.
  */
 export async function handleCreateViewCodes(request: Request, env: Env, user: AuthUser, artifactId: string): Promise<Response> {
-  let body: { recipients?: unknown; view_seconds?: unknown };
+  let body: { recipients?: unknown; view_seconds?: unknown; gate?: unknown };
   try { body = await request.json(); } catch {
     return json({ error: 'Invalid JSON body', code: 'INVALID_JSON' }, 400);
   }
@@ -61,6 +62,8 @@ export async function handleCreateViewCodes(request: Request, env: Env, user: Au
   }
   const viewSeconds = parseViewSeconds(body.view_seconds);
   if (typeof viewSeconds !== 'number') return json({ error: viewSeconds.error, code: 'VALIDATION_ERROR', param: 'view_seconds' }, 400);
+  const gate = body.gate === undefined ? null : parseGateText(body.gate);
+  if (gate && 'error' in gate) return json({ error: gate.error, code: 'VALIDATION_ERROR', param: gate.param }, 400);
 
   const artifact = await loadArtifact(env, artifactId);
   if (!artifact) return notFound();
@@ -80,6 +83,7 @@ export async function handleCreateViewCodes(request: Request, env: Env, user: Au
     await invalidateDeploymentCacheById(env, artifactId);
   }
 
+  if (gate) await saveGateText(env, artifactId, gate.text);
   const [created, url] = await Promise.all([
     createViewCodes(env, artifactId, labels, viewSeconds, user.id),
     pageUrl(env, artifactId),
@@ -88,6 +92,26 @@ export async function handleCreateViewCodes(request: Request, env: Env, user: Au
   // so link previews and logs never see it, and nothing opens until the person taps Open.
   const codes = created.map((c) => ({ ...c, link: url ? `${url}#code=${c.code}` : null }));
   return json({ enabled: true, url, view_seconds: viewSeconds, codes }, 201);
+}
+
+/**
+ * PUT /view-codes/gate `{ title?, message?, button? }` — what the code page says before
+ * anything opens (a missing or empty field goes back to the default). Anyone holding the link
+ * sees it: never put the confidential part here.
+ */
+export async function handleSetViewGate(request: Request, env: Env, user: AuthUser, artifactId: string): Promise<Response> {
+  let body: unknown;
+  try { body = await request.json(); } catch {
+    return json({ error: 'Invalid JSON body', code: 'INVALID_JSON' }, 400);
+  }
+  const artifact = await loadArtifact(env, artifactId);
+  if (!artifact) return notFound();
+  const forbidden = await requireSharingRole(env, artifactId, user.id, 'editor');
+  if (forbidden) return forbidden;
+  const parsed = parseGateText(body);
+  if ('error' in parsed) return json({ error: parsed.error, code: 'VALIDATION_ERROR', param: parsed.param }, 400);
+  await saveGateText(env, artifactId, parsed.text);
+  return json({ gate: parsed.text });
 }
 
 /** DELETE /view-codes/{codeId} — that code no longer opens the page. One already open

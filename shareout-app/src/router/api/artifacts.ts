@@ -3,7 +3,9 @@ import { getAnalytics } from '../../analytics';
 import { handleEditor } from '../../editor/index';
 import { handleListArtifacts, handleGetArtifact, handleUpdateArtifact, handleDeleteArtifact, handleListDeletedArtifacts, handleRestoreArtifact, handleRestoreAllDeleted } from '../../artifacts/crud';
 import { handleGetCollaborators, handleAddCollaborators, handleRemoveCollaborator, handleTransferOwnership } from '../../artifacts/collaborators';
-import { handleCreateViewCodes, handleDisableViewCodes, handleListViewCodes, handleRevokeViewCode } from '../../artifacts/view-codes/api';
+import {
+  handleCreateViewCodes, handleDisableViewCodes, handleListViewCodes, handleRevokeViewCode, handleSetViewGate,
+} from '../../artifacts/view-codes/api';
 import { handleShareArtifact } from '../../artifacts/share';
 import { handleGetVersions, handleGetVersionSource, handleRestoreVersion, handleRollback } from '../../artifacts/versions';
 import { handleGetArtifactFiles } from '../../artifacts/files';
@@ -261,6 +263,13 @@ export async function routeArtifactApi(ctx: FetchContext): Promise<Response | nu
     if (request.method === 'GET') return addCORS(await handleListViewCodes(env, user, artifactId));
     if (request.method === 'POST') return addCORS(await handleCreateViewCodes(request, env, user, artifactId));
     if (request.method === 'DELETE') return addCORS(await handleDisableViewCodes(env, user, artifactId));
+  }
+
+  const viewGateMatch = path.match(/^\/v1\/artifacts\/([^/]+)\/view-codes\/gate$/);
+  if (viewGateMatch && request.method === 'PUT') {
+    const user = await requireAuthUser(ctx);
+    if (!isAuthUser(user)) return user;
+    return addCORS(await handleSetViewGate(request, env, user, viewGateMatch[1]));
   }
 
   const viewCodeMatch = path.match(/^\/v1\/artifacts\/([^/]+)\/view-codes\/([^/]+)$/);

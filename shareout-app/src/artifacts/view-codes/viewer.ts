@@ -8,10 +8,12 @@ import type { Env } from '../../types';
 import { createAccessToken } from '../../token';
 import { artifactContentHost, artifactContentUrl, getSecurityHeaders } from '../../serve/security';
 import { escapeHtml, NOINDEX_ROBOTS } from '../../serve/utils';
-import { viewCodeGoneCopy } from '../../auth/pages';
+import { viewCodeGoneCopy, viewCodeOwnerNotice } from '../../auth/pages';
 import { pageLocale } from '../../i18n/accept-language';
+import type { PageLocale } from '../../i18n/accept-language';
 import type { LiveViewCode } from './store';
 import { VIEW_CODE_EVENT_KINDS } from './store';
+import { loadViewGateLook } from './gate-look';
 
 import { VIEW_CONTENT_AUTH } from './tokens';
 
@@ -38,6 +40,11 @@ export async function serveOneTimeViewer(
   const src = artifactContentUrl(env, artifactId, slug, entrypoint, ct, request);
   const lang = pageLocale(request);
   const gone = viewCodeGoneCopy(lang);
+  const look = await loadViewGateLook(env, artifactId);
+  const accent = look.brand?.accent || '#1a7f37';
+  const goneMark = look.brand?.logoUrl
+    ? `<img class="logo" src="${escapeHtml(look.brand.logoUrl)}" alt="${escapeHtml(look.brand.name)}">`
+    : `<div class="ok" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7"/></svg></div>`;
   const cfg = {
     aid: artifactId,
     ms: remainingMs,
@@ -60,11 +67,14 @@ html,body{margin:0;height:100%;overflow:hidden;background:#fff}
 *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 #so-otv-frame{position:fixed;inset:0;width:100%;height:100%;border:0;transition:filter .12s}
 body.so-otv-blur #so-otv-frame{filter:blur(32px)}
-#so-otv-mark{position:fixed;inset:0;pointer-events:none;z-index:2147483646;opacity:.2}
+#so-otv-mark{position:fixed;inset:0;pointer-events:none;z-index:2147483646;opacity:.085}
 #so-otv-mark svg{display:block}
-#so-otv-gone{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;color:#1f2328;text-align:center}
+#so-otv-gone{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;font:17px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;color:#1f2328;text-align:center;background:#fff}
 #so-otv-gone[hidden]{display:none}
-#so-otv-gone h1{font-size:20px;margin:0 0 8px}
+#so-otv-gone .ok{width:56px;height:56px;margin:0 auto 16px;border-radius:50%;background:color-mix(in srgb, ${escapeHtml(accent)} 12%, #fff);display:flex;align-items:center;justify-content:center}
+#so-otv-gone .ok svg{width:28px;height:28px;stroke:${escapeHtml(accent)};fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+#so-otv-gone .logo{display:block;width:72px;height:72px;margin:0 auto 16px;border-radius:50%;object-fit:cover}
+#so-otv-gone h1{font-size:24px;margin:0 0 8px}
 #so-otv-gone p{margin:0;color:#57606a}
 @media print{html,body{display:none!important}}
 </style>
@@ -73,7 +83,7 @@ body.so-otv-blur #so-otv-frame{filter:blur(32px)}
 <body>
 <iframe id="so-otv-frame" src="${escapeHtml(src)}" sandbox="${VIEW_SANDBOX}" referrerpolicy="no-referrer" title="ShareOut"></iframe>
 <div id="so-otv-mark" aria-hidden="true"></div>
-<div id="so-otv-gone" hidden><div><h1>${escapeHtml(gone.title)}</h1><p>${escapeHtml(gone.body)}</p></div></div>
+<div id="so-otv-gone" hidden><div>${goneMark}<h1>${escapeHtml(gone.title)}</h1><p>${escapeHtml(gone.body)}</p></div></div>
 <script>${viewerScript(json(cfg))}</script>
 </body>
 </html>`;
@@ -102,11 +112,12 @@ var frame=document.getElementById('so-otv-frame'),mark=document.getElementById('
 var t0=performance.now(),wallEnd=Date.now()+C.ms,closed=false,last={};
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return'&#'+c.charCodeAt(0)+';'})}
 var d=new Date(C.openedAt),stamp=C.label;
-try{stamp+=' \\u00b7 '+d.toLocaleDateString()+' '+d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}catch(e){}
+var loc=document.documentElement.lang||undefined;
+try{stamp+=' \\u00b7 '+d.toLocaleDateString(loc)+' '+d.toLocaleTimeString(loc,{hour:'2-digit',minute:'2-digit'})}catch(e){}
 // One full-screen SVG whose pattern is rotated as a whole, so no copy of the name is ever
-// cut by a tile edge. Rows alternate by half a tile (brick), every 72px: no strip of the
-// screen is free of the name.
-var px=Math.ceil(stamp.length*8.4),W=px+64,R=72;
+// cut by a tile edge. Rows alternate by half a tile (brick), every 120px, faint enough to read
+// through: any screenshot or photo of a screen still carries the name.
+var px=Math.ceil(stamp.length*8.4),W=px+150,R=120;
 function t(x,y){return '<text x="'+(x+1)+'" y="'+(y+1)+'" fill="#fff">'+esc(stamp)+'</text><text x="'+x+'" y="'+y+'" fill="#000">'+esc(stamp)+'</text>'}
 mark.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><defs><pattern id="so-otv-p" patternUnits="userSpaceOnUse" width="'+W+'" height="'+(2*R)+'" patternTransform="rotate(-24)">'+
 '<g font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="15">'+t(0,R*0.6)+t(W/2,R*1.6)+t(-W/2,R*1.6)+'</g></pattern></defs>'+
@@ -161,6 +172,28 @@ if(m&&k==='p'){e.preventDefault();s('print')}else if(m&&k==='s'){e.preventDefaul
 document.addEventListener('keyup',function(e){if(e.key==='PrintScreen')s('screenshot_key')},true);
 addEventListener('beforeprint',function(){s('print')});addEventListener('blur',function(){s('blur')});addEventListener('focus',function(){s('focus')});
 })();</script>`;
+
+/**
+ * The owner (or a collaborator) opening a one-time page with their account sees it as
+ * usual — not locked — so they can check and edit it. Say so on screen, or the open page
+ * reads as "the lock doesn't work". Pure CSS to dismiss: no script in the shell.
+ */
+export function withOneTimeOwnerNotice(resp: Response, lang: PageLocale): Response {
+  const text = escapeHtml(viewCodeOwnerNotice(lang));
+  const notice = `<input type="checkbox" id="so-otv-owner-x" hidden><div id="so-otv-owner" role="status">`
+    + `<span>${text}</span><label for="so-otv-owner-x" aria-label="${lang === 'es' ? 'Cerrar' : 'Close'}">×</label></div>`
+    + `<style>#so-otv-owner{position:fixed;left:0;right:0;top:12px;margin:0 auto;width:fit-content;z-index:2147483000;display:flex;gap:12px;align-items:center;`
+    + `max-width:min(640px,calc(100vw - 24px));box-sizing:border-box;padding:10px 12px 10px 16px;border-radius:12px;background:#1f2328;color:#fff;`
+    + `font:500 14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.18)}`
+    + `#so-otv-owner label{cursor:pointer;font-size:20px;line-height:1;padding:4px 6px;opacity:.8}`
+    + `#so-otv-owner-x:checked+#so-otv-owner{display:none}</style>`;
+  let done = false;
+  return new HTMLRewriter().on('body', { element(e) {
+    if (done) return;
+    done = true;
+    e.append(notice, { html: true });
+  } }).transform(resp);
+}
 
 /** Put the guard first in <head> (or <body> when the page has no head). */
 export function injectViewGuard(resp: Response): Response {

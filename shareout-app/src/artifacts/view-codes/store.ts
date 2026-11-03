@@ -113,6 +113,12 @@ export interface ViewCodeSummary {
   opened_at: string | null;
   closed_at: string | null;
   opened_device: string | null;
+  /** Browser and system, e.g. "Chrome · Android". */
+  opened_browser: string | null;
+  /** Coarse location as Cloudflare reports it — never the IP. */
+  opened_city: string | null;
+  opened_region: string | null;
+  opened_country: string | null;
   revoked_at: string | null;
   /** What the viewer tried while it was open, by kind. */
   attempts: Partial<Record<ViewCodeEventKind, number>>;
@@ -125,6 +131,10 @@ interface ViewCodeRow {
   created_at: string;
   opened_at: string | null;
   opened_device: string | null;
+  opened_browser: string | null;
+  opened_city: string | null;
+  opened_region: string | null;
+  opened_country: string | null;
   revoked_at: string | null;
 }
 
@@ -140,7 +150,8 @@ function statusOf(row: ViewCodeRow, now: number): ViewCodeStatus {
 export async function listViewCodes(env: Env, artifactId: string): Promise<ViewCodeSummary[]> {
   const [codes, events] = await Promise.all([
     env.DB.prepare(
-      `SELECT id, label, view_seconds, created_at, opened_at, opened_device, revoked_at
+      `SELECT id, label, view_seconds, created_at, opened_at, opened_device, opened_browser,
+              opened_city, opened_region, opened_country, revoked_at
          FROM artifact_view_codes WHERE artifact_id = ? ORDER BY created_at DESC, label`,
     ).bind(artifactId).all<ViewCodeRow>(),
     env.DB.prepare(
@@ -168,6 +179,10 @@ export async function listViewCodes(env: Env, artifactId: string): Promise<ViewC
       opened_at: r.opened_at,
       closed_at: end !== null && end <= now ? new Date(end).toISOString() : null,
       opened_device: r.opened_device,
+      opened_browser: r.opened_browser,
+      opened_city: r.opened_city,
+      opened_region: r.opened_region,
+      opened_country: r.opened_country,
       revoked_at: r.revoked_at,
       attempts: attempts.get(r.id) ?? {},
     };
@@ -199,21 +214,32 @@ export type RedeemResult =
  * Spend a code. The UPDATE is the whole check — `opened_at IS NULL` makes it single-use
  * even when two devices submit the same code at once (exactly one row update wins).
  */
+/** Where and on what a code was opened — recorded once, at redeem. Never the IP. */
+export interface OpenedFrom {
+  device: 'phone' | 'tablet' | 'computer';
+  browser: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+}
+
 export async function redeemViewCode(
   env: Env,
   artifactId: string,
   typed: string,
-  device: string,
+  from: OpenedFrom,
 ): Promise<RedeemResult> {
   const normalized = normalizeViewCode(typed);
   if (!normalized) return { ok: false, reason: 'invalid' };
   const hash = await hashViewCode(artifactId, normalized);
   const openedAt = new Date().toISOString();
   const won = await env.DB.prepare(
-    `UPDATE artifact_view_codes SET opened_at = ?, opened_device = ?
+    `UPDATE artifact_view_codes
+        SET opened_at = ?, opened_device = ?, opened_browser = ?, opened_city = ?, opened_region = ?, opened_country = ?
       WHERE artifact_id = ? AND code_hash = ? AND opened_at IS NULL AND revoked_at IS NULL
       RETURNING id, label, view_seconds`,
-  ).bind(openedAt, device, artifactId, hash).first<{ id: string; label: string; view_seconds: number }>();
+  ).bind(openedAt, from.device, from.browser, from.city, from.region, from.country, artifactId, hash)
+    .first<{ id: string; label: string; view_seconds: number }>();
   if (won) return { ok: true, codeId: won.id, label: won.label, openedAt, viewSeconds: won.view_seconds };
   const exists = await env.DB.prepare('SELECT 1 FROM artifact_view_codes WHERE artifact_id = ? AND code_hash = ?')
     .bind(artifactId, hash).first();
@@ -254,4 +280,29 @@ export function deviceClass(userAgent: string | null): 'phone' | 'tablet' | 'com
   if (/iPad|Tablet|Android(?!.*Mobile)/i.test(ua)) return 'tablet';
   if (/Mobi|iPhone|iPod|Android/i.test(ua)) return 'phone';
   return 'computer';
+}
+
+const BROWSERS: [RegExp, string][] = [
+  [/Edg(e|A|iOS)?\//, 'Edge'], [/OPR\/|Opera/, 'Opera'], [/SamsungBrowser\//, 'Samsung Internet'],
+  [/FxiOS\/|Firefox\//, 'Firefox'], [/CriOS\/|Chrome\//, 'Chrome'], [/Version\/[\d.]+.*Safari\//, 'Safari'],
+];
+const SYSTEMS: [RegExp, string][] = [
+  [/iPhone|iPad|iPod/, 'iOS'], [/Android/, 'Android'], [/Windows/, 'Windows'], [/CrOS/, 'ChromeOS'],
+  [/Mac OS X|Macintosh/, 'macOS'], [/Linux/, 'Linux'],
+];
+
+/** "Chrome · Android", "Safari · iOS" — browser and system from the user agent, or null. */
+export function browserSummary(userAgent: string | null): string | null {
+  const ua = userAgent || '';
+  const browser = BROWSERS.find(([re]) => re.test(ua))?.[1];
+  const system = SYSTEMS.find(([re]) => re.test(ua))?.[1];
+  return [browser, system].filter(Boolean).join(' · ') || null;
+}
+
+/** Device, browser and Cloudflare's coarse location for this request (no IP). */
+export function openedFrom(request: Request): OpenedFrom {
+  const ua = request.headers.get('User-Agent');
+  const cf = (request as Request & { cf?: { city?: unknown; region?: unknown; country?: unknown } }).cf;
+  const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 80) : null);
+  return { device: deviceClass(ua), browser: browserSummary(ua), city: text(cf?.city), region: text(cf?.region), country: text(cf?.country) };
 }

@@ -48,6 +48,7 @@ describe('one-time view: serving', () => {
     expect(html).not.toContain('allow-downloads');
     expect(html).not.toContain('clipboard-write');
     expect(html).toContain('Ana · Sucursal Centro');
+    expect(html).toContain('Thanks for reading');
     expect(html).not.toContain('shareout-initial-data');
     // The close is silent: the time left is in the script, never on screen.
     expect(html).not.toMatch(/countdown|cuenta regresiva/i);

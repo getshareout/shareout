@@ -12,8 +12,8 @@ seconds (default 90), then the page closes by itself and the code never works ag
 What the viewer sees and does not see:
 
 - Their **name is written across the page** (watermark), with the date and time they opened it.
-- **No countdown.** The page just closes when the time is up ("This content is no longer
-  available"). The code page never says the code works once.
+- **No countdown.** The page just closes when the time is up, with a thank-you ("Thanks for
+  reading — this content is no longer available"). The code page never says the code works once.
 - Copy, select, right-click, drag, print and save are blocked. There is no toolbar, no
   download, no assistant. The page cannot be opened outside its viewer (its frame URL
   answers 403 in a tab of its own).
@@ -26,14 +26,18 @@ Be straight with the user about the limits — say it in plain words before they
 - The log shows **attempts**, not proof: copy, print, save, right-click, the screenshot key
   on a computer, leaving the page. A phone screenshot sends no signal at all.
 - If someone forwards their link (or link + code), whoever opens it first uses it up — the real
-  person then sees "this code was already used", and the log shows the device it opened on.
+  person then sees "this access was already used", and the log shows the device, browser and
+  approximate city it opened from.
 
 ## Rules for the page
 
 - Web pages only (`type: html`). The page must carry its content in its HTML: a code holder
   has no session, so `sdk.json`, tables, connections and other live data calls do not work.
 - Turning it on makes the page **private**. The owner and named collaborators still open it
-  normally (signed in) to check it and manage the codes; nobody else gets in without a code.
+  normally (signed in) to check it and manage the codes, with a notice that their view is not
+  locked; nobody else gets in without a code. So "I can still open it" from the owner means
+  they are signed in — to see what a recipient sees, open a link in a private window. Opening a
+  personal link while signed in does not use the code up.
 - One code per person. The code is shown **once**, in the create response — hand it to the
   user right away; it cannot be read back later (only its hash is stored).
 
@@ -75,9 +79,25 @@ curl -s "$ORIGIN/v1/artifacts/$ARTIFACT_ID/view-codes" -H "Authorization: Bearer
 ```
 
 Each code: `status` (`unused` · `open` · `viewed` · `revoked`), `opened_at`, `closed_at`,
-`opened_device` (`phone` · `tablet` · `computer`), and `attempts`, e.g.
+`opened_device` (`phone` · `tablet` · `computer`), `opened_browser` (e.g. `Chrome · Android`),
+`opened_city`, `opened_region`, `opened_country` (Cloudflare's approximate location — the IP is
+never stored), and `attempts`, e.g.
 `{ "copy": 2, "left_page": 1 }`. Kinds: `copy`, `print`, `save`, `context_menu`,
 `screenshot_key`, `left_page`. Codes are never returned again.
+
+```bash
+# What the code page says (title, message, button) — the page's own words, not "Enter your code · Open"
+curl -s -X PUT "$ORIGIN/v1/artifacts/$ARTIFACT_ID/view-codes/gate" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"title": "Precios de noviembre", "message": "Ana te comparte la lista nueva.", "button": "Ver los precios"}'
+```
+
+- Set it every time: a gate that names the document and who sends it is what makes people open
+  it. Also accepted as `gate` on the create call. Limits: title 80, message 200, button 30.
+- **Anyone holding the link sees it**, before any code is checked — name the document, never
+  put the confidential part (no figures, no names of who is affected).
+- The workspace's logo, name and color show on it (and on the closing screen) when the workspace
+  has branding; `hide_footer` drops "Powered by ShareOut".
 
 ```bash
 # Revoke one code (an open page loses its pass at once)
