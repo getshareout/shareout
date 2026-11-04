@@ -90,6 +90,12 @@ function viewInsertStatement(env: Env, e: ViewEventMessage): D1PreparedStatement
   );
 }
 
+/** The view-events queue, whatever the deployment prefixed it with: `shareout-analytics-views` in the OSS
+ *  template, `shareout-next-analytics-views` on shareout.site. Not its dead-letter queue. */
+export function isViewsQueue(name: string): boolean {
+  return name === 'shareout-analytics-views' || name.endsWith('-analytics-views');
+}
+
 // Queue consumer: flush a batch of view events to D1 in one batched write. On any
 // failure the whole batch is retried (idempotent via INSERT OR IGNORE); after
 // max_retries it lands in the dead-letter queue rather than being lost.
