@@ -33,7 +33,7 @@ export const workspace_client_home_views_adminUsage_JS = `  // Usage: this month
         + '<button class="wsx-abtn" id="wsxBudgetSave" type="button">' + esc(t('common.save')) + '</button>'
         + (has ? '<button class="wsx-abtn" id="wsxBudgetClear" type="button">' + esc(t('admin.budgetRemove')) + '</button>' : '') + '</div>' : '';
       // Platform admins only (the API sends operator to no one else): what this spend cost us.
-      var op = lim.operator ? '<div class="wsx-admin__budgetstate" data-op-note style="margin-top:8px">' + esc(t('admin.usageOperator').replace('{cost}', fmtUsd(lim.operator.cost_usd)).replace('{margin}', fmtUsd(lim.operator.margin_usd)).replace('{markup}', String(lim.operator.markup))) + '</div>' : '';
+      var op = lim.operator ? '<div class="wsx-admin__budgetstate" data-op-note style="margin-top:8px"><span class="wsx-opbadge" data-op-badge>' + esc(t('admin.superOnly')) + '</span> ' + esc(t('admin.usageOperator').replace('{cost}', fmtUsd(lim.operator.cost_usd)).replace('{margin}', fmtUsd(lim.operator.margin_usd)).replace('{markup}', String(lim.operator.markup))) + '</div>' : '';
       out.budget = '<div class="wsx-admin__budget is-' + esc(st) + '">' + head + bar + note + op + edit + '</div>';
       if (isAdmin) {
         var kinds = lim.spend_by_kind || [];

@@ -13,6 +13,7 @@
 import type { Env } from '../types';
 import { CF_PRICING, BYTES_PER_GB, MICRO_USD } from '../superadmin/cf-pricing';
 import { createLogger } from '../logging';
+import { pendingAiCost } from '../data/ai-pending';
 
 export const USAGE_METRICS = [
   'storage_bytes',
@@ -208,18 +209,19 @@ export async function rollupWorkspaceUsage(
           AND a.workspace_id IS NOT NULL
         GROUP BY a.workspace_id`
     ).bind(startSec, endSec).all<{ wid: string; runs: number; ms: number }>(),
-    // BYO-key calls are paid by the workspace's own provider account, so they cost us nothing.
+    // AI: the one meter, ai_usage_events — LLM calls (tokens) and everything else (embeddings,
+    // searches, workflow steps). agent_usage_events re-logs the in-page assistant and crew calls
+    // already counted here; adding it double-counted them.
     env.DB.prepare(
-      `SELECT workspace_id AS wid, COALESCE(SUM(input_tokens + output_tokens), 0) AS tokens,
-              COALESCE(SUM(billed_cost_micro_usd), 0) AS micro
-         FROM agent_usage_events
-        WHERE created_at >= ? AND created_at < ? AND workspace_id IS NOT NULL AND byo = 0
+      `SELECT workspace_id AS wid, COALESCE(SUM(units), 0) AS tokens, COALESCE(SUM(base_cost_micro_usd), 0) AS micro
+         FROM ai_usage_events
+        WHERE created_at >= ? AND created_at < ? AND workspace_id IS NOT NULL AND unit_kind = 'tokens'
         GROUP BY workspace_id`
     ).bind(start, end).all<{ wid: string; tokens: number; micro: number }>(),
     env.DB.prepare(
       `SELECT workspace_id AS wid, COUNT(*) AS n, COALESCE(SUM(base_cost_micro_usd), 0) AS micro
          FROM ai_usage_events
-        WHERE created_at >= ? AND created_at < ? AND workspace_id IS NOT NULL
+        WHERE created_at >= ? AND created_at < ? AND workspace_id IS NOT NULL AND unit_kind IS NOT 'tokens'
         GROUP BY workspace_id`
     ).bind(start, end).all<{ wid: string; n: number; micro: number }>(),
   ]);
@@ -306,6 +308,29 @@ export async function getDailyUsage(env: Env, month: string, workspaceId?: strin
       ORDER BY u.day, name, u.metric`
   ).bind(...(workspaceId ? [from, to, workspaceId] : [from, to])).all<DailyUsageRow>();
   return results ?? [];
+}
+
+/** One workspace's AI rows for a month, live from ai_usage_events and split like the rollup (ai_llm_tokens,
+ *  ai_other_events), at cost. Billing → Usage reads these instead of the ledger's, so its AI total is the
+ *  same number as the AI budget, the Summary and the invoice — not last night's snapshot. */
+export async function liveAiDailyUsage(env: Env, month: string, workspaceId: string): Promise<DailyUsageRow[]> {
+  const { from, to } = monthBounds(month);
+  const [{ results }, pending] = await Promise.all([
+    env.DB.prepare(
+      `SELECT substr(e.created_at, 1, 10) AS day, COALESCE(w.name, w.slug, e.workspace_id) AS name,
+              e.unit_kind = 'tokens' AS llm, COUNT(*) AS n, COALESCE(SUM(e.units), 0) AS units, COALESCE(SUM(e.base_cost_micro_usd), 0) AS micro
+         FROM ai_usage_events e JOIN workspaces w ON w.id = e.workspace_id
+        WHERE e.workspace_id = ? AND e.created_at >= ? AND e.created_at < ?
+        GROUP BY day, llm ORDER BY day`
+    ).bind(workspaceId, from, to).all<{ day: string; name: string; llm: number | null; n: number; units: number; micro: number }>(),
+    pendingAiCost(env, workspaceId, from, to, 'day'),
+  ]);
+  return (results ?? []).map((r) => {
+    const llm = r.llm === 1;
+    // Pending calls are LLM calls (token-priced): their list price goes on the day's ai_llm_tokens row.
+    const micro = r.micro + (llm ? pending.get(r.day) ?? 0 : 0);
+    return { day: r.day, workspaceId, name: r.name, metric: llm ? 'ai_llm_tokens' : 'ai_other_events', quantity: llm ? r.units : r.n, costMicroUsd: micro };
+  });
 }
 
 export interface SpendSummary {

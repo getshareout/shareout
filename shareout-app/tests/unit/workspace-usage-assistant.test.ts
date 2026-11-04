@@ -24,17 +24,20 @@ beforeAll(async () => {
     env.DB.prepare(`INSERT INTO ai_usage_events VALUES ('aiu_1', 'wsp_u', 'usr_u', 'assistant_chat', 'anthropic/claude-sonnet-5.5', 1208, 'tokens', 2480, 'web', NULL, NULL, NULL, NULL, '2026-10-12T11:00:00.000Z')`),
     env.DB.prepare(`INSERT INTO ai_usage_events VALUES ('aiu_2', 'wsp_u', 'usr_u', 'ask_workspace', 'anthropic/claude-sonnet-5.5', 2000, 'tokens', 4000, 'web', NULL, NULL, NULL, NULL, '2026-10-12T12:00:00.000Z')`),
     env.DB.prepare(`INSERT INTO ai_usage_events VALUES ('aiu_3', 'wsp_u', 'usr_u', 'whisper_transcribe', '@cf/whisper', 12, 'audio_seconds', 90, 'web', NULL, NULL, NULL, NULL, '2026-10-12T13:00:00.000Z')`),
+    // The crew call aue_1 is metered in ai_usage_events too (the provider layer meters every call).
+    env.DB.prepare(`INSERT INTO ai_usage_events VALUES ('aiu_4', 'wsp_u', 'usr_u', 'crew_run', 'anthropic/claude-haiku-4.5', 1473, 'tokens', 1833, 'run_1', 1383, 90, 'actual', NULL, '2026-10-12T10:00:00.000Z')`),
   ]);
 });
 
 describe('GET /v1/workspaces/{id}/usage', () => {
-  it('lists assistant turns next to agent/crew calls, newest first, and totals them', async () => {
+  it('lists assistant turns next to agent/crew calls, newest first, and totals every metered call once', async () => {
     const res = await handleGetWorkspaceUsage(new Request('https://x/v1/workspaces/wsp_u/usage'), env as never, { id: 'usr_u' } as AuthUser, 'wsp_u');
     const body = await res.json() as { events: Array<Record<string, unknown>>; totals: Record<string, number> };
 
     expect(body.events.map((e) => e.id)).toEqual(['aiu_2', 'aiu_1', 'aue_1']);
     expect(body.events[0]).toMatchObject({ mode: 'ask_workspace', artifactId: null, model: 'anthropic/claude-sonnet-5.5', tokens: 2000, inputTokens: null, costUsd: 0.004 });
     expect(body.events[2]).toMatchObject({ mode: 'crew', artifactName: 'Dash', inputTokens: 1383, outputTokens: 90, tokens: 1473 });
-    expect(body.totals).toEqual({ requests: 3, inputTokens: 1383, outputTokens: 90, tokens: 4681, costUsd: 0.0083 });
+    // From ai_usage_events alone: the crew call counts once (not again from agent_usage_events), Whisper's cost is in.
+    expect(body.totals).toEqual({ requests: 3, inputTokens: 1383, outputTokens: 90, tokens: 4681, costUsd: 0.0084 });
   });
 });

@@ -18,6 +18,8 @@ export const workspace_client_home_views_adminBilling_JS = `  // Billing: the op
     function day(iso) { return iso ? String(iso).slice(0, 10) : '\\u2014'; }
     function monthName(ym) { try { return new Date(ym + '-01T00:00:00Z').toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' }); } catch (e) { return ym; } }
     function badge(st) { var cls = { paid: 'is-on', open: 'is-trial', void: 'is-off', draft: '' }[st] || ''; return '<span class="wsx-admin__rolebadge ' + cls + '" data-inv-status="' + esc(st) + '">' + esc(bt('admin.billStatus_' + st)) + '</span>'; }
+    // Operator-only blocks: a pill anyone can spot (the API never sends them to workspace admins).
+    function opPill() { return '<span class="wsx-opbadge" data-op-badge>' + esc(bt('admin.superOnly')) + '</span>'; }
     function reload() { delete adDataCache.billing; adBilling(); }
     // One request + toast; success repaints the section, failure frees the button and says why.
     function call(url, init, okMsg, btn) {
@@ -49,7 +51,7 @@ export const workspace_client_home_views_adminBilling_JS = `  // Billing: the op
       var op = manage && u.cost_micro_usd != null;
       return '<div class="wsx-admin__settings-section" data-inv-usage><div class="wsx-admin__settings-title">' + esc(bt('admin.billUsageTitle').replace('{month}', monthName(u.month))) + '</div>'
         + '<p class="wsx-lens__intro">' + esc(bt('admin.billUsageIntro').replace('{calls}', adCompact(u.calls)).replace('{total}', micro(u.price_micro_usd))) + '</p>'
-        + (op ? '<p class="wsx-field__note" data-op-note>' + esc(bt('admin.billOpCost').replace('{cost}', micro(u.cost_micro_usd)).replace('{markup}', String((u.markup_bps || 10000) / 10000)).replace('{margin}', micro(u.price_micro_usd - u.cost_micro_usd))) + '</p>' : '')
+        + (op ? '<p class="wsx-field__note" data-op-note>' + opPill() + ' ' + esc(bt('admin.billOpCost').replace('{cost}', micro(u.cost_micro_usd)).replace('{markup}', String((u.markup_bps || 10000) / 10000)).replace('{margin}', micro(u.price_micro_usd - u.cost_micro_usd))) + '</p>' : '')
         + usageTable('admin.billByKind', u.by_kind, function (k) { return tOr('admin.aiKind_' + k, k); }, op)
         + usageTable('admin.billByModel', u.by_model, function (k) { return k; }, op)
         + usageTable('admin.billByMember', u.by_member, function (k) { return k || bt('admin.billNoMember'); }, op)
@@ -170,8 +172,9 @@ export const workspace_client_home_views_adminBilling_JS = `  // Billing: the op
       var owedTxt = Object.keys(owed).map(function (c) { return money(owed[c], c); }).join(' + ');
       m.innerHTML = '<div class="wsx-admin__settings-section">' + head + '<p class="wsx-lens__intro">' + esc(bt(manage ? 'admin.billIntroManage' : 'admin.billIntro')) + '</p>'
         + (due.length ? '<div class="wsx-admin__cards"><div class="wsx-admin__card"><div class="wsx-admin__cardlbl">' + esc(bt('admin.billOwed')) + '</div><div class="wsx-admin__cardval">' + esc(owedTxt) + '</div><div class="wsx-admin__cardsub">' + esc(bt('admin.billOwedSub').replace('{n}', String(due.length))) + '</div></div></div>' : '')
-        + (manage ? markupHtml(res.markup) + '<div class="wsx-auto-bar"><button class="wsx-abtn" type="button" id="wsxBillNewBtn">' + esc(bt('admin.billNew')) + '</button></div>' + formHtml() : '')
-        + (invoices.length ? '<div class="wsx-bill__list">' + invoices.map(function (i) { return invoiceHtml(i, manage); }).join('') + '</div>' : i18nEmpty('admin.billNone')) + '</div>';
+        + (manage ? '<div class="wsx-opzone" data-op-zone><div class="wsx-opzone__head">' + opPill() + '<span class="wsx-opzone__sub">' + esc(bt('admin.superOnlySub')) + '</span></div>'
+          + markupHtml(res.markup) + '<div class="wsx-auto-bar"><button class="wsx-abtn" type="button" id="wsxBillNewBtn">' + esc(bt('admin.billNew')) + '</button></div>' + formHtml() + '</div>' : '')
+        + (invoices.length ? '<div class="wsx-bill__list">' + invoices.map(function (i) { return invoiceHtml(i, manage); }).join('') + '</div>' : '<div class="wsx-empty">' + esc(bt('admin.billNone')) + '</div>') + '</div>';
       var ms = document.getElementById('wsxBillMarkupSave'), mr = document.getElementById('wsxBillMarkupReset');
       if (ms) ms.addEventListener('click', function () {
         var raw = document.getElementById('wsxBillMarkup').value.trim();
