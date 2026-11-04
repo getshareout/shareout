@@ -48,7 +48,8 @@ describe('Admin Billing section', () => {
     await m.run();
     expect(m.wrap.hidden).toBe(false);
     expect(m.mountEl.innerHTML).toContain('Invoices');
-    expect(m.mountEl.innerHTML).toContain('admin.billNone');
+    expect(m.mountEl.innerHTML).toContain('No invoices yet.');
+    expect(m.mountEl.innerHTML).not.toContain('admin.billNone');
     expect(m.mountEl.innerHTML).not.toContain('wsxBillForm');
   });
 
@@ -82,6 +83,9 @@ describe('Admin Billing section', () => {
     expect(html).not.toContain('data-op-note');
     expect(html).not.toContain('$12.25');
     expect(html).not.toContain('wsxBillMarkupBox');
+    expect(html).not.toContain('data-op-zone');
+    expect(html).not.toContain('data-op-badge');
+    expect(html).not.toContain('Super admins only');
   });
 
   it('gives the operator the form and the paid/void actions', async () => {
@@ -100,6 +104,12 @@ describe('Admin Billing section', () => {
     expect(html).toContain('markup 1.5×');
     expect(html).toContain('id="wsxBillMarkupBox"');
     expect(html).toContain('In force: 1.5×');
+    // Every operator-only block says so: the markup and new-invoice zone, and the cost note.
+    const zone = html.slice(html.indexOf('data-op-zone'), html.indexOf('class="wsx-bill__list"'));
+    expect(zone).toContain('Super admins only');
+    expect(zone).toContain('id="wsxBillMarkupBox"');
+    expect(zone).toContain('id="wsxBillNewBtn"');
+    expect(html).toMatch(/data-op-note><span class="wsx-opbadge" data-op-badge>Super admins only<\/span> Cost /);
   });
 
   it('speaks Spanish', async () => {
