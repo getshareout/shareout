@@ -250,12 +250,16 @@ export async function rollupWorkspaceUsage(
     if (truncated) logger.warn('r2 listing truncated; storage under-counted', { day, objects: storage.objects });
   }
 
-  for (let i = 0; i < rows.length; i += 50) {
-    await env.DB.batch(
-      rows.slice(i, i + 50).map(([wid, metric, quantity, cost]) =>
-        env.DB.prepare(UPSERT_SET).bind(day, wid, metric, quantity, cost)
-      )
+  // A re-run replaces the day's rolled-up metrics outright: a row this run no longer produces (a source that
+  // stopped counting, or a metric split differently) must not survive next to the new ones. Live metrics stay.
+  const rolled: UsageMetric[] = ['serving_requests', 'job_runs', 'job_duration_ms', 'ai_llm_tokens', 'ai_other_events', ...(opts.measureStorage ? ['storage_bytes' as const] : [])];
+  const clear = env.DB.prepare(`DELETE FROM workspace_usage_daily WHERE day = ? AND metric IN (${rolled.map(() => '?').join(',')})`).bind(day, ...rolled);
+  for (let i = 0; i < Math.max(rows.length, 1); i += 50) {
+    const upserts = rows.slice(i, i + 50).map(([wid, metric, quantity, cost]) =>
+      env.DB.prepare(UPSERT_SET).bind(day, wid, metric, quantity, cost)
     );
+    // The delete rides in the first batch (one transaction), so readers never see the day empty.
+    await env.DB.batch(i === 0 ? [clear, ...upserts] : upserts);
   }
 
   logger.info('usage rollup done', { day, rows: rows.length, unattributed_bytes: unattributedBytes });

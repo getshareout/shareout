@@ -165,6 +165,19 @@ describe('rollupWorkspaceUsage', () => {
     expect(Object.keys(m).some((k) => k.startsWith('ws_b:serving'))).toBe(false);
   });
 
+  it('a re-run drops rolled rows it no longer produces and keeps live ones', async () => {
+    await seed();
+    await env.DB.batch([
+      env.DB.prepare(`INSERT INTO workspace_usage_daily (day, workspace_id, metric, quantity, cost_micro_usd) VALUES (?, 'ws_b', 'ai_llm_tokens', 999, 777)`).bind(day),
+      env.DB.prepare(`INSERT INTO workspace_usage_daily (day, workspace_id, metric, quantity, cost_micro_usd) VALUES (?, 'ws_b', 'email_sent', 3, 9)`).bind(day),
+    ]);
+    await rollupWorkspaceUsage(E, day, { measureStorage: false });
+    const m = await metrics();
+    expect(m['ws_b:ai_llm_tokens']).toBeUndefined();
+    expect(m['ws_b:ai_other_events']).toEqual([1, 450]);
+    expect(m['ws_b:email_sent']).toEqual([3, 9]);
+  });
+
   it('filters daily rows to one workspace', async () => {
     await seed();
     await rollupWorkspaceUsage(E, day, { measureStorage: true });
