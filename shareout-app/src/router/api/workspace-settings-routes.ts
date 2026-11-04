@@ -23,6 +23,7 @@ import { handleListRecommendedSkills } from '../../official-skills/list';
 import { handleListWorkspaceLibraries } from '../../workspace-library';
 import { handleGetWorkspaceAudit } from './workspace-audit';
 import { handleGetWorkspaceSpend } from './workspace-spend';
+import { handleGetWorkspaceAiReport } from './workspace-ai-report';
 import { handleGetWorkspaceSessionPolicy, handleSetWorkspaceSessionPolicy } from './workspace-session-policy';
 import { handleGetWorkspaceLocale, handleSetWorkspaceLocale, handleSetMyLocale } from './workspace-locale';
 import type { FetchContext } from '../context';
@@ -108,6 +109,14 @@ export async function routeWorkspaceSettings(ctx: FetchContext): Promise<Respons
     const user = await requireTokenOrSession(ctx);
     if (!isAuthUser(user)) return user;
     return addCORS(await handleGetWorkspaceSpend(request, env, user, workspaceId));
+  }
+
+  const workspaceAiReportMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/ai-report$/);
+  if (workspaceAiReportMatch && request.method === 'GET') {
+    const [, workspaceId] = workspaceAiReportMatch;
+    const user = await requireTokenOrSession(ctx);
+    if (!isAuthUser(user)) return user;
+    return addCORS(await handleGetWorkspaceAiReport(request, env, user, workspaceId));
   }
 
   const workspaceSessionPolicyMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/session-policy$/);
