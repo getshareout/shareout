@@ -3,6 +3,8 @@ import type { HomeLocaleCopy } from '../types';
 /** Admin portal tabs, settings, billing, and workspace management copy. */
 export const ADMIN_COPY: HomeLocaleCopy = {
   en: {
+    'admin.grpReports': 'Reports',
+    'admin.sec_summary': 'Summary',
     'admin.grpPeople': 'People',
     'admin.grpContent': 'Content',
     'admin.grpMoney': 'AI & billing',
@@ -350,6 +352,8 @@ export const ADMIN_COPY: HomeLocaleCopy = {
     'admin.tokenRevoked': 'Token revoked',
   },
   es: {
+    'admin.grpReports': 'Informes',
+    'admin.sec_summary': 'Resumen',
     'admin.grpPeople': 'Personas',
     'admin.grpContent': 'Contenido',
     'admin.grpMoney': 'IA y facturación',

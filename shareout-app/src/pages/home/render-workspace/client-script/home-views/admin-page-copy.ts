@@ -3,12 +3,13 @@
  *  (`admin.grp*`, `admin.sec_*`) stay in the boot copy: the sidebar is server-rendered. */
 export const ADMIN_PAGE_COPY: Record<'en' | 'es', Record<string, string>> = {
   "en": {
+    "admin.secd_summary": "How the workspace was used, month by month: reading, publishing, knowledge, AI and each member.",
     "admin.secd_members": "Who can open and edit this workspace, and how much they use it.",
     "admin.secd_clients": "Clients and partners outside your team, and the folders they can see.",
     "admin.secd_support": "Questions from your users. AI drafts a reply; you review and send it.",
     "admin.secd_artifacts": "Every page in this workspace: who owns it, who can see it and how it performs.",
     "admin.secd_automation": "Scheduled jobs, AI tasks and the data connections they use.",
-    "admin.secd_billing": "What this workspace costs, where the spend went, and your invoices.",
+    "admin.secd_billing": "What this workspace costs, where the spend went, your invoices and billing details.",
     "admin.secd_ai": "Which model the workspace uses, and your own API key if you bring one.",
     "admin.secd_access": "Who can join, how long sessions last, and requests waiting for you.",
     "admin.secd_publishing": "Whether pages can go public, and approvals waiting for you.",
@@ -35,12 +36,13 @@ export const ADMIN_PAGE_COPY: Record<'en' | 'es', Record<string, string>> = {
     "admin.automationFailingCard": "Failing",
   },
   "es": {
+    "admin.secd_summary": "Cómo se usó el espacio, mes a mes: lectura, publicaciones, conocimiento, IA y cada miembro.",
     "admin.secd_members": "Quién puede abrir y editar este espacio, y cuánto lo usa.",
     "admin.secd_clients": "Clientes y socios fuera de tu equipo, y las carpetas que pueden ver.",
     "admin.secd_support": "Consultas de tus usuarios. La IA redacta una respuesta; vos la revisás y la enviás.",
     "admin.secd_artifacts": "Todas las páginas del espacio: de quién son, quién las ve y cómo andan.",
     "admin.secd_automation": "Tareas programadas, tareas de IA y las conexiones de datos que usan.",
-    "admin.secd_billing": "Cuánto cuesta este espacio, en qué se fue el gasto y tus facturas.",
+    "admin.secd_billing": "Cuánto cuesta este espacio, en qué se fue el gasto, tus facturas y los datos de facturación.",
     "admin.secd_ai": "Qué modelo usa el espacio y tu propia API key si traés una.",
     "admin.secd_access": "Quién puede unirse, cuánto duran las sesiones y los pedidos que esperan por vos.",
     "admin.secd_publishing": "Si las páginas pueden hacerse públicas, y las aprobaciones que esperan por vos.",
