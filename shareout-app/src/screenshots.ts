@@ -295,14 +295,19 @@ export async function renderArtifactImage(
 
 // One continuous page sized to the full content, so the whole dashboard is captured
 // (not just the first screen). Printed with screen styles so it looks like the live
-// page, not its print CSS.
+// page, not its print CSS. A page's own top-level `@page { size: A4 }` applies even
+// under screen media: Chromium lays out at A4, shrinks it into this page and keeps
+// only the first sheet. So the capture overrides @page with the content size.
 async function continuousPdf(page: RenderPage, minWidth: number, minHeight: number): Promise<ArrayBuffer> {
   await page.emulateMediaType('screen').catch(() => {});
   const dims = await growToContent(page, 2000, 18000);
+  const width = `${Math.max(dims.w, minWidth)}px`;
+  const height = `${Math.max(dims.h, minHeight)}px`;
+  await page.addStyleTag({ content: `@page { size: ${width} ${height} !important; margin: 0 !important; }` }).catch(() => {});
   return (await page.pdf({
     printBackground: true,
-    width: `${Math.max(dims.w, minWidth)}px`,
-    height: `${Math.max(dims.h, minHeight)}px`,
+    width,
+    height,
     pageRanges: '1',
     margin: { top: '0', bottom: '0', left: '0', right: '0' },
   } as Parameters<typeof page.pdf>[0])) as unknown as ArrayBuffer;
