@@ -12,7 +12,7 @@ La raíz del workspace **nunca es una galería pública**. Está restringida a m
 
 | Visitante | Qué pasa |
 | --- | --- |
-| **Miembro del workspace** | Redirección a Home con este workspace (`/home?workspace=…`) |
+| **Miembro del workspace** | Redirección a Home con este workspace (`/home`) |
 | **Sesión iniciada, sin membresía** | Página "este workspace es privado" con opción de cambiar de cuenta |
 | **Anónimo** | Redirección a iniciar sesión, volviendo a este subdominio tras OAuth |
 

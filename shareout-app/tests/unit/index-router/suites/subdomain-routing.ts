@@ -66,7 +66,7 @@ describe('index router — subdomain routing', () => {
     });
     const response = await fetchPath('/', undefined, SUB, env);
     expect(response.status).toBe(302);
-    expect(response.headers.get('Location')).toBe('/home?workspace=ws_1');
+    expect(response.headers.get('Location')).toBe('/home');
   });
 
   it('shows an access page to a signed-in non-member', async () => {

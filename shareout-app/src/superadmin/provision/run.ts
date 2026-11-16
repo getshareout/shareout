@@ -430,14 +430,18 @@ export async function runProvisioning(
 
   const origin = getPlatformOrigin(env);
   const partial = steps.some((s) => s.status === 'failed');
+  const subdomain = row.subdomain_enabled === 1 ? `${origin.replace(/^(https?:\/\/).*$/, '$1')}${row.slug}.${getPlatformHostname(env)}/` : null;
+  // These links get sent to the customer: on the workspace's subdomain /home is already
+  // scoped to it, so prefer that over the apex's /home?workspace=<id>.
+  const home = subdomain ? `${subdomain}home` : `${origin}/home?workspace=${encodeURIComponent(row.id)}`;
   const base = {
     ok: !partial,
     created,
     workspace: { id: row.id, name: row.name, slug: row.slug, locale: row.locale },
     links: {
-      home: `${origin}/home?workspace=${encodeURIComponent(row.id)}`,
-      admin: `${origin}/home?workspace=${encodeURIComponent(row.id)}#l/admin`,
-      subdomain: row.subdomain_enabled === 1 ? `${origin.replace(/^(https?:\/\/).*$/, '$1')}${row.slug}.${getPlatformHostname(env)}/` : null,
+      home,
+      admin: `${home}#l/admin`,
+      subdomain,
       instance_admin: `${origin}/admin`,
     },
     admins: invites.admins,

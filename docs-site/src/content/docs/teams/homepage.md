@@ -12,7 +12,7 @@ The workspace root is **never a public gallery**. It is membership-gated:
 
 | Visitor | What happens |
 | --- | --- |
-| **Workspace member** | Redirect to Home scoped to this workspace (`/home?workspace=…`) |
+| **Workspace member** | Redirect to Home scoped to this workspace (`/home`) |
 | **Signed in, not a member** | "This workspace is private" page with option to switch accounts |
 | **Anonymous** | Redirect to sign in, returning to this subdomain after OAuth |
 
