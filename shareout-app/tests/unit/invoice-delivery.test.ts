@@ -336,6 +336,15 @@ describe('proof by email reply', () => {
     ['a sender that does not pass DMARC', { from: 'billing@acme.example', auth: 'mx.example; spf=pass; dkim=none; dmarc=none' }, 'sender check'],
     ['a reply without an attachment', { from: 'billing@acme.example', parts: [] }, 'no attachment'],
     ['an attachment that is not a document', { from: 'billing@acme.example', parts: [{ name: 'x.html', type: 'text/html', bytes: new TextEncoder().encode('<b>hi</b>') }] }, 'PDF, PNG, JPG or WEBP'],
+    // A "thanks, received" whose only images are the signature: inline, or attached under the
+    // name Outlook gives embedded images. Neither is a transfer proof.
+    ['a reply whose only images are a signature', {
+      from: 'billing@acme.example',
+      parts: [
+        { name: 'image001.png', type: 'image/png', bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]), inline: true },
+        { name: 'image002.png', type: 'image/png', bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 4, 5, 6]) },
+      ],
+    }, 'PDF, PNG, JPG or WEBP'],
   ])('changes nothing for %s, and asks the operator to look', async (_label, o: Partial<Parameters<typeof message>[0]>, why) => {
     const { invoice } = await createOpen(ACME, `A-0004-${Math.random().toString(36).slice(2, 10)}`);
     sent.length = 0;

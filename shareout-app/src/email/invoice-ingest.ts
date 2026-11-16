@@ -34,12 +34,15 @@ function mailFiles(attachments: Awaited<ReturnType<typeof PostalMime.parse>>['at
   });
 }
 
+// Names Outlook and Gmail give the images they embed in a body or signature (image001.png).
+const EMBEDDED_IMAGE_NAME = /^image\d{3}\.(png|jpe?g|gif|webp)$/i;
+
 /** The transfer proof among a reply's attachments: the first real attachment that passes the upload
- *  checks; failing that, the largest inline one — a screenshot pasted into the body — since a
- *  signature logo is inline too, but small. */
+ *  checks. Inline parts never count, and neither do images named like an embedded one: those are
+ *  signature logos as often as screenshots, and a "thanks, received" with a logo must not mark an
+ *  invoice paid. A pasted screenshot goes to the operator's review instead. */
 function pickProof(files: MailFile[]): MailFile | null {
-  const ok = files.filter((f) => !fileProblem(f.type, f.bytes));
-  return ok.find((f) => !f.inline) ?? ok.sort((a, b) => b.bytes.byteLength - a.bytes.byteLength)[0] ?? null;
+  return files.find((f) => !f.inline && !EMBEDDED_IMAGE_NAME.test(f.name) && !fileProblem(f.type, f.bytes)) ?? null;
 }
 
 /** Who may pay an invoice by email: the workspace's billing email, or one of its enabled internal owners/admins. */
