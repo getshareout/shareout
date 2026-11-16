@@ -46,7 +46,20 @@ export async function handleUserHomePage(
   env: Env,
   user: { id: string; email: string | null }
 ): Promise<Response> {
-  const filters = parseHomeFilters(new URL(request.url));
+  const url = new URL(request.url);
+  // A workspace subdomain or custom domain already names the workspace (and pins the
+  // page to it), so `?workspace=` there is only noise in a link people copy. Send the
+  // browser to the same URL without it; with no fragment in Location the browser keeps
+  // the original #fragment, so deep links (#l/admin/billing) survive. Only links that
+  // carry the parameter pay for the host lookup here.
+  if (url.searchParams.has('workspace') && await hostWorkspaceId(request, env)) {
+    url.searchParams.delete('workspace');
+    return new Response(null, {
+      status: 302,
+      headers: { Location: url.pathname + url.search, 'Cache-Control': 'no-store' },
+    });
+  }
+  const filters = parseHomeFilters(url);
 
   // Stream the shell at first byte, then run the body's reads and stream the real
   // body in underneath. First paint doesn't block on them (nor on the host lookup:

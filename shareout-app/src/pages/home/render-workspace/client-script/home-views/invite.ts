@@ -97,7 +97,8 @@ export const workspace_client_home_views_invite_JS = `  // ===== Invite people =
       var suggest = Object.keys(tally).sort(function (a, b) { return tally[b] - tally[a]; })[0];
       var shown = domains.slice(); if (suggest && shown.indexOf(suggest) < 0) shown.push(suggest);
       if (!shown.length) { mount.innerHTML = ''; return; }
-      var link = location.origin + '/auth/login?redirect=' + encodeURIComponent('/home?workspace=' + window.WSX_WS);
+      // On the workspace's own host /home is already scoped to it: share the short link.
+      var link = location.origin + '/auth/login?redirect=' + encodeURIComponent(window.WSX_HOST_PINNED ? '/home' : '/home?workspace=' + window.WSX_WS);
       mount.innerHTML = '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('invite.domainTitle')) + '</div>'
         + shown.map(function (d) {
           return '<label class="wsx-field wsx-field--inline"><input type="checkbox" data-inv-dom="' + esc(d) + '"' + (domains.indexOf(d) >= 0 ? ' checked' : '') + '><span>' + esc(t('invite.domainToggle').replace('{domain}', d)) + '</span></label>';
