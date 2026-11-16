@@ -72,7 +72,8 @@ export interface EmailSource {
 /** What email_sends records about where a message came from. */
 export interface EmailSendLog {
   artifactId?: string;
-  sourceKind: EmailSource['kind'] | 'page' | 'system';
+  /** 'invoice': an invoice email or an operator notice about one (sourceId = the invoice id). */
+  sourceKind: EmailSource['kind'] | 'page' | 'system' | 'invoice';
   sourceId?: string;
 }
 
@@ -126,6 +127,13 @@ export function inboxAddress(prefix: string, env: Env): string {
   return `${prefix}@${inboxEmailDomain(env)}`;
 }
 
+/** Replies to an invoice email arrive at invoice+<reply token>@<inbox domain> (email/invoice-ingest.ts). */
+export const INVOICE_INBOX_PREFIX = 'invoice';
+
+/** Inbox local-parts the inbound router answers itself — support tickets and invoice replies
+ *  (email/inbound.ts) — so no artifact is ever handed one as its address. */
+export const RESERVED_INBOX_PREFIXES: readonly string[] = ['support', INVOICE_INBOX_PREFIX];
+
 /** Generate a unique artifact_emails.email_prefix from an artifact slug, resolving
  *  collisions against existing rows. Shared by outbound (createArtifactEmail) and
  *  inbound (enableInbound) provisioning so a single artifact reuses one prefix. */
@@ -133,6 +141,7 @@ export async function generateEmailPrefix(env: Env, slug: string | null): Promis
   const base = (slug || 'report').toLowerCase().replace(/[^a-z0-9-]/g, '-');
   for (let attempt = 0; attempt < 10; attempt++) {
     const candidate = attempt === 0 ? base : `${base}-${attempt}`;
+    if (RESERVED_INBOX_PREFIXES.includes(candidate)) continue;
     const exists = await env.DB.prepare(
       'SELECT 1 FROM artifact_emails WHERE email_prefix = ?'
     ).bind(candidate).first();

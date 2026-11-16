@@ -9,8 +9,16 @@ import { resell } from '../data/ai-markup';
 // so the invoice never moves after it is created. It bills the workspace's price (cost × its
 // AI markup, ai-markup.ts); cost and markup stay in the snapshot for the operator and are
 // stripped from what the workspace sees (invoiceView).
+//
+// The "receipt" file is the invoice document: the PDF the operator issued in their own tax
+// system (an Argentine factura from ARCA, say). It is what the workspace downloads before
+// paying and what the invoice email attaches (invoice-mail.ts). The transfer proof is the
+// workspace's; attaching one marks the invoice paid (migrations/0041).
 
 export type InvoiceStatus = 'draft' | 'open' | 'paid' | 'void';
+
+/** What marked an invoice paid: the operator by hand, the workspace's uploaded proof, or a proof that came by email. */
+export type PaidSource = 'operator' | 'proof' | 'email';
 
 export interface UsageRow {
   key: string;
@@ -72,6 +80,12 @@ export interface InvoiceRecord {
   paid_at: string | null;
   paid_by: string | null;
   payment_reference: string | null;
+  emailed_at: string | null;
+  /** JSON array of the addresses the last send went to. */
+  emailed_to: string | null;
+  paid_source: PaidSource | null;
+  /** Never leaves the server except inside the reply address of the invoice email. */
+  reply_token: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -96,9 +110,13 @@ export class InvoiceInputError extends Error {
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DAY_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
-const NUMBER_RE = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,39}$/;
+// INV-2026-0001 by default, or the number the operator's tax system printed: "A-0003-00000042",
+// "FC B 0003-00000042", "N° 42". It is only ever displayed (escaped), never part of a path.
+const NUMBER_RE = /^[\p{L}\p{N}][\p{L}\p{N} ._/#°º-]{0,39}$/u;
 export const MAX_LINES = 50;
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
+/** A document invoice's total: 10 billion in its currency, room for an invoice in pesos. */
+export const MAX_TOTAL_CENTS = 1_000_000_000_000;
 
 export const isMonth = (s: unknown): s is string => typeof s === 'string' && MONTH_RE.test(s);
 
@@ -175,17 +193,39 @@ const str = (v: unknown, max: number, field: string): string | null => {
   return s || null;
 };
 
+function invoiceNumber(v: unknown): string | null {
+  const number = str(v, 40, 'number')?.replace(/\s+/g, ' ') ?? null;
+  if (number && !NUMBER_RE.test(number)) {
+    throw new InvoiceInputError('VALIDATION_ERROR', 'number may use letters, digits, spaces and . _ / - # (max 40)');
+  }
+  return number;
+}
+
+function currencyOf(v: unknown): string {
+  const currency = (str(v, 3, 'currency') ?? 'USD').toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currency)) throw new InvoiceInputError('VALIDATION_ERROR', 'currency must be a 3-letter code, e.g. USD');
+  return currency;
+}
+
+function dueOf(v: unknown): string | null {
+  const due = str(v, 10, 'due_at');
+  if (due && !DAY_RE.test(due)) throw new InvoiceInputError('VALIDATION_ERROR', 'due_at must be YYYY-MM-DD');
+  return due ? `${due}T00:00:00.000Z` : null;
+}
+
+function statusOf(v: unknown): 'draft' | 'open' {
+  const status = v == null ? 'draft' : v;
+  if (status !== 'draft' && status !== 'open') throw new InvoiceInputError('VALIDATION_ERROR', "status must be 'draft' or 'open'");
+  return status;
+}
+
 /** Validate a create body. Usage is added by the caller (it needs the database). */
 export function parseCreateInvoice(body: unknown): CreateInvoiceInput {
   if (!body || typeof body !== 'object') throw new InvoiceInputError('VALIDATION_ERROR', 'Body must be a JSON object');
   const b = body as Record<string, unknown>;
 
-  const number = str(b.number, 40, 'number');
-  if (number && !NUMBER_RE.test(number)) {
-    throw new InvoiceInputError('VALIDATION_ERROR', 'number may use letters, digits and . _ / - (max 40)');
-  }
-  const currency = (str(b.currency, 3, 'currency') ?? 'USD').toUpperCase();
-  if (!/^[A-Z]{3}$/.test(currency)) throw new InvoiceInputError('VALIDATION_ERROR', 'currency must be a 3-letter code, e.g. USD');
+  const number = invoiceNumber(b.number);
+  const currency = currencyOf(b.currency);
 
   const usageMonth = str(b.usage_month, 7, 'usage_month');
   if (usageMonth && !isMonth(usageMonth)) throw new InvoiceInputError('INVALID_MONTH', 'usage_month must be YYYY-MM');
@@ -195,11 +235,8 @@ export function parseCreateInvoice(body: unknown): CreateInvoiceInput {
   const periodMonth = str(b.period_month, 7, 'period_month') ?? usageMonth;
   if (periodMonth && !isMonth(periodMonth)) throw new InvoiceInputError('INVALID_MONTH', 'period_month must be YYYY-MM');
 
-  const due = str(b.due_at, 10, 'due_at');
-  if (due && !DAY_RE.test(due)) throw new InvoiceInputError('VALIDATION_ERROR', 'due_at must be YYYY-MM-DD');
-
-  const status = b.status == null ? 'draft' : b.status;
-  if (status !== 'draft' && status !== 'open') throw new InvoiceInputError('VALIDATION_ERROR', "status must be 'draft' or 'open'");
+  const dueAt = dueOf(b.due_at);
+  const status = statusOf(b.status);
 
   const rawLines = b.lines == null ? [] : b.lines;
   if (!Array.isArray(rawLines)) throw new InvoiceInputError('VALIDATION_ERROR', 'lines must be an array');
@@ -224,10 +261,50 @@ export function parseCreateInvoice(body: unknown): CreateInvoiceInput {
 
   return {
     number, currency, status, lines, usage_month: usageMonth, period_month: periodMonth,
-    due_at: due ? `${due}T00:00:00.000Z` : null,
+    due_at: dueAt,
     notes: str(b.notes, 2000, 'notes'),
   };
 }
+
+export interface DocumentInvoiceInput {
+  number: string;
+  currency: string;
+  total_cents: number;
+  period_month: string | null;
+  description: string;
+  due_at: string | null;
+  notes: string | null;
+  status: 'draft' | 'open';
+}
+
+/** Validate the query of a create-from-document request; the body is the document itself. The
+ *  number is required (it is the tax system's, not ours) and the total is one line. */
+export function parseDocumentInvoice(q: URLSearchParams): DocumentInvoiceInput {
+  const number = invoiceNumber(q.get('number'));
+  if (!number) throw new InvoiceInputError('VALIDATION_ERROR', 'number is required: the number printed on the invoice');
+  const raw = (q.get('total_cents') ?? '').trim();
+  const total = /^\d{1,13}$/.test(raw) ? Number(raw) : NaN;
+  if (!(total >= 1 && total <= MAX_TOTAL_CENTS)) {
+    throw new InvoiceInputError('VALIDATION_ERROR', 'total_cents must be a positive whole number of cents');
+  }
+  const periodMonth = str(q.get('period_month'), 7, 'period_month');
+  if (periodMonth && !isMonth(periodMonth)) throw new InvoiceInputError('INVALID_MONTH', 'period_month must be YYYY-MM');
+  const description = str(q.get('description'), 200, 'description');
+  if (!description) throw new InvoiceInputError('VALIDATION_ERROR', 'description is required');
+  return {
+    number, currency: currencyOf(q.get('currency')), total_cents: total, period_month: periodMonth, description,
+    due_at: dueOf(q.get('due_at')), notes: str(q.get('notes'), 2000, 'notes'), status: statusOf(q.get('status')),
+  };
+}
+
+export const documentLine = (description: string, cents: number): InvoiceLine =>
+  ({ kind: 'item', description, quantity: 1, unit_cents: cents, amount_cents: cents });
+
+/** 24 hex characters (96 random bits): the reply address names one invoice without being guessable. */
+export function newReplyToken(): string {
+  return [...crypto.getRandomValues(new Uint8Array(12))].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+export const REPLY_TOKEN_RE = /^[a-f0-9]{24}$/;
 
 export const totalCents = (lines: InvoiceLine[]): number => lines.reduce((n, l) => n + l.amount_cents, 0);
 
@@ -279,8 +356,17 @@ export function customerUsage(u: UsageSnapshot): UsageSnapshot {
   return { ...rest, by_kind: u.by_kind.map(row), by_model: u.by_model.map(row), by_member: u.by_member.map(row) };
 }
 
-/** The API shape: storage keys stay server-side; the workspace sees whether a file exists, and the
- *  operator (`operator: true`) also sees each usage line's cost and markup. */
+function emailedTo(json: string | null): string[] {
+  try {
+    const v = JSON.parse(json || '[]');
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** The API shape: storage keys and the reply token stay server-side; the workspace sees whether a file
+ *  exists, and the operator (`operator: true`) also sees each usage line's cost and markup. */
 export function invoiceView(r: InvoiceRecord, emails: Record<string, string> = {}, operator = false) {
   const lines = parseLines(r.lines_json).map((l) => (l.usage && !operator ? { ...l, usage: customerUsage(l.usage) } : l));
   return {
@@ -299,7 +385,10 @@ export function invoiceView(r: InvoiceRecord, emails: Record<string, string> = {
       ? { name: r.proof_name, type: r.proof_type, uploaded_at: r.proof_uploaded_at, uploaded_by: (r.proof_uploaded_by && emails[r.proof_uploaded_by]) || null }
       : null,
     paid_at: r.paid_at,
+    paid_source: r.paid_source ?? (r.status === 'paid' ? 'operator' : null),
     payment_reference: r.payment_reference,
+    emailed_at: r.emailed_at,
+    emailed_to: emailedTo(r.emailed_to),
     created_at: r.created_at,
   };
 }

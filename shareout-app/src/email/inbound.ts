@@ -1,6 +1,6 @@
 import PostalMime from 'postal-mime';
 import type { Env, EmailReceivedPayload } from '../types';
-import { inboxEmailDomain } from '../scheduling/email';
+import { INVOICE_INBOX_PREFIX, inboxEmailDomain } from '../scheduling/email';
 import { generateId, sha256 } from '../crypto-utils';
 import { emitJobEvent } from '../scheduling/events';
 import {
@@ -13,6 +13,7 @@ import {
 } from './inbox-store';
 import { ingestSupportEmail } from '../support/email-ingest';
 import { handleWorkspaceInbound } from './workspace-ingest';
+import { handleInvoiceInbound } from './invoice-ingest';
 
 // Max raw message size we accept (Cloudflare Email Routing caps near here anyway).
 const MAX_RAW_BYTES = 25 * 1024 * 1024;
@@ -20,6 +21,8 @@ const TEXT_PREVIEW_BYTES = 2048;
 
 // Reserved inbox local-part that opens/continues support tickets instead of routing
 // to an artifact inbox. Mail to support@<inbox-domain> lands in the support workbench.
+// Also reserved: invoice+<reply token>@ — replies to invoice emails (invoice-ingest.ts).
+// generateEmailPrefix never hands either to an artifact (RESERVED_INBOX_PREFIXES).
 const SUPPORT_PREFIX = 'support';
 
 /** Pull the bare address out of a "Name <addr@x>" From header. */
@@ -80,6 +83,11 @@ export async function handleInboundEmail(
 
   if (parsed.prefix === SUPPORT_PREFIX) {
     await handleSupportInbound(message, env);
+    return;
+  }
+
+  if (parsed.prefix === INVOICE_INBOX_PREFIX) {
+    await handleInvoiceInbound(message, env, parsed.tag);
     return;
   }
 

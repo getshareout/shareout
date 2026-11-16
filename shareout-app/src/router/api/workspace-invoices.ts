@@ -10,25 +10,32 @@ import { createLogger } from '../../logging';
 import { resetBudgetCache } from '../../data/ai-budget';
 import { bpsFromMultiplier, multiplier, workspaceMarkup, type Markup } from '../../data/ai-markup';
 import {
-  InvoiceInputError, MAX_FILE_BYTES, fileProblem, getInvoice, invoiceFileKey, invoiceView, isClosedMonth, isMonth, listInvoices,
-  nextInvoiceNumber, parseCreateInvoice, safeFileName, totalCents, usageAlreadyBilled, usageForMonth, usageLine,
+  InvoiceInputError, MAX_FILE_BYTES, documentLine, fileProblem, getInvoice, invoiceFileKey, invoiceView, isClosedMonth, isMonth, listInvoices,
+  nextInvoiceNumber, parseCreateInvoice, parseDocumentInvoice, safeFileName, totalCents, usageAlreadyBilled, usageForMonth, usageLine,
   type InvoiceRecord,
 } from '../../workspaces/invoices';
+import { invoiceRecipients, notifyInvoicePaid, sendInvoiceEmail, type InvoiceSendResult } from '../../workspaces/invoice-mail';
 
 // Workspace invoices (src/workspaces/invoices.ts). The instance operator (a platform admin)
-// creates, issues, marks paid and attaches the receipt; the workspace's owners and admins see
-// every invoice that left draft, download the receipt and attach their transfer proof.
+// creates, issues, marks paid and attaches the receipt — the invoice document; issuing emails it
+// (invoice-mail.ts). The workspace's owners and admins see every invoice that left draft, download
+// the document and attach their transfer proof, which marks the invoice paid and tells the operator.
 //
-//   GET    /v1/workspaces/{ws}/invoices                    list (+ can_manage)
-//   POST   /v1/workspaces/{ws}/invoices                    create (operator)
+//   GET    /v1/workspaces/{ws}/invoices                    list (+ can_manage; the operator also gets `delivery`: who issuing emails)
+//   POST   /v1/workspaces/{ws}/invoices                    create (operator); status 'open' emails it unless send_email: false
+//   POST   /v1/workspaces/{ws}/invoices/from-document?…    create from the invoice document in the body (operator)
 //   GET    /v1/workspaces/{ws}/invoices/usage?month=…      a closed month's AI usage, to preview (operator)
 //   PATCH  /v1/workspaces/{ws}/invoices/{id}               issue / paid / unpaid / void, notes, due date (operator)
 //   DELETE /v1/workspaces/{ws}/invoices/{id}               a draft (operator)
-//   PUT    /v1/workspaces/{ws}/invoices/{id}/receipt       the operator's receipt
-//   PUT    /v1/workspaces/{ws}/invoices/{id}/proof         the workspace's transfer proof (admin+)
+//   POST   /v1/workspaces/{ws}/invoices/{id}/send          email an unpaid invoice again (operator)
+//   PUT    /v1/workspaces/{ws}/invoices/{id}/receipt       the invoice document (operator)
+//   PUT    /v1/workspaces/{ws}/invoices/{id}/proof         the workspace's transfer proof (admin+): marks it paid
 //   GET    /v1/workspaces/{ws}/invoices/{id}/receipt|proof download
 //   GET    /v1/workspaces/{ws}/ai-markup                   the workspace's AI markup (operator)
 //   PUT    /v1/workspaces/{ws}/ai-markup                   { markup: 1.5 | null } (operator)
+//
+// People only: the route guard refuses agent tokens, and every handler that issues, sends or marks
+// paid checks `user.service` again.
 
 const FORBIDDEN = { error: 'Forbidden', code: 'FORBIDDEN' };
 const NOT_FOUND = { error: 'Invoice not found', code: 'NOT_FOUND' };
@@ -59,6 +66,20 @@ async function emailsFor(env: Env, rows: InvoiceRecord[]): Promise<Record<string
 const audit = (env: Env, user: AuthUser, workspaceId: string, action: string, inv: { id: string; number: string }, detail: Record<string, unknown> = {}) =>
   logAudit(env, { workspaceId, actorId: user.id, actorEmail: user.email, action, targetType: 'invoice', targetId: inv.id, detail: { number: inv.number, ...detail } });
 
+/** Issuing emails the invoice unless the caller says `send_email: false` (the operator's "send email" checkbox). */
+const wantsEmail = (v: unknown) => v !== false && v !== 'false' && v !== '0';
+
+const emailView = (r: InvoiceSendResult) => ({ sent: r.sent, to: r.to, suppressed: r.suppressed, ...(r.sent ? {} : { code: r.code, error: r.error }) });
+
+/** Send the invoice email for `id` (just issued, or resent) and audit it when it went out. */
+async function emailInvoice(env: Env, user: AuthUser, workspaceId: string, id: string, resend = false): Promise<InvoiceSendResult> {
+  const inv = await getInvoice(env, workspaceId, id);
+  if (!inv) return { sent: false, to: [], suppressed: [], code: 'EMAIL_FAILED', error: 'Invoice not found' };
+  const res = await sendInvoiceEmail(env, inv);
+  if (res.sent) await audit(env, user, workspaceId, 'invoice.email', inv, { to: res.to, ...(resend ? { resend: true } : {}) });
+  return res;
+}
+
 export async function handleListInvoices(env: Env, user: AuthUser, workspaceId: string): Promise<Response> {
   const manage = await canManage(env, user);
   const gate = await viewerGate(env, user, workspaceId, manage);
@@ -66,7 +87,11 @@ export async function handleListInvoices(env: Env, user: AuthUser, workspaceId: 
   const rows = await listInvoices(env, workspaceId, manage);
   const emails = await emailsFor(env, rows);
   const body: Record<string, unknown> = { invoices: rows.map((r) => invoiceView(r, emails, manage)), can_manage: manage };
-  if (manage) body.markup = markupView(await workspaceMarkup(env, workspaceId));
+  if (manage) {
+    body.markup = markupView(await workspaceMarkup(env, workspaceId));
+    // What "Issue" will do, shown next to its "send email" checkbox before anything goes out.
+    body.delivery = { ...(await invoiceRecipients(env, workspaceId)), email_enabled: !!env.EMAIL };
+  }
   return json(body);
 }
 
@@ -83,9 +108,10 @@ export async function handleCreateInvoice(request: Request, env: Env, user: Auth
   if (!(await canManage(env, user))) return json(FORBIDDEN, 403);
   if (!(await workspaceExists(env, workspaceId))) return json({ error: 'Workspace not found', code: 'NOT_FOUND' }, 404);
 
+  const raw = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   let input;
   try {
-    input = parseCreateInvoice(await request.json().catch(() => null));
+    input = parseCreateInvoice(raw);
   } catch (e) {
     if (e instanceof InvoiceInputError) return json({ error: e.message, code: e.code }, 400);
     throw e;
@@ -121,10 +147,62 @@ export async function handleCreateInvoice(request: Request, env: Env, user: Auth
       continue;
     }
     await audit(env, user, workspaceId, input.status === 'open' ? 'invoice.issue' : 'invoice.create', { id, number }, { total_cents: total, currency: input.currency });
+    const email = input.status === 'open' && wantsEmail(raw?.send_email) ? await emailInvoice(env, user, workspaceId, id) : null;
     const row = await getInvoice(env, workspaceId, id);
-    return json({ invoice: invoiceView(row!, {}, true) }, 201);
+    return json({ invoice: invoiceView(row!, {}, true), ...(email ? { email: emailView(email) } : {}) }, 201);
   }
   return json({ error: 'Could not allocate an invoice number; try again', code: 'NUMBER_TAKEN' }, 409);
+}
+
+const DOC_EXT: Record<string, string> = { 'application/pdf': '.pdf', 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' };
+
+/** One step from the invoice the operator issued in their own tax system: the body is the document
+ *  (PDF/PNG/JPG/WEBP, ≤10 MB, bytes checked), the query names it — number as printed, currency,
+ *  total_cents, description, optional period_month, due_at, notes, status, send_email, name. It
+ *  becomes a one-line invoice with the document attached, created in a single insert. */
+export async function handleCreateInvoiceFromDocument(request: Request, env: Env, user: AuthUser, workspaceId: string): Promise<Response> {
+  if (!(await canManage(env, user))) return json(FORBIDDEN, 403);
+  if (!(await workspaceExists(env, workspaceId))) return json({ error: 'Workspace not found', code: 'NOT_FOUND' }, 404);
+  const q = new URL(request.url).searchParams;
+  let input;
+  try {
+    input = parseDocumentInvoice(q);
+  } catch (e) {
+    if (e instanceof InvoiceInputError) return json({ error: e.message, code: e.code }, 400);
+    throw e;
+  }
+  if (Number(request.headers.get('Content-Length') || 0) > MAX_FILE_BYTES) {
+    return json({ error: 'The file is larger than 10 MB', code: 'FILE_TOO_LARGE' }, 413);
+  }
+  const contentType = (request.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  const problem = fileProblem(contentType, bytes);
+  if (problem) return json(problem, problem.code === 'FILE_TOO_LARGE' ? 413 : 400);
+
+  const id = `inv_${crypto.randomUUID().replace(/-/g, '').slice(0, 24)}`;
+  const key = invoiceFileKey(workspaceId, id, 'receipt');
+  const name = safeFileName(q.get('name'), `invoice-${input.number.replace(/[\\/\s]+/g, '-')}${DOC_EXT[contentType] ?? ''}`);
+  const now = new Date().toISOString();
+  // The document goes up first so the row is born with it; a taken number takes the file back down.
+  await env.ARTIFACTS.put(key, bytes, { httpMetadata: { contentType } });
+  try {
+    await env.DB.prepare(
+      `INSERT INTO workspace_invoices (id, workspace_id, number, status, currency, total_cents, period_month, lines_json, notes, due_at,
+         issued_at, receipt_r2_key, receipt_name, receipt_type, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(id, workspaceId, input.number, input.status, input.currency, input.total_cents, input.period_month,
+      JSON.stringify([documentLine(input.description, input.total_cents)]), input.notes, input.due_at,
+      input.status === 'open' ? now : null, key, name, contentType, user.id, now, now).run();
+  } catch (e) {
+    await env.ARTIFACTS.delete(key).catch(() => {});
+    if (/UNIQUE/i.test(String(e))) return json({ error: `Invoice number ${input.number} is already used`, code: 'NUMBER_TAKEN' }, 409);
+    throw e;
+  }
+  await audit(env, user, workspaceId, input.status === 'open' ? 'invoice.issue' : 'invoice.create', { id, number: input.number },
+    { total_cents: input.total_cents, currency: input.currency, document: name });
+  const email = input.status === 'open' && wantsEmail(q.get('send_email')) ? await emailInvoice(env, user, workspaceId, id) : null;
+  const row = await getInvoice(env, workspaceId, id);
+  return json({ invoice: invoiceView(row!, {}, true), ...(email ? { email: emailView(email) } : {}) }, 201);
 }
 
 // draft → open (issue) · open → paid · paid → open (undo) · draft|open → void
@@ -176,10 +254,11 @@ export async function handleUpdateInvoice(request: Request, env: Env, user: Auth
       }
       set('paid_at', paidAt ? `${paidAt}T00:00:00.000Z` : now);
       set('paid_by', user.id);
+      set('paid_source', 'operator');
       action = 'invoice.paid';
     }
     if (to === 'open' && inv.status === 'paid') {
-      set('paid_at', null); set('paid_by', null);
+      set('paid_at', null); set('paid_by', null); set('paid_source', null);
       action = 'invoice.unpaid';
     }
     if (to === 'void') action = 'invoice.void';
@@ -191,9 +270,26 @@ export async function handleUpdateInvoice(request: Request, env: Env, user: Auth
   set('updated_at', now);
   await env.DB.prepare(`UPDATE workspace_invoices SET ${sets.join(', ')} WHERE id = ? AND workspace_id = ?`)
     .bind(...binds, id, workspaceId).run();
-  await audit(env, user, workspaceId, action ?? 'invoice.update', inv);
+  await audit(env, user, workspaceId, action ?? 'invoice.update', inv, action === 'invoice.paid' ? { source: 'operator' } : {});
+  const email = action === 'invoice.issue' && wantsEmail(body.send_email) ? await emailInvoice(env, user, workspaceId, id) : null;
   const row = await getInvoice(env, workspaceId, id);
-  return json({ invoice: invoiceView(row!, await emailsFor(env, [row!]), true) });
+  return json({ invoice: invoiceView(row!, await emailsFor(env, [row!]), true), ...(email ? { email: emailView(email) } : {}) });
+}
+
+/** Email an unpaid invoice again, to whoever its recipients are now. */
+export async function handleSendInvoice(env: Env, user: AuthUser, workspaceId: string, id: string): Promise<Response> {
+  if (!(await canManage(env, user))) return json(FORBIDDEN, 403);
+  const inv = await getInvoice(env, workspaceId, id);
+  if (!inv) return json(NOT_FOUND, 404);
+  if (inv.status !== 'open') return json({ error: 'Only an issued, unpaid invoice can be emailed', code: 'INVALID_TRANSITION' }, 409);
+  const email = await emailInvoice(env, user, workspaceId, id, true);
+  if (!email.sent) {
+    const status = email.code === 'EMAIL_UNAVAILABLE' ? 503 : email.code === 'NO_RECIPIENTS' ? 409 : 502;
+    const hint = email.code === 'NO_RECIPIENTS' ? 'Ask the workspace to add a billing email under Admin → Billing → Billing details.' : undefined;
+    return json({ error: email.error ?? 'The email did not go out', code: email.code ?? 'EMAIL_FAILED', hint }, status);
+  }
+  const row = await getInvoice(env, workspaceId, id);
+  return json({ invoice: invoiceView(row!, await emailsFor(env, [row!]), true), email: emailView(email) });
 }
 
 export async function handleDeleteInvoice(env: Env, user: AuthUser, workspaceId: string, id: string): Promise<Response> {
@@ -213,7 +309,8 @@ export async function handleUploadInvoiceFile(
   request: Request, env: Env, user: AuthUser, workspaceId: string, id: string, which: 'receipt' | 'proof',
 ): Promise<Response> {
   const manage = await canManage(env, user);
-  if (which === 'receipt' && !manage) return json(FORBIDDEN, 403);
+  // A workspace's proof marks the invoice paid, so agent tokens may not attach one either.
+  if ((which === 'receipt' && !manage) || user.service) return json(FORBIDDEN, 403);
   const gate = await viewerGate(env, user, workspaceId, manage);
   if (gate) return gate;
   const inv = await getInvoice(env, workspaceId, id);
@@ -244,6 +341,19 @@ export async function handleUploadInvoiceFile(
       .bind(key, name, contentType, user.id, now, now, id, workspaceId).run();
   }
   await audit(env, user, workspaceId, `invoice.${which}`, inv, { name });
+  // The workspace's proof is the payment as far as ShareOut can tell: mark it paid and tell the
+  // operator, who checks the bank and can undo it (Mark unpaid). The operator attaching a proof
+  // for them changes nothing else; they mark it paid themselves.
+  if (which === 'proof' && !manage && inv.status === 'open') {
+    const paid = await env.DB.prepare(
+      `UPDATE workspace_invoices SET status = 'paid', paid_at = ?, paid_by = ?, paid_source = 'proof', updated_at = ?
+        WHERE id = ? AND workspace_id = ? AND status = 'open'`,
+    ).bind(now, user.id, now, id, workspaceId).run();
+    if (paid.meta?.changes) {
+      await audit(env, user, workspaceId, 'invoice.paid', inv, { source: 'proof' });
+      await notifyInvoicePaid(env, inv, 'proof', user.email ?? '', { bytes: bytes.slice().buffer, name, type: contentType });
+    }
+  }
   const row = await getInvoice(env, workspaceId, id);
   return json({ invoice: invoiceView(row!, await emailsFor(env, [row!]), manage) });
 }
@@ -317,20 +427,25 @@ export async function routeWorkspaceInvoices(ctx: FetchContext): Promise<Respons
     if (request.method === 'PUT') return addCORS(await handleSetMarkup(request, env, user, ws));
     return addCORS(json({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405));
   }
-  const m = path.match(/^\/v1\/workspaces\/([^/]+)\/invoices(?:\/([^/]+))?(?:\/(receipt|proof))?$/);
+  const m = path.match(/^\/v1\/workspaces\/([^/]+)\/invoices(?:\/([^/]+))?(?:\/(receipt|proof|send))?$/);
   if (!m) return null;
   const user = await requireTokenOrSession(ctx);
   if (!isAuthUser(user)) return user;
   const workspaceId = decodeURIComponent(m[1]!);
   const sub = m[2] ? decodeURIComponent(m[2]) : null;
-  const file = m[3] as 'receipt' | 'proof' | undefined;
+  const action = m[3] as 'receipt' | 'proof' | 'send' | undefined;
+  const file = action === 'send' ? undefined : action;
   const method = request.method;
 
   if (!sub) {
     if (method === 'GET') return addCORS(await handleListInvoices(env, user, workspaceId));
     if (method === 'POST') return addCORS(await handleCreateInvoice(request, env, user, workspaceId));
-  } else if (sub === 'usage' && !file) {
+  } else if (sub === 'usage' && !action) {
     if (method === 'GET') return addCORS(await handlePreviewUsage(request, env, user, workspaceId));
+  } else if (sub === 'from-document' && !action) {
+    if (method === 'POST') return addCORS(await handleCreateInvoiceFromDocument(request, env, user, workspaceId));
+  } else if (action === 'send') {
+    if (method === 'POST') return addCORS(await handleSendInvoice(env, user, workspaceId, sub));
   } else if (file) {
     if (method === 'GET') return addCORS(await handleDownloadInvoiceFile(env, user, workspaceId, sub, file));
     if (method === 'PUT') return addCORS(await handleUploadInvoiceFile(request, env, user, workspaceId, sub, file));

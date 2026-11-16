@@ -16,6 +16,7 @@ de a un log.
 | Invitaciones al espacio de trabajo | No se mandan por correo — usá **Copiar enlace** y pasá vos la URL ([abajo](#invitar-gente-sin-correo)) |
 | Resumen semanal, notificaciones | No se entregan |
 | Correo de artefactos, entregas de agentes | No se entregan |
+| Facturas por correo | No se mandan. Emitir funciona igual y **Admin → Facturación** avisa que el correo no salió |
 | **Ingreso con contraseña** | **No se ve afectado.** Por eso una instancia es usable sin nada de correo |
 
 ## Enviar
@@ -82,6 +83,29 @@ se trague casillas reales como `hola@tuempresa.com`.
 Cuando está vivo, **Admin → Configuración** muestra la dirección de la bandeja del
 espacio. Si esa sección no aparece, la instancia no tiene binding de correo — la dirección
 se oculta en vez de mostrarse como algo que no puede recibir.
+
+## Facturas por correo
+
+Si les facturás a los espacios desde **Admin → Facturación**, emitir una factura la manda por
+correo. No hay que configurar nada más que el [envío](#enviar):
+
+- Va al email de facturación del espacio (de sus datos de facturación) o, si no tiene, a sus
+  propietarios y administradores. Las direcciones de la lista de supresión se saltean. Antes de
+  emitir, el operador ve exactamente a quién va, con una casilla para no mandarla.
+- Lleva la factura adjunta y las respuestas van a `invoice+<token>@<EMAIL_INBOX_DOMAIN>`, una
+  dirección imposible de adivinar por factura. Para que lleguen, configurá la [recepción](#recibir);
+  el catch-all cubre también esta dirección.
+- Una respuesta que pasa DMARC, viene del email de facturación o de un propietario o
+  administrador y trae un PDF, PNG, JPG o WEBP (hasta 10 MB) queda como comprobante de
+  transferencia y marca la factura como pagada. Cualquier otra no cambia nada; en cambio, los
+  admins de la instancia reciben un correo para que la revisen.
+- Los admins de la instancia (`INSTANCE_ADMIN_EMAILS`, `SETUP_ADMIN_EMAIL` o la primera cuenta en
+  una instancia que no nombra a nadie) reciben un correo con el comprobante adjunto cada vez que el
+  comprobante de un espacio marca una factura como pagada, subido o por respuesta. **Marcar sin
+  pagar** lo deshace.
+
+El correo de facturas es transaccional: `LIFECYCLE_EMAILS_DISABLED` y `NURTURE_EMAILS_ENABLED` no
+lo afectan, y cada mensaje queda en `email_sends`.
 
 ## Entregabilidad
 
