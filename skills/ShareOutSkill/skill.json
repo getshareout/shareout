@@ -1,0 +1,20 @@
+{
+  "name": "shareout-skill",
+  "version": "2.67.0",
+  "updated_at": "2026-11-18T18:00:00Z",
+  "skill_endpoint": "/v1/skill",
+  "parts": {
+    "deploy/SKILL.md": {
+      "name": "shareout-deploy",
+      "version": "1.2.0",
+      "updated_at": "2026-07-27T20:30:00Z"
+    },
+    "team/SKILL.md": {
+      "name": "shareout-workspace-skill",
+      "version": "3.30.0",
+      "updated_at": "2026-07-25T20:00:00Z",
+      "skill_endpoint": "/v1/skill/team/SKILL.md",
+      "extends": "shareout-skill"
+    }
+  }
+}

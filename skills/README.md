@@ -51,13 +51,14 @@ instead: `claude mcp add --transport http shareout https://your-instance.example
 
 | File | Role |
 |------|------|
-| [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) | Plugin manifest. `version` must equal the skill's `SKILL.md` version |
+| [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) | Plugin manifest. `version` must equal the skill's version in `ShareOutSkill/skill.json` |
 | [`.mcp.json`](.mcp.json) | The connector the plugin adds |
+| [`ShareOutSkill/skill.json`](ShareOutSkill/skill.json) | Skill version, `updated_at` and the versions of its parts (`deploy/`, `team/`). `SKILL.md` frontmatter holds only `name` and `description` |
 | `../.claude-plugin/marketplace.json` | Marketplace that lists the plugin (`getshareout`) |
 | `icon.png` | Listing icon (copy of `shareout-app/public/_brand/icon-512.png`) |
 
 `npm run check:claude-plugin` (in `shareout-app/`, part of the pre-push checks) fails when
-the plugin version and the skill version differ, or when an MCP tool in
+the plugin version and the skill version differ, a Markdown file in the plugin has frontmatter keys other than `name` and `description` (the plugin directory refuses them), or an MCP tool in
 `shareout-app/src/mcp/` is missing from `mcp-connector.md`. Before a directory submission,
 also run `claude plugin validate ./skills --strict` and `claude plugin validate . --strict`.
 
@@ -82,18 +83,18 @@ If you only have bandwidth for one place: **this monorepo path wins.**
 ## Skill version on an instance
 
 `GET $ORIGIN/v1/skill/version`, `X-Skill-Version` and the `/v1/skill` ETag carry
-`<SKILL.md frontmatter version>+<first 8 hex of the skill.zip sha256>`, e.g.
+`<skill.json version>+<first 8 hex of the skill.zip sha256>`, e.g.
 `2.60.0+18c8deb6`. The hash moves with every content change, so an agent that stores
 the full string (or the ETag) and compares it for equality refreshes whenever the skill
-changes — the frontmatter version alone is bumped by hand and rarely.
+changes — the skill.json version alone is bumped by hand and rarely.
 
 Backward compatibility: the `+…` part is semver build metadata, so a client comparing
-semver still sees the frontmatter version (`/v1/skill/version` also returns it as
+semver still sees the skill.json version (`/v1/skill/version` also returns it as
 `semver`). An `If-None-Match` holding the old bare-semver ETag gets one `200` with the new
 ETag, then `304`s as before.
 
 The instance serves whichever copy is newer — the R2 sync or the asset staged with the
-deployed Worker: higher frontmatter version, then later `updated_at`, then the later of
+deployed Worker: higher skill.json version, then later `updated_at`, then the later of
 the R2 upload and the Worker version's deploy time (R2 when neither is known).
 
 ## What to open first

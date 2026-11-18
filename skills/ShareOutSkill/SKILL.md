@@ -1,9 +1,6 @@
 ---
 name: "shareout-skill"
-version: "2.66.0"
-updated_at: "2026-11-18T12:00:00Z"
 description: "Publish, update, inspect, and manage ShareOut artifacts on a self-hosted instance. Use when the user wants to build or publish a web artifact (HTML apps, dashboards, forms, or CSV/Markdown/JSON/TXT), wire SDK data stores, live data, schedules, sharing, analytics, or in-artifact AI. If the user wants to INSTALL or DEPLOY ShareOut on Cloudflare first, load deploy/SKILL.md immediately."
-skill_endpoint: "/v1/skill"
 ---
 
 # ShareOut Skill
@@ -115,9 +112,9 @@ load [deploy/SKILL.md](deploy/SKILL.md).
 Frontmatter `version` is this file (`2.65.0`).
 
 1. `GET $ORIGIN/v1/skill/version` → `{ "version", "semver", "updated_at" }`. `version` is
-   `<frontmatter>+<content hash>` (e.g. `2.60.0+18c8deb6`).
+   `<skill.json version>+<content hash>` (e.g. `2.60.0+18c8deb6`).
 2. Compare the full `version` string (or the ETag) with the one you last downloaded — **equality,
-   not semver**: content changes keep the same frontmatter version. Different (or never
+   not semver**: content changes keep the same skill.json version. Different (or never
    downloaded): download `GET $ORIGIN/v1/skill` (zip), replace local skill copy, remember its `version`, continue.
 3. If the instance has no skill endpoint yet (brand-new deploy mid-setup): use this repo copy and finish [deploy/SKILL.md](deploy/SKILL.md).
 

@@ -96,9 +96,13 @@ if (!skillMd) {
   process.exit(1);
 }
 
-const meta = parseFrontmatter(skillMd[0].toString('utf8'));
-if (!meta?.version) {
-  console.error('stage-skill-bundle: SKILL.md frontmatter has no version');
+// Version and dates live in skill.json: SKILL.md frontmatter carries only name and
+// description, the two keys every skill loader (and plugin directory) accepts.
+const front = parseFrontmatter(skillMd[0].toString('utf8')) ?? {};
+const side = entries['skill.json'] ? JSON.parse(entries['skill.json'][0].toString('utf8')) : {};
+const meta = { ...front, ...side };
+if (!meta.version) {
+  console.error('stage-skill-bundle: skills/ShareOutSkill/skill.json has no version');
   process.exit(1);
 }
 

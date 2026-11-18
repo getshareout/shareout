@@ -278,6 +278,9 @@ async function main() {
       const skillPath = join(SKILL_DIR, 'SKILL.md');
       skillMeta = parseFrontmatter(readFileSync(skillPath, 'utf8'));
     }
+    // Version and dates live in skill.json (SKILL.md frontmatter is name + description only).
+    const sidePath = join(SKILL_DIR, 'skill.json');
+    if (existsSync(sidePath)) skillMeta = { ...(skillMeta ?? {}), ...JSON.parse(readFileSync(sidePath, 'utf8')) };
 
     if (skillMeta) {
       const metaJson = JSON.stringify(
