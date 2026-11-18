@@ -1,7 +1,7 @@
 import type { Env } from '../types';
 import { getSessionUser } from '../auth/session';
 import { validateToken } from '../api-auth';
-import { isSuperAdminEmail, rosterIsEmpty, SUPERADMIN_EMAILS } from './recipients';
+import { envAdminEmails, isSuperAdminEmail, rosterIsEmpty, SUPERADMIN_EMAILS } from './recipients';
 
 export { isSuperAdminEmail, SUPERADMIN_EMAILS };
 
@@ -28,6 +28,21 @@ export async function isPlatformAdmin(env: Env, email: string | null | undefined
   if (isSuperAdminEmail(email, env)) return true;
   if (userId && (await isFirstUserAdmin(env, userId))) return true;
   return false;
+}
+
+/** Everyone isPlatformAdmin() says yes to, as addresses: the roster, INSTANCE_ADMIN_EMAILS and
+ *  SETUP_ADMIN_EMAIL — or, on a first-boot instance that names none, the earliest user. For the few
+ *  notices that go to the instance operator (a workspace paid an invoice). */
+export async function platformAdminEmails(env: Env): Promise<string[]> {
+  const named = [...SUPERADMIN_EMAILS, ...envAdminEmails(env), env.SETUP_ADMIN_EMAIL ?? '']
+    .map((e) => e.toLowerCase().trim()).filter(Boolean);
+  if (named.length) return [...new Set(named)];
+  try {
+    const first = await env.DB.prepare('SELECT email FROM users ORDER BY created_at ASC LIMIT 1').first<{ email: string | null }>();
+    return first?.email ? [first.email.toLowerCase().trim()] : [];
+  } catch {
+    return [];
+  }
 }
 
 // Require a platform owner, from either a browser session or a personal API token.

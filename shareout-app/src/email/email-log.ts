@@ -8,3 +8,8 @@ export async function claimEmailSend(env: Env, type: string, key: string): Promi
     .run();
   return (res.meta?.changes ?? 0) > 0;
 }
+
+/** Give a claim back when the work it guarded failed, so a retry of the same (type, key) runs again. */
+export async function releaseEmailSend(env: Env, type: string, key: string): Promise<void> {
+  await env.DB.prepare('DELETE FROM email_log WHERE type = ? AND key = ?').bind(type, key).run();
+}

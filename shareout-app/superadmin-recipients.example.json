@@ -1,5 +1,5 @@
 {
-  "_doc": "Copy to superadmin-recipients.json (gitignored in public repos) or seed via SETUP_ADMIN_EMAIL / INSTANCE_ADMIN_EMAILS / first-boot admin. Fake placeholders only — never commit real emails. Grants /admin access only; nothing is sent anywhere.",
+  "_doc": "Copy to superadmin-recipients.json (gitignored in public repos) or seed via SETUP_ADMIN_EMAIL / INSTANCE_ADMIN_EMAILS / first-boot admin. Fake placeholders only — never commit real emails. Grants /admin access; the only mail it gets is invoice payment notices.",
   "recipients": [
     { "email": "admin@example.com" },
     { "email": "ops@example.com" }

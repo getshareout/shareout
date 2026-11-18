@@ -17,6 +17,7 @@ import { escapeHtml } from './layout';
 import { colors, fonts, radius } from '../../packages/design-tokens/src/index';
 import type { Locale } from '../i18n';
 import { NOTIFY_EMAILS } from './catalog-notify';
+import { INVOICE_EMAILS } from './catalog-invoice';
 
 export type EmailAudienceTag = 'ANY' | 'EXTERNAL' | AudienceSegment;
 
@@ -764,6 +765,7 @@ export const EMAILS = {
   } satisfies EmailTemplate,
 
   ...NOTIFY_EMAILS,
+  ...INVOICE_EMAILS,
 } satisfies Record<string, EmailTemplate<any>>;
 
 export type EmailType = keyof typeof EMAILS;

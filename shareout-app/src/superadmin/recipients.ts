@@ -10,8 +10,9 @@
  *
  * `SETUP_ADMIN_EMAIL` also counts, so the first admin never locks themselves out.
  *
- * Grants access only. Super-admins are not notified out-of-band: the `/admin`
- * cockpit is the whole surface.
+ * Grants access. The `/admin` cockpit is the whole surface; the one thing mailed to
+ * super-admins is invoice payments (a workspace's transfer proof arrived — see
+ * platformAdminEmails() and src/workspaces/invoice-mail.ts).
  */
 import type { Env } from '../types';
 import roster from '../../superadmin-recipients.json';

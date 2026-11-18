@@ -2,8 +2,9 @@ import { BILLING_COPY } from './admin-billing-copy';
 
 /** Admin → Billing, bottom half: invoices the instance operator issues to this workspace (src/router/api/workspace-invoices.ts).
  *  Always shown (an empty state until the first one is issued). Shares the admin lens IIFE scope. */
-export const workspace_client_home_views_adminBilling_JS = `  // Billing: the operator creates/issues/marks paid; workspace admins download the receipt and attach transfer proof.
-  var adBillOpenId = null;
+export const workspace_client_home_views_adminBilling_JS = `  // Billing: the operator creates/issues (which emails the invoice)/marks paid; workspace admins download the
+  // invoice document and attach transfer proof, which marks it paid.
+  var adBillOpenId = null, adBillDelivery = null;
   var BILL_COPY = ${JSON.stringify(BILLING_COPY).replace(/</g, '\\u003c')};
   // Billing strings first (in the page's current language), then the shell's copy.
   function bt(k) { var de = document.documentElement, l = de && de.lang === 'es' ? 'es' : 'en'; return BILL_COPY[l][k] || BILL_COPY.en[k] || t(k); }
@@ -22,16 +23,35 @@ export const workspace_client_home_views_adminBilling_JS = `  // Billing: the op
     function opPill() { return '<span class="wsx-opbadge" data-op-badge>' + esc(bt('admin.superOnly')) + '</span>'; }
     function reload() { delete adDataCache.billing; adBilling(); }
     // One request + toast; success repaints the section, failure frees the button and says why.
+    // okMsg is the toast, or a function of the response that returns [text, type].
     function call(url, init, okMsg, btn) {
       adBusy(btn);
       return fetch(url, Object.assign({ credentials: 'same-origin' }, init)).then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (j) {
           if (!r.ok) throw new Error((j && ((j.error && j.error.message) || (typeof j.error === 'string' && j.error) || j.message)) || bt('admin.actionFailed'));
           if (j && j.invoice) adBillOpenId = j.invoice.id;
-          if (okMsg) showToast(okMsg, 'success');
+          var msg = typeof okMsg === 'function' ? okMsg(j) : [okMsg, 'success'];
+          if (msg && msg[0]) showToast(msg[0], msg[1]);
           reload(); return j;
         });
       }).catch(function (e) { adIdle(btn); showToast(String((e && e.message) || bt('admin.actionFailed')), 'error'); });
+    }
+    // After an issue or a resend: who got the email, or why it did not go out (the invoice is issued either way).
+    function mailToast(okKey) {
+      return function (j) {
+        var em = j && j.email;
+        if (!em) return [bt(okKey), 'success'];
+        return em.sent ? [bt('admin.billMailed_ok').replace('{to}', (em.to || []).join(', ')), 'success'] : [bt('admin.billMailFailed').replace('{error}', em.error || ''), 'error'];
+      };
+    }
+    // The "send email" checkbox, with exactly who issuing emails (res.delivery, operator only).
+    function sendRow(attr) {
+      var d = adBillDelivery || {}, to = d.to || [], sup = d.suppressed || [], can = !!(d.email_enabled && to.length);
+      var label = !d.email_enabled ? bt('admin.billSendOff')
+        : to.length ? bt(d.source === 'billing_email' ? 'admin.billSendToBilling' : 'admin.billSendToAdmins').replace('{to}', to.join(', '))
+          : sup.length ? bt('admin.billSendSkipped').replace('{list}', sup.join(', ')) : bt('admin.billSendNobody');
+      return '<label class="wsx-admin__check" data-inv-sendrow><input type="checkbox" ' + attr + (can ? ' checked' : ' disabled') + '> ' + esc(label) + '</label>'
+        + (can && sup.length ? '<span class="wsx-field__note">' + esc(bt('admin.billSendSkipped').replace('{list}', sup.join(', '))) + '</span>' : '');
     }
     // The workspace sees the price; the operator (op) also sees cost and margin per row.
     function usageTable(titleKey, rows, label, op) {
@@ -68,17 +88,20 @@ export const workspace_client_home_views_adminBilling_JS = `  // Billing: the op
         + '<div>' + esc(bt('admin.billReceipt')) + ': ' + (inv.receipt ? '<a class="wsx-abtn" href="' + esc(wsUrl('/invoices/' + inv.id + '/receipt')) + '" download data-inv-dl="receipt">' + esc(inv.receipt.name || bt('admin.billDownload')) + '</a>' : '<span class="wsx-atbl__date">' + esc(bt('admin.billReceiptNone')) + '</span>')
         + (manage && st !== 'void' ? ' <button class="wsx-abtn" type="button" data-inv-up="receipt" data-inv-id="' + id + '">' + esc(bt(inv.receipt ? 'admin.billReplace' : 'admin.billUploadReceipt')) + '</button>' : '') + '</div>'
         + '<div>' + esc(bt('admin.billProof')) + ': ' + (inv.proof ? '<a class="wsx-abtn" href="' + esc(wsUrl('/invoices/' + inv.id + '/proof')) + '" download data-inv-dl="proof">' + esc(inv.proof.name || bt('admin.billDownload')) + '</a> <span class="wsx-atbl__date">' + esc(bt('admin.billProofBy').replace('{who}', inv.proof.uploaded_by || '\\u2014').replace('{date}', day(inv.proof.uploaded_at))) + '</span>' : '<span class="wsx-atbl__date">' + esc(bt('admin.billProofNone')) + '</span>')
-        + (st === 'open' ? ' <button class="wsx-abtn" type="button" data-inv-up="proof" data-inv-id="' + id + '">' + esc(bt(inv.proof ? 'admin.billReplace' : 'admin.billUploadProof')) + '</button>' : '') + '</div>'
+        + (st === 'open' ? ' <button class="wsx-abtn" type="button" data-inv-up="proof" data-inv-id="' + id + '">' + esc(bt(inv.proof ? 'admin.billReplace' : 'admin.billUploadProof')) + '</button>'
+          + (manage ? '' : ' <span class="wsx-field__note">' + esc(bt('admin.billProofMarksPaid')) + '</span>') : '') + '</div>'
         + '</div></div>';
       var acts = '';
       if (manage) {
-        if (st === 'draft') acts = '<button class="wsx-abtn wsx-abtn--primary" type="button" data-inv-act="open" data-inv-id="' + id + '">' + esc(bt('admin.billIssue')) + '</button><button class="wsx-abtn" type="button" data-inv-act="delete" data-inv-id="' + id + '">' + esc(bt('admin.billDeleteDraft')) + '</button>';
-        if (st === 'open') acts = '<input class="wsx-field__in" style="max-width:240px" data-inv-ref="' + id + '" maxlength="200" placeholder="' + esc(bt('admin.billRefPh')) + '"><button class="wsx-abtn wsx-abtn--primary" type="button" data-inv-act="paid" data-inv-id="' + id + '">' + esc(bt('admin.billMarkPaid')) + '</button><button class="wsx-abtn" type="button" data-inv-act="void" data-inv-id="' + id + '">' + esc(bt('admin.billVoid')) + '</button>';
+        if (st === 'draft') acts = '<div style="flex-basis:100%">' + sendRow('data-inv-send="' + id + '"') + '</div><button class="wsx-abtn wsx-abtn--primary" type="button" data-inv-act="open" data-inv-id="' + id + '">' + esc(bt('admin.billIssue')) + '</button><button class="wsx-abtn" type="button" data-inv-act="delete" data-inv-id="' + id + '">' + esc(bt('admin.billDeleteDraft')) + '</button>';
+        if (st === 'open') acts = '<input class="wsx-field__in" style="max-width:240px" data-inv-ref="' + id + '" maxlength="200" placeholder="' + esc(bt('admin.billRefPh')) + '"><button class="wsx-abtn wsx-abtn--primary" type="button" data-inv-act="paid" data-inv-id="' + id + '">' + esc(bt('admin.billMarkPaid')) + '</button><button class="wsx-abtn" type="button" data-inv-act="send" data-inv-id="' + id + '" data-inv-num="' + esc(inv.number) + '">' + esc(bt('admin.billResend')) + '</button><button class="wsx-abtn" type="button" data-inv-act="void" data-inv-id="' + id + '">' + esc(bt('admin.billVoid')) + '</button>';
         if (st === 'paid') acts = '<button class="wsx-abtn" type="button" data-inv-act="unpaid" data-inv-id="' + id + '">' + esc(bt('admin.billMarkUnpaid')) + '</button>';
         if (acts) acts = '<div class="wsx-admin__domain-add" style="margin-top:14px;flex-wrap:wrap">' + acts + '</div>';
       }
       var meta = [bt('admin.billIssued') + ' ' + day(inv.issued_at), bt('admin.billDue') + ' ' + day(inv.due_at)];
-      if (inv.paid_at) meta.push(bt('admin.billPaidOn') + ' ' + day(inv.paid_at) + (inv.payment_reference ? ' \\u00b7 ' + inv.payment_reference : ''));
+      if (inv.emailed_at) meta.push(bt('admin.billEmailedOn').replace('{date}', day(inv.emailed_at)).replace('{to}', (inv.emailed_to || []).join(', ')));
+      else if (manage && st !== 'draft') meta.push(bt('admin.billNotEmailed'));
+      if (inv.paid_at) meta.push(bt('admin.billPaidOn') + ' ' + day(inv.paid_at) + (inv.paid_source ? ' (' + bt('admin.billPaidBy_' + inv.paid_source) + ')' : '') + (inv.payment_reference ? ' \\u00b7 ' + inv.payment_reference : ''));
       return '<details class="wsx-bill" data-inv="' + id + '"' + (adBillOpenId === inv.id ? ' open' : '') + '><summary class="wsx-bill__sum">'
         + '<span class="wsx-atbl__link">' + esc(inv.number) + '</span><span class="wsx-atbl__date">' + esc(inv.period_month ? monthName(inv.period_month) : day(inv.created_at)) + '</span>'
         + '<span class="wsx-bill__amt">' + money(inv.total_cents, inv.currency) + '</span>' + badge(st) + '</summary><div class="wsx-bill__body">'
@@ -105,8 +128,44 @@ export const workspace_client_home_views_adminBilling_JS = `  // Billing: the op
         + '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(bt('admin.billNumber')) + '</span><input class="wsx-field__in" id="wsxBillNum" maxlength="40" placeholder="' + esc(bt('admin.billNumberPh')) + '"></label></div>'
         + '<p class="wsx-field__note" id="wsxBillUsagePrev"></p>'
         + '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(bt('admin.billHowToPay')) + '</span><textarea class="wsx-field__in" id="wsxBillNotes" rows="3" maxlength="2000" placeholder="' + esc(bt('admin.billNotesPh')) + '"></textarea></label>'
+        + '<div>' + sendRow('id="wsxBillSend"') + '</div>'
         + '<div class="wsx-cform__foot"><button class="wsx-abtn" type="button" id="wsxBillDraft">' + esc(bt('admin.billSaveDraft')) + '</button><button class="wsx-abtn wsx-abtn--primary" type="button" id="wsxBillIssue">' + esc(bt('admin.billIssue')) + '</button></div>'
         + '</div></div>';
+    }
+    // One step from the invoice the operator issued in their own tax system: its PDF plus what it says.
+    // Currency and how-to-pay start from the latest invoice, which is usually what the next one says too.
+    function docFormHtml(last) {
+      last = last || {};
+      function fld(id, key, input) { return '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(bt(key)) + '</span>' + input.replace('<input ', '<input class="wsx-field__in" id="' + id + '" ') + '</label>'; }
+      return '<div class="wsx-admin__budget" id="wsxBillDocForm" hidden><div class="wsx-admin__settings-title">' + esc(bt('admin.billNewDoc')) + '</div><div class="wsx-cform">'
+        + '<p class="wsx-field__note">' + esc(bt('admin.billDocIntro')) + '</p>'
+        + fld('wsxBillDocFile', 'admin.billDocFile', '<input type="file" accept="application/pdf,image/png,image/jpeg,image/webp">')
+        + '<div class="wsx-cform__row">' + fld('wsxBillDocNum', 'admin.billNumber', '<input maxlength="40" placeholder="' + esc(bt('admin.billDocNumberPh')) + '">')
+        + fld('wsxBillDocCur', 'admin.billCurrency', '<input maxlength="3" value="' + esc(last.currency || 'USD') + '">')
+        + fld('wsxBillDocTotal', 'admin.billTotal', '<input type="number" min="0.01" step="0.01">') + '</div>'
+        + '<div class="wsx-cform__row">' + fld('wsxBillDocDesc', 'admin.billDocDesc', '<input maxlength="200" placeholder="' + esc(bt('admin.billDocDescPh')) + '">')
+        + fld('wsxBillDocPeriod', 'admin.billDocPeriod', '<input type="month">')
+        + fld('wsxBillDocDue', 'admin.billDue', '<input type="date">') + '</div>'
+        + '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(bt('admin.billHowToPay')) + '</span><textarea class="wsx-field__in" id="wsxBillDocNotes" rows="3" maxlength="2000" placeholder="' + esc(bt('admin.billNotesPh')) + '">' + esc(last.notes || '') + '</textarea></label>'
+        + '<div>' + sendRow('id="wsxBillDocSend"') + '</div>'
+        + '<div class="wsx-cform__foot"><button class="wsx-abtn" type="button" id="wsxBillDocDraft">' + esc(bt('admin.billSaveDraft')) + '</button><button class="wsx-abtn wsx-abtn--primary" type="button" id="wsxBillDocIssue">' + esc(bt('admin.billIssue')) + '</button></div>'
+        + '</div></div>';
+    }
+    function wireDocForm() {
+      function val(id) { var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
+      function submit(status, btn) {
+        var input = document.getElementById('wsxBillDocFile'), f = input && input.files && input.files[0];
+        var total = Math.round(Number(val('wsxBillDocTotal')) * 100);
+        if (!f || !val('wsxBillDocNum') || !val('wsxBillDocDesc') || !isFinite(total) || total < 1) { showToast(bt('admin.billDocMissing'), 'error'); return; }
+        if (f.size > 10 * 1024 * 1024) { showToast(bt('admin.billFileTooBig'), 'error'); return; }
+        var q = new URLSearchParams({ number: val('wsxBillDocNum'), currency: (val('wsxBillDocCur') || 'USD').toUpperCase(), total_cents: String(total), description: val('wsxBillDocDesc'), status: status, name: f.name });
+        [['period_month', 'wsxBillDocPeriod'], ['due_at', 'wsxBillDocDue'], ['notes', 'wsxBillDocNotes']].forEach(function (p) { if (val(p[1])) q.set(p[0], val(p[1])); });
+        if (status === 'open') { var cb = document.getElementById('wsxBillDocSend'); q.set('send_email', cb && cb.checked ? '1' : '0'); }
+        call(wsUrl('/invoices/from-document?' + q.toString()), { method: 'POST', headers: { 'Content-Type': f.type || 'application/octet-stream' }, body: f },
+          status === 'open' ? mailToast('admin.billIssued_ok') : bt('admin.billDraft_ok'), btn);
+      }
+      document.getElementById('wsxBillDocDraft').addEventListener('click', function () { submit('draft', this); });
+      document.getElementById('wsxBillDocIssue').addEventListener('click', function () { submit('open', this); });
     }
     function wireForm() {
       var form = document.getElementById('wsxBillForm'); if (!form) return;
@@ -141,7 +200,8 @@ export const workspace_client_home_views_adminBilling_JS = `  // Billing: the op
         var body = { status: status, lines: lines, usage_month: sel.value || null, currency: (document.getElementById('wsxBillCur').value || 'USD').trim().toUpperCase(),
           due_at: document.getElementById('wsxBillDue').value || null, number: document.getElementById('wsxBillNum').value.trim() || null, notes: document.getElementById('wsxBillNotes').value.trim() || null };
         if (!lines.length && !body.usage_month) { showToast(bt('admin.billLineInvalid'), 'error'); return; }
-        call(wsUrl('/invoices'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, bt(status === 'open' ? 'admin.billIssued_ok' : 'admin.billDraft_ok'), btn);
+        if (status === 'open') { var cb = document.getElementById('wsxBillSend'); body.send_email = !!(cb && cb.checked); }
+        call(wsUrl('/invoices'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, status === 'open' ? mailToast('admin.billIssued_ok') : bt('admin.billDraft_ok'), btn);
       }
       document.getElementById('wsxBillDraft').addEventListener('click', function () { submit('draft', this); });
       document.getElementById('wsxBillIssue').addEventListener('click', function () { submit('open', this); });
@@ -167,13 +227,16 @@ export const workspace_client_home_views_adminBilling_JS = `  // Billing: the op
       if (wrap) wrap.hidden = false;
       var head = '<div class="wsx-admin__settings-title">' + esc(bt('admin.billInvoices')) + '</div>';
       if (!res) { m.innerHTML = '<div class="wsx-admin__settings-section">' + head + i18nEmpty('common.couldNotLoad') + '</div>'; return; }
+      adBillDelivery = res.delivery || null;
       var due = invoices.filter(function (i) { return i.status === 'open'; });
       var owed = {}; due.forEach(function (i) { owed[i.currency] = (owed[i.currency] || 0) + i.total_cents; });
       var owedTxt = Object.keys(owed).map(function (c) { return money(owed[c], c); }).join(' + ');
+      var last = { currency: invoices[0] && invoices[0].currency, notes: (invoices.filter(function (i) { return i.notes; })[0] || {}).notes };
       m.innerHTML = '<div class="wsx-admin__settings-section">' + head + '<p class="wsx-lens__intro">' + esc(bt(manage ? 'admin.billIntroManage' : 'admin.billIntro')) + '</p>'
         + (due.length ? '<div class="wsx-admin__cards"><div class="wsx-admin__card"><div class="wsx-admin__cardlbl">' + esc(bt('admin.billOwed')) + '</div><div class="wsx-admin__cardval">' + esc(owedTxt) + '</div><div class="wsx-admin__cardsub">' + esc(bt('admin.billOwedSub').replace('{n}', String(due.length))) + '</div></div></div>' : '')
         + (manage ? '<div class="wsx-opzone" data-op-zone><div class="wsx-opzone__head">' + opPill() + '<span class="wsx-opzone__sub">' + esc(bt('admin.superOnlySub')) + '</span></div>'
-          + markupHtml(res.markup) + '<div class="wsx-auto-bar"><button class="wsx-abtn" type="button" id="wsxBillNewBtn">' + esc(bt('admin.billNew')) + '</button></div>' + formHtml() + '</div>' : '')
+          + markupHtml(res.markup) + '<div class="wsx-auto-bar"><button class="wsx-abtn" type="button" id="wsxBillDocBtn">' + esc(bt('admin.billNewDoc')) + '</button><button class="wsx-abtn" type="button" id="wsxBillNewBtn">' + esc(bt('admin.billNew')) + '</button></div>'
+          + docFormHtml(last) + formHtml() + '</div>' : '')
         + (invoices.length ? '<div class="wsx-bill__list">' + invoices.map(function (i) { return invoiceHtml(i, manage); }).join('') + '</div>' : '<div class="wsx-empty">' + esc(bt('admin.billNone')) + '</div>') + '</div>';
       var ms = document.getElementById('wsxBillMarkupSave'), mr = document.getElementById('wsxBillMarkupReset');
       if (ms) ms.addEventListener('click', function () {
@@ -184,18 +247,26 @@ export const workspace_client_home_views_adminBilling_JS = `  // Billing: the op
         saveMarkup(v, ms);
       });
       if (mr) mr.addEventListener('click', function () { saveMarkup(null, mr); });
-      var nb = document.getElementById('wsxBillNewBtn');
-      if (nb) nb.addEventListener('click', function () { var f = document.getElementById('wsxBillForm'); if (f) { f.hidden = !f.hidden; if (!f.hidden && !f.getAttribute('data-wired')) { f.setAttribute('data-wired', '1'); wireForm(); } } });
+      // The two create forms toggle open; each wires itself the first time it shows.
+      [['wsxBillNewBtn', 'wsxBillForm', wireForm], ['wsxBillDocBtn', 'wsxBillDocForm', wireDocForm]].forEach(function (p) {
+        var btn = document.getElementById(p[0]);
+        if (btn) btn.addEventListener('click', function () { var f = document.getElementById(p[1]); if (f) { f.hidden = !f.hidden; if (!f.hidden && !f.getAttribute('data-wired')) { f.setAttribute('data-wired', '1'); p[2](); } } });
+      });
       m.querySelectorAll('details[data-inv]').forEach(function (d) { d.addEventListener('toggle', function () { if (d.open) adBillOpenId = d.getAttribute('data-inv'); }); });
       m.querySelectorAll('[data-inv-act]').forEach(function (b) {
         b.addEventListener('click', function () {
           var id = b.getAttribute('data-inv-id'), act = b.getAttribute('data-inv-act'), url = wsUrl('/invoices/' + encodeURIComponent(id));
           adBillOpenId = id;
           if (act === 'delete') { if (!window.confirm(bt('admin.billDeleteConfirm'))) return; call(url, { method: 'DELETE' }, bt('admin.billDeleted_ok'), b); return; }
+          if (act === 'send') {
+            if (!window.confirm(bt('admin.billResendConfirm').replace('{number}', b.getAttribute('data-inv-num') || '').replace('{to}', ((adBillDelivery && adBillDelivery.to) || []).join(', ')))) return;
+            call(url + '/send', { method: 'POST' }, mailToast('admin.billSaved_ok'), b); return;
+          }
           if (act === 'void' && !window.confirm(bt('admin.billVoidConfirm'))) return;
           var body = { status: act === 'unpaid' ? 'open' : act };
           if (act === 'paid') { var ref = m.querySelector('[data-inv-ref="' + id + '"]'); if (ref && ref.value.trim()) body.payment_reference = ref.value.trim(); }
-          call(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, bt('admin.billSaved_ok'), b);
+          if (act === 'open') { var cb = m.querySelector('[data-inv-send="' + id + '"]'); body.send_email = !!(cb && cb.checked); }
+          call(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, act === 'open' ? mailToast('admin.billIssued_ok') : bt('admin.billSaved_ok'), b);
         });
       });
       m.querySelectorAll('[data-inv-up]').forEach(function (b) {
@@ -207,7 +278,8 @@ export const workspace_client_home_views_adminBilling_JS = `  // Billing: the op
             var f = input.files && input.files[0]; if (!f) return;
             if (f.size > 10 * 1024 * 1024) { showToast(bt('admin.billFileTooBig'), 'error'); return; }
             adBillOpenId = id;
-            call(wsUrl('/invoices/' + encodeURIComponent(id) + '/' + which + '?name=' + encodeURIComponent(f.name)), { method: 'PUT', headers: { 'Content-Type': f.type || 'application/octet-stream' }, body: f }, bt('admin.billUploaded_ok'), b);
+            call(wsUrl('/invoices/' + encodeURIComponent(id) + '/' + which + '?name=' + encodeURIComponent(f.name)), { method: 'PUT', headers: { 'Content-Type': f.type || 'application/octet-stream' }, body: f },
+              bt(which === 'proof' && !manage ? 'admin.billProofPaid_ok' : 'admin.billUploaded_ok'), b);
           });
           input.click();
         });
