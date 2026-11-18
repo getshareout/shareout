@@ -30,12 +30,48 @@ provisiona nombres; reemplazá IDs placeholder después del create si hace falta
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | secret | Habilita Google en `/auth/login`. Callback: `{SHAREOUT_BASE_URL}/auth/callback`. |
 | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | secret | Habilita **Entrar con Microsoft** (cuentas personales y de trabajo o escuela) en `/auth/login` y en el login de páginas privadas. Callback: `{SHAREOUT_BASE_URL}/auth/microsoft/callback`. Ver [abajo](#entrar-con-microsoft). |
 | `MICROSOFT_TENANT` | var | Opcional. `common` (default: personales + trabajo/escuela), `organizations` (solo trabajo/escuela), `consumers` (solo personales) o el GUID de un tenant. Cualquier otro valor oculta el botón. |
+| `GOOGLE_DRIVE_SA_KEY` | secret | Activa la importación de carpetas de Google Drive **compartiendo**: cada workspace comparte una carpeta con su propio email; sin consentimiento OAuth ni verificación de Google. Es la clave JSON de una cuenta de servicio que crea y suplanta una cuenta sin claves por workspace. Ver [más abajo](#google-drive-compartiendo). Si está, la importación de carpetas la usa en vez del consentimiento `drive.readonly` de abajo (la sincronización de planillas sigue con el suyo). |
 | `GOOGLE_DRIVE_CLIENT_ID` / `GOOGLE_DRIVE_CLIENT_SECRET` | secret | Activa la importación de carpetas de Google Drive (solo lectura, `drive.readonly`, un scope restringido; con su propio cliente OAuth, no el del login) y la sincronización programada de planillas (Automatizar → *Sincronizar datos desde Google Drive*), que pide su propio consentimiento solo para `drive.file`, con el selector de Google (Picker) adentro. Activá la **Google Picker API** en el mismo proyecto de Cloud. Redirección (ambos): `{SHAREOUT_BASE_URL}/v1/file-imports/oauth/google_drive/callback`. Requiere `CREDENTIALS_KEY`. Mientras la pantalla de consentimiento está en *Testing*, Google vence los refresh tokens a los 7 días y las sincronizaciones programadas se cortan; publicala para uso real. |
 | `GOOGLE_DRIVE_FILE_CLIENT_ID` / `GOOGLE_DRIVE_FILE_CLIENT_SECRET` | secret | Opcional. Un cliente OAuth en un **proyecto de Cloud aparte** solo para la sincronización de planillas (por ejemplo un proyecto publicado que declara solo `drive.file`, mientras el de importación de carpetas sigue en Testing). Misma redirección; activá la Google Picker API en ese proyecto. No uses un segundo cliente en el mismo proyecto: Google revoca por proyecto, y ShareOut toma un cliente distinto como un proyecto distinto cuando una desconexión decide si revocar. Sin definir = usa `GOOGLE_DRIVE_CLIENT_ID`. |
 | `MICROSOFT_FILES_CLIENT_ID` / `MICROSOFT_FILES_CLIENT_SECRET` / `MICROSOFT_FILES_TENANT` | secret / var | Activa la importación de OneDrive / SharePoint (delegados `Files.Read.All`, `Sites.Read.All`, `User.Read`, `offline_access`). Tenant por defecto `common`. Redirección: `{SHAREOUT_BASE_URL}/v1/file-imports/oauth/microsoft/callback`. |
 | — | — | **El login con contraseña no necesita configuración.** Está siempre disponible y es como `/setup` crea el primer admin. |
 | Binding `EMAIL` | binding | Habilita los códigos de un solo uso por email. Sin él, esos códigos solo llegan al log del worker. |
 | `EMAIL_DEFAULT_FROM` | var | From cuando Email está bound. |
+
+## Google Drive compartiendo
+
+Cada workspace tiene su propia cuenta de servicio de Google. Se comparte una carpeta de
+Drive con ese email como Lector y ShareOut la lee como esa cuenta: un workspace solo puede
+ver lo que se compartió con su propio email (lo hace cumplir Google). Una clave para la
+instancia; las cuentas de cada workspace no tienen ninguna.
+
+En un proyecto de Google Cloud que no tenga nada más (la clave puede suplantar a todas sus
+cuentas de servicio):
+
+```sh
+P=<project-id>
+gcloud services enable drive.googleapis.com iam.googleapis.com iamcredentials.googleapis.com --project $P
+gcloud iam service-accounts create shareout-drive-minter --project $P
+for r in serviceAccountCreator serviceAccountDeleter serviceAccountTokenCreator; do
+  gcloud projects add-iam-policy-binding $P \
+    --member serviceAccount:shareout-drive-minter@$P.iam.gserviceaccount.com --role roles/iam.$r
+done
+gcloud iam service-accounts keys create key.json \
+  --iam-account shareout-drive-minter@$P.iam.gserviceaccount.com
+npx wrangler secret put GOOGLE_DRIVE_SA_KEY < key.json && rm key.json
+```
+
+- **¿No te deja crear la clave?** Las organizaciones creadas desde el 2024-05-03 aplican
+  `iam.disableServiceAccountKeyCreation`; desactivalo solo en este proyecto.
+- **Cuántos workspaces:** Google limita las cuentas de servicio por proyecto ("varía según
+  el proyecto"). Mirá el tuyo con `gcloud quotas info list --service=iam.googleapis.com
+  --project=$P` (*Service Account Count*) o en la consola, en las cuotas de IAM, y pedí más
+  si hace falta. Un workspace que no puede tener su propia cuenta ve un error claro
+  (`SHARE_EMAIL_LIMIT`); nunca recibe una compartida. El worker registra
+  `Google service-account limit reached`.
+- **Rotar:** creá una segunda clave en `shareout-drive-minter`, cargala con
+  `wrangler secret put`, probá una importación y borrá la vieja. **Cortar todo:** borrá la clave.
+- El cron horario borra la cuenta de los workspaces eliminados.
 
 ## Entrar con Microsoft
 

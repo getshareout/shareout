@@ -152,6 +152,8 @@ export interface Env {
    *  when deciding whether to revoke at Google. Unset = the sheet sync uses GOOGLE_DRIVE_CLIENT_ID/SECRET. */
   GOOGLE_DRIVE_FILE_CLIENT_ID?: string;
   GOOGLE_DRIVE_FILE_CLIENT_SECRET?: string;
+  /** Google Drive import through sharing (src/file-imports/service-account.ts): the JSON key of the "minter" service account that creates and impersonates one keyless account per workspace. Set = the Google option shares a folder with the workspace's email instead of the OAuth consent. */
+  GOOGLE_DRIVE_SA_KEY?: string;
   /** Folder import from OneDrive / SharePoint (Microsoft Graph, delegated). Unset = hidden. May be the same Entra app as sign-in. */
   MICROSOFT_FILES_CLIENT_ID?: string;
   MICROSOFT_FILES_CLIENT_SECRET?: string;

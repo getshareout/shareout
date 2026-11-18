@@ -5,6 +5,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Deprecated
+
+- **Google Drive folder import through the `drive.readonly` OAuth consent:** hidden in the import window when `GOOGLE_DRIVE_SA_KEY` is set; existing sources keep syncing and can switch to sharing. `GOOGLE_DRIVE_CLIENT_ID` / `GOOGLE_DRIVE_CLIENT_SECRET` stay for the spreadsheet sync (`drive.file` + Picker).
+
 ### Removed
 
 - **Artifact templates:** the Templates lens, "Save as template", `/v1/artifact-templates`, the `list_templates` / `install_template` / `save_as_template` MCP tools and the provisioning `templates` step are gone. Migration 0022's tables stay (additive-only schema) and are no longer read or written.
@@ -22,6 +26,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - **Export zip-slip + `.doc` text boxes:** artifact/workspace export normalizes stored source paths (backslashes → `/`, no empty/`.`/`..` segments, no leading `/`, control or Windows-reserved characters/names, length caps; collisions `~2`, `~3`…) so no entry escapes `source/`; safe paths are byte-identical, and a `RENAMED.txt` lists any rewrite. The legacy `.doc` reader now reads every story in CP order (main, footnotes, headers/footers, annotations, endnotes, text boxes, header text boxes), so forms whose body is only shapes anchoring text boxes extract; a body that is only pictures/drawings fails with "Document has no extractable text (images/drawings only)" instead of "No text found".
 
 ### Added
+
+- **Google Drive import by sharing:** with `GOOGLE_DRIVE_SA_KEY` set, a workspace shares a Drive folder with its own Google service-account email (Viewer) instead of granting the restricted `drive.readonly` OAuth consent — no Google verification, no 100-user cap, and files added later come over on the next sync. One account per workspace, so Google's own ACLs keep workspaces apart; a workspace that cannot get one (the project's service-account limit) gets `SHARE_EMAIL_LIMIT`, never a shared account. `POST /v1/workspaces/{ws}/file-imports/share/google_drive`, `browse?link=`, `PATCH …/sources/{id} { access: 'share' }`. Migration 0042. Design: `shareout-app/docs/google-drive-service-account.md`.
 
 - **Knowledge graph editing over MCP:** six connector tools give owners and admins the same hand on the graph from Claude, ChatGPT or any MCP client: `knowledge_edit_entity` (create, rename, retype, confirm, discard, merge), `knowledge_edit_connection`, `knowledge_edit_fact`, `knowledge_edit_rules` (rules, glossary, types, team-types-only, restore), plus read-only `knowledge_rules` and `knowledge_review` (proposals, discarded, history). They take names as people say them, change nothing for members, and need an exact name or id to discard, merge or disconnect. `knowledge_entity` now says what the team confirmed. The curation routes are in the OpenAPI spec, the skill and the Knowledge docs.
 - **Knowledge — the team curates the graph:** owners and admins confirm, rename, retype, merge and discard entities, add or remove connections and facts, from the Knowledge map (drag a node's + to connect, drop a node on another to merge, double-click to create) or `/v1/workspaces/{id}/knowledge/{entities,relations,facts}`. Confirmed knowledge is drawn solid, proposals dashed, and every member sees it. A new **Rules** view (`/knowledge/{schema,rules,discarded}`) holds the team's types (on/off, team-only), glossary and plain-language rules. The learner reads all of it before every batch: confirmed items survive re-learns, discarded ones never come back, merged or renamed names land on the entity the team kept, ignored types are skipped, and a learned fact that differs from the team's shows next to it instead of replacing it. History per entity at `/knowledge/history`.

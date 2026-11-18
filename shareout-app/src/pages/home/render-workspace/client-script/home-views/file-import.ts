@@ -2,11 +2,13 @@
  * Import a folder from Google Drive / OneDrive / SharePoint (lazy chunk `drives`).
  * One modal, four screens: drives + imported folders → folder browser → target → progress.
  * Connecting opens the provider's consent in a popup; the callback page posts
- * `shareout:file-import:connected` back. The API (src/file-imports/routes.ts) enforces
+ * `shareout:file-import:connected` back. When the instance offers Google Drive by sharing
+ * (`share` in the overview) there is no consent: a share screen shows the workspace's own
+ * email, and browse/import send `access: 'share'`. The OAuth Google row is hidden then. The API (src/file-imports/routes.ts) enforces
  * who may import; this only draws it.
  */
 export const workspace_client_home_views_fileImport_JS = `  // ===== Import from Drive / OneDrive / SharePoint =====
-  var fiMo = null, fiTimer = null, fiListening = false;
+  var fiMo = null, fiTimer = null, fiListening = false, fiAccess = '';
   var FI_TERMINAL = ['done', 'stopped', 'failed'];
   function fiBase() { return '/v1/workspaces/' + encodeURIComponent(window.WSX_WS || '') + '/file-imports'; }
   function fiJson(method, path, body) {
@@ -39,8 +41,12 @@ export const workspace_client_home_views_fileImport_JS = `  // ===== Import from
   }
   function fiHome() {
     fiStop();
+    fiAccess = '';
     fiJson('GET', '').then(function (d) {
-      var provs = (d.providers || []).map(function (p) {
+      var sh = d.share;
+      var provs = (sh ? '<div class="wsx-cn__key"><span><b>' + esc(t('fimp.p.google_drive')) + '</b>' + (sh.shareEmail ? ' <span class="wsx-skill__hint">' + esc(t('fimp.sharedAs').replace('{email}', sh.shareEmail)) + '</span>' : '') + '</span><span>'
+        + fiBtn('data-fi-share="1"', t('fimp.shareBtn'), true) + '</span></div>' : '')
+        + (d.providers || []).filter(function (p) { return !sh || p.id !== 'google_drive'; }).map(function (p) {
         var label = t('fimp.p.' + p.id);
         var status = p.connected ? (p.accountEmail ? t('fimp.connectedAs').replace('{email}', p.accountEmail) : t('fimp.connected')) : '';
         return '<div class="wsx-cn__key"><span><b>' + esc(label) + '</b>' + (status ? ' <span class="wsx-skill__hint">' + esc(status) + '</span>' : '') + '</span><span>'
@@ -55,13 +61,15 @@ export const workspace_client_home_views_fileImport_JS = `  // ===== Import from
           + (r ? '<p class="wsx-field__note">' + esc(t('fimp.status.' + r.status)) + (r.stopMessage ? ' \\u2014 ' + esc(r.stopMessage) : '') + '</p>' + fiCounts(r.counts) : '')
           + '<div class="wsx-skill__btns">'
           + (s.connected ? fiBtn('data-fi-sync="' + esc(s.id) + '"', t('fimp.syncAgain'), false) : '<span class="wsx-field__note">' + esc(t('fimp.reconnect')) + '</span>')
+          + (s.canSwitchToShare ? ' ' + fiBtn('data-fi-switch="' + esc(s.id) + '"', t('fimp.share.switch'), false) : '')
           + (r ? ' ' + fiBtn('data-fi-run="' + esc(r.id) + '"', t('fimp.progress'), false) : '')
           + ' <label class="wsx-field__note"><input type="checkbox" data-fi-daily="' + esc(s.id) + '"' + (s.dailySync ? ' checked' : '') + (s.connected ? '' : ' disabled') + '> ' + esc(t('fimp.daily')) + '</label>'
           + ' ' + fiBtn('data-fi-rm="' + esc(s.id) + '"', t('fimp.remove'), false, true)
           + '</div></div>';
       }).join('');
+      var oauth = (d.providers || []).some(function (p) { return !sh || p.id !== 'google_drive'; });
       var b = fiBody('<p class="wsx-lens__intro">' + esc(t('fimp.intro')) + '</p>' + provs
-        + '<p class="wsx-field__note">' + esc(t('fimp.consentNote')) + '</p>'
+        + (oauth ? '<p class="wsx-field__note">' + esc(t('fimp.consentNote')) + '</p>' : '')
         + '<div class="wsx-sched__title">' + esc(t('fimp.sources')) + '</div>'
         + (srcs || '<p class="wsx-field__note">' + esc(t('fimp.noSources')) + '</p>')
         + '<p class="wsx-cform__err" id="fiErr"></p>');
@@ -73,6 +81,14 @@ export const workspace_client_home_views_fileImport_JS = `  // ===== Import from
     b.addEventListener('click', function (e) {
       var tg = e.target && e.target.closest ? e.target.closest('button') : null; if (!tg) return;
       var v;
+      if (tg.getAttribute('data-fi-share')) { fiShare(); return; }
+      if ((v = tg.getAttribute('data-fi-switch'))) {
+        var sw = v;
+        fiJson('POST', '/share/google_drive').then(function (s) {
+          if (!window.confirm(t('fimp.share.switchConfirm').replace('{email}', s.shareEmail))) return;
+          return fiJson('PATCH', '/sources/' + encodeURIComponent(sw), { access: 'share' }).then(fiHome);
+        }).catch(fiErr); return;
+      }
       if ((v = tg.getAttribute('data-fi-conn'))) { window.open(fiBase() + '/connect/' + encodeURIComponent(v), 'soFileImport', 'width=520,height=680'); return; }
       if ((v = tg.getAttribute('data-fi-pick'))) { fiBrowse(v, [{ ref: 'root', name: t('fimp.p.' + v) }], ''); return; }
       if ((v = tg.getAttribute('data-fi-disc'))) {
@@ -96,10 +112,48 @@ export const workspace_client_home_views_fileImport_JS = `  // ===== Import from
       });
     });
   }
+  // Google Drive through sharing: the workspace's own email, then check what was shared with it.
+  function fiShare() {
+    fiStop();
+    fiBody('<p class="wsx-field__note">' + esc(t('fimp.share.loading')) + '</p>');
+    fiJson('POST', '/share/google_drive').then(function (s) {
+      fiAccess = 'share';
+      var root = [{ ref: 'root', name: t('fimp.share.sharedWith') }];
+      var b = fiBody('<div class="wsx-sched__title">' + esc(t('fimp.share.title')) + '</div>'
+        + '<ol class="wsx-cn__steps"><li>' + esc(t('fimp.share.step1')) + '</li>'
+        + '<li>' + esc(t('fimp.share.step2')) + ' <code id="fiShareEmail">' + esc(s.shareEmail) + '</code> ' + fiBtn('id="fiCopy"', t('fimp.share.copy'), false) + '</li>'
+        + '<li>' + esc(t('fimp.share.step3')) + '</li></ol>'
+        + '<p class="wsx-field__note">' + esc(t('fimp.share.only')) + '</p>'
+        + '<p class="wsx-field__note">' + esc(t('fimp.share.blocked')) + '</p>'
+        + '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('fimp.share.link')) + '</span><input class="wsx-field__in" id="fiLink" placeholder="https://drive.google.com/drive/folders/\\u2026"></label>'
+        + '<p class="wsx-cform__err" id="fiErr"></p>'
+        + '<div class="wsx-cform__foot">' + fiBtn('data-fi-back="1"', t('fimp.back'), false) + ' ' + fiBtn('id="fiFind"', t('fimp.share.find'), false) + ' ' + fiBtn('id="fiCheck"', t('fimp.share.check'), true) + '</div>');
+      if (!b) return;
+      b.querySelector('[data-fi-back]').addEventListener('click', fiHome);
+      b.querySelector('#fiCopy').addEventListener('click', function () {
+        var btn = this;
+        if (navigator.clipboard) navigator.clipboard.writeText(s.shareEmail).then(function () { btn.textContent = t('fimp.share.copied'); }, function () {});
+      });
+      b.querySelector('#fiCheck').addEventListener('click', function () { fiBrowse('google_drive', root, ''); });
+      var find = function () {
+        var link = cv('fiLink');
+        if (!link) return;
+        fiJson('GET', '/browse/google_drive?access=share&link=' + encodeURIComponent(link)).then(function (d) {
+          var en = (d.entries || [])[0];
+          if (en) fiTarget('google_drive', en, root);
+        }, fiErr);
+      };
+      b.querySelector('#fiFind').addEventListener('click', find);
+      b.querySelector('#fiLink').addEventListener('keydown', function (e) { if (e.key === 'Enter') find(); });
+    }).catch(function (e) {
+      fiBody('<p class="wsx-cform__err">' + esc(errReason(e, t('fimp.failed'))) + '</p><div class="wsx-cform__foot">' + fiBtn('data-fi-home="1"', t('fimp.back'), false) + '</div>');
+      var hb = fiMo && fiMo.body.querySelector('[data-fi-home]'); if (hb) hb.addEventListener('click', fiHome);
+    });
+  }
   function fiBrowse(provider, stack, q) {
     var here = stack[stack.length - 1];
     fiBody(i18nLoad());
-    fiJson('GET', '/browse/' + encodeURIComponent(provider) + '?ref=' + encodeURIComponent(here.ref) + (q ? '&q=' + encodeURIComponent(q) : '')).then(function (d) {
+    fiJson('GET', '/browse/' + encodeURIComponent(provider) + '?ref=' + encodeURIComponent(here.ref) + (q ? '&q=' + encodeURIComponent(q) : '') + (fiAccess ? '&access=' + fiAccess : '')).then(function (d) {
       var rows = (d.entries || []).map(function (en, i) {
         return '<div class="wsx-cn__key"><span><b>' + esc(en.name) + '</b></span><span>'
           + fiBtn('data-fi-open="' + i + '"', t('fimp.open'), false)
@@ -108,12 +162,12 @@ export const workspace_client_home_views_fileImport_JS = `  // ===== Import from
       var b = fiBody('<div class="wsx-sched__title">' + esc(t('fimp.browseTitle')) + '</div>'
         + '<p class="wsx-field__note">' + stack.map(function (s) { return esc(s.name); }).join(' / ') + '</p>'
         + (d.searchable ? '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('fimp.searchSites')) + '</span><input class="wsx-field__in" id="fiQ" value="' + esc(q || '') + '"></label>' : '')
-        + (rows || '<p class="wsx-field__note">' + esc(t('fimp.empty')) + '</p>')
+        + (rows || '<p class="wsx-field__note">' + esc(d.shareEmail && stack.length === 1 ? t('fimp.share.none').replace('{email}', d.shareEmail) : t('fimp.empty')) + '</p>')
         + '<div class="wsx-cform__foot">' + fiBtn('data-fi-back="1"', t('fimp.back'), false) + '</div>');
       if (!b) return;
       var qi = b.querySelector('#fiQ');
       if (qi) qi.addEventListener('keydown', function (e) { if (e.key === 'Enter') fiBrowse(provider, stack, qi.value.trim()); });
-      b.querySelector('[data-fi-back]').addEventListener('click', function () { if (stack.length > 1) fiBrowse(provider, stack.slice(0, -1), ''); else fiHome(); });
+      b.querySelector('[data-fi-back]').addEventListener('click', function () { if (stack.length > 1) fiBrowse(provider, stack.slice(0, -1), ''); else if (d.shareEmail) fiShare(); else fiHome(); });
       b.querySelectorAll('[data-fi-open]').forEach(function (btn) {
         btn.addEventListener('click', function () { var en = d.entries[+btn.getAttribute('data-fi-open')]; fiBrowse(provider, stack.concat([{ ref: en.ref, name: en.name }]), ''); });
       });
@@ -141,7 +195,7 @@ export const workspace_client_home_views_fileImport_JS = `  // ===== Import from
           var go = this; go.disabled = true; go.textContent = t('fimp.starting');
           fiJson('POST', '/sources', {
             provider: provider, ref: entry.ref, name: entry.name, targetFolderId: cv('fiTgt') || null,
-            dailySync: document.getElementById('fiDaily').checked,
+            dailySync: document.getElementById('fiDaily').checked, access: fiAccess || undefined,
           }).then(function (r) { fiProgress(r.run.id); }, function (err) { go.disabled = false; go.textContent = t('fimp.start'); fiErr(err); });
         });
       });

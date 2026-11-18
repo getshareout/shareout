@@ -19,6 +19,10 @@ export const DRIVE_FILE_CONSENT = 'google_drive_file' as const;
 /** Every stored consent: a folder-import provider, or the sheet sync's drive.file consent. */
 export type ConsentProvider = FileImportProvider | typeof DRIVE_FILE_CONSENT;
 
+/** How a source reads its drive: a member's OAuth consent, or the workspace's own service account. */
+export const SOURCE_AUTHS = ['oauth', 'service_account'] as const;
+export type SourceAuth = (typeof SOURCE_AUTHS)[number];
+
 export const RUN_STATUSES = ['queued', 'walking', 'importing', 'done', 'stopped', 'failed'] as const;
 export type RunStatus = (typeof RUN_STATUSES)[number];
 export const ACTIVE_STATUSES: readonly RunStatus[] = ['queued', 'walking', 'importing'];

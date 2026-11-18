@@ -33,6 +33,28 @@ miembros externos no.
 6. **Empezá la importación** y seguí el progreso: encontrados, importados, artefactos, sin
    cambios, omitidos y con error, más los archivos para revisar y por qué.
 
+## Google Drive: compartí una carpeta con ShareOut
+
+En las instancias preparadas para esto, Google Drive funciona **compartiendo** en vez de
+conectar una cuenta: sin pantalla de permisos de Google.
+
+1. En la ventana de importación, elegí **Google Drive → Compartir una carpeta**. Aparece el
+   email propio de este workspace (`so-…@….iam.gserviceaccount.com`) con un botón **Copiar**.
+2. En Google Drive, clic derecho en la carpeta → **Compartir**, pegá el email, dale
+   **Lector** y **Enviar**.
+3. De vuelta en ShareOut, **Revisar acceso** muestra lo compartido con este workspace, o
+   pegá el link de la carpeta. Elegila y seguí como arriba.
+
+- El email es **solo de este workspace**: ningún otro workspace puede ver lo que compartas
+  con él. Si dejás de compartir la carpeta en Drive, ShareOut pierde el acceso; la próxima
+  sincronización se detiene y lo avisa, y la diaria vuelve sola cuando la compartas de nuevo.
+- **Los archivos que agregues después** llegan en la próxima sincronización.
+- **"No puedes compartir fuera de tu organización"** en Drive significa que el admin de
+  Google Workspace bloquea compartir afuera. Tiene que habilitarlo para tu equipo (una cuenta
+  de servicio no se puede agregar como dominio de confianza). Mientras tanto, subí los archivos.
+- Una carpeta importada con una conexión de Google anterior muestra **Pasar a compartir**:
+  primero compartila con el email y después pasala. No se importa nada de nuevo.
+
 ## Qué pasa con cada archivo
 
 | En el drive | En ShareOut |
@@ -84,8 +106,9 @@ diaria. Los archivos ya importados quedan. Para seguir sincronizando, conectá d
 importá la carpeta otra vez.
 
 <Aside type="note">
-**Self-hosting:** la función aparece cuando la instancia define `GOOGLE_DRIVE_CLIENT_ID` /
-`GOOGLE_DRIVE_CLIENT_SECRET` y/o `MICROSOFT_FILES_CLIENT_ID` /
+**Self-hosting:** la función aparece cuando la instancia define `GOOGLE_DRIVE_SA_KEY` (Google
+Drive compartiendo, ver [Secretos](/es/self-host/secrets/#google-drive-compartiendo)),
+`GOOGLE_DRIVE_CLIENT_ID` / `GOOGLE_DRIVE_CLIENT_SECRET` (el consentimiento anterior) y/o `MICROSOFT_FILES_CLIENT_ID` /
 `MICROSOFT_FILES_CLIENT_SECRET` (más `CREDENTIALS_KEY`). URIs de redirección:
 `$SHAREOUT_BASE_URL/v1/file-imports/oauth/google_drive/callback` y `…/microsoft/callback`.
 Vinculá el Workflow `FILE_IMPORT` para carpetas grandes. Ver [Secretos](/es/self-host/secrets/).
