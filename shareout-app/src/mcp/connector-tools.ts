@@ -49,7 +49,8 @@ const queryConnection: ToolDef = {
   name: 'query_connection',
   title: 'Query a data connector',
   description: [
-    'Runs one read-only SELECT (or WITH … SELECT) on a warehouse connector and returns the rows.',
+    'Runs one read-only SELECT (or WITH … SELECT) through ShareOut’s data connector API, on a warehouse the workspace connected to ShareOut (Snowflake, BigQuery, Redshift, Aurora or Supabase), and returns the rows.',
+    'Only connectors a workspace admin switched on for AI can be queried, and any statement that is not a SELECT is refused.',
     'Call list_connections first. Aggregate in SQL — results are capped at 1000 rows. Never try to change data.',
     'When you answer, say which connector the numbers came from.',
   ].join(' '),
@@ -74,7 +75,8 @@ const browseStorage: ToolDef = {
   name: 'browse_storage',
   title: 'Browse files in a storage connector',
   description: [
-    'Lists folders and files in an Amazon S3 connector (action "list", optional prefix) or reads one file (action "read", key).',
+    'Through ShareOut’s data connector API, lists folders and files in an Amazon S3 bucket the workspace connected to ShareOut (action "list", optional prefix) or reads one file (action "read", key).',
+    'Read-only, and only for connectors a workspace admin switched on for AI.',
     'CSV comes back as rows, JSON as data, text as text. Files over 10 MB or binary files cannot be read here.',
   ].join(' '),
   inputSchema: {
@@ -99,7 +101,8 @@ const readConnector: ToolDef = {
   name: 'read_connector',
   title: 'Read an app connector',
   description: [
-    'Reads data from an app connector over its API — today Humand (employees, departments, job positions, time off, attendance, courses, form answers).',
+    'Through ShareOut’s data connector API, reads data from an app the workspace connected to ShareOut — today the Humand API (employees, departments, job positions, time off, attendance, courses, form answers).',
+    'Only the fixed list of GET endpoints it returns can be read, and only on connectors a workspace admin switched on for AI.',
     'Call list_connections first (`readable`), then read_connector without endpoint to list what it can read, then with one endpoint and its query/path parameters.',
     'Lists are paged: page from 1, limit up to 500; next_page in the answer is the page to ask for next. Read-only. Say which connector the answer came from.',
   ].join(' '),
