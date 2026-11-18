@@ -15,6 +15,7 @@ External service connections via Data Platform and **Teams workspace connectors*
 | Amazon S3 · Supabase · Amazon Redshift · Amazon Aurora | [databases-and-storage.md](databases-and-storage.md) | Bucket files + read-only SQL over HTTPS (IAM key / Supabase token) |
 | Shopify | [shopify.md](shopify.md) | Products, orders, inventory |
 | Tienda Nube | [tiendanube.md](tiendanube.md) | LATAM e-commerce |
+| Humand | [humand.md](humand.md) | Employees, departments, time off, attendance (read-only, pasted API key) |
 | GitHub | [github.md](github.md) | Backup and export |
 | CORS Proxy | [cors-proxy.md](cors-proxy.md) | External API access |
 

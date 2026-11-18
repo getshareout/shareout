@@ -21,6 +21,7 @@ to where your team already works.
 | [Shopify](/integrations/shopify/) | Products, orders, inventory |
 | [Slack](/integrations/slack/) | Deliver artifacts to a channel or DM |
 | Tienda Nube | LATAM e-commerce |
+| [Humand](/integrations/humand/) | Employees, departments, time off and attendance (read-only) |
 | GitHub | Backup and export |
 | CORS proxy | Call allow-listed external APIs from the page |
 

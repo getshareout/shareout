@@ -63,9 +63,10 @@ your ShareOut account"). Allow, and the app is connected.
 | `knowledge_edit_connection` | Owners/admins: `connect` (`from`, `type`, `to`), `confirm` or `disconnect` — by `connection_id`, or `from` plus `to` and/or `type` |
 | `knowledge_edit_fact` | Owners/admins: `add` (`about`, `predicate`, `value`, `unit`), `confirm` (it becomes the team's value) or `remove` — by `fact_id`, or `about` + `predicate` (+ `value`) |
 | `knowledge_edit_rules` | Owners/admins: `add_rule`, `add_glossary` (`term`, `text`), `remove_rule` (`rule_id`), `set_type` (`type`, `description`, `ignored`), `remove_type`, `team_types_only` (`on`), `restore` (`kind`, `key`) |
-| `list_connections` | The workspace's data connectors; `queryable` (SQL) / `files` (S3) only when an admin switched AI on for that connector |
+| `list_connections` | The workspace's data connectors; `queryable` (SQL) / `files` (S3) / `readable` (app API, e.g. Humand) only when an admin switched AI on for that connector |
 | `query_connection` | One read-only `SELECT` on a warehouse connector (Snowflake, BigQuery, Redshift, Aurora, Supabase); `connection`, `sql`, optional `project_id` (BigQuery); ≤ 1000 rows |
 | `browse_storage` | Amazon S3 connector: `action: "list"` (+ `prefix`) or `"read"` (+ `key`); CSV → rows, JSON → data, text → text |
+| `read_connector` | App connector API (Humand): no `endpoint` → what it can read; `endpoint` + `query` / `path` → the data, `total`, `next_page`; GET endpoints only, answer capped (~50 KB) |
 | `get_help` | Short how-to and links |
 | `report_problem` | Opens a support ticket for the ShareOut team |
 | `search` / `fetch` | Read-only, ChatGPT deep-research shape. `search` covers all the person's workspaces unless `workspace_id` (id or slug) narrows it; `fetch` is by id |

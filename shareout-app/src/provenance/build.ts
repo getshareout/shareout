@@ -93,6 +93,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   google_sheets: 'Google Sheets',
   shopify: 'Shopify',
   tiendanube: 'Tienda Nube',
+  humand: 'Humand',
   slack: 'Slack',
   github: 'GitHub',
   mcp: 'MCP',

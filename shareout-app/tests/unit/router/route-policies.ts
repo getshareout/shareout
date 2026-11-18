@@ -186,6 +186,7 @@ export const MCP_TOOL_POLICIES: Record<string, McpToolPolicy> = {
   list_connections: 'workspace',
   query_connection: 'workspace',
   browse_storage: 'workspace',
+  read_connector: 'workspace',
   get_artifact: 'artifact',
   update_artifact: 'artifact',
   read_artifact: 'artifact',

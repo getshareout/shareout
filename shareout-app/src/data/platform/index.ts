@@ -32,6 +32,7 @@ import './providers/s3';
 import './providers/supabase';
 import './providers/redshift';
 import './providers/aurora';
+import './providers/humand';
 
 export { registerProvider, getProvider, listProviders, hasProvider } from './registry';
 export { BaseProvider } from './providers/base-provider';
