@@ -222,6 +222,8 @@ export interface Env {
   AI_PROVIDER_ORDER?: string;
   /** Model for the build agent and chat agent. Gateway slug (`anthropic/claude-sonnet-5`) or first-party id. Defaults to Claude Sonnet 5. */
   BUILD_MODEL?: string;
+  /** Model that transcribes scanned documents (a PDF with no text layer). Gateway slug (`anthropic/claude-haiku-5.5`) or first-party id. Defaults to Claude Haiku 5.5. */
+  SCAN_MODEL?: string;
   /** AI page builds as a tool-using agent (writes files, checks, fixes, publishes). `on` forces it for the whole instance, `off` is a kill switch that beats every flag; unset follows the `build_agent` feature flag (default off: the one-shot builder). */
   BUILD_AGENT?: string;
   /** Reasoning effort of AI page builds: `low`, `medium` or `high`. Defaults to `medium`. Chat and crew stay at their own. */
