@@ -93,7 +93,14 @@ re-learned); merged or renamed names land on the entity the team kept; ignored t
 skipped; and the team's types, glossary, rules and confirmed names lead its prompt. A learned
 fact that differs from the team's value is shown next to it, never in its place.
 
+The same edits run from the REST API (`/v1/workspaces/{id}/knowledge/{entities,relations,facts,schema,rules,discarded,history}`,
+in `docs-site/src/openapi/shareout.yaml`) and the MCP connector (`src/mcp/knowledge-curation-tools.ts`:
+`knowledge_edit_entity`, `knowledge_edit_connection`, `knowledge_edit_fact`, `knowledge_edit_rules`,
+`knowledge_rules`, `knowledge_review`). The MCP tools replay those routes in-process as the caller,
+so the owner/admin check and per-source visibility are the routes' own.
+
 ## Not in this slice
 
 Live co-editing (presence, cursors, shared review rounds), undo, time scrubbing over
-`validFrom`, and a whole-workspace overview graph. All are compatible with this layout.
+`validFrom`, a whole-workspace overview graph, and graph editing from the workspace assistant
+(in-app chat, Slack, Telegram). All are compatible with this layout.

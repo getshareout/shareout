@@ -3717,9 +3717,44 @@ paths:
             type: integer
             default: 50
             maximum: 100
+        - name: status
+          in: query
+          description: "`confirmed` = what the team confirmed or added; `draft` = learned, not reviewed yet."
+          schema:
+            type: string
+            enum: [confirmed, draft]
       responses:
         "200":
-          description: Entities, most-mentioned first
+          description: Entities, most-mentioned first. Each has `status` (`confirmed` | `draft`).
+    post:
+      tags: [Knowledge]
+      summary: Add an entity (confirmed by the team)
+      description: >-
+        Owner/admin. The entity is the team's: every re-learn keeps it, and files that use
+        its name or aliases attach to it. A name another entity already goes by is a `409`
+        with a merge `suggestion`.
+      operationId: createKnowledgeEntity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type]
+              properties:
+                name: { type: string, maxLength: 120 }
+                type: { type: string, description: "e.g. Organization, Person, Project" }
+                description: { type: string, maxLength: 2000 }
+                aliases: { type: array, maxItems: 20, items: { type: string } }
+      responses:
+        "201":
+          $ref: "#/components/responses/KnowledgeCurated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: The name belongs to another entity (`CONFLICT`, with a merge `suggestion`), or Knowledge is off (`KNOWLEDGE_DISABLED`)
   /v1/workspaces/{workspaceId}/knowledge/entities/{entityId}:
     parameters:
       - $ref: "#/components/parameters/WorkspaceId"
@@ -3743,6 +3778,466 @@ paths:
           description: The entity
         "404":
           $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Knowledge]
+      summary: "Rename, retype or describe an entity, or confirm it"
+      description: >-
+        Owner/admin. Send any of `name`, `type`, `description`, `aliases` (replaces the team's list),
+        or `{"confirm": true}` alone. A renamed entity keeps its old name as an alias, so files that
+        still use it land on it. The entity becomes the team's (`status: confirmed`). Renaming onto
+        a name another entity goes by is a `409` with a merge `suggestion`.
+      operationId: updateKnowledgeEntity
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 120 }
+                type: { type: string }
+                description: { type: string, maxLength: 2000 }
+                aliases: { type: array, maxItems: 20, items: { type: string } }
+                confirm: { type: boolean }
+      responses:
+        "200":
+          $ref: "#/components/responses/KnowledgeCurated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: The name belongs to another entity (`CONFLICT`, with a merge `suggestion`)
+    delete:
+      tags: [Knowledge]
+      summary: "Discard an entity"
+      description: >-
+        Owner/admin. Removes it with its connections and facts, and Knowledge never learns any of
+        its names again until it is restored (`POST …/discarded/restore`).
+      operationId: discardKnowledgeEntity
+      parameters:
+        - name: reason
+          in: query
+          description: "Optional: `noint` (not relevant), `wrong` (misread), `notent` (not a real thing), `dup` (duplicate)."
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/KnowledgeCurated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/knowledge/entities/{entityId}/merge:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: entityId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Knowledge]
+      summary: "Merge an entity into another"
+      description: >-
+        Owner/admin. `entityId` is folded into `into` (the one kept): connections, facts, mentions
+        and names move over, and later files that use the merged names land on `into`.
+      operationId: mergeKnowledgeEntity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [into]
+              properties:
+                into: { type: string, description: "Id of the entity to keep" }
+      responses:
+        "200":
+          $ref: "#/components/responses/KnowledgeCurated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/knowledge/entities/{entityId}/facts:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: entityId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Knowledge]
+      summary: "State a fact as the team"
+      description: >-
+        Owner/admin. Shown as the team's word (`source: null`); a learned fact that disagrees is
+        shown next to it, never in its place.
+      operationId: addKnowledgeFact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [predicate, value]
+              properties:
+                predicate: { type: string, maxLength: 60 }
+                value: { type: string, maxLength: 200 }
+                unit: { type: string, maxLength: 20 }
+      responses:
+        "201":
+          $ref: "#/components/responses/KnowledgeCurated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/knowledge/relations:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    post:
+      tags: [Knowledge]
+      summary: "Connect two entities (confirmed by the team)"
+      operationId: createKnowledgeRelation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, type, to]
+              properties:
+                from: { type: string, description: Entity id }
+                type: { type: string, description: "e.g. client of" }
+                to: { type: string, description: Entity id }
+      responses:
+        "201":
+          $ref: "#/components/responses/KnowledgeCurated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/knowledge/relations/{relationId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: relationId
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [Knowledge]
+      summary: "Discard a connection"
+      description: >-
+        Owner/admin. Knowledge never learns this connection again until it is restored.
+      operationId: discardKnowledgeRelation
+      parameters:
+        - name: reason
+          in: query
+          description: "Optional: `noint` (not relevant), `wrong` (misread), `notent` (not a real thing), `dup` (duplicate)."
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/KnowledgeCurated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/knowledge/relations/{relationId}/confirm:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: relationId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Knowledge]
+      summary: "Confirm a learned connection"
+      description: >-
+        Owner/admin. Kept on every re-learn, even when no file says it any more.
+      operationId: confirmKnowledgeRelation
+      responses:
+        "200":
+          $ref: "#/components/responses/KnowledgeCurated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/knowledge/facts/{factId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: factId
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [Knowledge]
+      summary: "Discard a fact"
+      description: >-
+        Owner/admin. Knowledge never learns this value again for this entity until it is restored.
+      operationId: discardKnowledgeFact
+      responses:
+        "200":
+          $ref: "#/components/responses/KnowledgeCurated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/knowledge/facts/{factId}/confirm:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: factId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Knowledge]
+      summary: "Confirm a learned fact"
+      description: >-
+        Owner/admin. Copies it into the team's facts, replacing the team's value for that predicate;
+        returns the new fact `id`.
+      operationId: confirmKnowledgeFact
+      responses:
+        "200":
+          $ref: "#/components/responses/KnowledgeCurated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/knowledge/schema:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Knowledge]
+      summary: "The team's types and the team-types-only switch"
+      description: >-
+        Every member. Owners and admins also get the types in use with counts (`team: false` for
+        learned ones) and the connection types in use; members get only the team's own types.
+      operationId: getKnowledgeSchema
+      responses:
+        "200":
+          description: "`{ types: [{ type, description, ignored, team, count? }], teamOnly, relationTypes }`"
+    put:
+      tags: [Knowledge]
+      summary: "Keep only the team's types, or not"
+      description: >-
+        Owner/admin. On: anything outside the team's types is not learned.
+      operationId: setKnowledgeTeamOnly
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [teamOnly]
+              properties:
+                teamOnly: { type: boolean }
+      responses:
+        "200":
+          $ref: "#/components/responses/KnowledgeCurated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/knowledge/schema/types/{type}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: type
+        in: path
+        required: true
+        schema:
+          type: string
+    put:
+      tags: [Knowledge]
+      summary: "Add or change one of the team's types"
+      description: >-
+        Owner/admin. `ignored: true` = never learn things of this type.
+      operationId: setKnowledgeType
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description: { type: string, maxLength: 200 }
+                ignored: { type: boolean }
+      responses:
+        "200":
+          $ref: "#/components/responses/KnowledgeCurated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Knowledge]
+      summary: "Remove one of the team's types"
+      description: >-
+        Owner/admin.
+      operationId: removeKnowledgeType
+      responses:
+        "200":
+          $ref: "#/components/responses/KnowledgeCurated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/knowledge/rules:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Knowledge]
+      summary: "The team's glossary and rules"
+      description: >-
+        Every member. The learner reads them before every file, team decisions first.
+      operationId: listKnowledgeRules
+      responses:
+        "200":
+          description: "`{ rules: [{ id, kind: rule|glossary, term, text, at }] }`"
+    post:
+      tags: [Knowledge]
+      summary: "Add a rule or a glossary term"
+      description: >-
+        Owner/admin. At most 100.
+      operationId: addKnowledgeRule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                kind: { type: string, enum: [rule, glossary], default: rule }
+                term: { type: string, maxLength: 60, description: Required for glossary }
+                text: { type: string, maxLength: 500 }
+      responses:
+        "201":
+          $ref: "#/components/responses/KnowledgeCurated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/knowledge/rules/{ruleId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: ruleId
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [Knowledge]
+      summary: "Remove a rule or glossary term"
+      description: >-
+        Owner/admin.
+      operationId: removeKnowledgeRule
+      responses:
+        "200":
+          $ref: "#/components/responses/KnowledgeCurated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/knowledge/discarded:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Knowledge]
+      summary: "What the team discarded"
+      description: >-
+        Owner/admin. Newest first; each has the `kind` and `key` restore takes.
+      operationId: listKnowledgeDiscarded
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 200 }
+      responses:
+        "200":
+          description: "`{ discarded: [{ kind: entity|relation|fact, key, label, reason, at }] }`"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/knowledge/discarded/restore:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    post:
+      tags: [Knowledge]
+      summary: "Restore something discarded"
+      description: >-
+        Owner/admin. Knowledge may learn it again from the next file that mentions it.
+      operationId: restoreKnowledgeDiscarded
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, key]
+              properties:
+                kind: { type: string, enum: [entity, relation, fact] }
+                key: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/KnowledgeCurated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/knowledge/history:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Knowledge]
+      summary: "The team's changes to the graph"
+      description: >-
+        Owner/admin. Newest first; `entity` keeps only the changes to that entity.
+      operationId: listKnowledgeHistory
+      parameters:
+        - name: entity
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 200 }
+      responses:
+        "200":
+          description: "`{ history: [{ id, at, by, action, targets, detail }] }`"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /v1/workspaces/{workspaceId}/knowledge/graph:
     parameters:
       - $ref: "#/components/parameters/WorkspaceId"
@@ -7893,6 +8388,15 @@ components:
                     at:
                       type: string
                       format: date-time
+    KnowledgeCurated:
+      description: Done. `id` is the entity, connection, fact or rule it touched (on a merge, the one kept).
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok: { type: boolean }
+              id: { type: string }
     BadRequest:
       description: Invalid request
       content:

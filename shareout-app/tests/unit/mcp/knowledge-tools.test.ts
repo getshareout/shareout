@@ -112,11 +112,14 @@ beforeEach(() => {
 });
 
 describe('knowledge tools are listed', () => {
-  it('exposes six read-only tools plus reindex, telling the model to cite and use the person\'s language', () => {
+  it('exposes read-only tools plus reindex and the team\'s edits, telling the model to cite and use the person\'s language', () => {
     const tools = listTools().filter((t) => t.name.startsWith('knowledge_'));
-    expect(tools.map((t) => t.name)).toEqual(['knowledge_search', 'knowledge_entity', 'knowledge_facts', 'knowledge_status', 'knowledge_reindex', 'knowledge_get', 'knowledge_from_artifact']);
+    expect(tools.map((t) => t.name)).toEqual([
+      'knowledge_search', 'knowledge_entity', 'knowledge_facts', 'knowledge_status', 'knowledge_reindex', 'knowledge_get', 'knowledge_from_artifact',
+      'knowledge_rules', 'knowledge_review', 'knowledge_edit_entity', 'knowledge_edit_connection', 'knowledge_edit_fact', 'knowledge_edit_rules',
+    ]);
     for (const t of tools) {
-      expect(t.annotations.readOnlyHint).toBe(t.name !== 'knowledge_reindex');
+      expect(t.annotations.readOnlyHint, t.name).toBe(t.name !== 'knowledge_reindex' && !t.name.startsWith('knowledge_edit_'));
       expect(t.description).toMatch(/person's language/);
     }
     expect(tools.find((t) => t.name === 'knowledge_search')!.description).toMatch(/say where each fact comes from/);

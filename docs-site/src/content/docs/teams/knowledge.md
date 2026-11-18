@@ -93,6 +93,26 @@ You stay in charge of the library. On any note's detail view you can:
 - **Forget** (owner/admin) — remove a note. Forgetting also stops that page from being
   re-learned, so it stays gone.
 
+### Teach it what matters (the graph)
+
+Knowledge also maps the clients, people, projects and documents your files talk about, and how
+they connect. Owners and admins shape that map, and **every re-learn respects it**:
+
+- **Confirm, fix or discard** what it proposed. Confirmed items are drawn solid, proposals
+  dashed. A rename keeps the old name as an alias, so files that still use it land in the same
+  place. Something discarded is never learned again (until you restore it from the Rules view).
+- **Connect, merge and add** — drag a node's **+** onto another to connect them, drop one node
+  on another to merge duplicates, double-click empty space to add something new.
+- **State facts** — a fact you add is shown as the team's word; a file that says otherwise is
+  shown next to it, never in its place.
+- **Rules** — the team's types (switch off the ones you don't care about, or keep only yours),
+  a glossary of your own words, and plain-language rules. The learner reads them before every
+  file, team decisions first.
+
+Members see all of it read-only. The same edits are available over the REST API (below) and
+the MCP connector (`knowledge_edit_entity`, `knowledge_edit_connection`, `knowledge_edit_fact`,
+`knowledge_edit_rules`, `knowledge_rules`, `knowledge_review`).
+
 ## What's in it
 
 Knowledge is a small tree of markdown files, one file per note. The YAML frontmatter holds the
@@ -190,6 +210,15 @@ the per-note routes return `404` — never an error.
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Delete a note; `forget=1` stops it being re-learned |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | Turn learning on or off (**paid plan** required to enable) |
 | `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 recent live pages; returns `{ queued, kicked }` (**paid plan**) |
+| `POST` | `/v1/workspaces/{id}/knowledge/entities` | Admin+ | Add an entity, confirmed by the team |
+| `PATCH` / `DELETE` | `/v1/workspaces/{id}/knowledge/entities/{entityId}` | Admin+ | Rename, retype, describe or confirm it; discard it |
+| `POST` | `/v1/workspaces/{id}/knowledge/entities/{entityId}/merge` · `/facts` | Admin+ | Merge it into another (`{ into }`); state a fact |
+| `POST` / `DELETE` | `/v1/workspaces/{id}/knowledge/relations[/{relationId}[/confirm]]` | Admin+ | Connect, confirm or discard a connection |
+| `POST` / `DELETE` | `/v1/workspaces/{id}/knowledge/facts/{factId}[/confirm]` | Admin+ | Confirm or discard a learned fact |
+| `GET` / `PUT` | `/v1/workspaces/{id}/knowledge/schema[/types/{type}]` | Member+ / Admin+ | The team's types and the "team types only" switch |
+| `GET` / `POST` / `DELETE` | `/v1/workspaces/{id}/knowledge/rules[/{ruleId}]` | Member+ / Admin+ | Glossary and rules the learner reads first |
+| `GET` / `POST` | `/v1/workspaces/{id}/knowledge/discarded[/restore]` | Admin+ | What was discarded; bring something back |
+| `GET` | `/v1/workspaces/{id}/knowledge/history` | Admin+ | The team's changes to the graph |
 
 A hand-edited note (via `PUT`) is never overwritten by the learner — the same rule the edit
 control follows in the lens. The overview (`index.md`) is loaded into every member's assistant,

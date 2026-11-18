@@ -88,6 +88,28 @@ Seguís al mando de la biblioteca. En la vista de detalle de cualquier nota pod�
 - **Pin** — marcar una nota para conservar. Fijar sigue el mismo camino "es tuya" que editar, así una nota fijada no cambia sola.
 - **Forget** (owner/admin) — eliminar una nota. Olvidar también evita que ese artefacto se re-aprenda.
 
+### Enseñale lo que importa (el grafo)
+
+Conocimiento también arma el mapa de clientes, personas, proyectos y documentos de los que hablan
+tus archivos, y cómo se conectan. Owners y admins le dan forma a ese mapa, y **cada re-aprendizaje
+lo respeta**:
+
+- **Confirmar, corregir o descartar** lo que propuso. Lo confirmado se dibuja sólido, las
+  propuestas punteadas. Al renombrar, el nombre viejo queda como alias, así los archivos que lo
+  siguen usando caen en el mismo lugar. Lo descartado no se vuelve a aprender (hasta que lo
+  restaurás desde la vista Reglas).
+- **Conectar, fusionar y crear** — arrastrá el **+** de un nodo sobre otro para conectarlos,
+  soltá un nodo sobre otro para fusionar duplicados, doble clic en un espacio vacío para crear.
+- **Datos del equipo** — un dato que agregás se muestra como palabra del equipo; si un archivo
+  dice otra cosa, aparece al lado, nunca en su lugar.
+- **Reglas** — los tipos del equipo (apagá los que no te interesan, o quedate solo con los tuyos),
+  un glosario con sus propias palabras y reglas en lenguaje simple. El learner las lee antes de
+  cada archivo, primero las decisiones del equipo.
+
+Los miembros lo ven todo en modo lectura. Las mismas ediciones están en la API REST (abajo) y en
+el conector MCP (`knowledge_edit_entity`, `knowledge_edit_connection`, `knowledge_edit_fact`,
+`knowledge_edit_rules`, `knowledge_rules`, `knowledge_review`).
+
 ## Qué contiene
 
 Knowledge es un árbol pequeño de archivos markdown, un archivo por nota. El frontmatter YAML
@@ -166,6 +188,15 @@ las rutas requieren membresía del workspace.
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Eliminar nota; `forget=1` evita re-aprendizaje |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | Activar/desactivar (**plan pago** para activar) |
 | `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Encolar hasta 200 artefactos; `{ queued, kicked }` (**plan pago**) |
+| `POST` | `/v1/workspaces/{id}/knowledge/entities` | Admin+ | Crear una entidad, confirmada por el equipo |
+| `PATCH` / `DELETE` | `/v1/workspaces/{id}/knowledge/entities/{entityId}` | Admin+ | Renombrar, cambiar tipo, describir o confirmar; descartar |
+| `POST` | `/v1/workspaces/{id}/knowledge/entities/{entityId}/merge` · `/facts` | Admin+ | Fusionar en otra (`{ into }`); agregar un dato |
+| `POST` / `DELETE` | `/v1/workspaces/{id}/knowledge/relations[/{relationId}[/confirm]]` | Admin+ | Conectar, confirmar o descartar una conexión |
+| `POST` / `DELETE` | `/v1/workspaces/{id}/knowledge/facts/{factId}[/confirm]` | Admin+ | Confirmar o descartar un dato aprendido |
+| `GET` / `PUT` | `/v1/workspaces/{id}/knowledge/schema[/types/{type}]` | Member+ / Admin+ | Los tipos del equipo y "solo tipos del equipo" |
+| `GET` / `POST` / `DELETE` | `/v1/workspaces/{id}/knowledge/rules[/{ruleId}]` | Member+ / Admin+ | Glosario y reglas que el learner lee primero |
+| `GET` / `POST` | `/v1/workspaces/{id}/knowledge/discarded[/restore]` | Admin+ | Lo descartado; restaurar |
+| `GET` | `/v1/workspaces/{id}/knowledge/history` | Admin+ | Los cambios del equipo al grafo |
 
 ## Privacidad y alcance
 
