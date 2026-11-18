@@ -13,7 +13,7 @@ import { handleDataRequest } from '../data/router';
 import { setFolderGuestComments } from '../sharees/folder-guest-comments';
 import type { BotWorkspace } from '../chat-agent/access';
 import {
-  NOT_MEMBER, ON_FAILURE, errorText, fail, invalid, ok, readJson, resolveFolder, resolveWorkspace, str, workspaceChoiceText,
+  NOT_MEMBER, errorText, fail, invalid, ok, readJson, resolveFolder, resolveWorkspace, str, workspaceChoiceText,
   type Args, type ToolContext, type ToolDef, type ToolResult,
 } from './tool-kit';
 
@@ -117,7 +117,7 @@ const shareWithPerson: ToolDef = {
   description: [
     'Gives one outside person (a client, a partner) access to a folder (everything in it) or one file, by email. They get an invite and see it at their "shared with me" page.',
     'capability: "view" (default) or "comment". Optional expiry: expires_in_days (e.g. 7, 30, 90) or expires_at (a date); sharing again replaces the expiry.',
-    'For workspace admins and the folder\'s creator. Confirm the email, the folder and the expiry with the person first.', ON_FAILURE,
+    'For workspace admins and the folder\'s creator. Access starts as soon as it runs.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -172,7 +172,7 @@ const shareWithPerson: ToolDef = {
 const revokeShare: ToolDef = {
   name: 'revoke_share',
   title: 'Stop sharing',
-  description: 'Removes one share (a grant) so that person or client loses access within about a minute. Get the grant id from folder_access. For workspace admins and the folder\'s creator. Confirm with the person first.',
+  description: 'Removes one share (a grant) so that person or client loses access within about a minute. The grant id comes from folder_access. For workspace admins and the folder\'s creator.',
   inputSchema: {
     type: 'object',
     properties: { grant_id: { type: 'string' }, workspace_id: WORKSPACE_ARG },
@@ -200,7 +200,7 @@ const setGuestComments: ToolDef = {
   description: [
     'Turns guest comments on or off. Guests are people with no account reviewing through a public link or a password link: they confirm their email with a code, then comment and reply under their name (they can never resolve, assign or approve).',
     'Give artifact_id for one page (only its owner may change it; enabled null makes the page follow its folder again), or folder (+ workspace_id) for everything in a folder that has no setting of its own (admins and the folder\'s creator).',
-    'Guests only ever comment where they can already open the page. Confirm with the person first.', ON_FAILURE,
+    'Guests only ever comment where they can already open the page.',
   ].join(' '),
   inputSchema: {
     type: 'object',

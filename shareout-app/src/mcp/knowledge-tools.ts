@@ -10,11 +10,13 @@ import { visibleSources } from '../knowledge/corpus/search';
 import type { SourceKind } from '../knowledge/corpus/client';
 import type { BotWorkspace } from '../chat-agent/access';
 import {
-  NOT_MEMBER, ON_FAILURE, errorText, fail, ok, readJson, resolveWorkspace, str, workspaceChoiceText,
+  NOT_MEMBER, errorText, fail, ok, readJson, resolveWorkspace, str, workspaceChoiceText,
   type Args, type ToolContext, type ToolDef, type ToolResult,
 } from './tool-kit';
 
+/** Appended to results (never to a tool description, which only describes). */
 export const ANSWER = 'Answer in the person\'s language, only from what this returns, and say where each fact comes from (the page or file name, with its link when there is one).';
+export const SOURCED = 'Every result names where it comes from (the page or file, with its link when there is one).';
 
 export const WORKSPACE_ARG = { type: 'string', description: 'Which workspace to look in. Needed when the person has more than one — ask them which.' };
 
@@ -121,9 +123,9 @@ const knowledgeSearch: ToolDef = {
   title: 'Search what the team knows',
   description: [
     'Searches everything the workspace has learned from its Files and pages and returns the passages that answer a question, each with its source.',
-    'Use it first for any question about the team\'s clients, projects, numbers, people or decisions.',
-    'Write the query in the words the person would use (any language).',
-    ANSWER, 'Cite passages by their [number] and source name.', ON_FAILURE,
+    'The starting point for any question about the team\'s clients, projects, numbers, people or decisions.',
+    'query: the question in the words the person would use (any language).',
+    SOURCED, 'Passages come numbered, each with its source name.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -167,7 +169,7 @@ const knowledgeEntity: ToolDef = {
   description: [
     'Looks up one thing the workspace knows about — a company, client, person, product or project — by name:',
     'what it is, what it is connected to (its neighbours), and which files and pages mention it.',
-    'Use knowledge_facts for its numbers and dates.', ANSWER, ON_FAILURE,
+    'Its numbers and dates are in knowledge_facts.', SOURCED,
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -222,7 +224,7 @@ const knowledgeFacts: ToolDef = {
   description: [
     'Returns the recorded facts (amounts, dates, statuses, owners…) about a company, client, person or project,',
     'each with the exact sentence it came from and its source. Optional filter keeps only facts whose name or value contains those words.',
-    ANSWER, 'Quote the evidence when the person asks how we know.', ON_FAILURE,
+    SOURCED,
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -268,7 +270,7 @@ const knowledgeStatus: ToolDef = {
   description: [
     'Says whether knowledge is on for a workspace, how many files and pages are learned, which are still being processed,',
     'which could not be read, and how many people, companies and projects it knows about.',
-    'Use it when a search finds nothing or the person asks what is covered. Answer in the person\'s language.', ON_FAILURE,
+    'Useful when a search finds nothing or the person asks what is covered.',
   ].join(' '),
   inputSchema: { type: 'object', properties: { workspace_id: WORKSPACE_ARG }, additionalProperties: false },
   annotations: { readOnlyHint: true, openWorldHint: false },
@@ -321,9 +323,8 @@ const knowledgeReindex: ToolDef = {
   title: 'Re-learn the workspace\'s files and pages',
   description: [
     'Re-learns every file and page of a workspace (or only artifact_ids) even when they did not change, so answers can cite the exact sub-page and section.',
-    'Only workspace owners and admins (and instance admins) may run it, once every 10 minutes per workspace. It costs AI usage, so run it only when asked or when knowledge_status shows sources from an older chunker.',
-    'With check_only it starts nothing and reports each source (queued / ready / failed, passages, how many cite a sub-page or section, last error) — use it to follow progress.',
-    'Answer in the person\'s language.', ON_FAILURE,
+    'Only workspace owners and admins (and instance admins) may run it, once every 10 minutes per workspace. It costs AI usage; it is meant for when the person asks or knowledge_status shows sources from an older chunker.',
+    'With check_only it starts nothing and reports each source (queued / ready / failed, passages, how many cite a sub-page or section, last error), which is how progress is followed.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -365,8 +366,8 @@ const knowledgeNote: ToolDef = {
   title: 'Read one knowledge note',
   description: [
     'Reads one note the workspace has learned (a topic, client, project…) in full, by its path (from knowledge_from_artifact, e.g. topics/retention.md),',
-    'with the pages it was learned from. Cite available sources by title with their link; an unavailable source is gone or not visible to the person, so do not guess what it was.',
-    ANSWER, ON_FAILURE,
+    'with the pages it was learned from. Available sources come with title and link; an unavailable source is gone or not visible to the person, and nothing more is known about it.',
+    SOURCED,
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -398,7 +399,7 @@ const knowledgeNote: ToolDef = {
 const knowledgeFromArtifact: ToolDef = {
   name: 'knowledge_from_artifact',
   title: 'Notes learned from a page',
-  description: ['Lists the knowledge notes the workspace learned from one page (the reverse of a note\'s sources), with the paths knowledge_get takes. Empty when the person cannot open the page.', ANSWER].join(' '),
+  description: ['Lists the knowledge notes the workspace learned from one page (the reverse of a note\'s sources), with the paths knowledge_get takes. Empty when the person cannot open the page.', SOURCED].join(' '),
   inputSchema: {
     type: 'object',
     properties: { artifact_id: { type: 'string', description: 'The page id.' }, workspace_id: WORKSPACE_ARG },

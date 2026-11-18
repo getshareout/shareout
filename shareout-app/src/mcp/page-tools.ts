@@ -10,7 +10,7 @@ import { queryArtifactComments } from '../pages/home/queries/comments';
 import { setApproval, setCommentAssignee, setCommentResolved, type ReviewResult } from '../pages/home/queries/review';
 import { handleListJobs } from '../scheduling/handler';
 import {
-  ON_FAILURE, errorText, fail, getRequest, ok, readJson, str,
+  errorText, fail, getRequest, ok, readJson, str,
   type ToolContext, type ToolDef, type ToolResult,
 } from './tool-kit';
 
@@ -42,7 +42,7 @@ interface VersionRow {
 const listVersions: ToolDef = {
   name: 'list_versions',
   title: 'Page history',
-  description: 'Lists the saved versions of a page, newest first: who published each one, when, how (api, agent, editor or restore), its change note, how many comments were left on it and who approved it. Says which version is live. Answer in the person\'s language.',
+  description: 'Lists the saved versions of a page, newest first: who published each one, when, how (api, agent, editor or restore), its change note, how many comments were left on it and who approved it. Says which version is live.',
   inputSchema: { type: 'object', properties: { artifact_id: ARTIFACT_ID }, required: ['artifact_id'], additionalProperties: false },
   annotations: { readOnlyHint: true, openWorldHint: false },
   async run(ctx, args) {
@@ -95,8 +95,7 @@ const restoreVersion: ToolDef = {
   title: 'Bring back an old version',
   description: [
     'Makes an old version of a page live again by saving it as a new version (nothing is deleted; the history keeps every version).',
-    'Needs edit access. Confirm the version with the person first. message: optional note for the history.',
-    'Afterwards tell the person which version is now live.', ON_FAILURE,
+    'Needs edit access. message: optional note for the history. Returns which version is now live.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -169,7 +168,7 @@ const listComments: ToolDef = {
 const resolveComment: ToolDef = {
   name: 'resolve_comment',
   title: 'Resolve or reopen a comment',
-  description: 'Marks a comment thread resolved (or reopens it with resolved: false). Anyone with comment access to the page may do it. Get the comment_id from list_comments.',
+  description: 'Marks a comment thread resolved (or reopens it with resolved: false). Anyone with comment access to the page may do it. comment_id comes from list_comments.',
   inputSchema: {
     type: 'object',
     properties: { artifact_id: ARTIFACT_ID, comment_id: { type: 'string' }, resolved: { type: 'boolean', default: true } },

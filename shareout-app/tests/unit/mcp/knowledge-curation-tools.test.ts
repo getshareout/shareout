@@ -114,12 +114,11 @@ beforeEach(() => {
 const EDIT_TOOLS = ['knowledge_edit_entity', 'knowledge_edit_connection', 'knowledge_edit_fact', 'knowledge_edit_rules'];
 
 describe('curation tools are listed', () => {
-  it('adds two read tools and four edit tools, each in the person\'s language; edits say they are for owners and admins', () => {
+  it('adds two read tools and four edit tools; edits say they are for owners and admins', () => {
     const tools = listTools().filter((t) => ['knowledge_rules', 'knowledge_review', ...EDIT_TOOLS].includes(t.name));
     expect(tools.map((t) => t.name)).toEqual(['knowledge_rules', 'knowledge_review', ...EDIT_TOOLS]);
     for (const t of tools) {
       expect(t.annotations.readOnlyHint, t.name).toBe(!EDIT_TOOLS.includes(t.name));
-      expect(t.description, t.name).toMatch(/person's language/);
       if (EDIT_TOOLS.includes(t.name)) expect(t.description, t.name).toMatch(/owners and admins/);
     }
   });

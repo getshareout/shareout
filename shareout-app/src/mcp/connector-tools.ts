@@ -38,7 +38,7 @@ const listConnections: ToolDef = {
     "Lists the workspace's data connectors (Snowflake, BigQuery, Redshift, Aurora, Supabase, Amazon S3, Humand, …).",
     '`queryable` means query_connection can run SQL on it; `files` means browse_storage can list and read its files;',
     '`readable` means read_connector can read its API.',
-    'Connectors an admin has not switched on for AI show neither; tell the person an admin can switch it on under Connectors.',
+    'Connectors an admin has not switched on for AI show none of the three; an admin switches a connector on under Connectors.',
   ].join(' '),
   inputSchema: { type: 'object', properties: { workspace_id: workspaceProp }, additionalProperties: false },
   annotations: { readOnlyHint: true, openWorldHint: false },
@@ -51,8 +51,7 @@ const queryConnection: ToolDef = {
   description: [
     'Runs one read-only SELECT (or WITH … SELECT) through ShareOut’s data connector API, on a warehouse the workspace connected to ShareOut (Snowflake, BigQuery, Redshift, Aurora or Supabase), and returns the rows.',
     'Only connectors a workspace admin switched on for AI can be queried, and any statement that is not a SELECT is refused.',
-    'Call list_connections first. Aggregate in SQL — results are capped at 1000 rows. Never try to change data.',
-    'When you answer, say which connector the numbers came from.',
+    '`connection` is a connector name from list_connections. Results are capped at 1000 rows, so totals and groupings belong in the SQL.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -103,8 +102,8 @@ const readConnector: ToolDef = {
   description: [
     'Through ShareOut’s data connector API, reads data from an app the workspace connected to ShareOut — today the Humand API (employees, departments, job positions, time off, attendance, courses, form answers).',
     'Only the fixed list of GET endpoints it returns can be read, and only on connectors a workspace admin switched on for AI.',
-    'Call list_connections first (`readable`), then read_connector without endpoint to list what it can read, then with one endpoint and its query/path parameters.',
-    'Lists are paged: page from 1, limit up to 500; next_page in the answer is the page to ask for next. Read-only. Say which connector the answer came from.',
+    '`connection` is a `readable` connector from list_connections. Without endpoint it lists what can be read; with one endpoint and its query/path parameters it returns the data.',
+    'Lists are paged: page from 1, limit up to 500; next_page in the answer is the page that follows. Read-only.',
   ].join(' '),
   inputSchema: {
     type: 'object',

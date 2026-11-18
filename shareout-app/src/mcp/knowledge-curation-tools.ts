@@ -85,8 +85,8 @@ const editEntity: ToolDef = {
     'create: add it (name, type; description and aliases optional). update: rename (the old name stays an alias), retype, set its description or aliases.',
     'confirm: the team agrees with it as learned. discard: it goes and is never learned again. merge: two entries are the same thing, entity is folded into "into" (the one kept).',
     'Whatever is created, updated, confirmed or merged becomes the team\'s: ' + KEPT,
-    'Use it when the person corrects Knowledge ("that is not a client", "X and Y are the same", "call it Z"). Do not discard or merge unless the person asked.',
-    ADMINS, TELL,
+    'For when the person corrects Knowledge ("that is not a client", "X and Y are the same", "call it Z"). discard and merge cannot be undone from here, only restored with knowledge_edit_rules.',
+    ADMINS,
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -193,7 +193,7 @@ const editConnection: ToolDef = {
     'Changes how two things Knowledge knows are connected ("Acme is a client of Northwind").',
     'connect: from, type (e.g. client of, works at, part of, supplies) and to. confirm: the team agrees with a learned connection. disconnect: it goes and is never learned again.',
     'Name the connection by connection_id (from knowledge_entity), or by from plus to and/or type. ' + KEPT,
-    'Do not disconnect unless the person asked.', ADMINS, TELL,
+    ADMINS,
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -250,7 +250,7 @@ const editFact: ToolDef = {
     'Changes the facts on record about one thing (amounts, dates, statuses, owners…).',
     'add: the team states a fact (about, predicate, value, unit optional); it is shown as the team\'s word, and a file that says otherwise shows next to it, never in its place.',
     'confirm: the team agrees with a learned fact, which becomes the team\'s value for that predicate. remove: the fact goes and is never learned again.',
-    'Name the fact by fact_id (from knowledge_facts structured results), or by about plus predicate (and value). ' + ADMINS, TELL,
+    'Name the fact by fact_id (from knowledge_facts structured results), or by about plus predicate (and value). ' + ADMINS,
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -323,7 +323,7 @@ const rulesTool: ToolDef = {
   title: 'The team\'s rules for Knowledge',
   description: [
     'Reads how the workspace team shapes Knowledge: the kinds of things it keeps (its types, and which are ignored), whether it keeps only the team\'s types, the glossary (what the team\'s words mean) and plain-language rules.',
-    'Every member may read them. Use the glossary and rules when answering from Knowledge, and read them before changing types or rules. Answer in the person\'s language.',
+    'Every member may read them. The glossary and rules say how the team wants Knowledge read, and what is already set before types or rules are changed.',
   ].join(' '),
   inputSchema: { type: 'object', properties: { workspace_id: WORKSPACE_ARG }, additionalProperties: false },
   annotations: { readOnlyHint: true, openWorldHint: false },
@@ -363,7 +363,7 @@ const editRules: ToolDef = {
     'add_rule: a plain-language rule (text), e.g. "Procedures are coded PR-xx; never treat them as people". add_glossary: what one of the team\'s words means (term, text). remove_rule: by rule_id (from knowledge_rules).',
     'set_type: add or change one of the team\'s types (type, description; ignored true = never learn things of that type). remove_type. team_types_only: on true, Knowledge keeps only the team\'s types.',
     'restore: bring back something discarded (kind and key from knowledge_review, show "discarded").',
-    'Rules apply to files learned from now on; owners and admins can re-learn older ones with knowledge_reindex.', ADMINS, TELL,
+    'Rules apply to files learned from now on; owners and admins can re-learn older ones with knowledge_reindex.', ADMINS,
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -458,7 +458,7 @@ const reviewTool: ToolDef = {
   description: [
     'For reviewing what Knowledge learned. show "proposals" (default): things it learned that the team has not confirmed yet, most mentioned first (optional type filter);',
     'confirm, fix or discard each with knowledge_edit_entity. show "discarded": what the team discarded, with the kind and key knowledge_edit_rules restores.',
-    'show "history": the team\'s recent changes (optionally for one entity). Discarded and history are for owners and admins. Answer in the person\'s language.',
+    'show "history": the team\'s recent changes (optionally for one entity). Discarded and history are for owners and admins.',
   ].join(' '),
   inputSchema: {
     type: 'object',

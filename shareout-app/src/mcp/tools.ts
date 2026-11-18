@@ -18,7 +18,7 @@ import { generateSlug, isSafeAssetPath, mimeForPath, resolveEntrypoint } from '.
 import { isSafePagePath } from '../serve/page-agent';
 import { createLogger, logError } from '../logging';
 import {
-  NOT_MEMBER, ON_FAILURE, errorText, fail, getRequest, invalid, ok, readJson, resolveFolder, resolveWorkspace, str, validateArgs, workspaceChoiceText,
+  NOT_MEMBER, errorText, fail, getRequest, invalid, ok, readJson, resolveFolder, resolveWorkspace, str, validateArgs, workspaceChoiceText,
   type Args, type ToolContext, type ToolDef, type ToolResult,
 } from './tool-kit';
 import { MEMBER_TOOLS } from './member-tools';
@@ -62,6 +62,9 @@ export const SERVER_INSTRUCTIONS = [
   'departments, time off, attendance), and say which connector the answer came from.',
   'If anything fails or behaves unexpectedly, call report_problem with what happened, then tell the person',
   'the ShareOut team was notified. For how-to questions about ShareOut, call get_help.',
+  'Confirm with the person before anything that reaches other people or cannot be undone from here: sharing a folder or file outside the team,',
+  'revoking a share, turning guest comments on or off, resending or cancelling an invite, restoring a version, and discarding, merging,',
+  'disconnecting or removing what Knowledge learned. After a change, say in a line or two what changed.',
 ].join(' ');
 
 function artifactUrl(origin: string, routingSlug: string): string {
@@ -217,7 +220,7 @@ function describePublish(
 const whoami: ToolDef = {
   name: 'whoami',
   title: 'Who am I',
-  description: 'Shows which ShareOut account is connected and its workspaces. Answer the person in their language.',
+  description: 'Shows which ShareOut account is connected and its workspaces.',
   inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   annotations: { readOnlyHint: true, openWorldHint: false },
   async run(ctx) {
@@ -233,7 +236,7 @@ const whoami: ToolDef = {
 const listWorkspaces: ToolDef = {
   name: 'list_workspaces',
   title: 'List workspaces',
-  description: 'Lists the ShareOut workspaces (teams) the person belongs to, with their ids. Use it to ask which workspace to publish to.',
+  description: 'Lists the ShareOut workspaces (teams) the person belongs to, with their ids, for choosing which workspace to publish to.',
   inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   annotations: { readOnlyHint: true, openWorldHint: false },
   async run(ctx) {
@@ -290,9 +293,9 @@ const getArtifact: ToolDef = {
   title: 'Get a page',
   description: [
     'Details of one page: name, link, who can see it, version.',
-    'include_content adds the main file\'s source; include_files adds every file of the page (its pages, css, js, data; images and fonts as base64), main file first. Use include_files before changing a page that has more than one file.',
-    'One answer holds up to 512 KB of file content: a file that does not fit comes back cut or left out and marked truncated, and must never be sent back with update_artifact.',
-    'To change the page, edit what this returns and pass its version to update_artifact as base_version.',
+    'include_content adds the main file\'s source; include_files adds every file of the page (its pages, css, js, data; images and fonts as base64), main file first; include_files is what a change to a page with more than one file starts from.',
+    'One answer holds up to 512 KB of file content: a file that does not fit comes back cut or left out and marked truncated; a truncated file is incomplete, and sending it back with update_artifact would save it cut.',
+    'The version it returns is the base_version update_artifact takes.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -334,14 +337,13 @@ const publishArtifact: ToolDef = {
   description: [
     'Publishes a new page on ShareOut and returns its link.',
     'content is a complete, self-contained HTML document (inline CSS/JS) or Markdown text.',
-    'For a site with several pages, send files instead of content: index.html (the first page) plus the other pages and assets, linked with relative links; the result links every page.',
-    'workspace_id: needed when the person has more than one workspace — ask them which one.',
+    'For a site with several pages, files replaces content: index.html (the first page) plus the other pages and assets, linked with relative links; the result links every page.',
+    'workspace_id: needed when the person has more than one workspace.',
     'visibility: "workspace" (default: everyone in the workspace), "private" (only them) or "public" (anyone with the link).',
     'folder: optional, a folder of that workspace (its name or id) to file the page in.',
     'message: optional one-line note for the version history.',
     'mcp_connections: optional, lets the page call the VIEWER\'s own account on workspace MCP connections (by connection name) — only the listed read-only tools; members-only pages (visibility workspace or private) only.',
-    'Afterwards give the person the link in their language, in plain words, and pass on any notice in the result.',
-    ON_FAILURE,
+    'Returns the link, who can see it, and any notice (visibility changed, under review, a warning).',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -409,13 +411,12 @@ const updateArtifact: ToolDef = {
   description: [
     'Replaces the content of a page the person already has (keeps its link and who can see it) and saves it as a new version.',
     'title renames the page; folder moves it into a folder of its workspace (name or id).',
-    'Send the whole new page, not a fragment. Find the artifact_id with list_artifacts, read the page with get_artifact first (include_files when it has more than one file) and pass the version it reports as base_version: if someone saved a newer version since, nothing is changed and you are told to read it again.',
-    'For a multi-page site send files instead of content: every file (index.html plus every page and asset, changed or not).',
-    'An update that would remove a file of the current version (content alone on a site, or files that leave some out) is refused; set replace_all_files: true only when the person wants those files gone.',
-    'Never send back a file that get_artifact marked truncated.',
+    'Takes the whole new page, not a fragment. artifact_id comes from list_artifacts; base_version is the version get_artifact reported (include_files for a page with more than one file): if someone saved a newer version since, nothing is changed and the error says so.',
+    'For a multi-page site, files replaces content: every file (index.html plus every page and asset, changed or not).',
+    'An update that would remove a file of the current version (content alone on a site, or files that leave some out) is refused unless replace_all_files is true, which is for when the person wants those files gone.',
+    'A file that get_artifact marked truncated is incomplete and would be saved cut.',
     'message: optional one-line note on what changed, shown in the page history.',
-    'Afterwards give the person the link.',
-    ON_FAILURE,
+    'Returns the page link.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -503,7 +504,7 @@ const updateArtifact: ToolDef = {
 const getHelp: ToolDef = {
   name: 'get_help',
   title: 'How ShareOut works',
-  description: 'Short explanation of what ShareOut does and where to learn more. Use it for how-to questions. Answer in the person\'s language, in plain words.',
+  description: 'Short explanation of what ShareOut does and where to learn more, for how-to questions.',
   inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   annotations: { readOnlyHint: true, openWorldHint: false },
   async run(ctx) {
@@ -525,7 +526,7 @@ const getHelp: ToolDef = {
 const reportProblem: ToolDef = {
   name: 'report_problem',
   title: 'Report a problem',
-  description: 'Tells the ShareOut team something went wrong (a failed publish, an error, a page that does not work). Call it whenever a ShareOut tool fails or the person reports a problem, then tell the person, in their language, that the team was notified.',
+  description: 'Tells the ShareOut team something went wrong (a failed publish, an error, a page that does not work) by opening a support ticket. For when a ShareOut tool fails or the person reports a problem; the team follows up with the person by email.',
   inputSchema: {
     type: 'object',
     properties: {
