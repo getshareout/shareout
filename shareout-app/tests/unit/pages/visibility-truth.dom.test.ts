@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 //
 // The Studio never offers "Anyone with the link" when public links can't take effect:
-// the create-confirm chooser and the inspector / Share popover visibility control.
+// the create-confirm chooser (the share dialog's own test covers tests/unit/components/share-dialog).
 import { beforeEach, describe, expect, it } from 'vitest';
 import { workspace_client_tabs_JS as tabsJs } from '../../../src/pages/home/render-workspace/client-script/tabs';
 import { workspace_client_inspector_JS as inspectorJs } from '../../../src/pages/home/render-workspace/client-script/inspector';
@@ -38,9 +38,8 @@ function load(openVis: boolean | undefined, lang: 'en' | 'es' = 'en') {
     },
     set: (target, prop, value) => { target[prop as string] = value; return true; },
   });
-  const api = new Function('scope', `with (scope) {\n${tabsJs}\n${inspectorJs}\n${createJs}\n; return { renderConfirm: renderConfirm, visBlockHtml: visBlockHtml }; }`)(scope) as {
+  const api = new Function('scope', `with (scope) {\n${tabsJs}\n${inspectorJs}\n${createJs}\n; return { renderConfirm: renderConfirm }; }`)(scope) as {
     renderConfirm: (c: { label: string; prompt: string }) => void;
-    visBlockHtml: (editable: boolean, opts: string[], cur: string, noPub?: boolean) => string;
   };
   return { ...api, threadList };
 }
@@ -79,33 +78,5 @@ describe('Studio create confirm: who can see it', () => {
     const h = load(false, 'es');
     h.renderConfirm({ label: 'Listo?', prompt: 'x' });
     expect(h.threadList.textContent).toContain('Los enlaces públicos están desactivados acá.');
-  });
-});
-
-describe('inspector / Share popover visibility control', () => {
-  it('disables the Public option and explains why when public links are off', () => {
-    const h = load(true);
-    const box = document.createElement('div');
-    box.innerHTML = h.visBlockHtml(true, ['private', 'workspace', 'public'], 'private', true);
-    const pub = box.querySelector('[data-vis="public"]') as HTMLButtonElement;
-    expect(pub.disabled).toBe(true);
-    expect(pub.title).toBe('Public links are turned off here.');
-    expect((box.querySelector('[data-vis="private"]') as HTMLButtonElement).disabled).toBe(false);
-    expect(box.querySelector('#wsxVisSub')!.textContent).toContain('Public links are turned off here.');
-  });
-
-  it('shows it normally when allowed', () => {
-    const h = load(true);
-    const box = document.createElement('div');
-    box.innerHTML = h.visBlockHtml(true, ['private', 'public'], 'private', false);
-    expect((box.querySelector('[data-vis="public"]') as HTMLButtonElement).disabled).toBe(false);
-    expect(box.querySelector('#wsxVisSub')!.textContent).not.toContain('turned off');
-  });
-
-  it('never disables the option an artifact already has', () => {
-    const h = load(true);
-    const box = document.createElement('div');
-    box.innerHTML = h.visBlockHtml(true, ['private', 'public'], 'public', true);
-    expect((box.querySelector('[data-vis="public"]') as HTMLButtonElement).disabled).toBe(false);
   });
 });

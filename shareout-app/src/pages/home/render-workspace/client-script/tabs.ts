@@ -142,8 +142,8 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
     }
     if (tabFullEl) tabFullEl.hidden = !rec;
     var shareWrap = document.getElementById('wsxShareWrap');
-    if (shareWrap) shareWrap.hidden = !(rec && rec.art.canEdit);
-    if (typeof sharePopArt !== 'undefined' && sharePopArt && (!rec || rec.art !== sharePopArt)) closeSharePop();
+    // Everyone with the tab open can share: editors add people, others copy or email the link.
+    if (shareWrap) shareWrap.hidden = !rec;
   }
 
   // Artifact type decides the stage and the Edit toggle. A PDF is inert bytes: Chrome

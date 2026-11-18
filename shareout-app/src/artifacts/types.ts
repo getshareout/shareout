@@ -30,6 +30,8 @@ export interface ArtifactDetail extends ArtifactSummary {
   live_message: string | null;
   live_message_source: 'author' | 'ai' | null;
   workspace_id: string | null;
+  /** The workspace's display name — only for its members, else null. */
+  workspace_name?: string | null;
   /** Who owns the artifact (null for workspace-owned artifacts with no owner). */
   owner: { name: string | null; email: string | null } | null;
   description: string | null;

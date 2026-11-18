@@ -64,7 +64,9 @@ describe('Inspector details — role-based actions', () => {
     expect(body.querySelector('[data-iact="trash"]')).toBeNull();
     expect(body.querySelector('[data-iact="open"]')).not.toBeNull();
     expect(body.querySelector('#wsxVisSeg')).toBeNull();
-    expect(body.textContent).toContain('inspector.visName.workspace');
+    // Who can see it, in words, with the share dialog one click away (members can share the link too).
+    expect(body.textContent).toContain('inspector.shareSum.workspace');
+    expect(body.querySelector('[data-open-share]')).not.toBeNull();
   });
 
   it('the owner keeps Edit and Trash', () => {

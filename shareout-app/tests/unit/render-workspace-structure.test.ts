@@ -57,10 +57,13 @@ describe('render-workspace module structure', () => {
     expect(scripts).toContain('Edit-Lite');
   });
 
-  it('puts a Share button on the artifact bar, wired to the share popover', () => {
+  it('puts a Share button on the artifact bar, wired to the one share dialog', () => {
     const { body, scripts } = buildWorkspaceView(args);
     expect(body).toContain('id="wsxShareBtn"');
-    expect(scripts).toContain('function openSharePop');
-    expect(scripts).toContain('function wireVis');
+    expect(scripts).toContain('function openShareFor');
+    // The dialog itself is a lazy chunk: only its stub ships in the boot shell.
+    expect(scripts).toContain("function wsxOpenShare() { return wsxLazy('share'");
+    expect(scripts).not.toContain('window.openShare=function');
+    expect(scripts).not.toContain('function openSharePop');
   });
 });
