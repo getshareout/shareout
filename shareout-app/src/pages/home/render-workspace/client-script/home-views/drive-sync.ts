@@ -1,22 +1,19 @@
 /**
  * Keep one of a page's datasets fresh from a Google Drive spreadsheet (lazy chunk
- * `drivesync`), opened from the Inspector's Automate tab. Connect (the folder import's
- * Drive consent: popup + `shareout:file-import:connected`) → pick a spreadsheet (browse
- * with files=sheets, or paste a link) → tab, dataset name and how often → a
- * `drive_file_sync` job (POST /v1/jobs) and a first run so the page has data right away.
+ * `drivesync`), opened from the Inspector's Automate tab. Its own Google consent, never the
+ * folder import's: drive.file with the Google Picker inside the consent, in a popup
+ * (`/file-imports/sheet-sync/pick`, or `?file=` for a pasted link so the Picker shows just
+ * that file). The popup posts `shareout:drive-sheet:picked` back → tab, dataset name and how
+ * often → a `drive_file_sync` job (POST /v1/jobs) and a first run so the page has data now.
  */
 export const workspace_client_home_views_driveSync_JS = `  // ===== Sync a dataset from Google Drive — lazy chunk 'drivesync' =====
-  var dsMo = null, dsListening = false, dsArt = null, dsDone = null;
-  function dsBase() { return '/v1/workspaces/' + encodeURIComponent(window.WSX_WS || '') + '/file-imports'; }
+  var dsMo = null, dsListening = false, dsArt = null, dsDone = null, dsPop = null;
+  function dsBase() { return '/v1/workspaces/' + encodeURIComponent(window.WSX_WS || '') + '/file-imports/sheet-sync'; }
   function dsGet(path) { return fetch(dsBase() + path, { credentials: 'same-origin' }).then(okOr).then(function (r) { return r.json(); }); }
   function dsOpen() { return !!(dsMo && dsMo.ov.isConnected); }
   function dsBody(html) { var b = dsOpen() ? dsMo.body.querySelector('#dsBody') : null; if (b) b.innerHTML = html; return b; }
   function dsBtn(attr, label, primary) { return '<button class="wsx-abtn' + (primary ? ' wsx-abtn--primary' : '') + '" type="button" ' + attr + '>' + esc(label) + '</button>'; }
-  function dsFail(e, back) {
-    var b = dsBody('<p class="wsx-cform__err" role="alert">' + esc(errReason(e, t('dsync.failed'))) + '</p>'
-      + (back ? '<div class="wsx-cform__foot">' + dsBtn('data-ds-home="1"', t('fimp.back'), false) + '</div>' : ''));
-    var hb = b && b.querySelector('[data-ds-home]'); if (hb) hb.addEventListener('click', dsHome);
-  }
+  function dsFail(e) { dsBody('<p class="wsx-cform__err" role="alert">' + esc(errReason(e, t('dsync.failed'))) + '</p>'); }
   // art: { id, name }. onDone runs once the job exists (and again after its first run).
   function openDriveSync(art, onDone) {
     if (!window.WSX_WS || !art || !art.id) return;
@@ -26,27 +23,50 @@ export const workspace_client_home_views_driveSync_JS = `  // ===== Sync a datas
     if (!dsListening) {
       dsListening = true;
       window.addEventListener('message', function (e) {
-        if (e.data && e.data.type === 'shareout:file-import:connected' && dsOpen()) dsHome();
+        // Only the popup this modal opened (the server posts it to this origin only).
+        if (!e.data || e.data.type !== 'shareout:drive-sheet:picked' || !dsOpen() || !dsPop || e.source !== dsPop) return;
+        dsPop = null;
+        var f = e.data.file;
+        if (e.data.ok && f && f.id) dsForm({ fileId: String(f.id), name: String(f.name || '') });
+        else dsHome(String(e.data.error || t('dsync.failed')));
       });
     }
     dsHome();
   }
-  function dsHome() {
+  function dsHome(problem) {
     dsBody(i18nLoad());
     dsGet('').then(function (d) {
-      var g = (d.providers || []).filter(function (p) { return p.id === 'google_drive'; })[0];
-      if (!g) { dsBody('<p class="wsx-field__note">' + esc(t('dsync.notSetUp')) + '</p>'); return; }
-      var who = g.connected ? (g.accountEmail ? t('fimp.connectedAs').replace('{email}', g.accountEmail) : t('fimp.connected')) : '';
-      var b = dsBody('<p class="wsx-lens__intro">' + esc(t('dsync.intro')) + '</p>'
+      if (!d.available) { dsBody('<p class="wsx-field__note">' + esc(t('dsync.notSetUp')) + '</p>'); return; }
+      var who = d.connected ? (d.accountEmail ? t('fimp.connectedAs').replace('{email}', d.accountEmail) : t('fimp.connected')) : '';
+      var b = dsBody((problem ? '<p class="wsx-cform__err" role="alert">' + esc(problem) + '</p>' : '')
+        + '<p class="wsx-lens__intro">' + esc(t('dsync.intro')) + '</p>'
         + '<div class="wsx-cn__key"><span><b>' + esc(t('fimp.p.google_drive')) + '</b>' + (who ? ' <span class="wsx-skill__hint">' + esc(who) + '</span>' : '') + '</span><span>'
-        + (g.connected ? dsBtn('data-ds-pick="1"', t('dsync.pick'), true) : dsBtn('data-ds-conn="1"', t('fimp.connect'), true)) + '</span></div>'
-        + (g.connected ? '' : '<p class="wsx-field__note">' + esc(t('fimp.consentNote')) + '</p>'));
+        + dsBtn('data-ds-pick="1"', t('dsync.pick'), true) + '</span></div>'
+        + '<p class="wsx-field__note">' + esc(t('dsync.consentNote')) + '</p>'
+        + '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('dsync.orLink')) + '</span><input class="wsx-field__in" id="dsLink" type="url" autocomplete="off" spellcheck="false" placeholder="https://docs.google.com/spreadsheets/d/\\u2026"></label>'
+        + '<p class="wsx-cform__err" id="dsLinkErr" role="alert"></p>'
+        + '<div class="wsx-cform__foot">' + (d.connected ? dsBtn('data-ds-disc="1"', t('fimp.disconnect'), false) : '') + dsBtn('data-ds-link="1"', t('dsync.useLink'), false) + '</div>');
       if (!b) return;
-      var c = b.querySelector('[data-ds-conn]');
-      if (c) c.addEventListener('click', function () { window.open(dsBase() + '/connect/google_drive', 'soFileImport', 'width=520,height=680'); });
-      var p = b.querySelector('[data-ds-pick]');
-      if (p) p.addEventListener('click', function () { dsBrowse([{ ref: 'root', name: t('fimp.p.google_drive') }]); });
-    }).catch(function (e) { dsFail(e, false); });
+      b.querySelector('[data-ds-pick]').addEventListener('click', function () { dsPick(''); });
+      function useLink() {
+        var id = dsLinkId(b.querySelector('#dsLink').value);
+        if (!id) { b.querySelector('#dsLinkErr').textContent = t('dsync.errLink'); return; }
+        dsPick(id);
+      }
+      b.querySelector('[data-ds-link]').addEventListener('click', useLink);
+      b.querySelector('#dsLink').addEventListener('keydown', function (e) { if (e.key === 'Enter') useLink(); });
+      var dc = b.querySelector('[data-ds-disc]');
+      if (dc) dc.addEventListener('click', function () {
+        if (!window.confirm(t('dsync.disconnectConfirm'))) return;
+        fetch(dsBase() + '/connection', { method: 'DELETE', credentials: 'same-origin' }).then(okOr).then(function () { dsHome(); }).catch(function (e) { dsFail(e); });
+      });
+    }).catch(function (e) { dsFail(e); });
+  }
+  // Google's consent with the Picker inside, in a popup. A pasted link's id narrows the Picker to that file.
+  function dsPick(fileId) {
+    dsPop = window.open(dsBase() + '/pick' + (fileId ? '?file=' + encodeURIComponent(fileId) : ''), 'soDriveSheet', 'width=900,height=720');
+    var b = dsBody('<p class="wsx-field__note">' + esc(t('dsync.waiting')) + '</p><div class="wsx-cform__foot">' + dsBtn('data-ds-home="1"', t('fimp.back'), false) + '</div>');
+    if (b) b.querySelector('[data-ds-home]').addEventListener('click', function () { dsPop = null; dsHome(); });
   }
   // A pasted Drive link carries the file id after /d/ or in ?id=; a bare id works too.
   function dsLinkId(v) {
@@ -54,45 +74,12 @@ export const workspace_client_home_views_driveSync_JS = `  // ===== Sync a datas
     var m = /\\/d\\/([A-Za-z0-9_-]{20,})/.exec(s) || /[?&]id=([A-Za-z0-9_-]{20,})/.exec(s);
     return m ? m[1] : (/^[A-Za-z0-9_-]{20,}$/.test(s) ? s : '');
   }
-  function dsBrowse(stack) {
-    var here = stack[stack.length - 1];
-    dsBody(i18nLoad());
-    dsGet('/browse/google_drive?files=sheets&ref=' + encodeURIComponent(here.ref)).then(function (d) {
-      var ents = d.entries || [];
-      var rows = ents.map(function (en, i) {
-        var file = en.kind === 'file';
-        return '<div class="wsx-cn__key"><span><b>' + esc(en.name) + '</b>' + (file && en.modifiedAt ? ' <span class="wsx-skill__hint">' + esc(whenAgo(en.modifiedAt)) + '</span>' : '') + '</span><span>'
-          + (file ? dsBtn('data-ds-sel="' + i + '"', t('dsync.choose'), true) : dsBtn('data-ds-open="' + i + '"', t('fimp.open'), false)) + '</span></div>';
-      }).join('');
-      var b = dsBody('<div class="wsx-sched__title">' + esc(t('dsync.browseTitle')) + '</div>'
-        + '<p class="wsx-field__note">' + stack.map(function (s) { return esc(s.name); }).join(' / ') + '</p>'
-        + (rows || '<p class="wsx-field__note">' + esc(t('dsync.noSheets')) + '</p>')
-        + '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('dsync.orLink')) + '</span><input class="wsx-field__in" id="dsLink" type="url" autocomplete="off" spellcheck="false" placeholder="https://docs.google.com/spreadsheets/d/\\u2026"></label>'
-        + '<p class="wsx-cform__err" id="dsLinkErr" role="alert"></p>'
-        + '<div class="wsx-cform__foot">' + dsBtn('data-ds-back="1"', t('fimp.back'), false) + dsBtn('data-ds-link="1"', t('dsync.useLink'), false) + '</div>');
-      if (!b) return;
-      b.querySelector('[data-ds-back]').addEventListener('click', function () { if (stack.length > 1) dsBrowse(stack.slice(0, -1)); else dsHome(); });
-      function useLink() {
-        var id = dsLinkId(b.querySelector('#dsLink').value);
-        if (!id) { b.querySelector('#dsLinkErr').textContent = t('dsync.errLink'); return; }
-        dsForm({ fileId: id, name: t('dsync.linkedFile') }, stack);
-      }
-      b.querySelector('[data-ds-link]').addEventListener('click', useLink);
-      b.querySelector('#dsLink').addEventListener('keydown', function (e) { if (e.key === 'Enter') useLink(); });
-      b.querySelectorAll('[data-ds-open]').forEach(function (btn) {
-        btn.addEventListener('click', function () { var en = ents[+btn.getAttribute('data-ds-open')]; dsBrowse(stack.concat([{ ref: en.ref, name: en.name }])); });
-      });
-      b.querySelectorAll('[data-ds-sel]').forEach(function (btn) {
-        btn.addEventListener('click', function () { var en = ents[+btn.getAttribute('data-ds-sel')]; dsForm({ fileId: en.fileId, name: en.name }, stack); });
-      });
-    }).catch(function (e) { dsFail(e, true); });
-  }
   // "Sales 2026.xlsx" → "sales_2026": a dataset name the API accepts.
   function dsSlug(name) {
     var s = String(name || '').replace(/\\.(xlsx|xlsm|xls|ods|csv)$/i, '').toLowerCase().replace(/[^a-z0-9_.-]+/g, '_').replace(/^[_.-]+|[_.-]+$/g, '').slice(0, 64);
     return s || 'data';
   }
-  function dsForm(file, stack) {
+  function dsForm(file) {
     var def = afCron('daily', '08:00', '1', viewerTz());
     var b = dsBody('<p class="wsx-field__note"><b>' + esc(t('dsync.file')) + ':</b> ' + esc(file.name) + '</p>'
       + '<div class="wsx-cform__row"><label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('dsync.tab')) + '</span><input class="wsx-field__in" id="ds_tab" type="text" autocomplete="off" placeholder="' + esc(t('dsync.tabPh')) + '"></label>'
@@ -107,7 +94,7 @@ export const workspace_client_home_views_driveSync_JS = `  // ===== Sync a datas
     var nameIn = b.querySelector('#ds_name'), hint = b.querySelector('#ds_hint');
     function paintHint() { hint.textContent = t('dsync.hint').replace('{code}', "sdk.dataset('" + (nameIn.value.trim() || 'data') + "').get()"); }
     nameIn.addEventListener('input', paintHint); paintHint();
-    b.querySelector('[data-ds-back]').addEventListener('click', function () { dsBrowse(stack); });
+    b.querySelector('[data-ds-back]').addEventListener('click', function () { dsHome(); });
     b.querySelector('[data-ds-save]').addEventListener('click', function () { dsSave(file, b, this); });
   }
   function dsSave(file, root, btn) {

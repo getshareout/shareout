@@ -12,6 +12,13 @@ export type FileImportProvider = (typeof FILE_IMPORT_PROVIDERS)[number];
 export const isFileImportProvider = (v: unknown): v is FileImportProvider =>
   typeof v === 'string' && (FILE_IMPORT_PROVIDERS as readonly string[]).includes(v);
 
+/** The spreadsheet sync's own Google consent: drive.file (non-sensitive) plus the Google
+ *  Picker, so the app reads only the files the person picks. Stored as its own row in
+ *  file_import_connections, apart from the folder import's drive.readonly consent. */
+export const DRIVE_FILE_CONSENT = 'google_drive_file' as const;
+/** Every stored consent: a folder-import provider, or the sheet sync's drive.file consent. */
+export type ConsentProvider = FileImportProvider | typeof DRIVE_FILE_CONSENT;
+
 export const RUN_STATUSES = ['queued', 'walking', 'importing', 'done', 'stopped', 'failed'] as const;
 export type RunStatus = (typeof RUN_STATUSES)[number];
 export const ACTIVE_STATUSES: readonly RunStatus[] = ['queued', 'walking', 'importing'];

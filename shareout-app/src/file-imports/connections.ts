@@ -6,15 +6,16 @@
 import type { Env } from '../types';
 import { generateId } from '../crypto-utils';
 import { decryptCredentials, encryptCredentials } from '../data/connections/credentials';
-import type { FileImportProvider } from './types';
-import { OAuthGrantError, refreshTokens, revokeAtProvider, type TokenSet } from './oauth';
+import { DRIVE_FILE_CONSENT, type ConsentProvider, type FileImportProvider } from './types';
+import { OAuthGrantError, providerConfig, refreshTokens, revokeAtProvider, type TokenSet } from './oauth';
 import { AuthExpiredError } from './http';
 
 export interface ConnectionRow {
   id: string;
   workspace_id: string;
   user_id: string;
-  provider: FileImportProvider;
+  /** A folder-import provider, or DRIVE_FILE_CONSENT (the sheet sync's own drive.file consent). */
+  provider: ConsentProvider;
   account_email: string | null;
   scopes: string | null;
   encrypted_credentials: string;
@@ -33,7 +34,7 @@ export interface ConnectionSummary {
 const REFRESH_SKEW_MS = 60_000;
 
 export async function saveConnection(
-  env: Env, workspaceId: string, userId: string, provider: FileImportProvider, tokens: TokenSet, email: string | null,
+  env: Env, workspaceId: string, userId: string, provider: ConsentProvider, tokens: TokenSet, email: string | null,
 ): Promise<string> {
   if (!env.CREDENTIALS_KEY) throw new Error('CREDENTIALS_KEY not configured');
   const existing = await env.DB.prepare(
@@ -63,15 +64,16 @@ export async function getConnection(env: Env, id: string): Promise<ConnectionRow
   return env.DB.prepare('SELECT * FROM file_import_connections WHERE id = ?').bind(id).first<ConnectionRow>();
 }
 
-export async function findConnection(env: Env, workspaceId: string, userId: string, provider: FileImportProvider): Promise<ConnectionRow | null> {
+export async function findConnection(env: Env, workspaceId: string, userId: string, provider: ConsentProvider): Promise<ConnectionRow | null> {
   return env.DB.prepare('SELECT * FROM file_import_connections WHERE workspace_id = ? AND user_id = ? AND provider = ?')
     .bind(workspaceId, userId, provider).first<ConnectionRow>();
 }
 
+/** The folder-import consents (the sheet sync's drive.file consent is not one of them). */
 export async function listConnections(env: Env, workspaceId: string, userId: string): Promise<ConnectionSummary[]> {
   const rows = await env.DB.prepare(
-    'SELECT id, provider, account_email, created_at FROM file_import_connections WHERE workspace_id = ? AND user_id = ?',
-  ).bind(workspaceId, userId).all<{ id: string; provider: FileImportProvider; account_email: string | null; created_at: string }>();
+    'SELECT id, provider, account_email, created_at FROM file_import_connections WHERE workspace_id = ? AND user_id = ? AND provider != ?',
+  ).bind(workspaceId, userId, DRIVE_FILE_CONSENT).all<{ id: string; provider: FileImportProvider; account_email: string | null; created_at: string }>();
   return (rows.results || []).map((r) => ({ id: r.id, provider: r.provider, accountEmail: r.account_email, connectedAt: r.created_at }));
 }
 
@@ -104,11 +106,31 @@ export async function accessTokenFor(env: Env, conn: ConnectionRow, force = fals
 }
 
 /**
+ * Google revokes per project, not per token: one revoke ends every consent the account gave
+ * that Cloud project — the folder import, the sheet sync, the same consent in another
+ * workspace. So skip the revoke while another Google consent of this person or account
+ * goes through the same OAuth client. A different client counts as a different project:
+ * GOOGLE_DRIVE_FILE_CLIENT_ID is documented as one (a second client in the same project
+ * would be cut too). An unknown client of our own keeps the old, careful rule.
+ */
+async function otherGoogleConsent(env: Env, conn: ConnectionRow): Promise<boolean> {
+  if (conn.provider !== 'google_drive' && conn.provider !== DRIVE_FILE_CONSENT) return false;
+  const rows = (await env.DB.prepare(`
+    SELECT DISTINCT provider FROM file_import_connections
+    WHERE id != ? AND provider IN ('google_drive', ?) AND (user_id = ? OR (account_email IS NOT NULL AND account_email = ?))
+  `).bind(conn.id, DRIVE_FILE_CONSENT, conn.user_id, conn.account_email).all<{ provider: ConsentProvider }>()).results || [];
+  const mine = providerConfig(env, conn.provider)?.clientId;
+  if (!mine) return rows.length > 0;
+  // A consent whose provider is no longer configured is unusable here; cutting it costs nothing.
+  return rows.some((r) => providerConfig(env, r.provider)?.clientId === mine);
+}
+
+/**
  * Forget a consent. Sources that read through it lose their connection (FK SET NULL)
  * and their daily sync, and any run in flight is stopped, so revoking really stops sync.
  */
 export async function deleteConnection(env: Env, conn: ConnectionRow): Promise<void> {
-  if (env.CREDENTIALS_KEY) {
+  if (env.CREDENTIALS_KEY && !(await otherGoogleConsent(env, conn))) {
     const creds = await decryptCredentials(conn.encrypted_credentials, conn.iv, env.CREDENTIALS_KEY).catch(() => null);
     await revokeAtProvider(conn.provider, (creds?.refresh_token as string) || (creds?.access_token as string) || '');
   }

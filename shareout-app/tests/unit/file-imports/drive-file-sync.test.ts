@@ -6,6 +6,7 @@ import { applyMigrations, e } from '../helpers/migrated-db';
 import { saveConnection } from '../../../src/file-imports/connections';
 import { driveFileSyncDestination } from '../../../src/delivery/destinations/drive-file-sync';
 import { googleDrive } from '../../../src/file-imports/providers/google';
+import { DRIVE_FILE_CONSENT } from '../../../src/file-imports/types';
 import { createJob, updateJob } from '../../../src/scheduling/jobs/crud';
 import { runScheduledJobs } from '../../../src/scheduling/jobs/execute';
 import type { DeliveryContext } from '../../../src/delivery/types';
@@ -82,7 +83,7 @@ beforeEach(async () => {
     bytes: book({ Summary: [['Region', 'Sales', 'Day'], ['North', 120, new Date(Date.UTC(2026, 10, 1))], ['South', 80.5, null]], Raw: [['id'], [1], [2], [3]] }) }];
   log = []; token = 'at-1'; refresh = 'ok';
   await e.DB.prepare('DELETE FROM datasets WHERE artifact_id = ?').bind(ART).run();
-  await saveConnection(e, WS, OWNER, 'google_drive', { accessToken: 'at-1', refreshToken: 'rt-1', expiresAt: new Date(Date.now() + 3600_000).toISOString(), scope: 's' }, 'owner@drive.test');
+  await saveConnection(e, WS, OWNER, DRIVE_FILE_CONSENT, { accessToken: 'at-1', refreshToken: 'rt-1', expiresAt: new Date(Date.now() + 3600_000).toISOString(), scope: 'https://www.googleapis.com/auth/drive.file' }, 'owner@drive.test');
   vi.stubGlobal('fetch', fakeFetch);
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -139,20 +140,28 @@ describe('drive_file_sync', () => {
 
   it('fails loudly: no connection, not a spreadsheet, file gone, access revoked', async () => {
     let res = await driveFileSyncDestination.deliver(e, ctx(NOCONN), cfg());
-    expect(res).toMatchObject({ success: false, error: 'The job owner has not connected Google Drive in this workspace.' });
+    expect(res).toMatchObject({ success: false, error: 'The job owner has not chosen this spreadsheet in Google Drive in this workspace. Choose it again in Automate → Sync data from Google Drive.' });
 
     files.push({ id: 'DOC1', name: 'Notes', mime: 'application/vnd.google-apps.document', modifiedTime: '2026-11-01T00:00:00.000Z', bytes: new Uint8Array() });
     res = await driveFileSyncDestination.deliver(e, ctx(), cfg({ fileId: 'DOC1' }));
     expect(res).toMatchObject({ success: false, error: '"Notes" is not a spreadsheet (Excel, Google Sheets, OpenDocument or CSV).' });
 
     res = await driveFileSyncDestination.deliver(e, ctx(), cfg({ fileId: 'GONE1' }));
-    expect(res).toMatchObject({ success: false, error: 'The file is gone or no longer shared with the job owner.' });
+    expect(res).toMatchObject({ success: false, error: 'The file is gone, no longer shared with the job owner, or was not chosen in the Google Drive picker.' });
 
     token = 'at-rotated'; refresh = 'revoked';
     res = await driveFileSyncDestination.deliver(e, ctx(), cfg());
     expect(log).toContain('refresh');
-    expect(res).toMatchObject({ success: false, error: 'Google Drive access expired or was revoked. Reconnect Google Drive, then run the sync again.' });
+    expect(res).toMatchObject({ success: false, error: 'Google Drive access expired or was revoked. Choose the spreadsheet again in Google Drive, then run the sync again.' });
     expect(await dataset()).toBeNull();
+  });
+
+  it("never reads through the folder import's drive.readonly consent", async () => {
+    await saveConnection(e, WS, NOCONN, 'google_drive', { accessToken: 'at-1', refreshToken: 'rt-ro', expiresAt: new Date(Date.now() + 3600_000).toISOString(), scope: 'https://www.googleapis.com/auth/drive.readonly' }, 'noconn@drive.test');
+    const res = await driveFileSyncDestination.deliver(e, ctx(NOCONN), cfg());
+    expect(res).toMatchObject({ success: false, error: expect.stringMatching(/^The job owner has not chosen this spreadsheet/) });
+    expect(log).toEqual([]);
+    await e.DB.prepare('DELETE FROM file_import_connections WHERE user_id = ?').bind(NOCONN).run();
   });
 
   it('refreshes a rejected access token once and carries on', async () => {
@@ -169,10 +178,14 @@ describe('drive_file_sync', () => {
     expect(await v(cfg({ fileId: '../etc' }))).toBe('drive_file_sync requires a Google Drive fileId');
     expect(await v(cfg({ dataset: 'has space' }))).toMatch(/dataset name/);
     expect(await v({ ...cfg(), provider: 'microsoft' })).toMatch(/google_drive/);
-    const saved = e.GOOGLE_DRIVE_CLIENT_ID;
-    (e as { GOOGLE_DRIVE_CLIENT_ID?: string }).GOOGLE_DRIVE_CLIENT_ID = undefined;
+    const env = e as { GOOGLE_DRIVE_CLIENT_ID?: string; GOOGLE_DRIVE_FILE_CLIENT_ID?: string; GOOGLE_DRIVE_FILE_CLIENT_SECRET?: string };
+    const saved = env.GOOGLE_DRIVE_CLIENT_ID;
+    env.GOOGLE_DRIVE_CLIENT_ID = undefined;
     expect(await v(cfg())).toBe('Google Drive is not set up on this instance');
-    (e as { GOOGLE_DRIVE_CLIENT_ID?: string }).GOOGLE_DRIVE_CLIENT_ID = saved;
+    // The sheet sync may have its own OAuth client, without the folder import's.
+    Object.assign(env, { GOOGLE_DRIVE_FILE_CLIENT_ID: 'fid', GOOGLE_DRIVE_FILE_CLIENT_SECRET: 'fsecret' });
+    expect(await v(cfg())).toBeNull();
+    Object.assign(env, { GOOGLE_DRIVE_CLIENT_ID: saved, GOOGLE_DRIVE_FILE_CLIENT_ID: undefined, GOOGLE_DRIVE_FILE_CLIENT_SECRET: undefined });
   });
 });
 
@@ -198,7 +211,7 @@ describe('drive_file_sync on a schedule', () => {
 
   it("only the job's creator can point it at another file; the page owner can change the rest", async () => {
     await e.DB.prepare("INSERT INTO collaborators (id, artifact_id, email, role) VALUES ('col_dfs_ed', ?, 'editor@dfs.test', 'editor')").bind(ART).run();
-    await saveConnection(e, WS, EDITOR, 'google_drive', { accessToken: 'at-ed', refreshToken: 'rt-ed', expiresAt: new Date(Date.now() + 3600_000).toISOString(), scope: 's' }, 'editor@drive.test');
+    await saveConnection(e, WS, EDITOR, DRIVE_FILE_CONSENT, { accessToken: 'at-ed', refreshToken: 'rt-ed', expiresAt: new Date(Date.now() + 3600_000).toISOString(), scope: 's' }, 'editor@drive.test');
     const { job, error } = await createJob(e, EDITOR, { artifact_id: ART, action: 'drive_file_sync', schedule: '0 9 * * *', config: cfg() });
     expect(error).toBeUndefined();
     // The page owner (not the creator) may not re-point it: it would read the editor's Drive.
