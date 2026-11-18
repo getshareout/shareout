@@ -120,6 +120,8 @@ export interface OAuthState {
   u: string;
   /** Sheet sync: the ShareOut origin the consent was opened from; the picked file is posted only there. */
   o?: string;
+  /** Sheet sync opened from a link an assistant handed over: the last page sends the person back to the conversation. */
+  a?: 1;
   n: string;
   exp: number;
 }
@@ -161,11 +163,11 @@ function nonceOf(state: string): string {
 /** `origin` and `fileIds` are for the sheet sync's Picker: where to post the pick, and (a
  *  pasted link) the one file the Picker should show. */
 export async function authorizationUrl(
-  env: Env, provider: ConsentProvider, workspaceId: string, userId: string, opts: { origin?: string; fileIds?: string[] } = {},
+  env: Env, provider: ConsentProvider, workspaceId: string, userId: string, opts: { origin?: string; fileIds?: string[]; assistant?: boolean } = {},
 ): Promise<string | null> {
   const cfg = providerConfig(env, provider);
   if (!cfg) return null;
-  const state = await signState(env, { p: provider, ws: workspaceId, u: userId, ...(opts.origin ? { o: opts.origin } : {}) });
+  const state = await signState(env, { p: provider, ws: workspaceId, u: userId, ...(opts.origin ? { o: opts.origin } : {}), ...(opts.assistant ? { a: 1 as const } : {}) });
   const params = new URLSearchParams({
     client_id: cfg.clientId,
     redirect_uri: redirectUri(env, provider),

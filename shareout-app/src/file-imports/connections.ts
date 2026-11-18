@@ -22,6 +22,10 @@ export interface ConnectionRow {
   iv: string;
   expires_at: string | null;
   created_at: string;
+  /** Sheet consent only (0043): the last spreadsheet its person picked in the Google Picker. */
+  picked_file_id?: string | null;
+  picked_file_name?: string | null;
+  picked_at?: string | null;
 }
 
 export interface ConnectionSummary {
@@ -67,6 +71,13 @@ export async function getConnection(env: Env, id: string): Promise<ConnectionRow
 export async function findConnection(env: Env, workspaceId: string, userId: string, provider: ConsentProvider): Promise<ConnectionRow | null> {
   return env.DB.prepare('SELECT * FROM file_import_connections WHERE workspace_id = ? AND user_id = ? AND provider = ?')
     .bind(workspaceId, userId, provider).first<ConnectionRow>();
+}
+
+/** Remembers the spreadsheet just picked under the sheet consent `connectionId`, so whoever
+ *  finishes the setup (the Inspector, or an assistant over MCP) can read it back. */
+export async function recordSheetPick(env: Env, connectionId: string, file: { id: string; name: string }): Promise<void> {
+  await env.DB.prepare('UPDATE file_import_connections SET picked_file_id = ?, picked_file_name = ?, picked_at = ? WHERE id = ? AND provider = ?')
+    .bind(file.id, file.name.slice(0, 200), new Date().toISOString(), connectionId, DRIVE_FILE_CONSENT).run();
 }
 
 /** The folder-import consents (the sheet sync's drive.file consent is not one of them). */

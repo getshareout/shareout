@@ -81,6 +81,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Run Python in-browser | [sdk/python.md](sdk/python.md) | [integrations/overview.md](integrations/overview.md) |
 | Scheduled notifications | [api/jobs.md](api/jobs.md) | [api/overview.md](api/overview.md) |
 | Deterministic warehouse/json snapshot refresh | [api/jobs.md](api/jobs.md#querysnapshotconfig) | [agents/crew.md](agents/crew.md), [sdk/connections.md](sdk/connections.md) |
+| Keep a page's data in sync with a Google Sheet / Excel in Drive (shared link or private file) | [integrations/spreadsheet-sync.md](integrations/spreadsheet-sync.md) | [api/jobs.md](api/jobs.md#publicsheetsyncconfig), [sdk/datasets.md](sdk/datasets.md) |
 | Check a published page: what viewers see, what broke (desktop + phone) | [api/verify.md](api/verify.md) | [creating/pre-ship.md](creating/pre-ship.md) |
 | Add a safety net / test an artifact won't break on change | [api/tests.md](api/tests.md) | [sdk/table.md](sdk/table.md), [sdk/json.md](sdk/json.md) |
 | Alert when a metric/KPI crosses a threshold | [api/metric-alerts.md](api/metric-alerts.md) | [patterns/dashboards.md](patterns/dashboards.md#followable-kpis-metric-alerts) |
@@ -210,6 +211,7 @@ ShareOutSkill/
 │   ├── overview.md             # Data Platform intro
 │   ├── slack.md                # Slack connection, channel/DM delivery
 │   ├── google-sheets.md        # Google Sheets OAuth + API
+│   ├── spreadsheet-sync.md     # Keep a page's dataset in sync with a Sheet / Drive file (guided)
 │   ├── google-analytics.md     # GA4 integration
 │   ├── google-ads.md           # Google Ads token-shim connector
 │   ├── facebook-ads.md         # Facebook Ads token-shim connector

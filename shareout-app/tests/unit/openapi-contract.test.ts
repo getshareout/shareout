@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import worker from '../../src/index';
 import type { Env } from '../../src/types';
+import { JOB_ACTIONS } from '../../src/scheduling/jobs/types';
+import embeddedSpec from '../../src/discovery/openapi.spec.json';
 
 const OPENAPI_PATH = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -80,6 +82,14 @@ describe('OpenAPI contract (shareout.yaml)', () => {
     expect(operations.length).toBeGreaterThanOrEqual(15);
     expect(operations.some((op) => op.path === '/v1/publish' && op.method === 'POST')).toBe(true);
     expect(operations.some((op) => op.path === '/v1/artifacts' && op.method === 'GET')).toBe(true);
+  });
+
+  it('lists every job action the API accepts, and the embedded copy matches the yaml', () => {
+    const spec = parse(readFileSync(OPENAPI_PATH, 'utf8')) as { components: { schemas: Record<string, { properties: { action: { enum: string[] } } }> } };
+    // JOB_ACTIONS is the only definition the server checks; the docs drifted from it once (#311).
+    for (const schema of ['Job', 'JobCreate']) expect(spec.components.schemas[schema].properties.action.enum, schema).toEqual([...JOB_ACTIONS]);
+    // Regenerate with `npm run build:discovery` after editing shareout.yaml.
+    expect(embeddedSpec).toEqual(spec);
   });
 
   it.each(operations)('$method $path is routed by the worker (not an unrouted 404)', async ({ method, path }) => {

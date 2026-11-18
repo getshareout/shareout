@@ -187,6 +187,8 @@ export const MCP_TOOL_POLICIES: Record<string, McpToolPolicy> = {
   query_connection: 'workspace',
   browse_storage: 'workspace',
   read_connector: 'workspace',
+  inspect_sheet_link: 'workspace',
+  pick_drive_spreadsheet: 'workspace',
   get_artifact: 'artifact',
   update_artifact: 'artifact',
   read_artifact: 'artifact',
@@ -201,5 +203,7 @@ export const MCP_TOOL_POLICIES: Record<string, McpToolPolicy> = {
   assign_comment: 'artifact',
   approve_version: 'artifact',
   list_jobs: 'artifact',
+  set_sheet_sync: 'artifact',
+  remove_sheet_sync: 'artifact',
   knowledge_from_artifact: 'artifact',
 };

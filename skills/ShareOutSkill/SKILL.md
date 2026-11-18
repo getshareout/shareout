@@ -179,6 +179,7 @@ Structured records: tasks, submissions, orders -> sdk.table()
 Realtime editing: docs, boards, multiplayer UI -> sdk.realtime()
 Files: images, PDFs, attachments -> sdk.blobs
 Live external systems: REST, warehouses, Sheets -> sdk.connection / live-data
+A spreadsheet the person keeps editing (Google Sheets, Excel in Drive) -> spreadsheet sync -> sdk.dataset (integrations/spreadsheet-sync.md)
 ```
 
 ---
@@ -421,7 +422,9 @@ learned, use `knowledge_edit_entity`, `knowledge_edit_connection`, `knowledge_ed
 `knowledge_edit_rules` (`knowledge_rules` and `knowledge_review` read the team's rules and what
 needs review); their edits hold on every re-learn. The connector also covers page history
 (`list_versions`, `restore_version`), review (`list_comments`, `resolve_comment`,
-`assign_comment`, `approve_version`), schedules (`list_jobs`) and folder sharing
+`assign_comment`, `approve_version`), schedules (`list_jobs`), spreadsheet syncs
+(`inspect_sheet_link`, `pick_drive_spreadsheet`, `set_sheet_sync`, `remove_sheet_sync` — guide the
+person as in [integrations/spreadsheet-sync.md](integrations/spreadsheet-sync.md)) and folder sharing
 (`folder_access`, `share_with_person`, `revoke_share`, `folder_activity`, `set_guest_comments`).
 
 Building a multi-page site through the connector? Pass `files: [{ path, content, encoding? }]`

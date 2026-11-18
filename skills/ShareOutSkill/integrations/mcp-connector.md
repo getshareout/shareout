@@ -56,6 +56,10 @@ your ShareOut account"). Allow, and the app is connected.
 | `approve_version` | Approve the live version (or `version_no`); `approved: false` withdraws. A record, not a publish gate. Comment access |
 | `verify_artifact` | Opens a page the way viewers see it (desktop + phone) and reports what broke: script errors with file:line, failed files, blocked libraries, accessibility, overflow, tap targets. Returns a short report and two screenshots. Read-only; owners and editors. Call it after `publish_artifact`, `update_artifact` or `edit_artifact`. See [api/verify.md](../api/verify.md). |
 | `list_jobs` | Scheduled sends; with `artifact_id` the page's schedules (owner/editors see shared ones plus their own personal deliveries, never someone else's DM subscription), else the person's own (`workspace_id` narrows) |
+| `inspect_sheet_link` | A Google Sheets / Drive share link: shared with anyone who has it?, title, tabs, first tab's rows and columns. Saves nothing |
+| `pick_drive_spreadsheet` | The link the person opens to pick a private Drive spreadsheet in Google (once per file), and the last file they picked in the workspace |
+| `set_sheet_sync` | Create (from `link` or a picked `file_id`) or change (`job_id`) a page's spreadsheet sync; defaults first tab, daily 08:00 (`how_often`, `time`, `timezone`); loads once and reports rows; never overwrites existing page data unless `replace_existing` — see [spreadsheet-sync.md](spreadsheet-sync.md) |
+| `remove_sheet_sync` | Stop a page's spreadsheet sync (the loaded data stays); other schedules are refused |
 | `folder_access` | Who can see a folder (`folder` name or id): the real audience (the most open of the folder's own or inherited visibility and the pages and files inside, which keep their own), how many items are more open than the folder, and every outside grant, with grant ids. Admins and the folder's creator also get those items by name. Internal members only |
 | `folder_activity` | What outside people opened in a folder's subtree (newest 100). Admins and the folder's creator |
 | `share_with_person` | Share a `folder` (or `file_id`) with one outside `email`: `capability` `view`/`comment`, optional `expires_in_days` or `expires_at`; returns the `/shared?folder=` portal link and the grant id. Admins and the folder's creator, when the workspace has external sharing |
@@ -106,6 +110,8 @@ Rules the tools follow:
   `restore_version` run the `/v1/artifacts/{id}/versions*` handlers (viewer / editor);
   `list_comments`, `resolve_comment`, `assign_comment` and `approve_version` run the same
   comment-access checks as the Home review endpoints; `list_jobs` runs `GET /v1/jobs`;
+  the spreadsheet-sync tools run `POST …/sheet-links/inspect`, `GET …/file-imports/sheet-sync` and
+  `POST/PATCH/DELETE /v1/jobs` + `POST /v1/jobs/{id}/run` (page owner or editor);
   `set_guest_comments` runs `PUT /v1/data/{id}/comments/_config` (owner) or the folder's
   guest-comments switch (folder manager);
   `folder_activity`, `share_with_person` and `revoke_share` run the
