@@ -62,7 +62,7 @@ export const workspace_client_home_views_driveSync_JS = `  // ===== Sync a datas
       var rows = ents.map(function (en, i) {
         var file = en.kind === 'file';
         return '<div class="wsx-cn__key"><span><b>' + esc(en.name) + '</b>' + (file && en.modifiedAt ? ' <span class="wsx-skill__hint">' + esc(whenAgo(en.modifiedAt)) + '</span>' : '') + '</span><span>'
-          + (file ? dsBtn('data-ds-sel="' + i + '"', t('fimp.select'), true) : dsBtn('data-ds-open="' + i + '"', t('fimp.open'), false)) + '</span></div>';
+          + (file ? dsBtn('data-ds-sel="' + i + '"', t('dsync.choose'), true) : dsBtn('data-ds-open="' + i + '"', t('fimp.open'), false)) + '</span></div>';
       }).join('');
       var b = dsBody('<div class="wsx-sched__title">' + esc(t('dsync.browseTitle')) + '</div>'
         + '<p class="wsx-field__note">' + stack.map(function (s) { return esc(s.name); }).join(' / ') + '</p>'
@@ -98,7 +98,7 @@ export const workspace_client_home_views_driveSync_JS = `  // ===== Sync a datas
       + '<div class="wsx-cform__row"><label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('dsync.tab')) + '</span><input class="wsx-field__in" id="ds_tab" type="text" autocomplete="off" placeholder="' + esc(t('dsync.tabPh')) + '"></label>'
       + '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('dsync.dataset')) + '</span><input class="wsx-field__in" id="ds_name" type="text" autocomplete="off" spellcheck="false" value="' + esc(dsSlug(file.name)) + '"></label></div>'
       + '<p class="wsx-field__note" id="ds_hint"></p>'
-      + '<h4 class="wsx-adet__h">' + esc(t('dsync.when')) + '</h4>' + afScheduleFields('ds', def.cron)
+      + '<h4 class="wsx-adet__h">' + esc(t('adet.schedule')) + '</h4>' + afScheduleFields('ds', def.cron)
       + '<p class="wsx-field__note">' + esc(t('dsync.unchangedNote')) + '</p>'
       + '<div class="wsx-cform__err" id="ds_err" role="alert"></div>'
       + '<div class="wsx-cform__foot">' + dsBtn('data-ds-back="1"', t('fimp.back'), false) + dsBtn('data-ds-save="1"', t('dsync.save'), true) + '</div>');

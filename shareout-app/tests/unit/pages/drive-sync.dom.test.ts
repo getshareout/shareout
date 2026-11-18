@@ -77,7 +77,7 @@ async function toForm() {
   btn(copy['dsync.pick']).click(); await flush();
   btn(copy['fimp.open']).click(); await flush();
   expect(document.querySelector('.wsx-modal')!.textContent).toContain('Finance');
-  btn(copy['fimp.select']).click(); await flush();
+  btn(copy['dsync.choose']).click(); await flush();
 }
 
 beforeEach(() => {
