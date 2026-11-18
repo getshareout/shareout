@@ -6,15 +6,19 @@ export const OPENAI_CHAT_MODEL = 'gpt-4o';
 export const CLAUDE_OPUS = { id: 'claude-opus-5', gateway: 'anthropic/claude-opus-5' } as const;
 export const CLAUDE_SONNET = { id: 'claude-sonnet-5-5', gateway: 'anthropic/claude-sonnet-5.5' } as const;
 export const CLAUDE_HAIKU = { id: 'claude-haiku-4-5-20251001', gateway: 'anthropic/claude-haiku-4.5' } as const;
+export const CLAUDE_HAIKU_5_5 = { id: 'claude-haiku-5-5', gateway: 'anthropic/claude-haiku-5.5' } as const;
+
+/** Default model for reading a scanned document into text (a plain transcription, not reasoning): small and cheap. */
+export const DEFAULT_SCAN_MODEL = CLAUDE_HAIKU_5_5;
 
 /** Default Claude model for agents, builds and per-artifact chat. */
 export const DEFAULT_CLAUDE_MODEL = CLAUDE_SONNET;
 
 /** The Claude model a stored id names (first-party id, gateway slug, or the undated
  *  alias), or null for an id ShareOut no longer serves. */
-export function claudeModelById(id: string | null | undefined): typeof CLAUDE_OPUS | typeof CLAUDE_SONNET | typeof CLAUDE_HAIKU | null {
+export function claudeModelById(id: string | null | undefined): typeof CLAUDE_OPUS | typeof CLAUDE_SONNET | typeof CLAUDE_HAIKU | typeof CLAUDE_HAIKU_5_5 | null {
   if (!id) return null;
-  return [CLAUDE_OPUS, CLAUDE_SONNET, CLAUDE_HAIKU].find((m) => m.id === id || m.gateway === id || m.id.replace(/-\d{8}$/, '') === id) ?? null;
+  return [CLAUDE_OPUS, CLAUDE_SONNET, CLAUDE_HAIKU, CLAUDE_HAIKU_5_5].find((m) => m.id === id || m.gateway === id || m.id.replace(/-\d{8}$/, '') === id) ?? null;
 }
 
 /** Request fields that turn thinking off on a direct Anthropic call, per model:
