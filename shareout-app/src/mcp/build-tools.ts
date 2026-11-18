@@ -17,7 +17,7 @@ const verifyArtifact: ToolDef = {
     'Opens a published page the way the people it is shared with see it — on a desktop screen and on a phone — and reports what is broken:',
     'script errors (with file and line), files that fail to load, blocked libraries, accessibility problems, content wider than the phone screen,',
     'tap targets that are too small, slow loading, and common mistakes in the source. Returns a short report and two screenshots (desktop, then phone).',
-    'Call it right after publish_artifact or update_artifact, fix what it reports, update the page and check again.',
+    'Meant for right after a page is published or changed: the report lists what to fix before the link is handed over.',
     'artifact_id: the page. version: an older or newer version number (defaults to the live one). full_page: screenshot the whole page height.',
     'Only owners and editors of the page can check it.',
   ].join(' '),

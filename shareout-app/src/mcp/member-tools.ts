@@ -7,12 +7,12 @@ import { handleInviteWorkspaceMembers, handleListWorkspaceMembers } from '../wor
 import { handleListWorkspaceInvites, handleResendWorkspaceInvite, handleRevokeWorkspaceInvite } from '../workspaces/invites-admin';
 import { MAX_BULK_INVITES } from '../workspaces/invite';
 import {
-  NOT_MEMBER, ON_FAILURE, errorText, fail, ok, readJson, resolveWorkspace, str, workspaceChoiceText,
+  NOT_MEMBER, errorText, fail, ok, readJson, resolveWorkspace, str, workspaceChoiceText,
   type Args, type ToolContext, type ToolDef, type ToolResult,
 } from './tool-kit';
 import type { BotWorkspace } from '../chat-agent/access';
 
-const CONFIRM = 'Before calling, confirm with the person the exact list of emails and the role.';
+const CONFIRM = 'Invites are sent as soon as it runs, so the list of emails and the role should be the ones the person confirmed.';
 const EMAIL_RE = /[^\s<>,;:"'()[\]]+@[^\s<>,;:"'()[\]]+\.[^\s<>,;:"'()[\]]+/g;
 
 /** Emails from an array or free text ("a@x.com, b@y.com", one per line, "Ana <a@x.com>"). */
@@ -81,9 +81,7 @@ const inviteMembers: ToolDef = {
     'Invites people to a ShareOut workspace by email; they get an email to join. Only workspace owners and admins can do this.',
     'emails: a list, or one text with emails separated by commas, spaces or new lines. role: "member" (default) or "admin".',
     CONFIRM,
-    'Afterwards tell the person, in their language and plain words, who was invited, who already was a member and who was skipped and why,',
-    'and offer the join links in case they want to send them themselves.',
-    ON_FAILURE,
+    'Returns who was invited, who already was a member, who was skipped and why, and each join link.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -186,8 +184,8 @@ function inviteAction(kind: 'resend' | 'revoke'): ToolDef {
     name: resend ? 'resend_invite' : 'revoke_invite',
     title: resend ? 'Resend an invite' : 'Cancel an invite',
     description: resend
-      ? 'Sends a pending workspace invite again (new email and a fresh join link). Owners/admins only. Confirm the email with the person first.'
-      : 'Cancels a pending workspace invite so the link stops working. Owners/admins only. Confirm the email with the person first.',
+      ? 'Sends a pending workspace invite again (new email and a fresh join link). Owners/admins only.'
+      : 'Cancels a pending workspace invite so the link stops working. Owners/admins only.',
     inputSchema: {
       type: 'object',
       properties: { workspace_id: { type: 'string' }, email: { type: 'string' } },

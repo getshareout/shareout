@@ -71,6 +71,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
+- **MCP tool descriptions only describe:** the connector's tool descriptions no longer tell the model how to behave ("Answer in the person's language", "Tell the person…", "If something fails, call report_problem…", "Confirm with the person first"). That guidance now lives once in the server instructions (returned by `initialize`), which gained a line on confirming before actions that reach other people or cannot be undone. Tool results are unchanged. A test (`tests/unit/mcp/tool-descriptions.test.ts`) fails if a description gains an instruction, or a tool lacks a title or a read-only/destructive hint.
 - **MCP data tool descriptions:** `query_connection`, `browse_storage` and `read_connector` now say what they reach (ShareOut's data connector API, on a warehouse, bucket or app the workspace connected) and their limits (read-only, only connectors an admin switched on for AI). No behavior change.
 - **Faster captures:** thumbnails, smoke tests and PDFs no longer wait out the full timeout for a `window.__shareoutReady` flag a page never sets — the flag is raced against network idle (pages that use the flag are still waited on).
 - **Docs site: broken links fixed + link checker.** `npm run check:links` in `docs-site/` checks every internal link and `#anchor` in the built `dist/` against the generated heading ids (28 broken links fixed, now 0). Spanish pages say "artefacto" for ShareOut artifacts instead of "artifact"/"página".

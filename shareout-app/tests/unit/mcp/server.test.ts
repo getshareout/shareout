@@ -113,8 +113,6 @@ describe('/mcp protocol', () => {
       'list_connections', 'query_connection', 'browse_storage', 'read_connector',
       'get_help', 'report_problem', 'search', 'fetch',
     ]));
-    const publish = (body!.result.tools as Array<{ name: string; description: string }>).find((t) => t.name === 'publish_artifact')!;
-    expect(publish.description).toMatch(/report_problem/);
   });
 
   it('unknown tool is an invalid-params error', async () => {

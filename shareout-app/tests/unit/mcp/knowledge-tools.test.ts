@@ -120,9 +120,8 @@ describe('knowledge tools are listed', () => {
     ]);
     for (const t of tools) {
       expect(t.annotations.readOnlyHint, t.name).toBe(t.name !== 'knowledge_reindex' && !t.name.startsWith('knowledge_edit_'));
-      expect(t.description).toMatch(/person's language/);
     }
-    expect(tools.find((t) => t.name === 'knowledge_search')!.description).toMatch(/say where each fact comes from/);
+    expect(tools.find((t) => t.name === 'knowledge_search')!.description).toMatch(/names where it comes from/);
   });
 });
 

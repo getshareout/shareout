@@ -11,7 +11,7 @@ import { decodeText, isTextMime, toBase64, versionHeads } from '../artifacts/fil
 import { editArtifact } from '../artifacts/edits';
 import { SOURCE_MAX_BYTES } from '../artifacts/versions';
 import { MAX_OPS } from '../artifacts/apply-ops';
-import { ON_FAILURE, fail, invalid, ok, readJson, str, type ToolDef } from './tool-kit';
+import { fail, invalid, ok, readJson, str, type ToolDef } from './tool-kit';
 
 const PAGE_DEFAULT = 100_000;
 
@@ -129,12 +129,11 @@ const editArtifactTool: ToolDef = {
   title: 'Edit a page',
   description: [
     'Changes part of a page the person already has, without sending the whole page: replace text, write, delete or rename files. Saves a new version at the same link.',
-    'Read the files first with read_artifact and pass the version it reports as base_version; if the page changed since, nothing is changed and you are told the current version.',
+    'base_version is the version read_artifact reported for the files; if the page changed since, nothing is changed and the error gives the current version.',
     `ops run in order (at most ${MAX_OPS}); if any fails, nothing is saved and the error says which op and why (no match: the closest line; several matches: their lines).`,
     'dry_run: true shows what would change without saving.',
     'message: optional one-line note on what changed, shown in the page history.',
-    'Afterwards give the person the link.',
-    ON_FAILURE,
+    'Returns the page link.',
   ].join(' '),
   inputSchema: {
     type: 'object',
