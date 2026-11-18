@@ -5,6 +5,7 @@ import {
   cleanupOldEvents,
   getAnalytics,
   handleViewEventBatch,
+  isViewsQueue,
   trackPageView,
 } from '../../src/analytics';
 import type { Env, ViewEventMessage } from '../../src/types';
@@ -182,6 +183,16 @@ describe('trackPageView', () => {
     } as unknown as Env['DB'];
 
     await expect(trackPageView(makeEnv(db), makeRequest(), ARTIFACT_ID)).resolves.toBeUndefined();
+  });
+});
+
+describe('isViewsQueue', () => {
+  it('takes the views queue under any deployment prefix, never its dead-letter queue or another queue', () => {
+    expect(isViewsQueue('shareout-analytics-views')).toBe(true);
+    expect(isViewsQueue('shareout-next-analytics-views')).toBe(true);
+    expect(isViewsQueue('shareout-next-analytics-views-dlq')).toBe(false);
+    expect(isViewsQueue('shareout-analytics-views-dlq')).toBe(false);
+    expect(isViewsQueue('shareout-build-jobs')).toBe(false);
   });
 });
 
