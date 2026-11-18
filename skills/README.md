@@ -42,9 +42,20 @@ add the marketplace `getshareout/shareout` → install **ShareOut**.
 What it runs, sends and fetches: the plugin ships no code, hooks or local servers, only
 Markdown and the connector address. When Claude calls a ShareOut tool, the request (for
 example the page you asked it to publish) goes to `https://shareout.site` under your
-account, with the same permissions you have in ShareOut. Nothing is sent anywhere else.
-The tools are listed in
+account, with the same permissions you have in ShareOut. The tools are listed in
 [ShareOutSkill/integrations/mcp-connector.md](ShareOutSkill/integrations/mcp-connector.md).
+
+The skill is documentation, and following it can send data to two other places, only when
+you ask for it:
+
+- **Your own ShareOut instance, over its REST API.** When there are no connector tools (or
+  you run your own instance), the skill has Claude call `https://<your instance>/v1/…` with
+  the token in `~/.shareout/credentials` or `SHAREOUT_TOKEN`. On `shareout.site` that is the
+  same service as the connector.
+- **Your Cloudflare account.** `ShareOutSkill/deploy/` explains how to install a self-hosted
+  instance; if you ask Claude to do that, it runs `wrangler` against your Cloudflare account.
+
+Nothing else is contacted: no analytics, no telemetry, no third-party service.
 
 Running your own instance? The plugin's address is fixed, so add your connector by URL
 instead: `claude mcp add --transport http shareout https://your-instance.example/mcp`.
