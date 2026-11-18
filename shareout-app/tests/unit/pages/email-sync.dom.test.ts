@@ -226,7 +226,7 @@ describe('Update by email', () => {
   it('a mail that was turned away shows who sent it and why', async () => {
     status = ON({ lastRejected: { from: 'eve@other.com', reason: 'not_allowed', at: new Date().toISOString(), message: 'eve@other.com isn’t on the list.' } });
     load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
-    expect($('[data-es-rejected]').textContent).toContain('An email from eve@other.com arrived but was not used: eve@other.com isn’t on the list.');
+    expect($('[data-es-rejected]').textContent).toContain('An email was not used. eve@other.com isn’t on the list.');
   });
 
   it('when on: shows the last update with its rows and the last email', async () => {

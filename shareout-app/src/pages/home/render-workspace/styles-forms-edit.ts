@@ -28,7 +28,9 @@ export const WORKSPACE_FORMS_EDIT_STYLES = `/* ---- Modal + native create forms 
 .wsx-esync__nb { white-space: nowrap; }
 .wsx-esync__acts { display: flex; flex-wrap: wrap; gap: 8px; }
 .wsx-esync__acts a.wsx-abtn { text-decoration: none; }
-.wsx-esync__steps { margin: 0; padding-left: 22px; display: grid; gap: 4px; font-size: var(--text-sm); color: var(--color-text); }
+.wsx-esync__steps { margin: 0; padding-left: 24px; list-style: decimal outside; font-size: var(--text-sm); color: var(--color-text); }
+.wsx-esync__steps li { display: list-item; margin: 0 0 6px; padding-left: 2px; }
+.wsx-esync__steps li::marker { font-weight: 600; }
 .wsx-esync__fine { font-size: var(--text-xs); }
 .wsx-esync__st.is-wait { background: var(--color-bg-secondary, var(--color-bg)); color: var(--color-text); }
 .wsx-esync__dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--color-primary); vertical-align: middle; animation: wsxEsPulse 1.4s ease-in-out infinite; }
