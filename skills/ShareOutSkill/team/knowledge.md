@@ -133,13 +133,13 @@ The calls, from broad to specific:
 GET /v1/workspaces/{workspaceId}/knowledge/entities?type=Organization&q=acme&limit=20
 ```
 
-Returns `types` (each entity type with its count) and `entities`, most-mentioned first. Each entity has `id`, `type`, `name`, `aliases`, `mentions` and up to five `sources`. `name` and `aliases` are only names that appear in a source you can open, and `q` matches only those — the same holds for the `other` entity in `relations` and for `graph` nodes.
+Returns `types` (each entity type with its count) and `entities`, most-mentioned first. Each entity has `id`, `type`, `name`, `aliases`, `status`, `mentions` and up to five `sources`. `status` is `confirmed` when the workspace team confirmed or added it, else `draft`; `&status=confirmed|draft` filters by it. `name` and `aliases` are only names that appear in a source you can open, and `q` matches only those — the same holds for the `other` entity in `relations` and for `graph` nodes.
 
 ```http
 GET /v1/workspaces/{workspaceId}/knowledge/entities/{entityId}?format=md
 ```
 
-Returns one entity: its `facts` (each with a `quote` and `source`), its `relations` (`direction` `out`/`in`, plus the `other` entity), and quoted `mentions` with a `cite`. `format=md` gives a compact briefing ready for an LLM prompt.
+Returns one entity: its `facts` (each with a `quote` and `source`; a fact the team stated has `source: null` and `status: confirmed`), its `relations` (`direction` `out`/`in`, plus the `other` entity), and quoted `mentions` with a `cite`. `format=md` gives a compact briefing ready for an LLM prompt.
 
 ```http
 GET /v1/workspaces/{workspaceId}/knowledge/graph?focus={entityId}&depth=1&limit=100
@@ -151,8 +151,41 @@ How to use it:
 
 - **Answering about a client or project:** find it with `entities?q=`, then read `entities/{id}?format=md` and cite the quotes.
 - **Need passages, not structure:** use `search`.
-- **Visibility:** the graph follows the same rule as search. An entity, fact or connection only appears if you can see at least one source behind it.
+- **Visibility:** the graph follows the same rule as search. A learned entity, fact or connection only appears if you can see at least one source behind it. What the team confirmed is the workspace's own: every member sees it, under the name and aliases the team gave it.
 - **Gaps:** extraction needs Workers AI on the instance. Without it, Knowledge still searches but the graph stays empty.
+
+## Shape what Knowledge learns (owners and admins)
+
+The team can correct the graph and teach the learner. Whatever an owner or admin confirms, creates, renames, merges or connects becomes the team's (`status: confirmed`) and **survives every re-learn**: a re-learn only adds evidence to it. What they discard is **never learned again** until restored. Before every file, the learner reads the team's types, glossary, rules, discards and confirmed names, team decisions first.
+
+On the **Conocimiento / Knowledge** map: confirmed items are solid, proposals dashed. Admins confirm or discard in the side panel, drag a node's **+** onto another to connect, drop a node on another to merge, and double-click empty space to create. The **Rules** view holds the team's types, glossary, rules and the discarded list.
+
+The same from the API (all under `/v1/workspaces/{workspaceId}/knowledge/`; writes are owner/admin, `403` for members):
+
+```http
+POST   entities                  {"name": "Hivoltely", "type": "Organization", "aliases": ["HV"]}
+PATCH  entities/{id}             {"name": "Hivoltely Lab", "type": "Laboratory"}   or   {"confirm": true}
+DELETE entities/{id}?reason=noint                     # noint | wrong | notent | dup
+POST   entities/{id}/merge       {"into": "{keptId}"}
+POST   entities/{id}/facts       {"predicate": "revision", "value": "Rev. 06"}
+POST   relations                 {"from": "{id}", "type": "client of", "to": "{id}"}
+POST   relations/{id}/confirm    ·  DELETE relations/{id}?reason=wrong
+POST   facts/{id}/confirm        ·  DELETE facts/{id}
+GET    schema                    ·  PUT schema {"teamOnly": true}
+PUT    schema/types/{type}       {"description": "…", "ignored": false}   ·  DELETE schema/types/{type}
+GET    rules                     ·  POST rules {"kind": "rule", "text": "…"} or {"kind": "glossary", "term": "SSA", "text": "…"}
+DELETE rules/{id}
+GET    discarded                 ·  POST discarded/restore {"kind": "entity", "key": "…"}
+GET    history?entity={id}
+```
+
+- A rename keeps the old name as an alias, so files that still use it land on the same entity.
+- Creating or renaming onto a name another entity already goes by is `409 CONFLICT`, with a `suggestion` to merge instead.
+- A learned fact that disagrees with the team's value is shown next to it, never in its place. Confirming a learned fact makes it the team's value.
+- `GET schema` and `GET rules` are for every member; members get only the team's own types. Counts, `discarded` and `history` are owner/admin.
+- New rules apply to files learned from then on; `POST …/knowledge/reindex` re-learns older ones (owner/admin, costs AI usage).
+
+Over MCP, the same edits are `knowledge_edit_entity`, `knowledge_edit_connection`, `knowledge_edit_fact` and `knowledge_edit_rules`; `knowledge_rules` reads the team's rules and `knowledge_review` lists proposals, the discarded list and the history. They take names as people say them; discard, merge and disconnect need an exact name or an id ([mcp-connector.md](../integrations/mcp-connector.md)).
 
 ## What Knowledge costs the workspace
 

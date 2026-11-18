@@ -56,6 +56,13 @@ your ShareOut account"). Allow, and the app is connected.
 | `knowledge_status` | Whether Knowledge is on, what's learned / processing / unreadable, and how many entities it knows |
 | `knowledge_get` | One note by `path`, with its body and the pages it was learned from (`source_artifacts`: title + absolute `url` when the person may open it, `available: false` otherwise) |
 | `knowledge_from_artifact` | Notes learned from one page (`artifact_id`; the page's workspace by default) — the reverse of a note's sources; empty when the person can't open the page |
+| `knowledge_reindex` | Owners/admins: re-learn every File and page (or `artifact_ids`); `check_only` reports progress. Once per 10 minutes, costs AI usage |
+| `knowledge_rules` | The team's types (and which are ignored), the "team types only" switch, glossary and rules. Every member; counts only for owners/admins |
+| `knowledge_review` | `show`: `proposals` (learned, not confirmed yet, most mentioned first; optional `type`), `discarded` (with the `kind` + `key` restore takes) or `history` (optionally one `entity`). Discarded and history are owners/admins |
+| `knowledge_edit_entity` | Owners/admins: `action` `create` (`name`, `type`, `description`, `aliases`), `update` (rename — the old name stays an alias — retype, describe), `confirm`, `discard` (optional `reason`), `merge` (`entity` into `into`). `entity` is a name as people say it or an id |
+| `knowledge_edit_connection` | Owners/admins: `connect` (`from`, `type`, `to`), `confirm` or `disconnect` — by `connection_id`, or `from` plus `to` and/or `type` |
+| `knowledge_edit_fact` | Owners/admins: `add` (`about`, `predicate`, `value`, `unit`), `confirm` (it becomes the team's value) or `remove` — by `fact_id`, or `about` + `predicate` (+ `value`) |
+| `knowledge_edit_rules` | Owners/admins: `add_rule`, `add_glossary` (`term`, `text`), `remove_rule` (`rule_id`), `set_type` (`type`, `description`, `ignored`), `remove_type`, `team_types_only` (`on`), `restore` (`kind`, `key`) |
 | `list_connections` | The workspace's data connectors; `queryable` (SQL) / `files` (S3) only when an admin switched AI on for that connector |
 | `query_connection` | One read-only `SELECT` on a warehouse connector (Snowflake, BigQuery, Redshift, Aurora, Supabase); `connection`, `sql`, optional `project_id` (BigQuery); ≤ 1000 rows |
 | `browse_storage` | Amazon S3 connector: `action: "list"` (+ `prefix`) or `"read"` (+ `key`); CSV → rows, JSON → data, text → text |
@@ -120,10 +127,15 @@ Rules the tools follow:
   (visibility downgraded, under review, approval needed) to relay to the person.
 - **Knowledge answers cite their sources** — the `knowledge_*` tools tell the model to answer
   in the person's language, only from what they return, naming the page or File (and link)
-  behind each fact. They are read-only, workspace-scoped by the signed-in account, run the
+  behind each fact. They are workspace-scoped by the signed-in account, run the
   same `/v1/workspaces/{id}/knowledge/*` routes (so a source someone can't open never shows
   up), and searches are metered to the workspace like any other. When Knowledge is off they
   say so instead of failing. See [team/knowledge.md](../team/knowledge.md).
+- **The team's edits hold** — `knowledge_edit_*` change only what an owner or admin asked for;
+  anyone else gets a plain refusal and nothing changes. What they confirm, rename, merge or
+  connect survives every re-learn, and what they discard is never learned again until restored.
+  A name that matches several things, or (for discard, merge and disconnect) no exact name,
+  changes nothing and lists the candidates with their ids to ask the person.
 - **Same rules as the API** — the tools run the same handlers as `POST /v1/publish`,
   `GET /v1/artifacts`, `/v1/workspaces/{id}/members/invite`, so quotas, moderation,
   workspace publish policy and roles all apply.
