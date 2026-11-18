@@ -18,6 +18,7 @@ import {
 } from './store';
 import { cronCadenceNotice } from '../scheduling/jobs/cron';
 import { runCrew } from './run-loop';
+import { priceRuns, workspaceMarkup } from '../data/ai-markup';
 import { resolveCrewLimits, countActiveRuns, crewCapsError } from './limits';
 import { listApprovals, getApproval, approveAndExecute, rejectApproval } from './approvals';
 
@@ -213,7 +214,7 @@ async function handleRun(request: Request, ctx: DataContext): Promise<Response> 
 async function handleListRuns(ctx: DataContext): Promise<Response> {
   const crew = await getCrew(ctx.env, ctx.artifactId);
   if (!crew) return successResponse({ runs: [] }, 200, ctx.origin);
-  const runs = await listRuns(ctx.env, crew.id);
+  const runs = priceRuns(await listRuns(ctx.env, crew.id), (await workspaceMarkup(ctx.env, ctx.workspaceId)).bps);
   return successResponse({ runs }, 200, ctx.origin);
 }
 
@@ -222,8 +223,8 @@ async function handleGetRun(ctx: DataContext, runId: string): Promise<Response> 
   if (!run || run.artifact_id !== ctx.artifactId) {
     return errorResponse(DATA_ERRORS.NOT_FOUND, ctx.origin);
   }
-  const events = await getRunEvents(ctx.env, runId);
-  return successResponse({ run, events }, 200, ctx.origin);
+  const [events, { bps }] = await Promise.all([getRunEvents(ctx.env, runId), workspaceMarkup(ctx.env, ctx.workspaceId)]);
+  return successResponse({ run: priceRuns([run], bps)[0], events }, 200, ctx.origin);
 }
 
 async function handleListTriggers(ctx: DataContext): Promise<Response> {

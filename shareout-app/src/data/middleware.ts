@@ -17,6 +17,7 @@ import {
   SPACE_GUEST_AUTH_PREFIX, isTrustedInstanceOrigin, spaceGuestCovers, spaceGuestFor, spaceGuestFromGrant, spaceGuestTokenName,
   type SpaceGuest,
 } from '../sharees/space-guest';
+import { isViewCodeToken } from '../artifacts/view-codes/tokens';
 
 export interface DataContext {
   artifactId: string;
@@ -193,7 +194,8 @@ export async function dataMiddleware(
   // own artifact's data and so we can derive write capability. For a truly
   // anonymous public viewer (no Authorization header, no session cookie) it
   // returns `deny` after cheap header checks with zero DB queries.
-  const requiresAuth = artifact.visibility === 'private' || artifact.visibility === 'workspace';
+  // A one-time view page is closed whatever its visibility says (as on the serve path).
+  const requiresAuth = artifact.visibility === 'private' || artifact.visibility === 'workspace' || artifact.auth_method === 'onetime';
   const authResult = await checkDataAuth(request, env, artifact);
   if (requiresAuth && !authResult.authorized) {
     return errorResponse(
@@ -310,8 +312,9 @@ async function checkDataAuth(
     if (payload?.authType === 'owner_test' && !isCaptureSession(payload)) return deny;
     // 'content' tokens authorize loading static artifact bytes on the content domain
     // ONLY (ADR 30) — they carry no viewer identity and must never grant data access.
-    // Capture links likewise only open the capture view.
-    if (payload && payload.authType !== 'content' && !isCaptureLink(payload.authType)) {
+    // Capture links likewise only open the capture view, and a one-time code's pass and
+    // frame token only open the page itself.
+    if (payload && payload.authType !== 'content' && !isCaptureLink(payload.authType) && !isViewCodeToken(payload.authType)) {
       // Artifact-scoped access token (password/credentials/owner/viewer-minted).
       // 'owner_test' is the read-only session of a capture render: it reads this
       // artifact as the owner but flags the request so the router blocks every mutation.
@@ -428,8 +431,8 @@ async function checkDataAuth(
     if (token) {
       const payload = await verifyAccessToken(token, artifact.id, env);
       // A capture credential is no password-gate cookie: as one it would skip the
-      // read-only flag its Bearer use carries.
-      if (payload && !isCaptureCredential(payload.authType)) {
+      // read-only flag its Bearer use carries. Nor is a one-time code's pass.
+      if (payload && !isCaptureCredential(payload.authType) && !isViewCodeToken(payload.authType)) {
         const owns = payload.authType === 'owner';
         return {
           authorized: true,
@@ -450,10 +453,10 @@ async function checkDataAuth(
     }
   }
 
-  // A space-guest cookie whose grant reaches this artifact. Never on a password or
-  // credentials page (the password is that page's only way in). A cookie-authenticated
+  // A space-guest cookie whose grant reaches this artifact. Never on a password,
+  // credentials or one-time page (the password / code is that page's only way in). A cookie-authenticated
   // write must come from this instance (CSRF).
-  if (artifact.auth_method !== 'password' && artifact.auth_method !== 'credentials' &&
+  if (artifact.auth_method !== 'password' && artifact.auth_method !== 'credentials' && artifact.auth_method !== 'onetime' &&
       (!MUTATING.has(request.method.toUpperCase()) || isTrustedInstanceOrigin(request, env))) {
     const guest = await spaceGuestFor(request, env, 'artifact', artifact.id, 'view');
     if (guest) return { authorized: true, needsAuth: false, viewer: { email: null, isOwner: false }, isArtifactOwner: false, spaceGuest: guest };

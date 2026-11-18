@@ -235,6 +235,10 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 .wsx-admin__budget.is-reached .wsx-admin__budgetstate { color: var(--color-error); }
 .wsx-admin__seatfill { height: 100%; background: var(--color-primary); border-radius: 2px; }
 /* Admin badge extras */
+.wsx-opbadge { display: inline-flex; align-items: center; font: 600 var(--text-xs) var(--font-body); padding: 2px 9px; border-radius: 999px; background: var(--color-text); color: var(--color-bg); white-space: nowrap; vertical-align: 1px; }
+.wsx-opzone { border: 1px dashed var(--color-border-strong); border-radius: var(--radius-lg); padding: 12px 14px 4px; margin: 0 0 20px; }
+.wsx-opzone__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.wsx-opzone__sub { font: var(--text-xs) var(--font-body); color: var(--color-text-tertiary); }
 .wsx-admin__rolebadge.is-trial { background: color-mix(in srgb, var(--color-warning) 14%, transparent); color: var(--color-warning); }
 .wsx-admin__rolebadge.is-warn { background: color-mix(in srgb, var(--color-error) 14%, transparent); color: var(--color-error); }
 /* Artifacts governance table */
@@ -336,6 +340,25 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 .wsx-adm__bdg { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border: 1px solid currentColor; border-radius: 10px; background: var(--color-warning-light); color: var(--color-warning); font: 700 11px/18px var(--font-body); text-align: center; }
 .wsx-adm__bdg.is-bad { background: var(--color-error-light); color: var(--color-error); }
 .wsx-adm__bdg[hidden] { display: none; }
+.wsx-adm__it[hidden], .wsx-adm__grp[hidden] { display: none; }
+.wsx-adm__grp[hidden] + .wsx-adm__it[hidden] + .wsx-adm__grp { margin-top: 2px; }
+/* Admin → Summary: the month picker, deltas on the KPI tiles, the daily views chart */
+.wsx-sum__month { padding: 7px 10px; border: 1.5px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); font: 600 var(--text-sm) var(--font-body); }
+.wsx-sum__kpis .wsx-an__delta { position: static; display: inline-block; margin-left: 10px; vertical-align: middle; letter-spacing: 0; }
+.wsx-sum__chart { margin: 4px 0 14px; }
+.wsx-sum__chart .wsx-spark { height: 72px; }
+.wsx-sum__facts { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; margin: 0; font-size: var(--text-sm); }
+.wsx-sum__facts dt { color: var(--color-text-secondary); }
+.wsx-sum__facts dd { margin: 0; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+#wsxSumMemTbl .wsx-atbl th { white-space: normal; vertical-align: bottom; }
+.wsx-sum__facts .wsx-sum__go { display: inline; margin: 0 0 0 8px; padding: 0; }
+.wsx-sum__who { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
+.wsx-sum__who label { display: flex; align-items: center; gap: 10px; font-size: var(--text-sm); }
+/* Billing details form: per-field problems */
+.wsx-field.is-bad .wsx-field__in { border-color: var(--color-error); }
+.wsx-field__err { font-size: var(--text-xs); color: var(--color-error); }
+.wsx-field__err:empty { display: none; }
+.wsx-bp__meta { margin-right: auto; align-self: center; }
 .wsx-adm__ph { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
 .wsx-adm__title { margin: 0 0 4px; font: 700 var(--text-h3)/1.2 var(--font-display, var(--font-body)); letter-spacing: -.01em; color: var(--color-text); }
 .wsx-adm__desc { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); }

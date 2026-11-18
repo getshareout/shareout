@@ -4,6 +4,7 @@
 // null otherwise, so callers can map null → 404.
 
 import type { Env } from '../types';
+import { resell, workspaceMarkup } from '../data/ai-markup';
 
 export type RunSurface = 'crew' | 'job' | 'alert';
 
@@ -90,7 +91,8 @@ async function crewRunDetail(env: Env, workspaceId: string, runId: string): Prom
     endedAt: (run.ended_at as string) || undefined,
     tokenInput: (run.token_input as number) ?? undefined,
     tokenOutput: (run.token_output as number) ?? undefined,
-    costMicroUsd: (run.cost_micro_usd as number) ?? undefined,
+    // At the workspace's price (cost × its AI markup).
+    costMicroUsd: typeof run.cost_micro_usd === 'number' ? resell(run.cost_micro_usd, (await workspaceMarkup(env, workspaceId)).bps) : undefined,
     steps,
     result: (run.result_text as string) || undefined,
     error: run.status === 'error' ? (run.termination_reason as string) || 'error' : undefined,
@@ -227,6 +229,7 @@ export async function listWorkspaceRuns(
          LEFT JOIN crews c ON c.id = r.crew_id
         WHERE a.workspace_id = ? ORDER BY r.started_at DESC LIMIT ?`
     ).bind(workspaceId, limit).all<Record<string, unknown>>();
+    const { bps } = await workspaceMarkup(env, workspaceId); // run cost at the workspace's price
     for (const x of r.results || []) {
       const ended = x.ended_at as string | null;
       items.push({
@@ -235,7 +238,7 @@ export async function listWorkspaceRuns(
         trigger: x.trigger_kind ? String(x.trigger_kind) : undefined,
         startedAt: x.started_at as string,
         durationMs: ended ? Date.parse(ended) - Date.parse(String(x.started_at)) : undefined,
-        costMicroUsd: (x.cost_micro_usd as number) ?? undefined,
+        costMicroUsd: typeof x.cost_micro_usd === 'number' ? resell(x.cost_micro_usd, bps) : undefined,
       });
     }
   }

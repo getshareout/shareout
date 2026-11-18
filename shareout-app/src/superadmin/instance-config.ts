@@ -15,6 +15,7 @@ import { googleOAuthConfigured, microsoftOAuthConfigured } from '../config/auth-
 import { schemaReady } from '../pages/setup';
 import { getAIProviderChain, DEFAULT_GATEWAY_MODEL } from '../data/agent/anthropic';
 import { getInstanceDefaultGatewayModel } from '../data/agent/ai-config';
+import { multiplier, workspaceMarkup } from '../data/ai-markup';
 import { storageQuotaBytes, storageMaxFileBytes } from '../storage-quota';
 import { envAdminEmails } from './recipients';
 import { badgeEnabled } from '../serve/badge';
@@ -45,6 +46,8 @@ export interface InstanceConfig {
      *  unless a workspace sets its own override (workspace_llm_config.gateway_model). */
     default_gateway_model: string | null;
     default_gateway_model_fallback: string;
+    /** AI resale markup for workspaces that set none (1 = at cost). Workspaces never see it. */
+    default_markup: number;
   };
   email: {
     binding: boolean;
@@ -91,6 +94,7 @@ function truthy(value: string | undefined): boolean {
 export async function buildInstanceConfig(env: Env): Promise<InstanceConfig> {
   const providers = getAIProviderChain(env).map((c) => c.provider);
   const defaultGatewayModel = await getInstanceDefaultGatewayModel(env);
+  const defaultMarkup = multiplier((await workspaceMarkup(env, null)).instanceBps) ?? 1;
   const hasSchema = await schemaReady(env);
   const adminsConfigured = envAdminEmails(env).length > 0;
   const gaps: ConfigGap[] = [];
@@ -152,6 +156,7 @@ export async function buildInstanceConfig(env: Env): Promise<InstanceConfig> {
       byo_keys: Boolean(env.CREDENTIALS_KEY),
       default_gateway_model: defaultGatewayModel,
       default_gateway_model_fallback: DEFAULT_GATEWAY_MODEL,
+      default_markup: defaultMarkup,
     },
     email: {
       binding: Boolean(env.EMAIL),

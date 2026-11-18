@@ -1,5 +1,5 @@
 import type { EmailConfig } from '../../scheduling/email';
-import { sendArtifactEmail, checkEmailRateLimit, incrementEmailCount } from '../../scheduling/email';
+import { sendArtifactEmail, checkEmailRateLimit, incrementEmailCount, PDF_FORMATS } from '../../scheduling/email';
 import { getTemplateForArtifact } from '../../scheduling/templates';
 import type { Destination } from '../types';
 
@@ -12,6 +12,10 @@ export const emailDestination: Destination<EmailConfig> = {
     for (const email of config.recipients) {
       if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) return `Invalid email: ${email}`;
     }
+    if (config.pdfFormat != null && !(PDF_FORMATS as readonly string[]).includes(config.pdfFormat)) {
+      return `pdfFormat must be one of: ${PDF_FORMATS.join(', ')}`;
+    }
+    if (config.pdfLandscape != null && typeof config.pdfLandscape !== 'boolean') return 'pdfLandscape must be true or false';
     if (config.template_id) {
       const template = await getTemplateForArtifact(env, config.template_id, ctx.artifactId);
       if (!template) return `Template not found: ${config.template_id}`;

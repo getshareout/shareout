@@ -246,6 +246,15 @@ export async function checkPasswordLoginLimit(env: Env, request: Request): Promi
   return checkKVRateLimit(env.RATE_LIMIT_KV, rateLimitClientKey(request), 'passwordLogin');
 }
 
+/**
+ * One-time view codes: per client only. A per-artifact ceiling would let one person
+ * spending 200 bad guesses lock every real code holder out of the page; the code space
+ * (32^8) keeps a distributed guess hopeless without it.
+ */
+export async function checkViewCodeGateLimit(env: Env, request: Request, artifactId: string): Promise<RateLimitResult> {
+  return checkKVRateLimit(env.RATE_LIMIT_KV, `vcd:${artifactId}:${rateLimitClientKey(request)}`, 'artifactGate');
+}
+
 export async function checkArtifactGateLimit(env: Env, request: Request, artifactId: string): Promise<RateLimitResult> {
   const perClient = await checkKVRateLimit(env.RATE_LIMIT_KV, `${artifactId}:${rateLimitClientKey(request)}`, 'artifactGate');
   if (!perClient.allowed) return perClient;

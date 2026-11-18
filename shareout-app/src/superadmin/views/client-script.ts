@@ -197,6 +197,23 @@ function initInstance() {
     };
   }
 
+  const markupIn = document.getElementById('sa-ai-markup');
+  const markupSave = document.getElementById('sa-ai-markup-save');
+  if (markupIn && markupSave) {
+    markupSave.onclick = async () => {
+      const out = document.getElementById('sa-ai-markup-result');
+      const v = Number(markupIn.value);
+      if (!isFinite(v) || v < 1 || v > 10) { out.textContent = 'Use a multiplier from 1 to 10.'; return; }
+      markupSave.disabled = true;
+      out.textContent = 'Saving…';
+      try {
+        const r = await api('PUT', '/v1/admin/ai-settings', { defaultMarkup: v });
+        out.textContent = 'Saved: ' + r.defaultMarkup + '×';
+      } catch (e) { out.textContent = e.message; }
+      markupSave.disabled = false;
+    };
+  }
+
   const createBtn = document.getElementById('sa-ws-create');
   if (createBtn) createBtn.onclick = async () => {
     const val = (id) => document.getElementById(id).value.trim();

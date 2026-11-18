@@ -134,7 +134,8 @@ describe('rollupWorkspaceUsage', () => {
         ('aue_1', 'ws_a', 'art_a1', 'admin', 'x', 'm', 100, 50, 1200, 1200, 0, '${day}T12:00:00.000Z'),
         ('aue_2', 'ws_a', 'art_a1', 'admin', 'x', 'm', 999, 999, 5000, 0, 1, '${day}T12:00:00.000Z');
       INSERT INTO ai_usage_events (id, workspace_id, kind, model, units, unit_kind, base_cost_micro_usd, created_at) VALUES
-        ('aiu_1', 'ws_b', 'whisper_transcribe', 'w', 60, 'audio_seconds', 450, '${day}T08:00:00.000Z')`;
+        ('aiu_1', 'ws_b', 'whisper_transcribe', 'w', 60, 'audio_seconds', 450, '${day}T08:00:00.000Z'),
+        ('aiu_2', 'ws_a', 'artifact_admin_chat', 'm', 150, 'tokens', 1200, '${day}T12:00:00.000Z')`;
     const reset = ['workspace_usage_daily', 'analytics_events', 'job_runs', 'scheduled_jobs', 'agent_usage_events', 'ai_usage_events',
       'connections', 'artifacts', 'workspaces', 'users'].map((t) => `DELETE FROM ${t}`);
     await env.DB.batch([...reset, `INSERT INTO users (id, email) VALUES ('usr_1', 'o@x.test')`, ...rows.split(';').map((x) => x.trim()).filter(Boolean)]
@@ -157,9 +158,24 @@ describe('rollupWorkspaceUsage', () => {
     expect(m['ws_a:serving_requests'][0]).toBe(2);
     expect(m['ws_b:job_runs'][0]).toBe(1);
     expect(m['ws_b:job_duration_ms'][0]).toBe(1500);
+    // The in-page call is in both meters (aue_1 and aiu_2): it counts once, from ai_usage_events.
     expect(m['ws_a:ai_llm_tokens']).toEqual([150, 1200]);
+    expect(m['ws_a:ai_other_events']).toBeUndefined();
     expect(m['ws_b:ai_other_events']).toEqual([1, 450]);
     expect(Object.keys(m).some((k) => k.startsWith('ws_b:serving'))).toBe(false);
+  });
+
+  it('a re-run drops rolled rows it no longer produces and keeps live ones', async () => {
+    await seed();
+    await env.DB.batch([
+      env.DB.prepare(`INSERT INTO workspace_usage_daily (day, workspace_id, metric, quantity, cost_micro_usd) VALUES (?, 'ws_b', 'ai_llm_tokens', 999, 777)`).bind(day),
+      env.DB.prepare(`INSERT INTO workspace_usage_daily (day, workspace_id, metric, quantity, cost_micro_usd) VALUES (?, 'ws_b', 'email_sent', 3, 9)`).bind(day),
+    ]);
+    await rollupWorkspaceUsage(E, day, { measureStorage: false });
+    const m = await metrics();
+    expect(m['ws_b:ai_llm_tokens']).toBeUndefined();
+    expect(m['ws_b:ai_other_events']).toEqual([1, 450]);
+    expect(m['ws_b:email_sent']).toEqual([3, 9]);
   });
 
   it('filters daily rows to one workspace', async () => {

@@ -248,7 +248,7 @@ const pageScript = `
           '<td>' + e.model + '</td>' +
           '<td class="num">' + (e.inputTokens == null ? '—' : e.inputTokens) + '</td>' +
           '<td class="num">' + (e.outputTokens == null ? e.tokens + ' total' : e.outputTokens) + '</td>' +
-          '<td class="num">' + usd(e.billedCostUsd) + '</td>' +
+          '<td class="num">' + usd(e.costUsd) + '</td>' +
           '<td>' + (e.byo ? '<span class="tag byo">own key</span>' : '<span class="tag">platform</span>') + '</td>' +
         '</tr>';
       }).join('');

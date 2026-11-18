@@ -6,7 +6,14 @@ vi.mock('../../../../src/workspaces/roles', async (importOriginal) => ({
   getInternalWorkspaceRole: roleMock,
 }));
 
+const budgetMock = vi.hoisted(() => vi.fn());
+vi.mock('../../../../src/data/ai-budget', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  budgetState: budgetMock,
+}));
+
 import {
+  handleGetWorkspaceLlm,
   handleSetWorkspaceGatewayModel,
   handleDeleteWorkspaceGatewayModel,
 } from '../../../../src/router/api/workspace-llm';
@@ -65,5 +72,22 @@ describe('handleDeleteWorkspaceGatewayModel', () => {
     const res = await handleDeleteWorkspaceGatewayModel(envWithDb(run), user, wsId);
     expect(res.status).toBe(200);
     expect(run).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('handleGetWorkspaceLlm', () => {
+  it("shows this month's spend from the AI budget (the one meter, at the workspace's price), not agent_usage_events", async () => {
+    roleMock.mockResolvedValue('member');
+    budgetMock.mockResolvedValue({ spentMicro: 32_234_700, costMicro: 21_489_800, markupBps: 15_000 });
+    const sqls: string[] = [];
+    const env = {
+      DB: { prepare: vi.fn((sql: string) => { sqls.push(sql); return { bind: vi.fn(() => ({ first: vi.fn(async () => null) })) }; }) },
+    } as unknown as Env;
+    const res = await handleGetWorkspaceLlm(env, user, wsId);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { currentMonthSpendUsd: number };
+    expect(body.currentMonthSpendUsd).toBe(32.2347);
+    expect(sqls.some((q) => q.includes('agent_usage_events'))).toBe(false);
+    expect(JSON.stringify(body)).not.toMatch(/cost|markup/i);
   });
 });

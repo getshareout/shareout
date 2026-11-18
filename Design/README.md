@@ -42,6 +42,7 @@ stay consistent with `Design/` rather than introducing a second style.
 | Apply logo, color, type at brand level | [visual/](visual/) |
 | Implement layouts, tokens, components in code | [system/](system/) |
 | Compose a landing / marketing / home page | [system/page-composition.md](system/page-composition.md) |
+| Build an admin, settings or management page (nav, hierarchy, attention color, long lists) | [system/app-pages.md](system/app-pages.md) |
 | Ship the design system to published artifacts (SDK) | [system/artifact-ui.md](system/artifact-ui.md) |
 | Brief an external designer on logo/identity | [handoff/brand_brief.md](handoff/brand_brief.md) |
 
@@ -74,6 +75,7 @@ Design/
 │   ├── overview.md           Narrative design system (v2)
 │   ├── layout.md             Page structure, breakpoints, grid
 │   ├── page-composition.md   Hero, section rhythm, eyebrows, CTAs (marketing/landing)
+│   ├── app-pages.md          Sidebar nav, page anatomy, attention color, folding (admin/settings)
 │   ├── tokens.md             CSS custom properties (spacing, radius, motion, z-index)
 │   ├── components.md         Buttons, inputs, cards, modals, states
 │   └── artifact-ui.md        Design system shipped to artifacts (shareout.css SDK)

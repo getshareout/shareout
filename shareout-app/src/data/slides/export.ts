@@ -1,10 +1,10 @@
-import puppeteer from '@cloudflare/puppeteer';
 import { errorResponse, type DataContext } from '../middleware';
 import { canEditPresentation } from './auth';
 import type { DbPresentation, DbSlide } from './db';
 import { mapPresentation } from './db';
 import { recordBrowserSince } from '../../workspaces/usage-ledger';
 import { captureOwnHosts, guardCapturePage } from '../../screenshots/request-policy';
+import { launchBrowser, type LaunchedBrowser } from '../../screenshots/launch';
 
 const NAV_TIMEOUT = 20000;
 
@@ -89,10 +89,10 @@ export async function handleExportRoute(request: Request, ctx: DataContext, pres
 
   const style = deckStyle(pres);
 
-  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
+  let browser: LaunchedBrowser | null = null;
   const startedAt = Date.now();
   try {
-    browser = await puppeteer.launch(ctx.env.BROWSER as Parameters<typeof puppeteer.launch>[0]);
+    browser = await launchBrowser(ctx.env.BROWSER);
     const page = await browser.newPage();
     await page.setViewport({ width: style.width, height: style.height, deviceScaleFactor: 1 });
     const guard = await guardCapturePage(page, captureOwnHosts(ctx.env));

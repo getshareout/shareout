@@ -51,6 +51,7 @@ import { handleShareTarget } from '../serve/share-target';
 import { normalizeVisibility, openVisibilityDisabled } from '../visibility-config';
 import { resolveAllowOpen } from '../access/allow-open';
 import type { Env } from '../types';
+import { isOneTimeView } from '../artifacts/view-codes/tokens';
 
 // Edge-cache a stable-keyed R2 image (thumbnails, workspace logos) via the Cache API.
 // Unlike version-addressed artifact assets, these R2 keys are reused when the entity's
@@ -218,7 +219,7 @@ export async function routeServe(ctx: FetchContext): Promise<Response | null> {
       return new Response(null, { status: 404 });
     }
     const vis = normalizeVisibility(row.visibility) || 'public';
-    const closed = vis === 'private' || vis === 'workspace';
+    const closed = vis === 'private' || vis === 'workspace' || isOneTimeView(row.auth_method);
     if (closed) {
       // Minimal ArtifactInfo for the access chokepoint — only identity fields matter.
       const info = {
@@ -249,6 +250,14 @@ export async function routeServe(ctx: FetchContext): Promise<Response | null> {
       : ext === 'svg' ? 'image/svg+xml'
       : 'image/jpeg';
     return serveCachedR2Image(env, r2Key, contentType, ctx.executionCtx);
+  }
+
+  // A one-time page's link-preview image, made public by its owner (artifacts/view-codes/gate-look).
+  const gateImageMatch = path.match(/^\/vg\/([^/.]+)\.(webp|png|jpg)$/);
+  if (gateImageMatch && request.method === 'GET') {
+    const [, name, ext] = gateImageMatch;
+    const contentType = ext === 'webp' ? 'image/webp' : ext === 'png' ? 'image/png' : 'image/jpeg';
+    return serveCachedR2Image(env, `view-gates/${name}.${ext}`, contentType, ctx.executionCtx);
   }
 
   if (path === '/setup' || path === '/setup/') {

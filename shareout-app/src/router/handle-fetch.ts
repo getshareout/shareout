@@ -84,7 +84,7 @@ const RESERVED_PREFIXES = [
   '/internal/', '/telegram/', '/slack/', '/report/', '/debug', '/health',
   '/app', '/home', '/create', '/teams', '/settings/', '/workspace', '/share-target',
   '/manifest.webmanifest', '/sw.js',
-  '/a/', '/@', '/p/', '/embed/', '/t/', '/wl/', '/mcp', '/oauth/',
+  '/a/', '/@', '/p/', '/embed/', '/t/', '/wl/', '/vg/', '/mcp', '/oauth/',
 ];
 
 function isReservedProductPath(path: string): boolean {

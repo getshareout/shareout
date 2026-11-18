@@ -3,6 +3,8 @@ import type { HomeLocaleCopy } from '../types';
 /** Admin portal tabs, settings, billing, and workspace management copy. */
 export const ADMIN_COPY: HomeLocaleCopy = {
   en: {
+    'admin.grpReports': 'Reports',
+    'admin.sec_summary': 'Summary',
     'admin.grpPeople': 'People',
     'admin.grpContent': 'Content',
     'admin.grpMoney': 'AI & billing',
@@ -224,6 +226,8 @@ export const ADMIN_COPY: HomeLocaleCopy = {
     'admin.seatsCount': '{used} / {total} seats',
     'admin.usage': 'Usage',
     'admin.usageIntro': 'What this workspace spent this month, by category. Updated nightly, so today\'s usage shows up tomorrow.',
+    'admin.usageOperator': 'AI cost {cost} · margin {margin} · markup {markup}×',
+    'admin.superOnly': 'Super admins only',
     'admin.usageThisMonth': 'This month',
     'admin.usageLastMonth': 'Last month',
     'admin.usageCsv': 'Download CSV',
@@ -349,6 +353,8 @@ export const ADMIN_COPY: HomeLocaleCopy = {
     'admin.tokenRevoked': 'Token revoked',
   },
   es: {
+    'admin.grpReports': 'Informes',
+    'admin.sec_summary': 'Resumen',
     'admin.grpPeople': 'Personas',
     'admin.grpContent': 'Contenido',
     'admin.grpMoney': 'IA y facturación',
@@ -570,6 +576,8 @@ export const ADMIN_COPY: HomeLocaleCopy = {
     'admin.seatsCount': '{used} / {total} asientos',
     'admin.usage': 'Consumo',
     'admin.usageIntro': 'Lo que gastó este espacio este mes, por categoría. Se actualiza cada noche, así que el consumo de hoy aparece mañana.',
+    'admin.usageOperator': 'Costo de IA {cost} · margen {margin} · markup {markup}×',
+    'admin.superOnly': 'Solo super admins',
     'admin.usageThisMonth': 'Este mes',
     'admin.usageLastMonth': 'Mes pasado',
     'admin.usageCsv': 'Descargar CSV',

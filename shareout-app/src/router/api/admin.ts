@@ -27,6 +27,8 @@ import { apiErrorResponse } from '../../http/api-error';
 import { buildInstanceConfig } from '../../superadmin/instance-config';
 import { getWorkspaceSso, putWorkspaceSso, deleteWorkspaceSso } from '../../superadmin/workspace-sso';
 import { getInstanceDefaultGatewayModel } from '../../data/agent/ai-config';
+import { bpsFromMultiplier, multiplier, workspaceMarkup } from '../../data/ai-markup';
+import { resetBudgetCache } from '../../data/ai-budget';
 import { renderFeatureGrid } from '../../superadmin/features-view';
 import { isKnownFeature } from '../../features/registry';
 import { setGlobalFlag, setWorkspaceFlag, GLOBAL_TARGET } from '../../features/flags';
@@ -153,25 +155,38 @@ export async function routeAdminApi(ctx: FetchContext): Promise<Response | null>
     return jsonResponse(await buildInstanceConfig(env));
   }
 
-  // GET/PUT /v1/admin/ai-settings — instance-wide default Vercel AI Gateway model.
-  // A workspace's own `gateway_model` (workspace-llm.ts) takes priority over this.
+  // GET/PUT /v1/admin/ai-settings — instance-wide AI defaults: the Vercel AI Gateway model (a
+  // workspace's own `gateway_model` wins, workspace-llm.ts) and the AI resale markup for workspaces
+  // that set none (ai-markup.ts; 1 = at cost). PUT updates only the keys it is sent.
   if (path === '/v1/admin/ai-settings' && request.method === 'GET') {
-    return jsonResponse({ defaultGatewayModel: await getInstanceDefaultGatewayModel(env) });
+    const [model, markup] = await Promise.all([getInstanceDefaultGatewayModel(env), workspaceMarkup(env, null)]);
+    return jsonResponse({ defaultGatewayModel: model, defaultMarkup: multiplier(markup.instanceBps) ?? 1 });
   }
   if (path === '/v1/admin/ai-settings' && request.method === 'PUT') {
-    const body = await request.json<{ defaultGatewayModel?: string | null }>().catch(() => ({}) as { defaultGatewayModel?: string | null });
+    const body = await request.json<{ defaultGatewayModel?: string | null; defaultMarkup?: number | null }>()
+      .catch(() => ({}) as { defaultGatewayModel?: string | null; defaultMarkup?: number | null });
+    const hasModel = 'defaultGatewayModel' in body, hasMarkup = 'defaultMarkup' in body;
+    if (!hasModel && !hasMarkup) return jsonError('Send defaultGatewayModel and/or defaultMarkup', 'VALIDATION_ERROR', 400);
     const model = body.defaultGatewayModel;
-    if (model !== null && (!model || typeof model !== 'string' || !model.includes('/'))) {
+    if (hasModel && model !== null && (!model || typeof model !== 'string' || !model.includes('/'))) {
       return jsonError('defaultGatewayModel must be a gateway model id or null', 'VALIDATION_ERROR', 400);
     }
-    await env.DB.prepare(`
-      INSERT INTO instance_ai_settings (id, default_gateway_model, updated_at)
-      VALUES (1, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-      ON CONFLICT(id) DO UPDATE SET
-        default_gateway_model = excluded.default_gateway_model,
-        updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-    `).bind(model).run();
-    return jsonResponse({ ok: true, defaultGatewayModel: model });
+    const bps = body.defaultMarkup == null ? null : bpsFromMultiplier(body.defaultMarkup);
+    if (hasMarkup && body.defaultMarkup != null && bps === null) {
+      return jsonError('defaultMarkup must be a multiplier from 1 (at cost) to 10, or null', 'VALIDATION_ERROR', 400);
+    }
+    await env.DB.prepare(`INSERT OR IGNORE INTO instance_ai_settings (id) VALUES (1)`).run();
+    if (hasModel) {
+      await env.DB.prepare(`UPDATE instance_ai_settings SET default_gateway_model = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = 1`)
+        .bind(model).run();
+    }
+    if (hasMarkup) {
+      await env.DB.prepare(`UPDATE instance_ai_settings SET default_markup_bps = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = 1`)
+        .bind(bps).run();
+      resetBudgetCache();
+    }
+    const [m, mk] = await Promise.all([getInstanceDefaultGatewayModel(env), workspaceMarkup(env, null)]);
+    return jsonResponse({ ok: true, defaultGatewayModel: m, defaultMarkup: multiplier(mk.instanceBps) ?? 1 });
   }
 
   // POST /v1/admin/workspaces/provision — one-step customer workspace: create (or adopt by

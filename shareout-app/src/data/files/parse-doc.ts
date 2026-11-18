@@ -5,12 +5,13 @@
 // footnotes, headers/footers, annotations, endnotes, text boxes) — no styles or images —
 // and field codes are dropped, keeping what they display.
 import * as XLSX from 'xlsx';
+import { DocReadError } from './doc-read-error';
+
+export { DocReadError };
 
 export const DOC_MAX_INPUT_BYTES = 8_000_000;
 const MAX_CHARS = 2_000_000;
 const MAX_PIECES = 100_000;
-
-export class DocReadError extends Error {}
 
 // Windows-1252 0x80–0x9F; everything else in an 8-bit piece maps to the same code point.
 const CP1252 = [

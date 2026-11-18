@@ -44,6 +44,7 @@ language.
 | Agent token (CI / service account) | [agent-tokens.md](agent-tokens.md) | [api.md](api.md#members-and-roles) |
 | Team Space folders | [folders.md](folders.md) | [subdomain.md](subdomain.md) |
 | External sharing (clients) | [external-sharing.md](external-sharing.md) | [admin-portal.md](admin-portal.md) |
+| One-time view (link + personal code, one look) | [one-time-view.md](one-time-view.md) | [external-sharing.md](external-sharing.md) |
 | Session policy / audit log | [api.md](api.md#session-policy) | [api.md](api.md#audit-log) |
 | Feature disabled for a workspace | [../api/features.md](../api/features.md) | [../api/errors.md](../api/errors.md) |
 
@@ -70,7 +71,8 @@ ShareOutSkill/team/
 ├── workspace-tables.md
 ├── file-imports.md
 ├── folders.md
-└── external-sharing.md
+├── external-sharing.md
+└── one-time-view.md
 ```
 
 ## Term Boundaries

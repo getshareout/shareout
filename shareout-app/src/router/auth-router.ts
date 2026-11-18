@@ -2,6 +2,7 @@ import { handleGoogleLogin, handleGoogleCallback, handleLinkGoogleStart } from '
 import { handleGoogleOneTap } from '../auth/google-one-tap';
 import { handleLogout } from '../auth/logout';
 import { handlePasswordAuth, handleCredentialsAuth } from '../auth/artifact-auth';
+import { handleViewCodeAuth, handleViewCodeEvent } from '../artifacts/view-codes/gate';
 import { handleDevLogin } from '../auth/dev-login';
 import { handleTelegramOpen, OPEN_PATH } from '../telegram/open-link';
 import {
@@ -348,6 +349,14 @@ async function routeAuthInner(ctx: FetchContext): Promise<Response | null> {
 
   if (path === '/auth/credentials' && request.method === 'POST') {
     return handleCredentialsAuth(request, env);
+  }
+
+  if (path === '/auth/view-code' && request.method === 'POST') {
+    return handleViewCodeAuth(request, env);
+  }
+
+  if (path === '/auth/view-code/event' && request.method === 'POST') {
+    return handleViewCodeEvent(request, env);
   }
 
   return null;

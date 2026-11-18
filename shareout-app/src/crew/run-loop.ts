@@ -4,6 +4,7 @@ import type { DataContext } from '../data/middleware';
 import { generateId } from '../crypto-utils';
 import { resolveAgentAiConfig, resolveGatewayModel, recordAgentUsage } from '../data/agent/ai-config';
 import { priceCall } from '../data/agent/model-costs';
+import { resell, workspaceMarkup } from '../data/ai-markup';
 import { claudeModelById, DEFAULT_CLAUDE_MODEL } from '../data/agent/models';
 import type { CrewRow, CrewRunRow, CrewSseEvent, TerminationReason, RunCaps } from './types';
 import { buildCrewDataContext, buildCrewPrincipal, redact } from './principal';
@@ -182,7 +183,9 @@ export async function executeCrewRun(
       )
       .run();
     await logEvent('finish', { output: redact({ terminationReason: reason, summary }) });
-    emit({ type: 'done', runId: run.id, terminationReason: reason, iterations, costMicroUsd: spent });
+    // The stream goes to the workspace: its price, not our cost (crew_runs keeps the cost).
+    const { bps } = await workspaceMarkup(env, crew.workspace_id);
+    emit({ type: 'done', runId: run.id, terminationReason: reason, iterations, costMicroUsd: resell(spent, bps) });
   };
 
   try {

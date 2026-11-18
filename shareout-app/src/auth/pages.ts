@@ -1,6 +1,7 @@
 import { renderHtmlPage } from '../design-system/shell';
 import { authPageStyles } from '../design-system/pages/auth.css';
 import { brandMarkImg } from '../brand';
+import type { ViewGateLook } from '../artifacts/view-codes/gate-look';
 import { escapeHtml } from '../html/utils';
 import { NOINDEX_ROBOTS } from '../serve/utils';
 import { turnstileWidgetHtml } from '../turnstile';
@@ -124,7 +125,7 @@ const LOCK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const EN = SIGN_IN_COPY.en;
 
 /** Auth/access gates for private content: never index, never emit OG of the page or artifact. */
-function renderAuthPage(title: string, body: string, status = 200, opts?: { noindex?: boolean; lang?: PageLocale }): Response {
+function renderAuthPage(title: string, body: string, status = 200, opts?: { noindex?: boolean; lang?: PageLocale; head?: string }): Response {
   const noindex = opts?.noindex !== false;
   return renderHtmlPage({
     title,
@@ -132,10 +133,11 @@ function renderAuthPage(title: string, body: string, status = 200, opts?: { noin
     pageStyles: authPageStyles,
     body,
     status,
-    // No OG/Twitter tags at all — unfurlers must not advertise private gates.
+    // No default OG/Twitter tags — unfurlers must not advertise private gates. A page whose
+    // owner turned its link preview on passes its own in `head`.
     noSocial: true,
     // Explicit robots meta + header so scrapers that ignore one still see the other.
-    extraHead: noindex ? `<meta name="robots" content="${NOINDEX_ROBOTS}">` : '',
+    extraHead: (noindex ? `<meta name="robots" content="${NOINDEX_ROBOTS}">` : '') + (opts?.head || ''),
     extraHeaders: noindex ? { 'X-Robots-Tag': NOINDEX_ROBOTS } : undefined,
   });
 }
@@ -813,4 +815,136 @@ export function credentialsLoginPage(
       Powered by <a href="/" class="footer-brand">${brandMarkImg('footer-mark', 16)}ShareOut</a>
     </div>
   </div>`, 401);
+}
+
+const VIEW_CODE_COPY = {
+  en: {
+    pageTitle: 'Enter your code - ShareOut',
+    title: 'Enter your code',
+    body: 'Type the code you were sent to open this content.',
+    linkTitle: 'Ready to open',
+    linkBody: 'Tap Open to see this content.',
+    label: 'Code',
+    open: 'Open',
+    invalid: 'That code doesn’t work. Check it and try again.',
+    used: 'This access was already used. If it wasn’t you, let whoever sent it know.',
+    throttled: 'Too many tries. Try again in a few minutes.',
+    goneTitle: 'Thanks for reading',
+    goneBody: 'This content is no longer available.',
+    ownerNotice: 'You’re signed in, so this isn’t locked. Anyone opening it with their link sees it locked.',
+  },
+  es: {
+    pageTitle: 'Ingresá tu código - ShareOut',
+    title: 'Ingresá tu código',
+    body: 'Escribí el código que te enviaron para ver este contenido.',
+    linkTitle: 'Listo para abrir',
+    linkBody: 'Tocá Abrir para ver este contenido.',
+    label: 'Código',
+    open: 'Abrir',
+    invalid: 'Ese código no funciona. Revisalo y probá de nuevo.',
+    used: 'Este acceso ya se usó. Si no fuiste vos, avisale a quien te lo envió.',
+    throttled: 'Demasiados intentos. Probá de nuevo en unos minutos.',
+    goneTitle: '¡Gracias por leerlo!',
+    goneBody: 'Este contenido ya no está disponible.',
+    ownerNotice: 'Lo ves con tu cuenta, por eso sin bloqueo. Quien entra con su link lo ve bloqueado.',
+  },
+} satisfies Record<PageLocale, Record<string, string>>;
+export type ViewCodeError = 'invalid' | 'used' | 'throttled';
+
+/** The one-time view gate: link + a personal code, no account. Says nothing about the
+ *  code being single-use or the page closing — the viewer finds out when it closes.
+ *  A personal link (`…#code=XXXX-XXXX`) fills the code in and hides the field, so the
+ *  person only taps Open. The fragment never reaches a server, and the code is not
+ *  sent until that tap, so a link preview cannot spend it. `look` puts the workspace's
+ *  logo, name and color on the card, and the page's own title, message and button. With the
+ *  owner's link preview on, the page answers 200 (unfurlers skip anything else) and carries
+ *  Open Graph tags built from that same public text and the preview image. */
+export function viewCodeLoginPage(
+  slug: string,
+  artifactId: string,
+  lang: PageLocale = 'en',
+  error?: ViewCodeError,
+  status = 401,
+  look?: ViewGateLook,
+  origin?: string,
+): Response {
+  const c = VIEW_CODE_COPY[lang] ?? VIEW_CODE_COPY.en;
+  const js = (v: string) => JSON.stringify(v).replace(/</g, '\\u003c');
+  const t = look?.text;
+  const brand = look?.brand ?? null;
+  const accent = brand?.accent ? escapeHtml(brand.accent) : '';
+  const card = accent
+    ? `<div class="card" style="--color-primary:${accent};--color-primary-hover:${accent};--color-primary-light:color-mix(in srgb, ${accent} 12%, transparent)">`
+    : '<div class="card">';
+  const mark = brand?.logoUrl
+    ? `<img class="auth-logo" src="${escapeHtml(brand.logoUrl)}" alt="${escapeHtml(brand.name)}">`
+    : `<div class="icon icon-primary">${LOCK_ICON}</div>`;
+  // The page's own words win; a personal link swaps the "type your code" copy for "tap Open".
+  const title = t?.title || c.title;
+  const linkTitle = t?.title || c.linkTitle;
+  const body = t?.message || c.body;
+  const linkBody = t?.message || c.linkBody;
+  const hint = t?.message ? `<p id="vcHint" style="font-size:14px;margin-top:-4px">${escapeHtml(c.body)}</p>` : '';
+  const preview = !!look?.preview && !error && !!origin;
+  return renderAuthPage(t?.title || c.pageTitle, `
+  ${card}
+    ${mark}
+    ${brand?.name ? `<p style="margin:0 0 6px;font-weight:600;letter-spacing:.02em">${escapeHtml(brand.name)}</p>` : ''}
+    <h1 id="vcTitle">${escapeHtml(title)}</h1>
+    <p id="vcBody">${escapeHtml(body)}</p>
+    ${hint}
+    ${error ? `<div class="error-box" role="alert">${escapeHtml(c[error])}</div>` : ''}
+    <form method="POST" action="/auth/view-code">
+      <input type="hidden" name="slug" value="${escapeHtml(slug)}">
+      <input type="hidden" name="artifact_id" value="${escapeHtml(artifactId)}">
+      <input type="text" name="code" placeholder="XXXX-XXXX" aria-label="${escapeHtml(c.label)}" required autofocus
+        autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="16">
+      <button type="submit" class="so-c-btn so-c-btn--primary so-c-btn--block">${escapeHtml(t?.button || c.open)}</button>
+    </form>
+    ${brand?.hideFooter ? '' : poweredByHtml()}
+  </div>
+  <script>
+  (function () {
+    var m = /(?:^#|&)code=([A-Za-z0-9-]{4,20})(?:&|$)/.exec(location.hash || '');
+    var input = document.querySelector('input[name="code"]');
+    if (!m || !input) return;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (_e) {}
+    input.value = m[1].toUpperCase();
+    input.style.display = 'none';
+    input.blur();
+    var hint = document.getElementById('vcHint');
+    if (hint) hint.remove();
+    document.getElementById('vcTitle').textContent = ${js(linkTitle)};
+    document.getElementById('vcBody').textContent = ${js(linkBody)};
+  })();
+  </script>`, preview ? 200 : status, { lang, head: preview ? gatePreviewTags(look!, origin!, t?.title || c.title) : '' });
+}
+
+/** Open Graph / Twitter tags for a one-time page whose owner turned its link preview on. */
+function gatePreviewTags(look: ViewGateLook, origin: string, title: string): string {
+  const image = look.imageUrl || look.brand?.logoUrl;
+  const tags: [string, string, string | null | undefined][] = [
+    ['property', 'og:type', 'website'],
+    ['property', 'og:site_name', look.brand?.name || null],
+    ['property', 'og:title', title],
+    ['property', 'og:description', look.text.message],
+    ['name', 'description', look.text.message],
+    ['property', 'og:image', image ? `${origin}${image}` : null],
+    ['name', 'twitter:card', look.imageUrl ? 'summary_large_image' : 'summary'],
+    ['name', 'twitter:title', title],
+    ['name', 'twitter:description', look.text.message],
+    ['name', 'twitter:image', image ? `${origin}${image}` : null],
+  ];
+  return tags.filter(([, , v]) => v).map(([attr, key, v]) => `<meta ${attr}="${key}" content="${escapeHtml(v!)}">`).join('');
+}
+
+/** Shown in place of a one-time page once its time is up. */
+export function viewCodeGoneCopy(lang: PageLocale = 'en'): { title: string; body: string } {
+  const c = VIEW_CODE_COPY[lang] ?? VIEW_CODE_COPY.en;
+  return { title: c.goneTitle, body: c.goneBody };
+}
+
+/** Told to the owner (or a collaborator) who opens a one-time page with their account. */
+export function viewCodeOwnerNotice(lang: PageLocale = 'en'): string {
+  return (VIEW_CODE_COPY[lang] ?? VIEW_CODE_COPY.en).ownerNotice;
 }

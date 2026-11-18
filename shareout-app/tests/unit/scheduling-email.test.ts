@@ -282,6 +282,22 @@ describe('sendArtifactEmail', () => {
     ]);
   });
 
+  it('asks the render for a paginated PDF only when pdfFormat is set', async () => {
+    const capture = captureArtifactReport as ReturnType<typeof vi.fn>;
+    capture.mockResolvedValue({ pdf: new ArrayBuffer(8), data: null });
+    const send = vi.fn().mockResolvedValue({ messageId: 'msg_pdf' });
+    const config = { recipients: ['a@example.com'], subject: 'Monthly', renderPdf: true };
+
+    await sendArtifactEmail(dbEnv([artifact, null], { EMAIL: { send } }), 'art_1', config);
+    expect(capture).toHaveBeenLastCalledWith(expect.anything(), 'art_1', {});
+
+    await sendArtifactEmail(dbEnv([artifact, null], { EMAIL: { send } }), 'art_1', { ...config, pdfFormat: 'A4' });
+    expect(capture).toHaveBeenLastCalledWith(expect.anything(), 'art_1', { format: 'A4', landscape: false });
+
+    await sendArtifactEmail(dbEnv([artifact, null], { EMAIL: { send } }), 'art_1', { ...config, pdfFormat: 'Letter', pdfLandscape: true });
+    expect(capture).toHaveBeenLastCalledWith(expect.anything(), 'art_1', { format: 'Letter', landscape: true });
+  });
+
   it('falls back to config html and omits attachments when render yields nothing', async () => {
     const send = vi.fn().mockResolvedValue({ messageId: 'msg_norender' });
     (captureArtifactReport as ReturnType<typeof vi.fn>).mockResolvedValue({ pdf: null, data: null });

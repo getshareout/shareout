@@ -1,7 +1,7 @@
 // The Admin sidebar (server-rendered, admin-nav.ts) and the client's page → panels map
 // (AD_SECTIONS in admin.ts) are two lists that must agree, or a sidebar entry opens nothing.
 import { describe, expect, it } from 'vitest';
-import { ADMIN_NAV, adminNavHtml } from '../../../src/pages/home/render-workspace/admin-nav';
+import { ADMIN_GATED, ADMIN_NAV, adminNavHtml } from '../../../src/pages/home/render-workspace/admin-nav';
 import { workspace_client_home_views_adminCore_JS as core, workspace_client_home_views_admin_JS as lazy } from '../../../src/pages/home/render-workspace/client-script/home-views/admin';
 import { ADMIN_PAGE_COPY } from '../../../src/pages/home/render-workspace/client-script/home-views/admin-page-copy';
 import { ADMIN_COPY } from '../../../src/pages/home/home-i18n/copy/admin';
@@ -54,5 +54,13 @@ describe('Admin sidebar', () => {
     expect(html.match(/data-admin-tab=/g)).toHaveLength(navKeys.length);
     expect(html.match(/data-ad-bdg="[a-z]+" hidden/g)).toHaveLength(navKeys.length);
     expect(html).toMatch(/class="wsx-adm__it is-on" data-admin-tab="members"[^>]*aria-current="page"/);
+  });
+
+  it('renders Summary (and its Reports heading) hidden until the API says this person may open it', () => {
+    const html = adminNavHtml();
+    expect(ADMIN_GATED).toEqual(['summary']);
+    expect(html).toMatch(/<div class="wsx-adm__grp" data-i18n="admin.grpReports" data-ad-gate="summary" hidden>/);
+    expect(html).toMatch(/data-admin-tab="summary" type="button" data-ad-gate="summary" hidden>/);
+    expect(html.match(/data-ad-gate=/g)).toHaveLength(2);
   });
 });

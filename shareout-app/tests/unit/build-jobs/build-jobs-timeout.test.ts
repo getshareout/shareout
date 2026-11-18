@@ -5,7 +5,9 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../../src/types';
 import type { BuildEvent, BuildJobSpec, BuildJobView, Emit } from '../../../src/build-jobs/types';
 
-vi.mock('../../../src/build-jobs/types', async (orig) => ({ ...(await orig<object>()), JOB_TIMEOUT_MS: 60, LANDING_MS: 10 }));
+// The same timeout also sweeps a job left queued (do.ts sweep): at 60ms a loaded machine let the
+// alarm start late, so the job was swept as interrupted before its first step. 1s is still quick.
+vi.mock('../../../src/build-jobs/types', async (orig) => ({ ...(await orig<object>()), JOB_TIMEOUT_MS: 1_000, LANDING_MS: 10 }));
 vi.mock('../../../src/support/alert', () => ({ alertOps: vi.fn(async () => true) }));
 
 import { applyMigrations } from '../helpers/migrated-db';

@@ -2013,6 +2013,360 @@
         }
       }
     },
+    "/v1/artifacts/{id}/view-codes": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ArtifactId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Collaborators"
+        ],
+        "summary": "List one-time view codes",
+        "description": "Every code on the page: who it is for, whether it was opened, from what kind of device, and what the viewer tried while it was open (copy, print, save, right-click, the screenshot key, leaving the page). The codes themselves are never returned again. Owner or editor.",
+        "operationId": "listViewCodes",
+        "responses": {
+          "200": {
+            "description": "The page's codes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "description": "The page opens with a code (auth_method `onetime`)."
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "gate": {
+                      "$ref": "#/components/schemas/ViewGate"
+                    },
+                    "view_codes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ViewCode"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Collaborators"
+        ],
+        "summary": "Create one-time view codes",
+        "description": "One personal code per person: the page link plus that code opens the page once, with no sign-in, for `view_seconds`, then it closes by itself and the code never works again. The viewer's name is written across the page; copy, print, save and download are blocked. Turns the page private; the owner and named collaborators keep their own access. Web pages only. The codes are in this response only. A browser cannot block a screenshot or a photo of the screen — the watermark is what names the person on any capture.",
+        "operationId": "createViewCodes",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "recipients"
+                ],
+                "properties": {
+                  "recipients": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "description": "Who each code is for — the name is the watermark they see.",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 80
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "label"
+                          ],
+                          "properties": {
+                            "label": {
+                              "type": "string",
+                              "maxLength": 80
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "view_seconds": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 600,
+                    "default": 90
+                  },
+                  "gate": {
+                    "$ref": "#/components/schemas/ViewGate"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created. Hand each person their `link` (or the page link and their code).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "view_seconds": {
+                      "type": "integer"
+                    },
+                    "codes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "example": "vcd_3f9a2b"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string",
+                            "example": "K7M4-QP9X"
+                          },
+                          "link": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "The person's own link: the page URL with the code in the fragment (`#code=…`). It opens the code page with the code filled in, so they only tap Open. The fragment never reaches a server; nothing is spent until that tap.",
+                            "example": "https://acme.shareout.site/precios-noviembre/#code=K7M4-QP9X"
+                          },
+                          "view_seconds": {
+                            "type": "integer"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid recipients or view_seconds, not a web page (`ONETIME_HTML_ONLY`), or too many codes (`VIEW_CODE_LIMIT`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Collaborators"
+        ],
+        "summary": "Turn one-time view off",
+        "description": "Every code stops working; the page stays private behind sign-in.",
+        "operationId": "disableViewCodes",
+        "responses": {
+          "200": {
+            "description": "Turned off"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/artifacts/{id}/view-codes/gate": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ArtifactId"
+        }
+      ],
+      "put": {
+        "tags": [
+          "Collaborators"
+        ],
+        "summary": "Set what the code page says",
+        "description": "The page's own title, message and button on its code page, instead of the generic \"Enter your code · Open\". A missing or empty field goes back to the default. The workspace's logo, name and color (workspace branding) show there too. Anyone holding the link sees this page, so never put the confidential part here. Owner or editor.",
+        "operationId": "setViewGate",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ViewGate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "gate": {
+                      "$ref": "#/components/schemas/ViewGate"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/artifacts/{id}/view-codes/gate/image": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ArtifactId"
+        }
+      ],
+      "put": {
+        "tags": [
+          "Collaborators"
+        ],
+        "summary": "Upload the link-preview image",
+        "description": "The picture a link preview shows (1200×630 reads best). PNG, JPG or WEBP up to 1 MB, sent as the raw body with its Content-Type. It is public as soon as it is uploaded — never a picture of the confidential part. Each upload gets a new URL, so no cache keeps the old one. Owner or editor.",
+        "operationId": "setViewGateImage",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "gate": {
+                      "$ref": "#/components/schemas/ViewGate"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Collaborators"
+        ],
+        "summary": "Remove the link-preview image",
+        "operationId": "deleteViewGateImage",
+        "responses": {
+          "200": {
+            "description": "Removed"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/artifacts/{id}/view-codes/{codeId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ArtifactId"
+        },
+        {
+          "name": "codeId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "delete": {
+        "tags": [
+          "Collaborators"
+        ],
+        "summary": "Revoke a one-time view code",
+        "description": "That code no longer opens the page; a page it already opened loses its pass at once.",
+        "operationId": "revokeViewCode",
+        "responses": {
+          "200": {
+            "description": "Revoked"
+          },
+          "404": {
+            "description": "No such code on this page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/artifacts/{id}/transfer-ownership": {
       "parameters": [
         {
@@ -14056,6 +14410,134 @@
               "null"
             ],
             "format": "date-time"
+          }
+        }
+      },
+      "ViewGate": {
+        "type": "object",
+        "description": "What the code page says before anything opens. Null fields use the defaults.",
+        "properties": {
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 80,
+            "example": "Carta del socio fundador"
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200,
+            "example": "Roberto te comparte el cierre de octubre."
+          },
+          "button": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 30,
+            "example": "Abrir la carta"
+          },
+          "preview": {
+            "type": "boolean",
+            "default": false,
+            "description": "Draw a link preview (WhatsApp, Slack, iMessage…): the code page answers 200 with Open Graph tags made of this title, message and the preview image (or the workspace logo). Off, a one-time page advertises nothing. Missing on PUT means off."
+          },
+          "image_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "readOnly": true,
+            "description": "Public path of the preview image (`/vg/…`); set with PUT …/view-codes/gate/image."
+          }
+        }
+      },
+      "ViewCode": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string",
+            "description": "Who the code is for (their watermark)."
+          },
+          "view_seconds": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unused",
+              "open",
+              "viewed",
+              "revoked"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "opened_device": {
+            "type": "string",
+            "enum": [
+              "phone",
+              "tablet",
+              "computer"
+            ],
+            "nullable": true
+          },
+          "opened_browser": {
+            "type": "string",
+            "nullable": true,
+            "description": "Browser and system, from the user agent.",
+            "example": "Chrome · Android"
+          },
+          "opened_city": {
+            "type": "string",
+            "nullable": true,
+            "description": "Approximate city it was opened from, as Cloudflare reports it. The IP is never stored."
+          },
+          "opened_region": {
+            "type": "string",
+            "nullable": true,
+            "example": "Santa Fe"
+          },
+          "opened_country": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO 3166-1 alpha-2 country code.",
+            "example": "AR"
+          },
+          "revoked_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "attempts": {
+            "type": "object",
+            "description": "What the viewer tried while it was open, by kind. Signals, not proof.",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "example": {
+              "copy": 2,
+              "left_page": 1
+            }
           }
         }
       },

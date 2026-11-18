@@ -4,7 +4,8 @@ import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { encryptCredentials } from '../../data/connections/credentials';
 import { getWorkspaceLlmConfig } from '../../data/agent/ai-config';
 import { jsonWithApiErrors } from '../../http/api-error';
-import { resetBudgetCache } from '../../data/ai-budget';
+import { budgetState, resetBudgetCache } from '../../data/ai-budget';
+import { resell, workspaceMarkup } from '../../data/ai-markup';
 
 const BYO_PROVIDERS = ['openai', 'vercel-gateway'] as const;
 const ASSISTANT_USAGE_KINDS = ['assistant_chat', 'ask_workspace'];
@@ -26,7 +27,7 @@ async function requireAdmin(env: Env, workspaceId: string, userId: string): Prom
   return role === 'owner' || role === 'admin';
 }
 
-// GET /v1/workspaces/{id}/llm — provider config summary (no secrets)
+// GET /v1/workspaces/{id}/llm — provider config summary (no secrets); spend at the workspace's price (cost × AI markup)
 export async function handleGetWorkspaceLlm(
   env: Env,
   user: AuthUser,
@@ -36,20 +37,17 @@ export async function handleGetWorkspaceLlm(
     return json({ error: 'Forbidden', code: 'FORBIDDEN' }, 403);
   }
 
-  const cfg = await getWorkspaceLlmConfig(env, workspaceId);
+  // This month's spend is the AI budget's number (every metered call, at the workspace's price),
+  // so AI & models, Billing → Usage, the Summary and the invoice agree.
+  const [cfg, month] = await Promise.all([getWorkspaceLlmConfig(env, workspaceId), budgetState(env, workspaceId)]);
   const period = new Date().toISOString().slice(0, 7);
-  const spend = await env.DB.prepare(`
-    SELECT COALESCE(SUM(base_cost_micro_usd), 0) AS micro
-    FROM agent_usage_events
-    WHERE workspace_id = ? AND strftime('%Y-%m', created_at) = ?
-  `).bind(workspaceId, period).first<{ micro: number }>();
 
   return json({
     hasByoKey: !!(cfg?.byo_provider),
     byoProvider: cfg?.byo_provider ?? null,
     gatewayModel: cfg?.gateway_model ?? null,
     monthlyBudgetUsd: cfg?.monthly_budget_micro_usd != null ? microToUsd(cfg.monthly_budget_micro_usd) : null,
-    currentMonthSpendUsd: microToUsd(spend?.micro ?? 0),
+    currentMonthSpendUsd: microToUsd(month.spentMicro),
     period,
   });
 }
@@ -168,7 +166,7 @@ export async function handleDeleteWorkspaceGatewayModel(
   return json({ ok: true });
 }
 
-// GET /v1/workspaces/{id}/usage — per-request usage ledger + aggregates
+// GET /v1/workspaces/{id}/usage — per-request usage ledger + aggregates, at the workspace's price (cost × AI markup)
 export async function handleGetWorkspaceUsage(
   request: Request,
   env: Env,
@@ -216,21 +214,20 @@ export async function handleGetWorkspaceUsage(
     created_at: string;
   }>();
 
-  const [totals, assistant] = await Promise.all([
+  // Totals come from the one AI meter (ai_usage_events): every LLM call and its cost, not only the
+  // in-page assistant rows listed above (agent_usage_events re-logs those, so it is never summed).
+  const [totals, { bps }] = await Promise.all([
     env.DB.prepare(`
       SELECT
-        COUNT(*) AS requests,
+        COALESCE(SUM(unit_kind = 'tokens'), 0) AS requests,
         COALESCE(SUM(input_tokens), 0) AS input_tokens,
         COALESCE(SUM(output_tokens), 0) AS output_tokens,
+        COALESCE(SUM(CASE WHEN unit_kind = 'tokens' THEN units ELSE 0 END), 0) AS tokens,
         COALESCE(SUM(base_cost_micro_usd), 0) AS cost
-      FROM agent_usage_events
-      WHERE workspace_id = ?
-    `).bind(workspaceId).first<{ requests: number; input_tokens: number; output_tokens: number; cost: number }>(),
-    env.DB.prepare(`
-      SELECT COUNT(*) AS requests, COALESCE(SUM(units), 0) AS tokens, COALESCE(SUM(base_cost_micro_usd), 0) AS cost
       FROM ai_usage_events
-      WHERE workspace_id = ? AND kind IN (${ASSISTANT_USAGE_KINDS.map(() => '?').join(',')}) AND unit_kind = 'tokens'
-    `).bind(workspaceId, ...ASSISTANT_USAGE_KINDS).first<{ requests: number; tokens: number; cost: number }>(),
+      WHERE workspace_id = ?
+    `).bind(workspaceId).first<{ requests: number; input_tokens: number; output_tokens: number; tokens: number; cost: number }>(),
+    workspaceMarkup(env, workspaceId),
   ]);
 
   const inputTokens = totals?.input_tokens ?? 0;
@@ -246,16 +243,16 @@ export async function handleGetWorkspaceUsage(
       inputTokens: r.input_tokens,
       outputTokens: r.output_tokens,
       tokens: r.tokens,
-      costUsd: microToUsd(r.base_cost_micro_usd),
+      costUsd: microToUsd(resell(r.base_cost_micro_usd, bps)),
       byo: !!r.byo,
       createdAt: r.created_at,
     })),
     totals: {
-      requests: (totals?.requests ?? 0) + (assistant?.requests ?? 0),
+      requests: totals?.requests ?? 0,
       inputTokens,
       outputTokens,
-      tokens: inputTokens + outputTokens + Math.round(assistant?.tokens ?? 0),
-      costUsd: microToUsd((totals?.cost ?? 0) + (assistant?.cost ?? 0)),
+      tokens: Math.round(totals?.tokens ?? 0),
+      costUsd: microToUsd(resell(totals?.cost ?? 0, bps)),
     },
     limit,
     offset,

@@ -94,6 +94,9 @@ erDiagram
 | `email_otp_codes` | One-time login codes. `code_hash` only, with `attempts` and `consumed_at` to stop replay and brute force. Guest comment codes share the table under the key `guest:<artifact_id>:<email_hash>` in `email`, so they never match a sign-in code and store no address. |
 | `google_oauth_tokens` | Per-user Google tokens for Sheets access, encrypted (`access_token_encrypted` + `iv`). |
 | `artifact_passwords` | Per-artifact username/password for password-gated artifacts. |
+| `artifact_view_codes` | One-time view codes (`auth_method = 'onetime'`): who each is for (the watermark), the code's hash, its window, when and on what device it was opened. *(0037)* Where and in what browser: `opened_city`, `opened_region`, `opened_country` (Cloudflare's coarse location, never the IP) and `opened_browser`. |
+| `artifact_view_gates` | *(0037)* A one-time page's own words on its code page: `title`, `message`, `button` (defaults when NULL). Shown before any code is checked, so never confidential. Logo and color come from `workspaces.branding`. *(0038)* `preview` turns on a link preview (Open Graph tags on the code page, which then answers 200) and `image` names its public preview image (`view-gates/<image>` in R2, served at `/vg/<image>`). |
+| `artifact_view_code_events` | What a one-time viewer tried while the page was open (copy, print, save, right-click, screenshot key, leaving the page). Capped per code. |
 | `rate_limits` | Every rate limit in the product: one counter per (`principal_type`+`principal_id`, `action`, `window_start`). Principals are users and artifacts; the window string carries its own granularity (ISO day, ISO hour, `YYYY-MM-DD`, or `YYYY-MM-DDTHH:MM`). The ceilings live in code. Pruned nightly. |
 | `onboarding_state` | Per-workspace first-run progress: skill acknowledged, dismissed, celebrated. |
 | `onboarding_personal_state` | *(0009)* The same three timestamps for the personal-home checklist, one row per user. |
@@ -130,7 +133,7 @@ The five paths: **membership** (`workspace_members`), **per-artifact invite**
 | `workspaces` | The tenant. Carries its own policy: `allowed_email_domains`/`allowed_emails` gate joining, `session_max_days` caps session life, `public_publish_policy` + `public_publish_approvals_required` govern publishing, `branding` and `feature_flags` are JSON. `locale` (`en`/`es`) is the language emails, the agent, the home shell and shared pages speak to its people. `member_folders_enabled` (default 1) lets plain members create Team Space folders and rename/delete the ones they created. |
 | `workspace_members` | Membership and `role` (`owner`/`admin`/`member`). `member_class` separates internal staff from external collaborators. |
 | `workspace_invite_claims` | Pending invites. `code_hash` only; `expires_at` and `claimed_at` make each single-use. `email_status` (`sent`/`failed`/`skipped`/`link_only`) with `email_sent_at` and `email_error` record whether the invite mail actually went out — null on rows minted before that was tracked. |
-| `workspace_llm_config` | Per-workspace AI settings: bring-your-own provider credentials (encrypted), `balance_micro_usd`, `markup_multiplier`, monthly budget, `gateway_model` override. |
+| `workspace_llm_config` | Per-workspace AI settings: bring-your-own provider credentials (encrypted), `balance_micro_usd`, monthly budget, `gateway_model` override, `ai_markup_bps` (AI resale markup; NULL = instance default). `markup_multiplier` is legacy and unread. |
 | `workspace_sso_config` | The workspace's own OIDC sign-in (Okta, Entra ID, …): `issuer`, `client_id`, the client secret encrypted with `CREDENTIALS_KEY`, and `email_domains` — the only addresses this IdP may sign in, each claimed by at most one workspace. `is_enforced` makes it the only sign-in method for those domains. Written by the instance owner only. |
 | `workspace_domains` | *(0020)* Customer-owned hostnames a workspace serves on (`portal.acme.example`), besides `<slug>.<apex>`. `hostname` is normalized (lowercase, punycode) and globally unique. Only `status = 'active'` routes; it takes a verified ownership check — `provider = 'cloudflare'` (a Cloudflare for SaaS custom hostname, `provider_id` its id, `ssl_status` its certificate) or `'manual'` (a DNS TXT record `verification_name` = `verification_token`). `is_primary` marks the one hostname links and emails use. |
 | `workspace_domain_handoffs` | *(0020)* One-time sign-in codes that carry an apex login to a custom hostname (whose cookie cannot be the apex's). `code_hash` only; bound to one `hostname`, `expires_at` a minute out, spent by `used_at`. |
@@ -138,6 +141,7 @@ The five paths: **membership** (`workspace_members`), **per-artifact invite**
 | `workspace_library` | Workspace- or user-scoped published modules, with `namespace`/`module_name` and install counters. |
 | `workspace_files` | The workspace's virtual filesystem, one row per file. `namespace` is the directory — `context` (markdown fed to agents, where `updated_by_kind` distinguishes human from agent edits), `catalog` (the data catalogue) and `knowledge` (the learned knowledge base). `scope_id` narrows a file to one sharee; `''` means workspace-wide. |
 | `workspace_storage_snapshots` | Daily storage usage per workspace against `max_bytes`, with `overage_bytes`. |
+| `workspace_summary_viewers` | *(0039)* Who may open Admin → Summary (the month-by-month usage report) besides the owner: one row per admin the owner picked. No rows = owner only; a listed user who is no longer an internal owner/admin is ignored. Kept by `src/workspaces/usage-summary.ts`. |
 | `folders` | Hierarchical grouping via self-referencing `parent_id`. Exists in both personal and workspace scope; `readme` holds folder-level docs. `guest_comments_enabled` lets people with no account comment on its artifacts (and its subfolders') that have no setting of their own. |
 | `collaborators` | Per-artifact invite by `email` with a `role`, resolved to a user on signup. |
 | `grants` | The general capability grant: *subject* (`subject_type`/`subject_id`) may do *capability* on *resource* (`resource_type`/`resource_id`), optionally until `expires_at`. |
@@ -322,7 +326,7 @@ erDiagram
 | `agent_messages` | Turns, with `suggested_edits` and `applied_at` when a turn proposed a change. |
 | `agent_usage` | Aggregated per-artifact, per-period agent usage. |
 | `agent_usage_events` | Per-call cost ledger: provider, model, tokens, `base_cost_micro_usd` vs `billed_cost_micro_usd`, `byo` flag. |
-| `instance_ai_settings` | Singleton (`id = 1`) instance-wide AI defaults: `default_gateway_model`, the fallback when a workspace has no `gateway_model` override. |
+| `instance_ai_settings` | Singleton (`id = 1`) instance-wide AI defaults: `default_gateway_model`, the fallback when a workspace has no `gateway_model` override; `default_markup_bps`, the AI resale markup for workspaces with none (NULL = at cost). |
 | `crews` | An autonomous agent: `instructions`, `model`, and hard limits (`max_iterations`, `run_budget_micro_usd`, `max_runtime_ms`). |
 | `crew_runs` | One execution: `status`, `termination_reason`, iterations, tokens, cost. |
 | `crew_run_events` | Ordered trace of a run — tool calls, inputs, outputs, latency. The debugging surface. |
@@ -445,6 +449,12 @@ cost — records it in `workspace_invoices` (0034). It is a ledger, not a paywal
 charged by ShareOut and nothing is gated on it. The workspace pays outside (a bank transfer),
 the operator attaches the receipt and marks the invoice paid.
 
+AI usage is resold at **cost × a markup** in basis points (0035): `workspace_llm_config.ai_markup_bps`,
+else `instance_ai_settings.default_markup_bps`, else 10000 (at cost). Every AI amount a workspace
+sees — the monthly budget, the Usage tab, invoices, crew and Knowledge costs — is at that price;
+only platform admins see cost and margin (`src/data/ai-markup.ts`). The older
+`workspace_llm_config.markup_multiplier` (REAL, default 1.30) is not read by anything.
+
 ```mermaid
 erDiagram
     workspaces ||--o| workspace_llm_config : "configures AI"
@@ -459,6 +469,7 @@ erDiagram
 | `agent_usage_events` | Per-call cost ledger for agent and crew work — documented under [07 Agents](#07-agents-crews--skills). |
 | `workspace_llm_config` | Provider credentials, balance, markup and monthly budget — documented under [02 Workspaces](#02-workspaces--access-control), where it sits in the baseline. |
 | `workspace_invoices` | Invoices the instance operator issues to a workspace by hand: `number`, `status` (`draft` → `open` → `paid`, or `void`), `total_cents` in `currency`, and `lines_json` — a snapshot of the line items, including a usage line that freezes a closed month of `ai_usage_events` by kind, model and member. The operator's receipt and the workspace's transfer proof live in R2 (`receipt_r2_key`, `proof_r2_key`). Drafts are visible only to platform admins; workspace owners/admins see the rest under Admin → Overview → Billing. |
+| `workspace_billing_profiles` | *(0040)* Who the workspace's invoices are made out to, one row per workspace: `country`, `legal_name`, `tax_id` (a CUIT, digits only, when `country = 'AR'`), `tax_condition` (the Argentine IVA condition), fiscal `address`, `city`, `province`, `postal_code`, `phone`, `billing_email`. Owners/admins edit it under Admin → Billing; validated in `src/workspaces/billing-profile.ts`. |
 | `workspace_usage_daily` | What each workspace cost per UTC `day`, one row per `metric` (storage measured from R2, serving, jobs, AI, email, browser) with `quantity` and `cost_micro_usd` at list price. The history behind the admin Usage ledger and its CSV. |
 
 Cost is stored in **`_micro_usd`** — millionths of a dollar, as `INTEGER`. Per-token amounts

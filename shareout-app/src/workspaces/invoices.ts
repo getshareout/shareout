@@ -1,11 +1,14 @@
 import type { Env } from '../types';
 import { priceCall } from '../data/agent/model-costs';
+import { resell } from '../data/ai-markup';
 
 // Invoices the instance operator issues to a workspace by hand (migrations/0034). ShareOut
 // charges nothing and gates nothing on them: the workspace pays outside (a bank transfer), the
 // operator attaches the receipt and marks the invoice paid. A usage line snapshots a CLOSED
 // month of ai_usage_events — the same meter the monthly AI budget reads — with its breakdown,
-// so the invoice never moves after it is created.
+// so the invoice never moves after it is created. It bills the workspace's price (cost × its
+// AI markup, ai-markup.ts); cost and markup stay in the snapshot for the operator and are
+// stripped from what the workspace sees (invoiceView).
 
 export type InvoiceStatus = 'draft' | 'open' | 'paid' | 'void';
 
@@ -14,12 +17,20 @@ export interface UsageRow {
   calls: number;
   input_tokens: number;
   output_tokens: number;
-  cost_micro_usd: number;
+  /** What the workspace pays. */
+  price_micro_usd: number;
+  /** Operator only. */
+  cost_micro_usd?: number;
 }
 
 export interface UsageSnapshot {
   month: string;
-  total_micro_usd: number;
+  /** What the workspace pays: cost × markup. */
+  price_micro_usd: number;
+  /** Operator only. */
+  cost_micro_usd?: number;
+  /** Operator only. 15000 = 1.5×. */
+  markup_bps?: number;
   calls: number;
   input_tokens: number;
   output_tokens: number;
@@ -106,8 +117,8 @@ function monthLabel(month: string): string {
   return new Date(`${month}-01T00:00:00.000Z`).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
-/** A closed month's metered AI usage for one workspace, by kind, model and member. */
-export async function usageForMonth(env: Env, workspaceId: string, month: string): Promise<UsageSnapshot> {
+/** A closed month's metered AI usage for one workspace, by kind, model and member, at cost and at `markupBps`. */
+export async function usageForMonth(env: Env, workspaceId: string, month: string, markupBps: number): Promise<UsageSnapshot> {
   const { start, end } = monthWindow(month);
   const rows = (await env.DB.prepare(
     `SELECT e.kind AS kind, e.model AS model, u.email AS email, e.cost_source AS cost_source,
@@ -121,7 +132,9 @@ export async function usageForMonth(env: Env, workspaceId: string, month: string
   }>()).results ?? [];
 
   const groups = { kind: new Map<string, UsageRow>(), model: new Map<string, UsageRow>(), member: new Map<string, UsageRow>() };
-  const snap: UsageSnapshot = { month, total_micro_usd: 0, calls: 0, input_tokens: 0, output_tokens: 0, by_kind: [], by_model: [], by_member: [] };
+  const snap: UsageSnapshot = {
+    month, price_micro_usd: 0, cost_micro_usd: 0, markup_bps: markupBps, calls: 0, input_tokens: 0, output_tokens: 0, by_kind: [], by_model: [], by_member: [],
+  };
   for (const r of rows) {
     let micro = r.cost ?? 0;
     // The hourly reconcile prices rows; one still pending gets the list price, as the AI budget does.
@@ -129,16 +142,20 @@ export async function usageForMonth(env: Env, workspaceId: string, month: string
       micro = (await priceCall(env, r.model, r.tin ?? 0, r.tout ?? 0).catch(() => ({ microUsd: 0 }))).microUsd;
     }
     const add = (map: Map<string, UsageRow>, key: string) => {
-      const g = map.get(key) ?? { key, calls: 0, input_tokens: 0, output_tokens: 0, cost_micro_usd: 0 };
-      g.calls += r.calls; g.input_tokens += r.tin ?? 0; g.output_tokens += r.tout ?? 0; g.cost_micro_usd += micro;
+      const g = map.get(key) ?? { key, calls: 0, input_tokens: 0, output_tokens: 0, price_micro_usd: 0, cost_micro_usd: 0 };
+      g.calls += r.calls; g.input_tokens += r.tin ?? 0; g.output_tokens += r.tout ?? 0; g.cost_micro_usd! += micro;
       map.set(key, g);
     };
     add(groups.kind, r.kind);
     add(groups.model, r.model);
     add(groups.member, r.email ?? '');
-    snap.total_micro_usd += micro; snap.calls += r.calls; snap.input_tokens += r.tin ?? 0; snap.output_tokens += r.tout ?? 0;
+    snap.cost_micro_usd! += micro; snap.calls += r.calls; snap.input_tokens += r.tin ?? 0; snap.output_tokens += r.tout ?? 0;
   }
-  const sorted = (m: Map<string, UsageRow>) => [...m.values()].sort((a, b) => b.cost_micro_usd - a.cost_micro_usd || a.key.localeCompare(b.key));
+  // Price each row and the total from cost; the total is priced once, so it is never off by row rounding.
+  const sorted = (m: Map<string, UsageRow>) => [...m.values()]
+    .map((g) => ({ ...g, price_micro_usd: resell(g.cost_micro_usd!, markupBps) }))
+    .sort((a, b) => b.price_micro_usd - a.price_micro_usd || a.key.localeCompare(b.key));
+  snap.price_micro_usd = resell(snap.cost_micro_usd!, markupBps);
   snap.by_kind = sorted(groups.kind);
   snap.by_model = sorted(groups.model);
   snap.by_member = sorted(groups.member);
@@ -146,7 +163,7 @@ export async function usageForMonth(env: Env, workspaceId: string, month: string
 }
 
 export function usageLine(snap: UsageSnapshot): InvoiceLine {
-  const cents = centsFromMicro(snap.total_micro_usd);
+  const cents = centsFromMicro(snap.price_micro_usd);
   return { kind: 'usage', description: `AI usage — ${monthLabel(snap.month)}`, quantity: 1, unit_cents: cents, amount_cents: cents, usage: snap };
 }
 
@@ -255,8 +272,17 @@ export async function listInvoices(env: Env, workspaceId: string, includeDrafts:
   return (await env.DB.prepare(sql).bind(workspaceId).all<InvoiceRecord>()).results ?? [];
 }
 
-/** The API shape: storage keys stay server-side; the workspace sees whether a file exists. */
-export function invoiceView(r: InvoiceRecord, emails: Record<string, string> = {}) {
+/** What the workspace may see of a usage snapshot: prices only — no cost, no markup. */
+export function customerUsage(u: UsageSnapshot): UsageSnapshot {
+  const row = ({ cost_micro_usd: _c, ...rest }: UsageRow): UsageRow => rest;
+  const { cost_micro_usd: _cost, markup_bps: _bps, ...rest } = u;
+  return { ...rest, by_kind: u.by_kind.map(row), by_model: u.by_model.map(row), by_member: u.by_member.map(row) };
+}
+
+/** The API shape: storage keys stay server-side; the workspace sees whether a file exists, and the
+ *  operator (`operator: true`) also sees each usage line's cost and markup. */
+export function invoiceView(r: InvoiceRecord, emails: Record<string, string> = {}, operator = false) {
+  const lines = parseLines(r.lines_json).map((l) => (l.usage && !operator ? { ...l, usage: customerUsage(l.usage) } : l));
   return {
     id: r.id,
     number: r.number,
@@ -264,7 +290,7 @@ export function invoiceView(r: InvoiceRecord, emails: Record<string, string> = {
     currency: r.currency,
     total_cents: r.total_cents,
     period_month: r.period_month,
-    lines: parseLines(r.lines_json),
+    lines,
     notes: r.notes,
     due_at: r.due_at,
     issued_at: r.issued_at,

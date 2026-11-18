@@ -7,7 +7,7 @@ import type { Env, TypeMetadata } from '../../types';
 import { sha256 } from '../../crypto-utils';
 import { extractTextFromHtml } from '../../serve/utils';
 import { parsePptx } from '../../data/files/parse-pptx';
-import { DocReadError, docToMarkdown } from '../../data/files/parse-doc';
+import { DocReadError } from '../../data/files/doc-read-error';
 import { isKnowledgeEnabled } from '../store';
 import { chunkMarkdown, MAX_CHUNKS, type Chunk } from './chunk';
 import { CHUNKER_VERSION, chunkSections, htmlSections } from './sections';
@@ -138,7 +138,8 @@ export async function toMarkdown(env: Env, filename: string, mime: string, bytes
   if (lower.endsWith('.pptx')) {
     return parsePptx(bytes).map((s) => `## Slide ${s.index}: ${s.title}\n\n${s.lines.join('\n')}`).join('\n\n');
   }
-  if (lower.endsWith('.doc') || mime === 'application/msword') return docToMarkdown(new Uint8Array(bytes));
+  // parse-doc brings SheetJS: load it for a .doc only, not wherever ingest is imported.
+  if (lower.endsWith('.doc') || mime === 'application/msword') return (await import('../../data/files/parse-doc')).docToMarkdown(new Uint8Array(bytes));
   const isHtml = mime.includes('html') || /\.html?$/.test(lower);
   if (env.AI && TO_MARKDOWN.test(lower)) {
     const res = await env.AI.toMarkdown({ name: filename, blob: new Blob([bytes], { type: mime }) });

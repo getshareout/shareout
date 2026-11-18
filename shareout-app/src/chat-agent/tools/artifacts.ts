@@ -2,7 +2,7 @@ import type { Env } from '../../types';
 import { createMiniDb, type MiniDb } from '../../data/minidb-client';
 import { extractTextFromHtml } from '../../serve/utils';
 import { toMarkdown } from '../../knowledge/corpus/ingest';
-import { DocReadError } from '../../data/files/parse-doc';
+import { DocReadError } from '../../data/files/doc-read-error';
 import { buildScopeClause } from '../../data/tables/scope';
 import type { ViewerScope } from '../../data/access-policy';
 import {

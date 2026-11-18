@@ -258,7 +258,7 @@ export interface Env {
 // pre-migration rows are normalized to 'public' — see normalizeVisibility.
 export type Visibility = 'public' | 'workspace' | 'private';
 export type FolderVisibility = 'inherit' | 'public' | 'workspace' | 'private';
-export type AuthMethod = 'google' | 'password' | 'credentials';
+export type AuthMethod = 'google' | 'password' | 'credentials' | 'onetime';
 export type CollaboratorRole = 'owner' | 'editor' | 'viewer';
 export type WorkspaceRole = 'owner' | 'admin' | 'member';
 export type ArtifactType = 'html' | 'csv' | 'txt' | 'markdown' | 'json' | 'pdf' | 'image' | 'video' | 'skill' | 'library';

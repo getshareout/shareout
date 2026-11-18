@@ -7,7 +7,7 @@ export const workspace_client_home_views_adminCore_JS = `  // ----- Admin — si
   function wsUrl(suffix) { return '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + suffix; }
   var adminTab = 'members', adFocus = null;
   // One sidebar entry = one page = the panels it paints. Old tab keys still resolve (deep links, ⌘K, emails).
-  var AD_SECTIONS = { members: ['members'], clients: ['clients'], support: ['support'], artifacts: ['artifacts'], automation: ['automation'], billing: ['usage', 'billing'], ai: ['ai'], access: ['security'], publishing: ['security', 'settings'], tokens: ['security'], audit: ['security'], general: ['settings'], branding: ['settings'], domains: ['domains'] };
+  var AD_SECTIONS = { summary: ['summary'], members: ['members'], clients: ['clients'], support: ['support'], artifacts: ['artifacts'], automation: ['automation'], billing: ['usage', 'aireport', 'billing', 'billprofile'], ai: ['ai'], access: ['security'], publishing: ['security', 'settings'], tokens: ['security'], audit: ['security'], general: ['settings'], branding: ['settings'], domains: ['domains'] };
   var AD_ALIAS = { overview: 'members', people: 'members', usage: 'billing', security: 'access', settings: 'general' };
   function adGroupOf(k) { return AD_SECTIONS[k] ? k : (AD_ALIAS[k] || 'members'); }
   function adHas(k) { return AD_SECTIONS[adminTab].indexOf(k) >= 0; }
@@ -788,7 +788,7 @@ export const workspace_client_home_views_admin_JS = `  var AD_COPY = ${JSON.stri
       var llm = res[0] || {};
       var usage = res[1] || {};
       var crew = res[2] || {};
-      var totals = usage.totals || { requests: 0, inputTokens: 0, outputTokens: 0, billedUsd: 0 };
+      var totals = usage.totals || { requests: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 };
       var events = usage.events || [];
       // Aggregate model breakdown client-side from the recent event window.
       var byModel = {};
@@ -796,7 +796,7 @@ export const workspace_client_home_views_admin_JS = `  var AD_COPY = ${JSON.stri
         var k = e.model || 'unknown';
         if (!byModel[k]) byModel[k] = { model: k, requests: 0, input: 0, output: 0, cost: 0, byo: 0 };
         byModel[k].requests++; byModel[k].input += Number(e.inputTokens) || 0; byModel[k].output += Number(e.outputTokens) || 0;
-        byModel[k].cost += Number(e.billedCostUsd) || 0; if (e.byo) byModel[k].byo++;
+        byModel[k].cost += Number(e.costUsd) || 0; if (e.byo) byModel[k].byo++;
       });
       var models = Object.keys(byModel).map(function (k) { return byModel[k]; }).sort(function (a, b) { return b.requests - a.requests; });
       function card(lbl, val, sub2) { return '<div class="wsx-admin__card"><div class="wsx-admin__cardlbl">' + lbl + '</div><div class="wsx-admin__cardval">' + val + '</div>' + (sub2 ? '<div class="wsx-admin__cardsub">' + sub2 + '</div>' : '') + '</div>'; }
@@ -806,7 +806,7 @@ export const workspace_client_home_views_admin_JS = `  var AD_COPY = ${JSON.stri
         + (llm.hasByoKey ? card(t('admin.aiBilling'), t('admin.aiYourKey'), esc(llm.byoProvider || 'BYO') + ' \\u00B7 ' + t('admin.aiNotMetered')) : card(t('admin.aiBalance'), balUsd != null ? '$' + Number(balUsd).toFixed(2) : '\\u2014', t('admin.aiPlatformKey')))
         + card(t('admin.aiRequests'), adCompact(totals.requests), t('admin.aiRecentWindow'))
         + card(t('admin.aiTokens'), adCompact((Number(totals.inputTokens) || 0) + (Number(totals.outputTokens) || 0)), t('admin.aiTokensInOut').replace('{in}', adCompact(totals.inputTokens)).replace('{out}', adCompact(totals.outputTokens)))
-        + card(t('admin.aiBilled'), '$' + Number(totals.billedUsd || 0).toFixed(2), t('admin.aiRecentWindow'))
+        + card(t('admin.aiBilled'), '$' + Number(totals.costUsd || 0).toFixed(2), t('admin.aiRecentWindow'))
         + (crew.summary ? card(t('admin.aiCrewRuns'), adCompact(crew.summary.runs), t('admin.aiErrorsCost').replace('{errors}', String(crew.summary.errors || 0)).replace('{cost}', Number(crew.summary.costUsd || 0).toFixed(2))) : '');
       var modelRows = models.map(function (mm) {
         return '<tr><td><span class="wsx-atbl__link">' + esc(mm.model) + '</span>' + (mm.byo ? '<span class="wsx-atbl__flag" title="' + esc(t('admin.aiByoFlag')) + '">' + esc(t('admin.aiByo')) + '</span>' : '') + '</td>'
@@ -943,7 +943,7 @@ export const workspace_client_home_views_admin_JS = `  var AD_COPY = ${JSON.stri
     }, run);
   }
   function loadAdmin() {
-    var fnMap = { artifacts: adArtifacts, members: adMembers, clients: adClients, automation: adAutomation, ai: adAI, security: adSecurity, usage: adUsage, billing: adBilling, support: adSupport, settings: adSettings, domains: adDomains };
+    var fnMap = { summary: adSummary, billprofile: adBillProfile, artifacts: adArtifacts, members: adMembers, clients: adClients, automation: adAutomation, ai: adAI, security: adSecurity, usage: adUsage, aireport: adAiReport, billing: adBilling, support: adSupport, settings: adSettings, domains: adDomains };
     var keys = AD_SECTIONS[adminTab], focus = adFocus; adFocus = null;
     var mount = document.getElementById('wsxAdminMount'); if (!mount) return;
     var act = adminTab === 'members' ? '<div class="wsx-adm__act"><button class="wsx-abtn wsx-abtn--primary" id="wsxInviteBtn" type="button">' + esc(t('invite.cta')) + '</button></div>' : '';
@@ -955,6 +955,7 @@ export const workspace_client_home_views_admin_JS = `  var AD_COPY = ${JSON.stri
     adWatchFold(mount);
     keys.forEach(function (k) { var fn = fnMap[k]; if (fn) fn(); });
     adNeeds();
+    adSummaryGate();
     var tgt = focus && focus !== adminTab && keys.length > 1 && document.getElementById('wsxAdSecWrap_' + focus);
     if (tgt && tgt.scrollIntoView) tgt.scrollIntoView({ block: 'start' });
   }

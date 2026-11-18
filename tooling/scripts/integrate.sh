@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Integrate several feature branches and run the full suite ONCE on the result.
+# Integrate several feature branches and test the result ONCE.
 #
 # Feature-branch pushes only run light checks (see install-hooks.sh). This is where the
 # tests run: merge every branch onto origin/main in a throwaway worktree, regenerate the
-# committed bundles, then typecheck + full suite + workspace suites + bundle checks.
+# committed bundles, then typecheck + every unit test the merged code can affect (the test
+# cache skips files whose inputs are unchanged since they passed; SHAREOUT_FULL_TESTS=1 to
+# run all) + workspace suites + bundle checks.
 # Fix failures on integration/<name>, push it (that push runs the tested hook), then
 # land it on main as one PR.
 #
@@ -30,7 +32,7 @@ for b in "$@"; do
   echo "==> merge origin/$b"
   if ! git merge -q --no-ff --no-edit "origin/$b"; then
     echo "Conflict merging $b in $DIR. Resolve, commit, merge the remaining branches" >&2
-    echo "by hand, then run: SHAREOUT_FULL_TESTS=1 $DIR/tooling/scripts/ci-check-fast.sh" >&2
+    echo "by hand, then run: $DIR/tooling/scripts/ci-check-fast.sh" >&2
     git diff --name-only --diff-filter=U >&2
     exit 1
   fi
@@ -47,8 +49,8 @@ if ! git diff --quiet; then
   git commit -q -m "integration: regenerate bundles"
 fi
 
-echo "==> full checks (once)"
-SHAREOUT_FULL_TESTS=1 "$DIR/tooling/scripts/ci-check-fast.sh"
+echo "==> checks with tests (once)"
+"$DIR/tooling/scripts/ci-check-fast.sh"
 
 echo ""
 echo "✓ $BRANCH passes. Next:"
