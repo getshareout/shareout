@@ -1,11 +1,12 @@
 /**
  * Data connector tools: list the workspace's connectors, run read-only SQL on the
- * warehouse ones (Snowflake, BigQuery, Redshift, Aurora, Supabase) and browse/read S3.
+ * warehouse ones (Snowflake, BigQuery, Redshift, Aurora, Supabase), browse/read S3 and
+ * read app connectors' APIs (Humand).
  * They run the workspace assistant's own tools after the MCP membership check, so the
  * same gates apply: only connectors an admin switched on for AI, the read-only SQL
  * guard, the per-workspace query limit, and per-user credentials.
  */
-import { browseStorageTool, listConnectionsTool, queryConnectionTool } from '../chat-agent/tools/connection-query';
+import { browseStorageTool, listConnectionsTool, queryConnectionTool, readConnectorTool } from '../chat-agent/tools/connection-query';
 import type { AccountTool } from '../chat-agent/tools/types';
 import {
   NOT_MEMBER, fail, ok, resolveWorkspace, str, workspaceChoiceText,
@@ -34,8 +35,9 @@ const listConnections: ToolDef = {
   name: 'list_connections',
   title: 'List data connectors',
   description: [
-    "Lists the workspace's data connectors (Snowflake, BigQuery, Redshift, Aurora, Supabase, Amazon S3, …).",
-    '`queryable` means query_connection can run SQL on it; `files` means browse_storage can list and read its files.',
+    "Lists the workspace's data connectors (Snowflake, BigQuery, Redshift, Aurora, Supabase, Amazon S3, Humand, …).",
+    '`queryable` means query_connection can run SQL on it; `files` means browse_storage can list and read its files;',
+    '`readable` means read_connector can read its API.',
     'Connectors an admin has not switched on for AI show neither; tell the person an admin can switch it on under Connectors.',
   ].join(' '),
   inputSchema: { type: 'object', properties: { workspace_id: workspaceProp }, additionalProperties: false },
@@ -93,4 +95,30 @@ const browseStorage: ToolDef = {
   }),
 };
 
-export const CONNECTOR_TOOLS: ToolDef[] = [listConnections, queryConnection, browseStorage];
+const readConnector: ToolDef = {
+  name: 'read_connector',
+  title: 'Read an app connector',
+  description: [
+    'Reads data from an app connector over its API — today Humand (employees, departments, job positions, time off, attendance, courses, form answers).',
+    'Call list_connections first (`readable`), then read_connector without endpoint to list what it can read, then with one endpoint and its query/path parameters.',
+    'Lists are paged: page from 1, limit up to 500; next_page in the answer is the page to ask for next. Read-only. Say which connector the answer came from.',
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      workspace_id: workspaceProp,
+      connection: { type: 'string', description: 'Connector name from list_connections.' },
+      endpoint: { type: 'string', description: 'Endpoint id, e.g. "users.list". Omit to list the endpoints.' },
+      query: { type: 'object', description: 'Query parameters, e.g. { "page": 1, "limit": 100 }.', additionalProperties: true },
+      path: { type: 'object', description: 'Path parameters the endpoint needs, e.g. { "id": 12 }.', additionalProperties: true },
+    },
+    required: ['connection'],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: true, openWorldHint: true },
+  run: (ctx, args) => runInWorkspace(ctx, args, 'read_connector', readConnectorTool, {
+    connection: args.connection, endpoint: args.endpoint, query: args.query, path: args.path,
+  }),
+};
+
+export const CONNECTOR_TOOLS: ToolDef[] = [listConnections, queryConnection, browseStorage, readConnector];

@@ -21,6 +21,7 @@ hacia donde tu equipo ya trabaja.
 | [Shopify](/es/integrations/shopify/) | Productos, pedidos, inventario |
 | [Slack](/es/integrations/slack/) | Entregar artefactos a un canal o DM |
 | Tienda Nube | E-commerce de LATAM |
+| [Humand](/es/integrations/humand/) | Colaboradores, áreas, vacaciones y asistencia (solo lectura) |
 | GitHub | Backup y exportación |
 | CORS proxy | Llamar a APIs externas de la lista permitida desde el artefacto |
 

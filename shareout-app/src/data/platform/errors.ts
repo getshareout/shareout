@@ -13,6 +13,7 @@ const PLATFORM_PROVIDER_LABELS: Record<string, string> = {
 	snowflake: 'Snowflake',
 	slack: 'Slack',
 	'facebook-ads': 'Facebook Ads',
+	humand: 'Humand',
 };
 
 /** Never expose token exchange, D1, or crypto internals in artifact OAuth popup pages. */

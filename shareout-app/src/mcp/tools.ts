@@ -57,8 +57,9 @@ export const SERVER_INSTRUCTIONS = [
   'When an owner or admin corrects what Knowledge learned (a wrong name, type, connection or fact, a duplicate, something not relevant),',
   'change it with knowledge_edit_entity, knowledge_edit_connection or knowledge_edit_fact; the team\'s glossary and rules are',
   'knowledge_rules and knowledge_edit_rules, and knowledge_review lists what still needs review. Knowledge keeps the team\'s edits on every re-learn.',
-  'For live numbers from the team’s databases or files (warehouses, Supabase, Amazon S3), call list_connections, then',
-  'query_connection (one read-only SELECT) or browse_storage (S3 files), and say which connector the answer came from.',
+  'For live numbers from the team’s databases, files or apps (warehouses, Supabase, Amazon S3, Humand), call list_connections, then',
+  'query_connection (one read-only SELECT), browse_storage (S3 files) or read_connector (app APIs such as Humand: employees,',
+  'departments, time off, attendance), and say which connector the answer came from.',
   'If anything fails or behaves unexpectedly, call report_problem with what happened, then tell the person',
   'the ShareOut team was notified. For how-to questions about ShareOut, call get_help.',
 ].join(' ');

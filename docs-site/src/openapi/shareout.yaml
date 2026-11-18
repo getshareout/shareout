@@ -7451,9 +7451,10 @@ paths:
         `credentials.type`: `api_key`, `basic_auth`, `service_account`). **Platform**
         (`kind: platform` + `provider`): the Connectors catalog — `s3`, `supabase`,
         `redshift`, `aurora`, `snowflake`, `bigquery`, `google-analytics`, `google-ads`,
-        `facebook-ads`, `shopify`, `tiendanube`. Platform credential types: `aws_access_key`
-        (`access_key_id`, `secret_access_key`, optional `session_token` — s3, redshift,
-        aurora), `oauth` (`access_token` — supabase, shopify, tiendanube, facebook-ads),
+        `facebook-ads`, `shopify`, `tiendanube`, `humand`. Platform credential types:
+        `aws_access_key` (`access_key_id`, `secret_access_key`, optional `session_token` — s3,
+        redshift, aurora), `oauth` (`access_token` — supabase, shopify, tiendanube,
+        facebook-ads, humand (the Humand API key; `config` is empty)),
         `key_pair` (snowflake), `service_account`, `authorized_user`. Per-provider `config`:
         s3 `bucket`, `region`, optional `prefix`, `endpoint`; supabase `project_ref` (ref or
         project URL); redshift `region`, `database` and one of `workgroup_name` /
