@@ -74,8 +74,9 @@ export function rejectionText(locale: Locale, reason: InboundRejection, from: st
  *  spreadsheet, and an allowed mailbox auto-forwarded it (forwarding-confirm.ts forwardingMailbox).
  *  The tap adds that exact sender to the list; the next mail from it still has to be verified. */
 export function canAllowRejection(r: InboundRejectionRecord): boolean {
-  // A whole address only — the tap must never add a bare @domain.
-  return r.reason === 'not_allowed' && r.verified === true && r.hasFile === true && !!r.forwardedBy && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.from);
+  // A whole address only, of the shape PUT …/senders accepts (router/api/email-sync.ts ADDRESS) — the
+  // tap must never add a bare @domain, and never offer a quoted or marked-up address it would refuse.
+  return r.reason === 'not_allowed' && r.verified === true && r.hasFile === true && !!r.forwardedBy && /^[^\s@,;<>"]+@[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(r.from);
 }
 
 export function rejectionMessage(locale: Locale, r: InboundRejectionRecord): string {

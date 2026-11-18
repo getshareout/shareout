@@ -370,6 +370,30 @@ describe('Update by email', () => {
       expect(sent.filter((x) => x.method === 'PUT').map((x) => x.body)).toEqual([{ senders: ['ana@acme.com', 'bob@acme.com', 'reportes@proveedor.com'] }]);
     });
 
+    it('two taps before the panel reloads keep both senders (the second waits for the first and builds on it)', async () => {
+      const off = (from: string) => ({ from, reason: 'not_allowed', at: new Date().toISOString(), count: 1, canAllow: true, forwardedBy: 'ana@acme.com', message: `A file from ${from} was bounced.` });
+      status = ON({ recentRejected: [off('reportes@proveedor.com'), off('ventas@proveedor.com')] });
+      load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+      sent = [];
+      btn('Allow reportes@proveedor.com').click();
+      btn('Allow ventas@proveedor.com').click();
+      await flush();
+      expect(sent.filter((x) => x.method === 'PUT').map((x) => x.body)).toEqual([
+        { senders: ['ana@acme.com', 'reportes@proveedor.com'] },
+        { senders: ['ana@acme.com', 'reportes@proveedor.com', 'ventas@proveedor.com'] },
+      ]);
+      expect((status as { senders: string[] }).senders).toEqual(['ana@acme.com', 'reportes@proveedor.com', 'ventas@proveedor.com']);
+    });
+
+    it('a bounced sender full of markup is shown as text, in the text and in the button', async () => {
+      const evil = '"><img src=x onerror="window.__pwned=1">@evil.test';
+      status = ON({ recentRejected: [{ from: evil, reason: 'not_allowed', at: new Date().toISOString(), count: 1, canAllow: true, forwardedBy: 'ana@acme.com', message: `A file from ${evil} was bounced.` }] });
+      load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+      expect(document.querySelector('.wsx-modal img')).toBeNull();
+      expect(document.querySelector('[data-es-allow]')!.getAttribute('data-es-allow')).toBe(evil);
+      expect($('[data-es-rejected]').textContent).toContain(evil);
+    });
+
     it('“Let the report arrive by itself”: three steps for Gmail, three for Outlook, folded; no jargon', async () => {
       status = ON();
       load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();

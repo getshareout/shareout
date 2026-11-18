@@ -928,6 +928,8 @@ export async function purgeArtifact(
   const wsRow = await env.DB.prepare('SELECT workspace_id FROM artifacts WHERE id = ?')
     .bind(artifactId).first<{ workspace_id: string | null }>();
   await purgeInbox(env, artifactId, wsRow?.workspace_id ?? '').catch(() => {});
+  // Gmail forwarding confirmations (who asked, Google's link) cascade too; explicit, as above.
+  await env.DB.prepare('DELETE FROM email_forward_confirmations WHERE artifact_id = ?').bind(artifactId).run();
   await relearnPage(env, wsRow?.workspace_id ?? null, artifactId, `purged:${Date.now()}`);
 
   await env.DB.prepare('DELETE FROM artifacts WHERE id = ?').bind(artifactId).run();
