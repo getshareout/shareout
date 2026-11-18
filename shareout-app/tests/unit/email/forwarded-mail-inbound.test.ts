@@ -16,7 +16,7 @@ vi.mock('../../../src/email/gateway', async (orig) => ({ ...(await orig<object>(
 vi.mock('../../../src/data/middleware', async (orig) => ({ ...(await orig<object>()), verifyOwner }));
 
 import { applyMigrations, e } from '../helpers/migrated-db';
-import { handleInboundEmail } from '../../../src/email/inbound';
+import { SENDER_NOT_PERMITTED_BOUNCE, handleInboundEmail } from '../../../src/email/inbound';
 import { listInboxMessages } from '../../../src/email/inbox-store';
 import { routeEmailSyncApi } from '../../../src/router/api/email-sync';
 import { createFetchContext } from '../../../src/router/context';
@@ -110,13 +110,13 @@ describe('automatic forward that keeps the original From (Gmail filter, Outlook 
   it('bounced when only the customer (the forwarder) is on the list: the allowlist matches the header From, not who forwarded', async () => {
     const addr2 = await pageWithSync('art_fwd_auto2', [CUSTOMER]);
     const m2 = await send(mail(addr2, { envFrom: CUSTOMER, headerFrom: VENDOR, auth: forwardedKeepingDkim('vendor.test') }));
-    expect(m2.setReject).toHaveBeenCalledWith('Sender not permitted');
+    expect(m2.setReject).toHaveBeenCalledWith(SENDER_NOT_PERMITTED_BOUNCE);
     expect(await status('art_fwd_auto2')).toMatchObject({ lastRejected: { from: VENDOR, reason: 'not_allowed' } });
   });
   it('bounced as unverified when the forward changed the message (subject tag / footer) and DKIM + DMARC fail', async () => {
     const addr = await pageWithSync('art_fwd_broken', [VENDOR]);
     const m = await send(mail(addr, { envFrom: 'x@forwarder.test', headerFrom: VENDOR, auth: forwardedDkimBroken('vendor.test'), subject: '[Reportes] Reporte' }));
-    expect(m.setReject).toHaveBeenCalledWith('Sender not permitted');
+    expect(m.setReject).toHaveBeenCalledWith(SENDER_NOT_PERMITTED_BOUNCE);
     const st = await status('art_fwd_broken');
     expect(st.lastRejected).toMatchObject({ from: VENDOR, reason: 'unverified' });
     expect(st.lastRejected.message).toMatch(/not through another account or a forwarding service/);
@@ -150,7 +150,7 @@ describe('a Google Group / alias that rewrites the From', () => {
   it('bounced when the list holds the vendor: the From is now the group address', async () => {
     const addr = await pageWithSync('art_fwd_grp', [VENDOR]);
     const m = await send(mail(addr, { envFrom: 'bounce@acme.test', headerFrom: `Reportes via Grupo <reportes-grupo@acme.test>`, auth: direct('acme.test', 'reportes-grupo@acme.test') }));
-    expect(m.setReject).toHaveBeenCalledWith('Sender not permitted');
+    expect(m.setReject).toHaveBeenCalledWith(SENDER_NOT_PERMITTED_BOUNCE);
     expect(await status('art_fwd_grp')).toMatchObject({ lastRejected: { from: 'reportes-grupo@acme.test', reason: 'not_allowed' } });
   });
   it('accepted once the group address itself is on the list (its domain signs the mail)', async () => {
@@ -166,7 +166,7 @@ describe('Gmail forwarding confirmation mail sent to the page address', () => {
   it('bounced (not on the list) and shown as the last rejection — the customer never sees the confirmation link', async () => {
     const addr = await pageWithSync('art_fwd_conf', [VENDOR]);
     const m = await send(mail(addr, { envFrom: GOOGLE, headerFrom: GOOGLE, auth: direct('google.com', GOOGLE), attach: 'none', subject: 'Gmail Forwarding Confirmation' }));
-    expect(m.setReject).toHaveBeenCalledWith('Sender not permitted');
+    expect(m.setReject).toHaveBeenCalledWith(SENDER_NOT_PERMITTED_BOUNCE);
     expect(await status('art_fwd_conf')).toMatchObject({ lastRejected: { from: GOOGLE, reason: 'not_allowed' } });
   });
   it('if that sender is listed for a moment, the mail is stored (readable in the inbox) and the sync fails harmlessly: no file attached, data kept', async () => {
@@ -184,8 +184,8 @@ describe('what a rejected sender and the page editors see', () => {
     const addr = await pageWithSync('art_fwd_rej', [CUSTOMER]);
     const a = await send(mail(addr, { envFrom: 'x@y.test', headerFrom: 'jefe@acme.test', auth: direct('acme.test', 'jefe@acme.test') }));
     const b = await send(mail(addr, { envFrom: CUSTOMER, headerFrom: CUSTOMER, auth: forwardedDkimBroken('acme.test') }));
-    expect(a.setReject.mock.calls).toEqual([['Sender not permitted']]);
-    expect(b.setReject.mock.calls).toEqual([['Sender not permitted']]);
+    expect(a.setReject.mock.calls).toEqual([[SENDER_NOT_PERMITTED_BOUNCE]]);
+    expect(b.setReject.mock.calls).toEqual([[SENDER_NOT_PERMITTED_BOUNCE]]);
     const st = await status('art_fwd_rej');
     expect(st).toMatchObject({ state: 'waiting_first_email', lastRejected: { from: CUSTOMER, reason: 'unverified' } });
     expect(st.message).toBe(st.lastRejected.message);          // only the LAST one is kept
