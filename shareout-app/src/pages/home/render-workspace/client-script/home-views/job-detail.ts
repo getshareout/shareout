@@ -23,6 +23,7 @@ export const workspace_client_home_views_jobDetail_JS = `  // ===== Automation d
     if (j.action === 'materialize') return (c.target && c.target.name) || '';
     if (j.action === 'drive_file_sync') return (c.fileName || c.fileId || '') + ' \\u2192 ' + (c.dataset || '');
     if (j.action === 'public_sheet_sync') return (c.fileName || t('slink.untitled')) + ' \\u2192 ' + (c.dataset || '');
+    if (j.action === 'email_sheet_sync') return t('esync.byEmail') + ' \\u2192 ' + (c.dataset || '');
     return '';
   }
   function jdSlackChannels(j, cb) {
@@ -56,6 +57,7 @@ export const workspace_client_home_views_jobDetail_JS = `  // ===== Automation d
     if (a === 'sheets_append') h += jdField(t('adet.range'), 'jd_range', c.range || '', { ph: 'Sheet1!A1' });
     if (a === 'drive_file_sync') h += jdField(t('dsync.tab'), 'jd_sheet', c.sheet || '', { ph: t('dsync.tabPh') }) + jdField(t('dsync.dataset'), 'jd_dataset', c.dataset || '');
     if (a === 'public_sheet_sync') h += jdField(t('slink.link'), 'jd_link', c.link || '') + jdField(t('dsync.tab'), 'jd_sheet', c.sheet || '', { ph: t('dsync.tabPh') }) + jdField(t('dsync.dataset'), 'jd_dataset', c.dataset || '');
+    if (a === 'email_sheet_sync') h += jdField(t('dsync.tab'), 'jd_sheet', c.sheet || '', { ph: t('dsync.tabPh') }) + jdField(t('esync.attachment'), 'jd_att', c.attachment || '', { ph: t('esync.attachmentPh') }) + jdField(t('dsync.dataset'), 'jd_dataset', c.dataset || '');
     return h || '<p class="wsx-field__note">' + esc(t('adet.noDestFields')) + '</p>';
   }
   function jdEditHtml(j) {
@@ -95,6 +97,7 @@ export const workspace_client_home_views_jobDetail_JS = `  // ===== Automation d
     if (q('jd_range')) { var rg = q('jd_range').value.trim(); if (rg) c.range = rg; else delete c.range; }
     if (q('jd_link')) { var lk = q('jd_link').value.trim(); if (!lk) return { err: 'slink.errEmpty' }; c.link = lk; }
     if (q('jd_sheet')) { var sh = q('jd_sheet').value.trim(); if (sh) c.sheet = sh; else delete c.sheet; }
+    if (q('jd_att')) { var at = q('jd_att').value.trim(); if (at) c.attachment = at; else delete c.attachment; }
     if (q('jd_dataset')) { var dn = q('jd_dataset').value.trim(); if (!/^[A-Za-z0-9_.-]{1,64}$/.test(dn)) return { err: 'dsync.errName' }; c.dataset = dn; }
     return { config: c };
   }

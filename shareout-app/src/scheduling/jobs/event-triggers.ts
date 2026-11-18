@@ -4,6 +4,7 @@
 import type { Env, EmailReceivedPayload } from '../../types';
 import { generateId } from '../../crypto-utils';
 import { executeJobAction, recordJobSteps } from './runner';
+import { notifyJobFailed } from './notify';
 import type { JobEventType, ScheduledJob } from './types';
 
 export async function runEventTriggeredJobs(
@@ -48,6 +49,12 @@ export async function runEventTriggeredJobs(
       VALUES (?, ?, ?, ?, ?, ?)
     `).bind(logId, job.id, now, result.success ? 'success' : 'failed', duration, result.error || null).run();
     await recordJobSteps(env, logId, job.id, result);
+
+    // A failed email sync emails its owner every time: each message is a file someone expected to
+    // land, and only allowlisted, verified senders get this far (bounded by the inbox's daily cap).
+    if (!result.success && job.action === 'email_sheet_sync') {
+      await notifyJobFailed(env, job, result.error || 'Unknown error', 'email');
+    }
 
     if (result.success) executed++;
     else failed++;

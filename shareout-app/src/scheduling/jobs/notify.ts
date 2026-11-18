@@ -7,12 +7,13 @@ import type { Env } from '../../types';
 import { dispatchLifecycleEmail } from '../../email/gateway';
 import type { ScheduledJob } from './types';
 
-export async function notifyJobFailed(env: Env, job: ScheduledJob, error: string): Promise<void> {
+/** via 'email': the job runs when a file is emailed in, so the next step is sending it again. */
+export async function notifyJobFailed(env: Env, job: ScheduledJob, error: string, via?: 'email'): Promise<void> {
   try {
     await dispatchLifecycleEmail(env, {
       type: 'job_failed',
       toUserId: job.owner_id,
-      data: { jobName: job.title || `${job.action} schedule`, error },
+      data: { jobName: job.title || `${job.action} schedule`, error, ...(via ? { via } : {}) },
     });
   } catch {
     // Best-effort; never break the cron batch.

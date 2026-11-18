@@ -35,6 +35,7 @@ Cron schedules run in **UTC**: convert the recipient's local time before sending
 | `telegram` | Message / snapshot / PDF to a linked Telegram chat | `TelegramConfig` |
 | `http_get` | Simple GET request | `HttpGetConfig` |
 | `materialize` | Re-run a connection query and store the result as a dataset/table/json key (extract refresh) | `MaterializeConfig` |
+| `email_sheet_sync` | Someone emails an Excel/CSV file to the page's own address → one tab of it replaces one of the page's datasets (event `email.received` only; allowed senders required) | [`EmailSheetSyncConfig`](#emailsheetsyncconfig) |
 | `query_snapshot` | Deterministic multi-query refresh: run fixed SQL/paths against a workspace connection → write each result to json/dataset/table | `QuerySnapshotConfig` |
 | `sheets_append` | Run one connection query → append the result rows to a connected Google Sheet (a new dated row-set each run) | `SheetsAppendConfig` |
 | `public_sheet_sync` | Copy one tab of a spreadsheet shared as "Anyone with the link" into one of the page's datasets — no Google sign-in | `PublicSheetSyncConfig` |
@@ -56,6 +57,7 @@ click, what they will see); the two config sections below are the wire format.
 - `artifact.viewed` - When artifact is viewed (throttled: 1/hour/visitor)
 - `comment.added` - When a comment is added
 - `email.received` - When inbound mail arrives at the artifact's inbox (see [../integrations/inbound-email.md](../integrations/inbound-email.md))
+  — `email_sheet_sync` turns an emailed spreadsheet into the page's data ([guide](../integrations/inbound-email.md#update-a-pages-data-by-email))
 
 ## POST /v1/jobs (Create)
 
@@ -106,7 +108,7 @@ click, what they will see); the two config sections below are the wire format.
 | `artifact_id` | string | Yes | Associated artifact |
 | `title` | string | No | Short human name shown in the schedules UI (≤200 chars). Strongly recommended — without it the UI synthesizes a generic name. |
 | `description` | string | No | One-line description of what the schedule does and why (≤1000 chars). Shown under the title. |
-| `action` | string | Yes | `email`, `webhook`, `slack`, `discord`, `telegram`, `http_get`, `materialize`, `query_snapshot`, `sheets_append` |
+| `action` | string | Yes | `email`, `webhook`, `slack`, `discord`, `telegram`, `http_get`, `materialize`, `query_snapshot`, `sheets_append`, `drive_file_sync`, `public_sheet_sync`, `email_sheet_sync` |
 | `trigger_type` | string | No | `cron` (default) or `event` |
 | `schedule` | string | Cron only | Cron expression (required for cron jobs) |
 | `event_type` | string | Event only | Event to trigger on (required for event jobs) |
@@ -427,6 +429,48 @@ interface QuerySnapshotConfig {
 ```
 
 Requires **owner/editor**. Uses `queryConnectionAny` under the hood — per-user warehouse connectors work when the artifact owner has linked credentials. See [../agents/crew.md](../agents/crew.md) for the interactive crew equivalent (`materialize_query`).
+
+### EmailSheetSyncConfig
+
+An Excel (`.xlsx`) or CSV file emailed — or auto-forwarded — to the page's own address → one tab
+of it replaces the page's dataset `dataset` (JSON rows keyed by the header row). Event-triggered
+only (`trigger_type: "event"`, `event_type: "email.received"`). No model in the loop: the same
+bounded parser and limits as the Drive syncs (8 MB file, 100,000 rows), and the write is skipped
+when the rows are unchanged. Any failure keeps the last good data.
+
+```typescript
+interface EmailSheetSyncConfig {
+  dataset: string;      // letters, digits, _ . -, up to 64 — the page reads sdk.dataset(dataset)
+  sheet?: string;       // tab name; empty = the first tab with cells
+  attachment?: string;  // file name, * = anything ("ventas*.xlsx"); empty = the first .xlsx/.csv
+}
+```
+
+Safety (the point of this action):
+
+- **Allowed senders first.** `PUT /v1/artifacts/{id}/email-sync/senders { "senders": ["ana@acme.com"] }`
+  turns the inbox on and returns the `address`. Creating the job with nobody allowed is refused,
+  and so is a whole free-mail domain (`@gmail.com`). While the job exists the list cannot be emptied or given a free-mail domain (also through the inbox API).
+- **Verified senders only.** Mail is bounced unless the header From is on the list and Cloudflare
+  vouches for its domain (DMARC pass, or a DKIM signature by that domain). Each run checks again.
+- Nothing in the mail is executed or rendered; a `.xlsx` must be a real zip, a `.csv` plain text.
+- A failed run emails the job owner the reason in one sentence with what to do (no attachment,
+  wrong type, tab not found, headers but no rows, too big, sender not allowed), in their language; `last_error` holds
+  the same sentence. `POST /v1/jobs/{id}/run` has no email to read and only says where to send it.
+
+```json
+{
+  "artifact_id": "art_abc123",
+  "action": "email_sheet_sync",
+  "trigger_type": "event",
+  "event_type": "email.received",
+  "title": "Update by email",
+  "config": { "dataset": "ventas" }
+}
+```
+
+Guide the person through it step by step:
+[../integrations/inbound-email.md#update-a-pages-data-by-email](../integrations/inbound-email.md#update-a-pages-data-by-email).
 
 ### SheetsAppendConfig
 

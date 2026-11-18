@@ -17,6 +17,11 @@ Both need owner or editor access to the page, and the page must be inside a work
 Each run writes the tab as JSON rows keyed by the header row; when nothing changed, the run
 skips the write.
 
+The file is not in Google at all — it arrives by email, or lives on someone's computer? A third
+way needs no Google: they email the Excel/CSV to the page's own address and the page updates
+(`email_sheet_sync`, MCP `set_email_sync`). See
+[inbound-email.md](inbound-email.md#update-a-pages-data-by-email).
+
 ## Guide the person, don't configure at them
 
 They are usually not technical. Run it as a short conversation:

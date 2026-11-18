@@ -24,6 +24,7 @@ pasa. Mandá un reporte semanal por email, posteá un snapshot a Slack, refresc�
 | `webhook` | Request HTTP a tu URL |
 | `http_get` | GET simple |
 | `materialize` | Vuelve a correr una query de conexión y guarda el resultado |
+| `email_sheet_sync` | En `email.received`: un Excel/CSV que un remitente permitido y verificado manda a la dirección del artefacto reemplaza uno de sus datasets |
 | `query_snapshot` | Corre queries fijas de warehouse/REST en schedule y escribe cada resultado en json/tabla/dataset |
 | `sheets_append` | Corre una query de conexión y agrega filas a una Google Sheet (historial diario creciente) |
 

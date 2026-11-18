@@ -58,6 +58,9 @@ export async function createJob(
       return { error: `event_type must be one of: ${JOB_EVENT_TYPES.join(', ')}` };
     }
   }
+  if (request.action === 'email_sheet_sync' && !(triggerType === 'event' && eventType === 'email.received')) {
+    return { error: 'email_sheet_sync runs when an email arrives: set trigger_type "event" and event_type "email.received"' };
+  }
 
   const artifact = await env.DB.prepare(
     'SELECT id, workspace_id FROM artifacts WHERE id = ?',

@@ -34,21 +34,49 @@ const mail = (envFrom: string, headerFrom: string, auth: string) => {
 
 describe('f40 allowlist authenticates the header From', () => {
   it('blocks: allowlisted envelope sender, attacker header From with dmarc=pass', async () => {
-    const msg = mail('boss@example.test', 'attacker@attacker.test', 'mx; spf=fail; dkim=pass header.d=attacker.test; dmarc=pass');
+    const msg = mail('boss@example.test', 'attacker@attacker.test', 'mx.cloudflare.net; spf=fail; dkim=pass header.d=attacker.test; dmarc=pass');
     await handleInboundEmail(msg as never, env, {} as ExecutionContext);
     expect(msg.setReject).toHaveBeenCalledWith('Sender not permitted');
     expect(emitJobEvent).not.toHaveBeenCalled();
   });
 
   it('blocks: allowlisted header From without dmarc=pass', async () => {
-    const msg = mail('boss@example.test', 'boss@example.test', 'mx; spf=pass; dkim=pass; dmarc=none');
+    const msg = mail('boss@example.test', 'boss@example.test', 'mx.cloudflare.net; spf=pass; dkim=pass; dmarc=none');
     await handleInboundEmail(msg as never, env, {} as ExecutionContext);
     expect(msg.setReject).toHaveBeenCalledWith('Sender not permitted');
     expect(emitJobEvent).not.toHaveBeenCalled();
   });
 
+  it('blocks: verdicts not stamped by Cloudflare (authserv-id is not mx.cloudflare.net)', async () => {
+    const msg = mail('boss@example.test', 'boss@example.test', 'mx.attacker.test; spf=pass; dkim=pass header.d=example.test; dmarc=pass');
+    await handleInboundEmail(msg as never, env, {} as ExecutionContext);
+    expect(msg.setReject).toHaveBeenCalledWith('Sender not permitted');
+  });
+
+  it('blocks: a sender-supplied Authentication-Results after Cloudflare\'s does not count', async () => {
+    // Headers.get joins repeated headers with ", " — Cloudflare's is prepended, so it comes first.
+    const msg = mail('boss@example.test', 'boss@example.test',
+      'mx.cloudflare.net; spf=fail (mx.cloudflare.net: 1.2.3.4, not permitted) smtp.mailfrom=boss@example.test; dkim=none; dmarc=none, mx.cloudflare.net; dkim=pass header.d=example.test; dmarc=pass');
+    await handleInboundEmail(msg as never, env, {} as ExecutionContext);
+    expect(msg.setReject).toHaveBeenCalledWith('Sender not permitted');
+  });
+
+  it('allows: no DMARC record, but a DKIM signature by the header From domain passed', async () => {
+    const msg = mail('boss@example.test', 'boss@example.test', 'mx.cloudflare.net; dkim=pass header.d=example.test header.s=s1; dmarc=none; spf=pass smtp.mailfrom=boss@example.test');
+    await handleInboundEmail(msg as never, env, {} as ExecutionContext);
+    expect(msg.setReject).not.toHaveBeenCalled();
+    expect(emitJobEvent).toHaveBeenCalledTimes(1);
+    expect(emitJobEvent.mock.calls[0][3]).toMatchObject({ sender: 'boss@example.test', senderVerified: true, from: 'boss@example.test' });
+  });
+
+  it('blocks: DKIM passed but for another domain (no DMARC)', async () => {
+    const msg = mail('boss@example.test', 'boss@example.test', 'mx.cloudflare.net; dkim=pass header.d=sendgrid.test; dmarc=none');
+    await handleInboundEmail(msg as never, env, {} as ExecutionContext);
+    expect(msg.setReject).toHaveBeenCalledWith('Sender not permitted');
+  });
+
   it('allows: ESP-style envelope with allowlisted header From and dmarc=pass', async () => {
-    const msg = mail('bounce-123@sendgrid.test', 'Boss <boss@example.test>', 'mx; spf=pass; dkim=pass; dmarc=pass');
+    const msg = mail('bounce-123@sendgrid.test', 'Boss <boss@example.test>', 'mx.cloudflare.net; spf=pass; dkim=pass; dmarc=pass');
     await handleInboundEmail(msg as never, env, {} as ExecutionContext);
     expect(msg.setReject).not.toHaveBeenCalled();
     expect(emitJobEvent).toHaveBeenCalledTimes(1);

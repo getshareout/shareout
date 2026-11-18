@@ -23,6 +23,14 @@ export const WORKSPACE_FORMS_EDIT_STYLES = `/* ---- Modal + native create forms 
 .wsx-cform__err:empty { min-height: 0; }
 .wsx-slink__warn { display: grid; gap: 6px; justify-items: start; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent); border-radius: var(--radius-md); background: var(--color-warning-light); color: var(--color-text); font-size: var(--text-sm); }
 .wsx-slink__warn p { margin: 0; }
+.wsx-esync__addr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-secondary, var(--color-bg)); }
+.wsx-esync__addr code { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; font: 600 var(--text-sm) var(--font-mono, monospace); color: var(--color-text); }
+.wsx-esync__st { display: grid; gap: 2px; padding: 10px 12px; border-radius: var(--radius-md); font-size: var(--text-sm); }
+.wsx-esync__st p { margin: 0; }
+.wsx-esync__st.is-ok { background: color-mix(in srgb, var(--color-success) 12%, transparent); }
+.wsx-esync__st.is-fail { background: var(--color-error-light); }
+.wsx-esync__st.is-idle { background: var(--color-bg-secondary, var(--color-bg)); color: var(--color-text-secondary); }
+.wsx-esync__row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; }
 .wsx-cform__test { font-size: var(--text-xs); }
 .wsx-cform__test.testing { color: var(--color-text-tertiary); }
 .wsx-cform__test.ok { color: var(--color-success); }

@@ -64,9 +64,40 @@ POST /v1/jobs
 }
 ```
 
-`email.received` payload fields available to the job: `from`, `to`, `prefix`,
-`tag`, `subject`, `textPreview`, `hasHtml`, `attachments[]`, `auth` (spf/dkim/dmarc),
+`email.received` payload fields available to the job: `from` (envelope sender), `sender`
+(header From — who wrote it), `senderVerified` (Cloudflare vouches for `sender`'s domain), `to`,
+`prefix`, `tag`, `subject`, `textPreview`, `hasHtml`, `attachments[]`, `auth` (spf/dkim/dmarc),
 `receivedAt`, `messageId`, `rfcMessageId`.
+
+## Update a page's data by email
+
+The person emails (or auto-forwards) an Excel or CSV file to the page's address, and the page's
+numbers update by themselves: no sign-in, nothing to install. It is the `email_sheet_sync` job
+([config](../api/jobs.md#emailsheetsyncconfig)); the Inspector has the same thing under
+Automate → **Update by email** (Spanish: **Actualizar por email**).
+
+Guide the person, one question at a time, in their words. Never show them config, ids, dataset
+names, "job", "DMARC" or "allowlist":
+
+1. **Ask who sends the file** ("Who will send the Excel? Their email address."). Default to the
+   person themselves. Exact addresses only; a whole `@gmail.com` is refused.
+2. `PUT /v1/artifacts/{id}/email-sync/senders { "senders": [...] }` → it answers with `address`.
+3. `POST /v1/jobs` with `action: "email_sheet_sync"`, `trigger_type: "event"`,
+   `event_type: "email.received"`, `config: { "dataset": <the page's dataset> }` — first tab and
+   any `.xlsx`/`.csv` attachment by default. `GET /v1/artifacts/{id}/email-sync` → `datasets`
+   lists the page's datasets, most recently written first; use the one the page reads.
+4. **Give them the address ready to copy** and say what happens: "Send the Excel to
+   `ventas-x1@inbox.shareout.site` from ana@acme.com. The page updates a few seconds later."
+   Mention they can set up an automatic forward in Gmail or Outlook if the file arrives by email anyway.
+5. **Confirm it worked** once they say they sent it: `GET /v1/artifacts/{id}/email-sync` →
+   `lastUpdate.rowCount` ("Got it: 365 rows updated at 10:32"), or `job.lastError` — one plain
+   sentence with what to do, in the owner's language. Read it to them as is.
+
+Mail from anyone not on the list is bounced back to the sender ("Sender not permitted"), and so
+is mail whose sender can't be verified (sent through another account or an unusual forwarder):
+then ask them to send it straight from the allowed mailbox, or add the address that actually sends it.
+A file that can't be used (no attachment, wrong type, tab not found, too big) keeps the page's
+previous data and emails the owner why.
 
 ## Management API
 
@@ -83,7 +114,9 @@ POST /v1/jobs
 ## Limits & safety
 
 - **Allowlist:** addresses or `@domain` entries. Unset = any authenticated sender.
-  Senders failing both DMARC and DKIM are bounced unless allowlisted.
+  Senders failing both DMARC and DKIM are bounced unless allowlisted. With a list, the header
+  From must be on it and verified: Cloudflare's own `Authentication-Results` (authserv-id
+  `mx.cloudflare.net`) shows DMARC pass, or a DKIM pass signed by that sender's domain.
 - **Size:** messages over 25 MB are rejected; attachments are stored in R2.
 - **Rate:** 200 received messages/artifact/day.
 - **Dedupe:** duplicate deliveries (same Message-ID) are stored once and fire the

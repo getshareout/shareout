@@ -236,8 +236,10 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
     return { subject: 'Rechazaron tu pedido de publicación', preheader: 'Rechazaron tu pedido de publicación', heading: 'Rechazaron tu pedido de publicación', bodyHtml: p(body), cta, bodyText: body };
   },
 
-  job_failed: ({ jobName, error }: JobFailedData, { baseUrl }) => {
-    const next = 'Va a volver a intentar en el próximo horario programado. Abrí Programaciones para arreglarla o correrla ahora.';
+  job_failed: ({ jobName, error, via }: JobFailedData, { baseUrl }) => {
+    const next = via === 'email'
+      ? 'El artefacto mantiene los datos anteriores. Corregí el archivo y mandalo de nuevo por email.'
+      : 'Va a volver a intentar en el próximo horario programado. Abrí Programaciones para arreglarla o correrla ahora.';
     return {
       subject: `Falló tu programación "${jobName}"`,
       preheader: error,

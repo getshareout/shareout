@@ -205,5 +205,7 @@ export const MCP_TOOL_POLICIES: Record<string, McpToolPolicy> = {
   list_jobs: 'artifact',
   set_sheet_sync: 'artifact',
   remove_sheet_sync: 'artifact',
+  set_email_sync: 'artifact',
+  check_email_sync: 'artifact',
   knowledge_from_artifact: 'artifact',
 };
