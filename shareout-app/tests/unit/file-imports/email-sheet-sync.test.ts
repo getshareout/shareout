@@ -183,6 +183,8 @@ describe('email_sheet_sync — a file that cannot be used keeps the last good da
   it('the wrong kind of file', () => failsWith([{ name: 'factura.pdf', type: 'application/pdf', bytes: new Uint8Array([37, 80, 68, 70]) }], /no Excel \(\.xlsx\) or CSV file \(it had: factura\.pdf\)/));
   it('a file named .xlsx that is not one', () => failsWith([{ name: 'virus.xlsx', type: XLSX_MIME, bytes: new TextEncoder().encode('<script>alert(1)</script>') }], /isn’t a real Excel file/));
   it('a .csv that is really markup', () => failsWith([{ name: 'x.csv', type: 'text/csv', bytes: new TextEncoder().encode('<html><table><tr><td>1</td></tr></table></html>') }], /isn’t a real CSV file/));
+  it('a header-only Excel', () => failsWith([{ name: 'vacio.xlsx', type: XLSX_MIME, bytes: book({ Ventas: [['Producto', 'Unidades']] }) }], /“vacio\.xlsx” has no rows under the headers \(tab “Ventas”\), so the page kept its data/));
+  it('a header-only CSV', () => failsWith([{ name: 'vacio.csv', type: 'text/csv', bytes: new TextEncoder().encode('producto,unidades\n') }], /“vacio\.csv” has no rows under the headers/));
   it('a tab that is not there', async () => {
     await e.DB.prepare("UPDATE scheduled_jobs SET config = ? WHERE artifact_id = ? AND action = 'email_sheet_sync'")
       .bind(JSON.stringify({ dataset: 'ventas', sheet: 'Resumen' }), ART).run();

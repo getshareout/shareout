@@ -23,7 +23,7 @@ const TYPES = ['xlsx', 'csv'] as const;
 type Code =
   | 'not_event' | 'no_workspace' | 'no_allowlist' | 'not_allowed' | 'unverified' | 'no_message'
   | 'no_attachment' | 'wrong_type' | 'no_match' | 'too_large' | 'too_many_rows' | 'not_a_sheet' | 'unreadable'
-  | 'sheet_not_found' | 'empty' | 'write_failed' | 'no_access';
+  | 'sheet_not_found' | 'empty' | 'no_rows' | 'write_failed' | 'no_access';
 
 // What went wrong and what to do, in the words the page owner reads (the run log, the failed-run
 // email). {x} placeholders are filled from `vars`.
@@ -44,6 +44,7 @@ const COPY: Record<Locale, Record<Code, string>> = {
     unreadable: '“{file}” could not be read. Open it in Excel, save it again and send it.',
     sheet_not_found: '“{file}” has no tab named “{sheet}” (tabs: {sheets}). Rename the tab or change it in the settings.',
     empty: '“{file}” is empty. Check you attached the right file.',
+    no_rows: '“{file}” has no rows under the headers (tab “{sheet}”), so the page kept its data. Check you attached the right file, with the data filled in.',
     write_failed: 'The file was read but the page’s data could not be saved: {detail}',
     no_access: 'The person who turned this on can no longer edit the page, so nothing changed. Someone who can edit it should turn it on again.',
   },
@@ -63,6 +64,7 @@ const COPY: Record<Locale, Record<Code, string>> = {
     unreadable: 'No se pudo leer “{file}”. Abrilo en Excel, guardalo de nuevo y mandalo.',
     sheet_not_found: '“{file}” no tiene una pestaña “{sheet}” (pestañas: {sheets}). Cambiale el nombre a la pestaña o cambiala en la configuración.',
     empty: '“{file}” está vacío. Revisá que adjuntaste el archivo correcto.',
+    no_rows: '“{file}” no tiene filas debajo de los encabezados (pestaña “{sheet}”), así que la página mantiene sus datos. Revisá que adjuntaste el archivo correcto, con los datos cargados.',
     write_failed: 'El archivo se leyó pero no se pudieron guardar los datos de la página: {detail}',
     no_access: 'La persona que activó esto ya no puede editar la página, así que no cambió nada. Alguien que pueda editarla tiene que activarlo de nuevo.',
   },
@@ -211,6 +213,8 @@ export const emailSheetSyncDestination: Destination<EmailSheetSyncConfig> = {
       const sheets = e instanceof SheetRowsError ? e.sheets.join(', ') : '';
       return fail('transform', code, { file: att.filename, max, sheet: sheetWanted, sheets, rows: SHEET_ROWS_MAX.toLocaleString(locale) });
     }
+    // Headers and no rows is a blank or wrong file, not "the data is now empty": keep what's there.
+    if (!parsed.rows.length) return fail('transform', 'no_rows', { file: att.filename, sheet: parsed.sheet });
     const key = await sheetRowsKey(parsed.sheet, parsed.rows);
     const current = await env.DB.prepare('SELECT metadata FROM datasets WHERE artifact_id = ? AND name = ?')
       .bind(ctx.artifactId, config.dataset).first<{ metadata: string | null }>();

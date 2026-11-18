@@ -455,7 +455,7 @@ Safety (the point of this action):
   vouches for its domain (DMARC pass, or a DKIM signature by that domain). Each run checks again.
 - Nothing in the mail is executed or rendered; a `.xlsx` must be a real zip, a `.csv` plain text.
 - A failed run emails the job owner the reason in one sentence with what to do (no attachment,
-  wrong type, tab not found, too big, sender not allowed), in their language; `last_error` holds
+  wrong type, tab not found, headers but no rows, too big, sender not allowed), in their language; `last_error` holds
   the same sentence. `POST /v1/jobs/{id}/run` has no email to read and only says where to send it.
 
 ```json
