@@ -8,6 +8,8 @@ import ledgerSql from '../../migrations/0010_workspace_usage_daily.sql?raw';
 import tokensSql from '../../migrations/0024_ai_usage_tokens.sql?raw';
 import invoicesSql from '../../migrations/0034_workspace_invoices.sql?raw';
 import markupSql from '../../migrations/0035_ai_markup.sql?raw';
+import billingProfilesSql from '../../migrations/0040_workspace_billing_profiles.sql?raw';
+import deliverySql from '../../migrations/0041_invoice_delivery.sql?raw';
 import { AT_COST_BPS, bpsFromMultiplier, priceRuns, resell, workspaceMarkup } from '../../src/data/ai-markup';
 import { budgetState, resetBudgetCache } from '../../src/data/ai-budget';
 import { handleGetWorkspaceAiLimits } from '../../src/router/api/workspace-ai-limits';
@@ -43,7 +45,7 @@ async function usage(at: string, cost: number, kind = 'assistant_chat') {
 }
 
 beforeAll(async () => {
-  for (const sql of [initSql, gatewaySql, ledgerSql, tokensSql, invoicesSql, markupSql]) {
+  for (const sql of [initSql, gatewaySql, ledgerSql, tokensSql, invoicesSql, markupSql, billingProfilesSql, deliverySql]) {
     const stmts = sql.replace(/--[^\n]*/g, '').split(/;\s*\n/).map((x) => x.trim()).filter(Boolean);
     for (let i = 0; i < stmts.length; i += 50) await e.DB.batch(stmts.slice(i, i + 50).map((x) => e.DB.prepare(x)));
   }

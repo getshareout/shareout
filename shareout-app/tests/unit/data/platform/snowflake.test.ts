@@ -190,6 +190,68 @@ describe('Snowflake provider', () => {
     expect(seen[0]).toBe('https://myorg-myacct.privatelink.snowflakecomputing.com/api/v2/statements');
   });
 
+  describe('async statements (202 + poll)', () => {
+    afterEach(() => vi.useRealTimers());
+
+    // Snowflake answers 202 with a handle, then 202 on each poll until the statement is done.
+    function stubSlowStatement(doneAfterMs: number) {
+      const started = Date.now();
+      let polls = 0;
+      vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo) => {
+        if (String(url).endsWith('/api/v2/statements')) {
+          return new Response(JSON.stringify({ statementHandle: 'h-1' }), { status: 202 });
+        }
+        polls++;
+        return Date.now() - started >= doneAfterMs
+          ? new Response(JSON.stringify({ data: [['done']] }), { status: 200 })
+          : new Response(JSON.stringify({ statementHandle: 'h-1' }), { status: 202 });
+      }));
+      return () => polls;
+    }
+
+    it('keeps polling while the statement is within its own timeout', async () => {
+      vi.useFakeTimers();
+      const polls = stubSlowStatement(100_000);
+      const pending = snowflakeProvider.executeRequest(
+        execCtx(),
+        snowflakeProvider.getEndpoint('statements.execute')!,
+        { body: { statement: 'SELECT 1', timeout: 110 } },
+      );
+      await vi.advanceTimersByTimeAsync(110_000);
+      const result = await pending;
+      expect(result.success).toBe(true);
+      expect((result.data as { data: unknown[] }).data).toEqual([['done']]);
+      expect(polls()).toBeGreaterThan(20);
+    });
+
+    it('treats timeout 0 (Snowflake maximum) as our own polling cap, not a 30s window', async () => {
+      vi.useFakeTimers();
+      stubSlowStatement(300_000);
+      const pending = snowflakeProvider.executeRequest(
+        execCtx(),
+        snowflakeProvider.getEndpoint('statements.execute')!,
+        { body: { statement: 'SELECT 1', timeout: 0 } },
+      );
+      await vi.advanceTimersByTimeAsync(310_000);
+      const result = await pending;
+      expect(result.success).toBe(true);
+    });
+
+    it('gives up once the statement timeout plus slack has passed', async () => {
+      vi.useFakeTimers();
+      stubSlowStatement(Number.POSITIVE_INFINITY);
+      const pending = snowflakeProvider.executeRequest(
+        execCtx(),
+        snowflakeProvider.getEndpoint('statements.execute')!,
+        { body: { statement: 'SELECT 1' } },
+      );
+      await vi.advanceTimersByTimeAsync(95_000);
+      const result = await pending;
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe('SNOWFLAKE_TIMEOUT');
+    });
+  });
+
   it('rejects unsupported OAuth/direct flows', async () => {
     await expect(snowflakeProvider.getAuthUrl()).rejects.toThrow('key-pair');
     await expect(snowflakeProvider.prepareDirectCredentials()).rejects.toThrow('direct');

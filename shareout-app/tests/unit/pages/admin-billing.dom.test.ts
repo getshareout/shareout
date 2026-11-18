@@ -119,3 +119,53 @@ describe('Admin Billing section', () => {
     expect(m.mountEl.innerHTML).toContain('Adjuntar comprobante de transferencia');
   });
 });
+
+describe('Admin Billing delivery', () => {
+  const emailed = { ...invoice, emailed_at: '2026-11-02T12:01:00.000Z', emailed_to: ['billing@acme.example'] };
+  const draft = { ...invoice, id: 'inv_2', number: 'A-0003-00000042', status: 'draft', currency: 'ARS', notes: 'Bank Y, account 42', issued_at: null, emailed_at: null, emailed_to: [] };
+  const delivery = { to: ['billing@acme.example'], source: 'billing_email', suppressed: [], email_enabled: true };
+
+  it('shows the operator who issuing emails, with the "send email" box ticked, and a resend on unpaid invoices', async () => {
+    const m = mount('en', { invoices: [draft, emailed], can_manage: true, markup: {}, delivery });
+    await m.run();
+    const html = m.mountEl.innerHTML;
+    expect(html).toContain('<input type="checkbox" data-inv-send="inv_2" checked>');
+    expect(html).toContain('Email it to the billing email: billing@acme.example');
+    expect(html).toContain('<input type="checkbox" id="wsxBillSend" checked>');
+    expect(html).toContain('data-inv-act="send" data-inv-id="inv_1"');
+    expect(html).toContain('Emailed 2026-11-02 to billing@acme.example');
+    // From a PDF: its own form, starting from the latest invoice's currency and how-to-pay.
+    expect(html).toContain('id="wsxBillDocBtn"');
+    expect(html).toContain('id="wsxBillDocForm"');
+    expect(html).toContain('id="wsxBillDocCur" maxlength="3" value="ARS"');
+    expect(html).toContain('id="wsxBillDocNotes" rows="3" maxlength="2000" placeholder="Bank, account holder, account number / CBU, reference to use…">Bank Y, account 42</textarea>');
+    expect(html).toContain('<input type="checkbox" id="wsxBillDocSend" checked>');
+  });
+
+  it('unticks and locks the box when nothing can be sent, and says why', async () => {
+    const off = mount('en', { invoices: [draft], can_manage: true, markup: {}, delivery: { ...delivery, email_enabled: false } });
+    await off.run();
+    expect(off.mountEl.innerHTML).toContain('<input type="checkbox" data-inv-send="inv_2" disabled>');
+    expect(off.mountEl.innerHTML).toContain('Email isn\'t set up on this instance');
+    const bounced = mount('es', { invoices: [draft], can_manage: true, markup: {}, delivery: { ...delivery, to: [], suppressed: ['billing@acme.example'] } });
+    await bounced.run();
+    expect(bounced.mountEl.innerHTML).toContain('<input type="checkbox" data-inv-send="inv_2" disabled>');
+    expect(bounced.mountEl.innerHTML).toContain('No se manda a billing@acme.example (por rebote o baja).');
+    const admins = mount('es', { invoices: [draft], can_manage: true, markup: {}, delivery: { ...delivery, source: 'admins', to: ['owner@acme.example', 'admin@acme.example'] } });
+    await admins.run();
+    expect(admins.mountEl.innerHTML).toContain('Mandarla a los propietarios y administradores: owner@acme.example, admin@acme.example');
+  });
+
+  it('tells a workspace admin the proof marks it paid, and why an invoice is paid', async () => {
+    const paid = { ...emailed, id: 'inv_3', status: 'paid', paid_at: '2026-11-03T10:00:00.000Z', paid_source: 'email' };
+    const m = mount('en', { invoices: [emailed, paid], can_manage: false });
+    await m.run();
+    const html = m.mountEl.innerHTML;
+    expect(html).toContain('Attaching it marks the invoice paid.');
+    expect(html).toContain('Paid 2026-11-03 (transfer proof by email)');
+    expect(html).toContain('Invoice document: <a');
+    expect(html).not.toContain('data-inv-send');
+    expect(html).not.toContain('data-inv-act="send"');
+    expect(html).not.toContain('Not emailed');
+  });
+});

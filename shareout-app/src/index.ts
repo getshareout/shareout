@@ -11,7 +11,7 @@ import { FileImportWorkflow } from './file-imports/workflow';
 import { SlidesConverter } from './pages/home/slides-converter-do';
 import { BuildJobs } from './build-jobs/do';
 import { handleScheduledEvent } from './scheduling/handler';
-import { handleViewEventBatch } from './analytics';
+import { handleViewEventBatch, isViewsQueue } from './analytics';
 import { logScheduledRun, withRequestLogging } from './request-logging';
 import { handleFetch } from './router/handle-fetch';
 import { setSelfFetch } from './http/self-fetch';
@@ -36,7 +36,7 @@ export default {
 
   // Batched analytics view-event ingest (opt-006). Other queues are ignored here.
   async queue(batch: MessageBatch<ViewEventMessage>, env: Env): Promise<void> {
-    if (batch.queue === 'shareout-analytics-views') {
+    if (isViewsQueue(batch.queue)) {
       await handleViewEventBatch(batch, env);
     }
   },

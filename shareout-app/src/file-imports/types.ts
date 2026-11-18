@@ -70,9 +70,18 @@ export type RemoteDownload =
 export interface BrowseEntry {
   ref: string;
   name: string;
-  kind: 'folder' | 'drive' | 'site' | 'group';
-  /** Can be picked as the folder to import. */
+  kind: 'folder' | 'drive' | 'site' | 'group' | 'file';
+  /** Can be picked: the folder to import, or (files mode) the file to sync. */
   selectable: boolean;
+  /** Files mode only: the provider's file id, its type and when it last changed. */
+  fileId?: string;
+  mime?: string;
+  modifiedAt?: string;
+}
+
+/** `files: 'sheets'` lists spreadsheets next to the folders (picking one file to sync). */
+export interface BrowseOptions {
+  files?: 'sheets';
 }
 
 export interface BrowseResult {
@@ -91,7 +100,7 @@ export interface ProviderApi {
   readonly id: FileImportProvider;
   listChildren(token: string, loc: RemoteLocation, pageToken?: string): Promise<RemoteListing>;
   download(token: string, driveId: string | null, entry: RemoteEntry): Promise<RemoteDownload>;
-  browse(token: string, ref: string, query?: string): Promise<BrowseResult>;
+  browse(token: string, ref: string, query?: string, opts?: BrowseOptions): Promise<BrowseResult>;
   /** Parse a selectable browse ref into a folder location. null = not importable. */
   locate(token: string, ref: string): Promise<RemoteLocation | null>;
 }

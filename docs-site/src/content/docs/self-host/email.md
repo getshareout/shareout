@@ -15,6 +15,7 @@ one-time codes to reach an inbox instead of a log.
 | Workspace invites | Not mailed — hit **Copy link** and send the join URL yourself ([below](#inviting-people-without-email)) |
 | Weekly digest, notifications | Not delivered |
 | Artifact email, crew email delivery | Not delivered |
+| Invoice emails | Not sent. Issuing still works, and **Admin → Billing** says the email did not go out |
 | **Password sign-in** | **Unaffected.** This is why an instance is usable with no email at all |
 
 ## Sending
@@ -80,6 +81,27 @@ real mailboxes like `hello@yourcompany.com`.
 Once it is live, **Admin → Settings** shows the workspace's inbox address. If that section
 is missing, the instance has no email binding — the address is hidden rather than shown as
 something that cannot receive.
+
+## Invoice mail
+
+If you bill workspaces from **Admin → Billing**, issuing an invoice emails it. Nothing to set up
+beyond [sending](#sending):
+
+- It goes to the workspace's billing email (from its billing details), or to its owners and
+  admins when there is none. Addresses on the suppression list are skipped. Before issuing, the
+  operator sees exactly who will get it, with a checkbox to not send it at all.
+- The invoice document is attached, and replies go to `invoice+<token>@<EMAIL_INBOX_DOMAIN>`, one
+  unguessable address per invoice. For replies to arrive, set up [receiving](#receiving); the
+  catch-all route covers this address too.
+- A reply that passes DMARC, comes from the billing email or an owner or admin, and carries a PDF,
+  PNG, JPG or WEBP (up to 10 MB) is filed as the transfer proof and marks the invoice paid.
+  Anything else changes nothing; the instance admins get an email asking them to look instead.
+- Instance admins (`INSTANCE_ADMIN_EMAILS`, `SETUP_ADMIN_EMAIL`, or the first account on an
+  instance that names neither) get an email with the proof attached whenever a workspace's proof
+  marks an invoice paid, uploaded or by reply. **Mark unpaid** undoes it.
+
+Invoice mail is transactional: `LIFECYCLE_EMAILS_DISABLED` and `NURTURE_EMAILS_ENABLED` do not
+affect it, and every message is in `email_sends`.
 
 ## Deliverability
 

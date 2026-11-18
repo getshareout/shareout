@@ -1,4 +1,4 @@
 {
-  "_doc": "Roster for /admin super-admin access. Keep EMPTY in a fork: set INSTANCE_ADMIN_EMAILS or SETUP_ADMIN_EMAIL (or claim at /setup). No out-of-band notifications — /admin is the whole surface. See superadmin-recipients.example.json for the filled shape.",
+  "_doc": "Roster for /admin super-admin access. Keep EMPTY in a fork: set INSTANCE_ADMIN_EMAILS or SETUP_ADMIN_EMAIL (or claim at /setup). /admin is the whole surface; the only mail super-admins get is invoice payment notices. See superadmin-recipients.example.json for the filled shape.",
   "recipients": []
 }

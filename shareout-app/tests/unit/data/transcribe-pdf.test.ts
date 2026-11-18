@@ -1,7 +1,7 @@
 // A scanned PDF goes to the model as a document part, in each provider's wire format.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../../src/types';
-import { transcribePdf } from '../../../src/data/files/transcribe-pdf';
+import { getScanConfig, transcribePdf } from '../../../src/data/files/transcribe-pdf';
 import type { AiMeter } from '../../../src/data/ai-usage';
 
 const METER: AiMeter = { workspaceId: 'wsp_1', userId: 'usr_1', kind: 'document_transcription', source: 'scan.pdf' };
@@ -47,5 +47,33 @@ describe('transcribePdf', () => {
     expect(await transcribePdf({} as Env, METER, 'JVBER')).toBeNull();
     expect(await transcribePdf({ ANTHROPIC_API_KEY: 'k' } as unknown as Env, METER, 'x'.repeat(27_000_001))).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+  describe('scan model', () => {
+    const bodyOf = (m: ReturnType<typeof vi.fn>) => JSON.parse(String((m.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+
+    it('reads scans with Haiku 5.5 on the gateway by default, not the chat model', async () => {
+      const fetchMock = vi.fn(async () => sse('openai'));
+      vi.stubGlobal('fetch', fetchMock);
+      expect(await transcribePdf({ VERCEL_AI_GATEWAY: 'k', AI_PROVIDER_ORDER: 'vercel-gateway' } as unknown as Env, METER, 'JVBER')).toBe('# Matriz');
+      expect(bodyOf(fetchMock).model).toBe('anthropic/claude-haiku-5.5');
+    });
+
+    it('SCAN_MODEL overrides it', async () => {
+      const fetchMock = vi.fn(async () => sse('openai'));
+      vi.stubGlobal('fetch', fetchMock);
+      await transcribePdf({ VERCEL_AI_GATEWAY: 'k', AI_PROVIDER_ORDER: 'vercel-gateway', SCAN_MODEL: 'google/gemini-2.5-flash-lite' } as unknown as Env, METER, 'JVBER');
+      expect(bodyOf(fetchMock).model).toBe('google/gemini-2.5-flash-lite');
+    });
+
+    it('uses the first-party Haiku 5.5 id on a direct Anthropic key', async () => {
+      const fetchMock = vi.fn(async () => sse('anthropic'));
+      vi.stubGlobal('fetch', fetchMock);
+      await transcribePdf({ ANTHROPIC_API_KEY: 'k', AI_PROVIDER_ORDER: 'anthropic' } as unknown as Env, METER, 'JVBER');
+      expect(bodyOf(fetchMock).model).toBe('claude-haiku-5-5');
+    });
+
+    it('keeps no config when no provider is set, and meters through streamChat (the guard test covers the rest)', () => {
+      expect(getScanConfig({} as Env)).toBeNull();
+    });
   });
 });

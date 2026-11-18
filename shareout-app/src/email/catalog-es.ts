@@ -27,6 +27,7 @@ import type {
 } from './catalog';
 import { escapeHtml } from './layout';
 import { NOTIFY_EMAILS_ES } from './catalog-notify';
+import { INVOICE_EMAILS_ES } from './catalog-invoice';
 import { colors } from '../../packages/design-tokens/src/index';
 
 const quote = (title: string, snippet: string) =>
@@ -273,6 +274,7 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
   },
 
   ...NOTIFY_EMAILS_ES,
+  ...INVOICE_EMAILS_ES,
 };
 
 /** Build an email in the recipient's language; English when there's no Spanish copy. */
