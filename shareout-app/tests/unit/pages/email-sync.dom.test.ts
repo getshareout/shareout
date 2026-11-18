@@ -358,6 +358,18 @@ describe('Update by email', () => {
       expect(toast).toHaveBeenCalledWith('Done. Files from reportes@proveedor.com now update the page. Forward the last one again so you don’t wait for the next.');
     });
 
+    it('one tap after the panel re-rendered sends ONE request with the current list (no stale listener from an earlier render)', async () => {
+      status = ON({ recentRejected: [{ from: 'reportes@proveedor.com', reason: 'not_allowed', at: new Date().toISOString(), count: 1, canAllow: true, forwardedBy: 'ana@acme.com', message: 'A file from reportes@proveedor.com, forwarded from ana@acme.com, was bounced.' }] });
+      load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+      // Someone is added in between: the panel reloads and renders again.
+      btn(copy['esync.change']).click();
+      $<HTMLInputElement>('#es_who2').value = 'ana@acme.com, bob@acme.com';
+      btn(copy['esync.saveSenders']).click(); await flush();
+      sent = [];
+      btn('Allow reportes@proveedor.com').click(); await flush();
+      expect(sent.filter((x) => x.method === 'PUT').map((x) => x.body)).toEqual([{ senders: ['ana@acme.com', 'bob@acme.com', 'reportes@proveedor.com'] }]);
+    });
+
     it('“Let the report arrive by itself”: three steps for Gmail, three for Outlook, folded; no jargon', async () => {
       status = ON();
       load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();

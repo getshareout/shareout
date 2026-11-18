@@ -10,7 +10,7 @@
  * is), a folded "let the report arrive by itself" how-to, and refreshes itself while open.
  */
 export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dataset by email — lazy chunk 'emailsync' =====
-  var esMo = null, esArt = null, esDone = null, esPoll = 0, esFwdSeen = '';
+  var esMo = null, esArt = null, esDone = null, esPoll = 0, esFwdSeen = '', esSendersNow = [];
   function esOpen() { return !!(esMo && esMo.ov.isConnected); }
   function esBody(html) { var b = esOpen() ? esMo.body.querySelector('#esBody') : null; if (b) b.innerHTML = html; return b; }
   function esBtn(attr, label, primary) { return '<button class="wsx-abtn' + (primary ? ' wsx-abtn--primary' : '') + '" type="button" ' + attr + '>' + esc(label) + '</button>'; }
@@ -194,19 +194,25 @@ export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dat
       + '<div class="wsx-cform__foot wsx-esync__foot">' + esBtn('data-es-close="1"', t('common.close'), false) + '</div>');
     if (!b) return;
     var err = b.querySelector('#es_err');
+    esSendersNow = senders.slice();
     esFwdBind(b, st);
-    // One tap on a forwarded report that was turned away: add exactly its sender (delegated, so it
-    // keeps working after the status refreshes itself).
-    b.addEventListener('click', function (ev) {
-      var a = ev.target && ev.target.closest ? ev.target.closest('[data-es-allow]') : null;
-      if (!a || a.disabled) return;
-      var who = a.getAttribute('data-es-allow');
-      a.disabled = true; err.textContent = '';
-      esReq('PUT', esUrl('/senders'), { senders: senders.concat([who]) }).then(function (res) {
-        if (!res.ok) { a.disabled = false; err.textContent = esSendersErr(res.d); return; }
-        wsxToast(esT('esync.allowed', { who: who })); esLoad(false);
-      }).catch(function () { a.disabled = false; err.textContent = t('autof.couldNotSave'); });
-    });
+    // One tap on a forwarded report that was turned away: add exactly its sender. Delegated, so it
+    // keeps working after the status refreshes itself; bound once per panel (#esBody outlives each
+    // render), and it reads the list and the error line as they are when tapped.
+    if (!b.hasAttribute('data-es-allow-bound')) {
+      b.setAttribute('data-es-allow-bound', '1');
+      b.addEventListener('click', function (ev) {
+        var a = ev.target && ev.target.closest ? ev.target.closest('[data-es-allow]') : null;
+        if (!a || a.disabled) return;
+        var who = a.getAttribute('data-es-allow'), e2 = b.querySelector('#es_err');
+        var list = esSendersNow.slice(); if (list.indexOf(who) === -1) list.push(who);
+        a.disabled = true; if (e2) e2.textContent = '';
+        esReq('PUT', esUrl('/senders'), { senders: list }).then(function (res) {
+          if (!res.ok) { a.disabled = false; if (e2) e2.textContent = esSendersErr(res.d); return; }
+          wsxToast(esT('esync.allowed', { who: who })); esLoad(false);
+        }).catch(function () { a.disabled = false; if (e2) e2.textContent = t('autof.couldNotSave'); });
+      });
+    }
     var copy = b.querySelector('[data-es-copy]');
     if (copy) copy.addEventListener('click', function () { esCopy(st.address || '', copy); });
     b.querySelector('[data-es-close]').addEventListener('click', function () { esMo.close(); });
