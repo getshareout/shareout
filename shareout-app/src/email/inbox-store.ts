@@ -1,6 +1,6 @@
 import type { Env } from '../types';
 import { createMiniDb } from '../data/minidb-client';
-import { generateEmailPrefix, inboxAddress } from '../scheduling/email';
+import { SHORT_INBOX_PREFIX, generateEmailPrefix, inboxAddress, newShortPrefix } from '../scheduling/email';
 
 // Server-side state for an artifact's opt-in inbound inbox. Config + quota live on
 // the existing artifact_emails D1 row (alongside the outbound prefix); the messages
@@ -61,14 +61,19 @@ export const INBOUND_DAILY_LIMIT = 200;
 export const INBOUND_MAX_RAW_BYTES = 25 * 1024 * 1024;
 
 /** Resolve an inbound recipient prefix to its artifact + inbound config. Returns
- *  null when no artifact owns the prefix (so the handler can reject unknown mail). */
+ *  null when no artifact owns the prefix (so the handler can reject unknown mail).
+ *  A prefix with a dot is a short address (email_inbox_short_addresses); without one, the long
+ *  slug-based address every page has had. Both lead to the same row, so every sender rule
+ *  (allowed list, verified sender, quota) applies to them exactly alike. */
 export async function resolveArtifactByPrefix(env: Env, prefix: string): Promise<InboxResolution | null> {
+  const short = prefix.includes('.');
+  if (short && !SHORT_INBOX_PREFIX.test(prefix)) return null;
   const row = await env.DB.prepare(
     `SELECT ae.artifact_id, ae.inbound_enabled, ae.inbound_allowlist,
             ae.inbound_received_today, ae.inbound_last_reset_date, a.workspace_id
        FROM artifact_emails ae
        JOIN artifacts a ON a.id = ae.artifact_id
-      WHERE ae.email_prefix = ?`
+      WHERE ${short ? 'ae.artifact_id = (SELECT artifact_id FROM email_inbox_short_addresses WHERE short_prefix = ?)' : 'ae.email_prefix = ?'}`
   ).bind(prefix).first<{
     artifact_id: string;
     inbound_enabled: number;
@@ -128,12 +133,39 @@ export async function enableInbound(env: Env, artifactId: string): Promise<void>
        VALUES (?, ?, ?, 1, ?)
        ON CONFLICT (artifact_id) DO UPDATE SET inbound_enabled = 1, inbound_enabled_at = excluded.inbound_enabled_at`
     ).bind(artifactId, prefix, artifact.owner_id, new Date().toISOString()).run();
+    await ensureShortPrefix(env, artifactId);
     return;
   }
 
   await env.DB.prepare(
     `UPDATE artifact_emails SET inbound_enabled = 1, inbound_enabled_at = ? WHERE artifact_id = ?`
   ).bind(new Date().toISOString(), artifactId).run();
+  await ensureShortPrefix(env, artifactId);
+}
+
+/** The page's short inbox local part ("ventas.k7m4p2"), minted the first time it is needed and
+ *  kept for good. A code already taken — by any page, live or purged — is skipped (primary key),
+ *  and a page gets one code only (unique artifact_id), even when two requests race. null when the
+ *  page does not exist or no free code was found (callers fall back to the long address). */
+export async function ensureShortPrefix(env: Env, artifactId: string): Promise<string | null> {
+  const mine = () => env.DB.prepare('SELECT short_prefix FROM email_inbox_short_addresses WHERE artifact_id = ?')
+    .bind(artifactId).first<{ short_prefix: string }>();
+  const have = await mine();
+  if (have) return have.short_prefix;
+  const art = await env.DB.prepare(
+    `SELECT COALESCE(d.slug, a.slug) AS slug
+       FROM artifacts a
+       LEFT JOIN deployments d ON d.artifact_id = a.id AND d.channel = 'production'
+      WHERE a.id = ?`
+  ).bind(artifactId).first<{ slug: string | null }>();
+  if (!art) return null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await env.DB.prepare('INSERT OR IGNORE INTO email_inbox_short_addresses (short_prefix, artifact_id) VALUES (?, ?)')
+      .bind(newShortPrefix(art.slug), artifactId).run();
+    const got = await mine();
+    if (got) return got.short_prefix;
+  }
+  return null;
 }
 
 export type InboundRejection = 'not_allowed' | 'unverified' | 'too_large' | 'rate_limited' | 'inbox_off';
@@ -169,17 +201,22 @@ export interface InboxStatus {
   receivedToday: number;
 }
 
+/** `address` is the short one ("ventas.k7m4p2@inbox…"), minted here for a page that turned its
+ *  inbox on before short addresses existed; the long slug address keeps working, unannounced. */
 export async function getInboxStatus(env: Env, artifactId: string): Promise<InboxStatus> {
   const row = await env.DB.prepare(
-    `SELECT email_prefix, inbound_enabled, inbound_allowlist,
-            inbound_received_today, inbound_last_reset_date
-       FROM artifact_emails WHERE artifact_id = ?`
+    `SELECT ae.email_prefix, ae.inbound_enabled, ae.inbound_allowlist,
+            ae.inbound_received_today, ae.inbound_last_reset_date, s.short_prefix
+       FROM artifact_emails ae
+       LEFT JOIN email_inbox_short_addresses s ON s.artifact_id = ae.artifact_id
+      WHERE ae.artifact_id = ?`
   ).bind(artifactId).first<{
     email_prefix: string;
     inbound_enabled: number;
     inbound_allowlist: string | null;
     inbound_received_today: number;
     inbound_last_reset_date: string;
+    short_prefix: string | null;
   }>();
 
   if (!row) return { enabled: false, address: null, allowlist: null, receivedToday: 0 };
@@ -195,7 +232,9 @@ export async function getInboxStatus(env: Env, artifactId: string): Promise<Inbo
 
   return {
     enabled: row.inbound_enabled === 1,
-    address: row.inbound_enabled === 1 ? inboxAddress(row.email_prefix, env) : null,
+    address: row.inbound_enabled === 1
+      ? inboxAddress(row.short_prefix || (await ensureShortPrefix(env, artifactId)) || row.email_prefix, env)
+      : null,
     allowlist,
     receivedToday: row.inbound_last_reset_date === today ? (row.inbound_received_today || 0) : 0,
   };

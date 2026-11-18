@@ -150,6 +150,36 @@ export async function generateEmailPrefix(env: Env, slug: string | null): Promis
   return `${base}-${generateId('e').slice(2, 10)}`;
 }
 
+/** Letters and digits nobody mixes up reading or dictating them: no 0/o, no 1/l/i. */
+const SHORT_ALPHABET = '23456789abcdefghjkmnpqrstuvwxyz';
+const SHORT_CODE_LENGTH = 6;
+const SHORT_WORD_MAX = 12;
+/** A short inbox local part: a word, a dot, the random code. Slugs never contain a dot, so this
+ *  can never equal a long prefix (generateEmailPrefix), a workspace slug or a reserved prefix. */
+export const SHORT_INBOX_PREFIX = new RegExp(`^[a-z0-9]{1,${SHORT_WORD_MAX}}\\.[${SHORT_ALPHABET}]{${SHORT_CODE_LENGTH}}$`);
+
+/** "ventas-del-mes-noviembre-2026" → "ventas": the slug's first word with a letter in it, cut to
+ *  12 characters; "inbox" when it has none. */
+export function shortInboxWord(slug: string | null): string {
+  const words = (slug || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const word = words.find((w) => /[a-z]/.test(w)) || '';
+  return word.slice(0, SHORT_WORD_MAX) || 'inbox';
+}
+
+/** A fresh short inbox local part for a page: "ventas.k7m4p2". 31^6 ≈ 887 million codes per word,
+ *  drawn from the platform CSPRNG. Uniqueness is the caller's (the table's primary key). */
+export function newShortPrefix(slug: string | null): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(SHORT_CODE_LENGTH * 2));
+  let code = '';
+  // Rejection sampling keeps every character equally likely (256 is not a multiple of 31).
+  const limit = 256 - (256 % SHORT_ALPHABET.length);
+  for (let i = 0; code.length < SHORT_CODE_LENGTH; i++) {
+    const b = i < bytes.length ? bytes[i] : crypto.getRandomValues(new Uint8Array(1))[0];
+    if (b < limit) code += SHORT_ALPHABET[b % SHORT_ALPHABET.length];
+  }
+  return `${shortInboxWord(slug)}.${code}`;
+}
+
 function defaultFromEmail(env: Env): string {
   if (env.EMAIL_DEFAULT_FROM) return env.EMAIL_DEFAULT_FROM;
   const host = getPlatformHostname(env);

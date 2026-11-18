@@ -30,7 +30,7 @@ Los archivos también pueden entrar a tu biblioteca desde tres lugares más — 
 La dirección del inbox del workspace está en **Admin → Settings → File inbox** (copiá con un clic). Los admins reciben notificación en la campana y opcionalmente por Telegram cuando un miembro manda archivos por email. Hojas de cálculo (`.xlsx`, `.csv`), decks (`.pptx`), PDFs e imágenes son los casos típicos.
 
 :::note[No es lo mismo que el inbox de un artefacto]
-El **inbox de un artefacto** (`tu-pagina@inbox.YOUR_DOMAIN`) captura mail *dentro de un artefacto* para automatizaciones — ver [Recibí emails](/es/everyone/inbox/). El **inbox de archivos del workspace** alimenta la biblioteca **Assets** compartida y al asistente con IA.
+El **inbox de un artefacto** (`gastos.k7m4p2@inbox.YOUR_DOMAIN`) captura mail *dentro de un artefacto* para automatizaciones — ver [Recibí emails](/es/everyone/inbox/). El **inbox de archivos del workspace** alimenta la biblioteca **Assets** compartida y al asistente con IA.
 :::
 
 ## Organizar en carpetas

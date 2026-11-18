@@ -12,20 +12,22 @@ Your page can have its **own email address**. Anything sent there shows up in yo
 Open your page in the **editor** and click the **Inbox** button (the envelope in the toolbar). Hit **Enable inbox** and you'll get an address like:
 
 ```
-your-page@inbox.YOUR_DOMAIN
+expenses.k7m4p2@inbox.YOUR_DOMAIN
 ```
 
-Copy it with one click. You can also enable it from the **Home** dashboard — open a page's details and find the **Inbox** section there.
+It's short on purpose, so it's easy to type or read out over the phone: the first word of the page's
+name, a dot, and six letters and numbers. Copy it with one click. (An address a page was given
+before keeps working.) You can also enable it from the **Home** dashboard — open a page's details and find the **Inbox** section there.
 
 ## Get mail into it
 
 Two easy ways:
 
 - **Give the address out.** Put it on a form, hand it to a supplier, use it as your "send receipts here" address.
-- **Forward from your existing inbox.** In Gmail (or Outlook), add one filter — *"from billing@… → forward to your-page@inbox.YOUR_DOMAIN"* — and you never think about it again.
+- **Forward from your existing inbox.** In Gmail (or Outlook), add one filter — *"from billing@… → forward to expenses.k7m4p2@inbox.YOUR_DOMAIN"* — and you never think about it again.
 
 :::tip[Add a tag with “+”]
-`your-page+receipts@inbox.YOUR_DOMAIN` lands in the **same** inbox, tagged `receipts`. Use tags to tell different kinds of mail apart so an automation can treat them differently.
+`expenses.k7m4p2+receipts@inbox.YOUR_DOMAIN` lands in the **same** inbox, tagged `receipts`. Use tags to tell different kinds of mail apart so an automation can treat them differently.
 :::
 
 ## See what arrives
@@ -44,6 +46,14 @@ On its own, the inbox just collects mail. Pair it with an [**automation**](/ever
 | Anything arrives | Send a signal to another app |
 
 Set up a "when an email arrives" automation once, and it runs every time — turning your inbox into action.
+
+## Start from an Excel file
+
+No page yet? In **New → Table from an Excel file**, pick an Excel (.xlsx) or CSV file from your
+computer. ShareOut makes a page with a clean table of it — the first row is the column titles —
+that reads well on a phone and says when it was last updated. Then it asks how to keep it up to
+date: **by emailing the Excel** is one tap (just say who sends it), or from Google Drive, or from a
+link. A file it can't use (too big, empty, not a spreadsheet) gets one sentence saying what to do.
 
 ## Update your page's numbers by emailing the Excel
 
@@ -69,7 +79,7 @@ A few seconds later the page shows the new numbers. Good to know:
 
 ## A real example
 
-1. Make an **"Expenses"** page and enable its inbox → `expenses@inbox.YOUR_DOMAIN`.
+1. Make an **"Expenses"** page and enable its inbox → `expenses.k7m4p2@inbox.YOUR_DOMAIN`.
 2. In Gmail, forward the building's invoices to that address (one filter).
 3. Add an automation: *when an email arrives, save the amount and remind me on Telegram 3 days before it's due.*
 

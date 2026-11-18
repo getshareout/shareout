@@ -27,6 +27,12 @@ const TEXT_PREVIEW_BYTES = 2048;
 // generateEmailPrefix never hands either to an artifact (RESERVED_INBOX_PREFIXES).
 const SUPPORT_PREFIX = 'support';
 
+/** The bounce a sender gets when they are not on the inbox's allowed list, or their domain could
+ *  not be verified: one plain, ASCII, single-line sentence they can act on. The same text for both
+ *  cases, and it says nothing about who is on the list. */
+export const SENDER_NOT_PERMITTED_BOUNCE =
+  'This address only accepts files from people the owner of the page has approved. Ask them to add your address, then send it again.';
+
 /** Pull the bare address out of a "Name <addr@x>" From header. */
 export function bareEmail(from: string): string {
   const m = from.match(/<([^>]+)>/);
@@ -192,7 +198,7 @@ export async function handleInboundEmail(
   const verified = senderVerified(cloudflareAuthResults(message.headers), sender);
   if (res.allowlist && !(verified && senderAllowed(sender, res.allowlist))) {
     await recordInboundRejection(env, res.artifactId, sender || envelopeFrom, senderAllowed(sender, res.allowlist) ? 'unverified' : 'not_allowed');
-    message.setReject('Sender not permitted');
+    message.setReject(SENDER_NOT_PERMITTED_BOUNCE);
     return;
   }
 

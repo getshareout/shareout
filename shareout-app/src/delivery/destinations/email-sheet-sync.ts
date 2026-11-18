@@ -147,8 +147,9 @@ export function pickAttachment(atts: StoredAttachment[], pattern?: string): { at
   return att ? { att } : { code: 'no_match' };
 }
 
-/** The bytes must be what the name claims: .xlsx is a zip; .csv is text (no zip, markup or NULs). */
-function looksLike(type: (typeof TYPES)[number], bytes: Uint8Array): boolean {
+/** The bytes must be what the name claims: .xlsx is a zip; .csv is text (no zip, markup or NULs).
+ *  Also checks a file picked in New → Table from an Excel file (pages/home/new-table.ts). */
+export function looksLike(type: (typeof TYPES)[number], bytes: Uint8Array): boolean {
   const zip = bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
   if (type === 'xlsx') return zip;
   if (zip) return false;
