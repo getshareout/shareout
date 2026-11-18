@@ -141,6 +141,8 @@ export const workspace_client_tabs_JS = `  // ===== tabs (Home + open artifacts)
       tabDeviceEl.setAttribute('aria-pressed', mob ? 'true' : 'false');
     }
     if (tabFullEl) tabFullEl.hidden = !rec;
+    var inspBtn = document.getElementById('wsxInspBtn');
+    if (inspBtn) inspBtn.hidden = !rec;
     var shareWrap = document.getElementById('wsxShareWrap');
     // Everyone with the tab open can share: editors add people, others copy or email the link.
     if (shareWrap) shareWrap.hidden = !rec;

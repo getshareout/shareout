@@ -435,8 +435,9 @@ Requires **owner/editor**. Uses `queryConnectionAny` under the hood — per-user
 An Excel (`.xlsx`) or CSV file emailed — or auto-forwarded — to the page's own address → one tab
 of it replaces the page's dataset `dataset` (JSON rows keyed by the header row). Event-triggered
 only (`trigger_type: "event"`, `event_type: "email.received"`). No model in the loop: the same
-bounded parser and limits as the Drive syncs (8 MB file, 100,000 rows), and the write is skipped
-when the rows are unchanged. Any failure keeps the last good data.
+bounded parser and limits as the Drive syncs (8 MB file, 100,000 rows; the email itself up to 25 MB,
+200 emails a day per page), and the write is skipped when the rows are unchanged. Any failure keeps
+the last good data.
 
 ```typescript
 interface EmailSheetSyncConfig {
@@ -456,7 +457,21 @@ Safety (the point of this action):
 - Nothing in the mail is executed or rendered; a `.xlsx` must be a real zip, a `.csv` plain text.
 - A failed run emails the job owner the reason in one sentence with what to do (no attachment,
   wrong type, tab not found, headers but no rows, too big, sender not allowed), in their language; `last_error` holds
-  the same sentence. `POST /v1/jobs/{id}/run` has no email to read and only says where to send it.
+  the same sentence.
+- **The dataset the page reads.** `GET /v1/artifacts/{id}/email-sync` → `suggestedDataset` (the one
+  the live page reads when it reads exactly one; `null` = it reads several, ask). A dataset the
+  page does not read is accepted but the `201` carries a `warning` — the page would stay empty.
+- **One per page and dataset.** A second identical create is `409 DUPLICATE_JOB` with the existing
+  `job_id`; change that one with `PATCH`.
+
+Answers specific to this action:
+
+| Call | Answer |
+|---|---|
+| `POST /v1/jobs` | `201 { job, address, senders, warning? }` · `400 NO_SENDERS` (names `PUT /v1/artifacts/{id}/email-sync/senders` with the page's id) · `400 FREE_MAIL_DOMAIN` · `400 BAD_DATASET_NAME` (says what is wrong and suggests a valid name) · `409 DUPLICATE_JOB { job_id }` |
+| `POST /v1/jobs/{id}/run` | `409 NOT_RUNNABLE { address }` — it runs when mail arrives; nothing changes (no failed run, no `last_error`) |
+| `DELETE /v1/jobs/{id}` | `200 { success, senders_kept }` — the address turns off; the page's data and the sender list stay |
+| `GET /v1/artifacts/{id}/email-sync` | `state`: `off` · `inbox_off` · `waiting_first_email` · `ok` · `failed`, plus a one-line `message`, `lastRejected` (the last bounced email and why) and `limits` |
 
 ```json
 {

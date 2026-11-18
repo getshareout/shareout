@@ -45,6 +45,28 @@ On its own, the inbox just collects mail. Pair it with an [**automation**](/ever
 
 Set up a "when an email arrives" automation once, and it runs every time — turning your inbox into action.
 
+## Update your page's numbers by emailing the Excel
+
+Does someone send you the same spreadsheet every week? Your page can update itself from it.
+Open the page from Home and choose **Update by email**. Say who sends the file (just their
+email address), press **Turn on**, and you get the page's address. Then, each time:
+
+1. Open your mail.
+2. Write a new email to the page's address.
+3. Attach the Excel and send it. The subject and the text don't matter.
+
+A few seconds later the page shows the new numbers. Good to know:
+
+- The **first row** of the first sheet is the column titles.
+- Each file **replaces** the data the page shows.
+- Only the people you listed can update it; mail from anyone else is sent back. Use the exact
+  address (like `ana@gmail.com`), not a whole `@gmail.com`.
+- If a file can't be used, the page keeps its previous numbers and you get an email saying why.
+- Limits: 8 MB and 100,000 rows per file, 25 MB per email, 200 emails a day.
+- Prefer not to think about it? In Outlook, a rule can forward that email to the page's address
+  (add the original sender to who can send it). Gmail's automatic forwarding asks for a
+  confirmation the page's address can't answer yet, so from Gmail send the file by hand.
+
 ## A real example
 
 1. Make an **"Expenses"** page and enable its inbox → `expenses@inbox.YOUR_DOMAIN`.
@@ -56,7 +78,7 @@ Now every invoice flows in and gets handled — you do nothing.
 ## You stay in control
 
 - **Allowed senders** — leave it open to anyone, or restrict it to certain people or domains (e.g. only `@yourcompany.com`). Spoofed senders are turned away automatically.
-- **Turn it off** any time. New mail is declined; everything you already received stays.
+- **Turn it off** any time. New mail is declined; everything you already received stays. (A page that updates by email turns its address off when you stop **Update by email**.)
 - It's **per page and opt-in** — nothing receives mail unless you switch it on.
 
 ## What's next

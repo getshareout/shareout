@@ -20,6 +20,7 @@ import { callerClass, loadProvenanceArtifact, resolveSourcesCaller, sourcesUser 
 import { detectCodeRefs, mergeCodeRefs, scanPage, type CodeRefs, type PageScan } from './scan';
 import { loadSourceFacts } from './facts';
 import { buildSources } from './build';
+import { normalizeRef } from './refs';
 import type { SourcesResponse } from './types';
 
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
@@ -108,6 +109,26 @@ export async function handleGetArtifactSources(ctx: FetchContext, artifactId: st
   const kv = env.SLUGS;
   if (responseKey && kv) deferWork(() => kv.put(responseKey, text, { expirationTtl: RESPONSE_TTL_S }));
   return noStore(jsonWithApiErrors(body));
+}
+
+/**
+ * The dataset names the live page reads — sdk.dataset('…') in its scripts, elements bound to
+ * dataset:…, manifest feeds — in the order they appear. null = cannot tell (nothing published,
+ * or the entrypoint is not an HTML file we can read). Same cached scan as the sources answer.
+ */
+export async function datasetsPageReads(env: Env, artifactId: string): Promise<string[] | null> {
+  const version = await loadVersion(env, artifactId, '');
+  if (!version) return null;
+  const assets = await loadAssets(env, version.id);
+  const entry = assets.find((a) => a.path === version.entrypoint);
+  const scan = entry ? await cachedScan(env, version.id, entry, assets) : null;
+  if (!scan) return null;
+  const names = new Set<string>();
+  const add = (ref: string | null) => { if (ref?.startsWith('dataset:')) names.add(ref.slice('dataset:'.length)); };
+  scan.code.datasets.forEach((n) => add(normalizeRef(`dataset:${n}`)));
+  for (const el of scan.elements) el.refs.forEach(add);
+  for (const feed of scan.manifest?.feeds ?? []) add(normalizeRef(typeof feed?.source === 'string' ? feed.source : ''));
+  return [...names];
 }
 
 function cacheKey(kind: 'resp' | 'scan', ...parts: string[]): string | null {

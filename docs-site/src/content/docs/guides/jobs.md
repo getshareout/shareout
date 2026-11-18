@@ -155,6 +155,32 @@ Pair with any action to react when mail arrives at the artifact's
 }
 ```
 
+### `email_sheet_sync` — update a page's data by email
+
+Someone emails (or auto-forwards) an Excel or CSV file to the page's own address and one of its
+datasets is replaced by the file's first tab. Allowed, verified senders only.
+
+```bash
+# 1. who may send it (turns the address on) → { address, senders }
+curl -X PUT https://shareout.site/v1/artifacts/art_abc123/email-sync/senders \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{ "senders": ["ana@acme.com"] }'
+# 2. which dataset the page reads → suggestedDataset (null = it reads several: ask)
+curl https://shareout.site/v1/artifacts/art_abc123/email-sync -H "Authorization: Bearer $TOKEN"
+# 3. the job → 201 { job, address, senders, warning? }
+curl -X POST https://shareout.site/v1/jobs \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{ "artifact_id": "art_abc123", "action": "email_sheet_sync", "trigger_type": "event",
+        "event_type": "email.received", "title": "Update by email", "config": { "dataset": "ventas" } }'
+```
+
+- A `warning` in the `201` means the page does not read that dataset — the page would stay empty.
+- One per page and dataset: a second is `409 DUPLICATE_JOB` with the existing `job_id`.
+- `POST /v1/jobs/{id}/run` answers `409 NOT_RUNNABLE` with the address and changes nothing — it runs when mail arrives.
+- `GET /v1/artifacts/{id}/email-sync` → `state` (`off` · `inbox_off` · `waiting_first_email` · `ok` · `failed`), a one-line `message`, and `lastRejected` (the last email bounced and why).
+- Deleting the job turns the address off and keeps the data and the sender list (`senders_kept`).
+- Limits: 8 MB and 100,000 rows per file, 25 MB per email, 200 emails a day per page.
+
 ## Retries
 
 Add `retry_config` for flaky downstreams:
@@ -169,7 +195,7 @@ Add `retry_config` for flaky downstreams:
 
 | Action | Endpoint |
 | --- | --- |
-| Run now | `POST /v1/jobs/{id}/run` |
+| Run now | `POST /v1/jobs/{id}/run` (not `email_sheet_sync`: it runs when mail arrives) |
 | Pause | `PATCH /v1/jobs/{id}` → `{ "enabled": false }` |
 | Recent logs | `GET /v1/jobs/{id}/logs` |
 

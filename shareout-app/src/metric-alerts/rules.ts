@@ -2,6 +2,7 @@ import type { Env } from '../types';
 import { generateId } from '../crypto-utils';
 import { JSON_IN, jsonList } from '../sql-in';
 import { getDestination } from '../delivery/registry';
+import { problemText } from '../delivery/types';
 import { type DeliveryContext } from '../delivery/types';
 import { parseCronSchedule, getNextRunTime } from '../scheduling/jobs/cron';
 import { checkViewerSelfDelivery } from '../scheduling/jobs/permissions';
@@ -131,7 +132,7 @@ export async function createRule(
     { artifactId: req.artifact_id, createdBy: userId, triggeredVia: 'manual' },
     req.destination.config
   );
-  if (configError) return { error: configError };
+  if (configError) return { error: problemText(configError) };
 
   const artifactCount = await env.DB.prepare(
     'SELECT COUNT(*) AS n FROM metric_alert_rules WHERE artifact_id = ? AND enabled = 1'

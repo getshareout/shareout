@@ -50,12 +50,26 @@ const SDK_EMPTY_READS = new Set(['KEY_NOT_FOUND', 'ROW_NOT_FOUND']);
 // The render is read-only, so a write the page makes on load is refused by design.
 const READ_ONLY_REFUSAL = /read-only test run/i;
 
-function requestIssue(r: PageSignals['requests'][number]): VerifyIssue {
+const DATASET_URL = /^\/v1\/data\/[^/]+\/datasets\/([^/?#]+)/;
+
+function requestIssue(r: PageSignals['requests'][number], awaited: ReadonlySet<string>): VerifyIssue {
   const outcome = r.status ? `${r.status}` : r.failure ?? 'failed';
   const api = r.url.startsWith('/v1/');
   const resource = ['document', 'script', 'stylesheet', 'font', 'image'].includes(r.type);
   const outsidePage = r.url.startsWith('/') && !api;
   const message = `${r.method} ${r.url} → ${outcome}${r.code ? ` ${r.code}` : ''}`;
+  // A dataset an email or spreadsheet sync fills, before its first file: nothing to fix here, and
+  // nothing an assistant could fix — the data arrives when the person sends it.
+  const dataset = r.status === 404 && r.code === 'DATASET_NOT_FOUND' ? DATASET_URL.exec(r.url)?.[1] : undefined;
+  if (dataset && awaited.has(decodeURIComponent(dataset))) {
+    return {
+      check: 'network',
+      rule: 'dataset_waiting',
+      severity: 'info',
+      message: `The data “${decodeURIComponent(dataset)}” is waiting for its first file (it updates by email or from a spreadsheet); the page shows it as soon as the first file arrives`,
+      count: r.count,
+    };
+  }
   if (api && r.method === 'GET' && r.status === 404 && r.code && SDK_EMPTY_READS.has(r.code)) {
     return {
       check: 'network',
@@ -80,7 +94,7 @@ function requestIssue(r: PageSignals['requests'][number]): VerifyIssue {
   };
 }
 
-function addPageSignals(out: Issues, s: PageSignals, ctx: { isPublic: boolean; lockCsp: boolean }): void {
+function addPageSignals(out: Issues, s: PageSignals, ctx: { isPublic: boolean; lockCsp: boolean; awaitedDatasets?: string[] }): void {
   const vp = s.viewport;
   if (s.renderError) {
     out.add({ check: 'render', rule: 'render_failed', severity: 'error', message: s.renderError }, vp);
@@ -160,7 +174,8 @@ function addPageSignals(out: Issues, s: PageSignals, ctx: { isPublic: boolean; l
         + (refusalsSeenByPage ? '; the page\'s own error handling saw the refusal, which real viewers do not get' : ''),
     }, vp);
   }
-  for (const r of s.requests) if (!r.readOnlySkip) out.add(requestIssue(r), vp);
+  const awaited = new Set(ctx.awaitedDatasets ?? []);
+  for (const r of s.requests) if (!r.readOnlySkip) out.add(requestIssue(r, awaited), vp);
   for (const b of s.blocked) {
     if (b.reason === 'csp') {
       out.add({
@@ -366,6 +381,8 @@ export interface ReportInput {
   thumbnailRefreshed: boolean;
   isPublic: boolean;
   lockCsp: boolean;
+  /** Datasets an email/spreadsheet sync fills that have no file yet: a 404 on them is a note. */
+  awaitedDatasets?: string[];
   startedAt: number;
   now?: number;
 }

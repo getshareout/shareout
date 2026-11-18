@@ -244,12 +244,19 @@ const approveVersion: ToolDef = {
   },
 };
 
-interface JobRow { id: string; title: string | null; action: string; trigger_type: string; schedule: string | null; enabled: boolean; next_run_at: string | null; artifact_id: string }
+interface JobRow { id: string; title: string | null; action: string; trigger_type: string; event_type?: string | null; schedule: string | null; enabled: boolean; next_run_at: string | null; artifact_id: string }
+
+/** When a job runs, in words: a schedule, or the event that starts it (an email sync is not a "send"). */
+function whenJobRuns(j: JobRow): string {
+  if (j.trigger_type === 'cron') return `schedule ${j.schedule} UTC`;
+  if (j.action === 'email_sheet_sync') return 'runs when an email with the file arrives at the page’s address (check_email_sync shows it)';
+  return j.event_type ? `runs on ${j.event_type}` : 'runs on an event';
+}
 
 const listJobs: ToolDef = {
   name: 'list_jobs',
-  title: 'Scheduled sends',
-  description: 'Lists scheduled and automatic sends (email, Slack, Telegram, webhooks…). With artifact_id: the schedules on that page — its owner and editors see every shared one plus their own; other people\'s personal subscriptions (their Slack DM, own email) stay private. Without it: the person\'s own schedules, optionally in one workspace. Times are UTC.',
+  title: 'Schedules and automations',
+  description: 'Lists a page’s schedules and automations: scheduled sends (email, Slack, Telegram, webhooks…), spreadsheet syncs, and updates by email. With artifact_id: the schedules on that page — its owner and editors see every shared one plus their own; other people\'s personal subscriptions (their Slack DM, own email) stay private. Without it: the person\'s own schedules, optionally in one workspace. Times are UTC.',
   inputSchema: {
     type: 'object',
     properties: { artifact_id: ARTIFACT_ID, workspace_id: { type: 'string', description: 'Only the person\'s schedules in this workspace (id).' } },
@@ -267,7 +274,7 @@ const listJobs: ToolDef = {
     if (!res.ok) return fail(`Could not list the schedules: ${errorText(body, res.status)}`, { status: res.status, code: body.code });
     const jobs = (body.jobs ?? []) as JobRow[];
     const text = jobs.length
-      ? jobs.map((j) => `- ${j.title || j.action} (${j.action}, ${j.trigger_type === 'cron' ? `schedule ${j.schedule} UTC` : 'on an event'}${j.enabled ? '' : ', paused'}${j.next_run_at ? `, next ${j.next_run_at}` : ''}) id ${j.id}`).join('\n')
+      ? jobs.map((j) => `- ${j.title || j.action} (${j.action}, ${whenJobRuns(j)}${j.enabled ? '' : ', paused'}${j.trigger_type === 'cron' && j.next_run_at ? `, next ${j.next_run_at}` : ''}) id ${j.id}`).join('\n')
       : 'No schedules found.';
     return ok(text, { jobs });
   },

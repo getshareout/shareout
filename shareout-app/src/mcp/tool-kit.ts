@@ -51,9 +51,38 @@ export const NOT_MEMBER = 'The person is not a member of that workspace. Call li
 
 type PropSchema = { type?: string | string[]; enum?: unknown[]; minimum?: number; maximum?: number };
 
-/** Checks arguments against a tool's inputSchema (required, type, enum, range). Returns what is wrong, or null. */
+/** The declared argument closest to a misspelt one ("sender" → "senders", "page" → none). */
+function closestArg(name: string, known: string[]): string | null {
+  const n = name.toLowerCase();
+  const dist = (a: string, b: string) => {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    return d[a.length][b.length];
+  };
+  let best: string | null = null, bestD = 3;
+  for (const k of known) {
+    const d = k.startsWith(n) || n.startsWith(k) ? 1 : dist(n, k.toLowerCase());
+    if (d < bestD) { best = k; bestD = d; }
+  }
+  return best;
+}
+
+/** Checks arguments against a tool's inputSchema (required, type, enum, range, and — when the
+ *  schema says additionalProperties: false — no arguments it does not take). Returns what is wrong, or null. */
 export function validateArgs(schema: Record<string, unknown>, args: Args): string | null {
   const props = (schema.properties ?? {}) as Record<string, PropSchema>;
+  if (schema.additionalProperties === false) {
+    // A misspelt or invented argument was silently ignored before, so the call "worked" without it.
+    const known = Object.keys(props);
+    const unknown = Object.keys(args).find((k) => !(k in props));
+    if (unknown) {
+      const near = closestArg(unknown, known);
+      return `unknown argument “${unknown}”${near ? ` (did you mean “${near}”?)` : ''}. This tool takes: ${known.join(', ') || 'no arguments'}.`;
+    }
+  }
   for (const key of (schema.required ?? []) as string[]) {
     if (args[key] === undefined || args[key] === null) return `${key} is required.`;
   }

@@ -4,9 +4,10 @@
 import type { Env } from '../../types';
 import { getUserRole } from '../../artifacts/roles';
 import { getDestination } from '../../delivery/registry';
+import { problemText } from '../../delivery/types';
 import { isFeatureEnabled } from '../../features/flags';
 import { generateId } from '../../crypto-utils';
-import { enableInbound, disableInbound } from '../../email/inbox-store';
+import { enableInbound, disableInbound, getInboxStatus } from '../../email/inbox-store';
 import { DEST_FEATURE, JOB_LIMIT_PER_USER } from './constants';
 import { getNextRunTime, parseCronSchedule } from './cron';
 import { invalidateViewEventJobCache } from './event-cache';
@@ -29,11 +30,30 @@ import type {
   ScheduledJob,
 } from './types';
 
+// One email sync per page and dataset: a second would answer the same email twice, and the panel
+// shows only one. Checked up front (to name the existing job) and again inside the write itself,
+// so two requests at once cannot both get through.
+const EMAIL_SYNC_FREE = `NOT EXISTS (SELECT 1 FROM scheduled_jobs o WHERE o.artifact_id = ? AND o.action = 'email_sheet_sync'
+  AND json_extract(o.config, '$.dataset') = ? AND o.id != ?)`;
+
+async function emailSyncFilling(env: Env, artifactId: string, dataset: string, exceptJobId: string): Promise<string | null> {
+  const row = await env.DB.prepare(
+    "SELECT id FROM scheduled_jobs WHERE artifact_id = ? AND action = 'email_sheet_sync' AND json_extract(config, '$.dataset') = ? AND id != ? LIMIT 1",
+  ).bind(artifactId, dataset, exceptJobId).first<{ id: string }>();
+  return row?.id ?? null;
+}
+
+const duplicateEmailSync = (dataset: string, id: string) => ({
+  error: `This page already updates “${dataset}” by email (job ${id}). Change that one (PATCH /v1/jobs/${id}) instead of adding another.`,
+  code: 'DUPLICATE_JOB',
+  existingJobId: id,
+});
+
 export async function createJob(
   env: Env,
   userId: string,
   request: CreateJobRequest,
-): Promise<{ job?: ScheduledJob; error?: string }> {
+): Promise<{ job?: ScheduledJob; error?: string; code?: string; existingJobId?: string }> {
   const triggerType = request.trigger_type || 'cron';
   const eventType = request.event_type || null;
 
@@ -90,6 +110,12 @@ export async function createJob(
     }
   }
 
+  const emailDataset = request.action === 'email_sheet_sync' ? String((request.config as { dataset?: unknown } | undefined)?.dataset ?? '') : null;
+  if (emailDataset !== null) {
+    const dup = await emailSyncFilling(env, request.artifact_id, emailDataset, '');
+    if (dup) return duplicateEmailSync(emailDataset, dup);
+  }
+
   const today = new Date().toISOString().split('T')[0];
   const jobCount = await env.DB.prepare(
     "SELECT count FROM rate_limits WHERE principal_type = 'user' AND principal_id = ? AND action = ? AND window_start = ?",
@@ -109,7 +135,7 @@ export async function createJob(
     request.config,
   );
   if (configError) {
-    return { error: configError };
+    return typeof configError === 'string' ? { error: configError } : { error: configError.error, code: configError.code };
   }
   const connectionError = await missingJobConnection(env, request.artifact_id, request.config);
   if (connectionError) {
@@ -135,13 +161,14 @@ export async function createJob(
   const title = typeof request.title === 'string' ? request.title.slice(0, 200) : null;
   const description = typeof request.description === 'string' ? request.description.slice(0, 1000) : null;
 
-  await env.DB.prepare(`
+  const inserted = await env.DB.prepare(`
     INSERT INTO scheduled_jobs (
       id, artifact_id, owner_id, title, description, action, schedule, config,
       trigger_type, event_type, max_attempts, backoff_type, initial_delay,
       next_run_at, enabled
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1
+     WHERE ? IS NULL OR ${EMAIL_SYNC_FREE}
   `).bind(
     id,
     request.artifact_id,
@@ -157,7 +184,15 @@ export async function createJob(
     retryConfig.backoffType,
     retryConfig.initialDelay,
     nextRunAt,
+    emailDataset,
+    request.artifact_id,
+    emailDataset ?? '',
+    id,
   ).run();
+  if (emailDataset !== null && (inserted.meta?.changes ?? 0) === 0) {
+    // Another request created the same email sync between the check above and this write.
+    return duplicateEmailSync(emailDataset, (await emailSyncFilling(env, request.artifact_id, emailDataset, id)) ?? '');
+  }
 
   await env.DB.prepare(`
     INSERT INTO rate_limits (principal_type, principal_id, action, window_start, count)
@@ -259,10 +294,10 @@ export async function deleteJob(
   env: Env,
   userId: string,
   jobId: string,
-): Promise<{ success: boolean; error?: string }> {
-  const job = await env.DB.prepare('SELECT owner_id, artifact_id, trigger_type, event_type FROM scheduled_jobs WHERE id = ?')
+): Promise<{ success: boolean; error?: string; sendersKept?: string[] }> {
+  const job = await env.DB.prepare('SELECT owner_id, artifact_id, action, trigger_type, event_type FROM scheduled_jobs WHERE id = ?')
     .bind(jobId)
-    .first<{ owner_id: string; artifact_id: string; trigger_type: string; event_type: string | null }>();
+    .first<{ owner_id: string; artifact_id: string; action: string; trigger_type: string; event_type: string | null }>();
 
   if (!job) {
     return { success: false, error: 'Job not found' };
@@ -286,6 +321,10 @@ export async function deleteJob(
     }
   }
 
+  // The address stops, but who may send stays saved for the next time it is turned on: say so.
+  if (job.action === 'email_sheet_sync') {
+    return { success: true, sendersKept: (await getInboxStatus(env, job.artifact_id)).allowlist ?? [] };
+  }
   return { success: true };
 }
 
@@ -294,7 +333,7 @@ export async function updateJob(
   userId: string,
   jobId: string,
   updates: { enabled?: boolean; schedule?: string; config?: JobConfig; title?: string | null; description?: string | null },
-): Promise<{ job?: ScheduledJob; error?: string }> {
+): Promise<{ job?: ScheduledJob; error?: string; code?: string; existingJobId?: string }> {
   const job = await env.DB.prepare('SELECT * FROM scheduled_jobs WHERE id = ?')
     .bind(jobId)
     .first<ScheduledJob>();
@@ -326,7 +365,16 @@ export async function updateJob(
     const destination = getDestination(job.action);
     const configError = destination
       && await destination.validate(env, { artifactId: job.artifact_id, createdBy: userId, triggeredVia: 'manual' }, updates.config);
-    if (configError) return { error: configError };
+    if (configError) return { error: problemText(configError) };
+  }
+
+  // Pointing an email sync at data another email sync on the page already fills would make the
+  // duplicate a second create is refused for.
+  const emailDataset = job.action === 'email_sheet_sync' && updates.config
+    ? String((updates.config as { dataset?: unknown }).dataset ?? '') : null;
+  if (emailDataset !== null) {
+    const dup = await emailSyncFilling(env, job.artifact_id, emailDataset, jobId);
+    if (dup) return duplicateEmailSync(emailDataset, dup);
   }
 
   if (updates.enabled === true || updates.config) {
@@ -378,7 +426,12 @@ export async function updateJob(
   params.push(Math.floor(Date.now() / 1000));
   params.push(jobId);
 
-  await env.DB.prepare(`UPDATE scheduled_jobs SET ${sets.join(', ')} WHERE id = ?`).bind(...params).run();
+  const guard = emailDataset !== null ? ` AND ${EMAIL_SYNC_FREE}` : '';
+  if (emailDataset !== null) params.push(job.artifact_id, emailDataset, jobId);
+  const changed = await env.DB.prepare(`UPDATE scheduled_jobs SET ${sets.join(', ')} WHERE id = ?${guard}`).bind(...params).run();
+  if (emailDataset !== null && (changed.meta?.changes ?? 0) === 0) {
+    return duplicateEmailSync(emailDataset, (await emailSyncFilling(env, job.artifact_id, emailDataset, jobId)) ?? '');
+  }
 
   const updated = await env.DB.prepare('SELECT * FROM scheduled_jobs WHERE id = ?')
     .bind(jobId)

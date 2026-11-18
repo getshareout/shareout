@@ -145,6 +145,32 @@ Combiná con cualquier acción para reaccionar cuando llega mail al
 }
 ```
 
+### `email_sheet_sync` — actualizar los datos de un artefacto por email
+
+Alguien manda (o reenvía automáticamente) un Excel o CSV a la dirección propia del artefacto y la
+primera pestaña del archivo reemplaza uno de sus datasets. Solo remitentes permitidos y verificados.
+
+```bash
+# 1. quién puede mandarlo (activa la dirección) → { address, senders }
+curl -X PUT https://shareout.site/v1/artifacts/art_abc123/email-sync/senders \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{ "senders": ["ana@acme.com"] }'
+# 2. qué dataset lee el artefacto → suggestedDataset (null = lee varios: preguntá)
+curl https://shareout.site/v1/artifacts/art_abc123/email-sync -H "Authorization: Bearer $TOKEN"
+# 3. el job → 201 { job, address, senders, warning? }
+curl -X POST https://shareout.site/v1/jobs \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{ "artifact_id": "art_abc123", "action": "email_sheet_sync", "trigger_type": "event",
+        "event_type": "email.received", "title": "Actualizar por email", "config": { "dataset": "ventas" } }'
+```
+
+- Un `warning` en el `201` quiere decir que el artefacto no lee ese dataset: quedaría vacío.
+- Uno por artefacto y dataset: un segundo da `409 DUPLICATE_JOB` con el `job_id` existente.
+- `POST /v1/jobs/{id}/run` responde `409 NOT_RUNNABLE` con la dirección y no cambia nada: corre cuando llega el mail.
+- `GET /v1/artifacts/{id}/email-sync` → `state` (`off` · `inbox_off` · `waiting_first_email` · `ok` · `failed`), un `message` de una línea y `lastRejected` (el último email rechazado y por qué).
+- Borrar el job apaga la dirección y conserva los datos y la lista de remitentes (`senders_kept`).
+- Límites: 8 MB y 100.000 filas por archivo, 25 MB por email, 200 emails por día por artefacto.
+
 ## Reintentos
 
 Agregá `retry_config` para downstreams inestables:
@@ -159,7 +185,7 @@ Agregá `retry_config` para downstreams inestables:
 
 | Acción | Endpoint |
 | --- | --- |
-| Ejecutar ahora | `POST /v1/jobs/{id}/run` |
+| Ejecutar ahora | `POST /v1/jobs/{id}/run` (no `email_sheet_sync`: corre cuando llega el mail) |
 | Pausar | `PATCH /v1/jobs/{id}` → `{ "enabled": false }` |
 | Logs recientes | `GET /v1/jobs/{id}/logs` |
 

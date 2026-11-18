@@ -200,6 +200,21 @@ export const WORKSPACE_AGENT_COMPOSER_STYLES = `/* ---- agent dock (inside canva
 @keyframes wsx-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 45%, transparent); } 70% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-success) 0%, transparent); } 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 0%, transparent); } }
 @media (max-width: 1100px) { .wsx__body { grid-template-columns: var(--wsx-rail) minmax(0,1fr); } .wsx__activity { display: none; } }
 @media (max-width: 720px) { .wsx__body { grid-template-columns: minmax(0, 1fr); } }
+/* <=1100px: the right rail is a bottom sheet the artifact bar's "Options" opens (inspector.ts inspSheet). */
+.wsx__inspbtn, .wsx__inspclose { display: none; }
+.wsx__inspscrim { position: fixed; inset: 0; z-index: 44; background: color-mix(in srgb, var(--color-text) 24%, transparent); }
+.wsx__inspscrim[hidden] { display: none; }
+@media (max-width: 1100px) {
+  .wsx__inspbtn:not([hidden]) { display: inline-flex; align-items: center; gap: 6px; flex: none; height: 32px; padding: 0 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); font: 600 var(--text-sm) var(--font-body); cursor: pointer; }
+  .wsx__inspbtn svg { width: 16px; height: 16px; }
+  .wsx.is-insp-open .wsx__activity { display: flex; position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 45; height: min(86vh, 760px); margin: 0; border-radius: var(--radius-xl) var(--radius-xl) 0 0; background: var(--color-bg-elevated); }
+  .wsx.is-insp-open .wsx__rtabs { padding-right: 48px; }
+  .wsx.is-insp-open .wsx__acthandle { display: none; }
+  .wsx.is-insp-open .wsx__inspclose { display: grid; place-items: center; position: absolute; top: 8px; right: 8px; z-index: 2; width: 32px; height: 32px; border: 0; border-radius: 50%; background: var(--color-surface); color: var(--color-text-secondary); cursor: pointer; }
+  .wsx__inspclose svg { width: 16px; height: 16px; }
+}
+/* A phone is already a phone: the mobile-preview toggle only crowds the bar. */
+@media (max-width: 720px) { #wsxTabDevice { display: none; } }
 @media (prefers-reduced-motion: reduce) { .wsx__live-dot { animation: none; } }
 
 /* ===== Home: contextual inspector hidden — canvas gets the room ===== */

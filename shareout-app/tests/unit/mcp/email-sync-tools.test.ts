@@ -47,12 +47,16 @@ describe('update by email over MCP', () => {
   it('asks for the sender first, refuses a bad address in plain words, then turns on and gives the address', async () => {
     const first = await call(alice, 'set_email_sync', { artifact_id: ART });
     expect(first.isError).toBe(true);
-    expect(text(first)).toMatch(/ask the person who will send the file/);
-    expect(first.structuredContent).toMatchObject({ needs_senders: true, suggested: alice.email });
+    expect(text(first)).toMatch(/First ask who will send the file/);
+    expect(text(first)).toContain(alice.email);
+    expect(first.structuredContent).toMatchObject({ code: 'NEEDS_SENDERS', needs_senders: true, suggested: alice.email });
 
     expect(text(await call(alice, 'set_email_sync', { artifact_id: ART, senders: ['@gmail.com'] }))).toMatch(/whole free-mail domain/);
 
-    const on = await call(alice, 'set_email_sync', { artifact_id: ART, senders: ['ana@acme.com'] });
+    // The page already has 'ventas' (uploaded, not emailed): each file would replace it, so it asks first.
+    const guard = await call(alice, 'set_email_sync', { artifact_id: ART, senders: ['ana@acme.com'] });
+    expect(guard.structuredContent).toMatchObject({ code: 'DATASET_EXISTS', dataset: 'ventas', row_count: 1 });
+    const on = await call(alice, 'set_email_sync', { artifact_id: ART, senders: ['ana@acme.com'], replace_existing: true });
     expect(on.isError).toBeFalsy();
     const address = String(on.structuredContent!.address);
     expect(address).toMatch(/@inbox\./);

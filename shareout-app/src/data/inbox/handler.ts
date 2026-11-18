@@ -51,18 +51,22 @@ function isStringArray(v: unknown): v is string[] {
 
 // While the page updates its data by email, the list is what keeps strangers out: it cannot be
 // emptied, and a whole free-mail domain (anyone with a Gmail address) is refused, as at job creation.
-const SENDERS_REQUIRED = Errors.validation('allowlist', 'This page updates its data by email, so keep at least one allowed sender (or remove the email sync first).', { example: '["person@company.com"]' });
-const FREE_MAIL_REFUSED = (entry: string) => Errors.validation('allowlist', `"${entry}" would let anyone with such an address update this page by email. List the exact addresses instead.`, { example: '["person@gmail.com"]' });
+// Same codes as PUT /v1/artifacts/{id}/email-sync/senders, so one mistake has one code on both.
+const SENDERS_REQUIRED = (id: string) => ({ code: 'NO_SENDERS', status: 400, param: 'allowlist', message: 'This page updates its data by email, so keep at least one allowed sender (or remove the email sync first).', suggestion: `PUT /v1/artifacts/${id}/email-sync/senders with {"senders": ["person@company.com"]}` });
+const FREE_MAIL_REFUSED = (entry: string) => ({ code: 'FREE_MAIL_DOMAIN', status: 400, param: 'allowlist', message: `"${entry}" would let anyone with such an address update this page by email. List the exact addresses instead.`, suggestion: `["ana@${entry.replace(/^@/, '')}"]` });
+// The address is how the file gets in: switching it off would silently stop the page updating.
+const SYNC_NEEDS_INBOX = { code: 'EMAIL_SYNC_ACTIVE', status: 409, message: 'This page updates its data by email, so its address has to stay on. Remove the email sync first (DELETE /v1/jobs/{jobId}) if it should stop.' };
+
+const emailSyncJob = (ctx: DataContext) => ctx.env.DB.prepare(
+  "SELECT id FROM scheduled_jobs WHERE artifact_id = ? AND action = 'email_sheet_sync' LIMIT 1"
+).bind(ctx.artifactId).first<{ id: string }>();
 
 async function emailSyncRefuses(ctx: DataContext, allowlist: string[] | null) {
   const entries = (allowlist || []).map((s) => s.trim().toLowerCase()).filter(Boolean);
   const free = entries.find(isFreeMailDomain);
   if (entries.length && !free) return null;
-  const job = await ctx.env.DB.prepare(
-    "SELECT 1 AS x FROM scheduled_jobs WHERE artifact_id = ? AND action = 'email_sheet_sync' LIMIT 1"
-  ).bind(ctx.artifactId).first<{ x: number }>();
-  if (!job) return null;
-  return free ? FREE_MAIL_REFUSED(free) : SENDERS_REQUIRED;
+  if (!(await emailSyncJob(ctx))) return null;
+  return free ? FREE_MAIL_REFUSED(free) : SENDERS_REQUIRED(ctx.artifactId);
 }
 
 export async function handleInbox(
@@ -93,6 +97,8 @@ export async function handleInbox(
   }
 
   if (path === '/disable' && request.method === 'POST') {
+    const job = await emailSyncJob(ctx);
+    if (job) return errorResponse({ ...SYNC_NEEDS_INBOX, message: SYNC_NEEDS_INBOX.message.replace('{jobId}', job.id) }, ctx.origin);
     await disableInbound(ctx.env, ctx.artifactId);
     return successResponse({ enabled: false }, 200, ctx.origin);
   }

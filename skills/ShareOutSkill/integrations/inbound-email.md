@@ -26,9 +26,14 @@ event-triggered jobs run (webhook, telegram, slack, email, crew, …)
   operator's `EMAIL_INBOX_DOMAIN` override. Don't guess it — read `status.address`
   from `sdk.inbox.enable()`. Plus-addressing works: `expensas+enero@inbox.shareout.site`
   delivers to the same inbox with `tag = "enero"`.
-- **Opt-in:** receiving is OFF until enabled. It turns on automatically when you
-  create the first `email.received` trigger, or explicitly via `sdk.inbox.enable()`.
-  It turns off when the last `email.received` trigger is removed.
+- **Opt-in:** receiving is OFF until something turns it on:
+  - `PUT /v1/artifacts/{id}/email-sync/senders` (Update by email) — turns it on and sets who may send;
+  - creating an `email.received` job — turns it on;
+  - `sdk.inbox.enable()` / `POST /v1/data/{id}/inbox/enable` — turns it on.
+
+  Deleting the last `email.received` job turns it off, but **keeps the sender list** for next
+  time. While a page updates by email (`email_sheet_sync`), `POST /v1/data/{id}/inbox/disable`
+  is refused (`409 EMAIL_SYNC_ACTIVE`): remove the email sync instead.
 
 ## Enable & read (SDK)
 
@@ -74,30 +79,82 @@ POST /v1/jobs
 The person emails (or auto-forwards) an Excel or CSV file to the page's address, and the page's
 numbers update by themselves: no sign-in, nothing to install. It is the `email_sheet_sync` job
 ([config](../api/jobs.md#emailsheetsyncconfig)); the Inspector has the same thing under
-Automate → **Update by email** (Spanish: **Actualizar por email**).
+Automate → **Update by email** (Spanish: **Actualizar por email**). Over MCP, `set_email_sync`
+does steps 2–4 in one call (it picks the dataset the page reads) and `check_email_sync` does step 6
+([mcp-connector.md](mcp-connector.md)).
 
 Guide the person, one question at a time, in their words. Never show them config, ids, dataset
 names, "job", "DMARC" or "allowlist":
 
-1. **Ask who sends the file** ("Who will send the Excel? Their email address."). Default to the
-   person themselves. Exact addresses only; a whole `@gmail.com` is refused.
-2. `PUT /v1/artifacts/{id}/email-sync/senders { "senders": [...] }` → it answers with `address`.
-3. `POST /v1/jobs` with `action: "email_sheet_sync"`, `trigger_type: "event"`,
-   `event_type: "email.received"`, `config: { "dataset": <the page's dataset> }` — first tab and
-   any `.xlsx`/`.csv` attachment by default. `GET /v1/artifacts/{id}/email-sync` → `datasets`
-   lists the page's datasets, most recently written first; use the one the page reads.
-4. **Give them the address ready to copy** and say what happens: "Send the Excel to
-   `ventas-x1@inbox.shareout.site` from ana@acme.com. The page updates a few seconds later."
-   Mention they can set up an automatic forward in Gmail or Outlook if the file arrives by email anyway.
-5. **Confirm it worked** once they say they sent it: `GET /v1/artifacts/{id}/email-sync` →
-   `lastUpdate.rowCount` ("Got it: 365 rows updated at 10:32"), or `job.lastError` — one plain
-   sentence with what to do, in the owner's language. Read it to them as is.
+1. **Ask who sends the file** ("Who will send the Excel? Their email address."). Suggest the
+   person's own address (`you` in the status). Exact addresses only; a whole `@gmail.com` is refused.
+2. `PUT /v1/artifacts/{id}/email-sync/senders { "senders": [...] }` (one address may be a plain
+   string) → it answers with `address`.
+3. **Pick the dataset the page reads.** `GET /v1/artifacts/{id}/email-sync` → `suggestedDataset`:
+   the one the live page reads (`reads`) when it reads exactly one — use it without asking. `null`
+   means the page reads several: ask in plain words which table the file fills. Writing a dataset
+   the page does not read leaves the page empty with no error, so never guess.
+4. `POST /v1/jobs` with `action: "email_sheet_sync"`, `trigger_type: "event"`,
+   `event_type: "email.received"`, `config: { "dataset": <suggestedDataset> }` — first tab and
+   any `.xlsx`/`.csv` attachment by default. The `201` carries `address`, `senders` and, when the
+   page does not read that dataset, a `warning` to fix before going on. A second job for the same
+   page and dataset is `409 DUPLICATE_JOB` with the existing `job_id`.
+5. **Give them the address ready to copy** and say what happens, in three steps: open your mail;
+   write a new email to `ventas-x1@inbox.shareout.site` from ana@acme.com; attach the Excel and
+   send. Subject and text do not matter; the first tab's first row is the column titles; **the
+   file replaces the data** the page shows. If the file reaches them by email anyway, an Outlook
+   rule can forward it (add the original sender to the list); Gmail's automatic forwarding needs a
+   confirmation the page's address cannot answer yet. Give them the page link at the end.
+6. **Confirm it worked** once they say they sent it: `GET /v1/artifacts/{id}/email-sync` →
+   `state` and `message` (one line, their language). `ok` + `lastUpdate.rowCount` ("Got it: 365
+   rows updated at 10:32"); `failed` + `job.lastError` — one plain sentence with what to do, read
+   it to them as is; `waiting_first_email` + `lastRejected` — the mail was bounced (below).
+
+`POST /v1/jobs/{id}/run` does not apply: the job runs when mail arrives, so it answers
+`409 NOT_RUNNABLE` with the address and changes nothing.
+
+### In the page
+
+The page reads the data with the SDK. `get()` returns `[]` until the first file arrives, so the
+page shows an empty state instead of breaking:
+
+```html
+<script src="/sdk/shareout.js"></script>
+<script>(async () => { const sdk = await ShareOut.create();
+  const rows = await sdk.dataset('ventas').get();   // [] until the first file arrives
+  /* draw rows */ })();</script>
+```
+
+`(await sdk.dataset('ventas').metadata()).updatedAt` is when the rows last changed — show it
+("Updated today 10:32"). `verify_artifact` treats a page that is only waiting for its first file
+as a note, not a failure.
+
+### Limits
+
+| | |
+|---|---|
+| File | 8 MB, up to 100,000 rows; `.xlsx` or `.csv` |
+| Email | 25 MB |
+| Emails per page | 200 a day |
+
+The same numbers are in the status (`limits`).
+
+### When a file does not arrive
 
 Mail from anyone not on the list is bounced back to the sender ("Sender not permitted"), and so
-is mail whose sender can't be verified (sent through another account or an unusual forwarder):
-then ask them to send it straight from the allowed mailbox, or add the address that actually sends it.
-A file that can't be used (no attachment, wrong type, tab not found, too big) keeps the page's
-previous data and emails the owner why.
+is mail whose sender can't be verified (sent through another account or an unusual forwarder),
+mail over 25 MB, mail past the daily limit and mail to a switched-off address. The last one
+bounced is kept: `lastRejected` (`from`, `reason`: `not_allowed` · `unverified` · `too_large` ·
+`rate_limited` · `inbox_off`, `at`, and a `message` saying what to do). Then ask them to send it
+straight from the allowed mailbox, or add the address that actually sends it.
+A file that can't be used (no attachment, wrong type, tab not found, headers but no rows, too big)
+keeps the page's previous data and emails the owner why (`state: failed`).
+
+`state: inbox_off` means the sync exists but the address is off: `PUT …/email-sync/senders`
+with the same list turns it back on.
+
+Stopping (`DELETE /v1/jobs/{id}`) turns the address off and keeps the page's data and the sender
+list (`senders_kept` in the answer).
 
 ## Management API
 
@@ -105,7 +162,9 @@ previous data and emails the owner why.
 |--------|------|-------|
 | GET | `/v1/data/{id}/inbox/status` | `{ enabled, address, allowlist, receivedToday }` |
 | POST | `/v1/data/{id}/inbox/enable` | owner/editor; body `{ allowlist?: string[] }` |
-| POST | `/v1/data/{id}/inbox/disable` | owner/editor |
+| POST | `/v1/data/{id}/inbox/disable` | owner/editor; `409 EMAIL_SYNC_ACTIVE` while the page updates by email |
+| GET | `/v1/artifacts/{id}/email-sync` | Update by email status: `address`, `senders`, `reads`, `suggestedDataset`, `state`, `message`, `job`, `lastEmail`, `lastUpdate`, `lastRejected`, `limits` |
+| GET / PUT | `/v1/artifacts/{id}/email-sync/senders` | `{ address, senders }`; PUT `{ senders: string[] \| string }` turns the address on |
 | PUT | `/v1/data/{id}/inbox/allowlist` | owner/editor; `{ allowlist: string[] \| null }` |
 | GET | `/v1/data/{id}/inbox/messages` | newest first; `?limit=&before=` |
 | GET | `/v1/data/{id}/inbox/messages/{msgId}` | full bodies + attachment metadata |

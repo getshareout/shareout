@@ -238,11 +238,15 @@ describe('email_sheet_sync — the action re-checks everything itself', () => {
 describe('email_sheet_sync — setting it up', () => {
   it('cannot be created while nobody is allowed to send, or with a whole free-mail domain', async () => {
     const make = (artifact_id: string) => createJob(e, OWNER, { artifact_id, action: 'email_sheet_sync', trigger_type: 'event', event_type: 'email.received', config: { dataset: 'd' } });
-    expect((await make(BARE)).error).toMatch(/Add at least one allowed sender first/);
+    const none = await make(BARE);
+    expect(none).toMatchObject({ code: 'NO_SENDERS' });
+    expect(none.error).toMatch(/Add who may send the file first: PUT \/v1\/artifacts\/art_ess_bare\/email-sync\/senders/);
     as(OWNER);
     expect((await api(BARE, 'PUT', { senders: ['ana@acme.test'] }, '/senders'))?.status).toBe(200);
     await setInboundAllowlist(e, BARE, ['ana@acme.test', 'gmail.com']);
-    expect((await make(BARE)).error).toMatch(/"gmail\.com" would let anyone/);
+    const free = await make(BARE);
+    expect(free).toMatchObject({ code: 'FREE_MAIL_DOMAIN' });
+    expect(free.error).toMatch(/“gmail\.com” would let anyone/);
   });
 
   it('runs only on email.received', async () => {

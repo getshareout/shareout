@@ -82,6 +82,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Scheduled notifications | [api/jobs.md](api/jobs.md) | [api/overview.md](api/overview.md) |
 | Deterministic warehouse/json snapshot refresh | [api/jobs.md](api/jobs.md#querysnapshotconfig) | [agents/crew.md](agents/crew.md), [sdk/connections.md](sdk/connections.md) |
 | Keep a page's data in sync with a Google Sheet / Excel in Drive (shared link or private file) | [integrations/spreadsheet-sync.md](integrations/spreadsheet-sync.md) | [api/jobs.md](api/jobs.md#publicsheetsyncconfig), [sdk/datasets.md](sdk/datasets.md) |
+| Update a page's data by emailing it an Excel/CSV (no Google, no sign-in) | [integrations/inbound-email.md](integrations/inbound-email.md#update-a-pages-data-by-email) | [api/jobs.md](api/jobs.md#emailsheetsyncconfig), [sdk/datasets.md](sdk/datasets.md), [integrations/mcp-connector.md](integrations/mcp-connector.md) |
 | Check a published page: what viewers see, what broke (desktop + phone) | [api/verify.md](api/verify.md) | [creating/pre-ship.md](creating/pre-ship.md) |
 | Add a safety net / test an artifact won't break on change | [api/tests.md](api/tests.md) | [sdk/table.md](sdk/table.md), [sdk/json.md](sdk/json.md) |
 | Alert when a metric/KPI crosses a threshold | [api/metric-alerts.md](api/metric-alerts.md) | [patterns/dashboards.md](patterns/dashboards.md#followable-kpis-metric-alerts) |

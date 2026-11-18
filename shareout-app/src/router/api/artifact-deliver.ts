@@ -4,6 +4,7 @@
 import type { Env } from '../../types';
 import type { AuthUser } from '../../api-auth';
 import { getDestination } from '../../delivery/registry';
+import { problemText } from '../../delivery/types';
 import { executeJobAction } from '../../scheduling/jobs/runner';
 import { checkViewerSelfDelivery } from '../../scheduling/jobs/permissions';
 import type { JobAction, JobConfig } from '../../scheduling/jobs/types';
@@ -113,7 +114,7 @@ export async function handleDeliverNow(
   if (!destination) return jsonError('Unknown action', 'VALIDATION_ERROR', 400);
   const ctx = { artifactId, createdBy: user.id, triggeredVia: 'manual' as const };
   const configError = await destination.validate(env, ctx, config);
-  if (configError) return jsonError(configError, 'VALIDATION_ERROR', 400);
+  if (configError) return jsonError(problemText(configError), typeof configError === 'string' ? 'VALIDATION_ERROR' : configError.code, 400);
 
   const result = await executeJobAction(env, action, artifactId, user.id, config, 'manual');
   if (!result.success) return jsonError(result.error || 'Delivery failed', 'DELIVERY_FAILED', 502);

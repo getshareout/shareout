@@ -291,6 +291,7 @@ export async function runVerify(
   }
   const result = buildResult({
     id,
+    awaitedDatasets: await awaitedDatasets(env, artifact.id),
     artifactId: artifact.id,
     versionNo: version.version_no,
     versionId: version.id,
@@ -346,4 +347,14 @@ export function presentResult(result: VerifyResult, origin: string): VerifyResul
       screenshot: v.screenshot ? { ...v.screenshot, url: `${origin}${v.screenshot.path}` } : null,
     })),
   };
+}
+
+/** Datasets a sync (email or spreadsheet) fills that do not exist yet: the page waits for the first file. */
+async function awaitedDatasets(env: Env, artifactId: string): Promise<string[]> {
+  const { results } = await env.DB.prepare(
+    `SELECT DISTINCT json_extract(j.config, '$.dataset') AS name FROM scheduled_jobs j
+      WHERE j.artifact_id = ? AND j.enabled = 1 AND j.action IN ('email_sheet_sync', 'public_sheet_sync', 'drive_file_sync')
+        AND NOT EXISTS (SELECT 1 FROM datasets d WHERE d.artifact_id = j.artifact_id AND d.name = json_extract(j.config, '$.dataset'))`,
+  ).bind(artifactId).all<{ name: string | null }>();
+  return (results ?? []).map((r) => r.name).filter((n): n is string => typeof n === 'string' && !!n);
 }

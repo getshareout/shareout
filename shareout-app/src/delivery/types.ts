@@ -38,6 +38,11 @@ export interface DeliveryContext {
 export interface Destination<C = unknown> {
   kind: string;
   /** Returns an error string when the config is invalid, else null. */
-  validate(env: Env, ctx: DeliveryContext, config: C): Promise<string | null>;
+  /** What is wrong with `config`, or null. A `{ error, code }` gives callers a stable code to branch on. */
+  validate(env: Env, ctx: DeliveryContext, config: C): Promise<string | ConfigProblem | null>;
   deliver(env: Env, ctx: DeliveryContext, config: C): Promise<DeliveryResult>;
 }
+
+export interface ConfigProblem { error: string; code: string }
+
+export const problemText = (p: string | ConfigProblem): string => (typeof p === 'string' ? p : p.error);

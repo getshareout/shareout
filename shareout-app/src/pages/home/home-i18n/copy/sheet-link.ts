@@ -3,7 +3,7 @@ import type { HomeLocaleCopy } from '../types';
 /** Inspector → Automate → "Sync from a shared link" (public_sheet_sync). Reuses dsync.* for the shared fields. */
 export const SHEET_LINK_COPY: HomeLocaleCopy = {
   en: {
-    'slink.tile': 'Sync from a shared link',
+    'slink.tile': 'From a link',
     'slink.tileSub': 'A Google Sheet anyone with the link can view',
     'slink.title': 'Sync data from a shared Google link',
     'slink.intro': 'Paste the share link of a Google Sheet, or of an Excel file in Google Drive. We load one tab into a dataset this page reads, as often as you choose. No Google sign-in.',
@@ -26,7 +26,7 @@ export const SHEET_LINK_COPY: HomeLocaleCopy = {
     'sched.dest.public_sheet_sync': 'Link sync',
   },
   es: {
-    'slink.tile': 'Sincronizar desde un enlace',
+    'slink.tile': 'Desde un enlace',
     'slink.tileSub': 'Una planilla de Google que cualquiera con el enlace puede ver',
     'slink.title': 'Sincronizar datos desde un enlace de Google',
     'slink.intro': 'Pegá el enlace para compartir de una planilla de Google, o de un Excel en Google Drive. Cargamos una pestaña en un dataset que este artefacto lee, con la frecuencia que elijas. Sin iniciar sesión en Google.',

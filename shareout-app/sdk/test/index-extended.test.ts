@@ -343,6 +343,19 @@ describe('Dataset.get — whole extract direct-from-R2 (008 Stage B2)', () => {
 
     expect(await sdk().dataset('sales').get()).toEqual([{ solo: true }]);
   });
+
+  it('a dataset that does not exist yet (no file has arrived) reads as no rows; other errors still throw', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (/\/datasets\/ventas(\/|$|\?)/.test(url)) {
+        return jsonResponse({ success: false, error: 'Dataset not found', code: 'DATASET_NOT_FOUND' }, 404);
+      }
+      return jsonResponse({ success: false, error: 'No access', code: 'FORBIDDEN' }, 403);
+    }));
+
+    expect(await sdk().dataset('ventas').get()).toEqual([]);
+    await expect(sdk().dataset('ventas').metadata()).rejects.toMatchObject({ code: 'DATASET_NOT_FOUND' });
+    await expect(sdk().dataset('privado').get()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
 });
 
 describe('SWR cache revalidation', () => {

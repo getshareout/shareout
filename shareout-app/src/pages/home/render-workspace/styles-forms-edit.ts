@@ -24,7 +24,20 @@ export const WORKSPACE_FORMS_EDIT_STYLES = `/* ---- Modal + native create forms 
 .wsx-slink__warn { display: grid; gap: 6px; justify-items: start; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent); border-radius: var(--radius-md); background: var(--color-warning-light); color: var(--color-text); font-size: var(--text-sm); }
 .wsx-slink__warn p { margin: 0; }
 .wsx-esync__addr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-secondary, var(--color-bg)); }
-.wsx-esync__addr code { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; font: 600 var(--text-sm) var(--font-mono, monospace); color: var(--color-text); }
+.wsx-esync__addr code { flex: 1 1 200px; min-width: 0; overflow-x: auto; font: 600 var(--text-sm) var(--font-mono, monospace); color: var(--color-text); }
+.wsx-esync__nb { white-space: nowrap; }
+.wsx-esync__acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.wsx-esync__acts a.wsx-abtn { text-decoration: none; }
+.wsx-esync__steps { margin: 0; padding-left: 24px; list-style: decimal outside; font-size: var(--text-sm); color: var(--color-text); }
+.wsx-esync__steps li { display: list-item; margin: 0 0 6px; padding-left: 2px; }
+.wsx-esync__steps li::marker { font-weight: 600; }
+.wsx-esync__fine { font-size: var(--text-xs); }
+.wsx-esync__st.is-wait { background: var(--color-bg-secondary, var(--color-bg)); color: var(--color-text); }
+.wsx-esync__dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--color-primary); vertical-align: middle; animation: wsxEsPulse 1.4s ease-in-out infinite; }
+@keyframes wsxEsPulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .wsx-esync__dot { animation: none; } }
+/* "Turn on" / "Close" stay in view on a short phone screen while the form scrolls. */
+.wsx-esync__foot { position: sticky; bottom: -18px; z-index: 1; margin: 0 -18px -18px; padding: 12px 18px; border-top: 1px solid var(--color-border); background: var(--color-bg-elevated); }
 .wsx-esync__st { display: grid; gap: 2px; padding: 10px 12px; border-radius: var(--radius-md); font-size: var(--text-sm); }
 .wsx-esync__st p { margin: 0; }
 .wsx-esync__st.is-ok { background: color-mix(in srgb, var(--color-success) 12%, transparent); }

@@ -6,21 +6,18 @@ into one of the page's **datasets** on a schedule; the page reads it with
 `sdk.dataset(name).get()` ([sdk/datasets.md](../sdk/datasets.md)). The Inspector does the same
 thing under **Automate → Sync data**.
 
-Two ways in, one question decides:
+Three ways in. One question decides between the first two; the third is for a file that is not
+in Google at all — it arrives by email, or lives on someone's computer:
 
 | The file… | Way | Job action | Who clicks what |
 |---|---|---|---|
 | may be seen by anyone who has its link | **Shared link** | `public_sheet_sync` | The person sets the file to "Anyone with the link" in Google and gives you the link. No Google sign-in. |
 | is private (personal, confidential, internal) | **Private file** | `drive_file_sync` | The person opens a link you give them and **picks the file in Google**, once. ShareOut can then read only that file. |
+| is an Excel/CSV someone emails (or could) | **By email** | `email_sheet_sync` | The person (or whoever sends it) emails the file to the page's own address; each file replaces the data. No Google, no sign-in. MCP `set_email_sync`; guide: [inbound-email.md](inbound-email.md#update-a-pages-data-by-email). |
 
-Both need owner or editor access to the page, and the page must be inside a workspace.
+All three need owner or editor access to the page, and the page must be inside a workspace.
 Each run writes the tab as JSON rows keyed by the header row; when nothing changed, the run
-skips the write.
-
-The file is not in Google at all — it arrives by email, or lives on someone's computer? A third
-way needs no Google: they email the Excel/CSV to the page's own address and the page updates
-(`email_sheet_sync`, MCP `set_email_sync`). See
-[inbound-email.md](inbound-email.md#update-a-pages-data-by-email).
+skips the write. The rest of this page is about the two Google ways; email has its own guide.
 
 ## Guide the person, don't configure at them
 
@@ -96,10 +93,17 @@ GET  /v1/workspaces/{ws}/file-imports/sheet-sync/pick?return=assistant[&file=<id
 POST /v1/jobs        { artifact_id, action, schedule, config, title }      → 201 { job }
 POST /v1/jobs/{id}/run                                                     → { execution: { status, error } }
 PATCH /v1/jobs/{id}  { config?, schedule? }  ·  DELETE /v1/jobs/{id}
+
+# By email (no schedule: it runs when the file arrives)
+PUT  /v1/artifacts/{id}/email-sync/senders   { "senders": ["ana@acme.com"] }  → { address, senders }
+GET  /v1/artifacts/{id}/email-sync                                         → { suggestedDataset, reads, state, message, … }
+POST /v1/jobs  { artifact_id, action: "email_sheet_sync", trigger_type: "event", event_type: "email.received", config: { dataset } }
+                                                                           → 201 { job, address, senders, warning? }
 ```
 
 Config shapes: [api/jobs.md#publicsheetsyncconfig](../api/jobs.md#publicsheetsyncconfig) and
-[api/jobs.md#drivefilesyncconfig](../api/jobs.md#drivefilesyncconfig). Schedules are cron in
+[api/jobs.md#drivefilesyncconfig](../api/jobs.md#drivefilesyncconfig), and
+[api/jobs.md#emailsheetsyncconfig](../api/jobs.md#emailsheetsyncconfig). Schedules are cron in
 **UTC**, one-hour granularity ([api/jobs.md](../api/jobs.md)).
 
 What an API token may do (same as the person it belongs to):
@@ -126,7 +130,7 @@ What an API token may do (same as the person it belongs to):
 ```js
 const sdk = await ShareOut.create();
 const ds = sdk.dataset('sales_2026');
-const rows = await ds.get();                          // [{ Region: 'North', Sales: 120 }, …]
+const rows = await ds.get();                          // [{ Region: 'North', Sales: 120 }, …]; [] before the first load
 const { updatedAt } = await ds.metadata();            // when the rows last changed
 ```
 

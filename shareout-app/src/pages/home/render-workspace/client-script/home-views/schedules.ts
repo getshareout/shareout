@@ -11,6 +11,27 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
     var k = action ? ('sched.dest.' + action) : 'sched.dest.run';
     return [t(k), SCHED_DEST_ICO[action] || 'doc'];
   }
+  // An email update reads in the viewer's language even when set up in another (its default title is ours),
+  // says when it runs in plain words (never the event's code) and has no "Run now": only an email runs it.
+  var SCHED_ES_TITLES = ['Update by email', 'Actualizar por email'];
+  function schedTitle(j) {
+    if (j.action === 'email_sheet_sync' && (!j.title || SCHED_ES_TITLES.indexOf(j.title) !== -1)) return t('esync.jobTitle');
+    return j.title || (schedDest(j.action)[0] + (j.artifact_name ? ' \\u00b7 ' + j.artifact_name : ''));
+  }
+  function schedWhen(j) {
+    if (j.action === 'email_sheet_sync') return t('esync.rowSub');
+    if (j.trigger_type === 'event') return j.event_type === 'email.received' ? t('adet.onEmail') : t('adet.onEvent').replace('{event}', j.event_type || '');
+    return cronHuman(j.schedule);
+  }
+  function schedRunnable(j) { return j.action !== 'email_sheet_sync'; }
+  // The page's address for its emailed file (owners/editors only; nothing shows otherwise).
+  function schedEmailAddr(j, el) {
+    if (!el || !j.artifact_id) return;
+    fetch('/v1/artifacts/' + encodeURIComponent(j.artifact_id) + '/email-sync', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d && d.address && el.isConnected) { el.textContent = d.address; el.hidden = false; } })
+      .catch(function () {});
+  }
   var SCHED_ICON = {
     mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
     chat: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
@@ -160,7 +181,7 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
           var cfg = j.config || {};
           var src = cfg.connection || cfg.bqConnection || '';
           var st = j.last_status || ''; var cls = st === 'success' ? 'ok' : (st === 'failed' ? 'fail' : '');
-          var title = j.title || (meta[0] + (j.artifact_name ? ' · ' + j.artifact_name : ''));
+          var title = schedTitle(j);
           var flow = '';
           if (j.artifact_name) flow += schedChip(j.artifact_name, 'doc', 'is-origin');
           if (src) flow += '<span class="wsx-sched__arrow">' + isvg('<path d="M5 12h14M13 6l6 6-6 6"/>') + '</span>' + schedChip(src, 'db', '');
@@ -170,15 +191,17 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
             + '<div class="wsx-sched__head"><button class="wsx-sched__title wsx-sched__open" type="button" data-sched-open>' + esc(title) + '</button>'
             +   (st && !paused ? '<span class="wsx-sched__badge ' + cls + '">' + esc(st) + '</span>' : '<span class="wsx-sched__badge">' + esc(paused ? t('sched.badgePaused') : t('sched.badgeIdle')) + '</span>') + '</div>'
             + '<div class="wsx-sched__flow">' + flow + '</div>'
-            + '<div class="wsx-sched__meta"><span class="wsx-sched__when">' + isvg(SCHED_ICON.clock) + esc(cronHuman(j.schedule)) + '</span>'
+            + '<div class="wsx-sched__meta"><span class="wsx-sched__when">' + isvg(SCHED_ICON[j.action === 'email_sheet_sync' ? 'mail' : 'clock']) + esc(schedWhen(j)) + '</span>'
+            +   (j.action === 'email_sheet_sync' ? '<code class="wsx-sched__addr" data-es-addr hidden></code>' : '')
             +   (j.last_run_at ? '<span>' + esc(t('sched.lastRun')) + ' ' + esc(whenAgo(j.last_run_at)) + '</span>' : '')
-            +   (j.next_run_at ? '<span>' + esc(t('sched.next')) + ' ' + esc(whenAgo(j.next_run_at)) + '</span>' : '') + '</div>'
+            +   (j.next_run_at && j.trigger_type !== 'event' ? '<span>' + esc(t('sched.next')) + ' ' + esc(whenAgo(j.next_run_at)) + '</span>' : '') + '</div>'
             + (st === 'failed' && j.last_error ? '<div class="wsx-runst is-fail" data-last-err>' + esc(j.last_error) + '</div>' : '')
             + '<div class="wsx-runbars" data-runs="' + esc(j.id) + '"><span class="wsx-sched__noruns">' + esc(t('sched.loadingRuns')) + '</span></div>'
-            + '<div class="wsx-sched__actions"><button class="wsx-abtn" data-sched-run type="button">' + esc(t('sched.runNow')) + '</button>' + autoCardButtons(!paused) + '<span class="wsx-runst" aria-live="polite"></span></div>'
+            + '<div class="wsx-sched__actions">' + (schedRunnable(j) ? '<button class="wsx-abtn" data-sched-run type="button">' + esc(t('sched.runNow')) + '</button>' : '') + autoCardButtons(!paused) + '<span class="wsx-runst" aria-live="polite"></span></div>'
             + '</div>';
         }).join('');
         m.querySelectorAll('[data-runs]').forEach(function (host) { loadJobLogs(host.getAttribute('data-runs'), host); });
+        jobs.forEach(function (j) { if (j.action === 'email_sheet_sync') schedEmailAddr(j, m.querySelector('[data-job="' + j.id + '"] [data-es-addr]')); });
         m.querySelectorAll('[data-sched-run]').forEach(function (b) { b.addEventListener('click', function () { runJobNow(b); }); });
         m.querySelectorAll('[data-sched-open]').forEach(function (b) { b.addEventListener('click', function () { schedOpen(b.closest('[data-job]').getAttribute('data-job')); }); });
         wireOpenCards(m, 'data-job', schedOpen);

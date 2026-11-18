@@ -74,6 +74,48 @@ function say(locale: Locale, code: Code, vars: Record<string, string | number> =
   return COPY[locale][code].replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ''));
 }
 
+// Setting it up (POST/PATCH /v1/jobs), in the caller's language, one code per mistake — the same
+// codes PUT /v1/artifacts/{id}/email-sync/senders uses.
+type SetupCode = 'BAD_DATASET_NAME' | 'BAD_SHEET' | 'BAD_ATTACHMENT' | 'NO_WORKSPACE' | 'FREE_MAIL_DOMAIN' | 'NO_SENDERS';
+const SETUP: Record<Locale, Record<SetupCode, string>> = {
+  en: {
+    BAD_DATASET_NAME: '“{name}” can’t be the name of the page’s data: {why}. Use letters, digits, _ . or -, up to 64 characters — for example {suggestion}.',
+    BAD_SHEET: 'sheet must be a tab name, up to 100 characters.',
+    BAD_ATTACHMENT: 'attachment must be a file name, up to 100 characters; * matches anything (for example "ventas*.xlsx").',
+    NO_WORKSPACE: 'Updating by email needs a page inside a workspace.',
+    FREE_MAIL_DOMAIN: '“{entry}” would let anyone with such an address update this page. List the exact addresses instead: PUT /v1/artifacts/{id}/email-sync/senders with {"senders": ["ana@{domain}"]}.',
+    NO_SENDERS: 'Add who may send the file first: PUT /v1/artifacts/{id}/email-sync/senders with {"senders": ["person@company.com"]}. Only they can update this page by email.',
+  },
+  es: {
+    BAD_DATASET_NAME: '“{name}” no puede ser el nombre de los datos del artefacto: {why}. Usá letras, números, _ . o -, hasta 64 caracteres — por ejemplo {suggestion}.',
+    BAD_SHEET: 'sheet tiene que ser el nombre de una hoja, de hasta 100 caracteres.',
+    BAD_ATTACHMENT: 'attachment tiene que ser un nombre de archivo, de hasta 100 caracteres; * es cualquier cosa (por ejemplo "ventas*.xlsx").',
+    NO_WORKSPACE: 'Actualizar por email necesita un artefacto dentro de un espacio.',
+    FREE_MAIL_DOMAIN: '“{entry}” dejaría que cualquiera con esa clase de dirección actualice este artefacto. Poné las direcciones exactas: PUT /v1/artifacts/{id}/email-sync/senders con {"senders": ["ana@{domain}"]}.',
+    NO_SENDERS: 'Primero agregá quién puede mandar el archivo: PUT /v1/artifacts/{id}/email-sync/senders con {"senders": ["persona@empresa.com"]}. Solo esas personas pueden actualizar este artefacto por email.',
+  },
+};
+const WHY: Record<Locale, Record<'empty' | 'long' | 'spaces' | 'accents' | 'chars', string>> = {
+  en: { empty: 'it is empty', long: 'it is longer than 64 characters', spaces: 'it has spaces', accents: 'it has accents or ñ', chars: 'it has characters other than letters, digits, _ . -' },
+  es: { empty: 'está vacío', long: 'tiene más de 64 caracteres', spaces: 'tiene espacios', accents: 'tiene acentos o ñ', chars: 'tiene caracteres que no son letras, números, _ . -' },
+};
+
+/** "Ventas del mes" → "ventas_del_mes": the closest valid dataset name. */
+export function datasetNameFrom(raw: string): string {
+  const s = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9_.-]+/g, '_').replace(/_+/g, '_').replace(/^[_.-]+|[_.-]+$/g, '').slice(0, 64);
+  return s || 'data';
+}
+
+function setupProblem(locale: Locale, code: SetupCode, vars: Record<string, string> = {}) {
+  return { code, error: SETUP[locale][code].replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? vars[k] : m)) };
+}
+
+function datasetNameProblem(locale: Locale, raw: unknown) {
+  const name = typeof raw === 'string' ? raw : '';
+  const why = !name.trim() ? 'empty' : name.length > 64 ? 'long' : /\s/.test(name) ? 'spaces' : /[^\x00-\x7f]/.test(name) ? 'accents' : 'chars';
+  return setupProblem(locale, 'BAD_DATASET_NAME', { name, why: WHY[locale][why], suggestion: datasetNameFrom(name) });
+}
+
 function typeOf(filename: string): (typeof TYPES)[number] | null {
   const ext = filename.toLowerCase().split('.').pop() || '';
   return (TYPES as readonly string[]).includes(ext) ? (ext as (typeof TYPES)[number]) : null;
@@ -140,20 +182,18 @@ export const emailSheetSyncDestination: Destination<EmailSheetSyncConfig> = {
   kind: 'email_sheet_sync',
 
   async validate(env, ctx, config) {
-    if (typeof config?.dataset !== 'string' || !DATASET_NAME.test(config.dataset)) {
-      return 'email_sheet_sync requires a dataset name (letters, digits, _ . -, up to 64)';
-    }
-    if (config.sheet !== undefined && (typeof config.sheet !== 'string' || config.sheet.length > 100)) return 'sheet must be a tab name (up to 100 characters)';
+    const workspaceId = await workspaceOf(env, ctx.artifactId);
+    const locale = await localeForRecipient(env, { userId: ctx.createdBy, workspaceId });
+    if (typeof config?.dataset !== 'string' || !DATASET_NAME.test(config.dataset)) return datasetNameProblem(locale, config?.dataset);
+    if (config.sheet !== undefined && (typeof config.sheet !== 'string' || config.sheet.length > 100)) return setupProblem(locale, 'BAD_SHEET');
     if (config.attachment !== undefined && (typeof config.attachment !== 'string' || (config.attachment.trim() !== '' && !ATTACHMENT_PATTERN.test(config.attachment.trim())))) {
-      return 'attachment must be a file name, * matches anything (e.g. "ventas*.xlsx"), up to 100 characters';
+      return setupProblem(locale, 'BAD_ATTACHMENT');
     }
-    if (!(await workspaceOf(env, ctx.artifactId))) return say('en', 'no_workspace');
+    if (!workspaceId) return setupProblem(locale, 'NO_WORKSPACE');
     // Anyone can send mail to the address; the allowed list is what makes it safe.
     const { senders, freeMail } = await allowlistOf(env, ctx.artifactId);
-    if (freeMail.length) return `"${freeMail[0]}" would let anyone with such an address update this page. List the exact addresses instead (PUT /v1/data/{artifactId}/inbox/allowlist).`;
-    if (!senders.length) {
-      return 'Add at least one allowed sender first (POST /v1/data/{artifactId}/inbox/enable with {"allowlist": ["person@company.com"]}): only they can update this page by email.';
-    }
+    if (freeMail.length) return setupProblem(locale, 'FREE_MAIL_DOMAIN', { entry: freeMail[0], domain: freeMail[0].replace(/^@/, ''), id: ctx.artifactId });
+    if (!senders.length) return setupProblem(locale, 'NO_SENDERS', { id: ctx.artifactId });
     return null;
   },
 
