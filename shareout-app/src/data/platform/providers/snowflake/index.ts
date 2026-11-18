@@ -166,7 +166,11 @@ class SnowflakeProvider extends BaseProvider {
 			...(body.parameters ? { parameters: body.parameters } : {}),
 		};
 
-		const deadline = Date.now() + Math.min(ASYNC_POLL_MAX_MS, timeoutSec * 1000 + ASYNC_POLL_GRACE_MS);
+		// timeout 0 asks Snowflake for its maximum (7 days), so only our own cap applies.
+		const pollWindowMs = timeoutSec > 0
+			? Math.min(ASYNC_POLL_MAX_MS, timeoutSec * 1000 + ASYNC_POLL_GRACE_MS)
+			: ASYNC_POLL_MAX_MS;
+		const deadline = Date.now() + pollWindowMs;
 		const first = await this.fetchJson<T>(`${host}/api/v2/statements`, {
 			method: 'POST',
 			headers,

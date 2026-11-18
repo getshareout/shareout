@@ -224,6 +224,19 @@ describe('Snowflake provider', () => {
       expect(polls()).toBeGreaterThan(20);
     });
 
+    it('treats timeout 0 (Snowflake maximum) as our own polling cap, not a 30s window', async () => {
+      vi.useFakeTimers();
+      stubSlowStatement(300_000);
+      const pending = snowflakeProvider.executeRequest(
+        execCtx(),
+        snowflakeProvider.getEndpoint('statements.execute')!,
+        { body: { statement: 'SELECT 1', timeout: 0 } },
+      );
+      await vi.advanceTimersByTimeAsync(310_000);
+      const result = await pending;
+      expect(result.success).toBe(true);
+    });
+
     it('gives up once the statement timeout plus slack has passed', async () => {
       vi.useFakeTimers();
       stubSlowStatement(Number.POSITIVE_INFINITY);
