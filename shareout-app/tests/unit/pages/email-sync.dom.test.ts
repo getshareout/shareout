@@ -306,7 +306,7 @@ describe('Update by email', () => {
     it('then whose report it is: Allow adds that address to who may send and closes the step', async () => {
       status = ON({ forwarding: [conf({ openedAt: new Date().toISOString() })] });
       load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
-      $<HTMLInputElement>('#es_fwd_who').value = 'Reportes@Proveedor.com';
+      $<HTMLInputElement>('[data-es-fwd-who]').value = 'Reportes@Proveedor.com';
       btn(copy['esync.fwdAdd']).click(); await flush();
       expect(sent.filter((x) => x.method !== 'GET').map((x) => [x.method, x.url, x.body])).toEqual([
         ['PUT', '/v1/artifacts/art_1/email-sync/senders', { senders: ['ana@acme.com', 'reportes@proveedor.com'] }],
@@ -324,6 +324,22 @@ describe('Update by email', () => {
       expect(sent.find((x) => x.method === 'POST')!.body).toEqual({ action: 'dismiss' });
       expect(toast).toHaveBeenCalledWith(copy['esync.fwdDismissed']);
       expect(document.querySelector('[data-es-fwd]')).toBeNull();
+    });
+
+    it('every pending request shows; the editor’s own comes first with the main Confirm, a stranger’s gets a plain button and a warning', async () => {
+      status = ON({ forwarding: [
+        conf({ id: 'efc_s', requester: 'stranger@gmail.com', requesterAllowed: false, receivedAt: new Date().toISOString() }),
+        conf({ id: 'efc_1', receivedAt: new Date(Date.now() - 60000).toISOString() }),
+      ] });
+      load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+      const boxes = [...document.querySelectorAll<HTMLElement>('[data-es-fwd]')];
+      expect(boxes.map((x) => x.getAttribute('data-es-fwd'))).toEqual(['efc_1', 'efc_s']);
+      expect(boxes[0].querySelector('[data-es-fwd-open]')!.className).toContain('wsx-abtn--primary');
+      expect(boxes[1].querySelector('[data-es-fwd-open]')!.className).not.toContain('wsx-abtn--primary');
+      expect(boxes[1].textContent).toContain(copy['esync.fwdUnknown']);
+      boxes[1].querySelector<HTMLButtonElement>('[data-es-fwd-no]')!.click(); await flush();
+      expect(sent.find((x) => x.method === 'POST')).toEqual({ url: '/v1/artifacts/art_1/email-sync/forwarding/efc_s', method: 'POST', body: { action: 'dismiss' } });
+      expect([...document.querySelectorAll('[data-es-fwd]')].map((x) => x.getAttribute('data-es-fwd'))).toEqual(['efc_1']);
     });
 
     it('a link that is not on Google’s own host is never rendered', async () => {

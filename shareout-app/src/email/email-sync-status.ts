@@ -139,7 +139,9 @@ export async function emailSyncStatus(env: Env, artifactId: string, workspaceId:
     .filter((r) => !(r.reason === 'not_allowed' && list.length && senderAllowed(r.from, list)))
     .map((r) => ({ ...r, message: rejectionMessage(locale, r), canAllow: canAllowRejection(r) }));
   const lastRejected = recentRejected[0] ?? null;
-  const forwarding = confirmations.map((c) => ({ ...c, requesterAllowed: list.length ? senderAllowed(c.requester, list) : false }));
+  // The page's own people first (a stranger's newer request must not take the top), then newest.
+  const forwarding = confirmations.map((c) => ({ ...c, requesterAllowed: list.length ? senderAllowed(c.requester, list) : false }))
+    .sort((a, b) => Number(b.requesterAllowed) - Number(a.requesterAllowed));
   let message = state === 'off' ? emailSyncSay(locale, 'off')
     : state === 'inbox_off' ? emailSyncSay(locale, 'inbox_off')
     : state === 'failed' ? emailSyncSay(locale, 'failed', { error: job?.last_error ?? '' }).trim()
@@ -174,7 +176,7 @@ export async function emailSyncStatus(env: Env, artifactId: string, workspaceId:
     lastRejected,
     /** The recent bounces, newest first (up to 5; a sender now on the list is left out). */
     recentRejected,
-    /** Gmail forwarding confirmations waiting for the page's editors, newest first. */
+    /** Gmail forwarding confirmations waiting for the page's editors: requesters on the list first, then newest. */
     forwarding,
     limits: EMAIL_SYNC_LIMITS,
   };

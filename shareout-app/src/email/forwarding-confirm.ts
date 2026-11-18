@@ -37,13 +37,16 @@
 import type { Env } from '../types';
 import { generateId } from '../crypto-utils';
 import type { CloudflareAuth } from './inbound';
+import { senderAllowed } from './inbox-store';
 
 /** How long a confirmation stays on the panel. Google does not publish how long its link lasts
  *  (its signature on the mail expires after 7 days); a week covers "I set it up Friday, I look
  *  Monday", and a new request from the same mailbox replaces it anyway. */
 export const FORWARD_CONFIRM_TTL_MS = 7 * 86_400_000;
-/** Pending confirmations kept per page: older ones are dropped, so a flood of requests from
- *  strangers cannot grow the table or bury the person's own. */
+/** Pending confirmations kept per page. Anyone who knows a page's address can make their own Gmail
+ *  send it a genuine confirmation, so when there are more, requests from mailboxes NOT on the
+ *  page's list go first (oldest first): strangers can neither grow the table nor push out the
+ *  person's own. */
 export const FORWARD_CONFIRMS_KEPT = 3;
 
 export interface ForwardingConfirmation {
@@ -124,8 +127,9 @@ export function gmailForwardingConfirmation(auth: CloudflareAuth | null, email: 
   const code = subject.match(/\(#(\d{6,12})\)/)?.[1] ?? text.match(/confirmation code:\s*(\d{6,12})/i)?.[1] ?? null;
 
   // Who asked: the address in the subject ("… from ana@gmail.com" / "… de ana@gmail.com"), else the
-  // first one in the text, never Google's or the page's own.
-  const own = (a: string) => a === dest || a.endsWith('@google.com') || a.endsWith(`@${dest.slice(dest.lastIndexOf('@') + 1)}`);
+  // first one in the text — never Google's, never the page's own address. (Only that address: a
+  // self-hosted instance may receive on its company's own mail domain, where ana@ is a real person.)
+  const own = (a: string) => a === dest || a.endsWith('@google.com');
   const pick = (s: string) => [...s.matchAll(ADDRESS_IN_TEXT)].map((x) => x[0].toLowerCase().replace(/\.+$/, '')).find((a) => !own(a)) ?? null;
   const requester = pick(subject) ?? pick(text);
   if (!requester || requester.length > 320) return null;
@@ -140,8 +144,9 @@ const toPending = (r: Row): PendingForwardConfirmation => ({
 });
 
 /** Keep a confirmation for the page: one per asking mailbox (a new request replaces the old one),
- *  the newest FORWARD_CONFIRMS_KEPT only, expired ones dropped. */
-export async function saveForwardConfirmation(env: Env, artifactId: string, c: ForwardingConfirmation): Promise<void> {
+ *  expired ones dropped, and at most FORWARD_CONFIRMS_KEPT — over that, requesters not on
+ *  `allowlist` are dropped before any that are, oldest first. */
+export async function saveForwardConfirmation(env: Env, artifactId: string, c: ForwardingConfirmation, allowlist: string[] | null): Promise<void> {
   const now = new Date();
   const link = gmailConfirmUrl(c.confirmUrl);
   if (!link) return;
@@ -153,11 +158,17 @@ export async function saveForwardConfirmation(env: Env, artifactId: string, c: F
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(generateId('efc'), artifactId, c.provider, c.requester, c.code, link,
       new Date(now.getTime() + FORWARD_CONFIRM_TTL_MS).toISOString(), now.toISOString()),
-    env.DB.prepare(
-      `DELETE FROM email_forward_confirmations WHERE artifact_id = ?1 AND id NOT IN
-         (SELECT id FROM email_forward_confirmations WHERE artifact_id = ?1 ORDER BY created_at DESC, rowid DESC LIMIT ${FORWARD_CONFIRMS_KEPT})`
-    ).bind(artifactId),
   ]);
+  const { results } = await env.DB.prepare(
+    'SELECT id, requester FROM email_forward_confirmations WHERE artifact_id = ? ORDER BY created_at DESC, rowid DESC'
+  ).bind(artifactId).all<{ id: string; requester: string }>();
+  const rows = results || [];
+  if (rows.length <= FORWARD_CONFIRMS_KEPT) return;
+  const allowed = (r: { requester: string }) => !!allowlist && senderAllowed(r.requester, allowlist);
+  const keep = new Set([...rows.filter(allowed), ...rows.filter((r) => !allowed(r))].slice(0, FORWARD_CONFIRMS_KEPT).map((r) => r.id));
+  const drop = rows.filter((r) => !keep.has(r.id)).map((r) => r.id);
+  await env.DB.prepare(`DELETE FROM email_forward_confirmations WHERE artifact_id = ? AND id IN (${drop.map(() => '?').join(',')})`)
+    .bind(artifactId, ...drop).run();
 }
 
 /** The page's pending confirmations, newest first. */

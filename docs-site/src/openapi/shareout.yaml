@@ -918,8 +918,8 @@ paths:
                   forwarding:
                     type: array
                     description: >-
-                      Gmail forwarding confirmations waiting for the page's editors, newest first (up to 3,
-                      7 days). Gmail emails the page's address a confirmation link before it forwards to it;
+                      Gmail forwarding confirmations waiting for the page's editors: requesters on the list first,
+                      then newest (up to 3, strangers' dropped first; 7 days). Gmail emails the page's address a confirmation link before it forwards to it;
                       a genuine one (DKIM and DMARC pass for google.com per Cloudflare, Google's forwarding
                       sender, its signed To is this address, its link on Google's own host) is kept here and
                       never becomes data. Outlook / Microsoft 365 has no such step.
