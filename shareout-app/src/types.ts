@@ -23,7 +23,12 @@ export interface EmailReceivedPayload {
   messageId: string;
   /** RFC Message-ID header, when present. */
   rfcMessageId: string | null;
+  /** Envelope sender (MAIL FROM). Forwarders rewrite it; `sender` is who wrote the mail. */
   from: string;
+  /** Header From address, lowercased: the address DMARC/DKIM vouch for and the allowlist matches. */
+  sender: string | null;
+  /** Cloudflare's stamp vouches for `sender`'s domain (DMARC pass, or DKIM pass for that domain). */
+  senderVerified: boolean;
   to: string;
   /** Resolved inbox prefix (the part before any +tag and the @). */
   prefix: string;

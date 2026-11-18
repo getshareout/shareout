@@ -35,7 +35,8 @@ export const workspace_client_inspector_automate_JS = `  // ----- Tests (artifac
   // ----- Automate (per-artifact schedules + alerts) -----
   function autoJobRow(j) {
     var st = j.last_status || ''; var cls = st === 'success' ? ' ok' : st === 'failed' ? ' fail' : '';
-    return '<div class="wsx-row"><div class="wsx-row__main"><div class="wsx-row__title">' + esc(j.title || j.action || t('admin.jobDefault')) + '</div><div class="wsx-row__sub">' + esc(cronHuman(j.schedule)) + (j.action ? ' \\u00B7 ' + esc(j.action) : '') + '</div></div>' + (st ? '<span class="wsx-row__badge' + cls + '">' + esc(st) + '</span>' : '') + '</div>';
+    var sub = j.action === 'email_sheet_sync' ? esc(t('esync.rowSub')) : esc(cronHuman(j.schedule)) + (j.action ? ' \\u00B7 ' + esc(j.action) : '');
+    return '<div class="wsx-row"><div class="wsx-row__main"><div class="wsx-row__title">' + esc(j.title || j.action || t('admin.jobDefault')) + '</div><div class="wsx-row__sub">' + sub + '</div></div>' + (st ? '<span class="wsx-row__badge' + cls + '">' + esc(st) + '</span>' : '') + '</div>';
   }
   function autoAlertRow(a) {
     return '<div class="wsx-row"><div class="wsx-row__main"><div class="wsx-row__title">' + esc(a.name || a.metric_id || t('inspector.alertDefault')) + '</div><div class="wsx-row__sub">' + esc(a.schedule ? cronHuman(a.schedule) : '') + '</div></div>' + (a.enabled ? '<span class="wsx-row__badge ok">' + esc(t('admin.on')) + '</span>' : '<span class="wsx-row__badge">' + esc(t('admin.off')) + '</span>') + '</div>';
@@ -77,6 +78,7 @@ export const workspace_client_inspector_automate_JS = `  // ----- Tests (artifac
       + autoTile('crew', '<circle cx="9" cy="7" r="3"/><path d="M2 21v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"/><circle cx="18" cy="8" r="2.5"/>', t('inspector.autoStartCrew'), t('inspector.autoStartCrewSub'))
       + (ed && window.WSX_WS ? autoTile('drivesync', '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M10 3v18"/>', t('dsync.tile'), t('dsync.tileSub')) : '')
       + (ed && window.WSX_WS ? autoTile('sheetlink', '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>', t('slink.tile'), t('slink.tileSub')) : '')
+      + (ed && window.WSX_WS ? autoTile('emailsync', '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>', t('esync.tile'), t('esync.tileSub')) : '')
       + '</div>'
       + '<button class="wsx-auto__chat" data-aauto="chat" type="button">' + isvg('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>') + esc(t('inspector.autoCustom')) + '</button>'
       + '</div></div>';
@@ -90,6 +92,7 @@ export const workspace_client_inspector_automate_JS = `  // ----- Tests (artifac
         else if (k === 'crew') agentAsk(t('inspector.askCrew').replace('{name}', n));
         else if (k === 'drivesync') openDriveSync({ id: art.id, name: n }, function () { delete autoCache[art.id]; if (activeArt === art) renderAutomate(art); });
         else if (k === 'sheetlink') openSheetLinkSync({ id: art.id, name: n }, function () { delete autoCache[art.id]; if (activeArt === art) renderAutomate(art); });
+        else if (k === 'emailsync') openEmailSync({ id: art.id, name: n }, function () { delete autoCache[art.id]; if (activeArt === art) renderAutomate(art); });
         else agentAsk(t('inspector.askCustom').replace('{name}', n));
       });
     });

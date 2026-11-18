@@ -73,7 +73,7 @@ export interface ActionItemAssignedData { fromName: string; title: string; snipp
 export interface ActionItemResolvedData { fromName: string; title: string; snippet: string; url: string }
 export interface PublishApprovalData { kind: 'request' | 'approved' | 'declined' }
 export interface CrewApprovalData { count: number }
-export interface JobFailedData { jobName: string; error: string }
+export interface JobFailedData { jobName: string; error: string; via?: 'email' }
 export interface ShareData {
   artifactName: string;
   artifactDescription?: string | null;
@@ -523,8 +523,10 @@ export const EMAILS = {
     category: 'product',
     audiences: ['ANY'],
     trigger: 'notifyJobFailed() — a scheduled job that was working (or never ran) just failed.',
-    build: ({ jobName, error }: JobFailedData, { baseUrl }) => {
-      const next = 'It will try again at its next scheduled time. Open Schedules to fix it or run it now.';
+    build: ({ jobName, error, via }: JobFailedData, { baseUrl }) => {
+      const next = via === 'email'
+        ? 'The page kept its previous data. Fix the file and email it again.'
+        : 'It will try again at its next scheduled time. Open Schedules to fix it or run it now.';
       return {
         subject: `Your schedule "${jobName}" failed`,
         preheader: error,

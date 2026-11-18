@@ -1,9 +1,8 @@
 import type { Destination, DeliveryStep } from '../types';
 import type { PublicSheetSyncConfig } from '../../scheduling/jobs/types';
 import { PublicLinkError, fetchPublicSheet, parseShareLink } from '../../data/files/public-sheet-link';
-import { SheetRowsError, sheetRows } from '../../data/files/sheet-rows';
+import { SheetRowsError, sheetRows, sheetRowsKey } from '../../data/files/sheet-rows';
 import { writeDatasetRows } from '../../data/datasets/handler';
-import { sha256 } from '../../crypto-utils';
 
 // A spreadsheet shared as "Anyone with the link can view" → one of the artifact's datasets,
 // on the job's own schedule — no Google sign-in. The private path is drive_file_sync (the
@@ -12,13 +11,6 @@ import { sha256 } from '../../crypto-utils';
 // schedule does not pile up dataset versions while nothing moves.
 
 const DATASET_NAME = /^[a-zA-Z0-9_.-]{1,64}$/;
-
-/** Same tab + same rows → same key. Dataset metadata is readable by the page's viewers, so
- *  it carries neither the link nor the file id (the link alone grants read access). */
-export async function publicSheetKey(sheet: string, rows: unknown[]): Promise<string> {
-  const hex = await sha256(new TextEncoder().encode(`${sheet}\n${JSON.stringify(rows)}`).buffer as ArrayBuffer);
-  return hex.slice(0, 32);
-}
 
 async function workspaceOf(env: Parameters<Destination['validate']>[0], artifactId: string): Promise<string | null> {
   const art = await env.DB.prepare('SELECT workspace_id FROM artifacts WHERE id = ?')
@@ -59,7 +51,7 @@ export const publicSheetSyncDestination: Destination<PublicSheetSyncConfig> = {
 
       phase = 'transform'; t0 = Date.now();
       const parsed = await sheetRows(file.bytes, sheetWanted);
-      const key = await publicSheetKey(parsed.sheet, parsed.rows);
+      const key = await sheetRowsKey(parsed.sheet, parsed.rows);
       const current = await env.DB.prepare('SELECT metadata FROM datasets WHERE artifact_id = ? AND name = ?')
         .bind(ctx.artifactId, config.dataset).first<{ metadata: string | null }>();
       let prevKey: string | undefined;

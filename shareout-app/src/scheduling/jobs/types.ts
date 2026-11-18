@@ -99,6 +99,7 @@ export const JOB_ACTIONS = [
   'asset_delivery',
   'drive_file_sync',
   'public_sheet_sync',
+  'email_sheet_sync',
 ] as const;
 
 export const JOB_TRIGGER_TYPES = ['cron', 'event'] as const;
@@ -187,6 +188,18 @@ export interface PublicSheetSyncConfig {
   dataset: string;
 }
 
+/** Config for the `email_sheet_sync` action (trigger: event `email.received`): an Excel or CSV
+ *  file emailed to the page's own address → the artifact's dataset `dataset`. Only senders on the
+ *  inbox allowlist whose domain Cloudflare vouches for (DMARC, or DKIM by that domain) update it;
+ *  the job cannot be created while the allowlist is empty. Skips the write when the rows are unchanged. */
+export interface EmailSheetSyncConfig {
+  dataset: string;
+  /** Tab name. Empty = the first tab with cells. */
+  sheet?: string;
+  /** Which attachment: a file name where * matches anything ("ventas*.xlsx"). Empty = the first .xlsx or .csv. */
+  attachment?: string;
+}
+
 /** Config for the `sheets_append` action: append query rows to a Google Sheet. */
 export interface SheetsAppendConfig {
   spreadsheetId?: string;
@@ -212,7 +225,8 @@ export type JobConfig =
   | ArtifactTestJobConfig
   | AssetDeliveryConfig
   | DriveFileSyncConfig
-  | PublicSheetSyncConfig;
+  | PublicSheetSyncConfig
+  | EmailSheetSyncConfig;
 
 /** Config for the `asset_delivery` action: email a file collection's download link on a
  *  schedule. The job is anchored to the workspace's asset-bucket artifact. (work/042 P4) */

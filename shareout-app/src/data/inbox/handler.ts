@@ -48,6 +48,17 @@ function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
 }
 
+// An empty list lets anyone send, so a page that updates its data by email keeps at least one.
+const SENDERS_REQUIRED = Errors.validation('allowlist', 'This page updates its data by email, so keep at least one allowed sender (or remove the email sync first).', { example: '["person@company.com"]' });
+
+async function emptiesEmailSync(ctx: DataContext, allowlist: string[] | null): Promise<boolean> {
+  if ((allowlist || []).some((s) => s.trim())) return false;
+  const job = await ctx.env.DB.prepare(
+    "SELECT 1 AS x FROM scheduled_jobs WHERE artifact_id = ? AND action = 'email_sheet_sync' LIMIT 1"
+  ).bind(ctx.artifactId).first<{ x: number }>();
+  return !!job;
+}
+
 export async function handleInbox(
   request: Request,
   ctx: DataContext,
@@ -68,6 +79,7 @@ export async function handleInbox(
       if (Array.isArray(body?.allowlist)) allowlist = body.allowlist;
       else if (body?.allowlist != null) return errorResponse(ALLOWLIST_INVALID, ctx.origin);
     } catch { /* no body is fine */ }
+    if (allowlist !== undefined && await emptiesEmailSync(ctx, allowlist)) return errorResponse(SENDERS_REQUIRED, ctx.origin);
     await enableInbound(ctx.env, ctx.artifactId);
     if (allowlist !== undefined) await setInboundAllowlist(ctx.env, ctx.artifactId, allowlist);
     return successResponse(await getInboxStatus(ctx.env, ctx.artifactId), 200, ctx.origin);
@@ -87,6 +99,7 @@ export async function handleInbox(
       return errorResponse(DATA_ERRORS.INVALID_JSON, ctx.origin);
     }
     if (allowlist !== null && !isStringArray(allowlist)) return errorResponse(ALLOWLIST_INVALID, ctx.origin);
+    if (await emptiesEmailSync(ctx, allowlist)) return errorResponse(SENDERS_REQUIRED, ctx.origin);
     await setInboundAllowlist(ctx.env, ctx.artifactId, allowlist);
     return successResponse(await getInboxStatus(ctx.env, ctx.artifactId), 200, ctx.origin);
   }

@@ -4,7 +4,7 @@ export const workspace_client_home_views_schedules_JS = `  // ----- My Schedules
   var SCHED_DEST_ICO = {
     email: 'mail', slack: 'img:/brand/slack-icon.png', telegram: 'img:/brand/telegram-icon.png',
     discord: 'chat', webhook: 'globe', http_get: 'globe',
-    query_snapshot: 'db', drive_file_sync: 'sheet', public_sheet_sync: 'sheet',
+    query_snapshot: 'db', drive_file_sync: 'sheet', public_sheet_sync: 'sheet', email_sheet_sync: 'mail',
     sheets_append: 'sheet', materialize: 'db', artifact_test: 'check'
   };
   function schedDest(action) {

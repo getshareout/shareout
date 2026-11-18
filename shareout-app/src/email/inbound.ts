@@ -64,6 +64,58 @@ export function parseAuthResults(headers: Headers): AuthVerdicts {
   return { spf: grab('spf'), dkim: grab('dkim'), dmarc: grab('dmarc') };
 }
 
+/** Email Routing's own verdicts. It prepends an Authentication-Results header whose authserv-id
+ *  is mx.cloudflare.net; any other one may have been written by the sender, so only the first
+ *  header counts, and only with that id. Headers.get joins repeated headers with ", ", and RFC
+ *  8601 has no comma outside comments and quoted strings, so the first such comma ends ours.
+ *  null = no Cloudflare stamp (treat the sender as unverified). */
+export interface CloudflareAuth { dmarc: string | null; dkim: { result: string; domain: string | null }[] }
+
+const CLOUDFLARE_AUTHSERV_ID = 'mx.cloudflare.net';
+
+export function cloudflareAuthResults(headers: Headers): CloudflareAuth | null {
+  const joined = headers.get('authentication-results') || '';
+  // Top-level split: drop (comments), honour "quoted strings", stop at the first top-level comma.
+  const parts: string[] = [''];
+  let depth = 0, quoted = false;
+  for (const ch of joined) {
+    if (quoted) { if (ch === '"') quoted = false; parts[parts.length - 1] += ch; continue; }
+    if (ch === '(') { depth++; continue; }
+    if (ch === ')') { depth = Math.max(0, depth - 1); continue; }
+    if (depth) continue;
+    if (ch === '"') { quoted = true; parts[parts.length - 1] += ch; continue; }
+    if (ch === ',') break;
+    if (ch === ';') { parts.push(''); continue; }
+    parts[parts.length - 1] += ch;
+  }
+  const [authserv, ...results] = parts.map((s) => s.trim());
+  if ((authserv.split(/\s+/)[0] || '').toLowerCase() !== CLOUDFLARE_AUTHSERV_ID) return null;
+  const out: CloudflareAuth = { dmarc: null, dkim: [] };
+  for (const res of results) {
+    const m = res.match(/^([a-z-]+)\s*=\s*([a-z]+)/i);
+    if (!m) continue;
+    const method = m[1].toLowerCase(), result = m[2].toLowerCase();
+    if (method === 'dmarc' && out.dmarc === null) out.dmarc = result;
+    if (method === 'dkim') {
+      const d = res.match(/\bheader\.d\s*=\s*"?([a-z0-9.-]+)/i) || res.match(/\bheader\.i\s*=\s*"?[^@\s;]*@([a-z0-9.-]+)/i);
+      out.dkim.push({ result, domain: d ? d[1].toLowerCase() : null });
+    }
+  }
+  return out;
+}
+
+/** True when Cloudflare vouches for the header From's domain: DMARC passed, or a DKIM signature
+ *  passed for that domain (or a parent of it). DKIM by itself proves only whoever signed. */
+export function senderVerified(auth: CloudflareAuth | null, fromAddress: string): boolean {
+  if (!auth) return false;
+  if (auth.dmarc === 'pass') return true;
+  const at = fromAddress.lastIndexOf('@');
+  const domain = at === -1 ? '' : fromAddress.slice(at + 1).trim().toLowerCase();
+  if (!domain) return false;
+  return auth.dkim.some((s) => s.result === 'pass' && !!s.domain && s.domain.includes('.')
+    && (domain === s.domain || domain.endsWith(`.${s.domain}`)));
+}
+
 /**
  * Cloudflare Email Routing entry point for inbound artifact mail. Resolves the
  * recipient to an opt-in inbox, parses + stores the message, and fires the
@@ -127,8 +179,10 @@ export async function handleInboundEmail(
   const rawBuffer = await new Response(message.raw).arrayBuffer();
   const email = await PostalMime.parse(rawBuffer);
 
-  // DMARC authenticates the header From, so that (not the envelope) is what the allowlist matches.
-  if (res.allowlist && !(auth.dmarc === 'pass' && senderAllowed(email.from?.address ?? '', res.allowlist))) {
+  // DMARC/DKIM authenticate the header From, so that (not the envelope) is what the allowlist matches.
+  const sender = (email.from?.address || '').trim().toLowerCase();
+  const verified = senderVerified(cloudflareAuthResults(message.headers), sender);
+  if (res.allowlist && !(verified && senderAllowed(sender, res.allowlist))) {
     message.setReject('Sender not permitted');
     return;
   }
@@ -183,6 +237,8 @@ export async function handleInboundEmail(
     messageId: id,
     rfcMessageId,
     from: message.from,
+    sender: sender || null,
+    senderVerified: verified,
     to: message.to,
     prefix: parsed.prefix,
     tag: parsed.tag,

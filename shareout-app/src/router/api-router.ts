@@ -7,6 +7,7 @@ import { routeFolderApi } from './api/folders';
 import { routeAssetApi } from './api/assets';
 import { routeFileImportApi } from '../file-imports/routes';
 import { routeSheetLinkApi } from './api/sheet-links';
+import { routeEmailSyncApi } from './api/email-sync';
 import { routeWorkspaceApi } from './api/workspaces';
 import { routeSkillsApi } from './api/skills';
 import { routeWorkspaceAgentApi } from './api/workspace-agent';
@@ -49,6 +50,7 @@ export async function routeApi(ctx: FetchContext): Promise<Response | null> {
       (await routeArtifactSourcesApi(ctx)) ??
       (await routeFileImportApi(ctx)) ??
       (await routeSheetLinkApi(ctx)) ??
+      (await routeEmailSyncApi(ctx)) ??
       (await routeArtifactApi(ctx)) ??
       (await routeAccessRequestsApi(ctx)) ??
       (await routeSkillsApi(ctx)) ??
