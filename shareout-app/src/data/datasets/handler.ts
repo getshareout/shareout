@@ -650,7 +650,9 @@ export async function writeDatasetRows(
   artifactId: string,
   name: string,
   format: DatasetFormat,
-  rows: unknown[]
+  rows: unknown[],
+  /** Kept on the dataset's metadata next to rowCount/columns (e.g. the Drive sync's `source`). */
+  extraMetadata?: Record<string, unknown>
 ): Promise<{ name: string; format: DatasetFormat; version: number; sizeBytes: number; rowCount: number }> {
   const nameError = validateName(name);
   if (nameError) throw new Error(nameError);
@@ -684,7 +686,7 @@ export async function writeDatasetRows(
   const columns = rows.length > 0 && rows[0] && typeof rows[0] === 'object'
     ? Object.keys(rows[0] as Record<string, unknown>)
     : [];
-  const metadata = JSON.stringify({ rowCount: rows.length, columns });
+  const metadata = JSON.stringify({ ...extraMetadata, rowCount: rows.length, columns });
   const now = new Date().toISOString();
 
   let version: number;

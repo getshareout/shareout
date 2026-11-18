@@ -75,6 +75,7 @@ export const workspace_client_inspector_automate_JS = `  // ----- Tests (artifac
       + autoTile('schedule', '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', t('inspector.autoScheduleSend'), t('inspector.autoScheduleSub'))
       + autoTile('alert', '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>', t('inspector.autoSetAlert'), t('inspector.autoSetAlertSub'))
       + autoTile('crew', '<circle cx="9" cy="7" r="3"/><path d="M2 21v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"/><circle cx="18" cy="8" r="2.5"/>', t('inspector.autoStartCrew'), t('inspector.autoStartCrewSub'))
+      + (ed && window.WSX_WS ? autoTile('drivesync', '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M10 3v18"/>', t('dsync.tile'), t('dsync.tileSub')) : '')
       + '</div>'
       + '<button class="wsx-auto__chat" data-aauto="chat" type="button">' + isvg('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>') + esc(t('inspector.autoCustom')) + '</button>'
       + '</div></div>';
@@ -86,6 +87,7 @@ export const workspace_client_inspector_automate_JS = `  // ----- Tests (artifac
         var n = art.name || t('inspector.thisPage'); var k = b.getAttribute('data-aauto');
         if (k === 'schedule' || k === 'alert') openAutoForm(k, { id: art.id, name: n }, function () { delete autoCache[art.id]; });
         else if (k === 'crew') agentAsk(t('inspector.askCrew').replace('{name}', n));
+        else if (k === 'drivesync') openDriveSync({ id: art.id, name: n }, function () { delete autoCache[art.id]; if (activeArt === art) renderAutomate(art); });
         else agentAsk(t('inspector.askCustom').replace('{name}', n));
       });
     });

@@ -7,7 +7,8 @@
  *   GET    /v1/workspaces/{ws}/file-imports/connect/{provider}    → 302 to the provider's consent screen
  *   GET    /v1/file-imports/oauth/{provider}/callback             consent lands here (fixed redirect URI)
  *   DELETE /v1/workspaces/{ws}/file-imports/connections/{provider} disconnect (stops every sync through it)
- *   GET    /v1/workspaces/{ws}/file-imports/browse/{provider}?ref=&q=  server-side folder browser
+ *   GET    /v1/workspaces/{ws}/file-imports/browse/{provider}?ref=&q=&files=sheets  server-side folder browser
+ *          (files=sheets also lists spreadsheets, for the artifact Drive-file sync; Google Drive only)
  *   POST   /v1/workspaces/{ws}/file-imports/sources               { provider, ref, name, targetFolderId?, convert?, dailySync? }
  *   PATCH  /v1/workspaces/{ws}/file-imports/sources/{id}          { dailySync?, convert? }
  *   DELETE /v1/workspaces/{ws}/file-imports/sources/{id}          stop syncing (imported files stay)
@@ -79,7 +80,8 @@ async function handleWorkspace(ctx: FetchContext, workspaceId: string, sub: stri
     if (conn instanceof Response) return conn;
     const ref = ctx.url.searchParams.get('ref') || 'root';
     const q = ctx.url.searchParams.get('q') || undefined;
-    return withProvider(env, conn, async (token) => json(await providerApi(conn.provider).browse(token, ref.slice(0, 600), q)));
+    const files = ctx.url.searchParams.get('files') === 'sheets' ? 'sheets' as const : undefined;
+    return withProvider(env, conn, async (token) => json(await providerApi(conn.provider).browse(token, ref.slice(0, 600), q, { files })));
   }
 
   if (sub === 'sources' && method === 'POST') return createSource(ctx, workspaceId, user.id, providers);
