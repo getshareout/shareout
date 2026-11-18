@@ -116,8 +116,10 @@ describe('home shell assets', () => {
       // es measured 120.2 KB, budget = that + ~5%. Follow-up: ship lens copy inside the
       // lazy lens chunks, so lens strings stop counting against every page load. Raised for
       // the Humand connector copy: es measured 126.4 KB, budget = that + ~0.5%. Raised for the
-      // shared-link sheet sync (slink.*): es measured 128.2 KB, budget = that + ~0.5%.
-      expect(new TextEncoder().encode(copy).length, l).toBeLessThan(129_000);
+      // shared-link sheet sync (slink.*): es measured 128.2 KB, budget = that + ~0.5%. Raised for
+      // the Google Drive share panel (one service account per workspace): es measured 129.8 KB,
+      // budget = that + ~0.5%.
+      expect(new TextEncoder().encode(copy).length, l).toBeLessThan(130_500);
     }
     for (const [name, c] of Object.entries(LAZY_CHUNKS)) expect(text.includes(c.src), `${name} is not in the boot shell`).toBe(false);
   });

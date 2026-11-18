@@ -127,13 +127,15 @@ right on every code path, today and in every future feature.
 
 - **Prod:** nothing to migrate (no client configured, no connections, no sources).
 - **Self-hosted instances:** when `GOOGLE_DRIVE_SA_KEY` is set, the folder-import Google tile uses
-  the service account and the OAuth Google option is hidden there. The OAuth routes stay (the
-  artifact sheet sync still connects through them); sharing is always explicit (`access: 'share'`). Existing OAuth sources keep syncing; their card
+  the service account and the OAuth Google option is hidden there. The OAuth routes stay for
+  instances without the key and for sources made with it; sharing is always explicit
+  (`access: 'share'`). Existing OAuth sources keep syncing; their card
   offers **Switch to shared-folder access** — share with the email, the source flips over and
   keeps its ledger (same remote ids, so nothing re-imports).
-- The OAuth Google code and `drive.readonly` are deleted once the artifact sheet sync no longer
-  reads through that connection (it moves to `drive.file` + Picker). The CHANGELOG marks
-  `GOOGLE_DRIVE_CLIENT_ID/SECRET` deprecated now.
+- The artifact sheet sync moved to its own `drive.file` + Picker consent (merged 2026-11-18), so
+  the only code left on `drive.readonly` is the OAuth folder import. Deleting it is a follow-up
+  and a product call: it removes Google folder import from instances that have not set
+  `GOOGLE_DRIVE_SA_KEY`. The CHANGELOG marks it deprecated now.
 
 ## (e) Self-host
 

@@ -7,7 +7,7 @@
  * 'share'` browse and sources read as the workspace's own service account (from the
  * path's workspace, after the membership check), so a folder shared with another
  * workspace is a 404 from Google itself. The folder-import UI then hides the OAuth Google
- * consent; its routes stay for the artifact sheet sync, which still reads through it.
+ * consent; its routes stay for instances without the key and for sources made with it.
  *
  *   GET    /v1/workspaces/{ws}/file-imports                       providers, my connections, sources
  *   GET    /v1/workspaces/{ws}/file-imports/connect/{provider}    → 302 to the provider's consent screen

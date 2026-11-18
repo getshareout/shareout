@@ -197,13 +197,13 @@ describe('isolation through Google’s ACLs', () => {
     return { a, b };
   }
 
-  it('the overview names the workspace\u2019s share email; the OAuth routes stay for the sheet sync', async () => {
+  it('the overview names the workspace\u2019s share email; the OAuth consent routes are untouched', async () => {
     const { a } = await twoWorkspaces();
     as(A_ADMIN);
     const ov = await (await call(`/v1/workspaces/${WS_A}/file-imports`))!.json() as { share: unknown; providers: unknown[] };
     expect(ov.share).toEqual({ provider: 'google_drive', shareEmail: a });
     expect(ov.providers).toEqual([{ id: 'google_drive', connected: false, accountEmail: null }]);
-    // The artifact sheet sync still connects and browses through OAuth: untouched by sharing.
+    // Connecting and browsing through the OAuth consent work as before: sharing is always explicit.
     expect((await call(`/v1/workspaces/${WS_A}/file-imports/connect/google_drive`))?.status).toBe(302);
     expect(((await (await call(`/v1/workspaces/${WS_A}/file-imports/browse/google_drive?files=sheets&ref=root`))!.json()) as { code: string }).code).toBe('NOT_CONNECTED');
     expect(log.drive).toEqual([]);
