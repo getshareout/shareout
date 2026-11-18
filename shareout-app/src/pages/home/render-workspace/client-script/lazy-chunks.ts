@@ -22,6 +22,7 @@ import { workspace_client_home_views_adminSummary_JS } from './home-views/admin-
 import { workspace_client_home_views_clients_JS } from './home-views/clients';
 import { workspace_client_home_views_knowledge_JS } from './home-views/knowledge';
 import { workspace_client_home_views_knowledgeMap_JS } from './home-views/knowledge-map';
+import { workspace_client_home_views_knowledgeCurate_JS } from './home-views/knowledge-curate';
 import { workspace_client_home_views_catalog_JS } from './home-views/catalog';
 import { workspace_client_home_views_catalogCert_JS } from './home-views/catalog-cert';
 import { workspace_client_home_views_catalogMetrics_JS } from './home-views/catalog-metrics';
@@ -46,7 +47,7 @@ export const LAZY_CHUNKS: Record<string, ChunkDef> = {
     exports: ['loadAdmin'],
   },
   knowledge: {
-    src: workspace_client_home_views_knowledge_JS + workspace_client_home_views_knowledgeMap_JS,
+    src: workspace_client_home_views_knowledge_JS + workspace_client_home_views_knowledgeMap_JS + workspace_client_home_views_knowledgeCurate_JS,
     exports: ['loadKnowledge', 'knRoute'],
     soft: ['knStopPoll'],
     vars: ['knCurrentPath'],

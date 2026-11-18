@@ -2,9 +2,11 @@
 //
 // Runtime tests for the Knowledge map fragment: the concentric layout (pure), the
 // evidence panel (facts + quotes + source links, connections grouped by relation) and
-// the finder (type chips, search debounce), in en and es.
+// the finder (type chips, search debounce), in en and es — plus the team's curation
+// (knowledge-curate.ts): solid vs dashed, admin controls vs read-only, the Rules view.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { workspace_client_home_views_knowledgeMap_JS as mapJs } from '../../../src/pages/home/render-workspace/client-script/home-views/knowledge-map';
+import { workspace_client_home_views_knowledgeCurate_JS as curateJs } from '../../../src/pages/home/render-workspace/client-script/home-views/knowledge-curate';
 import { KNOWLEDGE_MAP_COPY } from '../../../src/pages/home/home-i18n/copy/knowledge-map';
 
 type LayoutNode = { id: string; x: number; y: number; r: number; ring: number };
@@ -16,6 +18,7 @@ type Lens = {
   kmRender: (m: HTMLElement, top: string) => void;
   kmTypeLabel: (t: string) => string;
   kmRelLabel: (t: string) => string;
+  kcRenderRules: (m: HTMLElement, top: string) => void;
 };
 
 let locale: 'en' | 'es' = 'en';
@@ -44,6 +47,12 @@ function loadLens(): Lens {
       if (prop === 'i18nError') return (k: string) => '<div class="wsx-empty">' + k + '</div>';
       if (prop === 'fmtDay') return (v: string) => v;
       if (prop === 'openArtifact') return (...a: unknown[]) => { opened = a; };
+      if (prop === 'wsxModal') return (title: string, body: string) => {
+        const ov = document.createElement('div'); ov.className = 'wsx-modal'; ov.innerHTML = '<b>' + title + '</b><div class="wsx-modal__body">' + body + '</div>';
+        document.body.appendChild(ov); return { ov, close: () => ov.remove(), body: ov.querySelector('.wsx-modal__body') };
+      };
+      if (prop === 'Promise') return Promise;
+      if (prop === 'JSON') return JSON;
       if (prop === 'setTimeout') return globalThis.setTimeout;
       if (prop === 'clearTimeout') return globalThis.clearTimeout;
       if (prop === 'Math') return Math;
@@ -56,8 +65,8 @@ function loadLens(): Lens {
     },
     set: (target, prop, value) => { target[prop as string] = value; return true; },
   });
-  const names = ['kmState', 'kmLayout', 'kmPaintPanel', 'kmPaintFinder', 'kmRender', 'kmTypeLabel', 'kmRelLabel'];
-  const body = 'with (scope) {\n' + mapJs + '\nreturn { ' + names.map((n) => n + ': ' + n).join(', ') + ' };\n}';
+  const names = ['kmState', 'kmLayout', 'kmPaintPanel', 'kmPaintFinder', 'kmRender', 'kmTypeLabel', 'kmRelLabel', 'kcRenderRules'];
+  const body = 'with (scope) {\n' + mapJs + curateJs + '\nreturn { ' + names.map((n) => n + ': ' + n).join(', ') + ' };\n}';
   // eslint-disable-next-line @typescript-eslint/no-implied-eval
   return new Function('scope', body)(scope) as Lens;
 }
@@ -98,11 +107,12 @@ const DETAIL = {
 const dist = (a: LayoutNode, b: LayoutNode) => Math.hypot(a.x - b.x, a.y - b.y);
 
 beforeEach(() => {
+  (globalThis.window as unknown as Record<string, unknown>).WSX_ADMIN = false;
   locale = 'en';
   hash = '';
   opened = [];
   document.body.innerHTML = '';
-  fetchMock = vi.fn();
+  fetchMock = vi.fn(async () => ({ ok: false }));
 });
 
 describe('knowledge map — copy', () => {
@@ -311,5 +321,140 @@ describe('knowledge map — finder and shell', () => {
     expect(lens.kmState.focus).toBe('lh');
     expect(lens.kmState.trail).toEqual(['lh']);
     vi.useRealTimers();
+  });
+});
+
+const flush = async () => { for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0)); };
+const json = (d: unknown) => ({ ok: true, json: async () => d });
+
+describe('knowledge map — the team’s curation', () => {
+  const CONF_GRAPH = {
+    nodes: GRAPH.nodes.map((n, i) => ({ ...n, status: i < 3 ? 'confirmed' : 'draft' })),
+    edges: GRAPH.edges.map((e, i) => ({ ...e, status: i === 0 ? 'confirmed' : 'draft' })),
+  };
+
+  it('draws what the team confirmed solid and what Knowledge proposed dashed, with a legend', async () => {
+    const lens = loadLens();
+    fetchMock.mockImplementation(async (url: string) => {
+      if (/\/entities\?limit=40/.test(url)) return json({ types: [{ type: 'Organization', count: 2 }], entities: CONF_GRAPH.nodes.slice(0, 5) });
+      if (/\/graph\?/.test(url)) return json(CONF_GRAPH);
+      if (/\/entities\/org$/.test(url)) return json({ ...DETAIL, entity: { ...DETAIL.entity, status: 'confirmed' } });
+      return { ok: false };
+    });
+    document.body.innerHTML = '<div id="wsxKnMount"></div>';
+    lens.kmRender(document.getElementById('wsxKnMount')!, '');
+    await flush();
+    const svg = document.getElementById('kmSvg')!;
+    expect(svg.querySelectorAll('.km__node.is-draft')).toHaveLength(4);
+    expect(svg.querySelectorAll('.km__e.is-draft')).toHaveLength(4);
+    expect(document.querySelector('.km__legend')!.textContent).toContain('Confirmed by the team');
+    expect(document.querySelector('.km__legend')!.textContent).toContain('Proposed by Knowledge');
+    // members get no edit affordances on the canvas
+    expect(svg.querySelector('[data-km-handle]')).toBeNull();
+    expect(document.querySelector('[data-km-new]')).toBeNull();
+    expect(document.getElementById('kmPanel')!.textContent).toContain('Confirmed by the team');
+    // the finder filters by status, server-side
+    (document.querySelector('[data-km-status="draft"]') as HTMLButtonElement).click();
+    expect(fetchMock.mock.calls.some((c) => /\/entities\?limit=40&status=draft$/.test(String(c[0])))).toBe(true);
+  });
+
+  it('gives admins the controls: confirm, retype, rename, connect, facts, merge, discard', async () => {
+    (globalThis.window as unknown as Record<string, unknown>).WSX_ADMIN = true;
+    const lens = loadLens();
+    lens.kmState.types = ['Organization', 'Product', 'Project'];
+    lens.kmState.focus = 'org';
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PATCH') return json({ ok: true, id: 'org' });
+      if (/\/history/.test(url)) return json({ history: [{ id: 1, at: '2026-11-18T10:00:00Z', by: 'u1', action: 'entity.update', targets: ['org'], detail: { name: { from: 'HS Ltd', to: 'Harbor Studio' } } }] });
+      if (/\/entities\?limit=40/.test(url)) return json({ types: [], entities: [] });
+      return json({});
+    });
+    document.body.innerHTML = '<aside id="kmPanel"></aside>';
+    lens.kmPaintPanel(DETAIL);
+    const panel = document.getElementById('kmPanel')!;
+    expect(panel.querySelector('.kc-prop')!.textContent).toContain('Proposed by Knowledge');
+    for (const sel of ['[data-kc-confirm]', '[data-kc-discard]', '[data-kc-type]', '[data-kc-name]', '[data-kc-alias]', '[data-kc-def]', '[data-kc-fact]', '[data-kc-conn]', '[data-kc-merge]']) {
+      expect(panel.querySelector(sel), sel).not.toBeNull();
+    }
+    expect(panel.querySelectorAll('[data-kc-rok]')).toHaveLength(3); // every learned connection can be confirmed
+    expect(panel.querySelectorAll('[data-kc-fok]')).toHaveLength(2);
+    await flush();
+    expect(document.getElementById('kcHist')!.textContent).toContain('Edited «HS Ltd» → «Harbor Studio»');
+
+    (panel.querySelector('[data-kc-confirm]') as HTMLButtonElement).click();
+    await flush();
+    const patch = fetchMock.mock.calls.find((c) => (c[1] as RequestInit | undefined)?.method === 'PATCH')!;
+    expect(String(patch[0])).toBe('/v1/workspaces/wsp_test/knowledge/entities/org');
+    expect(JSON.parse(String((patch[1] as RequestInit).body))).toEqual({ confirm: true });
+  });
+
+  it('shows a learned value next to the team’s instead of replacing it', () => {
+    (globalThis.window as unknown as Record<string, unknown>).WSX_ADMIN = true;
+    const lens = loadLens();
+    document.body.innerHTML = '<aside id="kmPanel"></aside>';
+    lens.kmPaintPanel({
+      ...DETAIL,
+      entity: { ...DETAIL.entity, status: 'confirmed' },
+      facts: [
+        { id: 'ft', predicate: 'founded', value: '2018', unit: null, validFrom: null, quote: '', source: null, status: 'confirmed' },
+        { ...DETAIL.facts[1], status: 'draft' },
+      ],
+    });
+    const facts = document.querySelectorAll('.km__fact');
+    expect(facts[0].classList.contains('is-team')).toBe(true);
+    expect(facts[1].classList.contains('is-clash')).toBe(true);
+    expect(facts[1].querySelector('.kc-clash')!.textContent).toBe('The team says 2018. Keep the team’s value or use this one.');
+    expect(facts[1].querySelector('[data-kc-fok]')!.getAttribute('title')).toBe('Use this one');
+  });
+
+  it('members see the panel read-only', () => {
+    const lens = loadLens();
+    document.body.innerHTML = '<aside id="kmPanel"></aside>';
+    lens.kmPaintPanel(DETAIL);
+    const panel = document.getElementById('kmPanel')!;
+    expect(panel.querySelector('.kc-prop')!.textContent).toBe('Proposed by Knowledge · found in 0 sources');
+    expect(panel.querySelector('[data-kc-confirm], [data-kc-type], [data-kc-name], .km__acts, [data-kc-merge], #kcHist')).toBeNull();
+  });
+
+  it('renders the Rules view: types with switches, glossary, rules, discarded — editable for admins only', async () => {
+    const schema = { types: [{ type: 'Registro', description: 'RS-xx', ignored: false, team: true, count: 3 }, { type: 'Lugar', description: '', ignored: true, team: true, count: 2 }, { type: 'Organization', description: '', ignored: false, team: false, count: 5 }], teamOnly: false, relationTypes: ['part_of'] };
+    const rules = { rules: [{ id: 'r1', kind: 'glossary', term: 'NC (en RS-28)', text: 'No corresponde', at: '' }, { id: 'r2', kind: 'rule', term: null, text: 'Codes first', at: '' }] };
+    const discarded = { discarded: [{ kind: 'entity', key: 'neuquen', label: 'Neuquén', reason: 'noint', at: '' }] };
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method) return json({ ok: true });
+      if (/\/schema$/.test(url)) return json(schema);
+      if (/\/rules$/.test(url)) return json(rules);
+      if (/\/discarded/.test(url)) return json(discarded);
+      return { ok: false };
+    });
+    locale = 'es';
+    let lens = loadLens();
+    document.body.innerHTML = '<div id="m"></div>';
+    lens.kcRenderRules(document.getElementById('m')!, '');
+    await flush();
+    let text = document.getElementById('kcRules')!.textContent!;
+    expect(text).toContain('Estructura');
+    expect(text).toContain('NC (en RS-28)');
+    expect(text).toContain('Codes first');
+    expect(text).toContain('Solo dueños y administradores');
+    expect(document.querySelectorAll('.kc-switch:disabled').length).toBe(4); // team-only + 3 types
+    expect(text).not.toContain('Descartados'); // members don't see the discarded list
+    expect(fetchMock.mock.calls.some((c) => /\/discarded/.test(String(c[0])))).toBe(false);
+
+    (globalThis.window as unknown as Record<string, unknown>).WSX_ADMIN = true;
+    lens = loadLens();
+    document.body.innerHTML = '<div id="m"></div>';
+    lens.kcRenderRules(document.getElementById('m')!, '');
+    await flush();
+    text = document.getElementById('kcRules')!.textContent!;
+    expect(text).toContain('Descartados');
+    expect(text).toContain('Neuquén · No nos interesa');
+    expect(document.querySelector('.kc-trow.is-off')!.textContent).toContain('Lugar');
+    // switching a type off ignores it
+    (document.querySelector('[data-kc-tog="Registro"]') as HTMLButtonElement).click();
+    await flush();
+    const put = fetchMock.mock.calls.find((c) => (c[1] as RequestInit | undefined)?.method === 'PUT')!;
+    expect(String(put[0])).toBe('/v1/workspaces/wsp_test/knowledge/schema/types/Registro');
+    expect(JSON.parse(String((put[1] as RequestInit).body))).toEqual({ ignored: true });
   });
 });

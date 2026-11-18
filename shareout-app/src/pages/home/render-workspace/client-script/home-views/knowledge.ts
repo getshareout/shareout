@@ -52,7 +52,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     var m = knMount(); if (needWs(m)) return;
     knStopPoll();
     m.innerHTML = i18nLoad();
-    if (!knState.view) { var v = ''; try { v = localStorage.getItem('wsx_kn_view') || ''; } catch (e) {} knState.view = (v === 'table' || v === 'map') ? v : 'tree'; }
+    if (!knState.view) { var v = ''; try { v = localStorage.getItem('wsx_kn_view') || ''; } catch (e) {} knState.view = (v === 'table' || v === 'map' || v === 'rules') ? v : 'tree'; }
     var base = knBase();
     fetch(base, { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
@@ -208,6 +208,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
       + '<button class="' + (knState.view === 'tree' ? 'is-on' : '') + '" data-kn-view="tree" type="button">' + esc(t('knowledge.viewTree')) + '</button>'
       + '<button class="' + (knState.view === 'table' ? 'is-on' : '') + '" data-kn-view="table" type="button">' + esc(t('knowledge.viewTable')) + '</button>'
       + '<button class="' + (knState.view === 'map' ? 'is-on' : '') + '" data-kn-view="map" type="button">' + esc(t('knowledge.viewMap')) + '</button>'
+      + '<button class="' + (knState.view === 'rules' ? 'is-on' : '') + '" data-kn-view="rules" type="button">' + esc(t('knowledge.viewRules')) + '</button>'
       + '</div>';
   }
   function knHowP(key) {
@@ -441,7 +442,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
     var trainBtn = window.WSX_ADMIN ? '<button class="so-c-btn so-c-btn--primary wsx-kn2__train" id="knTrain" type="button" data-tip="' + esc(t('knowledge.tipTrain')) + '">' + esc(t('knowledge.train')) + '</button>' : '';
     var prog = '<div class="wsx-kn2__prog" id="knProg" hidden><div class="wsx-kn2__progtrack"><div class="wsx-kn2__progfill" id="knProgFill"></div></div><span class="wsx-kn2__proglabel" id="knProgLabel"></span></div>';
     // Lens-level (stats, train, view) live in the title row; search/filter live with what they filter.
-    var search = knState.view === 'map' ? '' : '<div class="wsx-qsearch">' + isvg('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>')
+    var search = knState.view === 'map' || knState.view === 'rules' ? '' : '<div class="wsx-qsearch">' + isvg('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>')
       + '<input id="knSearch" type="search" placeholder="' + esc(t('knowledge.searchPlaceholder')) + '" aria-label="' + esc(t('knowledge.searchPlaceholder')) + '" autocomplete="off" spellcheck="false"></div>';
     var stats = document.getElementById('knStats'); if (stats) stats.innerHTML = knKpiTiles();
     var acts = document.getElementById('knActions'); if (acts) acts.innerHTML = trainBtn + knToggle();
@@ -449,6 +450,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
       ? '<div class="wsx-cat__controls wsx-ttool"><div class="wsx-cat__bar wsx-kn2__bar">' + search + knSeg() + '<span class="wsx-cat__count" id="knCount"></span></div>' + prog + '</div>'
       : prog;
     if (knState.view === 'map') { kmRender(m, top); return; }
+    if (knState.view === 'rules') { kcRenderRules(m, top); return; }
     if (knState.view === 'table') {
       m.innerHTML = top + knTableBody();
       knBindShell(m); knBindTable(m); knApplyFilter();
