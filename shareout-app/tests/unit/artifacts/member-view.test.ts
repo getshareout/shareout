@@ -12,14 +12,15 @@ import type { Env } from '../../../src/types';
 const member = { id: 'usr_m', email: 'm@x.com', username: null };
 const vis = { userIds: ['usr_m'], emails: ['m@x.com'] };
 
-function env(visibility: string, opts: { member: boolean; wsRole?: string; ownerId?: string }): Env {
-  const row = { ...artifactRow, owner_id: opts.ownerId ?? 'usr_owner', workspace_id: 'wsp_1', visibility };
+function env(visibility: string, opts: { member: boolean; wsRole?: string; ownerId?: string; collab?: boolean }): Env {
+  const row = { ...artifactRow, owner_id: opts.ownerId ?? 'usr_owner', workspace_id: 'wsp_1', workspace_name: 'Acme', visibility };
   return {
     ...baseEnv,
     DB: makeDbMock({
       first: (sql, ...args) => {
         if (sql.includes('is_favorite')) return args.includes(row.id) || (sql.includes('a.slug = ?') && args.includes(row.slug)) ? row : null;
         if (sql.includes('owner_id FROM artifacts')) return row;
+        if (sql.includes('role FROM collaborators')) return opts.collab ? { role: 'viewer' } : null;
         if (sql.includes('email FROM users')) return { email: member.email };
         if (sql.includes('workspace_members')) return opts.member ? { role: opts.wsRole ?? 'member' } : null;
         return null;
@@ -48,6 +49,15 @@ describe('workspace member on a workspace-visible artifact', () => {
     expect(await jsonBody(admin)).toMatchObject({ can_edit: false, can_delete: true, can_manage_comments: false });
     const owner = await handleGetArtifact(new Request('https://x'), env('workspace', { member: true, ownerId: 'usr_m' }), member, 'art_1');
     expect(await jsonBody(owner)).toMatchObject({ can_edit: true, can_delete: true, can_manage_comments: true });
+  });
+
+  it('GET details names the workspace for its members only (the share dialog says "Everyone in Acme")', async () => {
+    const asMember = await handleGetArtifact(new Request('https://x'), env('workspace', { member: true }), member, 'art_1');
+    expect(await jsonBody(asMember)).toMatchObject({ workspace_name: 'Acme' });
+    // An outside collaborator (invited by email, not a member) sees the page but not the workspace's name.
+    const asGuest = await handleGetArtifact(new Request('https://x'), env('private', { member: false, collab: true }), member, 'art_1');
+    expect(asGuest.status).toBe(200);
+    expect(await jsonBody(asGuest)).toMatchObject({ workspace_name: null });
   });
 
   it('GET details resolves a slug (Home deep link #a/<slug>) to the artifact id', async () => {

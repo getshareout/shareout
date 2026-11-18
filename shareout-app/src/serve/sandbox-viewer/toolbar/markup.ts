@@ -1,5 +1,4 @@
 import { escapeHtml } from '../../utils';
-import { shareModalMarkup } from '../../../components/share-modal';
 import type { ToolbarRenderContext } from '../types';
 import { TOOLBAR_COPY } from './copy';
 import { GUEST_COPY } from './copy-guest';
@@ -236,5 +235,5 @@ export function renderToolbarMarkup(ctx: ToolbarRenderContext): string {
         <div class="so-cmt-replying" id="so-cmt-replying" style="margin-top:8px"></div>
       </div>
     </div>
-  </div>` : ''}${loggedIn ? shareModalMarkup(locale) : ''}${skillsOverlay}`;
+  </div>` : ''}${skillsOverlay}`;
 }

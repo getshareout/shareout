@@ -180,7 +180,7 @@ export async function handleGetArtifact(
       COALESCE(mod_a.status, 'approved') AS moderation_status,
       mod_a.reason AS moderation_reason, mod_a.checked_at AS moderation_checked_at,
       d.updated_at, d.slug as deploy_slug,
-      w.slug as workspace_slug, ou.name AS owner_name, ou.email AS owner_email,
+      w.slug as workspace_slug, w.name AS workspace_name, ou.name AS owner_name, ou.email AS owner_email,
       COALESCE((SELECT version_no FROM versions WHERE id = d.version_id), (SELECT MAX(version_no) FROM versions WHERE artifact_id = a.id)) as current_version,
       (SELECT MAX(version_no) FROM versions WHERE artifact_id = a.id) as latest_version,
       lv.message AS live_message, lv.message_source AS live_message_source,
@@ -216,6 +216,7 @@ export async function handleGetArtifact(
     updated_at: string | null;
     deploy_slug: string | null;
     workspace_slug: string | null;
+    workspace_name: string | null;
     artifact_type: string;
     type_metadata: string | null;
     current_version: number;
@@ -287,6 +288,8 @@ export async function handleGetArtifact(
     slug: artifact.slug,
     visibility: artifact.visibility as Visibility,
     workspace_id: artifact.workspace_id,
+    // The share dialog names the workspace ("Everyone in Acme"); only its members learn the name.
+    workspace_name: wsRole != null ? artifact.workspace_name : null,
     paused: artifact.paused === 1,
     created_at: artifact.created_at,
     updated_at: artifact.updated_at,

@@ -1,44 +1,26 @@
-/** Share popover on the artifact bar: the Details "Shared with" visibility + invite controls, one click away. */
-export const workspace_client_share_popover_JS = `  // ===== Share popover (artifact bar) =====
-  var sharePopEl = null, sharePopArt = null, sharePopVis = '';
-  var shareWrapEl = document.getElementById('wsxShareWrap');
+import { shareModalScript } from '../../../../components/share-modal';
+
+/** Lazy chunk (lazy-chunks.ts `share`): the one share dialog (components/share-modal), fetched on first use. */
+export const workspace_client_share_dialog_JS = `${shareModalScript({ baseUrl: '' })}
+  function wsxOpenShare(id, slug, name, canEdit) { window.openShare(id, slug, name, canEdit); }
+`;
+
+/** Share on the artifact bar and the Details rail: both open the one share dialog. */
+export const workspace_client_share_popover_JS = `  // ===== Share (artifact bar + Details rail) =====
   var shareBtnEl = document.getElementById('wsxShareBtn');
-  function closeSharePop() {
-    if (!sharePopEl) return;
-    var art = sharePopArt, v0 = sharePopVis;
-    sharePopEl.remove(); sharePopEl = null; sharePopArt = null;
-    if (shareBtnEl) shareBtnEl.setAttribute('aria-expanded', 'false');
-    document.removeEventListener('mousedown', onShareOutside, true);
-    document.removeEventListener('keydown', onShareKey, true);
-    var m = art && art.id && metaCache[art.id];
-    if (rActive === 'details' && activeArt === art && (!m || m.visibility !== v0)) paintRail();
+  function openShareFor(art) { if (art && art.id) wsxOpenShare(art.id, art.slug, art.name || '', !!art.canEdit); }
+  if (shareBtnEl) {
+    shareBtnEl.addEventListener('click', function () { var rec = panes[activeKey]; if (rec) openShareFor(rec.art); });
+    // Warm the dialog's chunk on intent so the click opens it at once.
+    var warmShare = function () { wsxChunk('share'); };
+    shareBtnEl.addEventListener('pointerenter', warmShare, { once: true });
+    shareBtnEl.addEventListener('focus', warmShare, { once: true });
   }
-  function onShareOutside(e) { if (sharePopEl && !sharePopEl.contains(e.target) && !shareBtnEl.contains(e.target)) closeSharePop(); }
-  function onShareKey(e) { if (e.key === 'Escape') { closeSharePop(); shareBtnEl.focus(); } }
-  function openSharePop() {
-    var rec = panes[activeKey]; if (!rec || !rec.art.canEdit) return;
-    var art = rec.art;
-    fetchMeta(art, function (meta) {
-      if (!meta || !meta.can_edit || panes[activeKey] !== rec || sharePopEl) return;
-      var vis = meta.visibility === 'unlisted' ? 'public' : (meta.visibility || 'private');
-      var opts = ['private'].concat(meta.workspace_id ? ['workspace'] : [], ['public']);
-      sharePopEl = document.createElement('div');
-      sharePopEl.className = 'wsx-sharepop'; sharePopEl.setAttribute('role', 'dialog'); sharePopEl.setAttribute('aria-label', t('share.button'));
-      sharePopEl.innerHTML = '<div class="wsx-sharepop__title">' + esc(t('share.title')) + '</div>' + visBlockHtml(true, opts, vis, meta.can_open_public === false)
-        + '<div class="wsx-det__chips wsx-det__sharecard wsx-sharepop__people"></div>'
-        + '<button class="wsx-abtn wsx-sharepop__copy" type="button" data-share-copy>' + isvg(SVG_LINK) + esc(t('share.copyLink')) + '</button>';
-      shareWrapEl.appendChild(sharePopEl);
-      sharePopArt = art; sharePopVis = vis;
-      shareBtnEl.setAttribute('aria-expanded', 'true');
-      wireVis(sharePopEl, art, vis);
-      renderShare(art, meta, true, sharePopEl.querySelector('.wsx-sharepop__people'));
-      sharePopEl.querySelector('[data-share-copy]').addEventListener('click', function () {
-        copyText(meta.url || (location.origin + '/a/' + encodeURIComponent(meta.slug || art.slug) + '/'), null);
-      });
-      document.addEventListener('mousedown', onShareOutside, true);
-      document.addEventListener('keydown', onShareKey, true);
-    });
-  }
-  if (shareBtnEl) shareBtnEl.addEventListener('click', function () { if (sharePopEl) closeSharePop(); else openSharePop(); });
+  // The dialog changed who can see it: drop the cached meta so the rail repaints the truth.
+  window.addEventListener('so:share-changed', function (e) {
+    var id = e.detail && e.detail.id; if (!id) return;
+    metaCache[id] = undefined;
+    if (rActive === 'details' && activeArt && activeArt.id === id) paintRail();
+  });
 
 `;

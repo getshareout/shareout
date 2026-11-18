@@ -54,6 +54,25 @@ export async function addCollaboratorEmails(
   return added;
 }
 
+/**
+ * The collaborator list every endpoint here answers with. `pending` = no account has
+ * signed in with that email yet (invited, never opened it), so the share dialog can
+ * say so instead of looking like a regular member.
+ */
+async function listCollaborators(env: Env, artifactId: string) {
+  const rows = await env.DB.prepare(
+    `SELECT c.email, c.role, c.added_at, u.last_login_at
+     FROM collaborators c LEFT JOIN users u ON u.email = c.email
+     WHERE c.artifact_id = ? ORDER BY c.added_at DESC`
+  ).bind(artifactId).all<{ email: string; role: string; added_at: string; last_login_at: string | null }>();
+  return (rows.results || []).map(c => ({
+    email: c.email,
+    role: c.role,
+    added_at: c.added_at,
+    pending: !c.last_login_at,
+  }));
+}
+
 export async function handleGetCollaborators(
   request: Request,
   env: Env,
@@ -72,17 +91,7 @@ export async function handleGetCollaborators(
   }
   if (forbidden) return forbidden;
 
-  const collaborators = await env.DB.prepare(
-    'SELECT email, role, added_at FROM collaborators WHERE artifact_id = ? ORDER BY added_at DESC'
-  ).bind(artifactId).all<{ email: string; role: string; added_at: string }>();
-
-  return json({
-    collaborators: (collaborators.results || []).map(c => ({
-      email: c.email,
-      role: c.role,
-      added_at: c.added_at,
-    })),
-  });
+  return json({ collaborators: await listCollaborators(env, artifactId) });
 }
 
 export async function handleAddCollaborators(
@@ -102,8 +111,9 @@ export async function handleAddCollaborators(
   const forbidden = await requireSharingRole(env, artifactId, user.id, 'editor');
   if (forbidden) return forbidden;
 
-  // notify: email the people this call newly adds (the Studio share panel sets it).
-  let body: { emails: string[]; role?: CollaboratorRole; notify?: boolean };
+  // notify: email the people this call newly adds (the share dialog sets it), with an
+  // optional note from the sharer (an editor's to write, as on POST /share).
+  let body: { emails: string[]; role?: CollaboratorRole; notify?: boolean; message?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -124,23 +134,16 @@ export async function handleAddCollaborators(
     .map(e => e.toLowerCase().trim());
 
   const added = await addCollaboratorEmails(env, artifactId, validEmails, role, user.id);
+  const message = typeof body.message === 'string' && body.message.trim() ? body.message.slice(0, 1000) : undefined;
   const notified = body.notify === true
-    ? await emailNewCollaborators(env, user.id, artifactId, added, role as 'viewer' | 'editor')
+    ? await emailNewCollaborators(env, user.id, artifactId, added, role as 'viewer' | 'editor', message)
     : undefined;
-
-  const allCollaborators = await env.DB.prepare(
-    'SELECT email, role, added_at FROM collaborators WHERE artifact_id = ?'
-  ).bind(artifactId).all<{ email: string; role: string; added_at: string }>();
 
   return json({
     success: true,
     added,
     ...(notified ? { notified } : {}),
-    collaborators: (allCollaborators.results || []).map(c => ({
-      email: c.email,
-      role: c.role,
-      added_at: c.added_at,
-    })),
+    collaborators: await listCollaborators(env, artifactId),
   });
 }
 
@@ -176,18 +179,10 @@ export async function handleRemoveCollaborator(
     'DELETE FROM collaborators WHERE artifact_id = ? AND email = ?'
   ).bind(artifactId, normalizedEmail).run();
 
-  const allCollaborators = await env.DB.prepare(
-    'SELECT email, role, added_at FROM collaborators WHERE artifact_id = ?'
-  ).bind(artifactId).all<{ email: string; role: string; added_at: string }>();
-
   return json({
     success: true,
     removed: result.meta.changes > 0,
-    collaborators: (allCollaborators.results || []).map(c => ({
-      email: c.email,
-      role: c.role,
-      added_at: c.added_at,
-    })),
+    collaborators: await listCollaborators(env, artifactId),
   });
 }
 

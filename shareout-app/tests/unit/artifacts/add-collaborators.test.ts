@@ -129,7 +129,7 @@ describe('handleAddCollaborators', () => {
           return null;
         },
         all: (sql) => {
-          if (sql.includes('FROM collaborators WHERE artifact_id = ?') && !sql.includes('AND email')) {
+          if (sql.includes('FROM collaborators c LEFT JOIN users')) {
             return {
               results: [
                 { email: 'new@example.com', role: 'editor', added_at: '2024-03-01T00:00:00Z' },
@@ -233,8 +233,28 @@ describe('handleAddCollaborators', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(emailNewCollaborators).toHaveBeenCalledWith(expect.anything(), user.id, 'art_1', ['new@example.com'], 'viewer');
+      expect(emailNewCollaborators).toHaveBeenCalledWith(expect.anything(), user.id, 'art_1', ['new@example.com'], 'viewer', undefined);
       expect((await jsonBody(response)).notified).toMatchObject({ sent: ['new@example.com'], rate_limited: false });
+    });
+
+    it('passes the sharer\'s note to the email, trimmed to 1000 characters', async () => {
+      emailNewCollaborators.mockReset().mockResolvedValue({ sent: ['new@example.com'], failed: [], rate_limited: false, url: null });
+      const note = 'Mirá el reporte de ventas. ' + 'x'.repeat(1200);
+
+      const response = await handleAddCollaborators(
+        post({ emails: ['new@example.com'], role: 'viewer', notify: true, message: note }),
+        notifyEnv(), user, 'art_1',
+      );
+
+      expect(response.status).toBe(200);
+      expect(emailNewCollaborators).toHaveBeenCalledWith(expect.anything(), user.id, 'art_1', ['new@example.com'], 'viewer', note.slice(0, 1000));
+    });
+
+    it('ignores a blank or non-string note', async () => {
+      emailNewCollaborators.mockReset().mockResolvedValue({ sent: [], failed: [], rate_limited: false, url: null });
+      await handleAddCollaborators(post({ emails: ['new@example.com'], role: 'viewer', notify: true, message: '   ' }), notifyEnv(), user, 'art_1');
+      await handleAddCollaborators(post({ emails: ['new@example.com'], role: 'viewer', notify: true, message: { x: 1 } }), notifyEnv(), user, 'art_1');
+      for (const call of emailNewCollaborators.mock.calls) expect(call[5]).toBeUndefined();
     });
 
     it('sends nothing without notify (API callers keep the old behaviour)', async () => {

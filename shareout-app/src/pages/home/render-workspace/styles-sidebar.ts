@@ -130,17 +130,9 @@ export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspect
 .wsx-tip { position: fixed; z-index: 500; max-width: 240px; padding: 6px 10px; border-radius: 8px; background: var(--color-text); color: var(--color-bg); font: 500 var(--text-xs) var(--font-body); line-height: 1.45; box-shadow: var(--shadow-lg); pointer-events: none; opacity: 0; transform: translateY(2px); transition: opacity var(--duration-fast), transform var(--duration-fast); display: none; }
 .wsx-tip.is-show { opacity: 1; transform: translateY(0); }
 /* share picker */
-.wsx-share__roletog { display: inline-flex; border: 1.5px solid var(--color-border); border-radius: 999px; overflow: hidden; align-self: flex-start; }
-.wsx-share__roletog button { border: 0; background: transparent; padding: 5px 13px; font: 600 var(--text-xs) var(--font-body); color: var(--color-text-secondary); cursor: pointer; }
-.wsx-share__roletog button.is-on { background: var(--color-primary); color: var(--color-text-inverse); }
 .wsx-share__search { width: 100%; box-sizing: border-box; padding: 10px 13px; border: 1px solid var(--color-border); border-radius: var(--radius-md); font: 400 var(--text-sm) var(--font-body); color: var(--color-text); background: var(--color-bg-elevated); outline: none; box-shadow: 0 1px 2px rgba(28,25,23,0.04); transition: border-color var(--duration-fast), box-shadow var(--duration-fast); }
 .wsx-share__search::placeholder { color: var(--color-text-tertiary); }
 .wsx-share__search:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-light); }
-.wsx-share__drop { display: flex; flex-direction: column; gap: 2px; max-height: 190px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
-.wsx-share__drop:empty { display: none; }
-.wsx-share__opt { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border: 0; background: transparent; text-align: left; cursor: pointer; font: 500 var(--text-sm) var(--font-body); color: var(--color-text); }
-.wsx-share__opt:hover { background: var(--color-surface); }
-.wsx-share__opt small { color: var(--color-text-tertiary); font-size: var(--text-xs); margin-left: auto; }
 .wsx-det__who .role { font-size: var(--text-xs); color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; }
 /* ===== Studio inspector redesign ===== */
 .wsx-det__hrow { display: flex; align-items: flex-start; gap: 8px; }
@@ -175,22 +167,8 @@ export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspect
 .wsx-det__page { flex-shrink: 0; text-align: left; padding: 5px 8px; border: 0; border-radius: var(--radius-sm); background: none; font: 500 var(--text-sm) var(--font-body); color: var(--color-text-secondary); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wsx-det__page:hover { background: var(--color-surface); color: var(--color-text); }
 .wsx-det__page.is-on { background: var(--color-surface); color: var(--color-text); font-weight: 600; }
-.wsx-det__sharecard { flex-direction: column; align-items: stretch; gap: 8px; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px; box-shadow: var(--shadow-sm); }
-.wsx-det__sharecard { min-width: 0; max-width: 100%; box-sizing: border-box; }
-.wsx-det__sharecard > * { min-width: 0; max-width: 100%; }
-.wsx-share__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
-.wsx-share__roletog { flex: none; }
-.wsx-share__chips .wsx-det__who { max-width: 100%; min-width: 0; box-sizing: border-box; }
 .wsx-det__who .em { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wsx-det__who .role, .wsx-det__who button { flex: none; }
-.wsx-share__count { font: 400 var(--text-xs) var(--font-body); color: var(--color-text-tertiary); }
-.wsx-share__empty { display: flex; align-items: flex-start; gap: 9px; }
-.wsx-share__emptyic { color: var(--color-text-tertiary); flex: none; margin-top: 1px; }
-.wsx-share__emptyt { font: 500 var(--text-sm) var(--font-body); color: var(--color-text-secondary); }
-.wsx-share__emptys { font: 400 var(--text-xs) var(--font-body); color: var(--color-text-tertiary); margin-top: 1px; }
-.wsx-share__note { font-size: var(--text-xs); color: var(--color-text-tertiary); }
-.wsx-share__chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.wsx-share__kbd { margin-left: auto; font: 500 11px var(--font-mono); padding: 1px 5px; border: 1px solid var(--color-border-strong); border-radius: 5px; color: var(--color-text-tertiary); }
 .wsx-folder { position: relative; }
 .wsx-folder__btn { width: 100%; justify-content: flex-start; gap: 8px; }
 .wsx-folder__btn > svg:first-child { width: 16px; height: 16px; flex: none; color: var(--color-text-tertiary); }
@@ -360,8 +338,4 @@ export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspect
 .wsx-vd__foot .so-c-btn { flex: none; }
 .wsx__sharewrap { position: relative; flex: none; order: 99; }
 .wsx__sharewrap[hidden] { display: none; }
-.wsx-sharepop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; width: min(360px, calc(100vw - 32px)); box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 14px; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
-.wsx-sharepop__title { font: 700 var(--text-base) var(--font-display, var(--font-body)); color: var(--color-text); }
-.wsx-sharepop__copy { align-self: flex-start; }
-.wsx-sharepop__copy svg { width: 15px; height: 15px; }
 `;
