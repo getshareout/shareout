@@ -8,6 +8,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { workspace_client_home_views_knowledgeMap_JS as mapJs } from '../../../src/pages/home/render-workspace/client-script/home-views/knowledge-map';
 import { workspace_client_home_views_knowledgeCurate_JS as curateJs } from '../../../src/pages/home/render-workspace/client-script/home-views/knowledge-curate';
 import { KNOWLEDGE_MAP_COPY } from '../../../src/pages/home/home-i18n/copy/knowledge-map';
+import { KNOWLEDGE_CURATE_COPY } from '../../../src/pages/home/home-i18n/copy/knowledge-curate';
+import { HOME_COPY } from '../../../src/pages/home/home-i18n/merge-copy';
 
 type LayoutNode = { id: string; x: number; y: number; r: number; ring: number };
 type Lens = {
@@ -29,6 +31,7 @@ let opened: unknown[] = [];
 function loadLens(): Lens {
   const win = globalThis.window as unknown as Record<string, unknown>;
   win.WSX_WS = 'wsp_test';
+  win.__SO_HOME_LOCALE = () => locale;
   const scope = new Proxy({} as Record<string | symbol, unknown>, {
     has: () => true,
     get: (target, prop) => {
@@ -120,6 +123,15 @@ describe('knowledge map — copy', () => {
     expect(Object.keys(KNOWLEDGE_MAP_COPY.es).sort()).toEqual(Object.keys(KNOWLEDGE_MAP_COPY.en).sort());
     expect(KNOWLEDGE_MAP_COPY.en['knowledge.viewMap']).toBe('Map');
     expect(KNOWLEDGE_MAP_COPY.es['knowledge.viewMap']).toBe('Mapa');
+  });
+
+  it('curation copy ships with the lazy chunk, in both languages, not in the boot copy', () => {
+    expect(Object.keys(KNOWLEDGE_CURATE_COPY.es).sort()).toEqual(Object.keys(KNOWLEDGE_CURATE_COPY.en).sort());
+    expect(HOME_COPY.en['kcur.confirm']).toBeUndefined();
+    expect(curateJs).toContain('"kcur.confirm":"Confirmar"');
+    // every kt() key the fragments use exists
+    const used = new Set([...(mapJs + curateJs).matchAll(/kt\('([^']+)'/g)].map((m) => m[1]));
+    for (const k of used) if (!k.endsWith('.')) expect(KNOWLEDGE_CURATE_COPY.en[k], k).toBeTruthy();
   });
 
   it('humanises unknown types and relations instead of showing raw keys', () => {

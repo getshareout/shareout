@@ -137,9 +137,9 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
       + '<button class="' + (kmState.depth === 1 ? 'is-on' : '') + '" data-km-depth="1" type="button">' + esc(t('kmap.depth1')) + '</button>'
       + '<button class="' + (kmState.depth === 2 ? 'is-on' : '') + '" data-km-depth="2" type="button">' + esc(t('kmap.depth2')) + '</button></div>'
       + '<button class="so-c-btn so-c-btn--sm" data-km-fit type="button">' + esc(t('kmap.fit')) + '</button>'
-      + (kmAdmin() ? '<button class="so-c-btn so-c-btn--sm" data-km-new type="button">' + esc(t('kcur.newEntityBtn')) + '</button>' : '') + '</div>';
-    var legend = '<div class="km__legend"><span><i></i>' + esc(t('kmap.legendConfirmed')) + '</span><span><i class="is-d"></i>' + esc(t('kmap.legendProposed')) + '</span>'
-      + (kmAdmin() ? '<span class="km__hint">' + esc(t('kmap.editHint')) + '</span>' : '') + '</div>';
+      + (kmAdmin() ? '<button class="so-c-btn so-c-btn--sm" data-km-new type="button">' + esc(kt('kcur.newEntityBtn')) + '</button>' : '') + '</div>';
+    var legend = '<div class="km__legend"><span><i></i>' + esc(kt('kmap.legendConfirmed')) + '</span><span><i class="is-d"></i>' + esc(kt('kmap.legendProposed')) + '</span>'
+      + (kmAdmin() ? '<span class="km__hint">' + esc(kt('kmap.editHint')) + '</span>' : '') + '</div>';
     var note = '';
     if (!lay.edges.length) note = '<div class="km__note">' + esc(t('kmap.noConnections')) + '</div>';
     else if (lay.hidden) note = '<div class="km__note">' + esc(t('kmap.hiddenByFilter').replace('{n}', lay.hidden.toLocaleString())) + '</div>';
@@ -258,7 +258,7 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
         return '<button class="km__chip' + (kmState.type === ty ? ' is-on' : '') + '" data-km-type="' + esc(ty) + '" type="button">' + kmDot(ty) + esc(kmTypeLabel(ty)) + '<span class="km__cnt">' + Number(kmState.counts[ty] || 0).toLocaleString() + '</span></button>';
       }).join('');
     var stat = '<div class="wsx__modetog km__status" role="group">' + [['', 'kmap.statusAll'], ['confirmed', 'kmap.statusConfirmed'], ['draft', 'kmap.statusDraft']].map(function (o) {
-      return '<button class="' + (kmState.status === o[0] ? 'is-on' : '') + '" data-km-status="' + o[0] + '" type="button">' + esc(t(o[1])) + '</button>';
+      return '<button class="' + (kmState.status === o[0] ? 'is-on' : '') + '" data-km-status="' + o[0] + '" type="button">' + esc(kt(o[1])) + '</button>';
     }).join('') + '</div>';
     var list = (kmState.hits || kmState.top).filter(function (e) { return (!kmState.type || e.type === kmState.type) && (!kmState.status || (kmState.status === 'confirmed') === (e.status === 'confirmed')); });
     var items = list.length ? list.map(function (e, i) {
@@ -378,10 +378,10 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
     var e = d.entity || {}, aliases = (e.aliases || []).filter(function (a) { return a && a !== e.name; });
     var top = kcPanelTop(d);
     var typeHtml = admin
-      ? '<select class="so-c-select kc-type" data-kc-type aria-label="' + esc(t('kcur.type')) + '">' + kcTypes(e.type).map(function (ty) { return '<option value="' + esc(ty) + '"' + (ty === e.type ? ' selected' : '') + '>' + esc(kmTypeLabel(ty)) + '</option>'; }).join('') + '</select>'
+      ? '<select class="so-c-select kc-type" data-kc-type aria-label="' + esc(kt('kcur.type')) + '">' + kcTypes(e.type).map(function (ty) { return '<option value="' + esc(ty) + '"' + (ty === e.type ? ' selected' : '') + '>' + esc(kmTypeLabel(ty)) + '</option>'; }).join('') + '</select>'
       : '<span class="wsx-atbl__type">' + esc(kmTypeLabel(e.type)) + '</span>';
     var head = top.box + '<div class="km__phead">' + kmDot(e.type, e.status !== 'confirmed') + typeHtml + '<span class="km__pm">' + esc(kmMentions(e.mentions)) + '</span></div>'
-      + '<h3 class="km__pname' + (admin ? ' is-edit' : '') + '"' + (admin ? ' data-kc-name title="' + esc(t('kcur.rename')) + '"' : '') + '>' + esc(e.name || '') + '</h3>'
+      + '<h3 class="km__pname' + (admin ? ' is-edit' : '') + '"' + (admin ? ' data-kc-name title="' + esc(kt('kcur.rename')) + '"' : '') + '>' + esc(e.name || '') + '</h3>'
       + (admin ? top.aliases : (aliases.length ? '<div class="km__aka">' + esc(t('kmap.alsoKnownAs')) + ' ' + esc(aliases.slice(0, 6).join(', ')) + '</div>' : ''))
       + top.def;
     var facts = (d.facts || []);
@@ -390,11 +390,11 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
     var fbody = facts.length ? facts.map(function (f) {
       var since = f.validFrom ? '<span class="km__since">' + esc(t('kmap.since').replace('{d}', fmtDay(f.validFrom, true) || f.validFrom)) + '</span>' : '';
       var team = f.status === 'confirmed', clash = !team && teamVal[f.predicate] != null && teamVal[f.predicate] !== f.value;
-      var acts = admin ? (team ? '<span class="km__acts"><button class="kc-ib" type="button" data-kc-fno="' + esc(f.id) + '" title="' + esc(t('kcur.remove')) + '">\\u2715</button></span>'
-        : '<span class="km__acts"><button class="kc-ib is-ok" type="button" data-kc-fok="' + esc(f.id) + '" title="' + esc(t(clash ? 'kcur.useThis' : 'kcur.confirm')) + '">\\u2713</button><button class="kc-ib" type="button" data-kc-fno="' + esc(f.id) + '" title="' + esc(t(clash ? 'kcur.keepOurs' : 'kcur.discard')) + '">\\u2715</button></span>') : '';
-      return '<div class="km__fact' + (team ? ' is-team' : ' is-draft') + (clash ? ' is-clash' : '') + '"><div class="km__fk">' + esc(kmHuman(f.predicate)) + (team ? ' <span class="so-c-badge wsx-kn__bdg">' + esc(t('kcur.teamFact')) + '</span>' : '') + acts + '</div>'
+      var acts = admin ? (team ? '<span class="km__acts"><button class="kc-ib" type="button" data-kc-fno="' + esc(f.id) + '" title="' + esc(kt('kcur.remove')) + '">\\u2715</button></span>'
+        : '<span class="km__acts"><button class="kc-ib is-ok" type="button" data-kc-fok="' + esc(f.id) + '" title="' + esc(kt(clash ? 'kcur.useThis' : 'kcur.confirm')) + '">\\u2713</button><button class="kc-ib" type="button" data-kc-fno="' + esc(f.id) + '" title="' + esc(kt(clash ? 'kcur.keepOurs' : 'kcur.discard')) + '">\\u2715</button></span>') : '';
+      return '<div class="km__fact' + (team ? ' is-team' : ' is-draft') + (clash ? ' is-clash' : '') + '"><div class="km__fk">' + esc(kmHuman(f.predicate)) + (team ? ' <span class="so-c-badge wsx-kn__bdg">' + esc(kt('kcur.teamFact')) + '</span>' : '') + acts + '</div>'
         + '<div class="km__fv">' + esc(f.value) + (f.unit ? ' <span class="km__unit">' + esc(f.unit) + '</span>' : '') + since + '</div>'
-        + (clash ? '<div class="kc-clash">' + esc(t('kcur.conflict').replace('{v}', teamVal[f.predicate])) + '</div>' : '')
+        + (clash ? '<div class="kc-clash">' + esc(kt('kcur.conflict').replace('{v}', teamVal[f.predicate])) + '</div>' : '')
         + (f.quote ? '<blockquote class="km__q">\\u201C' + esc(kmPlain(f.quote)) + '\\u201D</blockquote>' : '') + (f.source ? kmSrc(f.source) : '') + '</div>';
     }).join('') : '<div class="km__none">' + esc(t('kmap.noFacts')) + '</div>';
     var groups = {}, order = [];
@@ -406,7 +406,7 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
       return '<div class="km__group"><div class="km__gh" title="' + esc(t(inn ? 'kmap.incoming' : 'kmap.outgoing')) + '"><span class="km__arrow">' + (inn ? '\\u2190' : '\\u2192') + '</span>' + esc(kmRelLabel(first.type)) + '<span class="km__cnt">' + rs.length + '</span></div>'
         + rs.map(function (r) {
           var draft = r.status !== 'confirmed';
-          var acts = admin ? '<span class="km__acts">' + (draft ? '<button class="kc-ib is-ok" type="button" data-kc-rok="' + esc(r.id) + '" title="' + esc(t('kcur.confirm')) + '">\\u2713</button>' : '') + '<button class="kc-ib" type="button" data-kc-rno="' + esc(r.id) + '" title="' + esc(t('kcur.remove')) + '">\\u2715</button></span>' : '';
+          var acts = admin ? '<span class="km__acts">' + (draft ? '<button class="kc-ib is-ok" type="button" data-kc-rok="' + esc(r.id) + '" title="' + esc(kt('kcur.confirm')) + '">\\u2713</button>' : '') + '<button class="kc-ib" type="button" data-kc-rno="' + esc(r.id) + '" title="' + esc(kt('kcur.remove')) + '">\\u2715</button></span>' : '';
           return '<div class="km__crow' + (draft ? ' is-draft' : '') + '"><button class="km__item" type="button" data-km-go="' + esc(r.other.id) + '">' + kmDot(r.other.type, r.other.status !== 'confirmed') + '<span class="km__iname">' + esc(r.other.name) + '</span><span class="km__itype">' + esc(kmTypeLabel(r.other.type)) + '</span></button>' + acts + '</div>';
         }).join('') + '</div>';
     }).join('') : '<div class="km__none">' + esc(t('kmap.noConnections')) + '</div>';
@@ -415,10 +415,10 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
     var mbody = ms.length ? ms.slice(0, LIMIT).map(mrow).join('')
       + (ms.length > LIMIT ? '<div class="km__more" id="kmMore">' + ms.slice(LIMIT).map(mrow).join('') + '</div><button class="wsx-link km__morebtn" id="kmMoreBtn" type="button">' + esc(t('kmap.showMore').replace('{n}', (ms.length - LIMIT).toLocaleString())) + '</button>' : '')
       : '<div class="km__none">' + esc(t('kmap.noMentions')) + '</div>';
-    var addBtn = function (attr, key) { return admin ? '<button class="wsx-link km__add" type="button" ' + attr + '>' + esc(t(key)) + '</button>' : ''; };
-    var foot = admin ? '<section class="km__sec"><h4 class="km__h4">' + esc(t('kcur.history')) + '</h4><div id="kcHist">' + i18nLoad() + '</div></section>'
-      + '<div class="km__foot"><button class="so-c-btn so-c-btn--sm" type="button" data-kc-merge>' + esc(t('kcur.mergeInto')) + '</button>'
-      + (e.status === 'confirmed' ? '<button class="so-c-btn so-c-btn--sm km__danger" type="button" data-kc-discard2>' + esc(t('kcur.discard')) + '</button>' : '') + '</div>' : '';
+    var addBtn = function (attr, key) { return admin ? '<button class="wsx-link km__add" type="button" ' + attr + '>' + esc(kt(key)) + '</button>' : ''; };
+    var foot = admin ? '<section class="km__sec"><h4 class="km__h4">' + esc(kt('kcur.history')) + '</h4><div id="kcHist">' + i18nLoad() + '</div></section>'
+      + '<div class="km__foot"><button class="so-c-btn so-c-btn--sm" type="button" data-kc-merge>' + esc(kt('kcur.mergeInto')) + '</button>'
+      + (e.status === 'confirmed' ? '<button class="so-c-btn so-c-btn--sm km__danger" type="button" data-kc-discard2>' + esc(kt('kcur.discard')) + '</button>' : '') + '</div>' : '';
     host.innerHTML = head + kmSection(t('kmap.facts'), facts.length, fbody, addBtn('data-kc-fact', 'kcur.addFact'))
       + kmSection(t('kmap.connections'), (d.relations || []).length, cbody, addBtn('data-kc-conn', 'kcur.addConn'))
       + kmSection(t('kmap.mentions'), ms.length, mbody) + foot;

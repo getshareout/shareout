@@ -208,7 +208,7 @@ export const workspace_client_home_views_knowledge_JS = `  // ----- Knowledge â€
       + '<button class="' + (knState.view === 'tree' ? 'is-on' : '') + '" data-kn-view="tree" type="button">' + esc(t('knowledge.viewTree')) + '</button>'
       + '<button class="' + (knState.view === 'table' ? 'is-on' : '') + '" data-kn-view="table" type="button">' + esc(t('knowledge.viewTable')) + '</button>'
       + '<button class="' + (knState.view === 'map' ? 'is-on' : '') + '" data-kn-view="map" type="button">' + esc(t('knowledge.viewMap')) + '</button>'
-      + '<button class="' + (knState.view === 'rules' ? 'is-on' : '') + '" data-kn-view="rules" type="button">' + esc(t('knowledge.viewRules')) + '</button>'
+      + '<button class="' + (knState.view === 'rules' ? 'is-on' : '') + '" data-kn-view="rules" type="button">' + esc(kt('knowledge.viewRules')) + '</button>'
       + '</div>';
   }
   function knHowP(key) {
