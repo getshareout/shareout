@@ -22,6 +22,7 @@ import {
 } from './types';
 import type {
   CreateJobRequest,
+  DriveFileSyncConfig,
   JobConfig,
   JobLog,
   RetryConfig,
@@ -301,6 +302,16 @@ export async function updateJob(
 
   if (!(await canManageJob(env, job, userId))) {
     return { error: 'Permission denied' };
+  }
+
+  // A Drive sync reads through its creator's Drive connection, so only the creator may
+  // point it at another file — else the page owner could pull the creator's files.
+  if (updates.config && job.action === 'drive_file_sync' && job.owner_id !== userId) {
+    const prev = JSON.parse(job.config as unknown as string) as DriveFileSyncConfig;
+    const next = updates.config as DriveFileSyncConfig;
+    if (next.fileId !== prev.fileId || (next.provider ?? 'google_drive') !== (prev.provider ?? 'google_drive')) {
+      return { error: 'Only the person whose Google Drive this sync reads can change its file' };
+    }
   }
 
   if (updates.config) {

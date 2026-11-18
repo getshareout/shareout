@@ -14822,8 +14822,7 @@
               "materialize",
               "telegram",
               "query_snapshot",
-              "sheets_append",
-              "drive_file_sync"
+              "sheets_append"
             ]
           },
           "trigger_type": {
@@ -14907,8 +14906,7 @@
               "materialize",
               "telegram",
               "query_snapshot",
-              "sheets_append",
-              "drive_file_sync"
+              "sheets_append"
             ]
           },
           "trigger_type": {

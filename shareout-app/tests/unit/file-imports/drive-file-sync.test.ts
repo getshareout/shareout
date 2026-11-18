@@ -6,13 +6,14 @@ import { applyMigrations, e } from '../helpers/migrated-db';
 import { saveConnection } from '../../../src/file-imports/connections';
 import { driveFileSyncDestination } from '../../../src/delivery/destinations/drive-file-sync';
 import { googleDrive } from '../../../src/file-imports/providers/google';
-import { createJob } from '../../../src/scheduling/jobs/crud';
+import { createJob, updateJob } from '../../../src/scheduling/jobs/crud';
 import { runScheduledJobs } from '../../../src/scheduling/jobs/execute';
 import type { DeliveryContext } from '../../../src/delivery/types';
 import type { DriveFileSyncConfig } from '../../../src/scheduling/jobs/types';
 
 const OWNER = 'usr_dfs_owner';
 const NOCONN = 'usr_dfs_noconn';
+const EDITOR = 'usr_dfs_editor';
 const WS = 'wsp_dfs';
 const ART = 'art_dfs';
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -69,6 +70,7 @@ beforeAll(async () => {
   await e.DB.batch([
     e.DB.prepare('INSERT INTO users (id, email, name) VALUES (?, ?, ?)').bind(OWNER, 'owner@dfs.test', 'Owner'),
     e.DB.prepare('INSERT INTO users (id, email, name) VALUES (?, ?, ?)').bind(NOCONN, 'noconn@dfs.test', 'No conn'),
+    e.DB.prepare('INSERT INTO users (id, email, name) VALUES (?, ?, ?)').bind(EDITOR, 'editor@dfs.test', 'Editor'),
     e.DB.prepare('INSERT INTO workspaces (id, name, slug, owner_id) VALUES (?, ?, ?, ?)').bind(WS, 'DFS', 'dfs-ws', OWNER),
     e.DB.prepare("INSERT INTO workspace_members (id, workspace_id, user_id, role) VALUES ('wm_dfs', ?, ?, 'owner')").bind(WS, OWNER),
     e.DB.prepare("INSERT INTO artifacts (id, name, slug, owner_id, workspace_id, visibility) VALUES (?, 'Sales board', 'dfs-sales', ?, ?, 'private')").bind(ART, OWNER, WS),
@@ -192,6 +194,25 @@ describe('drive_file_sync on a schedule', () => {
     const row = await e.DB.prepare('SELECT next_run_at, last_status FROM scheduled_jobs WHERE id = ?').bind(job!.id).first<{ next_run_at: string; last_status: string }>();
     expect(row!.last_status).toBe('success');
     expect(row!.next_run_at).toMatch(/T\d{2}:00:00\.000Z$/);
+  });
+
+  it("only the job's creator can point it at another file; the page owner can change the rest", async () => {
+    await e.DB.prepare("INSERT INTO collaborators (id, artifact_id, email, role) VALUES ('col_dfs_ed', ?, 'editor@dfs.test', 'editor')").bind(ART).run();
+    await saveConnection(e, WS, EDITOR, 'google_drive', { accessToken: 'at-ed', refreshToken: 'rt-ed', expiresAt: new Date(Date.now() + 3600_000).toISOString(), scope: 's' }, 'editor@drive.test');
+    const { job, error } = await createJob(e, EDITOR, { artifact_id: ART, action: 'drive_file_sync', schedule: '0 9 * * *', config: cfg() });
+    expect(error).toBeUndefined();
+    // The page owner (not the creator) may not re-point it: it would read the editor's Drive.
+    let res = await updateJob(e, OWNER, job!.id, { config: cfg({ fileId: 'EDITORS_PRIVATE_FILE' }) });
+    expect(res.error).toBe('Only the person whose Google Drive this sync reads can change its file');
+    res = await updateJob(e, OWNER, job!.id, { config: { ...cfg(), provider: undefined, fileId: 'XL1' } as DriveFileSyncConfig, schedule: '0 * * * *' });
+    expect(res.error).toBeUndefined();
+    res = await updateJob(e, OWNER, job!.id, { config: cfg({ dataset: 'renamed', sheet: 'Raw' }) });
+    expect(res.error).toBeUndefined();
+    expect(res.job!.config).toMatchObject({ fileId: 'XL1', dataset: 'renamed', sheet: 'Raw' });
+    // The creator may.
+    res = await updateJob(e, EDITOR, job!.id, { config: cfg({ fileId: 'GS1', dataset: 'renamed' }) });
+    expect(res.error).toBeUndefined();
+    expect(res.job!.config).toMatchObject({ fileId: 'GS1' });
   });
 
   it('a viewer cannot schedule one', async () => {
