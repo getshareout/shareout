@@ -160,8 +160,8 @@ export interface QuerySnapshotConfig {
 
 /** Config for the `drive_file_sync` action: one tab of a Google Drive spreadsheet (Excel,
  *  Google Sheets, OpenDocument or CSV) → the artifact's dataset `dataset` (JSON rows keyed
- *  by the header row), read through the job owner's Drive connection. Skips the write
- *  when the file has not changed since the last sync. */
+ *  by the header row), read through the job owner's drive.file consent (the file was picked
+ *  in the Google Picker). Skips the write when the file has not changed since the last sync. */
 export interface DriveFileSyncConfig {
   provider?: 'google_drive';
   fileId: string;

@@ -2,7 +2,8 @@ import type { Destination, DeliveryStep } from '../types';
 import type { DriveFileSyncConfig } from '../../scheduling/jobs/types';
 import { providerConfig } from '../../file-imports/oauth';
 import { accessTokenFor, findConnection } from '../../file-imports/connections';
-import { DRIVE_FILE_ID, SHEET_MIMES, getDriveFile, googleDrive } from '../../file-imports/providers/google';
+import { DRIVE_FILE_ID, getDriveFile, googleDrive, isSpreadsheet } from '../../file-imports/providers/google';
+import { DRIVE_FILE_CONSENT } from '../../file-imports/types';
 import { AuthExpiredError, ProviderError, RateLimitedError } from '../../file-imports/http';
 import { SheetRowsError, sheetRows } from '../../data/files/sheet-rows';
 import { XLSX_MAX_INPUT_BYTES } from '../../data/files/parse-xlsx';
@@ -10,13 +11,13 @@ import { writeDatasetRows } from '../../data/datasets/handler';
 import { sha256 } from '../../crypto-utils';
 
 // A Drive spreadsheet → one of the artifact's datasets, on the job's own schedule (hourly,
-// daily, weekly …). Reads through the job owner's Google Drive connection (the one the
-// folder import uses). An unchanged file — same Drive revision, same tab — is skipped, so
+// daily, weekly …). Reads through the job owner's sheet-sync consent: Google drive.file,
+// granted for the files they picked in the Google Picker — never the folder import's
+// drive.readonly consent. An unchanged file — same Drive revision, same tab — is skipped, so
 // an hourly schedule costs one metadata call while nothing moves. No AI: the tab's rows
 // land as JSON that the page reads with the SDK's dataset store.
 
 const DATASET_NAME = /^[a-zA-Z0-9_.-]{1,64}$/;
-const SHEET_EXT = /\.(xlsx|xlsm|xls|ods|csv)$/i;
 
 async function readCapped(body: ReadableStream<Uint8Array>, max: number): Promise<Uint8Array | null> {
   const reader = body.getReader();
@@ -43,10 +44,11 @@ export async function driveSourceKey(fileId: string, sheet: string, revision: st
 }
 
 function driveError(e: unknown): string {
-  if (e instanceof AuthExpiredError) return 'Google Drive access expired or was revoked. Reconnect Google Drive, then run the sync again.';
+  if (e instanceof AuthExpiredError) return 'Google Drive access expired or was revoked. Choose the spreadsheet again in Google Drive, then run the sync again.';
   if (e instanceof RateLimitedError) return e.message;
   if (e instanceof ProviderError) {
-    if (e.status === 404) return 'The file is gone or no longer shared with the job owner.';
+    // drive.file only reaches files picked in the Picker, so "not found" also means "never picked".
+    if (e.status === 404) return 'The file is gone, no longer shared with the job owner, or was not chosen in the Google Drive picker.';
     if (e.status === 403) return 'The job owner no longer has access to this file.';
     return `Google Drive could not be read: ${e.message}`;
   }
@@ -63,7 +65,7 @@ export const driveFileSyncDestination: Destination<DriveFileSyncConfig> = {
       return 'drive_file_sync requires a dataset name (letters, digits, _ . -, up to 64)';
     }
     if (config.sheet !== undefined && (typeof config.sheet !== 'string' || config.sheet.length > 100)) return 'sheet must be a tab name (up to 100 characters)';
-    if (!providerConfig(env, 'google_drive')) return 'Google Drive is not set up on this instance';
+    if (!providerConfig(env, DRIVE_FILE_CONSENT)) return 'Google Drive is not set up on this instance';
     return null;
   },
 
@@ -78,8 +80,8 @@ export const driveFileSyncDestination: Destination<DriveFileSyncConfig> = {
     const art = await env.DB.prepare('SELECT workspace_id FROM artifacts WHERE id = ?')
       .bind(ctx.artifactId).first<{ workspace_id: string | null }>();
     if (!art?.workspace_id) return fail('fetch', 'Drive sync needs a page inside a workspace.');
-    const conn = await findConnection(env, art.workspace_id, ctx.createdBy, 'google_drive');
-    if (!conn) return fail('fetch', 'The job owner has not connected Google Drive in this workspace.');
+    const conn = await findConnection(env, art.workspace_id, ctx.createdBy, DRIVE_FILE_CONSENT);
+    if (!conn) return fail('fetch', 'The job owner has not chosen this spreadsheet in Google Drive in this workspace. Choose it again in Automate → Sync data from Google Drive.');
 
     const sheetWanted = (config.sheet || '').trim();
     let token = '';
@@ -97,9 +99,7 @@ export const driveFileSyncDestination: Destination<DriveFileSyncConfig> = {
       token = await accessTokenFor(env, conn);
       const entry = await withToken((tk) => getDriveFile(tk, config.fileId));
       if (entry.kind !== 'file') return fail('fetch', 'That Drive item is a folder, not a spreadsheet.');
-      if (!SHEET_MIMES.includes(entry.mime || '') && !SHEET_EXT.test(entry.name)) {
-        return fail('fetch', `"${entry.name}" is not a spreadsheet (Excel, Google Sheets, OpenDocument or CSV).`);
-      }
+      if (!isSpreadsheet(entry)) return fail('fetch', `"${entry.name}" is not a spreadsheet (Excel, Google Sheets, OpenDocument or CSV).`);
 
       const key = await driveSourceKey(entry.id, sheetWanted, entry.version || '');
       const current = await env.DB.prepare('SELECT metadata FROM datasets WHERE artifact_id = ? AND name = ?')

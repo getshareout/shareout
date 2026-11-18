@@ -3,11 +3,17 @@
  * second, read-only consent a member gives inside a workspace, with its own client ids,
  * so the login apps never carry file scopes.
  *
- * Google: drive.readonly, offline access. Microsoft: delegated Files.Read.All (OneDrive +
- * document libraries) and Sites.Read.All (finding SharePoint sites), plus User.Read for
- * the account label and offline_access for a refresh token.
+ * Google folder import: drive.readonly (a restricted scope), offline access. The sheet
+ * sync has its own consent (DRIVE_FILE_CONSENT): drive.file, which Google classes as
+ * non-sensitive, with the Google Picker shown inside the consent (trigger_onepick). The
+ * person picks the spreadsheet there, Google returns its id with the code, and the app can
+ * read only the files picked that way; the refresh token keeps that access for the
+ * scheduled sync. Microsoft: delegated Files.Read.All (OneDrive + document libraries) and
+ * Sites.Read.All (finding SharePoint sites), plus User.Read for the account label and
+ * offline_access for a refresh token.
  *   https://developers.google.com/identity/protocols/oauth2/web-server
  *   https://developers.google.com/workspace/drive/api/guides/api-specific-auth
+ *   https://developers.google.com/workspace/drive/picker/guides/overview-desktop
  *   https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow
  *   https://learn.microsoft.com/en-us/graph/permissions-reference
  *
@@ -16,10 +22,13 @@
  * from the same key and the state's nonce, so nothing needs storing between the hops.
  */
 import type { Env } from '../types';
-import type { FileImportProvider } from './types';
+import { DRIVE_FILE_CONSENT, type ConsentProvider, type FileImportProvider } from './types';
 import { errorText } from './http';
+import { SHEET_MIMES } from './providers/google';
 
 export const GOOGLE_SCOPES = ['https://www.googleapis.com/auth/drive.readonly'];
+/** The sheet sync's consent. With the Picker inside the consent, Google allows no other scope next to it. */
+export const GOOGLE_FILE_SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 export const MICROSOFT_SCOPES = ['Files.Read.All', 'Sites.Read.All', 'User.Read', 'offline_access'];
 
 const GOOGLE_AUTH = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -41,8 +50,23 @@ function msTenant(env: Env): string {
   return /^[A-Za-z0-9.-]{1,100}$/.test(t) ? t : 'common';
 }
 
-export function providerConfig(env: Env, provider: FileImportProvider): ProviderConfig | null {
+const isGoogle = (p: ConsentProvider): boolean => p === 'google_drive' || p === DRIVE_FILE_CONSENT;
+
+export function providerConfig(env: Env, provider: ConsentProvider): ProviderConfig | null {
   if (!env.CREDENTIALS_KEY) return null;
+  if (provider === DRIVE_FILE_CONSENT) {
+    // Its own OAuth client when set (say, a published project), else the folder import's.
+    const [clientId, clientSecret] = env.GOOGLE_DRIVE_FILE_CLIENT_ID && env.GOOGLE_DRIVE_FILE_CLIENT_SECRET
+      ? [env.GOOGLE_DRIVE_FILE_CLIENT_ID, env.GOOGLE_DRIVE_FILE_CLIENT_SECRET]
+      : [env.GOOGLE_DRIVE_CLIENT_ID, env.GOOGLE_DRIVE_CLIENT_SECRET];
+    if (!clientId || !clientSecret) return null;
+    return {
+      clientId, clientSecret, authUrl: GOOGLE_AUTH, tokenUrl: GOOGLE_TOKEN, scopes: GOOGLE_FILE_SCOPES,
+      // The Picker opens inside the consent (both params required) and returns picked_file_ids
+      // with the code: one file, spreadsheets only. Offline: the schedule reads without the person.
+      extraAuthParams: { access_type: 'offline', prompt: 'consent', trigger_onepick: 'true', mimetypes: SHEET_MIMES.join(',') },
+    };
+  }
   if (provider === 'google_drive') {
     if (!env.GOOGLE_DRIVE_CLIENT_ID || !env.GOOGLE_DRIVE_CLIENT_SECRET) return null;
     return {
@@ -66,8 +90,10 @@ export function configuredProviders(env: Env): FileImportProvider[] {
   return (['google_drive', 'microsoft'] as const).filter((p) => providerConfig(env, p));
 }
 
-export function redirectUri(env: Env, provider: FileImportProvider): string {
-  return `${(env.SHAREOUT_BASE_URL || '').replace(/\/+$/, '')}/v1/file-imports/oauth/${provider}/callback`;
+export function redirectUri(env: Env, provider: ConsentProvider): string {
+  // The sheet sync's consent lands on the Google Drive callback too: no extra redirect URI to register.
+  const path = provider === DRIVE_FILE_CONSENT ? 'google_drive' : provider;
+  return `${(env.SHAREOUT_BASE_URL || '').replace(/\/+$/, '')}/v1/file-imports/oauth/${path}/callback`;
 }
 
 // ---- signed state + PKCE ---------------------------------------------------------
@@ -89,9 +115,11 @@ async function hmac(key: string, data: string): Promise<ArrayBuffer> {
 }
 
 export interface OAuthState {
-  p: FileImportProvider;
+  p: ConsentProvider;
   ws: string;
   u: string;
+  /** Sheet sync: the ShareOut origin the consent was opened from; the picked file is posted only there. */
+  o?: string;
   n: string;
   exp: number;
 }
@@ -130,10 +158,14 @@ function nonceOf(state: string): string {
   try { return (JSON.parse(fromB64url(state.split('.')[0])) as OAuthState).n; } catch { return ''; }
 }
 
-export async function authorizationUrl(env: Env, provider: FileImportProvider, workspaceId: string, userId: string): Promise<string | null> {
+/** `origin` and `fileIds` are for the sheet sync's Picker: where to post the pick, and (a
+ *  pasted link) the one file the Picker should show. */
+export async function authorizationUrl(
+  env: Env, provider: ConsentProvider, workspaceId: string, userId: string, opts: { origin?: string; fileIds?: string[] } = {},
+): Promise<string | null> {
   const cfg = providerConfig(env, provider);
   if (!cfg) return null;
-  const state = await signState(env, { p: provider, ws: workspaceId, u: userId });
+  const state = await signState(env, { p: provider, ws: workspaceId, u: userId, ...(opts.origin ? { o: opts.origin } : {}) });
   const params = new URLSearchParams({
     client_id: cfg.clientId,
     redirect_uri: redirectUri(env, provider),
@@ -143,6 +175,7 @@ export async function authorizationUrl(env: Env, provider: FileImportProvider, w
     code_challenge: await pkceChallenge(await pkceVerifier(env, nonceOf(state))),
     code_challenge_method: 'S256',
     ...cfg.extraAuthParams,
+    ...(opts.fileIds?.length ? { file_ids: opts.fileIds.join(',') } : {}),
   });
   return `${cfg.authUrl}?${params}`;
 }
@@ -182,7 +215,7 @@ async function tokenRequest(cfg: ProviderConfig, form: Record<string, string>): 
   };
 }
 
-export async function exchangeCode(env: Env, provider: FileImportProvider, code: string, state: string): Promise<TokenSet> {
+export async function exchangeCode(env: Env, provider: ConsentProvider, code: string, state: string): Promise<TokenSet> {
   const cfg = providerConfig(env, provider);
   if (!cfg) throw new OAuthGrantError('NOT_CONFIGURED', 'This provider is not configured');
   return tokenRequest(cfg, {
@@ -191,7 +224,7 @@ export async function exchangeCode(env: Env, provider: FileImportProvider, code:
   });
 }
 
-export async function refreshTokens(env: Env, provider: FileImportProvider, refreshToken: string): Promise<TokenSet> {
+export async function refreshTokens(env: Env, provider: ConsentProvider, refreshToken: string): Promise<TokenSet> {
   const cfg = providerConfig(env, provider);
   if (!cfg) throw new OAuthGrantError('NOT_CONFIGURED', 'This provider is not configured');
   const t = await tokenRequest(cfg, {
@@ -204,16 +237,16 @@ export async function refreshTokens(env: Env, provider: FileImportProvider, refr
 
 /** Best-effort revoke at the provider. Microsoft has no per-token revoke for this flow;
  *  deleting our copy is what ends access there. */
-export async function revokeAtProvider(provider: FileImportProvider, token: string): Promise<void> {
-  if (provider !== 'google_drive' || !token) return;
+export async function revokeAtProvider(provider: ConsentProvider, token: string): Promise<void> {
+  if (!isGoogle(provider) || !token) return;
   await fetch(GOOGLE_REVOKE, {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token }),
   }).catch(() => {});
 }
 
 /** The account's email, for the "Connected as …" label. */
-export async function accountEmail(provider: FileImportProvider, accessToken: string): Promise<string | null> {
-  const url = provider === 'google_drive'
+export async function accountEmail(provider: ConsentProvider, accessToken: string): Promise<string | null> {
+  const url = isGoogle(provider)
     ? 'https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)'
     : 'https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName';
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } }).catch(() => null);

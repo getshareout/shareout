@@ -14,6 +14,14 @@
  *   DELETE /v1/workspaces/{ws}/file-imports/sources/{id}          stop syncing (imported files stay)
  *   POST   /v1/workspaces/{ws}/file-imports/sources/{id}/sync     sync again
  *   GET    /v1/workspaces/{ws}/file-imports/runs/{runId}          progress + per-file errors
+ *
+ * The spreadsheet sync's own consent (drive.file + the Google Picker inside it, never the
+ * folder import's drive.readonly). It returns on the Google Drive callback above:
+ *   GET    /v1/workspaces/{ws}/file-imports/sheet-sync               { available, connected, accountEmail }
+ *   GET    /v1/workspaces/{ws}/file-imports/sheet-sync/pick?file=    → 302 to Google: consent + Picker, one spreadsheet
+ *          (file = a pasted link's id: the Picker shows only that file); the callback posts
+ *          `shareout:drive-sheet:picked` { ok, file: { id, name } | null, error } to the opening ShareOut origin only
+ *   DELETE /v1/workspaces/{ws}/file-imports/sheet-sync/connection    forget it (scheduled syncs through it stop)
  */
 import type { FetchContext } from '../router/context';
 import type { Env } from '../types';
@@ -22,10 +30,11 @@ import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { jsonWithApiErrors } from '../http/api-error';
 import { escapeHtml } from '../html/utils';
 import { standalonePageStyles } from '../design-system/standalone-page';
-import { isFileImportProvider, MAX_DAILY_SOURCES_PER_WORKSPACE, type FileImportProvider } from './types';
-import { accountEmail, authorizationUrl, configuredProviders, exchangeCode, OAuthGrantError, providerConfig, verifyState } from './oauth';
+import { DRIVE_FILE_CONSENT, isFileImportProvider, MAX_DAILY_SOURCES_PER_WORKSPACE, type FileImportProvider, type RemoteEntry } from './types';
+import { accountEmail, authorizationUrl, configuredProviders, exchangeCode, OAuthGrantError, providerConfig, verifyState, type OAuthState } from './oauth';
 import { accessTokenFor, deleteConnection, findConnection, listConnections, saveConnection, type ConnectionRow } from './connections';
 import { providerApi } from './providers';
+import { DRIVE_FILE_ID, getDriveFile, isSpreadsheet } from './providers/google';
 import { canImport } from './mirror';
 import { createRun, getRun, getSource, readRun, runView, type RunRow, type SourceRow } from './runs';
 import { launchRun } from './launch';
@@ -34,6 +43,9 @@ import { generateId } from '../crypto-utils';
 
 const json = (data: unknown, status = 200) => jsonWithApiErrors(data, status);
 const err = (error: string, code: string, status: number, extra: Record<string, unknown> = {}) => json({ error, code, ...extra }, status);
+const redirect = (location: string) => new Response(null, { status: 302, headers: { Location: location, 'Cache-Control': 'no-store' } });
+/** A folder-import consent (never the sheet sync's drive.file one). */
+type ImportConnection = ConnectionRow & { provider: FileImportProvider };
 
 export async function routeFileImportApi(ctx: FetchContext): Promise<Response | null> {
   const { path } = ctx;
@@ -56,13 +68,15 @@ async function handleWorkspace(ctx: FetchContext, workspaceId: string, sub: stri
   }
   const providers = configuredProviders(env);
 
+  if (sub === 'sheet-sync' || sub.startsWith('sheet-sync/')) return sheetSync(ctx, workspaceId, user.id, sub.slice('sheet-sync'.length));
+
   if (sub === '' && method === 'GET') return json(await overview(env, workspaceId, user.id, providers));
 
   let m = sub.match(/^connect\/([a-z_]+)$/);
   if (m && method === 'GET') {
     if (!isFileImportProvider(m[1]) || !providers.includes(m[1])) return err('This provider is not set up on this instance', 'PROVIDER_NOT_CONFIGURED', 404);
     const url = await authorizationUrl(env, m[1], workspaceId, user.id);
-    return url ? new Response(null, { status: 302, headers: { Location: url, 'Cache-Control': 'no-store' } }) : err('This provider is not set up on this instance', 'PROVIDER_NOT_CONFIGURED', 404);
+    return url ? redirect(url) : err('This provider is not set up on this instance', 'PROVIDER_NOT_CONFIGURED', 404);
   }
 
   m = sub.match(/^connections\/([a-z_]+)$/);
@@ -138,10 +152,34 @@ async function handleWorkspace(ctx: FetchContext, workspaceId: string, sub: stri
   return err('Not found', 'NOT_FOUND', 404);
 }
 
-async function connectionFor(env: Env, workspaceId: string, userId: string, provider: string, providers: FileImportProvider[]): Promise<ConnectionRow | Response> {
+async function connectionFor(env: Env, workspaceId: string, userId: string, provider: string, providers: FileImportProvider[]): Promise<ImportConnection | Response> {
   if (!isFileImportProvider(provider) || !providers.includes(provider)) return err('This provider is not set up on this instance', 'PROVIDER_NOT_CONFIGURED', 404);
   const conn = await findConnection(env, workspaceId, userId, provider);
-  return conn ?? err('Connect this drive first', 'NOT_CONNECTED', 409);
+  return (conn as ImportConnection | null) ?? err('Connect this drive first', 'NOT_CONNECTED', 409);
+}
+
+// ---- the spreadsheet sync's consent: drive.file + Google Picker ----------------------
+
+async function sheetSync(ctx: FetchContext, workspaceId: string, userId: string, rest: string): Promise<Response> {
+  const { env, request } = ctx;
+  if (rest === '' && request.method === 'GET') {
+    const conn = await findConnection(env, workspaceId, userId, DRIVE_FILE_CONSENT);
+    return json({ available: !!providerConfig(env, DRIVE_FILE_CONSENT), connected: !!conn, accountEmail: conn?.account_email ?? null });
+  }
+  if (rest === '/pick' && request.method === 'GET') {
+    const file = ctx.url.searchParams.get('file') || '';
+    if (file && !DRIVE_FILE_ID.test(file)) return err('Not a Google Drive file id', 'VALIDATION_ERROR', 400);
+    // The popup opens on the page's own origin; the pick is posted back to that origin only.
+    const url = await authorizationUrl(env, DRIVE_FILE_CONSENT, workspaceId, userId, { origin: ctx.url.origin, fileIds: file ? [file] : [] });
+    return url ? redirect(url) : err('Google Drive is not set up on this instance', 'PROVIDER_NOT_CONFIGURED', 404);
+  }
+  if (rest === '/connection' && request.method === 'DELETE') {
+    const conn = await findConnection(env, workspaceId, userId, DRIVE_FILE_CONSENT);
+    if (!conn) return err('Not connected', 'NOT_FOUND', 404);
+    await deleteConnection(env, conn);
+    return json({ ok: true });
+  }
+  return err('Not found', 'NOT_FOUND', 404);
 }
 
 /** Run a provider call; map provider failures to API errors the UI can show. */
@@ -248,11 +286,13 @@ function callbackPage(ok: boolean, provider: string, message: string): Response 
 
 async function handleCallback(ctx: FetchContext, provider: string): Promise<Response> {
   const { env, url } = ctx;
+  const rawState = url.searchParams.get('state') || '';
+  const state = await verifyState(env, rawState);
+  // The sheet sync's consent returns here too (same redirect URI), told apart by its signed state.
+  if (state?.p === DRIVE_FILE_CONSENT && provider === 'google_drive') return handleSheetPick(ctx, state, rawState);
   if (!isFileImportProvider(provider) || !providerConfig(env, provider)) return callbackPage(false, provider, 'This provider is not set up on this instance.');
   if (url.searchParams.get('error')) return callbackPage(false, provider, 'Access was not granted.');
   const code = url.searchParams.get('code');
-  const rawState = url.searchParams.get('state') || '';
-  const state = await verifyState(env, rawState);
   if (!code || !state || state.p !== provider) return callbackPage(false, provider, 'This link expired. Start the connection again.');
   const user = await requireTokenOrSession(ctx);
   if (!isAuthUser(user) || user.id !== state.u) return callbackPage(false, provider, 'Sign in to ShareOut as the person who started this connection.');
@@ -264,4 +304,47 @@ async function handleCallback(ctx: FetchContext, provider: string): Promise<Resp
     return callbackPage(false, provider, e instanceof OAuthGrantError ? 'The provider refused the connection. Try again.' : 'Something went wrong while connecting.');
   }
   return callbackPage(true, provider, 'Your drive is connected. Go back to ShareOut to pick a folder.');
+}
+
+/** The sheet sync's consent page: tells the opening ShareOut window (that origin only) what was picked. */
+function sheetPickPage(ok: boolean, message: string, origin: string | undefined, file?: { id: string; name: string }): Response {
+  let target = '';
+  try { if (origin && new URL(origin).origin === origin) target = origin; } catch { /* no opener to tell */ }
+  // A Drive file name is the user's text: keep it from closing the script tag.
+  const msg = JSON.stringify({ type: 'shareout:drive-sheet:picked', ok, file: file ?? null, error: ok ? null : message }).replace(/</g, '\\u003c');
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${ok ? 'Spreadsheet picked' : 'Nothing picked'} - ShareOut</title><style>${standalonePageStyles}</style></head>
+<body><div class="card"><div class="icon ${ok ? 'success' : 'error'}">${ok ? '✓' : '✕'}</div>
+<h1>${ok ? 'Spreadsheet picked' : 'Nothing picked'}</h1><p>${escapeHtml(message)}</p>
+<p class="close-hint">You can close this window.</p></div>
+${target ? `<script>if (window.opener) { window.opener.postMessage(${msg}, ${JSON.stringify(target)}); window.close(); }</script>` : ''}
+</body></html>`;
+  return new Response(html, { status: ok ? 200 : 400, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
+}
+
+/** Consent + Picker came back: store the drive.file consent, check the picked file is a spreadsheet. */
+async function handleSheetPick(ctx: FetchContext, state: OAuthState, rawState: string): Promise<Response> {
+  const { env, url } = ctx;
+  const done = (ok: boolean, message: string, file?: { id: string; name: string }) => sheetPickPage(ok, message, state.o, file);
+  if (!providerConfig(env, DRIVE_FILE_CONSENT)) return done(false, 'Google Drive is not set up on this instance.');
+  if (url.searchParams.get('error')) return done(false, 'No spreadsheet was picked.');
+  const code = url.searchParams.get('code');
+  if (!code) return done(false, 'This link expired. Start again.');
+  const user = await requireTokenOrSession(ctx);
+  if (!isAuthUser(user) || user.id !== state.u) return done(false, 'Sign in to ShareOut as the person who started this.');
+  if (!(await canImport(env, state.ws, user.id))) return done(false, 'You can no longer import into this workspace.');
+  const fileId = (url.searchParams.get('picked_file_ids') || '').split(',')[0].trim();
+  if (!DRIVE_FILE_ID.test(fileId)) return done(false, 'No spreadsheet was picked. Try again.');
+  let entry: RemoteEntry;
+  try {
+    const tokens = await exchangeCode(env, DRIVE_FILE_CONSENT, code, rawState);
+    await saveConnection(env, state.ws, user.id, DRIVE_FILE_CONSENT, tokens, await accountEmail(DRIVE_FILE_CONSENT, tokens.accessToken));
+    entry = await getDriveFile(tokens.accessToken, fileId);
+  } catch (e) {
+    if (e instanceof OAuthGrantError) return done(false, 'Google refused the connection. Try again.');
+    if (e instanceof ProviderError || e instanceof AuthExpiredError) return done(false, 'Google Drive could not read that file. Pick it again.');
+    return done(false, 'Something went wrong while connecting.');
+  }
+  if (!isSpreadsheet(entry)) return done(false, `"${entry.name}" is not a spreadsheet (Excel, Google Sheets, OpenDocument or CSV).`);
+  return done(true, 'Go back to ShareOut to finish setting up the sync.', { id: entry.id, name: entry.name });
 }

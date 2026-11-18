@@ -24,6 +24,11 @@ export const SHEET_MIMES = [
   'text/csv',
   'application/vnd.google-apps.spreadsheet',
 ];
+const SHEET_EXT = /\.(xlsx|xlsm|xls|ods|csv)$/i;
+/** A file a single-file sync can read: a spreadsheet by type, or by extension. */
+export function isSpreadsheet(entry: RemoteEntry): boolean {
+  return entry.kind === 'file' && (SHEET_MIMES.includes(entry.mime || '') || SHEET_EXT.test(entry.name));
+}
 const FILE_FIELDS = 'nextPageToken,files(id,name,mimeType,size,modifiedTime)';
 
 interface DriveFile { id: string; name: string; mimeType: string; size?: string; modifiedTime?: string }
