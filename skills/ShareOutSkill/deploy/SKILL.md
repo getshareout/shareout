@@ -1,7 +1,5 @@
 ---
 name: "shareout-deploy"
-version: "1.2.0"
-updated_at: "2026-07-27T20:30:00Z"
 description: "Install and deploy a self-hosted ShareOut instance on the user's Cloudflare account. Use when the user wants to install ShareOut, self-host, Deploy to Cloudflare, set up their Artifact World, configure domain/DNS/secrets for ShareOut, or get a fresh instance running in minutes — including when they do not have a Cloudflare account yet."
 ---
 

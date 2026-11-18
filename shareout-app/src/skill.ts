@@ -52,7 +52,7 @@ function compareSemver(a: string, b: string): number {
 }
 
 /**
- * The newer copy wins: higher frontmatter version, then later `updated_at`, then the
+ * The newer copy wins: higher skill.json version, then later `updated_at`, then the
  * later of R2 upload vs. this Worker version's deploy. Unknown on both → R2, as before.
  */
 function pickNewer(r2: SkillSource, asset: SkillSource): SkillSource {
@@ -133,10 +133,10 @@ async function sourceSha256(src: SkillSource, bundle?: ArrayBuffer | null): Prom
 }
 
 /**
- * The served version: `<frontmatter version>+<sha8 of skill.zip>`. The frontmatter
+ * The served version: `<skill.json version>+<sha8 of skill.zip>`. The skill.json
  * version is bumped by hand and rarely; the hash moves with every content change, so
  * an agent comparing versions (or holding the ETag) refreshes when the skill changes.
- * Semver ignores `+build` metadata, so a semver compare still sees the frontmatter version.
+ * Semver ignores `+build` metadata, so a semver compare still sees the skill.json version.
  */
 async function servedVersion(src: SkillSource, bundle?: ArrayBuffer | null): Promise<string> {
   const sha = await sourceSha256(src, bundle);
@@ -268,7 +268,7 @@ export async function handleGetSkillVersion(env: Env): Promise<Response> {
   const version = await servedVersion(src);
   return new Response(JSON.stringify({
     version,
-    // The SKILL.md frontmatter version alone, for clients that compare semver.
+    // The skill.json version alone, for clients that compare semver.
     semver: src.meta.version,
     updated_at: src.meta.updated_at,
   }), {
@@ -312,7 +312,7 @@ export async function handleGetSkillMeta(env: Env): Promise<Response> {
         'GET /v1/skill/version - Returns JSON with version and updated_at',
         'GET /v1/skill with If-None-Match: "version" - Returns 304 if unchanged',
       ],
-      version_format: '<SKILL.md frontmatter version>+<first 8 hex of the skill.zip sha256>; changes with any skill content change. `semver` holds the frontmatter version alone.',
+      version_format: '<skill.json version>+<first 8 hex of the skill.zip sha256>; changes with any skill content change. `semver` holds the skill.json version alone.',
     },
   }), {
     status: 200,

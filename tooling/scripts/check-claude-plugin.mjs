@@ -3,10 +3,12 @@
  * Guard: the Claude plugin (skills/.claude-plugin/plugin.json + skills/.mcp.json, listed by
  * .claude-plugin/marketplace.json) stays in step with what it ships.
  *
- * - plugin.json `version` equals the skill's SKILL.md frontmatter version. Claude only
+ * - plugin.json `version` equals the skill version (skills/ShareOutSkill/skill.json). Claude only
  *   updates an installed plugin when that version changes, so a skill bump that forgets
  *   the plugin leaves plugin users on the old skill.
  * - the marketplace lists the plugin under the same name, at ./skills.
+ * - every Markdown file in the plugin has only `name` and `description` in its frontmatter:
+ *   the plugin directory refuses other keys from organizations it has not verified.
  * - the bundled connector is one https `/mcp` URL.
  * - every tool the MCP server defines (shareout-app/src/mcp/) is named in
  *   skills/ShareOutSkill/integrations/mcp-connector.md.
@@ -31,10 +33,15 @@ try {
   process.exit(1);
 }
 
-const skillVersion = /^version:\s*"?([^"\n]+)"?\s*$/m.exec(read('skills', 'ShareOutSkill', 'SKILL.md'))?.[1];
-if (!skillVersion) errors.push('skills/ShareOutSkill/SKILL.md has no frontmatter version');
+let skillVersion;
+try {
+  skillVersion = JSON.parse(read('skills', 'ShareOutSkill', 'skill.json')).version;
+} catch (e) {
+  errors.push(`cannot read skills/ShareOutSkill/skill.json: ${e.message}`);
+}
+if (!skillVersion) errors.push('skills/ShareOutSkill/skill.json has no version');
 else if (plugin.version !== skillVersion) {
-  errors.push(`skills/.claude-plugin/plugin.json version is ${plugin.version}, SKILL.md is ${skillVersion}: set both to the same value`);
+  errors.push(`skills/.claude-plugin/plugin.json version is ${plugin.version}, skill.json is ${skillVersion}: set both to the same value`);
 }
 
 const entry = (marketplace.plugins ?? []).find((p) => p.name === plugin.name);
@@ -63,6 +70,19 @@ if (tools.size === 0) errors.push('found no MCP tools in shareout-app/src/mcp/ (
 const doc = read('skills', 'ShareOutSkill', 'integrations', 'mcp-connector.md');
 for (const tool of [...tools].sort()) {
   if (!doc.includes(`\`${tool}\``)) errors.push(`MCP tool \`${tool}\` is not documented in skills/ShareOutSkill/integrations/mcp-connector.md`);
+}
+
+const walkMd = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+  e.isDirectory() ? walkMd(join(dir, e.name)) : e.name.endsWith('.md') ? [join(dir, e.name)] : []);
+for (const file of walkMd(join(repo, 'skills'))) {
+  const front = /^---\n([\s\S]*?)\n---/.exec(readFileSync(file, 'utf8'))?.[1];
+  if (front === undefined) continue;
+  for (const line of front.split('\n')) {
+    const key = /^([^\s:#][^:]*):/.exec(line)?.[1];
+    if (!key || !['name', 'description'].includes(key)) {
+      errors.push(`${file.slice(repo.length + 1)}: frontmatter line "${line.slice(0, 40)}" — only name and description are allowed (put the rest in skills/ShareOutSkill/skill.json)`);
+    }
+  }
 }
 
 if (errors.length) {

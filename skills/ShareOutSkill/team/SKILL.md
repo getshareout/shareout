@@ -1,10 +1,6 @@
 ---
 name: "shareout-workspace-skill"
-version: "3.30.0"
-updated_at: "2026-07-25T20:00:00Z"
 description: "Workspace administration overlay for ShareOut. Load after the base skill when the user asks to manage workspace members and roles, internal workspace visibility, subdomains, membership policy, publish governance, workspace connectors, the Home assistant, activity feed, admin portal and Run Inspector, skill marketplace, support workbench, file inbox, Workspace Knowledge, or external sharing with clients. On self-host / OSS there are no paid plan gates — use workspace roles, not Pro/Teams language."
-skill_endpoint: "/v1/skill/team/SKILL.md"
-extends: "shareout-skill"
 ---
 
 # ShareOut Workspace Skill
