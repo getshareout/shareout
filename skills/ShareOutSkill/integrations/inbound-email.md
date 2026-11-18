@@ -3,7 +3,7 @@
 Give an artifact its own email address. Mail sent (or forwarded) to it is parsed,
 stored, and fires an `email.received` trigger — so inbound mail becomes an action.
 
-**Use case:** forward an invoice ("expensas") to `expensas@inbox.shareout.site` →
+**Use case:** forward an invoice ("expensas") to `expensas.k7m4p2@inbox.shareout.site` →
 extract the amount → store a row + send a reminder. The sender keeps using Gmail/
 Outlook normally; the inbox is ShareOut-owned, so there's no OAuth and no mailbox
 access required.
@@ -12,7 +12,7 @@ access required.
 
 ```
 sender / a Gmail forward rule
-        │  → expensas@inbox.shareout.site
+        │  → expensas.k7m4p2@inbox.shareout.site
         ▼
 Cloudflare Email Routing  →  Worker email() handler
         │  parse + store in the artifact's inbox + fire email.received
@@ -20,12 +20,15 @@ Cloudflare Email Routing  →  Worker email() handler
 event-triggered jobs run (webhook, telegram, slack, email, crew, …)
 ```
 
-- **Address:** `<prefix>@inbox.<instance-host>`, where `<prefix>` is auto-generated
-  from the artifact slug. The inbox domain is instance-specific: `inbox.` + the
-  instance hostname (on shareout.site: `expensas@inbox.shareout.site`), or the
-  operator's `EMAIL_INBOX_DOMAIN` override. Don't guess it — read `status.address`
-  from `sdk.inbox.enable()`. Plus-addressing works: `expensas+enero@inbox.shareout.site`
-  delivers to the same inbox with `tag = "enero"`.
+- **Address:** short, so it is easy to type or dictate: the first word of the artifact slug, a
+  dot and six random letters/digits (no 0/o/1/l/i look-alikes) — `expensas.k7m4p2@inbox.shareout.site`.
+  It is minted once and never changes, and never goes to another artifact (not even after this one
+  is deleted). The long slug address an artifact had before (`expensas-de-octubre@inbox…`) keeps
+  working, with the same sender rules; it is just no longer shown. The inbox domain is
+  instance-specific: `inbox.` + the instance hostname, or the operator's `EMAIL_INBOX_DOMAIN`
+  override. Don't guess it — read `address` from the status (`sdk.inbox.enable()`,
+  `GET /v1/artifacts/{id}/email-sync`). Plus-addressing works:
+  `expensas.k7m4p2+enero@inbox.shareout.site` delivers to the same inbox with `tag = "enero"`.
 - **Opt-in:** receiving is OFF until something turns it on:
   - `PUT /v1/artifacts/{id}/email-sync/senders` (Update by email) — turns it on and sets who may send;
   - creating an `email.received` job — turns it on;
@@ -42,7 +45,7 @@ const so = await ShareOut.create();
 
 // Turn the inbox on (owner/editor). Optionally restrict who can send.
 const status = await so.inbox.enable({ allowlist: ['@edificio.com'] });
-console.log(status.address); // "expensas@inbox.shareout.site"
+console.log(status.address); // "expensas.k7m4p2@inbox.shareout.site"
 
 // List / read received mail
 const messages = await so.inbox.list({ limit: 20 });
@@ -100,7 +103,7 @@ names, "job", "DMARC" or "allowlist":
    page does not read that dataset, a `warning` to fix before going on. A second job for the same
    page and dataset is `409 DUPLICATE_JOB` with the existing `job_id`.
 5. **Give them the address ready to copy** and say what happens, in three steps: open your mail;
-   write a new email to `ventas-x1@inbox.shareout.site` from ana@acme.com; attach the Excel and
+   write a new email to `ventas.k7m4p2@inbox.shareout.site` from ana@acme.com; attach the Excel and
    send. Subject and text do not matter; the first tab's first row is the column titles; **the
    file replaces the data** the page shows. If the file reaches them by email anyway, an Outlook
    rule can forward it (add the original sender to the list); Gmail's automatic forwarding needs a
@@ -112,6 +115,24 @@ names, "job", "DMARC" or "allowlist":
 
 `POST /v1/jobs/{id}/run` does not apply: the job runs when mail arrives, so it answers
 `409 NOT_RUNNABLE` with the address and changes nothing.
+
+### A table of an Excel file, from scratch
+
+When the person has a spreadsheet and no page yet ("make me a table of this Excel that stays up
+to date"):
+
+- **In ShareOut, no assistant:** **New → Table from an Excel file** (Spanish: **Nuevo → Tabla desde
+  un Excel**). They pick the `.xlsx`/`.csv`; ShareOut makes a private page with a phone-friendly
+  table (first row = column titles, "Updated today at 10:32", an empty state), opens it, and offers
+  the three ways to keep it up to date — **by email** first, already pointed at the table's data, so
+  the only question is who sends the file. API: `POST /v1/home/new { "template": "table", "lang":
+  "es", "file": { "name": "ventas.xlsx", "content": "<base64>" } }` → `{ artifactId, slug, name,
+  rowCount }`, or `400/413/422 { code, error }` (`NOT_A_SHEET` · `TOO_LARGE` · `TOO_MANY_ROWS` ·
+  `NO_ROWS` · `UNREADABLE`) where `error` is one sentence saying what to do, in their language.
+- **Over MCP:** `publish_artifact` a page that reads one dataset (below) and shows a table with an
+  empty state, then `set_email_sync` (one question: who sends the file) and ask them to email the
+  Excel once to the address it returns — the table fills from that first email. Or point them to
+  **New → Table from an Excel file**, which does it in one step.
 
 ### In the page
 
@@ -141,10 +162,11 @@ The same numbers are in the status (`limits`).
 
 ### When a file does not arrive
 
-Mail from anyone not on the list is bounced back to the sender ("Sender not permitted"), and so
-is mail whose sender can't be verified (sent through another account or an unusual forwarder),
-mail over 25 MB, mail past the daily limit and mail to a switched-off address. The last one
-bounced is kept: `lastRejected` (`from`, `reason`: `not_allowed` · `unverified` · `too_large` ·
+Mail from anyone not on the list is bounced back to the sender, and so is mail whose sender can't
+be verified (sent through another account or an unusual forwarder) — both with the same sentence:
+"This address only accepts files from people the owner of the page has approved. Ask them to add
+your address, then send it again." Also bounced: mail over 25 MB, mail past the daily limit and
+mail to a switched-off address. The last one bounced is kept: `lastRejected` (`from`, `reason`: `not_allowed` · `unverified` · `too_large` ·
 `rate_limited` · `inbox_off`, `at`, and a `message` saying what to do). Then ask them to send it
 straight from the allowed mailbox, or add the address that actually sends it.
 A file that can't be used (no attachment, wrong type, tab not found, headers but no rows, too big)

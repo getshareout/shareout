@@ -12,20 +12,22 @@ Tu artefacto puede tener su **propia dirección de email**. Todo lo que mandes a
 Abrí tu artefacto en el **editor** y tocá el botón **Inbox** (el sobre en la barra). Apretá **Activar inbox** y vas a tener una dirección como:
 
 ```
-tu-pagina@inbox.YOUR_DOMAIN
+gastos.k7m4p2@inbox.YOUR_DOMAIN
 ```
 
-La copiás con un clic. También podés activarla desde el panel de **Inicio** — abrí los detalles de un artefacto y buscá la sección **Inbox**.
+Es corta a propósito, para que sea fácil de escribir o de dictar por teléfono: la primera palabra
+del nombre del artefacto, un punto y seis letras y números. La copiás con un clic. (Una dirección
+que el artefacto ya tenía sigue funcionando.) También podés activarla desde el panel de **Inicio** — abrí los detalles de un artefacto y buscá la sección **Inbox**.
 
 ## Hacé que lleguen mails
 
 Dos formas fáciles:
 
 - **Repartí la dirección.** Ponela en un formulario, dásela a un proveedor, usala como tu dirección de "mandá los comprobantes acá".
-- **Reenviá desde tu casilla actual.** En Gmail (o Outlook) creá un filtro — *"de facturacion@… → reenviar a tu-pagina@inbox.YOUR_DOMAIN"* — y no pensás más en eso.
+- **Reenviá desde tu casilla actual.** En Gmail (o Outlook) creá un filtro — *"de facturacion@… → reenviar a gastos.k7m4p2@inbox.YOUR_DOMAIN"* — y no pensás más en eso.
 
 :::tip[Agregá una etiqueta con “+”]
-`tu-pagina+comprobantes@inbox.YOUR_DOMAIN` llega al **mismo** inbox, etiquetado como `comprobantes`. Usá etiquetas para distinguir tipos de mail y que una automatización los trate distinto.
+`gastos.k7m4p2+comprobantes@inbox.YOUR_DOMAIN` llega al **mismo** inbox, etiquetado como `comprobantes`. Usá etiquetas para distinguir tipos de mail y que una automatización los trate distinto.
 :::
 
 ## Mirá qué llega
@@ -44,6 +46,15 @@ Sola, la casilla solo junta correos. Combinala con una [**automatización**](/es
 | Llega cualquier cosa | Mandar una señal a otra app |
 
 Configurás una vez la automatización "cuando llega un email" y corre siempre — convirtiendo tu casilla en acción.
+
+## Empezá desde un Excel
+
+¿Todavía no tenés el artefacto? En **Nuevo → Tabla desde un Excel**, elegí un Excel (.xlsx) o un
+CSV de tu computadora. ShareOut arma un artefacto con una tabla prolija — la primera fila son los
+títulos de las columnas — que se lee bien en el celular y dice cuándo se actualizó. Después te
+pregunta cómo mantenerla al día: **mandando el Excel por email** está a un toque (solo decís quién
+lo manda), o desde Google Drive, o desde un enlace. Si el archivo no sirve (muy grande, vacío, no es
+una planilla) te dice en una frase qué hacer.
 
 ## Actualizá los números de tu artefacto mandando el Excel por email
 
@@ -71,7 +82,7 @@ Unos segundos después el artefacto muestra los números nuevos. Bueno saber:
 
 ## Un ejemplo real
 
-1. Hacé un artefacto **"Gastos"** y activá su inbox → `gastos@inbox.YOUR_DOMAIN`.
+1. Hacé un artefacto **"Gastos"** y activá su inbox → `gastos.k7m4p2@inbox.YOUR_DOMAIN`.
 2. En Gmail, reenviá las facturas del edificio a esa dirección (un filtro).
 3. Agregá una automatización: *cuando llega un email, guardá el monto y recordame por Telegram 3 días antes del vencimiento.*
 

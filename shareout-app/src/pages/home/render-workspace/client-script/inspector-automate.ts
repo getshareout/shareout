@@ -70,17 +70,28 @@ export const workspace_client_inspector_automate_JS = `  // ----- Tests (artifac
   function autoTile(act, icon, title, sub, on) {
     return '<button class="wsx-qa' + (on ? ' is-on' : '') + '" data-aauto="' + act + '" type="button"><span class="wsx-qa__ic">' + isvg(icon) + '</span><span class="wsx-qa__txt"><span class="wsx-qa__t">' + esc(title) + '</span><span class="wsx-qa__s">' + esc(sub) + '</span></span></button>';
   }
+  // The three ways data comes in (Drive, a link, an emailed Excel): here and in New → Table from an Excel file.
+  var DATA_IN_ICONS = {
+    drivesync: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M10 3v18"/>',
+    sheetlink: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+    emailsync: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>'
+  };
+  var DATA_IN_COPY = { drivesync: 'dsync', sheetlink: 'slink', emailsync: 'esync' };
+  function dataInTiles(order, emailOn) {
+    return order.map(function (k) { var p = DATA_IN_COPY[k]; return autoTile(k, DATA_IN_ICONS[k], t(p + '.tile'), t(k === 'emailsync' && emailOn ? 'esync.tileOn' : p + '.tileSub'), k === 'emailsync' && emailOn); }).join('');
+  }
+  function openDataIn(k, art, onDone) {
+    if (k === 'drivesync') openDriveSync(art, onDone);
+    else if (k === 'sheetlink') openSheetLinkSync(art, onDone);
+    else if (k === 'emailsync') openEmailSync(art, onDone);
+  }
   function paintAutomate(art, data) {
     var jobs = data.jobs || [], alerts = data.alerts || [], m = metaCache[art.id], ed = !!(m && m.can_edit);
     function blk(label, help, body) { return '<div class="wsx-auto__sec"><div class="wsx-det__label"><span class="wsx-det__labeltxt">' + esc(label) + '</span>' + (help ? '<button class="wsx-det__help" type="button" aria-label="' + esc(help) + '" data-tip="' + esc(help) + '">?</button>' : '') + '</div>' + body + '</div>'; }
     var h = '<div class="wsx-auto">';
     // Data in first (Drive, a link, an emailed Excel), then send now → what already runs → monitoring → more.
     var emailOn = jobs.some(function (j) { return j.action === 'email_sheet_sync'; });
-    if (ed && window.WSX_WS) h += blk(t('inspector.dataIn'), t('inspector.dataInHelp'), '<div class="wsx-qa-grid">'
-      + autoTile('drivesync', '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M10 3v18"/>', t('dsync.tile'), t('dsync.tileSub'))
-      + autoTile('sheetlink', '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>', t('slink.tile'), t('slink.tileSub'))
-      + autoTile('emailsync', '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>', t('esync.tile'), t(emailOn ? 'esync.tileOn' : 'esync.tileSub'), emailOn)
-      + '</div>');
+    if (ed && window.WSX_WS) h += blk(t('inspector.dataIn'), t('inspector.dataInHelp'), '<div class="wsx-qa-grid">' + dataInTiles(['drivesync', 'sheetlink', 'emailsync'], emailOn) + '</div>');
     if (ed) h += blk(t('inspector.deliver'), t('inspector.deliverHelp'), '<div id="wsxDeliver"></div>');
     if (jobs.length) h += blk(t('inspector.autoSchedules'), '', '<div class="wsx-list">' + jobs.map(autoJobRow).join('') + '</div>');
     if (alerts.length) h += blk(t('inspector.autoAlerts'), '', '<div class="wsx-list">' + alerts.map(autoAlertRow).join('') + '</div>');
@@ -101,9 +112,7 @@ export const workspace_client_inspector_automate_JS = `  // ----- Tests (artifac
         var n = art.name || t('inspector.thisPage'); var k = b.getAttribute('data-aauto');
         if (k === 'schedule' || k === 'alert') openAutoForm(k, { id: art.id, name: n }, function () { delete autoCache[art.id]; });
         else if (k === 'crew') agentAsk(t('inspector.askCrew').replace('{name}', n));
-        else if (k === 'drivesync') openDriveSync({ id: art.id, name: n }, function () { delete autoCache[art.id]; if (activeArt === art) renderAutomate(art); });
-        else if (k === 'sheetlink') openSheetLinkSync({ id: art.id, name: n }, function () { delete autoCache[art.id]; if (activeArt === art) renderAutomate(art); });
-        else if (k === 'emailsync') openEmailSync({ id: art.id, name: n }, function () { delete autoCache[art.id]; if (activeArt === art) renderAutomate(art); });
+        else if (DATA_IN_ICONS[k]) openDataIn(k, { id: art.id, name: n }, function () { delete autoCache[art.id]; if (activeArt === art) renderAutomate(art); });
         else agentAsk(t('inspector.askCustom').replace('{name}', n));
       });
     });

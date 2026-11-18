@@ -1,6 +1,7 @@
 import type { HomeLocaleCopy } from '../types';
+import { TABLE_ERRORS } from '../../new-table-copy';
 
-/** The rail "New" menu: upload a file, blank document, from a template (no AI). */
+/** The rail "New" menu: upload a file, a table from an Excel file, blank document, from a template (no AI). */
 export const NEW_MENU_COPY: HomeLocaleCopy = {
   en: {
     'nav.new': 'New',
@@ -22,6 +23,21 @@ export const NEW_MENU_COPY: HomeLocaleCopy = {
     'new.tplHint.proposal': 'Context, what you propose, cost and timeline',
     'new.creating': 'Creating your document…',
     'new.failed': 'Couldn’t create the document. Try again?',
+    'new.table': 'Table from an Excel file',
+    'new.tableHint': 'Pick an Excel or CSV file; it shows as a table',
+    'new.tableCreating': 'Making your table…',
+    'new.tableFailed': 'Couldn’t make the table. Try again?',
+    'new.tableErrTitle': 'This file can’t be used',
+    'new.tableErrType': TABLE_ERRORS.en.NOT_A_SHEET,
+    'new.tableErrBig': TABLE_ERRORS.en.TOO_LARGE,
+    'new.tablePickAgain': 'Pick another file',
+    'new.tableReady': 'Your table is ready: {rows} rows from “{file}”.',
+    'new.tableReadyOne': 'Your table is ready: 1 row from “{file}”.',
+    'new.keepTitle': 'Keep it up to date?',
+    'new.keepIntro': 'When the Excel file changes, the table can update itself. Pick how:',
+    'new.keepEasiest': 'Easiest: email the Excel file each time it changes.',
+    'new.keepLater': 'Not now',
+    'new.keepLaterNote': 'You can do it later from Automate.',
   },
   es: {
     'nav.new': 'Nuevo',
@@ -43,5 +59,20 @@ export const NEW_MENU_COPY: HomeLocaleCopy = {
     'new.tplHint.proposal': 'Contexto, qué proponés, costos y plazos',
     'new.creating': 'Creando tu documento…',
     'new.failed': 'No se pudo crear el documento. ¿Probás de nuevo?',
+    'new.table': 'Tabla desde un Excel',
+    'new.tableHint': 'Elegí un Excel o CSV y lo mostramos como tabla',
+    'new.tableCreating': 'Armando tu tabla…',
+    'new.tableFailed': 'No se pudo armar la tabla. ¿Probás de nuevo?',
+    'new.tableErrTitle': 'No se puede usar este archivo',
+    'new.tableErrType': TABLE_ERRORS.es.NOT_A_SHEET,
+    'new.tableErrBig': TABLE_ERRORS.es.TOO_LARGE,
+    'new.tablePickAgain': 'Elegir otro archivo',
+    'new.tableReady': 'Listo: tu tabla tiene {rows} filas de “{file}”.',
+    'new.tableReadyOne': 'Listo: tu tabla tiene 1 fila de “{file}”.',
+    'new.keepTitle': '¿La mantenemos al día?',
+    'new.keepIntro': 'Cuando cambie el Excel, la tabla se puede actualizar sola. Elegí cómo:',
+    'new.keepEasiest': 'Lo más simple: mandar el Excel por email cada vez que cambie.',
+    'new.keepLater': 'Ahora no',
+    'new.keepLaterNote': 'Podés hacerlo después desde Automatizar.',
   },
 };

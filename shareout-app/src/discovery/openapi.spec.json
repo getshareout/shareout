@@ -1305,7 +1305,7 @@
                     "address": {
                       "type": "string",
                       "nullable": true,
-                      "description": "Where to send the file; null until senders are set, and while the address is off."
+                      "description": "Where to send the file — the short address (first word of the slug, a dot, six letters/digits). The long slug address keeps working. null until senders are set, and while the address is off."
                     },
                     "senders": {
                       "type": "array",
@@ -11778,8 +11778,8 @@
         "tags": [
           "Home"
         ],
-        "summary": "Create a blank document or one from a template",
-        "description": "The Studio \"New\" menu's no-AI path. Creates a private HTML document owned by the caller — blank or from a simple template (report, meeting notes, proposal) — and returns where to open it. Inside a workspace (subdomain or `workspace` query) the caller must be an internal member. Counts toward the daily publish limit and the storage cap. Agent (`sot_`) tokens are refused.",
+        "summary": "Create a blank document, one from a template, or a table of an Excel file",
+        "description": "The Studio \"New\" menu's no-AI path. Creates a private HTML document owned by the caller — blank or from a simple template (report, meeting notes, proposal) — and returns where to open it. With `template: table` and a `file` (.xlsx or .csv, base64), the file's first tab becomes the page's data (first row = column titles; 8 MB, 100,000 rows) and the page shows it as a table that reads that data by one name, so Update by email needs no dataset. A file it cannot use is refused before anything is created, with `code` and a one-sentence `error` in `lang`. Inside a workspace (subdomain or `workspace` query) the caller must be an internal member. Counts toward the daily publish limit and the storage cap. Agent (`sot_`) tokens are refused.",
         "operationId": "createHomeDocument",
         "parameters": [
           {
@@ -11803,7 +11803,8 @@
                       "blank",
                       "report",
                       "meeting",
-                      "proposal"
+                      "proposal",
+                      "table"
                     ],
                     "default": "blank"
                   },
@@ -11814,7 +11815,23 @@
                       "es"
                     ],
                     "default": "en",
-                    "description": "Language of the document's title and headings."
+                    "description": "Language of the document's title and headings (and of a table's errors)."
+                  },
+                  "file": {
+                    "type": "object",
+                    "description": "`template: table` only: the spreadsheet.",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "File name, ending in .xlsx or .csv (also the page's title)."
+                      },
+                      "content": {
+                        "type": "string",
+                        "format": "byte",
+                        "description": "The file",
+                        "base64.": null
+                      }
+                    }
                   }
                 }
               }
@@ -11840,6 +11857,10 @@
                     },
                     "name": {
                       "type": "string"
+                    },
+                    "rowCount": {
+                      "type": "integer",
+                      "description": "`template: table` only: rows written."
                     }
                   }
                 }
@@ -11847,7 +11868,7 @@
             }
           },
           "400": {
-            "$ref": "#/components/responses/BadRequest"
+            "description": "Unknown template, or (`template: table`) `NO_FILE` / `NOT_A_SHEET` — `error` says what to do."
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -11856,7 +11877,10 @@
             "$ref": "#/components/responses/Forbidden"
           },
           "413": {
-            "description": "Storage limit reached"
+            "description": "Storage limit reached, or (`template: table`) `TOO_LARGE` / `TOO_MANY_ROWS`."
+          },
+          "422": {
+            "description": "`template: table`: `NO_ROWS` (no rows under the titles) or `UNREADABLE`."
           },
           "429": {
             "description": "Daily publish limit reached"

@@ -136,12 +136,12 @@ describe('New menu', () => {
   }
   const items = () => Array.from(document.querySelectorAll('#wsxNewMenu [role="menuitem"]')).map((b) => b.firstChild!.textContent);
 
-  it('offers upload, blank document and template — in plain Spanish', () => {
+  it('offers upload, a table from an Excel, blank document and template — in plain Spanish', () => {
     locale = 'es';
     setup();
     (document.getElementById('wsxNewBtn') as HTMLButtonElement).click();
     expect(document.getElementById('wsxNewMenu')!.hidden).toBe(false);
-    expect(items()).toEqual(['Subir archivos', 'Documento en blanco', 'Desde una plantilla']);
+    expect(items()).toEqual(['Subir archivos', 'Tabla desde un Excel', 'Documento en blanco', 'Desde una plantilla']);
     (document.querySelector('[data-new="tpl"]') as HTMLButtonElement).click();
     expect(items()).toEqual(['Informe', 'Minuta de reunión', 'Propuesta']);
   });
@@ -149,7 +149,7 @@ describe('New menu', () => {
   it('leads with "Describe it to AI" when AI create is on, and opens the composer', () => {
     setup(true);
     (document.getElementById('wsxNewBtn') as HTMLButtonElement).click();
-    expect(items()).toEqual(['Describe it to AI', 'Upload files', 'Blank document', 'From a template']);
+    expect(items()).toEqual(['Describe it to AI', 'Upload files', 'Table from an Excel file', 'Blank document', 'From a template']);
     (document.querySelector('[data-new="ai"]') as HTMLButtonElement).click();
     expect(entered).toBe(1);
     expect(document.getElementById('wsxNewMenu')!.hidden).toBe(true);
