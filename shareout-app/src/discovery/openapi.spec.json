@@ -1281,6 +1281,233 @@
         }
       }
     },
+    "/v1/artifacts/{id}/email-sync": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ArtifactId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "Update by email — status",
+        "description": "What the \"Update by email\" panel shows for an `email_sheet_sync` job: the page's own address, who may send the file, the job's last result, the last email that arrived and the data it last wrote. Owner or editor of a page inside a workspace (else 404). Use it to confirm to the person that their file landed (\"365 rows updated at 10:32\") or to say why not (`job.lastError` is one plain sentence with what to do, in the owner's language).",
+        "operationId": "getEmailSync",
+        "responses": {
+          "200": {
+            "description": "Status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Where to send the file; null until senders are set."
+                    },
+                    "senders": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "datasets": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The page's datasets, most recently written first."
+                    },
+                    "you": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The caller's email — the default sender."
+                    },
+                    "job": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "dataset": {
+                          "type": "string"
+                        },
+                        "sheet": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "attachment": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "lastRunAt": {
+                          "type": "integer",
+                          "nullable": true,
+                          "description": "Unix seconds."
+                        },
+                        "lastStatus": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "success",
+                            "failed"
+                          ]
+                        },
+                        "lastError": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "lastEmail": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "from": {
+                          "type": "string"
+                        },
+                        "subject": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "receivedAt": {
+                          "type": "integer",
+                          "description": "Unix seconds."
+                        },
+                        "files": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "lastUpdate": {
+                      "type": "object",
+                      "nullable": true,
+                      "description": "The last write made from an emailed file (null if the dataset came from elsewhere).",
+                      "properties": {
+                        "rowCount": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "file": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "sheet": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "description": "`NO_WORKSPACE` — the page is not inside a workspace."
+          }
+        }
+      }
+    },
+    "/v1/artifacts/{id}/email-sync/senders": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ArtifactId"
+        }
+      ],
+      "put": {
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "Update by email — who may send the file",
+        "description": "Replaces the list of addresses allowed to update the page by email, and turns the page's inbox on (its address is in the response). Call it before creating the `email_sheet_sync` job, which refuses an empty list. Exact addresses, or a company `@domain`; never a whole free-mail domain (`@gmail.com`, `@outlook.com`, …). Mail from anyone else is bounced, and so is mail whose sender Cloudflare cannot vouch for (DMARC, or a DKIM signature by the sender's own domain). Owner or editor of the page.",
+        "operationId": "setEmailSyncSenders",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "senders"
+                ],
+                "properties": {
+                  "senders": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                      "type": "string"
+                    },
+                    "example": [
+                      "ana@acme.com"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The address to send to and the saved list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "address": {
+                      "type": "string"
+                    },
+                    "senders": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_SENDER` (`param` = the entry) — not an email address; `FREE_MAIL_DOMAIN` — a whole free-mail domain; `NO_SENDERS` — the list is empty; `TOO_MANY_SENDERS`; `VALIDATION_ERROR`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/artifacts/deleted": {
       "get": {
         "tags": [
@@ -16078,7 +16305,8 @@
               "artifact_test",
               "asset_delivery",
               "drive_file_sync",
-              "public_sheet_sync"
+              "public_sheet_sync",
+              "email_sheet_sync"
             ]
           },
           "trigger_type": {
@@ -16166,7 +16394,8 @@
               "artifact_test",
               "asset_delivery",
               "drive_file_sync",
-              "public_sheet_sync"
+              "public_sheet_sync",
+              "email_sheet_sync"
             ]
           },
           "trigger_type": {
@@ -16193,7 +16422,7 @@
           },
           "config": {
             "type": "object",
-            "description": "Action-specific configuration. Spreadsheet syncs: `public_sheet_sync` takes `PublicSheetSyncConfig` (a link shared as \"Anyone with the link can view\"; check it first with `POST /v1/workspaces/{workspaceId}/sheet-links/inspect`), `drive_file_sync` takes `DriveFileSyncConfig` (a private Drive file its creator picked in Google's consent + Picker, `GET /v1/workspaces/{workspaceId}/file-imports/sheet-sync/pick`). Both need owner or editor access to a page inside a workspace.",
+            "description": "Action-specific configuration. Spreadsheet syncs: `public_sheet_sync` takes `PublicSheetSyncConfig` (a link shared as \"Anyone with the link can view\"; check it first with `POST /v1/workspaces/{workspaceId}/sheet-links/inspect`), `drive_file_sync` takes `DriveFileSyncConfig` (a private Drive file its creator picked in Google's consent + Picker, `GET /v1/workspaces/{workspaceId}/file-imports/sheet-sync/pick`). Both need owner or editor access to a page inside a workspace. `email_sheet_sync` (event `email.received` only) takes `EmailSheetSyncConfig` `{ dataset, sheet?, attachment? }`: an Excel/CSV emailed to the page's own address replaces the dataset; set who may send it first with `PUT /v1/artifacts/{id}/email-sync/senders`.",
             "example": {
               "link": "https://docs.google.com/spreadsheets/d/1Bxi…/edit",
               "dataset": "sales",
