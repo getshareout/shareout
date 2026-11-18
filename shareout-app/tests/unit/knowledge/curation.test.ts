@@ -320,3 +320,58 @@ describe('who may curate', () => {
     expect(d.mentions).toEqual([]);
   });
 });
+
+describe('names, history and what members may read', () => {
+  it('refuses a name or alias another entity already goes by, so later learns keep landing on its owner', async () => {
+    const { e, ws } = await setup('Acme Inc. is a client of Northwind.');
+    const nw = (await byName(e, ws, 'Northwind'))!;
+    const acme = (await byName(e, ws, 'Acme Inc.'))!;
+    // an alias that is another entity's name
+    let r = await call<{ code: string; suggestion: string }>(e, ws, 'POST', 'entities', { name: 'NW Holdings', type: 'Organization', aliases: ['Northwind'] });
+    expect(r.status).toBe(409);
+    expect(r.body.suggestion).toContain(nw.id);
+    // the same name under another type
+    r = await call(e, ws, 'POST', 'entities', { name: 'Northwind', type: 'Client' });
+    expect(r.status).toBe(409);
+    expect(r.body.suggestion).toContain(nw.id);
+    // an alias the team already gave another entity
+    const area = (await call<{ id: string }>(e, ws, 'POST', 'entities', { name: 'Gerencia SGI', type: 'Area', aliases: ['SGI'] })).body;
+    r = await call(e, ws, 'PATCH', `entities/${acme.id}`, { aliases: ['SGI'] });
+    expect(r.status).toBe(409);
+    expect(r.body.suggestion).toContain(area.id);
+    // nothing was repointed: a later document still lands on Northwind and on Gerencia SGI
+    await putFile(e, ws, 'dlv_c2', 'Acme Inc. is a client of Northwind.');
+    const names = (await entities(e, ws)).map((x) => x.name);
+    expect(names.filter((n) => n === 'Northwind')).toHaveLength(1);
+    expect(names).not.toContain('NW Holdings');
+    expect((await entities(e, ws, '?q=SGI')).map((x) => x.id)).toEqual([area.id]);
+  });
+
+  it('per-entity history lists only that entity’s changes', async () => {
+    const { e, ws } = await setup('Acme Inc. is a client of Northwind.');
+    const acme = (await byName(e, ws, 'Acme Inc.'))!;
+    const nw = (await byName(e, ws, 'Northwind'))!;
+    await call(e, ws, 'PATCH', `entities/${acme.id}`, { confirm: true });
+    await call(e, ws, 'PATCH', `entities/${nw.id}`, { description: 'A partner.' });
+    await call(e, ws, 'POST', 'relations', { from: acme.id, type: 'owns', to: nw.id });
+    type H = { history: { action: string; targets: string[] }[] };
+    const mine = (await get<H>(e, ws, `history?entity=${acme.id}`)).body.history;
+    expect(mine.map((h) => h.action)).toEqual(['relation.create', 'entity.confirm']);
+    expect(mine.every((h) => h.targets.includes(acme.id))).toBe(true);
+    expect((await get<H>(e, ws, `history?entity=${nw.id}`)).body.history.map((h) => h.action)).toEqual(['relation.create', 'entity.update']);
+  });
+
+  it('gives members the team’s own types only — no graph-wide counts or relation types', async () => {
+    const { e, ws } = await setup('Acme Inc. is a client of Northwind.');
+    await call(e, ws, 'PUT', 'schema/types/Registro', { description: 'RS-xx' });
+    type S = { types: { type: string; count?: number; team: boolean }[]; relationTypes: string[] };
+    const admin = (await get<S>(e, ws, 'schema')).body;
+    expect(admin.types).toContainEqual(expect.objectContaining({ type: 'Organization', count: 2, team: false }));
+    expect(admin.relationTypes).toEqual(['client_of']);
+    getInternalWorkspaceRole.mockResolvedValue('member');
+    const member = (await get<S>(e, ws, 'schema')).body;
+    expect(member.types).toEqual([expect.objectContaining({ type: 'Registro', team: true })]);
+    expect(member.types[0].count).toBeUndefined();
+    expect(member.relationTypes).toEqual([]);
+  });
+});

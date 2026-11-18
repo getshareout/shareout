@@ -11,7 +11,8 @@
 //   GET    rules   ·  POST rules {kind: rule|glossary, term?, text}  ·  DELETE rules/{id}
 //   GET    discarded  ·  POST discarded/restore {kind, key}
 //   GET    history?entity=&limit=
-// Reading the schema and rules is for every member (they shape what everyone sees); every
+// Reading the rules and the team's types is for every member (they shape what everyone sees);
+// type counts and relation types in use (they span sources a member may not open), every
 // write, the discarded list and the history are for owners and admins.
 import type { FetchContext } from '../context';
 import { jsonResponse } from '../helpers/json-response';
@@ -78,7 +79,7 @@ export async function routeKnowledgeCuration(
 
   // ----- reads -----
   if (method === 'GET') {
-    if (sub === 'schema') return jsonResponse(await store.schema());
+    if (sub === 'schema') return jsonResponse(await store.schema(canManage));
     if (sub === 'rules') return jsonResponse({ rules: await store.rules() });
     if (!canManage) return forbidden();
     const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 50, 1), 200);

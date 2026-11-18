@@ -461,8 +461,8 @@ export class KnowledgeStore extends DurableObject<Env> {
     return this.metered(() => this.ctx.storage.transactionSync(() => curation.curate(this.q.bind(this), userId, op)));
   }
 
-  schema() {
-    return this.metered(() => curation.schema(this.q.bind(this)));
+  schema(full: boolean) {
+    return this.metered(() => curation.schema(this.q.bind(this), full));
   }
 
   rules() {

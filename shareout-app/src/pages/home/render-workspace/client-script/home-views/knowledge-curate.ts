@@ -350,7 +350,7 @@ export const workspace_client_home_views_knowledgeCurate_JS = `  // ----- Knowle
     var types = (s.types || []).map(function (x) {
       return '<div class="kc-trow' + (x.ignored ? ' is-off' : '') + '">' + kmDot(x.type) + '<span class="kc-trow__n"><b>' + esc(kmTypeLabel(x.type)) + '</b>'
         + (x.description ? '<span class="kc-trow__d">' + esc(x.description) + '</span>' : (x.team ? '' : '<span class="kc-trow__d">' + esc(kt('kcur.fromModel')) + '</span>')) + '</span>'
-        + '<span class="kc-trow__c">' + esc(kt('kcur.inGraph').replace('{n}', Number(x.count || 0).toLocaleString())) + '</span>'
+        + (x.count != null ? '<span class="kc-trow__c">' + esc(kt('kcur.inGraph').replace('{n}', Number(x.count).toLocaleString())) + '</span>' : '<span></span>')
         + '<span class="kc-trow__s">' + esc(kt(x.ignored ? 'kcur.ignored' : 'kcur.active')) + sw(!x.ignored, 'data-kc-tog="' + esc(x.type) + '"', kt('kcur.ignoreType') + ' ' + x.type) + '</span></div>';
     }).join('') || '<div class="km__none">' + esc(kt('kcur.nothing')) + '</div>';
     var gl = kcState.rules.filter(function (r) { return r.kind === 'glossary'; });

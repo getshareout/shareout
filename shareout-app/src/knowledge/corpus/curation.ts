@@ -120,21 +120,44 @@ function entityRow(q: Q, id: string) {
   return q('SELECT * FROM entities WHERE id = ?', id).toArray()[0];
 }
 
-/** Point these names at the entity, and lift any discard on them: the team wants them now. */
+/** Point these names at the entity — never taking one another live entity holds — and lift
+ *  any discard on the names it now holds: the team wants them. */
 function claimNames(q: Q, id: string, names: string[]): void {
   for (const n of names) {
     const norm = normalizeName(n);
     if (!norm) continue;
-    q('INSERT INTO graph_redirects (norm, entity_id) VALUES (?, ?) ON CONFLICT(norm) DO UPDATE SET entity_id = excluded.entity_id', norm, id);
-    q("DELETE FROM graph_tombstones WHERE kind = 'entity' AND key = ?", norm);
+    q(`INSERT INTO graph_redirects (norm, entity_id) VALUES (?, ?) ON CONFLICT(norm) DO UPDATE SET entity_id = excluded.entity_id
+        WHERE graph_redirects.entity_id NOT IN (SELECT id FROM entities)`, norm, id);
+    if (q('SELECT 1 AS x FROM graph_redirects WHERE norm = ? AND entity_id = ?', norm, id).toArray().length) {
+      q("DELETE FROM graph_tombstones WHERE kind = 'entity' AND key = ?", norm);
+    }
   }
+}
+
+/** Another entity this name already belongs to: one the team pointed it at, or its own name. */
+function nameHolder(q: Q, norm: string, self: string | null): string | null {
+  const r = q('SELECT r.entity_id AS id FROM graph_redirects r JOIN entities e ON e.id = r.entity_id WHERE r.norm = ? AND r.entity_id != ?', norm, self ?? '').toArray()[0];
+  if (r) return r.id as string;
+  const e = q('SELECT id FROM entities WHERE norm = ? AND id != ? ORDER BY (status = ?) DESC, mention_count DESC LIMIT 1', norm, self ?? '', CONFIRMED).toArray()[0];
+  return e ? (e.id as string) : null;
+}
+
+/** Refuse names another entity already goes by: the team merges them instead, so later
+ *  documents keep landing on the right one. */
+function nameClash(q: Q, names: string[], self: string | null): CurationResult | null {
+  for (const n of names) {
+    const norm = normalizeName(n);
+    const other = norm ? nameHolder(q, norm, self) : null;
+    if (other) return fail('CONFLICT', `“${n}” already names another entity — merge them instead`, other);
+  }
+  return null;
 }
 
 function confirmEntity(q: Q, id: string, user: string): void {
   q(`UPDATE entities SET status = ?, confirmed_by = COALESCE(confirmed_by, ?), confirmed_at = COALESCE(confirmed_at, ${NOW}) WHERE id = ?`, CONFIRMED, user, id);
 }
 
-/** Another entity already holds this (type, name). */
+/** Another entity already holds this (type, name) — the table's unique key. */
 function clash(q: Q, id: string, type: string, norm: string): string | null {
   const hit = q('SELECT id FROM entities WHERE type = ? AND norm = ? AND id != ?', type, norm, id).toArray()[0];
   return hit ? (hit.id as string) : null;
@@ -149,6 +172,8 @@ export function curate(q: Q, user: string, op: CurationOp): CurationResult {
       const type = normalizeType(clip(op.type, 40));
       const aliases = cleanAliases(op.aliases, name);
       const existing = q('SELECT id FROM entities WHERE type = ? AND norm = ?', type, norm).toArray()[0];
+      const taken = nameClash(q, [name, ...aliases], existing ? (existing.id as string) : null);
+      if (taken) return taken;
       const id = existing ? (existing.id as string) : newId('ent');
       if (existing) {
         q('UPDATE entities SET name = ?, description = CASE WHEN ? != \'\' THEN ? ELSE description END WHERE id = ?', name, clip(op.description, LIMITS.description), clip(op.description, LIMITS.description), id);
@@ -172,8 +197,13 @@ export function curate(q: Q, user: string, op: CurationOp): CurationResult {
       const type = op.type !== undefined ? normalizeType(clip(op.type, 40)) : before.type;
       const other = (name !== before.name || type !== before.type) ? clash(q, op.id, type, norm) : null;
       if (other) return fail('CONFLICT', `Another ${type} is already called “${name}” — merge them instead`, other);
-      let team = json<string[]>(row.team_aliases, []);
+      const had = json<string[]>(row.team_aliases, []);
+      let team = had;
       if (op.aliases !== undefined) team = cleanAliases(op.aliases, name);
+      // New names only: the entity's own old name and aliases are already its.
+      const fresh = [name, ...team].filter((n) => n !== before.name && !had.includes(n));
+      const taken = nameClash(q, fresh, op.id);
+      if (taken) return taken;
       // The old name stays an alias, so documents that still use it land here.
       if (name !== before.name && !team.includes(before.name)) team = [before.name, ...team].slice(0, LIMITS.aliases);
       team = team.filter((a) => a !== name);
@@ -410,9 +440,12 @@ export function listDiscarded(q: Q, limit: number): Discarded[] {
     .map((r) => ({ kind: r.kind as Discarded['kind'], key: r.key as string, label: r.label as string, reason: (r.reason as string | null) ?? null, at: r.at as string }));
 }
 
-/** Types for the Rules view: the team's own, plus the ones the graph uses today. */
-export function schema(q: Q) {
+/** Types for the Rules view. Owners/admins (`full`) also get the types the graph uses today,
+ *  with counts and the relation types in use; those span sources a member may not open, so a
+ *  member gets only the team's own types. */
+export function schema(q: Q, full: boolean) {
   const team = teamTypes(q);
+  if (!full) return { types: team.map((t) => ({ ...t, team: true })), teamOnly: teamOnly(q), relationTypes: [] as string[] };
   const inUse = q('SELECT type, COUNT(*) AS n FROM entities WHERE (mention_count > 0 OR status = ?) GROUP BY type ORDER BY n DESC', CONFIRMED).toArray();
   const counts = new Map(inUse.map((r) => [r.type as string, r.n as number]));
   const types = team.map((t) => ({ ...t, team: true, count: counts.get(t.type) ?? 0 }));
@@ -425,7 +458,7 @@ export interface LogEntry { id: number; at: string; by: string | null; action: s
 
 export function history(q: Q, opts: { entity?: string; limit: number }): LogEntry[] {
   const rows = opts.entity
-    ? q('SELECT * FROM graph_log WHERE targets LIKE ? ORDER BY id DESC LIMIT ?', `%"${opts.entity.replace(/[%_"]/g, '')}"%`, opts.limit).toArray()
+    ? q('SELECT * FROM graph_log WHERE EXISTS (SELECT 1 FROM json_each(graph_log.targets) WHERE value = ?) ORDER BY id DESC LIMIT ?', opts.entity, opts.limit).toArray()
     : q('SELECT * FROM graph_log ORDER BY id DESC LIMIT ?', opts.limit).toArray();
   return rows.map((r) => ({
     id: r.id as number, at: r.at as string, by: (r.by_user as string | null) ?? null, action: r.action as string,
