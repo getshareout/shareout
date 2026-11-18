@@ -147,6 +147,39 @@ async function rowsIn(ctx: ToolContext, artifactId: string, dataset: string): Pr
   } catch { return null; }
 }
 
+/** Who already writes dataset `name` on the page: another schedule (any action whose config
+ *  names it), the data itself (an upload, an earlier sync), or nobody. */
+async function datasetOwner(ctx: ToolContext, artifactId: string, name: string, exceptJobId?: string): Promise<{ job: string | null } | 'data' | null> {
+  const job = await ctx.env.DB.prepare("SELECT id, title FROM scheduled_jobs WHERE artifact_id = ? AND json_extract(config, '$.dataset') = ? AND id != ? LIMIT 1")
+    .bind(artifactId, name, exceptJobId ?? '').first<{ id: string; title: string | null }>();
+  if (job) return { job: job.title };
+  const ds = await ctx.env.DB.prepare('SELECT 1 FROM datasets WHERE artifact_id = ? AND name = ?').bind(artifactId, name).first();
+  return ds ? 'data' : null;
+}
+
+/** The default name, or the first free variant of it (sales_2026, sales_2026_2, …): a default never lands on data the page already has. */
+async function freeDatasetName(ctx: ToolContext, artifactId: string, base: string): Promise<string> {
+  for (let i = 1; i <= 50; i++) {
+    const name = i === 1 ? base : `${base.slice(0, 60)}_${i}`;
+    if (!(await datasetOwner(ctx, artifactId, name))) return name;
+  }
+  return `${base.slice(0, 50)}_${Date.now().toString(36)}`;
+}
+
+/** A dataset name the caller chose: refused when another schedule fills it, and when the page
+ *  already has data under it unless replacing was asked for. Null = fine to write. */
+async function namedDatasetProblem(ctx: ToolContext, artifactId: string, name: string, replace: boolean, verb: string, exceptJobId?: string): Promise<ToolResult | null> {
+  const owner = await datasetOwner(ctx, artifactId, name, exceptJobId);
+  if (owner && owner !== 'data') {
+    return invalid(`${verb}: another schedule on this page${owner.job ? ` (“${owner.job}”)` : ''} already fills dataset “${name}”; two would overwrite each other. Use another dataset name, or change that schedule instead.`, { code: 'DATASET_IN_USE', dataset: name });
+  }
+  if (owner === 'data' && !replace) {
+    const rows = await rowsIn(ctx, artifactId, name);
+    return invalid(`${verb}: the page already has data named “${name}”${rows !== null ? ` (${rows} rows)` : ''}, and the spreadsheet would replace it. Send replace_existing: true to replace it, or another dataset name.`, { code: 'DATASET_EXISTS', dataset: name, row_count: rows });
+  }
+  return null;
+}
+
 async function runOnce(ctx: ToolContext, jobId: string): Promise<{ ok: boolean; error?: string }> {
   const res = await handleRunJob(ctx.env, ctx.user, jobId);
   const body = await readJson(res);
@@ -241,7 +274,8 @@ const setSheetSync: ToolDef = {
   description: [
     'Creates or changes the schedule that copies one tab of a spreadsheet into one of a page’s datasets (JSON rows keyed by the header row, read in the page with sdk.dataset(name)).',
     'Source: link (a Google Sheets/Drive link shared as “Anyone with the link”) or file_id (a private Drive file the person already picked, from pick_drive_spreadsheet).',
-    'Defaults: the first tab with data, a dataset named after the file (“Sales 2026.xlsx” → sales_2026), daily at 08:00 UTC. how_often: hourly, daily, weekdays or weekly (Mondays); time and timezone set the hour.',
+    'Defaults: the first tab with data, a dataset named after the file (“Sales 2026.xlsx” → sales_2026, or sales_2026_2 when the page already has that name), daily at 08:00 UTC. how_often: hourly, daily, weekdays or weekly (Mondays); time and timezone set the hour.',
+    'A dataset name given explicitly that the page already has is refused unless replace_existing is true; one another schedule fills is always refused.',
     'run_now (default true) loads the data once right away and reports the row count; a new schedule whose first load fails is removed again and the reason returned.',
     'job_id changes an existing sync on the page (from list_jobs) instead of creating one. Needs owner or editor access to the page; up to 5 new schedules per person per day.',
     'Each run skips the write when the spreadsheet has not changed.',
@@ -259,6 +293,7 @@ const setSheetSync: ToolDef = {
       timezone: { type: 'string', description: 'IANA time zone, like America/Argentina/Buenos_Aires. Default UTC.' },
       job_id: { type: 'string', description: 'An existing sync on this page to change (from list_jobs).' },
       run_now: { type: 'boolean', default: true },
+      replace_existing: { type: 'boolean', default: false, description: 'Replace data the page already has under the given dataset name.' },
     },
     required: ['artifact_id'],
     additionalProperties: false,
@@ -274,6 +309,7 @@ const setSheetSync: ToolDef = {
     const dataset = str(args.dataset, 64);
     if (dataset && !DATASET_NAME.test(dataset)) return invalid('Nothing was done: dataset may use letters, digits, _ . and -, up to 64 characters.');
     const runNow = args.run_now !== false;
+    const replace = args.replace_existing === true;
 
     const role = await getUserRole(ctx.env, artifactId, ctx.user.id);
     if (role !== 'owner' && role !== 'editor') return invalid('Nothing was done: only the page’s owner or editors can keep its data in sync with a spreadsheet, and the person is neither (or the page does not exist).');
@@ -289,7 +325,7 @@ const setSheetSync: ToolDef = {
     }
 
     const jobId = str(args.job_id, 100);
-    if (jobId) return updateSync(ctx, artifactId, ws, jobId, { link, fileId, sheet, dataset, schedule, runNow });
+    if (jobId) return updateSync(ctx, artifactId, ws, jobId, { link, fileId, sheet, dataset, schedule, runNow, replace });
     if (!link && !fileId) return invalid('Nothing was done: send link (a spreadsheet shared as “Anyone with the link”) or file_id (a private Drive file picked with pick_drive_spreadsheet).');
 
     const locale = await localeForRecipient(ctx.env, { userId: ctx.user.id, workspaceId: ws });
@@ -313,6 +349,14 @@ const setSheetSync: ToolDef = {
       fileName = picked?.name || 'Google Drive spreadsheet';
       action = 'drive_file_sync';
       config = { provider: 'google_drive', fileId: fileId!, dataset: dataset || datasetSlug(picked?.name), ...(picked?.name ? { fileName: picked.name } : {}), ...(sheet ? { sheet } : {}) };
+    }
+
+    // Never write over data the page already has without being asked to.
+    if (dataset) {
+      const problem = await namedDatasetProblem(ctx, artifactId, dataset, replace, 'Nothing was done');
+      if (problem) return problem;
+    } else {
+      config.dataset = await freeDatasetName(ctx, artifactId, config.dataset);
     }
 
     const title = action === 'public_sheet_sync'
@@ -348,13 +392,17 @@ const setSheetSync: ToolDef = {
 
 async function updateSync(
   ctx: ToolContext, artifactId: string, ws: string, jobId: string,
-  p: { link: string | null; fileId: string | null; sheet: string | null; dataset: string | null; schedule?: { cron: string; label: string }; runNow: boolean },
+  p: { link: string | null; fileId: string | null; sheet: string | null; dataset: string | null; schedule?: { cron: string; label: string }; runNow: boolean; replace: boolean },
 ): Promise<ToolResult> {
   const job = await findSync(ctx, artifactId, jobId);
   if (!job) return invalid('Nothing was changed: this page has no spreadsheet sync with that job_id that the person can see. list_jobs with the page’s artifact_id lists them.');
   const prev = job.config as unknown as PublicSheetSyncConfig & DriveFileSyncConfig;
   if (job.action === 'public_sheet_sync' && p.fileId) return invalid('Nothing was changed: this sync reads a shared link; a private Drive file needs a new sync (set_sheet_sync with file_id, then remove_sheet_sync on this one).');
   if (job.action === 'drive_file_sync' && p.link) return invalid('Nothing was changed: this sync reads a private Drive file; a shared link needs a new sync (set_sheet_sync with link, then remove_sheet_sync on this one).');
+  if (p.dataset && p.dataset !== prev.dataset) {
+    const problem = await namedDatasetProblem(ctx, artifactId, p.dataset, p.replace, 'Nothing was changed', jobId);
+    if (problem) return problem;
+  }
   if (p.link) {
     const r = await replay(ctx, routeSheetLinkApi, 'POST', wsPath(ws, 'sheet-links/inspect'), { link: p.link });
     if (r.status !== 200) return linkProblem(r.status, r.body);

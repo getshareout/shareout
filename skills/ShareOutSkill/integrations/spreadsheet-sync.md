@@ -41,7 +41,7 @@ They are usually not technical. Run it as a short conversation:
 |---|---|
 | `inspect_sheet_link` | Checks a shared link: public or not, title, tabs, rows and columns of the first tab. Saves nothing. |
 | `pick_drive_spreadsheet` | Returns the link the person opens to pick a private file in Google, and the last file they picked in this workspace. |
-| `set_sheet_sync` | Creates the sync (from `link` or a picked `file_id`) with the defaults, loads it once right away and reports the row count; with `job_id` it changes one. A new sync whose first load fails is removed again. |
+| `set_sheet_sync` | Creates the sync (from `link` or a picked `file_id`) with the defaults, loads it once right away and reports the row count; with `job_id` it changes one. A new sync whose first load fails is removed again. It never writes over data the page already has: a default name that is taken becomes `name_2`; a `dataset` you name that exists is refused unless `replace_existing: true` (confirm with the person first); a name another schedule fills is always refused. |
 | `remove_sheet_sync` | Stops a sync. The data already loaded stays on the page. |
 | `list_jobs` | Lists the page's syncs (with `artifact_id`), to find the `job_id`. |
 

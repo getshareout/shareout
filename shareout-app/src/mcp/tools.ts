@@ -70,7 +70,7 @@ export const SERVER_INSTRUCTIONS = [
   'If anything fails or behaves unexpectedly, call report_problem with what happened, then tell the person',
   'the ShareOut team was notified. For how-to questions about ShareOut, call get_help.',
   'Confirm with the person before anything that reaches other people or cannot be undone from here: sharing a folder or file outside the team,',
-  'revoking a share, turning guest comments on or off, resending or cancelling an invite, restoring a version, and discarding, merging,',
+  'revoking a share, turning guest comments on or off, resending or cancelling an invite, restoring a version, replacing data a page already has, and discarding, merging,',
   'disconnecting or removing what Knowledge learned. After a change, say in a line or two what changed.',
 ].join(' ');
 

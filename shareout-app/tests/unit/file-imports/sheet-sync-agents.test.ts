@@ -271,6 +271,34 @@ describe('MCP tools', () => {
     expect((await e.DB.prepare('SELECT COUNT(*) AS n FROM scheduled_jobs WHERE artifact_id = ?').bind(ART).first<{ n: number }>())!.n).toBe(0);
   });
 
+  it('never writes over data the page already has unless asked (review R1)', async () => {
+    // The page already reads an uploaded "sales_2026" (1 row).
+    await e.DB.prepare("INSERT INTO datasets (id, artifact_id, name, format, r2_key, version, size_bytes, sha256, metadata) VALUES ('ds_ssa_up', ?, 'sales_2026', 'json', 'datasets/ssa/up.json', 1, 2, 'x', '{\"rowCount\":1}')").bind(ART).run();
+    const keep = async () => (await e.DB.prepare("SELECT id, version FROM datasets WHERE artifact_id = ? AND name = 'sales_2026'").bind(ART).first<{ id: string; version: number }>());
+
+    // Default name taken → the next free one; the uploaded data is untouched.
+    const auto = await call(OWNER, 'set_sheet_sync', { artifact_id: ART, link: LINK });
+    expect(text(auto)).toContain('in dataset “sales_2026_2”');
+    expect(await keep()).toEqual({ id: 'ds_ssa_up', version: 1 });
+
+    // Named explicitly → refused, nothing saved; replace_existing: true → replaced.
+    const named = await call(OWNER, 'set_sheet_sync', { artifact_id: ART, link: LINK, dataset: 'sales_2026' });
+    expect(named.isError).toBe(true);
+    expect(text(named)).toBe('Nothing was done: the page already has data named “sales_2026” (1 rows), and the spreadsheet would replace it. Send replace_existing: true to replace it, or another dataset name.');
+    expect((await e.DB.prepare('SELECT COUNT(*) AS n FROM scheduled_jobs WHERE artifact_id = ?').bind(ART).first<{ n: number }>())!.n).toBe(1);
+
+    // A name another schedule fills is refused even with replace_existing.
+    const clash = await call(OWNER, 'set_sheet_sync', { artifact_id: ART, link: LINK, dataset: 'sales_2026_2', replace_existing: true });
+    expect((clash.structuredContent as { code: string }).code).toBe('DATASET_IN_USE');
+    const jobId = (auto.structuredContent as { job_id: string }).job_id;
+    const moved = await call(OWNER, 'set_sheet_sync', { artifact_id: ART, job_id: jobId, dataset: 'sales_2026' });
+    expect((moved.structuredContent as { code: string }).code).toBe('DATASET_EXISTS');
+    expect(JSON.parse((await e.DB.prepare('SELECT config FROM scheduled_jobs WHERE id = ?').bind(jobId).first<{ config: string }>())!.config).dataset).toBe('sales_2026_2');
+
+    const replaced = await call(OWNER, 'set_sheet_sync', { artifact_id: ART, link: LINK, sheet: 'Raw', dataset: 'sales_2026', replace_existing: true });
+    expect(text(replaced)).toContain('the page now has 3 rows');
+  });
+
   it('remove_sheet_sync stops only spreadsheet syncs', async () => {
     await e.DB.prepare("INSERT INTO scheduled_jobs (id, artifact_id, owner_id, action, schedule, config, next_run_at) VALUES ('job_ssa_mail', ?, ?, 'email', '0 9 * * *', '{\"recipients\":[\"a@b.c\"]}', ?)")
       .bind(ART, OWNER, new Date().toISOString()).run();
