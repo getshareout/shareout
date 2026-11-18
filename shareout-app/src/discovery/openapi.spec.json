@@ -7941,7 +7941,7 @@
           "File imports"
         ],
         "summary": "Disconnect my drive",
-        "description": "Deletes my consent. Google is asked to revoke it only when it was my last Google consent here (a Google revoke ends every consent the account gave the app, the spreadsheet sync's included). Every folder syncing through it stops: running imports end with `CONNECTION_REVOKED`, daily sync turns off. Imported files stay.",
+        "description": "Deletes my consent. Google is asked to revoke it only when no other Google consent of mine goes through the same OAuth client (a Google revoke ends every consent the account gave that Cloud project, the spreadsheet sync's included). Every folder syncing through it stops: running imports end with `CONNECTION_REVOKED`, daily sync turns off. Imported files stay.",
         "operationId": "disconnectFileImport",
         "responses": {
           "200": {
@@ -8043,7 +8043,7 @@
           "File imports"
         ],
         "summary": "Disconnect Google Drive for spreadsheet sync",
-        "description": "Deletes my spreadsheet-sync consent. Scheduled syncs that read through it fail until the spreadsheet is picked again. Google is asked to revoke only when no other Google consent of mine is left (folder import keeps working).",
+        "description": "Deletes my spreadsheet-sync consent. Scheduled syncs that read through it fail until the spreadsheet is picked again. Google is asked to revoke only when no other Google consent of mine goes through the same OAuth client (folder import keeps working).",
         "operationId": "disconnectSheetSync",
         "responses": {
           "200": {

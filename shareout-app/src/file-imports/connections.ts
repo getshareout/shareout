@@ -7,7 +7,7 @@ import type { Env } from '../types';
 import { generateId } from '../crypto-utils';
 import { decryptCredentials, encryptCredentials } from '../data/connections/credentials';
 import { DRIVE_FILE_CONSENT, type ConsentProvider, type FileImportProvider } from './types';
-import { OAuthGrantError, refreshTokens, revokeAtProvider, type TokenSet } from './oauth';
+import { OAuthGrantError, providerConfig, refreshTokens, revokeAtProvider, type TokenSet } from './oauth';
 import { AuthExpiredError } from './http';
 
 export interface ConnectionRow {
@@ -107,17 +107,22 @@ export async function accessTokenFor(env: Env, conn: ConnectionRow, force = fals
 
 /**
  * Google revokes per project, not per token: one revoke ends every consent the account gave
- * this project — the folder import, the sheet sync, the same consent in another workspace.
- * So revoke at Google only when no other Google consent of this person or account is left.
+ * that Cloud project — the folder import, the sheet sync, the same consent in another
+ * workspace. So skip the revoke while another Google consent of this person or account
+ * goes through the same OAuth client. A different client counts as a different project:
+ * GOOGLE_DRIVE_FILE_CLIENT_ID is documented as one (a second client in the same project
+ * would be cut too). An unknown client of our own keeps the old, careful rule.
  */
 async function otherGoogleConsent(env: Env, conn: ConnectionRow): Promise<boolean> {
   if (conn.provider !== 'google_drive' && conn.provider !== DRIVE_FILE_CONSENT) return false;
-  const row = await env.DB.prepare(`
-    SELECT 1 FROM file_import_connections
+  const rows = (await env.DB.prepare(`
+    SELECT DISTINCT provider FROM file_import_connections
     WHERE id != ? AND provider IN ('google_drive', ?) AND (user_id = ? OR (account_email IS NOT NULL AND account_email = ?))
-    LIMIT 1
-  `).bind(conn.id, DRIVE_FILE_CONSENT, conn.user_id, conn.account_email).first();
-  return !!row;
+  `).bind(conn.id, DRIVE_FILE_CONSENT, conn.user_id, conn.account_email).all<{ provider: ConsentProvider }>()).results || [];
+  const mine = providerConfig(env, conn.provider)?.clientId;
+  if (!mine) return rows.length > 0;
+  // A consent whose provider is no longer configured is unusable here; cutting it costs nothing.
+  return rows.some((r) => providerConfig(env, r.provider)?.clientId === mine);
 }
 
 /**

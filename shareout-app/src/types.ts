@@ -147,8 +147,9 @@ export interface Env {
   /** Folder import from Google Drive (src/file-imports): its own OAuth client, a read-only file consent separate from sign-in. Unset = Drive import hidden. */
   GOOGLE_DRIVE_CLIENT_ID?: string;
   GOOGLE_DRIVE_CLIENT_SECRET?: string;
-  /** Optional: a separate OAuth client for the spreadsheet sync's drive.file + Picker consent (e.g. in a published project
-   *  while folder import's stays in Testing). Unset = the sheet sync uses GOOGLE_DRIVE_CLIENT_ID/SECRET. */
+  /** Optional: an OAuth client in a SEPARATE Cloud project for the spreadsheet sync's drive.file + Picker consent (e.g. a
+   *  published project while folder import's stays in Testing). Disconnects treat a different client as a different project
+   *  when deciding whether to revoke at Google. Unset = the sheet sync uses GOOGLE_DRIVE_CLIENT_ID/SECRET. */
   GOOGLE_DRIVE_FILE_CLIENT_ID?: string;
   GOOGLE_DRIVE_FILE_CLIENT_SECRET?: string;
   /** Folder import from OneDrive / SharePoint (Microsoft Graph, delegated). Unset = hidden. May be the same Entra app as sign-in. */

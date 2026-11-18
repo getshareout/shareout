@@ -240,6 +240,31 @@ describe('sheet sync consent: drive.file + the Google Picker', () => {
     expect((await call(`/v1/workspaces/${WS}/file-imports/connections/google_drive`, 'DELETE'))?.status).toBe(200);
     expect(calls.filter((c) => c.includes('/revoke'))).toEqual([]);
     expect(await sheetRow()).toMatchObject({ provider: DRIVE_FILE_CONSENT });
+    await e.DB.prepare('DELETE FROM file_import_connections WHERE workspace_id = ? AND user_id = ?').bind(WS, MEMBER).run();
+    vi.unstubAllGlobals();
+  });
+
+  it('with a separate OAuth client (its own Cloud project) each disconnect revokes its own grant at Google', async () => {
+    Object.assign(e, { GOOGLE_DRIVE_FILE_CLIENT_ID: 'fid', GOOGLE_DRIVE_FILE_CLIENT_SECRET: 'fsecret' });
+    await saveConnection(e, WS, MEMBER, 'google_drive', tokens('ro'), 'member@drive.test');
+    await saveConnection(e, WS, MEMBER, DRIVE_FILE_CONSENT, tokens('df'), 'member@drive.test');
+    as(MEMBER);
+    // The other consent is on another client, so it is not cut by this revoke: tell Google.
+    let calls = google({});
+    expect((await call(`/v1/workspaces/${WS}/file-imports/sheet-sync/connection`, 'DELETE'))?.status).toBe(200);
+    expect(calls.filter((c) => c.includes('/revoke'))).toEqual(['POST https://oauth2.googleapis.com/revoke']);
+    await saveConnection(e, WS, MEMBER, DRIVE_FILE_CONSENT, tokens('df'), 'member@drive.test');
+    calls = google({});
+    expect((await call(`/v1/workspaces/${WS}/file-imports/connections/google_drive`, 'DELETE'))?.status).toBe(200);
+    expect(calls.filter((c) => c.includes('/revoke'))).toEqual(['POST https://oauth2.googleapis.com/revoke']);
+    expect(await sheetRow()).toMatchObject({ provider: DRIVE_FILE_CONSENT });
+    // The same consent in another workspace goes through the same client: no revoke.
+    await e.DB.prepare("INSERT OR IGNORE INTO workspace_members (id, workspace_id, user_id, role) VALUES ('wm_rm2', ?, ?, 'member')").bind(WS2, MEMBER).run();
+    await saveConnection(e, WS2, MEMBER, DRIVE_FILE_CONSENT, tokens('df2'), 'member@drive.test');
+    calls = google({});
+    expect((await call(`/v1/workspaces/${WS}/file-imports/sheet-sync/connection`, 'DELETE'))?.status).toBe(200);
+    expect(calls.filter((c) => c.includes('/revoke'))).toEqual([]);
+    Object.assign(e, { GOOGLE_DRIVE_FILE_CLIENT_ID: undefined, GOOGLE_DRIVE_FILE_CLIENT_SECRET: undefined });
     vi.unstubAllGlobals();
   });
 });
