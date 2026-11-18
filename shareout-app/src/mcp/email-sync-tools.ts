@@ -129,7 +129,7 @@ const setEmailSync: ToolDef = {
     'artifact_id: the page’s id, link or slug (a name answers with the pages it matches). senders: exact addresses, a list or one string (a whole @gmail.com is refused);',
     'required the first time, optional later. dataset defaults to the one the page reads (asked back when it reads several).',
     'Each file REPLACES that dataset: when the page already has data under that name from elsewhere, the call is refused (DATASET_EXISTS) until replace_existing is true.',
-    `Returns the page’s address for the file. A file that cannot be used keeps the previous data and emails the page owner why. Limits: ${LIMITS}.`,
+    `Returns the page’s address for the file: a short one (the first word of the page’s slug, a dot, six letters/digits), easy to type or dictate. A file that cannot be used keeps the previous data and emails the page owner why. Limits: ${LIMITS}.`,
     'The page shows the data with sdk.dataset(name).get() (one object per row, keyed by the first row; [] until the first file).',
     'stop=true removes it (the address stops accepting files; the data and the sender list stay).',
   ].join(' '),

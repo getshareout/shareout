@@ -20,7 +20,7 @@ vi.mock('../../src/email/inbox-store', async (orig) => {
   return { ...actual, resolveArtifactByPrefix, storeInboundMessage, incrementInboundCount };
 });
 
-import { handleInboundEmail, parseInboundAddress } from '../../src/email/inbound';
+import { SENDER_NOT_PERMITTED_BOUNCE, handleInboundEmail, parseInboundAddress } from '../../src/email/inbound';
 
 const INBOX_DOMAIN = 'inbox.shareout.site';
 
@@ -182,8 +182,17 @@ describe('handleInboundEmail', () => {
     const env = fakeEnv();
     const msg = fakeMessage({ from: 'spam@evil.com' });
     await handleInboundEmail(msg as never, env, {} as ExecutionContext);
-    expect(msg.setReject).toHaveBeenCalledWith('Sender not permitted');
+    expect(msg.setReject).toHaveBeenCalledWith(SENDER_NOT_PERMITTED_BOUNCE);
     expect(emitJobEvent).not.toHaveBeenCalled();
+  });
+
+  it('bounces with one plain sentence the sender can act on: a single ASCII line, naming nobody', () => {
+    expect(SENDER_NOT_PERMITTED_BOUNCE).toBe(
+      'This address only accepts files from people the owner of the page has approved. Ask them to add your address, then send it again.',
+    );
+    expect(SENDER_NOT_PERMITTED_BOUNCE).toMatch(/^[\x20-\x7e]+$/); // SMTP-safe: printable ASCII, no line break
+    expect(SENDER_NOT_PERMITTED_BOUNCE.length).toBeLessThan(200);
+    expect(SENDER_NOT_PERMITTED_BOUNCE).not.toMatch(/@|verif|allowlist|list/i);
   });
 
   it('does not re-fire the event on a duplicate delivery', async () => {

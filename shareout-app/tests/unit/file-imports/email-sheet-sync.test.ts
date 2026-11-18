@@ -12,7 +12,7 @@ vi.mock('../../../src/email/gateway', async (orig) => ({ ...(await orig<object>(
 vi.mock('../../../src/data/middleware', async (orig) => ({ ...(await orig<object>()), verifyOwner }));
 
 import { applyMigrations, e } from '../helpers/migrated-db';
-import { handleInboundEmail } from '../../../src/email/inbound';
+import { SENDER_NOT_PERMITTED_BOUNCE, handleInboundEmail } from '../../../src/email/inbound';
 import { getInboxStatus, setInboundAllowlist, storeInboundMessage } from '../../../src/email/inbox-store';
 import { emailSheetSyncDestination, attachmentMatches, pickAttachment } from '../../../src/delivery/destinations/email-sheet-sync';
 import { createJob } from '../../../src/scheduling/jobs/crud';
@@ -154,13 +154,13 @@ describe('email_sheet_sync — the whole path', () => {
 
   it('a sender who is not on the list is bounced at the door and nothing changes', async () => {
     const m = await send(mail([{ name: 'a.xlsx', type: XLSX_MIME, bytes: VENTAS() }], { from: 'eve@acme.test', auth: 'mx.cloudflare.net; dkim=pass header.d=acme.test; dmarc=pass' }));
-    expect(m.setReject).toHaveBeenCalledWith('Sender not permitted');
+    expect(m.setReject).toHaveBeenCalledWith(SENDER_NOT_PERMITTED_BOUNCE);
     expect(await dataset()).toBeNull();
   });
 
   it('a forged From (no DMARC/DKIM for the sender’s domain) is bounced at the door', async () => {
     const m = await send(mail([{ name: 'a.xlsx', type: XLSX_MIME, bytes: VENTAS() }], { auth: 'mx.cloudflare.net; dkim=pass header.d=evil.test; dmarc=none' }));
-    expect(m.setReject).toHaveBeenCalledWith('Sender not permitted');
+    expect(m.setReject).toHaveBeenCalledWith(SENDER_NOT_PERMITTED_BOUNCE);
     expect(await dataset()).toBeNull();
   });
 });

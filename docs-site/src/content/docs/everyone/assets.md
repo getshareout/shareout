@@ -30,7 +30,7 @@ Files can land in your library from three other places — each records **where 
 The workspace inbox address is in **Admin → Settings → File inbox** (copy with one click). Admins get a bell notification and optional Telegram ping when a member emails files in. Spreadsheets (`.xlsx`, `.csv`), decks (`.pptx`), PDFs, and images are the typical payloads.
 
 :::note[Not the same as a page inbox]
-A **page inbox** (`your-page@inbox.YOUR_DOMAIN`) captures mail *into one artifact* for automations — see [Receive email](/everyone/inbox/). The **workspace file inbox** feeds the shared **Assets** library and the AI assistant instead.
+A **page inbox** (`expenses.k7m4p2@inbox.YOUR_DOMAIN`) captures mail *into one artifact* for automations — see [Receive email](/everyone/inbox/). The **workspace file inbox** feeds the shared **Assets** library and the AI assistant instead.
 :::
 
 ## Organize in folders

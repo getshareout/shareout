@@ -14,7 +14,7 @@ vi.mock('../../../src/email/gateway', async (orig) => ({ ...(await orig<object>(
 vi.mock('../../../src/data/middleware', async (orig) => ({ ...(await orig<object>()), verifyOwner }));
 
 import { applyMigrations, e } from '../helpers/migrated-db';
-import { handleInboundEmail } from '../../../src/email/inbound';
+import { SENDER_NOT_PERMITTED_BOUNCE, handleInboundEmail } from '../../../src/email/inbound';
 import { disableInbound, getInboxStatus } from '../../../src/email/inbox-store';
 import { routeEmailSyncApi } from '../../../src/router/api/email-sync';
 import { handleInbox } from '../../../src/data/inbox/handler';
@@ -278,7 +278,7 @@ describe('P1-15 — a rejected email leaves a trace', () => {
     await page('art_esf_rej', ['ventas']);
     const { address } = await turnOn('art_esf_rej', 'ventas');
     const m = await send(mail(address, { from: 'otro@acme.test', auth: CF_PASS.replace(/ana@/g, 'otro@') }));
-    expect(m.setReject).toHaveBeenCalledWith('Sender not permitted');
+    expect(m.setReject).toHaveBeenCalledWith(SENDER_NOT_PERMITTED_BOUNCE);
     as(owner);
     const st = await api('art_esf_rej');
     expect(st.body.lastRejected).toMatchObject({ from: 'otro@acme.test', reason: 'not_allowed' });
@@ -289,7 +289,7 @@ describe('P1-15 — a rejected email leaves a trace', () => {
   it('an allowed sender whose mail is not verified shows why', async () => {
     const { address } = (await api('art_esf_rej')).body as { address: string };
     const m = await send(mail(address, { auth: 'mx.cloudflare.net; dkim=none; dmarc=fail header.from=acme.test' }));
-    expect(m.setReject).toHaveBeenCalledWith('Sender not permitted');
+    expect(m.setReject).toHaveBeenCalledWith(SENDER_NOT_PERMITTED_BOUNCE);
     as(owner);
     expect((await api('art_esf_rej')).body.lastRejected).toMatchObject({ from: SENDER, reason: 'unverified' });
   });

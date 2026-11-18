@@ -1,7 +1,8 @@
 /**
  * POST /v1/home/new — the Studio "New" menu's no-AI path: a blank document or a
  * document from a simple template, created privately for the signed-in person and
- * opened straight into the editor. Inside a workspace the caller must be an internal
+ * opened straight into the editor — or, with template 'table' and a file, a table of an
+ * Excel or CSV file (new-table.ts). Inside a workspace the caller must be an internal
  * member (same rule as /v1/publish); the daily publish count and storage cap apply.
  */
 import type { Env } from '../../types';
@@ -14,6 +15,7 @@ import { publishGeneratedHtml } from '../../publish/publish-generated-html';
 import { rateLimitExceededResponse, storageLimitMessage } from '../../publish/limits';
 import { generateSlug } from '../../validation';
 import { hostWorkspaceId } from './host';
+import { handleNewTable } from './new-table';
 
 type Lang = 'en' | 'es';
 interface DocTemplate { title: string; intro: string; sections: string[] }
@@ -75,10 +77,10 @@ export async function handleHomeNewArtifactApi(
   env: Env,
   user: { id: string; email: string | null },
 ): Promise<Response> {
-  const body = (await request.json().catch(() => ({}))) as { template?: unknown; lang?: unknown };
+  const body = (await request.json().catch(() => ({}))) as { template?: unknown; lang?: unknown; file?: unknown };
   const key = typeof body.template === 'string' && body.template ? body.template : 'blank';
   const tpls = NEW_DOC_TEMPLATES[key];
-  if (!tpls) return json({ error: 'Unknown template', code: 'VALIDATION_ERROR', param: 'template', allowed: Object.keys(NEW_DOC_TEMPLATES) }, 400);
+  if (!tpls && key !== 'table') return json({ error: 'Unknown template', code: 'VALIDATION_ERROR', param: 'template', allowed: [...Object.keys(NEW_DOC_TEMPLATES), 'table'] }, 400);
   const lang: Lang = body.lang === 'es' ? 'es' : 'en';
 
   const workspaceId = (await hostWorkspaceId(request, env)) || new URL(request.url).searchParams.get('workspace')?.trim() || null;
@@ -88,6 +90,7 @@ export async function handleHomeNewArtifactApi(
 
   const rate = await checkRateLimit(env, user.id, 'publish', user.email);
   if (!rate.allowed) return rateLimitExceededResponse(rate.reset);
+  if (key === 'table') return handleNewTable(env, user, body.file, lang, workspaceId);
 
   const tpl = tpls[lang];
   const html = buildDocHtml(tpl, lang);

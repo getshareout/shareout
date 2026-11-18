@@ -424,6 +424,7 @@ Artifacts have real inboxes, and users get notified through email or a chat plat
 | Table | Holds |
 |---|---|
 | `artifact_emails` | An artifact's email identity (`email_prefix`) and inbound settings: `inbound_enabled`, `inbound_allowlist`, plus daily send/receive counters that reset on `last_reset_date`. The last bounced inbound email — `inbound_rejected_at`, `inbound_rejected_from`, `inbound_rejected_reason` (0044) — is what the Update-by-email panel shows when a file never arrived. |
+| `email_inbox_short_addresses` | The short inbox address of a page that receives mail (0045): `short_prefix` (first word of the slug, a dot, six random characters — slugs never contain a dot, so it can never equal a long address or a workspace inbox) → `artifact_id`. The long `artifact_emails.email_prefix` keeps working. Rows are never deleted: a purged page leaves `artifact_id` NULL, so a short address is never handed to another page. |
 | `artifact_email_optouts` | Recipients who unsubscribed from one artifact's emails (signed link or List-Unsubscribe). Per artifact, not the global `email_suppressions` list. |
 | `email_sends` | One row per outbound email per recipient: artifact, subject, who sent it (crew, job, alert, page, system, invoice — `source_id` is then the invoice), and whether it went out, failed, or was skipped as a repeat. |
 | `email_templates` | Reusable subject/HTML/text with a `variables_schema`. `is_system` marks built-ins. |

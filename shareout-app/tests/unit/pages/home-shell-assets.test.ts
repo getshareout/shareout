@@ -120,8 +120,9 @@ describe('home shell assets', () => {
       // the Google Drive share panel (one service account per workspace): es measured 129.8 KB,
       // budget = that + ~0.5%. Raised for "Update by email" (esync.*): es measured 132.6 KB,
       // budget = that + ~0.5%. Raised for the email-update fixes (three steps, phone sheet, data-in
-      // group): es measured 134.7 KB, budget = that + ~0.5%.
-      expect(new TextEncoder().encode(copy).length, l).toBeLessThan(135_400);
+      // group): es measured 134.7 KB, budget = that + ~0.5%. Raised for New → Table from an Excel
+      // file (new.table*, new.keep*): es measured 135.8 KB, budget = that + ~0.5%.
+      expect(new TextEncoder().encode(copy).length, l).toBeLessThan(136_500);
     }
     for (const [name, c] of Object.entries(LAZY_CHUNKS)) expect(text.includes(c.src), `${name} is not in the boot shell`).toBe(false);
   });
