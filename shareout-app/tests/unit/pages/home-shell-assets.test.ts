@@ -121,8 +121,10 @@ describe('home shell assets', () => {
       // budget = that + ~0.5%. Raised for "Update by email" (esync.*): es measured 132.6 KB,
       // budget = that + ~0.5%. Raised for the email-update fixes (three steps, phone sheet, data-in
       // group): es measured 134.7 KB, budget = that + ~0.5%. Raised for New → Table from an Excel
-      // file (new.table*, new.keep*): es measured 135.8 KB, budget = that + ~0.5%.
-      expect(new TextEncoder().encode(copy).length, l).toBeLessThan(136_500);
+      // file (new.table*, new.keep*): es measured 135.8 KB, budget = that + ~0.5%. Raised for
+      // automatic forwarding (Gmail's confirmation step, one-tap allow, the Gmail/Outlook how-to:
+      // esync.fwd*): es measured 137.9 KB, budget = that + ~0.5%.
+      expect(new TextEncoder().encode(copy).length, l).toBeLessThan(138_600);
     }
     for (const [name, c] of Object.entries(LAZY_CHUNKS)) expect(text.includes(c.src), `${name} is not in the boot shell`).toBe(false);
   });

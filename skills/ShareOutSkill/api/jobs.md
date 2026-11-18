@@ -471,7 +471,7 @@ Answers specific to this action:
 | `POST /v1/jobs` | `201 { job, address, senders, warning? }` · `400 NO_SENDERS` (names `PUT /v1/artifacts/{id}/email-sync/senders` with the page's id) · `400 FREE_MAIL_DOMAIN` · `400 BAD_DATASET_NAME` (says what is wrong and suggests a valid name) · `409 DUPLICATE_JOB { job_id }` |
 | `POST /v1/jobs/{id}/run` | `409 NOT_RUNNABLE { address }` — it runs when mail arrives; nothing changes (no failed run, no `last_error`) |
 | `DELETE /v1/jobs/{id}` | `200 { success, senders_kept }` — the address turns off; the page's data and the sender list stay |
-| `GET /v1/artifacts/{id}/email-sync` | `state`: `off` · `inbox_off` · `waiting_first_email` · `ok` · `failed`, plus a one-line `message`, `lastRejected` (the last bounced email and why) and `limits` |
+| `GET /v1/artifacts/{id}/email-sync` | `state`: `off` · `inbox_off` · `waiting_first_email` · `ok` · `failed`, plus a one-line `message`, `lastRejected` (the last bounced email and why), `recentRejected` (up to 5; `canAllow` = a report an allowed mailbox forwarded), `forwarding` (a Gmail forwarding confirmation to open: `requester`, `confirmUrl`) and `limits` |
 
 ```json
 {

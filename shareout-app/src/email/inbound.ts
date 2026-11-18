@@ -16,6 +16,7 @@ import {
 import { ingestSupportEmail } from '../support/email-ingest';
 import { handleWorkspaceInbound } from './workspace-ingest';
 import { handleInvoiceInbound } from './invoice-ingest';
+import { clearForwardConfirmation, forwardingMailbox, gmailForwardingConfirmation, saveForwardConfirmation } from './forwarding-confirm';
 
 // Max raw message size we accept (Cloudflare Email Routing caps near here anyway).
 const MAX_RAW_BYTES = INBOUND_MAX_RAW_BYTES;
@@ -77,7 +78,15 @@ export function parseAuthResults(headers: Headers): AuthVerdicts {
  *  header counts, and only with that id. Headers.get joins repeated headers with ", ", and RFC
  *  8601 has no comma outside comments and quoted strings, so the first such comma ends ours.
  *  null = no Cloudflare stamp (treat the sender as unverified). */
-export interface CloudflareAuth { dmarc: string | null; dkim: { result: string; domain: string | null }[] }
+export interface CloudflareAuth {
+  dmarc: string | null;
+  /** The header From domain DMARC was evaluated for (header.from), when Cloudflare names it. */
+  dmarcFrom?: string | null;
+  dkim: { result: string; domain: string | null }[];
+  /** SPF's result for the envelope sender, and the envelope it checked (smtp.mailfrom). */
+  spf?: string | null;
+  spfMailFrom?: string | null;
+}
 
 const CLOUDFLARE_AUTHSERV_ID = 'mx.cloudflare.net';
 
@@ -98,12 +107,19 @@ export function cloudflareAuthResults(headers: Headers): CloudflareAuth | null {
   }
   const [authserv, ...results] = parts.map((s) => s.trim());
   if ((authserv.split(/\s+/)[0] || '').toLowerCase() !== CLOUDFLARE_AUTHSERV_ID) return null;
-  const out: CloudflareAuth = { dmarc: null, dkim: [] };
+  const out: CloudflareAuth = { dmarc: null, dmarcFrom: null, dkim: [], spf: null, spfMailFrom: null };
   for (const res of results) {
     const m = res.match(/^([a-z-]+)\s*=\s*([a-z]+)/i);
     if (!m) continue;
     const method = m[1].toLowerCase(), result = m[2].toLowerCase();
-    if (method === 'dmarc' && out.dmarc === null) out.dmarc = result;
+    if (method === 'dmarc' && out.dmarc === null) {
+      out.dmarc = result;
+      out.dmarcFrom = res.match(/\bheader\.from\s*=\s*"?([a-z0-9.-]+)/i)?.[1].toLowerCase() ?? null;
+    }
+    if (method === 'spf' && out.spf === null) {
+      out.spf = result;
+      out.spfMailFrom = res.match(/\bsmtp\.mailfrom\s*=\s*"?([^\s";]+)/i)?.[1].toLowerCase() ?? null;
+    }
     if (method === 'dkim') {
       const d = res.match(/\bheader\.d\s*=\s*"?([a-z0-9.-]+)/i) || res.match(/\bheader\.i\s*=\s*"?[^@\s;]*@([a-z0-9.-]+)/i);
       out.dkim.push({ result, domain: d ? d[1].toLowerCase() : null });
@@ -195,11 +211,29 @@ export async function handleInboundEmail(
 
   // DMARC/DKIM authenticate the header From, so that (not the envelope) is what the allowlist matches.
   const sender = (email.from?.address || '').trim().toLowerCase();
-  const verified = senderVerified(cloudflareAuthResults(message.headers), sender);
-  if (res.allowlist && !(verified && senderAllowed(sender, res.allowlist))) {
-    await recordInboundRejection(env, res.artifactId, sender || envelopeFrom, senderAllowed(sender, res.allowlist) ? 'unverified' : 'not_allowed');
-    message.setReject(SENDER_NOT_PERMITTED_BOUNCE);
-    return;
+  const cf = cloudflareAuthResults(message.headers);
+  const verified = senderVerified(cf, sender);
+  if (res.allowlist) {
+    // Gmail asks the page's address to confirm before it auto-forwards: keep the link for the
+    // page's editors (forwarding-confirm.ts), never the mail. A copy that is not genuine falls
+    // through to the sender check below and is bounced like any other mail.
+    const confirmation = gmailForwardingConfirmation(cf, email, message.to);
+    if (confirmation) {
+      await saveForwardConfirmation(env, res.artifactId, confirmation);
+      return;
+    }
+    // A mail auto-forwarded by a mailbox means forwarding from it works: its confirmation is done.
+    const forwarder = forwardingMailbox(cf, message.from || '');
+    if (forwarder) await clearForwardConfirmation(env, res.artifactId, forwarder).catch(() => {});
+    if (!(verified && senderAllowed(sender, res.allowlist))) {
+      await recordInboundRejection(env, res.artifactId, sender || envelopeFrom, senderAllowed(sender, res.allowlist) ? 'unverified' : 'not_allowed', {
+        verified,
+        hasFile: (email.attachments || []).some((a) => /\.(xlsx|csv)$/i.test(a.filename || '')),
+        forwardedBy: forwarder && senderAllowed(forwarder, res.allowlist) ? forwarder : null,
+      });
+      message.setReject(SENDER_NOT_PERMITTED_BOUNCE);
+      return;
+    }
   }
 
   const rawMessageId = email.messageId || message.headers.get('message-id') || null;

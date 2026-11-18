@@ -4,11 +4,13 @@
  * thing — who sends the file (the viewer's own address pre-filled) — plus which data it replaces
  * only when the page shows several (GET …/email-sync `reads`); sheet and file name are folded
  * under "More options": PUT /v1/artifacts/{id}/email-sync/senders, then POST /v1/jobs. Once on, it
- * shows the address (copy, open my email), three steps, who may send, the last update, a mail
- * that was turned away and why, and refreshes itself while open.
+ * shows the address (copy, open my email), three steps, who may send, the last update, the recent
+ * mails that were turned away and why (a forwarded report: one tap to allow its sender), Gmail's
+ * forwarding confirmation as one step on top (Confirm → Google's own page, then whose report it
+ * is), a folded "let the report arrive by itself" how-to, and refreshes itself while open.
  */
 export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dataset by email — lazy chunk 'emailsync' =====
-  var esMo = null, esArt = null, esDone = null, esPoll = 0;
+  var esMo = null, esArt = null, esDone = null, esPoll = 0, esFwdSeen = '', esSendersNow = [], esAllowQ = Promise.resolve();
   function esOpen() { return !!(esMo && esMo.ov.isConnected); }
   function esBody(html) { var b = esOpen() ? esMo.body.querySelector('#esBody') : null; if (b) b.innerHTML = html; return b; }
   function esBtn(attr, label, primary) { return '<button class="wsx-abtn' + (primary ? ' wsx-abtn--primary' : '') + '" type="button" ' + attr + '>' + esc(label) + '</button>'; }
@@ -148,10 +150,15 @@ export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dat
     } else {
       h = '<div class="wsx-esync__st is-wait" role="status"><p><span class="wsx-esync__dot" aria-hidden="true"></span>' + esc(t('esync.waiting')) + '</p></div>';
     }
-    var rej = st.lastRejected, rejAt = rej && esDate(rej.at);
-    if (rej && rejAt && (!upAt || rejAt > upAt) && (!ranAt || rejAt > ranAt)) {
-      h += '<div class="wsx-esync__st is-fail" data-es-rejected="1"><p>' + esc(esT('esync.rejected', { from: rej.from || '', message: rej.message || '' })) + '</p><p class="wsx-field__note">' + esc(esWhen(rej.at)) + '</p></div>';
-    }
+    // The recent mails turned away since the last file (up to three): a forwarded report whose
+    // sender could be allowed gets one button that adds exactly that sender.
+    var rejs = Array.isArray(st.recentRejected) ? st.recentRejected : (st.lastRejected ? [st.lastRejected] : []);
+    rejs.filter(function (r) { var at = r && esDate(r.at); return at && (!upAt || at > upAt) && (!ranAt || at > ranAt); }).slice(0, 3).forEach(function (rej) {
+      var allow = rej.canAllow && rej.from && (st.senders || []).indexOf(rej.from) === -1;
+      h += '<div class="wsx-esync__st is-fail" data-es-rejected="1"><p>' + esc(allow ? rej.message : esT('esync.rejected', { from: rej.from || '', message: rej.message || '' })) + '</p>'
+        + (allow ? '<div class="wsx-esync__acts">' + esBtn('data-es-allow="' + esc(rej.from) + '"', esT('esync.allowSender', { who: rej.from }), true) + '</div>' : '')
+        + '<p class="wsx-field__note">' + esc(esWhen(rej.at) + (rej.count > 1 ? ' \u00b7 ' + esT('esync.times', { n: rej.count }) : '')) + '</p></div>';
+    });
     return h;
   }
   function esLastLine(st) {
@@ -163,7 +170,8 @@ export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dat
     var j = st.job, senders = st.senders || [], reads = esReads(st), lim = st.limits || {};
     var off = st.state === 'inbox_off' || !st.address;
     var mismatch = j.datasetReadByPage === false && reads.length;
-    var b = esBody((off
+    esFwdSeen = esFwdKey(st);
+    var b = esBody('<div id="es_fwd">' + esFwd(st) + '</div>' + (off
         ? '<div class="wsx-slink__warn" role="alert" data-es-off="1"><p>' + esc(t('esync.inboxOff')) + '</p>' + esBtn('data-es-on="1"', t('esync.turnBackOn'), true) + '</div>'
         : '<p class="wsx-lens__intro"><b>' + esc(t(justOn ? 'esync.ready' : 'esync.sendTo')) + '</b></p>'
           + '<div class="wsx-esync__addr"><code id="es_addr">' + esAddr(st.address) + '</code>'
@@ -174,7 +182,7 @@ export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dat
       + '<h4 class="wsx-adet__h">' + esc(t('esync.howTitle')) + '</h4>'
       + '<ol class="wsx-esync__steps"><li>' + esc(t('esync.step1')) + '</li><li>' + esc(esT('esync.step2', { who: senders.join(', ') })) + '</li><li>' + esc(t('esync.step3')) + '</li></ol>'
       + '<p class="wsx-field__note">' + esc(esT('esync.fine', { mb: lim.fileMb || 8, rows: Number(lim.rows || 100000).toLocaleString(locTag()) })) + ' ' + esc(t('esync.excelFirst')) + '</p>'
-      + '<details class="wsx-adet__adv"><summary>' + esc(t('esync.fwdTitle')) + '</summary><p class="wsx-field__note">' + esc(t('esync.fwdBody')) + '</p></details>'
+      + esHowTo()
       + '<h4 class="wsx-adet__h">' + esc(t('esync.lastUpdate')) + '</h4><div id="es_status">' + esStatus(st) + '</div>'
       + '<div class="wsx-esync__row"><span class="wsx-field__lbl">' + esc(t('esync.senders')) + '</span><button class="wsx-link" type="button" data-es-edit="1">' + esc(t('esync.change')) + '</button></div>'
       + '<div id="es_who_box"><p class="wsx-field__note">' + esc(senders.join(', ')) + '</p></div>'
@@ -186,6 +194,29 @@ export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dat
       + '<div class="wsx-cform__foot wsx-esync__foot">' + esBtn('data-es-close="1"', t('common.close'), false) + '</div>');
     if (!b) return;
     var err = b.querySelector('#es_err');
+    esSendersNow = senders.slice();
+    esFwdBind(b, st);
+    // One tap on a forwarded report that was turned away: add exactly its sender. Delegated, so it
+    // keeps working after the status refreshes itself; bound once per panel (#esBody outlives each
+    // render), and it reads the list and the error line as they are when tapped. Taps run one after
+    // another, each on the list the previous one saved, so a quick second tap never drops the first.
+    if (!b.hasAttribute('data-es-allow-bound')) {
+      b.setAttribute('data-es-allow-bound', '1');
+      b.addEventListener('click', function (ev) {
+        var a = ev.target && ev.target.closest ? ev.target.closest('[data-es-allow]') : null;
+        if (!a || a.disabled) return;
+        var who = a.getAttribute('data-es-allow'), e2 = b.querySelector('#es_err');
+        a.disabled = true; if (e2) e2.textContent = '';
+        esAllowQ = esAllowQ.then(function () {
+          var list = esSendersNow.slice(); if (list.indexOf(who) === -1) list.push(who);
+          return esReq('PUT', esUrl('/senders'), { senders: list }).then(function (res) {
+            if (!res.ok) { a.disabled = false; if (e2) e2.textContent = esSendersErr(res.d); return; }
+            esSendersNow = res.d && Array.isArray(res.d.senders) ? res.d.senders.slice() : list;
+            wsxToast(esT('esync.allowed', { who: who })); esLoad(false);
+          });
+        }).catch(function () { a.disabled = false; if (e2) e2.textContent = t('autof.couldNotSave'); });
+      });
+    }
     var copy = b.querySelector('[data-es-copy]');
     if (copy) copy.addEventListener('click', function () { esCopy(st.address || '', copy); });
     b.querySelector('[data-es-close]').addEventListener('click', function () { esMo.close(); });
@@ -232,12 +263,80 @@ export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dat
       if (gen !== esPoll || !esOpen()) return;
       esReq('GET', esUrl()).then(function (res) {
         if (gen !== esPoll || !esOpen() || !res.ok || !res.d.job) return;
-        var s = esMo.body.querySelector('#es_status'), l = esMo.body.querySelector('#es_last');
+        var s = esMo.body.querySelector('#es_status'), l = esMo.body.querySelector('#es_last'), f = esMo.body.querySelector('#es_fwd');
         if (s) s.innerHTML = esStatus(res.d);
         if (l) l.textContent = esLastLine(res.d);
+        // Gmail's confirmation arriving while the panel is open shows up by itself (redrawn only
+        // when it changed, so a half-typed answer is never wiped).
+        if (f && esFwdKey(res.d) !== esFwdSeen) { esFwdSeen = esFwdKey(res.d); f.innerHTML = esFwd(res.d); esFwdBind(esMo.body, res.d); }
         esWatch(gen);
       }).catch(function () { esWatch(gen); });
     }, 10000);
+  }
+  // Gmail asks this address to confirm before it forwards (GET …/email-sync, forwarding): one step
+  // on top — who asked, Confirm (Google's own page, opened in a new tab), the code if Gmail asks for
+  // it, "It's not mine". Once opened: whose report will be forwarded (added to who may send), Done.
+  // Only a link on Google's own host is ever rendered, whatever the server sends.
+  var ES_GOOGLE = /^https:\\/\\/(?:mail-settings|mail|isolated\\.mail)\\.google\\.com\\/mail\\/vf-[A-Za-z0-9%._~-]+$/;
+  function esFwdList(st) { return (Array.isArray(st.forwarding) ? st.forwarding : []).filter(function (c) { return c && c.id && ES_GOOGLE.test(String(c.confirmUrl || '')); }); }
+  function esFwdKey(st) { return esFwdList(st).map(function (c) { return c.id + (c.openedAt ? '+' : ''); }).join(','); }
+  function esFwd(st) {
+    var c = esFwdList(st)[0];
+    if (!c) return '';
+    var link = function (cls, label, attr) { return '<a class="' + cls + '" href="' + esc(c.confirmUrl) + '" target="_blank" rel="noopener noreferrer"' + (attr || '') + '>' + esc(label) + '</a>'; };
+    if (!c.openedAt) {
+      return '<div class="wsx-slink__warn wsx-esync__fwd" role="alert" data-es-fwd="' + esc(c.id) + '">'
+        + '<p><b>' + esc(esT('esync.fwdAsk', { who: c.requester })) + '</b></p>'
+        + '<p>' + esc(t('esync.fwdAskWhat')) + '</p>'
+        + '<div class="wsx-esync__acts">' + link('wsx-abtn wsx-abtn--primary', t('esync.fwdConfirm'), ' data-es-fwd-open="1"') + esBtn('data-es-fwd-no="1"', t('esync.fwdNotMine'), false) + '</div>'
+        + (c.code ? '<p class="wsx-field__note">' + esc(esT('esync.fwdCode', { code: c.code })) + '</p>' : '')
+        + (c.requesterAllowed ? '' : '<p class="wsx-field__note">' + esc(t('esync.fwdUnknown')) + '</p>')
+        + '</div>';
+    }
+    return '<div class="wsx-slink__warn wsx-esync__fwd" data-es-fwd="' + esc(c.id) + '" data-es-fwd-opened="1">'
+      + '<p><b>' + esc(esT('esync.fwdOpened', { who: c.requester })) + '</b></p>'
+      + esField(t('esync.fwdWhose'), '<input class="wsx-field__in" id="es_fwd_who" type="email" autocomplete="off" spellcheck="false" placeholder="' + esc(t('esync.fwdWhosePh')) + '">', t('esync.fwdWhoseNote'))
+      + '<div class="wsx-esync__acts">' + esBtn('data-es-fwd-add="1"', t('esync.fwdAdd'), true) + esBtn('data-es-fwd-done="1"', t('esync.fwdDone'), false) + '</div>'
+      + '<p class="wsx-field__note">' + link('wsx-link', t('esync.fwdReopen')) + '</p>'
+      + '</div>';
+  }
+  function esFwdBind(root, st) {
+    var box = root.querySelector('[data-es-fwd]'); if (!box) return;
+    var id = box.getAttribute('data-es-fwd'), err = root.querySelector('#es_err'), senders = st.senders || [];
+    function act(action) { return esReq('POST', esUrl('/forwarding/' + encodeURIComponent(id)), { action: action }); }
+    function fail(el) { return function () { if (el) el.disabled = false; err.textContent = t('autof.couldNotSave'); }; }
+    // Confirm: the link opens Google's page in a new tab; here the step moves on to the next question.
+    var open = box.querySelector('[data-es-fwd-open]');
+    if (open) open.addEventListener('click', function () { act('opened').then(function () { esLoad(false); }, fail()); });
+    var no = box.querySelector('[data-es-fwd-no]'), done = box.querySelector('[data-es-fwd-done]');
+    [no, done].forEach(function (el) {
+      if (el) el.addEventListener('click', function () {
+        el.disabled = true;
+        act('dismiss').then(function () { if (el === no) wsxToast(t('esync.fwdDismissed')); esLoad(false); }, fail(el));
+      });
+    });
+    var add = box.querySelector('[data-es-fwd-add]'), who = box.querySelector('#es_fwd_who');
+    if (who) esClearOnInput(box, err);
+    if (who) who.addEventListener('keydown', function (e) { if (e.key === 'Enter') add.click(); });
+    if (add) add.addEventListener('click', function () {
+      err.textContent = '';
+      var s = esSenders(who.value); if (s.err) { err.textContent = s.err; return; }
+      var list = senders.slice(); s.list.forEach(function (v) { if (list.indexOf(v) === -1) list.push(v); });
+      add.disabled = true;
+      esReq('PUT', esUrl('/senders'), { senders: list }).then(function (res) {
+        if (!res.ok) { add.disabled = false; err.textContent = esSendersErr(res.d); return; }
+        return act('dismiss').then(function () { wsxToast(esT('esync.fwdAdded', { who: s.list.join(', ') })); esLoad(false); });
+      }).catch(fail(add));
+    });
+  }
+  // "Let the report arrive by itself": three steps for Gmail, three for Outlook, folded.
+  function esHowTo() {
+    var ol = function (keys) { return '<ol class="wsx-esync__how">' + keys.map(function (k) { return '<li>' + esc(t(k)) + '</li>'; }).join('') + '</ol>'; };
+    return '<details class="wsx-adet__adv wsx-esync__howto" data-es-howto="1"><summary>' + esc(t('esync.fwdTitle')) + '</summary>'
+      + '<p class="wsx-field__note">' + esc(t('esync.fwdIntro')) + '</p>'
+      + '<h5>' + esc(t('esync.fwdGmail')) + '</h5>' + ol(['esync.fwdG1', 'esync.fwdG2', 'esync.fwdG3']) + '<p class="wsx-field__note">' + esc(t('esync.fwdGNote')) + '</p>'
+      + '<h5>' + esc(t('esync.fwdOutlook')) + '</h5>' + ol(['esync.fwdO1', 'esync.fwdO2', 'esync.fwdO3']) + '<p class="wsx-field__note">' + esc(t('esync.fwdONote')) + '</p>'
+      + '</details>';
   }
   function esEditSenders(root, senders) {
     var box = root.querySelector('#es_who_box'), err = root.querySelector('#es_err');

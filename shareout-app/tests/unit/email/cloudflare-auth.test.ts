@@ -6,9 +6,9 @@ import { cloudflareAuthResults, senderVerified } from '../../../src/email/inboun
 const h = (v: string) => new Headers({ 'authentication-results': v });
 
 describe('cloudflareAuthResults', () => {
-  it('reads dmarc and every dkim signature with its domain', () => {
+  it('reads dmarc (and the domain it was checked for), every dkim signature with its domain, and spf with the envelope it checked', () => {
     const a = cloudflareAuthResults(h('mx.cloudflare.net; dkim=pass header.d=sendgrid.net header.s=s1 header.b=abc; dkim=pass header.d=Acme.com; dmarc=pass header.from=acme.com policy.dmarc=none; spf=pass smtp.mailfrom=x@acme.com'));
-    expect(a).toEqual({ dmarc: 'pass', dkim: [{ result: 'pass', domain: 'sendgrid.net' }, { result: 'pass', domain: 'acme.com' }] });
+    expect(a).toEqual({ dmarc: 'pass', dmarcFrom: 'acme.com', dkim: [{ result: 'pass', domain: 'sendgrid.net' }, { result: 'pass', domain: 'acme.com' }], spf: 'pass', spfMailFrom: 'x@acme.com' });
   });
 
   it('is null without a Cloudflare stamp', () => {
@@ -18,7 +18,7 @@ describe('cloudflareAuthResults', () => {
 
   it('stops at the end of the first header; commas inside comments do not end it', () => {
     const a = cloudflareAuthResults(h('mx.cloudflare.net; spf=fail (mx.cloudflare.net: 1.2.3.4, 5.6.7.8 not permitted) smtp.mailfrom=a@acme.com; dmarc=none, evil.test; dmarc=pass; dkim=pass header.d=acme.com'));
-    expect(a).toEqual({ dmarc: 'none', dkim: [] });
+    expect(a).toEqual({ dmarc: 'none', dmarcFrom: null, dkim: [], spf: 'fail', spfMailFrom: 'a@acme.com' });
   });
 
   it('takes the domain from header.i when header.d is missing', () => {

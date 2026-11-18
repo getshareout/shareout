@@ -70,6 +70,13 @@ function routes(opts: { senders?: [unknown, number]; job?: [unknown, number] } =
       status = ON({ senders: (status as { senders: string[] }).senders });
       return json({ job: { id: 'job_9' } }, 201);
     }
+    const fwd = url.match(/^\/v1\/artifacts\/art_1\/email-sync\/forwarding\/([^/]+)$/);
+    if (fwd && method === 'POST') {
+      const list = ((status as { forwarding?: Array<Record<string, unknown>> }).forwarding || []);
+      const action = (body as { action: string }).action;
+      status = { ...status, forwarding: action === 'dismiss' ? list.filter((c) => c.id !== fwd[1]) : list.map((c) => (c.id === fwd[1] ? { ...c, openedAt: new Date().toISOString() } : c)) };
+      return json({ ok: true });
+    }
     if (url === '/v1/jobs/job_9' && method === 'DELETE') return json({ success: true });
     if (url === '/v1/jobs/job_9' && method === 'PATCH') { status = ON({ job: { ...(ON().job as object), ...(body as { config: object }).config, datasetReadByPage: true } }); return json({ job: { id: 'job_9' } }); }
     return json({ error: 'unexpected ' + url }, 404);
@@ -270,6 +277,133 @@ describe('Update by email', () => {
     expect(sent.some((s) => s.method === 'DELETE' && s.url === '/v1/jobs/job_9')).toBe(true);
     expect(done).toHaveBeenCalled();
     expect(toast).toHaveBeenCalledWith(copy['esync.stopped']);
+  });
+
+  describe('automatic forwarding', () => {
+    const GURL = 'https://mail-settings.google.com/mail/vf-%5BANGjdJ9x%5D-q8Lw2mN4';
+    const conf = (over: Record<string, unknown> = {}) => ({ id: 'efc_1', provider: 'gmail', requester: 'ana@gmail.com', code: '123456789', confirmUrl: GURL, openedAt: null, requesterAllowed: true, receivedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 6 * 86400000).toISOString(), ...over });
+    // A click on the Confirm link would navigate the test page: keep the click, drop the navigation.
+    const stopNav = (ev: Event) => { if ((ev.target as HTMLElement).closest?.('a[target="_blank"]')) ev.preventDefault(); };
+    beforeEach(() => document.addEventListener('click', stopNav, true));
+
+    it('Gmail’s confirmation is one step on top: who asked, Confirm opens Google’s own page in a new tab, and the code', async () => {
+      status = ON({ forwarding: [conf()] });
+      load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+      const box = $('[data-es-fwd]');
+      expect(box.compareDocumentPosition($('#es_addr')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(box.textContent).toContain('Gmail wants to confirm forwarding from ana@gmail.com');
+      expect(box.textContent).toContain('If Gmail asks for a code: 123456789');
+      expect(box.textContent).not.toContain(copy['esync.fwdUnknown']);
+      const a = box.querySelector<HTMLAnchorElement>('[data-es-fwd-open]')!;
+      expect([a.getAttribute('href'), a.target, a.rel]).toEqual([GURL, '_blank', 'noopener noreferrer']);
+      expect(a.textContent).toBe(copy['esync.fwdConfirm']);
+      a.click(); await flush();
+      expect(sent.find((x) => x.method === 'POST')).toEqual({ url: '/v1/artifacts/art_1/email-sync/forwarding/efc_1', method: 'POST', body: { action: 'opened' } });
+      // Next: whose report it is.
+      expect($('[data-es-fwd-opened]').textContent).toContain(copy['esync.fwdWhose']);
+    });
+
+    it('then whose report it is: Allow adds that address to who may send and closes the step', async () => {
+      status = ON({ forwarding: [conf({ openedAt: new Date().toISOString() })] });
+      load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+      $<HTMLInputElement>('#es_fwd_who').value = 'Reportes@Proveedor.com';
+      btn(copy['esync.fwdAdd']).click(); await flush();
+      expect(sent.filter((x) => x.method !== 'GET').map((x) => [x.method, x.url, x.body])).toEqual([
+        ['PUT', '/v1/artifacts/art_1/email-sync/senders', { senders: ['ana@acme.com', 'reportes@proveedor.com'] }],
+        ['POST', '/v1/artifacts/art_1/email-sync/forwarding/efc_1', { action: 'dismiss' }],
+      ]);
+      expect(toast).toHaveBeenCalledWith('Done. Reports from reportes@proveedor.com that you forward now update the page.');
+      expect(document.querySelector('[data-es-fwd]')).toBeNull();
+    });
+
+    it('a mailbox that is not on the list gets a warning, and “It’s not mine” removes the step', async () => {
+      status = ON({ forwarding: [conf({ requester: 'stranger@gmail.com', requesterAllowed: false })] });
+      load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+      expect($('[data-es-fwd]').textContent).toContain(copy['esync.fwdUnknown']);
+      btn(copy['esync.fwdNotMine']).click(); await flush();
+      expect(sent.find((x) => x.method === 'POST')!.body).toEqual({ action: 'dismiss' });
+      expect(toast).toHaveBeenCalledWith(copy['esync.fwdDismissed']);
+      expect(document.querySelector('[data-es-fwd]')).toBeNull();
+    });
+
+    it('a link that is not on Google’s own host is never rendered', async () => {
+      for (const bad of ['https://evil.test/mail/vf-x', 'http://mail-settings.google.com/mail/vf-x', 'https://mail-settings.google.com.evil.test/mail/vf-x', 'javascript:alert(1)//https://mail-settings.google.com/mail/vf-x']) {
+        document.body.innerHTML = '';
+        status = ON({ forwarding: [conf({ confirmUrl: bad })] });
+        load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+        expect(document.querySelector('[data-es-fwd]'), bad).toBeNull();
+        expect(document.querySelector('.wsx-modal')!.innerHTML).not.toContain(bad.replace(/&/g, '&amp;'));
+      }
+    });
+
+    it('recent bounces: up to three; a forwarded report gets one tap that adds exactly its sender', async () => {
+      const at = (min: number) => new Date(Date.now() - min * 60000).toISOString();
+      status = ON({
+        recentRejected: [
+          { from: 'reportes@proveedor.com', reason: 'not_allowed', at: at(1), count: 2, canAllow: true, forwardedBy: 'ana@acme.com', message: 'A file from reportes@proveedor.com, forwarded from ana@acme.com, was bounced because reportes@proveedor.com is not on the list. Allow reportes@proveedor.com and the next one updates the page.' },
+          { from: 'news@letter.test', reason: 'not_allowed', at: at(2), count: 1, canAllow: false, message: 'news@letter.test is not on the list.' },
+          { from: 'jefe@acme.com', reason: 'unverified', at: at(3), count: 1, canAllow: false, message: 'Could not confirm jefe@acme.com.' },
+          { from: 'old@x.test', reason: 'not_allowed', at: at(4), count: 1, canAllow: false, message: 'old@x.test is not on the list.' },
+        ],
+      });
+      load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+      const rows = document.querySelectorAll('[data-es-rejected]');
+      expect(rows).toHaveLength(3);
+      expect(rows[0].textContent).toMatch(/^A file from reportes@proveedor\.com, forwarded from ana@acme\.com/);
+      expect(rows[0].textContent).toContain('2 times');
+      expect(rows[1].textContent).toContain('An email was not used. news@letter.test is not on the list.');
+      expect(document.querySelectorAll('[data-es-allow]')).toHaveLength(1);
+      btn('Allow reportes@proveedor.com').click(); await flush();
+      expect(sent.find((x) => x.method === 'PUT')!.body).toEqual({ senders: ['ana@acme.com', 'reportes@proveedor.com'] });
+      expect(toast).toHaveBeenCalledWith('Done. Files from reportes@proveedor.com now update the page. Forward the last one again so you don’t wait for the next.');
+    });
+
+    it('one tap after the panel re-rendered sends ONE request with the current list (no stale listener from an earlier render)', async () => {
+      status = ON({ recentRejected: [{ from: 'reportes@proveedor.com', reason: 'not_allowed', at: new Date().toISOString(), count: 1, canAllow: true, forwardedBy: 'ana@acme.com', message: 'A file from reportes@proveedor.com, forwarded from ana@acme.com, was bounced.' }] });
+      load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+      // Someone is added in between: the panel reloads and renders again.
+      btn(copy['esync.change']).click();
+      $<HTMLInputElement>('#es_who2').value = 'ana@acme.com, bob@acme.com';
+      btn(copy['esync.saveSenders']).click(); await flush();
+      sent = [];
+      btn('Allow reportes@proveedor.com').click(); await flush();
+      expect(sent.filter((x) => x.method === 'PUT').map((x) => x.body)).toEqual([{ senders: ['ana@acme.com', 'bob@acme.com', 'reportes@proveedor.com'] }]);
+    });
+
+    it('two taps before the panel reloads keep both senders (the second waits for the first and builds on it)', async () => {
+      const off = (from: string) => ({ from, reason: 'not_allowed', at: new Date().toISOString(), count: 1, canAllow: true, forwardedBy: 'ana@acme.com', message: `A file from ${from} was bounced.` });
+      status = ON({ recentRejected: [off('reportes@proveedor.com'), off('ventas@proveedor.com')] });
+      load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+      sent = [];
+      btn('Allow reportes@proveedor.com').click();
+      btn('Allow ventas@proveedor.com').click();
+      await flush();
+      expect(sent.filter((x) => x.method === 'PUT').map((x) => x.body)).toEqual([
+        { senders: ['ana@acme.com', 'reportes@proveedor.com'] },
+        { senders: ['ana@acme.com', 'reportes@proveedor.com', 'ventas@proveedor.com'] },
+      ]);
+      expect((status as { senders: string[] }).senders).toEqual(['ana@acme.com', 'reportes@proveedor.com', 'ventas@proveedor.com']);
+    });
+
+    it('a bounced sender full of markup is shown as text, in the text and in the button', async () => {
+      const evil = '"><img src=x onerror="window.__pwned=1">@evil.test';
+      status = ON({ recentRejected: [{ from: evil, reason: 'not_allowed', at: new Date().toISOString(), count: 1, canAllow: true, forwardedBy: 'ana@acme.com', message: `A file from ${evil} was bounced.` }] });
+      load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+      expect(document.querySelector('.wsx-modal img')).toBeNull();
+      expect(document.querySelector('[data-es-allow]')!.getAttribute('data-es-allow')).toBe(evil);
+      expect($('[data-es-rejected]').textContent).toContain(evil);
+    });
+
+    it('“Let the report arrive by itself”: three steps for Gmail, three for Outlook, folded; no jargon', async () => {
+      status = ON();
+      load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+      const how = $<HTMLDetailsElement>('[data-es-howto]');
+      expect(how.open).toBe(false);
+      expect(how.querySelector('summary')!.textContent).toBe('Let the report arrive by itself');
+      expect([...how.querySelectorAll('ol')].map((o) => o.children.length)).toEqual([3, 3]);
+      expect(how.textContent).toContain(copy['esync.fwdONote']);
+      expect(modalText()).not.toMatch(/DMARC|DKIM|SPF|SRS|cron|job|OAuth|allowlist/i);
+    });
   });
 
   it('every esync key exists in English and Spanish', () => {

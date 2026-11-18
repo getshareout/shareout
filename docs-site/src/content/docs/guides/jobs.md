@@ -177,7 +177,8 @@ curl -X POST https://shareout.site/v1/jobs \
 - A `warning` in the `201` means the page does not read that dataset — the page would stay empty.
 - One per page and dataset: a second is `409 DUPLICATE_JOB` with the existing `job_id`.
 - `POST /v1/jobs/{id}/run` answers `409 NOT_RUNNABLE` with the address and changes nothing — it runs when mail arrives.
-- `GET /v1/artifacts/{id}/email-sync` → `state` (`off` · `inbox_off` · `waiting_first_email` · `ok` · `failed`), a one-line `message`, and `lastRejected` (the last email bounced and why).
+- `GET /v1/artifacts/{id}/email-sync` → `state` (`off` · `inbox_off` · `waiting_first_email` · `ok` · `failed`), a one-line `message`, `lastRejected` (the last email bounced and why) and `recentRejected` (up to 5, newest first; `canAllow: true` = a report an allowed mailbox auto-forwarded, whose verified sender can be added with one `PUT …/senders`).
+- Gmail auto-forwarding: Gmail emails the page's address a confirmation first. A genuine one (DKIM and DMARC pass for google.com per Cloudflare, Google's forwarding sender, its link on Google's own host) is not bounced and never becomes data: it shows in `forwarding` (`requester`, `confirmUrl`, `code` on older ones, `expiresAt`) for the page's editors to open. `POST /v1/artifacts/{id}/email-sync/forwarding/{confirmationId}` `{ "action": "opened" | "dismiss" }`. Outlook / Microsoft 365 has no confirmation step.
 - Deleting the job turns the address off and keeps the data and the sender list (`senders_kept`).
 - Limits: 8 MB and 100,000 rows per file, 25 MB per email, 200 emails a day per page.
 

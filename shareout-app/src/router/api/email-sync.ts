@@ -2,6 +2,8 @@
  * GET /v1/artifacts/{id}/email-sync          what the "Update by email" panel shows (+ `you`: the caller's email, the default sender)
  * GET /v1/artifacts/{id}/email-sync/senders  { address, senders }
  * PUT /v1/artifacts/{id}/email-sync/senders  { senders: string[] | string } — who may send the file
+ * POST /v1/artifacts/{id}/email-sync/forwarding/{confirmationId}  { action: 'opened' | 'dismiss' } —
+ *      an editor opened Gmail's confirmation link from the panel, or closed that step
  *
  * The page's own address, who may send it, the data the page reads, the last email that arrived,
  * the last one bounced, the data it last wrote, and a state + one sentence saying what to do
@@ -16,6 +18,7 @@ import { getUserRole } from '../../artifacts/roles';
 import { jsonWithApiErrors } from '../../http/api-error';
 import { enableInbound, getInboxStatus, setInboundAllowlist } from '../../email/inbox-store';
 import { emailSyncStatus } from '../../email/email-sync-status';
+import { updateForwardConfirmation } from '../../email/forwarding-confirm';
 import { FREE_MAIL_DOMAINS } from '../../delivery/destinations/email-sheet-sync';
 import { localeForRecipient, type Locale } from '../../i18n/locale';
 
@@ -52,7 +55,7 @@ const say = (locale: Locale, code: string, vars: Record<string, string | number>
   (COPY[locale][code] ?? COPY.en[code] ?? code).replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ''));
 
 export async function routeEmailSyncApi(ctx: FetchContext): Promise<Response | null> {
-  const m = ctx.path.match(/^\/v1\/artifacts\/([^/]+)\/email-sync(\/senders)?$/);
+  const m = ctx.path.match(/^\/v1\/artifacts\/([^/]+)\/email-sync(?:(\/senders)|\/forwarding\/([^/]+))?$/);
   if (!m) return null;
   const artifactId = decodeURIComponent(m[1]);
   const user = await requireTokenOrSession(ctx);
@@ -65,6 +68,14 @@ export async function routeEmailSyncApi(ctx: FetchContext): Promise<Response | n
   if (!art.workspace_id) return ctx.addCORS(err(say(locale, 'NO_WORKSPACE'), 'NO_WORKSPACE', 422));
 
   const method = ctx.request.method;
+  if (m[3]) {
+    if (method !== 'POST') return ctx.addCORS(json({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, { Allow: 'POST' }));
+    let action: unknown;
+    try { action = ((await ctx.request.json()) as { action?: unknown } | null)?.action; } catch { /* below */ }
+    if (action !== 'opened' && action !== 'dismiss') return ctx.addCORS(err('Send { "action": "opened" } or { "action": "dismiss" }.', 'VALIDATION_ERROR', 400));
+    const found = await updateForwardConfirmation(ctx.env, artifactId, decodeURIComponent(m[3]), action);
+    return ctx.addCORS(found ? json({ ok: true }) : err('Not found', 'NOT_FOUND', 404));
+  }
   if (m[2]) {
     if (method === 'PUT') return ctx.addCORS(await putSenders(ctx, artifactId, locale));
     if (method === 'GET') {

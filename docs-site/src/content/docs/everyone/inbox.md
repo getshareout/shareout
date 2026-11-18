@@ -73,9 +73,42 @@ A few seconds later the page shows the new numbers. Good to know:
   address (like `ana@gmail.com`), not a whole `@gmail.com`.
 - If a file can't be used, the page keeps its previous numbers and you get an email saying why.
 - Limits: 8 MB and 100,000 rows per file, 25 MB per email, 200 emails a day.
-- Prefer not to think about it? In Outlook, a rule can forward that email to the page's address
-  (add the original sender to who can send it). Gmail's automatic forwarding asks for a
-  confirmation the page's address can't answer yet, so from Gmail send the file by hand.
+
+### Let the report arrive by itself
+
+Does the report already reach you by email? Your mail can forward it to the page by itself. The
+steps are also in the page's **Update by email** window, under **Let the report arrive by itself**.
+
+**Gmail**
+
+1. In Gmail: **Settings → See all settings → Forwarding and POP/IMAP → Add a forwarding address**.
+   Paste the page's address.
+2. Gmail sends the page a confirmation. In a few seconds it shows up at the top of the **Update by
+   email** window: *"Gmail wants to confirm forwarding from ana@…"*. Tap **Confirm** — a Google page
+   opens; press **Confirm** there too. Then say whose report it is (the address it comes from), and
+   tap **Allow**.
+3. Open one of the reports in Gmail → **⋮ → Filter messages like these → Create filter** → tick
+   **Forward it to** and choose the page's address.
+
+Only the report is forwarded: don't turn on "Forward a copy of incoming mail", the filter is enough.
+Don't recognise the address in the confirmation? Tap **It's not mine** and nothing is confirmed.
+
+**Outlook or Microsoft 365**
+
+1. In Outlook: **Settings → Mail → Rules → Add new rule**.
+2. Condition: **From** → whoever sends you the report. Action: **Forward to** → the page's address. Save.
+3. The forward comes from your own address, so it has to be in **Who can send it** (it already is
+   if you set this up with it).
+
+Outlook asks for no confirmation. If nothing arrives, your company may not allow forwarding
+outside it — and Outlook doesn't tell you. Ask your IT person to allow automatic forwarding for
+your mailbox.
+
+**A forwarded report was sent back?** A Gmail filter keeps the report's original sender, and only
+the people you listed can update the page. The window then says *"A file from reports@… forwarded
+from your mail was bounced"* with one button, **Allow reports@…**. Tap it, and the next report
+updates the page (forward the last one again so you don't wait). The page also keeps the last few
+emails it sent back, so one stray email doesn't hide the one you're looking for.
 
 ## A real example
 

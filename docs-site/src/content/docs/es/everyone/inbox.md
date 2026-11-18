@@ -75,10 +75,44 @@ Unos segundos después el artefacto muestra los números nuevos. Bueno saber:
 - Si un archivo no se puede usar, el artefacto mantiene los números anteriores y te llega un email
   diciendo por qué.
 - Límites: 8 MB y 100.000 filas por archivo, 25 MB por email, 200 emails por día.
-- ¿Preferís no pensar en eso? En Outlook, una regla puede reenviar ese email a la dirección del
-  artefacto (agregá al remitente original a quién puede mandarlo). El reenvío automático de Gmail
-  pide una confirmación que la dirección del artefacto todavía no puede responder, así que desde
-  Gmail mandá el archivo a mano.
+
+### Que tu reporte llegue solo
+
+¿El reporte ya te llega por email? Tu correo lo puede reenviar solo al artefacto. Los pasos también
+están en la ventana **Actualizar por email** del artefacto, en **Que tu reporte llegue solo**.
+
+**Gmail**
+
+1. En Gmail: **Configuración → Ver todos los ajustes → Reenvío y correo POP/IMAP → Agregar una
+   dirección de reenvío**. Pegá la dirección del artefacto.
+2. Gmail le manda una confirmación al artefacto. En unos segundos aparece arriba de la ventana
+   **Actualizar por email**: *"Gmail quiere confirmar el reenvío desde ana@…"*. Tocá **Confirmar**:
+   se abre Google en otra pestaña, y ahí tocá **Confirmar** otra vez. Después decí de quién es el
+   reporte (la dirección de la que te llega) y tocá **Permitir**.
+3. Abrí uno de los reportes en Gmail → **⋮ → Filtrar mensajes similares → Crear filtro** → marcá
+   **Reenviarlo a** y elegí la dirección del artefacto.
+
+Solo se reenvía el reporte: no actives "Reenviar una copia del correo entrante", con el filtro
+alcanza. ¿No reconocés la dirección de la confirmación? Tocá **No es mío** y no se confirma nada.
+
+**Outlook o Microsoft 365**
+
+1. En Outlook: **Configuración → Correo → Reglas → Agregar nueva regla**.
+2. Condición: **De** → quien te manda el reporte. Acción: **Reenviar a** → la dirección del
+   artefacto. Guardar.
+3. El reenvío sale de tu propia dirección, así que tiene que estar en **Quién puede mandarlo** (ya
+   está si lo configuraste con ella).
+
+Outlook no pide confirmación. Si no llega nada, puede que tu empresa no permita reenviar correos
+afuera, y Outlook no te avisa. Pedile a la persona de sistemas que habilite el reenvío automático
+para tu correo.
+
+**¿Se rebotó un reporte reenviado?** Un filtro de Gmail mantiene al remitente original del reporte,
+y solo las personas que pusiste pueden actualizar el artefacto. La ventana dice entonces *"Llegó un
+archivo de reportes@… reenviado desde tu correo, pero se rebotó"* con un botón, **Permitir a
+reportes@…**. Tocalo y el próximo reporte actualiza el artefacto (reenviá el último para no
+esperar). El artefacto además guarda los últimos emails que rebotó, así un email suelto no tapa el
+que estás buscando.
 
 ## Un ejemplo real
 
