@@ -115,8 +115,9 @@ describe('home shell assets', () => {
       // Raised from 120 KB for the catalog certification + metrics copy (#223, #234):
       // es measured 120.2 KB, budget = that + ~5%. Follow-up: ship lens copy inside the
       // lazy lens chunks, so lens strings stop counting against every page load. Raised for
-      // the Humand connector copy: es measured 126.4 KB, budget = that + ~0.5%.
-      expect(new TextEncoder().encode(copy).length, l).toBeLessThan(127_000);
+      // the Humand connector copy: es measured 126.4 KB, budget = that + ~0.5%. Raised for the
+      // shared-link sheet sync (slink.*): es measured 128.2 KB, budget = that + ~0.5%.
+      expect(new TextEncoder().encode(copy).length, l).toBeLessThan(129_000);
     }
     for (const [name, c] of Object.entries(LAZY_CHUNKS)) expect(text.includes(c.src), `${name} is not in the boot shell`).toBe(false);
   });

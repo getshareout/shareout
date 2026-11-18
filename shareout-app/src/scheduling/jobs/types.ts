@@ -98,6 +98,7 @@ export const JOB_ACTIONS = [
   'artifact_test',
   'asset_delivery',
   'drive_file_sync',
+  'public_sheet_sync',
 ] as const;
 
 export const JOB_TRIGGER_TYPES = ['cron', 'event'] as const;
@@ -172,6 +173,20 @@ export interface DriveFileSyncConfig {
   dataset: string;
 }
 
+/** Config for the `public_sheet_sync` action: one tab of a spreadsheet shared as "Anyone
+ *  with the link can view" (a Google Sheet, or an Excel file in Drive) → the artifact's
+ *  dataset `dataset`, with no Google sign-in. ShareOut derives Google's export URL from
+ *  `link` and fetches only from Google's hosts. Skips the write when the rows are unchanged. */
+export interface PublicSheetSyncConfig {
+  /** The share link as pasted (docs.google.com/spreadsheets/d/… or drive.google.com/file/d/…). */
+  link: string;
+  /** Shown in the UI only; each run reads the live title from Google. */
+  fileName?: string;
+  /** Tab name. Empty = the first tab with cells. */
+  sheet?: string;
+  dataset: string;
+}
+
 /** Config for the `sheets_append` action: append query rows to a Google Sheet. */
 export interface SheetsAppendConfig {
   spreadsheetId?: string;
@@ -196,7 +211,8 @@ export type JobConfig =
   | SheetsAppendConfig
   | ArtifactTestJobConfig
   | AssetDeliveryConfig
-  | DriveFileSyncConfig;
+  | DriveFileSyncConfig
+  | PublicSheetSyncConfig;
 
 /** Config for the `asset_delivery` action: email a file collection's download link on a
  *  schedule. The job is anchored to the workspace's asset-bucket artifact. (work/042 P4) */

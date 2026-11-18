@@ -118,7 +118,7 @@ describe('handleCreateJob', () => {
       env,
       user
     );
-    expect(await jsonBody(badAction)).toMatchObject({ error: 'action must be one of: email, webhook, slack, discord, http_get, materialize, telegram, query_snapshot, sheets_append, artifact_test, asset_delivery, drive_file_sync' });
+    expect(await jsonBody(badAction)).toMatchObject({ error: 'action must be one of: email, webhook, slack, discord, http_get, materialize, telegram, query_snapshot, sheets_append, artifact_test, asset_delivery, drive_file_sync, public_sheet_sync' });
 
     const missingSchedule = await handleCreateJob(
       new Request('https://x', {
