@@ -124,6 +124,7 @@ describe('email_sheet_sync — the whole path', () => {
     expect(st).toMatchObject({ address, senders: [SENDER], datasets: ['ventas'], you: `${OWNER}@ess.test`,
       job: { dataset: 'ventas', lastStatus: 'success' }, lastUpdate: { rowCount: 2, file: 'ventas noviembre.xlsx', sheet: 'Ventas' },
       lastEmail: { from: SENDER, files: ['ventas noviembre.xlsx'] } });
+    expect(typeof st.job.lastRunAt).toBe('number');
   });
 
   it('the same rows again leave the dataset alone; new rows replace it', async () => {

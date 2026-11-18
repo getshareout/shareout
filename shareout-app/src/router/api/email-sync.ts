@@ -46,7 +46,7 @@ async function status(ctx: FetchContext, artifactId: string, workspaceId: string
     env.DB.prepare(
       `SELECT id, config, enabled, last_run_at, last_status, last_error FROM scheduled_jobs
         WHERE artifact_id = ? AND action = 'email_sheet_sync' ORDER BY created_at DESC LIMIT 1`,
-    ).bind(artifactId).first<{ id: string; config: string; enabled: number; last_run_at: number | null; last_status: string | null; last_error: string | null }>(),
+    ).bind(artifactId).first<{ id: string; config: string; enabled: number; last_run_at: number | string | null; last_status: string | null; last_error: string | null }>(),
     env.DB.prepare('SELECT name FROM datasets WHERE artifact_id = ? ORDER BY updated_at DESC LIMIT 20').bind(artifactId).all<{ name: string }>(),
   ]);
   const config = job ? (JSON.parse(job.config) as { dataset?: string; sheet?: string; attachment?: string }) : null;
@@ -67,7 +67,8 @@ async function status(ctx: FetchContext, artifactId: string, workspaceId: string
     datasets: (names.results || []).map((r) => r.name),
     job: job && config ? {
       id: job.id, enabled: job.enabled === 1, dataset: config.dataset ?? null, sheet: config.sheet ?? null, attachment: config.attachment ?? null,
-      lastRunAt: job.last_run_at, lastStatus: job.last_status, lastError: job.last_error,
+      // last_run_at reads back as text ("1795018526.0") from D1: hand out a number.
+      lastRunAt: job.last_run_at == null ? null : Number(job.last_run_at), lastStatus: job.last_status, lastError: job.last_error,
     } : null,
     lastEmail: last ? { from: last.from_addr, subject: last.subject, receivedAt: last.received_at, files } : null,
     lastUpdate: fromEmail ? { rowCount: meta.rowCount ?? null, file: meta.source?.file ?? null, sheet: meta.source?.sheet ?? null, at: meta.source?.syncedAt ?? null } : null,
