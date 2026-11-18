@@ -55,7 +55,7 @@ job() {
 }
 
 static_checks() {
-  for c in boundaries design-tokens ui inline domains customer-names skill-links migrations access-seams file-size; do
+  for c in boundaries design-tokens ui inline domains customer-names skill-links claude-plugin migrations access-seams file-size; do
     npm run -s "check:$c"
   done
   "$REPO_ROOT/tooling/scripts/check-agent-guides.sh"

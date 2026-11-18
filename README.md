@@ -216,6 +216,7 @@ Primary CTA: **Create with AI** (needs an AI key — see Day 1).
 | Browser SDK | `shareout-app/sdk/` |
 | Visual editor | `shareout-app/editor-client/` |
 | Agent skill (**canonical**) | [`skills/ShareOutSkill/`](skills/ShareOutSkill/) — see [skills/README.md](skills/README.md) |
+| Claude plugin (connector + skill) | [`skills/.claude-plugin/`](skills/.claude-plugin/plugin.json) — `/plugin marketplace add getshareout/shareout` ([how](skills/README.md#claude-plugin)) |
 | Skill public mirror | [`getshareout/shareout-skill`](https://github.com/getshareout/shareout-skill) (do not edit as primary) |
 | Design system | `Design/` |
 | Docs site | `docs-site/` → [docs.shareout.site](https://docs.shareout.site) |

@@ -18,6 +18,49 @@
          └─►  (release mirror)    ──►  github.com/getshareout/shareout-skill
 ```
 
+## Claude plugin
+
+This folder is also the official ShareOut plugin for Claude. It bundles two things:
+
+- the **ShareOut connector** ([`.mcp.json`](.mcp.json)): the remote MCP server at
+  `https://shareout.site/mcp`. Claude signs you in with your ShareOut account (OAuth) the
+  first time; there is no token to copy.
+- the **ShareOut skill** ([`ShareOutSkill/`](ShareOutSkill/)): how to build and publish a
+  good page.
+
+Install in Claude Code:
+
+```
+/plugin marketplace add getshareout/shareout
+/plugin install shareout@getshareout
+```
+
+or in one step: `/plugin install shareout --marketplace getshareout/shareout`. Then run
+`/mcp` and sign in to ShareOut. In claude.ai, Claude Desktop or Cowork: Customize → Plugins →
+add the marketplace `getshareout/shareout` → install **ShareOut**.
+
+What it runs, sends and fetches: the plugin ships no code, hooks or local servers, only
+Markdown and the connector address. When Claude calls a ShareOut tool, the request (for
+example the page you asked it to publish) goes to `https://shareout.site` under your
+account, with the same permissions you have in ShareOut. Nothing is sent anywhere else.
+The tools are listed in
+[ShareOutSkill/integrations/mcp-connector.md](ShareOutSkill/integrations/mcp-connector.md).
+
+Running your own instance? The plugin's address is fixed, so add your connector by URL
+instead: `claude mcp add --transport http shareout https://your-instance.example/mcp`.
+
+| File | Role |
+|------|------|
+| [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) | Plugin manifest. `version` must equal the skill's `SKILL.md` version |
+| [`.mcp.json`](.mcp.json) | The connector the plugin adds |
+| `../.claude-plugin/marketplace.json` | Marketplace that lists the plugin (`getshareout`) |
+| `icon.png` | Listing icon (copy of `shareout-app/public/_brand/icon-512.png`) |
+
+`npm run check:claude-plugin` (in `shareout-app/`, part of the pre-push checks) fails when
+the plugin version and the skill version differ, or when an MCP tool in
+`shareout-app/src/mcp/` is missing from `mcp-connector.md`. Before a directory submission,
+also run `claude plugin validate ./skills --strict` and `claude plugin validate . --strict`.
+
 ## Why not two sources?
 
 Historically the monorepo copy and `shareout-skill` drifted (different versions,

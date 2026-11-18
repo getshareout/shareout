@@ -26,6 +26,17 @@ If your company runs its own ShareOut, use its address instead (for example `htt
 
 On a Team or Enterprise plan, an owner may need to add the connector for the organization first.
 
+### Or install the ShareOut plugin
+
+The plugin adds the same connection plus a guide that teaches Claude how to make a good page. In **Customize → Plugins**, add the marketplace `getshareout/shareout` and install **ShareOut**. In Claude Code:
+
+```
+/plugin marketplace add getshareout/shareout
+/plugin install shareout@getshareout
+```
+
+The plugin connects to `https://shareout.site`. If your company runs its own ShareOut, use the link above instead.
+
 ## ChatGPT
 
 1. Open **Settings → Apps & Connectors → Advanced settings** and turn on **Developer mode**.

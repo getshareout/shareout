@@ -1,7 +1,7 @@
 ---
 name: "shareout-skill"
-version: "2.65.0"
-updated_at: "2026-11-02T22:00:00Z"
+version: "2.66.0"
+updated_at: "2026-11-18T12:00:00Z"
 description: "Publish, update, inspect, and manage ShareOut artifacts on a self-hosted instance. Use when the user wants to build or publish a web artifact (HTML apps, dashboards, forms, or CSV/Markdown/JSON/TXT), wire SDK data stores, live data, schedules, sharing, analytics, or in-artifact AI. If the user wants to INSTALL or DEPLOY ShareOut on Cloudflare first, load deploy/SKILL.md immediately."
 skill_endpoint: "/v1/skill"
 ---
@@ -40,6 +40,20 @@ The person you are helping is usually not technical. Every message you send them
   the page is private — say so and why (the `notice`), never announce it as public.
 
 If something goes wrong, see [If you get stuck](#if-you-get-stuck) — don't make them debug it.
+
+---
+
+## Connector first
+
+Do you have ShareOut tools in this session (`publish_artifact`, `edit_artifact`,
+`list_artifacts`, …)? Then the person installed the ShareOut plugin or added the connector and
+is already signed in. Use those tools: no origin, token or credentials file is needed, and
+section 0 does not apply. Start with `whoami` if you need their workspaces. The tool list is in
+[integrations/mcp-connector.md](integrations/mcp-connector.md); the rest of this skill still
+applies for what a good page looks like (HTML spec, data, sharing).
+
+Use the REST API below only when there are no ShareOut tools, or for something the tools do
+not cover.
 
 ---
 

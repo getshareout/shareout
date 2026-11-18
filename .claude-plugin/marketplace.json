@@ -1,0 +1,16 @@
+{
+  "name": "getshareout",
+  "description": "The official ShareOut plugin for Claude",
+  "owner": {
+    "name": "ShareOut",
+    "url": "https://shareout.site"
+  },
+  "plugins": [
+    {
+      "name": "shareout",
+      "source": "./skills",
+      "description": "Publish what Claude builds as a live page with a link: the ShareOut connector plus the ShareOut skill.",
+      "category": "productivity"
+    }
+  ]
+}
