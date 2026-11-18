@@ -18,6 +18,7 @@ destination; email is another; more can be added without changing callers.
 | `http_get` | Simple GET ping | `HttpGetConfig` |
 | `materialize` | Re-run a connection query → store as dataset/table/json | `MaterializeConfig` |
 | `query_snapshot` | Deterministic multi-query refresh against one connection | `QuerySnapshotConfig` |
+| `email_sheet_sync` | An Excel/CSV emailed to the page's address → one of its datasets (event `email.received`) | `EmailSheetSyncConfig` |
 
 All config shapes are documented in [jobs.md](jobs.md).
 

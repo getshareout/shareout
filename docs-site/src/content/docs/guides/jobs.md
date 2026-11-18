@@ -24,6 +24,7 @@ happens. Email a weekly report, post a snapshot to Slack, refresh a dataset.
 | `webhook` | HTTP request to your URL |
 | `http_get` | Simple GET |
 | `materialize` | Re-run a connection query and store the result |
+| `email_sheet_sync` | On `email.received`: an Excel/CSV emailed to the page's address by an allowed, verified sender replaces one of its datasets |
 | `query_snapshot` | Run fixed warehouse/REST queries on a schedule and write each result to json/table/dataset |
 | `sheets_append` | Run one connection query and append rows to a Google Sheet (growing daily history) |
 
