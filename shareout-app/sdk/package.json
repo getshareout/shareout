@@ -33,6 +33,6 @@
   },
   "dependencies": {
     "@shareout/chat-core": "*",
-    "tabulator-tables": "^6.6.1"
+    "tabulator-tables": "^6.7.1"
   }
 }

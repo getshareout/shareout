@@ -84,11 +84,11 @@
   },
   "dependencies": {
     "@cloudflare/containers": "0.3.7",
-    "@cloudflare/puppeteer": "^1.4.0",
+    "@cloudflare/puppeteer": "^2.0.0",
     "acorn": "^8.19.0",
     "aws4fetch": "^1.0.20",
     "fflate": "^0.8.3",
-    "postal-mime": "^4.0.7",
+    "postal-mime": "^4.2.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz",
     "yjs": "^13.6.33"
   },
