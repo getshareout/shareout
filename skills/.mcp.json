@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "shareout": {
+      "type": "http",
+      "url": "https://shareout.site/mcp"
+    }
+  }
+}

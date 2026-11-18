@@ -19,6 +19,20 @@ connect page is `$ORIGIN/home?view=connect`.
 | ChatGPT | Settings → Apps & Connectors → Advanced → **Developer mode** on → Create → paste `$ORIGIN/mcp`, authentication **OAuth** |
 | Claude Code | `claude mcp add --transport http shareout $ORIGIN/mcp` then `/mcp` to sign in |
 
+### Claude plugin
+
+The plugin bundles this connector and the ShareOut skill, so Claude gets the tools and knows
+how to build a good page. It lives in the product repo (`skills/.claude-plugin/plugin.json`,
+listed by `.claude-plugin/marketplace.json` at the repo root) and connects to
+`https://shareout.site/mcp`.
+
+| App | Where |
+| --- | --- |
+| Claude Code | `/plugin marketplace add getshareout/shareout` then `/plugin install shareout@getshareout`, then `/mcp` to sign in |
+| claude.ai / Claude Desktop / Cowork | Customize → Plugins → add the marketplace `getshareout/shareout` → install **ShareOut** |
+
+On your own instance, add the connector by URL (table above) instead: the plugin's URL is fixed.
+
 A ShareOut sign-in opens, then a consent screen ("Claude wants to publish pages to
 your ShareOut account"). Allow, and the app is connected.
 
@@ -54,6 +68,7 @@ your ShareOut account"). Allow, and the app is connected.
 | `knowledge_entity` | One company, person or project by `name` (or entity id): its connections, sources and quoted mentions |
 | `knowledge_facts` | Facts about `about` (amounts, dates, statuses), each with the quoted sentence and its source; optional `filter` |
 | `knowledge_status` | Whether Knowledge is on, what's learned / processing / unreadable, and how many entities it knows |
+| `knowledge_reindex` | Owners/admins: re-learn every File and page of a workspace (or only `artifact_ids`) even when unchanged; `check_only: true` starts nothing and reports each source's progress. Once every 10 minutes per workspace; costs AI usage |
 | `knowledge_get` | One note by `path`, with its body and the pages it was learned from (`source_artifacts`: title + absolute `url` when the person may open it, `available: false` otherwise) |
 | `knowledge_from_artifact` | Notes learned from one page (`artifact_id`; the page's workspace by default) — the reverse of a note's sources; empty when the person can't open the page |
 | `knowledge_reindex` | Owners/admins: re-learn every File and page (or `artifact_ids`); `check_only` reports progress. Once per 10 minutes, costs AI usage |
