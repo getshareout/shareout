@@ -117,6 +117,8 @@ export const WORKSPACE_KNOWLEDGE_MAP_STYLES = `
 .km__legend i { display: inline-block; width: 20px; border-top: 2px solid var(--color-text-tertiary); margin-right: 6px; vertical-align: middle; }
 .km__legend i.is-d { border-top-style: dashed; }
 .km__hint { color: var(--color-text-tertiary); }
+.km__new { margin-left: auto; }
+.km__head .km__trail { min-width: 160px; }
 .km__status { display: flex; }
 .km__status button { flex: 1; padding: 4px 6px; font-size: var(--text-xs); }
 .km__item.is-draft .km__iname, .km__crow.is-draft .km__iname { font-style: italic; color: var(--color-text-secondary); }
@@ -132,7 +134,7 @@ export const WORKSPACE_KNOWLEDGE_MAP_STYLES = `
 .km__pname.is-edit { cursor: text; border-radius: var(--radius-sm); padding: 2px 4px; margin-left: -4px; }
 .km__pname.is-edit:hover { background: var(--color-surface); }
 .kc-name__in { width: 100%; box-sizing: border-box; font: inherit; }
-.kc-type { font-size: var(--text-xs); padding: 2px 6px; }
+.km__phead .kc-type { width: auto; max-width: 60%; flex: 0 1 auto; font-size: var(--text-xs); padding: 2px 24px 2px 8px; min-height: 0; }
 .kc-prop { border: 1.5px dashed var(--color-border-strong); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px; background: var(--color-surface); font-size: var(--text-sm); }
 .kc-prop__t { color: var(--color-text-secondary); }
 .kc-prop__row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
@@ -162,7 +164,8 @@ export const WORKSPACE_KNOWLEDGE_MAP_STYLES = `
 .kc-pop__chk { display: flex; gap: 6px; align-items: center; font-size: var(--text-sm); margin-top: 10px; }
 .kc-pop__p { font-size: var(--text-sm); color: var(--color-text-secondary); margin: 0 0 8px; }
 .kc-pop__pair { font-size: var(--text-sm); overflow-wrap: anywhere; }
-.kc-pick { max-height: 220px; overflow: auto; margin-top: 6px; }
+.kc-pick { max-height: 200px; overflow: auto; margin-top: 6px; }
+.kc-pop { max-height: calc(100vh - 24px); overflow: auto; }
 .kc-modal__row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
 .kc-rule__ta { width: 100%; box-sizing: border-box; margin-top: 8px; }
 .kc-rules { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
@@ -193,6 +196,9 @@ export const WORKSPACE_KNOWLEDGE_MAP_STYLES = `
 .kc-note { margin: 12px 0 0; font-size: var(--text-xs); color: var(--color-text-tertiary); }
 .kc-mt { margin-top: 16px; }
 @media (max-width: 860px) {
+  /* Train + four views don't fit beside the title on a phone: let them wrap under it. */
+  .wsx-kn2__titlerow { flex-wrap: wrap; row-gap: 8px; }
+  .wsx-kn2__ctlright { margin-left: 0; flex-wrap: wrap; }
   .kc-rules { grid-template-columns: minmax(0, 1fr); }
   .kc-trow { grid-template-columns: auto minmax(0, 1fr) auto; }
   .kc-trow__c, .km__hint { display: none; }

@@ -136,10 +136,9 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
     var tools = '<div class="km__tools"><div class="wsx__modetog km__depth">'
       + '<button class="' + (kmState.depth === 1 ? 'is-on' : '') + '" data-km-depth="1" type="button">' + esc(t('kmap.depth1')) + '</button>'
       + '<button class="' + (kmState.depth === 2 ? 'is-on' : '') + '" data-km-depth="2" type="button">' + esc(t('kmap.depth2')) + '</button></div>'
-      + '<button class="so-c-btn so-c-btn--sm" data-km-fit type="button">' + esc(t('kmap.fit')) + '</button>'
-      + (kmAdmin() ? '<button class="so-c-btn so-c-btn--sm" data-km-new type="button">' + esc(kt('kcur.newEntityBtn')) + '</button>' : '') + '</div>';
+      + '<button class="so-c-btn so-c-btn--sm" data-km-fit type="button">' + esc(t('kmap.fit')) + '</button></div>';
     var legend = '<div class="km__legend"><span><i></i>' + esc(kt('kmap.legendConfirmed')) + '</span><span><i class="is-d"></i>' + esc(kt('kmap.legendProposed')) + '</span>'
-      + (kmAdmin() ? '<span class="km__hint">' + esc(kt('kmap.editHint')) + '</span>' : '') + '</div>';
+      + (kmAdmin() ? '<span class="km__hint">' + esc(kt('kmap.editHint')) + '</span><button class="so-c-btn so-c-btn--sm km__new" data-km-new type="button">' + esc(kt('kcur.newEntityBtn')) + '</button>' : '') + '</div>';
     var note = '';
     if (!lay.edges.length) note = '<div class="km__note">' + esc(t('kmap.noConnections')) + '</div>';
     else if (lay.hidden) note = '<div class="km__note">' + esc(t('kmap.hiddenByFilter').replace('{n}', lay.hidden.toLocaleString())) + '</div>';
@@ -386,7 +385,13 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
       + top.def;
     var facts = (d.facts || []);
     // A learned value that differs from the team's for the same thing: show both, the team decides.
-    var teamVal = {}; facts.forEach(function (f) { if (f.status === 'confirmed') teamVal[f.predicate] = f.value; });
+    var teamVal = {}, backing = {};
+    facts.forEach(function (f) { if (f.status === 'confirmed') teamVal[f.predicate] = f.value; });
+    facts = facts.filter(function (f) {
+      if (f.status === 'confirmed' || teamVal[f.predicate] !== f.value) return true;
+      if (!backing[f.predicate]) backing[f.predicate] = f;
+      return false;
+    }).map(function (f) { var b = f.status === 'confirmed' && backing[f.predicate]; return b ? Object.assign({}, f, { quote: b.quote, source: b.source }) : f; });
     var fbody = facts.length ? facts.map(function (f) {
       var since = f.validFrom ? '<span class="km__since">' + esc(t('kmap.since').replace('{d}', fmtDay(f.validFrom, true) || f.validFrom)) + '</span>' : '';
       var team = f.status === 'confirmed', clash = !team && teamVal[f.predicate] != null && teamVal[f.predicate] !== f.value;

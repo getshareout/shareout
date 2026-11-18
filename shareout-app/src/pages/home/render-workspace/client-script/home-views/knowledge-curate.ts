@@ -69,6 +69,13 @@ export const workspace_client_home_views_knowledgeCurate_JS = `  // ----- Knowle
     var f = p.querySelector('input, select, textarea'); if (f) f.focus();
     return p;
   }
+  // Content that arrives after the popover opened (picker results) can push it past the
+  // bottom of the window: lift it back in.
+  function kcFit() {
+    var p = document.getElementById('kcPop'); if (!p) return;
+    var h = p.offsetHeight, top = parseFloat(p.style.top) || 12;
+    if (top + h > window.innerHeight - 12) p.style.top = Math.max(12, window.innerHeight - h - 12) + 'px';
+  }
   function kcRow(okLabel) { return '<div class="kc-pop__row"><button class="so-c-btn so-c-btn--sm" type="button" data-kc-x>' + esc(kt('kcur.cancel')) + '</button><button class="so-c-btn so-c-btn--sm so-c-btn--primary" type="button" data-kc-ok>' + esc(okLabel) + '</button></div>'; }
   function kcBindRow(p, onOk) {
     p.querySelector('[data-kc-x]').addEventListener('click', kcClosePop);
@@ -76,16 +83,17 @@ export const workspace_client_home_views_knowledgeCurate_JS = `  // ----- Knowle
     p.querySelectorAll('input').forEach(function (i) { i.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); onOk(ok); } }); });
   }
   function kcTypeSelect(id, sel) { return '<select class="so-c-select kc-pop__in" id="' + id + '">' + kcTypes(sel).map(function (ty) { return '<option value="' + esc(ty) + '"' + (ty === sel ? ' selected' : '') + '>' + esc(kmTypeLabel(ty)) + '</option>'; }).join('') + '</select>'; }
-  function kcRelInput(id) { return '<input class="so-c-input kc-pop__in" id="' + id + '" list="' + id + 'L" placeholder="' + esc(kt('kcur.relationPh')) + '" autocomplete="off"><datalist id="' + id + 'L">' + kcRelTypes().map(function (r) { return '<option value="' + esc(kmRelLabel(r)) + '">'; }).join('') + '</datalist>'; }
+  function kcRelInput(id) { return '<input class="wsx-field__in kc-pop__in" id="' + id + '" list="' + id + 'L" placeholder="' + esc(kt('kcur.relationPh')) + '" autocomplete="off"><datalist id="' + id + 'L">' + kcRelTypes().map(function (r) { return '<option value="' + esc(kmRelLabel(r)) + '">'; }).join('') + '</datalist>'; }
 
   // Entity picker: type to search, click a result.
   function kcPicker(host, exclude, onPick) {
-    host.innerHTML = '<input class="so-c-input kc-pop__in" type="search" data-kc-q placeholder="' + esc(kt('kcur.searchEntity')) + '" autocomplete="off"><div class="kc-pick" data-kc-res></div>';
+    host.innerHTML = '<input class="wsx-field__in kc-pop__in" type="search" data-kc-q placeholder="' + esc(kt('kcur.searchEntity')) + '" autocomplete="off"><div class="kc-pick" data-kc-res></div>';
     var q = host.querySelector('[data-kc-q]'), res = host.querySelector('[data-kc-res]'), timer = null, req = 0;
     var paint = function (list) {
-      list = (list || []).filter(function (e) { return e.id !== exclude; }).slice(0, 8);
+      list = (list || []).filter(function (e) { return e.id !== exclude; }).slice(0, 6);
       res.innerHTML = list.length ? list.map(function (e) { return '<button type="button" class="km__item" data-kc-pick="' + esc(e.id) + '" data-kc-name="' + esc(e.name) + '">' + kmDot(e.type) + '<span class="km__iname">' + esc(e.name) + '</span><span class="km__itype">' + esc(kmTypeLabel(e.type)) + '</span></button>'; }).join('') : '<div class="km__none">' + esc(t('kmap.noResults')) + '</div>';
       res.querySelectorAll('[data-kc-pick]').forEach(function (b) { b.addEventListener('click', function () { res.querySelectorAll('.is-on').forEach(function (x) { x.classList.remove('is-on'); }); b.classList.add('is-on'); onPick(b.getAttribute('data-kc-pick'), b.getAttribute('data-kc-name')); }); });
+      kcFit();
     };
     paint(kmState.top);
     q.addEventListener('input', function () {
@@ -111,7 +119,7 @@ export const workspace_client_home_views_knowledgeCurate_JS = `  // ----- Knowle
   function kcCreateAt(x, y, linkTo) {
     kcLoadSchema(function () {
       var p = kcPop(x, y, kt('kcur.newEntity'),
-        '<label class="kc-pop__l">' + esc(kt('kcur.name')) + '</label><input class="so-c-input kc-pop__in" id="kcName" autocomplete="off">'
+        '<label class="kc-pop__l">' + esc(kt('kcur.name')) + '</label><input class="wsx-field__in kc-pop__in" id="kcName" autocomplete="off">'
         + '<label class="kc-pop__l">' + esc(kt('kcur.type')) + '</label>' + kcTypeSelect('kcType', (kcTypes()[0] || 'Organization'))
         + (linkTo ? '<label class="kc-pop__chk"><input type="checkbox" id="kcLink" checked> ' + esc(kt('kcur.linkTo').replace('{n}', kmName(linkTo))) + '</label>' : '')
         + kcRow(kt('kcur.create')));
@@ -205,7 +213,7 @@ export const workspace_client_home_views_knowledgeCurate_JS = `  // ----- Knowle
   }
   // A correction can become a rule the learner reads before every document.
   function kcOfferRule(text) {
-    var mo = wsxModal(kt('kcur.ruleTitle'), '<p>' + esc(kt('kcur.ruleBody')) + '</p><textarea class="so-c-input kc-rule__ta" id="kcRuleTa" rows="3">' + esc(text) + '</textarea>'
+    var mo = wsxModal(kt('kcur.ruleTitle'), '<p>' + esc(kt('kcur.ruleBody')) + '</p><textarea class="wsx-field__in wsx-field__ta kc-rule__ta" id="kcRuleTa" rows="3">' + esc(text) + '</textarea>'
       + '<div class="kc-modal__row"><button class="so-c-btn" type="button" data-kc-no>' + esc(kt('kcur.onlyThis')) + '</button><button class="so-c-btn so-c-btn--primary" type="button" data-kc-yes>' + esc(kt('kcur.saveRule')) + '</button></div>');
     mo.body.querySelector('[data-kc-no]').addEventListener('click', mo.close);
     mo.body.querySelector('[data-kc-yes]').addEventListener('click', function () {
@@ -251,8 +259,8 @@ export const workspace_client_home_views_knowledgeCurate_JS = `  // ----- Knowle
     on('[data-kc-conn]', function (ev) { var r = ev.currentTarget.getBoundingClientRect(); kcConnectPick(e.id, r.left - 200, r.bottom + 6); });
     on('[data-kc-fact]', function (ev) {
       var r = ev.currentTarget.getBoundingClientRect();
-      var p = kcPop(r.left - 200, r.bottom + 6, kt('kcur.addFact'), '<label class="kc-pop__l">' + esc(kt('kcur.factWhat')) + '</label><input class="so-c-input kc-pop__in" id="kcFk" autocomplete="off">'
-        + '<label class="kc-pop__l">' + esc(kt('kcur.factValue')) + '</label><input class="so-c-input kc-pop__in" id="kcFv" autocomplete="off">' + kcRow(kt('kcur.add')));
+      var p = kcPop(r.left - 200, r.bottom + 6, kt('kcur.addFact'), '<label class="kc-pop__l">' + esc(kt('kcur.factWhat')) + '</label><input class="wsx-field__in kc-pop__in" id="kcFk" autocomplete="off">'
+        + '<label class="kc-pop__l">' + esc(kt('kcur.factValue')) + '</label><input class="wsx-field__in kc-pop__in" id="kcFv" autocomplete="off">' + kcRow(kt('kcur.add')));
       kcBindRow(p, function (ok) {
         var k = document.getElementById('kcFk').value.trim(), v = document.getElementById('kcFv').value.trim(); if (!k || !v) return;
         ok.disabled = true;
@@ -275,7 +283,7 @@ export const workspace_client_home_views_knowledgeCurate_JS = `  // ----- Knowle
     var nm = host.querySelector('[data-kc-name]');
     if (nm) nm.addEventListener('click', function () {
       if (nm.querySelector('input')) return;
-      nm.innerHTML = '<input class="so-c-input kc-name__in" value="' + esc(e.name) + '" aria-label="' + esc(kt('kcur.name')) + '">';
+      nm.innerHTML = '<input class="wsx-field__in kc-name__in" value="' + esc(e.name) + '" aria-label="' + esc(kt('kcur.name')) + '">';
       var i = nm.querySelector('input'), done = false; i.focus(); i.select();
       var save = function () { if (done) return; done = true; var v = i.value.trim(); if (v && v !== e.name) kcPatch(e.id, { name: v }, kt('kcur.tRenamed')); else kmPaintPanel(d); };
       i.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') save(); if (ev.key === 'Escape') { done = true; kmPaintPanel(d); } });
@@ -294,7 +302,7 @@ export const workspace_client_home_views_knowledgeCurate_JS = `  // ----- Knowle
     if (df) df.addEventListener('click', function () {
       if (df.querySelector('textarea')) return;
       df.classList.remove('is-empty');
-      df.innerHTML = '<textarea class="so-c-input kc-def__ta" rows="4">' + esc(e.description || '') + '</textarea><div class="kc-pop__row"><button class="so-c-btn so-c-btn--sm" type="button" data-kc-dx>' + esc(kt('kcur.cancel')) + '</button><button class="so-c-btn so-c-btn--sm so-c-btn--primary" type="button" data-kc-ds>' + esc(kt('kcur.save')) + '</button></div>';
+      df.innerHTML = '<textarea class="wsx-field__in wsx-field__ta kc-def__ta" rows="4">' + esc(e.description || '') + '</textarea><div class="kc-pop__row"><button class="so-c-btn so-c-btn--sm" type="button" data-kc-dx>' + esc(kt('kcur.cancel')) + '</button><button class="so-c-btn so-c-btn--sm so-c-btn--primary" type="button" data-kc-ds>' + esc(kt('kcur.save')) + '</button></div>';
       var ta = df.querySelector('textarea'); ta.focus();
       df.querySelector('[data-kc-dx]').addEventListener('click', function (ev) { ev.stopPropagation(); kmPaintPanel(d); });
       df.querySelector('[data-kc-ds]').addEventListener('click', function (ev) { ev.stopPropagation(); kcPatch(e.id, { description: ta.value.trim() }, kt('kcur.tSaved')); });
@@ -352,16 +360,16 @@ export const workspace_client_home_views_knowledgeCurate_JS = `  // ----- Knowle
     host.innerHTML = ro
       + '<section class="kc-card"><h3>' + esc(kt('kcur.structure')) + '</h3><p class="kc-sub">' + esc(kt('kcur.structureSub')) + '</p>'
       + '<div class="kc-swl">' + sw(!!s.teamOnly, 'data-kc-only', kt('kcur.teamOnly')) + '<span>' + esc(kt('kcur.teamOnly')) + '</span></div>' + types
-      + (admin ? '<div class="kc-add"><input class="so-c-input" id="kcNewType" placeholder="' + esc(kt('kcur.newType')) + '"><input class="so-c-input" id="kcNewTypeD" placeholder="' + esc(kt('kcur.newTypeD')) + '"><button class="so-c-btn so-c-btn--sm" type="button" id="kcAddType">' + esc(kt('kcur.addType')) + '</button></div>' : '')
+      + (admin ? '<div class="kc-add"><input class="wsx-field__in" id="kcNewType" placeholder="' + esc(kt('kcur.newType')) + '"><input class="wsx-field__in" id="kcNewTypeD" placeholder="' + esc(kt('kcur.newTypeD')) + '"><button class="so-c-btn so-c-btn--sm" type="button" id="kcAddType">' + esc(kt('kcur.addType')) + '</button></div>' : '')
       + ((s.relationTypes || []).length ? '<h4 class="km__h4 kc-mt">' + esc(kt('kcur.relations')) + '</h4><div class="kc-aka">' + s.relationTypes.map(function (r) { return '<span class="kc-tag kc-tag--seen">' + esc(kmRelLabel(r)) + '</span>'; }).join('') + '</div>' : '')
       + '</section>'
       + '<div class="kc-col"><section class="kc-card"><h3>' + esc(kt('kcur.glossary')) + '</h3><p class="kc-sub">' + esc(kt('kcur.glossarySub')) + '</p>'
       + (gl.length ? gl.map(function (r) { return '<div class="kc-gl"><b>' + esc(r.term) + '</b><span>' + esc(r.text) + '</span>' + del(r.id) + '</div>'; }).join('') : '<div class="km__none">' + esc(kt('kcur.nothing')) + '</div>')
-      + (admin ? '<div class="kc-add"><input class="so-c-input kc-add__term" id="kcGt" placeholder="' + esc(kt('kcur.term')) + '"><input class="so-c-input" id="kcGd" placeholder="' + esc(kt('kcur.meaning')) + '"><button class="so-c-btn so-c-btn--sm" type="button" id="kcAddG">' + esc(kt('kcur.add')) + '</button></div>' : '')
+      + (admin ? '<div class="kc-add"><input class="wsx-field__in kc-add__term" id="kcGt" placeholder="' + esc(kt('kcur.term')) + '"><input class="wsx-field__in" id="kcGd" placeholder="' + esc(kt('kcur.meaning')) + '"><button class="so-c-btn so-c-btn--sm" type="button" id="kcAddG">' + esc(kt('kcur.add')) + '</button></div>' : '')
       + '</section>'
       + '<section class="kc-card"><h3>' + esc(kt('kcur.rules')) + '</h3><p class="kc-sub">' + esc(kt('kcur.rulesSub')) + '</p>'
       + (rs.length ? rs.map(function (r) { return '<div class="kc-rule"><span>' + esc(r.text) + '</span>' + del(r.id) + '</div>'; }).join('') : '<div class="km__none">' + esc(kt('kcur.nothing')) + '</div>')
-      + (admin ? '<div class="kc-add"><input class="so-c-input" id="kcRt" placeholder="' + esc(kt('kcur.rulePh')) + '"><button class="so-c-btn so-c-btn--sm" type="button" id="kcAddR">' + esc(kt('kcur.addRule')) + '</button></div>' : '')
+      + (admin ? '<div class="kc-add"><input class="wsx-field__in" id="kcRt" placeholder="' + esc(kt('kcur.rulePh')) + '"><button class="so-c-btn so-c-btn--sm" type="button" id="kcAddR">' + esc(kt('kcur.addRule')) + '</button></div>' : '')
       + '<p class="kc-note">' + esc(kt('kcur.retrain')) + '</p></section>'
       + (admin ? '<section class="kc-card"><h3>' + esc(kt('kcur.discarded')) + '</h3><p class="kc-sub">' + esc(kt('kcur.discardedSub')) + '</p>'
         + (kcState.discarded.length ? kcState.discarded.map(function (x) { return '<div class="kc-rule"><span>' + esc(x.label) + (x.reason ? ' <span class="kc-trow__d">\\u00B7 ' + esc(kt('kcur.why.' + x.reason) === 'kcur.why.' + x.reason ? x.reason : kt('kcur.why.' + x.reason)) + '</span>' : '') + '</span><button class="so-c-btn so-c-btn--sm" type="button" data-kc-restore="' + esc(x.kind) + '" data-kc-key="' + esc(x.key) + '">' + esc(kt('kcur.restore')) + '</button></div>'; }).join('') : '<div class="km__none">' + esc(kt('kcur.nothing')) + '</div>')
