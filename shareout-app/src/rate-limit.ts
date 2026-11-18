@@ -68,6 +68,9 @@ const RATE_LIMITS = {
   // GET /v1/artifacts/{id}/sources from signed-out viewers, per IP. The viewer's Data
   // panel loads once per open; this leaves room for a busy office behind one NAT.
   sourcesAnon: { limit: 120, windowSeconds: 3600 },
+  // POST /v1/workspaces/{ws}/sheet-links/inspect, per user: each call downloads a public
+  // spreadsheet from Google. Setting up a sync takes one or two.
+  sheetLinkInspect: { limit: 60, windowSeconds: 3600 },
 } as const;
 
 type RateLimitAction = keyof typeof RATE_LIMITS;

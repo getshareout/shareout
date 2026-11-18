@@ -21,6 +21,8 @@ export const WORKSPACE_FORMS_EDIT_STYLES = `/* ---- Modal + native create forms 
 .wsx-field__doc:hover { text-decoration: underline; }
 .wsx-cform__err { font-size: var(--text-xs); color: var(--color-danger, var(--color-error)); min-height: 14px; }
 .wsx-cform__err:empty { min-height: 0; }
+.wsx-slink__warn { display: grid; gap: 6px; justify-items: start; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent); border-radius: var(--radius-md); background: var(--color-warning-light); color: var(--color-text); font-size: var(--text-sm); }
+.wsx-slink__warn p { margin: 0; }
 .wsx-cform__test { font-size: var(--text-xs); }
 .wsx-cform__test.testing { color: var(--color-text-tertiary); }
 .wsx-cform__test.ok { color: var(--color-success); }

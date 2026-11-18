@@ -13,6 +13,7 @@ import { CONNECT_COPY } from './copy/connect';
 import { DROP_IMPORT_COPY } from './copy/drop-import';
 import { ERRORS_COPY } from './copy/errors';
 import { FILE_IMPORT_COPY } from './copy/file-import';
+import { SHEET_LINK_COPY } from './copy/sheet-link';
 import { FOLDER_ACCESS_COPY } from './copy/folder-access';
 import { FOLDER_CONTENTS_COPY } from './copy/folder-contents';
 import { GUEST_COMMENTS_COPY } from './copy/guest-comments';
@@ -69,6 +70,7 @@ const COPY_MODULES: HomeLocaleCopy[] = [
   NEW_MENU_COPY,
   DROP_IMPORT_COPY,
   FILE_IMPORT_COPY,
+  SHEET_LINK_COPY,
   PAGES_COPY,
   ERRORS_COPY,
   VERSION_CHANGELOG_COPY,

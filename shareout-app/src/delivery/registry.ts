@@ -11,6 +11,7 @@ import { sheetsAppendDestination } from './destinations/sheets-append';
 import { artifactTestDestination } from './destinations/artifact-test';
 import { assetDeliveryDestination } from './destinations/asset-delivery';
 import { driveFileSyncDestination } from './destinations/drive-file-sync';
+import { publicSheetSyncDestination } from './destinations/public-sheet-sync';
 
 const REGISTRY: Record<string, Destination<any>> = {
   slack: slackDestination,
@@ -25,6 +26,7 @@ const REGISTRY: Record<string, Destination<any>> = {
   artifact_test: artifactTestDestination,
   asset_delivery: assetDeliveryDestination,
   drive_file_sync: driveFileSyncDestination,
+  public_sheet_sync: publicSheetSyncDestination,
 };
 
 export function getDestination(kind: string): Destination<any> | null {
