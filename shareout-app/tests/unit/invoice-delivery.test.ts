@@ -186,6 +186,17 @@ describe('issue → email', () => {
     expect((await auditFor(id)).find((a) => a.action === 'invoice.email')?.detail).toMatchObject({ resend: true, to: ['billing@acme.example'] });
   });
 
+  it('emails once when the same draft is issued twice at the same moment', async () => {
+    const draft = await read(await handleCreateInvoice(json('POST', base(ACME), { lines: [{ description: 'Setup', unit_cents: 1_000 }] }), e, OP, ACME));
+    const id = draft.body.invoice.id;
+    const issue = () => handleUpdateInvoice(json('PATCH', `${base(ACME)}/${id}`, { status: 'open' }), e, OP, ACME, id).then(read);
+    const results = await Promise.all([issue(), issue()]);
+    expect(results.filter((r) => r.body.email?.sent)).toHaveLength(1);
+    expect(sent).toHaveLength(1);
+    expect((await auditFor(id)).filter((a) => a.action === 'invoice.issue')).toHaveLength(1);
+    expect((await invoiceRow(id))?.status).toBe('open');
+  });
+
   it('never mails a suppressed address', async () => {
     await addSuppression(e, { email: 'billing@acme.example', reason: 'bounce' });
     try {

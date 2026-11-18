@@ -268,8 +268,10 @@ export async function handleUpdateInvoice(request: Request, env: Env, user: Auth
   if (!sets.length) return json({ invoice: invoiceView(inv, {}, true) });
 
   set('updated_at', now);
-  await env.DB.prepare(`UPDATE workspace_invoices SET ${sets.join(', ')} WHERE id = ? AND workspace_id = ?`)
-    .bind(...binds, id, workspaceId).run();
+  // Only from the status we read: two "Issue" clicks racing must not both email the invoice.
+  const res = await env.DB.prepare(`UPDATE workspace_invoices SET ${sets.join(', ')} WHERE id = ? AND workspace_id = ? AND status = ?`)
+    .bind(...binds, id, workspaceId, inv.status).run();
+  if (!res.meta?.changes) return json({ error: 'The invoice changed in the meantime; reload and try again', code: 'INVALID_TRANSITION' }, 409);
   await audit(env, user, workspaceId, action ?? 'invoice.update', inv, action === 'invoice.paid' ? { source: 'operator' } : {});
   const email = action === 'invoice.issue' && wantsEmail(body.send_email) ? await emailInvoice(env, user, workspaceId, id) : null;
   const row = await getInvoice(env, workspaceId, id);
