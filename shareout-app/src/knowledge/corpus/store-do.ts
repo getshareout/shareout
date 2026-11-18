@@ -9,6 +9,7 @@ import type {
 } from './client';
 import type { Extraction } from './extract';
 import * as graphSql from './graph-store';
+import * as curation from './curation';
 import { dropStem, keywordSearch, STEM_SCHEMA, writeStem } from './keyword-index';
 import { STEM_VERSION } from './lexical';
 
@@ -58,7 +59,8 @@ export class KnowledgeStore extends DurableObject<Env> {
     super(state, env);
     this.sql = state.storage.sql;
     state.blockConcurrencyWhile(async () => {
-      for (const stmt of [...SCHEMA, ...graphSql.GRAPH_SCHEMA]) this.sql.exec(stmt);
+      for (const stmt of [...SCHEMA, ...graphSql.GRAPH_SCHEMA, ...curation.CURATION_SCHEMA]) this.sql.exec(stmt);
+      curation.migrateCuration(this.sql);
       // Passage locations (sub-page + heading id) arrived after the first stores were created.
       const cols = new Set(this.sql.exec('PRAGMA table_info(chunks)').toArray().map((r) => r.name as string));
       if (!cols.has('page')) this.sql.exec('ALTER TABLE chunks ADD COLUMN page TEXT');
@@ -431,11 +433,16 @@ export class KnowledgeStore extends DurableObject<Env> {
     return this.metered(() => graphSql.knownEntities(this.q.bind(this), limit));
   }
 
+  /** What the learner is told before every batch: the team's types, rules and entities first. */
+  learnerContext(limit: number): curation.LearnerContext {
+    return this.metered(() => curation.learnerContext(this.q.bind(this), limit));
+  }
+
   applyExtraction(refId: string, x: Extraction) {
     return this.metered(() => this.ctx.storage.transactionSync(() => graphSql.applyExtraction(this.q.bind(this), refId, x)));
   }
 
-  listEntities(opts: { type?: string; q?: string; limit: number }) {
+  listEntities(opts: { type?: string; q?: string; status?: 'confirmed' | 'draft'; limit: number }) {
     return this.metered(() => ({ types: graphSql.entityTypes(this.q.bind(this)), entities: graphSql.listEntities(this.q.bind(this), opts) }));
   }
 
@@ -445,6 +452,29 @@ export class KnowledgeStore extends DurableObject<Env> {
 
   graph(opts: { focus?: string; depth: number; limit: number }) {
     return this.metered(() => graphSql.graph(this.q.bind(this), opts));
+  }
+
+  // ----- the team's curation (curation.ts) -----
+
+  /** One team decision, in one transaction. `userId` is recorded in the history. */
+  curate(userId: string, op: curation.CurationOp): curation.CurationResult {
+    return this.metered(() => this.ctx.storage.transactionSync(() => curation.curate(this.q.bind(this), userId, op)));
+  }
+
+  schema(full: boolean) {
+    return this.metered(() => curation.schema(this.q.bind(this), full));
+  }
+
+  rules() {
+    return this.metered(() => curation.listRules(this.q.bind(this)));
+  }
+
+  discarded(limit: number) {
+    return this.metered(() => curation.listDiscarded(this.q.bind(this), limit));
+  }
+
+  history(opts: { entity?: string; limit: number }) {
+    return this.metered(() => curation.history(this.q.bind(this), opts));
   }
 
   /** This store's SQLite work over the last `days` days, plus its current size. */

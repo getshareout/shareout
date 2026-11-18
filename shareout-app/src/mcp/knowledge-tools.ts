@@ -22,7 +22,8 @@ interface Cite { kind: SourceKind; id: string; title: string; url: string | null
 interface EntitySummary { id: string; type: string; name: string; aliases: string[]; mentions: number; sources: Cite[] }
 interface EntityDetail {
   entity: EntitySummary;
-  facts: Array<{ predicate: string; value: string; unit: string | null; validFrom: string | null; quote: string; source: Cite }>;
+  /** A fact the team added has no source (and no quote): the team's word is the evidence. */
+  facts: Array<{ predicate: string; value: string; unit: string | null; validFrom: string | null; quote: string; source: Cite | null }>;
   relations: Array<{ type: string; direction: 'out' | 'in'; other: { id: string; name: string; type: string }; mentions: number; sources: Cite[] }>;
   mentions: Array<{ quote: string; cite: string; source: Cite }>;
 }
@@ -97,7 +98,7 @@ const nothingKnown = (name: string, w: BotWorkspace) =>
   ok(`Nothing is known about "${name}" in "${w.name}" yet. Try knowledge_search with other words, or tell the person it is not in the workspace's files and pages.`, { found: false, workspace_id: w.id });
 
 const factLine = (owner: string, f: EntityDetail['facts'][number]) =>
-  `- ${owner} · ${f.predicate}: ${f.value}${f.unit ? ` ${f.unit}` : ''}${f.validFrom ? ` (from ${f.validFrom})` : ''} — "${f.quote}" [${citeText(f.source)}]`;
+  `- ${owner} · ${f.predicate}: ${f.value}${f.unit ? ` ${f.unit}` : ''}${f.validFrom ? ` (from ${f.validFrom})` : ''} — ${f.source ? `"${f.quote}" [${citeText(f.source)}]` : 'confirmed by the workspace team'}`;
 
 // ── tools ───────────────────────────────────────────────────────────────────
 

@@ -2,9 +2,11 @@
  *  (search + type chips + most-mentioned), a focused neighbourhood graph (concentric
  *  layout, no simulation — the same entity always looks the same) and an evidence
  *  panel (facts with quotes, connections grouped by relation, mentions). Design note:
- *  docs/knowledge-map.md. Shares the knowledge.ts shell (KPIs, Train, view toggle). */
+ *  docs/knowledge-map.md. Shares the knowledge.ts shell (KPIs, Train, view toggle).
+ *  What the team confirmed is drawn solid, what the model proposed dashed; owners and
+ *  admins edit from the canvas and the panel (knowledge-curate.ts). */
 export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge map — focused neighbourhood graph + evidence panel -----
-  var kmState = { focus: '', depth: 1, type: '', q: '', types: [], counts: {}, top: [], hits: null, names: {}, gcache: {}, dcache: {}, trail: [], lay: null, vb: null, active: -1 };
+  var kmState = { focus: '', depth: 1, type: '', status: '', q: '', types: [], counts: {}, top: [], hits: null, names: {}, gcache: {}, dcache: {}, trail: [], lay: null, vb: null, active: -1 };
   // Validated categorical palette (dataviz skill, light surface): fixed order by type name, never cycled.
   var KM_PALETTE = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
   var kmSearchTimer = null, kmReq = 0;
@@ -13,13 +15,14 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
   function kmRelLabel(ty) { var k = 'kmap.rel.' + ty, v = t(k); return v === k ? String(ty || '').replace(/_/g, ' ') : v; }
   function kmHuman(s) { return String(s || '').replace(/_/g, ' '); }
   function kmColor(ty) { var i = kmState.types.indexOf(ty); return i >= 0 && i < KM_PALETTE.length ? KM_PALETTE[i] : 'var(--color-text-tertiary)'; }
-  function kmDot(ty) { return '<span class="km__dot" style="background:' + kmColor(ty) + '"></span>'; }
+  function kmDot(ty, draft) { return '<span class="km__dot' + (draft ? ' is-draft' : '') + '" style="' + (draft ? 'border-color:' : 'background:') + kmColor(ty) + '"></span>'; }
   function kmTrunc(s, n) { s = String(s || ''); n = n || 26; return s.length > n ? s.slice(0, n - 1) + '\\u2026' : s; }
   // Quotes are lifted from markdown sources — drop the bold/italic markers, show the words.
   function kmPlain(s) { return String(s || '').replace(/\\*\\*|__/g, ''); }
   function kmMentions(n) { n = Number(n || 0); return n === 1 ? t('kmap.mentionsOne') : t('kmap.mentionsCount').replace('{n}', n.toLocaleString()); }
   function kmName(id) { return kmState.names[id] || id; }
   function kmEntityTotal() { var n = 0; for (var k in kmState.counts) if (kmState.counts.hasOwnProperty(k)) n += Number(kmState.counts[k] || 0); return n; }
+  function kmAdmin() { return !!window.WSX_ADMIN; }
   function kmRemember(list) { (list || []).forEach(function (n) { if (n && n.id && n.name) kmState.names[n.id] = n.name; }); }
 
   // Switching the shared Tree|Table|Map toggle: the hash carries map/<id> only while the map is up.
@@ -88,18 +91,19 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
     lay.edges.forEach(function (e) {
       var a = P[e.from], b = P[e.to], primary = e.from === focus || e.to === focus;
       var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-      out.push('<g class="km__e' + (primary ? ' is-primary' : '') + '" data-km-from="' + esc(e.from) + '" data-km-to="' + esc(e.to) + '">'
+      out.push('<g class="km__e' + (primary ? ' is-primary' : '') + (e.status === 'confirmed' ? '' : ' is-draft') + '" data-km-from="' + esc(e.from) + '" data-km-to="' + esc(e.to) + '">'
         + '<line x1="' + a.x.toFixed(1) + '" y1="' + a.y.toFixed(1) + '" x2="' + b.x.toFixed(1) + '" y2="' + b.y.toFixed(1) + '"/>'
         + '<text class="km__elbl" x="' + mx.toFixed(1) + '" y="' + (my - 4).toFixed(1) + '" text-anchor="middle">' + esc(kmRelLabel(e.type)) + '</text></g>');
     });
     out.push('</g><g class="km__nodes">');
     lay.nodes.forEach(function (n) {
-      var c = kmColor(n.n.type), isF = n.id === focus;
+      var c = kmColor(n.n.type), isF = n.id === focus, draft = n.n.status !== 'confirmed';
       var anchor = isF ? 'middle' : (n.x >= 0 ? 'start' : 'end');
       var lx = isF ? n.x : n.x + (n.x >= 0 ? n.r + 7 : -(n.r + 7)), ly = isF ? n.y + n.r + 17 : n.y + 4;
-      out.push('<g class="km__node' + (isF ? ' is-focus' : '') + ' km__ring' + n.ring + '" data-km-node="' + esc(n.id) + '" tabindex="0" role="button" aria-label="' + esc(n.n.name) + '">'
+      out.push('<g class="km__node' + (isF ? ' is-focus' : '') + (draft ? ' is-draft' : '') + ' km__ring' + n.ring + '" data-km-node="' + esc(n.id) + '" tabindex="0" role="button" aria-label="' + esc(n.n.name) + '">'
         + (isF ? '<circle class="km__halo" cx="' + n.x.toFixed(1) + '" cy="' + n.y.toFixed(1) + '" r="' + (n.r + 6) + '" style="stroke:' + c + '"/>' : '')
-        + '<circle cx="' + n.x.toFixed(1) + '" cy="' + n.y.toFixed(1) + '" r="' + n.r.toFixed(1) + '" style="fill:' + (isF ? c : 'color-mix(in srgb, ' + c + ' 18%, var(--color-bg-elevated))') + ';stroke:' + c + '"/>'
+        + '<circle cx="' + n.x.toFixed(1) + '" cy="' + n.y.toFixed(1) + '" r="' + n.r.toFixed(1) + '" style="fill:' + (draft ? 'var(--color-bg-elevated)' : isF ? c : 'color-mix(in srgb, ' + c + ' 22%, var(--color-bg-elevated))') + ';stroke:' + c + '"/>'
+        + (kmAdmin() ? '<g class="km__handle" data-km-handle="' + esc(n.id) + '"><circle cx="' + (n.x + n.r * 0.8).toFixed(1) + '" cy="' + (n.y + n.r * 0.8).toFixed(1) + '" r="7"/><path d="M' + (n.x + n.r * 0.8 - 3).toFixed(1) + ' ' + (n.y + n.r * 0.8).toFixed(1) + 'h6M' + (n.x + n.r * 0.8).toFixed(1) + ' ' + (n.y + n.r * 0.8 - 3).toFixed(1) + 'v6"/></g>' : '')
         + '<text class="km__lbl" x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="' + anchor + '">' + esc(kmTrunc(n.n.name)) + '</text></g>');
     });
     out.push('</g>');
@@ -133,10 +137,12 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
       + '<button class="' + (kmState.depth === 1 ? 'is-on' : '') + '" data-km-depth="1" type="button">' + esc(t('kmap.depth1')) + '</button>'
       + '<button class="' + (kmState.depth === 2 ? 'is-on' : '') + '" data-km-depth="2" type="button">' + esc(t('kmap.depth2')) + '</button></div>'
       + '<button class="so-c-btn so-c-btn--sm" data-km-fit type="button">' + esc(t('kmap.fit')) + '</button></div>';
+    var legend = '<div class="km__legend"><span><i></i>' + esc(kt('kmap.legendConfirmed')) + '</span><span><i class="is-d"></i>' + esc(kt('kmap.legendProposed')) + '</span>'
+      + (kmAdmin() ? '<span class="km__hint">' + esc(kt('kmap.editHint')) + '</span><button class="so-c-btn so-c-btn--sm km__new" data-km-new type="button">' + esc(kt('kcur.newEntityBtn')) + '</button>' : '') + '</div>';
     var note = '';
     if (!lay.edges.length) note = '<div class="km__note">' + esc(t('kmap.noConnections')) + '</div>';
     else if (lay.hidden) note = '<div class="km__note">' + esc(t('kmap.hiddenByFilter').replace('{n}', lay.hidden.toLocaleString())) + '</div>';
-    host.innerHTML = '<div class="km__head">' + trail + tools + '</div>'
+    host.innerHTML = '<div class="km__head">' + trail + tools + '</div>' + legend
       + '<svg class="km__svg' + (lay.ring1 <= 10 ? ' km--labels' : '') + (lay.dense ? ' km--dense' : '') + '" id="kmSvg" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" role="img">' + kmSvgInner(lay) + '</svg>' + note;
     kmApplyVb();
     kmBindCanvas(host);
@@ -148,6 +154,7 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
       b.addEventListener('click', function () { var d = Number(b.getAttribute('data-km-depth')); if (d !== kmState.depth) { kmState.depth = d; kmLoadGraph(); } });
     });
     var fit = host.querySelector('[data-km-fit]'); if (fit) fit.addEventListener('click', kmFit);
+    var nb = host.querySelector('[data-km-new]'); if (nb) nb.addEventListener('click', function () { var r = nb.getBoundingClientRect(); kcCreateAt(r.left - 120, r.bottom + 6, kmState.focus); });
     host.querySelectorAll('[data-km-crumb]').forEach(function (b) {
       b.addEventListener('click', function () {
         var i = Number(b.getAttribute('data-km-crumb'));
@@ -172,12 +179,20 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
       ev.preventDefault(); kmGo(n.getAttribute('data-km-node'), 'push');
     });
     // Drag to pan, wheel to zoom around the cursor; a click (< 4px of movement) on a node refocuses.
+    // Admins: drag a node's + onto another node to connect them, drop a node on another to
+    // merge it, double-click empty space to create. Everyone: drag empty space to pan.
     var drag = null;
     var pt = function (ev) { var r = svg.getBoundingClientRect(), v = kmState.vb; return { x: v.x + (ev.clientX - r.left) / r.width * v.w, y: v.y + (ev.clientY - r.top) / r.height * v.h, r: r }; };
+    var nodeAt = function (p, not) {
+      var hit = null; (kmState.lay ? kmState.lay.nodes : []).forEach(function (n) { if (n.id !== not && Math.hypot(n.x - p.x, n.y - p.y) < n.r + 8) hit = n; }); return hit;
+    };
+    var target = function (id) { svg.querySelectorAll('.km__node.is-target').forEach(function (x) { x.classList.remove('is-target'); }); if (id) { var el = svg.querySelector('[data-km-node="' + id + '"]'); if (el) el.classList.add('is-target'); } };
     svg.addEventListener('pointerdown', function (ev) {
       if (ev.button !== 0) return;
+      var h = kmAdmin() && ev.target.closest && ev.target.closest('[data-km-handle]');
       var n = ev.target.closest && ev.target.closest('[data-km-node]');
-      drag = { sx: ev.clientX, sy: ev.clientY, vx: kmState.vb.x, vy: kmState.vb.y, moved: false, node: n ? n.getAttribute('data-km-node') : '' };
+      drag = { sx: ev.clientX, sy: ev.clientY, vx: kmState.vb.x, vy: kmState.vb.y, moved: false, node: n ? n.getAttribute('data-km-node') : '', link: h ? h.getAttribute('data-km-handle') : '', el: n };
+      if (h) ev.stopPropagation();
       try { svg.setPointerCapture(ev.pointerId); } catch (e) {}
     });
     svg.addEventListener('pointermove', function (ev) {
@@ -185,15 +200,47 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
       var r = svg.getBoundingClientRect(), dx = ev.clientX - drag.sx, dy = ev.clientY - drag.sy;
       if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
       if (!drag.moved) return;
+      var p = pt(ev), from = kmState.lay && kmState.lay.nodes.filter(function (x) { return x.id === (drag.link || drag.node); })[0];
+      if (drag.link && from) {
+        var gl = svg.querySelector('.km__ghost');
+        if (!gl) { gl = document.createElementNS('http://www.w3.org/2000/svg', 'line'); gl.setAttribute('class', 'km__ghost'); svg.appendChild(gl); }
+        gl.setAttribute('x1', from.x); gl.setAttribute('y1', from.y); gl.setAttribute('x2', p.x); gl.setAttribute('y2', p.y);
+        var to = nodeAt(p, drag.link); target(to ? to.id : '');
+        return;
+      }
+      if (drag.node && kmAdmin() && from) {
+        drag.el.setAttribute('transform', 'translate(' + (p.x - from.x).toFixed(1) + ',' + (p.y - from.y).toFixed(1) + ')');
+        drag.el.classList.add('is-moving');
+        var on = nodeAt(p, drag.node); target(on ? on.id : '');
+        return;
+      }
       kmState.vb.x = drag.vx - dx / r.width * kmState.vb.w; kmState.vb.y = drag.vy - dy / r.height * kmState.vb.h; kmApplyVb();
       svg.classList.add('is-dragging');
     });
-    svg.addEventListener('pointerup', function () {
-      var was = drag; drag = null; svg.classList.remove('is-dragging');
-      if (!was || was.moved || !was.node || was.node === kmState.focus) return;
+    svg.addEventListener('pointerup', function (ev) {
+      var was = drag; drag = null; svg.classList.remove('is-dragging'); target('');
+      if (!was) return;
+      var p = pt(ev);
+      if (was.link) {
+        var gl = svg.querySelector('.km__ghost'); if (gl) gl.remove();
+        var to = was.moved && nodeAt(p, was.link);
+        if (to) kcConnect(was.link, to.id, ev.clientX, ev.clientY);
+        return;
+      }
+      if (was.moved && was.node && kmAdmin()) {
+        if (was.el) { was.el.removeAttribute('transform'); was.el.classList.remove('is-moving'); }
+        var into = nodeAt(p, was.node);
+        if (into) kcMergeAsk(was.node, into.id);
+        return;
+      }
+      if (was.moved || !was.node || was.node === kmState.focus) return;
       kmGo(was.node, 'push');
     });
-    svg.addEventListener('pointercancel', function () { drag = null; svg.classList.remove('is-dragging'); });
+    svg.addEventListener('pointercancel', function () { drag = null; svg.classList.remove('is-dragging'); target(''); });
+    svg.addEventListener('dblclick', function (ev) {
+      if (!kmAdmin() || (ev.target.closest && ev.target.closest('[data-km-node]'))) return;
+      kcCreateAt(ev.clientX, ev.clientY, kmState.focus);
+    });
     svg.addEventListener('wheel', function (ev) {
       ev.preventDefault();
       var p = pt(ev), v = kmState.vb, k = ev.deltaY > 0 ? 1.12 : 1 / 1.12;
@@ -209,14 +256,17 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
       + kmState.types.map(function (ty) {
         return '<button class="km__chip' + (kmState.type === ty ? ' is-on' : '') + '" data-km-type="' + esc(ty) + '" type="button">' + kmDot(ty) + esc(kmTypeLabel(ty)) + '<span class="km__cnt">' + Number(kmState.counts[ty] || 0).toLocaleString() + '</span></button>';
       }).join('');
-    var list = (kmState.hits || kmState.top).filter(function (e) { return !kmState.type || e.type === kmState.type; });
+    var stat = '<div class="wsx__modetog km__status" role="group">' + [['', 'kmap.statusAll'], ['confirmed', 'kmap.statusConfirmed'], ['draft', 'kmap.statusDraft']].map(function (o) {
+      return '<button class="' + (kmState.status === o[0] ? 'is-on' : '') + '" data-km-status="' + o[0] + '" type="button">' + esc(kt(o[1])) + '</button>';
+    }).join('') + '</div>';
+    var list = (kmState.hits || kmState.top).filter(function (e) { return (!kmState.type || e.type === kmState.type) && (!kmState.status || (kmState.status === 'confirmed') === (e.status === 'confirmed')); });
     var items = list.length ? list.map(function (e, i) {
-      return '<button class="km__item' + (e.id === kmState.focus ? ' is-on' : '') + (i === kmState.active ? ' is-active' : '') + '" data-km-go="' + esc(e.id) + '" type="button">'
-        + kmDot(e.type) + '<span class="km__iname">' + esc(e.name) + '</span><span class="km__itype">' + esc(kmTypeLabel(e.type)) + '</span></button>';
+      return '<button class="km__item' + (e.id === kmState.focus ? ' is-on' : '') + (i === kmState.active ? ' is-active' : '') + (e.status === 'confirmed' ? '' : ' is-draft') + '" data-km-go="' + esc(e.id) + '" type="button">'
+        + kmDot(e.type, e.status !== 'confirmed') + '<span class="km__iname">' + esc(e.name) + '</span><span class="km__itype">' + esc(kmTypeLabel(e.type)) + '</span></button>';
     }).join('') : '<div class="km__none">' + esc(t('kmap.noResults')) + '</div>';
     var had = document.getElementById('kmSearch'), hadFocus = had && document.activeElement === had, sel = had ? [had.selectionStart, had.selectionEnd] : null;
     host.innerHTML = '<input class="wsx-cat__search km__search" id="kmSearch" type="search" placeholder="' + esc(t('kmap.searchPlaceholder')) + '" autocomplete="off" value="' + esc(kmState.q) + '">'
-      + '<div class="km__chips">' + chips + '</div>'
+      + stat + '<div class="km__chips">' + chips + '</div>'
       + '<div class="km__lh">' + esc(t(kmState.hits ? 'kmap.results' : 'kmap.mostMentioned')) + '</div>'
       + '<div class="km__list" id="kmList">' + items + '</div>';
     var s = document.getElementById('kmSearch');
@@ -242,18 +292,21 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
       b.addEventListener('click', function () { kmState.type = b.getAttribute('data-km-type'); kmState.active = -1; kmPaintFinder(); kmPaintCanvas(); });
     });
     host.querySelectorAll('[data-km-go]').forEach(function (b) { b.addEventListener('click', function () { kmGo(b.getAttribute('data-km-go'), 'reset'); }); });
+    host.querySelectorAll('[data-km-status]').forEach(function (b) {
+      b.addEventListener('click', function () { kmState.status = b.getAttribute('data-km-status'); kmState.active = -1; kmLoadTypes(function () { kmPaintFinder(); }); });
+    });
   }
 
   function kmSearch() {
     var q = kmState.q, my = ++kmReq;
-    fetch(knBase() + '/entities?limit=30&q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+    fetch(knBase() + '/entities?limit=30&q=' + encodeURIComponent(q) + (kmState.status ? '&status=' + kmState.status : ''), { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) { if (my !== kmReq || kmState.q !== q) return; kmState.hits = (d && d.entities) || []; kmRemember(kmState.hits); kmPaintFinder(); })
       .catch(function () {});
   }
 
   function kmLoadTypes(cb) {
-    fetch(knBase() + '/entities?limit=40', { credentials: 'same-origin' })
+    fetch(knBase() + '/entities?limit=40' + (kmState.status ? '&status=' + kmState.status : ''), { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
         if (!d) { cb(false); return; }
@@ -315,21 +368,39 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
     }
     return '<span class="km__src km__src--file"><span class="so-c-badge wsx-kn__bdg">' + esc(t('kmap.file')) + '</span>' + esc(src.title) + '</span>';
   }
-  function kmSection(title, count, body) {
-    return '<section class="km__sec"><h4 class="km__h4">' + esc(title) + '<span class="km__cnt">' + Number(count || 0).toLocaleString() + '</span></h4>' + body + '</section>';
+  function kmSection(title, count, body, action) {
+    return '<section class="km__sec"><h4 class="km__h4">' + esc(title) + '<span class="km__cnt">' + Number(count || 0).toLocaleString() + '</span>' + (action || '') + '</h4>' + body + '</section>';
   }
   function kmPaintPanel(d) {
     var host = document.getElementById('kmPanel'); if (!host) return;
+    var admin = kmAdmin();
     var e = d.entity || {}, aliases = (e.aliases || []).filter(function (a) { return a && a !== e.name; });
-    var head = '<div class="km__phead">' + kmDot(e.type) + '<span class="wsx-atbl__type">' + esc(kmTypeLabel(e.type)) + '</span><span class="km__pm">' + esc(kmMentions(e.mentions)) + '</span></div>'
-      + '<h3 class="km__pname">' + esc(e.name || '') + '</h3>'
-      + (aliases.length ? '<div class="km__aka">' + esc(t('kmap.alsoKnownAs')) + ' ' + esc(aliases.slice(0, 6).join(', ')) + '</div>' : '');
+    var top = kcPanelTop(d);
+    var typeHtml = admin
+      ? '<select class="so-c-select kc-type" data-kc-type aria-label="' + esc(kt('kcur.type')) + '">' + kcTypes(e.type).map(function (ty) { return '<option value="' + esc(ty) + '"' + (ty === e.type ? ' selected' : '') + '>' + esc(kmTypeLabel(ty)) + '</option>'; }).join('') + '</select>'
+      : '<span class="wsx-atbl__type">' + esc(kmTypeLabel(e.type)) + '</span>';
+    var head = top.box + '<div class="km__phead">' + kmDot(e.type, e.status !== 'confirmed') + typeHtml + '<span class="km__pm">' + esc(kmMentions(e.mentions)) + '</span></div>'
+      + '<h3 class="km__pname' + (admin ? ' is-edit' : '') + '"' + (admin ? ' data-kc-name title="' + esc(kt('kcur.rename')) + '"' : '') + '>' + esc(e.name || '') + '</h3>'
+      + (admin ? top.aliases : (aliases.length ? '<div class="km__aka">' + esc(t('kmap.alsoKnownAs')) + ' ' + esc(aliases.slice(0, 6).join(', ')) + '</div>' : ''))
+      + top.def;
     var facts = (d.facts || []);
+    // A learned value that differs from the team's for the same thing: show both, the team decides.
+    var teamVal = {}, backing = {};
+    facts.forEach(function (f) { if (f.status === 'confirmed') teamVal[f.predicate] = f.value; });
+    facts = facts.filter(function (f) {
+      if (f.status === 'confirmed' || teamVal[f.predicate] !== f.value) return true;
+      if (!backing[f.predicate]) backing[f.predicate] = f;
+      return false;
+    }).map(function (f) { var b = f.status === 'confirmed' && backing[f.predicate]; return b ? Object.assign({}, f, { quote: b.quote, source: b.source }) : f; });
     var fbody = facts.length ? facts.map(function (f) {
       var since = f.validFrom ? '<span class="km__since">' + esc(t('kmap.since').replace('{d}', fmtDay(f.validFrom, true) || f.validFrom)) + '</span>' : '';
-      return '<div class="km__fact"><div class="km__fk">' + esc(kmHuman(f.predicate)) + '</div>'
+      var team = f.status === 'confirmed', clash = !team && teamVal[f.predicate] != null && teamVal[f.predicate] !== f.value;
+      var acts = admin ? (team ? '<span class="km__acts"><button class="kc-ib" type="button" data-kc-fno="' + esc(f.id) + '" title="' + esc(kt('kcur.remove')) + '">\\u2715</button></span>'
+        : '<span class="km__acts"><button class="kc-ib is-ok" type="button" data-kc-fok="' + esc(f.id) + '" title="' + esc(kt(clash ? 'kcur.useThis' : 'kcur.confirm')) + '">\\u2713</button><button class="kc-ib" type="button" data-kc-fno="' + esc(f.id) + '" title="' + esc(kt(clash ? 'kcur.keepOurs' : 'kcur.discard')) + '">\\u2715</button></span>') : '';
+      return '<div class="km__fact' + (team ? ' is-team' : ' is-draft') + (clash ? ' is-clash' : '') + '"><div class="km__fk">' + esc(kmHuman(f.predicate)) + (team ? ' <span class="so-c-badge wsx-kn__bdg">' + esc(kt('kcur.teamFact')) + '</span>' : '') + acts + '</div>'
         + '<div class="km__fv">' + esc(f.value) + (f.unit ? ' <span class="km__unit">' + esc(f.unit) + '</span>' : '') + since + '</div>'
-        + (f.quote ? '<blockquote class="km__q">\\u201C' + esc(kmPlain(f.quote)) + '\\u201D</blockquote>' : '') + kmSrc(f.source) + '</div>';
+        + (clash ? '<div class="kc-clash">' + esc(kt('kcur.conflict').replace('{v}', teamVal[f.predicate])) + '</div>' : '')
+        + (f.quote ? '<blockquote class="km__q">\\u201C' + esc(kmPlain(f.quote)) + '\\u201D</blockquote>' : '') + (f.source ? kmSrc(f.source) : '') + '</div>';
     }).join('') : '<div class="km__none">' + esc(t('kmap.noFacts')) + '</div>';
     var groups = {}, order = [];
     (d.relations || []).forEach(function (r) {
@@ -339,7 +410,9 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
       var rs = groups[k], first = rs[0], inn = first.direction === 'in';
       return '<div class="km__group"><div class="km__gh" title="' + esc(t(inn ? 'kmap.incoming' : 'kmap.outgoing')) + '"><span class="km__arrow">' + (inn ? '\\u2190' : '\\u2192') + '</span>' + esc(kmRelLabel(first.type)) + '<span class="km__cnt">' + rs.length + '</span></div>'
         + rs.map(function (r) {
-          return '<button class="km__item" type="button" data-km-go="' + esc(r.other.id) + '">' + kmDot(r.other.type) + '<span class="km__iname">' + esc(r.other.name) + '</span><span class="km__itype">' + esc(kmTypeLabel(r.other.type)) + '</span></button>';
+          var draft = r.status !== 'confirmed';
+          var acts = admin ? '<span class="km__acts">' + (draft ? '<button class="kc-ib is-ok" type="button" data-kc-rok="' + esc(r.id) + '" title="' + esc(kt('kcur.confirm')) + '">\\u2713</button>' : '') + '<button class="kc-ib" type="button" data-kc-rno="' + esc(r.id) + '" title="' + esc(kt('kcur.remove')) + '">\\u2715</button></span>' : '';
+          return '<div class="km__crow' + (draft ? ' is-draft' : '') + '"><button class="km__item" type="button" data-km-go="' + esc(r.other.id) + '">' + kmDot(r.other.type, r.other.status !== 'confirmed') + '<span class="km__iname">' + esc(r.other.name) + '</span><span class="km__itype">' + esc(kmTypeLabel(r.other.type)) + '</span></button>' + acts + '</div>';
         }).join('') + '</div>';
     }).join('') : '<div class="km__none">' + esc(t('kmap.noConnections')) + '</div>';
     var ms = (d.mentions || []), LIMIT = 6;
@@ -347,7 +420,13 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
     var mbody = ms.length ? ms.slice(0, LIMIT).map(mrow).join('')
       + (ms.length > LIMIT ? '<div class="km__more" id="kmMore">' + ms.slice(LIMIT).map(mrow).join('') + '</div><button class="wsx-link km__morebtn" id="kmMoreBtn" type="button">' + esc(t('kmap.showMore').replace('{n}', (ms.length - LIMIT).toLocaleString())) + '</button>' : '')
       : '<div class="km__none">' + esc(t('kmap.noMentions')) + '</div>';
-    host.innerHTML = head + kmSection(t('kmap.facts'), facts.length, fbody) + kmSection(t('kmap.connections'), (d.relations || []).length, cbody) + kmSection(t('kmap.mentions'), ms.length, mbody);
+    var addBtn = function (attr, key) { return admin ? '<button class="wsx-link km__add" type="button" ' + attr + '>' + esc(kt(key)) + '</button>' : ''; };
+    var foot = admin ? '<section class="km__sec"><h4 class="km__h4">' + esc(kt('kcur.history')) + '</h4><div id="kcHist">' + i18nLoad() + '</div></section>'
+      + '<div class="km__foot"><button class="so-c-btn so-c-btn--sm" type="button" data-kc-merge>' + esc(kt('kcur.mergeInto')) + '</button>'
+      + (e.status === 'confirmed' ? '<button class="so-c-btn so-c-btn--sm km__danger" type="button" data-kc-discard2>' + esc(kt('kcur.discard')) + '</button>' : '') + '</div>' : '';
+    host.innerHTML = head + kmSection(t('kmap.facts'), facts.length, fbody, addBtn('data-kc-fact', 'kcur.addFact'))
+      + kmSection(t('kmap.connections'), (d.relations || []).length, cbody, addBtn('data-kc-conn', 'kcur.addConn'))
+      + kmSection(t('kmap.mentions'), ms.length, mbody) + foot;
     host.scrollTop = 0;
     host.querySelectorAll('[data-km-go]').forEach(function (b) { b.addEventListener('click', function () { kmGo(b.getAttribute('data-km-go'), 'push'); }); });
     host.querySelectorAll('[data-km-open-id]').forEach(function (b) {
@@ -358,6 +437,7 @@ export const workspace_client_home_views_knowledgeMap_JS = `  // ----- Knowledge
     });
     var more = document.getElementById('kmMoreBtn');
     if (more) more.addEventListener('click', function () { var x = document.getElementById('kmMore'); if (x) x.classList.add('is-open'); more.remove(); });
+    kcBindPanel(host, d);
   }
 
   // ---- Shell: called by knRenderShell when the view toggle is on Map ----
