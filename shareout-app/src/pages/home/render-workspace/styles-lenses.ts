@@ -235,6 +235,10 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 .wsx-admin__budget.is-reached .wsx-admin__budgetstate { color: var(--color-error); }
 .wsx-admin__seatfill { height: 100%; background: var(--color-primary); border-radius: 2px; }
 /* Admin badge extras */
+.wsx-opbadge { display: inline-flex; align-items: center; font: 600 var(--text-xs) var(--font-body); padding: 2px 9px; border-radius: 999px; background: var(--color-text); color: var(--color-bg); white-space: nowrap; vertical-align: 1px; }
+.wsx-opzone { border: 1px dashed var(--color-border-strong); border-radius: var(--radius-lg); padding: 12px 14px 4px; margin: 0 0 20px; }
+.wsx-opzone__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.wsx-opzone__sub { font: var(--text-xs) var(--font-body); color: var(--color-text-tertiary); }
 .wsx-admin__rolebadge.is-trial { background: color-mix(in srgb, var(--color-warning) 14%, transparent); color: var(--color-warning); }
 .wsx-admin__rolebadge.is-warn { background: color-mix(in srgb, var(--color-error) 14%, transparent); color: var(--color-error); }
 /* Artifacts governance table */

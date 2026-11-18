@@ -7,7 +7,7 @@ export const workspace_client_home_views_adminCore_JS = `  // ----- Admin — si
   function wsUrl(suffix) { return '/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + suffix; }
   var adminTab = 'members', adFocus = null;
   // One sidebar entry = one page = the panels it paints. Old tab keys still resolve (deep links, ⌘K, emails).
-  var AD_SECTIONS = { summary: ['summary'], members: ['members'], clients: ['clients'], support: ['support'], artifacts: ['artifacts'], automation: ['automation'], billing: ['usage', 'billing', 'billprofile'], ai: ['ai'], access: ['security'], publishing: ['security', 'settings'], tokens: ['security'], audit: ['security'], general: ['settings'], branding: ['settings'], domains: ['domains'] };
+  var AD_SECTIONS = { summary: ['summary'], members: ['members'], clients: ['clients'], support: ['support'], artifacts: ['artifacts'], automation: ['automation'], billing: ['usage', 'aireport', 'billing', 'billprofile'], ai: ['ai'], access: ['security'], publishing: ['security', 'settings'], tokens: ['security'], audit: ['security'], general: ['settings'], branding: ['settings'], domains: ['domains'] };
   var AD_ALIAS = { overview: 'members', people: 'members', usage: 'billing', security: 'access', settings: 'general' };
   function adGroupOf(k) { return AD_SECTIONS[k] ? k : (AD_ALIAS[k] || 'members'); }
   function adHas(k) { return AD_SECTIONS[adminTab].indexOf(k) >= 0; }
@@ -943,7 +943,7 @@ export const workspace_client_home_views_admin_JS = `  var AD_COPY = ${JSON.stri
     }, run);
   }
   function loadAdmin() {
-    var fnMap = { summary: adSummary, billprofile: adBillProfile, artifacts: adArtifacts, members: adMembers, clients: adClients, automation: adAutomation, ai: adAI, security: adSecurity, usage: adUsage, billing: adBilling, support: adSupport, settings: adSettings, domains: adDomains };
+    var fnMap = { summary: adSummary, billprofile: adBillProfile, artifacts: adArtifacts, members: adMembers, clients: adClients, automation: adAutomation, ai: adAI, security: adSecurity, usage: adUsage, aireport: adAiReport, billing: adBilling, support: adSupport, settings: adSettings, domains: adDomains };
     var keys = AD_SECTIONS[adminTab], focus = adFocus; adFocus = null;
     var mount = document.getElementById('wsxAdminMount'); if (!mount) return;
     var act = adminTab === 'members' ? '<div class="wsx-adm__act"><button class="wsx-abtn wsx-abtn--primary" id="wsxInviteBtn" type="button">' + esc(t('invite.cta')) + '</button></div>' : '';

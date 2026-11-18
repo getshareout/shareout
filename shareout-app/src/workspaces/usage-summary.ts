@@ -13,6 +13,7 @@
 
 import type { Env, WorkspaceRole } from '../types';
 import { resell } from '../data/ai-markup';
+import { pendingAiCost } from '../data/ai-pending';
 
 export const MAX_SUMMARY_VIEWERS = 50;
 const TOP_PAGES = 50;
@@ -194,6 +195,11 @@ export async function getUsageSummary(env: Env, ws: string, month: string, bps: 
   const members = rows(1) as unknown as Member[];
   const curRows = cur.map((_, i) => rows(fixed.length + i) as unknown as PerUser[]);
   const prevRows = before.map((_, i) => rows(fixed.length + cur.length + i) as unknown as PerUser[]);
+  // Calls the hourly reconcile has not priced yet count at list price, as in the AI budget and invoices.
+  const [curPending, prevPending] = await Promise.all([pendingAiCost(env, ws, from, to, 'user_id'), pendingAiCost(env, ws, pr.from, pr.to, 'user_id')]);
+  for (const [list, pending] of [[curRows[4]!, curPending], [prevRows[4]!, prevPending]] as const) {
+    for (const r of list) r.cost = num(r.cost) + (pending.get(r.user_id) ?? 0);
+  }
   const thisMonth = rollUp(month, members, curRows, bps);
   const lastMonth = rollUp(prev, members, prevRows, bps);
   const files = curRows[5]!, lookups = curRows[4]!.reduce((n, r) => n + num(r.lookups), 0);

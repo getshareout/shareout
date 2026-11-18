@@ -29,6 +29,10 @@ const CREW_REPEAT_WINDOW_MS = 12 * 3600_000;
 // (workers-types). We only ever produce `disposition: 'attachment'` (CSV as a raw
 // string, PDF as an ArrayBuffer).
 
+/** Paper sizes a rendered PDF attachment can be paginated at. */
+export const PDF_FORMATS = ['A4', 'Letter', 'Legal'] as const;
+export type PdfFormat = (typeof PDF_FORMATS)[number];
+
 export interface EmailConfig {
   recipients: string[];
   subject?: string;
@@ -44,6 +48,11 @@ export interface EmailConfig {
   template_data?: Record<string, unknown>;
   /** Server-render the live artifact to PDF and attach it (re-runs data via the workspace connection). */
   renderPdf?: boolean;
+  /** Paginate the PDF at this paper size with the page's print CSS (`@media print`, `@page`).
+   *  Unset = one continuous page of the screen layout. */
+  pdfFormat?: PdfFormat;
+  /** Landscape pages when pdfFormat is set (default portrait). */
+  pdfLandscape?: boolean;
   /** Attach the artifact's window.__shareoutExport.csv (re-rendered). */
   attachArtifactCsv?: boolean;
   /** Use the artifact's window.__shareoutExport.emailHtml/Subject as the email body. */
@@ -289,7 +298,8 @@ export async function sendArtifactEmail(
   // the email body, a PDF attachment, and a CSV attachment.
   const attachments: EmailAttachment[] = [];
   if (config.renderPdf || config.attachArtifactCsv || config.useArtifactEmailHtml) {
-    const captured = await captureArtifactReport(env, artifactId);
+    const captured = await captureArtifactReport(env, artifactId,
+      config.pdfFormat ? { format: config.pdfFormat, landscape: config.pdfLandscape === true } : {});
     if (config.useArtifactEmailHtml && captured.data?.emailHtml) {
       htmlContent = captured.data.emailHtml;
       if (captured.data.emailSubject) subjectContent = captured.data.emailSubject;

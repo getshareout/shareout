@@ -68,6 +68,7 @@ describe('Admin Usage: AI budget', () => {
     const html = m.els.wsxAdminMount.innerHTML!;
     expect(html).toContain('data-op-note');
     expect(html).toContain('AI cost $55.00 · margin $27.50 · markup 1.5×');
+    expect(html).toContain('data-op-badge');
   });
 
   it('shows no cost line without operator data', async () => {
@@ -75,6 +76,7 @@ describe('Admin Usage: AI budget', () => {
     m.adUsage();
     await m.done();
     expect(m.els.wsxAdminMount.innerHTML!).not.toContain('data-op-note');
+    expect(m.els.wsxAdminMount.innerHTML!).not.toContain('data-op-badge');
   });
 
   it('shows a member only their own row, no edit control and no per-kind table', async () => {

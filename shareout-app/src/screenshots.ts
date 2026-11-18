@@ -40,6 +40,8 @@ export interface RenderOptions extends WaitOptions {
 export interface PdfOptions extends WaitOptions {
   width?: number;
   height?: number;
+  /** Paginate at this paper size (e.g. 'A4') with the page's print CSS. Unset = one
+   *  continuous page of the screen layout. */
   format?: string;
   landscape?: boolean;
 }
@@ -291,7 +293,41 @@ export async function renderArtifactImage(
   });
 }
 
-/** Render an artifact's production page to PDF bytes (captures screen layout). */
+// One continuous page sized to the full content, so the whole dashboard is captured
+// (not just the first screen). Printed with screen styles so it looks like the live
+// page, not its print CSS. A page's own top-level `@page { size: A4 }` applies even
+// under screen media: Chromium lays out at A4, shrinks it into this page and keeps
+// only the first sheet. So the capture overrides @page with the content size.
+async function continuousPdf(page: RenderPage, minWidth: number, minHeight: number): Promise<ArrayBuffer> {
+  await page.emulateMediaType('screen').catch(() => {});
+  const dims = await growToContent(page, 2000, 18000);
+  const width = `${Math.max(dims.w, minWidth)}px`;
+  const height = `${Math.max(dims.h, minHeight)}px`;
+  await page.addStyleTag({ content: `@page { size: ${width} ${height} !important; margin: 0 !important; }` }).catch(() => {});
+  return (await page.pdf({
+    printBackground: true,
+    width,
+    height,
+    pageRanges: '1',
+    margin: { top: '0', bottom: '0', left: '0', right: '0' },
+  } as Parameters<typeof page.pdf>[0])) as unknown as ArrayBuffer;
+}
+
+// Paginated at a paper size with the page's own print CSS. A `@page` size and margins
+// win over `format` (preferCSSPageSize); no margin is added here so they aren't doubled.
+async function paperPdf(page: RenderPage, format: string, landscape: boolean): Promise<ArrayBuffer> {
+  await page.emulateMediaType('print').catch(() => {});
+  return (await page.pdf({
+    printBackground: true,
+    format,
+    landscape,
+    preferCSSPageSize: true,
+    margin: { top: '0', bottom: '0', left: '0', right: '0' },
+  } as Parameters<typeof page.pdf>[0])) as unknown as ArrayBuffer;
+}
+
+/** Render an artifact's production page to PDF bytes: one continuous page of the
+ *  screen layout, or paginated at `opts.format` (landscape unless `landscape: false`). */
 export async function renderArtifactPdf(
   env: Env,
   artifactId: string,
@@ -302,34 +338,8 @@ export async function renderArtifactPdf(
   // PDF renders need more headroom than thumbnails — data must be fully loaded.
   const waits: WaitOptions = { idleTimeout: opts.idleTimeout ?? 12000, settleMs: opts.settleMs ?? 1500 };
 
-  return withArtifactPage(env, artifactId, { width, height }, waits, async (page) => {
-    // Print with screen styles so dashboards look like the live page, not print CSS.
-    await page.emulateMediaType('screen').catch(() => {});
-
-    // If a paper format is explicitly requested, paginate normally.
-    if (opts.format) {
-      return (await page.pdf({
-        printBackground: true,
-        format: opts.format,
-        landscape: opts.landscape ?? true,
-        margin: { top: '12px', bottom: '12px', left: '12px', right: '12px' },
-      } as Parameters<typeof page.pdf>[0])) as unknown as ArrayBuffer;
-    }
-
-    // Default: one continuous page sized to the full content, so the whole
-    // dashboard is captured (not just the first screen).
-    const dims = await growToContent(page, 2000, 18000);
-    const pdfWidth = Math.max(dims.w, width);
-    const pdfHeight = Math.max(dims.h, height);
-
-    return (await page.pdf({
-      printBackground: true,
-      width: `${pdfWidth}px`,
-      height: `${pdfHeight}px`,
-      pageRanges: '1',
-      margin: { top: '0', bottom: '0', left: '0', right: '0' },
-    } as Parameters<typeof page.pdf>[0])) as unknown as ArrayBuffer;
-  });
+  return withArtifactPage(env, artifactId, { width, height }, waits, (page) =>
+    opts.format ? paperPdf(page, opts.format, opts.landscape ?? true) : continuousPdf(page, width, height));
 }
 
 /**
@@ -346,17 +356,20 @@ export interface ArtifactExport {
 }
 
 export interface CapturedReport {
-  /** Full-content PDF of the rendered page, or null if BROWSER is unbound / render failed. */
+  /** PDF of the rendered page (full content, or paginated at `opts.format`), or null if
+   *  BROWSER is unbound / render failed. */
   pdf: ArrayBuffer | null;
   /** Whatever the artifact published on window.__shareoutExport, or null. */
   data: ArtifactExport | null;
 }
 
 /**
- * Render an artifact's live page once and return BOTH a full-content PDF and the
- * artifact's `window.__shareoutExport` payload. Used by scheduled delivery so a
- * single headless render (under the read-only capture session — the page reloads
- * this artifact's data) yields the PDF, the email HTML, and the CSV together.
+ * Render an artifact's live page once and return BOTH a PDF and the artifact's
+ * `window.__shareoutExport` payload. Used by scheduled delivery so a single headless
+ * render (under the read-only capture session — the page reloads this artifact's
+ * data) yields the PDF, the email HTML, and the CSV together. The PDF is one
+ * continuous page of the screen layout, or paginated at `opts.format` (portrait
+ * unless `landscape: true`) with the page's print CSS.
  */
 export async function captureArtifactReport(
   env: Env,
@@ -373,15 +386,9 @@ export async function captureArtifactReport(
       return e && typeof e === 'object' ? e : null;
     }).catch(() => null)) as ArtifactExport | null;
 
-    await page.emulateMediaType('screen').catch(() => {});
-    const dims = await growToContent(page, 2000, 18000);
-    const pdf = (await page.pdf({
-      printBackground: true,
-      width: `${Math.max(dims.w, width)}px`,
-      height: `${Math.max(dims.h, height)}px`,
-      pageRanges: '1',
-      margin: { top: '0', bottom: '0', left: '0', right: '0' },
-    } as Parameters<typeof page.pdf>[0])) as unknown as ArrayBuffer;
+    const pdf = opts.format
+      ? await paperPdf(page, opts.format, opts.landscape ?? false)
+      : await continuousPdf(page, width, height);
 
     return { pdf, data };
   });

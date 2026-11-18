@@ -170,6 +170,8 @@ interface EmailConfig {
   useArtifactEmailHtml?: boolean; // Use window.__shareoutExport.emailHtml/emailSubject as the body
   attachArtifactCsv?: boolean;    // Attach window.__shareoutExport.csv
   renderPdf?: boolean;            // Attach a full-height PDF of the rendered page
+  pdfFormat?: 'A4' | 'Letter' | 'Legal'; // Paginate that PDF at this paper size with the page's print CSS
+  pdfLandscape?: boolean;         // With pdfFormat; default portrait
   pdfFilename?: string;
   template_id?: string;           // Use email template (see /v1/templates)
   template_data?: Record<string, unknown>;  // Variables for template interpolation
@@ -197,6 +199,8 @@ Contract — every one of these is load-bearing (omitting any silently falls bac
 - **Set `window.__shareoutReady = true`** once the page has rendered with data — in *every* code path (success, empty, and error). The renderer waits for this flag before capturing; without it the capture races your async data load and grabs nothing. Report emails always wait for it (up to 12 s); other captures (thumbnails, PDFs, verify) wait only for a page that visibly uses it — the flag is defined at load or an inline script mentions it — so if you set it from a separate `.js` file after async work, also put `window.__shareoutReady = false;` in an inline `<script>` at the top of the page.
 - **Inline every style in `emailHtml`.** Use table-based layout for KPI rows/grids (Outlook ignores fl/grid). The on-page CSS in `<style>`/`<head>` is for the dashboard view only.
 - Keep `html` set to a short plain fallback (e.g. `"<p>Report attached.</p>"`) — it ships only if the render fails, so seeing it in your inbox means the contract above broke.
+
+`renderPdf: true` attaches one continuous page of the screen layout; add `pdfFormat: 'A4'` (or `'Letter'` / `'Legal'`) to get a paginated PDF printed with the page's own `@media print` CSS instead, where a `@page { size; margin }` rule wins over `pdfFormat`.
 
 Pair this with a `query_snapshot` job a bit earlier in the day to refresh the json the page reads (see [QuerySnapshotConfig](#querysnapshotconfig)). Verify a real send with `POST /v1/jobs/{id}/run` and read the delivered email — a successful job status only means it sent *something*, not that the live body was captured.
 

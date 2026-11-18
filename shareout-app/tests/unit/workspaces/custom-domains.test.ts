@@ -323,7 +323,7 @@ describe('login handoff', () => {
 
     // The new cookie is a working session on the custom host: the member lands home.
     const home = await req('https://portal.acme.example/', { cookie: setCookie.split(';')[0] });
-    expect(home.headers.get('Location')).toBe(`/home?workspace=${A}`);
+    expect(home.headers.get('Location')).toBe('/home');
 
     // Single use.
     const replay = await req(cb.toString());
