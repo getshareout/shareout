@@ -117,7 +117,8 @@ describe('a first run', () => {
     expect(r.status).toBe(201);
     expect(r.body).toMatchObject({ ok: true, created: true, workspace: { name: 'Acme', slug: 'acme', locale: 'es' } });
     expect(r.body.links.subdomain).toBe('https://acme.shareout.test/');
-    expect(r.body.links.home).toContain(`/home?workspace=${id}`);
+    expect(r.body.links.home).toBe('https://acme.shareout.test/home');
+    expect(r.body.links.admin).toBe('https://acme.shareout.test/home#l/admin');
     expect(r.body.duration_ms).toBeLessThan(10_000);
     const row = await e.DB.prepare('SELECT locale, subdomain_enabled, owner_id FROM workspaces WHERE id = ?').bind(id).first<any>();
     expect(row).toMatchObject({ locale: 'es', subdomain_enabled: 1 });
@@ -269,6 +270,14 @@ describe('partial failure', () => {
     expect(ana).toMatchObject({ status: 'invited', email_sent: false });
     expect(ana.invite_url).toMatch(/\/invite\//);
     expect(r.body.next_steps.join(' ')).toContain(ana.invite_url);
+  });
+
+  it('links to the apex home with the workspace id when the subdomain is off', async () => {
+    const r = await provision(spec('nosub', { subdomain: false, connectors: [] }));
+    const id = await wsId('nosub');
+    expect(r.body.links.subdomain).toBeNull();
+    expect(r.body.links.home).toBe(`https://shareout.test/home?workspace=${id}`);
+    expect(r.body.links.admin).toBe(`https://shareout.test/home?workspace=${id}#l/admin`);
   });
 });
 

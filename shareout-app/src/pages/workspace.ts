@@ -52,9 +52,11 @@ export async function handleWorkspaceLanding(request: Request, env: Env, workspa
   const user = await getSessionUser(request, env);
 
   if (user && await isMember(env, workspace.id, user.id)) {
+    // This runs on the workspace's own host, which already scopes /home to it, so the
+    // link stays clean (no ?workspace=).
     return new Response(null, {
       status: 302,
-      headers: { Location: `/home?workspace=${encodeURIComponent(workspace.id)}`, 'Cache-Control': 'no-store' },
+      headers: { Location: '/home', 'Cache-Control': 'no-store' },
     });
   }
 

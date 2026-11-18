@@ -8,7 +8,8 @@ import { emitJobEvent } from '../scheduling/events';
 import { purgeInbox } from '../email/inbox-store';
 import { validateAccessPolicy } from '../data/access-policy';
 import { canViewArtifact } from '../data/middleware';
-import { deleteKnowledgeFile, requestKnowledgeRebuild } from '../knowledge/store';
+import { deleteKnowledgeFile, isKnowledgeEnabled, requestKnowledgeRebuild } from '../knowledge/store';
+import { enqueueIngest } from '../knowledge/ingest';
 import { deleteKnowledgeVector } from '../knowledge/distill';
 import { artifactDigestPath } from '../knowledge/types';
 import { coerceVisibility, normalizeVisibility } from '../visibility-config';
@@ -359,8 +360,8 @@ export async function handleUpdateArtifact(
   artifactId: string
 ): Promise<Response> {
   const artifact = await env.DB.prepare(
-    'SELECT id, workspace_id, auth_method, owner_id FROM artifacts WHERE id = ?'
-  ).bind(artifactId).first<{ id: string; workspace_id: string | null; owner_id: string | null; auth_method: string | null }>();
+    'SELECT id, workspace_id, auth_method, visibility, owner_id FROM artifacts WHERE id = ?'
+  ).bind(artifactId).first<{ id: string; workspace_id: string | null; owner_id: string | null; auth_method: string | null; visibility: string | null }>();
 
   if (!artifact) {
     return json({ error: 'Artifact not found', code: 'NOT_FOUND' }, 404);
@@ -421,6 +422,7 @@ export async function handleUpdateArtifact(
   let visibilityHeldMessage: string | null = null;
   let approvalRequired: number | null = null;
   let madePrivate = false;
+  let madeShared = false;
   if (body.visibility !== undefined) {
     // Accept legacy 'unlisted' input and fold it into 'public' (retired 2026-07).
     const requested = normalizeVisibility(body.visibility) as Visibility;
@@ -499,6 +501,7 @@ export async function handleUpdateArtifact(
     updates.push('visibility = ?');
     values.push(coerced);
     madePrivate = coerced === 'private';
+    madeShared = artifact.visibility === 'private' && !madePrivate;
   }
 
   if (body.paused !== undefined) {
@@ -546,6 +549,15 @@ export async function handleUpdateArtifact(
     await deleteKnowledgeVector(env, artifact.workspace_id, digest);
     // Notes learned from it are hidden from other members now; rebuild them without it.
     await requestKnowledgeRebuild(env, artifact.workspace_id);
+    // Clear the last share's queue row so sharing it again learns it again.
+    await env.DB.prepare("DELETE FROM knowledge_ingest WHERE workspace_id = ? AND artifact_id = ? AND reason = 'shared'")
+      .bind(artifact.workspace_id, artifactId).run();
+  }
+  if (madeShared && artifact.workspace_id && (await isKnowledgeEnabled(env, artifact.workspace_id))) {
+    // The distiller skipped it while private and nothing else re-queues it: learn the live version now.
+    const live = await env.DB.prepare("SELECT version_id FROM deployments WHERE artifact_id = ? AND channel = 'production'")
+      .bind(artifactId).first<{ version_id: string }>();
+    if (live) await enqueueIngest(env, artifact.workspace_id, artifactId, 'shared', live.version_id);
   }
   if (hasPresentation) await setPresentation(env, artifactId, presentation);
   if (tags) await replaceTags(env, artifactId, tags);
