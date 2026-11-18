@@ -9,9 +9,9 @@ model, like a Tableau extract or Power BI import. For live, mutable, per-row dat
 ## Methods
 
 ```typescript
-get<T>(): Promise<T[]>                                   // ALL rows — whole extract direct-from-R2, parsed for you
+get<T>(): Promise<T[]>                                   // ALL rows — whole extract direct-from-R2, parsed for you; [] if the dataset doesn't exist yet
 page<T>(opts?: { offset?: number; limit?: number }): Promise<DatasetPage<T>>  // Worker-paginated slice
-metadata(): Promise<DatasetMetadata>                     // rowCount, columns, version, size
+metadata(): Promise<DatasetMetadata>                     // rowCount, columns, version, size, updatedAt
 downloadUrl(): Promise<string>                           // short-lived DIRECT-from-R2 URL (raw bytes)
 stream(): Promise<ReadableStream<Uint8Array>>            // Worker-proxied stream (fallback)
 list(): Promise<DatasetSummary[]>
@@ -40,10 +40,45 @@ const url = await sdk.dataset('shipments').downloadUrl();          // raw direct
 const firstHundred = await sdk.dataset('shipments').page({ offset: 0, limit: 100 });
 ```
 
+## Before the first write, and when it last changed
+
+A dataset filled later — by a spreadsheet sync, an emailed file, a scheduled `materialize` — does
+not exist until its first write. `get()` returns `[]` for it, so the page shows an empty state
+instead of breaking; `metadata()`, `page()` and `downloadUrl()` still reject with
+`DATASET_NOT_FOUND` (404), so check `rows.length` rather than catching. A misspelled name also
+reads as `[]`: keep the name identical to the one the sync writes.
+
+```typescript
+interface DatasetMetadata {
+  name: string;
+  format: 'json' | 'csv';
+  sizeBytes: number;
+  version: number;     // +1 on every write
+  rowCount?: number;
+  columns?: string[];
+  createdAt: string;   // ISO 8601
+  updatedAt: string;   // ISO 8601 — when the rows last changed (a sync that finds nothing new doesn't write)
+}
+```
+
+```javascript
+const ds = sdk.dataset('ventas');
+const rows = await ds.get();
+if (!rows.length) showEmpty('Waiting for the first file…');
+else {
+  draw(rows);
+  const { updatedAt } = await ds.metadata();
+  showUpdated(new Date(updatedAt));      // "Updated today 10:32"
+}
+```
+
 ## Creating a dataset
 
 Datasets are written by **materializing** a query or pushing rows — see
-[connections.md](connections.md) `materialize()`. They are read-only via this store.
+[connections.md](connections.md) `materialize()` — or by a spreadsheet kept in sync
+([../integrations/spreadsheet-sync.md](../integrations/spreadsheet-sync.md)) or emailed to the page
+([../integrations/inbound-email.md](../integrations/inbound-email.md#update-a-pages-data-by-email)).
+They are read-only via this store.
 
 ## Limits
 

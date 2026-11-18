@@ -9,6 +9,8 @@ import {
   incrementInboundCount,
   checkInboundRateLimit,
   senderAllowed,
+  recordInboundRejection,
+  INBOUND_MAX_RAW_BYTES,
   type StoredAttachment,
 } from './inbox-store';
 import { ingestSupportEmail } from '../support/email-ingest';
@@ -16,7 +18,7 @@ import { handleWorkspaceInbound } from './workspace-ingest';
 import { handleInvoiceInbound } from './invoice-ingest';
 
 // Max raw message size we accept (Cloudflare Email Routing caps near here anyway).
-const MAX_RAW_BYTES = 25 * 1024 * 1024;
+const MAX_RAW_BYTES = INBOUND_MAX_RAW_BYTES;
 const TEXT_PREVIEW_BYTES = 2048;
 
 // Reserved inbox local-part that opens/continues support tickets instead of routing
@@ -155,12 +157,17 @@ export async function handleInboundEmail(
     message.setReject('Mailbox not found');
     return;
   }
+  // The envelope sender, until the parsed header From is known: enough to tell the page's
+  // editors who tried (the bounce itself only reaches the sender).
+  const envelopeFrom = bareEmail(message.from || '');
   if (!res.inboundEnabled) {
+    await recordInboundRejection(env, res.artifactId, envelopeFrom, 'inbox_off');
     message.setReject('Mailbox not found');
     return;
   }
 
   if (message.rawSize > MAX_RAW_BYTES) {
+    await recordInboundRejection(env, res.artifactId, envelopeFrom, 'too_large');
     message.setReject('Message too large');
     return;
   }
@@ -172,6 +179,7 @@ export async function handleInboundEmail(
   }
 
   if (!(await checkInboundRateLimit(res))) {
+    await recordInboundRejection(env, res.artifactId, envelopeFrom, 'rate_limited');
     message.setReject('Inbox rate limit exceeded');
     return;
   }
@@ -183,6 +191,7 @@ export async function handleInboundEmail(
   const sender = (email.from?.address || '').trim().toLowerCase();
   const verified = senderVerified(cloudflareAuthResults(message.headers), sender);
   if (res.allowlist && !(verified && senderAllowed(sender, res.allowlist))) {
+    await recordInboundRejection(env, res.artifactId, sender || envelopeFrom, senderAllowed(sender, res.allowlist) ? 'unverified' : 'not_allowed');
     message.setReject('Sender not permitted');
     return;
   }

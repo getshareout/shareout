@@ -52,6 +52,8 @@ export const WORKSPACE_LENSES_STYLES = `/* ---- artifact stage (per tab) ---- */
 .wsx-sched__arrow { color: var(--color-text-tertiary); display: inline-flex; }
 .wsx-sched__arrow svg { width: 15px; height: 15px; }
 .wsx-sched__meta { display: flex; flex-wrap: wrap; gap: 14px; font-size: var(--text-xs); color: var(--color-text-tertiary); margin-bottom: 10px; }
+.wsx-sched__addr { max-width: 100%; overflow-x: auto; white-space: nowrap; font: 600 var(--text-xs) var(--font-mono, monospace); color: var(--color-text-secondary); }
+.wsx-sched__addr[hidden] { display: none; }
 .wsx-sched__when { display: inline-flex; align-items: center; gap: 5px; color: var(--color-text-secondary); font-weight: 600; }
 .wsx-sched__when svg { width: 13px; height: 13px; }
 .wsx-runbars { display: flex; align-items: flex-end; gap: 2px; height: 22px; }

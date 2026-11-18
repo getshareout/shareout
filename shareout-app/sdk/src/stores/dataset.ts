@@ -29,9 +29,19 @@ export class Dataset {
    * the browser" model. Falls back to the Worker stream when direct R2 serving is
    * unconfigured or the direct fetch is blocked (e.g. R2 CORS). Use `page()` for
    * server-side pagination of very large datasets.
+   *
+   * A dataset that does not exist yet — a page waiting for the first emailed or synced file —
+   * reads as no rows (`[]`), like `json.get()` reads a missing key as null. `metadata()` still
+   * throws DATASET_NOT_FOUND for when the difference matters.
    */
   async get<T = unknown>(): Promise<T[]> {
-    const info = await this._extractInfo();
+    let info: { url: string; format: 'json' | 'csv'; direct: boolean };
+    try {
+      info = await this._extractInfo();
+    } catch (err) {
+      if (err instanceof ShareOutError && err.code === 'DATASET_NOT_FOUND') return [];
+      throw err;
+    }
     let text: string;
     try {
       text = await fetchExtractText(this._absolute(info.url), info.direct, this.sdk._sessionToken);

@@ -13,6 +13,7 @@ import { cleanupExpiredAdminSessions, cleanupOldRateLimits } from '../api-auth';
 import { cleanupExpiredDeviceCodes } from '../auth/device-auth';
 import { cleanupMcpOAuth } from '../mcp/oauth';
 import { cronCadenceNotice } from './jobs/cron';
+import { emailSyncCreated } from '../email/email-sync-status';
 import { runDueCrewTriggers } from '../crew/triggers';
 import { runModerationRescan, recheckPendingModeration, recheckFailOpenModeration } from '../moderation/rescan';
 import { checkContentDomainReputation, runBandwidthAutoPause } from '../moderation/maintenance';
@@ -135,11 +136,15 @@ export async function handleCreateJob(request: Request, env: Env, user: Authenti
     if (/^(Permission denied|Viewers can only)/.test(result.error)) {
       return errorResponse(result.error, 'FORBIDDEN', 403);
     }
-    return errorResponse(result.error, 'INVALID_REQUEST', 400);
+    if (result.code === 'DUPLICATE_JOB') return jsonResponse({ error: result.error, code: result.code, job_id: result.existingJobId }, 409);
+    return errorResponse(result.error, result.code || 'INVALID_REQUEST', 400);
   }
 
   const notice = triggerType === 'cron' && body.schedule ? cronCadenceNotice(body.schedule) : null;
-  return jsonResponse({ job: result.job && toApiJob(result.job), ...(notice ? { notice } : {}) }, 201);
+  // An email sync answers with what the person needs next: the address, who may send, and a
+  // warning when the page does not read the data the file will fill.
+  const extra = body.action === 'email_sheet_sync' && result.job ? await emailSyncCreated(env, user.id, result.job).catch(() => ({})) : {};
+  return jsonResponse({ job: result.job && toApiJob(result.job), ...(notice ? { notice } : {}), ...extra }, 201);
 }
 
 export async function handleListJobs(request: Request, env: Env, user: AuthenticatedUser): Promise<Response> {
@@ -208,12 +213,13 @@ export async function handleDeleteJob(env: Env, user: AuthenticatedUser, jobId: 
     return errorResponse(result.error, result.error === 'Job not found' ? 'NOT_FOUND' : 'FORBIDDEN', status);
   }
 
-  return jsonResponse({ success: true });
+  return jsonResponse({ success: true, ...(result.sendersKept ? { senders_kept: result.sendersKept } : {}) });
 }
 
 export async function handleRunJob(env: Env, user: AuthenticatedUser, jobId: string): Promise<Response> {
   const result = await runJobManually(env, user.id, jobId);
 
+  if (result.code === 'NOT_RUNNABLE') return jsonResponse({ error: result.error, code: result.code, address: result.address ?? null }, 409);
   if (result.error) {
     const status = result.error === 'Job not found' ? 404 : result.error === 'Permission denied' ? 403 : 400;
     return errorResponse(result.error, result.error === 'Job not found' ? 'NOT_FOUND' : 'FORBIDDEN', status);

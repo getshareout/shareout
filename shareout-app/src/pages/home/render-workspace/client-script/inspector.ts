@@ -47,6 +47,9 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       // Home: nothing to inspect — hide the right rail; Activity lives in a canvas widget.
       ws.classList.add('is-home');
       if (rbackEl) rbackEl.hidden = true;
+      // The phone sheet (inspector-sheet.ts) closes with nothing to inspect; chunks assembled
+      // without it (an older boot script, the DOM tests) simply have no sheet.
+      if (typeof inspSheet === 'function') inspSheet(false);
       return;
     }
     ws.classList.remove('is-home');

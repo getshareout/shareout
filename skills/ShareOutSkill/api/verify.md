@@ -81,6 +81,7 @@ Owners and editors of the page only. A workspace Agent token (`sot_`) needs
 | `request_failed` | error / warning | A file or request failed (status or network error). `GET /styles.css → 404` means a root-relative path → use `styles.css`. |
 | `api_error` | error | A ShareOut API call failed; carries the API's `code` and `hint`. |
 | `api_empty_read` | note | `json.get` of a key that does not exist yet — the SDK reads it as empty. |
+| `dataset_waiting` | note | A dataset a spreadsheet or email sync on the page fills that has no file yet ("waiting for its first file"); `dataset(name).get()` reads it as `[]`. A missing dataset nothing fills stays an `api_error`. |
 | `write_skipped` | note | The page writes on load; verify renders read-only, so writes are refused (viewers' writes work). |
 | `csp_blocked` | error | The viewer's browser refuses this script/style/font (public pages: CDN allowlist) → `/vendor/<pkg>@<version>/…` or an allowlisted CDN, or keep the page private. |
 | `native_dialog` | warning | `alert()`/`confirm()`/`prompt()` blocks the page → inline message. |

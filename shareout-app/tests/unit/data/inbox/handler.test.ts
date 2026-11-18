@@ -30,7 +30,8 @@ function makeCtx(): DataContext {
     workspaceId: 'ws_1',
     artifact: { id: ARTIFACT_ID, name: 'Inbox', visibility: 'private', auth_method: null, workspace_id: 'ws_1' },
     db: {} as DataContext['db'],
-    env: {} as Env,
+    // No email_sheet_sync job on the page (the guard on /disable and /allowlist looks).
+    env: { DB: { prepare: () => ({ bind: () => ({ first: async () => null }) }) } } as unknown as Env,
     origin: null,
   };
 }

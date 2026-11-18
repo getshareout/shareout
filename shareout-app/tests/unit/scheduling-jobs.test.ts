@@ -48,7 +48,7 @@ vi.mock('../../src/scheduling/email', () => ({
 // Stub the store so those hooks don't touch the strict DB-call sequences here.
 const enableInbound = vi.hoisted(() => vi.fn());
 const disableInbound = vi.hoisted(() => vi.fn());
-vi.mock('../../src/email/inbox-store', () => ({ enableInbound, disableInbound }));
+vi.mock('../../src/email/inbox-store', async (orig) => ({ ...(await orig<object>()), enableInbound, disableInbound }));
 
 const notifyJobFailed = vi.hoisted(() => vi.fn());
 vi.mock('../../src/scheduling/jobs/notify', () => ({ notifyJobFailed }));

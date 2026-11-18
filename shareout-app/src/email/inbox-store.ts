@@ -56,7 +56,9 @@ export interface InboxResolution {
   lastResetDate: string;
 }
 
-const INBOUND_DAILY_LIMIT = 200;
+export const INBOUND_DAILY_LIMIT = 200;
+/** Largest inbound message accepted, raw (src/email/inbound.ts). */
+export const INBOUND_MAX_RAW_BYTES = 25 * 1024 * 1024;
 
 /** Resolve an inbound recipient prefix to its artifact + inbound config. Returns
  *  null when no artifact owns the prefix (so the handler can reject unknown mail). */
@@ -132,6 +134,26 @@ export async function enableInbound(env: Env, artifactId: string): Promise<void>
   await env.DB.prepare(
     `UPDATE artifact_emails SET inbound_enabled = 1, inbound_enabled_at = ? WHERE artifact_id = ?`
   ).bind(new Date().toISOString(), artifactId).run();
+}
+
+export type InboundRejection = 'not_allowed' | 'unverified' | 'too_large' | 'rate_limited' | 'inbox_off';
+
+/** Keep the last bounced email (who, why, when) so the page's editors can see why a file never
+ *  arrived: the bounce itself only reaches the sender. Best effort — never blocks the bounce. */
+export async function recordInboundRejection(env: Env, artifactId: string, from: string, reason: InboundRejection): Promise<void> {
+  try {
+    await env.DB.prepare(
+      'UPDATE artifact_emails SET inbound_rejected_at = ?, inbound_rejected_from = ?, inbound_rejected_reason = ? WHERE artifact_id = ?'
+    ).bind(new Date().toISOString(), from.slice(0, 320), reason, artifactId).run();
+  } catch { /* the bounce matters more than the record */ }
+}
+
+export async function getInboundRejection(env: Env, artifactId: string): Promise<{ from: string; reason: InboundRejection; at: string } | null> {
+  const row = await env.DB.prepare(
+    'SELECT inbound_rejected_at, inbound_rejected_from, inbound_rejected_reason FROM artifact_emails WHERE artifact_id = ?'
+  ).bind(artifactId).first<{ inbound_rejected_at: string | null; inbound_rejected_from: string | null; inbound_rejected_reason: string | null }>();
+  if (!row?.inbound_rejected_at || !row.inbound_rejected_reason) return null;
+  return { from: row.inbound_rejected_from || '', reason: row.inbound_rejected_reason as InboundRejection, at: row.inbound_rejected_at };
 }
 
 export async function disableInbound(env: Env, artifactId: string): Promise<void> {

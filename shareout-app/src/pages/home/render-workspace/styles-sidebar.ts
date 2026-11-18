@@ -292,6 +292,7 @@ export const WORKSPACE_SIDEBAR_STYLES = `/* ---- right rail (the working Inspect
 .wsx-qa__txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .wsx-qa__t { font: 700 var(--text-sm) var(--font-body); color: var(--color-text); }
 .wsx-qa__s { font-size: var(--text-xs); color: var(--color-text-tertiary); }
+.wsx-qa.is-on .wsx-qa__s { color: var(--color-success); font-weight: 600; }
 .wsx-auto__chat { display: flex; align-items: center; gap: 8px; width: 100%; justify-content: center; margin-top: 4px; padding: 10px 12px; border: 1px dashed var(--color-border-strong); border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); font: 600 var(--text-sm) var(--font-body); cursor: pointer; transition: border-color var(--duration-fast), color var(--duration-fast); }
 .wsx-auto__chat:hover { border-color: var(--color-primary); color: var(--color-primary); }
 .wsx-auto__chat svg { width: 16px; height: 16px; flex: none; }

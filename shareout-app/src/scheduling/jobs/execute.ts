@@ -14,6 +14,9 @@ import { calculateBackoffDelay } from './retry';
 import { executeJobAction, recordJobSteps } from './runner';
 import { notifyJobFailed } from './notify';
 import type { DeliveryStep } from '../../delivery/types';
+import { getInboxStatus } from '../../email/inbox-store';
+import { emailSyncSay } from '../../email/email-sync-status';
+import { localeForRecipient } from '../../i18n/locale';
 import type { RetryConfig, RunJobResult, ScheduledJob } from './types';
 
 /** Process due cron jobs (up to 50 per tick) with retry and artifact_test throttling. */
@@ -139,13 +142,21 @@ export async function runJobManually(
   env: Env,
   userId: string,
   jobId: string,
-): Promise<{ result?: RunJobResult; error?: string }> {
+): Promise<{ result?: RunJobResult; error?: string; code?: string; address?: string | null }> {
   const job = await env.DB.prepare('SELECT * FROM scheduled_jobs WHERE id = ?')
     .bind(jobId)
     .first<ScheduledJob>();
 
   if (!job) return { error: 'Job not found' };
   if (!(await canManageJob(env, job, userId))) return { error: 'Permission denied' };
+  // An email sync has nothing to read until an email arrives: running it by hand would only log a
+  // failure the panel and assistants then read out as a real problem. Say where to send the file.
+  if (job.action === 'email_sheet_sync') {
+    const art = await env.DB.prepare('SELECT workspace_id FROM artifacts WHERE id = ?').bind(job.artifact_id).first<{ workspace_id: string | null }>();
+    const locale = await localeForRecipient(env, { userId, workspaceId: art?.workspace_id ?? null });
+    const { address } = await getInboxStatus(env, job.artifact_id);
+    return { error: emailSyncSay(locale, 'not_runnable', { address: address ?? '' }), code: 'NOT_RUNNABLE', address };
+  }
 
   return { result: await executeJobNow(env, job) };
 }

@@ -852,7 +852,11 @@ paths:
         address, who may send the file, the job's last result, the last email that arrived and
         the data it last wrote. Owner or editor of a page inside a workspace (else 404). Use it to
         confirm to the person that their file landed ("365 rows updated at 10:32") or to say why
-        not (`job.lastError` is one plain sentence with what to do, in the owner's language).
+        not (`message` and `job.lastError` are one plain sentence with what to do, in the caller's
+        and the owner's language). Before setting it up, `suggestedDataset` is the dataset to
+        write: the one the live page reads (`reads`) when it reads exactly one. `null` means the
+        page reads several — ask which one. A job whose dataset the page does not read has
+        `job.datasetReadByPage: false`: the page would stay empty, so say so.
       operationId: getEmailSync
       responses:
         "200":
@@ -862,10 +866,46 @@ paths:
               schema:
                 type: object
                 properties:
-                  address: { type: string, nullable: true, description: "Where to send the file; null until senders are set." }
+                  address: { type: string, nullable: true, description: "Where to send the file; null until senders are set, and while the address is off." }
                   senders: { type: array, items: { type: string } }
                   datasets: { type: array, items: { type: string }, description: "The page's datasets, most recently written first." }
+                  reads:
+                    type: array
+                    nullable: true
+                    items: { type: string }
+                    description: "Dataset names the live page reads (`sdk.dataset('…')` in its HTML and scripts). Empty = it reads none; null = it cannot be told (no live version, not an HTML page)."
+                  suggestedDataset:
+                    type: string
+                    nullable: true
+                    description: "The dataset to write: the job's, else the one the page reads when it reads exactly one, else the most recently written one, else `data`. null = the page reads several: ask which."
                   you: { type: string, nullable: true, description: "The caller's email — the default sender." }
+                  state:
+                    type: string
+                    enum: [off, inbox_off, waiting_first_email, ok, failed]
+                    description: >-
+                      `off` — no email sync; `inbox_off` — the sync exists but the page's address is
+                      off, so mail is not accepted (setting the senders again turns it back on);
+                      `waiting_first_email` — on, no file has updated the page yet; `ok` — the last
+                      file updated the page; `failed` — the last file could not be used and the page
+                      kept its data.
+                  message: { type: string, description: "One line for the person, in the caller's language: what the state means and what to do." }
+                  limits:
+                    type: object
+                    description: What one email can bring.
+                    properties:
+                      fileMb: { type: integer, example: 8 }
+                      rows: { type: integer, example: 100000 }
+                      mailMb: { type: integer, example: 25 }
+                      perDay: { type: integer, example: 200, description: Emails per page per day. }
+                  lastRejected:
+                    type: object
+                    nullable: true
+                    description: The last email the address refused (it was bounced to the sender; nothing changed).
+                    properties:
+                      from: { type: string }
+                      reason: { type: string, enum: [not_allowed, unverified, too_large, rate_limited, inbox_off] }
+                      at: { type: string, format: date-time }
+                      message: { type: string, description: "Why, and what to do, in the caller's language." }
                   job:
                     type: object
                     nullable: true
@@ -873,6 +913,7 @@ paths:
                       id: { type: string }
                       enabled: { type: boolean }
                       dataset: { type: string }
+                      datasetReadByPage: { type: boolean, nullable: true, description: "false = the live page does not read this dataset, so the file would not show; null = cannot be told." }
                       sheet: { type: string, nullable: true }
                       attachment: { type: string, nullable: true }
                       lastRunAt: { type: integer, nullable: true, description: Unix seconds. }
@@ -904,6 +945,25 @@ paths:
   /v1/artifacts/{id}/email-sync/senders:
     parameters:
       - $ref: "#/components/parameters/ArtifactId"
+    get:
+      tags: [Jobs]
+      summary: Update by email — who may send the file (read)
+      description: The page's address and the addresses allowed to send the file. Owner or editor of the page.
+      operationId: getEmailSyncSenders
+      responses:
+        "200":
+          description: The address and the list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  address: { type: string, nullable: true }
+                  senders: { type: array, items: { type: string } }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
     put:
       tags: [Jobs]
       summary: Update by email — who may send the file
@@ -913,7 +973,8 @@ paths:
         `email_sheet_sync` job, which refuses an empty list. Exact addresses, or a company
         `@domain`; never a whole free-mail domain (`@gmail.com`, `@outlook.com`, …). Mail from
         anyone else is bounced, and so is mail whose sender Cloudflare cannot vouch for (DMARC,
-        or a DKIM signature by the sender's own domain). Owner or editor of the page.
+        or a DKIM signature by the sender's own domain). Owner or editor of the page. It also
+        turns a switched-off address back on (`state: inbox_off`).
       operationId: setEmailSyncSenders
       requestBody:
         required: true
@@ -924,9 +985,12 @@ paths:
               required: [senders]
               properties:
                 senders:
-                  type: array
-                  maxItems: 20
-                  items: { type: string }
+                  description: One address, or a list of up to 20.
+                  oneOf:
+                    - type: array
+                      maxItems: 20
+                      items: { type: string }
+                    - type: string
                   example: [ana@acme.com]
       responses:
         "200":
@@ -3097,8 +3161,19 @@ paths:
                 properties:
                   job:
                     $ref: "#/components/schemas/Job"
+                  address: { type: string, description: "`email_sheet_sync` only: the page's address to send the file to." }
+                  senders: { type: array, items: { type: string }, description: "`email_sheet_sync` only: who may send it." }
+                  warning: { type: string, description: "`email_sheet_sync` only: the live page does not read this dataset, so the file would not show on it." }
         "400":
-          $ref: "#/components/responses/BadRequest"
+          description: >-
+            Invalid request. For `email_sheet_sync`: `NO_SENDERS` — nobody may send the file yet (call
+            `PUT /v1/artifacts/{id}/email-sync/senders` first; the message names the page's id);
+            `FREE_MAIL_DOMAIN` — the list holds a whole free-mail domain; `BAD_DATASET_NAME` — the
+            dataset name is not letters, digits, `_ . -` (up to 64), with a valid suggestion.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "403":
           description: >-
             No access to the artifact, or a viewer scheduling delivery to someone
@@ -3108,6 +3183,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "409":
+          description: >-
+            `DUPLICATE_JOB` — the page already updates this dataset by email (one `email_sheet_sync`
+            per page and dataset); `job_id` is the existing one. Change it with PATCH instead.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Error"
+                  - type: object
+                    properties:
+                      job_id: { type: string }
   /v1/jobs/{id}:
     parameters:
       - name: id
@@ -3160,10 +3247,21 @@ paths:
     delete:
       tags: [Jobs]
       summary: Delete a job
+      description: >-
+        Deleting the last `email.received` job turns the page's address off. The allowed senders
+        are kept for next time (`senders_kept`); clear them with
+        `PUT /v1/data/{artifactId}/inbox/allowlist { "allowlist": null }`.
       operationId: deleteJob
       responses:
         "200":
           description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  senders_kept: { type: array, items: { type: string }, description: "`email_sheet_sync` only: the sender list that stays." }
   /v1/jobs/{id}/run:
     parameters:
       - name: id
@@ -3174,7 +3272,10 @@ paths:
     post:
       tags: [Jobs]
       summary: Run a job now
-      description: Trigger immediately without affecting the schedule.
+      description: >-
+        Trigger immediately without affecting the schedule. An `email_sheet_sync` job has nothing
+        to run until a file arrives: it answers `409 NOT_RUNNABLE` with the address and changes
+        nothing (no failed run, no `last_error`).
       operationId: runJob
       responses:
         "200":
@@ -3188,6 +3289,16 @@ paths:
                     type: string
                   execution:
                     type: object
+        "409":
+          description: "`NOT_RUNNABLE` — the job runs when an email arrives; send the file to `address`."
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Error"
+                  - type: object
+                    properties:
+                      address: { type: string, nullable: true }
   /v1/folders:
     get:
       tags: [Folders]
@@ -9791,6 +9902,8 @@ components:
             `email_sheet_sync` (event `email.received` only) takes `EmailSheetSyncConfig`
             `{ dataset, sheet?, attachment? }`: an Excel/CSV emailed to the page's own address replaces
             the dataset; set who may send it first with `PUT /v1/artifacts/{id}/email-sync/senders`.
+            Use the dataset the page reads (`GET /v1/artifacts/{id}/email-sync` → `suggestedDataset`);
+            one such job per page and dataset (a second is `409 DUPLICATE_JOB`).
           example: { link: "https://docs.google.com/spreadsheets/d/1Bxi…/edit", dataset: sales, sheet: Summary }
         retry_config:
           type: object

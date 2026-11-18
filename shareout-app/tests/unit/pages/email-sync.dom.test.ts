@@ -45,11 +45,12 @@ const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)
 const modalText = () => document.querySelector('.wsx-modal')!.textContent || '';
 const btn = (label: string) => [...document.querySelectorAll<HTMLButtonElement>('.wsx-modal button')].find((b) => b.textContent === label)!;
 
-const NOT_SET = { address: null, senders: [], datasets: ['ventas'], job: null, lastEmail: null, lastUpdate: null, you: 'leo@acme.com' };
+const NOT_SET = { address: null, senders: [], datasets: ['ventas'], reads: null, suggestedDataset: 'ventas', state: 'off', job: null, lastEmail: null, lastUpdate: null, lastRejected: null, you: 'leo@acme.com' };
 const ON = (over: Record<string, unknown> = {}) => ({
   address: ADDRESS, senders: ['ana@acme.com'], datasets: ['ventas'], you: 'leo@acme.com',
-  job: { id: 'job_9', enabled: true, dataset: 'ventas', sheet: null, attachment: null, lastRunAt: null, lastStatus: null, lastError: null },
-  lastEmail: null, lastUpdate: null, ...over,
+  reads: ['ventas'], suggestedDataset: 'ventas', state: 'waiting_first_email', limits: { fileMb: 8, rows: 100000, mailMb: 25, perDay: 200 },
+  job: { id: 'job_9', enabled: true, dataset: 'ventas', sheet: null, attachment: null, lastRunAt: null, lastStatus: null, lastError: null, datasetReadByPage: true },
+  lastEmail: null, lastUpdate: null, lastRejected: null, ...over,
 });
 
 function routes(opts: { senders?: [unknown, number]; job?: [unknown, number] } = {}) {
@@ -70,6 +71,7 @@ function routes(opts: { senders?: [unknown, number]; job?: [unknown, number] } =
       return json({ job: { id: 'job_9' } }, 201);
     }
     if (url === '/v1/jobs/job_9' && method === 'DELETE') return json({ success: true });
+    if (url === '/v1/jobs/job_9' && method === 'PATCH') { status = ON({ job: { ...(ON().job as object), ...(body as { config: object }).config, datasetReadByPage: true } }); return json({ job: { id: 'job_9' } }); }
     return json({ error: 'unexpected ' + url }, 404);
   });
 }
@@ -109,7 +111,8 @@ describe('Update by email', () => {
     expect($('#es_addr').textContent).toBe(ADDRESS);
     btn(copy['esync.copy']).click(); await flush();
     expect(writeText).toHaveBeenCalledWith(ADDRESS);
-    expect(toast).toHaveBeenCalledWith(copy['esync.copied']);
+    // The button itself says it worked.
+    expect(document.querySelector('[data-es-copy]')!.textContent).toBe(copy['esync.copied']);
   });
 
   it('a typo in the address is caught before anything is saved, in one sentence', async () => {
@@ -120,7 +123,110 @@ describe('Update by email', () => {
     $<HTMLInputElement>('#es_who').value = '@gmail.com';
     btn(copy['esync.save']).click(); await flush();
     expect($('#es_err').textContent).toBe(copy['esync.errFreeMail'].replace('{email}', '@gmail.com'));
+    expect($('#es_err').textContent).toContain('ana@gmail.com');
     expect(sent.some((s) => s.method !== 'GET')).toBe(false);
+  });
+
+  it('a name with a space is quoted whole, and the error goes away once the field changes', async () => {
+    load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+    const who = $<HTMLInputElement>('#es_who');
+    who.value = 'juan perez';
+    btn(copy['esync.save']).click(); await flush();
+    expect($('#es_err').textContent).toBe(copy['esync.errEmail'].replace('{email}', 'juan perez'));
+    who.value = 'juan@acme.com';
+    who.dispatchEvent(new Event('input'));
+    expect($('#es_err').textContent).toBe('');
+    // Two addresses separated by a space still count as two.
+    who.value = 'ana@acme.com bob@acme.com';
+    btn(copy['esync.save']).click(); await flush();
+    expect(sent.find((s) => s.method === 'PUT')!.body).toEqual({ senders: ['ana@acme.com', 'bob@acme.com'] });
+  });
+
+  it('a page that reads exactly one set of data: nothing asked, that one is used', async () => {
+    status = { ...NOT_SET, reads: ['ventas_2026'], suggestedDataset: 'ventas_2026', datasets: ['otra'] };
+    load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+    expect(document.querySelector('#es_ds')).toBeNull();
+    expect(modalText()).not.toContain(copy['esync.datasetAsk']);
+    btn(copy['esync.save']).click(); await flush();
+    expect(sent.find((s) => s.url === '/v1/jobs')!.body).toMatchObject({ config: { dataset: 'ventas_2026' } });
+  });
+
+  it('a page that reads several: asks which, in plain words, before turning on', async () => {
+    status = { ...NOT_SET, reads: ['ventas', 'stock'], suggestedDataset: null };
+    load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+    const sel = $<HTMLSelectElement>('#es_ds');
+    expect(sel.tagName).toBe('SELECT');
+    expect([...sel.options].map((o) => o.value)).toEqual(['', 'ventas', 'stock']);
+    expect(modalText()).toContain(copy['esync.datasetAsk']);
+    btn(copy['esync.save']).click(); await flush();
+    expect($('#es_err').textContent).toBe(copy['esync.errDataset']);
+    expect(sent.some((s) => s.method !== 'GET')).toBe(false);
+    sel.value = 'stock'; sel.dispatchEvent(new Event('change'));
+    expect($('#es_err').textContent).toBe('');
+    btn(copy['esync.save']).click(); await flush();
+    expect(sent.find((s) => s.url === '/v1/jobs')!.body).toMatchObject({ config: { dataset: 'stock' } });
+  });
+
+  it('the file-name field means “starts with”: the * is added for you; sheet is “Excel sheet”', async () => {
+    load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+    expect(modalText()).toContain(copy['esync.sheet']);
+    expect(modalText()).not.toMatch(/\*/);
+    $<HTMLInputElement>('#es_att').value = 'ventas';
+    $<HTMLInputElement>('#es_tab').value = 'Hoja1';
+    btn(copy['esync.save']).click(); await flush();
+    expect(sent.find((s) => s.url === '/v1/jobs')!.body).toMatchObject({ config: { dataset: 'ventas', sheet: 'Hoja1', attachment: 'ventas*' } });
+  });
+
+  it('already on for that data (409): shows the address instead of an error', async () => {
+    routes({ job: [{ error: 'Already on', code: 'DUPLICATE_JOB', job_id: 'job_9' }, 409] });
+    load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+    status = ON();
+    btn(copy['esync.save']).click(); await flush();
+    expect($('#es_err')?.textContent || '').toBe('');
+    expect($('#es_addr').textContent).toBe(ADDRESS);
+  });
+
+  it('ready screen: three steps, open my email, waiting for the first email, and an address that never breaks mid-name', async () => {
+    status = ON();
+    load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+    const steps = [...document.querySelectorAll('.wsx-esync__steps li')].map((li) => li.textContent);
+    expect(steps).toEqual([copy['esync.step1'], copy['esync.step2'].replace('{who}', 'ana@acme.com'), copy['esync.step3']]);
+    expect($<HTMLAnchorElement>('[data-es-mailto]').getAttribute('href')).toBe('mailto:' + ADDRESS);
+    expect($('#es_status').textContent).toContain(copy['esync.waiting']);
+    expect(modalText()).toContain('Up to 8 MB and 100,000 rows');
+    // Only one break opportunity, right after the @; each half is kept whole.
+    expect($('#es_addr').querySelectorAll('wbr').length).toBe(1);
+    expect([...$('#es_addr').querySelectorAll('.wsx-esync__nb')].map((n) => n.textContent)).toEqual(['ventas-x1', '@inbox.shareout.site']);
+    // Turn on / Close stay in view: the footer is the sticky one.
+    expect(document.querySelector('.wsx-esync__foot [data-es-close]')).not.toBeNull();
+  });
+
+  it('a page that does not show the chosen data says so, with a one-click fix', async () => {
+    status = ON({ reads: ['ventas'], job: { ...(ON().job as object), dataset: 'data', datasetReadByPage: false } });
+    load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+    expect($('[data-es-dswarn]').textContent).toContain('doesn’t show “data”');
+    btn(copy['esync.fixDs'].replace('{name}', 'ventas')).click(); await flush();
+    expect(sent.find((s) => s.method === 'PATCH')).toEqual({ url: '/v1/jobs/job_9', method: 'PATCH', body: { config: { dataset: 'ventas' } } });
+    expect(toast).toHaveBeenCalledWith(copy['esync.fixedDs'].replace('{name}', 'ventas'));
+    expect(document.querySelector('[data-es-dswarn]')).toBeNull();
+  });
+
+  it('address switched off: says so and turns it back on with the same senders', async () => {
+    status = ON({ address: null, state: 'inbox_off' });
+    load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+    expect($('[data-es-off]').textContent).toContain(copy['esync.inboxOff']);
+    expect(document.querySelector('[data-es-copy]')).toBeNull();
+    routes();
+    status = ON({ address: null, state: 'inbox_off' });
+    btn(copy['esync.turnBackOn']).click(); await flush();
+    expect(sent.find((s) => s.method === 'PUT')!.body).toEqual({ senders: ['ana@acme.com'] });
+    expect(toast).toHaveBeenCalledWith(copy['esync.backOn']);
+  });
+
+  it('a mail that was turned away shows who sent it and why', async () => {
+    status = ON({ lastRejected: { from: 'eve@other.com', reason: 'not_allowed', at: new Date().toISOString(), message: 'eve@other.com isn’t on the list.' } });
+    load().openEmailSync({ id: 'art_1', name: 'Ventas' }); await flush();
+    expect($('[data-es-rejected]').textContent).toContain('An email from eve@other.com arrived but was not used: eve@other.com isn’t on the list.');
   });
 
   it('when on: shows the last update with its rows and the last email', async () => {

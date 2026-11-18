@@ -4,7 +4,29 @@ export const workspace_client_home_views_jobDetail_JS = `  // ===== Automation d
   var jdEditing = false;
   var jdSlackNames = {};     // artifactId -> { channelId: name }
   function jdFind(id) { return (schedJobs || []).filter(function (j) { return j.id === id; })[0] || null; }
-  function jdTitle(j) { var meta = schedDest(j.action); return j.title || (meta[0] + (j.artifact_name ? ' \\u00b7 ' + j.artifact_name : '')); }
+  function jdTitle(j) { return schedTitle(j); }
+  // An email update: its page's address and what the page reads (GET …/email-sync), once per page.
+  var jdEsCache = {};
+  function jdEmailStatus(j, cb) {
+    if (jdEsCache[j.artifact_id]) { cb(jdEsCache[j.artifact_id]); return; }
+    fetch('/v1/artifacts/' + encodeURIComponent(j.artifact_id) + '/email-sync', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d) jdEsCache[j.artifact_id] = d; cb(d); })
+      .catch(function () { cb(null); });
+  }
+  // "ventas" ⇄ "ventas*": the file name starts with it (a typed * is kept).
+  function jdPattern(v) { v = String(v || '').trim(); return !v ? '' : v.indexOf('*') === -1 ? v + '*' : v; }
+  function jdPatternShow(p) { return /^[^*]+\\*$/.test(p || '') ? p.slice(0, -1) : (p || ''); }
+  function jdDsWarn(root, reads) {
+    var inp = root.querySelector('#jd_dataset'), w = root.querySelector('#jd_dswarn');
+    if (!inp || !w) return;
+    function paint() {
+      var v = inp.value.trim(), bad = reads.length && v && reads.indexOf(v) === -1;
+      w.hidden = !bad;
+      if (bad) w.textContent = t('esync.dsWarnOn').replace('{name}', function () { return v; }).replace('{reads}', function () { return reads.slice(0, 4).map(function (n) { return '\\u201c' + n + '\\u201d'; }).join(' / '); });
+    }
+    inp.addEventListener('input', paint); paint();
+  }
   function jdHost(u) { try { return new URL(u).host; } catch (e) { return ''; } }
   // One line saying where it delivers. Webhook URLs carry secrets: show their host only.
   function jdDestSummary(j) {
@@ -57,7 +79,8 @@ export const workspace_client_home_views_jobDetail_JS = `  // ===== Automation d
     if (a === 'sheets_append') h += jdField(t('adet.range'), 'jd_range', c.range || '', { ph: 'Sheet1!A1' });
     if (a === 'drive_file_sync') h += jdField(t('dsync.tab'), 'jd_sheet', c.sheet || '', { ph: t('dsync.tabPh') }) + jdField(t('dsync.dataset'), 'jd_dataset', c.dataset || '');
     if (a === 'public_sheet_sync') h += jdField(t('slink.link'), 'jd_link', c.link || '') + jdField(t('dsync.tab'), 'jd_sheet', c.sheet || '', { ph: t('dsync.tabPh') }) + jdField(t('dsync.dataset'), 'jd_dataset', c.dataset || '');
-    if (a === 'email_sheet_sync') h += jdField(t('dsync.tab'), 'jd_sheet', c.sheet || '', { ph: t('dsync.tabPh') }) + jdField(t('esync.attachment'), 'jd_att', c.attachment || '', { ph: t('esync.attachmentPh') }) + jdField(t('dsync.dataset'), 'jd_dataset', c.dataset || '');
+    if (a === 'email_sheet_sync') h += jdField(t('esync.sheet'), 'jd_sheet', c.sheet || '', { ph: t('esync.sheetPh') }) + jdField(t('esync.attachment'), 'jd_att', jdPatternShow(c.attachment), { ph: t('esync.attachmentPh'), note: t('esync.attachmentNote') })
+      + jdField(t('esync.dataset'), 'jd_dataset', c.dataset || '') + '<p class="wsx-slink__warn" id="jd_dswarn" role="alert" hidden></p>';
     return h || '<p class="wsx-field__note">' + esc(t('adet.noDestFields')) + '</p>';
   }
   function jdEditHtml(j) {
@@ -97,7 +120,7 @@ export const workspace_client_home_views_jobDetail_JS = `  // ===== Automation d
     if (q('jd_range')) { var rg = q('jd_range').value.trim(); if (rg) c.range = rg; else delete c.range; }
     if (q('jd_link')) { var lk = q('jd_link').value.trim(); if (!lk) return { err: 'slink.errEmpty' }; c.link = lk; }
     if (q('jd_sheet')) { var sh = q('jd_sheet').value.trim(); if (sh) c.sheet = sh; else delete c.sheet; }
-    if (q('jd_att')) { var at = q('jd_att').value.trim(); if (at) c.attachment = at; else delete c.attachment; }
+    if (q('jd_att')) { var at = jdPattern(q('jd_att').value); if (at) c.attachment = at; else delete c.attachment; }
     if (q('jd_dataset')) { var dn = q('jd_dataset').value.trim(); if (!/^[A-Za-z0-9_.-]{1,64}$/.test(dn)) return { err: 'dsync.errName' }; c.dataset = dn; }
     return { config: c };
   }
@@ -187,7 +210,9 @@ export const workspace_client_home_views_jobDetail_JS = `  // ===== Automation d
     var dest = jdDestSummary(j);
     var head = '<div class="wsx-adet__head"><h3 class="wsx-adet__title">' + esc(jdTitle(j)) + '</h3><span class="wsx-sched__badge ' + badge[0] + '">' + esc(badge[1]) + '</span></div>'
       + (j.description && !jdEditing ? '<p class="wsx-adet__desc">' + esc(j.description) + '</p>' : '');
-    var acts = jdEditing ? '' : '<div class="wsx-adet__acts"><button class="wsx-abtn wsx-abtn--primary" type="button" data-jd="run">' + esc(t('sched.runNow')) + '</button>'
+    var email = j.action === 'email_sheet_sync';
+    // Only an arriving email runs an email update: no "Run now" (the panel shows its address instead).
+    var acts = jdEditing ? '' : '<div class="wsx-adet__acts">' + (email ? '<button class="wsx-abtn wsx-abtn--primary" type="button" data-jd="esync">' + esc(t('esync.openPanel')) + '</button>' : '<button class="wsx-abtn wsx-abtn--primary" type="button" data-jd="run">' + esc(t('sched.runNow')) + '</button>')
       + '<button class="wsx-abtn" type="button" data-jd="edit">' + esc(t('adet.edit')) + '</button>'
       + '<button class="wsx-abtn" type="button" data-jd="toggle">' + esc(t(paused ? 'autof.resume' : 'autof.pause')) + '</button>'
       + '<button class="wsx-abtn danger" type="button" data-jd="del">' + esc(t('autof.delete')) + '</button><span class="wsx-runst" aria-live="polite"></span></div>';
@@ -197,14 +222,16 @@ export const workspace_client_home_views_jobDetail_JS = `  // ===== Automation d
           + (j.artifact_slug ? adetRow(t('adet.artifact'), '<button class="wsx-link" type="button" data-jd="art">' + esc(j.artifact_name || j.artifact_slug) + '</button>') : '')
           + (src ? adetRow(t('adet.source'), esc(src)) : '') + '</dl>')
         + adetSec(t('adet.when'), '<dl class="wsx-adet__dl">'
-          + adetRow(t('adet.schedule'), esc(j.trigger_type === 'event' ? t('adet.onEvent').replace('{event}', j.event_type || '') : cronHuman(j.schedule)))
+          + adetRow(t('adet.schedule'), esc(schedWhen(j)))
+          + (email ? adetRow(t('esync.address'), '<code class="wsx-sched__addr" data-jd-addr>\\u2026</code>') : '')
           + (j.trigger_type === 'event' ? '' : adetRow(t('adet.nextRun'), esc(paused ? t('sched.badgePaused') : adetWhen(j.next_run_at))))
           + adetRow(t('adet.lastRun'), esc(adetWhen(j.last_run_at))) + '</dl>'
           + (st === 'failed' && j.last_error ? '<div class="wsx-runst is-fail">' + esc(j.last_error) + '</div>' : ''));
     m.innerHTML = '<div class="wsx-adet-page">' + back + '<div class="wsx-adet" data-adet="' + esc(j.id) + '">' + head + acts + body
       + adetSec(t('adet.history'), '<div data-jd-runs>' + i18nLoad() + '</div>') + '</div></div>';
     var root = m.firstChild;
-    if (jdEditing) afWireSchedule(root, 'jd');
+    // Event jobs (an email update) have no schedule fields to wire.
+    if (jdEditing && j.trigger_type !== 'event') afWireSchedule(root, 'jd');
     if (j.action === 'slack' && cfg.channelId) jdSlackChannels(j, function (map) {
       var d = root.querySelector('[data-jd-dest]'); if (d && map[cfg.channelId]) d.textContent = '#' + map[cfg.channelId];
       var s = root.querySelector('#jd_slack'); if (!s) return;
@@ -224,9 +251,14 @@ export const workspace_client_home_views_jobDetail_JS = `  // ===== Automation d
       else if (act === 'cancel') { jdEditing = false; jdRender(j); }
       else if (act === 'save') jdSave(j, root, b);
       else if (act === 'run') jdRun(j, b, root.querySelector('.wsx-adet__acts .wsx-runst'));
+      else if (act === 'esync') openEmailSync({ id: j.artifact_id, name: j.artifact_name || '' }, function () { delete jdEsCache[j.artifact_id]; });
       else if (act === 'toggle') jdToggle(j);
       else if (act === 'del') jdDelete(j);
       else if (act === 'art' && j.artifact_slug && typeof openArtifactPage === 'function') openArtifactPage(j.artifact_slug, '');
+    });
+    if (email) jdEmailStatus(j, function (d) {
+      var el = root.querySelector('[data-jd-addr]'); if (el) el.textContent = (d && d.address) || '\\u2014';
+      if (jdEditing && d) jdDsWarn(root, Array.isArray(d.reads) ? d.reads : []);
     });
     jdLoadRuns(j, root.querySelector('[data-jd-runs]'));
   }

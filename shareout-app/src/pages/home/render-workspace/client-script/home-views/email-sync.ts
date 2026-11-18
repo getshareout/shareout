@@ -1,10 +1,11 @@
 /**
  * Update a page's data by email (lazy chunk `emailsync`): someone emails the Excel or CSV file to
  * the page's own address and its dataset updates (an `email_sheet_sync` job). Setup asks one
- * thing — who sends the file (the viewer's own address pre-filled) — with tab, file name and
- * dataset folded under "More options": PUT /v1/artifacts/{id}/email-sync/senders, then POST
- * /v1/jobs. Once on, it shows the address with a copy button, who may send, the last update and
- * the last email (GET /v1/artifacts/{id}/email-sync), and refreshes itself while open.
+ * thing — who sends the file (the viewer's own address pre-filled) — plus which data it replaces
+ * only when the page shows several (GET …/email-sync `reads`); sheet and file name are folded
+ * under "More options": PUT /v1/artifacts/{id}/email-sync/senders, then POST /v1/jobs. Once on, it
+ * shows the address (copy, open my email), three steps, who may send, the last update, a mail
+ * that was turned away and why, and refreshes itself while open.
  */
 export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dataset by email — lazy chunk 'emailsync' =====
   var esMo = null, esArt = null, esDone = null, esPoll = 0;
@@ -12,17 +13,19 @@ export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dat
   function esBody(html) { var b = esOpen() ? esMo.body.querySelector('#esBody') : null; if (b) b.innerHTML = html; return b; }
   function esBtn(attr, label, primary) { return '<button class="wsx-abtn' + (primary ? ' wsx-abtn--primary' : '') + '" type="button" ' + attr + '>' + esc(label) + '</button>'; }
   function esUrl(sub) { return '/v1/artifacts/' + encodeURIComponent(esArt.id) + '/email-sync' + (sub || ''); }
+  // t(key) with {name} placeholders filled (a function replacer, so a "$" in a value stays as typed).
+  function esT(key, vars) { return t(key).replace(/\\{(\\w+)\\}/g, function (m, k) { return vars && vars[k] != null ? String(vars[k]) : m; }); }
   function esReq(method, url, body) {
     var o = { method: method, credentials: 'same-origin' };
     if (body !== undefined) { o.headers = { 'Content-Type': 'application/json' }; o.body = JSON.stringify(body); }
-    return fetch(url, o).then(function (r) { return r.json().catch(function () { return null; }).then(function (d) { return { ok: r.ok, d: d || {} }; }); });
+    return fetch(url, o).then(function (r) { return r.json().catch(function () { return null; }).then(function (d) { return { ok: r.ok, status: r.status, d: d || {} }; }); });
   }
   // art: { id, name }. onDone runs when the sync is turned on or off.
   function openEmailSync(art, onDone) {
     if (!art || !art.id) return;
     if (esOpen()) esMo.close();
     esArt = art; esDone = onDone || null; esPoll++;
-    esMo = wsxModal(t('esync.title'), '<div class="wsx-cform" id="esBody"></div>');
+    esMo = wsxModal(t('esync.title'), '<div class="wsx-cform wsx-esync" id="esBody"></div>');
     esLoad(false);
   }
   function esLoad(justOn) {
@@ -40,56 +43,74 @@ export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dat
     var tag = locTag(), time;
     try { time = d.toLocaleTimeString(tag, { hour: '2-digit', minute: '2-digit' }); } catch (e) { time = d.toISOString().slice(11, 16); }
     var now = new Date(), y = new Date(now.getTime() - 86400000);
-    if (d.toDateString() === now.toDateString()) return t('esync.today').replace('{time}', time);
-    if (d.toDateString() === y.toDateString()) return t('esync.yesterday').replace('{time}', time);
+    if (d.toDateString() === now.toDateString()) return esT('esync.today', { time: time });
+    if (d.toDateString() === y.toDateString()) return esT('esync.yesterday', { time: time });
     try { return d.toLocaleString(tag, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (e) { return d.toISOString().slice(0, 16).replace('T', ' '); }
   }
   var ES_FREE = ['gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'live.com', 'msn.com', 'yahoo.com', 'icloud.com', 'me.com', 'aol.com', 'proton.me', 'protonmail.com', 'gmx.com', 'mail.com', 'yandex.com'];
-  // "a@x.com, b@y.com" → { list } or { err } with the sentence to show.
+  var ES_ADDR = /^[^\\s@<>",;]+@[a-z0-9-]+(\\.[a-z0-9-]+)+$/, ES_DOM = /^@[a-z0-9-]+(\\.[a-z0-9-]+)+$/;
+  // "a@x.com, b@y.com" → { list } or { err } with the sentence to show. Commas, semicolons and new
+  // lines separate addresses; a part with spaces is one entry ("juan perez" is quoted whole),
+  // unless every word in it is an address.
   function esSenders(raw) {
-    var parts = String(raw || '').split(/[\\s,;]+/).filter(Boolean), list = [];
+    var parts = String(raw || '').split(/[,;\\n]+/).map(function (p) { return p.trim(); }).filter(Boolean), flat = [], list = [];
     if (!parts.length) return { err: t('esync.errWho') };
-    for (var i = 0; i < parts.length; i++) {
-      var v = parts[i].toLowerCase();
-      var dom = /^@[a-z0-9-]+(\\.[a-z0-9-]+)+$/.test(v);
-      if (!dom && !/^[^\\s@<>"]+@[a-z0-9-]+(\\.[a-z0-9-]+)+$/.test(v)) return { err: t('esync.errEmail').replace('{email}', parts[i]) };
-      if (dom && ES_FREE.indexOf(v.slice(1)) !== -1) return { err: t('esync.errFreeMail').replace('{email}', v) };
+    parts.forEach(function (p) {
+      var words = p.split(/\\s+/);
+      if (words.length > 1 && words.every(function (w) { return ES_ADDR.test(w.toLowerCase()); })) flat = flat.concat(words); else flat.push(p);
+    });
+    for (var i = 0; i < flat.length; i++) {
+      var v = flat[i].toLowerCase(), dom = ES_DOM.test(v);
+      if (!dom && !ES_ADDR.test(v)) return { err: esT('esync.errEmail', { email: flat[i] }) };
+      if (dom && ES_FREE.indexOf(v.slice(1)) !== -1) return { err: esT('esync.errFreeMail', { email: v }) };
       if (list.indexOf(v) === -1) list.push(v);
     }
     return { list: list };
   }
   function esSendersErr(d) {
-    if (d.code === 'BAD_SENDER') return t('esync.errEmail').replace('{email}', d.param || '');
-    if (d.code === 'FREE_MAIL_DOMAIN') return t('esync.errFreeMail').replace('{email}', d.param || '');
+    if (d.code === 'BAD_SENDER') return esT('esync.errEmail', { email: d.param || '' });
+    if (d.code === 'FREE_MAIL_DOMAIN') return esT('esync.errFreeMail', { email: d.param || '' });
     if (d.code === 'NO_SENDERS') return t('esync.errWho');
     return d.error || t('autof.couldNotSave');
   }
-  // One question (who sends it); everything else has a default, folded under "More options".
+  // "ventas" → "ventas*" (the file name starts with it); a typed * is kept as is.
+  function esPattern(v) { v = String(v || '').trim(); return !v ? '' : v.indexOf('*') === -1 ? v + '*' : v; }
+  function esPatternShow(p) { return /^[^*]+\\*$/.test(p || '') ? p.slice(0, -1) : (p || ''); }
+  function esReads(st) { return Array.isArray(st.reads) ? st.reads.filter(function (n) { return typeof n === 'string' && n; }) : []; }
+  function esField(label, input, note) { return '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(label) + '</span>' + input + '</label>' + (note ? '<p class="wsx-field__note">' + esc(note) + '</p>' : ''); }
+  function esIn(id, ph, value, extra) { return '<input class="wsx-field__in" id="' + id + '" type="text" autocomplete="off" spellcheck="false"' + (ph ? ' placeholder="' + esc(ph) + '"' : '') + (value ? ' value="' + esc(value) + '"' : '') + (extra || '') + '>'; }
+  function esClearOnInput(root, err) { root.querySelectorAll('input, select').forEach(function (el) { el.addEventListener('input', function () { err.textContent = ''; }); el.addEventListener('change', function () { err.textContent = ''; }); }); }
+  // One question (who sends it). Which data it replaces is asked only when the page shows
+  // several; one = used as is; unknown = a prefilled field under "More options".
   function esSetup(st) {
-    var ds = (st.datasets && st.datasets[0]) || 'data';
-    var b = esBody('<p class="wsx-lens__intro">' + esc(t('esync.intro')) + '</p>'
-      + '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('esync.who')) + '</span><input class="wsx-field__in" id="es_who" type="email" multiple autocomplete="email" spellcheck="false" placeholder="' + esc(t('esync.whoPh')) + '" value="' + esc((st.senders && st.senders.length ? st.senders.join(', ') : st.you) || '') + '"></label>'
-      + '<p class="wsx-field__note">' + esc(t('esync.whoNote')) + '</p>'
+    var reads = esReads(st);
+    var fixedDs = reads.length === 1 ? reads[0] : (st.suggestedDataset || (st.datasets && st.datasets[0]) || 'data');
+    var ask = reads.length > 1 ? esField(t('esync.datasetAsk'), '<select class="wsx-field__in" id="es_ds"><option value="">' + esc(t('esync.datasetPick')) + '</option>'
+        + reads.map(function (n) { return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('') + '</select>', t('esync.datasetAskNote')) : '';
+    var b = esBody('<p class="wsx-lens__intro">' + esc(t('esync.intro')) + ' ' + esc(t('esync.noAccount')) + '</p>'
+      + esField(t('esync.who'), '<input class="wsx-field__in" id="es_who" type="email" multiple autocomplete="email" spellcheck="false" placeholder="' + esc(t('esync.whoPh')) + '" value="' + esc((st.senders && st.senders.length ? st.senders.join(', ') : st.you) || '') + '">', t('esync.whoNote'))
+      + ask
       + '<details class="wsx-adet__adv"><summary>' + esc(t('esync.more')) + '</summary>'
-      + '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('dsync.tab')) + '</span><input class="wsx-field__in" id="es_tab" type="text" autocomplete="off" placeholder="' + esc(t('dsync.tabPh')) + '"></label>'
-      + '<p class="wsx-field__note">' + esc(t('esync.tabNote')) + '</p>'
-      + '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('esync.attachment')) + '</span><input class="wsx-field__in" id="es_att" type="text" autocomplete="off" spellcheck="false" placeholder="' + esc(t('esync.attachmentPh')) + '"></label>'
-      + '<p class="wsx-field__note">' + esc(t('esync.attachmentNote')) + '</p>'
-      + '<label class="wsx-field"><span class="wsx-field__lbl">' + esc(t('dsync.dataset')) + '</span><input class="wsx-field__in" id="es_ds" type="text" autocomplete="off" spellcheck="false" value="' + esc(ds) + '"></label>'
-      + '<p class="wsx-field__note">' + esc(t('esync.datasetNote')) + '</p></details>'
+      + esField(t('esync.sheet'), esIn('es_tab', t('esync.sheetPh')), t('esync.tabNote'))
+      + esField(t('esync.attachment'), esIn('es_att', t('esync.attachmentPh')), t('esync.attachmentNote'))
+      + (reads.length ? '' : esField(t('esync.dataset'), esIn('es_ds', '', fixedDs), t('esync.datasetNote')))
+      + '</details>'
+      + '<p class="wsx-field__note wsx-esync__fine">' + esc(t('esync.excelFirst')) + '</p>'
       + '<p class="wsx-cform__err" id="es_err" role="alert"></p>'
-      + '<div class="wsx-cform__foot">' + esBtn('data-es-save="1"', t('esync.save'), true) + '</div>');
+      + '<div class="wsx-cform__foot wsx-esync__foot">' + esBtn('data-es-save="1"', t('esync.save'), true) + '</div>');
     if (!b) return;
     var who = b.querySelector('#es_who'), go = b.querySelector('[data-es-save]');
+    esClearOnInput(b, b.querySelector('#es_err'));
     who.addEventListener('keydown', function (e) { if (e.key === 'Enter') go.click(); });
-    go.addEventListener('click', function () { esSave(b, go); });
+    go.addEventListener('click', function () { esSave(b, go, fixedDs); });
   }
-  function esSave(root, btn) {
+  function esSave(root, btn, fixedDs) {
     var err = root.querySelector('#es_err'); err.textContent = '';
     var s = esSenders(root.querySelector('#es_who').value); if (s.err) { err.textContent = s.err; return; }
-    var ds = root.querySelector('#es_ds').value.trim() || 'data';
+    var dsEl = root.querySelector('#es_ds'), ds = dsEl ? dsEl.value.trim() : fixedDs;
+    if (!ds) { err.textContent = t(dsEl && dsEl.tagName === 'SELECT' ? 'esync.errDataset' : 'dsync.errName'); return; }
     if (!/^[A-Za-z0-9_.-]{1,64}$/.test(ds)) { err.textContent = t('dsync.errName'); return; }
-    var config = { dataset: ds }, tab = root.querySelector('#es_tab').value.trim(), att = root.querySelector('#es_att').value.trim();
+    var config = { dataset: ds }, tab = root.querySelector('#es_tab').value.trim(), att = esPattern(root.querySelector('#es_att').value);
     if (tab) config.sheet = tab;
     if (att) config.attachment = att;
     var label = btn.textContent; btn.disabled = true; btn.textContent = t('esync.saving');
@@ -99,47 +120,99 @@ export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dat
       if (!res.ok) { reset(esSendersErr(res.d)); return; }
       return esReq('POST', '/v1/jobs', { artifact_id: esArt.id, action: 'email_sheet_sync', trigger_type: 'event', event_type: 'email.received', config: config, title: t('esync.jobTitle') })
         .then(function (r2) {
-          if (!r2.ok || !r2.d.job) { reset(r2.d.error || t('autof.couldNotSave')); return; }
+          // Already on for that data (another tab or a double click): show it, nothing to undo.
+          if ((!r2.ok || !r2.d.job) && r2.d.code !== 'DUPLICATE_JOB') { reset(r2.d.error || t('autof.couldNotSave')); return; }
           if (esDone) esDone();
           esLoad(true);
         });
     }).catch(function () { reset(t('autof.couldNotSave')); });
   }
-  // What the last file did: rows written, or why it could not be used (the page kept its data).
-  function esStatus(st) {
-    var j = st.job || {}, up = st.lastUpdate, ranAt = esDate(j.lastRunAt), upAt = up && esDate(up.at);
-    if (j.lastStatus === 'failed' && (!upAt || (ranAt && ranAt > upAt))) {
-      return '<div class="wsx-esync__st is-fail" role="status"><p><b>' + esc(t('esync.failLine')) + '</b></p>' + (j.lastError ? '<p>' + esc(j.lastError) + '</p>' : '') + '<p class="wsx-field__note">' + esc(esWhen(j.lastRunAt)) + '</p></div>';
-    }
-    if (up) {
-      var when = esWhen(ranAt && upAt && ranAt > upAt && j.lastStatus === 'success' ? j.lastRunAt : up.at);
-      var line = up.rowCount != null ? t('esync.okLine').replace('{rows}', Number(up.rowCount).toLocaleString(locTag())).replace('{when}', when) : t('esync.okNoRows').replace('{when}', when);
-      return '<div class="wsx-esync__st is-ok" role="status"><p><b>\\u2713 ' + esc(line) + '</b></p>' + (up.file ? '<p class="wsx-field__note">' + esc(up.file + (up.sheet ? ' \\u00b7 ' + up.sheet : '')) + '</p>' : '') + '</div>';
-    }
-    return '<div class="wsx-esync__st is-idle" role="status"><p>' + esc(t('esync.notYet')) + '</p></div>';
+  // The address may only wrap right after its "@": each half stays whole.
+  function esAddr(a) {
+    var at = a.lastIndexOf('@');
+    if (at < 1) return '<span class="wsx-esync__nb">' + esc(a) + '</span>';
+    return '<span class="wsx-esync__nb">' + esc(a.slice(0, at)) + '</span><wbr><span class="wsx-esync__nb">' + esc(a.slice(at)) + '</span>';
   }
+  // What the last file did: rows written, why it could not be used (the page kept its data), or
+  // waiting for the first one — plus a mail that was turned away after that, and why.
+  function esStatus(st) {
+    var j = st.job || {}, up = st.lastUpdate, ranAt = esDate(j.lastRunAt), upAt = up && esDate(up.at), h;
+    if (j.lastStatus === 'failed' && (!upAt || (ranAt && ranAt > upAt))) {
+      h = '<div class="wsx-esync__st is-fail" role="status"><p><b>' + esc(t('esync.failLine')) + '</b></p>' + (j.lastError ? '<p>' + esc(j.lastError) + '</p>' : '') + '<p class="wsx-field__note">' + esc(esWhen(j.lastRunAt)) + '</p></div>';
+    } else if (up) {
+      var when = esWhen(ranAt && upAt && ranAt > upAt && j.lastStatus === 'success' ? j.lastRunAt : up.at);
+      var line = up.rowCount != null ? esT('esync.okLine', { rows: Number(up.rowCount).toLocaleString(locTag()), when: when }) : esT('esync.okNoRows', { when: when });
+      h = '<div class="wsx-esync__st is-ok" role="status"><p><b>\\u2713 ' + esc(line) + '</b></p>' + (up.file ? '<p class="wsx-field__note">' + esc(up.file + (up.sheet ? ' \\u00b7 ' + up.sheet : '')) + '</p>' : '') + '</div>';
+    } else if (st.lastEmail) {
+      h = '<div class="wsx-esync__st is-idle" role="status"><p>' + esc(t('esync.notYet')) + '</p></div>';
+    } else {
+      h = '<div class="wsx-esync__st is-wait" role="status"><p><span class="wsx-esync__dot" aria-hidden="true"></span>' + esc(t('esync.waiting')) + '</p></div>';
+    }
+    var rej = st.lastRejected, rejAt = rej && esDate(rej.at);
+    if (rej && rejAt && (!upAt || rejAt > upAt) && (!ranAt || rejAt > ranAt)) {
+      h += '<div class="wsx-esync__st is-fail" data-es-rejected="1"><p>' + esc(esT('esync.rejected', { from: rej.from || '', message: rej.message || '' })) + '</p><p class="wsx-field__note">' + esc(esWhen(rej.at)) + '</p></div>';
+    }
+    return h;
+  }
+  function esLastLine(st) {
+    var e = st.lastEmail; if (!e) return t('esync.noEmailYet');
+    return esT('esync.lastEmailLine', { from: e.from || '', when: esWhen(e.receivedAt) }) + (e.files && e.files.length ? ' \\u00b7 ' + e.files.join(', ') : '');
+  }
+  function esQuote(list) { return list.map(function (n) { return '\\u201c' + n + '\\u201d'; }).join(' / '); }
   function esManage(st, justOn) {
-    var j = st.job, senders = st.senders || [];
-    var last = st.lastEmail
-      ? esc(t('esync.lastEmailLine').replace('{from}', st.lastEmail.from || '').replace('{when}', esWhen(st.lastEmail.receivedAt))) + (st.lastEmail.files && st.lastEmail.files.length ? ' \\u00b7 ' + esc(st.lastEmail.files.join(', ')) : '')
-      : esc(t('esync.noEmailYet'));
-    var b = esBody('<p class="wsx-lens__intro"><b>' + esc(t(justOn ? 'esync.ready' : 'esync.sendTo')) + '</b></p>'
-      + '<div class="wsx-esync__addr"><code id="es_addr">' + esc(st.address || '') + '</code>' + esBtn('data-es-copy="1"', t('esync.copy'), true) + '</div>'
-      + '<p class="wsx-field__note">' + esc(t('esync.howTo').replace('{who}', senders.join(', '))) + '</p>'
+    var j = st.job, senders = st.senders || [], reads = esReads(st), lim = st.limits || {};
+    var off = st.state === 'inbox_off' || !st.address;
+    var mismatch = j.datasetReadByPage === false && reads.length;
+    var b = esBody((off
+        ? '<div class="wsx-slink__warn" role="alert" data-es-off="1"><p>' + esc(t('esync.inboxOff')) + '</p>' + esBtn('data-es-on="1"', t('esync.turnBackOn'), true) + '</div>'
+        : '<p class="wsx-lens__intro"><b>' + esc(t(justOn ? 'esync.ready' : 'esync.sendTo')) + '</b></p>'
+          + '<div class="wsx-esync__addr"><code id="es_addr">' + esAddr(st.address) + '</code>'
+          + '<div class="wsx-esync__acts">' + esBtn('data-es-copy="1"', t('esync.copy'), true)
+          + '<a class="wsx-abtn" href="mailto:' + esc(st.address) + '" data-es-mailto="1">' + esc(t('esync.mailto')) + '</a></div></div>')
+      + (mismatch ? '<div class="wsx-slink__warn" role="alert" data-es-dswarn="1"><p>' + esc(esT('esync.dsWarnOn', { name: j.dataset || '', reads: esQuote(reads.slice(0, 4)) })) + '</p><div class="wsx-esync__acts">'
+          + reads.slice(0, 4).map(function (n) { return esBtn('data-es-useds="' + esc(n) + '"', esT('esync.fixDs', { name: n }), false); }).join('') + '</div></div>' : '')
+      + '<h4 class="wsx-adet__h">' + esc(t('esync.howTitle')) + '</h4>'
+      + '<ol class="wsx-esync__steps"><li>' + esc(t('esync.step1')) + '</li><li>' + esc(esT('esync.step2', { who: senders.join(', ') })) + '</li><li>' + esc(t('esync.step3')) + '</li></ol>'
+      + '<p class="wsx-field__note">' + esc(esT('esync.fine', { mb: lim.fileMb || 8, rows: Number(lim.rows || 100000).toLocaleString(locTag()) })) + ' ' + esc(t('esync.excelFirst')) + '</p>'
+      + '<details class="wsx-adet__adv"><summary>' + esc(t('esync.fwdTitle')) + '</summary><p class="wsx-field__note">' + esc(t('esync.fwdBody')) + '</p></details>'
+      + '<h4 class="wsx-adet__h">' + esc(t('esync.lastUpdate')) + '</h4><div id="es_status">' + esStatus(st) + '</div>'
       + '<div class="wsx-esync__row"><span class="wsx-field__lbl">' + esc(t('esync.senders')) + '</span><button class="wsx-link" type="button" data-es-edit="1">' + esc(t('esync.change')) + '</button></div>'
       + '<div id="es_who_box"><p class="wsx-field__note">' + esc(senders.join(', ')) + '</p></div>'
-      + '<h4 class="wsx-adet__h">' + esc(t('esync.lastUpdate')) + '</h4><div id="es_status">' + esStatus(st) + '</div>'
-      + '<h4 class="wsx-adet__h">' + esc(t('esync.lastEmail')) + '</h4><p class="wsx-field__note" id="es_last">' + last + '</p>'
+      + '<h4 class="wsx-adet__h">' + esc(t('esync.lastEmail')) + '</h4><p class="wsx-field__note" id="es_last">' + esc(esLastLine(st)) + '</p>'
       + '<details class="wsx-adet__adv"><summary>' + esc(t('esync.more')) + '</summary>'
-      + '<p class="wsx-field__note">' + esc(t('dsync.dataset')) + ': ' + esc(j.dataset || '') + (j.sheet ? ' \\u00b7 ' + esc(t('dsync.tab')) + ': ' + esc(j.sheet) : '') + (j.attachment ? ' \\u00b7 ' + esc(j.attachment) : '') + '</p>'
+      + '<p class="wsx-field__note">' + esc(t('esync.dataset')) + ': ' + esc(j.dataset || '') + (j.sheet ? ' \\u00b7 ' + esc(t('esync.sheet')) + ': ' + esc(j.sheet) : '') + (j.attachment ? ' \\u00b7 ' + esc(esT('esync.attStarts', { p: esPatternShow(j.attachment) })) : '') + '</p>'
       + esBtn('data-es-stop="1"', t('esync.stop'), false) + '</details>'
       + '<p class="wsx-cform__err" id="es_err" role="alert"></p>'
-      + '<div class="wsx-cform__foot">' + esBtn('data-es-close="1"', t('common.close'), false) + '</div>');
+      + '<div class="wsx-cform__foot wsx-esync__foot">' + esBtn('data-es-close="1"', t('common.close'), false) + '</div>');
     if (!b) return;
     var err = b.querySelector('#es_err');
-    b.querySelector('[data-es-copy]').addEventListener('click', function () { esCopy(st.address || ''); });
+    var copy = b.querySelector('[data-es-copy]');
+    if (copy) copy.addEventListener('click', function () { esCopy(st.address || '', copy); });
     b.querySelector('[data-es-close]').addEventListener('click', function () { esMo.close(); });
     b.querySelector('[data-es-edit]').addEventListener('click', function () { esEditSenders(b, senders); });
+    var on = b.querySelector('[data-es-on]');
+    if (on) on.addEventListener('click', function () {
+      if (!senders.length) { esEditSenders(b, senders); return; }
+      on.disabled = true;
+      // Saving who may send turns the address back on (same call as setup).
+      esReq('PUT', esUrl('/senders'), { senders: senders }).then(function (res) {
+        if (!res.ok) { on.disabled = false; err.textContent = esSendersErr(res.d); return; }
+        wsxToast(t('esync.backOn')); esLoad(false);
+      }).catch(function () { on.disabled = false; err.textContent = t('autof.couldNotSave'); });
+    });
+    b.querySelectorAll('[data-es-useds]').forEach(function (u) {
+      u.addEventListener('click', function () {
+        var name = u.getAttribute('data-es-useds'), config = { dataset: name };
+        if (j.sheet) config.sheet = j.sheet;
+        if (j.attachment) config.attachment = j.attachment;
+        u.disabled = true;
+        esReq('PATCH', '/v1/jobs/' + encodeURIComponent(j.id), { config: config }).then(function (res) {
+          if (!res.ok) { u.disabled = false; err.textContent = res.d.error || t('autof.couldNotSave'); return; }
+          if (esDone) esDone();
+          wsxToast(esT('esync.fixedDs', { name: name })); esLoad(false);
+        }).catch(function () { u.disabled = false; err.textContent = t('autof.couldNotSave'); });
+      });
+    });
     var stop = b.querySelector('[data-es-stop]'), armed = false;
     stop.addEventListener('click', function () {
       if (!armed) { armed = true; err.textContent = t('esync.stopConfirm'); stop.textContent = t('esync.stopSure'); return; }
@@ -161,7 +234,7 @@ export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dat
         if (gen !== esPoll || !esOpen() || !res.ok || !res.d.job) return;
         var s = esMo.body.querySelector('#es_status'), l = esMo.body.querySelector('#es_last');
         if (s) s.innerHTML = esStatus(res.d);
-        if (l && res.d.lastEmail) l.textContent = t('esync.lastEmailLine').replace('{from}', res.d.lastEmail.from || '').replace('{when}', esWhen(res.d.lastEmail.receivedAt)) + (res.d.lastEmail.files && res.d.lastEmail.files.length ? ' \\u00b7 ' + res.d.lastEmail.files.join(', ') : '');
+        if (l) l.textContent = esLastLine(res.d);
         esWatch(gen);
       }).catch(function () { esWatch(gen); });
     }, 10000);
@@ -171,6 +244,7 @@ export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dat
     box.innerHTML = '<label class="wsx-field"><input class="wsx-field__in" id="es_who2" type="email" multiple autocomplete="email" spellcheck="false" value="' + esc(senders.join(', ')) + '" aria-label="' + esc(t('esync.senders')) + '"></label>'
       + '<p class="wsx-field__note">' + esc(t('esync.whoNote')) + '</p>' + esBtn('data-es-who-save="1"', t('esync.saveSenders'), true);
     var inp = box.querySelector('#es_who2'), btn = box.querySelector('[data-es-who-save]');
+    esClearOnInput(box, err);
     inp.focus();
     btn.addEventListener('click', function () {
       err.textContent = '';
@@ -184,8 +258,9 @@ export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dat
       }).catch(function () { btn.disabled = false; err.textContent = t('autof.couldNotSave'); });
     });
   }
-  function esCopy(txt) {
-    var done = function () { wsxToast(t('esync.copied')); };
+  // The button itself says it worked ("✓ Copied") for two seconds.
+  function esCopy(txt, btn) {
+    var done = function () { if (!btn) return; btn.textContent = t('esync.copied'); setTimeout(function () { if (btn.isConnected) btn.textContent = t('esync.copy'); }, 2000); };
     var fail = function () { var c = esMo && esMo.body.querySelector('#es_addr'); if (c && window.getSelection) { var r = document.createRange(); r.selectNodeContents(c); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); } };
     try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt).then(done, fail); return; } } catch (e) { /* fall back */ }
     fail();

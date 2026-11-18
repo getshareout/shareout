@@ -121,6 +121,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
         <button class="wsx-abtn wsx__tabreq" id="wsxTabReqEdit" type="button" hidden data-i18n="tabs.requestEdit">Request edit access</button>
         <button class="wsx__tabdevice" id="wsxTabDevice" type="button" hidden aria-pressed="false" data-i18n-title="tabs.mobilePreview" data-i18n-aria="tabs.mobilePreview" title="Toggle mobile preview" aria-label="Toggle mobile preview">${svg('<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>')}</button>
         <button class="wsx__tabdevice" id="wsxTabFull" type="button" hidden data-i18n-title="tabs.fullScreen" data-i18n-aria="tabs.fullScreen" title="Full screen" aria-label="View full screen">${svg('<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>')}</button>
+        <button class="wsx__inspbtn" id="wsxInspBtn" type="button" hidden aria-expanded="false" data-i18n-title="inspector.openPanelAria" data-i18n-aria="inspector.openPanelAria" title="Details, comments and automations" aria-label="Details, comments and automations">${svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/>')}<span data-i18n="inspector.openPanel">Options</span></button>
         <span class="wsx__sharewrap" id="wsxShareWrap" hidden><button class="wsx-abtn wsx-abtn--primary" id="wsxShareBtn" type="button" aria-haspopup="dialog" aria-expanded="false" data-i18n="share.button">Share</button></span>
       </div>
       <div class="wsx__panes" id="wsxPanes">
@@ -256,6 +257,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
     </main>
 
     <aside class="wsx__activity">
+      <button class="wsx__inspclose" id="wsxInspClose" type="button" data-i18n-aria="common.close" aria-label="Close">${svg('<path d="M18 6L6 18M6 6l12 12"/>')}</button>
       <button class="wsx__acthandle" id="wsxActHandle" type="button" data-i18n-aria="widget.resize" data-i18n-title="widget.resize" aria-label="Drag to resize panel" title="Drag to resize"></button>
       <div class="wsx__rtabs" id="wsxRtabs"></div>
       <div class="wsx__rbody" id="wsxRbody"></div>
@@ -264,6 +266,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
 
   <div class="wsx-newmenu" id="wsxNewMenu" role="menu" data-i18n-aria="new.menu" aria-label="Create something new" hidden></div>
   <div class="wsx__railscrim" id="wsxRailScrim" hidden></div>
+  <div class="wsx__inspscrim" id="wsxInspScrim" hidden></div>
   <div class="wsx__scrim" id="wsxScrim" hidden></div>
   <section class="wsx__composer" id="wsxComposer" data-state="resting" aria-labelledby="wsxComposerTitle">
     <button type="button" class="wsx__pill" id="wsxPill" aria-haspopup="dialog"><span class="wsx__pill-text" data-i18n="composer.pill">Ask your workspace…</span><span class="wsx__pill-dot" id="wsxPillDot" hidden><span class="wsx-sr" data-i18n="composer.unread">New message</span></span></button>

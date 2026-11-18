@@ -119,8 +119,9 @@ describe('home shell assets', () => {
       // shared-link sheet sync (slink.*): es measured 128.2 KB, budget = that + ~0.5%. Raised for
       // the Google Drive share panel (one service account per workspace): es measured 129.8 KB,
       // budget = that + ~0.5%. Raised for "Update by email" (esync.*): es measured 132.6 KB,
-      // budget = that + ~0.5%.
-      expect(new TextEncoder().encode(copy).length, l).toBeLessThan(133_300);
+      // budget = that + ~0.5%. Raised for the email-update fixes (three steps, phone sheet, data-in
+      // group): es measured 134.7 KB, budget = that + ~0.5%.
+      expect(new TextEncoder().encode(copy).length, l).toBeLessThan(135_400);
     }
     for (const [name, c] of Object.entries(LAZY_CHUNKS)) expect(text.includes(c.src), `${name} is not in the boot shell`).toBe(false);
   });

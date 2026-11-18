@@ -249,8 +249,10 @@ describe('knowledge_reindex', () => {
 
 describe('workspace isolation', () => {
   it('refuses a workspace the token does not belong to, before reading it', async () => {
+    // Each tool gets only the arguments it takes: unknown ones are refused by name.
+    const own: Record<string, Record<string, string>> = { knowledge_search: { query: 'Contoso' }, knowledge_entity: { name: 'Contoso' }, knowledge_facts: { about: 'Contoso' }, knowledge_status: {} };
     for (const name of ['knowledge_search', 'knowledge_entity', 'knowledge_facts', 'knowledge_status']) {
-      const r = await callTool(ana, name, { workspace_id: WS_B, query: 'Contoso', name: 'Contoso', about: 'Contoso' });
+      const r = await callTool(ana, name, { workspace_id: WS_B, ...own[name] });
       expect(r!.isError, name).toBe(true);
       expect(text(r), name).toMatch(/not a member of that workspace/);
       expect(text(r), name).not.toContain('70k');

@@ -45,6 +45,30 @@ Sola, la casilla solo junta correos. Combinala con una [**automatización**](/es
 
 Configurás una vez la automatización "cuando llega un email" y corre siempre — convirtiendo tu casilla en acción.
 
+## Actualizá los números de tu artefacto mandando el Excel por email
+
+¿Alguien te manda la misma planilla todas las semanas? Tu artefacto puede actualizarse solo con
+ella. Abrí el artefacto desde Inicio y elegí **Actualizar por email**. Decí quién manda el archivo
+(solo su email), tocá **Activar** y vas a tener la dirección del artefacto. Después, cada vez:
+
+1. Abrí tu correo.
+2. Escribí un email nuevo a la dirección del artefacto.
+3. Adjuntá el Excel y mandalo. El asunto y el texto no importan.
+
+Unos segundos después el artefacto muestra los números nuevos. Bueno saber:
+
+- La **primera fila** de la primera hoja son los títulos de las columnas.
+- Cada archivo **reemplaza** los datos que muestra el artefacto.
+- Solo las personas que pusiste pueden actualizarlo; el correo de cualquier otra persona se
+  devuelve. Usá la dirección completa (por ejemplo `ana@gmail.com`), no todo `@gmail.com`.
+- Si un archivo no se puede usar, el artefacto mantiene los números anteriores y te llega un email
+  diciendo por qué.
+- Límites: 8 MB y 100.000 filas por archivo, 25 MB por email, 200 emails por día.
+- ¿Preferís no pensar en eso? En Outlook, una regla puede reenviar ese email a la dirección del
+  artefacto (agregá al remitente original a quién puede mandarlo). El reenvío automático de Gmail
+  pide una confirmación que la dirección del artefacto todavía no puede responder, así que desde
+  Gmail mandá el archivo a mano.
+
 ## Un ejemplo real
 
 1. Hacé un artefacto **"Gastos"** y activá su inbox → `gastos@inbox.YOUR_DOMAIN`.
@@ -56,7 +80,7 @@ Ahora cada factura entra y se resuelve sola — vos no hacés nada.
 ## Vos tenés el control
 
 - **Remitentes permitidos** — dejala abierta a cualquiera, o limitala a ciertas personas o dominios (por ejemplo, solo `@tuempresa.com`). Los remitentes falsificados se rechazan automáticamente.
-- **Apagala** cuando quieras. Los mails nuevos se rechazan; todo lo que ya recibiste queda.
+- **Apagala** cuando quieras. Los mails nuevos se rechazan; todo lo que ya recibiste queda. (Un artefacto que se actualiza por email apaga su dirección cuando dejás de **Actualizar por email**.)
 - Es **por artefacto y opcional** — nada recibe correo hasta que lo activás.
 
 ## Qué sigue

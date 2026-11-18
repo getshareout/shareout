@@ -11,6 +11,7 @@ Create or update an artifact.
 {
   "name": "My App",
   "slug": "my-app",
+  "workspace_id": "wsp_…",
   "entrypoint": "index.html",
   "files": [
     {
@@ -41,6 +42,7 @@ Create or update an artifact.
   "deployment": {
     "slug": "my-app",
     "url": "$ORIGIN/a/my-app/",
+    "subdomain_url": "https://acme.example.com/my-app/",
     "mobile_url": "$ORIGIN/a/my-app/?v=mobile"
   },
   "pwa": {
@@ -106,6 +108,7 @@ Tell the user the page is private and why; don't call the link public and don't 
 | `slug` | string | No | Human-facing slug (auto-generated from `name` if omitted). Unique **per workspace** (or per owner for personal artifacts). Drives subdomain/namespaced URLs and publish dedup. |
 | `entrypoint` | string | No | Default: `index.html`, or the only file's path when `files` has a single file (e.g. a lone `data.csv`). Must name a path in `files` |
 | `files` | FileEntry[] | Yes | Files to publish. Each `path` is relative with `/` between folders (`index.html`, `img/logo@2x.png`, `css/a+b.css`): no `..`, no leading `/`, no backslash, no empty or `.` segments (`a//b`, `./x`), no control characters, at most 512 characters. A bad path returns `400 INVALID_PATH` with a `hint` naming it |
+| `workspace_id` | string | No | Publish into this workspace (id from `GET /v1/workspaces`) so its members see it; the caller must be a member (else `403 FORBIDDEN`). Omit it on a first publish and the page lands in the caller's personal space; republishing the same `slug` keeps a workspace page in its workspace. Workspace pages answer with `deployment.subdomain_url` — the link to share |
 | `visibility` | string | No | Omitted → `public` when the instance and account allow it, otherwise `private` with `visibility_downgraded` (see above). `private` (owner + explicitly shared), `workspace` (all members of the artifact's workspace), `public` (anyone on the internet with the link; discoverable). (`unlisted` is a retired legacy alias, still accepted and treated as `public`.) |
 | `mobile_html` | string | No | Mobile-specific HTML |
 | `pwa` | PWAConfig | No | PWA configuration |
