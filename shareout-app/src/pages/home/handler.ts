@@ -2,7 +2,7 @@
  * Main request handler: loads home page data and renders the SSR response.
  */
 import type { Env } from '../../types';
-import { configuredProviders } from '../../file-imports/oauth';
+import { importMenuProviders } from '../../file-imports/service-account';
 import { getVisibilityScope, placeholders } from '../../account-links';
 import { inboxEmailDomain } from '../../scheduling/email';
 import { getPlatformOrigin } from '../../config/origins';
@@ -158,7 +158,7 @@ async function buildHomeBody(
     isInstanceAdmin,
     slidesImport: !!env.SLIDES_CONVERTER,
     openVisibilityAllowed: !!user.email && (await resolveAllowOpen(env, user.id, null)),
-    fileImportProviders: configuredProviders(env),
+    fileImportProviders: importMenuProviders(env),
     platformOrigin: getPlatformOrigin(env),
     appVersion: env.CF_VERSION_METADATA?.id?.slice(0, 7) || '',
     createEnabled,

@@ -121,7 +121,7 @@ export const workspace_client_home_views_fileImport_JS = `  // ===== Import from
       var root = [{ ref: 'root', name: t('fimp.share.sharedWith') }];
       var b = fiBody('<div class="wsx-sched__title">' + esc(t('fimp.share.title')) + '</div>'
         + '<ol class="wsx-cn__steps"><li>' + esc(t('fimp.share.step1')) + '</li>'
-        + '<li>' + esc(t('fimp.share.step2')) + ' <code id="fiShareEmail">' + esc(s.shareEmail) + '</code> ' + fiBtn('id="fiCopy"', t('fimp.share.copy'), false) + '</li>'
+        + '<li>' + esc(t('fimp.share.step2')) + '<div class="wsx-skill__btns"><code id="fiShareEmail" style="word-break:break-all">' + esc(s.shareEmail) + '</code> ' + fiBtn('id="fiCopy"', t('fimp.share.copy'), false) + '</div></li>'
         + '<li>' + esc(t('fimp.share.step3')) + '</li></ol>'
         + '<p class="wsx-field__note">' + esc(t('fimp.share.only')) + '</p>'
         + '<p class="wsx-field__note">' + esc(t('fimp.share.blocked')) + '</p>'

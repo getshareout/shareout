@@ -20,7 +20,7 @@ import { runDueFileImports } from '../../../src/file-imports/schedule';
 import { timing } from '../../../src/file-imports/http';
 import { DEFAULT_LIMITS } from '../../../src/file-imports/types';
 import {
-  ShareAccountError, ensureServiceAccount, minterKey, resetServiceAccountCaches, serviceAccountFor, signJwt,
+  ShareAccountError, ensureServiceAccount, importMenuProviders, minterKey, resetServiceAccountCaches, serviceAccountFor, signJwt,
   sweepOrphanedServiceAccounts, workspaceDriveToken,
 } from '../../../src/file-imports/service-account';
 import { driveIdFromLink } from '../../../src/file-imports/providers/google-shared';
@@ -96,6 +96,13 @@ describe('the instance key and JWT', () => {
     expect(minterKey(e)?.project_id).toBe('so-test-proj');
     expect(minterKey({ ...e, GOOGLE_DRIVE_SA_KEY: '{"client_email":"x"}' } as typeof e)).toBeNull();
     expect(minterKey({ ...e, GOOGLE_DRIVE_SA_KEY: 'not json' } as typeof e)).toBeNull();
+  });
+
+  it('the import menu shows Google Drive with only the sharing key set (no OAuth client)', () => {
+    const only = { ...e, GOOGLE_DRIVE_CLIENT_ID: undefined, GOOGLE_DRIVE_CLIENT_SECRET: undefined } as typeof e;
+    expect(importMenuProviders(only)).toEqual(['google_drive']);
+    expect(importMenuProviders({ ...only, GOOGLE_DRIVE_SA_KEY: undefined } as typeof e)).toEqual([]);
+    expect(importMenuProviders(e)).toEqual(['google_drive']);
   });
 
   it('signs an RS256 assertion for the token endpoint, valid for one hour', async () => {

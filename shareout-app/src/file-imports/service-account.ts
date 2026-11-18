@@ -18,8 +18,10 @@
  *   https://docs.cloud.google.com/iam/quotas
  */
 import type { Env } from '../types';
+import type { FileImportProvider } from './types';
 import { createLogger } from '../logging';
 import { errorText } from './http';
+import { configuredProviders } from './oauth';
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const IAM = 'https://iam.googleapis.com/v1';
@@ -82,6 +84,12 @@ export function minterKey(env: Env): MinterKey | null {
 
 export function serviceAccountConfigured(env: Env): boolean {
   return !!minterKey(env);
+}
+
+/** What the import menu offers: the OAuth providers, plus Google Drive when it works by sharing. */
+export function importMenuProviders(env: Env): FileImportProvider[] {
+  const oauth = configuredProviders(env);
+  return serviceAccountConfigured(env) && !oauth.includes('google_drive') ? ['google_drive', ...oauth] : oauth;
 }
 
 // ---- JWT (RS256) -----------------------------------------------------------------
