@@ -7089,7 +7089,7 @@ paths:
                   description: "`template: table` only: the spreadsheet."
                   properties:
                     name: { type: string, description: "File name, ending in .xlsx or .csv (also the page's title)." }
-                    content: { type: string, format: byte, description: The file, base64. }
+                    content: { type: string, format: byte, description: "The file, base64." }
       responses:
         "200":
           description: Created

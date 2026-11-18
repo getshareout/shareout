@@ -11828,8 +11828,7 @@
                       "content": {
                         "type": "string",
                         "format": "byte",
-                        "description": "The file",
-                        "base64.": null
+                        "description": "The file, base64."
                       }
                     }
                   }
