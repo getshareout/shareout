@@ -7,12 +7,23 @@
  *   https://developers.google.com/workspace/drive/api/reference/rest/v3/drives/list
  *   https://developers.google.com/workspace/drive/api/guides/enable-shareddrives
  */
-import type { BrowseEntry, BrowseResult, ProviderApi, RemoteDownload, RemoteEntry, RemoteListing, RemoteLocation } from '../types';
-import { AuthExpiredError, fetchWithBackoff, getJson } from '../http';
+import type { BrowseEntry, BrowseOptions, BrowseResult, ProviderApi, RemoteDownload, RemoteEntry, RemoteListing, RemoteLocation } from '../types';
+import { AuthExpiredError, ProviderError, fetchWithBackoff, getJson } from '../http';
 import { GOOGLE_FOLDER_MIME, planGoogleFile } from '../export-map';
 
 const API = 'https://www.googleapis.com/drive/v3';
 const ID = /^[A-Za-z0-9_-]{1,200}$/;
+/** What a single-file sync accepts as a Drive file id. */
+export const DRIVE_FILE_ID = ID;
+/** Files mode lists these: Excel, OpenDocument, CSV and native Google Sheets (exported as .xlsx). */
+export const SHEET_MIMES = [
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+  'application/vnd.ms-excel.sheet.macroEnabled.12',
+  'application/vnd.oasis.opendocument.spreadsheet',
+  'text/csv',
+  'application/vnd.google-apps.spreadsheet',
+];
 const FILE_FIELDS = 'nextPageToken,files(id,name,mimeType,size,modifiedTime)';
 
 interface DriveFile { id: string; name: string; mimeType: string; size?: string; modifiedTime?: string }
@@ -52,6 +63,29 @@ async function folderRows(token: string, query: string, driveId: string | null, 
   return out;
 }
 
+async function sheetRows(token: string, query: string, driveId: string | null, refDrive: string): Promise<BrowseEntry[]> {
+  const out: BrowseEntry[] = [];
+  const mimes = SHEET_MIMES.map((m) => `mimeType = '${m}'`).join(' or ');
+  let page: string | undefined;
+  do {
+    const r = await getJson<FileList>(listUrl(`${query} and (${mimes}) and trashed = false`, driveId, page, 'nextPageToken,files(id,name,mimeType,modifiedTime)'), token);
+    for (const f of r.files || []) {
+      out.push({ ref: `file:${refDrive}:${f.id}`, name: f.name, kind: 'file', selectable: true, fileId: f.id, mime: f.mimeType, modifiedAt: f.modifiedTime });
+    }
+    page = r.nextPageToken;
+  } while (page && out.length < 1000);
+  return out;
+}
+
+/** One file's metadata: what a single-file sync checks before it downloads anything. */
+export async function getDriveFile(token: string, fileId: string): Promise<RemoteEntry> {
+  if (!ID.test(fileId)) throw new ProviderError(400, 'VALIDATION_ERROR', 'Not a Google Drive file id.');
+  const p = new URLSearchParams({ fields: 'id,name,mimeType,size,modifiedTime,trashed', supportsAllDrives: 'true' });
+  const f = await getJson<DriveFile & { trashed?: boolean }>(`${API}/files/${encodeURIComponent(fileId)}?${p}`, token);
+  if (f.trashed) throw new ProviderError(404, 'NOT_FOUND', 'The file is in the Drive trash.');
+  return toEntry(f);
+}
+
 export const googleDrive: ProviderApi = {
   id: 'google_drive',
 
@@ -88,7 +122,14 @@ export const googleDrive: ProviderApi = {
     };
   },
 
-  async browse(token: string, ref: string): Promise<BrowseResult> {
+  async browse(token: string, ref: string, _query?: string, opts?: BrowseOptions): Promise<BrowseResult> {
+    // Files mode picks one spreadsheet: folders are only for opening, the sheets are the picks.
+    const files = opts?.files === 'sheets';
+    const level = async (query: string, driveId: string | null, refDrive: string): Promise<BrowseEntry[]> => {
+      const folders = await folderRows(token, query, driveId, refDrive);
+      if (!files) return folders;
+      return [...folders.map((f) => ({ ...f, selectable: false })), ...await sheetRows(token, query, driveId, refDrive)];
+    };
     if (ref === 'root') {
       const entries: BrowseEntry[] = [
         { ref: 'my', name: 'My Drive', kind: 'drive', selectable: true },
@@ -102,13 +143,13 @@ export const googleDrive: ProviderApi = {
         for (const d of r.drives || []) entries.push({ ref: `drive:${d.id}`, name: d.name, kind: 'drive', selectable: true });
         page = r.nextPageToken;
       } while (page && entries.length < 500);
-      return { entries };
+      return { entries: files ? entries.map((e) => ({ ...e, selectable: false })) : entries };
     }
-    if (ref === 'my') return { entries: await folderRows(token, "'root' in parents", null, '-') };
-    if (ref === 'shared') return { entries: await folderRows(token, 'sharedWithMe', null, '-') };
+    if (ref === 'my') return { entries: await level("'root' in parents", null, '-') };
+    if (ref === 'shared') return { entries: await level('sharedWithMe', null, '-') };
     const loc = await this.locate(token, ref);
     if (!loc) return { entries: [] };
-    return { entries: await folderRows(token, `'${q(loc.folderId)}' in parents`, loc.driveId, loc.driveId ?? '-') };
+    return { entries: await level(`'${q(loc.folderId)}' in parents`, loc.driveId, loc.driveId ?? '-') };
   },
 
   async locate(_token: string, ref: string): Promise<RemoteLocation | null> {

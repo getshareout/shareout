@@ -97,6 +97,7 @@ export const JOB_ACTIONS = [
   'sheets_append',
   'artifact_test',
   'asset_delivery',
+  'drive_file_sync',
 ] as const;
 
 export const JOB_TRIGGER_TYPES = ['cron', 'event'] as const;
@@ -157,6 +158,20 @@ export interface QuerySnapshotConfig {
   }>;
 }
 
+/** Config for the `drive_file_sync` action: one tab of a Google Drive spreadsheet (Excel,
+ *  Google Sheets, OpenDocument or CSV) → the artifact's dataset `dataset` (JSON rows keyed
+ *  by the header row), read through the job owner's Drive connection. Skips the write
+ *  when the file has not changed since the last sync. */
+export interface DriveFileSyncConfig {
+  provider?: 'google_drive';
+  fileId: string;
+  /** Shown in the UI only; the sync reads the live name from Drive. */
+  fileName?: string;
+  /** Tab name. Empty = the first tab with cells. */
+  sheet?: string;
+  dataset: string;
+}
+
 /** Config for the `sheets_append` action: append query rows to a Google Sheet. */
 export interface SheetsAppendConfig {
   spreadsheetId?: string;
@@ -180,7 +195,8 @@ export type JobConfig =
   | QuerySnapshotConfig
   | SheetsAppendConfig
   | ArtifactTestJobConfig
-  | AssetDeliveryConfig;
+  | AssetDeliveryConfig
+  | DriveFileSyncConfig;
 
 /** Config for the `asset_delivery` action: email a file collection's download link on a
  *  schedule. The job is anchored to the workspace's asset-bucket artifact. (work/042 P4) */

@@ -10,6 +10,7 @@ import { querySnapshotDestination } from './destinations/query-snapshot';
 import { sheetsAppendDestination } from './destinations/sheets-append';
 import { artifactTestDestination } from './destinations/artifact-test';
 import { assetDeliveryDestination } from './destinations/asset-delivery';
+import { driveFileSyncDestination } from './destinations/drive-file-sync';
 
 const REGISTRY: Record<string, Destination<any>> = {
   slack: slackDestination,
@@ -23,6 +24,7 @@ const REGISTRY: Record<string, Destination<any>> = {
   sheets_append: sheetsAppendDestination,
   artifact_test: artifactTestDestination,
   asset_delivery: assetDeliveryDestination,
+  drive_file_sync: driveFileSyncDestination,
 };
 
 export function getDestination(kind: string): Destination<any> | null {
