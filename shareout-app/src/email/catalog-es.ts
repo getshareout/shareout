@@ -238,7 +238,7 @@ export const EMAILS_ES: Partial<Record<EmailType, Builder>> = {
 
   job_failed: ({ jobName, error, via }: JobFailedData, { baseUrl }) => {
     const next = via === 'email'
-      ? 'La página mantiene los datos anteriores. Corregí el archivo y mandalo de nuevo por email.'
+      ? 'El artefacto mantiene los datos anteriores. Corregí el archivo y mandalo de nuevo por email.'
       : 'Va a volver a intentar en el próximo horario programado. Abrí Programaciones para arreglarla o correrla ahora.';
     return {
       subject: `Falló tu programación "${jobName}"`,
