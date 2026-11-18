@@ -450,7 +450,7 @@ Safety (the point of this action):
 
 - **Allowed senders first.** `PUT /v1/artifacts/{id}/email-sync/senders { "senders": ["ana@acme.com"] }`
   turns the inbox on and returns the `address`. Creating the job with nobody allowed is refused,
-  and so is a whole free-mail domain (`@gmail.com`). The list cannot be emptied while the job exists.
+  and so is a whole free-mail domain (`@gmail.com`). While the job exists the list cannot be emptied or given a free-mail domain (also through the inbox API).
 - **Verified senders only.** Mail is bounced unless the header From is on the list and Cloudflare
   vouches for its domain (DMARC pass, or a DKIM signature by that domain). Each run checks again.
 - Nothing in the mail is executed or rendered; a `.xlsx` must be a real zip, a `.csv` plain text.

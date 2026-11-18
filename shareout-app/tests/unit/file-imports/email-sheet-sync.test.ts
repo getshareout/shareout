@@ -272,7 +272,18 @@ describe('email_sheet_sync — setting it up', () => {
     const put = (allowlist: unknown) => handleInbox(new Request('https://x/inbox/allowlist', { method: 'PUT', body: JSON.stringify({ allowlist }) }), ctx, '/allowlist');
     expect((await put(null)).status).toBe(400);
     expect((await put([])).status).toBe(400);
+    // A whole free-mail domain would let any Gmail sender past the door: refused, alone or mixed in.
+    for (const list of [['@gmail.com'], [SENDER, '@gmail.com'], ['Outlook.com']]) {
+      const res = await put(list);
+      expect(res.status, JSON.stringify(list)).toBe(400);
+      expect(JSON.stringify(await res.json())).toMatch(/would let anyone with such an address/);
+    }
+    const enable = await handleInbox(new Request('https://x/inbox/enable', { method: 'POST', body: JSON.stringify({ allowlist: ['@hotmail.com'] }) }), ctx, '/enable');
+    expect(enable.status).toBe(400);
     expect((await getInboxStatus(e, ART)).allowlist).toEqual([SENDER]);
+    // A company domain or another exact address is fine.
+    expect((await put([SENDER, '@acme.test'])).status).toBe(200);
+    expect((await put([SENDER])).status).toBe(200);
   });
 });
 

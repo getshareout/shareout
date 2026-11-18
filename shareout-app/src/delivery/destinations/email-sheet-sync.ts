@@ -127,7 +127,7 @@ export const FREE_MAIL_DOMAINS = new Set([
   'gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'live.com', 'msn.com', 'yahoo.com',
   'icloud.com', 'me.com', 'aol.com', 'proton.me', 'protonmail.com', 'gmx.com', 'mail.com', 'yandex.com',
 ]);
-const isFreeMailDomain = (entry: string) => !entry.slice(1).includes('@') && FREE_MAIL_DOMAINS.has(entry.replace(/^@/, ''));
+export const isFreeMailDomain = (entry: string) => !entry.slice(1).includes('@') && FREE_MAIL_DOMAINS.has(entry.replace(/^@/, ''));
 
 /** The inbox allowlist as this action honours it: free-mail domain entries do not count. */
 async function allowlistOf(env: Env, artifactId: string): Promise<{ senders: string[]; freeMail: string[] }> {

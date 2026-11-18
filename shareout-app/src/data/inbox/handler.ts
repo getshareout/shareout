@@ -2,6 +2,7 @@ import type { DataContext } from '../middleware';
 import { errorResponse, successResponse, verifyOwner } from '../middleware';
 import { DATA_ERRORS } from '../../types';
 import { Errors } from '../errors';
+import { isFreeMailDomain } from '../../delivery/destinations/email-sheet-sync';
 import {
   getInboxStatus,
   enableInbound,
@@ -48,15 +49,20 @@ function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
 }
 
-// An empty list lets anyone send, so a page that updates its data by email keeps at least one.
+// While the page updates its data by email, the list is what keeps strangers out: it cannot be
+// emptied, and a whole free-mail domain (anyone with a Gmail address) is refused, as at job creation.
 const SENDERS_REQUIRED = Errors.validation('allowlist', 'This page updates its data by email, so keep at least one allowed sender (or remove the email sync first).', { example: '["person@company.com"]' });
+const FREE_MAIL_REFUSED = (entry: string) => Errors.validation('allowlist', `"${entry}" would let anyone with such an address update this page by email. List the exact addresses instead.`, { example: '["person@gmail.com"]' });
 
-async function emptiesEmailSync(ctx: DataContext, allowlist: string[] | null): Promise<boolean> {
-  if ((allowlist || []).some((s) => s.trim())) return false;
+async function emailSyncRefuses(ctx: DataContext, allowlist: string[] | null) {
+  const entries = (allowlist || []).map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const free = entries.find(isFreeMailDomain);
+  if (entries.length && !free) return null;
   const job = await ctx.env.DB.prepare(
     "SELECT 1 AS x FROM scheduled_jobs WHERE artifact_id = ? AND action = 'email_sheet_sync' LIMIT 1"
   ).bind(ctx.artifactId).first<{ x: number }>();
-  return !!job;
+  if (!job) return null;
+  return free ? FREE_MAIL_REFUSED(free) : SENDERS_REQUIRED;
 }
 
 export async function handleInbox(
@@ -79,7 +85,8 @@ export async function handleInbox(
       if (Array.isArray(body?.allowlist)) allowlist = body.allowlist;
       else if (body?.allowlist != null) return errorResponse(ALLOWLIST_INVALID, ctx.origin);
     } catch { /* no body is fine */ }
-    if (allowlist !== undefined && await emptiesEmailSync(ctx, allowlist)) return errorResponse(SENDERS_REQUIRED, ctx.origin);
+    const refused = allowlist !== undefined ? await emailSyncRefuses(ctx, allowlist) : null;
+    if (refused) return errorResponse(refused, ctx.origin);
     await enableInbound(ctx.env, ctx.artifactId);
     if (allowlist !== undefined) await setInboundAllowlist(ctx.env, ctx.artifactId, allowlist);
     return successResponse(await getInboxStatus(ctx.env, ctx.artifactId), 200, ctx.origin);
@@ -99,7 +106,8 @@ export async function handleInbox(
       return errorResponse(DATA_ERRORS.INVALID_JSON, ctx.origin);
     }
     if (allowlist !== null && !isStringArray(allowlist)) return errorResponse(ALLOWLIST_INVALID, ctx.origin);
-    if (await emptiesEmailSync(ctx, allowlist)) return errorResponse(SENDERS_REQUIRED, ctx.origin);
+    const refused = await emailSyncRefuses(ctx, allowlist);
+    if (refused) return errorResponse(refused, ctx.origin);
     await setInboundAllowlist(ctx.env, ctx.artifactId, allowlist);
     return successResponse(await getInboxStatus(ctx.env, ctx.artifactId), 200, ctx.origin);
   }
