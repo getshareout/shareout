@@ -197,6 +197,7 @@ export async function handleUpdateJob(
 
   const result = await updateJob(env, user.id, jobId, body);
 
+  if (result.code === 'DUPLICATE_JOB') return jsonResponse({ error: result.error, code: result.code, job_id: result.existingJobId }, 409);
   if (result.error) {
     const status = result.error === 'Job not found' ? 404 : result.error === 'Permission denied' ? 403 : 400;
     return errorResponse(result.error, result.error === 'Job not found' ? 'NOT_FOUND' : 'INVALID_REQUEST', status);

@@ -19,7 +19,7 @@ import { disableInbound, getInboxStatus } from '../../../src/email/inbox-store';
 import { routeEmailSyncApi } from '../../../src/router/api/email-sync';
 import { handleInbox } from '../../../src/data/inbox/handler';
 import { createFetchContext } from '../../../src/router/context';
-import { handleCreateJob, handleDeleteJob, handleRunJob } from '../../../src/scheduling/handler';
+import { handleCreateJob, handleDeleteJob, handleRunJob, handleUpdateJob } from '../../../src/scheduling/handler';
 import { writeDatasetRows } from '../../../src/data/datasets/handler';
 import { callTool } from '../../../src/mcp/tools';
 import { buildResult } from '../../../src/verify/report';
@@ -195,6 +195,31 @@ describe('P0-3 — one email sync per page and dataset', () => {
     expect(again.status).toBe(409);
     expect(again.body).toMatchObject({ code: 'DUPLICATE_JOB', job_id: jobId });
     expect(await jobsOn('art_esf_dup')).toHaveLength(1);
+  });
+
+  it('PATCHing one email sync onto the data another already fills is the same 409; changing its tab is fine', async () => {
+    as(owner);
+    const other = await createJob('art_esf_dup', { dataset: 'stock' });
+    expect(other.status).toBe(201);
+    const [ventas] = (await jobsOn('art_esf_dup')).filter((j) => JSON.parse(j.config).dataset === 'ventas');
+    const patch = (body: unknown) => handleUpdateJob(new Request(`https://shareout.test/v1/jobs/${other.body.job.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }), e, { id: OWNER, email: owner.email } as never, String(other.body.job.id)).then(async (r) => ({ status: r.status, body: (await r.json()) as Record<string, any> }));
+    const clash = await patch({ config: { dataset: 'ventas' } });
+    expect(clash.status).toBe(409);
+    expect(clash.body).toMatchObject({ code: 'DUPLICATE_JOB', job_id: ventas.id });
+    const configs = (await jobsOn('art_esf_dup')).map((j) => JSON.parse(j.config).dataset).sort();
+    expect(configs).toEqual(['stock', 'ventas']);
+    expect((await patch({ config: { dataset: 'stock', sheet: 'Hoja2' } })).status).toBe(200);
+  });
+
+  it('two identical creates at the same moment leave one job', async () => {
+    await page('art_esf_race', ['ventas']);
+    as(owner);
+    await api('art_esf_race', 'PUT', { senders: [SENDER] }, '/senders');
+    const results = await Promise.all([createJob('art_esf_race', { dataset: 'ventas' }), createJob('art_esf_race', { dataset: 'ventas' })]);
+    expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
+    expect(await jobsOn('art_esf_race')).toHaveLength(1);
   });
 });
 
