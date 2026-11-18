@@ -164,7 +164,7 @@ export const EMAIL_SYNC_COPY: HomeLocaleCopy = {
     'esync.fwdO3': 'El reenvío sale de tu propia dirección, así que tiene que estar en «Quién puede mandarlo» (ya está si lo configuraste con ella).',
     'esync.fwdONote': '¿No llega nada? Puede que tu empresa no permita reenviar correos afuera, y Outlook no te avisa. Pedile a la persona de sistemas que habilite el reenvío automático para tu correo.',
     'esync.fwdAsk': 'Gmail quiere confirmar el reenvío desde {who}',
-    'esync.fwdAskWhat': 'Tocá Confirmar: se abre una página de Google, y ahí tocá Confirmar otra vez. Después, los reportes que reenvíes desde ese correo llegan solos.',
+    'esync.fwdAskWhat': 'Tocá Confirmar: se abre Google en otra pestaña, y ahí tocá Confirmar otra vez. Después, los reportes que reenvíes desde ese correo llegan solos.',
     'esync.fwdConfirm': 'Confirmar',
     'esync.fwdNotMine': 'No es mío',
     'esync.fwdCode': 'Si Gmail te pide un código: {code}',

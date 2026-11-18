@@ -87,7 +87,7 @@ están en la ventana **Actualizar por email** del artefacto, en **Que tu reporte
    dirección de reenvío**. Pegá la dirección del artefacto.
 2. Gmail le manda una confirmación al artefacto. En unos segundos aparece arriba de la ventana
    **Actualizar por email**: *"Gmail quiere confirmar el reenvío desde ana@…"*. Tocá **Confirmar**:
-   se abre una página de Google, y ahí tocá **Confirmar** otra vez. Después decí de quién es el
+   se abre Google en otra pestaña, y ahí tocá **Confirmar** otra vez. Después decí de quién es el
    reporte (la dirección de la que te llega) y tocá **Permitir**.
 3. Abrí uno de los reportes en Gmail → **⋮ → Filtrar mensajes similares → Crear filtro** → marcá
    **Reenviarlo a** y elegí la dirección del artefacto.

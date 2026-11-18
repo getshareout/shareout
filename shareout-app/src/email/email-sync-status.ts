@@ -58,7 +58,7 @@ const COPY: Record<Locale, Record<string, string>> = {
     not_read: 'El artefacto no lee “{dataset}”, así que el archivo que manden no se vería. Lee: {reads}. Usá uno de esos nombres, o cambiá el artefacto para que lea “{dataset}”.',
     not_runnable: 'Esto se actualiza solo cuando alguien manda el archivo a {address}. No hay nada que correr ahora: mandá el archivo ahí.',
     forwarded_offer: 'Llegó un archivo de {from} reenviado desde {by}, pero se rebotó porque {from} no está en la lista. Permití {from} y el próximo actualiza el artefacto.',
-    forward_confirm: 'Gmail quiere confirmar el reenvío desde {requester} a este artefacto. Abrí este link y tocá Confirmar en la página de Google: {url}',
+    forward_confirm: 'Gmail quiere confirmar el reenvío desde {requester} a este artefacto. Abrí este link y tocá Confirmar en el sitio de Google: {url}',
   },
 };
 
