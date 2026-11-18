@@ -38,7 +38,7 @@ export async function runSmoke(env: Env, artifactId: string, versionId?: string)
       versionId,
       beforeNavigate: (page) => {
         // Catch load-time errors before navigation.
-        page.on('pageerror', (e: Error) => errors.push(e.message || String(e)));
+        page.on('pageerror', (e: unknown) => errors.push((e as Error)?.message || String(e)));
         page.on('console', (msg: { type: () => string; text: () => string }) => {
           if (msg.type() === 'error') errors.push(msg.text());
         });
