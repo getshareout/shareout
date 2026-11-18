@@ -105,9 +105,8 @@ names, "job", "DMARC" or "allowlist":
 5. **Give them the address ready to copy** and say what happens, in three steps: open your mail;
    write a new email to `ventas.k7m4p2@inbox.shareout.site` from ana@acme.com; attach the Excel and
    send. Subject and text do not matter; the first tab's first row is the column titles; **the
-   file replaces the data** the page shows. If the file reaches them by email anyway, an Outlook
-   rule can forward it (add the original sender to the list); Gmail's automatic forwarding needs a
-   confirmation the page's address cannot answer yet. Give them the page link at the end.
+   file replaces the data** the page shows. If the file already reaches them by email, it can
+   arrive by itself ([below](#let-the-report-arrive-by-itself)). Give them the page link at the end.
 6. **Confirm it worked** once they say they sent it: `GET /v1/artifacts/{id}/email-sync` →
    `state` and `message` (one line, their language). `ok` + `lastUpdate.rowCount` ("Got it: 365
    rows updated at 10:32"); `failed` + `job.lastError` — one plain sentence with what to do, read
@@ -115,6 +114,42 @@ names, "job", "DMARC" or "allowlist":
 
 `POST /v1/jobs/{id}/run` does not apply: the job runs when mail arrives, so it answers
 `409 NOT_RUNNABLE` with the address and changes nothing.
+
+### Let the report arrive by itself
+
+When the report already reaches the person by email, their mail can forward it. Walk them through
+it one step at a time, in their words (Spanish UI labels in brackets):
+
+**Gmail** — three steps:
+
+1. Gmail → **Settings → See all settings → Forwarding and POP/IMAP → Add a forwarding address**
+   [Configuración → Ver todos los ajustes → Reenvío y correo POP/IMAP → Agregar una dirección de
+   reenvío], and paste the page's address.
+2. Gmail emails the page's address a confirmation. `GET /v1/artifacts/{id}/email-sync` (or
+   `check_email_sync`) then has it in `forwarding`: `requester` (the Gmail account that asked),
+   `confirmUrl` (Google's own page) and, only on older confirmations, a `code`. **Hand them the
+   link**: on Google's page they press **Confirm**. In ShareOut's own panel it is the "Gmail wants
+   to confirm forwarding from ana@… → Confirm" step on top. If they do not recognise `requester`,
+   do not confirm (`requesterAllowed: false` means it is not on the list) — the panel's "It's not
+   mine" removes it.
+3. A filter on the report: open one in Gmail → **⋮ → Filter messages like these → Create filter →
+   Forward it to** [⋮ → Filtrar mensajes similares → Crear filtro → Reenviarlo a] the page's
+   address. Not "Forward a copy of incoming mail": that would send all their mail.
+
+A Gmail forward keeps the report's **original sender**, so ask whose report it is and add that
+sender (`PUT …/email-sync/senders` with the current list plus it; `set_email_sync` with the same).
+
+**Outlook / Microsoft 365** — no confirmation step: **Settings → Mail → Rules → Add new rule**,
+condition **From** the report's sender, action **Forward to** the page's address. A forward comes
+from the person's own address, which is already on the list. A company may block forwarding outside
+it (Microsoft 365's default for new organisations); the bounce goes to the report's sender, not to
+the person, so if nothing arrives: "your IT has to allow automatic forwarding for your mailbox".
+
+**A forwarded report was bounced?** `recentRejected` entries with `canAllow: true` are reports an
+allowed mailbox auto-forwarded (Cloudflare authenticated the forwarding envelope: Gmail
+`ana+caf_=…@gmail.com`, Microsoft `ana+SRS=…@acme.com`) whose own sender is verified but not on the
+list. Ask the person whether to allow that sender; if yes, add exactly it. The next one updates the
+page (or they forward the last one again). Nothing is let in on its own.
 
 ### A table of an Excel file, from scratch
 
@@ -166,9 +201,12 @@ Mail from anyone not on the list is bounced back to the sender, and so is mail w
 be verified (sent through another account or an unusual forwarder) — both with the same sentence:
 "This address only accepts files from people the owner of the page has approved. Ask them to add
 your address, then send it again." Also bounced: mail over 25 MB, mail past the daily limit and
-mail to a switched-off address. The last one bounced is kept: `lastRejected` (`from`, `reason`: `not_allowed` · `unverified` · `too_large` ·
-`rate_limited` · `inbox_off`, `at`, and a `message` saying what to do). Then ask them to send it
-straight from the allowed mailbox, or add the address that actually sends it.
+mail to a switched-off address. The recent ones are kept: `recentRejected` (up to 5, newest first,
+one per sender and reason with a `count`) and `lastRejected` (the newest) — `from`, `reason`:
+`not_allowed` · `unverified` · `too_large` · `rate_limited` · `inbox_off`, `at`, a `message` saying
+what to do, and `canAllow` (above). A sender bounced as not on the list who is on it now is left
+out. Then ask them to send it straight from the allowed mailbox, or add the address that actually
+sends it.
 A file that can't be used (no attachment, wrong type, tab not found, headers but no rows, too big)
 keeps the page's previous data and emails the owner why (`state: failed`).
 
@@ -185,8 +223,9 @@ list (`senders_kept` in the answer).
 | GET | `/v1/data/{id}/inbox/status` | `{ enabled, address, allowlist, receivedToday }` |
 | POST | `/v1/data/{id}/inbox/enable` | owner/editor; body `{ allowlist?: string[] }` |
 | POST | `/v1/data/{id}/inbox/disable` | owner/editor; `409 EMAIL_SYNC_ACTIVE` while the page updates by email |
-| GET | `/v1/artifacts/{id}/email-sync` | Update by email status: `address`, `senders`, `reads`, `suggestedDataset`, `state`, `message`, `job`, `lastEmail`, `lastUpdate`, `lastRejected`, `limits` |
+| GET | `/v1/artifacts/{id}/email-sync` | Update by email status: `address`, `senders`, `reads`, `suggestedDataset`, `state`, `message`, `job`, `lastEmail`, `lastUpdate`, `lastRejected`, `recentRejected`, `forwarding`, `limits` |
 | GET / PUT | `/v1/artifacts/{id}/email-sync/senders` | `{ address, senders }`; PUT `{ senders: string[] \| string }` turns the address on |
+| POST | `/v1/artifacts/{id}/email-sync/forwarding/{confirmationId}` | `{ action: "opened" \| "dismiss" }` — a Gmail forwarding confirmation was opened from the panel, or closed |
 | PUT | `/v1/data/{id}/inbox/allowlist` | owner/editor; `{ allowlist: string[] \| null }` |
 | GET | `/v1/data/{id}/inbox/messages` | newest first; `?limit=&before=` |
 | GET | `/v1/data/{id}/inbox/messages/{msgId}` | full bodies + attachment metadata |
@@ -198,6 +237,11 @@ list (`senders_kept` in the answer).
   Senders failing both DMARC and DKIM are bounced unless allowlisted. With a list, the header
   From must be on it and verified: Cloudflare's own `Authentication-Results` (authserv-id
   `mx.cloudflare.net`) shows DMARC pass, or a DKIM pass signed by that sender's domain.
+- **Gmail forwarding confirmation** (only on an inbox with a list): kept for the page's editors,
+  never stored as mail or data, only when Cloudflare shows DKIM and DMARC pass for google.com, it
+  comes from `forwarding-noreply@google.com` (one From header), its signed To is this address, and
+  its link is https on Google's own host (`mail-settings.google.com`, `/mail/vf-…`). Anything else
+  is checked like any other mail. Up to 3 per page, one per requesting mailbox, 7 days.
 - **Size:** messages over 25 MB are rejected; attachments are stored in R2.
 - **Rate:** 200 received messages/artifact/day.
 - **Dedupe:** duplicate deliveries (same Message-ID) are stored once and fire the

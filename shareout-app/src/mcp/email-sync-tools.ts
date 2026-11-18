@@ -252,7 +252,8 @@ const setEmailSync: ToolDef = {
       `Ready. Give the person this address to copy: ${address}`,
       `Tell them, in their words: send an email from ${who} to that address with the Excel (.xlsx) file attached (a CSV works too). The subject and text do not matter.`,
       'The first tab is read, and its first row holds the column titles. Each file replaces the page’s data; a file that cannot be used keeps the last good data.',
-      `Email from anyone else is bounced. Limits: ${LIMITS}. An Outlook rule can forward the file automatically (Gmail’s forwarding needs a confirmation this address cannot answer yet).`,
+      `Email from anyone else is bounced. Limits: ${LIMITS}.`,
+      'If the file already reaches them by email, it can come by itself: in Gmail, Settings → Forwarding → add this address (Gmail sends this address a confirmation; check_email_sync then has its link for them to open), then a filter on the report that forwards it here; in Outlook, a rule that redirects the report here. The report’s original sender has to be on the list.',
       `When they say they sent it, call check_email_sync and tell them how many rows arrived. The page: ${link}`,
       pageNote,
     ].filter(Boolean).join('\n'), {
@@ -267,8 +268,9 @@ const checkEmailSync: ToolDef = {
   title: 'Check the last file emailed to a page',
   description: [
     'Reads whether a page updates by email and what the last emailed file did: rows written and when, or the one-sentence reason it could',
-    'not be used (in the page owner’s language, with what to do), and the last email that was bounced and why (not on the list, not verified, too big).',
-    'Also returns the address and who may send. artifact_id: the page’s id, link or slug. Read-only.',
+    'not be used (in the page owner’s language, with what to do), and the recent emails that were bounced and why (not on the list, not verified, too big),',
+    'including a report auto-forwarded from an allowed mailbox whose original sender could be allowed. Also a Gmail forwarding confirmation waiting to be',
+    'opened: who asked, its code and Google’s confirmation link. Also returns the address and who may send. artifact_id: the page’s id, link or slug. Read-only.',
   ].join(' '),
   inputSchema: { type: 'object', properties: { artifact_id: PAGE }, required: ['artifact_id'], additionalProperties: false },
   annotations: { readOnlyHint: true, openWorldHint: false },
@@ -291,11 +293,22 @@ const checkEmailSync: ToolDef = {
       text = st.lastEmail ? 'An email arrived but the page has not been updated from it yet.' : `No file has arrived yet. The address is ${st.address}.`;
     }
     const rej = st.lastRejected;
-    if (rej && Date.parse(rej.at) > wrote) text += ` The last email that reached the address was bounced (${whenText(rej.at)}). Tell the person: ${rej.message}`;
+    if (rej && Date.parse(rej.at) > wrote) {
+      text += ` The last email that reached the address was bounced (${whenText(rej.at)}). Tell the person: ${rej.message}`;
+      if (rej.canAllow) text += ` Then ask the person whether to allow ${rej.from}; if yes, call set_email_sync with senders: ${[...st.senders, rej.from].join(', ')}.`;
+    }
+    const earlier = (st.recentRejected ?? []).slice(1).filter((r) => Date.parse(r.at) > wrote);
+    if (earlier.length) text += ` Earlier bounces: ${earlier.map((r) => `${r.from} (${r.reason.replace('_', ' ')}, ${whenText(r.at)})`).join('; ')}.`;
     if (j.datasetReadByPage === false) text += ` Note: ${datasetWarning('en', j.dataset ?? '', st.reads)}`;
-    return ok(`${text} Allowed senders: ${st.senders.join(', ')}.`, {
+    // Gmail waits for this address to confirm before it forwards: the person opens Google's link.
+    const confirm = (st.forwarding ?? []).map((c) => c.openedAt
+      ? `The person opened Gmail’s confirmation for ${c.requester} from the panel (${whenText(c.openedAt)}); if Google said it is confirmed, forwarding from it works.`
+      : `Gmail is waiting for a confirmation to forward mail from ${c.requester} to this page. Give the person this link to open; on Google’s page they press Confirm: ${c.confirmUrl}${c.code ? ` (confirmation code ${c.code}, if Gmail asks for it)` : ''}. It expires ${whenText(c.expiresAt)}.${c.requesterAllowed ? '' : ` ${c.requester} is not on the list of senders: confirm only if the person recognises it.`} Then ask whose report will be forwarded and add that sender with set_email_sync (keeping the current senders).`);
+    return ok(`${[...confirm, text].join(' ')} Allowed senders: ${st.senders.join(', ')}.`, {
       on: true, state: st.state, address: st.address, senders: st.senders, last_status: j.lastStatus, last_error: j.lastError,
-      last_update: up, last_email: st.lastEmail, last_rejected: rej, page_url: pageUrl(ctx, page),
+      last_update: up, last_email: st.lastEmail, last_rejected: rej, recent_rejected: st.recentRejected ?? [],
+      forwarding_confirmations: (st.forwarding ?? []).map((c) => ({ requester: c.requester, code: c.code, confirm_url: c.confirmUrl, expires_at: c.expiresAt, opened_at: c.openedAt, requester_allowed: c.requesterAllowed })),
+      page_url: pageUrl(ctx, page),
     });
   },
 };

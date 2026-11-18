@@ -1,7 +1,8 @@
 /**
  * "Update by email" (email_sheet_sync) as the page's editors and their assistants see it: the
  * page's address, who may send, which data the page actually reads, what the last file did, the
- * last email that was bounced, and one state + one sentence saying what to do next. Shared by
+ * recent emails that were bounced, a Gmail forwarding confirmation waiting to be answered, and one
+ * state + one sentence saying what to do next. Shared by
  * GET /v1/artifacts/{id}/email-sync (the panel, MCP) and the job routes.
  */
 import type { Env } from '../types';
@@ -10,9 +11,10 @@ import { datasetsPageReads } from '../provenance/handler';
 import { XLSX_MAX_INPUT_BYTES } from '../data/files/parse-xlsx';
 import { SHEET_ROWS_MAX } from '../data/files/sheet-rows';
 import {
-  INBOUND_DAILY_LIMIT, INBOUND_MAX_RAW_BYTES, getInboundRejection, getInboxStatus, listInboxMessages,
-  type InboundRejection, type StoredAttachment,
+  INBOUND_DAILY_LIMIT, INBOUND_MAX_RAW_BYTES, getInboundRejections, getInboxStatus, listInboxMessages, senderAllowed,
+  type InboundRejection, type InboundRejectionRecord, type StoredAttachment,
 } from './inbox-store';
+import { listForwardConfirmations } from './forwarding-confirm';
 
 export type EmailSyncState = 'off' | 'inbox_off' | 'waiting_first_email' | 'ok' | 'failed';
 
@@ -39,6 +41,8 @@ const COPY: Record<Locale, Record<string, string>> = {
     inbox_off_rej: 'An email from {from} arrived while the page’s address was off, so it was bounced.',
     not_read: 'The page does not read “{dataset}”, so the emailed file would not show on it. It reads: {reads}. Use one of those names, or change the page to read “{dataset}”.',
     not_runnable: 'This runs by itself when someone emails the file to {address}. There is nothing to run now: send the file there.',
+    forwarded_offer: 'A file from {from}, forwarded from {by}, was bounced because {from} is not on the list. Allow {from} and the next one updates the page.',
+    forward_confirm: 'Gmail wants to confirm forwarding from {requester} to this page. Open this link and press Confirm on Google’s page: {url}',
   },
   es: {
     off: 'No está activado. Agregá quién manda el archivo para activarlo.',
@@ -53,6 +57,8 @@ const COPY: Record<Locale, Record<string, string>> = {
     inbox_off_rej: 'Llegó un email de {from} mientras la dirección del artefacto estaba apagada, así que se rebotó.',
     not_read: 'El artefacto no lee “{dataset}”, así que el archivo que manden no se vería. Lee: {reads}. Usá uno de esos nombres, o cambiá el artefacto para que lea “{dataset}”.',
     not_runnable: 'Esto se actualiza solo cuando alguien manda el archivo a {address}. No hay nada que correr ahora: mandá el archivo ahí.',
+    forwarded_offer: 'Llegó un archivo de {from} reenviado desde {by}, pero se rebotó porque {from} no está en la lista. Permití {from} y el próximo actualiza el artefacto.',
+    forward_confirm: 'Gmail quiere confirmar el reenvío desde {requester} a este artefacto. Abrí este link y tocá Confirmar en la página de Google: {url}',
   },
 };
 
@@ -62,6 +68,18 @@ export function emailSyncSay(locale: Locale, key: keyof (typeof COPY)['en'], var
 
 export function rejectionText(locale: Locale, reason: InboundRejection, from: string): string {
   return emailSyncSay(locale, reason === 'inbox_off' ? 'inbox_off_rej' : reason, { from: from || '?' });
+}
+
+/** A bounced report its editors can let in with one tap: its sender is verified, it carried a
+ *  spreadsheet, and an allowed mailbox auto-forwarded it (forwarding-confirm.ts forwardingMailbox).
+ *  The tap adds that exact sender to the list; the next mail from it still has to be verified. */
+export function canAllowRejection(r: InboundRejectionRecord): boolean {
+  // A whole address only — the tap must never add a bare @domain.
+  return r.reason === 'not_allowed' && r.verified === true && r.hasFile === true && !!r.forwardedBy && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.from);
+}
+
+export function rejectionMessage(locale: Locale, r: InboundRejectionRecord): string {
+  return canAllowRejection(r) ? emailSyncSay(locale, 'forwarded_offer', { from: r.from, by: r.forwardedBy ?? '' }) : rejectionText(locale, r.reason, r.from);
 }
 
 /** A warning when the page reads named datasets and `dataset` is not one of them; null otherwise. */
@@ -82,7 +100,7 @@ export function suggestDataset(reads: string[] | null, datasets: string[]): stri
 interface JobRow { id: string; config: string; enabled: number; last_run_at: number | string | null; last_status: string | null; last_error: string | null }
 
 export async function emailSyncStatus(env: Env, artifactId: string, workspaceId: string, locale: Locale) {
-  const [inbox, job, names, reads, rejected] = await Promise.all([
+  const [inbox, job, names, reads, rejections, confirmations] = await Promise.all([
     getInboxStatus(env, artifactId),
     env.DB.prepare(
       `SELECT id, config, enabled, last_run_at, last_status, last_error FROM scheduled_jobs
@@ -90,7 +108,8 @@ export async function emailSyncStatus(env: Env, artifactId: string, workspaceId:
     ).bind(artifactId).first<JobRow>(),
     env.DB.prepare('SELECT name FROM datasets WHERE artifact_id = ? ORDER BY updated_at DESC LIMIT 20').bind(artifactId).all<{ name: string }>(),
     datasetsPageReads(env, artifactId).catch(() => null),
-    getInboundRejection(env, artifactId),
+    getInboundRejections(env, artifactId),
+    listForwardConfirmations(env, artifactId),
   ]);
   const datasets = (names.results || []).map((r) => r.name);
   let config: { dataset?: string; sheet?: string; attachment?: string } | null = null;
@@ -113,14 +132,25 @@ export async function emailSyncStatus(env: Env, artifactId: string, workspaceId:
   const failedLast = !!job && job.last_status === 'failed' && (!wroteAt || (lastRunAt ?? 0) * 1000 > wroteAt);
   const state: EmailSyncState = !job ? 'off' : !inbox.enabled ? 'inbox_off' : failedLast ? 'failed' : lastUpdate ? 'ok' : 'waiting_first_email';
 
-  const lastRejected = rejected ? { ...rejected, message: rejectionText(locale, rejected.reason, rejected.from) } : null;
+  // A sender bounced as not on the list who is on it now needs nothing more: drop it.
+  const list = (inbox.allowlist || []).map((a) => a.toLowerCase());
+  const recentRejected = rejections
+    .filter((r) => !(r.reason === 'not_allowed' && list.length && senderAllowed(r.from, list)))
+    .map((r) => ({ ...r, message: rejectionMessage(locale, r), canAllow: canAllowRejection(r) }));
+  const lastRejected = recentRejected[0] ?? null;
+  const forwarding = confirmations.map((c) => ({ ...c, requesterAllowed: list.length ? senderAllowed(c.requester, list) : false }));
   let message = state === 'off' ? emailSyncSay(locale, 'off')
     : state === 'inbox_off' ? emailSyncSay(locale, 'inbox_off')
     : state === 'failed' ? emailSyncSay(locale, 'failed', { error: job?.last_error ?? '' }).trim()
     : state === 'ok' ? emailSyncSay(locale, 'ok', { rows: lastUpdate?.rowCount ?? '?', file: lastUpdate?.file ?? '' })
     : emailSyncSay(locale, 'waiting', { address: inbox.address ?? '' });
-  // A bounce after the last good file is what the person needs to hear about.
+  // A bounce after the last good file is what the person needs to hear about — after the failure
+  // too, when it came later (they sent it again and it was bounced).
   if (lastRejected && (state === 'ok' || state === 'waiting_first_email') && Date.parse(lastRejected.at) > wroteAt) message = lastRejected.message;
+  if (lastRejected && state === 'failed' && Date.parse(lastRejected.at) > (lastRunAt ?? 0) * 1000) message = `${message} ${lastRejected.message}`;
+  // Gmail waiting for its confirmation comes first: nothing is forwarded until it is answered.
+  const toConfirm = forwarding.find((c) => !c.openedAt);
+  if (toConfirm && state !== 'off' && state !== 'inbox_off') message = emailSyncSay(locale, 'forward_confirm', { requester: toConfirm.requester, url: toConfirm.confirmUrl });
 
   const readByPage = (name: string | undefined) => (!name || !reads?.length ? null : reads.includes(name));
   return {
@@ -141,6 +171,10 @@ export async function emailSyncStatus(env: Env, artifactId: string, workspaceId:
     lastEmail: last ? { from: last.from_addr, subject: last.subject, receivedAt: last.received_at, files } : null,
     lastUpdate,
     lastRejected,
+    /** The recent bounces, newest first (up to 5; a sender now on the list is left out). */
+    recentRejected,
+    /** Gmail forwarding confirmations waiting for the page's editors, newest first. */
+    forwarding,
     limits: EMAIL_SYNC_LIMITS,
   };
 }

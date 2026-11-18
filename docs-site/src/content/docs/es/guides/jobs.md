@@ -167,7 +167,8 @@ curl -X POST https://shareout.site/v1/jobs \
 - Un `warning` en el `201` quiere decir que el artefacto no lee ese dataset: quedaría vacío.
 - Uno por artefacto y dataset: un segundo da `409 DUPLICATE_JOB` con el `job_id` existente.
 - `POST /v1/jobs/{id}/run` responde `409 NOT_RUNNABLE` con la dirección y no cambia nada: corre cuando llega el mail.
-- `GET /v1/artifacts/{id}/email-sync` → `state` (`off` · `inbox_off` · `waiting_first_email` · `ok` · `failed`), un `message` de una línea y `lastRejected` (el último email rechazado y por qué).
+- `GET /v1/artifacts/{id}/email-sync` → `state` (`off` · `inbox_off` · `waiting_first_email` · `ok` · `failed`), un `message` de una línea, `lastRejected` (el último email rechazado y por qué) y `recentRejected` (hasta 5, el más nuevo primero; `canAllow: true` = un reporte que reenvió automáticamente un correo permitido, cuyo remitente verificado se agrega con un `PUT …/senders`).
+- Reenvío automático de Gmail: Gmail primero le manda una confirmación a la dirección del artefacto. Una genuina (DKIM y DMARC pasan para google.com según Cloudflare, el remitente de reenvío de Google, el link en un host propio de Google) no se rebota ni se vuelve datos: aparece en `forwarding` (`requester`, `confirmUrl`, `code` en las viejas, `expiresAt`) para que la abran los editores del artefacto. `POST /v1/artifacts/{id}/email-sync/forwarding/{confirmationId}` `{ "action": "opened" | "dismiss" }`. Outlook / Microsoft 365 no tiene paso de confirmación.
 - Borrar el job apaga la dirección y conserva los datos y la lista de remitentes (`senders_kept`).
 - Límites: 8 MB y 100.000 filas por archivo, 25 MB por email, 200 emails por día por artefacto.
 

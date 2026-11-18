@@ -906,6 +906,35 @@ paths:
                       reason: { type: string, enum: [not_allowed, unverified, too_large, rate_limited, inbox_off] }
                       at: { type: string, format: date-time }
                       message: { type: string, description: "Why, and what to do, in the caller's language." }
+                      count: { type: integer, description: Times this sender was bounced for this reason. }
+                      verified: { type: boolean, description: Cloudflare vouched for the sender's domain. }
+                      hasFile: { type: boolean, description: The email carried an .xlsx or .csv file. }
+                      forwardedBy: { type: string, description: "The allowed mailbox that auto-forwarded it (Cloudflare's SPF pass for a Gmail `+caf_=` or Microsoft `+SRS=` envelope)." }
+                      canAllow: { type: boolean, description: "A report an allowed mailbox auto-forwarded, whose verified sender is not on the list: adding exactly that sender (PUT …/senders) lets the next one in." }
+                  recentRejected:
+                    type: array
+                    description: The recent emails the address refused, newest first (up to 5, one per sender and reason; a sender now on the list is left out). Same fields as `lastRejected`, which is the first of them.
+                    items: { type: object }
+                  forwarding:
+                    type: array
+                    description: >-
+                      Gmail forwarding confirmations waiting for the page's editors, newest first (up to 3,
+                      7 days). Gmail emails the page's address a confirmation link before it forwards to it;
+                      a genuine one (DKIM and DMARC pass for google.com per Cloudflare, Google's forwarding
+                      sender, its signed To is this address, its link on Google's own host) is kept here and
+                      never becomes data. Outlook / Microsoft 365 has no such step.
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        provider: { type: string, enum: [gmail] }
+                        requester: { type: string, description: The Gmail account asking to forward to the page. }
+                        requesterAllowed: { type: boolean, description: The requester is on the list of senders. }
+                        confirmUrl: { type: string, description: "Google's confirmation page (https://mail-settings.google.com/mail/vf-…); the person presses Confirm there." }
+                        code: { type: string, nullable: true, description: Only older confirmations carry a code. }
+                        receivedAt: { type: string, format: date-time }
+                        expiresAt: { type: string, format: date-time }
+                        openedAt: { type: string, format: date-time, nullable: true, description: An editor opened the link from the panel. }
                   job:
                     type: object
                     nullable: true
@@ -942,6 +971,45 @@ paths:
           $ref: "#/components/responses/NotFound"
         "422":
           description: "`NO_WORKSPACE` — the page is not inside a workspace."
+  /v1/artifacts/{id}/email-sync/forwarding/{confirmationId}:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+      - name: confirmationId
+        in: path
+        required: true
+        schema: { type: string }
+        description: "`forwarding[].id` from `GET /v1/artifacts/{id}/email-sync`."
+    post:
+      tags: [Jobs]
+      summary: Update by email — a Gmail forwarding confirmation was opened, or closed
+      description: >-
+        `opened`: an editor opened Gmail's confirmation link (the panel then asks whose report will
+        be forwarded). `dismiss`: the step is closed (done, or not theirs). Owner or editor of the page.
+      operationId: updateEmailSyncForwarding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, enum: [opened, dismiss] }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+        "400":
+          description: "`VALIDATION_ERROR` — action is not `opened` or `dismiss`."
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /v1/artifacts/{id}/email-sync/senders:
     parameters:
       - $ref: "#/components/parameters/ArtifactId"

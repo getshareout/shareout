@@ -170,22 +170,80 @@ export async function ensureShortPrefix(env: Env, artifactId: string): Promise<s
 
 export type InboundRejection = 'not_allowed' | 'unverified' | 'too_large' | 'rate_limited' | 'inbox_off';
 
-/** Keep the last bounced email (who, why, when) so the page's editors can see why a file never
- *  arrived: the bounce itself only reaches the sender. Best effort — never blocks the bounce. */
-export async function recordInboundRejection(env: Env, artifactId: string, from: string, reason: InboundRejection): Promise<void> {
+/** One bounced email, as the page's editors see it. `forwardedBy`: the allowed mailbox that
+ *  auto-forwarded it (inbound.ts forwardedByAllowed — Cloudflare's SPF pass for a forwarding
+ *  envelope); `verified`: Cloudflare vouched for `from`; `hasFile`: it carried a spreadsheet. */
+export interface InboundRejectionRecord {
+  from: string;
+  reason: InboundRejection;
+  at: string;
+  count: number;
+  verified?: boolean;
+  hasFile?: boolean;
+  forwardedBy?: string;
+}
+
+/** How many recent bounces a page keeps (0046): enough that one stray mail no longer hides the one
+ *  the person is asking about, small enough to stay a column. */
+export const INBOUND_REJECTIONS_KEPT = 5;
+
+const REJECTION_REASONS = new Set<string>(['not_allowed', 'unverified', 'too_large', 'rate_limited', 'inbox_off']);
+
+function parseRejections(raw: string | null): InboundRejectionRecord[] {
+  if (!raw) return [];
   try {
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list)) return [];
+    return list.filter((r) => r && typeof r.at === 'string' && REJECTION_REASONS.has(r.reason)).map((r) => ({
+      from: String(r.from ?? '').slice(0, 320),
+      reason: r.reason as InboundRejection,
+      at: r.at,
+      count: Number(r.count) > 0 ? Number(r.count) : 1,
+      ...(typeof r.verified === 'boolean' ? { verified: r.verified } : {}),
+      ...(typeof r.hasFile === 'boolean' ? { hasFile: r.hasFile } : {}),
+      ...(typeof r.forwardedBy === 'string' && r.forwardedBy ? { forwardedBy: r.forwardedBy.slice(0, 320) } : {}),
+    })).slice(0, INBOUND_REJECTIONS_KEPT);
+  } catch { return []; }
+}
+
+/** Keep the recent bounced emails (who, why, when) so the page's editors can see why a file never
+ *  arrived: the bounce itself only reaches the sender. A sender bounced again for the same reason
+ *  moves to the top (count + 1) instead of pushing others out. Best effort — never blocks the bounce. */
+export async function recordInboundRejection(
+  env: Env, artifactId: string, from: string, reason: InboundRejection,
+  detail: { verified?: boolean; hasFile?: boolean; forwardedBy?: string | null } = {},
+): Promise<void> {
+  try {
+    const at = new Date().toISOString();
+    const who = from.slice(0, 320);
+    const row = await env.DB.prepare('SELECT inbound_rejections FROM artifact_emails WHERE artifact_id = ?')
+      .bind(artifactId).first<{ inbound_rejections: string | null }>();
+    const list = parseRejections(row?.inbound_rejections ?? null);
+    const same = list.findIndex((r) => r.from === who && r.reason === reason);
+    const count = same === -1 ? 1 : list[same].count + 1;
+    if (same !== -1) list.splice(same, 1);
+    list.unshift({
+      from: who, reason, at, count,
+      ...(detail.verified !== undefined ? { verified: detail.verified } : {}),
+      ...(detail.hasFile !== undefined ? { hasFile: detail.hasFile } : {}),
+      ...(detail.forwardedBy ? { forwardedBy: detail.forwardedBy.slice(0, 320) } : {}),
+    });
     await env.DB.prepare(
-      'UPDATE artifact_emails SET inbound_rejected_at = ?, inbound_rejected_from = ?, inbound_rejected_reason = ? WHERE artifact_id = ?'
-    ).bind(new Date().toISOString(), from.slice(0, 320), reason, artifactId).run();
+      'UPDATE artifact_emails SET inbound_rejected_at = ?, inbound_rejected_from = ?, inbound_rejected_reason = ?, inbound_rejections = ? WHERE artifact_id = ?'
+    ).bind(at, who, reason, JSON.stringify(list.slice(0, INBOUND_REJECTIONS_KEPT)), artifactId).run();
   } catch { /* the bounce matters more than the record */ }
 }
 
-export async function getInboundRejection(env: Env, artifactId: string): Promise<{ from: string; reason: InboundRejection; at: string } | null> {
+/** The recent bounces, newest first. A page bounced before 0046 has only the single 0044 record. */
+export async function getInboundRejections(env: Env, artifactId: string): Promise<InboundRejectionRecord[]> {
   const row = await env.DB.prepare(
-    'SELECT inbound_rejected_at, inbound_rejected_from, inbound_rejected_reason FROM artifact_emails WHERE artifact_id = ?'
-  ).bind(artifactId).first<{ inbound_rejected_at: string | null; inbound_rejected_from: string | null; inbound_rejected_reason: string | null }>();
-  if (!row?.inbound_rejected_at || !row.inbound_rejected_reason) return null;
-  return { from: row.inbound_rejected_from || '', reason: row.inbound_rejected_reason as InboundRejection, at: row.inbound_rejected_at };
+    'SELECT inbound_rejected_at, inbound_rejected_from, inbound_rejected_reason, inbound_rejections FROM artifact_emails WHERE artifact_id = ?'
+  ).bind(artifactId).first<{ inbound_rejected_at: string | null; inbound_rejected_from: string | null; inbound_rejected_reason: string | null; inbound_rejections: string | null }>();
+  if (!row) return [];
+  const list = parseRejections(row.inbound_rejections);
+  if (list.length) return list;
+  if (!row.inbound_rejected_at || !row.inbound_rejected_reason || !REJECTION_REASONS.has(row.inbound_rejected_reason)) return [];
+  return [{ from: row.inbound_rejected_from || '', reason: row.inbound_rejected_reason as InboundRejection, at: row.inbound_rejected_at, count: 1 }];
 }
 
 export async function disableInbound(env: Env, artifactId: string): Promise<void> {
