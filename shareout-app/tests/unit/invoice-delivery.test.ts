@@ -341,6 +341,45 @@ describe('proof by email reply', () => {
     expect(await invoiceRow(invoice.id)).toMatchObject({ status: 'paid', paid_source: 'email', proof_name: 'comprobante.pdf', paid_by: OWNER.id });
   });
 
+  it('processes a redelivery when the first attempt failed part-way', async () => {
+    const { invoice } = await createOpen(ACME, 'A-0003-00000090');
+    const to = await replyTo(invoice.id);
+    let failed = false;
+    const DB = new Proxy(e.DB, {
+      get: (t, p) => p === 'prepare'
+        ? (sql: string) => { if (!failed && sql.includes("paid_source = 'email'")) { failed = true; throw new Error('D1 unavailable'); } return t.prepare(sql); }
+        : typeof (t as any)[p] === 'function' ? (t as any)[p].bind(t) : (t as any)[p],
+    });
+    const m = message({ from: 'billing@acme.example', to, id: 'r-retry', parts: [proofPart] });
+    await expect(handleInboundEmail(m as never, { ...e, DB } as unknown as Env, {} as ExecutionContext)).rejects.toThrow('D1 unavailable');
+    expect(await invoiceRow(invoice.id)).toMatchObject({ status: 'open', proof_r2_key: null });
+    expect((await e.ARTIFACTS.list({ prefix: `workspace-invoices/${ACME}/${invoice.id}/proof` })).objects).toHaveLength(0);
+
+    await deliver(message({ from: 'billing@acme.example', to, id: 'r-retry', parts: [proofPart] }));
+    expect(await invoiceRow(invoice.id)).toMatchObject({ status: 'paid', paid_source: 'email' });
+  });
+
+  it('leaves the invoice unpaid when the proof cannot be stored, and fails loudly', async () => {
+    const { invoice } = await createOpen(ACME, 'A-0003-00000091');
+    const to = await replyTo(invoice.id);
+    const ARTIFACTS = new Proxy(e.ARTIFACTS, {
+      get: (t, p) => p === 'put'
+        ? async () => { throw new Error('R2 unavailable'); }
+        : typeof (t as any)[p] === 'function' ? (t as any)[p].bind(t) : (t as any)[p],
+    });
+    sent.length = 0;
+    const m = message({ from: 'billing@acme.example', to, id: 'r-store', parts: [proofPart] });
+    await expect(handleInboundEmail(m as never, { ...e, ARTIFACTS } as unknown as Env, {} as ExecutionContext)).rejects.toThrow('R2 unavailable');
+    expect(await invoiceRow(invoice.id)).toMatchObject({ status: 'open', paid_source: null, proof_r2_key: null });
+    expect(toOperator()).toHaveLength(0);
+
+    // Storage is back: the redelivery goes through, and the proof is where the invoice says.
+    await deliver(message({ from: 'billing@acme.example', to, id: 'r-store', parts: [proofPart] }));
+    const row = await invoiceRow(invoice.id);
+    expect(row).toMatchObject({ status: 'paid', paid_source: 'email' });
+    expect(new Uint8Array(await (await e.ARTIFACTS.get(row!.proof_r2_key))!.arrayBuffer())).toEqual(PROOF);
+  });
+
   it.each([
     ['an unknown sender', { from: 'someone@globex.example' }, 'sender'],
     ['a member who is not an admin', { from: 'member@acme.example' }, 'sender'],

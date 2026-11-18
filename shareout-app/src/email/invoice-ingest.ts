@@ -3,7 +3,7 @@ import type { Env } from '../types';
 import { sha256 } from '../crypto-utils';
 import { logAudit } from '../audit';
 import { createLogger } from '../logging';
-import { claimEmailSend } from './email-log';
+import { claimEmailSend, releaseEmailSend } from './email-log';
 import { bareEmail, parseAuthResults } from './inbound';
 import type { InvoiceReplyReason } from './catalog-invoice';
 import { getBillingProfile } from '../workspaces/billing-profile';
@@ -89,12 +89,24 @@ export async function handleInvoiceInbound(message: ForwardableEmailMessage, env
   const raw = await new Response(message.raw).arrayBuffer();
   const email = await PostalMime.parse(raw);
   const messageId = (email.messageId || message.headers.get('message-id') || '').replace(/^<|>$/g, '');
-  // Email Routing delivers at least once: handle each message once.
-  if (!(await claimEmailSend(env, 'invoice_reply', `${inv.id}:${messageId || `sha256:${await sha256(raw)}`}`))) return;
+  // Email Routing delivers at least once: handle each message once. A failure gives the claim back
+  // and fails loudly, so a redelivery of the same message is processed instead of ignored.
+  const claim = `${inv.id}:${messageId || `sha256:${await sha256(raw)}`}`;
+  if (!(await claimEmailSend(env, 'invoice_reply', claim))) return;
+  try {
+    await applyReply(env, message, inv, email, auth.dmarc === 'pass');
+  } catch (err) {
+    createLogger(env, { scope: 'invoice-ingest' }).error('Invoice reply failed; a redelivery will retry it', { invoice_id: inv.id, error: String(err) });
+    await releaseEmailSend(env, 'invoice_reply', claim);
+    throw err;
+  }
+}
 
+async function applyReply(
+  env: Env, message: ForwardableEmailMessage, inv: InvoiceRecord, email: Awaited<ReturnType<typeof PostalMime.parse>>, verified: boolean,
+): Promise<void> {
   // DMARC vouches for the header From, so that — not the envelope sender — is who replied.
   const from = (email.from?.address || bareEmail(message.from)).toLowerCase().trim();
-  const verified = auth.dmarc === 'pass';
   const files = mailFiles(email.attachments || []);
   const review = (reason: InvoiceReplyReason) => notifyInvoiceReply(env, inv, {
     from, reason, subject: email.subject?.trim() || null, excerpt: (email.text || '').trim().slice(0, EXCERPT_CHARS) || null,
@@ -108,18 +120,27 @@ export async function handleInvoiceInbound(message: ForwardableEmailMessage, env
   const proof = pickProof(files);
   if (!proof) return review(files.length ? 'file' : 'no_attachment');
 
-  // Claim the transition first: an invoice paid or voided a moment ago keeps its own proof.
+  // Store the proof before the invoice is marked paid, so a failed put leaves it unpaid (and throws).
+  // The key is this reply's own: a reply that loses the race to another proof never overwrites it,
+  // and its file is taken back down.
   const now = new Date().toISOString();
-  const key = invoiceFileKey(inv.workspace_id, inv.id, 'proof');
-  const paid = await env.DB.prepare(
-    `UPDATE workspace_invoices SET proof_r2_key = ?, proof_name = ?, proof_type = ?, proof_uploaded_by = ?, proof_uploaded_at = ?,
-        status = 'paid', paid_at = ?, paid_by = ?, paid_source = 'email', updated_at = ?
-      WHERE id = ? AND status = 'open'`,
-  ).bind(key, proof.name, proof.type, sender.userId, now, now, sender.userId, now, inv.id).run();
-  if (!paid.meta?.changes) return review('paid');
-  // A storage hiccup must not cost the operator the proof: it still goes out attached to the notice.
-  await env.ARTIFACTS.put(key, proof.bytes, { httpMetadata: { contentType: proof.type } }).catch((err) =>
-    createLogger(env, { scope: 'invoice-ingest' }).error('Invoice proof not stored', { invoice_id: inv.id, error: String(err) }));
+  const key = `${invoiceFileKey(inv.workspace_id, inv.id, 'proof')}-email-${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
+  await env.ARTIFACTS.put(key, proof.bytes, { httpMetadata: { contentType: proof.type } });
+  let paid: D1Result;
+  try {
+    paid = await env.DB.prepare(
+      `UPDATE workspace_invoices SET proof_r2_key = ?, proof_name = ?, proof_type = ?, proof_uploaded_by = ?, proof_uploaded_at = ?,
+          status = 'paid', paid_at = ?, paid_by = ?, paid_source = 'email', updated_at = ?
+        WHERE id = ? AND status = 'open'`,
+    ).bind(key, proof.name, proof.type, sender.userId, now, now, sender.userId, now, inv.id).run();
+  } catch (err) {
+    await env.ARTIFACTS.delete(key).catch(() => {});
+    throw err;
+  }
+  if (!paid.meta?.changes) {
+    await env.ARTIFACTS.delete(key).catch(() => {});
+    return review('paid');
+  }
 
   const entry = { workspaceId: inv.workspace_id, actorId: sender.userId, actorEmail: from, targetType: 'invoice', targetId: inv.id };
   await logAudit(env, { ...entry, action: 'invoice.proof', detail: { number: inv.number, name: proof.name, source: 'email' } });
