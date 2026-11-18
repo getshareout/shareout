@@ -4,7 +4,7 @@ import { colors, fonts, radius, shadows, googleFontsPreconnect } from '../../pac
 import { cssVariables } from '../design-system/base.css';
 import { componentStylesheet } from '../design-system/components/stylesheet';
 import { renderSocialMetaTags, type SocialPreview } from '../serve/social-meta';
-import { shareModalMarkup, shareModalScript } from '../components/share-modal';
+import { shareModalScript } from '../components/share-modal';
 import type { Locale } from '../i18n';
 import { viewerCopy, type ViewerCopy } from './copy';
 
@@ -306,7 +306,6 @@ export function generateViewerShell(
       ${bodyContent}
     </main>
   </div>
-  ${ctx.loggedIn ? shareModalMarkup(ctx.locale) : ''}
   ${adminToolbar}${ctx.loggedIn ? `
   ${scriptOpen(ctx)}
     ${shareModalScript({ baseUrl: ctx.baseUrl, locale: ctx.locale })}

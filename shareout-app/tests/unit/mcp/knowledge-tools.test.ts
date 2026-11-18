@@ -23,6 +23,8 @@ vi.mock('../../../src/chat-agent/access', () => ({ listWorkspacesForUser }));
 import { callTool, listTools } from '../../../src/mcp/tools';
 import { queueKnowledgeSource } from '../../../src/knowledge/corpus/ingest';
 import { setKnowledgeEnabled, upsertKnowledgeFile } from '../../../src/knowledge';
+import { routeKnowledgeApi } from '../../../src/router/api/knowledge';
+import { createFetchContext } from '../../../src/router/context';
 
 const base = env as unknown as Env;
 const run = Date.now();
@@ -110,11 +112,14 @@ beforeEach(() => {
 });
 
 describe('knowledge tools are listed', () => {
-  it('exposes six read-only tools plus reindex, telling the model to cite and use the person\'s language', () => {
+  it('exposes read-only tools plus reindex and the team\'s edits, telling the model to cite and use the person\'s language', () => {
     const tools = listTools().filter((t) => t.name.startsWith('knowledge_'));
-    expect(tools.map((t) => t.name)).toEqual(['knowledge_search', 'knowledge_entity', 'knowledge_facts', 'knowledge_status', 'knowledge_reindex', 'knowledge_get', 'knowledge_from_artifact']);
+    expect(tools.map((t) => t.name)).toEqual([
+      'knowledge_search', 'knowledge_entity', 'knowledge_facts', 'knowledge_status', 'knowledge_reindex', 'knowledge_get', 'knowledge_from_artifact',
+      'knowledge_rules', 'knowledge_review', 'knowledge_edit_entity', 'knowledge_edit_connection', 'knowledge_edit_fact', 'knowledge_edit_rules',
+    ]);
     for (const t of tools) {
-      expect(t.annotations.readOnlyHint).toBe(t.name !== 'knowledge_reindex');
+      expect(t.annotations.readOnlyHint, t.name).toBe(t.name !== 'knowledge_reindex' && !t.name.startsWith('knowledge_edit_'));
       expect(t.description).toMatch(/person's language/);
     }
     expect(tools.find((t) => t.name === 'knowledge_search')!.description).toMatch(/say where each fact comes from/);
@@ -193,6 +198,17 @@ describe('knowledge_facts', () => {
     expect(text(forAna)).not.toContain('90k');
     const forBo = await callTool(ctxFor('so_bo'), 'knowledge_facts', { about: 'Northwind', workspace_id: WS_A });
     expect(text(forBo)).toContain('budget: 90k');
+  });
+  it('lists a fact the team added as confirmed by the team, with no source to cite', async () => {
+    const acme = (await callTool(ana, 'knowledge_entity', { name: 'Acme', workspace_id: WS_A }))!.structuredContent!.entity as { id: string };
+    const req = new Request(`https://shareout.test/v1/workspaces/${WS_A}/knowledge/entities/${acme.id}/facts`, {
+      method: 'POST', headers: { Authorization: 'Bearer so_ana', 'Content-Type': 'application/json' }, body: JSON.stringify({ predicate: 'account owner', value: 'Ana' }),
+    });
+    expect((await routeKnowledgeApi(createFetchContext(req, e)))!.status).toBe(201);
+    const r = await callTool(ana, 'knowledge_facts', { about: 'Acme', workspace_id: WS_A });
+    expect(r!.isError).toBeUndefined();
+    expect(text(r)).toContain('- Acme · account_owner: Ana — confirmed by the workspace team');
+    expect(text(r)).toContain(`"Acme's budget is 50k." [dlv_a1.md]`);
   });
 });
 

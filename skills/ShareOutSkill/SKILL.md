@@ -419,7 +419,10 @@ Answering questions about what a workspace knows (clients, projects, numbers) th
 connector? Use its `knowledge_search`, `knowledge_entity`, `knowledge_facts`,
 `knowledge_get`, `knowledge_from_artifact` and `knowledge_status` tools and cite the source
 of every fact — see [integrations/mcp-connector.md](integrations/mcp-connector.md) and
-[team/knowledge.md](team/knowledge.md). The connector also covers page history
+[team/knowledge.md](team/knowledge.md). When an owner or admin corrects what Knowledge
+learned, use `knowledge_edit_entity`, `knowledge_edit_connection`, `knowledge_edit_fact` and
+`knowledge_edit_rules` (`knowledge_rules` and `knowledge_review` read the team's rules and what
+needs review); their edits hold on every re-learn. The connector also covers page history
 (`list_versions`, `restore_version`), review (`list_comments`, `resolve_comment`,
 `assign_comment`, `approve_version`), schedules (`list_jobs`) and folder sharing
 (`folder_access`, `share_with_person`, `revoke_share`, `folder_activity`, `set_guest_comments`).

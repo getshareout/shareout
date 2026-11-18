@@ -14,33 +14,48 @@ import {
   type Args, type ToolContext, type ToolDef, type ToolResult,
 } from './tool-kit';
 
-const ANSWER = 'Answer in the person\'s language, only from what this returns, and say where each fact comes from (the page or file name, with its link when there is one).';
+export const ANSWER = 'Answer in the person\'s language, only from what this returns, and say where each fact comes from (the page or file name, with its link when there is one).';
 
-const WORKSPACE_ARG = { type: 'string', description: 'Which workspace to look in. Needed when the person has more than one — ask them which.' };
+export const WORKSPACE_ARG = { type: 'string', description: 'Which workspace to look in. Needed when the person has more than one — ask them which.' };
 
 interface Cite { kind: SourceKind; id: string; title: string; url: string | null }
-interface EntitySummary { id: string; type: string; name: string; aliases: string[]; mentions: number; sources: Cite[] }
-interface EntityDetail {
+/** `status` is 'confirmed' once the workspace team confirmed it, else 'draft' (learned, not reviewed). */
+export interface EntitySummary {
+  id: string; type: string; name: string; aliases: string[]; mentions: number; sources: Cite[];
+  status?: string; description?: string | null;
+}
+export interface EntityDetail {
   entity: EntitySummary;
-  facts: Array<{ predicate: string; value: string; unit: string | null; validFrom: string | null; quote: string; source: Cite }>;
-  relations: Array<{ type: string; direction: 'out' | 'in'; other: { id: string; name: string; type: string }; mentions: number; sources: Cite[] }>;
+  /** A fact the team added has no source (and no quote): the team's word is the evidence. */
+  facts: Array<{ id: string; predicate: string; value: string; unit: string | null; validFrom: string | null; quote: string; source: Cite | null; status?: string }>;
+  relations: Array<{ id: string; type: string; direction: 'out' | 'in'; status?: string; other: { id: string; name: string; type: string }; mentions: number; sources: Cite[] }>;
   mentions: Array<{ quote: string; cite: string; source: Cite }>;
 }
 
+export const isConfirmed = (x: { status?: string }) => x.status === 'confirmed';
+
 const citeText = (s: Cite) => (s.url ? `${s.title} (${s.url})` : s.title);
 
-async function knowledgeGet(ctx: ToolContext, workspaceId: string, sub: string, params: Record<string, string> = {}, post?: unknown) {
-  const qs = new URLSearchParams(params).toString();
+/** Replays /v1/workspaces/{id}/knowledge/{sub} in-process as the caller. */
+export async function knowledgeRequest(
+  ctx: ToolContext, workspaceId: string, method: string, sub: string,
+  opts: { params?: Record<string, string>; body?: unknown } = {},
+) {
+  const qs = new URLSearchParams(opts.params ?? {}).toString();
   const req = new Request(`${ctx.origin}/v1/workspaces/${encodeURIComponent(workspaceId)}/knowledge/${sub}${qs ? `?${qs}` : ''}`, {
-    headers: { Authorization: ctx.authorization, ...(post !== undefined ? { 'Content-Type': 'application/json' } : {}) },
-    ...(post !== undefined ? { method: 'POST', body: JSON.stringify(post) } : {}),
+    method,
+    headers: { Authorization: ctx.authorization, ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
+    ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
   });
   const res = await routeKnowledgeApi(createFetchContext(req, ctx.env, ctx.executionCtx));
   return { status: res?.status ?? 404, body: res ? await readJson(res) : {} };
 }
 
+const knowledgeGet = (ctx: ToolContext, workspaceId: string, sub: string, params: Record<string, string> = {}, post?: unknown) =>
+  knowledgeRequest(ctx, workspaceId, post !== undefined ? 'POST' : 'GET', sub, { params, body: post });
+
 /** The result to send back instead of data: knowledge off, not set up, not a member, or an error. */
-function notAnswered(w: BotWorkspace, status: number, body: Record<string, unknown>): ToolResult {
+export function notAnswered(w: BotWorkspace, status: number, body: Record<string, unknown>): ToolResult {
   if (body.code === 'KNOWLEDGE_DISABLED') {
     return ok(`Knowledge is turned off for "${w.name}", so there is nothing to look in yet. A workspace owner or admin can turn it on in ShareOut, in the Knowledge section.`, { enabled: false, workspace_id: w.id });
   }
@@ -49,7 +64,7 @@ function notAnswered(w: BotWorkspace, status: number, body: Record<string, unkno
   return fail(`Could not read the workspace's knowledge: ${errorText(body, status)}`, { status, code: body.code });
 }
 
-async function pickWorkspace(ctx: ToolContext, args: Args, action: string): Promise<BotWorkspace | ToolResult> {
+export async function pickWorkspace(ctx: ToolContext, args: Args, action: string): Promise<BotWorkspace | ToolResult> {
   const resolved = await resolveWorkspace(ctx, str(args.workspace_id, 100));
   if (resolved.notMember) return fail(NOT_MEMBER);
   if (resolved.choices) return ok(workspaceChoiceText(action, resolved.choices), { needs_workspace: true, workspaces: resolved.choices });
@@ -72,10 +87,10 @@ interface CorpusSource {
 }
 interface CorpusStatusBody { chunker_version: number; last_reindex_at: string | null; counts: Record<string, number>; sources: CorpusSource[] }
 
-const isResult = (v: unknown): v is ToolResult => typeof v === 'object' && v !== null && 'content' in v;
+export const isResult = (v: unknown): v is ToolResult => typeof v === 'object' && v !== null && 'content' in v;
 
 /** Entities matching a name (exact name or alias first), or the one whose id was given. */
-async function findEntities(ctx: ToolContext, w: BotWorkspace, name: string, limit: number): Promise<EntitySummary[] | ToolResult> {
+export async function findEntities(ctx: ToolContext, w: BotWorkspace, name: string, limit: number): Promise<EntitySummary[] | ToolResult> {
   const list = await knowledgeGet(ctx, w.id, 'entities', { q: name, limit: String(limit) });
   if (list.status !== 200) return notAnswered(w, list.status, list.body);
   const found = (list.body.entities ?? []) as EntitySummary[];
@@ -88,7 +103,7 @@ async function findEntities(ctx: ToolContext, w: BotWorkspace, name: string, lim
   return [...found.filter(exact), ...found.filter((e) => !exact(e))];
 }
 
-async function entityDetail(ctx: ToolContext, w: BotWorkspace, id: string): Promise<EntityDetail | null> {
+export async function entityDetail(ctx: ToolContext, w: BotWorkspace, id: string): Promise<EntityDetail | null> {
   const one = await knowledgeGet(ctx, w.id, `entities/${encodeURIComponent(id)}`);
   return one.status === 200 ? (one.body as unknown as EntityDetail) : null;
 }
@@ -97,7 +112,7 @@ const nothingKnown = (name: string, w: BotWorkspace) =>
   ok(`Nothing is known about "${name}" in "${w.name}" yet. Try knowledge_search with other words, or tell the person it is not in the workspace's files and pages.`, { found: false, workspace_id: w.id });
 
 const factLine = (owner: string, f: EntityDetail['facts'][number]) =>
-  `- ${owner} · ${f.predicate}: ${f.value}${f.unit ? ` ${f.unit}` : ''}${f.validFrom ? ` (from ${f.validFrom})` : ''} — "${f.quote}" [${citeText(f.source)}]`;
+  `- ${owner} · ${f.predicate}: ${f.value}${f.unit ? ` ${f.unit}` : ''}${f.validFrom ? ` (from ${f.validFrom})` : ''} — ${f.source ? `"${f.quote}" [${citeText(f.source)}]` : 'confirmed by the workspace team'}`;
 
 // ── tools ───────────────────────────────────────────────────────────────────
 
@@ -176,12 +191,15 @@ const knowledgeEntity: ToolDef = {
     const e = x.entity;
     const others = found.slice(1);
     const aliases = e.aliases.filter((a) => a !== e.name);
+    const evidence = (r: EntityDetail['relations'][number]) =>
+      [r.sources.map((s) => s.title).join('; '), isConfirmed(r) ? 'confirmed by the team' : ''].filter(Boolean).join('; ');
     const lines = [
       `${e.name} (${e.type}) in "${w.name}"${aliases.length ? ` — also called ${aliases.join(', ')}` : ''}. Mentioned ${e.mentions} times.`,
-      'Sources:', ...e.sources.map((s) => `- ${citeText(s)}`),
+      ...(isConfirmed(e) ? [`Confirmed by the workspace team${e.description ? ` — ${e.description}` : ''}.`] : []),
+      ...(e.sources.length ? ['Sources:', ...e.sources.map((s) => `- ${citeText(s)}`)] : ['No file or page mentions it yet; the team added it.']),
       ...(x.relations.length ? ['Connected to:', ...x.relations.map((r) => r.direction === 'out'
-        ? `- ${e.name} ${r.type} ${r.other.name} (${r.other.type}) [${r.sources.map((s) => s.title).join('; ')}]`
-        : `- ${r.other.name} (${r.other.type}) ${r.type} ${e.name} [${r.sources.map((s) => s.title).join('; ')}]`)] : []),
+        ? `- ${e.name} ${r.type} ${r.other.name} (${r.other.type}) [${evidence(r)}]`
+        : `- ${r.other.name} (${r.other.type}) ${r.type} ${e.name} [${evidence(r)}]`)] : []),
       ...(x.mentions.length ? ['What the sources say:', ...x.mentions.slice(0, 8).map((m) => `- "${m.quote}" [${m.cite}]`)] : []),
       ...(x.facts.length ? [`${x.facts.length} facts on record — call knowledge_facts for them.`] : []),
       ...(others.length ? [`Other matches for "${name}": ${others.map((o) => `${o.name} (${o.type}, id ${o.id})`).join(', ')}.`] : []),

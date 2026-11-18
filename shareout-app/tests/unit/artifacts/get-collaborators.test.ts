@@ -52,7 +52,7 @@ describe('handleGetCollaborators', () => {
     expect(await jsonBody(response)).toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  it('returns collaborators ordered by added_at', async () => {
+  it('returns collaborators ordered by added_at, marking who has never signed in', async () => {
     const env = {
       ...baseEnv,
       DB: makeDbMock({
@@ -62,11 +62,12 @@ describe('handleGetCollaborators', () => {
           return null;
         },
         all: (sql) => {
-          if (sql.includes('added_at FROM collaborators')) {
+          if (sql.includes('FROM collaborators c LEFT JOIN users')) {
             return {
               results: [
-                { email: 'editor@example.com', role: 'editor', added_at: '2024-02-01T00:00:00Z' },
-                { email: 'viewer@example.com', role: 'viewer', added_at: '2024-01-01T00:00:00Z' },
+                { email: 'editor@example.com', role: 'editor', added_at: '2024-02-01T00:00:00Z', last_login_at: '2024-02-02T00:00:00Z' },
+                // Invited by email, no account yet (LEFT JOIN users → null).
+                { email: 'viewer@example.com', role: 'viewer', added_at: '2024-01-01T00:00:00Z', last_login_at: null },
               ],
             };
           }
@@ -85,8 +86,8 @@ describe('handleGetCollaborators', () => {
     expect(response.status).toBe(200);
     expect(await jsonBody(response)).toEqual({
       collaborators: [
-        { email: 'editor@example.com', role: 'editor', added_at: '2024-02-01T00:00:00Z' },
-        { email: 'viewer@example.com', role: 'viewer', added_at: '2024-01-01T00:00:00Z' },
+        { email: 'editor@example.com', role: 'editor', added_at: '2024-02-01T00:00:00Z', pending: false },
+        { email: 'viewer@example.com', role: 'viewer', added_at: '2024-01-01T00:00:00Z', pending: true },
       ],
     });
   });

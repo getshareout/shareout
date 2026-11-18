@@ -11,8 +11,8 @@ export const TOOLKITS: Record<string, { summary: string; tools: string[] }> = {
     tools: ['search_artifacts', 'edit_page', 'create_artifact', 'present_artifact', 'share_artifact', 'unshare_artifact', 'set_page_visibility', 'send_snapshot', 'send_pdf'],
   },
   data: {
-    summary: 'fresh numbers: run a page’s data sources, SQL on connectors, add / change / delete table rows, set JSON values, watch a metric',
-    tools: ['list_data_sources', 'run_data_source', 'list_connections', 'query_connection', 'browse_storage', 'add_table_row', 'update_table_row', 'delete_table_row', 'set_json_value', 'watch_metric'],
+    summary: 'fresh numbers: run a page’s data sources, SQL on connectors, read app connectors (Humand: employees, time off, attendance), add / change / delete table rows, set JSON values, watch a metric',
+    tools: ['list_data_sources', 'run_data_source', 'list_connections', 'query_connection', 'browse_storage', 'read_connector', 'add_table_row', 'update_table_row', 'delete_table_row', 'set_json_value', 'watch_metric'],
   },
   automations: {
     summary: 'alerts, scheduled jobs and sends, and asking a page’s crew to do work',

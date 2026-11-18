@@ -77,7 +77,30 @@ shows them humanised (`part of`) and, for the dozen most common, translated.
 Entity types (Organization, Product…) are translated the same way, with the raw
 type as fallback so a new type never breaks the view.
 
+## The team's hand (curation)
+
+What the team confirmed is drawn **solid**, what Knowledge proposed **dashed**. Owners and
+admins edit in place: confirm or discard a proposal, rename (the old name stays an alias),
+retype, add aliases, a definition and facts, connect (drag a node's **+** onto another),
+merge (drop a node on another), create (double-click empty canvas). The **Rules** view holds
+the team's types (on/off, team-only), glossary and rules; the discarded list restores. Members
+see all of it read-only.
+
+The learner honours every decision on every batch (`src/knowledge/corpus/curation.ts`):
+confirmed items are never renamed, retyped or dropped by a re-learn; discarded names,
+connections and facts are never proposed again (keyed by name, so they hold when a source is
+re-learned); merged or renamed names land on the entity the team kept; ignored types are
+skipped; and the team's types, glossary, rules and confirmed names lead its prompt. A learned
+fact that differs from the team's value is shown next to it, never in its place.
+
+The same edits run from the REST API (`/v1/workspaces/{id}/knowledge/{entities,relations,facts,schema,rules,discarded,history}`,
+in `docs-site/src/openapi/shareout.yaml`) and the MCP connector (`src/mcp/knowledge-curation-tools.ts`:
+`knowledge_edit_entity`, `knowledge_edit_connection`, `knowledge_edit_fact`, `knowledge_edit_rules`,
+`knowledge_rules`, `knowledge_review`). The MCP tools replay those routes in-process as the caller,
+so the owner/admin check and per-source visibility are the routes' own.
+
 ## Not in this slice
 
-Editing entities or relations, merging duplicates, time scrubbing over `validFrom`,
-and a whole-workspace overview graph. All are compatible with this layout.
+Live co-editing (presence, cursors, shared review rounds), undo, time scrubbing over
+`validFrom`, a whole-workspace overview graph, and graph editing from the workspace assistant
+(in-app chat, Slack, Telegram). All are compatible with this layout.

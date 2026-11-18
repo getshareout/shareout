@@ -227,6 +227,7 @@ export default defineConfig({
 						{ label: 'Facebook Ads', slug: 'integrations/facebook-ads', translations: { es: 'Facebook Ads' } },
 						{ label: 'Shopify', slug: 'integrations/shopify', translations: { es: 'Shopify' } },
 						{ label: 'Tienda Nube', slug: 'integrations/tiendanube', translations: { es: 'Tienda Nube' } },
+						{ label: 'Humand', slug: 'integrations/humand', translations: { es: 'Humand' } },
 						{ label: 'Slack', slug: 'integrations/slack', translations: { es: 'Slack' } },
 						{ label: 'GitHub', slug: 'integrations/github', translations: { es: 'GitHub' } },
 						{ label: 'CORS proxy', slug: 'integrations/cors-proxy', translations: { es: 'Proxy CORS' } },

@@ -186,7 +186,7 @@ export function renderToolbarScriptAdmin(baseUrl: string, slug: string, artifact
       document.getElementById('so-admin-content').innerHTML = html;
       loadArtifactConnectors();
     }
-    var CONN_LABELS = { rest_api: 'REST API', bigquery: 'BigQuery', snowflake: 'Snowflake', postgres: 'PostgreSQL', snowflake_kp: 'Snowflake', 'google-sheets': 'Google Sheets', 'google-analytics': 'Google Analytics', google_analytics: 'Google Analytics', shopify: 'Shopify', tiendanube: 'Tiendanube', slack: 'Slack' };
+    var CONN_LABELS = { rest_api: 'REST API', bigquery: 'BigQuery', snowflake: 'Snowflake', postgres: 'PostgreSQL', snowflake_kp: 'Snowflake', 'google-sheets': 'Google Sheets', 'google-analytics': 'Google Analytics', google_analytics: 'Google Analytics', shopify: 'Shopify', tiendanube: 'Tiendanube', slack: 'Slack', humand: 'Humand' };
     function connProviderLabel(p) {
       if (!p) return 'Connector';
       var k = String(p).toLowerCase().replace(/_/g, '-');

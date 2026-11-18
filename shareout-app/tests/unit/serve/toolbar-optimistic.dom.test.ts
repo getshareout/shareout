@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 //
-// Viewer toolbar + share dialog actions are optimistic: the UI changes on click, the
+// Viewer toolbar actions are optimistic: the UI changes on click, the
 // request runs behind, and a failure restores the previous state with a clear message.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { componentScripts } from '../../../src/design-system/components/index';
@@ -8,7 +8,6 @@ import { renderToolbarScriptCore } from '../../../src/serve/sandbox-viewer/toolb
 import { renderToolbarScriptAuth } from '../../../src/serve/sandbox-viewer/toolbar/script-auth';
 import { renderToolbarScriptAdmin } from '../../../src/serve/sandbox-viewer/toolbar/script-admin';
 import { TOOLBAR_COPY } from '../../../src/serve/sandbox-viewer/toolbar/copy';
-import { shareModalMarkup, shareModalScript } from '../../../src/components/share-modal';
 
 const es = TOOLBAR_COPY.es;
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -77,34 +76,5 @@ describe('admin comments toggle', () => {
     await flush();
     expect(document.getElementById('so-cmt-toggle')!.textContent).toBe('On');
     expect(toastText()).toContain(es.settingFail);
-  });
-});
-
-describe('share dialog', () => {
-  function openWith(emails: string): void {
-    document.body.innerHTML = shareModalMarkup('en');
-    new Function(shareModalScript({ baseUrl: '', locale: 'en' }))();
-    w().openShare('a1', 'slug', 'Plan', true, null);
-    (document.getElementById('soShareEmails') as HTMLInputElement).value = emails;
-  }
-  const overlayOpen = () => (document.getElementById('soShareOverlay') as HTMLElement).style.display === 'flex';
-
-  it('closes at once with "invites sent"', async () => {
-    openWith('ana@x.test, bo@x.test');
-    w().submitShare();
-    expect(overlayOpen()).toBe(false);
-    await flush();
-    expect(toastText()).toContain('2');
-  });
-
-  it('a refusal reopens the dialog as filled in, with the server reason', async () => {
-    fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: 'Not allowed to share' }), { status: 403 }));
-    openWith('ana@x.test');
-    w().submitShare();
-    expect(overlayOpen()).toBe(false);
-    await flush();
-    expect(overlayOpen()).toBe(true);
-    expect((document.getElementById('soShareEmails') as HTMLInputElement).value).toBe('ana@x.test');
-    expect(document.getElementById('soShareStatus')!.textContent).toBe('Not allowed to share');
   });
 });

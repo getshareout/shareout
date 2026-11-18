@@ -24,6 +24,7 @@ import {
 import { MEMBER_TOOLS } from './member-tools';
 import { BUILD_TOOLS } from './build-tools';
 import { KNOWLEDGE_TOOLS } from './knowledge-tools';
+import { KNOWLEDGE_CURATION_TOOLS } from './knowledge-curation-tools';
 import { CONNECTOR_TOOLS } from './connector-tools';
 import { PAGE_TOOLS } from './page-tools';
 import { SHARING_TOOLS } from './sharing-tools';
@@ -53,8 +54,12 @@ export const SERVER_INSTRUCTIONS = [
   'For questions about what the team knows (clients, projects, people, numbers, decisions), call knowledge_search first,',
   'then knowledge_entity or knowledge_facts for one company, person or project. Answer only from what they return and always',
   'say where each fact comes from (the page or file name, with its link). If nothing is found, knowledge_status says what is covered.',
-  'For live numbers from the team’s databases or files (warehouses, Supabase, Amazon S3), call list_connections, then',
-  'query_connection (one read-only SELECT) or browse_storage (S3 files), and say which connector the answer came from.',
+  'When an owner or admin corrects what Knowledge learned (a wrong name, type, connection or fact, a duplicate, something not relevant),',
+  'change it with knowledge_edit_entity, knowledge_edit_connection or knowledge_edit_fact; the team\'s glossary and rules are',
+  'knowledge_rules and knowledge_edit_rules, and knowledge_review lists what still needs review. Knowledge keeps the team\'s edits on every re-learn.',
+  'For live numbers from the team’s databases, files or apps (warehouses, Supabase, Amazon S3, Humand), call list_connections, then',
+  'query_connection (one read-only SELECT), browse_storage (S3 files) or read_connector (app APIs such as Humand: employees,',
+  'departments, time off, attendance), and say which connector the answer came from.',
   'If anything fails or behaves unexpectedly, call report_problem with what happened, then tell the person',
   'the ShareOut team was notified. For how-to questions about ShareOut, call get_help.',
 ].join(' ');
@@ -617,7 +622,7 @@ const fetchTool: ToolDef = {
 // Deterministic order (lets clients cache the list).
 export const TOOLS: ToolDef[] = [
   whoami, listWorkspaces, listArtifacts, getArtifact, publishArtifact, updateArtifact, ...EDIT_TOOLS, ...BUILD_TOOLS,
-  ...PAGE_TOOLS, ...SHARING_TOOLS, ...MEMBER_TOOLS, ...KNOWLEDGE_TOOLS, ...CONNECTOR_TOOLS, getHelp, reportProblem, search, fetchTool,
+  ...PAGE_TOOLS, ...SHARING_TOOLS, ...MEMBER_TOOLS, ...KNOWLEDGE_TOOLS, ...KNOWLEDGE_CURATION_TOOLS, ...CONNECTOR_TOOLS, getHelp, reportProblem, search, fetchTool,
 ];
 
 export function listTools() {

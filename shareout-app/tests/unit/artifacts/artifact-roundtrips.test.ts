@@ -72,7 +72,7 @@ function handler(opts: { exists?: boolean } = {}): Handler {
     if (sql.includes('SELECT role FROM collaborators WHERE artifact_id = ? AND email = ?')) return args[1] === collab.email ? { role: 'viewer' } : null;
     if (sql.includes("member_class = 'internal'")) return args[1] === admin.id ? { role: 'admin' } : null;
     if (sql.includes('FROM versions v')) return [{ id: 'ver_1', version_no: 1, entrypoint: 'index.html', created_at: 'x' }];
-    if (sql.includes('SELECT email, role, added_at FROM collaborators')) return [{ email: collab.email, role: 'viewer', added_at: 'x' }];
+    if (sql.includes('FROM collaborators c LEFT JOIN users')) return [{ email: collab.email, role: 'viewer', added_at: 'x', last_login_at: 'y' }];
     return null;
   };
 }
@@ -138,7 +138,7 @@ describe('GET /v1/artifacts/:id/collaborators — waves (was 6 sequential)', () 
     const db = wavesDb(handler());
     const { out } = await db.settle(handleGetCollaborators(get(`/v1/artifacts/${ART}/collaborators`), db.env, stranger, ART));
     expect(out.status).toBe(403);
-    expect(db.calls.some((s) => s.includes('SELECT email, role, added_at FROM collaborators'))).toBe(false);
+    expect(db.calls.some((s) => s.includes('FROM collaborators c LEFT JOIN users'))).toBe(false);
   });
 
   it('a missing artifact is still 404', async () => {

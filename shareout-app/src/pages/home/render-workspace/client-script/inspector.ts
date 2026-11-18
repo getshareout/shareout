@@ -98,56 +98,6 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     return '<button class="wsx-det__icon ' + (extra || '') + (label ? ' wsx-det__act' : '') + '" data-iact="' + act + '" type="button" data-tip="' + esc(title) + '" aria-label="' + esc(title) + '">' + isvg(path) + (label ? '<span>' + esc(label) + '</span>' : '') + '</button>';
   }
   function fmtDate(s) { if (!s) return '\\u2014'; var ts = Date.parse(s); if (!ts) return '\\u2014'; var d = new Date(ts); return d.toLocaleDateString(locTag(), { year: 'numeric', month: 'short', day: 'numeric' }); }
-  function visName(k) { return t('inspector.visName.' + k); }
-  function visCaption(k) { return t('inspector.visCaption.' + k); }
-  // Open visibility restricts external CDNs (CSP allowlist); nudge private+collaborators to lift it.
-  function visSub(k) { var c = visCaption(k); return k === 'public' ? c + ' ' + t('inspector.visCdnHint') : c; }
-  // "Shared with" empty-state title tracks visibility so it never contradicts the badge (Public but "only you see").
-  function shareEmptyTitle(v) { return v === 'private' ? t('inspector.onlyYouSee') : visCaption(v === 'unlisted' ? 'public' : v); }
-  // Visibility segmented control — shared by the Details rail and the Share popover.
-  // "Anyone with the link" is shown but off when this instance/workspace can't honor it (never offer what won't happen).
-  function visSubOff(k, noPub) { return visSub(k) + (noPub && k !== 'public' ? ' ' + t('inspector.visPublicOff') : ''); }
-  function visBlockHtml(editable, visOpts, visCur, noPub) {
-    return editable
-      ? '<div class="wsx-vis-seg" id="wsxVisSeg"' + (noPub ? ' data-nopub="1"' : '') + ' role="radiogroup" aria-label="' + esc(t('inspector.visibility')) + '">'
-        + visOpts.map(function (o) { var off = noPub && o === 'public' && o !== visCur; return '<button data-vis="' + o + '" role="radio" aria-checked="' + (o === visCur ? 'true' : 'false') + '" type="button" class="' + (o === visCur ? 'is-sel vk-' + o : '') + '"' + (off ? ' disabled title="' + esc(t('inspector.visPublicOff')) + '"' : '') + '><span class="dot"></span>' + esc(visName(o)) + '</button>'; }).join('')
-        + '</div><div class="wsx-vis-seg__sub" id="wsxVisSub">' + esc(visSubOff(visCur, noPub)) + '</div>'
-      : '<span class="wsx-det__type">' + esc(visName(visCur)) + '</span>';
-  }
-  function wireVis(root, art, visCur) {
-    var seg = root.querySelector('#wsxVisSeg');
-    if (seg) {
-      var subEl = root.querySelector('#wsxVisSub');
-      var applyVis = function (v) {
-        seg.querySelectorAll('[data-vis]').forEach(function (b) { var o = b.getAttribute('data-vis'), on = o === v; b.setAttribute('aria-checked', on ? 'true' : 'false'); b.className = on ? 'is-sel vk-' + o : ''; });
-        if (subEl) subEl.textContent = visSubOff(v, !!seg.getAttribute('data-nopub'));
-        var etEl = root.querySelector('#wsxShareEmptyT');
-        if (etEl) etEl.textContent = shareEmptyTitle(v);
-        if (metaCache[art.id]) metaCache[art.id].visibility = v;
-      };
-      seg.querySelectorAll('[data-vis]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var next = b.getAttribute('data-vis'), prev = visCur;
-          seg.querySelectorAll('[data-vis]').forEach(function (x) { if (x.classList.contains('is-sel')) prev = x.getAttribute('data-vis'); });
-          if (next === prev) return;
-          optimistic({
-            key: 'vis:' + art.id,
-            apply: function () { applyVis(next); },
-            rollback: function () { applyVis(prev); },
-            request: function () { return patchArtifact(art.id, { visibility: next }); },
-            error: t('cards.visFailed'),
-            done: function (j) {
-              var applied = (j && j.visibility) || next;
-              if (j && j.message) wsxToast(j.message, true);
-              else wsxToast(t('inspector.visToast.' + (applied === 'unlisted' ? 'public' : applied)));
-              if (applied !== next) applyVis(applied); // server overrode (moderation)
-            },
-          });
-        });
-      });
-    }
-  }
-
   // Details helpers (sec, wireSecs, aboutHtml, wsxToast, copyText…) live in inspector-details.ts.
   function paintDetails(art, meta) {
     var editable = !!(meta && meta.can_edit);
@@ -160,20 +110,16 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     var fullUrl = (meta && meta.url) || (location.origin + openUrl);
     var fav = meta && meta.is_favorite;
     var ce = editable ? ' contenteditable="true" spellcheck="false"' : '';
-    var hasWs = !!(meta && meta.workspace_id);
-    var visOpts = ['private'].concat(hasWs ? ['workspace'] : [], ['public']);
     var visCur = (vis === 'unlisted' ? 'public' : vis) || 'private';
 
     var favTip = fav ? t('inspector.favRemove') : t('inspector.favAdd');
     var star = meta ? '<button class="wsx-det__star' + (fav ? ' is-on' : '') + '" data-iact="fav" type="button" data-tip="' + esc(favTip) + '" aria-label="' + esc(favTip) + '">' + isvg(SVG_STAR) + '</button>' : '';
-    var visBlock = visBlockHtml(editable, visOpts, visCur, !!(meta && meta.can_open_public === false));
 
     // 1 identity (title, description, meta) → 2 actions → 3 held notice → 4 sections.
     var h = '<div class="wsx__details"><div class="wsx-det__head">';
     h += '<div class="wsx-det__hrow"><div class="wsx-det__name"' + ce + ' data-edit="name">' + esc(name) + '</div>' + star + '</div>';
     if (desc || editable) h += '<div class="wsx-det__desc"' + ce + ' data-edit="description" data-ph="' + esc(t('inspector.addDescription')) + '">' + esc(desc) + '</div>';
     if (meta) h += aboutHtml(meta, type, vis);
-    if (!editable) h += visBlock;
     h += '<div class="wsx-det__acts">'
       + iconBtn('open', t('inspector.act.open'), SVG_OPEN, '', t('inspector.actl.open'))
       + (editable ? iconBtn('edit', t('inspector.act.edit'), SVG_EDIT, '', t('inspector.actl.edit')) : '')
@@ -192,9 +138,8 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     var moreRow = function (k, label) { return '<button class="wsx-det__morerow" type="button" data-rsub="' + k + '"><span>' + esc(label) + '</span><span class="wsx-det__chev" aria-hidden="true"></span></button>'; };
     var moreOpen = SEC_OPEN.indexOf('more') >= 0;
     h += '<div class="wsx-det__secs" id="wsxSecs">'
-      + (editable
-        ? '<div class="wsx-det__sharesum"><span class="wsx-det__sharedot vk-' + visCur + '"></span><span class="wsx-det__sharetxt">' + esc(t('inspector.shareSum.' + visCur)) + '</span><button class="wsx-link" type="button" data-open-share>' + esc(t('share.button')) + '</button></div>'
-        : sec('share', t('inspector.sharedWith'), t('inspector.sharedWithHelp'), '<div class="wsx-det__chips wsx-det__sharecard" id="wsxShare"></div>'))
+      // Who can see it, one line; the one share dialog does the rest (everyone can open it).
+      + '<div class="wsx-det__sharesum"><span class="wsx-det__sharedot vk-' + visCur + '"></span><span class="wsx-det__sharetxt">' + esc(t('inspector.shareSum.' + visCur)) + '</span><button class="wsx-link" type="button" data-open-share>' + esc(t('share.button')) + '</button></div>'
       + pagesHtml(meta, art)
       + (editable ? sec('organize', t('inspector.organize'), t('inspector.organizeHelp'), '<div id="wsxFolder"></div><div class="wsx-det__chips" id="wsxTags"></div>') : '')
       + '<details class="wsx-det__more" data-sec="more"' + (moreOpen ? ' open' : '') + '><summary class="wsx-det__morehead">' + esc(t('inspector.more')) + '</summary><div class="wsx-det__morebody">'
@@ -255,133 +200,15 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
 
     root.querySelectorAll('[data-rsub]').forEach(function (b) { b.addEventListener('click', function () { rActive = b.getAttribute('data-rsub'); paintRail(); }); });
     var shareOpen = root.querySelector('[data-open-share]');
-    if (shareOpen) shareOpen.addEventListener('click', function () { if (shareBtnEl && !sharePopEl) shareBtnEl.click(); });
+    if (shareOpen) shareOpen.addEventListener('click', function () { openShareFor(art); });
 
     wireSecs(root);
 
-    if (!editable) renderShare(art, meta, editable);
     renderKnowledgeFrom(art, meta);
     if (editable) { renderTags(art, (meta.tags || []).slice()); renderFolder(art, meta); renderTests(art); }
     var statsEl = root.querySelector('#wsxDetStats');
     if (art.id && statsEl) loadAnalytics(art.id, statsEl);
   }
-  // Share-with: role-aware collaborators + always-visible workspace-member search (multi-add).
-  var memberCache = {};
-  var PEOPLE_SVG = '<svg class="wsx-share__emptyic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
-  function renderShare(art, meta, editable, host) {
-    var box = host || rbodyEl.querySelector('#wsxShare'); if (!box) return;
-    var wsId = (meta && meta.workspace_id) || '';
-    var list = [];          // [{email, role}]
-    var role = 'viewer';    // role for the next add
-
-    function loadMembers(cb) {
-      if (memberCache[wsId] !== undefined) { cb(memberCache[wsId]); return; }
-      if (!wsId) { memberCache[wsId] = []; cb([]); return; }
-      fetch('/v1/workspaces/' + encodeURIComponent(wsId) + '/members', { credentials: 'same-origin' })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (d) { memberCache[wsId] = (d && d.members) || []; cb(memberCache[wsId]); })
-        .catch(function () { memberCache[wsId] = []; cb([]); });
-    }
-    // Say what happened to the email too, not just the grant (notify:true).
-    function shareToast(d, em) {
-      var n = (d && d.notified) || {};
-      return t(n.rate_limited ? 'inspector.shareEmailLimit' : (n.failed || []).length ? 'inspector.shareNoEmail' : (n.sent || []).length ? 'inspector.shareEmailed' : 'inspector.shareAlready').replace('{email}', em);
-    }
-    function addEmails(emails) {
-      if (!emails.length) return;
-      var last = emails[emails.length - 1], r0 = role, added = [];
-      optimistic({
-        key: 'collab:add:' + art.id + ':' + emails.join(','),
-        apply: function () {
-          emails.forEach(function (em) { if (!list.some(function (c) { return c.email === em; })) { list.push({ email: em, role: r0 }); added.push(em); } });
-          paint();
-        },
-        rollback: function () { list = list.filter(function (c) { return added.indexOf(c.email) < 0; }); added = []; paint(); },
-        request: function () {
-          return fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/collaborators', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emails: emails, role: r0, notify: true }) })
-            .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
-        },
-        error: t('inspector.inviteFailed'),
-        done: function (d) { if (d && d.collaborators) { list = d.collaborators; paint(); } metaCache[art.id] = undefined; wsxToast(shareToast(d, last)); },
-      });
-    }
-    function paint() {
-      var count = list.length;
-      var countTxt = count === 0 ? '' : (count === 1 ? t('inspector.onePerson') : t('inspector.peopleCount').replace('{n}', count));
-      var head = editable
-        ? '<div class="wsx-share__head"><span class="wsx-share__count">' + esc(countTxt) + '</span>'
-          + '<div class="wsx-share__roletog"><button data-role="viewer" type="button" class="' + (role === 'viewer' ? 'is-on' : '') + '">' + esc(t('inspector.viewer')) + '</button><button data-role="editor" type="button" class="' + (role === 'editor' ? 'is-on' : '') + '">' + esc(t('inspector.editor')) + '</button></div></div>'
-        : '';
-      var curVis = (metaCache[art.id] && metaCache[art.id].visibility) || (meta && meta.visibility) || 'private';
-      var emptyState = (!count && editable)
-        ? '<div class="wsx-share__empty">' + PEOPLE_SVG + '<div><div class="wsx-share__emptyt" id="wsxShareEmptyT">' + esc(shareEmptyTitle(curVis)) + '</div><div class="wsx-share__emptys">' + esc(t('inspector.addTeammates')) + '</div></div></div>'
-        : '';
-      var input = editable
-        ? '<input class="wsx-share__search" id="wsxShareSearch" placeholder="' + esc(t('inspector.shareAddPeople')) + '" autocomplete="off"><div class="wsx-share__drop" id="wsxShareDrop"></div>'
-        : '';
-      var chips = list.map(function (c) {
-        var ini = (c.email[0] || '?').toUpperCase();
-        return '<span class="wsx-det__who" title="' + esc(c.email) + '"><span class="av">' + esc(ini) + '</span><span class="em">' + esc(c.email) + '</span> <span class="role">' + esc(c.role || t('inspector.viewer')) + '</span>' + (editable ? '<button data-rm="' + esc(c.email) + '" title="' + esc(t('common.delete')) + '" type="button">\\u00D7</button>' : '') + '</span>';
-      }).join('');
-      if (!count && !editable) chips = '<span class="wsx-share__note">' + esc(t('inspector.privateToYou')) + '</span>';
-      var chipWrap = chips ? '<div class="wsx-share__chips">' + chips + '</div>' : '';
-      box.innerHTML = head + emptyState + input + chipWrap;
-      box.querySelectorAll('[data-rm]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var em = b.getAttribute('data-rm'), idx = -1, removed = null;
-          optimistic({
-            key: 'collab:rm:' + art.id + ':' + em,
-            apply: function () { list.forEach(function (c, i) { if (c.email === em) { idx = i; removed = c; } }); list = list.filter(function (c) { return c.email !== em; }); paint(); },
-            rollback: function () { if (removed && !list.some(function (c) { return c.email === em; })) list.splice(idx < 0 ? list.length : idx, 0, removed); paint(); },
-            request: function () { return fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/collaborators/' + encodeURIComponent(em), { method: 'DELETE', credentials: 'same-origin' }); },
-            error: t('inspector.removeCollabFailed'),
-            done: function () { metaCache[art.id] = undefined; },
-          });
-        });
-      });
-      box.querySelectorAll('[data-role]').forEach(function (b) {
-        b.addEventListener('click', function () { role = b.getAttribute('data-role'); box.querySelectorAll('[data-role]').forEach(function (x) { x.classList.toggle('is-on', x === b); }); });
-      });
-      if (editable) wireSearch();
-    }
-    function wireSearch() {
-      var search = box.querySelector('#wsxShareSearch'), drop = box.querySelector('#wsxShareDrop'); if (!search) return;
-      function renderDrop(q) {
-        loadMembers(function (members) {
-          var taken = {}; list.forEach(function (c) { taken[c.email] = 1; });
-          var ql = (q || '').toLowerCase();
-          var matches = members.filter(function (m) {
-            if (taken[m.email]) return false;
-            if (!ql) return true;
-            return (m.email || '').toLowerCase().indexOf(ql) >= 0 || (m.name || '').toLowerCase().indexOf(ql) >= 0;
-          }).slice(0, 8);
-          var h = matches.map(function (m) {
-            return '<button class="wsx-share__opt" data-add="' + esc(m.email) + '" type="button"><span class="wsx-cm__av">' + esc((m.name || m.email)[0].toUpperCase()) + '</span>' + esc(m.name || m.email) + '<small>' + esc(m.email) + '</small></button>';
-          }).join('');
-          var raw = (q || '').trim();
-          if (raw && raw.indexOf('@') > 0 && !taken[raw] && !matches.some(function (m) { return m.email === raw; })) {
-            h += '<button class="wsx-share__opt" data-add="' + esc(raw) + '" type="button"><span class="wsx-cm__av">+</span>' + esc(t('inspector.invite')) + ' ' + esc(raw) + '<kbd class="wsx-share__kbd">' + esc(t('inspector.enterHint')) + '</kbd></button>';
-          }
-          drop.innerHTML = h;
-          drop.querySelectorAll('[data-add]').forEach(function (b) {
-            b.addEventListener('click', function () { addEmails([b.getAttribute('data-add')]); search.value = ''; renderDrop(''); search.focus(); });
-          });
-        });
-      }
-      search.addEventListener('input', function () { renderDrop(search.value); });
-      search.addEventListener('focus', function () { renderDrop(search.value); });
-      search.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') { e.preventDefault(); var v = search.value.trim(); if (v.indexOf('@') > 0) { addEmails([v]); search.value = ''; renderDrop(''); } }
-      });
-    }
-
-    box.innerHTML = i18nLoad();
-    fetch('/v1/artifacts/' + encodeURIComponent(art.id) + '/collaborators', { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { list = (d && d.collaborators) || []; paint(); })
-      .catch(function () { paint(); });
-  }
-
   // ----- Tags (artifact_tags via /v1/artifacts/:id/tags) -----
   function renderTags(art, tags) {
     var box = rbodyEl.querySelector('#wsxTags'); if (!box) return;

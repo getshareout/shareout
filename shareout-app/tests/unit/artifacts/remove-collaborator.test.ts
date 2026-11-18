@@ -115,7 +115,8 @@ describe('handleRemoveCollaborator', () => {
     expect(await jsonBody(response)).toEqual({
       success: true,
       removed: true,
-      collaborators: [{ email: 'viewer@example.com', role: 'viewer', added_at: '2024-01-01T00:00:00Z' }],
+      // The mock row has no last_login_at: that person never signed in.
+      collaborators: [{ email: 'viewer@example.com', role: 'viewer', added_at: '2024-01-01T00:00:00Z', pending: true }],
     });
   });
 

@@ -110,6 +110,7 @@ export async function emailNewCollaborators(
   artifactId: string,
   emails: string[],
   role: 'viewer' | 'editor',
+  message?: string,
 ): Promise<ShareEmailOutcome & { rate_limited: boolean; url: string | null }> {
   if (!emails.length) return { sent: [], failed: [], rate_limited: false, url: null };
   try {
@@ -120,7 +121,7 @@ export async function emailNewCollaborators(
     if (!rate.allowed) {
       return { sent: [], failed: emails.map((email) => ({ email, error: 'rate_limited' })), rate_limited: true, url };
     }
-    const out = await deliverShareEmails(env, { artifact, senderId, recipients: emails, role, remaining: rate.remaining });
+    const out = await deliverShareEmails(env, { artifact, senderId, recipients: emails, role, message, remaining: rate.remaining });
     return { sent: out.sent, failed: out.failed, rate_limited: out.failed.some((f) => f.error === 'rate_limited'), url };
   } catch {
     return { sent: [], failed: emails.map((email) => ({ email, error: 'send_failed' })), rate_limited: false, url: null };

@@ -543,8 +543,23 @@ Opt-in learned library. Full guide: [knowledge.md](knowledge.md). On self-host, 
 | `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 pages for notes + every page and File for search → `{ queued, kicked, corpus, corpusRemaining }`. |
 | `GET` | `/v1/workspaces/{id}/knowledge/search?q=&limit=&format=md` | Member+ | Cited passages from Files and pages. |
 | `GET` | `/v1/workspaces/{id}/knowledge/sources?limit=` | Member+ | Learned sources: counts by status + recent list. |
-| `GET` | `/v1/workspaces/{id}/knowledge/entities?type=&q=&limit=` | Member+ | Entities (clients, people, products…) by mentions. |
+| `GET` | `/v1/workspaces/{id}/knowledge/entities?type=&q=&status=&limit=` | Member+ | Entities (clients, people, products…) by mentions; `status=confirmed\|draft`. |
 | `GET` | `/v1/workspaces/{id}/knowledge/entities/{entityId}?format=md` | Member+ | One entity: facts, relations, quoted mentions. |
+| `POST` | `/v1/workspaces/{id}/knowledge/entities` | Admin+ | Add an entity `{ name, type, description?, aliases? }`, confirmed by the team → `201 { id }`. A name another entity goes by → `409 CONFLICT` + merge `suggestion`. |
+| `PATCH` | `/v1/workspaces/{id}/knowledge/entities/{entityId}` | Admin+ | Rename (old name stays an alias), retype, `description`, `aliases`, or `{ "confirm": true }`. |
+| `DELETE` | `/v1/workspaces/{id}/knowledge/entities/{entityId}?reason=` | Admin+ | Discard: gone, and never learned again until restored. `reason`: `noint`, `wrong`, `notent`, `dup`. |
+| `POST` | `/v1/workspaces/{id}/knowledge/entities/{entityId}/merge` | Admin+ | `{ into }`: fold this entity into the one kept. |
+| `POST` | `/v1/workspaces/{id}/knowledge/entities/{entityId}/facts` | Admin+ | The team states a fact `{ predicate, value, unit? }` → `201 { id }`. |
+| `POST` | `/v1/workspaces/{id}/knowledge/relations` | Admin+ | Connect `{ from, type, to }` (entity ids) → `201 { id }`. |
+| `POST` / `DELETE` | `/v1/workspaces/{id}/knowledge/relations/{relationId}[/confirm]` | Admin+ | Confirm a learned connection, or discard it (`?reason=`). |
+| `POST` / `DELETE` | `/v1/workspaces/{id}/knowledge/facts/{factId}[/confirm]` | Admin+ | Confirm a learned fact (it becomes the team's value), or discard it. |
+| `GET` / `PUT` | `/v1/workspaces/{id}/knowledge/schema` | Member+ / Admin+ | The team's types and `teamOnly`; `PUT { teamOnly }`. Admins also get learned types with counts and `relationTypes`. |
+| `PUT` / `DELETE` | `/v1/workspaces/{id}/knowledge/schema/types/{type}` | Admin+ | Set `{ description?, ignored? }` on one of the team's types, or remove it. |
+| `GET` / `POST` | `/v1/workspaces/{id}/knowledge/rules` | Member+ / Admin+ | Glossary and rules the learner reads first; `POST { kind: rule\|glossary, term?, text }`. |
+| `DELETE` | `/v1/workspaces/{id}/knowledge/rules/{ruleId}` | Admin+ | Remove a rule or glossary term. |
+| `GET` | `/v1/workspaces/{id}/knowledge/discarded?limit=` | Admin+ | What the team discarded, each with `kind` + `key`. |
+| `POST` | `/v1/workspaces/{id}/knowledge/discarded/restore` | Admin+ | `{ kind, key }`: Knowledge may learn it again. |
+| `GET` | `/v1/workspaces/{id}/knowledge/history?entity=&limit=` | Admin+ | The team's changes to the graph, newest first. |
 | `GET` | `/v1/workspaces/{id}/knowledge/graph?focus=&depth=&limit=` | Member+ | Knowledge graph nodes + edges. |
 | `GET` | `/v1/workspaces/{id}/knowledge/usage?days=30` | Admin+ | Metered Knowledge cost (AI, storage, vectors), micro-USD, tracking only. |
 

@@ -15,7 +15,7 @@ import {
 } from './actions';
 import { addTableRowTool, updateTableRowTool, deleteTableRowTool, setJsonValueTool } from './data';
 import { setClientNotesTool } from './client-notes';
-import { browseStorageTool, listConnectionsTool, queryConnectionTool } from './connection-query';
+import { browseStorageTool, listConnectionsTool, queryConnectionTool, readConnectorTool } from './connection-query';
 import { createScheduleTool } from './create-schedule';
 import { createArtifactTool } from './build';
 import { catalogSearchTool, catalogGetTool, catalogUpdateTool } from './catalog';
@@ -89,7 +89,7 @@ export const ACCOUNT_TOOLS: AccountTool[] = [
 
 // Capability-gated tool groups. A surface opts into each via Capabilities
 // instead of branching on platform id.
-export const CONNECTOR_TOOLS: AccountTool[] = [listConnectionsTool, queryConnectionTool, browseStorageTool];
+export const CONNECTOR_TOOLS: AccountTool[] = [listConnectionsTool, queryConnectionTool, browseStorageTool, readConnectorTool];
 export const SCHEDULE_TOOLS: AccountTool[] = [createScheduleTool];
 export const BUILD_TOOLS: AccountTool[] = [createArtifactTool];
 
@@ -100,7 +100,7 @@ export const BUILD_TOOLS: AccountTool[] = [createArtifactTool];
 export interface Capabilities {
   /** Answer-only turn: drop every tool that writes, proposes a write, or creates something (e.g. POST /v1/ask). */
   readOnly?: boolean;
-  /** Ad-hoc read-only access to workspace connectors (list_connections, query_connection, browse_storage). */
+  /** Ad-hoc read-only access to workspace connectors (list_connections, query_connection, browse_storage, read_connector). */
   canQueryConnections: boolean;
   /** Set up recurring scheduled sends (create_schedule). */
   canSchedule: boolean;

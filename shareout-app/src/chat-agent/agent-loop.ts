@@ -112,7 +112,7 @@ function systemPrompt(platform: PlatformId, caps: Capabilities, selectedWorkspac
   ].filter(Boolean).join(' ');
   const citeLine = 'When the user asks where something is covered or how a procedure, rule or step works, call find_passages first. Answer with the page (and sub-page) name, the section heading or number, a short quoted excerpt, and that passage’s `url` so they land on the right section. Never cite a passage the tool did not return.';
   const dataLine = caps.canQueryConnections
-    ? 'You can also run ad-hoc read-only SQL against the workspace’s data connectors (query_connection) — only connectors the admin has enabled for the assistant. Use list_connections first to see names and which are enabled. Write only SELECT queries; never attempt to change data. For storage connectors (Amazon S3) use browse_storage to list folders and read CSV/JSON/text files.'
+    ? 'You can also run ad-hoc read-only SQL against the workspace’s data connectors (query_connection) — only connectors the admin has enabled for the assistant. Use list_connections first to see names and which are enabled. Write only SELECT queries; never attempt to change data. For storage connectors (Amazon S3) use browse_storage to list folders and read CSV/JSON/text files. For app connectors (`readable` in list_connections, e.g. Humand for employees, departments, time off and attendance) use read_connector: call it without endpoint to see what it can read, then read one endpoint, paging with page/limit when you need every row.'
     : null;
   const scheduleLine = caps.canSchedule
     ? 'You can set up a recurring scheduled send of a page (create_schedule) — e.g. “email me this dashboard every Monday”. It asks the user to confirm before anything is created.'
